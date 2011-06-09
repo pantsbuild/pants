@@ -1,4 +1,3 @@
-#!/bin/sh
 # ==================================================================================================
 # Copyright 2011 Twitter, Inc.
 # --------------------------------------------------------------------------------------------------
@@ -15,12 +14,18 @@
 # limitations under the License.
 # ==================================================================================================
 
-MY_DIR=$(dirname $0)
-export BUILD_ROOT=${MY_DIR}
-export PYTHONPATH=${MY_DIR}/src/python
+class Builder(object):
+  """Abstract base class for builder implementations that can execute a parsed BUILD target."""
 
-if [ -z "$ANT_OPTS" ]; then
-  export ANT_OPTS="-Xmx1g -XX:MaxPermSize=512m"
-fi
+  def __init__(self, ferror, root_dir):
+    self.ferror = ferror
+    self.root_dir = root_dir
 
-/usr/bin/env python2.6 ${MY_DIR}/src/python/twitter/pants/bin/pants_exe.py "$@"
+  def build(self, target, args):
+    """Subclasses must implement a BUILD target executor.  The value returned should be an int,
+    0 indicating success and any other value indicating failure.
+
+    target: the parsed target to build
+    args: additional arguments to the builder backend"""
+
+    pass

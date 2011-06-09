@@ -1,4 +1,3 @@
-#!/bin/sh
 # ==================================================================================================
 # Copyright 2011 Twitter, Inc.
 # --------------------------------------------------------------------------------------------------
@@ -15,12 +14,35 @@
 # limitations under the License.
 # ==================================================================================================
 
-MY_DIR=$(dirname $0)
-export BUILD_ROOT=${MY_DIR}
-export PYTHONPATH=${MY_DIR}/src/python
+from twitter.pants.base.generator import TemplateData
 
-if [ -z "$ANT_OPTS" ]; then
-  export ANT_OPTS="-Xmx1g -XX:MaxPermSize=512m"
-fi
+class Exclude(object):
+  """Represents a dependency exclude pattern to filter transitive dependencies against."""
 
-/usr/bin/env python2.6 ${MY_DIR}/src/python/twitter/pants/bin/pants_exe.py "$@"
+  def __init__(self, org, name = None):
+    self.org = org
+    self.name = name
+
+  def __eq__(self, other):
+    return other and (
+      type(other) == Exclude) and (
+      self.org == other.org) and (
+      self.name == other.name)
+
+  def __hash__(self):
+    value = 17
+    value *= 37 + hash(self.org)
+    value *= 37 + hash(self.name)
+    return value
+
+  def __ne__(self, other):
+    return not self.__eq__(other)
+
+  def __repr__(self):
+    return "org=%s name=%s" % (self.org, self.name)
+
+  def _create_template_data(self):
+    return TemplateData(
+      org = self.org,
+      name = self.name,
+    )

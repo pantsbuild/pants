@@ -1,4 +1,3 @@
-#!/bin/sh
 # ==================================================================================================
 # Copyright 2011 Twitter, Inc.
 # --------------------------------------------------------------------------------------------------
@@ -15,12 +14,25 @@
 # limitations under the License.
 # ==================================================================================================
 
-MY_DIR=$(dirname $0)
-export BUILD_ROOT=${MY_DIR}
-export PYTHONPATH=${MY_DIR}/src/python
+from twitter.common.collections import OrderedSet
 
-if [ -z "$ANT_OPTS" ]; then
-  export ANT_OPTS="-Xmx1g -XX:MaxPermSize=512m"
-fi
+from twitter.pants.base.generator import TemplateData
 
-/usr/bin/env python2.6 ${MY_DIR}/src/python/twitter/pants/bin/pants_exe.py "$@"
+from with_sources import TargetWithSources
+
+class PythonTarget(TargetWithSources):
+  def __init__(self, target_base, name, sources, resources = None, dependencies = None, is_meta = False):
+    TargetWithSources.__init__(self, target_base, name, is_meta)
+
+    self.sources = self._resolve_paths(target_base, sources)
+    self.resources = self._resolve_paths(target_base, resources) if resources else OrderedSet()
+    self.dependencies = dependencies if dependencies else OrderedSet()
+
+  def _create_template_data(self):
+    return TemplateData(
+      name = self.name,
+      template_base = self.target_base,
+      sources = self.sources,
+      resources = self.resources,
+      dependencies = self.dependencies
+    )

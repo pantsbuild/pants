@@ -1,0 +1,15 @@
+[MASTER]
+
+[BASIC]
+
+[DESIGN]
+
+[SIMILARITIES]
+min-similarity-lines=8
+
+[MISCELLANEOUS]
+notes=FIXME,XXX,TODO
+
+[FORMAT]
+max-line-length=100
+indent-string='  '

@@ -1,4 +1,3 @@
-#!/bin/sh
 # ==================================================================================================
 # Copyright 2011 Twitter, Inc.
 # --------------------------------------------------------------------------------------------------
@@ -15,12 +14,19 @@
 # limitations under the License.
 # ==================================================================================================
 
-MY_DIR=$(dirname $0)
-export BUILD_ROOT=${MY_DIR}
-export PYTHONPATH=${MY_DIR}/src/python
+from address import Address
+from build_file import BuildFile
+from chroot import Chroot
+from fileset import Fileset
+from parse_context import ParseContext
+from target import Target, TargetDefinitionException
 
-if [ -z "$ANT_OPTS" ]; then
-  export ANT_OPTS="-Xmx1g -XX:MaxPermSize=512m"
-fi
-
-/usr/bin/env python2.6 ${MY_DIR}/src/python/twitter/pants/bin/pants_exe.py "$@"
+__all__ = [
+  'Address',
+  'BuildFile',
+  'Chroot',
+  'Fileset',
+  'ParseContext',
+  'Target',
+  'TargetDefinitionException'
+]

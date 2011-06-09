@@ -1,4 +1,3 @@
-#!/bin/sh
 # ==================================================================================================
 # Copyright 2011 Twitter, Inc.
 # --------------------------------------------------------------------------------------------------
@@ -15,12 +14,22 @@
 # limitations under the License.
 # ==================================================================================================
 
-MY_DIR=$(dirname $0)
-export BUILD_ROOT=${MY_DIR}
-export PYTHONPATH=${MY_DIR}/src/python
+PANTS_SOURCES   = rglobs('*.py') - rglobs('bin/*.py')
+PANTS_GARBAGE   = rglobs('*.pyc') + rglobs('*~')
+PANTS_RESOURCES = rglobs('*') - PANTS_SOURCES - PANTS_GARBAGE
 
-if [ -z "$ANT_OPTS" ]; then
-  export ANT_OPTS="-Xmx1g -XX:MaxPermSize=512m"
-fi
+python_library(
+  name = 'pants-lib',
+  dependencies = [
+    pants("3rdparty/python:mako"),
+    pants("src/python/twitter/common")
+  ],
+  sources = PANTS_SOURCES,
+  resources = PANTS_RESOURCES
+)
 
-/usr/bin/env python2.6 ${MY_DIR}/src/python/twitter/pants/bin/pants_exe.py "$@"
+python_binary(
+  name = 'pants',
+  dependencies = [pants(":pants-lib")],
+  source = 'bin/pants_exe.py',
+)

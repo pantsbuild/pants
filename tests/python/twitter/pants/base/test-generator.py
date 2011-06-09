@@ -1,4 +1,3 @@
-#!/bin/sh
 # ==================================================================================================
 # Copyright 2011 Twitter, Inc.
 # --------------------------------------------------------------------------------------------------
@@ -15,12 +14,34 @@
 # limitations under the License.
 # ==================================================================================================
 
-MY_DIR=$(dirname $0)
-export BUILD_ROOT=${MY_DIR}
-export PYTHONPATH=${MY_DIR}/src/python
+__author__ = 'John Sirios'
 
-if [ -z "$ANT_OPTS" ]; then
-  export ANT_OPTS="-Xmx1g -XX:MaxPermSize=512m"
-fi
+from twitter.pants.base.generator import TemplateData
 
-/usr/bin/env python2.6 ${MY_DIR}/src/python/twitter/pants/bin/pants_exe.py "$@"
+import unittest
+
+class TemplateDataTest(unittest.TestCase):
+  def setUp(self):
+    self.data = TemplateData(foo = 'bar', baz = 42)
+
+  def test_member_access(self):
+    try:
+      self.data.bip
+      self.fail("Access to undefined template data slots should raise")
+    except AttributeError:
+      # expected
+      pass
+
+  def test_member_mutation(self):
+    try:
+      self.data.baz = 1 / 137
+      self.fail("Mutation of a template data's slots should not be allowed")
+    except AttributeError:
+      # expected
+      pass
+
+  def test_extend(self):
+    self.assertEqual(self.data.extend(jake = 0.3), TemplateData(baz = 42, foo = 'bar', jake = 0.3))
+
+  def test_equals(self):
+    self.assertEqual(self.data, TemplateData(baz = 42).extend(foo = 'bar'))

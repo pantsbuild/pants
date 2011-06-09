@@ -1,4 +1,3 @@
-#!/bin/sh
 # ==================================================================================================
 # Copyright 2011 Twitter, Inc.
 # --------------------------------------------------------------------------------------------------
@@ -15,12 +14,33 @@
 # limitations under the License.
 # ==================================================================================================
 
-MY_DIR=$(dirname $0)
-export BUILD_ROOT=${MY_DIR}
-export PYTHONPATH=${MY_DIR}/src/python
+__author__ = 'John Sirois'
 
-if [ -z "$ANT_OPTS" ]; then
-  export ANT_OPTS="-Xmx1g -XX:MaxPermSize=512m"
-fi
+from . import Command
 
-/usr/bin/env python2.6 ${MY_DIR}/src/python/twitter/pants/bin/pants_exe.py "$@"
+from copy import copy
+
+class Help(Command):
+  """Provides help for available commands or a single specified command."""
+
+  __command__ = 'help'
+
+  def setup_parser(self, parser):
+    self.parser = copy(parser)
+
+    parser.set_usage("%prog help ([command])")
+    parser.epilog = """Lists available commands with no arguments; otherwise prints help for the
+                    specifed command."""
+
+  def __init__(self, root_dir, parser, argv):
+    Command.__init__(self, root_dir, parser, argv)
+
+    if len(self.args) > 1:
+      self.error("The help command accepts at most 1 argument.")
+    self.subcommand = self.args[0]
+
+  def execute(self):
+    subcommand_class = Command.get_command(self.subcommand)
+
+    command = subcommand_class(self.root_dir, self.parser, [ '--help' ])
+    return command.execute()

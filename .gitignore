@@ -1,4 +1,6 @@
 *~
+*#
+.#*
 .DS_Store
 .build.properties
 .idea
@@ -10,9 +12,11 @@ codegen/classes/
 dist
 out
 target
+ivy
 
 *.class
 *.iml
 *.ipr
 *.iws
 *.pyc
+*.hprof

@@ -1,4 +1,3 @@
-#!/bin/sh
 # ==================================================================================================
 # Copyright 2011 Twitter, Inc.
 # --------------------------------------------------------------------------------------------------
@@ -15,12 +14,18 @@
 # limitations under the License.
 # ==================================================================================================
 
-MY_DIR=$(dirname $0)
-export BUILD_ROOT=${MY_DIR}
-export PYTHONPATH=${MY_DIR}/src/python
+from python_target import PythonTarget
 
-if [ -z "$ANT_OPTS" ]; then
-  export ANT_OPTS="-Xmx1g -XX:MaxPermSize=512m"
-fi
-
-/usr/bin/env python2.6 ${MY_DIR}/src/python/twitter/pants/bin/pants_exe.py "$@"
+class PythonBinary(PythonTarget):
+  def __init__(self, name, source, dependencies = None):
+    """
+      name: target name
+      source: the python source file that becomes this binary's __main__
+      dependencies: a list of other PythonLibrary or Pants targets this binary depends upon
+    """
+    PythonTarget.__init__(
+      self,
+      'src/python',
+      name,
+      [source],
+      dependencies = dependencies)

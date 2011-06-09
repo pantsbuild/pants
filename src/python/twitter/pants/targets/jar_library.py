@@ -1,4 +1,3 @@
-#!/bin/sh
 # ==================================================================================================
 # Copyright 2011 Twitter, Inc.
 # --------------------------------------------------------------------------------------------------
@@ -15,12 +14,23 @@
 # limitations under the License.
 # ==================================================================================================
 
-MY_DIR=$(dirname $0)
-export BUILD_ROOT=${MY_DIR}
-export PYTHONPATH=${MY_DIR}/src/python
+from twitter.pants.base import Target
 
-if [ -z "$ANT_OPTS" ]; then
-  export ANT_OPTS="-Xmx1g -XX:MaxPermSize=512m"
-fi
+class JarLibrary(Target):
+  """Serves as a proxy for one or more JarDependencies or JavaTargets."""
 
-/usr/bin/env python2.6 ${MY_DIR}/src/python/twitter/pants/bin/pants_exe.py "$@"
+  def __init__(self, name, dependencies):
+    """name: The name of this module target, addressable via pants via the portion of the spec
+        following the colon
+    dependencies: one or more JarDependencies this JarLibrary bundles or Pants pointing to other
+        JarLibraries or JavaTargets"""
+
+    assert len(dependencies) > 0, "At least one dependency must be specified"
+    Target.__init__(self, name, False)
+
+    self.dependencies = dependencies
+
+  def resolve(self):
+    for dependency in self.dependencies:
+      for resolved_dependency in dependency.resolve():
+        yield resolved_dependency
