@@ -240,11 +240,12 @@ class Doc(Command):
         props = get_publish_properties(target)
         for source in target.sources:
           source_path = os.path.join(self.java_src_prefix, source)
+          key = '%s%%%s' % (target.provides.org, target.provides.name)
           if os.path.exists(source_path):
-            if 'revision.major.%s' % target.provides.name in props.getPropertyDict():
-              major = props.getProperty('revision.major.%s' % target.provides.name)
-              minor = props.getProperty('revision.minor.%s' % target.provides.name)
-              patch = props.getProperty('revision.patch.%s' % target.provides.name)
+            if 'revision.major.%s' % key in props.getPropertyDict():
+              major = props.getProperty('revision.major.%s' % key)
+              minor = props.getProperty('revision.minor.%s' % key)
+              patch = props.getProperty('revision.patch.%s' % key)
               revision = '%s.%s.%s' % (major, minor, patch)
             else:
               revision = 'NOT-PUBLISHED-YET'
