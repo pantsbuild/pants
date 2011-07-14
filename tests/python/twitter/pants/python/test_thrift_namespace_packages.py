@@ -14,11 +14,21 @@
 # limitations under the License.
 # ==================================================================================================
 
-python_test_suite(name = 'all',
-  dependencies = [
-    pants('tests/python/twitter/pants/ant'),
-    pants('tests/python/twitter/pants/base'),
-    pants('tests/python/twitter/pants/targets'),
-    pants('tests/python/twitter/pants/python:all'),
-  ]
-)
+import unittest
+
+from twitter.birds.duck.ttypes import Duck
+from twitter.birds.goose.ttypes import Goose
+
+import unittest
+
+
+class ThritNamespacePackagesTest(unittest.TestCase):
+
+  def test_thrift_namespaces(self):
+    """The 'test' here is the very fact that we can successfully import the generated thrift code
+    with a shared package prefix (twitter.birds) from two different eggs.
+    However there's no harm in also exercising the thrift objects, just to be sure we can."""
+    myDuck = Duck()
+    myDuck.quack = 'QUACKQUACKQUACK'
+    myGoose = Goose()
+    myGoose.laysGoldenEggs = True

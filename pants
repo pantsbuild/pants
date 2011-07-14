@@ -23,4 +23,5 @@ if [ -z "$ANT_OPTS" ]; then
   export ANT_OPTS="-Xmx1g -XX:MaxPermSize=512m"
 fi
 
-/usr/bin/env python2.6 ${MY_DIR}/src/python/twitter/pants/bin/pants_exe.py "$@"
+PYTHON=${PYTHON:=/usr/bin/env python2.6}
+${PYTHON} ${MY_DIR}/src/python/twitter/pants/bin/pants_exe.py "$@"

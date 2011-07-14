@@ -21,19 +21,30 @@ class JarDependency(object):
   """Represents a binary jar dependency ala maven or ivy.  For the ivy dependency defined by:
     <dependency org="com.google.guava" name="guava" rev="r07"/>
 
-  The equivalent Dependency object could be created with either of the following:
-    Dependency(org = "com.google.guava", name = "guava", rev = "r07")
-    Dependency("com.google.guava", "guava", "r07")
+  The equivalent Dependency object could be created with:
+    JarDependency(org = "com.google.guava", name = "guava", rev = "r07")
 
-  If the rev keyword argument is left out, the revision is assumed to be the latest available."""
+  If the rev keyword argument is left out, the revision is assumed to be the latest available.
 
-  def __init__(self, org, name, rev = None, ext = None):
+  The extension of the artifact can be over-ridden if it differs from the artifact type with the ext
+  keyword argument.  This is sometimes needed for artifacts packaged with maven bundle type but
+  stored as jars.
+
+  The url of the artifact can be over-ridden if non-standard by specifying the url keyword argument.
+
+  If the dependency has API docs available online, these can be noted with apidocs and generated
+  javadocs with {@link}s to the jar's classes will be properly hyperlinked.
+  """
+
+  def __init__(self, org, name, rev = None, ext = None, url = None, apidocs = None):
     self.org = org
     self.name = name
     self.rev = rev
     self.excludes = []
     self.transitive = True
     self.ext = ext
+    self.url = url
+    self.apidocs = apidocs
     self._id = None
     self._configurations = [ 'default' ]
 
@@ -93,5 +104,6 @@ class JarDependency(object):
       excludes = self.excludes,
       transitive = self.transitive,
       ext = self.ext,
+      url = self.url,
       configurations = ';'.join(self._configurations),
     )

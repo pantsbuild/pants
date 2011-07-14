@@ -27,9 +27,11 @@ from twitter.pants.base import Chroot
 from twitter.pants.targets import PythonBinary
 from twitter.pants.targets import PythonEgg
 from twitter.pants.targets import PythonLibrary
+from twitter.pants.targets import PythonAntlrLibrary
 from twitter.pants.targets import PythonThriftLibrary
 from twitter.pants.targets import PythonTests
 
+from twitter.pants.python.antlr_builder import PythonAntlrBuilder
 from twitter.pants.python.thrift_builder import PythonThriftBuilder
 
 class PythonChroot(object):
@@ -104,8 +106,14 @@ class PythonChroot(object):
     self.chroot.copy(src, '__main__.py', 'sources')
 
   def _dump_thrift_library(self, library):
-    builder = PythonThriftBuilder(library, self.root)
     print '  Generating %s...' % library
+    self._dump_built_library(PythonThriftBuilder(library, self.root))
+
+  def _dump_antlr_library(self, library):
+    print '  Generating %s...' % library
+    self._dump_built_library(PythonAntlrBuilder(library, self.root))
+
+  def _dump_built_library(self, builder):
     egg_file = builder.build_egg()
     if egg_file:
       egg_file = os.path.relpath(egg_file, self.root)
@@ -126,6 +134,7 @@ class PythonChroot(object):
     eggs = set()
     binaries = set()
     thrifts = set()
+    antlrs = set()
 
     def add_dep(trg):
       if isinstance(trg, PythonLibrary):
@@ -139,6 +148,8 @@ class PythonChroot(object):
         binaries.add(trg)
       elif isinstance(trg, PythonThriftLibrary):
         thrifts.add(trg)
+      elif isinstance(trg, PythonAntlrLibrary):
+        antlrs.add(trg)
       elif isinstance(trg, PythonTests):
         # do not dump test sources/resources, but dump their
         # dependencies.
@@ -149,11 +160,11 @@ class PythonChroot(object):
 
     target.walk(lambda t: add_dep(t), lambda typ: not isinstance(typ, PythonEgg))
 
-    return libraries, eggs, binaries, thrifts
+    return libraries, eggs, binaries, thrifts, antlrs
 
   def dump(self):
     print 'Building PythonBinary %s:' % self.target
-    libraries, eggs, binaries, thrifts = self.build_dep_tree(self.target)
+    libraries, eggs, binaries, thrifts, antlrs = self.build_dep_tree(self.target)
 
     for lib in libraries:
       self._dump_library(lib)
@@ -165,6 +176,8 @@ class PythonChroot(object):
       self._dump_egg(egg)
     for thr in thrifts:
       self._dump_thrift_library(thr)
+    for antlr in antlrs:
+      self._dump_antlr_library(antlr)
     if len(binaries) > 1:
       print >> sys.stderr, 'WARNING: Target has multiple python_binary targets!'
     for binary in binaries:

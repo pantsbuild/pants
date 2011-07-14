@@ -14,6 +14,7 @@
 # limitations under the License.
 # ==================================================================================================
 
+from annotation_processor import AnnotationProcessor
 from artifact import Artifact
 from exclude import Exclude
 from exportable_jvm_library import ExportableJvmLibrary
@@ -29,6 +30,7 @@ from pants_target import Pants
 from python_binary import PythonBinary
 from python_egg import PythonEgg
 from python_library import PythonLibrary
+from python_antlr_library import PythonAntlrLibrary
 from python_thrift_library import PythonThriftLibrary
 from python_target import PythonTarget
 from python_tests import PythonTests, PythonTestSuite
@@ -38,6 +40,7 @@ from scala_tests import ScalaTests
 from with_sources import TargetWithSources
 
 __all__ = [
+  'AnnotationProcessor',
   'Artifact',
   'Exclude',
   'ExportableJvmLibrary',
@@ -55,6 +58,7 @@ __all__ = [
   'PythonEgg',
   'PythonLibrary',
   'PythonTarget',
+  'PythonAntlrLibrary',
   'PythonThriftLibrary',
   'PythonTests',
   'PythonTestSuite',

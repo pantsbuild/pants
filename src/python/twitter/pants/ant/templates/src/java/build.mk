@@ -53,6 +53,14 @@ limitations under the License.
   </property>
   % endif
 
+  % if lib.processors:
+  <property name="${lib.id}.processors">
+    % for processor in lib.processors:
+    ${processor}
+    % endfor
+  </property>
+  % endif
+
   % if lib.deploy_jar:
   <!-- enable dist creating a monolithic deploy jar -->
   <property name="${lib.id}.deployjar" value="true"/>

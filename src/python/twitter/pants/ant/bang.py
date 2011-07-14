@@ -15,6 +15,7 @@
 # ==================================================================================================
 
 from twitter.pants.targets import (
+  AnnotationProcessor,
   InternalTarget,
   JavaLibrary,
   JavaProtobufLibrary,
@@ -48,6 +49,8 @@ def extract_target(java_targets, name = None):
       return JavaProtobufLibrary._aggregate(name('protobuf'), provides, buildflags, targets)
     elif target_type == JavaThriftLibrary:
       return JavaThriftLibrary._aggregate(name('thrift'), provides, buildflags, targets)
+    elif target_type == AnnotationProcessor:
+      return AnnotationProcessor._aggregate(name('apt'), provides, targets)
     elif target_type == JavaLibrary:
       return JavaLibrary._aggregate(name('java'), provides, deployjar, buildflags, targets)
     elif target_type == ScalaLibrary:

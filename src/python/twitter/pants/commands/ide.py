@@ -163,12 +163,15 @@ class Project(object):
   def configure(self):
     """Configures this project's source sets returning the full set of targets the project is
     comprised of.  The full set can be larger than the initial set of targets when any of the
-    initial targets only has partial ownership of its parent directory source set."""
+    initial targets only has partial ownership of its source set's directories."""
+
+    # TODO(John Sirois): much waste lies here, revisit structuring for more readable and efficient
+    # construction of source sets and excludes ... and add a test!
 
     analyzed = OrderedSet()
     targeted = set()
 
-    def accept_target(target):
+    def source_target(target):
       return has_sources(target) and not target.is_codegen
 
     def configure_source_sets(relative_base, sources, is_test):
@@ -179,6 +182,14 @@ class Project(object):
         if absolute_path not in targeted:
           targeted.add(absolute_path)
           self.sources.append(SourceSet(self.root_dir, relative_base, path, is_test))
+
+    def find_source_basedirs(target):
+      dirs = set()
+      if source_target(target):
+        absolute_base = os.path.join(self.root_dir, target.target_base)
+        dirs.update([ os.path.join(absolute_base, os.path.dirname(source))
+                      for source in target.sources ])
+      return dirs
 
     def configure_target(target):
       if target not in analyzed:
@@ -196,18 +207,58 @@ class Project(object):
             resources.update(target.binary_resources)
           if resources:
             self.resource_extensions.update(Project.extract_resource_extensions(resources))
-            configure_source_sets(ExportableJvmLibrary.RESOURCES_BASE_DIR, resources, is_test = False)
+            configure_source_sets(ExportableJvmLibrary.RESOURCES_BASE_DIR,
+                                  resources,
+                                  is_test = False)
 
         if target.sources:
           test = is_test(target)
           self.has_tests = self.has_tests or test
           configure_source_sets(target.target_base, target.sources, is_test = test)
 
-        siblings = Target.get_all_addresses(target.address.buildfile)
-        return filter(accept_target, [ Target.get(a) for a in siblings if a != target.address ])
+        # Other BUILD files may specify sources in the same directory as this target.  Those BUILD
+        # files might be in parent directories (globs('a/b/*.java')) or even children directories if
+        # this target globs children as well.  Gather all these candidate BUILD files to test for
+        # sources they own that live in the directories this targets sources live in.
+        target_dirset = find_source_basedirs(target)
+        candidates = Target.get_all_addresses(target.address.buildfile)
+        for ancestor in target.address.buildfile.ancestors():
+          candidates.update(Target.get_all_addresses(ancestor))
+        for sibling in target.address.buildfile.siblings():
+          candidates.update(Target.get_all_addresses(sibling))
+        for descendant in target.address.buildfile.descendants():
+          candidates.update(Target.get_all_addresses(descendant))
+
+        def is_sibling(target):
+          return source_target(target) and target_dirset.intersection(find_source_basedirs(target))
+
+        return filter(is_sibling, [ Target.get(a) for a in candidates if a != target.address ])
 
     for target in self.targets:
-      target.walk(configure_target, predicate = accept_target)
+      target.walk(configure_target, predicate = source_target)
+
+    # We need to figure out excludes, in doing so there are 2 cases we should not exclude:
+    # 1.) targets depend on A only should lead to an exclude of B
+    # A/BUILD
+    # A/B/BUILD
+    #
+    # 2.) targets depend on A and C should not lead to an exclude of B (would wipe out C)
+    # A/BUILD
+    # A/B
+    # A/B/C/BUILD
+    #
+    # 1 approach: build set of all paths and parent paths containing BUILDs our targets depend on -
+    # these are unexcludable
+
+    unexcludable_paths = set()
+    for source_set in self.sources:
+      parent = os.path.join(self.root_dir, source_set.source_base, source_set.path)
+      while True:
+        unexcludable_paths.add(parent)
+        parent, dir = os.path.split(parent)
+        # no need to add the repo root or above, all source paths and extra paths are children
+        if parent == self.root_dir:
+          break
 
     for source_set in self.sources:
       paths = set()
@@ -216,11 +267,13 @@ class Project(object):
         if dirs:
           paths.update([ os.path.join(root, dir) for dir in dirs ])
       unused_children = paths - targeted
-      if unused_children and paths != unused_children:
-        source_set.excludes.extend(os.path.relpath(child, source_base) for child in unused_children)
+      if unused_children:
+        for child in unused_children:
+          if child not in unexcludable_paths:
+            source_set.excludes.append(os.path.relpath(child, source_base))
 
     targets = OrderedSet()
     for target in self.targets:
-      target.walk(lambda target: targets.add(target), has_sources)
+      target.walk(lambda target: targets.add(target), source_target)
     targets.update(analyzed - targets)
     return targets

@@ -22,7 +22,7 @@ from twitter.common.collections import OrderedSet
 from twitter.common.config import Properties
 from copy import copy
 from datetime import datetime
-from twitter.pants import is_exported
+from twitter.pants import is_exported, is_jvm
 from twitter.pants.base import Address, Target
 from twitter.pants.targets import JavaLibrary
 from twitter.pants.ant import AntBuilder
@@ -135,8 +135,8 @@ class Doc(Command):
       return classpath_result
 
     self._create_artifact_data()
-
-    javadoc_result = subprocess.call([
+    sources_file = self._create_sources_file(doc_target);
+    command = [
       'javadoc',
       '-encoding', 'UTF-8',
       '-notimestamp',
@@ -146,7 +146,22 @@ class Doc(Command):
       '-top', '<script type="text/javascript">top.updateArtifact(window.location);</script>',
       '-classpath', '@%s' % classpath_file,
       '-d', self.target_path,
-    ] + doc_target.sources)
+      '@%s' % sources_file
+    ]
+
+    # Always provide external linking for java API
+    offlinelinks = set([ 'http://download.oracle.com/javase/6/docs/api/' ])
+
+    def link(target):
+      for jar in target.jar_dependencies:
+        if jar.apidocs:
+          offlinelinks.add(jar.apidocs)
+    doc_target.walk(link, is_jvm)
+
+    for link in offlinelinks:
+      command.extend(['-linkoffline', link, link])
+
+    javadoc_result = subprocess.call(command)
 
     if self.options.ignore_failure or javadoc_result == 0:
       for root, _, files in self._walk_assets(_ASSETS_DIR):
@@ -248,3 +263,9 @@ class Doc(Command):
       print >> data_file, "artifacts.hasChangelog = %s;" % (
         'true' if self.link_changelog else 'false'
       )
+
+  def _create_sources_file(self, target):
+    sources_file = os.path.abspath(os.path.join(self.target_path, 'sources.txt'))
+    with open(sources_file, 'w') as argfile:
+      argfile.writelines(['%s\n' % s for s in target.sources])
+    return sources_file

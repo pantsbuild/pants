@@ -48,8 +48,8 @@ class Py(Command):
     try:
       address = Address.parse(root_dir, self.args[0])
       target = Target.get(address)
-    except:
-      self.error("Invalid target in %s" % self.args[0])
+    except Exception as e:
+      self.error("Invalid target in %s (%s)" % (self.args[0], str(e)))
 
     if not target:
       self.error("Target %s does not exist" % address)

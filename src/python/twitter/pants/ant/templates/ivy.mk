@@ -57,8 +57,15 @@ limitations under the License.
                 transitive="false"
       % endif
     >
-      % if dependency.ext:
-      <artifact name="${dependency.module}" ext="${dependency.ext}"/>
+      % if dependency.ext or dependency.url:
+      <artifact name="${dependency.module}"
+        % if dependency.ext:
+        ext="${dependency.ext}"
+        % endif
+        % if dependency.url:
+        url="${dependency.url}"
+        % endif
+      />
       % endif
       % if dependency.excludes:
         % for exclude in dependency.excludes:

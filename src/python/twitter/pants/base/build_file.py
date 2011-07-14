@@ -72,15 +72,51 @@ class BuildFile(object):
     self.relpath = os.path.relpath(self.full_path, self.root_dir)
     self.canonical_relpath = os.path.join(os.path.dirname(self.relpath), BuildFile._CANONICAL_NAME)
 
-  def family(self):
-    """Returns an iterator over all the BUILD files co-located with this BUILD file.  The family
-    forms a single logical BUILD file composed of the canonical BUILD file and optional sibling
-    build files each with their own extension, eg: BUILD.extras."""
+  def descendants(self):
+    """Returns all BUILD files in descendant directories of this BUILD file's parent directory."""
 
-    yield self
-    for build in glob1(self.parent_path, 'BUILD.*'):
+    descendants = BuildFile.scan_buildfiles(self.root_dir, self.parent_path)
+    for sibling in self.family():
+      descendants.discard(sibling)
+    return descendants
+
+  def ancestors(self):
+    """Returns all BUILD files in ancestor directories of this BUILD file's parent directory."""
+
+    def find_parent(dir):
+      parent = os.path.dirname(dir)
+      buildfile = os.path.join(parent, BuildFile._CANONICAL_NAME)
+      if os.path.exists(buildfile):
+        return parent, BuildFile(self.root_dir, os.path.relpath(buildfile, self.root_dir))
+      else:
+        return parent, None
+
+    parent_buildfiles = OrderedSet()
+
+    parentdir = os.path.dirname(self.full_path)
+    while parentdir != self.root_dir:
+      parentdir, buildfile = find_parent(parentdir)
+      if buildfile:
+        parent_buildfiles.update(buildfile.family())
+
+    return parent_buildfiles
+
+  def siblings(self):
+    """Returns an iterator over all the BUILD files co-located with this BUILD file not including
+    this BUILD file itself"""
+
+    for build in glob1(self.parent_path, 'BUILD*'):
       if self.name != build and BuildFile._is_buildfile_name(build):
         yield BuildFile(self.root_dir, os.path.join(os.path.dirname(self.relpath), build))
+
+  def family(self):
+    """Returns an iterator over all the BUILD files co-located with this BUILD file including this
+    BUILD file itself.  The family forms a single logical BUILD file composed of the canonical BUILD
+    file and optional sibling build files each with their own extension, eg: BUILD.extras."""
+
+    yield self
+    for sibling in self.siblings():
+      yield sibling
 
   def __eq__(self, other):
     result = other and (

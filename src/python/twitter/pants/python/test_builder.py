@@ -21,7 +21,7 @@ from twitter.common.collections import OrderedSet
 from twitter.pants.base import Target, Address
 from twitter.pants.python.python_chroot import PythonChroot
 from twitter.pants.python.launcher import Launcher
-from twitter.pants.targets import PythonTests, PythonTestSuite
+from twitter.pants.targets import PythonTests, PythonTestSuite, PythonEgg
 
 class PythonTestBuilder(object):
   class InvalidDependencyException(Exception): pass
@@ -37,14 +37,21 @@ class PythonTestBuilder(object):
 
   @staticmethod
   def get_pytest_eggs(root):
-    specs = ["3rdparty/python:pytest", "3rdparty/python:py"]
+    specs = ["3rdparty/python:pytest"]
     eggs = []
     for spec in specs:
       address = Address.parse(root, spec)
       target = Target.get(address)
-      for dep in target.dependencies:
-        for egg in dep.eggs:
-          eggs.append(egg)
+      def add_eggs(target):
+        deps = []
+        for dep in target.dependencies:
+          if isinstance(dep, PythonEgg):
+            for egg in dep.eggs:
+              eggs.append(egg)
+          else:
+            deps.append(dep)
+        return deps
+      target.walk(lambda t: add_eggs(t))
     return eggs
 
   @staticmethod

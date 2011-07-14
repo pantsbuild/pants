@@ -20,41 +20,43 @@ from twitter.common.collections import OrderedSet
 
 from exportable_jvm_library import ExportableJvmLibrary
 
-class JavaLibrary(ExportableJvmLibrary):
-  """Defines a target that produces a java library."""
+class AnnotationProcessor(ExportableJvmLibrary):
+  """Defines a target that produces a java library containing one or more annotation processors."""
 
   _SRC_DIR = 'src/java'
 
   @classmethod
-  def _aggregate(cls, name, provides, deployjar, buildflags, java_libs):
+  def _aggregate(cls, name, provides, apt_libs):
     all_deps = OrderedSet()
     all_excludes = OrderedSet()
     all_sources = []
     all_resources = []
     all_binary_resources = []
+    all_annotation_processors = []
 
-    for java_lib in java_libs:
-      if java_lib.resolved_dependencies:
-        all_deps.update(dep for dep in java_lib.jar_dependencies if dep.rev is not None)
-      if java_lib.excludes:
-        all_excludes.update(java_lib.excludes)
-      if java_lib.sources:
-        all_sources.extend(java_lib.sources)
-      if java_lib.resources:
-        all_resources.extend(java_lib.resources)
-      if java_lib.binary_resources:
-        all_binary_resources.extend(java_lib.binary_resources)
+    for apt_lib in apt_libs:
+      if apt_lib.resolved_dependencies:
+        all_deps.update(dep for dep in apt_lib.jar_dependencies if dep.rev is not None)
+      if apt_lib.excludes:
+        all_excludes.update(apt_lib.excludes)
+      if apt_lib.sources:
+        all_sources.extend(apt_lib.sources)
+      if apt_lib.resources:
+        all_resources.extend(apt_lib.resources)
+      if apt_lib.binary_resources:
+        all_binary_resources.extend(apt_lib.binary_resources)
+      if apt_lib.processors:
+        all_annotation_processors.extend(apt_lib.processors)
 
-    return JavaLibrary(name,
-                       all_sources,
-                       provides = provides,
-                       dependencies = all_deps,
-                       excludes = all_excludes,
-                       resources = all_resources,
-                       binary_resources = all_binary_resources,
-                       deployjar = deployjar,
-                       buildflags = buildflags,
-                       is_meta = True)
+    return AnnotationProcessor(name,
+                               all_sources,
+                               provides = provides,
+                               dependencies = all_deps,
+                               excludes = all_excludes,
+                               resources = all_resources,
+                               binary_resources = all_binary_resources,
+                               processors = all_annotation_processors,
+                               is_meta = True)
 
   def __init__(self, name, sources,
                provides = None,
@@ -62,8 +64,7 @@ class JavaLibrary(ExportableJvmLibrary):
                excludes = None,
                resources = None,
                binary_resources = None,
-               deployjar = False,
-               buildflags = None,
+               processors = None,
                is_meta = False):
 
     """name: The name of this module target, addressable via pants via the portion of the spec
@@ -78,37 +79,40 @@ class JavaLibrary(ExportableJvmLibrary):
         this module's jar
     binary_resources: An optional list of paths containing binary resources to place in this
         module's jar
-    deployjar: An optional boolean that turns on generation of a monolithic deploy jar
-    buildflags: A list of additional command line arguments to pass to the underlying build system
-        for this target"""
+    processors: a list of the fully qualified class names of the annotation processors this library
+        exports"""
 
     ExportableJvmLibrary.__init__(self,
-                                  JavaLibrary._SRC_DIR,
+                                  AnnotationProcessor._SRC_DIR,
                                   name,
                                   sources,
                                   provides,
                                   dependencies,
                                   excludes,
-                                  buildflags,
+                                  [],
                                   is_meta)
 
     self.resources = self._resolve_paths(ExportableJvmLibrary.RESOURCES_BASE_DIR, resources)
-    self.binary_resources = self._resolve_paths(ExportableJvmLibrary.RESOURCES_BASE_DIR, binary_resources)
-    self.deployjar = deployjar
+    self.binary_resources = self._resolve_paths(ExportableJvmLibrary.RESOURCES_BASE_DIR,
+                                                binary_resources)
+    self.processors = processors
 
   def _create_template_data(self):
     allsources = []
     if self.sources:
-      allsources += list(os.path.join(JavaLibrary._SRC_DIR, source) for source in self.sources)
+      allsources += [ os.path.join(AnnotationProcessor._SRC_DIR, source)
+                      for source in self.sources ]
     if self.resources:
-      allsources += list(os.path.join(ExportableJvmLibrary.RESOURCES_BASE_DIR, res) for res in self.resources)
+      allsources += [ os.path.join(ExportableJvmLibrary.RESOURCES_BASE_DIR, res)
+                      for res in self.resources ]
     if self.binary_resources:
-      allsources += list(os.path.join(ExportableJvmLibrary.RESOURCES_BASE_DIR, res) for res in self.binary_resources)
+      allsources += [ os.path.join(ExportableJvmLibrary.RESOURCES_BASE_DIR, res)
+                      for res in self.binary_resources ]
 
     return ExportableJvmLibrary._create_template_data(self).extend(
       resources = self.resources,
       binary_resources = self.binary_resources,
-      deploy_jar = self.deployjar,
+      deploy_jar = False,
       allsources = allsources,
-      processors = []
+      processors = self.processors
     )

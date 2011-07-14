@@ -7,13 +7,13 @@
 .pants.d
 .project
 .settings
-build
+.pydevproject
+build/
 codegen/classes/
 dist
 out
 target
 ivy
-
 *.class
 *.iml
 *.ipr

@@ -19,12 +19,28 @@ python_library(
   dependencies = [egg("antlr_python_runtime-3.1.3-py2.6.egg")])
 
 python_library(
+  name = 'paramiko',
+  dependencies = [
+    pants(":pycrypto"),
+    egg("paramiko-1.7.7.1-py2.6.egg")
+  ]
+)
+
+python_library(
   name = 'py',
   dependencies = [egg("py-1.4.2-py2.6.egg")])
 
 python_library(
+  name = 'pycrypto',
+  dependencies = [egg("pycrypto-2.3-*.egg")])
+
+python_library(
   name = 'pytest',
-  dependencies = [egg("pytest-2.0.2-py2.6.egg")])
+  dependencies = [
+    pants(":py"),
+    egg("pytest-2.0.2-py2.6.egg"),
+  ]
+)
 
 python_library(
   name = 'python-ldap',
@@ -33,6 +49,10 @@ python_library(
 python_library(
   name = 'mako',
   dependencies = [egg("Mako-0.4.0-py2.6.egg")])
+
+python_library(
+  name = 'rbtools',
+  dependencies = [egg("RBTools-0.2-py2.6.egg")])
 
 python_library(
   name = 'thrift-0.7',

@@ -23,6 +23,7 @@ from twitter.pants.base import Fileset
 from twitter.pants.targets import *
 
 # aliases
+annotation_processor = AnnotationProcessor
 artifact = Artifact
 egg = PythonEgg
 exclude = Exclude
@@ -35,6 +36,7 @@ java_tests = JavaTests
 java_thrift_library = JavaThriftLibrary
 python_binary = PythonBinary
 python_library = PythonLibrary
+python_antlr_library = PythonAntlrLibrary
 python_thrift_library = PythonThriftLibrary
 python_tests = PythonTests
 python_test_suite = PythonTestSuite
@@ -84,6 +86,11 @@ def is_jvm(target):
 
   return isinstance(target, JvmTarget)
 
+def is_apt(target):
+  """Returns True if the target produces annotation processors."""
+
+  return isinstance(target, AnnotationProcessor)
+
 def has_jvm_targets(targets):
   """Returns true if the given sequence of targets contains at least one jvm target as determined
   by is_jvm(...)"""
@@ -129,6 +136,7 @@ def is_test(t):
 # bind this as late as possible
 pants = fancy_pants
 __all__ = (
+  'annotation_processor',
   'artifact',
   'exclude',
   'egg',
@@ -140,6 +148,7 @@ __all__ = (
   'java_tests',
   'java_thrift_library',
   'pants',
+  'python_antlr_library',
   'python_binary',
   'python_library',
   'python_tests',
