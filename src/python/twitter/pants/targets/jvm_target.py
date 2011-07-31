@@ -33,7 +33,7 @@ class JvmTarget(InternalTarget, TargetWithSources):
     if sources is None or sources == []:
       raise TargetDefinitionException(self, 'No sources specified')
 
-    self.sources = self._resolve_paths(target_base, sources)
+    self.sources = self._resolve_paths(self.target_base, sources)
     self.excludes = excludes
     self.buildflags = buildflags
 

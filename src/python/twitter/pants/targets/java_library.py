@@ -23,10 +23,8 @@ from exportable_jvm_library import ExportableJvmLibrary
 class JavaLibrary(ExportableJvmLibrary):
   """Defines a target that produces a java library."""
 
-  _SRC_DIR = 'src/java'
-
   @classmethod
-  def _aggregate(cls, name, provides, deployjar, buildflags, java_libs):
+  def _aggregate(cls, name, provides, deployjar, buildflags, java_libs, target_base):
     all_deps = OrderedSet()
     all_excludes = OrderedSet()
     all_sources = []
@@ -47,6 +45,7 @@ class JavaLibrary(ExportableJvmLibrary):
 
     return JavaLibrary(name,
                        all_sources,
+                       target_base = target_base,
                        provides = provides,
                        dependencies = all_deps,
                        excludes = all_excludes,
@@ -57,6 +56,7 @@ class JavaLibrary(ExportableJvmLibrary):
                        is_meta = True)
 
   def __init__(self, name, sources,
+               target_base = None,
                provides = None,
                dependencies = None,
                excludes = None,
@@ -83,7 +83,7 @@ class JavaLibrary(ExportableJvmLibrary):
         for this target"""
 
     ExportableJvmLibrary.__init__(self,
-                                  JavaLibrary._SRC_DIR,
+                                  target_base,
                                   name,
                                   sources,
                                   provides,
@@ -92,18 +92,20 @@ class JavaLibrary(ExportableJvmLibrary):
                                   buildflags,
                                   is_meta)
 
-    self.resources = self._resolve_paths(ExportableJvmLibrary.RESOURCES_BASE_DIR, resources)
-    self.binary_resources = self._resolve_paths(ExportableJvmLibrary.RESOURCES_BASE_DIR, binary_resources)
+    self.sibling_resources_base = os.path.join(os.path.dirname(self.target_base), 'resources')
+    self.resources = self._resolve_paths(self.sibling_resources_base, resources)
+    self.binary_resources = self._resolve_paths(self.sibling_resources_base, binary_resources)
     self.deployjar = deployjar
 
   def _create_template_data(self):
     allsources = []
     if self.sources:
-      allsources += list(os.path.join(JavaLibrary._SRC_DIR, source) for source in self.sources)
+      allsources += list(os.path.join(self.target_base, source) for source in self.sources)
     if self.resources:
-      allsources += list(os.path.join(ExportableJvmLibrary.RESOURCES_BASE_DIR, res) for res in self.resources)
+      allsources += list(os.path.join(self.sibling_resources_base, res) for res in self.resources)
     if self.binary_resources:
-      allsources += list(os.path.join(ExportableJvmLibrary.RESOURCES_BASE_DIR, res) for res in self.binary_resources)
+      allsources += list(os.path.join(self.sibling_resources_base, res)
+                         for res in self.binary_resources)
 
     return ExportableJvmLibrary._create_template_data(self).extend(
       resources = self.resources,

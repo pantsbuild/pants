@@ -18,8 +18,8 @@ from collections import deque
 from copy import copy
 
 from twitter.common.collections import OrderedSet
-from twitter.pants import is_apt
-from twitter.pants.targets import JavaLibrary
+from twitter.pants import is_apt, is_java, is_scala
+from twitter.pants.targets import JavaLibrary, ScalaLibrary
 
 import bang
 
@@ -37,11 +37,20 @@ def extract_target(java_targets, is_transitive, name = None):
   all_deps.update(internal_deps)
   all_deps.update(jar_deps)
 
-  return JavaLibrary('ide',
-                     sources,
-                     dependencies = all_deps,
-                     excludes = meta_target.excludes,
-                     is_meta = True)
+  if is_java(meta_target):
+    return JavaLibrary('ide',
+                       sources,
+                       dependencies = all_deps,
+                       excludes = meta_target.excludes,
+                       is_meta = True)
+  elif is_scala(meta_target):
+    return ScalaLibrary('ide',
+                        sources,
+                        dependencies = all_deps,
+                        excludes = meta_target.excludes,
+                        is_meta = True)
+  else:
+    raise TypeError("Cannot generate IDE configuration for targets: %s" % java_targets)
 
 def _extract_target(meta_target, is_transitive, is_apt):
   """

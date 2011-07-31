@@ -80,10 +80,11 @@ def extract_zip():
   exe_out.write(egg_content)
   exe_out.close()
 
-def is_usable_egg(filename):
-  if not (filename.startswith('.deps/') and filename.endswith('.egg')):
-    return False
-  return EggParser().is_compatible(filename)
+def get_egg_from_path(path):
+  for name in path.split(os.path.sep):
+    if name.endswith('.egg'):
+      return name
+  return None
 
 def extract_deps():
   exe_zipfile = "__PEX_CREATOR_ZIPFILE__"
@@ -92,19 +93,23 @@ def extract_deps():
   egg_cache = cache_base()
   path_adjuncts = []
   for name in zp.namelist():
-    if is_usable_egg(name):
-      egg_in = zp.open(name)
-      egg_contents = egg_in.read()
-      egg_in.close()
+    if name.startswith('.deps/'):
+      eggname = get_egg_from_path(name)
+      if eggname is not None and EggParser().is_compatible(eggname):
+        egg_in = zp.open(name)
+        egg_contents = egg_in.read()
+        egg_in.close()
 
-      dest = os.path.join(egg_cache, name)
-      path_adjuncts.append(dest)
-      if same(dest, egg_contents):
-        continue
+        dest = os.path.join(egg_cache, name)
+        eggdest = os.path.join(egg_cache, '.deps', eggname)
+        if eggdest not in path_adjuncts:
+          path_adjuncts.append(eggdest)
+        if same(dest, egg_contents):
+          continue
 
-      egg_out = safe_open_for_write(dest)
-      egg_out.write(egg_contents)
-      egg_out.close()
+        egg_out = safe_open_for_write(dest)
+        egg_out.write(egg_contents)
+        egg_out.close()
   zp.close()
   return exe_zipfile, path_adjuncts
 
@@ -116,7 +121,6 @@ __all_symbols = [
   md5s_equal,
   extract_zip,
   same,
-  is_usable_egg,
   extract_deps
 ]
 

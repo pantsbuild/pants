@@ -27,7 +27,7 @@ class ScalaLibrary(ExportableJvmLibrary):
   _SRC_DIR = 'src/scala'
 
   @classmethod
-  def _aggregate(cls, name, provides, deployjar, buildflags, scala_libs):
+  def _aggregate(cls, name, provides, deployjar, buildflags, scala_libs, target_base):
     all_deps = OrderedSet()
     all_excludes = OrderedSet()
     all_sources = []
@@ -51,6 +51,7 @@ class ScalaLibrary(ExportableJvmLibrary):
 
     return ScalaLibrary(name,
                         all_sources,
+                        target_base = target_base,
                         java_sources = all_java_sources,
                         provides = provides,
                         dependencies = all_deps,
@@ -62,6 +63,7 @@ class ScalaLibrary(ExportableJvmLibrary):
                         is_meta = True)
 
   def __init__(self, name, sources,
+               target_base = None,
                java_sources = None,
                provides = None,
                dependencies = None,
@@ -98,7 +100,7 @@ class ScalaLibrary(ExportableJvmLibrary):
       return all_deps
 
     ExportableJvmLibrary.__init__(self,
-                                  ScalaLibrary._SRC_DIR,
+                                  target_base,
                                   name,
                                   sources,
                                   provides,
@@ -107,19 +109,25 @@ class ScalaLibrary(ExportableJvmLibrary):
                                   buildflags,
                                   is_meta)
 
-    self.java_sources = self._resolve_paths('src/java', java_sources)
-    self.resources = self._resolve_paths(ExportableJvmLibrary.RESOURCES_BASE_DIR, resources)
-    self.binary_resources = self._resolve_paths(ExportableJvmLibrary.RESOURCES_BASE_DIR, binary_resources)
+    base_parent = os.path.dirname(self.target_base)
+    sibling_java_base = os.path.join(base_parent, 'java')
+    self.java_sources = self._resolve_paths(sibling_java_base, java_sources)
+
+    self.sibling_resources_base = os.path.join(base_parent, 'resources')
+    self.resources = self._resolve_paths(self.sibling_resources_base, resources)
+    self.binary_resources = self._resolve_paths(self.sibling_resources_base, binary_resources)
+
     self.deployjar = deployjar
 
   def _create_template_data(self):
     allsources = []
     if self.sources:
-      allsources += list(os.path.join(ScalaLibrary._SRC_DIR, source) for source in self.sources)
+      allsources += list(os.path.join(self.target_base, source) for source in self.sources)
     if self.resources:
-      allsources += list(os.path.join(ExportableJvmLibrary.RESOURCES_BASE_DIR, res) for res in self.resources)
+      allsources += list(os.path.join(self.sibling_resources_base, res) for res in self.resources)
     if self.binary_resources:
-      allsources += list(os.path.join(ExportableJvmLibrary.RESOURCES_BASE_DIR, res) for res in self.binary_resources)
+      allsources += list(os.path.join(self.sibling_resources_base, res)
+                         for res in self.binary_resources)
 
     return ExportableJvmLibrary._create_template_data(self).extend(
       java_sources = self.java_sources,

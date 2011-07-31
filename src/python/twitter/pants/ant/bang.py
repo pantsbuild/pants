@@ -41,10 +41,20 @@ def extract_target(java_targets, name = None):
   deployjar = hasattr(representative_target, 'deployjar') and representative_target.deployjar
   buildflags = representative_target.buildflags
 
-  def create_target(target_type, target_name, target_index, targets):
+  def discriminator(tgt):
+    # Chunk up our targets by (type, src base) - the javac task in the ant build relies upon a
+    # single srcdir that points to the root of a package tree to ensure differential compilation
+    # works.
+    return type(tgt), tgt.target_base
+
+  def create_target(category, target_name, target_index, targets):
     def name(name):
       return "%s-%s-%d" % (target_name, name, target_index)
 
+    # TODO(John Sirois): JavaLibrary and ScalaLibrary can float here between src/ and tests/ - add
+    # ant build support to allow the same treatment for JavaThriftLibrary and JavaProtobufLibrary
+    # so that tests can house test IDL in tests/
+    target_type, base = category
     if target_type == JavaProtobufLibrary:
       return JavaProtobufLibrary._aggregate(name('protobuf'), provides, buildflags, targets)
     elif target_type == JavaThriftLibrary:
@@ -52,9 +62,9 @@ def extract_target(java_targets, name = None):
     elif target_type == AnnotationProcessor:
       return AnnotationProcessor._aggregate(name('apt'), provides, targets)
     elif target_type == JavaLibrary:
-      return JavaLibrary._aggregate(name('java'), provides, deployjar, buildflags, targets)
+      return JavaLibrary._aggregate(name('java'), provides, deployjar, buildflags, targets, base)
     elif target_type == ScalaLibrary:
-      return ScalaLibrary._aggregate(name('scala'), provides, deployjar, buildflags, targets)
+      return ScalaLibrary._aggregate(name('scala'), provides, deployjar, buildflags, targets, base)
     elif target_type == JavaTests:
       return JavaTests._aggregate(name('java-tests'), buildflags, targets)
     elif target_type == ScalaTests:
@@ -79,16 +89,16 @@ def extract_target(java_targets, name = None):
     return target
 
   # chunk up our targets by type & custom build xml
-  coalesced = InternalTarget.coalesce_targets(java_targets)
+  coalesced = InternalTarget.coalesce_targets(java_targets, discriminator)
   coalesced = list(reversed(coalesced))
 
-  start_type = type(coalesced[0])
+  start_type = discriminator(coalesced[0])
   start = 0
   descriptors = []
 
   for current in range(0, len(coalesced)):
     current_target = coalesced[current]
-    current_type = type(current_target)
+    current_type = discriminator(current_target)
 
     if current_target.custom_antxml_path:
       if start < current:
@@ -99,7 +109,7 @@ def extract_target(java_targets, name = None):
       descriptors.append((current_type, [current_target]))
       start = current + 1
       if current < (len(coalesced) - 1):
-        start_type = type(coalesced[start])
+        start_type = discriminator(coalesced[start])
 
     elif start_type != current_type:
       # record the type chunk we just left

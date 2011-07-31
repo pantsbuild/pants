@@ -14,18 +14,11 @@
 # limitations under the License.
 # ==================================================================================================
 
-import os
 from twitter.common.collections import OrderedSet
 from python_target import PythonTarget
 from pants_target import Pants
 
 class PythonAntlrLibrary(PythonTarget):
-  # TODO(benjy): Some ANTLR grammars are tightly-bound to the language of the parser they generate,
-  # containing snippets of code in that language etc. It might make more sense to have those live
-  # in src/<language>. This is not currently possible however, as each target type can only appear
-  # in a single target_base.
-  _SRC_DIR = 'src/antlr'
-
   def __init__(self, name, module,
                antlr_version = '3.1.3',
                sources = None,
@@ -50,7 +43,7 @@ class PythonAntlrLibrary(PythonTarget):
 
     PythonTarget.__init__(
       self,
-      PythonAntlrLibrary._SRC_DIR,
+      None, # Allow an antly library to be hosted in any source base dir
       name,
       sources,
       resources,

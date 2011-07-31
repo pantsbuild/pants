@@ -19,6 +19,16 @@ python_library(
   dependencies = [egg("antlr_python_runtime-3.1.3-py2.6.egg")])
 
 python_library(
+  name = 'git-python',
+  dependencies = [
+    egg("GitPython-0.3.1-py2.6.egg"),
+    egg("async-*.egg"),
+    egg("gitdb-*.egg"),
+    egg("smmap-0.8.1-py2.6.egg")
+  ]
+)
+
+python_library(
   name = 'paramiko',
   dependencies = [
     pants(":pycrypto"),

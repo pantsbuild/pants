@@ -91,7 +91,15 @@ class PythonChroot(object):
     for egg_path in egg.eggs:
       src = egg_path
       dst = os.path.join('.deps', os.path.basename(src))
-      self.chroot.copy(src, dst, 'resources')
+      if os.path.isfile(src):
+        self.chroot.copy(src, dst, 'resources')
+      else:
+        for src_dir, subdirs, files in os.walk(src):
+          for f in files:
+            self.chroot.copy(
+              os.path.join(src_dir, f),
+              os.path.join(dst, os.path.relpath(os.path.join(src_dir, f), src)),
+              'resources')
 
   def _dump_setuptools(self):
     SETUPTOOLS = 'setuptools-0.6c11-py2.6.egg'

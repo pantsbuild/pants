@@ -17,7 +17,7 @@
 from twitter.common.collections import OrderedSet
 
 from twitter.pants.base.generator import TemplateData
-from pants_target import Pants
+
 from jvm_target import JvmTarget
 
 class ScalaTests(JvmTarget):
@@ -62,22 +62,14 @@ class ScalaTests(JvmTarget):
     buildflags: A list of additional command line arguments to pass to the underlying build system
         for this target"""
 
-    def get_all_deps():
-      all_deps = OrderedSet()
-      all_deps.update(Pants('src/scala/com/twitter/common/testing:explicit-specs-runner').resolve())
-      all_deps.update(Pants('3rdparty:scala-library').resolve())
-      if dependencies:
-        all_deps.update(dependencies)
-      return all_deps
-
     JvmTarget.__init__(self,
-                        'tests/scala',
-                        name,
-                        sources,
-                        get_all_deps(),
-                        excludes,
-                        buildflags,
-                        is_meta)
+                       'tests/scala',
+                       name,
+                       sources,
+                       dependencies,
+                       excludes,
+                       buildflags,
+                       is_meta)
 
   def _create_template_data(self):
     jar_dependency, id, exported = self._get_artifact_info()

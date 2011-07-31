@@ -22,7 +22,19 @@ class TargetWithSources(Target):
   def __init__(self, target_base, name, is_meta = False):
     Target.__init__(self, name, is_meta)
 
-    self.target_base = target_base
+    # TODO(John Sirois): rationalize constructor parameter and find_target_base
+    self.target_base = target_base if target_base else self.find_target_base()
+
+  def find_target_base(self):
+    """Finds the directory relative to the repo root directory that houses this target's sources
+    in the native packaging scheme.  For Java projects, this would typically be the relative path
+    to the root of a package hierarchy - currently src/java, tests/java, etc.  For C for example
+    this might be different: src/c/src and src/c/includes.
+
+    The default implementation assumes all source roots are 2 levels deep from the root directory.
+    """
+
+    return os.path.sep.join(self.address.buildfile.relpath.split(os.path.sep)[:2])
 
   def _resolve_paths(self, base, paths):
     # meta targets are composed of already-resolved paths

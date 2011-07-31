@@ -16,6 +16,7 @@
 
 from twitter.pants.base.generator import Generator
 from twitter.pants.base.builder import Builder
+from twitter.pants.targets import Pants
 from twitter.pants import has_jvm_targets, is_test
 
 import bang
@@ -100,6 +101,15 @@ class AntBuilder(Builder):
   def create_ant_builds(self, workspace_root, targets, flags, target):
     if target._id in targets:
       return targets[target._id]
+
+    # Link in libraries required by ant targets as needed
+    if target.target_base == 'tests/java':
+      junit = target.do_in_context(lambda: Pants('3rdparty:junit').resolve())
+      target.update_dependencies(junit)
+    elif target.target_base == 'tests/scala':
+      explicit_specs_runner = target.do_in_context(
+        lambda: Pants('src/scala/com/twitter/common/testing:explicit-specs-runner').resolve())
+      target.update_dependencies(explicit_specs_runner)
 
     try:
       library_template_data = target._create_template_data()

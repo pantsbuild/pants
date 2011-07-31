@@ -88,9 +88,9 @@ class InternalTarget(Target):
     return sorted
 
   @classmethod
-  def coalesce_targets(cls, internal_targets):
+  def coalesce_targets(cls, internal_targets, discriminator):
     """Returns a list of targets internal_targets depend on sorted from most dependent to least and
-    grouped where possible by target type."""
+    grouped where possible by target type as categorized by the given discriminator."""
 
     sorted_targets = InternalTarget.sort_targets(internal_targets)
 
@@ -112,19 +112,19 @@ class InternalTarget(Target):
     # main scan left to right no backtracking
     for i in range(len(sorted_targets) - 1):
       current_target = sorted_targets[i]
-      if current_type != type(current_target):
+      if current_type != discriminator(current_target):
         scanned_back = False
 
         # scan ahead for next type match
         for j in range(i + 1, len(sorted_targets)):
           look_ahead_target = sorted_targets[j]
-          if current_type == type(look_ahead_target):
+          if current_type == discriminator(look_ahead_target):
             scanned_back = True
 
             # swap this guy as far back as we can
             for k in range(j, i, -1):
               previous_target = sorted_targets[k - 1]
-              mismatching_types = current_type != type(previous_target)
+              mismatching_types = current_type != discriminator(previous_target)
               not_a_dependency = look_ahead_target not in previous_target.internal_dependencies
               if mismatching_types and not_a_dependency:
                 sorted_targets[k] = sorted_targets[k - 1]
@@ -135,7 +135,7 @@ class InternalTarget(Target):
             break # out of j
 
         if not scanned_back: # done with coalescing the current type, move on to next
-          current_type = type(current_target)
+          current_type = discriminator(current_target)
 
     return sorted_targets
 
@@ -144,11 +144,11 @@ class InternalTarget(Target):
 
     return InternalTarget.sort_targets([ self ])
 
-  def coalesce(self):
+  def coalesce(self, discriminator):
     """Returns a list of targets this target depends on sorted from most dependent to least and
-    grouped where possible by target type."""
+    grouped where possible by target type as categorized by the given discriminator."""
 
-    return InternalTarget.coalesce_targets([ self ])
+    return InternalTarget.coalesce_targets([ self ], discriminator)
 
   def __init__(self, name, dependencies, is_meta):
     Target.__init__(self, name, is_meta)

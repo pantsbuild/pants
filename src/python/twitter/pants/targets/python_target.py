@@ -21,11 +21,17 @@ from twitter.pants.base.generator import TemplateData
 from with_sources import TargetWithSources
 
 class PythonTarget(TargetWithSources):
-  def __init__(self, target_base, name, sources, resources = None, dependencies = None, is_meta = False):
+  def __init__(self,
+               target_base,
+               name,
+               sources,
+               resources = None,
+               dependencies = None,
+               is_meta = False):
     TargetWithSources.__init__(self, target_base, name, is_meta)
 
-    self.sources = self._resolve_paths(target_base, sources)
-    self.resources = self._resolve_paths(target_base, resources) if resources else OrderedSet()
+    self.sources = self._resolve_paths(self.target_base, sources)
+    self.resources = self._resolve_paths(self.target_base, resources) if resources else OrderedSet()
     self.dependencies = dependencies if dependencies else OrderedSet()
 
   def _create_template_data(self):

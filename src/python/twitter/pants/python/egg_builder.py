@@ -43,8 +43,14 @@ class EggBuilder(object):
     os.chdir(egg_root)
     print 'EggBuilder executing: %s' % ' '.join(args)
     try:
+      oldenv = os.getenv('PYTHONPATH')
+      os.putenv('PYTHONPATH', ':'.join(sys.path))
       po = subprocess.Popen(args, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
       rv = po.wait()
+      if oldenv:
+        os.putenv('PYTHONPATH', oldenv)
+      else:
+        os.unsetenv('PYTHONPATH')
       eggs = os.path.abspath(os.path.join('dist', '*.egg'))
       eggs = glob.glob(eggs)
       if rv != 0 or len(eggs) != 1:
