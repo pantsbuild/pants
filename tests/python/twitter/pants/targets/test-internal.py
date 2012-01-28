@@ -16,7 +16,7 @@
 
 __author__ = 'John Sirios'
 
-from twitter.pants.targets import InternalTarget, InternalTarget_CycleException
+from twitter.pants.targets import InternalTarget
 
 import unittest
 
@@ -38,7 +38,7 @@ class InternalTargetTest(unittest.TestCase):
     try:
       InternalTarget.check_cycles(a)
       self.fail("Expected a cycle to be detected")
-    except InternalTarget_CycleException:
+    except InternalTarget.CycleException:
       # expected
       pass
 
@@ -54,6 +54,6 @@ class InternalTargetTest(unittest.TestCase):
     try:
       InternalTarget.check_cycles(a)
       self.fail("Expected a cycle to be detected")
-    except InternalTarget_CycleException:
+    except InternalTarget.CycleException:
       # expected
       pass

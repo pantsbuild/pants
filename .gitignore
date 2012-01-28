@@ -8,11 +8,16 @@
 .project
 .settings
 .classpath
+.factorypath
+.python
+.python-eggs
 .pydevproject
+bin/
 build/
 codegen/classes/
 dist
 out
+pants.pex
 target
 ivy
 *.class
@@ -21,4 +26,8 @@ ivy
 *.iws
 *.pyc
 *.hprof
+*.swp
 scalding/data/
+src/cpp/julpan0/build*
+src/cpp/julpan0/data
+src/cpp/julpan0/third_party_data/

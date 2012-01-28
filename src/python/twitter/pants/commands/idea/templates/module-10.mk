@@ -26,7 +26,7 @@ limitations under the License.
       <configuration ivyFile="${module.ivyfile}"
                      useProjectSettings="false"
                      ivySettingsFile="${module.ivysettingsfile}"
-                     onlyResolveSelectedConfigs="true"/>
+                     onlyResolveSelectedConfigs="false"/>
     </facet>
     % endif
 
@@ -84,6 +84,9 @@ limitations under the License.
 
     <orderEntry type="inheritedJdk"/>
     <orderEntry type="sourceFolder" forTests="false"/>
+    % if module.has_scala:
+    <orderEntry type="library" name="scala" level="project"/>
+    % endif
   </component>
 
 % for component in module.extra_components:

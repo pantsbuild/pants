@@ -23,29 +23,9 @@ from jvm_target import JvmTarget
 class ScalaTests(JvmTarget):
   """Defines a target that tests a scala library."""
 
-  @classmethod
-  def _aggregate(cls, name, buildflags, scala_tests):
-    all_deps = OrderedSet()
-    all_excludes = OrderedSet()
-    all_sources = []
-
-    for scala_test in scala_tests:
-      if scala_test.resolved_dependencies:
-        all_deps.update(dep for dep in scala_test.jar_dependencies if dep.rev is not None)
-      if scala_test.excludes:
-        all_excludes.update(scala_test.excludes)
-      if scala_test.sources:
-        all_sources.extend(scala_test.sources)
-
-    return ScalaTests(name,
-                      all_sources,
-                      dependencies = all_deps,
-                      buildflags = buildflags,
-                      is_meta = True)
-
   def __init__(self,
                name,
-               sources,
+               sources = None,
                dependencies = None,
                excludes = None,
                buildflags = None,
@@ -63,7 +43,6 @@ class ScalaTests(JvmTarget):
         for this target"""
 
     JvmTarget.__init__(self,
-                       'tests/scala',
                        name,
                        sources,
                        dependencies,

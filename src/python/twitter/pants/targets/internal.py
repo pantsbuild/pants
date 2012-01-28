@@ -19,16 +19,16 @@ import collections
 
 from twitter.pants.base import Target
 
-class InternalTarget_CycleException(Exception):
-  """Thrown when a circular dependency is detected."""
-
-  def __init__(self, precedents, cycle):
-    Exception.__init__(self, 'Cycle detected along path:\n\t%s' % (
-      ' ->\n\t'.join(str(target.address) for target in list(precedents) + [ cycle ])
-    ))
-
 class InternalTarget(Target):
   """A baseclass for targets that support an optional dependency set."""
+
+  class CycleException(Exception):
+    """Thrown when a circular dependency is detected."""
+
+    def __init__(self, precedents, cycle):
+      Exception.__init__(self, 'Cycle detected along path:\n\t%s' % (
+        ' ->\n\t'.join(str(target.address) for target in list(precedents) + [ cycle ])
+      ))
 
   @classmethod
   def check_cycles(cls, internal_target):
@@ -39,7 +39,7 @@ class InternalTarget(Target):
 
     def descend(internal_dep):
       if internal_dep in dep_stack:
-        raise InternalTarget_CycleException(dep_stack, internal_dep)
+        raise InternalTarget.CycleException(dep_stack, internal_dep)
       if hasattr(internal_dep, 'internal_dependencies'):
         dep_stack.add(internal_dep)
         for dep in internal_dep.internal_dependencies:
@@ -153,24 +153,34 @@ class InternalTarget(Target):
   def __init__(self, name, dependencies, is_meta):
     Target.__init__(self, name, is_meta)
 
-    self.resolved_dependencies = OrderedSet()
+    self.dependencies = OrderedSet()
     self.internal_dependencies = OrderedSet()
     self.jar_dependencies = OrderedSet()
 
-    self.update_dependencies(dependencies)
+    # TODO(John Sirois): if meta targets were truly built outside parse contexts - we could instead
+    # just use the more general check: if parsing: delay(doit) else: doit()
+    # Fix how target _ids are built / addresses to not require a BUILD file - ie: support anonymous,
+    # non-addressable targets - which is what meta-targets really are once created.
+    if is_meta:
+      # Meta targets are built outside any parse context - so update dependencies immediately
+      self.update_dependencies(dependencies)
+    else:
+      # Defer dependency resolution after parsing the current BUILD file to allow for forward
+      # references
+      self._post_construct(self.update_dependencies, dependencies)
 
   def update_dependencies(self, dependencies):
     if dependencies:
       for dependency in dependencies:
         for resolved_dependency in dependency.resolve():
-          self.resolved_dependencies.add(resolved_dependency)
+          self.dependencies.add(resolved_dependency)
           if isinstance(resolved_dependency, InternalTarget):
             self.internal_dependencies.add(resolved_dependency)
           self.jar_dependencies.update(resolved_dependency._as_jar_dependencies())
 
   def _walk(self, walked, work, predicate = None):
     Target._walk(self, walked, work, predicate)
-    for dep in self.resolved_dependencies:
+    for dep in self.dependencies:
       if isinstance(dep, Target) and not dep in walked:
         walked.add(dep)
         if not predicate or predicate(dep):

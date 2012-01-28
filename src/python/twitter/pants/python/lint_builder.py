@@ -19,16 +19,15 @@ import sys
 import subprocess
 
 from twitter.common.collections import OrderedSet
-from twitter.pants.base import Address, Target
+from twitter.common.python import PythonLauncher
 from twitter.pants.python.python_chroot import PythonChroot
-from twitter.pants.python.launcher import Launcher
-from twitter.pants.targets import PythonEgg, PythonLibrary, PythonBinary, PythonTests, Pants
+from twitter.pants.targets import PythonEgg
 
 try:
   import pylint
-  _HAS_PYLINT=True
+  _HAVE_PYLINT = True
 except ImportError:
-  _HAS_PYLINT=False
+  _HAVE_PYLINT = False
 
 class PythonLintBuilder(object):
   def __init__(self, targets, args, root_dir):
@@ -37,15 +36,14 @@ class PythonLintBuilder(object):
     self.root_dir = root_dir
 
   def run(self):
-    if not _HAS_PYLINT:
+    if not _HAVE_PYLINT:
       print >> sys.stderr, 'ERROR: Pylint not found!  Skipping.'
       return 1
     return self._run_lints(self.targets, self.args)
 
   def _run_lint(self, target, args):
     chroot = PythonChroot(target, self.root_dir)
-    chroot.dump()
-    launcher = Launcher(chroot.path())
+    launcher = PythonLauncher(chroot.dump().path())
 
     interpreter_args = ['-m', 'pylint.lint',
       '--rcfile=%s' % os.path.join(self.root_dir, 'build-support', 'pylint', 'pylint.rc')]
@@ -58,6 +56,7 @@ class PythonLintBuilder(object):
     launcher.run(
       interpreter_args=interpreter_args,
       args=list(sources),
+      extra_deps=sys.path, # TODO(wickman) Extract only the pylint dependencies from sys.path
       with_chroot=True)
 
   def _run_lints(self, targets, args):

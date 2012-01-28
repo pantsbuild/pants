@@ -52,6 +52,9 @@ limitations under the License.
     <dependency org="${dependency.org}"
                 name="${dependency.module}"
                 rev="${dependency.version if dependency.version else 'latest.integration'}"
+      % if dependency.force:
+                force="true"
+      % endif
                 conf="${dependency.configurations}"
       % if not dependency.transitive:
                 transitive="false"

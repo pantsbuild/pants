@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # ==================================================================================================
 # Copyright 2011 Twitter, Inc.
 # --------------------------------------------------------------------------------------------------
@@ -16,12 +16,48 @@
 # ==================================================================================================
 
 MY_DIR=$(dirname $0)
-export BUILD_ROOT=${MY_DIR}
-export PYTHONPATH=${MY_DIR}/src/python
+VIRTUAL_PYTHON=$MY_DIR/.python
+
+PANTS_EXE=$MY_DIR/src/python/twitter/pants/bin/pants_exe.py
+MAKO_EGG=$MY_DIR/3rdparty/python/Mako-0.4.0-py2.6.egg
+MARKDOWN_EGG=$MY_DIR/3rdparty/python/Markdown-2.0.3-py2.6.egg
+ELEMENTTREE_EGG=$MY_DIR/3rdparty/python/elementtree-1.2.7_20070827_preview-py2.6.egg
+
+function run_pants_bare() {
+  source $VIRTUAL_PYTHON/bin/activate
+  PYTHONPATH=$MAKO_EGG:$MARKDOWN_EGG:$ELEMENTTREE_EGG:$MY_DIR/src/python python $PANTS_EXE "$@"
+  deactivate
+}
+
+if [ ! -e $VIRTUAL_PYTHON/bin/python ]; then
+  $MY_DIR/build-support/bootstrap/bootstrap.sh
+  rc=$?
+  if [[ $rc != 0 ]]; then
+    echo "Unable to bootstrap a sane Python virtual environment for pants!"
+    rm -rf $VIRTUAL_PYTHON
+    exit $rc
+  fi
+fi
+
+if [ -z "${PANTS_DEV}" -a ! -e $MY_DIR/pants.pex ]; then
+  run_pants_bare src/python/twitter/pants:pants
+  if [ ! -e $MY_DIR/dist/pants.pex ]; then
+    echo "Unable to build pants!  Cannot continue!"
+    exit
+  else
+    mv $MY_DIR/dist/pants.pex $MY_DIR/pants.pex
+  fi
+fi
 
 if [ -z "$ANT_OPTS" ]; then
   export ANT_OPTS="-Xmx1g -XX:MaxPermSize=512m"
 fi
 
-PYTHON=${PYTHON:=/usr/bin/env python2.6}
-${PYTHON} ${MY_DIR}/src/python/twitter/pants/bin/pants_exe.py "$@"
+if [ ! -z "${PANTS_DEV}" ]; then
+  # TODO(John Sirois): ideally this would just use pants.pex to run the pants target in py mode:
+  # ./pants.pex py src/python/twitter/pants "$@"
+  echo "*** running pants in dev mode from $PANTS_EXE ***"
+  run_pants_bare "$@"
+else
+  ${MY_DIR}/pants.pex "$@"
+fi

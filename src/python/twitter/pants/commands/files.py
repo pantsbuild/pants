@@ -27,7 +27,7 @@ class Files(Command):
 
   __command__ = 'files'
 
-  def setup_parser(self, parser):
+  def setup_parser(self, parser, args):
     parser.set_usage("%prog files [spec]")
     parser.epilog = """Lists all source files owned by the given BUILD target."""
 

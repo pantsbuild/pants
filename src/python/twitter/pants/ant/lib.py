@@ -16,21 +16,21 @@
 
 from twitter.pants.base.generator import Generator
 from twitter.pants.base.builder import Builder
+from twitter.pants.targets import JarDependency
+from twitter.pants.targets import JavaProtobufLibrary
+from twitter.pants.targets import JavaThriftLibrary
+from twitter.pants.targets import JavaTests
 from twitter.pants.targets import Pants
-from twitter.pants import has_jvm_targets, is_test
+from twitter.pants.targets import ScalaLibrary
+from twitter.pants.targets import ScalaTests
+from twitter.pants import has_jvm_targets, is_jvm
 
 import bang
-import ide
 import os
 import shutil
 import subprocess
 import traceback
 import pkgutil
-
-TRANSITIVITY_NONE = 'none'
-TRANSITIVITY_SOURCES = 'sources'
-TRANSITIVITY_TESTS = 'tests'
-TRANSITIVITY_ALL = 'all'
 
 _TEMPLATE_BASEDIR = 'templates'
 
@@ -55,13 +55,11 @@ class AntBuilder(Builder):
 
   @classmethod
   def _check_target(cls, target):
-    assert has_jvm_targets([target]),\
+    assert has_jvm_targets([target]), \
       "AntBuilder can only build jvm targets, given %s" % str(target)
 
-  def __init__(self, ferror, root_dir, is_ide, ide_transitivity):
+  def __init__(self, ferror, root_dir):
     Builder.__init__(self, ferror, root_dir)
-    self.is_ide = is_ide
-    self.ide_transitivity = ide_transitivity
 
   def build(self, targets, args):
     _, _, result = self.generate_and_build(targets, args)
@@ -99,17 +97,59 @@ class AntBuilder(Builder):
     return buildxml, ivyxml, subprocess.call(antargs)
 
   def create_ant_builds(self, workspace_root, targets, flags, target):
-    if target._id in targets:
-      return targets[target._id]
+    if target.id in targets:
+      return targets[target.id]
 
     # Link in libraries required by ant targets as needed
-    if target.target_base == 'tests/java':
+    def add_scaladeps(tgt):
+      scaladeps = target.do_in_context(lambda: JarDependency(
+        org = 'org.scala-lang',
+        name = 'scala-library',
+        rev = '${scala.version}'
+      ).withSources().resolve())
+      target.update_dependencies(scaladeps)
+
+    if is_jvm(target):
+      if not target.sources:
+        target.sources = [ '_not_a_real_file_' ]
+
+    if isinstance(target, JavaProtobufLibrary):
+      protobufdeps = target.do_in_context(lambda: JarDependency(
+        org = 'com.google.protobuf',
+        name = 'protobuf-java',
+        rev = '${protobuf.library.version}'
+      ).resolve())
+      target.update_dependencies(protobufdeps)
+    elif isinstance(target, JavaThriftLibrary):
+      def resolve_thriftdeps():
+        all_deps = [
+          Pants('3rdparty:commons-lang'),
+          JarDependency(org = 'org.apache.thrift',
+                        name = 'libthrift',
+                        rev = '${thrift.library.version}'),
+          Pants('3rdparty:slf4j-api'),
+
+          # finagle thrift extra deps
+          Pants('3rdparty:finagle-core'),
+          Pants('3rdparty:finagle-thrift'),
+          Pants('3rdparty:util'),
+        ]
+        for dep in all_deps:
+          target.update_dependencies(dep.resolve())
+      target.do_in_context(resolve_thriftdeps)
+    elif isinstance(target, JavaTests):
       junit = target.do_in_context(lambda: Pants('3rdparty:junit').resolve())
       target.update_dependencies(junit)
-    elif target.target_base == 'tests/scala':
-      explicit_specs_runner = target.do_in_context(
-        lambda: Pants('src/scala/com/twitter/common/testing:explicit-specs-runner').resolve())
-      target.update_dependencies(explicit_specs_runner)
+    elif isinstance(target, ScalaLibrary):
+      add_scaladeps(target)
+    elif isinstance(target, ScalaTests):
+      add_scaladeps(target)
+      specdeps = target.do_in_context(lambda: JarDependency(
+        org = 'org.scala-tools.testing',
+        name = '${specs.name}',
+        rev = '${specs.version}'
+      ).withSources().resolve())
+      target.update_dependencies(specdeps)
 
     try:
       library_template_data = target._create_template_data()
@@ -136,7 +176,7 @@ class AntBuilder(Builder):
 
     AntBuilder._generate(self.root_dir, build_template, library_template_data, pants_buildxml)
 
-    targets[target._id] = buildxml
+    targets[target.id] = buildxml
 
     for additional_library in target.internal_dependencies:
       self.create_ant_builds(workspace_root, targets, flags, additional_library)
@@ -148,20 +188,7 @@ class AntBuilder(Builder):
       AntBuilder._check_target(target)
 
     foil = list(targets)[0]
-    if self.is_ide:
-      def is_transitive():
-        if self.ide_transitivity == TRANSITIVITY_TESTS:
-          return is_test
-        if self.ide_transitivity == TRANSITIVITY_ALL:
-          return lambda target: True
-        if self.ide_transitivity == TRANSITIVITY_NONE:
-          return lambda target: False
-        if self.ide_transitivity == TRANSITIVITY_SOURCES:
-          return lambda target: not is_test(target)
-
-      is_transitive = is_transitive()
-      return foil.do_in_context(lambda: ide.extract_target(targets, is_transitive, name))
-    elif len(targets) > 1 or foil.address.is_meta:
-      return foil.do_in_context(lambda: bang.extract_target(targets, name))
+    if len(targets) > 1 or foil.address.is_meta:
+      return bang.extract_target(targets, name)
     else:
       return foil

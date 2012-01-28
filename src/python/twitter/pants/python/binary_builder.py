@@ -17,13 +17,10 @@
 __author__ = 'Brian Wickman'
 
 import os
-import shutil
-import zipfile
-import pkgutil
 
-from twitter.pants.targets import PythonLibrary, PythonEgg, PythonBinary
+from twitter.common.python.pexbuilder import PexBuilder
+from twitter.pants.targets import PythonBinary
 from twitter.pants.python.python_chroot import PythonChroot
-from twitter.pants.python.pex_creator import PexCreator
 
 class PythonBinaryBuilder(object):
   class NotABinaryTargetException(Exception): pass
@@ -36,26 +33,14 @@ class PythonBinaryBuilder(object):
     self.chroot = PythonChroot(target, root_dir)
     self.distdir = os.path.join(root_dir, 'dist')
 
-  def _generate_zip(self):
-    chroot = self.chroot.dump()
-    zp_path = os.path.join(self.distdir, '%s.zip' % self.target.name)
-    zippy = zipfile.ZipFile(zp_path, 'w', compression = zipfile.ZIP_DEFLATED)
-    sorted_digest = list(chroot.files())
-    sorted_digest.sort()
-    for pth in sorted_digest:
-      zippy.write(os.path.join(chroot.path(), pth), pth)
-    zippy.close()
-    return zp_path
+  def _generate(self):
+    env = self.chroot.dump()
+    pex = PexBuilder(env)
+    pex_name = os.path.join(self.distdir, '%s.pex' % self.target.name)
+    pex.write(pex_name)
+    print 'Wrote %s' % pex_name
 
   def run(self):
     print 'Building PythonBinary %s:' % self.target
-
-    zp_path = self._generate_zip()
-    print 'generated zip binary in: %s' % zp_path
-
-    pexer = PexCreator(zp_path, self.target.name)
-    pex = pexer.build(os.path.join(self.distdir, '%s.pex' % self.target.name))
-
-    print 'generated pex binary in: %s' % pex
-
+    self._generate()
     return 0

@@ -20,6 +20,7 @@ import glob
 import os
 import subprocess
 import sys
+from twitter.common.contextutil import environment_as, pushd
 
 class EggBuilder(object):
   """A helper class to create an egg."""
@@ -39,23 +40,17 @@ class EggBuilder(object):
       'setup.py', 'bdist_egg',
       '--dist-dir=dist',
       '--bdist-dir=build.%s' % target.name]
-    cwd = os.getcwd()
-    os.chdir(egg_root)
-    print 'EggBuilder executing: %s' % ' '.join(args)
-    try:
-      oldenv = os.getenv('PYTHONPATH')
-      os.putenv('PYTHONPATH', ':'.join(sys.path))
-      po = subprocess.Popen(args, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-      rv = po.wait()
-      if oldenv:
-        os.putenv('PYTHONPATH', oldenv)
-      else:
-        os.unsetenv('PYTHONPATH')
+    with pushd(egg_root):
+      print 'EggBuilder executing: %s' % ' '.join(args)
+      with environment_as(PYTHONPATH = ':'.join(sys.path)):
+        po = subprocess.Popen(args, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+        rv = po.wait()
       eggs = os.path.abspath(os.path.join('dist', '*.egg'))
       eggs = glob.glob(eggs)
       if rv != 0 or len(eggs) != 1:
         comm = po.communicate()
-        print >> sys.stderr, 'egg generation failed (return value=%d, num eggs=%d)' % (rv, len(eggs))
+        print >> sys.stderr, 'egg generation failed (return value=%d, num eggs=%d)' % (
+          rv, len(eggs))
         print >> sys.stderr, 'STDOUT'
         print >> sys.stderr, comm[0]
         print >> sys.stderr, 'STDERR'
@@ -63,6 +58,4 @@ class EggBuilder(object):
         raise EggBuilder.EggBuildingException(
           'Generation of eggs failed for target = %s' % target)
       egg_path = eggs[0]
-    finally:
-      os.chdir(cwd)
     return egg_path

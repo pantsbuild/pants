@@ -14,6 +14,7 @@
 # limitations under the License.
 # ==================================================================================================
 
+import marshal
 import os
 import re
 
@@ -24,12 +25,12 @@ class BuildFile(object):
   _CANONICAL_NAME = 'BUILD'
   _PATTERN = re.compile('^%s(\.[a-z]+)?$' % _CANONICAL_NAME)
 
-  @classmethod
-  def _is_buildfile_name(cls, name):
+  @staticmethod
+  def _is_buildfile_name(name):
     return BuildFile._PATTERN.match(name)
 
-  @classmethod
-  def scan_buildfiles(cls, root_dir, base_path = None):
+  @staticmethod
+  def scan_buildfiles(root_dir, base_path = None):
     """Looks for all BUILD files under base_path"""
 
     buildfiles = OrderedSet()
@@ -40,35 +41,40 @@ class BuildFile(object):
           buildfiles.add(BuildFile(root_dir, buildfile_relpath))
     return buildfiles
 
-  def __init__(self, root_dir, relpath):
+  def __init__(self, root_dir, relpath, must_exist=True):
     """Creates a BuildFile object representing the BUILD file set at the specified path.
 
     root_dir: The base directory of the project
     relpath: The path relative to root_dir where the BUILD file is found - this can either point
         directly at the BUILD file or else to a directory which contains BUILD files
-    raises IOError if the specified path does not house a BUILD file.
+    must_exist: If True, the specified BUILD file must exist or else an IOError is thrown
+    raises IOError if the specified path does not house a BUILD file and must_exist is True
     """
 
-    path = os.path.join(root_dir, relpath)
+    path = os.path.abspath(os.path.join(root_dir, relpath))
     buildfile = os.path.join(path, BuildFile._CANONICAL_NAME) if os.path.isdir(path) else path
-
-    if not os.path.exists(buildfile):
-      raise IOError("BUILD file does not exist at: %s" % (buildfile))
-
-    if not BuildFile._is_buildfile_name(os.path.basename(buildfile)):
-      raise IOError("%s is not a BUILD file" % buildfile)
 
     if os.path.isdir(buildfile):
       raise IOError("%s is a directory" % buildfile)
 
-    if not os.path.exists(buildfile):
-      raise IOError("BUILD file does not exist at: %s" % buildfile)
+    if must_exist:
+      if not os.path.exists(buildfile):
+        raise IOError("BUILD file does not exist at: %s" % (buildfile))
+
+      if not BuildFile._is_buildfile_name(os.path.basename(buildfile)):
+        raise IOError("%s is not a BUILD file" % buildfile)
+
+      if not os.path.exists(buildfile):
+        raise IOError("BUILD file does not exist at: %s" % buildfile)
 
     self.root_dir = root_dir
     self.full_path = buildfile
 
     self.name = os.path.basename(self.full_path)
     self.parent_path = os.path.dirname(self.full_path)
+
+    self._bytecode_path = os.path.join(self.parent_path, '.%s.pyc' % self.name)
+
     self.relpath = os.path.relpath(self.full_path, self.root_dir)
     self.canonical_relpath = os.path.join(os.path.dirname(self.relpath), BuildFile._CANONICAL_NAME)
 
@@ -117,6 +123,19 @@ class BuildFile(object):
     yield self
     for sibling in self.siblings():
       yield sibling
+
+  def code(self):
+    """Returns the code object for this BUILD file."""
+    if (os.path.exists(self._bytecode_path)
+        and os.path.getmtime(self.full_path) <= os.path.getmtime(self._bytecode_path)):
+      with open(self._bytecode_path, 'r') as bytecode:
+        return marshal.load(bytecode)
+    else:
+      with open(self.full_path, 'r') as source:
+        code = compile(source.read(), self.full_path, 'exec')
+        with open(self._bytecode_path, 'w') as bytecode:
+          marshal.dump(code, bytecode)
+        return code
 
   def __eq__(self, other):
     result = other and (

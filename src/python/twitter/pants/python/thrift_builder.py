@@ -18,12 +18,11 @@ __author__ = 'Brian Wickman'
 
 import os
 import sys
-import glob
 import shutil
 import tempfile
 import subprocess
 
-from twitter.pants.base import Chroot
+from twitter.common.dirutil.chroot import RelativeChroot
 from twitter.pants.python.egg_builder import EggBuilder
 
 class PythonThriftBuilder(object):
@@ -39,7 +38,7 @@ class PythonThriftBuilder(object):
     self.target = target
     self.root = root_dir
     distdir = os.path.join(self.root, 'dist')
-    self.chroot = Chroot(root_dir, distdir, target.name)
+    self.chroot = RelativeChroot(root_dir, distdir, target.name)
     codegen_root = tempfile.mkdtemp(dir=self.chroot.path(), prefix='codegen.')
     self.codegen_root = os.path.relpath(codegen_root, self.chroot.path())
     self.detected_packages = set()
@@ -58,11 +57,11 @@ class PythonThriftBuilder(object):
   def thrift_binary(root_dir):
     # TODO(Brian Wickman):  Will we ever need to make this smarter?
     PLATMAP = {
-      ('darwin', 'i386'): ['mac', '10.6', '0.5.0', 'thrift'],
-      ('darwin', 'x86_64'): ['mac', '10.6', '0.5.0', 'thrift'],
-      ('darwin', 'x86_64'): ['mac', '10.7', '0.5.0', 'thrift'],
-      ('linux',  'x86_64'): ['linux', 'x86_64', '0.5.0', 'thrift'],
-      ('linux',  'i686') : ['linux', 'i386', '0.5.0', 'thrift']
+      ('darwin', 'i386'): ['mac', '10.6', '0.5.0-finagle', 'thrift'],
+      ('darwin', 'x86_64'): ['mac', '10.6', '0.5.0-finagle', 'thrift'],
+      ('darwin', 'x86_64'): ['mac', '10.7', '0.5.0-finagle', 'thrift'],
+      ('linux',  'x86_64'): ['linux', 'x86_64', '0.5.0-finagle', 'thrift'],
+      ('linux',  'i686') : ['linux', 'i386', '0.5.0-finagle', 'thrift']
     }
     uname = os.uname()
     platform = (uname[0].lower(), uname[4])

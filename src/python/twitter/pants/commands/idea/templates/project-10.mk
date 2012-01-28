@@ -70,8 +70,9 @@ limitations under the License.
   <component name="libraryTable">
     <library name="scala">
       <CLASSES>
-        <root url="jar://${project.root_dir}/build-support/antlib/scala-library-2.8.1.jar!/"/>
-        <root url="jar://${project.root_dir}/build-support/antlib/scala-compiler-2.8.1.jar!/"/>
+        % for path in project.scala_compiler_classpath:
+        <root url="jar://${path}!/"/>
+        % endfor
       </CLASSES>
       <JAVADOC />
       <SOURCES />
@@ -83,10 +84,6 @@ limitations under the License.
     <mapping directory="${project.root_dir}" vcs="Git"/>
   </component>
 
-  <%
-    checkstyle_suppression_files = ','.join([ project.root_dir + '/build-support/commons/checkstyle/checkstyle_suppressions.xml' ] +
-	     [project.root_dir + '/' + relpath for relpath in project.extra_checkstyle_suppression_files ] )
-  %>
   <component name="CheckStyle-IDEA">
     <option name="configuration">
       <map>
@@ -94,8 +91,8 @@ limitations under the License.
         <entry key="check-test-classes" value="test" />
         <entry key="location-0" value="CLASSPATH:/sun_checks.xml:The default CheckStyle rules." />
         <entry key="location-1" value="file://${project.root_dir}/build-support/checkstyle/coding_style.xml:Twitter CheckStyle rules." />
-        <entry key="property-1.checkstyle.suppression.files" value="${checkstyle_suppression_files}"/>
-        <entry key="thirdparty-classpath" value="${project.root_dir}/build-support/antlib/checkstyle-custom-checks.jar" />
+        <entry key="property-1.checkstyle.suppression.files" value="${project.checkstyle_suppression_files}"/>
+        <entry key="thirdparty-classpath" value="${project.checkstyle_classpath}" />
       </map>
     </option>
   </component>

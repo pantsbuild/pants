@@ -16,8 +16,8 @@
 
 __author__ = 'John Sirois'
 
-from python_builder import PythonBuilder
-from python_chroot import PythonChroot
+from twitter.pants.python.python_builder import PythonBuilder
+from twitter.pants.python.python_chroot import PythonChroot
 
 __all__ = [
   'PythonBuilder',

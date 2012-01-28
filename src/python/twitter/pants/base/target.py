@@ -44,7 +44,7 @@ class Target(object):
       if buildfile in Target._addresses_by_buildfile:
         return Target._addresses_by_buildfile[buildfile]
       else:
-        return None
+        return OrderedSet()
 
     addresses = lookup()
     if addresses:
@@ -72,10 +72,16 @@ class Target(object):
     self.name = name
     self.is_meta = is_meta
     self.is_codegen = False
+    self.description = None
 
     self.address = self.locate()
-    self._id = self._create_id()
+    self.id = self._create_id()
     self.register()
+
+  def _post_construct(self, func, *args, **kwargs):
+    """Registers a command to invoke after this target's BUILD file is parsed."""
+
+    ParseContext.locate().on_context_exit(func, *args, **kwargs)
 
   def _create_id(self):
     """Generates a unique identifer for the BUILD target.  The generated id is safe for use as a
@@ -115,7 +121,7 @@ class Target(object):
 
   def _walk(self, walked, work, predicate = None):
     for target in self.resolve():
-      if target not in walked:
+      if target not in walked and isinstance(target, Target):
         walked.add(target)
         if not predicate or predicate(target):
           additional_targets = work(target)
@@ -126,6 +132,10 @@ class Target(object):
 
   def do_in_context(self, work):
     return ParseContext(self.address.buildfile).do_in_context(work)
+
+  def with_description(self, description):
+    self.description = description
+    return self
 
   def __eq__(self, other):
     result = other and (

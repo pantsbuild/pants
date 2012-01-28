@@ -16,15 +16,14 @@
 
 from address import Address
 from build_file import BuildFile
-from chroot import Chroot
 from fileset import Fileset
-from parse_context import ParseContext
+from parse_context import ContextError, ParseContext
 from target import Target, TargetDefinitionException
 
 __all__ = [
   'Address',
   'BuildFile',
-  'Chroot',
+  'ContextError',
   'Fileset',
   'ParseContext',
   'Target',

@@ -37,10 +37,17 @@ class MockTarget(object):
     self.excludes = []
     self.rev = rev
 
+
   def __repr__(self):
     return self.name
 
 
+  def walk(self, func, unused_predicate):
+    if not self.rev:
+      func(self)
+
+
+# TODO(John Sirois): test --no-{java,scala} behavior
 class IdeTest(unittest.TestCase):
   def test_extract_target(self):
     jar1 = MockTarget('jar1', rev = 1)
@@ -86,7 +93,8 @@ class IdeTest(unittest.TestCase):
     #         -> jar6
     #   --> jar4
 
-    internal_deps, jar_deps = _extract_target(a, lambda target: True, lambda target: target.is_apt)
+    internal_deps, jar_deps = _extract_target(a, lambda target: True,
+                                              lambda target: target.is_apt or target.is_codegen)
 
     self.assertEquals(OrderedSet([c, b]), internal_deps,
                       'Expected depth first walk to roll up e to 1st visited dependee (c)')

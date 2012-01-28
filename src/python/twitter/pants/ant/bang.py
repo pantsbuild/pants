@@ -14,6 +14,10 @@
 # limitations under the License.
 # ==================================================================================================
 
+from twitter.common.collections import OrderedSet
+
+from twitter.pants import get_buildroot, is_internal, is_jvm
+from twitter.pants.base import BuildFile, ParseContext
 from twitter.pants.targets import (
   AnnotationProcessor,
   InternalTarget,
@@ -25,7 +29,43 @@ from twitter.pants.targets import (
   ScalaTests
 )
 
-from twitter.pants import is_jvm
+def _aggregate(target_type, name, libs, deployjar=None, buildflags=None):
+  all_deps = OrderedSet()
+  all_excludes = OrderedSet()
+  all_sources = []
+  all_java_sources = []
+  all_resources = []
+  all_annotation_processors = []
+
+  kwargs = dict(is_meta=True)
+
+  if deployjar:
+    kwargs['deployjar'] = deployjar
+
+  if buildflags:
+    kwargs['buildflags'] = buildflags
+
+  for lib in libs:
+    if lib.dependencies:
+      all_deps.update(dep for dep in lib.jar_dependencies if dep.rev is not None)
+      kwargs['dependencies'] = all_deps
+    if lib.excludes:
+      all_excludes.update(lib.excludes)
+      kwargs['excludes'] = all_excludes
+    if lib.sources:
+      all_sources.extend(lib.sources)
+    if hasattr(lib, 'java_sources') and lib.java_sources:
+      all_java_sources.extend(lib.java_sources)
+      kwargs['java_sources'] = all_java_sources
+    if hasattr(lib, 'resources') and lib.resources:
+      all_resources.extend(lib.resources)
+      kwargs['resources'] = all_resources
+    if hasattr(lib, 'processors') and lib.processors:
+      all_annotation_processors.extend(lib.processors)
+      kwargs['processors'] = all_annotation_processors
+
+  return target_type(name, all_sources, **kwargs)
+
 
 def extract_target(java_targets, name = None):
   """Extracts a minimal set of linked targets from the given target's internal transitive dependency
@@ -55,35 +95,37 @@ def extract_target(java_targets, name = None):
     # ant build support to allow the same treatment for JavaThriftLibrary and JavaProtobufLibrary
     # so that tests can house test IDL in tests/
     target_type, base = category
-    if target_type == JavaProtobufLibrary:
-      return JavaProtobufLibrary._aggregate(name('protobuf'), provides, buildflags, targets)
-    elif target_type == JavaThriftLibrary:
-      return JavaThriftLibrary._aggregate(name('thrift'), provides, buildflags, targets)
-    elif target_type == AnnotationProcessor:
-      return AnnotationProcessor._aggregate(name('apt'), provides, targets)
-    elif target_type == JavaLibrary:
-      return JavaLibrary._aggregate(name('java'), provides, deployjar, buildflags, targets, base)
-    elif target_type == ScalaLibrary:
-      return ScalaLibrary._aggregate(name('scala'), provides, deployjar, buildflags, targets, base)
-    elif target_type == JavaTests:
-      return JavaTests._aggregate(name('java-tests'), buildflags, targets)
-    elif target_type == ScalaTests:
-      return ScalaTests._aggregate(name('scala-tests'), buildflags, targets)
-    else:
-      raise Exception("Cannot aggregate targets of type: %s" % target_type)
+    def create():
+      if target_type == JavaProtobufLibrary:
+        return _aggregate(JavaProtobufLibrary, name('protobuf'), targets, buildflags=buildflags)
+      elif target_type == JavaThriftLibrary:
+        return _aggregate(JavaThriftLibrary, name('thrift'), targets, buildflags=buildflags)
+      elif target_type == AnnotationProcessor:
+        return _aggregate(AnnotationProcessor, name('apt'), targets)
+      elif target_type == JavaLibrary:
+        return _aggregate(JavaLibrary, name('java'), targets, deployjar, buildflags)
+      elif target_type == ScalaLibrary:
+        return _aggregate(ScalaLibrary, name('scala'), targets, deployjar, buildflags)
+      elif target_type == JavaTests:
+        return _aggregate(JavaTests, name('java-tests'), targets, buildflags=buildflags)
+      elif target_type == ScalaTests:
+        return _aggregate(ScalaTests, name('scala-tests'), targets, buildflags=buildflags)
+      else:
+        raise Exception("Cannot aggregate targets of type: %s" % target_type)
+    return ParseContext(BuildFile(get_buildroot(), base, must_exist=False)).do_in_context(create)
 
   # TODO(John Sirois): support a flag that selects conflict resolution policy - this currently
   # happens to mirror the ivy policy we use
   def resolve_conflicts(target):
     dependencies = {}
-    for dependency in target.resolved_dependencies:
+    for dependency in target.dependencies:
       for jar in dependency._as_jar_dependencies():
         key = jar.org, jar.name
         previous = dependencies.get(key, jar)
         if jar.rev >= previous.rev:
           if jar != previous:
-            print "WARNING: replacing %s with %s for %s" % (previous, jar, target._id)
-            target.resolved_dependencies.remove(previous)
+            print "WARNING: replacing %s with %s for %s" % (previous, jar, target.id)
+            target.dependencies.remove(previous)
             target.jar_dependencies.remove(previous)
           dependencies[key] = jar
     return target
@@ -129,7 +171,7 @@ def extract_target(java_targets, name = None):
     meta_target = resolve_conflicts(create_target(ttype, meta_target_base_name, index, targets))
     targets_by_meta_target.append((meta_target, targets))
     for target in targets:
-      meta_targets_by_target_id[target._id] = meta_target
+      meta_targets_by_target_id[target.id] = meta_target
 
   # calculate the other meta-targets (if any) each meta-target depends on
   extra_targets_by_meta_target = []
@@ -139,9 +181,9 @@ def extract_target(java_targets, name = None):
     for target in targets:
       if target.custom_antxml_path:
         custom_antxml_path = target.custom_antxml_path
-      for dep in target.resolved_dependencies:
+      for dep in target.dependencies:
         if is_jvm(dep):
-          meta = meta_targets_by_target_id[dep._id]
+          meta = meta_targets_by_target_id[dep.id]
           if meta != meta_target:
             meta_deps.add(meta)
     extra_targets_by_meta_target.append((meta_target, meta_deps, custom_antxml_path))
@@ -153,9 +195,7 @@ def extract_target(java_targets, name = None):
         excludes.update(target.excludes)
       for jar_dep in target.jar_dependencies:
         excludes.update(jar_dep.excludes)
-      for internal_dep in target.internal_dependencies:
-        lift(internal_dep)
-    lift(meta_target)
+    meta_target.walk(lift, is_internal)
     return excludes
 
   # link in the extra inter-meta deps

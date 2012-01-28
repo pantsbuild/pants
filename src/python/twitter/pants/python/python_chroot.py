@@ -16,23 +16,28 @@
 
 __author__ = 'Brian Wickman'
 
+import copy
+import errno
 import os
+import pkgutil
+import random
 import shutil
 import sys
-import random
-import pkgutil
+import tempfile
 
-from twitter.pants.base import Chroot
+from twitter.common.python.dependency import PythonDependency
+from twitter.common.python.environment import PythonEnvironment
+from twitter.common.contextutil import temporary_dir
+from twitter.pants.base import Target, Address
 
-from twitter.pants.targets import PythonBinary
-from twitter.pants.targets import PythonEgg
-from twitter.pants.targets import PythonLibrary
-from twitter.pants.targets import PythonAntlrLibrary
-from twitter.pants.targets import PythonThriftLibrary
-from twitter.pants.targets import PythonTests
+from twitter.pants.targets import (
+  PythonBinary, PythonEgg, PythonLibrary, PythonAntlrLibrary,
+  PythonThriftLibrary, PythonTests)
 
+from twitter.pants.base.build_cache import BuildCache
 from twitter.pants.python.antlr_builder import PythonAntlrBuilder
 from twitter.pants.python.thrift_builder import PythonThriftBuilder
+from twitter.pants.targets.with_sources import TargetWithSources
 
 class PythonChroot(object):
   class InvalidDependencyException(Exception):
@@ -44,100 +49,120 @@ class PythonChroot(object):
       Exception.__init__(self, "Not a valid Python dependency! Found: %s" % target)
 
   def __init__(self, target, root_dir):
-    self.target = target
-    self.root = root_dir
+    self._target = target
+    self._root = root_dir
+    self._cache = BuildCache(os.path.join(root_dir, '.pants.d', 'py_artifact_cache'))
     distdir = os.path.join(root_dir, 'dist')
-    self.chroot = Chroot(root_dir, distdir, target.name)
+    distpath = tempfile.mktemp(dir=distdir, prefix=target.name)
+    self.env = PythonEnvironment(distpath)
 
   def __del__(self):
-    shutil.rmtree(self.chroot.path())
+    if os.getenv('PANTS_LEAVE_CHROOT') is None:
+      try:
+        shutil.rmtree(self.path())
+      except OSError as e:
+        if e.errno != errno.ENOENT:
+          raise
 
   def path(self):
-    return self.chroot.path()
+    return self.env.path()
 
   def _dump_library(self, library):
     def translate_module(module):
       if module is None:
-        module=''
+        module = ''
       return module.replace('.', os.path.sep)
 
-    def copy_to_chroot(base, path, relative_to=None, label=None):
-      src = os.path.join(base, path)
+    def copy_to_chroot(base, path, relative_to, add_function):
+      src = os.path.join(self._root, base, path)
       dst = os.path.join(translate_module(relative_to), path)
-      self.chroot.copy(src, dst, label)
+      add_function(src, dst)
 
     template = library._create_template_data()
     print '  Dumping library: %s [relative module: %s]' % (library, template.module)
     for filename in template.sources:
-      copy_to_chroot(template.template_base, filename, template.module, 'sources')
+      copy_to_chroot(template.template_base, filename, template.module, self.env.add_source)
     for filename in template.resources:
-      copy_to_chroot(template.template_base, filename, template.module, 'resources')
-
-  def _dump_inits(self):
-    # iterate through self.digest and find missing __init__.py's
-    relative_digest = self.chroot.get('sources')
-    init_digest = set()
-    for path in relative_digest:
-      split_path = path.split(os.path.sep)
-      for k in range(1, len(split_path)):
-        sub_path = os.path.sep.join(split_path[0:k] + ['__init__.py'])
-        if sub_path not in relative_digest and sub_path not in init_digest:
-          print '  Dumping __init__: %s' % sub_path
-          self.chroot.touch(sub_path)
-          init_digest.add(sub_path)
+      copy_to_chroot(template.template_base, filename, template.module, self.env.add_resource)
 
   def _dump_egg(self, egg):
-    print '  Dumping egg: %s' % egg
-    for egg_path in egg.eggs:
-      src = egg_path
-      dst = os.path.join('.deps', os.path.basename(src))
-      if os.path.isfile(src):
-        self.chroot.copy(src, dst, 'resources')
-      else:
-        for src_dir, subdirs, files in os.walk(src):
-          for f in files:
-            self.chroot.copy(
-              os.path.join(src_dir, f),
-              os.path.join(dst, os.path.relpath(os.path.join(src_dir, f), src)),
-              'resources')
+    target_name = os.path.pathsep.join(sorted(os.path.basename(e) for e in egg.eggs))
+    cache_key = self._cache.key_for(target_name, egg.eggs)
+    if self._cache.needs_update(cache_key):
+      print '  Dumping egg: %s' % egg
+      prefixes, all_added_files = set(), set()
+      for egg_path in egg.eggs:
+        egg_dep = PythonDependency.from_eggs(egg_path)
+        prefix, added_files = self.env.add_dependency(egg_dep)
+        all_added_files.update(added_files)
+        prefixes.add(prefix)
+      assert len(prefixes) == 1, 'Ambiguous egg environment!'
+      self._cache.update(cache_key, all_added_files, artifact_root=prefixes.pop())
+    else:
+      print '  Dumping (cached) egg: %s' % egg
+      self._cache.use_cached_files(cache_key, self.env.add_dependency_file)
 
   def _dump_setuptools(self):
-    SETUPTOOLS = 'setuptools-0.6c11-py2.6.egg'
+    SETUPTOOLS = 'distribute-0.6.21-py2.6.egg'
     print '  Dumping setuptools: %s' % SETUPTOOLS
     data = pkgutil.get_data(__name__, os.path.join('bootstrap', SETUPTOOLS))
-    dst = os.path.join('.deps', SETUPTOOLS)
-    self.chroot.write(data, dst, 'resources')
+    with temporary_dir() as tempdir:
+      egg_path = os.path.join(tempdir, SETUPTOOLS)
+      with open(egg_path, 'w') as fp:
+        fp.write(data)
+      egg_dep = PythonDependency.from_eggs(egg_path)
+      self.env.add_dependency(egg_dep)
+
+  # TODO(wickman) Just add write() to self.env and do this with pkg_resources or
+  # just build an egg for twitter.common.python.
+  def _get_common_python(self):
+    return Target.get(Address.parse(self._root, 'src/python/twitter/common/python'))
 
   def _dump_bin(self, binary_name, base):
-    src = os.path.join(base, binary_name)
+    src = os.path.join(self._root, base, binary_name)
     print '  Dumping binary: %s' % binary_name
-    self.chroot.copy(src, '__main__.py', 'sources')
+    self.env.set_executable(src, os.path.basename(src))
 
   def _dump_thrift_library(self, library):
-    print '  Generating %s...' % library
-    self._dump_built_library(PythonThriftBuilder(library, self.root))
+    self._dump_built_library(library, PythonThriftBuilder(library, self._root))
 
   def _dump_antlr_library(self, library):
-    print '  Generating %s...' % library
-    self._dump_built_library(PythonAntlrBuilder(library, self.root))
+    self._dump_built_library(library, PythonAntlrBuilder(library, self._root))
 
-  def _dump_built_library(self, builder):
-    egg_file = builder.build_egg()
-    if egg_file:
-      egg_file = os.path.relpath(egg_file, self.root)
-      for pkg in builder.packages():
-        print '    found namespace: %s' % pkg
-      # make a random string to disambiguate possibly similarly-named eggs?
-      randstr = ''.join(map(chr, random.sample(range(ord('a'), ord('z')), 8))) + '_'
-      print '    copying...',
-      self.chroot.copy(egg_file, os.path.join('.deps', randstr + os.path.basename(egg_file)), 'resources')
-      print 'done.'
+  def _dump_built_library(self, library, builder):
+    absolute_sources = library.expand_files()
+    absolute_sources.sort()
+    cache_key = self._cache.key_for(library._create_id(), absolute_sources)
+    if not self._cache.needs_update(cache_key):
+      print '  Generating (cached) %s...' % library
+      self._cache.use_cached_files(cache_key, self.env.add_dependency_file)
     else:
-      print '   Failed!'
-      raise PythonChroot.BuildFailureException(
-        "Failed to build %s!" % library)
+      print '  Generating %s...' % library
+      egg_file = builder.build_egg()
 
-  def build_dep_tree(self, target):
+      if egg_file:
+        src_egg_file = egg_file
+        dst_egg_file = os.path.join(os.path.dirname(egg_file),
+            cache_key.hash + '_' + os.path.basename(egg_file))
+        os.rename(src_egg_file, dst_egg_file)
+        self._cache.update(cache_key, [dst_egg_file])
+        egg_dep = PythonDependency.from_eggs(dst_egg_file)
+
+        for pkg in builder.packages():
+          print '    found namespace: %s' % pkg
+        print '    copying...',
+        self.env.add_dependency(egg_dep)
+        print 'done.'
+      else:
+        print '   Failed!'
+        raise PythonChroot.BuildFailureException("Failed to build %s!" % library)
+
+  def build_dep_tree(self, input_target):
+    target = copy.deepcopy(input_target)
+    common_python = self._get_common_python()
+    if common_python not in target.dependencies:
+      target.dependencies.add(common_python)
+
     libraries = set()
     eggs = set()
     binaries = set()
@@ -171,15 +196,12 @@ class PythonChroot(object):
     return libraries, eggs, binaries, thrifts, antlrs
 
   def dump(self):
-    print 'Building PythonBinary %s:' % self.target
-    libraries, eggs, binaries, thrifts, antlrs = self.build_dep_tree(self.target)
+    print 'Building PythonBinary %s:' % self._target
+    libraries, eggs, binaries, thrifts, antlrs = self.build_dep_tree(self._target)
 
     for lib in libraries:
       self._dump_library(lib)
-    self._dump_inits()
-
-    if eggs:
-      self._dump_setuptools()
+    self._dump_setuptools()
     for egg in eggs:
       self._dump_egg(egg)
     for thr in thrifts:
@@ -190,4 +212,5 @@ class PythonChroot(object):
       print >> sys.stderr, 'WARNING: Target has multiple python_binary targets!'
     for binary in binaries:
       self._dump_bin(binary.sources[0], binary.target_base)
-    return self.chroot
+    self.env.freeze()
+    return self.env

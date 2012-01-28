@@ -41,14 +41,7 @@ class PythonAntlrLibrary(PythonTarget):
         all_deps.update(dependencies)
       return all_deps
 
-    PythonTarget.__init__(
-      self,
-      None, # Allow an antly library to be hosted in any source base dir
-      name,
-      sources,
-      resources,
-      get_all_deps(),
-      False)
+    PythonTarget.__init__(self, name, sources, resources, get_all_deps())
 
     self.module = module
     self.antlr_version = antlr_version

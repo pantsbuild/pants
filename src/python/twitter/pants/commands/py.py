@@ -14,26 +14,20 @@
 # limitations under the License.
 # ==================================================================================================
 
-import os
-
 from . import Command
 
-from twitter.common.collections import OrderedSet
+from twitter.common.python import PythonLauncher
 
-from twitter.pants import is_python
 from twitter.pants.base import Address, Target
 from twitter.pants.targets import PythonBinary
 from twitter.pants.python import PythonChroot
-from twitter.pants.python.launcher import Launcher
-
-import traceback
 
 class Py(Command):
   """Python chroot manipulation."""
 
   __command__ = 'py'
 
-  def setup_parser(self, parser):
+  def setup_parser(self, parser, args):
     parser.set_usage("\n"
                      "  %prog py (options) [spec] args\n")
     parser.disable_interspersed_args()
@@ -59,9 +53,8 @@ class Py(Command):
   def execute(self):
     print "Build operating on target: %s" % self.target
     executor = PythonChroot(self.target, self.root_dir)
-    executor.dump()
+    launcher = PythonLauncher(executor.dump().path())
     binary = None
     if isinstance(self.target, PythonBinary):
-      binary = os.path.join(executor.path(), '__main__.py')
-    launcher = Launcher(executor.path(), binary)
-    launcher.run(args=list(self.args))
+      binary = executor.path()
+    launcher.run(binary=binary, args=list(self.args))

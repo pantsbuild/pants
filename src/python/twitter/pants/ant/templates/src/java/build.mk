@@ -45,14 +45,6 @@ limitations under the License.
   </property>
   % endif
 
-  % if lib.binary_resources:
-  <property name="${lib.id}.binary.resources">
-    % for path in lib.binary_resources:
-    ${path}
-    % endfor
-  </property>
-  % endif
-
   % if lib.processors:
   <property name="${lib.id}.processors">
     % for processor in lib.processors:

@@ -25,7 +25,7 @@ class Filemap(Command):
 
   __command__ = 'filemap'
 
-  def setup_parser(self, parser):
+  def setup_parser(self, parser, args):
     parser.set_usage("%prog filemap")
     parser.epilog = """Outputs a mapping from source file to the target that owns the source file.
     The mapping is output in 2 columns."""

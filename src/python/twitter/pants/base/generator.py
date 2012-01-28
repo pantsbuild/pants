@@ -14,27 +14,13 @@
 # limitations under the License.
 # ==================================================================================================
 
+import sys
+
 try:
   from mako.template import Template
 except ImportError:
-  exit("""pants requires mako to run.
-
-You can find mako here: http://www.makotemplates.org/
-
-If you have easy_install, you can install with:
-$ sudo easy_install mako
-
-If python 2.6 is not your platform default, then:
-$ sudo easy_install-2.6 mako
-
-If you have pip, use:
-$ sup pip install mako
-
-If you're seeing this message again after having already installed mako, its
-likely root and your user are using different versions of python.  You can
-probably fix the issue by ensuring root's version of python is selected 1st on
-your user account's PATH.
-""")
+  print >> sys.stderr, "Could not properly bootstrap your Python environment!"
+  sys.exit(1)
 
 import os
 import pprint

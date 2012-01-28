@@ -17,15 +17,10 @@
 from python_target import PythonTarget
 
 class PythonBinary(PythonTarget):
-  def __init__(self, name, source, dependencies = None):
+  def __init__(self, name, source, dependencies=None):
     """
       name: target name
       source: the python source file that becomes this binary's __main__
       dependencies: a list of other PythonLibrary or Pants targets this binary depends upon
     """
-    PythonTarget.__init__(
-      self,
-      'src/python',
-      name,
-      [source],
-      dependencies = dependencies)
+    PythonTarget.__init__(self, name, [source], dependencies=dependencies)

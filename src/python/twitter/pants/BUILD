@@ -21,8 +21,15 @@ PANTS_RESOURCES = rglobs('*') - PANTS_SOURCES - PANTS_GARBAGE
 python_library(
   name = 'pants-lib',
   dependencies = [
+    pants("3rdparty/python:elementtree"),
     pants("3rdparty/python:mako"),
-    pants("src/python/twitter/common")
+    pants("3rdparty/python:markdown"),
+    pants("3rdparty/python:psutil"),
+    pants("3rdparty/python:pylint"),
+    pants("3rdparty/python:pytest"),
+    pants("src/python/twitter/common"),
+    pants("src/python/twitter/common/app"),
+    pants("src/python/twitter/common/python")
   ],
   sources = PANTS_SOURCES,
   resources = PANTS_RESOURCES
@@ -32,4 +39,10 @@ python_binary(
   name = 'pants',
   dependencies = [pants(":pants-lib")],
   source = 'bin/pants_exe.py',
+)
+
+python_binary(
+  name = 'ng',
+  dependencies = [pants(":pants-lib")],
+  source = 'java/nailgun_client.py',
 )

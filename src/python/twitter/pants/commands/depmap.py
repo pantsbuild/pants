@@ -18,7 +18,7 @@ __author__ = 'John Sirois'
 
 from . import Command
 
-from twitter.pants import is_java, is_python
+from twitter.pants import is_jvm, is_python
 from twitter.pants.base import Address, Target
 
 import sys
@@ -30,7 +30,7 @@ class Depmap(Command):
 
   __command__ = 'depmap'
 
-  def setup_parser(self, parser):
+  def setup_parser(self, parser, args):
     parser.set_usage("%prog depmap (options) [spec]")
     parser.add_option("-i", "--internal-only", action="store_true", dest = "is_internal_only",
                       default = False, help = """Specifies that only internal dependencies should
@@ -74,7 +74,7 @@ class Depmap(Command):
   def execute(self):
     target = Target.get(self.address)
 
-    if is_java(target):
+    if all(is_jvm(t) for t in target.resolve()):
       if self.is_graph:
         self._print_digraph(target)
       else:
@@ -132,11 +132,12 @@ class Depmap(Command):
           printed.add(dep_id)
           indent += 1
 
-        for internal_dep in dep.internal_dependencies:
-          print_deps(printed, internal_dep, indent)
+        if is_jvm(dep):
+          for internal_dep in dep.internal_dependencies:
+            print_deps(printed, internal_dep, indent)
 
         if not self.is_internal_only:
-          if is_java(self):
+          if is_jvm(dep):
             for jar_dep in dep.jar_dependencies:
               jar_dep_id, internal = self._dep_id(jar_dep)
               if not internal:
@@ -144,10 +145,15 @@ class Depmap(Command):
                   print_dep(jar_dep_id, indent)
                   printed.add(jar_dep_id)
 
-    print_deps(set(), target)
+    printed = set()
+    for t in target.resolve():
+      print_deps(printed, t)
 
   def _print_digraph(self, target):
-    target_id, _ = self._dep_id(target)
+    def output_candidate(internal):
+      return (self.is_internal_only and internal) or (
+        self.is_external_only and not internal) or (
+        not self.is_internal_only and not self.is_external_only)
 
     def print_dep(dep):
       dep_id, internal = self._dep_id(dep)
@@ -166,28 +172,27 @@ class Depmap(Command):
       if dep not in printed:
         printed.add(dep)
 
-        dep_id, _ = self._dep_id(dep)
-        for dependency in dep.internal_dependencies:
-          print_deps(printed, dependency)
+        for dependency in dep.resolve():
+          if is_jvm(dependency):
+            for internal_dependency in dependency.internal_dependencies:
+              print_deps(printed, internal_dependency)
 
-        for jar in dep.jar_dependencies:
-          jar_id, internal = self._dep_id(jar)
-          output_candidate = (self.is_internal_only and internal) or (
-            self.is_external_only and not internal) or (
-            not self.is_internal_only and not self.is_external_only)
+          for jar in (dependency.jar_dependencies if is_jvm(dependency) else [dependency]):
+            jar_id, internal = self._dep_id(jar)
+            if output_candidate(internal):
+              if jar not in printed:
+                print_dep(jar)
+                printed.add(jar)
 
-          if output_candidate and jar not in printed:
-            print_dep(jar)
-            printed.add(jar)
+              target_id, _ = self._dep_id(target)
+              dep_id, _ = self._dep_id(dependency)
+              left_id = target_id if self.is_external_only else dep_id
+              if (left_id, jar_id) not in printed:
+                styled = internal and not self.is_internal_only
+                print '  "%s" -> "%s"%s;' % (left_id, jar_id, ' [style="dashed"]' if styled else '')
+                printed.add((left_id, jar_id))
 
-          if output_candidate:
-            left_id = target_id if self.is_external_only else dep_id
-            if (left_id, jar_id) not in printed:
-              styled = internal and not self.is_internal_only
-              print '  "%s" -> "%s"%s;' % (left_id, jar_id, ' [style="dashed"]' if styled else '')
-              printed.add((left_id, jar_id))
-
-    print('digraph "%s" {' % target._id)
+    print('digraph "%s" {' % target.id)
     print_dep(target)
     print_deps(set(), target)
     print('}')

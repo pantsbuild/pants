@@ -48,6 +48,8 @@ class BuildFileTest(unittest.TestCase):
 
     BuildFileTest.touch('grandparent/parent/BUILD')
     BuildFileTest.touch('grandparent/parent/BUILD.twitter')
+    BuildFileTest.touch('grandparent/BUILD')
+    BuildFileTest.touch('grandparent/BUILD.foo')
     BuildFileTest.touch('BUILD')
     BuildFileTest.touch('BUILD.twitter')
     BuildFileTest.touch('grandparent/parent/child1/BUILD')
@@ -82,6 +84,8 @@ class BuildFileTest(unittest.TestCase):
 
   def testAncestors(self):
     self.assertEquals(OrderedSet([
+        BuildFileTest.buildfile('grandparent/BUILD'),
+        BuildFileTest.buildfile('grandparent/BUILD.foo'),
         BuildFileTest.buildfile('BUILD'),
         BuildFileTest.buildfile('BUILD.twitter'),
     ]), self.buildfile.ancestors())

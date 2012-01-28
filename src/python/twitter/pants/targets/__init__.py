@@ -18,13 +18,14 @@ from annotation_processor import AnnotationProcessor
 from artifact import Artifact
 from exclude import Exclude
 from exportable_jvm_library import ExportableJvmLibrary
-from internal import InternalTarget, InternalTarget_CycleException
+from internal import InternalTarget
 from jar_dependency import JarDependency
 from jar_library import JarLibrary
 from java_library import JavaLibrary
 from java_thrift_library import JavaThriftLibrary
 from java_protobuf_library import JavaProtobufLibrary
 from java_tests import JavaTests
+from jvm_binary import Bundle, JvmApp, JvmBinary
 from jvm_target import JvmTarget
 from pants_target import Pants
 from python_binary import PythonBinary
@@ -37,21 +38,25 @@ from python_tests import PythonTests, PythonTestSuite
 from repository import Repository
 from scala_library import ScalaLibrary
 from scala_tests import ScalaTests
+from sources import SourceRoot
 from with_sources import TargetWithSources
+from doc import Doc
 
 __all__ = [
   'AnnotationProcessor',
   'Artifact',
+  'Bundle',
   'Exclude',
   'ExportableJvmLibrary',
   'InternalTarget',
-  'InternalTarget_CycleException',
   'JarDependency',
   'JarLibrary',
   'JavaLibrary',
   'JavaThriftLibrary',
   'JavaProtobufLibrary',
   'JavaTests',
+  'JvmApp',
+  'JvmBinary',
   'JvmTarget',
   'Pants',
   'PythonBinary',
@@ -65,5 +70,7 @@ __all__ = [
   'Repository',
   'ScalaLibrary',
   'ScalaTests',
-  'TargetWithSources'
+  'SourceRoot',
+  'TargetWithSources',
+  'Doc'
 ]

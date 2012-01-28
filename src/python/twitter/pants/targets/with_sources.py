@@ -16,27 +16,50 @@
 
 import os
 
+from twitter.common.contextutil import pushd
+
+from twitter.pants import get_buildroot
 from twitter.pants.base import Target
+from twitter.pants.targets.sources import SourceRoot
 
 class TargetWithSources(Target):
-  def __init__(self, target_base, name, is_meta = False):
+  def __init__(self, name, is_meta=False):
     Target.__init__(self, name, is_meta)
 
-    # TODO(John Sirois): rationalize constructor parameter and find_target_base
-    self.target_base = target_base if target_base else self.find_target_base()
+    self.target_base = SourceRoot.find(self)
 
-  def find_target_base(self):
-    """Finds the directory relative to the repo root directory that houses this target's sources
-    in the native packaging scheme.  For Java projects, this would typically be the relative path
-    to the root of a package hierarchy - currently src/java, tests/java, etc.  For C for example
-    this might be different: src/c/src and src/c/includes.
+  def expand_files(self, recursive=True):
+    """Expand files used to build this target to absolute paths.  By default this expansion is done
+    recursively."""
 
-    The default implementation assumes all source roots are 2 levels deep from the root directory.
+    files = []
+
+    def _expand(target):
+      files.extend([os.path.abspath(os.path.join(target.target_base, s))
+          for s in (target.sources or [])])
+      files.extend([target.address.buildfile.full_path])
+      if recursive:
+        for dep in target.dependencies:
+          if isinstance(dep, TargetWithSources):
+            _expand(dep)
+          elif hasattr(dep, 'address'):
+            # Don't know what it is, but we'll include the BUILD file to be paranoid
+            files.append(dep.address.buildfile.full_path)
+
+    _expand(self)
+    return files
+
+  def _resolve_paths(self, rel_base, paths):
+    """
+      Resolves paths relative to the given rel_base from the build root.
+      For example:
+        target: ~/workspace/src/java/com/twitter/common/base/BUILD
+        rel_base: src/resources
+
+      Resolves paths from:
+        ~/workspace/src/resources/com/twitter/common/base
     """
 
-    return os.path.sep.join(self.address.buildfile.relpath.split(os.path.sep)[:2])
-
-  def _resolve_paths(self, base, paths):
     # meta targets are composed of already-resolved paths
     if not paths or self.is_meta:
       return paths
@@ -67,22 +90,9 @@ class TargetWithSources(Target):
 
       return flat
 
-    base_path = os.path.join(self.address.buildfile.root_dir, self.target_base)
-    buildfile = os.path.join(self.address.buildfile.root_dir, self.address.buildfile.relpath)
-    src_relpath = os.path.dirname(buildfile).replace(base_path + '/', '')
+    src_relpath = os.path.relpath(self.address.buildfile.parent_path,
+                                  os.path.join(get_buildroot(), self.target_base))
 
-    src_root = os.path.join(self.address.buildfile.root_dir, base)
-    src_base_path = os.path.join(src_root, src_relpath)
-
-    def resolve_path(path):
-      if path.startswith('/'):
-        return path[1:]
-      else:
-        return os.path.join(src_relpath, path)
-
-    start = os.path.abspath(os.curdir)
-    try:
-      os.chdir(src_base_path)
-      return [ resolve_path(path) for path in flatten_paths(paths) ]
-    finally:
-      os.chdir(start)
+    resolve_basepath = os.path.join(get_buildroot(), rel_base, src_relpath)
+    with pushd(resolve_basepath):
+      return [ os.path.normpath(os.path.join(src_relpath, path)) for path in flatten_paths(paths) ]

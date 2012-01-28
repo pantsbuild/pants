@@ -14,27 +14,12 @@
 # limitations under the License.
 # ==================================================================================================
 
-from twitter.common.collections import OrderedSet
 from python_target import PythonTarget
 
 class PythonTests(PythonTarget):
-  def __init__(self, name, sources, resources = None, dependencies = None, is_meta = False):
-    PythonTarget.__init__(
-      self,
-      'tests/python',
-      name,
-      sources,
-      resources,
-      dependencies,
-      is_meta)
+  def __init__(self, name, sources, resources=None, dependencies=None):
+    PythonTarget.__init__(self, name, sources, resources, dependencies)
 
 class PythonTestSuite(PythonTarget):
-  def __init__(self, name, dependencies = None):
-    PythonTarget.__init__(
-      self,
-      'tests/python',
-      name,
-      [],
-      [],
-      dependencies,
-      False)
+  def __init__(self, name, dependencies=None):
+    PythonTarget.__init__(self, name, (), (), dependencies)

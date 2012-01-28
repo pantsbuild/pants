@@ -23,30 +23,9 @@ from jvm_target import JvmTarget
 class JavaTests(JvmTarget):
   """Defines a target that tests a java library."""
 
-  @classmethod
-  def _aggregate(cls, name, buildflags, java_tests):
-    all_deps = OrderedSet()
-    all_excludes = OrderedSet()
-    all_sources = []
-
-    for java_test in java_tests:
-      if java_test.resolved_dependencies:
-        all_deps.update(dep for dep in java_test.jar_dependencies if dep.rev is not None)
-      if java_test.excludes:
-        all_excludes.update(java_test.excludes)
-      if java_test.sources:
-        all_sources.extend(java_test.sources)
-
-    return JavaTests(name,
-                     all_sources,
-                     dependencies = all_deps,
-                     excludes = all_excludes,
-                     buildflags = buildflags,
-                     is_meta = True)
-
   def __init__(self,
                name,
-               sources,
+               sources = None,
                dependencies = None,
                excludes = None,
                buildflags = None,
@@ -63,14 +42,7 @@ class JavaTests(JvmTarget):
     buildflags: A list of additional command line arguments to pass to the underlying build system
         for this target"""
 
-    JvmTarget.__init__(self,
-                       'tests/java',
-                       name,
-                       sources,
-                       dependencies,
-                       excludes,
-                       buildflags,
-                       is_meta)
+    JvmTarget.__init__(self, name, sources, dependencies, excludes, buildflags, is_meta)
 
   def _create_template_data(self):
     jar_dependency, id, exported = self._get_artifact_info()

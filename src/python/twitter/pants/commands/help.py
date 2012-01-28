@@ -25,7 +25,7 @@ class Help(Command):
 
   __command__ = 'help'
 
-  def setup_parser(self, parser):
+  def setup_parser(self, parser, args):
     self.parser = copy(parser)
 
     parser.set_usage("%prog help ([command])")

@@ -14,6 +14,7 @@
 # limitations under the License.
 # ==================================================================================================
 
+from twitter.pants import get_buildroot, get_version
 from twitter.pants.base import Address
 from twitter.pants.commands import Command
 
@@ -39,16 +40,19 @@ _BUILD_ALIASES = set([
   '-f',
 ])
 
-_VERSION = '0.0.2'
 _DISABLE_PANTS_RC_OPTION = '--no-pantsrc'
+
+def exit_and_fail(msg=''):
+  print >> sys.stderr, msg
+  sys.exit(1)
 
 def find_all_commands():
   for cmd in Command.all_commands():
     cls = Command.get_command(cmd)
     yield '%s\t%s' % (cmd, cls.__doc__)
 
-def _help(root_dir):
-  print 'Pants %s @ BUILD_ROOT: %s' % (_VERSION, root_dir)
+def _help(version, root_dir):
+  print 'Pants %s @ PANTS_BUILD_ROOT: %s' % (version, root_dir)
   print
   print 'Available subcommands:\n\t%s' % '\n\t'.join(find_all_commands())
   print
@@ -56,7 +60,7 @@ def _help(root_dir):
 section named for the subcommand in ini style format, ie:
   [build]
   options: --fast"""
-  exit()
+  sys.exit(0)
 
 def _prepend_default_options(command, args):
   if _DISABLE_PANTS_RC_OPTION not in args:
@@ -79,33 +83,32 @@ def _synthesize_command(root_dir, args):
     return command, _prepend_default_options(command, subcommand_args)
 
   if command.startswith('-'):
-    exit('Invalid command: %s' % command)
+    exit_and_fail('Invalid command: %s' % command)
 
   # assume 'build' if a command was ommitted.
   try:
     Address.parse(root_dir, command)
     return _BUILD_COMMAND, _prepend_default_options(_BUILD_COMMAND, args)
   except:
-    exit('Failed to execute pants build: %s' % traceback.format_exc())
+    exit_and_fail('Failed to execute pants build: %s' % traceback.format_exc())
 
 def _parse_command(root_dir, args):
   command, args = _synthesize_command(root_dir, args)
   return Command.get_command(command), args
 
 def main():
-  if 'BUILD_ROOT' not in os.environ:
-    exit('BUILD_ROOT environment must be defined')
+  root_dir = get_buildroot()
+  version = get_version()
 
-  root_dir = os.path.realpath(os.environ['BUILD_ROOT'])
   if not os.path.exists(root_dir):
-    exit('BUILD_ROOT does not point to a valid path: %s' % root_dir)
+    exit_and_fail('PANTS_BUILD_ROOT does not point to a valid path: %s' % root_dir)
 
   if len(sys.argv) < 2 or (len(sys.argv) == 2 and sys.argv[1] in _HELP_ALIASES):
-    _help(root_dir)
+    _help(version, root_dir)
 
   command_class, command_args = _parse_command(root_dir, sys.argv[1:])
 
-  parser = optparse.OptionParser(version = '%%prog %s' % _VERSION)
+  parser = optparse.OptionParser(version = '%%prog %s' % version)
   parser.add_option(_DISABLE_PANTS_RC_OPTION, action = 'store_false', dest = 'pantsrc',
                     default = True, help = 'Specifies that ~/.pantsrc should be ignored.')
   command = command_class(root_dir, parser, command_args)

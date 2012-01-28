@@ -19,54 +19,77 @@ __author__ = 'John Sirois'
 from . import Command
 
 from twitter.common.collections import OrderedSet
-from twitter.pants import has_sources, extract_jvm_targets, is_scala, is_test
+from twitter.common.config import Properties
+from twitter.pants import (
+  extract_jvm_targets,
+  get_buildroot,
+  has_sources,
+  is_apt,
+  is_java,
+  is_scala,
+  is_test
+)
 from twitter.pants.base import Address, Target
 from twitter.pants.targets import JavaLibrary, ScalaLibrary, ExportableJvmLibrary
+from twitter.pants.tasks.binary_utils import profile_classpath
 from twitter.pants.ant import AntBuilder
-from twitter.pants.ant.lib import (
-  TRANSITIVITY_NONE,
-  TRANSITIVITY_SOURCES,
-  TRANSITIVITY_TESTS,
-  TRANSITIVITY_ALL,
-)
+from twitter.pants.ant.ide import extract_target
 
 import os
+import re
 import traceback
-
-_TRANSITIVITY_CHOICES = [
-  TRANSITIVITY_NONE,
-  TRANSITIVITY_SOURCES,
-  TRANSITIVITY_TESTS,
-  TRANSITIVITY_ALL
-]
-_VALID_TRANSITIVITIES = set(_TRANSITIVITY_CHOICES)
 
 class Ide(Command):
   """Creates IDE projects for a set of BUILD targets."""
 
-  def setup_parser(self, parser):
-    parser.set_usage("%prog idea ([spec]...)")
-    parser.add_option("-d", "--directory", action = "store_true", dest = "is_directory_list",
-                      default = False, help = "Specifies specs should be treated as plain paths, "
+  PROFILE_DIR = os.path.join(get_buildroot(), 'build-support/profiles')
+  SCALA_PROFILE_PARSER = re.compile('scala-compile-(.+).ivy.xml')
+
+  def setup_parser(self, parser, args):
+    parser.set_usage("%%prog %s ([spec]...)" % self.__class__.__command__)
+    parser.add_option("-d", "--directory", action="store_true", dest="is_directory_list",
+                      default=False, help="Specifies specs should be treated as plain paths, "
                       "in which case all targets found in all BUILD files under the paths will be "
                       "used to create the IDEA project configuration.")
-    parser.add_option("-c", "--clean", action = "store_true", dest = "clean",
-                      default = False, help = "Triggers a clean build of any codegen targets.")
-    parser.add_option("-t", "--ide-transitivity", dest = "ide_transitivity", type = "choice",
-                      choices = _TRANSITIVITY_CHOICES, default = TRANSITIVITY_ALL,
-                      help = "[%%default] Specifies IDE dependencies should be transitive for one "
-                             "of: %s" % _TRANSITIVITY_CHOICES)
-    parser.add_option("-n", "--project-name", dest = "project_name",
-                      default = "project",
-                      help = "[%default] Specifies the name to use for the generated project.")
-    parser.add_option("-p", "--python", action = "store_true", dest = "python",
-                      default = False, help = "Adds python support to the generated project "
-                      "configuration.")
+    parser.add_option("-c", "--clean", action="store_true", dest="clean",
+                      default=False, help="Triggers a clean build of any codegen targets.")
+    parser.add_option("-n", "--project-name", dest="project_name",
+                      default="project",
+                      help="[%default] Specifies the name to use for the generated project.")
+
+    def set_bool(option, opt_str, value, parser):
+      setattr(parser.values, option.dest, not opt_str.startswith("--no"))
+
+    parser.add_option("-p", "--python", "--no-python",
+                      action="callback", callback=set_bool, dest='python', default=False,
+                      help="[%default] Adds python support to the generated project configuration.")
+    parser.add_option("--java", "--no-java",
+                      action="callback", callback=set_bool, dest='java', default=True,
+                      help="[%default] Includes java sources in the project; otherwise compiles "
+                      "them and adds them to the project classpath.")
+    parser.add_option("--scala", "--no-scala",
+                      action="callback", callback=set_bool, dest='scala', default=True,
+                      help="[%default] Includes scala sources in the project; otherwise compiles "
+                      "them and adds them to the project classpath.")
+
+
+    profiles = os.listdir(Ide.PROFILE_DIR)
+    self.scala_compiler_profile_by_version = {}
+    for profile in profiles:
+      match = Ide.SCALA_PROFILE_PARSER.match(profile)
+      if match:
+        version = match.group(1)
+        self.scala_compiler_profile_by_version[version] = 'scala-compile-%s' % version
+    supported_versions = sorted(self.scala_compiler_profile_by_version.keys())
+    parser.add_option("--scala-version", dest='scala_version', default='2.8.1', type = "choice",
+                      choices = supported_versions, help="[%default] Sets the scala version.")
 
   def __init__(self, root_dir, parser, argv):
     Command.__init__(self, root_dir, parser, argv)
 
     self.project_name = self.options.project_name
+    self.scala_compiler_profile = self.scala_compiler_profile_by_version[self.options.scala_version]
+
     addresses = self._parse_addresses() if self.args else Command.scan_addresses(root_dir)
     self.targets = [ Target.get(address) for address in addresses ]
 
@@ -88,23 +111,64 @@ class Ide(Command):
     if not jvm_targets:
       raise Exception("Only jvm targets currently handled and none found in: %s" % self.targets)
 
-    project = Project(self.project_name, self.options.python, self.root_dir, jvm_targets)
-    all_targets = project.configure()
-    ivyfile, ivysettingsfile = self._generate_ivy(all_targets)
-    self._generate_project_files(project, ivyfile, ivysettingsfile)
+    skip_java = not self.options.java
+    skip_scala = not self.options.scala
 
-  def _generate_ivy(self, targets):
-    jvmbuilder = AntBuilder(self.error,
-                            self.root_dir,
-                            is_ide = True,
-                            ide_transitivity = self.options.ide_transitivity)
+    checkstyle_suppression_files = self._load_checkstyle_suppressions()
+    project = Project(self.project_name,
+                      self.options.python,
+                      skip_java,
+                      skip_scala,
+                      self.root_dir,
+                      checkstyle_suppression_files,
+                      jvm_targets)
+    all_targets = project.configure(self.scala_compiler_profile)
+
+    foil = list(all_targets)[0]
+    is_transitive = lambda target: True
+    def is_cp(target):
+      return target.is_codegen \
+             or is_apt(target) \
+             or (skip_java and is_java(target)) \
+             or (skip_scala and is_scala(target))
+
+    ide_target = foil.do_in_context(lambda: extract_target(all_targets, is_transitive, is_cp))
+
+    ivyfile, ivysettingsfile = self._generate_ivy(ide_target)
+    return self._generate_project_files(project, ivyfile, ivysettingsfile)
+
+  def _generate_ivy(self, ide_target):
+    jvmbuilder = AntBuilder(self.error, self.root_dir)
 
     antargs = []
     if self.options.clean:
       antargs.extend([ 'clean-all', 'compile' ])
 
-    _, ivyfile, _ = jvmbuilder.generate_and_build(targets, antargs, name = self.project_name)
+    _, ivyfile, _ = jvmbuilder.generate_and_build([ide_target], antargs, name = self.project_name)
     return ivyfile, os.path.join(self.root_dir, 'build-support', 'ivy', 'ivysettings.xml')
+
+  def _load_checkstyle_suppressions(self):
+    with open(os.path.join(self.root_dir, 'build.properties')) as build_props:
+      return Ide._find_checkstyle_suppressions(build_props, self.root_dir)
+
+  @staticmethod
+  def _find_checkstyle_suppressions(props, root_dir):
+    props = Properties.load(props)
+
+    # Magic - we know the root.dir property is defined elsewhere, so we seed it.
+    props['root.dir'] = root_dir
+
+    def resolve_props(value):
+      def replace_symbols(matchobj):
+        return props[matchobj.group(1)]
+
+      symbol_parser = re.compile("\${([^}]+)\}")
+      while symbol_parser.match(value):
+        value = symbol_parser.sub(replace_symbols, value)
+      return value
+
+    files = resolve_props(props['checkstyle.suppression.files'])
+    return files.split(',')
 
   def _generate_project_files(self, project, ivyfile, ivysettingsfile):
     """Generates project files that configure the IDE given a configured project and ivy files."""
@@ -144,7 +208,8 @@ class Project(object):
         _, ext = os.path.splitext(resource)
         yield ext
 
-  def __init__(self, name, has_python, root_dir, targets):
+  def __init__(self, name, has_python, skip_java, skip_scala, root_dir,
+               checkstyle_suppression_files, targets):
     """Creates a new, unconfigured, Project based at root_dir and comprised of the sources visible
     to the given targets."""
 
@@ -156,11 +221,14 @@ class Project(object):
     self.resource_extensions = set()
 
     self.has_python = has_python
+    self.skip_java = skip_java
+    self.skip_scala = skip_scala
     self.has_scala = False
     self.has_tests = False
-    self.extra_checkstyle_suppression_files = []  # Paths relative to the build root.
 
-  def configure(self):
+    self.checkstyle_suppression_files = checkstyle_suppression_files # Absolute paths.
+
+  def configure(self, scala_compiler_profile):
     """Configures this project's source sets returning the full set of targets the project is
     comprised of.  The full set can be larger than the initial set of targets when any of the
     initial targets only has partial ownership of its source set's directories."""
@@ -172,7 +240,10 @@ class Project(object):
     targeted = set()
 
     def source_target(target):
-      return has_sources(target) and not target.is_codegen
+      return has_sources(target) \
+          and (not target.is_codegen
+               and not (self.skip_java and is_java(target))
+               and not (self.skip_scala and is_scala(target)))
 
     def configure_source_sets(relative_base, sources, is_test):
       absolute_base = os.path.join(self.root_dir, relative_base)
@@ -195,7 +266,7 @@ class Project(object):
       if target not in analyzed:
         analyzed.add(target)
 
-        self.has_scala = self.has_scala or is_scala(target)
+        self.has_scala = not self.skip_scala and (self.has_scala or is_scala(target))
 
         if isinstance(target, JavaLibrary) or isinstance(target, ScalaLibrary):
           # TODO(John Sirois): this does not handle test resources, make test resources 1st class
@@ -203,8 +274,6 @@ class Project(object):
           resources = set()
           if target.resources:
             resources.update(target.resources)
-          if target.binary_resources:
-            resources.update(target.binary_resources)
           if resources:
             self.resource_extensions.update(Project.extract_resource_extensions(resources))
             configure_source_sets(ExportableJvmLibrary.RESOURCES_BASE_DIR,
@@ -236,6 +305,8 @@ class Project(object):
 
     for target in self.targets:
       target.walk(configure_target, predicate = source_target)
+
+    self._configure_profiles(scala_compiler_profile)
 
     # We need to figure out excludes, in doing so there are 2 cases we should not exclude:
     # 1.) targets depend on A only should lead to an exclude of B
@@ -277,3 +348,9 @@ class Project(object):
       target.walk(lambda target: targets.add(target), source_target)
     targets.update(analyzed - targets)
     return targets
+
+  def _configure_profiles(self, scala_compiler_profile):
+    self.checkstyle_classpath = profile_classpath('checkstyle')
+    self.scala_compiler_classpath = []
+    if self.has_scala:
+      self.scala_compiler_classpath.extend(profile_classpath(scala_compiler_profile))

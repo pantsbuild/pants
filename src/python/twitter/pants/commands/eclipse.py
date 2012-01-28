@@ -16,20 +16,24 @@
 
 __author__ = 'John Sirois'
 
+from .ide import Ide
+
 from twitter.common.collections import OrderedSet
-from ide import Ide
+from twitter.pants import is_apt
 from twitter.pants.base.generator import Generator, TemplateData
 
 import collections
 import os
-import urllib
 import pkgutil
+import subprocess
+import urllib
 
 _TEMPLATE_BASEDIR = 'eclipse/templates'
 
 _VERSIONS = {
-  '3.5': '3.5', # 3.5 and 3.6 are .project/.classpath compatible
+  '3.5': '3.5', # 3.5-3.7 are .project/.classpath compatible
   '3.6': '3.5',
+  '3.7': '3.5',
 }
 
 class Eclipse(Ide):
@@ -37,8 +41,8 @@ class Eclipse(Ide):
 
   __command__ = 'eclipse'
 
-  def setup_parser(self, parser):
-    Ide.setup_parser(self, parser)
+  def setup_parser(self, parser, args):
+    Ide.setup_parser(self, parser, args)
 
     supported_versions = list(_VERSIONS.keys())
     supported_versions.sort()
@@ -46,11 +50,6 @@ class Eclipse(Ide):
                       default = '3.5', type = "choice", choices = supported_versions,
                       help = "[%%default] The Eclipse version the project configuration "
                       "should be generated for; can be one of: %s" % supported_versions)
-
-    parser.add_option("--eclipse-build-output-dir", dest = "eclipse_output_dir",
-                      default = os.path.join(self.root_dir, 'target/eclipse/bin'),
-                      help = "[%default] Specifies the directory Eclipse should use for its own "
-                      "build output.")
 
     parser.epilog = """Creates an Eclipse project appropriate for editing, debugging and testing
     the specified BUILD targets."""
@@ -61,13 +60,17 @@ class Eclipse(Ide):
     eclipse_version = _VERSIONS[self.options.version]
     self.project_template = os.path.join(_TEMPLATE_BASEDIR, 'project-%s.mk' % eclipse_version)
     self.classpath_template = os.path.join(_TEMPLATE_BASEDIR, 'classpath-%s.mk' % eclipse_version)
+    self.apt_template = os.path.join(_TEMPLATE_BASEDIR, 'factorypath-%s.mk' % eclipse_version)
     self.pydev_template = os.path.join(_TEMPLATE_BASEDIR, 'pydevproject-%s.mk' % eclipse_version)
 
     self.project_name = self.options.project_name
 
     self.project_filename = os.path.join(self.root_dir, '.project')
     self.classpath_filename = os.path.join(self.root_dir, '.classpath')
+    self.apt_filename = os.path.join(self.root_dir, '.factorypath')
     self.pydev_filename = os.path.join(self.root_dir, '.pydevproject')
+
+    self.ivy_jar = os.path.join(root_dir, 'build-support', 'ivy', 'lib', 'ivy-2.2.0.jar')
 
   def _generate_project_files(self, project, ivyfile, ivysettingsfile):
     def create_sourcepath(base, sources):
@@ -106,7 +109,9 @@ class Eclipse(Ide):
       resolveBeforeLaunch = 'false',
     )
 
-    outdir = os.path.abspath(self.options.eclipse_output_dir)
+    output_dir = os.path.join('target', 'eclipse')
+
+    outdir = os.path.abspath(os.path.join(output_dir, 'bin'))
     if not os.path.exists(outdir):
       os.makedirs(outdir)
 
@@ -124,11 +129,63 @@ class Eclipse(Ide):
 
     with open(self.project_filename, 'w') as output:
       Generator(pkgutil.get_data(__name__, self.project_template),
-          project = configured_project).write(output)
+                project = configured_project).write(output)
 
     with open(self.classpath_filename, 'w') as output:
       Generator(pkgutil.get_data(__name__, self.classpath_template),
-          classpath = configured_classpath).write(output)
+                classpath = configured_classpath).write(output)
+
+    if os.path.exists(self.apt_filename):
+      os.remove(self.apt_filename)
+
+    def has_apt():
+      apt_targets = []
+      def test_apt(t):
+        if is_apt(t):
+          apt_targets.append(t)
+
+      for target in project.targets:
+        target.walk(test_apt)
+        if apt_targets:
+          return True
+      return False
+
+    if has_apt():
+      libs_base_path = os.path.join(output_dir, 'libs')
+      libdir = os.path.abspath(libs_base_path)
+      if not os.path.exists(libdir):
+        os.makedirs(libdir)
+
+      print "Retrieving apt libs..."
+      retrieve_result = subprocess.call([
+        'java',
+        '-jar', self.ivy_jar,
+        '-warn',
+        '-settings', ivysettingsfile,
+        '-ivy', ivyfile,
+        '-retrieve', '%s/%s/[conf]/[artifact].[ext]' % (self.root_dir, libs_base_path),
+        '-types', 'jar',
+        '-sync',
+        '-symlink'
+      ])
+
+      if retrieve_result != 0:
+        print "Failed to retrieve apt libs."
+        return retrieve_result
+
+      jarpaths = []
+      for path, _, filenames in os.walk(libdir):
+        for filename in filenames:
+          jarpaths.append(os.path.join(path, filename))
+
+      configured_factorypath = TemplateData(
+        jarpaths = jarpaths
+      )
+
+      with open(self.apt_filename, 'w') as output:
+        Generator(pkgutil.get_data(__name__, self.apt_template),
+                  factorypath = configured_factorypath).write(output)
+      print "Generated apt config"
 
     if os.path.exists(self.pydev_filename):
       os.remove(self.pydev_filename)
@@ -136,4 +193,6 @@ class Eclipse(Ide):
     if project.has_python:
       with open(self.pydev_filename, 'w') as output:
         Generator(pkgutil.get_data(__name__, self.pydev_template),
-            project = configured_project).write(output)
+                  project = configured_project).write(output)
+
+    return 0

@@ -24,52 +24,13 @@ from exportable_jvm_library import ExportableJvmLibrary
 class ScalaLibrary(ExportableJvmLibrary):
   """Defines a target that produces a scala library."""
 
-  _SRC_DIR = 'src/scala'
-
-  @classmethod
-  def _aggregate(cls, name, provides, deployjar, buildflags, scala_libs, target_base):
-    all_deps = OrderedSet()
-    all_excludes = OrderedSet()
-    all_sources = []
-    all_java_sources = []
-    all_resources = []
-    all_binary_resources = []
-
-    for scala_lib in scala_libs:
-      if scala_lib.resolved_dependencies:
-        all_deps.update(dep for dep in scala_lib.jar_dependencies if dep.rev is not None)
-      if scala_lib.excludes:
-        all_excludes.update(scala_lib.excludes)
-      if scala_lib.sources:
-        all_sources.extend(scala_lib.sources)
-      if scala_lib.java_sources:
-        all_java_sources.extend(scala_lib.java_sources)
-      if scala_lib.resources:
-        all_resources.extend(scala_lib.resources)
-      if scala_lib.binary_resources:
-        all_binary_resources.extend(scala_lib.binary_resources)
-
-    return ScalaLibrary(name,
-                        all_sources,
-                        target_base = target_base,
-                        java_sources = all_java_sources,
-                        provides = provides,
-                        dependencies = all_deps,
-                        excludes = all_excludes,
-                        resources = all_resources,
-                        binary_resources = all_binary_resources,
-                        deployjar = deployjar,
-                        buildflags = buildflags,
-                        is_meta = True)
-
-  def __init__(self, name, sources,
-               target_base = None,
+  def __init__(self, name,
+               sources = None,
                java_sources = None,
                provides = None,
                dependencies = None,
                excludes = None,
                resources = None,
-               binary_resources = None,
                deployjar = False,
                buildflags = None,
                is_meta = False):
@@ -86,25 +47,15 @@ class ScalaLibrary(ExportableJvmLibrary):
         transitive dependencies against.
     resources: An optional list of paths containing (filterable) text file resources to place in
         this module's jar
-    binary_resources: An optional list of paths containing binary resources to place in this
-        module's jar
     deployjar: An optional boolean that turns on generation of a monolithic deploy jar
     buildflags: A list of additional command line arguments to pass to the underlying build system
         for this target"""
 
-    def get_all_deps():
-      all_deps = OrderedSet()
-      all_deps.update(Pants('3rdparty:scala-library').resolve())
-      if dependencies:
-        all_deps.update(dependencies)
-      return all_deps
-
     ExportableJvmLibrary.__init__(self,
-                                  target_base,
                                   name,
                                   sources,
                                   provides,
-                                  get_all_deps(),
+                                  dependencies,
                                   excludes,
                                   buildflags,
                                   is_meta)
@@ -115,7 +66,6 @@ class ScalaLibrary(ExportableJvmLibrary):
 
     self.sibling_resources_base = os.path.join(base_parent, 'resources')
     self.resources = self._resolve_paths(self.sibling_resources_base, resources)
-    self.binary_resources = self._resolve_paths(self.sibling_resources_base, binary_resources)
 
     self.deployjar = deployjar
 
@@ -125,14 +75,10 @@ class ScalaLibrary(ExportableJvmLibrary):
       allsources += list(os.path.join(self.target_base, source) for source in self.sources)
     if self.resources:
       allsources += list(os.path.join(self.sibling_resources_base, res) for res in self.resources)
-    if self.binary_resources:
-      allsources += list(os.path.join(self.sibling_resources_base, res)
-                         for res in self.binary_resources)
 
     return ExportableJvmLibrary._create_template_data(self).extend(
       java_sources = self.java_sources,
       resources = self.resources,
-      binary_resources = self.binary_resources,
       deploy_jar = self.deployjar,
       allsources = allsources,
     )

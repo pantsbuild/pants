@@ -24,30 +24,6 @@ from jar_dependency import JarDependency
 class JavaProtobufLibrary(ExportableJvmLibrary):
   """Defines a target that builds java stubs from a protobuf IDL file."""
 
-  _SRC_DIR = 'src/protobuf'
-
-  @classmethod
-  def _aggregate(cls, name, provides, buildflags, java_proto_libs):
-    all_sources = []
-    all_deps = OrderedSet()
-    all_excludes = OrderedSet()
-
-    for java_proto_lib in java_proto_libs:
-      if java_proto_lib.sources:
-        all_sources.extend(java_proto_lib.sources)
-      if java_proto_lib.resolved_dependencies:
-        all_deps.update(dep for dep in java_proto_lib.jar_dependencies if dep.rev is not None)
-      if java_proto_lib.excludes:
-        all_excludes.update(java_proto_lib.excludes)
-
-    return JavaProtobufLibrary(name,
-                               all_sources,
-                               provides = provides,
-                               dependencies = all_deps,
-                               excludes = all_excludes,
-                               buildflags = buildflags,
-                               is_meta = True)
-
   def __init__(self,
                name,
                sources,
@@ -68,25 +44,14 @@ class JavaProtobufLibrary(ExportableJvmLibrary):
     buildflags: A list of additional command line arguments to pass to the underlying build system
         for this target"""
 
-    def get_all_deps():
-      all_deps = set([
-        JarDependency(org = 'com.google.protobuf',
-                      name = 'protobuf-java',
-                      rev = '${protobuf.library.version}'),
-      ])
-      if dependencies:
-        all_deps.update(dependencies)
-      return all_deps
-
     ExportableJvmLibrary.__init__(self,
-                                   JavaProtobufLibrary._SRC_DIR,
-                                   name,
-                                   sources,
-                                   provides,
-                                   get_all_deps(),
-                                   excludes,
-                                   buildflags,
-                                   is_meta)
+                                  name,
+                                  sources,
+                                  provides,
+                                  dependencies,
+                                  excludes,
+                                  buildflags,
+                                  is_meta)
     self.is_codegen = True
 
   def _as_jar_dependency(self):
@@ -95,7 +60,7 @@ class JavaProtobufLibrary(ExportableJvmLibrary):
   def _create_template_data(self):
     allsources = []
     if self.sources:
-      allsources += list(os.path.join(JavaProtobufLibrary._SRC_DIR, src) for src in self.sources)
+      allsources += list(os.path.join(self.target_base, src) for src in self.sources)
 
     return ExportableJvmLibrary._create_template_data(self).extend(
       allsources = allsources,

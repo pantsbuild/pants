@@ -48,47 +48,51 @@ class Command:
 
   @staticmethod
   def scan_addresses(root_dir, base_path = None):
-    """Parses all targets available in BUILD files under base_path and returns their addresses.  If no
-    base_path is specified, root_dir is assumed to be the base_path"""
+    """Parses all targets available in BUILD files under base_path and
+    returns their addresses.  If no base_path is specified, root_dir is
+    assumed to be the base_path"""
 
     addresses = OrderedSet()
     for buildfile in BuildFile.scan_buildfiles(root_dir, base_path):
       addresses.update(Target.get_all_addresses(buildfile))
     return addresses
 
-  def __init__(self, root_dir, parser, argv):
+  def __init__(self, root_dir, parser, args):
     """root_dir: The root directory of the pants workspace
     parser: an OptionParser
     argv: the subcommand arguments to parse"""
 
     self.root_dir = root_dir
-    self.setup_parser(parser)
 
     # Override the OptionParser's error with more useful output
     def error(message = None):
       if message:
-          print message
-          print
+        print message
+        print
       parser.print_help()
       parser.exit(status = 1)
     parser.error = error
+    self.error = error
 
-    self.options, self.args = parser.parse_args(argv)
+    self.setup_parser(parser, args)
+    self.options, self.args = parser.parse_args(args)
     self.parser = parser
 
-  def setup_parser(self, parser):
-    """Subclasses should override and confiure the OptionParser to reflect the subcommand option
-    and argument requirements.  Upon successful construction, subcommands will be able to access
-    self.options and self.args."""
+  def setup_parser(self, parser, args):
+    """Subclasses should override and confiure the OptionParser to reflect
+    the subcommand option and argument requirements.  Upon successful
+    construction, subcommands will be able to access self.options and
+    self.args."""
 
     pass
 
   def error(self, message = None):
-    self.parser.error(message)
+    """Reports the error message followed by pants help and then exits."""
 
   def execute(self):
-    """Subcommands should override to perform the command action.  The value returned should be an
-    int, 0 indicating success and any other value indicating failure."""
+    """Subcommands should override to perform the command action.  The value
+    returned should be an int, 0 indicating success and any other value
+    indicating failure."""
 
     pass
 

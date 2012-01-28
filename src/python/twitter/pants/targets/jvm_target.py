@@ -25,17 +25,13 @@ from with_sources import TargetWithSources
 class JvmTarget(InternalTarget, TargetWithSources):
   """A base class for all java module targets that provides path and dependency translation."""
 
-  def __init__(self, target_base, name, sources, dependencies, excludes = None,
-               buildflags = None, is_meta = False):
+  def __init__(self, name, sources, dependencies, excludes=None, buildflags=None, is_meta=False):
     InternalTarget.__init__(self, name, dependencies, is_meta)
-    TargetWithSources.__init__(self, target_base, name, is_meta)
+    TargetWithSources.__init__(self, name, is_meta)
 
-    if sources is None or sources == []:
-      raise TargetDefinitionException(self, 'No sources specified')
-
-    self.sources = self._resolve_paths(self.target_base, sources)
-    self.excludes = excludes
-    self.buildflags = buildflags
+    self.sources = self._resolve_paths(self.target_base, sources) or []
+    self.excludes = excludes or []
+    self.buildflags = buildflags or []
 
     custom_antxml = '%s.xml' % self.name
     buildfile = self.address.buildfile.full_path
@@ -45,7 +41,7 @@ class JvmTarget(InternalTarget, TargetWithSources):
   def _as_jar_dependency(self):
     jar_dependency, _, _ = self._get_artifact_info()
     jar = JarDependency(org = jar_dependency.org, name = jar_dependency.name, rev = None)
-    jar._id = self._id
+    jar.id = self.id
     return jar
 
   def _as_jar_dependencies(self):
@@ -56,10 +52,10 @@ class JvmTarget(InternalTarget, TargetWithSources):
     exported = bool(provides)
 
     org = provides.org if exported else 'internal'
-    module = provides.name if exported else self._id
+    module = provides.name if exported else self.id
     version = provides.rev if exported else None
 
-    id = "%s-%s" % (provides.org, provides.name) if exported else self._id
+    id = "%s-%s" % (provides.org, provides.name) if exported else self.id
 
     return JarDependency(org = org, name = module, rev = version), id, exported
 

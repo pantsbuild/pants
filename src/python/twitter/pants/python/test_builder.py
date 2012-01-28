@@ -18,9 +18,10 @@ import os
 import errno
 
 from twitter.common.collections import OrderedSet
+from twitter.common.python import PythonLauncher
+
 from twitter.pants.base import Target, Address
 from twitter.pants.python.python_chroot import PythonChroot
-from twitter.pants.python.launcher import Launcher
 from twitter.pants.targets import PythonTests, PythonTestSuite, PythonEgg
 
 class PythonTestBuilder(object):
@@ -73,8 +74,7 @@ class PythonTestBuilder(object):
 
   def _run_python_test(self, target):
     chroot = PythonChroot(target, self.root_dir)
-    chroot.dump()
-    launcher = Launcher(chroot.path())
+    launcher = PythonLauncher(chroot.dump().path())
 
     extra_deps = PythonTestBuilder.get_pytest_eggs(self.root_dir)
     test_args = ['-m', 'pytest']
@@ -83,7 +83,9 @@ class PythonTestBuilder(object):
     sources = [os.path.join(target.target_base, source) for source in target.sources]
     return launcher.run(interpreter_args=test_args,
                         args=list(sources),
-                        extra_deps=extra_deps)
+                        extra_deps=extra_deps,
+                        kill_orphans=True,
+                        )
 
   def _run_python_test_suite(self, target):
     tests = OrderedSet([])

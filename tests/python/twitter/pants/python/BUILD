@@ -17,25 +17,26 @@
 
 python_test_suite(name = 'all',
   dependencies = [
-    pants(':test_eggparser'),
+    pants(':test_python_chroot_deps'),
     pants(':test_antlr_builder'),
-    pants(':test_thrift_namespace_packages')
+    pants(':test_thrift_namespace_packages'),
   ]
 )
 
-python_tests(name = 'test_eggparser',
-  sources = ['test_eggparser.py'],
-  dependencies = [ pants("src/python/twitter/pants:pants-lib") ]
+
+python_tests(name = 'test_python_chroot_deps',
+  sources = ['test_python_chroot_deps.py'],
+  dependencies = [ pants('src/python/twitter/pants:pants-lib') ]
 )
 
 python_tests(name = 'test_antlr_builder',
   sources = ['test_antlr_builder.py'],
-  dependencies = [ pants("src/antlr/twitter/pants/python/test:eval"),
-                   pants("src/antlr/twitter/pants/python/test:csv")]
+  dependencies = [ pants('src/antlr/twitter/pants/python/test:eval'),
+                   pants('src/antlr/twitter/pants/python/test:csv')]
 )
 
 python_tests(name = 'test_thrift_namespace_packages',
   sources = ['test_thrift_namespace_packages.py'],
-  dependencies = [ pants("src/thrift/com/twitter/pants/testing:duck-py"),
-                   pants("src/thrift/com/twitter/pants/testing:goose-py") ]
+  dependencies = [ pants('src/thrift/com/twitter/pants/testing:duck-py'),
+                   pants('src/thrift/com/twitter/pants/testing:goose-py') ]
 )

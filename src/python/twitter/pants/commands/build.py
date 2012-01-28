@@ -18,34 +18,20 @@ from . import Command
 
 from twitter.common.collections import OrderedSet
 
-from twitter.pants import is_python, extract_jvm_targets
+from twitter.pants import is_python, extract_jvm_targets, is_doc
 from twitter.pants.ant import AntBuilder
-from twitter.pants.ant.lib import (
-  TRANSITIVITY_NONE,
-  TRANSITIVITY_SOURCES,
-  TRANSITIVITY_TESTS,
-  TRANSITIVITY_ALL,
-)
 from twitter.pants.base import Address, Target
 from twitter.pants.targets import InternalTarget
 from twitter.pants.python import PythonBuilder
 
 import traceback
 
-_TRANSITIVITY_CHOICES = [
-  TRANSITIVITY_NONE,
-  TRANSITIVITY_SOURCES,
-  TRANSITIVITY_TESTS,
-  TRANSITIVITY_ALL
-]
-_VALID_TRANSITIVITIES = set(_TRANSITIVITY_CHOICES)
-
 class Build(Command):
   """Builds a specified target."""
 
   __command__ = 'build'
 
-  def setup_parser(self, parser):
+  def setup_parser(self, parser, args):
     parser.set_usage("\n"
                      "  %prog build (options) [spec] (build args)\n"
                      "  %prog build (options) [spec]... -- (build args)")
@@ -54,14 +40,10 @@ class Build(Command):
                       help = "Specifies the build should be flattened before executing, this can "
                              "help speed up many builds.  Equivalent to the ! suffix BUILD target "
                              "modifier")
-    parser.add_option("--ide", action="store_true", dest = "is_ide", default = False,
-                      help = "Specifies the build should just do enough to get an IDE usable.")
-    parser.add_option("-t", "--ide-transitivity", dest = "ide_transitivity", type = "choice",
-                      choices = _TRANSITIVITY_CHOICES, default = TRANSITIVITY_TESTS,
-                      help = "[%%default] Specifies IDE dependencies should be transitive for one "
-                             "of: %s" % _TRANSITIVITY_CHOICES)
     parser.add_option("-q", "--quiet", action="store_true", dest = "quiet", default = False,
                       help = "Don't output result of empty targets")
+    parser.add_option("-x", "--time", action="store_true", dest = "time", default = False,
+                      help = "Times jvm build steps and outputs a report")
 
     parser.epilog = """Builds the specified target(s).  Currently any additional arguments are
     passed straight through to the ant build system."""
@@ -96,7 +78,7 @@ class Build(Command):
 
       try:
         InternalTarget.check_cycles(target)
-      except CycleException as e:
+      except InternalTarget.CycleException as e:
         self.error("Target contains an internal dependency cycle: %s" % e)
 
       if not target:
@@ -104,9 +86,6 @@ class Build(Command):
       if not target.address.is_meta:
         target.address.is_meta = self.options.is_meta or address.is_meta
       self.targets.add(target)
-
-    self.is_ide = self.options.is_ide
-    self.ide_transitivity = self.options.ide_transitivity
 
   def execute(self):
     print "Build operating on targets: %s" % self.targets
@@ -135,11 +114,16 @@ class Build(Command):
   def _jvm_build(self, targets):
     try:
       # TODO(John Sirois): think about moving away from the ant backend
-      executor = AntBuilder(self.error, self.root_dir, self.is_ide, self.ide_transitivity)
+      executor = AntBuilder(self.error, self.root_dir)
       if self.options.quiet:
         self.build_args.insert(0, "-logger")
         self.build_args.insert(1, "org.apache.tools.ant.NoBannerLogger")
         self.build_args.insert(2, "-q")
+      if self.options.time:
+        self.build_args.insert(0, "-lib")
+        self.build_args.insert(1, "build-support/antlib")
+        self.build_args.insert(2, "-listener")
+        self.build_args.insert(3, "net.sf.antcontrib.perf.AntPerformanceListener")
       return executor.build(targets, self.build_args)
     except:
       self.error("Problem executing AntBuilder for targets %s: %s" % (targets,

@@ -18,17 +18,15 @@ from collections import deque
 from copy import copy
 
 from twitter.common.collections import OrderedSet
-from twitter.pants import is_apt, is_java, is_scala
+from twitter.pants import is_internal, is_java, is_scala
 from twitter.pants.targets import JavaLibrary, ScalaLibrary
 
 import bang
 
-def extract_target(java_targets, is_transitive, name = None):
+def extract_target(java_targets, is_transitive, is_classpath, name = None):
   meta_target = bang.extract_target(java_targets, name)
 
-  internal_deps, jar_deps = _extract_target(meta_target,
-                                            is_transitive,
-                                            lambda target: is_apt(target))
+  internal_deps, jar_deps = _extract_target(meta_target, is_transitive, is_classpath)
 
   # TODO(John Sirois): make an empty source set work in ant/compile.xml
   sources = [ '__no_source__' ]
@@ -52,7 +50,7 @@ def extract_target(java_targets, is_transitive, name = None):
   else:
     raise TypeError("Cannot generate IDE configuration for targets: %s" % java_targets)
 
-def _extract_target(meta_target, is_transitive, is_apt):
+def _extract_target(meta_target, is_transitive, is_classpath):
   """
     Extracts the minimal set of internal dependencies and external jar dependencies from the given
     (meta) target so that an ide can run any required custom annotation processors and resolve all
@@ -85,13 +83,18 @@ def _extract_target(meta_target, is_transitive, is_apt):
   jar_deps = OrderedSet()
 
   visited = set()
+
+  def add_cp_deps(target):
+    codegen_graph[0].internal_dependencies.add(target)
+
   def sift_targets(target, add_deps = False):
     if target not in visited:
       visited.add(target)
-      is_needed_on_ide_classpath = add_deps or target.is_codegen or is_apt(target)
 
+      is_needed_on_ide_classpath = add_deps or is_classpath(target)
       if is_needed_on_ide_classpath:
-        codegen_graph[0].internal_dependencies.add(target)
+        # Add the target and its transitive internal deps. for compilation
+        target.walk(add_cp_deps, is_internal)
       else:
         for jar_dependency in target.jar_dependencies:
           if jar_dependency.rev:
@@ -112,7 +115,7 @@ def _extract_target(meta_target, is_transitive, is_apt):
 
   sift_targets(meta_target)
 
-  assert len(codegen_graph) == 1 and codegen_graph[0] == root_target,\
+  assert len(codegen_graph) == 1 and codegen_graph[0] == root_target, \
     "Unexpected walk: %s" % codegen_graph
 
   return codegen_graph.popleft().internal_dependencies, jar_deps

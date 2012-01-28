@@ -37,8 +37,8 @@ class Idea(Ide):
 
   __command__ = 'idea'
 
-  def setup_parser(self, parser):
-    Ide.setup_parser(self, parser)
+  def setup_parser(self, parser, args):
+    Ide.setup_parser(self, parser, args)
 
     supported_versions = list(_VERSIONS.keys())
     supported_versions.sort()
@@ -51,9 +51,9 @@ class Idea(Ide):
                       default = self.root_dir, help = "[%default] Specifies the directory to "
                       "output the generated project files to.")
     parser.add_option("--nomerge", action = "store_true", dest = "nomerge",
-                      default = False, help = "Stomp any manual customizations in existing Intellij "
-                      "IDEA configuration. If unspecified, manual customizations will be merged "
-                      "into the new configuration.")
+                      default = False, help = "Stomp any manual customizations in existing "
+                      "Intellij IDEA configuration. If unspecified, manual customizations will be "
+                      " merged into the new configuration.")
     parser.add_option("--idea-build-output-dir", dest = "intellij_output_dir",
                       default = os.path.join(self.root_dir, 'target/intellij/out'),
                       help = "[%default] Specifies the directory IntelliJ IDEA should use for its "
@@ -122,8 +122,10 @@ class Idea(Ide):
       java_encoding = self.options.java_encoding,
       resource_extensions = self._get_resource_extensions(project),
       has_scala = project.has_scala,
+      scala_compiler_classpath = project.scala_compiler_classpath,
       scala = TemplateData(fsc = self.options.fsc) if project.has_scala else None,
-      extra_checkstyle_suppression_files = project.extra_checkstyle_suppression_files,
+      checkstyle_suppression_files = ','.join(project.checkstyle_suppression_files),
+      checkstyle_classpath = ';'.join(project.checkstyle_classpath),
       extra_components = [],
     )
 
@@ -139,9 +141,9 @@ class Idea(Ide):
         Generator(pkgutil.get_data(__name__, self.module_template), module = configured_module))
 
     if not self.options.nomerge:
-      # Get the names of the components we generated, and then delete the generated files.
-      # Clunky, but performance is not an issue, and this is an easy way to get those component names
-      # from the templates.
+      # Get the names of the components we generated, and then delete the
+      # generated files.  Clunky, but performance is not an issue, and this
+      # is an easy way to get those component names from the templates.
       extra_project_components = self._get_components_to_merge(existing_project_components, ipr)
       extra_module_components =  self._get_components_to_merge(existing_module_components, iml)
       os.remove(ipr)
@@ -155,6 +157,8 @@ class Idea(Ide):
 
     shutil.move(ipr, self.project_filename)
     shutil.move(iml, self.module_filename)
+
+    return 0
 
   def _generate_to_tempfile(self, generator):
     """Applies the specified generator to a temp file and returns the path to that file.
@@ -189,8 +193,10 @@ class Idea(Ide):
     superceded by a <component> in the specified xml file.
     mergable_components is a list of (name, xml_fragment) pairs."""
 
-    # As a convenience, we use _parse_xml_component_elements to get the superceding component names,
-    # ignoring the generated xml fragments. This is fine, since performance is not an issue.
-    generated_component_names = set([ name for (name, _) in self._parse_xml_component_elements(path) ])
+    # As a convenience, we use _parse_xml_component_elements to get the
+    # superceding component names, ignoring the generated xml fragments.
+    # This is fine, since performance is not an issue.
+    generated_component_names = set(
+      [ name for (name, _) in self._parse_xml_component_elements(path) ])
     return [ x[1] for x in mergable_components if x[0] not in generated_component_names]
 

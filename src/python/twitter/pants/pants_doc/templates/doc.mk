@@ -1,0 +1,4 @@
+<html>
+<body>
+${text}
+</body>

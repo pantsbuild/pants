@@ -58,14 +58,6 @@ limitations under the License.
   </property>
   % endif
 
-  % if lib.binary_resources:
-  <property name="${lib.id}.binary.resources">
-    % for path in lib.binary_resources:
-    ${path}
-    % endfor
-  </property>
-  % endif
-
   % if lib.deploy_jar:
   <!-- enable dist creating a monolithic deploy jar -->
   <property name="${lib.id}.deployjar" value="true"/>

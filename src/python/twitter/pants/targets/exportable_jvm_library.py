@@ -23,7 +23,6 @@ class ExportableJvmLibrary(JvmTarget):
   RESOURCES_BASE_DIR = 'src/resources'
 
   def __init__(self,
-               target_base,
                name,
                sources,
                provides = None,
@@ -36,18 +35,10 @@ class ExportableJvmLibrary(JvmTarget):
     # flow
     self.provides = provides
 
-    JvmTarget.__init__(self,
-                        target_base,
-                        name,
-                        sources,
-                        dependencies,
-                        excludes,
-                        buildflags,
-                        is_meta)
+    JvmTarget.__init__(self, name, sources, dependencies, excludes, buildflags, is_meta)
 
   def _provides(self):
     return self.provides
-
 
   def _create_template_data(self):
     jar_dependency, id, exported = self._get_artifact_info()

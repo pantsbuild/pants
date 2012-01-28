@@ -26,6 +26,9 @@ class JarDependency(object):
 
   If the rev keyword argument is left out, the revision is assumed to be the latest available.
 
+  If the rev is specified and force = True is also specified, this will force the artifact revision
+  to be rev even if other transitive deps specify a different revision for the same artifact.
+
   The extension of the artifact can be over-ridden if it differs from the artifact type with the ext
   keyword argument.  This is sometimes needed for artifacts packaged with maven bundle type but
   stored as jars.
@@ -36,16 +39,17 @@ class JarDependency(object):
   javadocs with {@link}s to the jar's classes will be properly hyperlinked.
   """
 
-  def __init__(self, org, name, rev = None, ext = None, url = None, apidocs = None):
+  def __init__(self, org, name, rev = None, force = False, ext = None, url = None, apidocs = None):
     self.org = org
     self.name = name
     self.rev = rev
+    self.force = force
     self.excludes = []
     self.transitive = True
     self.ext = ext
     self.url = url
     self.apidocs = apidocs
-    self._id = None
+    self.id = None
     self._configurations = [ 'default' ]
 
   def exclude(self, org, name = None):
@@ -101,6 +105,7 @@ class JarDependency(object):
       org = self.org,
       module = self.name,
       version = self.rev,
+      force = self.force,
       excludes = self.excludes,
       transitive = self.transitive,
       ext = self.ext,

@@ -22,7 +22,7 @@ import shutil
 import tempfile
 import subprocess
 
-from twitter.pants.base import Chroot
+from twitter.common.dirutil.chroot import RelativeChroot
 from twitter.pants.python.egg_builder import EggBuilder
 
 class PythonAntlrBuilder(object):
@@ -36,7 +36,7 @@ class PythonAntlrBuilder(object):
     self.root = root_dir
     self.module = target.module
     distdir = os.path.join(self.root, 'dist')
-    self.chroot = Chroot(root_dir, distdir, target.name)
+    self.chroot = RelativeChroot(root_dir, distdir, target.name)
     codegen_root = tempfile.mkdtemp(dir=self.chroot.path(), prefix='codegen.')
     self.codegen_root = os.path.relpath(codegen_root, self.chroot.path())
     self.created_packages = set()

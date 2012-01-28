@@ -30,7 +30,7 @@ class List(Command):
 
   __command__ = 'list'
 
-  def setup_parser(self, parser):
+  def setup_parser(self, parser, args):
     parser.set_usage("%prog list ([spec]...)")
     parser.add_option("-d", "--directory", action="store_true", dest = "is_directory_list",
                       default = False, help = """Specifies specs should be treated as plain paths,
@@ -49,6 +49,8 @@ class List(Command):
                       help = "Specifies the separator to use between the org/name/rev components "
                              "of a dependency's fully qualified name.  Only makes sense when "
                              "combined with --provides")
+    parser.add_option("--documented", dest = "documented", default = False, action="store_true",
+                      help = "Prints only targets with documentation")
     parser.epilog = """Lists all BUILD targets in the system with no arguments, otherwise lists all
     the BUILD targets that reside in the the BUILD files hosting the specified targets."""
 
@@ -86,6 +88,12 @@ class List(Command):
 
       column_extractors = [ extractors[col] for col in (self.options.provides_columns.split(',')) ]
       print_fn = lambda address: self._print_provides(column_extractors, address)
+    elif self.options.documented:
+      def print_documented(address):
+        target = Target.get(address)
+        if target.description:
+          return '%s\n  %s' % (address, '\n  '.join(target.description.strip().split('\n')))
+      print_fn = print_documented
     else:
       print_fn = lambda address: str(address)
 

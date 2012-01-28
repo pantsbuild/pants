@@ -14,17 +14,10 @@
 # limitations under the License.
 # ==================================================================================================
 
-import os
-from twitter.pants.base import ParseContext
 from python_target import PythonTarget
 
 class PythonLibrary(PythonTarget):
-  def __init__(self, name,
-               sources = None,
-               resources = None,
-               dependencies = None,
-               module = "",
-               module_root = "src/python"):
+  def __init__(self, name, sources=(), resources=(), dependencies=(), module=""):
     """
       name = Name of library
       sources = Python source files
@@ -32,19 +25,10 @@ class PythonLibrary(PythonTarget):
         recommended that your application uses the pkgutil package to access these
         resources in a .zip-module friendly way.)
       dependencies = other PythonLibraries, Eggs or internal Pants targets
-      module = everything beneath module_root is relative to this module name, None if root namespace
-      module_root = see above
+      module = everything beneath module is relative to this module name, None if root namespace
     """
-    context = ParseContext.locate()
     self._module = module
-    PythonTarget.__init__(
-      self,
-      module_root,
-      name,
-      sources,
-      resources,
-      dependencies,
-      False)
+    PythonTarget.__init__(self, name, sources, resources, dependencies)
 
   def _create_template_data(self):
-    return PythonTarget._create_template_data(self).extend(module = self._module)
+    return PythonTarget._create_template_data(self).extend(module=self._module)

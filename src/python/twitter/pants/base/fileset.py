@@ -15,15 +15,20 @@
 # ==================================================================================================
 
 class Fileset(object):
-  """A callable object that will gather up a set of files lazily when called.  Supports unions with
-  iterables, other Filesets and individual items using the ^ and + operators as well as set
-  difference using the - operator."""
+  """
+    An iterable, callable object that will gather up a set of files lazily when iterated over or
+    called.  Supports unions with iterables, other Filesets and individual items using the ^ and +
+    operators as well as set difference using the - operator.
+  """
 
   def __init__(self, callable):
     self._callable = callable
 
   def __call__(self, *args, **kwargs):
     return self._callable(*args, **kwargs)
+
+  def __iter__(self):
+    return iter(self._callable())
 
   def __add__(self, other):
     return self ^ other
@@ -34,6 +39,9 @@ class Fileset(object):
         return self() ^ other()
       elif isinstance(other, set):
         return self() ^ other
+      elif isinstance(other, basestring):
+        raise TypeError('Unsupported operand type (%r) for ^: %r and %r' %
+                        (type(other), self, other))
       else:
         try:
           return self() ^ set(iter(other))
@@ -47,6 +55,9 @@ class Fileset(object):
         return self() - other()
       elif isinstance(other, set):
         return self() - other
+      elif isinstance(other, basestring):
+        raise TypeError('Unsupported operand type (%r) for -: %r and %r' %
+                        (type(other), self, other))
       else:
         try:
           return self() - set(iter(other))
