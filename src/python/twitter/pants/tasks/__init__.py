@@ -118,7 +118,7 @@ class Context(object):
 
     self._targets = OrderedSet()
     for target in self.target_roots:
-      target.walk(self._add_target)
+      self._add_target(target)
 
     self.id = self.identify(self._targets)
 
@@ -132,7 +132,9 @@ class Context(object):
     return 'Context(id:%s, state:%s, targets:%s)' % (self.id, self.state, self.targets())
 
   def _add_target(self, target):
-    self._targets.update(t for t in target.resolve())
+    def add_targets(tgt):
+      self._targets.update(t for t in tgt.resolve())
+    target.walk(add_targets)
 
   def add_target(self, build_dir, target_type, *args, **kwargs):
     target = self._do_in_context(lambda: target_type(*args, **kwargs), build_dir)
