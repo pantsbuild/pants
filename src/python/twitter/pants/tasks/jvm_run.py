@@ -42,7 +42,6 @@ class JvmRun(Task):
 
   def __init__(self, context):
     Task.__init__(self, context)
-    #self.context.products.require('classes')
     self.jvm_args = context.config.getlist('jvm-run', 'jvm_args', default=[])
     if context.options.run_jvmargs:
       self.jvm_args.extend(context.options.run_jvmargs)
