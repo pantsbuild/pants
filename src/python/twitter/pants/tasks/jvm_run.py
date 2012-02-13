@@ -40,7 +40,6 @@ class JvmRun(Task):
       action="callback", callback=mkflag.set_bool, default=False,
       help = "[%default] Run binary with a debugger")
 
-
   def __init__(self, context):
     Task.__init__(self, context)
     self.context.products.require('classes')
@@ -71,9 +70,3 @@ class JvmRun(Task):
       )
       if result != 0:
         raise TaskError()
-
-
-
-
-
-
