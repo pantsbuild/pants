@@ -322,6 +322,7 @@ from twitter.pants.tasks.jar_publish import JarPublish
 from twitter.pants.tasks.java_compile import JavaCompile
 from twitter.pants.tasks.javadoc_gen import JavadocGen
 from twitter.pants.tasks.junit_run import JUnitRun
+from twitter.pants.tasks.jvm_run import JvmRun
 from twitter.pants.tasks.nailgun_task import NailgunTask
 from twitter.pants.tasks.protobuf_gen import ProtobufGen
 from twitter.pants.tasks.scala_compile import ScalaCompile
@@ -439,3 +440,9 @@ goal(
   action=BundleCreate,
   dependencies=['binary']
 ).install().with_description('Create an application bundle from binary targets.')
+
+goal(
+  name='jvm-run',
+  action=JvmRun,
+  dependencies=['resolve', 'compile']
+).install('run').with_description('Run a (currently JVM only) binary target.')
