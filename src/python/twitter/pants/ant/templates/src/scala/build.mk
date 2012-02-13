@@ -1,5 +1,7 @@
 <?xml version="1.0"?>
-
+<%!
+import os
+%>
 <!--
 =================================================================================================
 Copyright 2011 Twitter, Inc.
@@ -31,7 +33,7 @@ limitations under the License.
   % endfor
   % if lib.java_sources:
     % for path in lib.java_sources:
-    <include name="java/${path}"/>
+    <include name="${os.path.relpath(path, os.path.join(root_dir, 'src'))}"/>
     % endfor
   % endif
   </fileset>

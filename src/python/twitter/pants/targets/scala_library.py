@@ -60,14 +60,24 @@ class ScalaLibrary(ExportableJvmLibrary):
                                   buildflags,
                                   is_meta)
 
-    base_parent = os.path.dirname(self.target_base)
-    sibling_java_base = os.path.join(base_parent, 'java')
-    self.java_sources = self._resolve_paths(sibling_java_base, java_sources)
+    self.java_sources = java_sources
 
+    base_parent = os.path.dirname(self.target_base)
     self.sibling_resources_base = os.path.join(base_parent, 'resources')
     self.resources = self._resolve_paths(self.sibling_resources_base, resources)
 
     self.deployjar = deployjar
+
+  def resolved_java_sources(self):
+    resolved_sources = []
+
+    if self.java_sources:
+      for target in self.java_sources:
+        for resolved in target.resolve():
+          if hasattr(resolved, 'sources'):
+            resolved_sources += list(os.path.join(resolved.target_base, source)
+              for source in resolved.sources if source.endswith('.java'))
+    return resolved_sources
 
   def _create_template_data(self):
     allsources = []
@@ -77,7 +87,7 @@ class ScalaLibrary(ExportableJvmLibrary):
       allsources += list(os.path.join(self.sibling_resources_base, res) for res in self.resources)
 
     return ExportableJvmLibrary._create_template_data(self).extend(
-      java_sources = self.java_sources,
+      java_sources = self.resolved_java_sources(),
       resources = self.resources,
       deploy_jar = self.deployjar,
       allsources = allsources,

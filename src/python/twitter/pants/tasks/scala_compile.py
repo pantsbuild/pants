@@ -94,15 +94,7 @@ class ScalaCompile(NailgunTask):
         sources[target].update(src)
 
         if isinstance(target, ScalaLibrary) and target.java_sources:
-          # TODO(John Sirois): XXX this assumes too much about project layouts - fix
-          base_parent = os.path.dirname(target.target_base)
-          sibling_java_base = os.path.join(base_parent, 'java')
-
-          java_src = (os.path.join(sibling_java_base, source)
-                      for source in target.java_sources if source.endswith('.java'))
-          if java_src:
-            bases.add(sibling_java_base)
-            sources[target].update(java_src)
+          sources[target].update(target.resolved_java_sources())
 
     for target in targets:
       collect_sources(target)
