@@ -112,11 +112,12 @@ class IvyResolve(NailgunTask):
       if changed_deps:
         self._ivycachepath(self._ivy_xml, self._classpath_file, *targets)
 
-    with self._cachepath(self._classpath_file) as classpath:
-      with self.context.state('classpath', []) as cp:
-        for path in classpath:
-          for conf in self._confs:
-            cp.append((conf, path.strip()))
+    if os.path.exists(self._classpath_file):
+      with self._cachepath(self._classpath_file) as classpath:
+        with self.context.state('classpath', []) as cp:
+          for path in classpath:
+            for conf in self._confs:
+              cp.append((conf, path.strip()))
 
     create_jardeps_for = self.context.products.isrequired('jar_dependencies')
     if create_jardeps_for:
