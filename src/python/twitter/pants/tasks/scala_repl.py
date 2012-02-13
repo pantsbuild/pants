@@ -16,6 +16,7 @@
 
 __author__ = 'Benjy Weinberger'
 
+import shlex
 
 from twitter.pants.targets import JavaLibrary, JavaTests, ScalaLibrary, ScalaTests
 from twitter.pants.tasks import Task
@@ -37,7 +38,8 @@ class ScalaRepl(Task):
     Task.__init__(self, context)
     self.jvm_args = context.config.getlist('scala-repl', 'jvm_args', default=[])
     if context.options.run_jvmargs:
-      self.jvm_args.extend(context.options.run_jvmargs)
+      for arg in context.options.run_jvmargs:
+        self.jvm_args.extend(shlex.split(arg))
     self.confs = context.config.getlist('scala-repl', 'confs')
     self.profile = context.config.get('scala-repl', 'profile')
     self.main = context.config.get('scala-repl', 'main')

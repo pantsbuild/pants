@@ -16,8 +16,10 @@
 
 __author__ = 'Benjy Weinberger'
 
+import shlex
 
 from twitter.common.collections.orderedset import OrderedSet
+
 from twitter.pants.targets import JvmBinary
 from twitter.pants.tasks import Task, TaskError
 from twitter.pants.tasks.binary_utils import runjava
@@ -44,10 +46,12 @@ class JvmRun(Task):
     Task.__init__(self, context)
     self.jvm_args = context.config.getlist('jvm-run', 'jvm_args', default=[])
     if context.options.run_jvmargs:
-      self.jvm_args.extend(context.options.run_jvmargs)
+      for arg in context.options.run_jvmargs:
+        self.jvm_args.extend(shlex.split(arg))
     self.args = []
     if context.options.run_args:
-      self.args.extend(context.options.run_args)
+      for arg in context.options.run_args:
+        self.args.extend(shlex.split(arg))
     if context.options.run_debug:
       self.jvm_args.extend(context.config.getlist('jvm-run', 'debug_args'))
     self.confs = context.config.getlist('jvm-run', 'confs')
