@@ -36,9 +36,17 @@ class ScalaCompile(NailgunTask):
                                  "enabled.")
 
   def __init__(self, context, output_dir=None, classpath=None, main=None, args=None, confs=None):
-    self._profile = context.config.get('scala-compile', 'profile')
     workdir = context.config.get('scala-compile', 'nailgun_dir')
     NailgunTask.__init__(self, context, workdir=workdir)
+
+    self._compile_profile = context.config.get('scala-compile', 'compile-profile')
+
+    # All scala targets implicitly depend on the selected scala runtime.
+    scaladeps = []
+    for spec in context.config.getlist('scala-compile', 'scaladeps'):
+      scaladeps.extend(context.resolve(spec))
+    for target in context.targets(is_scala):
+      target.update_dependencies(scaladeps)
 
     self._compiler_classpath = classpath
     self._output_dir = output_dir or context.config.get('scala-compile', 'workdir')
@@ -103,7 +111,10 @@ class ScalaCompile(NailgunTask):
   def compile(self, classpath, bases, sources_by_target):
     safe_mkdir(self._output_dir)
 
-    compiler_classpath = self._compiler_classpath or nailgun_profile_classpath(self, self._profile)
+    compiler_classpath = (
+      self._compiler_classpath
+      or nailgun_profile_classpath(self, self._compile_profile)
+    )
     self.ng('ng-cp', *compiler_classpath)
 
     # TODO(John Sirois): separate compiler profile from runtime profile
