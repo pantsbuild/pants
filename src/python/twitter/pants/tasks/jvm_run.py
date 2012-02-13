@@ -42,16 +42,16 @@ class JvmRun(Task):
 
   def __init__(self, context):
     Task.__init__(self, context)
-    self.context.products.require('classes')
-    self.jvm_args = context.config.getlist('run', 'jvm_args', default=[])
+    #self.context.products.require('classes')
+    self.jvm_args = context.config.getlist('jvm-run', 'jvm_args', default=[])
     if context.options.run_jvmargs:
       self.jvm_args.extend(context.options.run_jvmargs)
     self.args = []
     if context.options.run_args:
       self.args.extend(context.options.run_args)
     if context.options.run_debug:
-      self.jvm_args.extend(context.config.getlist('jvm', 'debug_args'))
-    self.confs = context.config.getlist('run', 'confs')
+      self.jvm_args.extend(context.config.getlist('jvm-run', 'debug_args'))
+    self.confs = context.config.getlist('jvm-run', 'confs')
 
   def execute(self, targets):
     # Run the first target that is a binary.

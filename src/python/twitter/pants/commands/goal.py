@@ -323,6 +323,7 @@ from twitter.pants.tasks.java_compile import JavaCompile
 from twitter.pants.tasks.javadoc_gen import JavadocGen
 from twitter.pants.tasks.junit_run import JUnitRun
 from twitter.pants.tasks.jvm_run import JvmRun
+from twitter.pants.tasks.scala_repl import ScalaRepl
 from twitter.pants.tasks.nailgun_task import NailgunTask
 from twitter.pants.tasks.protobuf_gen import ProtobufGen
 from twitter.pants.tasks.scala_compile import ScalaCompile
@@ -446,3 +447,9 @@ goal(
   action=JvmRun,
   dependencies=['resolve', 'compile']
 ).install('run').with_description('Run a (currently JVM only) binary target.')
+
+goal(
+  name='scala-repl',
+  action=ScalaRepl,
+  dependencies=['resolve', 'compile']
+).install('repl').with_description('Run a (currently Scala only) REPL with the classpath set according to the targets.')
