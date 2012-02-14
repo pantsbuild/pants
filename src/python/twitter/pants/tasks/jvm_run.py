@@ -53,7 +53,7 @@ class JvmRun(Task):
       for arg in context.options.run_args:
         self.args.extend(shlex.split(arg))
     if context.options.run_debug:
-      self.jvm_args.extend(context.config.getlist('jvm-run', 'debug_args'))
+      self.jvm_args.extend(context.config.getlist('jvm', 'debug_args'))
     self.confs = context.config.getlist('jvm-run', 'confs')
 
   def execute(self, targets):
