@@ -20,11 +20,9 @@ import os
 import subprocess
 import multiprocessing
 
-from collections import defaultdict
-
 from twitter.common.dirutil import safe_mkdir
 from twitter.pants import is_jvm, JavaLibrary, JavaTests
-from twitter.pants.tasks import Task, TaskError
+from twitter.pants.tasks import binary_utils, Task, TaskError
 
 def is_java(target):
   return isinstance(target, JavaLibrary) or isinstance(target, JavaTests)
@@ -80,9 +78,14 @@ class JavadocGen(Task):
       safe_mkdir(self._output_dir)
       with self.context.state('classpath', []) as cp:
         classpath = [jar for conf, jar in cp if conf in self.confs]
-        javadoc_targets = filter(is_java, changed_targets \
-            if self.transitive \
-            else set(changed_targets).intersection(set(self.context.target_roots)))
+
+        def find_javadoc_targets():
+          if self.transitive:
+            return changed_targets
+          else:
+            return set(changed_targets).intersection(set(self.context.target_roots))
+
+        javadoc_targets = list(filter(is_java, find_javadoc_targets()))
         if self.combined:
           self.generate_combined(classpath, javadoc_targets)
         else:
@@ -98,15 +101,13 @@ class JavadocGen(Task):
 
   def generate_combined(self, classpath, targets):
     gendir = os.path.join(self._output_dir, 'combined')
-    safe_mkdir(gendir, clean=True)
-    command = create_javadoc_command(classpath, gendir, *targets)
-    if command:
-      create_javadoc(command, gendir)
-      if self.open:
-        if os.uname()[0] != 'Darwin':
-          print 'Sorry, open currently only supports OSX'
-        else:
-          subprocess.Popen(['open', os.path.join(gendir, 'index.html')])
+    if targets:
+      safe_mkdir(gendir, clean=True)
+      command = create_javadoc_command(classpath, gendir, *targets)
+      if command:
+        create_javadoc(command, gendir)
+    if self.open:
+      binary_utils.open(os.path.join(gendir, 'index.html'))
 
   def generate_individual(self, classpath, targets):
     jobs = {}

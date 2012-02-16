@@ -17,6 +17,7 @@
 import os
 
 from twitter.common.collections import OrderedSet
+from twitter.pants.targets import resolve_target_sources
 
 from pants_target import Pants
 from exportable_jvm_library import ExportableJvmLibrary
@@ -68,17 +69,6 @@ class ScalaLibrary(ExportableJvmLibrary):
 
     self.deployjar = deployjar
 
-  def resolved_java_sources(self):
-    resolved_sources = []
-
-    if self.java_sources:
-      for target in self.java_sources:
-        for resolved in target.resolve():
-          if hasattr(resolved, 'sources'):
-            resolved_sources += list(os.path.join(resolved.target_base, source)
-              for source in resolved.sources if source.endswith('.java'))
-    return resolved_sources
-
   def _create_template_data(self):
     allsources = []
     if self.sources:
@@ -87,7 +77,7 @@ class ScalaLibrary(ExportableJvmLibrary):
       allsources += list(os.path.join(self.sibling_resources_base, res) for res in self.resources)
 
     return ExportableJvmLibrary._create_template_data(self).extend(
-      java_sources = self.resolved_java_sources(),
+      java_sources = resolve_target_sources(self.java_sources, '.java'),
       resources = self.resources,
       deploy_jar = self.deployjar,
       allsources = allsources,

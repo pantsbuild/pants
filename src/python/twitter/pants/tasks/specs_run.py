@@ -95,19 +95,10 @@ class SpecsRun(Task):
           raise TaskError()
 
   def calculate_tests(self, targets):
-    def is_test_file(test):
-      # TODO(John Sirois): config for a list of include regexes and exclude regexes
-      basename = os.path.basename(test)
-      return (test.endswith('Test.scala')
-              or test.endswith('IT.scala')
-              or test.endswith('Spec.scala')) \
-             and not basename.startswith('Base') and not basename.startswith('Abstract')
-
     tests = set()
     for target in targets:
       if is_scala(target) and is_test(target):
-        tests.update(os.path.join(target.target_base, test) for test in target.sources
-                     if is_test_file(test))
+        tests.update(os.path.join(target.target_base, test) for test in target.sources)
     return tests
 
   def normalize(self, classname_or_file):

@@ -61,12 +61,16 @@ class NailgunTask(Task):
   def log_kill(log, pid, port=None):
     log.info('killing ng server @ pid:%d%s' % (pid, ' port:%d' % port if port else ''))
 
-  def __init__(self, context, classpath=None, workdir=None, nailgun_jar=None, args=None):
+  def __init__(self, context, classpath=None, workdir=None, nailgun_jar=None, args=None,
+               stdin=None, stderr=sys.stderr, stdout=sys.stdout):
     Task.__init__(self, context)
 
     self._classpath = classpath
     self._nailgun_jar = nailgun_jar or context.config.get('nailgun', 'jar')
     self._ng_server_args = args or context.config.getlist('nailgun', 'args')
+    self._stdin = stdin
+    self._stderr = stderr
+    self._stdout = stdout
 
     workdir = workdir or context.config.get('nailgun', 'workdir')
     self._pidfile = os.path.join(workdir, 'pid')
@@ -115,7 +119,7 @@ class NailgunTask(Task):
   def _get_nailgun_client(self):
     endpoint = self._get_nailgun_endpoint()
     if endpoint and _check_pid(endpoint[0]):
-      return NailgunClient(port=endpoint[1], work_dir=get_buildroot())
+      return self._create_ngclient(port=endpoint[1])
     else:
       return self._spawn_nailgun_server()
 
@@ -137,7 +141,7 @@ class NailgunTask(Task):
             port = self._parse_nailgun_port(started)
             with open(self._pidfile, 'a') as pidfile:
               pidfile.write(':%d' % port)
-            nailgun = NailgunClient(port=port, work_dir=get_buildroot())
+            nailgun = self._create_ngclient(port)
             log.debug('Detected ng server up on port %d' % port)
             break
 
@@ -152,6 +156,9 @@ class NailgunTask(Task):
         log.debug('Failed to connect on attempt %d' % attempt)
         time.sleep(0.1)
 
+  def _create_ngclient(self, port):
+    return NailgunClient(port=port, work_dir=get_buildroot(), ins=self._stdin, out=self._stdout,
+                         err=self._stderr)
 
   def _spawn_nailgun_server(self):
     log.info('No ng server found, spawning...')

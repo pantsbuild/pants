@@ -48,10 +48,12 @@ class PythonChroot(object):
     def __init__(self, target):
       Exception.__init__(self, "Not a valid Python dependency! Found: %s" % target)
 
-  def __init__(self, target, root_dir):
+  def __init__(self, target, root_dir, extra_targets=None):
     self._target = target
     self._root = root_dir
     self._cache = BuildCache(os.path.join(root_dir, '.pants.d', 'py_artifact_cache'))
+    self._extra_targets = list(extra_targets) if extra_targets is not None else []
+    self._extra_targets.append(self._get_common_python())
     distdir = os.path.join(root_dir, 'dist')
     distpath = tempfile.mktemp(dir=distdir, prefix=target.name)
     self.env = PythonEnvironment(distpath)
@@ -157,12 +159,7 @@ class PythonChroot(object):
         print '   Failed!'
         raise PythonChroot.BuildFailureException("Failed to build %s!" % library)
 
-  def build_dep_tree(self, input_target):
-    target = copy.deepcopy(input_target)
-    common_python = self._get_common_python()
-    if common_python not in target.dependencies:
-      target.dependencies.add(common_python)
-
+  def build_dep_tree(self, target):
     libraries = set()
     eggs = set()
     binaries = set()
@@ -171,7 +168,7 @@ class PythonChroot(object):
 
     def add_dep(trg):
       if isinstance(trg, PythonLibrary):
-        if trg.sources:
+        if trg.sources or trg.resources:
           libraries.add(trg)
         for egg in [dep for dep in trg.dependencies if isinstance(dep, PythonEgg)]:
           eggs.add(egg)
@@ -189,15 +186,31 @@ class PythonChroot(object):
         pass
       else:
         raise PythonChroot.InvalidDependencyException(trg)
-      return [dep for dep in trg.dependencies if not isinstance(dep, PythonEgg)]
 
     target.walk(lambda t: add_dep(t), lambda typ: not isinstance(typ, PythonEgg))
+    return libraries, eggs, binaries, thrifts, antlrs
+
+  def aggregate_targets(self, targets):
+    libraries, eggs, binaries, thrifts, antlrs = set(), set(), set(), set(), set()
+
+    for target in targets:
+      (addl_libraries,
+       addl_eggs,
+       addl_binaries,
+       addl_thrifts,
+       addl_antlrs) = self.build_dep_tree(target)
+      libraries.update(addl_libraries)
+      eggs.update(addl_eggs)
+      binaries.update(addl_binaries)
+      thrifts.update(addl_thrifts)
+      antlrs.update(addl_antlrs)
 
     return libraries, eggs, binaries, thrifts, antlrs
 
   def dump(self):
     print 'Building PythonBinary %s:' % self._target
-    libraries, eggs, binaries, thrifts, antlrs = self.build_dep_tree(self._target)
+    libraries, eggs, binaries, thrifts, antlrs = self.aggregate_targets(
+      [self._target] + self._extra_targets)
 
     for lib in libraries:
       self._dump_library(lib)

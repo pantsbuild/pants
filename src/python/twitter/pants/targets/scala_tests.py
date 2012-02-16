@@ -17,7 +17,7 @@
 from twitter.common.collections import OrderedSet
 
 from twitter.pants.base.generator import TemplateData
-
+from twitter.pants.targets import resolve_target_sources
 from jvm_target import JvmTarget
 
 class ScalaTests(JvmTarget):
@@ -26,6 +26,7 @@ class ScalaTests(JvmTarget):
   def __init__(self,
                name,
                sources = None,
+               java_sources = None,
                dependencies = None,
                excludes = None,
                buildflags = None,
@@ -49,6 +50,7 @@ class ScalaTests(JvmTarget):
                        excludes,
                        buildflags,
                        is_meta)
+    self.java_sources = java_sources
 
   def _create_template_data(self):
     jar_dependency, id, exported = self._get_artifact_info()
@@ -67,6 +69,7 @@ class ScalaTests(JvmTarget):
       module = jar_dependency.name,
       version = jar_dependency.rev,
       sources = self.sources,
+      java_sources = resolve_target_sources(self.java_sources, '.java'),
       dependencies = [dep._create_template_data() for dep in self.jar_dependencies],
       excludes = exclude_template_datas,
       buildflags = self.buildflags,

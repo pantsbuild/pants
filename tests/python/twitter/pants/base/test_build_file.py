@@ -17,6 +17,7 @@
 __author__ = 'John Sirois'
 
 from twitter.common.collections import OrderedSet
+from twitter.common.dirutil import touch
 from twitter.pants.base import BuildFile
 
 import os
@@ -34,9 +35,7 @@ class BuildFileTest(unittest.TestCase):
 
   @classmethod
   def touch(cls, path):
-    fullpath = os.path.join(BuildFileTest.root_dir, path)
-    BuildFileTest.makedirs(os.path.dirname(fullpath))
-    open(fullpath, 'w').close()
+    touch(os.path.join(BuildFileTest.root_dir, path))
 
   @classmethod
   def buildfile(cls, path):

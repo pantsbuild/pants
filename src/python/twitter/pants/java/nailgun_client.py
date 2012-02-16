@@ -66,10 +66,9 @@ class NailgunSession(object):
   def __init__(self, sock, ins, out, err):
     self._sock = sock
     self._send_chunk = partial(_send_chunk, sock)
-    self._input_reader = NailgunSession._InputReader(ins, self._sock)
+    self._input_reader = NailgunSession._InputReader(ins, self._sock) if ins else None
     self._out = out
     self._err = err
-
 
   class _InputReader(threading.Thread):
     def __init__(self, ins, sock):
@@ -79,7 +78,6 @@ class NailgunSession(object):
       self._sock = sock
       self._send_chunk = partial(_send_chunk, sock)
       self._stopping = threading.Event()
-
 
     def run(self):
       while self._should_run():
@@ -100,10 +98,8 @@ class NailgunSession(object):
                 pass
               self.stop()
 
-
     def stop(self):
       self._stopping.set()
-
 
     def _should_run(self):
       return not self._stopping.is_set()
@@ -122,12 +118,13 @@ environment: %s''' % (work_dir, main_class, args, environment))
     self._send_chunk('D', work_dir)
     self._send_chunk('C', main_class)
 
-    self._input_reader.start()
+    if self._input_reader:
+      self._input_reader.start()
     try:
       return self._read_response()
     finally:
-      self._input_reader.stop()
-
+      if self._input_reader:
+        self._input_reader.stop()
 
   def _read_response(self):
     buffer = ''
@@ -145,7 +142,6 @@ environment: %s''' % (work_dir, main_class, args, environment))
         return int(payload)
       else:
         raise ProtocolError('Received unexpected chunk %s -> %s' % (command, payload))
-
 
   def _readchunk(self, buffer):
     while len(buffer) < HEADER_LENGTH:
@@ -181,7 +177,8 @@ class NailgunClient(object):
 
       host: the nailgun server to contact (defaults to localhost)
       port: the port the nailgun server is listening on (defaults to the default nailgun port: 2113)
-      ins: a file to read command standard input from (defaults to stdin)
+      ins: a file to read command standard input from (defaults to stdin) - can be None in which
+           case no input is read
       out: a stream to write command standard output to (defaults to stdout)
       err: a stream to write command standard error to (defaults to stderr)
       work_dir: the working directory for all nailgun commands (defaults to PWD)
@@ -196,11 +193,9 @@ class NailgunClient(object):
 
     self.execute = self.__call__
 
-
   def try_connect(self):
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     return sock if sock.connect_ex((self._host, self._port)) == 0 else None
-
 
   def __call__(self, main_class, *args, **environment):
     """

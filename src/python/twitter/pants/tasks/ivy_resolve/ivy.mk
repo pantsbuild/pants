@@ -38,13 +38,21 @@ limitations under the License.
     <conf name="test" visibility="private" description="build and run tests"/>
   </configurations>
 
+  % if lib.publications:
   <publications>
     <artifact conf="default" type="jar" ext="jar"/>
     <artifact conf="default" type="pom" ext="pom"/>
+    % if 'sources' in lib.publications:
     <artifact conf="sources" type="source" m:classifier="sources" ext="jar"/>
+    % endif
+    % if 'docs' in lib.publications:
     <artifact conf="docs" type="doc" m:classifier="javadoc" ext="jar"/>
+    % endif
+    % if 'changelog' in lib.publications:
     <artifact conf="changelog" type="CHANGELOG" m:classifier="CHANGELOG" ext="txt"/>
+    % endif
   </publications>
+  % endif
 
   % if lib.dependencies:
   <dependencies>

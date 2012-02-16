@@ -16,11 +16,11 @@
 
 __author__ = 'John Sirois'
 
-from . import Command
+import os
+import traceback
 
 from twitter.pants.base import Address, Target
-
-import traceback
+from twitter.pants.commands import Command
 
 class Files(Command):
   """Lists all source files owned by the given target."""
@@ -40,17 +40,28 @@ class Files(Command):
     spec = self.args[0]
     try:
       address = Address.parse(root_dir, spec)
-    except:
+    except IOError:
       self.error("Problem parsing spec %s: %s" % (spec, traceback.format_exc()))
 
     try:
       self.target = Target.get(address)
-    except:
+    except (ImportError, SyntaxError, TypeError):
       self.error("Problem parsing BUILD target %s: %s" % (address, traceback.format_exc()))
 
     if not self.target:
         self.error("Target %s does not exist" % address)
 
   def execute(self):
-    for sourcefile in self.target.sources:
-      print sourcefile
+    for target in self.target.resolve():
+      for sourcefile in getattr(target, 'sources', ()) or ():
+        print os.path.join(target.target_base, sourcefile)
+
+      for resourcefile in getattr(target, 'resources', ()) or ():
+        # TODO(John Sirois): fill resource source_root hole to get a full path from the build
+        # root here
+        print '[res] %s' % resourcefile
+
+      for java_source in getattr(target, 'java_sources', ()) or ():
+        # TODO(John Sirois): fill java_sources source_root hole to get a full path from the build
+        # root here
+        print '[java cyclic] %s' % java_source

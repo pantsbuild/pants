@@ -39,7 +39,7 @@ class Exclude(object):
     return not self.__eq__(other)
 
   def __repr__(self):
-    return "org=%s name=%s" % (self.org, self.name)
+    return "Exclude(org='%s', name=%s)" % (self.org, ('%s' % self.name) if self.name else None)
 
   def _create_template_data(self):
     return TemplateData(

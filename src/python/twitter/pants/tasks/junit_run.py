@@ -19,7 +19,7 @@ __author__ = 'John Sirois'
 import os
 import re
 
-from twitter.pants import get_buildroot, is_java, is_test
+from twitter.pants import get_buildroot, is_java, is_scala, is_test
 from twitter.pants.tasks import Task, TaskError
 from twitter.pants.tasks.binary_utils import profile_classpath, runjava
 
@@ -71,21 +71,23 @@ class JUnitRun(Task):
     if context.options.junit_run_debug:
       self.java_args.extend(context.config.getlist('jvm', 'debug_args'))
 
-    classes = context.options.junit_run_tests
-    self.tests = map(self.normalize, classes) if classes else None
+    self.test_classes = context.options.junit_run_tests
+    self.context.products.require('classes')
 
     self.flags = []
     if context.options.junit_run_xmlreport or context.options.junit_run_suppress_output:
       if context.options.junit_run_xmlreport:
-        self.flags.append('-xmlreport=true')
-      self.flags.append('-suppress-output=true')
-      self.flags.append('-outdir=%s' % (context.options.junit_run_outdir or
-                                        context.config.get('junit-run', 'workdir')))
+        self.flags.append('-xmlreport')
+      self.flags.append('-suppress-output')
+      self.flags.append('-outdir')
+      self.flags.append(context.options.junit_run_outdir
+                        or context.config.get('junit-run', 'workdir'))
 
 
   def execute(self, targets):
     if not self.context.options.junit_run_skip:
-      tests = self.tests or self.calculate_tests(targets)
+      tests = list(self.normalize_test_classes() if self.test_classes
+                                                 else self.calculate_tests(targets))
       if tests:
         classpath = profile_classpath(self.profile)
 
@@ -106,37 +108,40 @@ class JUnitRun(Task):
         if result != 0:
           raise TaskError()
 
-  def calculate_tests(self, targets):
-    def is_test_file(test):
-      # TODO(John Sirois): config for a list of include regexes and exclude regexes
-      basename = os.path.basename(test)
-      return (test.endswith('Test.java') or test.endswith('IT.java')) \
-          and not basename.startswith('Base') and not basename.startswith('Abstract')
+  def normalize_test_classes(self):
+    for cls in self.test_classes:
+      for c in self.normalize(cls):
+        yield c
 
-    tests = set()
+  def calculate_tests(self, targets):
     for target in targets:
-      if is_java(target) and is_test(target):
-        tests.update(self.normalize(test, target.target_base) for test in target.sources
-                     if is_test_file(test))
-    return tests
+      if (is_java(target) or is_scala(target)) and is_test(target):
+        for test in target.sources:
+          for cls in self.normalize(test, target.target_base):
+            yield cls
 
   def normalize(self, classname_or_file, basedir=None):
     components = classname_or_file.split('#', 2)
     classname = components[0]
     methodname = '#' + components[1] if len(components) == 2 else ''
 
-    if not classname.endswith('.java'):
-      return classname + methodname
-
+    classes_by_source = self.context.products.get('classes')
     def relpath_toclassname(path):
-      return path.replace('/', '.').replace('.java', '')
+      classes = classes_by_source.get(path)
+      for base, classes in classes.items():
+        for cls in classes:
+          clsname, _ = cls.replace('/', '.').rsplit('.class', 1)
+          yield clsname
 
     if basedir:
-      return relpath_toclassname(classname) + methodname
-    else:
+      for classname in relpath_toclassname(classname):
+        yield classname + methodname
+    elif os.path.exists(classname):
       basedir = calculate_basedir(classname)
-      return relpath_toclassname(os.path.relpath(classname, basedir)) + methodname
-
+      for classname in relpath_toclassname(os.path.relpath(classname, basedir)):
+        yield classname + methodname
+    else:
+      yield classname + methodname
 
 PACKAGE_PARSER = re.compile(r'^\s*package\s+([\w.]+)\s*;\s*')
 

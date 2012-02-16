@@ -16,6 +16,7 @@
 
 __author__ = 'John Sirois'
 
+import functools
 import os
 
 from contextlib import contextmanager
@@ -70,33 +71,26 @@ class JarCreate(Task):
                             action="callback", callback=mkflag.set_bool,
                             help="[%default] Create javadoc jars.")
 
-  def __init__(self, context, output_dir=None, confs=None):
+  def __init__(self, context):
     Task.__init__(self, context)
 
-    self._output_dir = (
-      output_dir
-      or context.options.jar_create_outdir
-      or context.config.get('jar-create', 'workdir')
-    )
-    self.transitive = context.options.jar_create_transitive
-    self.confs = confs or context.config.getlist('jar-create', 'confs')
-    self.compression = ZIP_DEFLATED if context.options.jar_create_compressed else ZIP_STORED
+    options = context.options
+    products = context.products
 
-    self.jar_classes = context.options.jar_create_classes or context.products.isrequired('jars')
+    self._output_dir = options.jar_create_outdir or context.config.get('jar-create', 'workdir')
+    self.transitive = options.jar_create_transitive
+    self.confs = context.config.getlist('jar-create', 'confs')
+    self.compression = ZIP_DEFLATED if options.jar_create_compressed else ZIP_STORED
+
+    self.jar_classes = options.jar_create_classes or products.isrequired('jars')
     if self.jar_classes:
-      self.context.products.require('classes')
+      products.require('classes')
 
-    self.jar_sources = (
-      context.options.jar_create_sources
-      or context.products.isrequired('source_jars')
-    )
-
-    self.jar_javadoc = (
-      context.options.jar_create_javadoc
-      or context.products.isrequired('javadoc_jars')
-    )
+    self.jar_javadoc = products.isrequired('javadoc_jars') or options.jar_create_javadoc
     if self.jar_javadoc:
-      context.products.require('javadoc')
+      products.require('javadoc')
+
+    self.jar_sources = products.isrequired('source_jars') or options.jar_create_sources
 
   def execute(self, targets):
     safe_mkdir(self._output_dir)
@@ -104,18 +98,22 @@ class JarCreate(Task):
     def jar_targets(predicate):
       return filter(predicate, (targets if self.transitive else self.context.target_roots))
 
-    def add_genjar(target, name):
-      if self.context.products.isrequired('jars'):
-        self.context.products.get('jars').add(target, self._output_dir).append(name)
+    def add_genjar(typename, target, name):
+      if self.context.products.isrequired(typename):
+        self.context.products.get(typename).add(target, self._output_dir).append(name)
 
     if self.jar_classes:
-      self.jar(jar_targets(is_jvm), self.context.products.get('classes'), add_genjar)
+      self.jar(jar_targets(is_jvm),
+               self.context.products.get('classes'),
+               functools.partial(add_genjar, 'jars'))
 
     if self.jar_sources:
-      self.sourcejar(jar_targets(is_jvm), add_genjar)
+      self.sourcejar(jar_targets(is_jvm), functools.partial(add_genjar, 'source_jars'))
 
     if self.jar_javadoc:
-      self.javadocjar(jar_targets(is_java), self.context.products.get('javadoc'), add_genjar)
+      self.javadocjar(jar_targets(is_java),
+                      self.context.products.get('javadoc'),
+                      functools.partial(add_genjar, 'javadoc_jars'))
 
   @contextmanager
   def create_jar(self, path):

@@ -22,6 +22,7 @@ python_library(
   name = 'pants-lib',
   dependencies = [
     pants("3rdparty/python:elementtree"),
+    pants("3rdparty/python:lxml"),
     pants("3rdparty/python:mako"),
     pants("3rdparty/python:markdown"),
     pants("3rdparty/python:psutil"),

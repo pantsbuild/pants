@@ -19,10 +19,13 @@ from twitter.pants.base.generator import TemplateData
 class Artifact(object):
   """Represents a jvm artifact ala maven or ivy."""
 
-  def __init__(self, org, name, repo):
-    """org: the originization of this artifact, the group id in maven parlance
-    name: the name of the artifact
-    repo: the repository this artifact is published to"""
+  def __init__(self, org, name, repo, description=None):
+    """
+      :org the originization of this artifact, the group id in maven parlance
+      :name the name of the artifact
+      :repo the repository this artifact is published to
+      :description a description of this artifact
+    """
 
     self.org = org
     self.name = name
@@ -31,6 +34,7 @@ class Artifact(object):
     if len(repos) != 1:
       raise Exception("An artifact must have exactly 1 repo, given: %s" % repos)
     self.repo = repos[0]
+    self.description = description
 
   def __eq__(self, other):
     result = other and (
@@ -53,9 +57,10 @@ class Artifact(object):
 
   def _create_template_data(self):
     return TemplateData(
-      org = self.org,
-      module = self.name,
-      version = self.rev,
-      repo = self.repo.name
+      org=self.org,
+      module=self.name,
+      version=self.rev,
+      repo=self.repo.name,
+      description=self.description
     )
 

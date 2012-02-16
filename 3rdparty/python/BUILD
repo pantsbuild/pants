@@ -26,6 +26,10 @@ python_library(
 )
 
 python_library(
+  name = 'coverage',
+  dependencies = [egg("coverage-*.egg")])
+
+python_library(
   name = 'git-python',
   dependencies = [
     egg("GitPython-0.3.1-py2.6.egg"),
@@ -130,6 +134,14 @@ python_library(
   dependencies = [egg("Django-1.3.1-py2.6.egg")])
 
 python_library(
+  name = 'django_auth_ldap',
+  dependencies = [egg("django_auth_ldap-1.0.14-py2.6.egg")])
+
+python_library(
+  name = 'ldap',
+  dependencies = [egg("python_ldap-2.3.13-py2.6-*.egg")])
+
+python_library(
   name = 'redis',
   dependencies = [egg("redis-2.4.9-py2.6.egg")])
 
@@ -189,5 +201,16 @@ python_library(
   dependencies = [egg("pystachio-0.4.0-py2.*.egg")])
 
 python_library(
+  name = 'cherrypy',
+  dependencies = [egg("CherryPy-3.2.2-py2.6.egg")])
+
+python_library(
+  name = 'django_cpserver',
+  dependencies = [egg("django_cpserver-1.1-py2.6.egg")])
+python_library(
   name = 'psutil',
   dependencies = [egg("psutil-0.4.1-py2.6-*.egg")])
+
+python_library(
+  name = 'tornado',
+  dependencies = [egg("tornado-2.2-py2.6.egg")])

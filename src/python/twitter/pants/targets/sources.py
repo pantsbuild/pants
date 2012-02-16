@@ -35,12 +35,13 @@ class SourceRoot(object):
     It is illegal to have nested source roots.
   """
 
-  ROOTS = defaultdict(OrderedSet)
+  _ROOTS = defaultdict(OrderedSet)
+  _SEARCHED = set()
 
   @staticmethod
   def _register(sourceroot):
     for t in sourceroot.types:
-      SourceRoot.ROOTS[t].add(sourceroot.basedir)
+      SourceRoot._ROOTS[t].add(sourceroot.basedir)
 
   @staticmethod
   def find(target):
@@ -49,15 +50,28 @@ class SourceRoot(object):
       directory of the target's BUILD file is returned.
     """
     target_path = os.path.relpath(target.address.buildfile.parent_path, get_buildroot())
-    for buildfile in target.address.buildfile.ancestors():
-      ParseContext(buildfile).parse()
 
-    for typ in target.__class__.mro():
-      for root in SourceRoot.ROOTS.get(typ, ()):
-        if target_path.startswith(root):
+    def _find():
+      for typ in target.__class__.mro():
+        for root in SourceRoot._ROOTS.get(typ, ()):
+          if target_path.startswith(root):
+            return root
+
+    # Try already registered roots
+    root = _find()
+    if root:
+      return root
+
+    # Fall back to searching the ancestor path for a root
+    for buildfile in reversed(target.address.buildfile.ancestors()):
+      if buildfile not in SourceRoot._SEARCHED:
+        SourceRoot._SEARCHED.add(buildfile)
+        ParseContext(buildfile).parse()
+        root = _find()
+        if root:
           return root
 
-    # Fall back to resolving files relative to the BUILD file parent dir as the target base
+    # Finally, resolve files relative to the BUILD file parent dir as the target base
     return target_path
 
   @staticmethod

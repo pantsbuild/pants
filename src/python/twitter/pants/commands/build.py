@@ -14,6 +14,8 @@
 # limitations under the License.
 # ==================================================================================================
 
+import traceback
+
 from . import Command
 
 from twitter.common.collections import OrderedSet
@@ -23,8 +25,6 @@ from twitter.pants.ant import AntBuilder
 from twitter.pants.base import Address, Target
 from twitter.pants.targets import InternalTarget
 from twitter.pants.python import PythonBuilder
-
-import traceback
 
 class Build(Command):
   """Builds a specified target."""

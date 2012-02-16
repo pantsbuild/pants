@@ -366,7 +366,11 @@ if NailgunTask.killall:
   ng_killall.install('clean-all', first=True)
 
 
-goal(name='ivy', action=IvyResolve).install('resolve')
+# TODO(John Sirois): Resolve eggs
+goal(
+  name='ivy',
+  action=IvyResolve
+).install('resolve').with_description('Resolves jar dependencies and produces dependency reports.')
 
 
 # TODO(John Sirois): gen attempted as the sole Goal should gen for all known gen types but
@@ -409,19 +413,21 @@ goal(name='javac',
 checkstyle.install('compile')
 
 
+# TODO(John Sirois): Create scaladoc and pydoc in a doc phase
 goal(name='javadoc',
      action=JavadocGen,
      dependencies=['compile']).install('javadoc').with_description('Create javadoc.')
 goal(name='jar',
      action=JarCreate,
      dependencies=['compile']).install('jar').with_description('Create one or more jars.')
+
+# TODO(John Sirois): Publish eggs in the publish phase
 goal(name='publish',
      action=JarPublish,
      dependencies=[
        'javadoc',
        'jar'
-     ]).install('publish').with_description('Publish one or more jars.')
-
+     ]).install().with_description('Publish one or more artifacts.')
 
 goal(name='junit',
      action=JUnitRun,
@@ -430,7 +436,7 @@ goal(name='specs',
      action=SpecsRun,
      dependencies=['compile']).install('test')
 
-
+# TODO(John Sirois): Create pex's in binary phase
 goal(
   name='binary',
   action=BinaryCreate,

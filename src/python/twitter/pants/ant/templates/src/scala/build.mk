@@ -47,7 +47,7 @@ limitations under the License.
   % if lib.java_sources:
   <property name="${lib.id}.java.sources">
     % for path in lib.java_sources:
-    ${path}
+    ${os.path.relpath(path, os.path.join(root_dir, 'src', 'java'))}
     % endfor
   </property>
   % endif

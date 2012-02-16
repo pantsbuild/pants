@@ -75,6 +75,7 @@ from twitter.pants.targets import *
 annotation_processor = AnnotationProcessor
 artifact = Artifact
 bundle = Bundle
+credentials = Credentials
 doc = Doc
 egg = PythonEgg
 exclude = Exclude
@@ -194,6 +195,7 @@ __all__ = (
   'annotation_processor',
   'artifact',
   'bundle',
+  'credentials',
   'exclude',
   'egg',
   'get_buildroot',

@@ -70,8 +70,8 @@ class Products(object):
     def __repr__(self):
       return 'ProductMapping(%s) {\n  %s\n}' % (self.typename, '\n  '.join(
         '%s => %s\n    %s' % (str(target), basedir, outputs)
-                              for target, (basedir, outputs) in self.by_target.items()
-      ))
+                              for target, outputs_by_basedir in self.by_target.items()
+                              for basedir, outputs in outputs_by_basedir.items()))
 
   def __init__(self):
     self.products = {}
@@ -481,6 +481,33 @@ class Phase(object):
       do_setup_parser(phase, setup)
 
   @staticmethod
+  def execution_order(phases):
+    """
+      Yields goals in execution order for the given phases.  Does not account for goals run
+      multiple times due to grouping.
+    """
+    dependencies_by_goal = OrderedDict()
+    def populate_dependencies(phases):
+      for phase in phases:
+        for goal in phase.goals():
+          if goal not in dependencies_by_goal:
+            populate_dependencies(goal.dependencies)
+            deps = OrderedSet()
+            for phasedep in goal.dependencies:
+              deps.update(phasedep.goals())
+            dependencies_by_goal[goal] = deps
+    populate_dependencies(phases)
+
+    while dependencies_by_goal:
+      for goal, deps in dependencies_by_goal.items():
+        if not deps:
+          dependencies_by_goal.pop(goal)
+          for g, deps in dependencies_by_goal.items():
+            if goal in deps:
+              deps.discard(goal)
+          yield goal
+
+  @staticmethod
   def attempt(context, phases, timer=None):
     """
       Attempts to reach the goals for the supplied phases, optionally recording phase timings and
@@ -525,20 +552,13 @@ class Phase(object):
         timer.log('total: %.3fs' % elapsed)
 
     try:
-      # Prepare tasks
+      # Prepare tasks roots to leaves
       tasks_by_goal = {}
-      def prepare_tasks(phase):
-        for goal in phase.goals():
-          if goal not in tasks_by_goal:
-            for dependency in goal.dependencies:
-              prepare_tasks(dependency)
-            task = goal.prepare(context)
-            tasks_by_goal[goal] = task
+      for goal in reversed(list(Phase.execution_order(phases))):
+        task = goal.prepare(context)
+        tasks_by_goal[goal] = task
 
-      for phase in phases:
-        prepare_tasks(phase)
-
-      # Execute phases
+      # Execute phases leaves to roots
       for phase in phases:
         Group.execute(phase, tasks_by_goal, context, executed, timer=timer)
 
@@ -574,12 +594,15 @@ class Phase(object):
   def with_description(self, description):
     self.description = description
 
-  def install(self, goal, first=False, replace=False):
+  def install(self, goal, first=False, replace=False, before=None):
     g = self.goals()
     if replace:
       del g[:]
+    g_names = map(lambda goal: goal.name, g)
     if first:
       g.insert(0, goal)
+    elif before in g_names:
+      g.insert(g_names.index(before), goal)
     else:
       g.append(goal)
 
@@ -647,15 +670,16 @@ class Goal(object):
     """Prepares a Task that can be executed to achieve this goal."""
     return self._task(context)
 
-  def install(self, phase=None, first=False, replace=False):
+  def install(self, phase=None, first=False, replace=False, before=None):
     """
       Installs this goal in the specified phase (or a new phase with the same name as this Goal),
       appending to any pre-existing goals unless first=True in which case it is installed as the
       first goal in the phase.  If replace=True then this goal replaces all others for the phase.
-      The phase this goal is installed in is returned.
+      The phase this goal is installed in is returned. If before is not None, installs this goal
+      right before the goal marked by before.
     """
     phase = Phase(phase or self.name)
-    phase.install(self, first, replace)
+    phase.install(self, first, replace, before)
     return phase
 
 

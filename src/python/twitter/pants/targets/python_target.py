@@ -30,8 +30,8 @@ class PythonTarget(TargetWithSources):
 
   def _walk(self, walked, work, predicate = None):
     Target._walk(self, walked, work, predicate)
-    for depenedency in self.dependencies:
-      for dep in depenedency.resolve():
+    for dependency in self.dependencies:
+      for dep in dependency.resolve():
         if isinstance(dep, Target) and not dep in walked:
           walked.add(dep)
           if not predicate or predicate(dep):

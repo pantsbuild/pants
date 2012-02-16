@@ -20,7 +20,7 @@ import os
 import subprocess
 
 from twitter.common import log
-from twitter.common.dirutil import safe_mkdir
+from twitter.common.dirutil import safe_mkdir, touch
 from twitter.pants.tasks import Config, TaskError
 
 _ID_BY_OS = {
@@ -119,6 +119,15 @@ def profile_classpath(profile, java_runner=None, config=None, ivy_jar=None, ivy_
       '-confs', 'default'
     ]
     java_runner(classpath=ivy_classpath, main='org.apache.ivy.Main', args=ivy_args)
-    with open(profile_check, 'w'): pass # touch
+    touch(profile_check)
 
   return [os.path.join(profile_libdir, jar) for jar in os.listdir(profile_libdir)]
+
+
+def open(*files):
+  """Attempts to open the given files using the preferred native viewer or editor."""
+  if files:
+    if os.uname()[0].lower() != 'darwin':
+      print 'Sorry, open currently only supports OSX'
+    else:
+      subprocess.Popen(['open'] + list(files))

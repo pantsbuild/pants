@@ -23,11 +23,19 @@ import re
 
 from twitter.common import log
 from twitter.common.dirutil import safe_open, safe_mkdir
-from twitter.pants import is_apt
+from twitter.pants import get_buildroot, is_apt
 from twitter.pants.targets import JavaLibrary, JavaTests
 from twitter.pants.tasks import TaskError
 from twitter.pants.tasks.binary_utils import nailgun_profile_classpath
 from twitter.pants.tasks.nailgun_task import NailgunTask
+
+
+# Well known metadata file to auto-register annotation processors with a java 1.6+ compiler
+_PROCESSOR_INFO_FILE = 'META-INF/services/javax.annotation.processing.Processor'
+
+
+_JMAKE_MAIN = 'com.sun.tools.jmake.Main'
+
 
 class JavaCompile(NailgunTask):
   @staticmethod
@@ -42,31 +50,32 @@ class JavaCompile(NailgunTask):
                             help="[%default] Compile java code with all configured warnings "
                                  "enabled.")
 
-  def __init__(self, context, output_dir=None, classpath=None, main=None, args=None, confs=None):
-    self._profile = context.config.get('java-compile', 'profile')
-    workdir = context.config.get('java-compile', 'nailgun_dir')
-    NailgunTask.__init__(self, context, workdir=workdir)
+  def __init__(self, context):
+    NailgunTask.__init__(self, context, workdir=context.config.get('java-compile', 'nailgun_dir'))
 
-    self._compiler_classpath = classpath
-    self._output_dir = output_dir or context.config.get('java-compile', 'workdir')
-    self._processor_service_info_file = \
-        os.path.join(self._output_dir, 'META-INF/services/javax.annotation.processing.Processor')
-    self._main = main or context.config.get('java-compile', 'main')
+    workdir = context.config.get('java-compile', 'workdir')
+    self._classes_dir = os.path.join(workdir, 'classes')
+    self._resources_dir = os.path.join(workdir, 'resources')
+    self._dependencies_file = os.path.join(workdir, 'dependencies')
 
-    self._args = args or context.config.getlist('java-compile', 'args')
+    self._jmake_profile = context.config.get('java-compile', 'jmake-profile')
+    self._compiler_profile = context.config.get('java-compile', 'compiler-profile')
+
+    self._args = context.config.getlist('java-compile', 'args')
     if context.options.java_compile_warnings:
       self._args.extend(context.config.getlist('java-compile', 'warning_args'))
     else:
       self._args.extend(context.config.getlist('java-compile', 'no_warning_args'))
 
-    self._confs = confs or context.config.getlist('java-compile', 'confs')
+    self._confs = context.config.getlist('java-compile', 'confs')
 
   def execute(self, targets):
     java_targets = filter(JavaCompile._is_java, targets)
     if java_targets:
       with self.context.state('classpath', []) as cp:
         for conf in self._confs:
-          cp.insert(0, (conf, self._output_dir))
+          cp.insert(0, (conf, self._resources_dir))
+          cp.insert(0, (conf, self._classes_dir))
 
         with self.changed(java_targets, invalidate_dependants=True) as changed:
           bases, sources_by_target, processors, fingerprint = self.calculate_sources(changed)
@@ -74,22 +83,36 @@ class JavaCompile(NailgunTask):
             classpath = [jar for conf, jar in cp if conf in self._confs]
             result = self.compile(classpath, bases, sources_by_target, fingerprint)
             if result != 0:
-              raise TaskError('%s returned %d' % (self._main, result))
+              raise TaskError('%s returned %d' % (_JMAKE_MAIN, result))
 
             if processors:
-              if os.path.exists(self._processor_service_info_file):
-                with safe_open(self._processor_service_info_file, 'r') as f:
+              # Produce a monolithic apt processor service info file for further compilation rounds
+              # and the unit test classpath.
+              processor_info_file = os.path.join(self._classes_dir, _PROCESSOR_INFO_FILE)
+              if os.path.exists(processor_info_file):
+                with safe_open(processor_info_file, 'r') as f:
                   for processor in f:
                     processors.add(processor.strip())
-              with safe_open(self._processor_service_info_file, 'w') as f:
-                for processor in processors:
-                  f.write('%s\n' % processor)
+              self.write_processor_info(processor_info_file, processors)
 
       if self.context.products.isrequired('classes'):
         genmap = self.context.products.get('classes')
-        classes_by_target = SunCompiler.findclasses(self._output_dir, targets)
-        for target, classes in classes_by_target.items():
-          genmap.add(target, self._output_dir, classes)
+
+        # Map generated classes to the owning targets and sources.
+        compiler = DependencyCompiler(self._classes_dir, self._dependencies_file)
+        for target, classes_by_source in compiler.findclasses(targets).items():
+          for source, classes in classes_by_source.items():
+            genmap.add(source, self._classes_dir, classes)
+            genmap.add(target, self._classes_dir, classes)
+
+        # TODO(John Sirois): Map target.resources in the same way
+        # 'Map' (rewrite) annotation processor service info files to the owning targets.
+        for target in targets:
+          if is_apt(target) and target.processors:
+            basedir = os.path.join(self._resources_dir, target.id)
+            processor_info_file = os.path.join(basedir, _PROCESSOR_INFO_FILE)
+            self.write_processor_info(processor_info_file, target.processors)
+            genmap.add(target, basedir, [_PROCESSOR_INFO_FILE])
 
   def calculate_sources(self, targets):
     bases = set()
@@ -109,44 +132,60 @@ class JavaCompile(NailgunTask):
     return bases, sources, processors, self.context.identify(targets)
 
   def compile(self, classpath, bases, sources_by_target, fingerprint):
-    safe_mkdir(self._output_dir)
+    safe_mkdir(self._classes_dir)
 
-    compiler_classpath = self._compiler_classpath or nailgun_profile_classpath(self, self._profile)
-    self.ng('ng-cp', *compiler_classpath)
+    jmake_classpath = nailgun_profile_classpath(self, self._jmake_profile)
+    self.ng('ng-cp', *jmake_classpath)
 
     args = [
       '-classpath', ':'.join(classpath),
-
-      # TODO(John Sirois): untangle the jmake -C hacks somehow
       '-C-sourcepath', '-C%s' % ':'.join(bases),
-#      '-sourcepath', ':'.join(bases),
-
-      '-d', self._output_dir,
-
-      # TODO(John Sirois): untangle this jmake specific bit
-      '-pdb', os.path.join(self._output_dir, '%s.dependencies.pdb' % fingerprint),
+      '-d', self._classes_dir,
+      '-pdb', os.path.join(self._classes_dir, '%s.dependencies.pdb' % fingerprint),
     ]
+
+    compiler_classpath = nailgun_profile_classpath(self, self._compiler_profile)
+    args.extend([
+      '-jcpath', ':'.join(compiler_classpath),
+      '-jcmainclass', 'com.twitter.common.tools.Compiler',
+      '-C-dependencyfile', '-C%s' % self._dependencies_file
+    ])
+
     args.extend(self._args)
-    args.extend(reduce(lambda all, sources: all | sources, sources_by_target.values()))
-    log.debug('Executing: %s %s' % (self._main, ' '.join(args)))
-    return self.ng(self._main, *args)
+    args.extend(reduce(lambda all, sources: all.union(sources), sources_by_target.values()))
+    log.debug('Executing: %s %s' % (_JMAKE_MAIN, ' '.join(args)))
+    return self.ng(_JMAKE_MAIN, *args)
+
+  def write_processor_info(self, processor_info_file, processors):
+    with safe_open(processor_info_file, 'w') as f:
+      for processor in processors:
+        f.write('%s\n' % processor)
 
 
-class SunCompiler(object):
+class DependencyCompiler(object):
   _CLASS_FILE_NAME_PARSER = re.compile(r'(?:\$.*)*\.class$')
 
-  @staticmethod
-  def findclasses(outputdir, targets):
-    sources_by_target = []
-    for target in targets:
-      sources_by_target.append((target, set(target.sources)))
+  def __init__(self, outputdir, depfile):
+    self.outputdir = outputdir
+    self.depfile = depfile
 
-    classes_by_target = defaultdict(list)
-    for root, dirs, files in os.walk(outputdir):
-      for file in files:
-        path = os.path.relpath(os.path.join(root, file), outputdir)
-        rel_sourcefile = SunCompiler._CLASS_FILE_NAME_PARSER.sub('.java', path)
-        for target, rel_sources in sources_by_target:
-          if rel_sourcefile in rel_sources:
-            classes_by_target[target].append(path)
-    return classes_by_target
+  def findclasses(self, targets):
+    sources = set()
+    target_by_source = dict()
+    for target in targets:
+      for source in target.sources:
+        src = os.path.join(target.target_base, source)
+        target_by_source[src] = target
+        sources.add(src)
+
+    classes_by_target_by_source = defaultdict(lambda: defaultdict(set))
+    with open(self.depfile, 'r') as deps:
+      for dep in deps.readlines():
+        src, cls = dep.strip().split('->')
+        sourcefile = os.path.relpath(os.path.join(self.outputdir, src.strip()), get_buildroot())
+        if sourcefile in sources:
+          classfile = os.path.relpath(os.path.join(self.outputdir, cls.strip()), self.outputdir)
+          target = target_by_source[sourcefile]
+          relsrc = os.path.relpath(sourcefile, target.target_base)
+          classes_by_target_by_source[target][relsrc].add(classfile)
+    return classes_by_target_by_source

@@ -14,8 +14,23 @@
 # limitations under the License.
 # ==================================================================================================
 
+import os
+
+def resolve_target_sources(target_sources, extension):
+  """given a list of pants targets, extract their sources as a list"""
+  resolved_sources = []
+
+  if target_sources:
+    for target in target_sources:
+      for resolved in target.resolve():
+        if hasattr(resolved, 'sources'):
+          resolved_sources.extend(os.path.join(resolved.target_base, source)
+            for source in resolved.sources if source.endswith(extension))
+  return resolved_sources
+
 from annotation_processor import AnnotationProcessor
 from artifact import Artifact
+from credentials import Credentials
 from exclude import Exclude
 from exportable_jvm_library import ExportableJvmLibrary
 from internal import InternalTarget
@@ -46,6 +61,7 @@ __all__ = [
   'AnnotationProcessor',
   'Artifact',
   'Bundle',
+  'Credentials',
   'Exclude',
   'ExportableJvmLibrary',
   'InternalTarget',

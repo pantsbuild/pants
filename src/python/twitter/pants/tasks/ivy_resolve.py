@@ -20,13 +20,20 @@ __author__ = 'John Sirois'
 import os
 import pkgutil
 import re
+import shutil
 
 from twitter.common.dirutil import safe_mkdir, safe_open
 
 from twitter.pants import get_buildroot, is_internal, is_jvm
 from twitter.pants.base.generator import Generator, TemplateData
-from twitter.pants.tasks import TaskError
+from twitter.pants.tasks import binary_utils, TaskError
 from twitter.pants.tasks.nailgun_task import NailgunTask
+
+try:
+  from lxml import etree
+  _REPORT_AVAILABLE=True
+except ImportError:
+  _REPORT_AVAILABLE=False
 
 class IvyResolve(NailgunTask):
 
@@ -37,10 +44,25 @@ class IvyResolve(NailgunTask):
                             help='''Specifies a jar dependency override in the form:
                             [org]#[name]=(revision|url)
 
-                            For example, two specify 2 overrides:
+                            For example, to specify 2 overrides:
                             %(flag)s=com.foo#bar=0.1.2 \\
                             %(flag)s=com.baz#spam=file:///tmp/spam.jar
                             ''' % dict(flag=flag))
+
+    if _REPORT_AVAILABLE:
+      report = mkflag("report")
+      option_group.add_option(report, mkflag("report", negate=True), dest = "ivy_resolve_report",
+                              action="callback", callback=mkflag.set_bool, default=False,
+                              help = "[%default] Generate an ivy resolve html report")
+
+      option_group.add_option(mkflag("open"), mkflag("open", negate=True),
+                              dest="ivy_resolve_open", default=False,
+                              action="callback", callback=mkflag.set_bool,
+                              help="[%%default] Attempt to open the generated ivy resolve report "
+                                   "in a browser (implies %s)." % report)
+
+      option_group.add_option(mkflag("outdir"), dest="ivy_resolve_outdir",
+                              help="Emit ivy report outputs in to this directory.")
 
   def __init__(self, context,
                workdir=None,
@@ -66,6 +88,13 @@ class IvyResolve(NailgunTask):
     self._ivy_xml = os.path.join(work_dir, 'ivy.xml')
     self._classpath_file = os.path.join(work_dir, 'classpath')
     self._classpath_dir = os.path.join(work_dir, 'mapped')
+
+    if _REPORT_AVAILABLE:
+      self._outdir = context.options.ivy_resolve_outdir or os.path.join(work_dir, 'reports')
+      self._open = context.options.ivy_resolve_open
+      self._report = self._open or context.options.ivy_resolve_report
+    else:
+      self._report = False
 
     def parse_override(override):
       match = re.match(r'^([^#]+)#([^=]+)=([^\s]+)$', override)
@@ -119,6 +148,9 @@ class IvyResolve(NailgunTask):
             for conf in self._confs:
               cp.append((conf, path.strip()))
 
+    if self._report:
+      self._generate_ivy_report()
+
     create_jardeps_for = self.context.products.isrequired('jar_dependencies')
     if create_jardeps_for:
       genmap = self.context.products.get('jar_dependencies')
@@ -126,12 +158,14 @@ class IvyResolve(NailgunTask):
         self._mapjars(genmap, target)
 
   def _generate_ivy(self, jars, excludes, ivyxml):
+    org, name = self._identify()
     template_data = TemplateData(
-      org = 'internal',
-      module = self.context.id,
-      version = 'latest.integration',
-      dependencies = [self._generate_jar_template(jar) for jar in jars],
-      excludes = [self._generate_exclude_template(exclude) for exclude in excludes]
+      org=org,
+      module=name,
+      version='latest.integration',
+      publications=None,
+      dependencies=[self._generate_jar_template(jar) for jar in jars],
+      excludes=[self._generate_exclude_template(exclude) for exclude in excludes]
     )
 
     safe_mkdir(os.path.dirname(ivyxml))
@@ -140,6 +174,40 @@ class IvyResolve(NailgunTask):
                             root_dir = get_buildroot(),
                             lib = template_data)
       generator.write(output)
+
+  def _generate_ivy_report(self):
+    org, name = self._identify()
+    with open(os.path.join(self._cachedir, 'ivy-report.xsl')) as report_xsl:
+      xsltree = etree.parse(report_xsl)
+      transform = etree.XSLT(xsltree)
+      reports = []
+      for conf in self._confs:
+        report_name = '%s-%s-%s.xml' % (org, name, conf)
+        with open(os.path.join(self._cachedir, report_name)) as report_xml:
+          xmltree = etree.parse(report_xml)
+          html_name = '%s-%s-%s.html' % (org, name, conf)
+          with safe_open(os.path.join(self._outdir, html_name), 'w') as report_html:
+            html_content = str(transform(xmltree))
+            report_html.write(html_content)
+            reports.append(report_html.name)
+
+      css = os.path.join(self._outdir, 'ivy-report.css')
+      if os.path.exists(css):
+        os.unlink(css)
+      shutil.copy(os.path.join(self._cachedir, 'ivy-report.css'), self._outdir)
+
+      if self._open:
+        binary_utils.open(*reports)
+
+  def _identify(self):
+    if len(self.context.target_roots) == 1:
+      target = self.context.target_roots[0]
+      if hasattr(target, 'provides') and target.provides:
+        return target.provides.org, target.provides.name
+      else:
+        return 'internal', target.id
+    else:
+      return 'internal', self.context.id
 
   def _calculate_classpath(self, targets):
     jars = set()

@@ -3,6 +3,7 @@
 .#*
 .DS_Store
 .build.properties
+.coverage*
 .idea
 .pants.d
 .project
@@ -15,6 +16,7 @@
 bin/
 build/
 codegen/classes/
+htmlcov/
 dist
 out
 pants.pex

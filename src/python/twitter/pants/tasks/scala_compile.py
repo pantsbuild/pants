@@ -22,6 +22,8 @@ import os
 from twitter.common.dirutil import safe_mkdir
 from twitter.pants import get_buildroot, is_scala
 from twitter.pants.targets.scala_library import ScalaLibrary
+from twitter.pants.targets.scala_tests import ScalaTests
+from twitter.pants.targets import resolve_target_sources
 from twitter.pants.tasks import TaskError
 from twitter.pants.tasks.binary_utils import nailgun_profile_classpath
 from twitter.pants.tasks.nailgun_task import NailgunTask
@@ -71,17 +73,20 @@ class ScalaCompile(NailgunTask):
       with self.changed(scala_targets, invalidate_dependants=True) as changed_targets:
         bases, sources_by_target = self.calculate_sources(changed_targets)
         if sources_by_target:
-            classpath = [jar for conf, jar in cp if conf in self._confs]
-            result = self.compile(classpath, bases, sources_by_target)
-            if result != 0:
-              raise TaskError('%s returned %d' % (self._main, result))
+          classpath = [jar for conf, jar in cp if conf in self._confs]
+          result = self.compile(classpath, bases, sources_by_target)
+          if result != 0:
+            raise TaskError('%s returned %d' % (self._main, result))
 
       if self.context.products.isrequired('classes'):
         genmap = self.context.products.get('classes')
-        _, sources = self.calculate_sources(scala_targets)
-        for target, sources in sources.items():
-          classes = ScalaCompiler.findclasses(self._output_dir, sources, self._depfile)
-          genmap.add(target, self._output_dir, classes)
+
+        # Map generated classes to the owning targets and sources.
+        compiler = ScalaCompiler(self._output_dir, self._depfile)
+        for target, classes_by_source in compiler.findclasses(targets).items():
+          for source, classes in classes_by_source.items():
+            genmap.add(source, self._output_dir, classes)
+            genmap.add(target, self._output_dir, classes)
 
   def calculate_sources(self, targets):
     bases = set()
@@ -93,8 +98,8 @@ class ScalaCompile(NailgunTask):
         bases.add(target.target_base)
         sources[target].update(src)
 
-        if isinstance(target, ScalaLibrary) and target.java_sources:
-          sources[target].update(target.resolved_java_sources())
+        if (isinstance(target, ScalaLibrary) or isinstance(target, ScalaTests)) and target.java_sources:
+          sources[target].update(resolve_target_sources(target.java_sources, '.java'))
 
     for target in targets:
       collect_sources(target)
@@ -120,7 +125,7 @@ class ScalaCompile(NailgunTask):
       '-make:transitivenocp'
     ]
     args.extend(self._args)
-    args.extend(reduce(lambda all, sources: all | sources, sources_by_target.values()))
+    args.extend(reduce(lambda all, sources: all.union(sources), sources_by_target.values()))
     self.context.log.debug('Executing: %s %s' % (self._main, ' '.join(args)))
     return self.ng(self._main, *args)
 
@@ -128,19 +133,32 @@ class ScalaCompile(NailgunTask):
 class ScalaCompiler(object):
   _SECTIONS = ['classpath', 'sources', 'source_to_class']
 
-  @staticmethod
-  def findclasses(outputdir, sources, depfile):
-    classes = []
-    with open(depfile, 'r') as deps:
+  def __init__(self, outputdir, depfile):
+    self.outputdir = outputdir
+    self.depfile = depfile
+
+  def findclasses(self, targets):
+    sources = set()
+    target_by_source = dict()
+    for target in targets:
+      for source in target.sources:
+        src = os.path.join(target.target_base, source)
+        target_by_source[src] = target
+        sources.add(src)
+
+    classes_by_target_by_source = defaultdict(lambda: defaultdict(set))
+    with open(self.depfile, 'r') as deps:
       section = 0
       for dep in deps.readlines():
         line = dep.strip()
         if '-------' == line:
           section += 1
         elif ScalaCompiler._SECTIONS[section] == 'source_to_class':
-          mapping = line.split('->')
-          sourcefile = os.path.relpath(os.path.join(outputdir, mapping[0].strip()), get_buildroot())
+          src, cls = line.split('->')
+          sourcefile = os.path.relpath(os.path.join(self.outputdir, src.strip()), get_buildroot())
           if sourcefile in sources:
-            classfile = os.path.relpath(os.path.join(outputdir, mapping[1].strip()), outputdir)
-            classes.append(classfile)
-    return classes
+            classfile = os.path.relpath(os.path.join(self.outputdir, cls.strip()), self.outputdir)
+            target = target_by_source[sourcefile]
+            relsrc = os.path.relpath(sourcefile, target.target_base)
+            classes_by_target_by_source[target][relsrc].add(classfile)
+    return classes_by_target_by_source
