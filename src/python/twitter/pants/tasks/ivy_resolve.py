@@ -262,6 +262,7 @@ class IvyResolve(NailgunTask):
       '-settings', self._ivy_settings,
       '-cache', self._cachedir,
       '-ivy', ivyxml,
+      '-types', 'jar',
       '-cachepath', classpathfile,
       '-confs'
     ]

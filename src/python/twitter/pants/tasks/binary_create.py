@@ -128,12 +128,21 @@ class BinaryCreate(Task):
     self.context.log.debug('  dumping %s' % jarpath)
 
     with temporary_dir() as tmpdir:
-      with pushd(tmpdir):
-        with self.open_jar(jarpath) as sourcejar:
-          sourcejar.extractall()
-          for root, dirs, files in os.walk(tmpdir):
-            for file in files:
-              path = os.path.join(root, file)
-              relpath = os.path.relpath(path, tmpdir)
-              if Manifest.PATH != relpath:
-                jarfile.write(path, relpath)
+      with self.open_jar(jarpath) as sourcejar:
+        BinaryCreate.safe_extract(sourcejar, tmpdir)
+        for root, dirs, files in os.walk(tmpdir):
+          for file in files:
+            path = os.path.join(root, file)
+            relpath = os.path.relpath(path, tmpdir)
+            if Manifest.PATH != relpath:
+              jarfile.write(path, relpath)
+
+  @staticmethod
+  def safe_extract(jar, dest_dir):
+    """OS X's python 2.6.1 has a bug in zipfile that makes it unzip directories as regular files."""
+    for path in jar.namelist():
+      # While we're at it, we also perform this safety test.
+      if path.startswith('/') or path.startswith('..'):
+        raise Exception('Jar file contains unsafe path: %s' % path)
+      if not path.endswith('/'):  # Ignore directories. extract() will create parent dirs as needed.
+        jar.extract(path, dest_dir)
