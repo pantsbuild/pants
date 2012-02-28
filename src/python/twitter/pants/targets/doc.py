@@ -16,8 +16,10 @@
 
 __author__ = 'Mark McBride'
 
-from internal import InternalTarget
-from with_sources import TargetWithSources
+from twitter.pants.base import Target, TargetDefinitionException
+from twitter.pants.targets.pants_target import Pants
+from twitter.pants.targets.internal import InternalTarget
+from twitter.pants.targets.with_sources import TargetWithSources
 
 class Doc(InternalTarget, TargetWithSources):
   """A target that processes documentation in a directory"""
@@ -28,4 +30,45 @@ class Doc(InternalTarget, TargetWithSources):
       raise TargetDefinitionException(self, 'No sources specified')
     self.name = name
     self.sources = self._resolve_paths(self.target_base, sources)
-    self.resources = self._resolve_paths(self.target_base, resources)
+    self.resources = self._resolve_paths(self.target_base, resources) if resources else []
+
+
+class Wiki(Target):
+  """A target that identifies a wiki where pages can be published"""
+
+  def __init__(self, name, url_builder):
+    """:url_builder a function that accepts a page target and an optional wiki :config dict and
+    returns a tuple of (alias, fully qualified url)."""
+    Target.__init__(self, name, is_meta=False)
+    self.url_builder = url_builder
+
+
+class Page(InternalTarget, TargetWithSources):
+  """A target that identifies a single documentation page."""
+  def __init__(self, name, source, dependencies=None, resources=None):
+    InternalTarget.__init__(self, name, dependencies, is_meta=False)
+    TargetWithSources.__init__(self, name)
+
+    self.source = self._resolve_paths(self.target_base, [source]).pop()
+    self.resources = self._resolve_paths(self.target_base, resources) if resources else []
+    self._wikis = {}
+
+  def register_wiki(self, wiki, **kwargs):
+    """
+      Adds this page to the given wiki for publishing.  Wiki-specific configuration is passed as
+      kwargs.
+    """
+    if isinstance(wiki, Pants):
+      wiki = wiki.get()
+    if not isinstance(wiki, Wiki):
+      raise ValueError('The 1st argument must be a wiki target, given: %s' % wiki)
+    self._wikis[wiki] = kwargs
+    return self
+
+  def wiki_config(self, wiki):
+    """Gets the wiki specific config for the given wiki if present or else returns None."""
+    return self._wikis.get(wiki)
+
+  def wikis(self):
+    """Returns all the wikis registered with this page."""
+    return self._wikis.keys()

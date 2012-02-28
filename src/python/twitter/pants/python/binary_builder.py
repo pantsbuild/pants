@@ -14,6 +14,8 @@
 # limitations under the License.
 # ==================================================================================================
 
+from __future__ import print_function
+
 __author__ = 'Brian Wickman'
 
 import os
@@ -38,9 +40,9 @@ class PythonBinaryBuilder(object):
     pex = PexBuilder(env)
     pex_name = os.path.join(self.distdir, '%s.pex' % self.target.name)
     pex.write(pex_name)
-    print 'Wrote %s' % pex_name
+    print('Wrote %s' % pex_name)
 
   def run(self):
-    print 'Building PythonBinary %s:' % self.target
+    print('Building PythonBinary %s:' % self.target)
     self._generate()
     return 0

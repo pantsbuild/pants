@@ -18,23 +18,17 @@ __author__ = 'John Sirois'
 
 import os
 
-from contextlib import contextmanager
-from zipfile import ZipFile, ZIP_STORED, ZIP_DEFLATED
+from zipfile import  ZIP_STORED, ZIP_DEFLATED
 
-from twitter.common.contextutil import pushd, temporary_dir
+from twitter.common.contextutil import open_zip as open_jar, pushd, temporary_dir
 from twitter.common.dirutil import safe_mkdir
 
-from . import Task
 from twitter.pants import get_buildroot, get_version, is_internal
 from twitter.pants.java import Manifest
-from twitter.pants.targets import JvmBinary
+from twitter.pants.tasks.jvm_binary_task import JvmBinaryTask
 
 
-def is_binary(target):
-  return isinstance(target, JvmBinary)
-
-
-class BinaryCreate(Task):
+class BinaryCreate(JvmBinaryTask):
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
     option_group.add_option(mkflag("outdir"), dest="binary_create_outdir",
@@ -53,7 +47,7 @@ class BinaryCreate(Task):
                                  "transitively.")
 
   def __init__(self, context):
-    Task.__init__(self, context)
+    JvmBinaryTask.__init__(self, context)
 
     self.outdir = (
       context.options.binary_create_outdir
@@ -62,33 +56,25 @@ class BinaryCreate(Task):
     self.compression = ZIP_DEFLATED if context.options.binary_create_compressed else ZIP_STORED
     self.deployjar = context.options.binary_create_deployjar
 
-    context.products.require('jars')
+    context.products.require('jars', predicate=self.is_binary)
     if self.deployjar:
-      context.products.require('jar_dependencies', predicate=is_binary)
+      self.require_jar_dependencies()
 
   def execute(self, targets):
-    for binary in filter(is_binary, targets):
+    for binary in filter(self.is_binary, targets):
       self.create_binary(binary)
-
-  @contextmanager
-  def create_jar(self, path):
-    zip = ZipFile(path, 'w', compression=self.compression)
-    yield zip
-    zip.close()
 
   def create_binary(self, binary):
     import platform
     safe_mkdir(self.outdir)
 
     jarmap = self.context.products.get('jars')
-    jardepmap = self.context.products.get('jar_dependencies') if self.deployjar else None
 
-    binary_jarname = '%s.jar' % binary.name
+    binary_jarname = '%s.jar' % binary.basename
     binaryjarpath = os.path.join(self.outdir, binary_jarname)
     self.context.log.info('creating %s' % os.path.relpath(binaryjarpath, get_buildroot()))
 
-    with self.create_jar(binaryjarpath) as jar:
-      externaljars = set()
+    with open_jar(binaryjarpath, 'w', compression=self.compression) as jar:
       def add_jars(target):
         generated = jarmap.get(target)
         if generated:
@@ -96,16 +82,11 @@ class BinaryCreate(Task):
             for internaljar in jars:
               self.dump(os.path.join(basedir, internaljar), jar)
 
-        if jardepmap:
-          resolved = jardepmap.get(target)
-          if resolved:
-            for basedir, jars in resolved.items():
-              for externaljar in jars:
-                if externaljar not in externaljars:
-                  self.dump(os.path.join(basedir, externaljar), jar)
-                  externaljars.add(externaljar)
-
       binary.walk(add_jars, is_internal)
+
+      if self.deployjar:
+        for basedir, externaljar in self.list_jar_dependencies(binary):
+          self.dump(os.path.join(basedir, externaljar), jar)
 
       manifest = Manifest()
       manifest.addentry(Manifest.MANIFEST_VERSION, '1.0')
@@ -118,17 +99,11 @@ class BinaryCreate(Task):
 
       jarmap.add(binary, self.outdir, [binary_jarname])
 
-  @contextmanager
-  def open_jar(self, path):
-    zip = ZipFile(path)
-    yield zip
-    zip.close()
-
   def dump(self, jarpath, jarfile):
     self.context.log.debug('  dumping %s' % jarpath)
 
     with temporary_dir() as tmpdir:
-      with self.open_jar(jarpath) as sourcejar:
+      with open_jar(jarpath) as sourcejar:
         BinaryCreate.safe_extract(sourcejar, tmpdir)
         for root, dirs, files in os.walk(tmpdir):
           for file in files:

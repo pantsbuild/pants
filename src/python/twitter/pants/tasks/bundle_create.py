@@ -17,25 +17,18 @@
 __author__ = 'John Sirois'
 
 import os
-import tarfile
 
-from contextlib import contextmanager
-from zipfile import ZipFile, ZIP_DEFLATED, ZIP_STORED
+from zipfile import ZIP_DEFLATED
 
 from twitter.common.collections import OrderedDict, OrderedSet
+from twitter.common.contextutil import open_tar, open_zip
 from twitter.common.dirutil import safe_mkdir
 
-from . import Task, TaskError
-from twitter.pants import get_buildroot, is_internal
+from twitter.pants import get_buildroot
 from twitter.pants.java import Manifest
-from twitter.pants.targets import JvmApp, JvmBinary
-
-
-@contextmanager
-def open_zip(path, mode, compression=ZIP_STORED):
-  zip = ZipFile(path, mode=mode, compression=compression)
-  yield zip
-  zip.close()
+from twitter.pants.targets import JvmApp
+from twitter.pants.tasks import TaskError
+from twitter.pants.tasks.jvm_binary_task import JvmBinaryTask
 
 
 class Archiver(object):
@@ -51,15 +44,9 @@ class TarArchiver(Archiver):
     self.mode = mode
     self.extension = extension
 
-  @contextmanager
-  def create_tar(self, path):
-    tar = tarfile.open(path, self.mode, dereference=True)
-    yield tar
-    tar.close()
-
   def archive(self, basedir, outdir, name):
     tarpath = os.path.join(outdir, '%s.%s' % (name, self.extension))
-    with self.create_tar(tarpath) as tar:
+    with open_tar(tarpath, self.mode, dereference=True) as tar:
       tar.add(basedir, arcname='')
     return tarpath
 
@@ -72,7 +59,7 @@ class ZipArchiver(Archiver):
   def archive(self, basedir, outdir, name):
     zippath = os.path.join(outdir, '%s.zip' % name)
     with open_zip(zippath, 'w', compression=ZIP_DEFLATED) as zip:
-      for root, dirs, files in os.walk(basedir):
+      for root, _, files in os.walk(basedir):
         for file in files:
           full_path = os.path.join(root, file)
           relpath = os.path.relpath(full_path, basedir)
@@ -88,11 +75,7 @@ ARCHIVER_BY_TYPE = OrderedDict(
 )
 
 
-def is_binary(target):
-  return isinstance(target, JvmBinary)
-
-
-class BundleCreate(Task):
+class BundleCreate(JvmBinaryTask):
 
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
@@ -105,7 +88,7 @@ class BundleCreate(Task):
                                  "Choose from %s" % ARCHIVER_BY_TYPE.keys())
 
   def __init__(self, context):
-    Task.__init__(self, context)
+    JvmBinaryTask.__init__(self, context)
 
     self.outdir = (
       context.options.bundle_create_outdir
@@ -113,8 +96,8 @@ class BundleCreate(Task):
     )
     self.archiver = context.options.bundle_create_archive
 
-    self.context.products.require('jars', predicate=is_binary)
-    self.context.products.require('jar_dependencies', predicate=is_binary)
+    self.context.products.require('jars', predicate=self.is_binary)
+    self.require_jar_dependencies()
 
   def execute(self, targets):
     def is_app(target):
@@ -124,11 +107,11 @@ class BundleCreate(Task):
     for app in filter(is_app, targets):
       basedir = self.bundle(app)
       if archiver:
-        archivepath = archiver.archive(basedir, self.outdir, app.name)
+        archivepath = archiver.archive(basedir, self.outdir, app.basename)
         self.context.log.info('created %s' % os.path.relpath(archivepath, get_buildroot()))
 
   def bundle(self, app):
-    bundledir = os.path.join(self.outdir, '%s-bundle' % app.name)
+    bundledir = os.path.join(self.outdir, '%s-bundle' % app.basename)
     self.context.log.info('creating %s' % os.path.relpath(bundledir, get_buildroot()))
 
     safe_mkdir(bundledir, clean=True)
@@ -136,18 +119,11 @@ class BundleCreate(Task):
     libdir = os.path.join(bundledir, 'libs')
     os.mkdir(libdir)
 
-    genmap = self.context.products.get('jar_dependencies')
     classpath = OrderedSet()
-    def link_jar(target):
-      generated = genmap.get(target)
-      if generated:
-        for basedir, jars in generated.items():
-          for jar in jars:
-            if jar not in classpath:
-              path = os.path.join(basedir, jar)
-              os.symlink(path, os.path.join(libdir, jar))
-              classpath.add(jar)
-    app.walk(link_jar, is_internal)
+    for basedir, externaljar in self.list_jar_dependencies(app.binary):
+      path = os.path.join(basedir, externaljar)
+      os.symlink(path, os.path.join(libdir, externaljar))
+      classpath.add(externaljar)
 
     for basedir, jars in self.context.products.get('jars').get(app.binary).items():
       if len(jars) != 1:

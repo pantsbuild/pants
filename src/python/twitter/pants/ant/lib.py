@@ -14,23 +14,26 @@
 # limitations under the License.
 # ==================================================================================================
 
-from twitter.pants.base.generator import Generator
-from twitter.pants.base.builder import Builder
-from twitter.pants.targets import JarDependency
-from twitter.pants.targets import JavaProtobufLibrary
-from twitter.pants.targets import JavaThriftLibrary
-from twitter.pants.targets import JavaTests
-from twitter.pants.targets import Pants
-from twitter.pants.targets import ScalaLibrary
-from twitter.pants.targets import ScalaTests
-from twitter.pants import has_jvm_targets, is_jvm
+from __future__ import print_function
 
-import bang
 import os
+import pkgutil
 import shutil
 import subprocess
 import traceback
-import pkgutil
+
+from twitter.pants import has_jvm_targets, is_jvm
+from twitter.pants.ant import bang
+from twitter.pants.base.generator import Generator
+from twitter.pants.base.builder import Builder
+from twitter.pants.targets import (
+  JarDependency,
+  JavaProtobufLibrary,
+  JavaThriftLibrary,
+  JavaTests,
+  Pants,
+  ScalaLibrary,
+  ScalaTests)
 
 _TEMPLATE_BASEDIR = 'templates'
 
@@ -93,7 +96,7 @@ class AntBuilder(Builder):
     if args:
       antargs.extend(args)
 
-    print 'AntBuilder executing (ANT_OPTS="%s") %s' % (os.environ['ANT_OPTS'], ' '.join(antargs))
+    print('AntBuilder executing (ANT_OPTS="%s") %s' % (os.environ['ANT_OPTS'], ' '.join(antargs)))
     return buildxml, ivyxml, subprocess.call(antargs)
 
   def create_ant_builds(self, workspace_root, targets, flags, target):
@@ -106,7 +109,7 @@ class AntBuilder(Builder):
         org = 'org.scala-lang',
         name = 'scala-library',
         rev = '${scala.version}'
-      ).withSources().resolve())
+      ).with_sources().resolve())
       target.update_dependencies(scaladeps)
 
     if is_jvm(target):
@@ -148,7 +151,7 @@ class AntBuilder(Builder):
         org = 'org.scala-tools.testing',
         name = '${specs.name}',
         rev = '${specs.version}'
-      ).withSources().resolve())
+      ).with_sources().resolve())
       target.update_dependencies(specdeps)
 
     try:

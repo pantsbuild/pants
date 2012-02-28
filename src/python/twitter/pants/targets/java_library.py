@@ -16,9 +16,7 @@
 
 import os
 
-from twitter.common.collections import OrderedSet
-
-from exportable_jvm_library import ExportableJvmLibrary
+from twitter.pants.targets.exportable_jvm_library import ExportableJvmLibrary
 
 class JavaLibrary(ExportableJvmLibrary):
   """Defines a target that produces a java library."""

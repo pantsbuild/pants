@@ -16,7 +16,8 @@
 
 __author__ = 'John Sirois'
 
-from cStringIO import StringIO
+from twitter.common.lang import Compatibility
+StringIO = Compatibility.StringIO
 
 class Manifest(object):
   """

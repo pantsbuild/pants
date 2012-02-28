@@ -17,7 +17,7 @@
 import os
 
 from twitter.common.contextutil import pushd
-
+from twitter.common.lang import Compatibility
 from twitter.pants import get_buildroot
 from twitter.pants.base import Target
 from twitter.pants.targets.sources import SourceRoot
@@ -73,7 +73,7 @@ class TargetWithSources(Target):
       flat = []
 
       def flatmap(item):
-        if isinstance(item, basestring):
+        if isinstance(item, Compatibility.string):
           flat.append(item)
         else:
           try:

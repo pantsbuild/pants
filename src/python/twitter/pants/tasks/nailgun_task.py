@@ -133,28 +133,28 @@ class NailgunTask(Task):
     return int(match.group(1))
 
   def _await_nailgun_server(self):
-      nailgun = None
-      with _safe_open(self._ng_out, 'r') as ng_out:
-        while True:
-          started = ng_out.readline()
-          if started:
-            port = self._parse_nailgun_port(started)
-            with open(self._pidfile, 'a') as pidfile:
-              pidfile.write(':%d' % port)
-            nailgun = self._create_ngclient(port)
-            log.debug('Detected ng server up on port %d' % port)
-            break
-
-      attempt = 0
+    nailgun = None
+    with _safe_open(self._ng_out, 'r') as ng_out:
       while True:
-        sock = nailgun.try_connect()
-        if sock:
-          sock.close()
-          log.info('Connected to ng server pid: %d @ port: %d' % self._get_nailgun_endpoint())
-          return nailgun
-        attempt += 1
-        log.debug('Failed to connect on attempt %d' % attempt)
-        time.sleep(0.1)
+        started = ng_out.readline()
+        if started:
+          port = self._parse_nailgun_port(started)
+          with open(self._pidfile, 'a') as pidfile:
+            pidfile.write(':%d' % port)
+          nailgun = self._create_ngclient(port)
+          log.debug('Detected ng server up on port %d' % port)
+          break
+
+    attempt = 0
+    while True:
+      sock = nailgun.try_connect()
+      if sock:
+        sock.close()
+        log.info('Connected to ng server pid: %d @ port: %d' % self._get_nailgun_endpoint())
+        return nailgun
+      attempt += 1
+      log.debug('Failed to connect on attempt %d' % attempt)
+      time.sleep(0.1)
 
   def _create_ngclient(self, port):
     return NailgunClient(port=port, work_dir=get_buildroot(), ins=self._stdin, out=self._stdout,
@@ -212,7 +212,7 @@ try:
         if 'java' == proc.name and cmdline_matches(proc.cmdline):
           NailgunTask.log_kill(log, proc.pid)
           proc.kill()
-      except psutil.AccessDenied, psutil.NoSuchProcess:
+      except (psutil.AccessDenied, psutil.NoSuchProcess):
         pass
 
   NailgunTask.killall = staticmethod(killall)

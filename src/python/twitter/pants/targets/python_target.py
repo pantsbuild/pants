@@ -16,7 +16,6 @@
 
 from twitter.common.collections import OrderedSet
 from twitter.pants.base import Target
-from twitter.pants.base.generator import TemplateData
 from twitter.pants.targets.with_sources import TargetWithSources
 
 class PythonTarget(TargetWithSources):
@@ -26,7 +25,6 @@ class PythonTarget(TargetWithSources):
     self.sources = self._resolve_paths(self.target_base, sources)
     self.resources = self._resolve_paths(self.target_base, resources) if resources else OrderedSet()
     self.dependencies = OrderedSet(dependencies) if dependencies else OrderedSet()
-
 
   def _walk(self, walked, work, predicate = None):
     Target._walk(self, walked, work, predicate)
@@ -39,14 +37,5 @@ class PythonTarget(TargetWithSources):
             dep._walk(walked, work, predicate)
             if additional_targets:
               for additional_target in additional_targets:
-                additional_target._walk(walked, work, predicate)
-
-
-  def _create_template_data(self):
-    return TemplateData(
-      name = self.name,
-      template_base = self.target_base,
-      sources = self.sources,
-      resources = self.resources,
-      dependencies = self.dependencies
-    )
+                if hasattr(additional_target, '_walk'):
+                  additional_target._walk(walked, work, predicate)

@@ -49,10 +49,11 @@ class ParseContextTest(unittest.TestCase):
 
   def test_parse(self):
     with temporary_dir() as root_dir:
-      buildfile = create_buildfile(root_dir, 'a', '''
+      buildfile = create_buildfile(root_dir, 'a',
+'''
 with open('b', 'w') as b:
   b.write('jack spratt')
-      '''.strip())
+'''.strip())
       b_file = os.path.join(root_dir, 'a', 'b')
       self.assertFalse(os.path.exists(b_file))
       ParseContext(buildfile).parse()
@@ -66,8 +67,8 @@ with open('b', 'w') as b:
         parse_context.on_context_exit(lambda: 37)
 
     with temporary_dir() as root_dir:
-      buildfile = create_buildfile(root_dir, 'a', '''
-import os
+      buildfile = create_buildfile(root_dir, 'a',
+'''import os
 from twitter.pants.base import ParseContext
 def leave_a_trail(file, contents=''):
   with open(file, 'w') as b:
@@ -75,7 +76,7 @@ def leave_a_trail(file, contents=''):
 b_file = os.path.join(os.path.dirname(__file__), 'b')
 ParseContext.locate().on_context_exit(leave_a_trail, b_file, contents='42')
 assert not os.path.exists(b_file), 'Expected context exit action to be delayed.'
-      '''.strip())
+'''.strip())
       b_file = os.path.join(root_dir, 'a', 'b')
       self.assertFalse(os.path.exists(b_file))
       ParseContext(buildfile).parse()

@@ -49,3 +49,22 @@ class Pants(Target):
       raise KeyError("Failed to find target for: %s" % self.address)
     for dep in resolved.resolve():
       yield dep
+
+  def get(self):
+    """
+      De-reference this pants pointer to a single target.  If the pointer aliases more than one
+      target a LookupError is raised.
+    """
+    resolved = list(self.resolve())
+    if len(resolved) > 1:
+      raise LookupError('%s points to more than one target: %s' % (self, resolved))
+    return resolved.pop()
+
+  def __getattr__(self, name):
+    try:
+      return Target.__getattribute__(self, name)
+    except AttributeError as e:
+      try:
+        return getattr(self.get(), name)
+      except (AttributeError, LookupError):
+        raise e

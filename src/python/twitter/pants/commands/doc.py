@@ -14,6 +14,8 @@
 # limitations under the License.
 # ==================================================================================================
 
+from __future__ import print_function
+
 __author__ = 'John Sirois'
 
 from . import Command
@@ -135,10 +137,10 @@ class Doc(Command):
     # during recursive execution (in the case of dependencies on doc targets)
     # these are called with different targets/target/path values
     if self.execute_javadoc(self.targets, self.target_path):
-      print "JavaDoc execution failed"
+      print("JavaDoc execution failed")
       return 1
     if self.execute_pantsdoc(self.targets, self.target_path):
-      print "PantsDoc execution failed"
+      print("PantsDoc execution failed")
       return 1
     return 0
 
@@ -153,7 +155,7 @@ class Doc(Command):
     doc_target = self._create_doc_target(targets, all_sources, all_deps)
     classpath_result, classpath_file = self._create_classpath_file(doc_target, target_path)
     if classpath_result != 0:
-      print "Failed to generate javadoc classpath."
+      print("Failed to generate javadoc classpath.")
       return classpath_result
 
     self._create_artifact_data(targets, target_path)
@@ -212,7 +214,8 @@ class Doc(Command):
       else:
         source_file = "javadoc-single-package.html"
       with open(new_file, 'w') as output:
-        output.write(pkg_resources.resource_string(__name__, os.path.join(_ASSETS_DIR, source_file)))
+        output.write(pkg_resources.resource_string(__name__,
+          os.path.join(_ASSETS_DIR, source_file)))
       return 0
     return javadoc_result
 
@@ -226,7 +229,7 @@ class Doc(Command):
           if os.path.exists(source_path):
             all_sources.append(source_path)
           else:
-            print "skipping %s" % source_path
+            print("skipping %s" % source_path)
 
           for jar_dep in target.jar_dependencies:
             if jar_dep.rev:
@@ -290,14 +293,14 @@ class Doc(Command):
                                 artifactBaseUrl = target.provides.repo.url)
 
     with open(self._artifact_data_path(target_path), mode = 'w') as data_file:
-      print >> data_file, "var artifacts = %s;" % json.dumps(data, sort_keys = True, indent = 2)
-      print >> data_file, "artifacts.title = '%s';" % self.options.title
-      print >> data_file, "artifacts.publishDate = '%s';" % (
+      print("var artifacts = %s;" % json.dumps(data, sort_keys = True, indent = 2), file=data_file)
+      print("artifacts.title = '%s';" % self.options.title, file=data_file)
+      print("artifacts.publishDate = '%s';" % (
         datetime.now().strftime('%m/%d/%Y %I:%M %p')
-      )
-      print >> data_file, "artifacts.hasChangelog = %s;" % (
+      ), file=data_file)
+      print("artifacts.hasChangelog = %s;" % (
         'true' if self.link_changelog else 'false'
-      )
+      ), file=data_file)
 
   def _create_sources_file(self, target, target_path):
     sources_file = os.path.abspath(os.path.join(target_path, 'sources.txt'))

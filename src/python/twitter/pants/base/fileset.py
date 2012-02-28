@@ -14,6 +14,8 @@
 # limitations under the License.
 # ==================================================================================================
 
+from twitter.common.lang import Compatibility
+
 class Fileset(object):
   """
     An iterable, callable object that will gather up a set of files lazily when iterated over or
@@ -39,7 +41,7 @@ class Fileset(object):
         return self() ^ other()
       elif isinstance(other, set):
         return self() ^ other
-      elif isinstance(other, basestring):
+      elif isinstance(other, Compatibility.string):
         raise TypeError('Unsupported operand type (%r) for ^: %r and %r' %
                         (type(other), self, other))
       else:
@@ -55,7 +57,7 @@ class Fileset(object):
         return self() - other()
       elif isinstance(other, set):
         return self() - other
-      elif isinstance(other, basestring):
+      elif isinstance(other, Compatibility.string):
         raise TypeError('Unsupported operand type (%r) for -: %r and %r' %
                         (type(other), self, other))
       else:

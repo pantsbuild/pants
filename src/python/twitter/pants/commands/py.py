@@ -14,6 +14,8 @@
 # limitations under the License.
 # ==================================================================================================
 
+from __future__ import print_function
+
 import os
 
 from . import Command
@@ -74,8 +76,8 @@ class Py(Command):
       self.error('No valid target specified!')
 
   def execute(self):
-    print "Build operating on target: %s %s" % (self.target,
-      'Extra targets: %s' % ' '.join(map(str, self.extra_targets)) if self.extra_targets else '')
+    print("Build operating on target: %s %s" % (self.target,
+      'Extra targets: %s' % ' '.join(map(str, self.extra_targets)) if self.extra_targets else ''))
     executor = PythonChroot(self.target, self.root_dir, extra_targets=self.extra_targets)
     if self.options.pex:
       # TODO(wickman)  This overlaps with commands/build.py and should be factored out, perhaps

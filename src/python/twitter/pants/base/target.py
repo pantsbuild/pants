@@ -18,9 +18,8 @@ import os
 import collections
 
 from twitter.common.collections import OrderedSet
-
-from address import Address
-from parse_context import ParseContext
+from twitter.pants.base.address import Address
+from twitter.pants.base.parse_context import ParseContext
 
 class TargetDefinitionException(Exception):
   """Thrown on errors in target definitions."""
@@ -53,8 +52,8 @@ class Target(object):
       ParseContext(buildfile).parse()
       return lookup()
 
-  @classmethod
-  def get(cls, address):
+  @staticmethod
+  def get(address):
     """Returns the specified module target if already parsed; otherwise, parses the buildfile in the
     context of its parent directory and returns the parsed target."""
 
@@ -88,7 +87,7 @@ class Target(object):
     a path name on unix systems."""
 
     buildfile_relpath = os.path.dirname(self.address.buildfile.relpath)
-    if buildfile_relpath is '.':
+    if buildfile_relpath in ('.', ''):
       return self.name
     else:
       return "%s.%s" % (buildfile_relpath.replace(os.sep, '.'), self.name)
@@ -125,10 +124,12 @@ class Target(object):
         walked.add(target)
         if not predicate or predicate(target):
           additional_targets = work(target)
-          target._walk(walked, work, predicate)
+          if hasattr(target, '_walk'):
+            target._walk(walked, work, predicate)
           if additional_targets:
             for additional_target in additional_targets:
-              additional_target._walk(walked, work, predicate)
+              if hasattr(additional_target, '_walk'):
+                additional_target._walk(walked, work, predicate)
 
   def do_in_context(self, work):
     return ParseContext(self.address.buildfile).do_in_context(work)

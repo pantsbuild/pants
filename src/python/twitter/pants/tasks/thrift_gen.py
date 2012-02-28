@@ -28,10 +28,11 @@ from twitter.common.dirutil import safe_mkdir
 
 from twitter.pants import is_jvm, is_python
 from twitter.pants.targets import JavaLibrary, JavaThriftLibrary, PythonLibrary, PythonThriftLibrary
-from twitter.pants.tasks import Task, TaskError
+from twitter.pants.tasks import TaskError
 from twitter.pants.tasks.binary_utils import select_binary
+from twitter.pants.tasks.code_gen import CodeGen
 
-class ThriftGen(Task):
+class ThriftGen(CodeGen):
   class GenInfo(object):
     def __init__(self, gen, deps):
       self.gen = gen
@@ -47,23 +48,20 @@ class ThriftGen(Task):
                             help="Force generation of thrift code for these languages.  Both "
                                  "'python' and 'java' are supported")
 
-  def __init__(self, context, output_dir=None, version=None, java_geninfo=None, python_geninfo=None,
-               strict=None, verbose=None):
-
-    Task.__init__(self, context)
+  def __init__(self, context):
+    CodeGen.__init__(self, context)
 
     self.thrift_binary = select_binary(
       context.config.get('thrift-gen', 'supportdir'),
-      version or context.config.get('thrift-gen', 'version'),
+      context.config.get('thrift-gen', 'version'),
       'thrift'
     )
     self.output_dir = (
-      output_dir
-      or context.options.thrift_gen_create_outdir
+      context.options.thrift_gen_create_outdir
       or context.config.get('thrift-gen', 'workdir')
     )
-    self.strict = strict or context.config.getbool('thrift-gen', 'strict')
-    self.verbose = verbose or context.config.getbool('thrift-gen', 'verbose')
+    self.strict = context.config.getbool('thrift-gen', 'strict')
+    self.verbose = context.config.getbool('thrift-gen', 'verbose')
 
     def create_geninfo(key):
       gen_info = context.config.getdict('thrift-gen', key)
@@ -73,80 +71,33 @@ class ThriftGen(Task):
         deps.update(context.resolve(dep))
       return ThriftGen.GenInfo(gen, deps)
 
-    self.gen_java = java_geninfo or create_geninfo('java')
-    self.gen_python = python_geninfo or create_geninfo('python')
+    self.gen_java = create_geninfo('java')
+    self.gen_python = create_geninfo('python')
     self.gen_langs = set(context.options.thrift_gen_langs)
 
   def invalidate_for(self):
     return self.gen_langs
 
-  def execute(self, targets):
-    thrifts = [t for t in targets if ThriftGen._is_thrift(t)]
-    with self.changed(thrifts, invalidate_dependants=True) as changed_targets:
-      safe_mkdir(self.output_dir)
+  def is_gentarget(self, target):
+    return isinstance(target, JavaThriftLibrary) or isinstance(target, PythonThriftLibrary)
 
-      def forced(lang):
-        thrift_targets = set()
-        if lang in self.gen_langs:
-          for target in targets:
-            target.walk(thrift_targets.add, ThriftGen._is_thrift)
-        return thrift_targets
+  def is_forced(self, lang):
+    return lang in self.gen_langs
 
-      thrifts_by_dependee = self.context.dependants(ThriftGen._is_thrift)
-      dependees_by_thrift = defaultdict(set)
-      for dependee, thrifts in thrifts_by_dependee.items():
-        for thrift in thrifts:
-          dependees_by_thrift[thrift].add(dependee)
+  def genlangs(self):
+    return dict(java=is_jvm, python=is_python)
 
-      def find_thrift_targets(predicate):
-        thrift_targets = set()
-        for dependee in thrifts_by_dependee.keys():
-          if predicate(dependee):
-            tgts = thrifts_by_dependee.pop(dependee)
-            for tgt in tgts:
-              tgt.walk(thrift_targets.add, ThriftGen._is_thrift)
-        return thrift_targets.intersection(set(targets))
+  def genlang(self, lang, targets):
+    bases, sources = self._calculate_sources(targets)
 
-      # TODO(John Sirois): optimization -> find thrift_targets that share dependees and execute
-      # thrift with multiple gens in those cases
+    if lang == 'java':
+      gen = self.gen_java.gen
+    elif lang == 'python':
+      gen = self.gen_python.gen
+    else:
+      raise TaskError('Unrecognized thrift gen lang: %s' % lang)
 
-      changed = set(changed_targets)
-
-      # Handle jvm
-      thrift_targets = find_thrift_targets(is_jvm) | forced('java')
-      if thrift_targets:
-        self._gen_thrift(changed.intersection(thrift_targets), self.gen_java.gen)
-
-        java_target_by_thrift = {}
-        for target in thrift_targets:
-          java_target_by_thrift[target] = self._create_java_target(
-            target,
-            dependees_by_thrift.get(target, [])
-          )
-        for thrift_target, java_target in java_target_by_thrift.items():
-          for dep in thrift_target.internal_dependencies:
-            java_target.update_dependencies([java_target_by_thrift[dep]])
-
-      # Handle python
-      thrift_targets = find_thrift_targets(is_python) | forced('python')
-      if thrift_targets:
-        self._gen_thrift(changed.intersection(thrift_targets), self.gen_python.gen)
-
-        python_target_by_thrift = {}
-        for target in thrift_targets:
-          python_target_by_thrift[target] = self._create_python_target(
-            target,
-            dependees_by_thrift.get(target, [])
-          )
-        for thrift_target, python_target in python_target_by_thrift.items():
-          for dep in thrift_target.internal_dependencies:
-            python_target.dependencies.add(python_target_by_thrift[dep])
-
-      if thrifts_by_dependee:
-        raise TaskError
-
-  def _gen_thrift(self, thrift_targets, gen):
-    bases, sources = self._calculate_sources(thrift_targets)
+    safe_mkdir(self.output_dir)
 
     args = [
       self.thrift_binary,
@@ -174,15 +125,11 @@ class ThriftGen(Task):
     if sum(p.wait() for p in processes) != 0:
       raise TaskError
 
-  @staticmethod
-  def _is_thrift(target):
-    return isinstance(target, JavaThriftLibrary) or isinstance(target, PythonThriftLibrary)
-
   def _calculate_sources(self, thrift_targets):
     bases = set()
     sources = set()
     def collect_sources(target):
-      if ThriftGen._is_thrift(target):
+      if self.is_gentarget(target):
         bases.add(target.target_base)
         sources.update(os.path.join(target.target_base, source) for source in target.sources)
     for target in thrift_targets:
@@ -195,6 +142,14 @@ class ThriftGen(Task):
     for source in sources:
       root_sources.difference_update(find_includes(bases, source))
     return root_sources
+
+  def createtarget(self, lang, gentarget, dependees):
+    if lang == 'java':
+      return self._create_java_target(gentarget, dependees)
+    elif lang == 'python':
+      return self._create_python_target(gentarget, dependees)
+    else:
+      raise TaskError('Unrecognized thrift gen lang: %s' % lang)
 
   def _create_java_target(self, target, dependees):
     gen_java_dir = os.path.join(self.output_dir, 'gen-java')
@@ -222,7 +177,6 @@ class ThriftGen(Task):
                                   PythonLibrary,
                                   name=target.id,
                                   sources=genfiles,
-                                  module_root=gen_python_dir,
                                   dependencies=self.gen_python.deps)
     tgt.id = target.id
     for dependee in dependees:

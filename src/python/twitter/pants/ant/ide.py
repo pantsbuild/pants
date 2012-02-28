@@ -15,45 +15,47 @@
 # ==================================================================================================
 
 from collections import deque
-from copy import copy
 
 from twitter.common.collections import OrderedSet
-from twitter.pants import is_internal, is_java, is_scala
+from twitter.pants import is_internal, is_java, is_scala, get_buildroot
+from twitter.pants.base.build_file import BuildFile
+from twitter.pants.base.parse_context import ParseContext
 from twitter.pants.targets import JavaLibrary, ScalaLibrary
+from twitter.pants.targets.internal import InternalTarget
 
-import bang
+def extract_target(java_targets, is_classpath):
+  primary_target = InternalTarget.sort_targets(java_targets)[0]
 
-def extract_target(java_targets, is_transitive, is_classpath, name = None):
-  meta_target = bang.extract_target(java_targets, name)
+  def create_target():
+    internal_deps, jar_deps = _extract_target(java_targets, is_classpath)
 
-  internal_deps, jar_deps = _extract_target(meta_target, is_transitive, is_classpath)
+    # TODO(John Sirois): make an empty source set work in ant/compile.xml
+    sources = [ '__no_source__' ]
 
-  # TODO(John Sirois): make an empty source set work in ant/compile.xml
-  sources = [ '__no_source__' ]
+    all_deps = OrderedSet()
+    all_deps.update(internal_deps)
+    all_deps.update(jar_deps)
 
-  all_deps = OrderedSet()
-  all_deps.update(internal_deps)
-  all_deps.update(jar_deps)
+    if is_java(primary_target):
+      return JavaLibrary('ide',
+                         sources,
+                         dependencies = all_deps,
+                         is_meta = True)
+    elif is_scala(primary_target):
+      return ScalaLibrary('ide',
+                          sources,
+                          dependencies = all_deps,
+                          is_meta = True)
+    else:
+      raise TypeError("Cannot generate IDE configuration for targets: %s" % java_targets)
 
-  if is_java(meta_target):
-    return JavaLibrary('ide',
-                       sources,
-                       dependencies = all_deps,
-                       excludes = meta_target.excludes,
-                       is_meta = True)
-  elif is_scala(meta_target):
-    return ScalaLibrary('ide',
-                        sources,
-                        dependencies = all_deps,
-                        excludes = meta_target.excludes,
-                        is_meta = True)
-  else:
-    raise TypeError("Cannot generate IDE configuration for targets: %s" % java_targets)
+  buildfile = BuildFile(get_buildroot(), primary_target.target_base, must_exist=False)
+  return ParseContext(buildfile).do_in_context(create_target)
 
-def _extract_target(meta_target, is_transitive, is_classpath):
+def _extract_target(targets, is_classpath):
   """
     Extracts the minimal set of internal dependencies and external jar dependencies from the given
-    (meta) target so that an ide can run any required custom annotation processors and resolve all
+    targets so that an ide can run any required custom annotation processors and resolve all
     symbols.
 
     The extraction algorithm proceeds under the following assumptions:
@@ -98,10 +100,7 @@ def _extract_target(meta_target, is_transitive, is_classpath):
       else:
         for jar_dependency in target.jar_dependencies:
           if jar_dependency.rev:
-            if is_transitive(target):
-              jar_deps.add(jar_dependency)
-            else:
-              jar_deps.add(copy(jar_dependency).intransitive())
+            jar_deps.add(jar_dependency)
 
       if is_needed_on_ide_classpath:
         codegen_graph.appendleft(target)
@@ -113,7 +112,8 @@ def _extract_target(meta_target, is_transitive, is_classpath):
       if is_needed_on_ide_classpath:
         codegen_graph.popleft()
 
-  sift_targets(meta_target)
+  for target in targets:
+    sift_targets(target)
 
   assert len(codegen_graph) == 1 and codegen_graph[0] == root_target, \
     "Unexpected walk: %s" % codegen_graph

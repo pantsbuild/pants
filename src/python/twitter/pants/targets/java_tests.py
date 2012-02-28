@@ -14,11 +14,8 @@
 # limitations under the License.
 # ==================================================================================================
 
-from twitter.common.collections import OrderedSet
-
 from twitter.pants.base.generator import TemplateData
-
-from jvm_target import JvmTarget
+from twitter.pants.targets.jvm_target import JvmTarget
 
 class JavaTests(JvmTarget):
   """Defines a target that tests a java library."""

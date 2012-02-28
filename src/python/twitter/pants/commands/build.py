@@ -14,13 +14,14 @@
 # limitations under the License.
 # ==================================================================================================
 
+from __future__ import print_function
+
 import traceback
 
 from . import Command
 
 from twitter.common.collections import OrderedSet
-
-from twitter.pants import is_python, extract_jvm_targets, is_doc
+from twitter.pants import is_python, extract_jvm_targets
 from twitter.pants.ant import AntBuilder
 from twitter.pants.base import Address, Target
 from twitter.pants.targets import InternalTarget
@@ -57,7 +58,7 @@ class Build(Command):
     try:
       specs_end = self.args.index('--')
       if len(self.args) > specs_end:
-        self.build_args = self.args.__getslice__(specs_end + 1, len(self.args) + 1)
+        self.build_args = self.args[specs_end+1:len(self.args)+1]
       else:
         self.build_args = []
     except ValueError:
@@ -65,7 +66,7 @@ class Build(Command):
       self.build_args = self.args[1:] if len(self.args) > 1 else []
 
     self.targets = OrderedSet()
-    for spec in self.args.__getslice__(0, specs_end):
+    for spec in self.args[0:specs_end]:
       try:
         address = Address.parse(root_dir, spec)
       except:
@@ -88,7 +89,7 @@ class Build(Command):
       self.targets.add(target)
 
   def execute(self):
-    print "Build operating on targets: %s" % self.targets
+    print("Build operating on targets: %s" % self.targets)
 
     jvm_targets = OrderedSet()
     python_targets = OrderedSet()

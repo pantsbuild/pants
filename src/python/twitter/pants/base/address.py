@@ -16,7 +16,7 @@
 
 import os
 
-from build_file import BuildFile
+from twitter.pants.base.build_file import BuildFile
 
 class Address(object):
   """Represents a BUILD file target address."""

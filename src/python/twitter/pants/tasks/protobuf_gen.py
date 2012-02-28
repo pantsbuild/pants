@@ -28,11 +28,12 @@ from twitter.common.dirutil import safe_mkdir
 
 from twitter.pants import is_jvm, is_python
 from twitter.pants.targets import JavaLibrary, JavaProtobufLibrary, PythonLibrary
-from twitter.pants.tasks import Task, TaskError
+from twitter.pants.tasks import TaskError
 from twitter.pants.tasks.binary_utils import select_binary
+from twitter.pants.tasks.code_gen import CodeGen
 
 
-class ProtobufGen(Task):
+class ProtobufGen(CodeGen):
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
     option_group.add_option(mkflag("outdir"), dest="protobuf_gen_create_outdir",
@@ -43,17 +44,17 @@ class ProtobufGen(Task):
                             help="Force generation of protobuf code for these languages.  Both "
                                  "'python' and 'java' are supported")
 
-  def __init__(self, context, output_dir=None, version=None, javadeps=None, pythondeps=None):
-    Task.__init__(self, context)
+  def __init__(self, context):
+    CodeGen.__init__(self, context)
 
     self.protobuf_binary = select_binary(
       context.config.get('protobuf-gen', 'supportdir'),
-      version or context.config.get('protobuf-gen', 'version'),
+      context.config.get('protobuf-gen', 'version'),
       'protoc'
     )
+
     self.output_dir = (
-      output_dir
-      or context.options.protobuf_gen_create_outdir
+      context.options.protobuf_gen_create_outdir
       or context.config.get('protobuf-gen', 'workdir')
     )
 
@@ -63,88 +64,41 @@ class ProtobufGen(Task):
         deps.update(context.resolve(dep))
       return deps
 
-    self.javadeps = javadeps or resolve_deps('javadeps')
-    self.pythondeps = pythondeps or resolve_deps('pythondeps')
+    self.javadeps = resolve_deps('javadeps')
+    self.java_out = os.path.join(self.output_dir, 'gen-java')
+
+    self.pythondeps = resolve_deps('pythondeps')
+    self.py_out = os.path.join(self.output_dir, 'gen-py')
+
     self.gen_langs = set(context.options.protobuf_gen_langs)
 
   def invalidate_for(self):
     return self.gen_langs
 
-  def execute(self, targets):
-    protobufs = [t for t in targets if ProtobufGen._is_protobuf(t)]
-    with self.changed(protobufs, invalidate_dependants=True) as changed_targets:
-      safe_mkdir(self.output_dir)
+  def is_gentarget(self, target):
+    return isinstance(target, JavaProtobufLibrary)
 
-      def forced(lang):
-        protobuf_targets = set()
-        if lang in self.gen_langs:
-          for target in changed_targets:
-            target.walk(protobuf_targets.add, ProtobufGen._is_protobuf)
-        return protobuf_targets
+  def is_forced(self, lang):
+    return lang in self.gen_langs
 
-      protobufs_by_dependee = self.context.dependants(ProtobufGen._is_protobuf)
-      dependees_by_protobuf = defaultdict(set)
-      for dependee, protobufs in protobufs_by_dependee.items():
-        for protobuf in protobufs:
-          dependees_by_protobuf[protobuf].add(dependee)
+  def genlangs(self):
+    return dict(java=is_jvm, python=is_python)
 
-      def find_protobuf_targets(predicate):
-        protobuf_targets = set()
-        for dependee in protobufs_by_dependee.keys():
-          if predicate(dependee):
-            tgts = protobufs_by_dependee.pop(dependee)
-            for tgt in tgts:
-              tgt.walk(protobuf_targets.add, ProtobufGen._is_protobuf)
-        return protobuf_targets.intersection(set(changed_targets))
+  def genlang(self, lang, targets):
+    bases, sources = self._calculate_sources(targets)
 
-      # TODO(John Sirois): optimization -> find protobuf_targets that share dependees and execute
-      # protoc with multiple gens in those cases
-
-      changed = set(changed_targets)
-
-      # Handle jvm
-      protobuf_targets = find_protobuf_targets(is_jvm) | forced('java')
-      if protobuf_targets:
-        java_out = os.path.join(self.output_dir, 'gen-java')
-        safe_mkdir(java_out)
-        self._gen_protobuf(changed.intersection(protobuf_targets), '--java_out=%s' % java_out)
-
-        java_target_by_protobuf = {}
-        for target in protobuf_targets:
-          java_target_by_protobuf[target] = self._create_java_target(
-            target,
-            dependees_by_protobuf.get(target, [])
-          )
-        for protobuf_target, java_target in java_target_by_protobuf.items():
-          for dep in protobuf_target.internal_dependencies:
-            java_target.update_dependencies([java_target_by_protobuf[dep]])
-
-      # Handle python
-      protobuf_targets = find_protobuf_targets(is_python) | forced('python')
-      if protobuf_targets:
-        python_out = os.path.join(self.output_dir, 'gen-py')
-        safe_mkdir(python_out)
-        self._gen_protobuf(changed.intersection(protobuf_targets), '--python_out=%s' % python_out)
-
-        python_target_by_protobuf = {}
-        for target in protobuf_targets:
-          python_target_by_protobuf[target] = self._create_python_target(
-            target,
-            dependees_by_protobuf.get(target, [])
-          )
-        for protobuf_target, python_target in python_target_by_protobuf.items():
-          for dep in protobuf_target.internal_dependencies:
-            python_target.dependencies.add(python_target_by_protobuf[dep])
-
-      if protobufs_by_dependee:
-        raise TaskError
-
-  def _gen_protobuf(self, protobuf_targets, gen):
-    bases, sources = self._calculate_sources(protobuf_targets)
+    if lang == 'java':
+      safe_mkdir(self.java_out)
+      gen = '--java_out=%s' % self.java_out
+    elif lang == 'python':
+      safe_mkdir(self.py_out)
+      gen = '--python_out=%s' % self.py_out
+    else:
+      raise TaskError('Unrecognized protobuf gen lang: %s' % lang)
 
     args = [
       self.protobuf_binary,
-      gen,
+      gen
     ]
 
     for base in bases:
@@ -157,28 +111,31 @@ class ProtobufGen(Task):
     if result != 0:
       raise TaskError
 
-  @staticmethod
-  def _is_protobuf(target):
-    return isinstance(target, JavaProtobufLibrary)
-
-  def _calculate_sources(self, thrift_targets):
+  def _calculate_sources(self, targets):
     bases = set()
     sources = set()
     def collect_sources(target):
-      if ProtobufGen._is_protobuf(target):
+      if self.is_gentarget(target):
         bases.add(target.target_base)
         sources.update(os.path.join(target.target_base, source) for source in target.sources)
-    for target in thrift_targets:
+    for target in targets:
       target.walk(collect_sources)
     return bases, sources
 
+  def createtarget(self, lang, gentarget, dependees):
+    if lang == 'java':
+      return self._create_java_target(gentarget, dependees)
+    elif lang == 'python':
+      return self._create_python_target(gentarget, dependees)
+    else:
+      raise TaskError('Unrecognized protobuf gen lang: %s' % lang)
+
   def _create_java_target(self, target, dependees):
-    gen_java_dir = os.path.join(self.output_dir, 'gen-java')
     genfiles = []
     for source in target.sources:
       path = os.path.join(target.target_base, source)
       genfiles.extend(calculate_genfiles(path, source).get('java', []))
-    tgt = self.context.add_target(gen_java_dir,
+    tgt = self.context.add_target(self.java_out,
                                   JavaLibrary,
                                   name=target.id,
                                   sources=genfiles,
@@ -190,16 +147,14 @@ class ProtobufGen(Task):
     return tgt
 
   def _create_python_target(self, target, dependees):
-    gen_python_dir = os.path.join(self.output_dir, 'gen-py')
     genfiles = []
     for source in target.sources:
       path = os.path.join(target.target_base, source)
       genfiles.extend(calculate_genfiles(path, source).get('py', []))
-    tgt = self.context.add_target(gen_python_dir,
+    tgt = self.context.add_target(self.py_out,
                                   PythonLibrary,
                                   name=target.id,
                                   sources=genfiles,
-                                  module_root=gen_python_dir,
                                   dependencies=self.pythondeps)
     tgt.id = target.id
     for dependee in dependees:

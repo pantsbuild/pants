@@ -15,8 +15,7 @@
 # ==================================================================================================
 
 from twitter.pants.base.generator import TemplateData
-
-from jvm_target import JvmTarget
+from twitter.pants.targets.jvm_target import JvmTarget
 
 class ExportableJvmLibrary(JvmTarget):
   """A baseclass for java targets that support being exported to an artifact repository."""

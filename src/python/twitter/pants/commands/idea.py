@@ -16,7 +16,7 @@
 
 __author__ = 'John Sirois'
 
-from ide import Ide, Project
+from twitter.pants.commands.ide import Ide, Project
 from twitter.pants.base.generator import Generator, TemplateData
 
 import os

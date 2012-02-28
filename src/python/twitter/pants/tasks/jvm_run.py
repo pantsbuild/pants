@@ -18,8 +18,6 @@ __author__ = 'Benjy Weinberger'
 
 import shlex
 
-from twitter.common.collections.orderedset import OrderedSet
-
 from twitter.pants.targets import JvmBinary
 from twitter.pants.tasks import Task, TaskError
 from twitter.pants.tasks.binary_utils import runjava

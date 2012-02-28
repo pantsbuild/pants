@@ -101,7 +101,7 @@ class List(Command):
       for address in Target.get_all_addresses(buildfile):
         line = print_fn(address)
         if line:
-          print line
+          print(line)
 
   def _print_provides(self, column_extractors, address):
     target = Target.get(address)

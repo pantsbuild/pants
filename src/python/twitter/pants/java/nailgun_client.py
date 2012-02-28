@@ -14,6 +14,8 @@
 # limitations under the License.
 # ==================================================================================================
 
+from __future__ import print_function
+
 __author__ = 'John Sirois'
 
 import os
@@ -266,7 +268,7 @@ def main(args):
     app.help()
 
   if options.show_version or options.just_version:
-    print >> sys.stdout, 'Python NailGun client version 0.0.1'
+    print('Python NailGun client version 0.0.1', file=sys.stdout)
     if options.just_version:
       sys.exit(0)
 

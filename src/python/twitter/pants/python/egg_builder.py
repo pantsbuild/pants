@@ -14,6 +14,8 @@
 # limitations under the License.
 # ==================================================================================================
 
+from __future__ import print_function
+
 __author__ = 'Benjy Weinberger'
 
 import glob
@@ -41,7 +43,6 @@ class EggBuilder(object):
       '--dist-dir=dist',
       '--bdist-dir=build.%s' % target.name]
     with pushd(egg_root):
-      print 'EggBuilder executing: %s' % ' '.join(args)
       with environment_as(PYTHONPATH = ':'.join(sys.path)):
         po = subprocess.Popen(args, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
         rv = po.wait()
@@ -49,12 +50,12 @@ class EggBuilder(object):
       eggs = glob.glob(eggs)
       if rv != 0 or len(eggs) != 1:
         comm = po.communicate()
-        print >> sys.stderr, 'egg generation failed (return value=%d, num eggs=%d)' % (
-          rv, len(eggs))
-        print >> sys.stderr, 'STDOUT'
-        print >> sys.stderr, comm[0]
-        print >> sys.stderr, 'STDERR'
-        print >> sys.stderr, comm[1]
+        print('egg generation failed (return value=%d, num eggs=%d)' % (rv, len(eggs)),
+          file=sys.stderr)
+        print('STDOUT', file=sys.stderr)
+        print(comm[0], file=sys.stderr)
+        print('STDERR', file=sys.stderr)
+        print(comm[1], file=sys.stderr)
         raise EggBuilder.EggBuildingException(
           'Generation of eggs failed for target = %s' % target)
       egg_path = eggs[0]

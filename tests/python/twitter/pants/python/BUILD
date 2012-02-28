@@ -31,7 +31,8 @@ python_tests(name = 'test_python_chroot_deps',
 
 python_tests(name = 'test_antlr_builder',
   sources = ['test_antlr_builder.py'],
-  dependencies = [ pants('src/antlr/twitter/pants/python/test:eval'),
+  dependencies = [ pants('src/python/twitter/pants:pants-lib'),
+                   pants('src/antlr/twitter/pants/python/test:eval'),
                    pants('src/antlr/twitter/pants/python/test:csv')]
 )
 

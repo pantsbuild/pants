@@ -14,11 +14,13 @@
 # limitations under the License.
 # ==================================================================================================
 
-from twitter.common.collections import OrderedSet
-from twitter.pants.base import BuildFile, Target
+from __future__ import print_function
 
 import inspect
 import sys
+
+from twitter.common.collections import OrderedSet
+from twitter.pants.base import BuildFile, Target
 
 class Command:
   """Baseclass for all pants subcommands."""
@@ -40,7 +42,7 @@ class Command:
       if ispkg: continue
       fq_module = '.'.join([__name__, mod])
       __import__(fq_module)
-      for (kls_name, kls) in inspect.getmembers(sys.modules[fq_module], inspect.isclass):
+      for (_, kls) in inspect.getmembers(sys.modules[fq_module], inspect.isclass):
         if issubclass(kls, Command):
           command_name = kls.__dict__.get('__command__', None)
           if command_name:
@@ -67,8 +69,7 @@ class Command:
     # Override the OptionParser's error with more useful output
     def error(message = None):
       if message:
-        print message
-        print
+        print(message + '\n')
       parser.print_help()
       parser.exit(status = 1)
     parser.error = error

@@ -15,7 +15,7 @@
 # ==================================================================================================
 
 from twitter.pants.base.generator import TemplateData
-from exclude import Exclude
+from twitter.pants.targets.exclude import Exclude
 
 class JarDependency(object):
   """Represents a binary jar dependency ala maven or ivy.  For the ivy dependency defined by:
@@ -52,6 +52,11 @@ class JarDependency(object):
     self.id = None
     self._configurations = [ 'default' ]
 
+    # Support legacy method names
+    # TODO(John Sirois): introduce a deprecation cycle for these and then kill
+    self.withSources = self.with_sources
+    self.withDocs = self.with_sources
+
   def exclude(self, org, name = None):
     """Adds a transitive dependency of this jar to the exclude list."""
 
@@ -65,11 +70,11 @@ class JarDependency(object):
     self.transitive = False
     return self
 
-  def withSources(self):
+  def with_sources(self):
     self._configurations.append('sources')
     return self
 
-  def withDocs(self):
+  def with_docs(self):
     self._configurations.append('docs')
     return self
 

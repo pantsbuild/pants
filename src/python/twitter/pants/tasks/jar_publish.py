@@ -14,8 +14,11 @@
 # limitations under the License.
 # ==================================================================================================
 
+from __future__ import print_function
+
 __author__ = 'John Sirois'
 
+import hashlib
 import getpass
 import os
 import pkgutil
@@ -58,7 +61,7 @@ class Semver(object):
   def __cmp__(self, other):
     diff = self.major - other.major
     if not diff:
-      diff = self.major - other.major
+      diff = self.minor - other.minor
       if not diff:
         diff = self.patch - other.patch
     return diff
@@ -88,17 +91,19 @@ class PushDb(object):
     minor = db_get('revision.minor', '0')
     patch = db_get('revision.patch', '0')
     sha = db_get('revision.sha', None)
+    fingerprint = db_get('revision.fingerprint', None)
     semver = Semver(major, minor, patch)
     jar_dep.rev = semver.version()
-    return jar_dep, semver, sha
+    return jar_dep, semver, sha, fingerprint
 
-  def set_version(self, target, version, sha):
+  def set_version(self, target, version, sha, fingerprint):
     version = version if isinstance(version, Semver) else Semver.parse(version)
     _, _, db_set = self._accessors_for_target(target)
     db_set('revision.major', version.major)
     db_set('revision.minor', version.minor)
     db_set('revision.patch', version.patch)
     db_set('revision.sha', sha)
+    db_set('revision.fingerprint', fingerprint)
 
   def _accessors_for_target(self, target):
     jar_dep, id, exported = target._get_artifact_info()
@@ -157,7 +162,7 @@ class PomWriter(object):
       generator.write(output)
 
   def internaldep(self, target):
-    jar, _, _ = self.get_db(target).as_jar_with_version(target)
+    jar, _, _, _ = self.get_db(target).as_jar_with_version(target)
     return PomWriter.jardep(jar)
 
 
@@ -203,7 +208,7 @@ class IvyWriter(object):
       generator.write(output)
 
   def internaldep(self, target):
-    jar, _, _ = self.get_db(target).as_jar_with_version(target)
+    jar, _, _, _ = self.get_db(target).as_jar_with_version(target)
     return TemplateData(
       org = jar.org,
       module = jar.name,
@@ -223,6 +228,15 @@ def is_exported(target):
     or isinstance(target, JavaLibrary)
     or isinstance(target, ScalaLibrary)
   )
+
+
+def coordinate(org, name, rev=None):
+  return '%s#%s;%s' % (org, name, rev) if rev else '%s#%s' % (org, name)
+
+
+def jar_coordinate(jar, rev=None):
+  return coordinate(jar.org, jar.name, rev or jar.rev)
+
 
 class JarPublish(Task):
 
@@ -362,13 +376,20 @@ class JarPublish(Task):
         pushdbs[dbfile] = result
       return result
 
-    def stage_artifacts(target, jar, version, confs=None):
+    def fingerprint_internal(target):
+      if not is_internal(target):
+        raise ValueError('Expected an internal target for fingerprinting, got %s' % target)
+      pushdb, _, _ = get_db(target)
+      _, _, _, fingerprint = pushdb.as_jar_with_version(target)
+      return fingerprint or '0.0.0'
+
+    def stage_artifacts(target, jar, version, changelog, confs=None):
       def artifact_path(name=None, suffix='', extension='jar'):
         return os.path.join(self.outdir, jar.org, jar.name,
                             '%s-%s%s.%s' % ((name or jar.name), version, suffix, extension))
 
       with safe_open(artifact_path(suffix='-CHANGELOG', extension='txt'), 'w') as changelog_file:
-        changelog_file.write(changes)
+        changelog_file.write(changelog)
 
       def get_pushdb(target):
         return get_db(target)[0]
@@ -392,8 +413,9 @@ class JarPublish(Task):
       return ivyxml
 
     if self.overrides:
-      print 'Publishing with revision overrides:\n  %s' % '\n  '.join('%s#%s=%s' % (org, name, rev)
-          for (org, name), rev in self.overrides.items())
+      print('Publishing with revision overrides:\n  %s' % '\n  '.join(
+        '%s=%s' % (coordinate(org, name), rev) for (org, name), rev in self.overrides.items()
+      ))
 
     head_sha = self.check_output(['git', 'rev-parse', 'HEAD']).strip()
 
@@ -402,7 +424,7 @@ class JarPublish(Task):
     skip = (self.restart_at is not None)
     for target in self.exported_targets():
       pushdb, dbfile, repo = get_db(target)
-      jar, semver, sha = pushdb.as_jar_with_version(target)
+      jar, semver, sha, fingerprint = pushdb.as_jar_with_version(target)
 
       published.append(jar)
 
@@ -410,41 +432,48 @@ class JarPublish(Task):
         skip = False
 
       newver = self.overrides.get((jar.org, jar.name)) or semver.bump()
+      if newver <= semver:
+        raise TaskError('Requested version %s must be greater than the current version %s' % (
+          newver.version(), semver.version()
+        ))
 
-      changes = self.changelog(target, sha)
-      if not changes and not self.force:
-        print 'No changes for %s#%s;%s' % (jar.org, jar.name, semver.version())
-        stage_artifacts(target, jar, (newver if self.force else semver).version())
+      newfingerprint = self.fingerprint(target, fingerprint_internal)
+      no_changes = newfingerprint == fingerprint
+
+      if no_changes:
+        changelog = 'No changes for %s - forced push.\n' % jar_coordinate(jar, semver.version())
+      else:
+        changelog = self.changelog(target, sha) or 'Direct dependencies changed.\n'
+
+      if no_changes and not self.force:
+        print('No changes for %s' % jar_coordinate(jar, semver.version()))
+        stage_artifacts(target, jar, (newver if self.force else semver).version(), changelog)
       elif skip:
-        print 'Skipping %s#%s;%s to resume at %s#%s' % (
-          jar.org,
-          jar.name,
-          (newver if self.force else semver).version(),
-          self.restart_at[0],
-          self.restart_at[1]
-        )
-        stage_artifacts(target, jar, semver.version())
+        print('Skipping %s to resume at %s' % (
+          jar_coordinate(jar, (newver if self.force else semver).version()),
+          coordinate(self.restart_at[0], self.restart_at[1])
+        ))
+        stage_artifacts(target, jar, semver.version(), changelog)
       else:
         if not self.dryrun:
           # Confirm push looks good
-          if not changes:
-            print 'No changes for %s#%s;%s - forced push.' % (jar.org, jar.name, semver.version())
+          if no_changes:
+            print(changelog)
           else:
-            print '\nChanges for %s#%s since %s @ %s:\n\n%s' % (
-              jar.org, jar.name, semver.version(), sha, changes
-            )
-          push = raw_input('Publish %s#%s with revision %s ? [y|N] ' % (
-            jar.org, jar.name, newver.version()
+            print('\nChanges for %s since %s @ %s:\n\n%s' % (
+              coordinate(jar.org, jar.name), semver.version(), sha, changelog
+            ))
+          push = raw_input('Publish %s with revision %s ? [y|N] ' % (
+            coordinate(jar.org, jar.name), newver.version()
           ))
-          print '\n'
+          print('\n')
           if push.strip().lower() != 'y':
-            # TODO(John Sirois): Use context.stop()
             raise TaskError('User aborted push')
 
-        pushdb.set_version(target, newver, head_sha)
-        ivyxml = stage_artifacts(target, jar, newver.version(), confs=repo['confs'])
+        pushdb.set_version(target, newver, head_sha, newfingerprint)
+        ivyxml = stage_artifacts(target, jar, newver.version(), changelog, confs=repo['confs'])
         if self.dryrun:
-          print 'Skipping publish of %s#%s;%s in test mode.' % (jar.org, jar.name, newver.version())
+          print('Skipping publish of %s in test mode.' % jar_coordinate(jar, newver.version()))
         else:
           resolver = repo['resolver']
 
@@ -473,8 +502,8 @@ class JarPublish(Task):
           ]
           result = binary_utils.runjava(jvmargs=jvmargs, classpath=self.ivycp, args=args)
           if result != 0:
-            raise TaskError('Failed to push %s#%s;%s - ivy failed with %d' % (
-              jar.org, jar.name, newver.version(), result)
+            raise TaskError('Failed to push %s - ivy failed with %d' % (
+              jar_coordinate(jar, newver.version()), result)
             )
 
           pushdb.dump(dbfile)
@@ -487,18 +516,38 @@ class JarPublish(Task):
     return OrderedSet(filter(exportable,
                              reversed(InternalTarget.sort_targets(filter(exportable, candidates)))))
 
+  def fingerprint(self, target, fingerprint_internal):
+    sha = hashlib.sha1()
+
+    for source in sorted(target.sources):
+      path = os.path.join(target.target_base, source)
+      with open(path) as fd:
+        sha.update(source)
+        sha.update(fd.read())
+
+    # TODO(John Sirois): handle resources and circular dep scala_library java_sources
+
+    for jarsig in sorted([jar_coordinate(j) for j in target.jar_dependencies if j.rev]):
+      sha.update(jarsig)
+
+    internal_dependencies = sorted(target.internal_dependencies, key=lambda t: t.id)
+    for internal_target in internal_dependencies:
+      fingerprint = fingerprint_internal(internal_target)
+      sha.update(fingerprint)
+
+    return sha.hexdigest()
+
   def changelog(self, target, sha):
     cmd = ['git', 'whatchanged', '--stat', '-M', '-C']
     if sha:
       cmd.append('%s..HEAD' % sha)
     cmd.append('--')
     cmd.extend(os.path.join(target.target_base, source) for source in target.sources)
-    cmd.append(target.address.buildfile.relpath)
     return self.check_output(cmd)
 
   def check_clean_master(self):
     if self.dryrun or not self.commit:
-      print 'Skipping check for a clean master in test mode.'
+      print('Skipping check for a clean master in test mode.')
     else:
       branch = self.check_output(['git', 'rev-parse', '--abbrev-ref', 'HEAD']).strip()
       if branch != 'master':
@@ -516,17 +565,18 @@ class JarPublish(Task):
         org=org,
         name=name,
         rev=rev,
+        coordinate=coordinate(org, name, rev),
         user=getpass.getuser(),
         cause='with forced revision' if (org, name) in self.overrides else '(autoinc)'
       )
       self.check_call(['git', 'pull', '--ff-only', '--tags', 'origin', 'master'])
       self.check_call(['git', 'tag' , '-a',
-                       '-m', 'Publish of %(org)s#%(name)s initiated by %(user)s %(cause)s' % args,
+                       '-m', 'Publish of %(coordinate)s initiated by %(user)s %(cause)s' % args,
                        '%(org)s-%(name)s-%(rev)s' % args, sha])
 
       self.check_call(['git', 'commit' , '-a',
                        '-m', 'pants build committing publish data for push of '
-                             '%(org)s#%(name)s;%(rev)s' % args])
+                             '%(coordinate)s' % args])
 
       self.check_call(['git', 'push' , 'origin', 'master', '--tags'])
 
@@ -560,4 +610,3 @@ class JarPublish(Task):
                                        for jar in publishedjars])
       generator.write(wrapper)
       return wrapper.name
-

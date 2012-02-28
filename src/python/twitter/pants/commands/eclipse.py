@@ -14,6 +14,8 @@
 # limitations under the License.
 # ==================================================================================================
 
+from __future__ import print_function
+
 __author__ = 'John Sirois'
 
 from .ide import Ide
@@ -156,7 +158,7 @@ class Eclipse(Ide):
       if not os.path.exists(libdir):
         os.makedirs(libdir)
 
-      print "Retrieving apt libs..."
+      print("Retrieving apt libs...")
       retrieve_result = subprocess.call([
         'java',
         '-jar', self.ivy_jar,
@@ -170,7 +172,7 @@ class Eclipse(Ide):
       ])
 
       if retrieve_result != 0:
-        print "Failed to retrieve apt libs."
+        print("Failed to retrieve apt libs.")
         return retrieve_result
 
       jarpaths = []
@@ -185,7 +187,7 @@ class Eclipse(Ide):
       with open(self.apt_filename, 'w') as output:
         Generator(pkgutil.get_data(__name__, self.apt_template),
                   factorypath = configured_factorypath).write(output)
-      print "Generated apt config"
+      print("Generated apt config")
 
     if os.path.exists(self.pydev_filename):
       os.remove(self.pydev_filename)

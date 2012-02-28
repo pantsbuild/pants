@@ -19,7 +19,7 @@ __author__ = 'jsirois'
 import unittest
 
 from twitter.common.contextutil import temporary_file
-from twitter.pants.tasks.config import Config
+from twitter.pants.base import Config
 
 class ConfigTest(unittest.TestCase):
 

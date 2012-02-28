@@ -125,14 +125,13 @@ class Ide(Command):
     all_targets = project.configure(self.scala_compiler_profile)
 
     foil = list(all_targets)[0]
-    is_transitive = lambda target: True
     def is_cp(target):
       return target.is_codegen \
              or is_apt(target) \
              or (skip_java and is_java(target)) \
              or (skip_scala and is_scala(target))
 
-    ide_target = foil.do_in_context(lambda: extract_target(all_targets, is_transitive, is_cp))
+    ide_target = foil.do_in_context(lambda: extract_target(all_targets, is_cp))
 
     ivyfile, ivysettingsfile = self._generate_ivy(ide_target)
     return self._generate_project_files(project, ivyfile, ivysettingsfile)
@@ -173,7 +172,7 @@ class Ide(Command):
   def _generate_project_files(self, project, ivyfile, ivysettingsfile):
     """Generates project files that configure the IDE given a configured project and ivy files."""
 
-    raise Exception('Subclasses must implement this method')
+    raise NotImplementedError('Subclasses must implement this method')
 
 class SourceSet(object):
   """Models a set of source files."""

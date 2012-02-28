@@ -16,11 +16,8 @@
 
 import os
 
-from twitter.common.collections import OrderedSet
 from twitter.pants.targets import resolve_target_sources
-
-from pants_target import Pants
-from exportable_jvm_library import ExportableJvmLibrary
+from twitter.pants.targets.exportable_jvm_library import ExportableJvmLibrary
 
 class ScalaLibrary(ExportableJvmLibrary):
   """Defines a target that produces a scala library."""

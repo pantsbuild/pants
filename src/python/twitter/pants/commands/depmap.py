@@ -14,6 +14,8 @@
 # limitations under the License.
 # ==================================================================================================
 
+from __future__ import print_function
+
 __author__ = 'John Sirois'
 
 from . import Command
@@ -81,21 +83,21 @@ class Depmap(Command):
         self._print_dependency_tree(target)
     elif is_python(target):
       if self.is_internal_only or self.is_external_only or self.is_minimal or self.is_graph:
-        print >> sys.stderr, 'Unsupported option for Python target'
+        print('Unsupported option for Python target', file=sys.stderr)
         sys.exit(1)
       self._print_python_dependencies(target, 0)
 
   def _print_python_dependencies(self, target, indent):
     attrs = []
-    print '%s%s ' % (' ' * 4 * indent, target),
+    print('%s%s ' % (' ' * 4 * indent, target), file=sys.stderr, end='')
     if hasattr(target, 'sources') and target.sources and len(target.sources) > 0:
       attrs.append('sources: %d files' % len(target.sources))
     if hasattr(target, 'resources') and target.resources and len(target.resources) > 0:
       attrs.append('resources: %d files' % len(target.resources))
     if len(attrs) > 0:
-      print '[%s]' % ', '.join(attrs)
+      print('[%s]' % ', '.join(attrs))
     else:
-      print
+      print()
     if hasattr(target, 'dependencies'):
       for dep in target.dependencies:
         for d in dep.resolve():
@@ -161,10 +163,10 @@ class Depmap(Command):
       twitter_styled = not internal and dep.org.startswith('com.twitter')
 
       if science_styled:
-        fmt = '  "%(id)s" [label="%(id)s", style="fill", fillcolor="#0084b4", fontcolor="white"];'
+        fmt = '  "%(id)s" [label="%(id)s", style="filled", fillcolor="#0084b4", fontcolor="white"];'
         print(fmt % { 'id': dep_id })
       elif twitter_styled:
-        print('  "%s" [style="fill", fillcolor="#codeed"];' % dep_id)
+        print('  "%s" [style="filled", fillcolor="#c0deed"];' % dep_id)
       else:
         print('  "%s";' % dep_id)
 
@@ -189,7 +191,7 @@ class Depmap(Command):
               left_id = target_id if self.is_external_only else dep_id
               if (left_id, jar_id) not in printed:
                 styled = internal and not self.is_internal_only
-                print '  "%s" -> "%s"%s;' % (left_id, jar_id, ' [style="dashed"]' if styled else '')
+                print('  "%s" -> "%s"%s;' % (left_id, jar_id, ' [style="dashed"]' if styled else ''))
                 printed.add((left_id, jar_id))
 
     print('digraph "%s" {' % target.id)

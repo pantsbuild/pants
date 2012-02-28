@@ -17,10 +17,9 @@
 import os
 
 from twitter.pants.base import TargetDefinitionException
-
-from internal import InternalTarget
-from jar_dependency import JarDependency
-from with_sources import TargetWithSources
+from twitter.pants.targets.internal import InternalTarget
+from twitter.pants.targets.jar_dependency import JarDependency
+from twitter.pants.targets.with_sources import TargetWithSources
 
 class JvmTarget(InternalTarget, TargetWithSources):
   """A base class for all java module targets that provides path and dependency translation."""

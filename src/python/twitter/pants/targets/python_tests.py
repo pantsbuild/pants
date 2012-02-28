@@ -14,7 +14,7 @@
 # limitations under the License.
 # ==================================================================================================
 
-from python_target import PythonTarget
+from twitter.pants.targets.python_target import PythonTarget
 
 class PythonTests(PythonTarget):
   def __init__(self, name, sources, resources=None, dependencies=None):

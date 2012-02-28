@@ -14,6 +14,8 @@
 # limitations under the License.
 # ==================================================================================================
 
+from __future__ import print_function
+
 __author__ = 'John Sirois'
 
 from . import Command
@@ -42,4 +44,4 @@ class Filemap(Command):
         target = Target.get(address)
         if hasattr(target, 'sources') and target.sources is not None:
           for sourcefile in target.sources:
-            print sourcefile, address
+            print(sourcefile, address)

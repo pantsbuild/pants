@@ -93,8 +93,10 @@ class IdeTest(unittest.TestCase):
     #         -> jar6
     #   --> jar4
 
-    internal_deps, jar_deps = _extract_target(a, lambda target: True,
-                                              lambda target: target.is_apt or target.is_codegen)
+    internal_deps, jar_deps = _extract_target(
+      [a, e, j],
+      lambda target: target.is_apt or target.is_codegen
+    )
 
     self.assertEquals(OrderedSet([c, b]), internal_deps,
                       'Expected depth first walk to roll up e to 1st visited dependee (c)')

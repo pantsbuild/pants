@@ -19,6 +19,7 @@ import os
 import re
 
 from twitter.common.collections import OrderedSet
+from twitter.common.python.interpreter import PythonIdentity
 from glob import glob1
 
 class BuildFile(object):
@@ -73,7 +74,8 @@ class BuildFile(object):
     self.name = os.path.basename(self.full_path)
     self.parent_path = os.path.dirname(self.full_path)
 
-    self._bytecode_path = os.path.join(self.parent_path, '.%s.pyc' % self.name)
+    self._bytecode_path = os.path.join(self.parent_path, '.%s.%s.pyc' % (
+      self.name, PythonIdentity.get()))
 
     self.relpath = os.path.relpath(self.full_path, self.root_dir)
     self.canonical_relpath = os.path.join(os.path.dirname(self.relpath), BuildFile._CANONICAL_NAME)
@@ -92,7 +94,7 @@ class BuildFile(object):
     def find_parent(dir):
       parent = os.path.dirname(dir)
       buildfile = os.path.join(parent, BuildFile._CANONICAL_NAME)
-      if os.path.exists(buildfile):
+      if os.path.exists(buildfile) and not os.path.isdir(buildfile):
         return parent, BuildFile(self.root_dir, os.path.relpath(buildfile, self.root_dir))
       else:
         return parent, None
@@ -100,7 +102,9 @@ class BuildFile(object):
     parent_buildfiles = OrderedSet()
 
     parentdir = os.path.dirname(self.full_path)
-    while parentdir != self.root_dir:
+    visited = set()
+    while parentdir not in visited:
+      visited.add(parentdir)
       parentdir, buildfile = find_parent(parentdir)
       if buildfile:
         parent_buildfiles.update(buildfile.family())
@@ -113,7 +117,9 @@ class BuildFile(object):
 
     for build in glob1(self.parent_path, 'BUILD*'):
       if self.name != build and BuildFile._is_buildfile_name(build):
-        yield BuildFile(self.root_dir, os.path.join(os.path.dirname(self.relpath), build))
+        siblingpath = os.path.join(os.path.dirname(self.relpath), build)
+        if not os.path.isdir(os.path.join(self.root_dir, siblingpath)):
+          yield BuildFile(self.root_dir, siblingpath)
 
   def family(self):
     """Returns an iterator over all the BUILD files co-located with this BUILD file including this
@@ -128,12 +134,12 @@ class BuildFile(object):
     """Returns the code object for this BUILD file."""
     if (os.path.exists(self._bytecode_path)
         and os.path.getmtime(self.full_path) <= os.path.getmtime(self._bytecode_path)):
-      with open(self._bytecode_path, 'r') as bytecode:
+      with open(self._bytecode_path, 'rb') as bytecode:
         return marshal.load(bytecode)
     else:
-      with open(self.full_path, 'r') as source:
+      with open(self.full_path, 'rb') as source:
         code = compile(source.read(), self.full_path, 'exec')
-        with open(self._bytecode_path, 'w') as bytecode:
+        with open(self._bytecode_path, 'wb') as bytecode:
           marshal.dump(code, bytecode)
         return code
 

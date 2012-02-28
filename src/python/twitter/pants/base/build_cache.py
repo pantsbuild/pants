@@ -14,13 +14,15 @@
 # limitations under the License.
 # ==================================================================================================
 
+from collections import namedtuple
 import errno
 import hashlib
 import os
 import shutil
 
-from collections import namedtuple
+from twitter.common.lang import Compatibility
 from twitter.common.dirutil import safe_rmtree
+
 
 CacheKey = namedtuple('CacheKey', 'target_name, sources, hash, filename')
 
@@ -78,7 +80,8 @@ class BuildCache(object):
       rel_path = os.path.basename(artifact) \
           if artifact_root is None \
           else os.path.relpath(artifact, artifact_root)
-      assert not rel_path.startswith('..')
+      assert not rel_path.startswith('..'), \
+        'Weird: artifact=%s, rel_path=%s' % (artifact, rel_path)
       artifact_dest = os.path.join(cache_key.filename, rel_path)
       dir_name = os.path.dirname(artifact_dest)
       if not os.path.exists(dir_name):
@@ -104,7 +107,7 @@ class BuildCache(object):
 
     :returns: Iterable of (relative_path, absolute_path).
     """
-    assert not isinstance(paths, basestring)
+    assert not isinstance(paths, Compatibility.string)
     for path in sorted(paths):
       if os.path.isdir(path):
         for dir_name, _, filenames in sorted(os.walk(path)):
@@ -119,8 +122,8 @@ class BuildCache(object):
     sha = hashlib.sha1()
 
     for relative_filename, filename in self._walk_paths(paths):
-      with open(filename) as fd:
-        sha.update(relative_filename)
+      with open(filename, "rb") as fd:
+        sha.update(Compatibility.to_bytes(relative_filename))
         sha.update(fd.read())
 
     return sha.hexdigest()
@@ -137,7 +140,7 @@ class BuildCache(object):
 
   def _read_sha(self, cache_key):
     try:
-      with open(self._sha_file(cache_key)) as fd:
+      with open(self._sha_file(cache_key), 'rb') as fd:
         return fd.read().strip()
     except IOError as e:
       if e.errno != errno.ENOENT:

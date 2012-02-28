@@ -14,14 +14,20 @@
 # limitations under the License.
 # ==================================================================================================
 
+from __future__ import print_function
+
 __author__ = 'jsirois'
 
 import os
 import subprocess
 
+from contextlib import contextmanager
+
 from twitter.common import log
-from twitter.common.dirutil import safe_mkdir, touch
-from twitter.pants.tasks import Config, TaskError
+from twitter.common.contextutil import temporary_file
+from twitter.common.dirutil import safe_mkdir, safe_open, touch
+from twitter.pants.base import Config
+from twitter.pants.tasks import TaskError
 
 _ID_BY_OS = {
   'linux': lambda release, machine: ('linux', machine),
@@ -56,6 +62,51 @@ def select_binary(base_path, version, name):
   raise TaskError('Cannot generate thrift code for: %s' % [sysname, release, machine])
 
 
+@contextmanager
+def safe_args(args,
+              max_args=None,
+              config=None,
+              argfile=None,
+              delimiter='\n',
+              quoter=None,
+              delete=True):
+  """
+    Yields args if there are less than a limit otherwise writes args to an argfile and yields an
+    argument list with one argument formed from the path of the argfile.
+
+    :args The args to work with.
+    :max_args The maximum number of args to let though without writing an argfile.  If not specified
+              then the maximum will be loaded from config.
+    :config Used to lookup the configured maximum number of args that can be passed to a subprocess;
+            defaults to the default config and looks for key 'max_subprocess_args' in the DEFAULTS.
+    :argfile The file to write args to when there are too many; defaults to a temporary file.
+    :delimiter The delimiter to insert between args written to the argfile, defaults to '\n'
+    :quoter A function that can take the argfile path and return a single argument value;
+            defaults to:
+            <code>lambda f: '@' + f<code>
+    :delete If True deletes any arg files created upon exit from this context; defaults to True.
+  """
+  max_args = max_args or (config or Config.load()).getdefault('max_subprocess_args', int, 10)
+  if len(args) > max_args:
+    def create_argfile(fp):
+      fp.write(delimiter.join(args))
+      fp.close()
+      return [quoter(fp.name) if quoter else '@%s' % fp.name]
+
+    if argfile:
+      try:
+        with safe_open(argfile, 'w') as fp:
+          yield create_argfile(fp)
+      finally:
+        if delete and os.path.exists(argfile):
+          os.unlink(argfile)
+    else:
+      with temporary_file(cleanup=delete) as fp:
+        yield create_argfile(fp)
+  else:
+    yield args
+
+
 def runjava(jvmargs=None, classpath=None, main=None, args=None):
   """Spawns a java process with the supplied configuration and returns its exit code."""
   cmd = ['java']
@@ -73,8 +124,10 @@ def runjava(jvmargs=None, classpath=None, main=None, args=None):
 
 def nailgun_profile_classpath(nailgun_task, profile, ivy_jar=None, ivy_settings=None):
   def nailgun_runner(classpath, main, args):
-    nailgun_task.ng('ng-cp', *classpath)
-    nailgun_task.ng(main, *args)
+    result = nailgun_task.ng('ng-cp', *classpath)
+    if result != 0:
+      return result
+    return nailgun_task.ng(main, *args)
 
   return profile_classpath(
     profile,
@@ -90,7 +143,7 @@ def profile_classpath(profile, java_runner=None, config=None, ivy_jar=None, ivy_
   # path structure
 
   def call_java(classpath, main, args):
-    runjava(classpath=classpath, main=main, args=args)
+    return runjava(classpath=classpath, main=main, args=args)
   java_runner = java_runner or call_java
 
   config = config or Config.load()
@@ -115,11 +168,14 @@ def profile_classpath(profile, java_runner=None, config=None, ivy_jar=None, ivy_
 
       '-sync',
       '-symlink',
-      '-types', 'jar',
+      '-types', 'jar', 'bundle',
       '-confs', 'default'
     ]
-    java_runner(classpath=ivy_classpath, main='org.apache.ivy.Main', args=ivy_args)
+    result = java_runner(classpath=ivy_classpath, main='org.apache.ivy.Main', args=ivy_args)
+    if result != 0:
+      raise TaskError('Failed to load profile %s, ivy exit code %d' % (profile, result))
     touch(profile_check)
+
 
   return [os.path.join(profile_libdir, jar) for jar in os.listdir(profile_libdir)]
 
@@ -128,6 +184,6 @@ def open(*files):
   """Attempts to open the given files using the preferred native viewer or editor."""
   if files:
     if os.uname()[0].lower() != 'darwin':
-      print 'Sorry, open currently only supports OSX'
+      print('Sorry, open currently only supports OSX')
     else:
       subprocess.Popen(['open'] + list(files))

@@ -14,11 +14,17 @@
 # limitations under the License.
 # ==================================================================================================
 
+from __future__ import print_function
+
 from twitter.pants import get_buildroot, get_version
 from twitter.pants.base import Address
 from twitter.pants.commands import Command
 
-import ConfigParser
+try:
+  import ConfigParser
+except ImportError:
+  import configparser as ConfigParser
+
 import optparse
 import os
 import sys
@@ -43,7 +49,7 @@ _BUILD_ALIASES = set([
 _DISABLE_PANTS_RC_OPTION = '--no-pantsrc'
 
 def exit_and_fail(msg=''):
-  print >> sys.stderr, msg
+  print(msg, file=sys.stderr)
   sys.exit(1)
 
 def find_all_commands():
@@ -52,15 +58,15 @@ def find_all_commands():
     yield '%s\t%s' % (cmd, cls.__doc__)
 
 def _help(version, root_dir):
-  print 'Pants %s @ PANTS_BUILD_ROOT: %s' % (version, root_dir)
-  print
-  print 'Available subcommands:\n\t%s' % '\n\t'.join(find_all_commands())
-  print
-  print """Default subcommand flags can be stored in ~/.pantsrc using the 'options' key of a
+  print('Pants %s @ PANTS_BUILD_ROOT: %s' % (version, root_dir))
+  print()
+  print('Available subcommands:\n\t%s' % '\n\t'.join(find_all_commands()))
+  print()
+  print("""Default subcommand flags can be stored in ~/.pantsrc using the 'options' key of a
 section named for the subcommand in ini style format, ie:
   [build]
-  options: --fast"""
-  sys.exit(0)
+  options: --fast""")
+  exit_and_fail()
 
 def _prepend_default_options(command, args):
   if _DISABLE_PANTS_RC_OPTION not in args:
@@ -70,7 +76,7 @@ def _prepend_default_options(command, args):
       config.read(pantsrc)
       if config.has_option(command, 'options'):
         expanded_options = config.get(command, 'options').split() + args
-        print "(using ~/.pantsrc expansion: pants %s %s)" % (command, ' '.join(expanded_options))
+        print("(using ~/.pantsrc expansion: pants %s %s)" % (command, ' '.join(expanded_options)))
         return expanded_options
   return args
 

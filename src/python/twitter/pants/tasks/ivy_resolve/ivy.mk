@@ -36,6 +36,7 @@ limitations under the License.
     <conf name="docs" description="javadocs"/>
     <conf name="changelog" description="changelog for artifact pushes"/>
     <conf name="test" visibility="private" description="build and run tests"/>
+    <conf name="provided" description="provided by target environment"/>
   </configurations>
 
   % if lib.publications:

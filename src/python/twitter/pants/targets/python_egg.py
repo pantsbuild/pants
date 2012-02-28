@@ -48,7 +48,7 @@ class PythonEgg(object):
       several architectures, e.g. linux-x86_64 and macosx-10.6-x86_64.
     """
     # architecture inspecific platform so we can do fat pexes
-    self._env = Environment(search_path = glob.glob(egg_glob), platform = None)
+    self._env = Environment(search_path = glob.glob(egg_glob), platform = None, python = None)
     pkgs = [pkg for pkg in self._env]
     if len(pkgs) != 1:
       raise PythonEgg.AmbiguousEggNest(egg_glob, self._env)

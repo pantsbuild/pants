@@ -20,9 +20,9 @@ from twitter.pants import is_python
 from twitter.pants.base.builder import Builder
 from twitter.pants.targets import PythonBinary, PythonTests, PythonTestSuite
 
-from binary_builder import PythonBinaryBuilder
-from test_builder import PythonTestBuilder
-from lint_builder import PythonLintBuilder
+from twitter.pants.python.binary_builder import PythonBinaryBuilder
+from twitter.pants.python.test_builder import PythonTestBuilder
+from twitter.pants.python.lint_builder import PythonLintBuilder
 
 class PythonBuilder(Builder):
   def __init__(self, ferror, root_dir):

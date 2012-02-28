@@ -16,6 +16,7 @@
 
 import os
 import unittest
+import pytest
 
 from twitter.common.python import PythonLauncher
 

@@ -17,6 +17,9 @@
 import collections
 import copy
 import os
+import sys
+
+from twitter.common.lang import Compatibility
 
 class ContextError(Exception):
   """Inidicates an action that requires a BUILD file parse context was attempted outside any."""
@@ -55,7 +58,7 @@ class ParseContext(object):
 
       pants_context = {}
       ast = compile("from twitter.pants import *", "<string>", "exec")
-      exec ast in pants_context
+      Compatibility.exec_function(ast, pants_context)
 
       def _parse():
         start = os.path.abspath(os.curdir)
@@ -72,7 +75,7 @@ class ParseContext(object):
               'PANTS_NEW': False
             })
             eval_globals.update(globals)
-            eval(buildfile.code(), eval_globals)
+            Compatibility.exec_function(buildfile.code(), eval_globals)
         finally:
           os.chdir(start)
 

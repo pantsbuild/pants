@@ -17,7 +17,7 @@
 __author__ = 'John Sirois'
 
 from twitter.common.collections import OrderedSet
-from twitter.common.dirutil import touch
+from twitter.common.dirutil import touch, safe_mkdir
 from twitter.pants.base import BuildFile
 
 import os
@@ -29,9 +29,7 @@ class BuildFileTest(unittest.TestCase):
 
   @classmethod
   def makedirs(cls, path):
-    while not os.path.exists(path):
-      os.makedirs(path)
-      path = os.path.dirname(path)
+    safe_mkdir(os.path.join(BuildFileTest.root_dir, path))
 
   @classmethod
   def touch(cls, path):
@@ -47,13 +45,14 @@ class BuildFileTest(unittest.TestCase):
 
     BuildFileTest.touch('grandparent/parent/BUILD')
     BuildFileTest.touch('grandparent/parent/BUILD.twitter')
-    BuildFileTest.touch('grandparent/BUILD')
-    BuildFileTest.touch('grandparent/BUILD.foo')
+    BuildFileTest.makedirs('grandparent/parent/BUILD.dir')
+    BuildFileTest.makedirs('grandparent/BUILD')
     BuildFileTest.touch('BUILD')
     BuildFileTest.touch('BUILD.twitter')
     BuildFileTest.touch('grandparent/parent/child1/BUILD')
     BuildFileTest.touch('grandparent/parent/child1/BUILD.twitter')
     BuildFileTest.touch('grandparent/parent/child2/child3/BUILD')
+    BuildFileTest.makedirs('grandparent/parent/child2/BUILD')
     BuildFileTest.makedirs('grandparent/parent/child4')
 
   @classmethod
@@ -83,8 +82,6 @@ class BuildFileTest(unittest.TestCase):
 
   def testAncestors(self):
     self.assertEquals(OrderedSet([
-        BuildFileTest.buildfile('grandparent/BUILD'),
-        BuildFileTest.buildfile('grandparent/BUILD.foo'),
         BuildFileTest.buildfile('BUILD'),
         BuildFileTest.buildfile('BUILD.twitter'),
     ]), self.buildfile.ancestors())

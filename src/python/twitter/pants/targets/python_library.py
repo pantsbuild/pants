@@ -14,7 +14,7 @@
 # limitations under the License.
 # ==================================================================================================
 
-from python_target import PythonTarget
+from twitter.pants.targets.python_target import PythonTarget
 
 class PythonLibrary(PythonTarget):
   def __init__(self, name, sources=(), resources=(), dependencies=(), module=""):
@@ -27,8 +27,5 @@ class PythonLibrary(PythonTarget):
       dependencies = other PythonLibraries, Eggs or internal Pants targets
       module = everything beneath module is relative to this module name, None if root namespace
     """
-    self._module = module
     PythonTarget.__init__(self, name, sources, resources, dependencies)
-
-  def _create_template_data(self):
-    return PythonTarget._create_template_data(self).extend(module=self._module)
+    self.module = module

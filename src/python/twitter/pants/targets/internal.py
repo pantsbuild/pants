@@ -176,7 +176,8 @@ class InternalTarget(Target):
           self.dependencies.add(resolved_dependency)
           if isinstance(resolved_dependency, InternalTarget):
             self.internal_dependencies.add(resolved_dependency)
-          self.jar_dependencies.update(resolved_dependency._as_jar_dependencies())
+          if hasattr(resolved_dependency, '_as_jar_dependencies'):
+            self.jar_dependencies.update(resolved_dependency._as_jar_dependencies())
 
   def _walk(self, walked, work, predicate = None):
     Target._walk(self, walked, work, predicate)

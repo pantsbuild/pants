@@ -198,7 +198,7 @@ python_library(
 
 python_library(
   name = 'pystachio',
-  dependencies = [egg("pystachio-0.4.0-py2.*.egg")])
+  dependencies = [egg("pystachio-0.4.2-py2.*.egg")])
 
 python_library(
   name = 'cherrypy',
@@ -214,3 +214,7 @@ python_library(
 python_library(
   name = 'tornado',
   dependencies = [egg("tornado-2.2-py2.6.egg")])
+
+python_library(
+  name = 'pygments',
+  dependencies = [egg("Pygments-1.4-py2.6.egg")])

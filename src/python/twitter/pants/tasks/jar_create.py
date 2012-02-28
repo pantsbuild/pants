@@ -20,9 +20,11 @@ import functools
 import os
 
 from contextlib import contextmanager
-from zipfile import ZipFile, ZIP_STORED, ZIP_DEFLATED
+from zipfile import ZIP_STORED, ZIP_DEFLATED
 
+from twitter.common.contextutil import open_zip as open_jar
 from twitter.common.dirutil import safe_mkdir
+
 from twitter.pants import get_buildroot, is_apt, JavaLibrary, JavaTests, ScalaLibrary, ScalaTests
 from twitter.pants.tasks import Task
 
@@ -37,7 +39,7 @@ def is_jvm(target):
 
 def jarname(target):
   # TODO(John Sirois): incorporate version
-  jar_dependency, id, exported = target._get_artifact_info()
+  _, id, _ = target._get_artifact_info()
   return id
 
 
@@ -117,9 +119,8 @@ class JarCreate(Task):
 
   @contextmanager
   def create_jar(self, path):
-    zip = ZipFile(path, 'w', compression=self.compression)
-    yield zip
-    zip.close()
+    with open_jar(path, 'w', compression=self.compression) as jar:
+      yield jar
 
   def jar(self, jvm_targets, genmap, add_genjar):
     for target in jvm_targets:

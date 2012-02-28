@@ -18,7 +18,6 @@ __author__ = 'Mark McBride'
 
 from . import Command
 
-import json
 import os
 import shutil
 import subprocess
@@ -26,13 +25,14 @@ import traceback
 from copy import copy
 
 from twitter.common.collections import OrderedSet
-from twitter.pants import is_exported, is_jvm
+from twitter.pants import is_jvm
 from twitter.pants.base import Address, Target
 from twitter.pants.targets import JavaLibrary
 from twitter.pants.ant import AntBuilder, bang
 
 class IvyResolve(Command):
-  """Resolves ivy dependencies to a local directory, obviating the need for an explicit resolve per build."""
+  """Resolves ivy dependencies to a local directory, obviating the need for
+  an explicit resolve per build."""
 
   __command__ = 'ivy_resolve'
 
@@ -82,7 +82,7 @@ class IvyResolve(Command):
         self.error("Problem parsing target %s: %s" % (address, traceback.format_exc()))
 
       if address.is_meta:
-        print "target is meta"
+        print("target is meta")
         target = target.do_in_context(lambda: bang.extract_target([target], None))
       if not IvyResolve._is_resolvable(target):
         self.error("Target: %s is not resolvable" % address)
@@ -96,7 +96,7 @@ class IvyResolve(Command):
             if IvyResolve._is_resolvable(dep):
               targets.add(dep)
             else:
-              print "skipping %s as it's not ivy resolvable" % (dep.name)
+              print("skipping %s as it's not ivy resolvable" % dep.name)
       target.walk(add_targets)
 
     return targets
@@ -104,10 +104,10 @@ class IvyResolve(Command):
 
   def execute(self):
     for target in self.targets:
-      print "creating ivyxml for " + target.name
+      print("creating ivyxml for " + target.name)
       ivyxml = self.create_ivyxml(target)
       libs_dir = os.path.join(os.path.dirname(ivyxml), 'libs')
-      print "cleaning " + libs_dir
+      print("cleaning " + libs_dir)
       if os.path.exists(libs_dir):
         shutil.rmtree(libs_dir)
 
@@ -117,7 +117,7 @@ class IvyResolve(Command):
           self.build_libs_dir(target, ivyxml, configuration)
 
   def build_target_dir_fileset(self, target, ivyxml):
-    print "writing target_dir fileset for " + target.name
+    print("writing target_dir fileset for " + target.name)
     target_dirs = OrderedSet()
     def add_targets(ttarget):
       target_dirs.add(ttarget._create_template_data().id)

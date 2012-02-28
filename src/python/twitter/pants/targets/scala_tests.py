@@ -14,11 +14,9 @@
 # limitations under the License.
 # ==================================================================================================
 
-from twitter.common.collections import OrderedSet
-
 from twitter.pants.base.generator import TemplateData
 from twitter.pants.targets import resolve_target_sources
-from jvm_target import JvmTarget
+from twitter.pants.targets.jvm_target import JvmTarget
 
 class ScalaTests(JvmTarget):
   """Defines a target that tests a scala library."""

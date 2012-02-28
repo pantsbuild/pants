@@ -14,8 +14,9 @@
 # limitations under the License.
 # ==================================================================================================
 
-from twitter.common.collections import OrderedSet
+from __future__ import print_function
 
+from twitter.common.collections import OrderedSet
 from twitter.pants import get_buildroot, is_internal, is_jvm
 from twitter.pants.base import BuildFile, ParseContext
 from twitter.pants.targets import (
@@ -77,7 +78,6 @@ def extract_target(java_targets, name = None):
   representative_target = list(java_targets)[0]
 
   meta_target_base_name = "fast-%s" % (name if name else representative_target.name)
-  provides = None
   deployjar = hasattr(representative_target, 'deployjar') and representative_target.deployjar
   buildflags = representative_target.buildflags
 
@@ -124,7 +124,7 @@ def extract_target(java_targets, name = None):
         previous = dependencies.get(key, jar)
         if jar.rev >= previous.rev:
           if jar != previous:
-            print "WARNING: replacing %s with %s for %s" % (previous, jar, target.id)
+            print("WARNING: replacing %s with %s for %s" % (previous, jar, target.id))
             target.dependencies.remove(previous)
             target.jar_dependencies.remove(previous)
           dependencies[key] = jar

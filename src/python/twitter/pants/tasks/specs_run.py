@@ -19,9 +19,11 @@ __author__ = 'John Sirois'
 import os
 import re
 
+from twitter.common.collections import OrderedSet
+
 from twitter.pants import get_buildroot, is_scala, is_test
 from twitter.pants.tasks import Task, TaskError
-from twitter.pants.tasks.binary_utils import profile_classpath, runjava
+from twitter.pants.tasks.binary_utils import profile_classpath, runjava, safe_args
 
 class SpecsRun(Task):
   @classmethod
@@ -61,41 +63,40 @@ class SpecsRun(Task):
     self.skip = context.options.specs_run_skip
     self.color = context.options.specs_run_color
 
+    self.workdir = context.config.get('specs-run', 'workdir')
+
     classes = context.options.specs_run_tests
     self.tests = map(self.normalize, classes) if classes else None
 
   def execute(self, targets):
     if not self.skip:
-      args = []
-      if self.tests:
-        args.append('--classes')
-        args.append(','.join(self.tests))
-      else:
-        tests = self.calculate_tests(targets)
-        if tests:
-          args.append('--specs-files=%s' % ','.join(tests))
-
-      if args:
-        if self.color:
-          args.append('--color')
-
+      def run_tests(main, args):
         classpath = profile_classpath(self.profile)
         classpath.extend(os.path.join(get_buildroot(), path)
                          for path in ('src/resources', 'tests/resources'))
         with self.context.state('classpath', []) as cp:
           classpath.extend(jar for conf, jar in cp if conf in self.confs)
 
-        result = runjava(
-          jvmargs=self.java_args,
-          classpath=classpath,
-          main='run' if self.tests else 'com.twitter.common.testing.ExplicitSpecsRunnerMain',
-          args=args
-        )
+        result = runjava(jvmargs=self.java_args, classpath=classpath, main=main, args=args)
         if result != 0:
           raise TaskError()
 
+      args = []
+      if self.color:
+        args.append('--color')
+
+      if self.tests:
+        args.append('--classes')
+        args.append(','.join(self.tests))
+        run_tests('run', args)
+      else:
+        with safe_args(self.calculate_tests(targets)) as tests:
+          if tests:
+            args.append('--specs-files=%s' % ','.join(tests))
+            run_tests('com.twitter.common.testing.ExplicitSpecsRunnerMain', args)
+
   def calculate_tests(self, targets):
-    tests = set()
+    tests = OrderedSet()
     for target in targets:
       if is_scala(target) and is_test(target):
         tests.update(os.path.join(target.target_base, test) for test in target.sources)

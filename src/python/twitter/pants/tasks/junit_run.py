@@ -21,7 +21,7 @@ import re
 
 from twitter.pants import get_buildroot, is_java, is_scala, is_test
 from twitter.pants.tasks import Task, TaskError
-from twitter.pants.tasks.binary_utils import profile_classpath, runjava
+from twitter.pants.tasks.binary_utils import profile_classpath, runjava, safe_args
 
 class JUnitRun(Task):
   @classmethod
@@ -74,14 +74,18 @@ class JUnitRun(Task):
     self.test_classes = context.options.junit_run_tests
     self.context.products.require('classes')
 
+    self.outdir = (
+      context.options.junit_run_outdir
+      or context.config.get('junit-run', 'workdir')
+    )
+
     self.flags = []
     if context.options.junit_run_xmlreport or context.options.junit_run_suppress_output:
       if context.options.junit_run_xmlreport:
         self.flags.append('-xmlreport')
       self.flags.append('-suppress-output')
       self.flags.append('-outdir')
-      self.flags.append(context.options.junit_run_outdir
-                        or context.config.get('junit-run', 'workdir'))
+      self.flags.append(self.outdir)
 
 
   def execute(self, targets):
@@ -99,14 +103,15 @@ class JUnitRun(Task):
         with self.context.state('classpath', []) as cp:
           classpath.extend(jar for conf, jar in cp if conf in self.confs)
 
-        result = runjava(
-          jvmargs=self.java_args,
-          classpath=classpath,
-          main='com.twitter.common.testing.runner.JUnitConsoleRunner',
-          args=self.flags + list(tests)
-        )
-        if result != 0:
-          raise TaskError()
+        with safe_args(tests) as all_tests:
+          result = runjava(
+            jvmargs=self.java_args,
+            classpath=classpath,
+            main='com.twitter.common.testing.runner.JUnitConsoleRunner',
+            args=self.flags + all_tests
+          )
+          if result != 0:
+            raise TaskError()
 
   def normalize_test_classes(self):
     for cls in self.test_classes:

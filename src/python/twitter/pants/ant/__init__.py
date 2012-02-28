@@ -14,7 +14,7 @@
 # limitations under the License.
 # ==================================================================================================
 
-from lib import AntBuilder
+from twitter.pants.ant.lib import AntBuilder
 
 __all__ = (
   AntBuilder,

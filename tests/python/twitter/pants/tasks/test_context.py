@@ -18,7 +18,8 @@ __author__ = 'jsirois'
 
 import unittest
 
-from twitter.pants.tasks import Config, Context
+from twitter.pants.base import Config
+from twitter.pants.goal import Context
 
 
 class MockTarget(object):

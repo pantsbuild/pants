@@ -14,7 +14,7 @@
 # limitations under the License.
 # ==================================================================================================
 
-from python_target import PythonTarget
+from twitter.pants.targets.python_target import PythonTarget
 
 class PythonBinary(PythonTarget):
   def __init__(self, name, source, dependencies=None):

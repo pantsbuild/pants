@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==================================================================================================
-from contextlib import contextmanager
 
 __author__ = 'John Sirois'
 
@@ -22,6 +21,8 @@ import pkgutil
 import re
 import shutil
 
+from contextlib import contextmanager
+
 from twitter.common.dirutil import safe_mkdir, safe_open
 
 from twitter.pants import get_buildroot, is_internal, is_jvm
@@ -29,11 +30,6 @@ from twitter.pants.base.generator import Generator, TemplateData
 from twitter.pants.tasks import binary_utils, TaskError
 from twitter.pants.tasks.nailgun_task import NailgunTask
 
-try:
-  from lxml import etree
-  _REPORT_AVAILABLE=True
-except ImportError:
-  _REPORT_AVAILABLE=False
 
 class IvyResolve(NailgunTask):
 
@@ -49,52 +45,42 @@ class IvyResolve(NailgunTask):
                             %(flag)s=com.baz#spam=file:///tmp/spam.jar
                             ''' % dict(flag=flag))
 
-    if _REPORT_AVAILABLE:
-      report = mkflag("report")
-      option_group.add_option(report, mkflag("report", negate=True), dest = "ivy_resolve_report",
-                              action="callback", callback=mkflag.set_bool, default=False,
-                              help = "[%default] Generate an ivy resolve html report")
+    report = mkflag("report")
+    option_group.add_option(report, mkflag("report", negate=True), dest = "ivy_resolve_report",
+                            action="callback", callback=mkflag.set_bool, default=False,
+                            help = "[%default] Generate an ivy resolve html report")
 
-      option_group.add_option(mkflag("open"), mkflag("open", negate=True),
-                              dest="ivy_resolve_open", default=False,
-                              action="callback", callback=mkflag.set_bool,
-                              help="[%%default] Attempt to open the generated ivy resolve report "
-                                   "in a browser (implies %s)." % report)
+    option_group.add_option(mkflag("open"), mkflag("open", negate=True),
+                            dest="ivy_resolve_open", default=False,
+                            action="callback", callback=mkflag.set_bool,
+                            help="[%%default] Attempt to open the generated ivy resolve report "
+                                 "in a browser (implies %s)." % report)
 
-      option_group.add_option(mkflag("outdir"), dest="ivy_resolve_outdir",
-                              help="Emit ivy report outputs in to this directory.")
+    option_group.add_option(mkflag("outdir"), dest="ivy_resolve_outdir",
+                            help="Emit ivy report outputs in to this directory.")
 
-  def __init__(self, context,
-               workdir=None,
-               ivy_jar=None,
-               ivy_settings=None,
-               cache_dir=None,
-               confs = None,
-               transitive=None):
-
-    classpath = [ivy_jar] if ivy_jar else context.config.getlist('ivy', 'classpath')
+  def __init__(self, context):
+    classpath = context.config.getlist('ivy', 'classpath')
     nailgun_dir = context.config.get('ivy-resolve', 'nailgun_dir')
     NailgunTask.__init__(self, context, classpath=classpath, workdir=nailgun_dir)
 
-    self._ivy_settings = ivy_settings or context.config.get('ivy', 'ivy_settings')
-    self._cachedir = cache_dir or context.config.get('ivy-resolve', 'cache_dir')
-    self._confs = confs or context.config.getlist('ivy-resolve', 'confs')
-    self._transitive = transitive or context.config.getbool('ivy-resolve', 'transitive')
-    self._args = confs or context.config.getlist('ivy-resolve', 'args')
+    self._ivy_settings = context.config.get('ivy', 'ivy_settings')
+    self._cachedir = context.config.get('ivy-resolve', 'cache_dir')
+    self._confs = context.config.getlist('ivy-resolve', 'confs')
+    self._transitive = context.config.getbool('ivy-resolve', 'transitive')
+    self._args = context.config.getlist('ivy-resolve', 'args')
+
+    self._profile = context.config.get('ivy-resolve', 'profile')
 
     self._template_path = os.path.join('ivy_resolve', 'ivy.mk')
 
-    work_dir = workdir or context.config.get('ivy-resolve', 'workdir')
-    self._ivy_xml = os.path.join(work_dir, 'ivy.xml')
-    self._classpath_file = os.path.join(work_dir, 'classpath')
-    self._classpath_dir = os.path.join(work_dir, 'mapped')
+    self._work_dir = context.config.get('ivy-resolve', 'workdir')
+    self._classpath_file = os.path.join(self._work_dir, 'classpath')
+    self._classpath_dir = os.path.join(self._work_dir, 'mapped')
 
-    if _REPORT_AVAILABLE:
-      self._outdir = context.options.ivy_resolve_outdir or os.path.join(work_dir, 'reports')
-      self._open = context.options.ivy_resolve_open
-      self._report = self._open or context.options.ivy_resolve_report
-    else:
-      self._report = False
+    self._outdir = context.options.ivy_resolve_outdir or os.path.join(self._work_dir, 'reports')
+    self._open = context.options.ivy_resolve_open
+    self._report = self._open or context.options.ivy_resolve_report
 
     def parse_override(override):
       match = re.match(r'^([^#]+)#([^=]+)=([^\s]+)$', override)
@@ -139,7 +125,11 @@ class IvyResolve(NailgunTask):
 
     with self.changed(filter(is_classpath, targets), only_buildfiles=True) as changed_deps:
       if changed_deps:
-        self._ivycachepath(self._ivy_xml, self._classpath_file, *targets)
+        self._exec_ivy(self._work_dir, targets, [
+          '-cachepath', self._classpath_file,
+	  '-types', 'jar', 'bundle',
+          '-confs'
+        ] + self._confs)
 
     if os.path.exists(self._classpath_file):
       with self._cachepath(self._classpath_file) as classpath:
@@ -176,28 +166,31 @@ class IvyResolve(NailgunTask):
       generator.write(output)
 
   def _generate_ivy_report(self):
+    classpath = binary_utils.nailgun_profile_classpath(self, self._profile)
+    self.ng('ng-cp', *classpath)
+
+    reports = []
     org, name = self._identify()
-    with open(os.path.join(self._cachedir, 'ivy-report.xsl')) as report_xsl:
-      xsltree = etree.parse(report_xsl)
-      transform = etree.XSLT(xsltree)
-      reports = []
-      for conf in self._confs:
-        report_name = '%s-%s-%s.xml' % (org, name, conf)
-        with open(os.path.join(self._cachedir, report_name)) as report_xml:
-          xmltree = etree.parse(report_xml)
-          html_name = '%s-%s-%s.html' % (org, name, conf)
-          with safe_open(os.path.join(self._outdir, html_name), 'w') as report_html:
-            html_content = str(transform(xmltree))
-            report_html.write(html_content)
-            reports.append(report_html.name)
+    xsl = os.path.join(self._cachedir, 'ivy-report.xsl')
+    safe_mkdir(self._outdir, clean=True)
+    for conf in self._confs:
+      params = dict(
+        org=org,
+        name=name,
+        conf=conf
+      )
+      xml = os.path.join(self._cachedir, '%(org)s-%(name)s-%(conf)s.xml' % params)
+      out = os.path.join(self._outdir, '%(org)s-%(name)s-%(conf)s.html' % params)
+      self.ng('org.apache.xalan.xslt.Process', '-IN', xml, '-XSL', xsl, '-OUT', out)
+      reports.append(out)
 
-      css = os.path.join(self._outdir, 'ivy-report.css')
-      if os.path.exists(css):
-        os.unlink(css)
-      shutil.copy(os.path.join(self._cachedir, 'ivy-report.css'), self._outdir)
+    css = os.path.join(self._outdir, 'ivy-report.css')
+    if os.path.exists(css):
+      os.unlink(css)
+    shutil.copy(os.path.join(self._cachedir, 'ivy-report.css'), self._outdir)
 
-      if self._open:
-        binary_utils.open(*reports)
+    if self._open:
+      binary_utils.open(*reports)
 
   def _identify(self):
     if len(self.context.target_roots) == 1:
@@ -245,16 +238,28 @@ class IvyResolve(NailgunTask):
       yield (path.strip() for path in cp.read().split(os.pathsep) if path.strip())
 
   def _mapjars(self, genmap, target):
-    ivyxml = os.path.join(self._classpath_dir, '%s.ivy.xml' % target.id)
-    classpathfile = os.path.join(self._classpath_dir, '%s.classpath' % target.id)
-    self._ivycachepath(ivyxml, classpathfile, target)
+    mapdir = os.path.join(self._classpath_dir, target.id)
+    safe_mkdir(mapdir, clean=True)
+    self._exec_ivy(mapdir, [target], [
+      '-retrieve', '%s/[organisation]/[artifact]/[organisation]-[artifact]-[revision].jar' % mapdir,
+      '-symlink',
+      '-types', 'jar', 'bundle',
+    ])
 
-    with self._cachepath(classpathfile) as classpath:
-      for path in classpath:
-        dir, jar = os.path.split(path.strip())
-        genmap.add(target, dir).append(jar)
+    for org in os.listdir(mapdir):
+      orgdir = os.path.join(mapdir, org)
+      if os.path.isdir(orgdir):
+        for name in os.listdir(orgdir):
+          artifactdir = os.path.join(orgdir, name)
+          if os.path.isdir(artifactdir):
+            for file in os.listdir(artifactdir):
+              if file.endswith('.jar'):
+                genmap.add(org, artifactdir).append(file)
+                genmap.add((org, name), artifactdir).append(file)
+                genmap.add(target, artifactdir).append(file)
 
-  def _ivycachepath(self, ivyxml, classpathfile, *targets):
+  def _exec_ivy(self, workdir, targets, args):
+    ivyxml = os.path.join(workdir, 'ivy.xml')
     jars, excludes = self._calculate_classpath(targets)
     self._generate_ivy(jars, excludes, ivyxml)
 
@@ -262,16 +267,12 @@ class IvyResolve(NailgunTask):
       '-settings', self._ivy_settings,
       '-cache', self._cachedir,
       '-ivy', ivyxml,
-      '-types', 'jar', 'bundle',
-      '-cachepath', classpathfile,
-      '-confs'
     ]
-    ivy_args.extend(self._confs)
+    ivy_args.extend(args)
     if not self._transitive:
       ivy_args.append('-notransitive')
     ivy_args.extend(self._args)
 
-    safe_mkdir(os.path.dirname(classpathfile))
     result = self.ng('org.apache.ivy.Main', *ivy_args)
     if result != 0:
       raise TaskError('org.apache.ivy.Main returned %d' % result)

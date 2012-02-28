@@ -16,10 +16,7 @@
 
 import os
 
-from twitter.common.collections import OrderedSet
-
-from exportable_jvm_library import ExportableJvmLibrary
-from jar_dependency import JarDependency
+from twitter.pants.targets.exportable_jvm_library import ExportableJvmLibrary
 
 class JavaProtobufLibrary(ExportableJvmLibrary):
   """Defines a target that builds java stubs from a protobuf IDL file."""
@@ -55,7 +52,7 @@ class JavaProtobufLibrary(ExportableJvmLibrary):
     self.is_codegen = True
 
   def _as_jar_dependency(self):
-    return ExportableJvmLibrary._as_jar_dependency(self).withSources()
+    return ExportableJvmLibrary._as_jar_dependency(self).with_sources()
 
   def _create_template_data(self):
     allsources = []

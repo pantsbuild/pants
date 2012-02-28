@@ -16,9 +16,9 @@
 
 import os
 
-from jvm_target import JvmTarget
-
-from twitter.pants.base import Target, TargetDefinitionException
+from twitter.common.lang import Compatibility
+from twitter.pants.base import Fileset, Target, TargetDefinitionException
+from twitter.pants.targets.jvm_target import JvmTarget
 
 class JvmBinary(JvmTarget):
   """
@@ -26,21 +26,28 @@ class JvmBinary(JvmTarget):
     from an associated java source file or from its dependencies.
   """
 
-  def __init__(self, name, main, source=None, dependencies=None, excludes=None):
+  def __init__(self, name, main,
+               basename=None,
+               source=None,
+               dependencies=None,
+               excludes=None,
+               deploy_excludes=None):
+
     JvmTarget.__init__(self,
                        name=name,
                        sources=[source] if source else None,
                        dependencies=dependencies,
                        excludes=excludes)
 
-    if not isinstance(main, basestring):
+    if not isinstance(main, Compatibility.string):
       raise TargetDefinitionException(self, 'main must be a fully qualified classname')
 
-    if source and not isinstance(source, basestring):
+    if source and not isinstance(source, Compatibility.string):
       raise TargetDefinitionException(self, 'source must be a single relative file path')
 
     self.main = main
-
+    self.basename = basename or name
+    self.deploy_excludes = deploy_excludes or []
 
 class IdentityMapper(object):
   """A mapper that maps files specified relative to a base directory."""
@@ -69,8 +76,12 @@ class Bundle(object):
     self.mapper = mapper or IdentityMapper(os.getcwd())
     self.filemap = {}
 
-  def add(self, *from_specs):
-    self.filemap.update(((self.mapper(from_spec), from_spec) for from_spec in from_specs))
+  def add(self, *filesets):
+    for fileset in filesets:
+      paths = fileset() if isinstance(fileset, Fileset) \
+                        else fileset if hasattr(fileset, '__iter__') \
+                        else [fileset]
+      self.filemap.update(((self.mapper(path), path) for path in paths))
     return self
 
   def resolve(self):
@@ -83,7 +94,7 @@ class Bundle(object):
 class JvmApp(Target):
   """Defines a jvm app package consisting of a binary plus additional bundles of files."""
 
-  def __init__(self, name, binary, bundles):
+  def __init__(self, name, binary, bundles, basename=None):
     Target.__init__(self, name, is_meta=False)
 
     if not binary:
@@ -120,10 +131,8 @@ class JvmApp(Target):
       raise TargetDefinitionException(self, 'bundles must be one or more Bundle objects, '
                                             'got %s' % bundles)
 
+    self.basename = basename or name
+
   def _walk(self, walked, work, predicate=None):
     Target._walk(self, walked, work, predicate)
     self.binary._walk(walked, work, predicate)
-
-
-
-

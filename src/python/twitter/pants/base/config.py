@@ -16,7 +16,11 @@
 
 __author__ = 'jsirois'
 
-import ConfigParser
+try:
+  import ConfigParser
+except ImportError:
+  import configparser as ConfigParser
+
 import os
 import getpass
 
@@ -29,7 +33,7 @@ class Config(object):
     value of var_name.
   """
 
-  class ConfigError(StandardError): pass
+  class ConfigError(Exception): pass
 
   DEFAULT = 'DEFAULT'
 
@@ -96,7 +100,7 @@ class Config(object):
     if not self.config.has_option(section, option):
       return default
     raw_value = self.config.get(section, option)
-    if issubclass(type, basestring):
+    if issubclass(type, str):
       return raw_value
 
     try:

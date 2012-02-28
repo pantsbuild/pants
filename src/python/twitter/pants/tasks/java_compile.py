@@ -80,10 +80,15 @@ class JavaCompile(NailgunTask):
         with self.changed(java_targets, invalidate_dependants=True) as changed:
           bases, sources_by_target, processors, fingerprint = self.calculate_sources(changed)
           if sources_by_target:
-            classpath = [jar for conf, jar in cp if conf in self._confs]
-            result = self.compile(classpath, bases, sources_by_target, fingerprint)
-            if result != 0:
-              raise TaskError('%s returned %d' % (_JMAKE_MAIN, result))
+            sources = reduce(lambda all, sources: all.union(sources), sources_by_target.values())
+            if not sources:
+              self.context.log.warn('Skipping java compile for targets with no sources:\n  %s' %
+                                    '\n  '.join(str(t) for t in sources_by_target.keys()))
+            else:
+              classpath = [jar for conf, jar in cp if conf in self._confs]
+              result = self.compile(classpath, bases, sources, fingerprint)
+              if result != 0:
+                raise TaskError('%s returned %d' % (_JMAKE_MAIN, result))
 
             if processors:
               # Produce a monolithic apt processor service info file for further compilation rounds
@@ -131,7 +136,7 @@ class JavaCompile(NailgunTask):
       collect_sources(target)
     return bases, sources, processors, self.context.identify(targets)
 
-  def compile(self, classpath, bases, sources_by_target, fingerprint):
+  def compile(self, classpath, bases, sources, fingerprint):
     safe_mkdir(self._classes_dir)
 
     jmake_classpath = nailgun_profile_classpath(self, self._jmake_profile)
@@ -152,7 +157,7 @@ class JavaCompile(NailgunTask):
     ])
 
     args.extend(self._args)
-    args.extend(reduce(lambda all, sources: all.union(sources), sources_by_target.values()))
+    args.extend(sources)
     log.debug('Executing: %s %s' % (_JMAKE_MAIN, ' '.join(args)))
     return self.ng(_JMAKE_MAIN, *args)
 
@@ -174,18 +179,19 @@ class DependencyCompiler(object):
     target_by_source = dict()
     for target in targets:
       for source in target.sources:
-        src = os.path.join(target.target_base, source)
+        src = os.path.normpath(os.path.join(target.target_base, source))
         target_by_source[src] = target
         sources.add(src)
 
     classes_by_target_by_source = defaultdict(lambda: defaultdict(set))
-    with open(self.depfile, 'r') as deps:
-      for dep in deps.readlines():
-        src, cls = dep.strip().split('->')
-        sourcefile = os.path.relpath(os.path.join(self.outputdir, src.strip()), get_buildroot())
-        if sourcefile in sources:
-          classfile = os.path.relpath(os.path.join(self.outputdir, cls.strip()), self.outputdir)
-          target = target_by_source[sourcefile]
-          relsrc = os.path.relpath(sourcefile, target.target_base)
-          classes_by_target_by_source[target][relsrc].add(classfile)
+    if os.path.exists(self.depfile):
+      with open(self.depfile, 'r') as deps:
+        for dep in deps.readlines():
+          src, cls = dep.strip().split('->')
+          sourcefile = os.path.relpath(os.path.join(self.outputdir, src.strip()), get_buildroot())
+          if sourcefile in sources:
+            classfile = os.path.relpath(os.path.join(self.outputdir, cls.strip()), self.outputdir)
+            target = target_by_source[sourcefile]
+            relsrc = os.path.relpath(sourcefile, target.target_base)
+            classes_by_target_by_source[target][relsrc].add(classfile)
     return classes_by_target_by_source

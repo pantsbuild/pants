@@ -14,6 +14,8 @@
 # limitations under the License.
 # ==================================================================================================
 
+from __future__ import print_function
+
 import os
 import sys
 
@@ -43,6 +45,8 @@ def get_buildroot():
 
 import fnmatch
 import glob
+
+from functools import reduce
 
 from twitter.pants.base import Fileset
 
@@ -88,9 +92,11 @@ java_tests = JavaTests
 java_thrift_library = JavaThriftLibrary
 jvm_binary = JvmBinary
 jvm_app = JvmApp
+page = Page
 python_binary = PythonBinary
 python_library = PythonLibrary
 python_antlr_library = PythonAntlrLibrary
+python_requirement = PythonRequirement
 python_thrift_library = PythonThriftLibrary
 python_tests = PythonTests
 python_test_suite = PythonTestSuite
@@ -98,6 +104,7 @@ repo = Repository
 scala_library = ScalaLibrary
 scala_tests = ScalaTests
 source_root = SourceRoot
+wiki = Wiki
 
 def has_sources(target):
   """Returns True if the target has sources."""
@@ -137,7 +144,7 @@ def extract_jvm_targets(targets):
 
   for target in targets:
     if target is None:
-      print >> sys.stderr, 'Warning! Null target!'
+      print('Warning! Null target!', file=sys.stderr)
       continue
     for real_target in target.resolve():
       if is_jvm(real_target):
@@ -187,15 +194,20 @@ def is_test(t):
 pants = fancy_pants
 
 # bind tasks and goals below utility functions they use from above
-from twitter.pants.tasks import Config, Context, Goal, Group, Task, TaskError
+from twitter.pants.base import Config
+from twitter.pants.goal import Context, Goal, Group, Phase
+from twitter.pants.tasks import Task, TaskError
+
 goal = Goal
 group = Group
+phase = Phase
 
 __all__ = (
   'annotation_processor',
   'artifact',
   'bundle',
   'credentials',
+  'doc',
   'exclude',
   'egg',
   'get_buildroot',
@@ -220,10 +232,13 @@ __all__ = (
   'java_thrift_library',
   'jvm_app',
   'jvm_binary',
+  'page',
   'pants',
+  'phase',
   'python_antlr_library',
   'python_binary',
   'python_library',
+  'python_requirement',
   'python_tests',
   'python_test_suite',
   'python_thrift_library',
@@ -232,7 +247,7 @@ __all__ = (
   'scala_library',
   'scala_tests',
   'source_root',
-  'doc',
+  'wiki',
   'Config',
   'Context',
   'JavaLibrary',

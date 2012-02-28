@@ -15,8 +15,8 @@
 # ==================================================================================================
 
 from twitter.common.collections import OrderedSet
-from python_target import PythonTarget
-from pants_target import Pants
+from twitter.pants.targets.python_target import PythonTarget
+from twitter.pants.targets.pants_target import Pants
 
 class PythonAntlrLibrary(PythonTarget):
   def __init__(self, name, module,

@@ -14,6 +14,8 @@
 # limitations under the License.
 # ==================================================================================================
 
+from __future__ import print_function
+
 __author__ = 'Benjy Weinberger'
 
 import os
@@ -75,7 +77,7 @@ class PythonAntlrBuilder(object):
 
     cwd = os.getcwd()
     os.chdir(self.chroot.path())
-    print 'PythonAntlrBuilder executing: %s' % ' '.join(args)
+    print('PythonAntlrBuilder executing: %s' % ' '.join(args))
     try:
       po = subprocess.Popen(args)
     finally:
@@ -83,11 +85,11 @@ class PythonAntlrBuilder(object):
     rv = po.wait()
     if rv != 0:
       comm = po.communicate()
-      print >> sys.stderr, 'ANTLR generation failed!'
-      print >> sys.stderr, 'STDOUT'
-      print >> sys.stderr, comm[0]
-      print >> sys.stderr, 'STDERR'
-      print >> sys.stderr, comm[1]
+      print('ANTLR generation failed!', file=sys.stderr)
+      print('STDOUT', file=sys.stderr)
+      print(comm[0], file=sys.stderr)
+      print('STDERR', file=sys.stderr)
+      print(comm[1], file=sys.stderr)
     return rv == 0
 
   @staticmethod

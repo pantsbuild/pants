@@ -14,9 +14,10 @@
 # limitations under the License.
 # ==================================================================================================
 
+from __future__ import print_function
+
 import os
 import sys
-import subprocess
 
 from twitter.common.collections import OrderedSet
 from twitter.common.python import PythonLauncher
@@ -37,7 +38,7 @@ class PythonLintBuilder(object):
 
   def run(self):
     if not _HAVE_PYLINT:
-      print >> sys.stderr, 'ERROR: Pylint not found!  Skipping.'
+      print('ERROR: Pylint not found!  Skipping.', file=sys.stderr)
       return 1
     return self._run_lints(self.targets, self.args)
 
@@ -51,8 +52,8 @@ class PythonLintBuilder(object):
       interpreter_args.extend(args)
     sources = OrderedSet([])
     if not isinstance(target, PythonEgg):
-      target.walk(lambda trg: sources.update(trg.sources),
-                  lambda trg: not isinstance(trg, PythonEgg))
+      target.walk(lambda trg: sources.update(
+        trg.sources if hasattr(trg, 'sources') and trg.sources is not None else []))
     launcher.run(
       interpreter_args=interpreter_args,
       args=list(sources),

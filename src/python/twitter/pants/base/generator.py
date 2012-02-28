@@ -14,12 +14,14 @@
 # limitations under the License.
 # ==================================================================================================
 
+from __future__ import print_function
+
 import sys
 
 try:
   from mako.template import Template
 except ImportError:
-  print >> sys.stderr, "Could not properly bootstrap your Python environment!"
+  print("Could not properly bootstrap your Python environment, missing Mako!", file=sys.stderr)
   sys.exit(1)
 
 import os
@@ -46,7 +48,7 @@ class TemplateData(dict):
     if key in self:
       return self[key]
     else:
-      return object.__getattr__(self, key)
+      return object.__getattribute__(self, key)
 
   def __str__(self):
     return 'TemplateData(%s)' % pprint.pformat(self)

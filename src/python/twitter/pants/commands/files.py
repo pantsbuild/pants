@@ -14,6 +14,8 @@
 # limitations under the License.
 # ==================================================================================================
 
+from __future__ import print_function
+
 __author__ = 'John Sirois'
 
 import os
@@ -49,19 +51,19 @@ class Files(Command):
       self.error("Problem parsing BUILD target %s: %s" % (address, traceback.format_exc()))
 
     if not self.target:
-        self.error("Target %s does not exist" % address)
+      self.error("Target %s does not exist" % address)
 
   def execute(self):
     for target in self.target.resolve():
       for sourcefile in getattr(target, 'sources', ()) or ():
-        print os.path.join(target.target_base, sourcefile)
+        print(os.path.join(target.target_base, sourcefile))
 
       for resourcefile in getattr(target, 'resources', ()) or ():
         # TODO(John Sirois): fill resource source_root hole to get a full path from the build
         # root here
-        print '[res] %s' % resourcefile
+        print('[res] %s' % resourcefile)
 
       for java_source in getattr(target, 'java_sources', ()) or ():
         # TODO(John Sirois): fill java_sources source_root hole to get a full path from the build
         # root here
-        print '[java cyclic] %s' % java_source
+        print('[java cyclic] %s' % java_source)

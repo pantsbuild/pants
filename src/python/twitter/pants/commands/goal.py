@@ -24,17 +24,17 @@ import traceback
 
 from contextlib import contextmanager
 from copy import copy
-from cStringIO import StringIO
-
-from . import Command
 
 from twitter.common import log
+from twitter.common.lang import Compatibility
 from twitter.common.dirutil import safe_mkdir, safe_rmtree
-
 from twitter.pants import get_buildroot, goal, group, is_apt, is_scala
-from twitter.pants.base import Address, BuildFile, ParseContext, Target
-from twitter.pants.tasks import Context, Phase, Task
-from twitter.pants.tasks.config import Config
+from twitter.pants.base import Address, BuildFile, Config, ParseContext, Target
+from twitter.pants.commands import Command
+from twitter.pants.tasks import Task, TaskError
+from twitter.pants.goal import Context, GoalError, Phase
+
+StringIO = Compatibility.StringIO
 
 class List(Task):
   @classmethod
@@ -43,7 +43,7 @@ class List(Task):
                             help="[%default] List all goals even if no description is available.")
 
   def execute(self, targets):
-     print 'Installed goals:'
+     print('Installed goals:')
      documented_rows = []
      undocumented = []
      max_width = 0
@@ -54,9 +54,10 @@ class List(Task):
        elif self.context.options.goal_list_all:
          undocumented.append(phase.name)
      for name, description in documented_rows:
-       print '  %s: %s' % (name.rjust(max_width), description)
+       print('  %s: %s' % (name.rjust(max_width), description))
      if undocumented:
-       print '\nUndocumented goals:\n  %s' % ' '.join(undocumented)
+       print('\nUndocumented goals:\n  %s' % ' '.join(undocumented))
+
 
 goal(name='goals', action=List).install().with_description('List all documented goals.')
 
@@ -95,8 +96,8 @@ class Help(Task):
     parser.parse_args(['--help'])
 
   def list_goals(self, message):
-    print message
-    print
+    print(message)
+    print()
     return Phase.execute(self.context, 'goals')
 
 goal(name='help', action=Help).install().with_description('Provide help for the specified goal.')
@@ -111,7 +112,7 @@ class Goal(Command):
   def check_errors(self, banner):
     errors = {}
     def error(key, include_traceback=False):
-      exc_type, exc_value, exc_traceback = sys.exc_info()
+      exc_type, exc_value, _ = sys.exc_info()
       msg = StringIO()
       if include_traceback:
         frame = inspect.trace()[-1]
@@ -225,7 +226,7 @@ class Goal(Command):
           try:
             buildfile = BuildFile(get_buildroot(), os.path.relpath(path, get_buildroot()))
             parse_build(buildfile)
-          except (TypeError, ImportError):
+          except (TypeError, ImportError, TaskError, GoalError):
             error(path, include_traceback=True)
           except (IOError, SyntaxError):
             error(path)
@@ -245,7 +246,7 @@ class Goal(Command):
               prompt = 'did you mean' if len(siblings) == 1 else 'maybe you meant one of these'
               error('%s => %s?:\n    %s' % (address, prompt,
                                             '\n    '.join(str(a) for a in siblings)))
-          except (TypeError, ImportError):
+          except (TypeError, ImportError, TaskError, GoalError):
             error(spec, include_traceback=True)
           except (IOError, SyntaxError):
             error(spec)
@@ -281,14 +282,14 @@ class Goal(Command):
         def now(self):
           return time.time()
         def log(self, message):
-          print message
+          print(message)
       timer = Timer()
 
     logger = None
     if self.options.log or self.options.log_level:
       from twitter.common.log import init
       from twitter.common.log.options import LogOptions
-      LogOptions.set_stdout_log_level((self.options.log_level or 'info').upper())
+      LogOptions.set_stderr_log_level((self.options.log_level or 'info').upper())
       logdir = self.config.get('goals', 'logdir')
       if logdir:
         safe_mkdir(logdir)
@@ -304,8 +305,8 @@ class Goal(Command):
         unknown.append(phase)
 
     if unknown:
-        print 'Unknown goal(s): %s' % ' '.join(phase.name for phase in unknown)
-        print
+        print('Unknown goal(s): %s' % ' '.join(phase.name for phase in unknown))
+        print()
         return Phase.execute(context, 'goals')
 
     return Phase.attempt(context, self.phases, timer=timer)
@@ -323,10 +324,11 @@ from twitter.pants.tasks.java_compile import JavaCompile
 from twitter.pants.tasks.javadoc_gen import JavadocGen
 from twitter.pants.tasks.junit_run import JUnitRun
 from twitter.pants.tasks.jvm_run import JvmRun
-from twitter.pants.tasks.scala_repl import ScalaRepl
+from twitter.pants.tasks.markdown_to_html import MarkdownToHtml
 from twitter.pants.tasks.nailgun_task import NailgunTask
 from twitter.pants.tasks.protobuf_gen import ProtobufGen
 from twitter.pants.tasks.scala_compile import ScalaCompile
+from twitter.pants.tasks.scala_repl import ScalaRepl
 from twitter.pants.tasks.specs_run import SpecsRun
 from twitter.pants.tasks.thrift_gen import ThriftGen
 
@@ -337,12 +339,9 @@ class Invalidator(Task):
 goal(name='invalidate', action=Invalidator).install().with_description('Invalidate all caches')
 
 
-class CleanAll(Task):
-  def execute(self, targets):
-    safe_rmtree(self.context.config.getdefault('pants_workdir'))
 goal(
   name='clean-all',
-  action=CleanAll,
+  action=lambda ctx: safe_rmtree(ctx.config.getdefault('pants_workdir')),
   dependencies=['invalidate']
 ).install().with_description('Cleans all intermediate build output')
 
@@ -417,6 +416,14 @@ checkstyle.install('compile')
 goal(name='javadoc',
      action=JavadocGen,
      dependencies=['compile']).install('javadoc').with_description('Create javadoc.')
+
+
+if MarkdownToHtml.AVAILABLE:
+  goal(name='markdown',
+       action=MarkdownToHtml
+  ).install('markdown').with_description('Generate html from markdown docs.')
+
+
 goal(name='jar',
      action=JarCreate,
      dependencies=['compile']).install('jar').with_description('Create one or more jars.')
@@ -458,4 +465,14 @@ goal(
   name='scala-repl',
   action=ScalaRepl,
   dependencies=['resolve', 'compile']
-).install('repl').with_description('Run a (currently Scala only) REPL with the classpath set according to the targets.')
+).install('repl').with_description(
+  'Run a (currently Scala only) REPL with the classpath set according to the targets.')
+
+
+from twitter.pants.tasks.python.setup import SetupPythonEnvironment
+
+goal(
+  name='python-setup',
+  action=SetupPythonEnvironment,
+).install('setup').with_description(
+"Setup the target's build environment.")

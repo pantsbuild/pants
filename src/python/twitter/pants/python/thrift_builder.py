@@ -14,6 +14,8 @@
 # limitations under the License.
 # ==================================================================================================
 
+from __future__ import print_function
+
 __author__ = 'Brian Wickman'
 
 import os
@@ -90,7 +92,6 @@ class PythonThriftBuilder(object):
 
     cwd = os.getcwd()
     os.chdir(self.chroot.path())
-    print 'PythonThriftBuilder executing: %s' % ' '.join(args)
     try:
       po = subprocess.Popen(args)
     finally:
@@ -98,11 +99,11 @@ class PythonThriftBuilder(object):
     rv = po.wait()
     if rv != 0:
       comm = po.communicate()
-      print >> sys.stderr, 'thrift generation failed!'
-      print >> sys.stderr, 'STDOUT'
-      print >> sys.stderr, comm[0]
-      print >> sys.stderr, 'STDERR'
-      print >> sys.stderr, comm[1]
+      print('thrift generation failed!', file=sys.stderr)
+      print('STDOUT', file=sys.stderr)
+      print(comm[0], file=sys.stderr)
+      print('STDERR', file=sys.stderr)
+      print(comm[1], file=sys.stderr)
     return rv == 0
 
   @staticmethod
@@ -114,7 +115,7 @@ class PythonThriftBuilder(object):
     self.run_thrifts()
 
     genpy_root = os.path.join(self.chroot.path(), self.codegen_root, 'gen-py')
-    for dir, subdirs, files in os.walk(os.path.normpath(genpy_root)):
+    for dir, _, files in os.walk(os.path.normpath(genpy_root)):
       reldir = os.path.relpath(dir, genpy_root)
       if reldir == '.': continue
       if '__init__.py' not in files: continue
