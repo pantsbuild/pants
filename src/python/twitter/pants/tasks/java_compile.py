@@ -144,7 +144,6 @@ class JavaCompile(NailgunTask):
 
     args = [
       '-classpath', ':'.join(classpath),
-      '-C-sourcepath', '-C%s' % ':'.join(bases),
       '-d', self._classes_dir,
       '-pdb', os.path.join(self._classes_dir, '%s.dependencies.pdb' % fingerprint),
     ]

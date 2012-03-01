@@ -123,7 +123,6 @@ class ScalaCompile(NailgunTask):
     # TODO(John Sirois): separate compiler profile from runtime profile
     args = [
       '-classpath', ':'.join(compiler_classpath + classpath),
-      '-sourcepath', ':'.join(bases),
       '-d', self._output_dir,
 
       # TODO(John Sirois): dependencyfile requires the deprecated -make:XXX - transition to ssc
