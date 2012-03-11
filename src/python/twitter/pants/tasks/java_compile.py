@@ -78,7 +78,7 @@ class JavaCompile(NailgunTask):
           cp.insert(0, (conf, self._classes_dir))
 
         with self.changed(java_targets, invalidate_dependants=True) as changed:
-          bases, sources_by_target, processors, fingerprint = self.calculate_sources(changed)
+          sources_by_target, processors, fingerprint = self.calculate_sources(changed)
           if sources_by_target:
             sources = reduce(lambda all, sources: all.union(sources), sources_by_target.values())
             if not sources:
@@ -86,7 +86,7 @@ class JavaCompile(NailgunTask):
                                     '\n  '.join(str(t) for t in sources_by_target.keys()))
             else:
               classpath = [jar for conf, jar in cp if conf in self._confs]
-              result = self.compile(classpath, bases, sources, fingerprint)
+              result = self.compile(classpath, sources, fingerprint)
               if result != 0:
                 raise TaskError('%s returned %d' % (_JMAKE_MAIN, result))
 
@@ -120,23 +120,21 @@ class JavaCompile(NailgunTask):
             genmap.add(target, basedir, [_PROCESSOR_INFO_FILE])
 
   def calculate_sources(self, targets):
-    bases = set()
     sources = defaultdict(set)
     processors = set()
     def collect_sources(target):
       src = (os.path.join(target.target_base, source)
              for source in target.sources if source.endswith('.java'))
       if src:
-        bases.add(target.target_base)
         sources[target].update(src)
         if is_apt(target) and target.processors:
           processors.update(target.processors)
 
     for target in targets:
       collect_sources(target)
-    return bases, sources, processors, self.context.identify(targets)
+    return sources, processors, self.context.identify(targets)
 
-  def compile(self, classpath, bases, sources, fingerprint):
+  def compile(self, classpath, sources, fingerprint):
     safe_mkdir(self._classes_dir)
 
     jmake_classpath = nailgun_profile_classpath(self, self._jmake_profile)

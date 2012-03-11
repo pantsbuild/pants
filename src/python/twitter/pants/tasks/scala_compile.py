@@ -71,7 +71,7 @@ class ScalaCompile(NailgunTask):
           cp.insert(0, (conf, self._output_dir))
 
       with self.changed(scala_targets, invalidate_dependants=True) as changed_targets:
-        bases, sources_by_target = self.calculate_sources(changed_targets)
+        sources_by_target = self.calculate_sources(changed_targets)
         if sources_by_target:
           sources = reduce(lambda all, sources: all.union(sources), sources_by_target.values())
           if not sources:
@@ -79,7 +79,7 @@ class ScalaCompile(NailgunTask):
                                   '\n  '.join(str(t) for t in sources_by_target.keys()))
           else:
             classpath = [jar for conf, jar in cp if conf in self._confs]
-            result = self.compile(classpath, bases, sources)
+            result = self.compile(classpath, sources)
             if result != 0:
               raise TaskError('%s returned %d' % (self._main, result))
 
@@ -94,13 +94,11 @@ class ScalaCompile(NailgunTask):
             genmap.add(target, self._output_dir, classes)
 
   def calculate_sources(self, targets):
-    bases = set()
     sources = defaultdict(set)
     def collect_sources(target):
       src = (os.path.join(target.target_base, source)
              for source in target.sources if source.endswith('.scala'))
       if src:
-        bases.add(target.target_base)
         sources[target].update(src)
 
         if (isinstance(target, ScalaLibrary) or isinstance(target, ScalaTests)) and (
@@ -109,9 +107,9 @@ class ScalaCompile(NailgunTask):
 
     for target in targets:
       collect_sources(target)
-    return bases, sources
+    return sources
 
-  def compile(self, classpath, bases, sources):
+  def compile(self, classpath, sources):
     safe_mkdir(self._output_dir)
 
     compiler_classpath = (
