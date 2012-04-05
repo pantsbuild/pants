@@ -378,9 +378,11 @@ goal(name='thrift', action=ThriftGen).install('gen').with_description('Generate 
 goal(name='protoc', action=ProtobufGen).install('gen')
 
 
-checkstyle = goal(name='checkstyle',
-                 action=Checkstyle,
-                 dependencies=['gen', 'resolve'])
+goal(
+  name='checkstyle',
+  action=Checkstyle,
+  dependencies=['gen', 'resolve']
+).install().with_description('Run checkstyle against java source code.')
 
 
 # Support straight up checkstyle runs in addition to checkstyle as last phase of compile below
@@ -388,7 +390,6 @@ goal(name='javac',
      action=JavaCompile,
      group=group('gen', lambda target: target.is_codegen),
      dependencies=['gen', 'resolve']).install('checkstyle')
-checkstyle.install().with_description('Run checkstyle against java source code.')
 
 
 def is_java(target):
@@ -409,7 +410,6 @@ goal(name='javac',
      action=JavaCompile,
      group=group('jvm', is_java),
      dependencies=['gen', 'resolve']).install('compile')
-checkstyle.install('compile')
 
 
 # TODO(John Sirois): Create scaladoc and pydoc in a doc phase
