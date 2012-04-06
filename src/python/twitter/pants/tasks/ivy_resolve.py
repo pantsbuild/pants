@@ -16,6 +16,7 @@
 
 __author__ = 'John Sirois'
 
+import hashlib
 import os
 import pkgutil
 import re
@@ -120,18 +121,39 @@ class IvyResolve(NailgunTask):
       of (conf, jar path).
     """
 
+    def dirname_for_requested_targets(targets):
+      """Where we put the classpath file for this set of targets."""
+      sha = hashlib.sha1()
+      for t in targets:
+        sha.update(t.id)
+      return sha.hexdigest()
+
     def is_classpath(t):
       return is_internal(t) and any(jar for jar in t.jar_dependencies if jar.rev)
 
+    target_workdir = os.path.join(self._work_dir, dirname_for_requested_targets(targets))
+    target_classpath_file = os.path.join(target_workdir, 'classpath')
     with self.changed(filter(is_classpath, targets), only_buildfiles=True) as changed_deps:
       if changed_deps:
-        self._exec_ivy(self._work_dir, targets, [
-          '-cachepath', self._classpath_file,
-	  '-types', 'jar', 'bundle',
+        self._exec_ivy(target_workdir, targets, [
+          '-cachepath', target_classpath_file,
+          '-types', 'jar', 'bundle',
           '-confs'
         ] + self._confs)
 
-    if os.path.exists(self._classpath_file):
+    if os.path.exists(target_classpath_file):
+      # Symlink to the current classpath file.
+      if os.path.exists(self._classpath_file):
+        os.unlink(self._classpath_file)
+      os.symlink(target_classpath_file, self._classpath_file)
+
+      # Symlink to the current ivy.xml file (useful for IDEs that read it).
+      ivyxml_symlink = os.path.join(self._work_dir, 'ivy.xml')
+      target_ivyxml = os.path.join(target_workdir, 'ivy.xml')
+      if os.path.exists(ivyxml_symlink):
+        os.unlink(ivyxml_symlink)
+      os.symlink(target_ivyxml, ivyxml_symlink)
+
       with self._cachepath(self._classpath_file) as classpath:
         with self.context.state('classpath', []) as cp:
           for path in classpath:
@@ -258,8 +280,8 @@ class IvyResolve(NailgunTask):
                 genmap.add((org, name), artifactdir).append(file)
                 genmap.add(target, artifactdir).append(file)
 
-  def _exec_ivy(self, workdir, targets, args):
-    ivyxml = os.path.join(workdir, 'ivy.xml')
+  def _exec_ivy(self, target_workdir, targets, args):
+    ivyxml = os.path.join(target_workdir, 'ivy.xml')
     jars, excludes = self._calculate_classpath(targets)
     self._generate_ivy(jars, excludes, ivyxml)
 
@@ -276,3 +298,4 @@ class IvyResolve(NailgunTask):
     result = self.ng('org.apache.ivy.Main', *ivy_args)
     if result != 0:
       raise TaskError('org.apache.ivy.Main returned %d' % result)
+
