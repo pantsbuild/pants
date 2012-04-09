@@ -25,7 +25,9 @@ import pkgutil
 import shutil
 import subprocess
 
-from twitter.common.collections import OrderedSet
+from collections import defaultdict
+
+from twitter.common.collections import OrderedDict, OrderedSet
 from twitter.common.config import Properties
 from twitter.common.dirutil import safe_open, safe_rmtree
 
@@ -42,18 +44,33 @@ class Semver(object):
     if len(components) != 3:
       raise ValueError
     major, minor, patch = components
-    return Semver(major, minor, patch)
+    def to_i(component):
+      try:
+        return int(component)
+      except (TypeError, ValueError):
+        raise ValueError('Invalid revision component %s in %s - '
+                         'must be an integer' % (component, version))
+    return Semver(to_i(major), to_i(minor), to_i(patch))
 
-  def __init__(self, major, minor, patch):
-    self.major = int(major)
-    self.minor = int(minor)
-    self.patch = int(patch)
+  def __init__(self, major, minor, patch, snapshot=False):
+    self.major = major
+    self.minor = minor
+    self.patch = patch
+    self.snapshot = snapshot
 
   def bump(self):
+    # A bump of a snapshot discards snapshot status
     return Semver(self.major, self.minor, self.patch + 1)
 
+  def make_snapshot(self):
+    return Semver(self.major, self.minor, self.patch, snapshot=True)
+
   def version(self):
-    return '%s.%s.%s' % (self.major, self.minor, self.patch)
+    return '%s.%s.%s' % (
+      self.major,
+      self.minor,
+      ('%s-SNAPSHOT' % self.patch) if self.snapshot else self.patch
+    )
 
   def __eq__(self, other):
     return self.__cmp__(other) == 0
@@ -64,6 +81,13 @@ class Semver(object):
       diff = self.minor - other.minor
       if not diff:
         diff = self.patch - other.patch
+        if not diff:
+          if self.snapshot and not other.snapshot:
+            diff = 1
+          elif not self.snapshot and other.snapshot:
+            diff = -1
+          else:
+            diff = 0
     return diff
 
   def __repr__(self):
@@ -87,12 +111,13 @@ class PushDb(object):
     """
     jar_dep, db_get, _ = self._accessors_for_target(target)
 
-    major = db_get('revision.major', '0')
-    minor = db_get('revision.minor', '0')
-    patch = db_get('revision.patch', '0')
+    major = int(db_get('revision.major', '0'))
+    minor = int(db_get('revision.minor', '0'))
+    patch = int(db_get('revision.patch', '0'))
+    snapshot = db_get('revision.snapshot', 'false').lower() == 'true'
     sha = db_get('revision.sha', None)
     fingerprint = db_get('revision.fingerprint', None)
-    semver = Semver(major, minor, patch)
+    semver = Semver(major, minor, patch, snapshot=snapshot)
     jar_dep.rev = semver.version()
     return jar_dep, semver, sha, fingerprint
 
@@ -102,6 +127,7 @@ class PushDb(object):
     db_set('revision.major', version.major)
     db_set('revision.minor', version.minor)
     db_set('revision.patch', version.patch)
+    db_set('revision.snapshot', str(version.snapshot).lower())
     db_set('revision.sha', sha)
     db_set('revision.fingerprint', fingerprint)
 
@@ -127,99 +153,113 @@ class PushDb(object):
       Properties.dump(self._props, props)
 
 
-class PomWriter(object):
-  @staticmethod
-  def jardep(jar):
-    def create_exclude(exclude):
-      return TemplateData(
-        org=exclude.org,
-        name=exclude.name,
-      )
-    template_data = TemplateData(
+class DependencyWriter(object):
+  """
+    Builds up a template data representing a target and applies this to a template to produce a
+    dependency descriptor.
+  """
+
+  def __init__(self, get_db, template_relpath):
+    self.get_db = get_db
+    self.template_relpath = template_relpath
+
+  def write(self, target, path, confs=None):
+    def as_jar(internal_target):
+      jar, _, _, _ = self.get_db(internal_target).as_jar_with_version(internal_target)
+      return jar
+
+    # TODO(John Sirois): a dict is used here to de-dup codegen targets which have both the original
+    # codegen target - say java_thrift_library - and the synthetic generated target (java_library)
+    # Consider reworking codegen tasks to add removal of the original codegen targets when rewriting
+    # the graph
+    dependencies = OrderedDict()
+    for dep in target.internal_dependencies:
+      jar = as_jar(dep)
+      dependencies[(jar.org, jar.name)] = self.internaldep(jar)
+    for jar in target.jar_dependencies:
+      if jar.rev:
+        dependencies[(jar.org, jar.name)] = self.jardep(jar)
+    target_jar = self.internaldep(as_jar(target)).extend(dependencies=dependencies.values())
+
+    template_kwargs = self.templateargs(target_jar, confs)
+    with safe_open(path, 'w') as output:
+      template = pkgutil.get_data(__name__, self.template_relpath)
+      Generator(template, **template_kwargs).write(output)
+
+  def templateargs(self, target_jar, confs=None):
+    """
+      Subclasses must return a dict for use by their template given the target jar template data
+      and optional specific ivy configurations.
+    """
+    raise NotImplementedError()
+
+  def internaldep(self, jar_dependency):
+    """
+      Subclasses must return a template data for the given internal target (provided in jar
+      dependency form).
+    """
+    raise NotImplementedError()
+
+  def jardep(self, jar_dependency):
+    """Subclasses must return a template data for the given external jar dependency."""
+    raise NotImplementedError()
+
+  def create_exclude(self, exclude):
+    return TemplateData(org=exclude.org, name=exclude.name)
+
+
+class PomWriter(DependencyWriter):
+  def __init__(self, get_db):
+    super(PomWriter, self).__init__(get_db, os.path.join('jar_publish', 'pom.mk'))
+
+  def templateargs(self, target_jar, confs=None):
+    return dict(artifact=target_jar)
+
+  def jardep(self, jar):
+    return TemplateData(
       org=jar.org,
       name=jar.name,
       rev=jar.rev,
       scope='compile',
-      excludes=None
-    )
-    if jar.excludes:
-      template_data = template_data.extend(
-        excludes=[create_exclude(exclude) for exclude in jar.excludes if exclude.name]
-      )
-    return template_data
-
-  def __init__(self, get_db):
-    self.get_db = get_db
-
-  def write(self, target, path):
-    dependencies = [self.internaldep(dep) for dep in target.internal_dependencies]
-    dependencies.extend(PomWriter.jardep(dep) for dep in target.jar_dependencies if dep.rev)
-    target_jar = self.internaldep(target).extend(dependencies=dependencies)
-
-    with safe_open(path, 'w') as output:
-      generator = Generator(pkgutil.get_data(__name__, os.path.join('jar_publish', 'pom.mk')),
-                            artifact=target_jar)
-      generator.write(output)
-
-  def internaldep(self, target):
-    jar, _, _, _ = self.get_db(target).as_jar_with_version(target)
-    return PomWriter.jardep(jar)
-
-
-class IvyWriter(object):
-  def __init__(self, get_db):
-    self.get_db = get_db
-
-  @staticmethod
-  def jardep(jar):
-    return TemplateData(
-      org = jar.org,
-      module = jar.name,
-      version = jar.rev,
-      force = jar.force,
-      excludes = [IvyWriter.create_exclude(exclude) for exclude in jar.excludes],
-      transitive = jar.transitive,
-      ext = jar.ext,
-      url = jar.url,
-      configurations = ';'.join(jar._configurations),
+      excludes=[self.create_exclude(exclude) for exclude in jar.excludes if exclude.name]
     )
 
-  @staticmethod
-  def create_exclude(exclude):
-    return TemplateData(org = exclude.org, name = exclude.name)
+  def internaldep(self, jar_dependency):
+    return self.jardep(jar_dependency)
 
-  def write(self, target, path, confs=None):
-    dependencies = [self.internaldep(dep) for dep in target.internal_dependencies]
-    dependencies.extend(self.jardep(dep) for dep in target.jar_dependencies if dep.rev)
 
-    excludes = []
-    if target.excludes:
-      excludes.extend(IvyWriter.create_exclude(exclude) for exclude in target.excludes)
+class IvyWriter(DependencyWriter):
+  def __init__(self, get_db):
+    super(IvyWriter, self).__init__(get_db, os.path.join('ivy_resolve', 'ivy.mk'))
 
-    template_data = self.internaldep(target).extend(
+  def templateargs(self, target_jar, confs=None):
+    return dict(lib=target_jar.extend(
       publications=set(confs) if confs else set(),
-      dependencies=dependencies,
-      excludes=excludes
-    )
+    ))
 
-    with safe_open(path, 'w') as output:
-      generator = Generator(pkgutil.get_data(__name__, os.path.join('ivy_resolve', 'ivy.mk')),
-                            lib=template_data)
-      generator.write(output)
-
-  def internaldep(self, target):
-    jar, _, _, _ = self.get_db(target).as_jar_with_version(target)
+  def _jardep(self, jar, transitive=True, ext=None, url=None, configurations='default'):
     return TemplateData(
-      org = jar.org,
-      module = jar.name,
-      version = jar.rev,
-      force = False,
-      excludes = [IvyWriter.create_exclude(exclude) for exclude in target.excludes],
-      transitive = True,
-      ext = None,
-      url = None,
-      configurations = 'default',
+      org=jar.org,
+      module=jar.name,
+      version=jar.rev,
+      force=jar.force,
+      excludes=[self.create_exclude(exclude) for exclude in jar.excludes],
+      transitive=transitive,
+      ext=ext,
+      url=url,
+      configurations=configurations,
     )
+
+  def jardep(self, jar):
+    return self._jardep(jar,
+      transitive=jar.transitive,
+      ext=jar.ext,
+      url=jar.url,
+      configurations=';'.join(jar._configurations)
+    )
+
+  def internaldep(self, jar_dependency):
+    return self._jardep(jar_dependency)
 
 
 def is_exported(target):
@@ -262,9 +302,16 @@ class JarPublish(Task):
                             action="callback", callback=mkflag.set_bool,
                             help="Turns off commits of the push db for local testing.")
 
-    option_group.add_option(mkflag("repo-prefix"), dest="jar_publish_repo_prefix",
-                            help="Prefix provided jars repo names with this string - useful for "
-                                 "swapping out a set of standard repos for another.")
+    local_flag = mkflag("local")
+    option_group.add_option(local_flag, dest="jar_publish_local",
+                            help="Publishes jars to a maven repository on the local filesystem at "
+                                 "the specified path.")
+
+    option_group.add_option(mkflag("local-snapshot"), mkflag("local-snapshot", negate=True),
+                            dest="jar_publish_local_snapshot", default=True,
+                            action="callback", callback=mkflag.set_bool,
+                            help="[%%default] If %s is specified, publishes jars with '-SNAPSHOT' "
+                                 "revisions." % local_flag)
 
     option_group.add_option(mkflag("transitive"), mkflag("transitive", negate=True),
                             dest="jar_publish_transitive", default=True,
@@ -305,14 +352,26 @@ class JarPublish(Task):
 
     self.outdir = context.config.get('jar-publish', 'workdir')
     self.cachedir = os.path.join(self.outdir, 'cache')
-    self.repos = context.config.getdict('jar-publish', 'repos')
-    self.repo_prefix = context.options.jar_publish_repo_prefix or ''
+
+    if context.options.jar_publish_local:
+      local_repo = dict(
+        resolver='publish_local',
+        path=os.path.abspath(os.path.expanduser(context.options.jar_publish_local)),
+        confs=context.config.getlist('jar-publish', 'publish_local_confs', default=['*']),
+        auth=None
+      )
+      self.repos = defaultdict(lambda: local_repo)
+      self.commit = False
+      self.snapshot = context.options.jar_publish_local_snapshot
+    else:
+      self.repos = context.config.getdict('jar-publish', 'repos')
+      self.commit = context.options.jar_publish_commit
+      self.snapshot = False
 
     self.ivycp = context.config.getlist('ivy', 'classpath')
     self.ivysettings = context.config.get('ivy', 'ivy_settings')
 
     self.dryrun = context.options.jar_publish_dryrun
-    self.commit = context.options.jar_publish_commit
     self.transitive = context.options.jar_publish_transitive
     self.force = context.options.jar_publish_force
 
@@ -346,8 +405,8 @@ class JarPublish(Task):
           coordinate, rev = override.split('=', 1)
           try:
             rev = Semver.parse(rev)
-          except ValueError:
-            raise TaskError('Invalid version: %s' % rev)
+          except ValueError as e:
+            raise TaskError('Invalid version %s: %s' % (rev, e))
           return parse_jarcoordinate(coordinate), rev
         except ValueError:
           raise TaskError('Invalid override: %s' % override)
@@ -367,11 +426,13 @@ class JarPublish(Task):
 
     pushdbs = {}
     def get_db(target):
+      if target.provides is None:
+        raise TaskError('trying to publish target %r which does not provide an artifact' % target)
       dbfile = target.provides.repo.push_db
       result = pushdbs.get(dbfile)
       if not result:
         db = PushDb.load(dbfile)
-        repo = self.repos[(self.repo_prefix + target.provides.repo.name)]
+        repo = self.repos[target.provides.repo.name]
         result = (db, dbfile, repo)
         pushdbs[dbfile] = result
       return result
@@ -432,6 +493,9 @@ class JarPublish(Task):
         skip = False
 
       newver = self.overrides.get((jar.org, jar.name)) or semver.bump()
+      if self.snapshot:
+        newver = newver.make_snapshot()
+
       if newver <= semver:
         raise TaskError('Requested version %s must be greater than the current version %s' % (
           newver.version(), semver.version()
@@ -476,6 +540,7 @@ class JarPublish(Task):
           print('Skipping publish of %s in test mode.' % jar_coordinate(jar, newver.version()))
         else:
           resolver = repo['resolver']
+          path = repo.get('path')
 
           # Get authentication for the publish repo if needed
           jvmargs = []
@@ -489,7 +554,7 @@ class JarPublish(Task):
             jvmargs.append(credentials.password())
 
           # Do the publish
-          ivysettings = self.generate_ivysettings(published)
+          ivysettings = self.generate_ivysettings(published, publish_local=path)
           args = [
             '-settings', ivysettings,
             '-ivy', ivyxml,
@@ -500,14 +565,18 @@ class JarPublish(Task):
             '-revision', newver.version(),
             '-m2compatible',
           ]
+          if self.snapshot:
+            args.append('-overwrite')
+
           result = binary_utils.runjava(jvmargs=jvmargs, classpath=self.ivycp, args=args)
           if result != 0:
             raise TaskError('Failed to push %s - ivy failed with %d' % (
               jar_coordinate(jar, newver.version()), result)
             )
 
-          pushdb.dump(dbfile)
-          self.commit_push(jar.org, jar.name, newver.version(), head_sha)
+          if self.commit:
+            pushdb.dump(dbfile)
+            self.commit_push(jar.org, jar.name, newver.version(), head_sha)
 
   def exported_targets(self):
     candidates = set(self.context.targets() if self.transitive else self.context.target_roots)
@@ -560,25 +629,24 @@ class JarPublish(Task):
                       failuremsg='Can only push from a clean master, index is dirty')
 
   def commit_push(self, org, name, rev, sha):
-    if self.commit:
-      args = dict(
-        org=org,
-        name=name,
-        rev=rev,
-        coordinate=coordinate(org, name, rev),
-        user=getpass.getuser(),
-        cause='with forced revision' if (org, name) in self.overrides else '(autoinc)'
-      )
-      self.check_call(['git', 'pull', '--ff-only', '--tags', 'origin', 'master'])
-      self.check_call(['git', 'tag' , '-a',
-                       '-m', 'Publish of %(coordinate)s initiated by %(user)s %(cause)s' % args,
-                       '%(org)s-%(name)s-%(rev)s' % args, sha])
+    args = dict(
+      org=org,
+      name=name,
+      rev=rev,
+      coordinate=coordinate(org, name, rev),
+      user=getpass.getuser(),
+      cause='with forced revision' if (org, name) in self.overrides else '(autoinc)'
+    )
+    self.check_call(['git', 'pull', '--ff-only', '--tags', 'origin', 'master'])
+    self.check_call(['git', 'tag' , '-a',
+                     '-m', 'Publish of %(coordinate)s initiated by %(user)s %(cause)s' % args,
+                     '%(org)s-%(name)s-%(rev)s' % args, sha])
 
-      self.check_call(['git', 'commit' , '-a',
-                       '-m', 'pants build committing publish data for push of '
-                             '%(coordinate)s' % args])
+    self.check_call(['git', 'commit' , '-a',
+                     '-m', 'pants build committing publish data for push of '
+                           '%(coordinate)s' % args])
 
-      self.check_call(['git', 'push' , 'origin', 'master', '--tags'])
+    self.check_call(['git', 'push' , 'origin', 'master', '--tags'])
 
   def check_call(self, cmd, failuremsg=None):
     self.log_call(cmd)
@@ -599,7 +667,7 @@ class JarPublish(Task):
     if result != 0:
       raise TaskError(failuremsg or '%s failed with exit code %d' % (' '.join(cmd), result))
 
-  def generate_ivysettings(self, publishedjars):
+  def generate_ivysettings(self, publishedjars, publish_local=None):
     template = pkgutil.get_data(__name__, os.path.join('jar_publish', 'ivysettings.mk'))
     with safe_open(os.path.join(self.outdir, 'ivysettings.xml'), 'w') as wrapper:
       generator = Generator(template,
@@ -607,6 +675,7 @@ class JarPublish(Task):
                             dir=self.outdir,
                             cachedir=self.cachedir,
                             published=[TemplateData(org=jar.org, name=jar.name)
-                                       for jar in publishedjars])
+                                       for jar in publishedjars],
+                            publish_local=publish_local)
       generator.write(wrapper)
       return wrapper.name

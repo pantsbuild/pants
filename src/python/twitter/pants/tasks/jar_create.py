@@ -26,7 +26,7 @@ from twitter.common.contextutil import open_zip as open_jar
 from twitter.common.dirutil import safe_mkdir
 
 from twitter.pants import get_buildroot, is_apt, JavaLibrary, JavaTests, ScalaLibrary, ScalaTests
-from twitter.pants.tasks import Task
+from twitter.pants.tasks import Task, TaskError
 
 
 def is_java(target):
@@ -94,6 +94,8 @@ class JarCreate(Task):
 
     self.jar_sources = products.isrequired('source_jars') or options.jar_create_sources
 
+    self._jars = {}
+
   def execute(self, targets):
     safe_mkdir(self._output_dir)
 
@@ -118,7 +120,13 @@ class JarCreate(Task):
                       functools.partial(add_genjar, 'javadoc_jars'))
 
   @contextmanager
-  def create_jar(self, path):
+  def create_jar(self, target, path):
+    existing = self._jars.setdefault(path, target)
+    if target != existing:
+      raise TaskError('Duplicate name: target %s tried to write %s already mapped to target %s' % (
+        target, path, existing
+      ))
+    self._jars[path] = target
     with open_jar(path, 'w', compression=self.compression) as jar:
       yield jar
 
@@ -129,7 +137,7 @@ class JarCreate(Task):
         jar_name = '%s.jar' % jarname(target)
         add_genjar(target, jar_name)
         jar_path = os.path.join(self._output_dir, jar_name)
-        with self.create_jar(jar_path) as zip:
+        with self.create_jar(target, jar_path) as zip:
           for basedir, classfiles in generated.items():
             for classfile in classfiles:
               zip.write(os.path.join(basedir, classfile), classfile)
@@ -144,7 +152,7 @@ class JarCreate(Task):
       jar_name = '%s-sources.jar' % jarname(target)
       add_genjar(target, jar_name)
       jar_path = os.path.join(self._output_dir, jar_name)
-      with self.create_jar(jar_path) as zip:
+      with self.create_jar(target, jar_path) as zip:
         for source in target.sources:
           zip.write(os.path.join(target.target_base, source), source)
 
@@ -155,7 +163,7 @@ class JarCreate(Task):
         jar_name = '%s-javadoc.jar' % jarname(target)
         add_genjar(target, jar_name)
         jar_path = os.path.join(self._output_dir, jar_name)
-        with self.create_jar(jar_path) as zip:
+        with self.create_jar(target, jar_path) as zip:
           for basedir, javadocfiles in generated.items():
             for javadocfile in javadocfiles:
               zip.write(os.path.join(basedir, javadocfile), javadocfile)

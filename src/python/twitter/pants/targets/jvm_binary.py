@@ -22,24 +22,28 @@ from twitter.pants.targets.jvm_target import JvmTarget
 
 class JvmBinary(JvmTarget):
   """
-    Defines a jvm binary consisting of a main class.  The binary can either collect the main class
-    from an associated java source file or from its dependencies.
+    Defines a jvm binary optionally identifying a launcher main class.  If a main is specified, The
+    binary can either collect the main class from an associated java source file or from its
+    dependencies.
   """
 
-  def __init__(self, name, main,
+  def __init__(self, name,
+               main=None,
                basename=None,
                source=None,
                dependencies=None,
                excludes=None,
-               deploy_excludes=None):
+               deploy_excludes=None,
+               configurations=None):
 
     JvmTarget.__init__(self,
                        name=name,
                        sources=[source] if source else None,
                        dependencies=dependencies,
-                       excludes=excludes)
+                       excludes=excludes,
+                       configurations=configurations)
 
-    if not isinstance(main, Compatibility.string):
+    if main and not isinstance(main, Compatibility.string):
       raise TargetDefinitionException(self, 'main must be a fully qualified classname')
 
     if source and not isinstance(source, Compatibility.string):
@@ -49,7 +53,7 @@ class JvmBinary(JvmTarget):
     self.basename = basename or name
     self.deploy_excludes = deploy_excludes or []
 
-class IdentityMapper(object):
+class RelativeToMapper(object):
   """A mapper that maps files specified relative to a base directory."""
 
   def __init__(self, base):
@@ -58,7 +62,7 @@ class IdentityMapper(object):
     self.base = base
 
   def __call__(self, file):
-    return os.path.join(self.base, file)
+    return os.path.relpath(file, self.base)
 
   def __repr__(self):
     return 'IdentityMapper(%s)' % self.base
@@ -67,13 +71,23 @@ class IdentityMapper(object):
 class Bundle(object):
   """Defines a bundle of files mapped from their full path name to a path name in the bundle."""
 
-  def __init__(self, mapper=None):
+  def __init__(self, mapper=None, relative_to=None):
     """
       Creates a new bundle with an empty filemap.  If no mapper is specified, an IdentityMapper
       is used to map files into the bundle relative to the cwd.
     """
 
-    self.mapper = mapper or IdentityMapper(os.getcwd())
+    if mapper and relative_to:
+      raise ValueError("Must specify exactly one of 'mapper' or 'relative_to'")
+
+    if relative_to:
+      base = os.path.abspath(relative_to)
+      if not os.path.exists(base) and os.path.isdir(base):
+        raise ValueError('Could not find a directory to bundle relative to at %s' % base)
+      self.mapper = RelativeToMapper(base)
+    else:
+      self.mapper = mapper or RelativeToMapper(os.getcwd())
+
     self.filemap = {}
 
   def add(self, *filesets):
@@ -81,7 +95,7 @@ class Bundle(object):
       paths = fileset() if isinstance(fileset, Fileset) \
                         else fileset if hasattr(fileset, '__iter__') \
                         else [fileset]
-      self.filemap.update(((self.mapper(path), path) for path in paths))
+      self.filemap.update(((os.path.abspath(path), self.mapper(path)) for path in paths))
     return self
 
   def resolve(self):

@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==================================================================================================
+from twitter.pants.targets.jar_dependency import JarDependency
 
 __author__ = 'John Sirois'
 
@@ -36,6 +37,8 @@ class IvyResolve(NailgunTask):
 
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
+    NailgunTask.setup_parser(option_group, args, mkflag)
+
     flag = mkflag('override')
     option_group.add_option(flag, action='append', dest='ivy_resolve_overrides',
                             help='''Specifies a jar dependency override in the form:
@@ -137,26 +140,27 @@ class IvyResolve(NailgunTask):
       if changed_deps:
         self._exec_ivy(target_workdir, targets, [
           '-cachepath', target_classpath_file,
-          '-types', 'jar', 'bundle',
           '-confs'
         ] + self._confs)
 
     if os.path.exists(target_classpath_file):
+      def safe_link(src, dest):
+        if os.path.exists(dest):
+          os.unlink(dest)
+        os.symlink(src, dest)
+
       # Symlink to the current classpath file.
-      if os.path.exists(self._classpath_file):
-        os.unlink(self._classpath_file)
-      os.symlink(target_classpath_file, self._classpath_file)
+      safe_link(target_classpath_file, self._classpath_file)
 
       # Symlink to the current ivy.xml file (useful for IDEs that read it).
       ivyxml_symlink = os.path.join(self._work_dir, 'ivy.xml')
       target_ivyxml = os.path.join(target_workdir, 'ivy.xml')
-      if os.path.exists(ivyxml_symlink):
-        os.unlink(ivyxml_symlink)
-      os.symlink(target_ivyxml, ivyxml_symlink)
+      safe_link(target_ivyxml, ivyxml_symlink)
 
-      with self._cachepath(self._classpath_file) as classpath:
-        with self.context.state('classpath', []) as cp:
-          for path in classpath:
+    with self._cachepath(self._classpath_file) as classpath:
+      with self.context.state('classpath', []) as cp:
+        for path in classpath:
+          if self._is_jar(path):
             for conf in self._confs:
               cp.append((conf, path.strip()))
 
@@ -189,7 +193,6 @@ class IvyResolve(NailgunTask):
 
   def _generate_ivy_report(self):
     classpath = binary_utils.nailgun_profile_classpath(self, self._profile)
-    self.ng('ng-cp', *classpath)
 
     reports = []
     org, name = self._identify()
@@ -203,7 +206,8 @@ class IvyResolve(NailgunTask):
       )
       xml = os.path.join(self._cachedir, '%(org)s-%(name)s-%(conf)s.xml' % params)
       out = os.path.join(self._outdir, '%(org)s-%(name)s-%(conf)s.html' % params)
-      self.ng('org.apache.xalan.xslt.Process', '-IN', xml, '-XSL', xsl, '-OUT', out)
+      args = ['-IN', xml, '-XSL', xsl, '-OUT', out]
+      self.runjava('org.apache.xalan.xslt.Process', classpath=classpath, args=args)
       reports.append(out)
 
     css = os.path.join(self._outdir, 'ivy-report.css')
@@ -262,11 +266,14 @@ class IvyResolve(NailgunTask):
   def _mapjars(self, genmap, target):
     mapdir = os.path.join(self._classpath_dir, target.id)
     safe_mkdir(mapdir, clean=True)
-    self._exec_ivy(mapdir, [target], [
-      '-retrieve', '%s/[organisation]/[artifact]/[organisation]-[artifact]-[revision].jar' % mapdir,
+    ivyargs = [
+      '-retrieve', '%s/[organisation]/[artifact]/[conf]/'
+                   '[organisation]-[artifact]-[revision](-[classifier]).[ext]' % mapdir,
       '-symlink',
-      '-types', 'jar', 'bundle',
-    ])
+      '-confs',
+    ]
+    ivyargs.extend(target.configurations or self._confs)
+    self._exec_ivy(mapdir, [target], ivyargs)
 
     for org in os.listdir(mapdir):
       orgdir = os.path.join(mapdir, org)
@@ -274,11 +281,21 @@ class IvyResolve(NailgunTask):
         for name in os.listdir(orgdir):
           artifactdir = os.path.join(orgdir, name)
           if os.path.isdir(artifactdir):
-            for file in os.listdir(artifactdir):
-              if file.endswith('.jar'):
-                genmap.add(org, artifactdir).append(file)
-                genmap.add((org, name), artifactdir).append(file)
-                genmap.add(target, artifactdir).append(file)
+            for conf in os.listdir(artifactdir):
+              confdir = os.path.join(artifactdir, conf)
+              for file in os.listdir(confdir):
+                if self._is_jar(file):
+                  # TODO(John Sirois): kill the org and (org, name) exclude mappings in favor of a
+                  # conf whitelist
+                  genmap.add(org, confdir).append(file)
+                  genmap.add((org, name), confdir).append(file)
+
+                  genmap.add(target, confdir).append(file)
+                  genmap.add((target, conf), confdir).append(file)
+                  genmap.add((org, name, conf), confdir).append(file)
+
+  def _is_jar(self, path):
+    return path.endswith('.jar')
 
   def _exec_ivy(self, target_workdir, targets, args):
     ivyxml = os.path.join(target_workdir, 'ivy.xml')
@@ -295,7 +312,7 @@ class IvyResolve(NailgunTask):
       ivy_args.append('-notransitive')
     ivy_args.extend(self._args)
 
-    result = self.ng('org.apache.ivy.Main', *ivy_args)
+    result = self.runjava('org.apache.ivy.Main', args=ivy_args)
     if result != 0:
       raise TaskError('org.apache.ivy.Main returned %d' % result)
 

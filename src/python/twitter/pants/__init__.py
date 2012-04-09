@@ -38,7 +38,7 @@ def get_buildroot():
         if build_root != os.path.dirname(build_root):
           build_root = os.path.dirname(build_root)
         else:
-          print >> sys.stderr, 'Could not find .git root!'
+          print('Could not find .git root!', file=sys.stderr)
           sys.exit(1)
       _BUILD_ROOT = os.path.realpath(build_root)
   return _BUILD_ROOT
@@ -177,7 +177,7 @@ def is_apt(target):
 def is_python(target):
   """Returns True if the target has python sources."""
 
-  return isinstance(target, PythonTarget) or isinstance(target, PythonEgg)
+  return isinstance(target, PythonTarget)
 
 def is_scala(target):
   """Returns True if the target has scala sources."""

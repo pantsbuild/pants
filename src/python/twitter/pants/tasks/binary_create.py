@@ -31,30 +31,21 @@ from twitter.pants.tasks.jvm_binary_task import JvmBinaryTask
 class BinaryCreate(JvmBinaryTask):
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
-    option_group.add_option(mkflag("outdir"), dest="binary_create_outdir",
-                            help="Create binary in this directory.")
-
+    JvmBinaryTask.setup_parser(option_group, args, mkflag)
     option_group.add_option(mkflag("compressed"), mkflag("compressed", negate=True),
                             dest="binary_create_compressed", default=True,
                             action="callback", callback=mkflag.set_bool,
                             help="[%default] Create a compressed binary jar.")
 
-    option_group.add_option(mkflag("deployjar"), mkflag("deployjar", negate=True),
-                            dest="binary_create_deployjar", default=False,
-                            action="callback", callback=mkflag.set_bool,
-                            help="[%default] Create a monolithic deploy jar containing this "
-                                 "binaries classfiles as well as all classfiles it depends on "
-                                 "transitively.")
-
   def __init__(self, context):
     JvmBinaryTask.__init__(self, context)
 
     self.outdir = (
-      context.options.binary_create_outdir
+      context.options.jvm_binary_create_outdir
       or context.config.get('binary-create', 'outdir')
     )
     self.compression = ZIP_DEFLATED if context.options.binary_create_compressed else ZIP_STORED
-    self.deployjar = context.options.binary_create_deployjar
+    self.deployjar = context.options.jvm_binary_create_deployjar
 
     context.products.require('jars', predicate=self.is_binary)
     if self.deployjar:
@@ -94,7 +85,8 @@ class BinaryCreate(JvmBinaryTask):
         Manifest.CREATED_BY,
         'python %s pants %s (Twitter, Inc.)' % (platform.python_version(), get_version())
       )
-      manifest.addentry(Manifest.MAIN_CLASS,  binary.main)
+      main = binary.main or '*** java -jar not supported, please use -cp and pick a main ***'
+      manifest.addentry(Manifest.MAIN_CLASS,  main)
       jar.writestr(Manifest.PATH, manifest.contents())
 
       jarmap.add(binary, self.outdir, [binary_jarname])

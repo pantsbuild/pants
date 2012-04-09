@@ -30,13 +30,15 @@ function run_pants_bare() {
 }
 
 if [ ! -e $VIRTUAL_PYTHON/bin/python ]; then
-  $MY_DIR/build-support/bootstrap/bootstrap.sh
+  $MY_DIR/build-support/python/setup.sh
   rc=$?
   if [[ $rc != 0 ]]; then
     echo "Unable to bootstrap a sane Python virtual environment for pants!"
     rm -rf $VIRTUAL_PYTHON
     exit $rc
   fi
+  source $VIRTUAL_PYTHON/bin/activate
+  deactivate
 fi
 
 if [ -z "${PANTS_DEV}" -a ! -e $MY_DIR/pants.pex ]; then
@@ -46,6 +48,7 @@ if [ -z "${PANTS_DEV}" -a ! -e $MY_DIR/pants.pex ]; then
     exit
   else
     mv $MY_DIR/dist/pants.pex $MY_DIR/pants.pex
+    cp $MY_DIR/pants.pex $VIRTUAL_PYTHON/pants.pex
   fi
 fi
 

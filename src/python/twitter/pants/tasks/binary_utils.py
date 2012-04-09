@@ -24,8 +24,9 @@ import subprocess
 from contextlib import contextmanager
 
 from twitter.common import log
-from twitter.common.contextutil import temporary_file
+from twitter.common.contextutil import environment_as, temporary_file
 from twitter.common.dirutil import safe_mkdir, safe_open, touch
+
 from twitter.pants.base import Config
 from twitter.pants.tasks import TaskError
 
@@ -107,6 +108,20 @@ def safe_args(args,
     yield args
 
 
+@contextmanager
+def safe_classpath(logger=None):
+  """
+    Yields to a block in an environment with no CLASSPATH.  This is useful to ensure hermetic java
+    invocations.
+  """
+  classpath = os.getenv('CLASSPATH')
+  if classpath:
+    logger = logger or log.warn
+    logger('Scrubbing CLASSPATH=%s' % classpath)
+  with environment_as(CLASSPATH=None):
+    yield
+
+
 def runjava(jvmargs=None, classpath=None, main=None, args=None):
   """Spawns a java process with the supplied configuration and returns its exit code."""
   cmd = ['java']
@@ -118,20 +133,16 @@ def runjava(jvmargs=None, classpath=None, main=None, args=None):
     cmd.append(main)
   if args:
     cmd.extend(args)
+
   log.debug('Executing: %s' % ' '.join(cmd))
-  return subprocess.call(cmd)
+  with safe_classpath():
+    return subprocess.call(cmd)
 
 
 def nailgun_profile_classpath(nailgun_task, profile, ivy_jar=None, ivy_settings=None):
-  def nailgun_runner(classpath, main, args):
-    result = nailgun_task.ng('ng-cp', *classpath)
-    if result != 0:
-      return result
-    return nailgun_task.ng(main, *args)
-
   return profile_classpath(
     profile,
-    java_runner=nailgun_runner,
+    java_runner=nailgun_task.runjava,
     config=nailgun_task.context.config,
     ivy_jar=ivy_jar,
     ivy_settings=ivy_settings
@@ -142,9 +153,7 @@ def profile_classpath(profile, java_runner=None, config=None, ivy_jar=None, ivy_
   # TODO(John Sirois): consider rework when ant backend is gone and there is no more need to share
   # path structure
 
-  def call_java(classpath, main, args):
-    return runjava(classpath=classpath, main=main, args=args)
-  java_runner = java_runner or call_java
+  java_runner = java_runner or runjava
 
   config = config or Config.load()
 

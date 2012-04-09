@@ -33,9 +33,9 @@ class Config(object):
     value of var_name.
   """
 
-  class ConfigError(Exception): pass
+  DEFAULT_SECTION = ConfigParser.DEFAULTSECT
 
-  DEFAULT = 'DEFAULT'
+  class ConfigError(Exception): pass
 
   @staticmethod
   def load(configpath=os.path.join(get_buildroot(), 'pants.ini'), defaults=None):
@@ -45,6 +45,16 @@ class Config(object):
       file's DEFAULT section.  The 'buildroot', invoking 'user' and invoking user's 'homedir' are
       automatically defaulted.
     """
+    return Config(Config.create_parser(defaults), configpath)
+
+  @staticmethod
+  def create_parser(defaults=None):
+    """
+      Creates a config parser that supports %([key-name])s value substitution.  Any defaults
+      supplied will act as if specified in the loaded config file's DEFAULT section and be available
+      for substitutions.  The 'buildroot', invoking 'user' and invoking user's 'homedir' are
+      automatically defaulted.
+    """
     standard_defaults = dict(
       buildroot=get_buildroot(),
       homedir=os.path.expanduser('~'),
@@ -52,12 +62,12 @@ class Config(object):
     )
     if defaults:
       standard_defaults.update(defaults)
-    return Config(configpath, defaults=standard_defaults)
+    return ConfigParser.SafeConfigParser(standard_defaults)
 
-  def __init__(self, configpath, defaults):
-    self.config = ConfigParser.SafeConfigParser(defaults)
+  def __init__(self, configparser, configpath):
+    self.configparser = configparser
     with open(configpath) as ini:
-      self.config.readfp(ini, filename=configpath)
+      self.configparser.readfp(ini, filename=configpath)
     self.file = configpath
 
   def getbool(self, section, option, default=None):
@@ -85,7 +95,7 @@ class Config(object):
       Retrieves option from the DEFAULT section if it exists and attempts to parse it as type.
       If there is no definition found, the default value supplied is returned.
     """
-    return self.get(Config.DEFAULT, option, type, default=default)
+    return self.get(Config.DEFAULT_SECTION, option, type, default=default)
 
   def get(self, section, option, type=str, default=None):
     """
@@ -97,9 +107,9 @@ class Config(object):
     return self._getinstance(section, option, type, default=default)
 
   def _getinstance(self, section, option, type, default=None):
-    if not self.config.has_option(section, option):
+    if not self.configparser.has_option(section, option):
       return default
-    raw_value = self.config.get(section, option)
+    raw_value = self.configparser.get(section, option)
     if issubclass(type, str):
       return raw_value
 

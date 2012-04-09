@@ -85,7 +85,7 @@ class Task(object):
     def check(self, target):
       """Checks if a target has changed and invalidates it if so."""
       cache_key = self._key_for(target)
-      if self._cache.needs_update(cache_key):
+      if cache_key and self._cache.needs_update(cache_key):
         self._invalidate(target, cache_key)
 
     def update(self, cache_key):
@@ -98,6 +98,9 @@ class Task(object):
 
     def _key_for(self, target):
       if self._only_buildfiles:
+        if not os.path.exists(target.address.buildfile.full_path):
+          # A synthetic target - keep no cache for these
+          return None
         absolute_sources = [target.address.buildfile.full_path]
       else:
         absolute_sources = sorted(target.expand_files(recursive=False))

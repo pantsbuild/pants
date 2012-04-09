@@ -18,9 +18,10 @@ import marshal
 import os
 import re
 
+from glob import glob1
+
 from twitter.common.collections import OrderedSet
 from twitter.common.python.interpreter import PythonIdentity
-from glob import glob1
 
 class BuildFile(object):
   _CANONICAL_NAME = 'BUILD'
@@ -103,7 +104,7 @@ class BuildFile(object):
 
     parentdir = os.path.dirname(self.full_path)
     visited = set()
-    while parentdir not in visited:
+    while parentdir not in visited and self.root_dir != parentdir:
       visited.add(parentdir)
       parentdir, buildfile = find_parent(parentdir)
       if buildfile:

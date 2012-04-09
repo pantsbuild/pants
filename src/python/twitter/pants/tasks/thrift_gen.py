@@ -73,7 +73,12 @@ class ThriftGen(CodeGen):
 
     self.gen_java = create_geninfo('java')
     self.gen_python = create_geninfo('python')
+
     self.gen_langs = set(context.options.thrift_gen_langs)
+    for lang in ('java', 'python'):
+      if self.context.products.isrequired(lang):
+        self.gen_langs.add(lang)
+
 
   def invalidate_for(self):
     return self.gen_langs

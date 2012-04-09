@@ -137,4 +137,3 @@ class Build(Command):
     except:
       self.error("Problem executing PythonBuilder for targets %s: %s" % (targets,
                                                                          traceback.format_exc()))
-

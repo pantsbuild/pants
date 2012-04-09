@@ -31,6 +31,8 @@ from twitter.pants.tasks.nailgun_task import NailgunTask
 class ScalaCompile(NailgunTask):
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
+    NailgunTask.setup_parser(option_group, args, mkflag)
+
     option_group.add_option(mkflag("warnings"), mkflag("warnings", negate=True),
                             dest="scala_compile_warnings", default=True,
                             action="callback", callback=mkflag.set_bool,
@@ -116,7 +118,6 @@ class ScalaCompile(NailgunTask):
       self._compiler_classpath
       or nailgun_profile_classpath(self, self._compile_profile)
     )
-    self.ng('ng-cp', *compiler_classpath)
 
     # TODO(John Sirois): separate compiler profile from runtime profile
     args = [
@@ -130,7 +131,7 @@ class ScalaCompile(NailgunTask):
     args.extend(self._args)
     args.extend(sources)
     self.context.log.debug('Executing: %s %s' % (self._main, ' '.join(args)))
-    return self.ng(self._main, *args)
+    return self.runjava(self._main, classpath=compiler_classpath, args=args)
 
 
 class ScalaCompiler(object):

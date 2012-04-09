@@ -53,4 +53,3 @@ class Manifest(object):
 
   def contents(self):
     return self._contents + '\n'
-

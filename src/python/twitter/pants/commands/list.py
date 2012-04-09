@@ -107,4 +107,3 @@ class List(Command):
     target = Target.get(address)
     if is_exported(target):
       return " ".join(extractor(target) for extractor in column_extractors)
-

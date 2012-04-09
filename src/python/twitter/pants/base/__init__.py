@@ -14,12 +14,13 @@
 # limitations under the License.
 # ==================================================================================================
 
-from twitter.pants.base.address import Address
-from twitter.pants.base.build_file import BuildFile
-from twitter.pants.base.config import Config
-from twitter.pants.base.fileset import Fileset
-from twitter.pants.base.parse_context import ContextError, ParseContext
-from twitter.pants.base.target import Target, TargetDefinitionException
+from .address import Address
+from .build_file import BuildFile
+from .config import Config
+from .fileset import Fileset
+from .parse_context import ContextError, ParseContext
+from .target import Target, TargetDefinitionException
+
 
 __all__ = [
   'Address',

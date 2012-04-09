@@ -37,6 +37,27 @@ _PROCESSOR_INFO_FILE = 'META-INF/services/javax.annotation.processing.Processor'
 _JMAKE_MAIN = 'com.sun.tools.jmake.Main'
 
 
+# From http://kenai.com/projects/jmake/sources/mercurial/content/src/com/sun/tools/jmake/Main.java?rev=26
+# Main.mainExternal docs.
+_JMAKE_ERROR_CODES = {
+   -1: 'invalid command line option detected',
+   -2: 'error reading command file',
+   -3: 'project database corrupted',
+   -4: 'error initializing or calling the compiler',
+   -5: 'compilation error',
+   -6: 'error parsing a class file',
+   -7: 'file not found',
+   -8: 'I/O exception',
+   -9: 'internal jmake exception',
+  -10: 'deduced and actual class name mismatch',
+  -11: 'invalid source file extension',
+  -12: 'a class in a JAR is found dependent on a class with the .java source',
+  -13: 'more than one entry for the same class is found in the project',
+  -20: 'internal Java error (caused by java.lang.InternalError)',
+  -30: 'internal Java error (caused by java.lang.RuntimeException).'
+}
+
+
 class JavaCompile(NailgunTask):
   @staticmethod
   def _is_java(target):
@@ -44,6 +65,8 @@ class JavaCompile(NailgunTask):
 
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
+    NailgunTask.setup_parser(option_group, args, mkflag)
+
     option_group.add_option(mkflag("warnings"), mkflag("warnings", negate=True),
                             dest="java_compile_warnings", default=True,
                             action="callback", callback=mkflag.set_bool,
@@ -62,6 +85,8 @@ class JavaCompile(NailgunTask):
     self._compiler_profile = context.config.get('java-compile', 'compiler-profile')
 
     self._args = context.config.getlist('java-compile', 'args')
+    self._jvm_args = context.config.getlist('java-compile', 'jvm_args')
+
     if context.options.java_compile_warnings:
       self._args.extend(context.config.getlist('java-compile', 'warning_args'))
     else:
@@ -88,7 +113,8 @@ class JavaCompile(NailgunTask):
               classpath = [jar for conf, jar in cp if conf in self._confs]
               result = self.compile(classpath, sources, fingerprint)
               if result != 0:
-                raise TaskError('%s returned %d' % (_JMAKE_MAIN, result))
+                default_message = 'Unexpected error - %s returned %d' % (_JMAKE_MAIN, result)
+                raise TaskError(_JMAKE_ERROR_CODES.get(result, default_message))
 
             if processors:
               # Produce a monolithic apt processor service info file for further compilation rounds
@@ -138,7 +164,6 @@ class JavaCompile(NailgunTask):
     safe_mkdir(self._classes_dir)
 
     jmake_classpath = nailgun_profile_classpath(self, self._jmake_profile)
-    self.ng('ng-cp', *jmake_classpath)
 
     args = [
       '-classpath', ':'.join(classpath),
@@ -150,13 +175,13 @@ class JavaCompile(NailgunTask):
     args.extend([
       '-jcpath', ':'.join(compiler_classpath),
       '-jcmainclass', 'com.twitter.common.tools.Compiler',
-      '-C-dependencyfile', '-C%s' % self._dependencies_file
+      '-C-Tdependencyfile', '-C%s' % self._dependencies_file,
     ])
 
     args.extend(self._args)
     args.extend(sources)
     log.debug('Executing: %s %s' % (_JMAKE_MAIN, ' '.join(args)))
-    return self.ng(_JMAKE_MAIN, *args)
+    return self.runjava(_JMAKE_MAIN, classpath=jmake_classpath, args=args, jvmargs=self._jvm_args)
 
   def write_processor_info(self, processor_info_file, processors):
     with safe_open(processor_info_file, 'w') as f:

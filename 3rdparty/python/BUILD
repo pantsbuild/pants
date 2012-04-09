@@ -32,10 +32,7 @@ python_library(
 python_library(
   name = 'git-python',
   dependencies = [
-    egg("GitPython-0.3.1-py2.6.egg"),
-    egg("async-*.egg"),
-    egg("gitdb-*.egg"),
-    egg("smmap-0.8.1-py2.6.egg")
+    python_requirement('GitPython')
   ]
 )
 
@@ -72,8 +69,7 @@ python_library(
 python_library(
   name = 'pytest',
   dependencies = [
-    pants(":py"),
-    egg("pytest-2.2.0-py2.6.egg"),
+    python_requirement('pytest')
   ]
 )
 
@@ -95,7 +91,7 @@ python_library(
 
 python_library(
   name = 'thrift-0.7',
-  dependencies = [egg("Thrift-0.7.0_dev-py2.6.egg")])
+  dependencies = [python_requirement('thrift>=0.8.0')])
 
 python_library(
   name = 'zookeeper',
@@ -178,7 +174,7 @@ python_library(
 
 python_library(
   name = 'bottle',
-  dependencies = [egg('bottle-0.10.dev-py2.6.egg')])
+  dependencies = [python_requirement('bottle')])
 
 python_library(
   name = 'protobuf',
@@ -218,3 +214,15 @@ python_library(
 python_library(
   name = 'pygments',
   dependencies = [egg("Pygments-1.4-py2.6.egg")])
+
+python_library(
+  name = 'markupsafe',
+  dependencies = [egg("MarkupSafe-0.15-py2.6-*.egg")])
+
+python_library(
+  name = 'pyyaml',
+  dependencies = [egg("PyYAML-*.egg")])
+
+python_library(
+  name = 'pytz',
+  dependencies = [egg("pytz-2012b-py2.6.egg")])

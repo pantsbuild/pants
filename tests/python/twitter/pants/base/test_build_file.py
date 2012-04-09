@@ -41,7 +41,12 @@ class BuildFileTest(unittest.TestCase):
 
   @classmethod
   def setUpClass(cls):
-    BuildFileTest.root_dir = tempfile.mkdtemp()
+    BuildFileTest.base_dir = tempfile.mkdtemp()
+
+    # Seed a BUILD outside the build root that should not be detected
+    touch(os.path.join(BuildFileTest.base_dir, 'BUILD'))
+
+    BuildFileTest.root_dir = os.path.join(BuildFileTest.base_dir, 'root')
 
     BuildFileTest.touch('grandparent/parent/BUILD')
     BuildFileTest.touch('grandparent/parent/BUILD.twitter')
@@ -61,7 +66,6 @@ class BuildFileTest(unittest.TestCase):
 
   def setUp(self):
     self.buildfile = BuildFileTest.buildfile('grandparent/parent/BUILD')
-    pass
 
   def testSiblings(self):
     buildfile = BuildFileTest.buildfile('grandparent/parent/BUILD.twitter')

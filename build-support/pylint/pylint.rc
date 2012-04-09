@@ -1,6 +1,22 @@
 [MASTER]
 
 [BASIC]
+variable-rgx = [a-z_][a-z0-9_]{1,30}$
+argument-rgx = [a-z_][a-z0-9_]{1,30}$
+
+# See:
+#   http://www.logilab.org/card/pylintfeatures
+#
+# C0111: Missing docstring
+# W0141: Used builtin function (e.g. map, filter) instead of list comprehension
+# R0903: Too few public methods
+
+[MESSAGES CONTROL]
+disable = C0111,W0141,R0903,
+
+[REPORTS]
+output-format=colorized
+include-ids=yes
 
 [DESIGN]
 

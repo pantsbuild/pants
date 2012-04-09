@@ -19,11 +19,7 @@ import unittest
 from twitter.birds.duck.ttypes import Duck
 from twitter.birds.goose.ttypes import Goose
 
-import unittest
-
-
 class ThritNamespacePackagesTest(unittest.TestCase):
-
   def test_thrift_namespaces(self):
     """The 'test' here is the very fact that we can successfully import the generated thrift code
     with a shared package prefix (twitter.birds) from two different eggs.

@@ -73,7 +73,7 @@ from twitter.common.dirutil import safe_open
 from twitter.pants import get_buildroot
 from twitter.pants.base import Address, Target
 from twitter.pants.targets import Page
-from twitter.pants.tasks import Task, TaskError
+from twitter.pants.tasks import binary_utils, Task, TaskError
 
 class MarkdownToHtml(Task):
   AVAILABLE = HAS_MARKDOWN
@@ -81,6 +81,11 @@ class MarkdownToHtml(Task):
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
     configure_codehighlight_options(option_group, mkflag)
+
+    option_group.add_option(mkflag("open"), mkflag("open", negate=True),
+                            dest = "markdown_to_html_open",
+                            action="callback", callback=mkflag.set_bool, default=False,
+                            help = "[%default] Open the generated documents in a browser.")
 
     option_group.add_option(mkflag("standalone"), mkflag("standalone", negate=True),
                             dest = "markdown_to_html_standalone",
@@ -97,6 +102,8 @@ class MarkdownToHtml(Task):
 
   def __init__(self, context):
     Task.__init__(self, context)
+
+    self.open = context.options.markdown_to_html_open
 
     self.outdir = (
       context.options.markdown_to_html_outdir
@@ -126,8 +133,25 @@ class MarkdownToHtml(Task):
     if css:
       self.context.log.info('Emitted %s' % css)
 
+    def is_page(target):
+      return isinstance(target, Page)
+
+    roots = set()
+    interior_nodes = set()
+    if self.open:
+      dependencies_by_page = self.context.dependants(on_predicate=is_page, from_predicate=is_page)
+      roots.update(dependencies_by_page.keys())
+      for dependencies in dependencies_by_page.values():
+        interior_nodes.update(dependencies)
+        roots.difference_update(dependencies)
+      for page in self.context.targets(is_page):
+        # There are no in or out edges so we need to show show this isolated page.
+        if not page.dependencies and page not in interior_nodes:
+          roots.add(page)
+
     genmap = self.context.products.get('markdown_html')
-    for page in filter(lambda t: isinstance(t, Page), targets):
+    show = []
+    for page in filter(is_page, targets):
       _, ext = os.path.splitext(page.source)
       if ext in self.extensions:
         def process_page(key, outdir, url_builder, config):
@@ -146,17 +170,24 @@ class MarkdownToHtml(Task):
           self.context.log.info('Processed %s to %s' % (page.source, html_path))
           outputs.append(os.path.relpath(html_path, outdir))
           genmap.add(key, outdir, outputs)
+          return html_path
 
         def url_builder(linked_page, config=None):
           path, ext = os.path.splitext(linked_page.source)
           return linked_page.name, os.path.relpath(path + '.html', os.path.dirname(page.source))
-        process_page(page, os.path.join(self.outdir, 'html'), url_builder, lambda p: None)
+
+        html = process_page(page, os.path.join(self.outdir, 'html'), url_builder, lambda p: None)
+        if self.open and page in roots:
+          show.append(html)
 
         for wiki in page.wikis():
           def get_config(page):
             return page.wiki_config(wiki)
           basedir = os.path.join(self.outdir, wiki.id)
           process_page((wiki, page), basedir, wiki.url_builder, get_config)
+
+    if show:
+      binary_utils.open(*show)
 
   PANTS_LINK = re.compile(r'''pants\(['"]([^)]+)['"]\)''')
 
@@ -188,7 +219,7 @@ class MarkdownToHtml(Task):
       with open(os.path.join(get_buildroot(), base, source), 'r') as input:
         md_html = markdown.markdown(
           input.read(),
-          extensions=['codehilite', 'extra', 'toc', wikilinks]
+          extensions=['codehilite', 'extra', 'tables', 'toc', wikilinks]
         )
         if standalone:
           if css:
@@ -219,4 +250,3 @@ class MarkdownToHtml(Task):
               output.write('\n')
           output.write(md_html)
         return output.name
-

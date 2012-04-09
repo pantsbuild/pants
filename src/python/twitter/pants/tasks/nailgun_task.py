@@ -24,9 +24,10 @@ import time
 
 from twitter.common import log
 from twitter.common.dirutil import safe_open
+
 from twitter.pants import get_buildroot
 from twitter.pants.java import NailgunClient, NailgunError
-from twitter.pants.tasks import Task
+from twitter.pants.tasks import binary_utils, Task
 
 def _check_pid(pid):
   try:
@@ -57,9 +58,19 @@ class NailgunTask(Task):
   PANTS_NG_ARG_PREFIX = '-Dtwitter.pants.buildroot'
   PANTS_NG_ARG = '%s=%s' % (PANTS_NG_ARG_PREFIX, get_buildroot())
 
+  _DAEMON_OPTION_PRESENT = False
+
   @staticmethod
   def log_kill(log, pid, port=None):
     log.info('killing ng server @ pid:%d%s' % (pid, ' port:%d' % port if port else ''))
+
+  @classmethod
+  def setup_parser(cls, option_group, args, mkflag):
+    if not NailgunTask._DAEMON_OPTION_PRESENT:
+      option_group.parser.add_option("--ng-daemons", "--no-ng-daemons", dest="nailgun_daemon",
+                                     default=True, action="callback", callback=mkflag.set_bool,
+                                     help="[%default] Use nailgun daemons to execute java tasks.")
+      NailgunTask._DAEMON_OPTION_PRESENT = True
 
   def __init__(self, context, classpath=None, workdir=None, nailgun_jar=None, args=None,
                stdin=None, stderr=sys.stderr, stdout=sys.stdout):
@@ -71,23 +82,34 @@ class NailgunTask(Task):
     self._stdin = stdin
     self._stderr = stderr
     self._stdout = stdout
+    self._daemon = context.options.nailgun_daemon
 
     workdir = workdir or context.config.get('nailgun', 'workdir')
     self._pidfile = os.path.join(workdir, 'pid')
     self._ng_out = os.path.join(workdir, 'stdout')
     self._ng_err = os.path.join(workdir, 'stderr')
 
-  def ng(self, main_class, *args, **environment):
-    nailgun = self._get_nailgun_client()
-    try:
-      if self._classpath:
-        nailgun('ng-cp', *[os.path.relpath(jar, get_buildroot()) for jar in self._classpath])
-      return nailgun(main_class, *args, **environment)
-    except NailgunError as e:
-      self.ng_shutdown()
-      raise e
+  def runjava(self, main, classpath=None, args=None, jvmargs=None):
+    """
+      Runs the java main using the given classpath and args.  If --no-ng-daemons is specified then
+      the java main is run in a freshly spawned subprocess, otherwise a persistent nailgun server
+      dedicated to this Task subclass is used to speed up amortized run times.
+    """
 
-  def ng_shutdown(self):
+    cp = (self._classpath or []) + (classpath or [])
+    if self._daemon:
+      nailgun = self._get_nailgun_client()
+      try:
+        if cp:
+          nailgun('ng-cp', *[os.path.relpath(jar, get_buildroot()) for jar in cp])
+        return nailgun(main, *args)
+      except NailgunError as e:
+        self._ng_shutdown()
+        raise e
+    else:
+      return binary_utils.runjava(main=main, classpath=cp, args=args, jvmargs=jvmargs)
+
+  def _ng_shutdown(self):
     endpoint = self._get_nailgun_endpoint()
     if endpoint:
       pid, port = endpoint
@@ -184,18 +206,19 @@ class NailgunTask(Task):
     args.extend(['-jar', self._nailgun_jar, ':0'])
     log.debug('Executing: %s' % ' '.join(args))
 
-    process = subprocess.Popen(
-      args,
-      stdin=in_fd,
-      stdout=out_fd,
-      stderr=err_fd,
-      close_fds=True,
-      cwd=get_buildroot()
-    )
-    with _safe_open(self._pidfile, 'w') as pidfile:
-      pidfile.write('%d' % process.pid)
-    log.debug('Spawned ng server @ %d' % process.pid)
-    sys.exit(0)
+    with binary_utils.safe_classpath(logger=log.warn):
+      process = subprocess.Popen(
+        args,
+        stdin=in_fd,
+        stdout=out_fd,
+        stderr=err_fd,
+        close_fds=True,
+        cwd=get_buildroot()
+      )
+      with _safe_open(self._pidfile, 'w') as pidfile:
+        pidfile.write('%d' % process.pid)
+      log.debug('Spawned ng server @ %d' % process.pid)
+      sys.exit(0)
 
 try:
   import psutil

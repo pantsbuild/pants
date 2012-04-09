@@ -16,16 +16,18 @@
 
 from __future__ import print_function
 
+__author__ = 'Brian Wickman'
+
 import os
 
 from . import Command
 
-from twitter.common.python import PythonLauncher
-from twitter.common.python.pexbuilder import PexBuilder
+from twitter.common.python.pex import PEX
 
 from twitter.pants.base import Address, Target
 from twitter.pants.targets import PythonBinary
-from twitter.pants.python import PythonChroot
+from twitter.pants.python.python_chroot import PythonChroot
+from twitter.pants.python.resolver import PythonResolver
 
 class Py(Command):
   """Python chroot manipulation."""
@@ -38,6 +40,8 @@ class Py(Command):
     parser.disable_interspersed_args()
     parser.add_option("--pex", dest = "pex", default = False, action='store_true',
                       help = "dump a .pex of this chroot")
+    parser.add_option("--resolve", dest = "resolve", default = False, action='store_true',
+                      help = "resolve targets instead of building.")
     parser.epilog = """Interact with the chroot of the specified target."""
 
   def __init__(self, root_dir, parser, argv):
@@ -48,6 +52,7 @@ class Py(Command):
 
     targets = []
 
+    # TODO(wickman)  Ignore the -- crap
     for k in range(len(self.args)):
       arg = self.args[0]
       if arg == '--':
@@ -78,16 +83,20 @@ class Py(Command):
   def execute(self):
     print("Build operating on target: %s %s" % (self.target,
       'Extra targets: %s' % ' '.join(map(str, self.extra_targets)) if self.extra_targets else ''))
+
+    if self.options.resolve:
+      executor = PythonResolver(self.target, self.root_dir, extra_targets=self.extra_targets)
+      executor.dump()
+      return 0
+
     executor = PythonChroot(self.target, self.root_dir, extra_targets=self.extra_targets)
+    builder = executor.dump()
     if self.options.pex:
-      # TODO(wickman)  This overlaps with commands/build.py and should be factored out, perhaps
-      # in pants.new.
       pex_name = os.path.join(self.root_dir, 'dist', '%s.pex' % self.target.name)
-      PexBuilder(executor.dump()).write(pex_name)
+      builder.build(pex_name)
       print('Wrote %s' % pex_name)
+      return 0
     else:
-      launcher = PythonLauncher(executor.dump().path())
-      binary = None
-      if isinstance(self.target, PythonBinary):
-        binary = executor.path()
-      launcher.run(binary=binary, args=list(self.args))
+      builder.freeze()
+      pex = PEX(builder.path())
+      return pex.run(args=list(self.args))

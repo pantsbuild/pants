@@ -78,7 +78,10 @@ class CodeGen(Task):
     gentargets = [t for t in targets if self.is_gentarget(t)]
     capabilities = self.genlangs() # lang_name => predicate
 
-    gentargets_by_dependee = self.context.dependants(self.is_gentarget)
+    gentargets_by_dependee = self.context.dependants(
+      on_predicate=self.is_gentarget,
+      from_predicate=lambda t: not self.is_gentarget(t)
+    )
     dependees_by_gentarget = defaultdict(set)
     for dependee, tgts in gentargets_by_dependee.items():
       for gentarget in tgts:
@@ -97,7 +100,10 @@ class CodeGen(Task):
       gentargets_bylang[lang] = gentargets if self.is_forced(lang) else find_gentargets(predicate)
 
     if gentargets_by_dependee:
-      raise TaskError('Left with unexpected unconsumed gen targets: %s' % gentargets_by_dependee)
+      self.context.log.warn('Left with unexpected unconsumed gen targets:\n\t%s' % '\n\t'.join(
+        '%s -> %s' % (dependee, gentargets)
+        for dependee, gentargets in gentargets_by_dependee.items()
+      ))
 
     with self.changed(gentargets, invalidate_dependants=True) as changed_targets:
       changed = set(changed_targets)

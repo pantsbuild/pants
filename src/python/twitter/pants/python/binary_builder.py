@@ -19,8 +19,10 @@ from __future__ import print_function
 __author__ = 'Brian Wickman'
 
 import os
+import tempfile
 
-from twitter.common.python.pexbuilder import PexBuilder
+from twitter.common.python.pex_builder import PEXBuilder
+from twitter.pants.base import Config
 from twitter.pants.targets import PythonBinary
 from twitter.pants.python.python_chroot import PythonChroot
 
@@ -32,17 +34,28 @@ class PythonBinaryBuilder(object):
     if not isinstance(target, PythonBinary):
       raise PythonBinaryBuilder.NotABinaryTargetException(
         "Target %s is not a PythonBinary!" % target)
-    self.chroot = PythonChroot(target, root_dir)
-    self.distdir = os.path.join(root_dir, 'dist')
+    config = Config.load()
+    self.distdir = config.getdefault('pants_distdir')
+    distpath = tempfile.mktemp(dir=self.distdir, prefix=target.name)
+    self.builder = PEXBuilder(distpath)
 
-  def _generate(self):
-    env = self.chroot.dump()
-    pex = PexBuilder(env)
-    pex_name = os.path.join(self.distdir, '%s.pex' % self.target.name)
-    pex.write(pex_name)
-    print('Wrote %s' % pex_name)
+    # configure builder PexInfo options
+    for repo in target._repositories:
+      self.builder.info().add_repository(repo)
+    for index in target._indices:
+      self.builder.info().add_index(index)
+    self.builder.info().allow_pypi = target._allow_pypi
+    self.builder.info().zip_safe = target._zip_safe
+    self.builder.info().inherit_path = target._inherit_path
+    self.builder.info().entry_point = target._entry_point
+    self.builder.info().ignore_errors = target._ignore_errors
+
+    self.chroot = PythonChroot(target, root_dir, builder=self.builder)
 
   def run(self):
     print('Building PythonBinary %s:' % self.target)
-    self._generate()
+    env = self.chroot.dump()
+    filename = os.path.join(self.distdir, '%s.pex' % self.target.name)
+    env.build(filename)
+    print('Wrote %s' % filename)
     return 0

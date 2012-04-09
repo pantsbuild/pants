@@ -32,6 +32,16 @@ class Products(object):
       """
       return self.by_target.get(target)
 
+    def keys_for(self, basedir, file):
+      """Returns the set of keys the given mapped product is registered under."""
+      keys = set()
+      for key, mappings in self.by_target.items():
+        for mapped in mappings.get(basedir, []):
+          if file == mapped:
+            keys.add(key)
+            break
+      return keys
+
     def __repr__(self):
       return 'ProductMapping(%s) {\n  %s\n}' % (self.typename, '\n  '.join(
         '%s => %s\n    %s' % (str(target), basedir, outputs)

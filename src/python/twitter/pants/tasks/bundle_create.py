@@ -79,9 +79,7 @@ class BundleCreate(JvmBinaryTask):
 
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
-    option_group.add_option(mkflag("outdir"), dest="bundle_create_outdir",
-                            help="Create bundles and archives in this directory.")
-
+    JvmBinaryTask.setup_parser(option_group, args, mkflag)
     option_group.add_option(mkflag("archive"), dest="bundle_create_archive",
                             type="choice", choices=list(ARCHIVER_BY_TYPE.keys()),
                             help="[%%default] Create an archive from the bundle. "
@@ -91,12 +89,14 @@ class BundleCreate(JvmBinaryTask):
     JvmBinaryTask.__init__(self, context)
 
     self.outdir = (
-      context.options.bundle_create_outdir
+      context.options.jvm_binary_create_outdir
       or context.config.get('bundle-create', 'outdir')
     )
     self.archiver = context.options.bundle_create_archive
 
-    self.context.products.require('jars', predicate=self.is_binary)
+    self.deployjar = context.options.jvm_binary_create_deployjar
+    if not self.deployjar:
+      self.context.products.require('jars', predicate=self.is_binary)
     self.require_jar_dependencies()
 
   def execute(self, targets):
@@ -116,30 +116,36 @@ class BundleCreate(JvmBinaryTask):
 
     safe_mkdir(bundledir, clean=True)
 
-    libdir = os.path.join(bundledir, 'libs')
-    os.mkdir(libdir)
-
     classpath = OrderedSet()
-    for basedir, externaljar in self.list_jar_dependencies(app.binary):
-      path = os.path.join(basedir, externaljar)
-      os.symlink(path, os.path.join(libdir, externaljar))
-      classpath.add(externaljar)
+    if not self.deployjar:
+      libdir = os.path.join(bundledir, 'libs')
+      os.mkdir(libdir)
+
+      for basedir, externaljar in self.list_jar_dependencies(app.binary):
+        path = os.path.join(basedir, externaljar)
+        os.symlink(path, os.path.join(libdir, externaljar))
+        classpath.add(externaljar)
 
     for basedir, jars in self.context.products.get('jars').get(app.binary).items():
       if len(jars) != 1:
         raise TaskError('Expected 1 mapped binary but found: %s' % jars)
 
       binary = jars.pop()
-      with open_zip(os.path.join(basedir, binary), 'r') as src:
-        with open_zip(os.path.join(bundledir, binary), 'w', compression=ZIP_DEFLATED) as dest:
-          for item in src.infolist():
-            buffer = src.read(item.filename)
-            if Manifest.PATH == item.filename:
-              manifest = Manifest(buffer)
-              manifest.addentry(Manifest.CLASS_PATH,
-                                ' '.join(os.path.join('libs', jar) for jar in classpath))
-              buffer = manifest.contents()
-            dest.writestr(item, buffer)
+      binary_jar = os.path.join(basedir, binary)
+      bundle_jar = os.path.join(bundledir, binary)
+      if not classpath:
+        os.symlink(binary_jar, bundle_jar)
+      else:
+        with open_zip(binary_jar, 'r') as src:
+          with open_zip(bundle_jar, 'w', compression=ZIP_DEFLATED) as dest:
+            for item in src.infolist():
+              buffer = src.read(item.filename)
+              if Manifest.PATH == item.filename:
+                manifest = Manifest(buffer)
+                manifest.addentry(Manifest.CLASS_PATH,
+                                  ' '.join(os.path.join('libs', jar) for jar in classpath))
+                buffer = manifest.contents()
+              dest.writestr(item, buffer)
 
     for bundle in app.bundles:
       for path, relpath in bundle.filemap.items():

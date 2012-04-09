@@ -18,11 +18,13 @@ from __future__ import print_function
 
 import sys
 
+class PantsBootstrapError(ImportError):
+  pass
+
 try:
   from mako.template import Template
 except ImportError:
-  print("Could not properly bootstrap your Python environment, missing Mako!", file=sys.stderr)
-  sys.exit(1)
+  raise PantsBootstrapError("Could not properly bootstrap Pants because Mako is missing!")
 
 import os
 import pprint

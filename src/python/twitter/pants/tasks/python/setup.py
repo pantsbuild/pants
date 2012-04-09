@@ -35,7 +35,7 @@ else:
   from urllib2 import urlopen
 
 def setup_virtualenv_py(context):
-  virtualenv_cache = context.config.get('python-setup', 'cache')
+  virtualenv_cache = context.config.get('python-setup', 'bootstrap_cache')
   virtualenv_target = context.config.get('python-setup', 'virtualenv_target')
   if not os.path.exists(virtualenv_cache):
     safe_mkdir(virtualenv_cache)
@@ -70,7 +70,7 @@ def subprocess_call(cmdline):
   return (po.returncode, stdout, stderr)
 
 def install_virtualenv(context, interpreter):
-  virtualenv_cache = context.config.get('python-setup', 'cache')
+  virtualenv_cache = context.config.get('python-setup', 'bootstrap_cache')
   virtualenv_target = context.config.get('python-setup', 'virtualenv_target')
   pip_repos = context.config.getlist('python-setup', 'repos')
   if not os.path.exists(virtualenv_target):
@@ -108,6 +108,8 @@ def install_virtualenv(context, interpreter):
   rc, stdout, stderr = subprocess_call(cmdline)
   if rc != 0:
     context.log.warn('Failed to install virtualenv: err=%s' % stderr)
+    context.log.info('Cleaning up %s' % interpreter.identity())
+    safe_rmtree(environment_install_path)
     raise TaskError('Could not install virtualenv for %s' % interpreter.identity())
 
   def install_package(pkg):
@@ -153,4 +155,8 @@ class SetupPythonEnvironment(Task):
 
     for interpreter in interpreters:
       self.context.log.debug('Preparing %s' % interpreter)
-      install_virtualenv(self.context, interpreter)
+      try:
+        install_virtualenv(self.context, interpreter)
+      except TaskError as e:
+        print('Failed to install %s, continuing anyway.' % interpreter)
+

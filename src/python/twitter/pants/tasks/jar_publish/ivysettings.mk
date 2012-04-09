@@ -36,6 +36,12 @@ limitations under the License.
       <ivy pattern="${dir}/[organisation]/[module]/ivy-[revision].xml" />
       <artifact pattern="${dir}/[organisation]/[module]/[artifact]-[revision](-[classifier]).[ext]"/>
     </filesystem>
+    % if publish_local:
+    <filesystem name="publish_local" transactional="false" local="true" m2compatible="true">
+      <ivy pattern="${publish_local}/[organisation]/[module]/[revision]/ivy-[revision].xml" />
+      <artifact pattern="${publish_local}/[organisation]/[module]/[revision]/[artifact]-[revision](-[classifier]).[ext]"/>
+    </filesystem>
+    % endif
   </resolvers>
 
   <modules>

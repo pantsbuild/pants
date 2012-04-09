@@ -71,6 +71,9 @@ class ProtobufGen(CodeGen):
     self.py_out = os.path.join(self.output_dir, 'gen-py')
 
     self.gen_langs = set(context.options.protobuf_gen_langs)
+    for lang in ('java', 'python'):
+      if self.context.products.isrequired(lang):
+        self.gen_langs.add(lang)
 
   def invalidate_for(self):
     return self.gen_langs
@@ -138,6 +141,7 @@ class ProtobufGen(CodeGen):
     tgt = self.context.add_target(self.java_out,
                                   JavaLibrary,
                                   name=target.id,
+                                  provides=target.provides,
                                   sources=genfiles,
                                   dependencies=self.javadeps)
     tgt.id = target.id

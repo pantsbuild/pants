@@ -62,6 +62,10 @@ class Goal(object):
 
       self._task = FuncTask
 
+  @property
+  def task_type(self):
+    return self._task
+
   def setup_parser(self, phase, parser, args):
     """Allows a task to add its command line args to the global sepcification."""
     def namespace(sep):

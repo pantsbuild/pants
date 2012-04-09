@@ -20,10 +20,10 @@ __author__ = 'Brian Wickman'
 
 import os
 import sys
-import shutil
 import tempfile
 import subprocess
 
+from twitter.common.dirutil import safe_rmtree
 from twitter.common.dirutil.chroot import RelativeChroot
 from twitter.pants.python.egg_builder import EggBuilder
 
@@ -53,7 +53,7 @@ class PythonThriftBuilder(object):
     return self.detected_packages
 
   def cleanup(self):
-    shutil.rmtree(self.chroot.path())
+    safe_rmtree(self.chroot.path())
 
   @staticmethod
   def thrift_binary(root_dir):
@@ -131,8 +131,8 @@ class PythonThriftBuilder(object):
       # Note that the thrift compiler should always generate empty __init__.py
       # files, but we test for this anyway, just in case that changes.
       if len(files) == 1 and os.path.getsize(init_py_abspath) == 0:
-        with open(init_py_abspath, 'w') as f:
-          f.write("__import__('pkg_resources').declare_namespace(__name__)")
+        with open(init_py_abspath, 'wb') as f:
+          f.write(b"__import__('pkg_resources').declare_namespace(__name__)")
         self.detected_namespace_packages.add(module_path)
 
     if not self.detected_packages:
@@ -151,16 +151,15 @@ setup(name        = "%(target_name)s",
       namespace_packages = %(namespace_packages)s)
 """
       boilerplate = boilerplate % {
-        'target_name': self.target.name,
+        'target_name': self.target._create_id(),
         'genpy_root': genpy_root,
         'packages': repr(list(packages)),
         'namespace_packages': repr(list(namespace_packages))
       }
 
-      self.chroot.write(boilerplate, os.path.join(self.codegen_root, 'setup.py'))
+      self.chroot.write(boilerplate.encode('utf-8'), os.path.join(self.codegen_root, 'setup.py'))
     dump_setup_py(self.detected_packages, self.detected_namespace_packages)
 
     egg_root = os.path.join(self.chroot.path(), self.codegen_root)
     egg_path = EggBuilder().build_egg(egg_root, self.target)
     return egg_path
-

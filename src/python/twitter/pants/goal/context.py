@@ -18,16 +18,11 @@ class Context(object):
   def __init__(self, config, options, target_roots, log=None):
     self.config = config
     self.options = options
-    self.target_roots = target_roots
     self.log = log or Context.Log()
     self._state = {}
     self.products = Products()
 
-    self._targets = OrderedSet()
-    for target in self.target_roots:
-      self._add_target(target)
-
-    self.id = self.identify(self._targets)
+    self.replace_targets(target_roots)
 
   def identify(self, targets):
     id = hashlib.md5()
@@ -37,6 +32,13 @@ class Context(object):
 
   def __str__(self):
     return 'Context(id:%s, state:%s, targets:%s)' % (self.id, self.state, self.targets())
+
+  def replace_targets(self, target_roots):
+    self.target_roots = target_roots
+    self._targets = OrderedSet()
+    for target in target_roots:
+      self._add_target(target)
+    self.id = self.identify(self._targets)
 
   def _add_target(self, target):
     def add_targets(tgt):
@@ -51,10 +53,10 @@ class Context(object):
   def targets(self, predicate=None):
     return filter(predicate, self._targets)
 
-  def dependants(self, predicate=None):
-    core = set(self.targets(predicate))
+  def dependants(self, on_predicate=None, from_predicate=None):
+    core = set(self.targets(on_predicate))
     dependees = defaultdict(set)
-    for target in self.targets(lambda t: not predicate(t)):
+    for target in self.targets(from_predicate):
       if hasattr(target, 'dependencies'):
         for dependency in target.dependencies:
           if dependency in core:

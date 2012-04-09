@@ -17,15 +17,15 @@
 __author__ = 'John Sirois'
 
 import os
-import re
 
 from twitter.common.collections import OrderedSet
 
-from twitter.pants import get_buildroot, is_scala, is_test
+from twitter.pants import is_scala, is_test
 from twitter.pants.tasks import Task, TaskError
 from twitter.pants.tasks.binary_utils import profile_classpath, runjava, safe_args
+from twitter.pants.tasks.jvm_task import JvmTask
 
-class SpecsRun(Task):
+class SpecsRun(JvmTask):
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
     option_group.add_option(mkflag("skip"), mkflag("skip", negate=True), dest = "specs_run_skip",
@@ -65,35 +65,29 @@ class SpecsRun(Task):
 
     self.workdir = context.config.get('specs-run', 'workdir')
 
-    classes = context.options.specs_run_tests
-    self.tests = map(self.normalize, classes) if classes else None
+    self.tests = context.options.specs_run_tests
 
   def execute(self, targets):
     if not self.skip:
-      def run_tests(main, args):
-        classpath = profile_classpath(self.profile)
-        classpath.extend(os.path.join(get_buildroot(), path)
-                         for path in ('src/resources', 'tests/resources'))
-        with self.context.state('classpath', []) as cp:
-          classpath.extend(jar for conf, jar in cp if conf in self.confs)
+      def run_tests(tests):
+        args = ['--color'] if self.color else []
+        args.append('--specs=%s' % ','.join(tests))
 
-        result = runjava(jvmargs=self.java_args, classpath=classpath, main=main, args=args)
+        result = runjava(
+          jvmargs=self.java_args,
+          classpath=self.classpath(profile_classpath(self.profile), confs=self.confs),
+          main='com.twitter.common.testing.ExplicitSpecsRunnerMain',
+          args=args
+        )
         if result != 0:
           raise TaskError()
 
-      args = []
-      if self.color:
-        args.append('--color')
-
       if self.tests:
-        args.append('--classes')
-        args.append(','.join(self.tests))
-        run_tests('run', args)
+        run_tests(self.tests)
       else:
         with safe_args(self.calculate_tests(targets)) as tests:
           if tests:
-            args.append('--specs-files=%s' % ','.join(tests))
-            run_tests('com.twitter.common.testing.ExplicitSpecsRunnerMain', args)
+            run_tests(tests)
 
   def calculate_tests(self, targets):
     tests = OrderedSet()
@@ -101,27 +95,3 @@ class SpecsRun(Task):
       if is_scala(target) and is_test(target):
         tests.update(os.path.join(target.target_base, test) for test in target.sources)
     return tests
-
-  def normalize(self, classname_or_file):
-    if not classname_or_file.endswith('.scala'):
-      return classname_or_file
-
-    basedir = calculate_basedir(classname_or_file)
-    return os.path.relpath(classname_or_file, basedir).replace('/', '.').replace('.scala', '')
-
-
-PACKAGE_PARSER = re.compile(r'^\s*package\s+([\w.]+)\s*')
-
-def calculate_basedir(file):
-  with open(file, 'r') as source:
-    for line in source:
-      match = PACKAGE_PARSER.match(line)
-      if match:
-        package = match.group(1)
-        packagedir = package.replace('.', '/')
-        dir = os.path.dirname(file)
-        if not dir.endswith(packagedir):
-          raise TaskError('File %s declares a mismatching package %s' % (file, package))
-        return dir[:-len(packagedir)]
-
-  raise TaskError('Could not calculate a base dir for: %s' % file)

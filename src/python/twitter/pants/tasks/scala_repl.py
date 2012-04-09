@@ -21,14 +21,14 @@ import shlex
 from twitter.pants.targets import JavaLibrary, JavaTests, ScalaLibrary, ScalaTests
 from twitter.pants.tasks import Task
 from twitter.pants.tasks.binary_utils import profile_classpath, runjava
-
+from twitter.pants.tasks.jvm_task import JvmTask
 
 def is_jvm(target):
   return isinstance(target, JavaLibrary) or isinstance(target, JavaTests) or \
          isinstance(target, ScalaLibrary) or isinstance(target, ScalaTests)
 
 
-class ScalaRepl(Task):
+class ScalaRepl(JvmTask):
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
     option_group.add_option(mkflag("jvmargs"), dest = "run_jvmargs", action="append",
@@ -45,13 +45,9 @@ class ScalaRepl(Task):
     self.main = context.config.get('scala-repl', 'main')
 
   def execute(self, targets):
-    classpath = profile_classpath(self.profile)
-    with self.context.state('classpath', []) as cp:
-      classpath.extend(jar for conf, jar in cp if conf in self.confs)
-
-    result = runjava(
+    runjava(
       jvmargs=self.jvm_args,
-      classpath=classpath,
+      classpath=self.classpath(profile_classpath(self.profile), confs=self.confs),
       main=self.main,
       args=[]
     )

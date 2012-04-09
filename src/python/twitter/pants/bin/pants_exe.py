@@ -18,17 +18,14 @@ from __future__ import print_function
 
 from twitter.pants import get_buildroot, get_version
 from twitter.pants.base import Address
+from twitter.pants.base.rcfile import RcFile
 from twitter.pants.commands import Command
-
-try:
-  import ConfigParser
-except ImportError:
-  import configparser as ConfigParser
 
 import optparse
 import os
 import sys
 import traceback
+
 
 _HELP_ALIASES = set([
   '-h',
@@ -46,16 +43,19 @@ _BUILD_ALIASES = set([
   '-f',
 ])
 
-_DISABLE_PANTS_RC_OPTION = '--no-pantsrc'
+_LOG_EXIT_OPTION = '--log-exit'
+
 
 def exit_and_fail(msg=''):
   print(msg, file=sys.stderr)
   sys.exit(1)
 
+
 def find_all_commands():
   for cmd in Command.all_commands():
     cls = Command.get_command(cmd)
     yield '%s\t%s' % (cmd, cls.__doc__)
+
 
 def _help(version, root_dir):
   print('Pants %s @ PANTS_BUILD_ROOT: %s' % (version, root_dir))
@@ -68,17 +68,13 @@ section named for the subcommand in ini style format, ie:
   options: --fast""")
   exit_and_fail()
 
-def _prepend_default_options(command, args):
-  if _DISABLE_PANTS_RC_OPTION not in args:
-    pantsrc = os.path.join(os.path.expanduser('~'), '.pantsrc')
-    if os.path.exists(pantsrc):
-      config = ConfigParser.SafeConfigParser()
-      config.read(pantsrc)
-      if config.has_option(command, 'options'):
-        expanded_options = config.get(command, 'options').split() + args
-        print("(using ~/.pantsrc expansion: pants %s %s)" % (command, ' '.join(expanded_options)))
-        return expanded_options
-  return args
+
+def _add_default_options(command, args):
+  expanded_options = RcFile(paths=['~/.pantsrc']).apply_defaults([command], args)
+  if expanded_options != args:
+    print("(using ~/.pantsrc expansion: pants %s %s)" % (command, ' '.join(expanded_options)))
+  return expanded_options
+
 
 def _synthesize_command(root_dir, args):
   command = args[0]
@@ -86,7 +82,7 @@ def _synthesize_command(root_dir, args):
   command = _BUILD_COMMAND if command in _BUILD_ALIASES else command
   if command in Command.all_commands():
     subcommand_args = args[1:] if len(args) > 1 else []
-    return command, _prepend_default_options(command, subcommand_args)
+    return command, _add_default_options(command, subcommand_args)
 
   if command.startswith('-'):
     exit_and_fail('Invalid command: %s' % command)
@@ -94,13 +90,22 @@ def _synthesize_command(root_dir, args):
   # assume 'build' if a command was ommitted.
   try:
     Address.parse(root_dir, command)
-    return _BUILD_COMMAND, _prepend_default_options(_BUILD_COMMAND, args)
+    return _BUILD_COMMAND, _add_default_options(_BUILD_COMMAND, args)
   except:
     exit_and_fail('Failed to execute pants build: %s' % traceback.format_exc())
+
 
 def _parse_command(root_dir, args):
   command, args = _synthesize_command(root_dir, args)
   return Command.get_command(command), args
+
+
+def _log_exit(result):
+  if result == 0:
+    print("Pants executed successfully")
+  else:
+    print("Pants failed with error %s" % result)
+
 
 def main():
   root_dir = get_buildroot()
@@ -115,12 +120,16 @@ def main():
   command_class, command_args = _parse_command(root_dir, sys.argv[1:])
 
   parser = optparse.OptionParser(version = '%%prog %s' % version)
-  parser.add_option(_DISABLE_PANTS_RC_OPTION, action = 'store_false', dest = 'pantsrc',
-                    default = True, help = 'Specifies that ~/.pantsrc should be ignored.')
+  RcFile.install_disable_rc_option(parser)
+  parser.add_option(_LOG_EXIT_OPTION, action = 'store_true', dest = 'log_exit',
+                    default = False, help = 'Log an exit message on success or failure')
   command = command_class(root_dir, parser, command_args)
 
   result = command.execute()
+  if _LOG_EXIT_OPTION in command_args:
+    _log_exit(result)
   sys.exit(result)
+
 
 if __name__ == '__main__':
   main()

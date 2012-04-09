@@ -18,29 +18,21 @@ PANTS_SOURCES   = rglobs('*.py') - rglobs('bin/*.py')
 PANTS_GARBAGE   = rglobs('*.pyc') + rglobs('*~')
 PANTS_RESOURCES = rglobs('*') - PANTS_SOURCES - PANTS_GARBAGE
 
-python_library(
-  name = 'pants-deps',
-  dependencies = [
-    pants("3rdparty/python:elementtree"),
-    pants("3rdparty/python:mako"),
-    pants("3rdparty/python:markdown"),
-    pants("3rdparty/python:psutil"),
-    pants("3rdparty/python:pygments"),
-    pants("3rdparty/python:pylint"),
-    pants("3rdparty/python:pytest"),
-  ]
-)
+# Only build pylint on py 2.x
+def pylint_build_filter():
+  import sys
+  return sys.version_info[0] == 2
 
 python_library(
-  name = 'pants-deps-multi',
+  name = 'pants-deps',
   dependencies = [
     python_requirement("elementtree"),
     python_requirement('mako'),
     python_requirement('markdown'),
     python_requirement('psutil'),
-    python_requirement("py"),
     python_requirement("pygments"),
-    python_requirement("pylint"),
+    python_requirement("pylint", version_filter=pylint_build_filter),
+    python_requirement("pytest"),
   ]
 )
 
@@ -51,7 +43,8 @@ python_library(
     pants("src/python/twitter/common/app"),
     pants("src/python/twitter/common/confluence"),
     pants("src/python/twitter/common/python"),
-    pants("src/python/twitter/common/lang")
+    pants("src/python/twitter/common/lang"),
+    pants(":pants-deps"),
   ],
   sources = PANTS_SOURCES,
   resources = PANTS_RESOURCES
@@ -60,25 +53,6 @@ python_library(
 python_binary(
   name = 'pants',
   dependencies = [
-    pants(":pants-deps"),
-    pants(":pants-lib")
-  ],
-  source = 'bin/pants_exe.py',
-)
-
-python_binary(
-  name = 'pants',
-  dependencies = [
-    pants(":pants-deps"),
-    pants(":pants-lib")
-  ],
-  source = 'bin/pants_exe.py',
-)
-
-python_binary(
-  name = 'pants-multi',
-  dependencies = [
-    pants(":pants-deps-multi"),
     pants(":pants-lib")
   ],
   source = 'bin/pants_exe.py',
@@ -95,13 +69,9 @@ python_binary(
 
 # TODO(John Sirois): add a BUILD.commons github wiki goal to the 'publish' phase and publish these
 
-page(name = 'pants.new-docs',
+page(name = 'readme',
   source = 'README.md',
   dependencies = [
-    pants(':pants.new-docs-addendum')
+    pants('src/python/twitter/pants/docs:migration')
   ]
-)
-
-page(name = 'pants.new-docs-addendum',
-  source = 'addendum.markdown'
 )

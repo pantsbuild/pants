@@ -82,9 +82,9 @@ limitations under the License.
       % if dependency.excludes:
         % for exclude in dependency.excludes:
           % if exclude.name:
-      <exclude org="${exclude.org}" module="${exclude.name}"/>
+      <exclude matcher="exactOrRegexp" org="${exclude.org}" module="${exclude.name}"/>
           % else:
-      <exclude org="${exclude.org}"/>
+      <exclude matcher="exactOrRegexp" org="${exclude.org}"/>
           % endif
         % endfor
       % endif
@@ -93,9 +93,9 @@ limitations under the License.
     % if lib.excludes:
       % for exclude in lib.excludes:
         % if exclude.name:
-    <exclude org="${exclude.org}" module="${exclude.name}"/>
+    <exclude matcher="exactOrRegexp" org="${exclude.org}" module="${exclude.name}"/>
         % else:
-    <exclude org="${exclude.org}"/>
+    <exclude matcher="exactOrRegexp" org="${exclude.org}"/>
         % endif
       % endfor
     % endif

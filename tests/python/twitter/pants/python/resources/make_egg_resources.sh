@@ -8,7 +8,7 @@
 CWD=$(dirname $0)
 
 pushd $CWD/egg_data
-  PYTHON_BIN=../../../../../../../.python/bin/python
+  PYTHON_BIN=../../../../../../../.python/bin/bootstrap
   BUILD_DIR=$(mktemp -d build.XXXXXX)
   DIST_DIR=$(mktemp -d dist.XXXXXX)
 

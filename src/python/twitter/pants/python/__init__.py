@@ -14,7 +14,7 @@
 # limitations under the License.
 # ==================================================================================================
 
-__author__ = 'John Sirois'
+__author__ = 'John Sirois, Brian Wickman'
 
 from twitter.pants.python.python_builder import PythonBuilder
 from twitter.pants.python.python_chroot import PythonChroot

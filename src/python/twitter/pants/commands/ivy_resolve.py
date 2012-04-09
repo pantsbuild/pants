@@ -165,4 +165,3 @@ class IvyResolve(Command):
         "%s/[artifact]-[revision].[ext]" % libs_dir,
         "-symlink",
         "-sync"])
-

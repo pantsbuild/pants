@@ -24,7 +24,11 @@ from twitter.pants.targets.with_sources import TargetWithSources
 class JvmTarget(InternalTarget, TargetWithSources):
   """A base class for all java module targets that provides path and dependency translation."""
 
-  def __init__(self, name, sources, dependencies, excludes=None, buildflags=None, is_meta=False):
+  def __init__(self, name, sources, dependencies,
+               excludes=None,
+               buildflags=None,
+               is_meta=False,
+               configurations=None):
     InternalTarget.__init__(self, name, dependencies, is_meta)
     TargetWithSources.__init__(self, name, is_meta)
 
@@ -36,6 +40,8 @@ class JvmTarget(InternalTarget, TargetWithSources):
     buildfile = self.address.buildfile.full_path
     custom_antxml_path = os.path.join(os.path.dirname(buildfile), custom_antxml)
     self.custom_antxml_path = custom_antxml_path if os.path.exists(custom_antxml_path) else None
+
+    self.configurations = configurations
 
   def _as_jar_dependency(self):
     jar_dependency, _, _ = self._get_artifact_info()

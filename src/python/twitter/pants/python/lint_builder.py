@@ -20,9 +20,10 @@ import os
 import sys
 
 from twitter.common.collections import OrderedSet
-from twitter.common.python import PythonLauncher
+from twitter.common.python.pex import PEX
+
+from twitter.pants.base import Target, Address
 from twitter.pants.python.python_chroot import PythonChroot
-from twitter.pants.targets import PythonEgg
 
 try:
   import pylint
@@ -43,22 +44,20 @@ class PythonLintBuilder(object):
     return self._run_lints(self.targets, self.args)
 
   def _run_lint(self, target, args):
-    chroot = PythonChroot(target, self.root_dir)
-    launcher = PythonLauncher(chroot.dump().path())
+    chroot = PythonChroot(target, self.root_dir, extra_targets=[
+      Target.get(Address.parse(self.root_dir, '3rdparty/python:pylint'))])
+    builder = chroot.dump()
+    builder.info().entry_point = 'pylint.lint'
+    builder.freeze()
 
-    interpreter_args = ['-m', 'pylint.lint',
+    interpreter_args = [
       '--rcfile=%s' % os.path.join(self.root_dir, 'build-support', 'pylint', 'pylint.rc')]
-    if args:
-      interpreter_args.extend(args)
+    interpreter_args.extend(args or [])
     sources = OrderedSet([])
-    if not isinstance(target, PythonEgg):
-      target.walk(lambda trg: sources.update(
-        trg.sources if hasattr(trg, 'sources') and trg.sources is not None else []))
-    launcher.run(
-      interpreter_args=interpreter_args,
-      args=list(sources),
-      extra_deps=sys.path, # TODO(wickman) Extract only the pylint dependencies from sys.path
-      with_chroot=True)
+    target.walk(lambda trg: sources.update(
+      trg.sources if hasattr(trg, 'sources') and trg.sources is not None else []))
+    pex = PEX(builder.path())
+    pex.run(args=interpreter_args + list(sources), with_chroot=True)
 
   def _run_lints(self, targets, args):
     for target in targets:

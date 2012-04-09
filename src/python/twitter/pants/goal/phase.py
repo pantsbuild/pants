@@ -142,7 +142,7 @@ class Phase(PhaseBase):
   @staticmethod
   def all():
     """Returns all registered goals as a sorted sequence of phase, goals tuples."""
-    return sorted(Phase._goals_by_phase.items(), key=lambda (phase, goals): phase.name)
+    return sorted(Phase._goals_by_phase.items(), key=lambda pair: pair[0].name)
 
   def __init__(self, name):
     self.name = name

@@ -19,19 +19,16 @@ import unittest
 import antlr3
 import antlr3.tree
 
-from twitter.pants.python.test.ExprLexer import ExprLexer
-from twitter.pants.python.test.ExprParser import ExprParser
-from twitter.pants.python.test.Eval import Eval
+from twitter.common.python.test.ExprLexer import ExprLexer
+from twitter.common.python.test.ExprParser import ExprParser
+from twitter.common.python.test.Eval import Eval
 
 # We import this gratuitously, just to test that namespace packages work correctly in the
 # generated ANTLR code. This module shares a namespace prefix with the generated
 # ANTLR code, and so will be masked by it if namespace packages are broken.
-from twitter.pants.python.test2.csvLexer import csvLexer
-
-
+from twitter.common.python.test2.csvLexer import csvLexer
 
 class AntlrBuilderTest(unittest.TestCase):
-
   def test_generated_parser(self):
     """The 'test' here is the very fact that we can successfully import the generated antlr code.
     However there's no harm in also exercising it. This code is modified from the canonical example

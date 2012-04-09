@@ -17,16 +17,9 @@
 
 python_test_suite(name = 'all',
   dependencies = [
-    pants(':test_python_chroot_deps'),
     pants(':test_antlr_builder'),
     pants(':test_thrift_namespace_packages'),
   ]
-)
-
-
-python_tests(name = 'test_python_chroot_deps',
-  sources = ['test_python_chroot_deps.py'],
-  dependencies = [ pants('src/python/twitter/pants:pants-lib') ]
 )
 
 python_tests(name = 'test_antlr_builder',

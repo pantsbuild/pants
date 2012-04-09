@@ -36,6 +36,8 @@ class Checkstyle(NailgunTask):
 
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
+    NailgunTask.setup_parser(option_group, args, mkflag)
+
     option_group.add_option(mkflag("skip"), mkflag("skip", negate=True),
                             dest="checkstyle_skip", default=False,
                             action="callback", callback=mkflag.set_bool,
@@ -72,7 +74,6 @@ class Checkstyle(NailgunTask):
     classpath = nailgun_profile_classpath(self, self._profile)
     with self.context.state('classpath', []) as cp:
       classpath.extend(jar for conf, jar in cp if conf in self._confs)
-    self.ng('ng-cp', *classpath)
 
     args = [
       '-c', self._configuration_file,
@@ -88,4 +89,4 @@ class Checkstyle(NailgunTask):
 
     args.extend(sources)
     log.debug('Executing: %s %s' % (CHECKSTYLE_MAIN, ' '.join(args)))
-    return self.ng(CHECKSTYLE_MAIN, *args)
+    return self.runjava(CHECKSTYLE_MAIN, classpath=classpath, args=args)

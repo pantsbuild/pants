@@ -17,22 +17,24 @@
 __author__ = 'Brian Wickman'
 
 from pkg_resources import Requirement
-from twitter.pants.targets.python_target import PythonTarget
+from twitter.pants.base import Target
 
-class PythonRequirement(PythonTarget):
-  """Egg equivalence classes"""
+class PythonRequirement(Target):
+  """Pants wrapper around pkg_resources.Requirement"""
 
-  def __init__(self, requirement, name=None):
+  def __init__(self, requirement, dynamic=False, repository=None, name=None, version_filter=None):
     self._requirement = Requirement.parse(requirement)
     self._name = name or self._requirement.project_name
-
-    PythonTarget.__init__(self,
-      name = self._name,
-      sources = None,
-      dependencies = None)
+    self._dynamic = dynamic
+    self._repository = repository
+    self._version_filter = version_filter or (lambda: True)
+    Target.__init__(self, self._name, False)
 
   def size(self):
     return 1
+
+  def should_build(self):
+    return self._version_filter()
 
   def __repr__(self):
     return 'PythonRequirement(%s)' % self._requirement

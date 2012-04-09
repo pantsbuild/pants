@@ -23,13 +23,15 @@ import time
 import traceback
 
 from contextlib import contextmanager
-from copy import copy
+from optparse import Option, OptionParser
 
 from twitter.common import log
-from twitter.common.lang import Compatibility
+from twitter.common.collections import OrderedSet
 from twitter.common.dirutil import safe_mkdir, safe_rmtree
+from twitter.common.lang import Compatibility
 from twitter.pants import get_buildroot, goal, group, is_apt, is_scala
 from twitter.pants.base import Address, BuildFile, Config, ParseContext, Target
+from twitter.pants.base.rcfile import RcFile
 from twitter.pants.commands import Command
 from twitter.pants.tasks import Task, TaskError
 from twitter.pants.goal import Context, GoalError, Phase
@@ -65,21 +67,11 @@ goal(name='goals', action=List).install().with_description('List all documented 
 class Help(Task):
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
-    # Guard against double parsing for ./pants goal help help
-    if not hasattr(cls, '_setup_parser'):
-      cls._setup_parser = True
-
-      def parser():
-        parser = copy(option_group.parser)
-        parser.option_groups.remove(option_group)
-        return parser
-      Help.parser = staticmethod(parser)
-
-      default = None
-      if len(args) > 1 and (not args[1].startswith('-')):
-        default = args[1]
-        del args[1]
-      option_group.add_option(mkflag("goal"), dest = "help_goal", default=default)
+    default = None
+    if len(args) > 1 and (not args[1].startswith('-')):
+      default = args[1]
+      del args[1]
+    option_group.add_option(mkflag("goal"), dest = "help_goal", default=default)
 
   def execute(self, targets):
     goal = self.context.options.help_goal
@@ -89,9 +81,10 @@ class Help(Task):
     if not phase.goals():
       return self.list_goals('Goal %s is unknown.' % goal)
 
-    parser = Help.parser()
+    parser = OptionParser()
     parser.set_usage('%s goal %s ([target]...)' % (sys.argv[0], goal))
     parser.epilog = phase.description
+    Goal.add_global_options(parser)
     Phase.setup_parser(parser, [], [phase])
     parser.parse_args(['--help'])
 
@@ -107,6 +100,63 @@ class Goal(Command):
   """Lists installed goals or else executes a named goal."""
 
   __command__ = 'goal'
+
+  GLOBAL_OPTIONS = [
+    Option("-x", "--time", action="store_true", dest="time", default=False,
+           help="Times goal phases and outputs a report."),
+    Option("-v", "--log", action="store_true", dest="log", default=False,
+           help="[%default] Logs extra build output."),
+    Option("-d", "--logdir", dest="logdir",
+           help="[%default] Forks logs to files under this directory."),
+    Option("-l", "--level", dest="log_level", type="choice", choices=['debug', 'info', 'warn'],
+           help="[info] Sets the logging level to one of 'debug', 'info' or 'warn', implies -v "
+                  "if set."),
+    Option("--all", dest="target_directory", action="append",
+           help="DEPRECATED: Use [dir]: with no flag in a normal target position on the command "
+                  "line. (Adds all targets found in the given directory's BUILD file. Can be "
+                  "specified more than once.)"),
+    Option("--all-recursive", dest="recursive_directory", action="append",
+           help="DEPRECATED: Use [dir]:: with no flag in a normal target position on the command "
+                  "line. (Adds all targets found recursively under the given directory. Can be "
+                  "specified more than once to add more than one root target directory to scan.)")
+  ]
+
+  @staticmethod
+  def add_global_options(parser):
+    for option in Goal.GLOBAL_OPTIONS:
+      parser.add_option(option)
+
+  @staticmethod
+  def parse_args(args):
+    goals = OrderedSet()
+    specs = OrderedSet()
+    help = False
+    explicit_multi = False
+
+    def is_spec(spec):
+      return os.sep in spec or ':' in spec
+
+    for i, arg in enumerate(args):
+      help = help or 'help' == arg
+      if not arg.startswith('-'):
+        specs.add(arg) if is_spec(arg) else goals.add(arg)
+      elif '--' == arg:
+        if specs:
+          raise GoalError('Cannot intermix targets with goals when using --. Targets should '
+                          'appear on the right')
+        explicit_multi = True
+        del args[i]
+        break
+
+    if explicit_multi:
+      spec_offset = len(goals) + 1 if help else len(goals)
+      specs.update(arg for arg in args[spec_offset:] if not arg.startswith('-'))
+
+    return goals, specs
+
+  def __init__(self, root_dir, parser, args):
+    self.targets = []
+    Command.__init__(self, root_dir, parser, args)
 
   @contextmanager
   def check_errors(self, banner):
@@ -139,26 +189,68 @@ class Goal(Command):
           msg.write('\n  %s =>\n    %s' % (key, '\n      '.join(exc.splitlines())))
       self.error(msg.getvalue())
 
+  def add_targets(self, error, dir, buildfile):
+    try:
+      self.targets.extend(Target.get(addr) for addr in Target.get_all_addresses(buildfile))
+    except (TypeError, ImportError):
+      error(dir, include_traceback=True)
+    except (IOError, SyntaxError):
+      error(dir)
+
+  def get_dir(self, spec):
+    path = spec.split(':', 1)[0]
+    if os.path.isdir(path):
+      return path
+    else:
+      if os.path.isfile(path):
+        return os.path.dirname(path)
+      else:
+        return spec
+
+  def add_target_recursive(self, *specs):
+    with self.check_errors('There was a problem scanning the '
+                           'following directories for targets:') as error:
+      for spec in specs:
+        dir = self.get_dir(spec)
+        for buildfile in BuildFile.scan_buildfiles(self.root_dir, dir):
+          self.add_targets(error, dir, buildfile)
+
+  def add_target_directory(self, *specs):
+    with self.check_errors("There was a problem loading targets "
+                           "from the following directory's BUILD files") as error:
+      for spec in specs:
+        dir = self.get_dir(spec)
+        try:
+          self.add_targets(error, dir, BuildFile(self.root_dir, dir))
+        except IOError:
+          error(dir)
+
+  def parse_spec(self, error, spec):
+    if spec.endswith('::'):
+      self.add_target_recursive(spec[:-len('::')])
+    elif spec.endswith(':'):
+      self.add_target_directory(spec[:-len(':')])
+    else:
+      try:
+        address = Address.parse(get_buildroot(), spec)
+        ParseContext(address.buildfile).parse()
+        target = Target.get(address)
+        if target:
+          self.targets.append(target)
+        else:
+          siblings = Target.get_all_addresses(address.buildfile)
+          prompt = 'did you mean' if len(siblings) == 1 else 'maybe you meant one of these'
+          error('%s => %s?:\n    %s' % (address, prompt,
+                                        '\n    '.join(str(a) for a in siblings)))
+      except (TypeError, ImportError, TaskError, GoalError):
+        error(spec, include_traceback=True)
+      except (IOError, SyntaxError):
+        error(spec)
+
   def setup_parser(self, parser, args):
     self.config = Config.load()
 
-    parser.add_option("-x", "--time", action="store_true", dest = "time", default = False,
-                      help = "Times goal phases and outputs a report.")
-
-    parser.add_option("-v", "--log", action="store_true", dest = "log", default = False,
-                      help = "[%default] Logs extra build output.")
-    parser.add_option("-l", "--level", dest = "log_level",
-                      type="choice", choices=['debug', 'info', 'warn'],
-                      help = "[info] Sets the logging level to one of 'debug', 'info' or 'warn', "
-                             "implies -v if set.")
-
-    parser.add_option("--all", dest="target_directory", action="append",
-                      help = "Adds all targets found in the given directory's BUILD file.  Can "
-                             "be specified more than once.")
-    parser.add_option("--all-recursive", dest="recursive_directory", action="append",
-                      help = "Adds all targets found recursively under the given directory.  Can "
-                             "be specified more than once to add more than one root target "
-                             "directory to scan.")
+    Goal.add_global_options(parser)
 
     # We support attempting zero or more goals.  Multiple goals must be delimited from further
     # options and non goal args with a '--'.  The key permutations we need to support:
@@ -192,90 +284,65 @@ class Goal(Command):
       ]
       parser.set_usage("\n%s" % format_usage(usages))
       parser.epilog = ("Either lists all installed goals, provides extra help for a goal or else "
-                       "attempts to achieve the specified goal for the listed targets.")
+                       "attempts to achieve the specified goal for the listed targets." """
+                       Note that target specs accept two special forms:
+                         [dir]:  to include all targets in the specified directory
+                         [dir]:: to include all targets found in all BUILD files recursively under
+                                 the directory""")
 
       parser.print_help()
       sys.exit(0)
     else:
-      goals = []
-      help = False
-      multi = False
-      for i, arg in enumerate(args):
-        help = help or 'help' == arg
-        goals.append(arg)
-        if '--' == arg:
-          multi = True
-          del args[i]
-          goals.pop()
-          break
-        if arg.startswith('-'):
-          break
-      if not multi:
-        goals = [goals[0]]
+      goals, specs = Goal.parse_args(args)
 
-      spec_offset = len(goals) + 1 if help else len(goals)
-      specs = [arg for arg in args[spec_offset:] if not arg.startswith('-')]
-
-      def parse_build(buildfile):
-        # TODO(John Sirois): kill PANTS_NEW and its usages when pants.new is rolled out
-        ParseContext(buildfile).parse(PANTS_NEW=True)
+      # TODO(John Sirois): kill PANTS_NEW and its usages when pants.new is rolled out
+      ParseContext.enable_pantsnew()
 
       # Bootstrap goals by loading any configured bootstrap BUILD files
       with self.check_errors('The following bootstrap_buildfiles cannot be loaded:') as error:
         for path in self.config.getlist('goals', 'bootstrap_buildfiles', default = []):
           try:
             buildfile = BuildFile(get_buildroot(), os.path.relpath(path, get_buildroot()))
-            parse_build(buildfile)
+            ParseContext(buildfile).parse()
           except (TypeError, ImportError, TaskError, GoalError):
             error(path, include_traceback=True)
           except (IOError, SyntaxError):
             error(path)
 
       # Bootstrap user goals by loading any BUILD files implied by targets
-      self.targets = []
       with self.check_errors('The following targets could not be loaded:') as error:
         for spec in specs:
-          try:
-            address = Address.parse(get_buildroot(), spec)
-            parse_build(address.buildfile)
-            target = Target.get(address)
-            if target:
-              self.targets.append(target)
-            else:
-              siblings = Target.get_all_addresses(address.buildfile)
-              prompt = 'did you mean' if len(siblings) == 1 else 'maybe you meant one of these'
-              error('%s => %s?:\n    %s' % (address, prompt,
-                                            '\n    '.join(str(a) for a in siblings)))
-          except (TypeError, ImportError, TaskError, GoalError):
-            error(spec, include_traceback=True)
-          except (IOError, SyntaxError):
-            error(spec)
+          self.parse_spec(error, spec)
 
       self.phases = [Phase(goal) for goal in goals]
+
+      rcfiles = self.config.getdefault('rcfiles', type=list, default=[])
+      if rcfiles:
+        rcfile = RcFile(rcfiles, default_prepend=False, process_default=True)
+
+        # Break down the goals specified on the command line to the full set that will be run so we
+        # can apply default flags to inner goal nodes.  Also break down goals by Task subclass and
+        # register the task class hierarchy fully qualified names so we can apply defaults to
+        # baseclasses.
+
+        all_goals = Phase.execution_order(Phase(goal) for goal in goals)
+        sections = OrderedSet()
+        for goal in all_goals:
+          sections.add(goal.name)
+          for clazz in goal.task_type.mro():
+            if clazz == Task:
+              break
+            sections.add('%s.%s' % (clazz.__module__, clazz.__name__))
+
+        augmented_args = rcfile.apply_defaults(sections, args)
+        if augmented_args != args:
+          del args[:]
+          args.extend(augmented_args)
+          print("(using pantsrc expansion: pants goal %s)" % ' '.join(augmented_args))
+
       Phase.setup_parser(parser, args, self.phases)
 
   def execute(self):
-    def add_targets(dir, buildfile):
-      try:
-        self.targets.extend(Target.get(addr) for addr in Target.get_all_addresses(buildfile))
-      except (TypeError, ImportError):
-        error(dir, include_traceback=True)
-      except (IOError, SyntaxError):
-        error(dir)
-
-    if self.options.recursive_directory:
-      with self.check_errors('There was a problem scanning the '
-                             'following directories for targets:') as error:
-        for dir in self.options.recursive_directory:
-          for buildfile in BuildFile.scan_buildfiles(self.root_dir, dir):
-            add_targets(dir, buildfile)
-
-    if self.options.target_directory:
-      with self.check_errors("There was a problem loading targets "
-                             "from the following directory's BUILD files") as error:
-        for dir in self.options.target_directory:
-          add_targets(dir, BuildFile(self.root_dir, dir))
-
     timer = None
     if self.options.time:
       class Timer(object):
@@ -290,12 +357,24 @@ class Goal(Command):
       from twitter.common.log import init
       from twitter.common.log.options import LogOptions
       LogOptions.set_stderr_log_level((self.options.log_level or 'info').upper())
-      logdir = self.config.get('goals', 'logdir')
+      logdir = self.options.logdir or self.config.get('goals', 'logdir', default=None)
       if logdir:
         safe_mkdir(logdir)
         LogOptions.set_log_dir(logdir)
-      init('goals')
+        init('goals')
+      else:
+        init()
       logger = log
+
+    if self.options.recursive_directory:
+      log.warn('--all-recursive is deprecated, use a target spec with the form [dir]:: instead')
+      for dir in self.options.recursive_directory:
+        self.add_target_recursive(dir)
+
+    if self.options.target_directory:
+      log.warn('--all is deprecated, use a target spec with the form [dir]: instead')
+      for dir in self.options.target_directory:
+        self.add_target_directory(dir)
 
     context = Context(self.config, self.options, self.targets, log=logger)
 
@@ -306,8 +385,11 @@ class Goal(Command):
 
     if unknown:
         print('Unknown goal(s): %s' % ' '.join(phase.name for phase in unknown))
-        print()
+        print('')
         return Phase.execute(context, 'goals')
+
+    if logger:
+      logger.debug('Operating on targets: %s', self.targets)
 
     return Phase.attempt(context, self.phases, timer=timer)
 
@@ -317,6 +399,7 @@ from twitter.pants.targets import JavaLibrary, JavaTests
 from twitter.pants.tasks.binary_create import BinaryCreate
 from twitter.pants.tasks.bundle_create import BundleCreate
 from twitter.pants.tasks.checkstyle import Checkstyle
+from twitter.pants.tasks.filedeps import FileDeps
 from twitter.pants.tasks.ivy_resolve import IvyResolve
 from twitter.pants.tasks.jar_create import JarCreate
 from twitter.pants.tasks.jar_publish import JarPublish
@@ -326,6 +409,7 @@ from twitter.pants.tasks.junit_run import JUnitRun
 from twitter.pants.tasks.jvm_run import JvmRun
 from twitter.pants.tasks.markdown_to_html import MarkdownToHtml
 from twitter.pants.tasks.nailgun_task import NailgunTask
+from twitter.pants.tasks.pathdeps import PathDeps
 from twitter.pants.tasks.protobuf_gen import ProtobufGen
 from twitter.pants.tasks.scala_compile import ScalaCompile
 from twitter.pants.tasks.scala_repl import ScalaRepl
@@ -458,15 +542,43 @@ goal(
 goal(
   name='jvm-run',
   action=JvmRun,
-  dependencies=['resolve', 'compile']
+  dependencies=['compile']
 ).install('run').with_description('Run a (currently JVM only) binary target.')
 
 goal(
   name='scala-repl',
   action=ScalaRepl,
-  dependencies=['resolve', 'compile']
+  dependencies=['compile']
 ).install('repl').with_description(
   'Run a (currently Scala only) REPL with the classpath set according to the targets.')
+
+goal(
+  name='filedeps',
+  action=FileDeps
+).install('filedeps').with_description('Print out a list of all files the target depends on')
+
+goal(
+  name='pathdeps',
+  action=PathDeps
+).install('pathdeps').with_description(
+  'Print out a list of all paths containing build files the target depends on')
+
+from twitter.pants.tasks.idea_gen import IdeaGen
+
+goal(
+  name='idea',
+  action=IdeaGen,
+  dependencies=['jar']
+).install().with_description('Create an IntelliJ IDEA project from the given targets.')
+
+
+from twitter.pants.tasks.eclipse_gen import EclipseGen
+
+goal(
+  name='eclipse',
+  action=EclipseGen,
+  dependencies=['jar']
+).install().with_description('Create an Eclipse project from the given targets.')
 
 
 from twitter.pants.tasks.python.setup import SetupPythonEnvironment

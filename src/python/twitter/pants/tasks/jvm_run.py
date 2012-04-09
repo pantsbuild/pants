@@ -21,13 +21,14 @@ import shlex
 from twitter.pants.targets import JvmBinary
 from twitter.pants.tasks import Task, TaskError
 from twitter.pants.tasks.binary_utils import runjava
+from twitter.pants.tasks.jvm_task import JvmTask
 
 
 def is_binary(target):
   return isinstance(target, JvmBinary)
 
 
-class JvmRun(Task):
+class JvmRun(JvmTask):
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
     option_group.add_option(mkflag("jvmargs"), dest = "run_jvmargs", action="append",
@@ -59,13 +60,9 @@ class JvmRun(Task):
     binaries = filter(is_binary, targets)
     if len(binaries) > 0:  # We only run the first one.
       main = binaries[0].main
-      classpath = []
-      with self.context.state('classpath', []) as cp:
-        classpath.extend(jar for conf, jar in cp if conf in self.confs)
-
       result = runjava(
         jvmargs=self.jvm_args,
-        classpath=classpath,
+        classpath=(self.classpath(confs=self.confs)),
         main=main,
         args=self.args
       )
