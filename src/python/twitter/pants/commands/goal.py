@@ -452,7 +452,8 @@ if NailgunTask.killall:
 # TODO(John Sirois): Resolve eggs
 goal(
   name='ivy',
-  action=IvyResolve
+  action=IvyResolve,
+  dependencies=['gen']
 ).install('resolve').with_description('Resolves jar dependencies and produces dependency reports.')
 
 
