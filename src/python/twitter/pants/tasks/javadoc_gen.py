@@ -145,6 +145,13 @@ class JavadocGen(Task):
     return os.path.join(self._output_dir, target.id)
 
 def create_javadoc_command(classpath, gendir, *targets):
+  sources = []
+  for target in targets:
+    sources.extend(os.path.join(target.target_base, source) for source in target.sources)
+
+  if not sources:
+    return None
+
   # TODO(John Sirois): try com.sun.tools.javadoc.Main via ng
   command = [
     'javadoc',
@@ -157,7 +164,7 @@ def create_javadoc_command(classpath, gendir, *targets):
   ]
 
   # Always provide external linking for java API
-  offlinelinks = set([ 'http://download.oracle.com/javase/6/docs/api/' ])
+  offlinelinks = set(['http://download.oracle.com/javase/6/docs/api/'])
   def link(target):
     for jar in target.jar_dependencies:
       if jar.apidocs:
@@ -168,9 +175,7 @@ def create_javadoc_command(classpath, gendir, *targets):
   for link in offlinelinks:
     command.extend(['-linkoffline', link, link])
 
-  for target in targets:
-    command.extend(os.path.join(target.target_base, source) for source in target.sources)
-
+  command.extend(sources)
   return command
 
 

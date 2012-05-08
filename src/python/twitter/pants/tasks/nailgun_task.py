@@ -61,7 +61,11 @@ class NailgunTask(Task):
   _DAEMON_OPTION_PRESENT = False
 
   @staticmethod
-  def log_kill(log, pid, port=None):
+  def create_pidfile_arg(pidfile):
+    return '-Dpidfile=%s' % os.path.relpath(pidfile, get_buildroot())
+
+  @staticmethod
+  def _log_kill(log, pid, port=None):
     log.info('killing ng server @ pid:%d%s' % (pid, ' port:%d' % port if port else ''))
 
   @classmethod
@@ -113,7 +117,7 @@ class NailgunTask(Task):
     endpoint = self._get_nailgun_endpoint()
     if endpoint:
       pid, port = endpoint
-      NailgunTask.log_kill(self.context.log, pid, port)
+      NailgunTask._log_kill(self.context.log, pid, port)
       try:
         os.kill(pid, 9)
       except OSError:
@@ -133,9 +137,16 @@ class NailgunTask(Task):
           return invalid_pidfile()
         pid, port = endpoint
         try:
-          return int(pid), int(port)
+          return int(pid.strip()), int(port.strip())
         except ValueError:
           return invalid_pidfile()
+    elif NailgunTask._find:
+      pid_port = NailgunTask._find(self._pidfile)
+      if pid_port:
+        self.context.log.info('found ng server @ pid:%d port:%d' % pid_port)
+        with safe_open(self._pidfile, 'w') as pidfile:
+          pidfile.write('%d:%d\n' % pid_port)
+      return pid_port
     return None
 
   def _get_nailgun_client(self):
@@ -162,7 +173,7 @@ class NailgunTask(Task):
         if started:
           port = self._parse_nailgun_port(started)
           with open(self._pidfile, 'a') as pidfile:
-            pidfile.write(':%d' % port)
+            pidfile.write(':%d\n' % port)
           nailgun = self._create_ngclient(port)
           log.debug('Detected ng server up on port %d' % port)
           break
@@ -202,7 +213,7 @@ class NailgunTask(Task):
     if self._ng_server_args:
       args.extend(self._ng_server_args)
     args.append(NailgunTask.PANTS_NG_ARG)
-    args.append('-Dpidfile=%s' % os.path.relpath(self._pidfile, get_buildroot()))
+    args.append(NailgunTask.create_pidfile_arg(self._pidfile))
     args.extend(['-jar', self._nailgun_jar, ':0'])
     log.debug('Executing: %s' % ' '.join(args))
 
@@ -220,10 +231,11 @@ class NailgunTask(Task):
       log.debug('Spawned ng server @ %d' % process.pid)
       sys.exit(0)
 
+
 try:
   import psutil
 
-  def killall(log, everywhere=False):
+  def _find_ngs(everywhere=False):
     def cmdline_matches(cmdline):
       if everywhere:
         return any(filter(lambda arg: arg.startswith(NailgunTask.PANTS_NG_ARG_PREFIX), cmdline))
@@ -233,11 +245,43 @@ try:
     for proc in psutil.process_iter():
       try:
         if 'java' == proc.name and cmdline_matches(proc.cmdline):
-          NailgunTask.log_kill(log, proc.pid)
-          proc.kill()
+          yield proc
+      except (psutil.AccessDenied, psutil.NoSuchProcess):
+        pass
+
+
+  def killall(log, everywhere=False):
+    for proc in _find_ngs(everywhere=everywhere):
+      try:
+        NailgunTask._log_kill(log, proc.pid)
+        proc.kill()
       except (psutil.AccessDenied, psutil.NoSuchProcess):
         pass
 
   NailgunTask.killall = staticmethod(killall)
+
+
+  def _find_ng_listen_port(proc):
+    for connection in proc.get_connections(kind='tcp'):
+      if connection.status == 'LISTEN':
+        host, port = connection.local_address
+        return port
+    return None
+
+
+  def _find(pidfile):
+    pidfile_arg = NailgunTask.create_pidfile_arg(pidfile)
+    for proc in _find_ngs(everywhere=False):
+      try:
+        if pidfile_arg in proc.cmdline:
+          port = _find_ng_listen_port(proc)
+          if port:
+            return proc.pid, port
+      except (psutil.AccessDenied, psutil.NoSuchProcess):
+        pass
+    return None
+
+  NailgunTask._find = staticmethod(_find)
 except ImportError:
   NailgunTask.killall = None
+  NailgunTask._find = None

@@ -7,8 +7,11 @@ from collections import defaultdict
 from contextlib import contextmanager
 import os
 
+from twitter.common.collections import OrderedSet
 from twitter.common.dirutil import safe_rmtree, safe_mkdir, safe_open
-from twitter.pants.base.build_cache import BuildCache
+
+from twitter.pants.base.build_cache import BuildCache, NO_SOURCES, TARGET_SOURCES
+from twitter.pants.targets import JarDependency
 
 
 class TaskError(Exception):
@@ -59,10 +62,10 @@ class Task(object):
       Manages cache checks, updates and invalidation keeping track of basic change and invalidation
       statistics.
     """
-    def __init__(self, cache, targets, only_buildfiles):
+    def __init__(self, cache, targets, only_externaldeps):
       self._cache = cache
-      self._only_buildfiles = only_buildfiles
       self._targets = set(targets)
+      self._sources = NO_SOURCES if only_externaldeps else TARGET_SOURCES
 
       self.changed_files = 0
       self.invalidated_files = 0
@@ -97,14 +100,43 @@ class Task(object):
       self._invalidate(target, cache_key or self._key_for(target), indirect=True)
 
     def _key_for(self, target):
-      if self._only_buildfiles:
-        if not os.path.exists(target.address.buildfile.full_path):
-          # A synthetic target - keep no cache for these
-          return None
-        absolute_sources = [target.address.buildfile.full_path]
-      else:
-        absolute_sources = sorted(target.expand_files(recursive=False))
-      return self._cache.key_for(target.id, absolute_sources)
+      return self._cache.key_for_target(
+        target,
+        sources=self._sources,
+        fingerprint_extra=lambda sha: self._fingerprint_jardeps(target, sha)
+      )
+
+    _JAR_HASH_KEYS = (
+      'org',
+      'name',
+      'rev',
+      'force',
+      'excludes',
+      'transitive',
+      'ext',
+      'url',
+      '_configurations'
+    )
+
+    def _fingerprint_jardeps(self, target, sha):
+      internaltargets = OrderedSet()
+      alltargets = OrderedSet()
+      def fingerprint_external(target):
+        internaltargets.add(target)
+        if hasattr(target, 'dependencies'):
+          alltargets.update(target.dependencies)
+      target.walk(fingerprint_external)
+
+      for external_target in alltargets - internaltargets:
+        # TODO(John Sirois): Hashing on external targets should have a formal api - we happen to
+        # know jars are special and python requirements __str__ works for this purpose.
+        if isinstance(external_target, JarDependency):
+          jarid = ''
+          for key in Task.CacheManager._JAR_HASH_KEYS:
+            jarid += str(getattr(external_target, key))
+          sha.update(jarid)
+        else:
+          sha.update(str(external_target))
 
     def _invalidate(self, target, cache_key, indirect=False):
       if target in self._targets:
@@ -163,7 +195,7 @@ class Task(object):
       if cache_manager.changed_files:
         msg = 'Operating on %d files in %d changed targets' % (
           cache_manager.changed_files,
-          len(cache_manager.changed) - cache_manager.invalidated_targets
+          len(cache_manager.changed)
         )
         if cache_manager.invalidated_files:
           msg += ' and %d files in %d invalidated dependant targets' % (

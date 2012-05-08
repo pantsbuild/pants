@@ -6,6 +6,7 @@
 .coverage*
 .idea
 .pants.d
+.pants.run
 .project
 .settings
 .classpath

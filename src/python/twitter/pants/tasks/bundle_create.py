@@ -92,8 +92,16 @@ class BundleCreate(JvmBinaryTask):
       context.options.jvm_binary_create_outdir
       or context.config.get('bundle-create', 'outdir')
     )
-    self.archiver = context.options.bundle_create_archive
 
+    def fill_archiver_type():
+      self.archiver_type = context.options.bundle_create_archive
+      # If no option specified, check if anyone is requiring it
+      if not self.archiver_type:
+        for archive_type in ARCHIVER_BY_TYPE.keys():
+          if context.products.isrequired(archive_type):
+            self.archiver_type = archive_type
+
+    fill_archiver_type()
     self.deployjar = context.options.jvm_binary_create_deployjar
     if not self.deployjar:
       self.context.products.require('jars', predicate=self.is_binary)
@@ -103,11 +111,13 @@ class BundleCreate(JvmBinaryTask):
     def is_app(target):
       return isinstance(target, JvmApp)
 
-    archiver = ARCHIVER_BY_TYPE[self.archiver] if self.archiver else None
+    archiver = ARCHIVER_BY_TYPE[self.archiver_type] if self.archiver_type else None
     for app in filter(is_app, targets):
       basedir = self.bundle(app)
       if archiver:
+        archivemap = self.context.products.get(self.archiver_type)
         archivepath = archiver.archive(basedir, self.outdir, app.basename)
+        archivemap.add(app, self.outdir, [archivepath])
         self.context.log.info('created %s' % os.path.relpath(archivepath, get_buildroot()))
 
   def bundle(self, app):

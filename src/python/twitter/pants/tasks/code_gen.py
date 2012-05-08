@@ -18,7 +18,8 @@ __author__ = 'John Sirois'
 
 from collections import defaultdict
 
-from twitter.pants.tasks import Task, TaskError
+from twitter.pants import get_buildroot
+from twitter.pants.tasks import Task
 
 class CodeGen(Task):
   """
@@ -77,7 +78,6 @@ class CodeGen(Task):
   def execute(self, targets):
     gentargets = [t for t in targets if self.is_gentarget(t)]
     capabilities = self.genlangs() # lang_name => predicate
-
     gentargets_by_dependee = self.context.dependants(
       on_predicate=self.is_gentarget,
       from_predicate=lambda t: not self.is_gentarget(t)
@@ -98,7 +98,6 @@ class CodeGen(Task):
     gentargets_bylang = {}
     for lang, predicate in capabilities.items():
       gentargets_bylang[lang] = gentargets if self.is_forced(lang) else find_gentargets(predicate)
-
     if gentargets_by_dependee:
       self.context.log.warn('Left with unexpected unconsumed gen targets:\n\t%s' % '\n\t'.join(
         '%s -> %s' % (dependee, gentargets)
@@ -122,6 +121,9 @@ class CodeGen(Task):
             target,
             dependees_by_gentarget.get(target, [])
           )
+        genmap = self.context.products.get(lang)
         for gentarget, langtarget in langtarget_by_gentarget.items():
+          genmap.add(gentarget, get_buildroot(), [langtarget])
           for dep in self.getdependencies(gentarget):
-            self.updatedependencies(langtarget, langtarget_by_gentarget[dep])
+            if self.is_gentarget(dep):
+              self.updatedependencies(langtarget, langtarget_by_gentarget[dep])

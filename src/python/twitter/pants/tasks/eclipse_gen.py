@@ -40,8 +40,9 @@ _VERSIONS = {
 
 
 _SETTINGS = (
+  'org.eclipse.core.resources.prefs',
   'org.eclipse.jdt.core.prefs',
-  'org.eclipse.core.resources.prefs'
+  'org.eclipse.jdt.ui.prefs',
 )
 
 

@@ -219,7 +219,7 @@ class MarkdownToHtml(Task):
       with open(os.path.join(get_buildroot(), base, source), 'r') as input:
         md_html = markdown.markdown(
           input.read(),
-          extensions=['codehilite', 'extra', 'tables', 'toc', wikilinks]
+          extensions=['codehilite(guess_lang=False)', 'extra', 'tables', 'toc', wikilinks],
         )
         if standalone:
           if css:

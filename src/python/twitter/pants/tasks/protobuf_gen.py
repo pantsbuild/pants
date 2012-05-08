@@ -60,7 +60,7 @@ class ProtobufGen(CodeGen):
 
     def resolve_deps(key):
       deps = OrderedSet()
-      for dep in context.config.getlist('protobuf-gen', 'javadeps'):
+      for dep in context.config.getlist('protobuf-gen', key):
         deps.update(context.resolve(dep))
       return deps
 
@@ -138,12 +138,12 @@ class ProtobufGen(CodeGen):
     for source in target.sources:
       path = os.path.join(target.target_base, source)
       genfiles.extend(calculate_genfiles(path, source).get('java', []))
-    tgt = self.context.add_target(self.java_out,
-                                  JavaLibrary,
-                                  name=target.id,
-                                  provides=target.provides,
-                                  sources=genfiles,
-                                  dependencies=self.javadeps)
+    tgt = self.context.add_new_target(self.java_out,
+                                      JavaLibrary,
+                                      name=target.id,
+                                      provides=target.provides,
+                                      sources=genfiles,
+                                      dependencies=self.javadeps)
     tgt.id = target.id
     tgt.is_codegen = True
     for dependee in dependees:
@@ -155,11 +155,11 @@ class ProtobufGen(CodeGen):
     for source in target.sources:
       path = os.path.join(target.target_base, source)
       genfiles.extend(calculate_genfiles(path, source).get('py', []))
-    tgt = self.context.add_target(self.py_out,
-                                  PythonLibrary,
-                                  name=target.id,
-                                  sources=genfiles,
-                                  dependencies=self.pythondeps)
+    tgt = self.context.add_new_target(self.py_out,
+                                      PythonLibrary,
+                                      name=target.id,
+                                      sources=genfiles,
+                                      dependencies=self.pythondeps)
     tgt.id = target.id
     for dependee in dependees:
       dependee.dependencies.add(tgt)

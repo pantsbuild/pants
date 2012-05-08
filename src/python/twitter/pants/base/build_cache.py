@@ -14,17 +14,49 @@
 # limitations under the License.
 # ==================================================================================================
 
-from collections import namedtuple
 import errno
 import hashlib
 import os
 import shutil
 
+from abc import ABCMeta, abstractmethod
+from collections import namedtuple
+
 from twitter.common.lang import Compatibility
 from twitter.common.dirutil import safe_rmtree
 
 
-CacheKey = namedtuple('CacheKey', 'target_name, sources, hash, filename')
+CacheKey = namedtuple('CacheKey', ['sources', 'hash', 'filename'])
+
+
+class SourceScope(object):
+  """Selects sources of a given scope from targets."""
+
+  __metaclass__ = ABCMeta
+
+  @staticmethod
+  def for_selector(selector):
+    class Scope(SourceScope):
+      def select(self, target):
+        return selector(target)
+    return Scope()
+
+  @abstractmethod
+  def select(self, target):
+    """Selects source files from the given target and returns them as absolute paths."""
+
+  def valid(self, target):
+    """Returns True if the given target can be used with this SourceScope."""
+    return hasattr(target, 'expand_files')
+
+
+NO_SOURCES = SourceScope.for_selector(lambda t: ())
+TARGET_SOURCES = SourceScope.for_selector(
+  lambda t: t.expand_files(recursive=False, include_buildfile=False)
+)
+TRANSITIVE_SOURCES = SourceScope.for_selector(
+  lambda t: t.expand_files(recursive=True, include_buildfile=False)
+)
 
 
 class BuildCache(object):
@@ -40,10 +72,32 @@ class BuildCache(object):
       if e.errno != errno.EEXIST:
         raise
 
-  def key_for(self, target_name, sources):
-    """Get a key representing the given target name and its sources."""
-    filename = os.path.join(self._root, target_name.replace(os.path.sep, '.'))
-    return CacheKey(target_name, sources, self._sources_hash(sources), filename)
+  def key_for(self, id, sources):
+    """Get a cache key representing the given id'd entity and its associated source files."""
+    return self._key_for(id, self._sources_hash(sources), sources)
+
+  def key_for_target(self, target, sources=TARGET_SOURCES, fingerprint_extra=None):
+    """Get a key representing the given target name and its sources.
+
+    :target: The target to create a CacheKey for.
+    :sources: A source scope to select from the target for hashing, defaults to TARGET_SOURCES.
+    :fingerprint_extra: A that accepts a sha hash and updates it with extra fingerprint data.
+    """
+    if (not sources or not sources.valid(target)) and not fingerprint_extra:
+      raise ValueError('A target needs to have at least one of sources or a '
+                       'fingerprint_extra function to generate a CacheKey.')
+    if not sources:
+      sources = NO_SOURCES
+
+    srcs = sorted(sources.select(target))
+    sha = self._sources_hash(srcs)
+    if fingerprint_extra:
+      fingerprint_extra(sha)
+    return self._key_for(target.id, sha, srcs)
+
+  def _key_for(self, id, sha, sources):
+    filename = os.path.join(self._root, id)
+    return CacheKey(sources, sha.hexdigest(), filename)
 
   def invalidate(self, cache_key):
     """Invalidates this cache key and any cached files associated with it.
@@ -126,7 +180,7 @@ class BuildCache(object):
         sha.update(Compatibility.to_bytes(relative_filename))
         sha.update(fd.read())
 
-    return sha.hexdigest()
+    return sha
 
   def _key(self, key):
     return key.replace(os.path.sep, '.')

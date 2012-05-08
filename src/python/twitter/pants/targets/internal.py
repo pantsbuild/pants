@@ -179,6 +179,12 @@ class InternalTarget(Target):
           if hasattr(resolved_dependency, '_as_jar_dependencies'):
             self.jar_dependencies.update(resolved_dependency._as_jar_dependencies())
 
+  def replace_dependency(self, dependency, replacement):
+    self.dependencies.discard(dependency)
+    self.internal_dependencies.discard(dependency)
+    self.jar_dependencies.discard(dependency)
+    self.update_dependencies([replacement])
+
   def _walk(self, walked, work, predicate = None):
     Target._walk(self, walked, work, predicate)
     for dep in self.dependencies:

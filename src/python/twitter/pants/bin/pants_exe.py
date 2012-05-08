@@ -16,6 +16,8 @@
 
 from __future__ import print_function
 
+from twitter.common.dirutil import Lock
+
 from twitter.pants import get_buildroot, get_version
 from twitter.pants.base import Address
 from twitter.pants.base.rcfile import RcFile
@@ -46,12 +48,26 @@ _BUILD_ALIASES = set([
 _LOG_EXIT_OPTION = '--log-exit'
 
 
-def exit_and_fail(msg=''):
-  print(msg, file=sys.stderr)
-  sys.exit(1)
+def _log_exit(result):
+  if result == 0:
+    print("Pants executed successfully")
+  else:
+    print("Pants failed with error %s" % result)
 
 
-def find_all_commands():
+def _do_exit(result=0, msg=None):
+  if msg:
+    print(msg, file=sys.stderr)
+  if _LOG_EXIT_OPTION in sys.argv:
+    _log_exit(result)
+  sys.exit(result)
+
+
+def _exit_and_fail(msg=None):
+  _do_exit(result=1, msg=msg)
+
+
+def _find_all_commands():
   for cmd in Command.all_commands():
     cls = Command.get_command(cmd)
     yield '%s\t%s' % (cmd, cls.__doc__)
@@ -60,13 +76,13 @@ def find_all_commands():
 def _help(version, root_dir):
   print('Pants %s @ PANTS_BUILD_ROOT: %s' % (version, root_dir))
   print()
-  print('Available subcommands:\n\t%s' % '\n\t'.join(find_all_commands()))
+  print('Available subcommands:\n\t%s' % '\n\t'.join(_find_all_commands()))
   print()
   print("""Default subcommand flags can be stored in ~/.pantsrc using the 'options' key of a
 section named for the subcommand in ini style format, ie:
   [build]
   options: --fast""")
-  exit_and_fail()
+  _exit_and_fail()
 
 
 def _add_default_options(command, args):
@@ -85,14 +101,14 @@ def _synthesize_command(root_dir, args):
     return command, _add_default_options(command, subcommand_args)
 
   if command.startswith('-'):
-    exit_and_fail('Invalid command: %s' % command)
+    _exit_and_fail('Invalid command: %s' % command)
 
-  # assume 'build' if a command was ommitted.
+  # assume 'build' if a command was omitted.
   try:
     Address.parse(root_dir, command)
     return _BUILD_COMMAND, _add_default_options(_BUILD_COMMAND, args)
   except:
-    exit_and_fail('Failed to execute pants build: %s' % traceback.format_exc())
+    _exit_and_fail('Failed to execute pants build: %s' % traceback.format_exc())
 
 
 def _parse_command(root_dir, args):
@@ -100,19 +116,23 @@ def _parse_command(root_dir, args):
   return Command.get_command(command), args
 
 
-def _log_exit(result):
-  if result == 0:
-    print("Pants executed successfully")
-  else:
-    print("Pants failed with error %s" % result)
+try:
+  import psutil
+
+  def _process_info(pid):
+    process = psutil.Process(pid)
+    return '%d (%s)' % (pid, ' '.join(process.cmdline))
+except ImportError:
+  def _process_info(pid):
+    return '%d' % pid
 
 
-def main():
+def _run():
   root_dir = get_buildroot()
   version = get_version()
 
   if not os.path.exists(root_dir):
-    exit_and_fail('PANTS_BUILD_ROOT does not point to a valid path: %s' % root_dir)
+    _exit_and_fail('PANTS_BUILD_ROOT does not point to a valid path: %s' % root_dir)
 
   if len(sys.argv) < 2 or (len(sys.argv) == 2 and sys.argv[1] in _HELP_ALIASES):
     _help(version, root_dir)
@@ -125,10 +145,26 @@ def main():
                     default = False, help = 'Log an exit message on success or failure')
   command = command_class(root_dir, parser, command_args)
 
-  result = command.execute()
-  if _LOG_EXIT_OPTION in command_args:
-    _log_exit(result)
-  sys.exit(result)
+  if command.serialized():
+    def onwait(pid):
+      print('Waiting on pants process %s to complete' % _process_info(pid), file=sys.stderr)
+      return True
+    runfile = os.path.join(root_dir, '.pants.run')
+    lock = Lock.acquire(runfile, onwait=onwait)
+  else:
+    lock = Lock.unlocked()
+  try:
+    result = command.run(lock)
+    _do_exit(result)
+  finally:
+    lock.release()
+
+
+def main():
+  try:
+    _run()
+  except KeyboardInterrupt:
+    _exit_and_fail('Interrupted by user.')
 
 
 if __name__ == '__main__':

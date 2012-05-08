@@ -45,7 +45,7 @@ if [ -z "${PANTS_DEV}" -a ! -e $MY_DIR/pants.pex ]; then
   run_pants_bare src/python/twitter/pants:pants
   if [ ! -e $MY_DIR/dist/pants.pex ]; then
     echo "Unable to build pants!  Cannot continue!"
-    exit
+    exit 1
   else
     mv $MY_DIR/dist/pants.pex $MY_DIR/pants.pex
     cp $MY_DIR/pants.pex $VIRTUAL_PYTHON/pants.pex

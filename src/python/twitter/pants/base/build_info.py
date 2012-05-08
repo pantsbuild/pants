@@ -42,7 +42,7 @@ def get_build_info():
   buildroot = get_build_root()
 
   revision = safe_call(['git', 'rev-parse', 'HEAD']).strip().decode('utf-8')
-  tag = safe_call(['git', 'describe']).strip()
+  tag = safe_call(['git', 'describe', '--always']).strip()
   tag = 'none' if b'cannot' in tag else tag.decode('utf-8')
   branchname = revision
   for branchname in safe_call(['git', 'branch']).splitlines():

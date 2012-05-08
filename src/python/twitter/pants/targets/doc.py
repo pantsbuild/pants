@@ -49,9 +49,15 @@ class Page(InternalTarget, TargetWithSources):
     InternalTarget.__init__(self, name, dependencies, is_meta=False)
     TargetWithSources.__init__(self, name)
 
-    self.source = self._resolve_paths(self.target_base, [source]).pop()
+    self.sources = self._resolve_paths(self.target_base, [source])
+    self._source = self.sources.pop()
+
     self.resources = self._resolve_paths(self.target_base, resources) if resources else []
     self._wikis = {}
+
+  @property
+  def source(self):
+    return self._source
 
   def register_wiki(self, wiki, **kwargs):
     """

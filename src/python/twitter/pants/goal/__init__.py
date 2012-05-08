@@ -90,16 +90,20 @@ class Goal(object):
     """Prepares a Task that can be executed to achieve this goal."""
     return self._task(context)
 
-  def install(self, phase=None, first=False, replace=False, before=None):
+  def install(self, phase=None, first=False, replace=False, before=None, after=None):
     """
-      Installs this goal in the specified phase (or a new phase with the same name as this Goal),
-      appending to any pre-existing goals unless first=True in which case it is installed as the
-      first goal in the phase.  If replace=True then this goal replaces all others for the phase.
-      The phase this goal is installed in is returned. If before is not None, installs this goal
-      right before the goal marked by before.
+      Installs this goal in the specified phase (or a new phase with the same name as this Goal).
+
+      The placement of the goal in the execution list of the phase defaults to the end but can be
+      influence by specifying exactly one of the following arguments:
+
+      first: Places this goal 1st in the phase's execution list
+      replace: Replaces any existing goals in the phase with this goal
+      before: Places this goal before the named goal in the phase's execution list
+      after: Places this goal after the named goal in the phase's execution list
     """
     phase = Phase(phase or self.name)
-    phase.install(self, first, replace, before)
+    phase.install(self, first, replace, before, after)
     return phase
 
 from twitter.pants.goal.context import Context

@@ -54,16 +54,11 @@ class Group(object):
           execute_task(goal.name, tasks_by_goal[goal], context.targets())
         else:
           for chunk in Group.create_chunks(context, goals):
-            def in_chunk(target):
-              return target in chunk
             for goal in goals:
-              task = tasks_by_goal[goal]
-              def is_goal_chunk(target):
-                return in_chunk(target) and goal.group.predicate(target)
-              goal_chunk = OrderedSet(context.targets(predicate=is_goal_chunk))
+              goal_chunk = filter(goal.group.predicate, chunk)
               if len(goal_chunk) > 0:
                 context.log.info('[%s:%s:%s]' % (phase, group_name, goal.name))
-                execute_task(goal.name, task, goal_chunk)
+                execute_task(goal.name, tasks_by_goal[goal], goal_chunk)
 
   @staticmethod
   def create_chunks(context, goals):
@@ -96,7 +91,7 @@ class Group(object):
 
     context.log.debug('::: created chunks(%d)' % len(chunks))
     for i, chunk in enumerate(chunks):
-      context.log.debug('  chunk(%d):\n    %s' % (i, '\n    '.join(str(t) for t in chunk)))
+      context.log.debug('  chunk(%d):\n\t%s' % (i, '\n\t'.join(sorted(map(str, chunk)))))
 
     return chunks
 

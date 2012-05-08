@@ -20,11 +20,12 @@ import os
 
 from zipfile import  ZIP_STORED, ZIP_DEFLATED
 
-from twitter.common.contextutil import open_zip as open_jar, pushd, temporary_dir
+from twitter.common.contextutil import open_zip as open_jar, temporary_dir
 from twitter.common.dirutil import safe_mkdir
 
 from twitter.pants import get_buildroot, get_version, is_internal
 from twitter.pants.java import Manifest
+from twitter.pants.tasks.binary_utils import safe_extract
 from twitter.pants.tasks.jvm_binary_task import JvmBinaryTask
 
 
@@ -95,21 +96,11 @@ class BinaryCreate(JvmBinaryTask):
     self.context.log.debug('  dumping %s' % jarpath)
 
     with temporary_dir() as tmpdir:
-      with open_jar(jarpath) as sourcejar:
-        BinaryCreate.safe_extract(sourcejar, tmpdir)
-        for root, dirs, files in os.walk(tmpdir):
-          for file in files:
-            path = os.path.join(root, file)
-            relpath = os.path.relpath(path, tmpdir)
-            if Manifest.PATH != relpath:
-              jarfile.write(path, relpath)
+      safe_extract(jarpath, tmpdir)
+      for root, dirs, files in os.walk(tmpdir):
+        for file in files:
+          path = os.path.join(root, file)
+          relpath = os.path.relpath(path, tmpdir)
+          if Manifest.PATH != relpath:
+            jarfile.write(path, relpath)
 
-  @staticmethod
-  def safe_extract(jar, dest_dir):
-    """OS X's python 2.6.1 has a bug in zipfile that makes it unzip directories as regular files."""
-    for path in jar.namelist():
-      # While we're at it, we also perform this safety test.
-      if path.startswith('/') or path.startswith('..'):
-        raise Exception('Jar file contains unsafe path: %s' % path)
-      if not path.endswith('/'):  # Ignore directories. extract() will create parent dirs as needed.
-        jar.extract(path, dest_dir)

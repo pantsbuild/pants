@@ -30,6 +30,10 @@ its scalability.
 This guide will explain how to author BUILD files and how to use the
 Pants tool.
 
+# Installing and Troubleshooting Pants Installations
+
+See [[installation instructions|pants('src/python/twitter/pants:install')]].
+
 # Using Pants
 
 Pants is invoked via the pants script, usually located in the root of

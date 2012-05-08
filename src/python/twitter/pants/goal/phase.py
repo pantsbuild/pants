@@ -12,7 +12,20 @@ from twitter.pants.tasks import TaskError
 
 class SingletonPhases(type):
   phases = dict()
+  renames = dict()
+
+  def rename(cls, phase, name):
+    """
+      Renames the given phase and ensures all future requests for the old name are mapped to the
+      given phase instance.
+    """
+    cls.phases.pop(phase.name)
+    cls.renames[phase.name] = name
+    phase.name = name
+    cls.phases[name] = phase
+
   def __call__(cls, name):
+    name = cls.renames.get(name, name)
     if name not in cls.phases:
       cls.phases[name] = super(SingletonPhases, cls).__call__(name)
     return cls.phases[name]
@@ -22,6 +35,11 @@ PhaseBase = SingletonPhases('PhaseBase', (object,), {})
 
 class Phase(PhaseBase):
   _goals_by_phase = defaultdict(list)
+  _phase_by_goal = dict()
+
+  @staticmethod
+  def of(goal):
+    return Phase._phase_by_goal[goal]
 
   @staticmethod
   def setup_parser(parser, args, phases):
@@ -109,13 +127,31 @@ class Phase(PhaseBase):
         timer.log('total: %.3fs' % elapsed)
 
     try:
-      # Prepare tasks roots to leaves
+      # Prepare tasks roots to leaves and allow for goals introducing new goals in existing phases.
       tasks_by_goal = {}
-      for goal in reversed(list(Phase.execution_order(phases))):
-        task = goal.prepare(context)
-        tasks_by_goal[goal] = task
+      expanded = OrderedSet()
+      prepared = set()
+      round = 0
+      while True:
+        goals = list(Phase.execution_order(phases))
+        if set(goals) == prepared:
+          break
+        else:
+          round += 1
+          context.log.debug('Preparing goals in round %d' % round)
+          for goal in reversed(goals):
+            if goal not in prepared:
+              phase = Phase.of(goal)
+              expanded.add(phase)
+              context.log.debug('preparing: %s:%s' % (phase, goal.name))
+              prepared.add(goal)
+              task = goal.prepare(context)
+              tasks_by_goal[goal] = task
 
       # Execute phases leaves to roots
+      context.log.debug(
+        'Executing goals in phases %s' % ' -> '.join(map(str, reversed(expanded)))
+      )
       for phase in phases:
         Group.execute(phase, tasks_by_goal, context, executed, timer=timer)
 
@@ -150,8 +186,25 @@ class Phase(PhaseBase):
 
   def with_description(self, description):
     self.description = description
+    return self
 
-  def install(self, goal, first=False, replace=False, before=None):
+  def install(self, goal, first=False, replace=False, before=None, after=None):
+    """
+      Installs the given goal in this phase.  The placement of the goal in this phases' execution
+      list defaults to the end but its position can be influence by specifying exactly one of the
+      following arguments:
+
+      first: Places the goal 1st in the execution list
+      replace: Removes all existing goals in this phase and installs this goal
+      before: Places the goal before the named goal in the execution list
+      after: Places the goal after the named goal in the execution list
+    """
+
+    if (first or replace or before or after) and not (first ^ replace ^ bool(before) ^ bool(after)):
+      raise GoalError('Can only specify one of first, replace, before or after')
+
+    Phase._phase_by_goal[goal] = self
+
     g = self.goals()
     if replace:
       del g[:]
@@ -160,8 +213,25 @@ class Phase(PhaseBase):
       g.insert(0, goal)
     elif before in g_names:
       g.insert(g_names.index(before), goal)
+    elif after in g_names:
+      g.insert(g_names.index(after)+1, goal)
     else:
       g.append(goal)
+    return self
+
+  def rename(self, name):
+    """Renames this goal."""
+    PhaseBase.rename(self, name)
+    return self
+
+  def remove(self, name):
+    """Removes the named goal from this phase's list of goals to attempt."""
+    goals = self.goals()
+    for goal in goals:
+      if goal.name == name:
+        goals.remove(goal)
+        return self
+    raise GoalError('Goal %s does not exist in this phase, members are: %s' % (name, goals))
 
   class UnsatisfiedDependencyError(GoalError):
     """Raised when an operation cannot be completed due to an unsatisfied goal dependency."""

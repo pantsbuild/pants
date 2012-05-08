@@ -28,16 +28,17 @@ class TargetWithSources(Target):
 
     self.target_base = SourceRoot.find(self)
 
-  def expand_files(self, recursive=True):
+  def expand_files(self, recursive=True, include_buildfile=True):
     """Expand files used to build this target to absolute paths.  By default this expansion is done
-    recursively."""
+    recursively and target BUILD files are included."""
 
     files = []
 
     def _expand(target):
       files.extend([os.path.abspath(os.path.join(target.target_base, s))
           for s in (target.sources or [])])
-      files.extend([target.address.buildfile.full_path])
+      if include_buildfile:
+        files.append(target.address.buildfile.full_path)
       if recursive:
         for dep in target.dependencies:
           if isinstance(dep, TargetWithSources):

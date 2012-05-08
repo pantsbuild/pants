@@ -59,6 +59,10 @@ class Command:
       addresses.update(Target.get_all_addresses(buildfile))
     return addresses
 
+  @classmethod
+  def serialized(cls):
+    return False
+
   def __init__(self, root_dir, parser, args):
     """root_dir: The root directory of the pants workspace
     parser: an OptionParser
@@ -90,11 +94,17 @@ class Command:
   def error(self, message = None):
     """Reports the error message followed by pants help and then exits."""
 
-  def execute(self):
-    """Subcommands should override to perform the command action.  The value
-    returned should be an int, 0 indicating success and any other value
-    indicating failure."""
+  def run(self, lock):
+    """Subcommands that are serialized() should override if they need the ability to interact with
+    the global command lock.
+    The value returned should be an int, 0 indicating success and any other value indicating
+    failure."""
+    return self.execute()
 
-    pass
+  def execute(self):
+    """Subcommands that do not require serialization should override to perform the command action.
+    The value returned should be an int, 0 indicating success and any other value indicating
+    failure."""
+    raise NotImplementedError('Either run(lock) or execute() must be over-ridden.')
 
 Command._register_modules()

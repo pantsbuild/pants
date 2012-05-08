@@ -17,8 +17,8 @@
 from __future__ import print_function
 
 from twitter.common.collections import OrderedSet
-from twitter.pants import get_buildroot, is_internal, is_jvm
-from twitter.pants.base import BuildFile, ParseContext
+from twitter.pants import is_internal, is_jvm
+from twitter.pants.base import ParseContext
 from twitter.pants.targets import (
   AnnotationProcessor,
   InternalTarget,
@@ -95,7 +95,7 @@ def extract_target(java_targets, name = None):
     # ant build support to allow the same treatment for JavaThriftLibrary and JavaProtobufLibrary
     # so that tests can house test IDL in tests/
     target_type, base = category
-    def create():
+    with ParseContext.temp(base):
       if target_type == JavaProtobufLibrary:
         return _aggregate(JavaProtobufLibrary, name('protobuf'), targets, buildflags=buildflags)
       elif target_type == JavaThriftLibrary:
@@ -112,7 +112,6 @@ def extract_target(java_targets, name = None):
         return _aggregate(ScalaTests, name('scala-tests'), targets, buildflags=buildflags)
       else:
         raise Exception("Cannot aggregate targets of type: %s" % target_type)
-    return ParseContext(BuildFile(get_buildroot(), base, must_exist=False)).do_in_context(create)
 
   # TODO(John Sirois): support a flag that selects conflict resolution policy - this currently
   # happens to mirror the ivy policy we use

@@ -18,6 +18,7 @@ import os
 import collections
 
 from twitter.common.collections import OrderedSet
+from twitter.common.decorators import deprecated_with_warning
 from twitter.pants.base.address import Address
 from twitter.pants.base.parse_context import ParseContext
 
@@ -131,6 +132,9 @@ class Target(object):
               if hasattr(additional_target, '_walk'):
                 additional_target._walk(walked, work, predicate)
 
+
+  # TODO(John Sirois): Kill this method once ant backend is gone
+  @deprecated_with_warning("you're using deprecated pants commands, http://go/pantsmigration")
   def do_in_context(self, work):
     return ParseContext(self.address.buildfile).do_in_context(work)
 

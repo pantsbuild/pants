@@ -54,6 +54,11 @@ class IdeGen(JvmBinaryTask):
                                  "this trumps %s and not all project related files will be stored "
                                  "there." % gen_dir)
 
+    option_group.add_option(mkflag("intransitive"), default=False,
+                            action="store_true", dest='ide_gen_intransitive',
+                            help="Limits the sources included in the generated project to just "
+                                 "those owned by the targets specified on the command line")
+
     option_group.add_option(mkflag("python"), mkflag("python", negate=True), default=False,
                             action="callback", callback=mkflag.set_bool, dest='ide_gen_python',
                             help="[%default] Adds python support to the generated project "
@@ -83,6 +88,8 @@ class IdeGen(JvmBinaryTask):
       )
     )
     self.cwd = context.options.ide_gen_project_cwd or self.work_dir
+
+    self.intransitive = context.options.ide_gen_intransitive
 
     checkstyle_suppression_files = context.config.getdefault(
       'checkstyle_suppression_files', type=list, default=[]
@@ -119,6 +126,8 @@ class IdeGen(JvmBinaryTask):
                         scala_compiler_profile):
 
     jvm_targets = extract_jvm_targets(targets)
+    if self.intransitive:
+      jvm_targets = set(self.context.target_roots).intersection(jvm_targets)
     project = Project(self.project_name,
                       self.python,
                       self.skip_java,
@@ -126,7 +135,8 @@ class IdeGen(JvmBinaryTask):
                       get_buildroot(),
                       checkstyle_suppression_files,
                       debug_port,
-                      jvm_targets)
+                      jvm_targets,
+                      not self.intransitive)
 
     if self.python:
       python_source_paths = self.context.config.getlist('ide', 'python_source_paths', default=[])
@@ -159,6 +169,7 @@ class IdeGen(JvmBinaryTask):
 
         or (self.skip_java and is_java(target))
         or (self.skip_scala and is_scala(target))
+        or (self.intransitive and target not in self.context.target_roots)
       )
 
     jars = OrderedSet()
@@ -176,12 +187,12 @@ class IdeGen(JvmBinaryTask):
 
     self.context.replace_targets(compile)
 
-    self.binary = self.context.add_target(self.work_dir,
-                                          JvmBinary,
-                                          name='%s-external-jars' % self.project_name,
-                                          dependencies=jars,
-                                          excludes=excludes,
-                                          configurations=(self.classes_conf, self.sources_conf))
+    self.binary = self.context.add_new_target(self.work_dir,
+                                              JvmBinary,
+                                              name='%s-external-jars' % self.project_name,
+                                              dependencies=jars,
+                                              excludes=excludes,
+                                              configurations=(self.classes_conf, self.sources_conf))
     self.require_jar_dependencies(predicate=lambda t: t == self.binary)
 
     self.context.log.debug('pruned to cp:\n\t%s' % '\n\t'.join(
@@ -302,13 +313,14 @@ class Project(object):
         yield ext
 
   def __init__(self, name, has_python, skip_java, skip_scala, root_dir,
-               checkstyle_suppression_files, debug_port, targets):
+               checkstyle_suppression_files, debug_port, targets, transitive):
     """Creates a new, unconfigured, Project based at root_dir and comprised of the sources visible
     to the given targets."""
 
     self.name = name
     self.root_dir = root_dir
     self.targets = OrderedSet(targets)
+    self.transitive = transitive
 
     self.sources = []
     self.py_sources = []
@@ -349,7 +361,7 @@ class Project(object):
     targeted = set()
 
     def source_target(target):
-      return has_sources(target) \
+      return (self.transitive or target in self.targets) and has_sources(target) \
           and (not target.is_codegen
                and not (self.skip_java and is_java(target))
                and not (self.skip_scala and is_scala(target)))

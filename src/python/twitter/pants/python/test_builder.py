@@ -22,19 +22,16 @@ import errno
 import os
 import time
 import signal
-import subprocess
 import sys
 
 from twitter.common.collections import OrderedSet
-from twitter.common.lang import Compatibility
 from twitter.common.quantity import Amount, Time
 from twitter.common.python.pex import PEX
 from twitter.common.python.pex_builder import PEXBuilder
 
-from twitter.pants.base import Target, Address, ParseContext
+from twitter.pants.base import ParseContext
 from twitter.pants.python.python_chroot import PythonChroot
 from twitter.pants.targets import PythonTests, PythonTestSuite, PythonRequirement
-from twitter.pants.goal.context import Context as FakeContext
 
 
 class PythonTestResult(object):
@@ -88,13 +85,12 @@ class PythonTestBuilder(object):
   @staticmethod
   def generate_test_targets():
     if PythonTestBuilder.TESTING_TARGETS is None:
-      def define_targets():
-        return [
+      with ParseContext.temp():
+        PythonTestBuilder.TESTING_TARGETS = [
           PythonRequirement('pytest'),
           PythonRequirement('unittest2', version_filter=lambda:sys.version_info[0]==2),
           PythonRequirement('unittest2py3k', version_filter=lambda:sys.version_info[0]==3)
         ]
-      PythonTestBuilder.TESTING_TARGETS = ParseContext.fake(define_targets)
     return PythonTestBuilder.TESTING_TARGETS
 
   @staticmethod

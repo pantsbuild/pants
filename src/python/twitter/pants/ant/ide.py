@@ -17,8 +17,7 @@
 from collections import deque
 
 from twitter.common.collections import OrderedSet
-from twitter.pants import is_internal, is_java, is_scala, get_buildroot
-from twitter.pants.base.build_file import BuildFile
+from twitter.pants import is_internal, is_java, is_scala
 from twitter.pants.base.parse_context import ParseContext
 from twitter.pants.targets import JavaLibrary, ScalaLibrary
 from twitter.pants.targets.internal import InternalTarget
@@ -26,7 +25,7 @@ from twitter.pants.targets.internal import InternalTarget
 def extract_target(java_targets, is_classpath):
   primary_target = InternalTarget.sort_targets(java_targets)[0]
 
-  def create_target():
+  with ParseContext.temp(primary_target.target_base):
     internal_deps, jar_deps = _extract_target(java_targets, is_classpath)
 
     # TODO(John Sirois): make an empty source set work in ant/compile.xml
@@ -49,8 +48,6 @@ def extract_target(java_targets, is_classpath):
     else:
       raise TypeError("Cannot generate IDE configuration for targets: %s" % java_targets)
 
-  buildfile = BuildFile(get_buildroot(), primary_target.target_base, must_exist=False)
-  return ParseContext(buildfile).do_in_context(create_target)
 
 def _extract_target(targets, is_classpath):
   """

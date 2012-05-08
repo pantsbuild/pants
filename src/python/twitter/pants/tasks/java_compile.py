@@ -19,14 +19,14 @@ __author__ = 'John Sirois'
 from collections import defaultdict
 
 import os
-import re
 
 from twitter.common import log
 from twitter.common.dirutil import safe_open, safe_mkdir
-from twitter.pants import get_buildroot, is_apt
+from twitter.pants import is_apt
 from twitter.pants.targets import JavaLibrary, JavaTests
 from twitter.pants.tasks import TaskError
 from twitter.pants.tasks.binary_utils import nailgun_profile_classpath
+from twitter.pants.tasks.jvm_compiler_dependencies import Dependencies
 from twitter.pants.tasks.nailgun_task import NailgunTask
 
 
@@ -56,6 +56,8 @@ _JMAKE_ERROR_CODES = {
   -20: 'internal Java error (caused by java.lang.InternalError)',
   -30: 'internal Java error (caused by java.lang.RuntimeException).'
 }
+# When executed via a subprocess return codes will be treated as unsigned
+_JMAKE_ERROR_CODES.update((256+code, msg) for code, msg in _JMAKE_ERROR_CODES.items())
 
 
 class JavaCompile(NailgunTask):
@@ -130,8 +132,8 @@ class JavaCompile(NailgunTask):
         genmap = self.context.products.get('classes')
 
         # Map generated classes to the owning targets and sources.
-        compiler = DependencyCompiler(self._classes_dir, self._dependencies_file)
-        for target, classes_by_source in compiler.findclasses(targets).items():
+        dependencies = Dependencies(self._classes_dir, self._dependencies_file)
+        for target, classes_by_source in dependencies.findclasses(targets).items():
           for source, classes in classes_by_source.items():
             genmap.add(source, self._classes_dir, classes)
             genmap.add(target, self._classes_dir, classes)
@@ -187,33 +189,3 @@ class JavaCompile(NailgunTask):
     with safe_open(processor_info_file, 'w') as f:
       for processor in processors:
         f.write('%s\n' % processor)
-
-
-class DependencyCompiler(object):
-  _CLASS_FILE_NAME_PARSER = re.compile(r'(?:\$.*)*\.class$')
-
-  def __init__(self, outputdir, depfile):
-    self.outputdir = outputdir
-    self.depfile = depfile
-
-  def findclasses(self, targets):
-    sources = set()
-    target_by_source = dict()
-    for target in targets:
-      for source in target.sources:
-        src = os.path.normpath(os.path.join(target.target_base, source))
-        target_by_source[src] = target
-        sources.add(src)
-
-    classes_by_target_by_source = defaultdict(lambda: defaultdict(set))
-    if os.path.exists(self.depfile):
-      with open(self.depfile, 'r') as deps:
-        for dep in deps.readlines():
-          src, cls = dep.strip().split('->')
-          sourcefile = os.path.relpath(os.path.join(self.outputdir, src.strip()), get_buildroot())
-          if sourcefile in sources:
-            classfile = os.path.relpath(os.path.join(self.outputdir, cls.strip()), self.outputdir)
-            target = target_by_source[sourcefile]
-            relsrc = os.path.relpath(sourcefile, target.target_base)
-            classes_by_target_by_source[target][relsrc].add(classfile)
-    return classes_by_target_by_source

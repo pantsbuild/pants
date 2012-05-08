@@ -24,7 +24,7 @@ import subprocess
 from contextlib import contextmanager
 
 from twitter.common import log
-from twitter.common.contextutil import environment_as, temporary_file
+from twitter.common.contextutil import environment_as, open_zip, temporary_file
 from twitter.common.dirutil import safe_mkdir, safe_open, touch
 
 from twitter.pants.base import Config
@@ -59,7 +59,10 @@ def select_binary(base_path, version, name):
     if middle_path:
       binary_path = os.path.join(base_path, *(middle_path + [version, name]))
       log.debug('Selected %s binary at: %s' % (name, binary_path))
-      return binary_path
+      if os.path.exists(binary_path):
+        return binary_path
+      else:
+        raise TaskError('Selected binary %s does not exist!' % binary_path)
   raise TaskError('Cannot generate thrift code for: %s' % [sysname, release, machine])
 
 
@@ -196,3 +199,18 @@ def open(*files):
       print('Sorry, open currently only supports OSX')
     else:
       subprocess.Popen(['open'] + list(files))
+
+
+def safe_extract(path, dest_dir):
+  """
+    OS X's python 2.6.1 has a bug in zipfile that makes it unzip directories as regular files.
+    This method should work on for python 2.6-3.x.
+  """
+
+  with open_zip(path) as zip:
+    for path in zip.namelist():
+      # While we're at it, we also perform this safety test.
+      if path.startswith('/') or path.startswith('..'):
+        raise ValueError('Jar file contains unsafe path: %s' % path)
+      if not path.endswith('/'):  # Ignore directories. extract() will create parent dirs as needed.
+        zip.extract(path, dest_dir)

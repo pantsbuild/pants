@@ -154,6 +154,11 @@ class Goal(Command):
 
     return goals, specs
 
+  # TODO(John Sirois): revisit wholesale locking when we move py support into pants new
+  @classmethod
+  def serialized(cls):
+    return True
+
   def __init__(self, root_dir, parser, args):
     self.targets = []
     Command.__init__(self, root_dir, parser, args)
@@ -342,7 +347,7 @@ class Goal(Command):
 
       Phase.setup_parser(parser, args, self.phases)
 
-  def execute(self):
+  def run(self, lock):
     timer = None
     if self.options.time:
       class Timer(object):
@@ -376,7 +381,7 @@ class Goal(Command):
       for dir in self.options.target_directory:
         self.add_target_directory(dir)
 
-    context = Context(self.config, self.options, self.targets, log=logger)
+    context = Context(self.config, self.options, self.targets, lock=lock, log=logger)
 
     unknown = []
     for phase in self.phases:
@@ -415,6 +420,7 @@ from twitter.pants.tasks.scala_compile import ScalaCompile
 from twitter.pants.tasks.scala_repl import ScalaRepl
 from twitter.pants.tasks.specs_run import SpecsRun
 from twitter.pants.tasks.thrift_gen import ThriftGen
+from twitter.pants.tasks.thriftstore_dml_gen import ThriftstoreDMLGen
 
 
 class Invalidator(Task):

@@ -77,7 +77,12 @@ class SourceRoot(object):
   @staticmethod
   def here(*types):
     """Registers the cwd as a source root for the given target types."""
-    return SourceRoot(None, *types)
+    return SourceRoot.register(None, *types)
+
+  @staticmethod
+  def register(basedir, *types):
+    """Registers the given basedir as a source root for the given target types."""
+    return SourceRoot(basedir, *types)
 
   def __init__(self, basedir, *types):
     """

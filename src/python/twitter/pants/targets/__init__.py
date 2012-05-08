@@ -39,6 +39,7 @@ from twitter.pants.targets.jar_dependency import JarDependency
 from twitter.pants.targets.jar_library import JarLibrary
 from twitter.pants.targets.java_library import JavaLibrary
 from twitter.pants.targets.java_thrift_library import JavaThriftLibrary
+from twitter.pants.targets.java_thriftstore_dml_library import JavaThriftstoreDMLLibrary
 from twitter.pants.targets.java_protobuf_library import JavaProtobufLibrary
 from twitter.pants.targets.java_tests import JavaTests
 from twitter.pants.targets.jvm_binary import Bundle, JvmApp, JvmBinary
@@ -55,6 +56,7 @@ from twitter.pants.targets.python_tests import PythonTests, PythonTestSuite
 from twitter.pants.targets.repository import Repository
 from twitter.pants.targets.scala_library import ScalaLibrary
 from twitter.pants.targets.scala_tests import ScalaTests
+from twitter.pants.targets.scalac_plugin import ScalacPlugin
 from twitter.pants.targets.sources import SourceRoot
 from twitter.pants.targets.with_sources import TargetWithSources
 
@@ -71,6 +73,9 @@ __all__ = [
   'JarLibrary',
   'JavaLibrary',
   'JavaThriftLibrary',
+  # TODO(Anand) Remove this from pants proper when a code adjoinment mechanism exists
+  # or ok if/when thriftstore is open sourced as well..
+  'JavaThriftstoreDMLLibrary',
   'JavaProtobufLibrary',
   'JavaTests',
   'JvmApp',
@@ -90,6 +95,7 @@ __all__ = [
   'Repository',
   'ScalaLibrary',
   'ScalaTests',
+  'ScalacPlugin',
   'SourceRoot',
   'TargetWithSources',
   'Wiki'

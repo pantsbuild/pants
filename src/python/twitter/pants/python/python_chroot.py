@@ -18,27 +18,17 @@ from __future__ import print_function
 
 __author__ = 'Brian Wickman'
 
-import copy
-import errno
 import os
-import pkgutil
 import sys
 import tempfile
 
-import pkg_resources
 
 from twitter.common.collections import OrderedSet
-from twitter.common.contextutil import temporary_dir
-from twitter.common.dirutil import safe_mkdir, safe_rmtree
-from twitter.common.lang import Compatibility
+from twitter.common.dirutil import safe_rmtree
 from twitter.common.python.interpreter import PythonIdentity
 from twitter.common.python.platforms import Platform
-from twitter.common.quantity import Time, Amount
-from twitter.pants.base import Target, Address
 
-from twitter.pants.targets import (
-  PythonBinary, PythonLibrary, PythonAntlrLibrary,
-  PythonThriftLibrary, PythonTests)
+from twitter.pants.targets import PythonBinary
 
 from twitter.pants.base import Config
 from twitter.pants.base.build_cache import BuildCache
@@ -46,7 +36,6 @@ from twitter.pants.python.antlr_builder import PythonAntlrBuilder
 from twitter.pants.python.thrift_builder import PythonThriftBuilder
 
 from twitter.common.python.fetcher import Fetcher
-from twitter.common.python.resolver import Resolver
 from twitter.common.python.pex_builder import PEXBuilder
 
 from twitter.pants.python.resolver import PythonResolver, SilentResolver
@@ -155,7 +144,7 @@ class PythonChroot(object):
     # BuildCache.
     absolute_sources = library.expand_files()
     absolute_sources.sort()
-    cache_key = self._cache.key_for(library._create_id(), absolute_sources)
+    cache_key = self._cache.key_for(library.id, absolute_sources)
     if not self._cache.needs_update(cache_key):
       self.debug('  Generating (cached) %s...' % library)
       self._cache.use_cached_files(cache_key, self._builder.add_dependency_file)

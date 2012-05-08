@@ -43,6 +43,9 @@ class ThriftGen(CodeGen):
     option_group.add_option(mkflag("outdir"), dest="thrift_gen_create_outdir",
                             help="Emit generated code in to this directory.")
 
+    option_group.add_option(mkflag("version"), dest="thrift_version",
+                            help="Thrift compiler version.")
+
     option_group.add_option(mkflag("lang"), dest="thrift_gen_langs",  default=[],
                             action="append", type="choice", choices=['python', 'java'],
                             help="Force generation of thrift code for these languages.  Both "
@@ -53,7 +56,8 @@ class ThriftGen(CodeGen):
 
     self.thrift_binary = select_binary(
       context.config.get('thrift-gen', 'supportdir'),
-      context.config.get('thrift-gen', 'version'),
+      (context.options.thrift_version
+        or context.config.get('thrift-gen', 'version')),
       'thrift'
     )
     self.output_dir = (
@@ -161,12 +165,12 @@ class ThriftGen(CodeGen):
     genfiles = []
     for source in target.sources:
       genfiles.extend(calculate_genfiles(os.path.join(target.target_base, source)).get('java', []))
-    tgt = self.context.add_target(gen_java_dir,
-                                  JavaLibrary,
-                                  name=target.id,
-                                  provides=target.provides,
-                                  sources=genfiles,
-                                  dependencies=self.gen_java.deps)
+    tgt = self.context.add_new_target(gen_java_dir,
+                                      JavaLibrary,
+                                      name=target.id,
+                                      provides=target.provides,
+                                      sources=genfiles,
+                                      dependencies=self.gen_java.deps)
     tgt.id = target.id
     tgt.is_codegen = True
     for dependee in dependees:
@@ -178,11 +182,11 @@ class ThriftGen(CodeGen):
     genfiles = []
     for source in target.sources:
       genfiles.extend(calculate_genfiles(os.path.join(target.target_base, source)).get('py', []))
-    tgt = self.context.add_target(gen_python_dir,
-                                  PythonLibrary,
-                                  name=target.id,
-                                  sources=genfiles,
-                                  dependencies=self.gen_python.deps)
+    tgt = self.context.add_new_target(gen_python_dir,
+                                      PythonLibrary,
+                                      name=target.id,
+                                      sources=genfiles,
+                                      dependencies=self.gen_python.deps)
     tgt.id = target.id
     for dependee in dependees:
       dependee.dependencies.add(tgt)

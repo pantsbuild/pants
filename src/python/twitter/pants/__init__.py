@@ -43,6 +43,7 @@ def get_buildroot():
       _BUILD_ROOT = os.path.realpath(build_root)
   return _BUILD_ROOT
 
+
 import fnmatch
 import glob
 
@@ -50,12 +51,14 @@ from functools import reduce
 
 from twitter.pants.base import Fileset
 
+
 def globs(*globspecs):
   """Returns a Fileset that combines the lists of files returned by glob.glob for each globspec."""
 
   def combine(files, globspec):
     return files ^ set(glob.glob(globspec))
   return Fileset(lambda: reduce(combine, globspecs, set()))
+
 
 def rglobs(*globspecs):
   """Returns a Fileset that does a recursive scan under the current directory combining the lists of
@@ -80,16 +83,19 @@ annotation_processor = AnnotationProcessor
 artifact = Artifact
 bundle = Bundle
 credentials = Credentials
+dependencies = jar_library = JarLibrary
 doc = Doc
 egg = PythonEgg
 exclude = Exclude
 fancy_pants = Pants
 jar = JarDependency
-jar_library = JarLibrary
 java_library = JavaLibrary
 java_protobuf_library = JavaProtobufLibrary
 java_tests = JavaTests
 java_thrift_library = JavaThriftLibrary
+# TODO(Anand) Remove this from pants proper when a code adjoinment mechanism exists
+# or ok if/when thriftstore is open sourced as well
+java_thriftstore_dml_library = JavaThriftstoreDMLLibrary
 jvm_binary = JvmBinary
 jvm_app = JvmApp
 page = Page
@@ -103,39 +109,47 @@ python_test_suite = PythonTestSuite
 repo = Repository
 scala_library = ScalaLibrary
 scala_tests = ScalaTests
+scalac_plugin = ScalacPlugin
 source_root = SourceRoot
 wiki = Wiki
+
 
 def has_sources(target):
   """Returns True if the target has sources."""
 
   return isinstance(target, TargetWithSources)
 
+
 def is_exported(target):
   """Returns True if the target provides an artifact exportable from the repo."""
 
   return isinstance(target, ExportableJvmLibrary) and target.provides
+
 
 def is_internal(target):
   """Returns True if the target is internal to the repo (ie: it might have dependencies)."""
 
   return isinstance(target, InternalTarget)
 
+
 def is_jvm(target):
   """Returns True if the target produces jvm bytecode."""
 
   return isinstance(target, JvmTarget)
+
 
 def is_apt(target):
   """Returns True if the target produces annotation processors."""
 
   return isinstance(target, AnnotationProcessor)
 
+
 def has_jvm_targets(targets):
   """Returns true if the given sequence of targets contains at least one jvm target as determined
   by is_jvm(...)"""
 
   return len(list(extract_jvm_targets(targets))) > 0
+
 
 def extract_jvm_targets(targets):
   """Returns an iterator over the jvm targets the given sequence of targets resolve to.  The given
@@ -150,10 +164,12 @@ def extract_jvm_targets(targets):
       if is_jvm(real_target):
         yield real_target
 
+
 def is_doc(target):
   """Returns True if the target is a documentation target."""
 
   return isinstance(target, Doc)
+
 
 def is_java(target):
   """Returns True if the target has or generates java sources."""
@@ -169,20 +185,28 @@ def is_thrift(target):
 
   return isinstance(target, JavaThriftLibrary)
 
+
 def is_apt(target):
   """Returns True if the target exports an annotation processor."""
 
   return isinstance(target, AnnotationProcessor)
+
 
 def is_python(target):
   """Returns True if the target has python sources."""
 
   return isinstance(target, PythonTarget)
 
+
 def is_scala(target):
   """Returns True if the target has scala sources."""
 
   return isinstance(target, ScalaLibrary) or isinstance(target, ScalaTests)
+
+
+def is_scalac_plugin(target):
+  return isinstance(target, ScalacPlugin)
+
 
 def is_test(t):
   """Returns True if the target is comprised of tests."""
@@ -207,6 +231,7 @@ __all__ = (
   'artifact',
   'bundle',
   'credentials',
+  'dependencies',
   'doc',
   'exclude',
   'egg',
@@ -230,6 +255,7 @@ __all__ = (
   'java_protobuf_library',
   'java_tests',
   'java_thrift_library',
+  'java_thriftstore_dml_library',
   'jvm_app',
   'jvm_binary',
   'page',
@@ -246,6 +272,7 @@ __all__ = (
   'rglobs',
   'scala_library',
   'scala_tests',
+  'scalac_plugin',
   'source_root',
   'wiki',
   'Config',

@@ -30,6 +30,7 @@ from twitter.pants.targets import (
   JarDependency,
   JavaProtobufLibrary,
   JavaThriftLibrary,
+  JavaThriftstoreDMLLibrary,
   JavaTests,
   Pants,
   ScalaLibrary,

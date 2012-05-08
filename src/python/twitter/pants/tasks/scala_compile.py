@@ -16,17 +16,26 @@
 
 __author__ = 'John Sirois'
 
-from collections import defaultdict
 import os
+import textwrap
 
-from twitter.common.dirutil import safe_mkdir
-from twitter.pants import get_buildroot, is_scala
+from collections import defaultdict
+
+from twitter.common.dirutil import safe_mkdir, safe_open
+
+from twitter.pants import is_scala, is_scalac_plugin
 from twitter.pants.targets.scala_library import ScalaLibrary
 from twitter.pants.targets.scala_tests import ScalaTests
 from twitter.pants.targets import resolve_target_sources
 from twitter.pants.tasks import TaskError
 from twitter.pants.tasks.binary_utils import nailgun_profile_classpath
+from twitter.pants.tasks.jvm_compiler_dependencies import Dependencies
 from twitter.pants.tasks.nailgun_task import NailgunTask
+
+
+# Well known metadata file required to register scalac plugins with nsc.
+_PLUGIN_INFO_FILE = 'scalac-plugin.xml'
+
 
 class ScalaCompile(NailgunTask):
   @classmethod
@@ -39,11 +48,11 @@ class ScalaCompile(NailgunTask):
                             help="[%default] Compile scala code with all configured warnings "
                                  "enabled.")
 
-  def __init__(self, context, output_dir=None, classpath=None, main=None, args=None, confs=None):
-    workdir = context.config.get('scala-compile', 'nailgun_dir')
-    NailgunTask.__init__(self, context, workdir=workdir)
+  def __init__(self, context):
+    NailgunTask.__init__(self, context, workdir=context.config.get('scala-compile', 'nailgun_dir'))
 
     self._compile_profile = context.config.get('scala-compile', 'compile-profile')
+    self._depemitter_profile = context.config.get('scala-compile', 'dependencies-plugin-profile')
 
     # All scala targets implicitly depend on the selected scala runtime.
     scaladeps = []
@@ -52,25 +61,28 @@ class ScalaCompile(NailgunTask):
     for target in context.targets(is_scala):
       target.update_dependencies(scaladeps)
 
-    self._compiler_classpath = classpath
-    self._output_dir = output_dir or context.config.get('scala-compile', 'workdir')
-    self._main = main or context.config.get('scala-compile', 'main')
+    workdir = context.config.get('scala-compile', 'workdir')
+    self._classes_dir = os.path.join(workdir, 'classes')
+    self._resources_dir = os.path.join(workdir, 'resources')
 
-    self._args = args or context.config.getlist('scala-compile', 'args')
+    self._main = context.config.get('scala-compile', 'main')
+
+    self._args = context.config.getlist('scala-compile', 'args')
     if context.options.scala_compile_warnings:
       self._args.extend(context.config.getlist('scala-compile', 'warning_args'))
     else:
       self._args.extend(context.config.getlist('scala-compile', 'no_warning_args'))
 
-    self._confs = confs or context.config.getlist('scala-compile', 'confs')
-    self._depfile = os.path.join(self._output_dir, 'dependencies')
+    self._confs = context.config.getlist('scala-compile', 'confs')
+    self._depfile = os.path.join(workdir, 'dependencies')
 
   def execute(self, targets):
     scala_targets = filter(is_scala, targets)
     if scala_targets:
       with self.context.state('classpath', []) as cp:
         for conf in self._confs:
-          cp.insert(0, (conf, self._output_dir))
+          cp.insert(0, (conf, self._resources_dir))
+          cp.insert(0, (conf, self._classes_dir))
 
       with self.changed(scala_targets, invalidate_dependants=True) as changed_targets:
         sources_by_target = self.calculate_sources(changed_targets)
@@ -89,11 +101,18 @@ class ScalaCompile(NailgunTask):
         genmap = self.context.products.get('classes')
 
         # Map generated classes to the owning targets and sources.
-        compiler = ScalaCompiler(self._output_dir, self._depfile)
-        for target, classes_by_source in compiler.findclasses(targets).items():
+        dependencies = Dependencies(self._classes_dir, self._depfile)
+        for target, classes_by_source in dependencies.findclasses(targets).items():
           for source, classes in classes_by_source.items():
-            genmap.add(source, self._output_dir, classes)
-            genmap.add(target, self._output_dir, classes)
+            genmap.add(source, self._classes_dir, classes)
+            genmap.add(target, self._classes_dir, classes)
+
+        # TODO(John Sirois): Map target.resources in the same way
+        # Create and Map scala plugin info files to the owning targets.
+        for target in targets:
+          if is_scalac_plugin(target) and target.classname:
+            basedir = self.write_plugin_info(target)
+            genmap.add(target, basedir, [_PLUGIN_INFO_FILE])
 
   def calculate_sources(self, targets):
     sources = defaultdict(set)
@@ -112,58 +131,40 @@ class ScalaCompile(NailgunTask):
     return sources
 
   def compile(self, classpath, sources):
-    safe_mkdir(self._output_dir)
+    safe_mkdir(self._classes_dir)
 
-    compiler_classpath = (
-      self._compiler_classpath
-      or nailgun_profile_classpath(self, self._compile_profile)
-    )
+    compiler_classpath = nailgun_profile_classpath(self, self._compile_profile)
 
     # TODO(John Sirois): separate compiler profile from runtime profile
     args = [
       '-classpath', ':'.join(compiler_classpath + classpath),
-      '-d', self._output_dir,
+      '-d', self._classes_dir,
 
-      # TODO(John Sirois): dependencyfile requires the deprecated -make:XXX - transition to ssc
-      '-dependencyfile', self._depfile,
-      '-make:transitivenocp'
+      # Support for outputting a dependencies file of source -> class
+      '-Xplugin:%s' % self.get_depemitter_plugin(),
+      '-P:depemitter:file:%s' % self._depfile
     ]
+
     args.extend(self._args)
     args.extend(sources)
     self.context.log.debug('Executing: %s %s' % (self._main, ' '.join(args)))
     return self.runjava(self._main, classpath=compiler_classpath, args=args)
 
+  def get_depemitter_plugin(self):
+    depemitter_classpath = nailgun_profile_classpath(self, self._depemitter_profile)
+    depemitter_jar = depemitter_classpath.pop()
+    if depemitter_classpath:
+      raise TaskError('Expected only 1 jar for the depemitter plugin, '
+                      'found these extra: ' % depemitter_classpath)
+    return depemitter_jar
 
-class ScalaCompiler(object):
-  _SECTIONS = ['classpath', 'sources', 'source_to_class']
-
-  def __init__(self, outputdir, depfile):
-    self.outputdir = outputdir
-    self.depfile = depfile
-
-  def findclasses(self, targets):
-    sources = set()
-    target_by_source = dict()
-    for target in targets:
-      for source in target.sources:
-        src = os.path.normpath(os.path.join(target.target_base, source))
-        target_by_source[src] = target
-        sources.add(src)
-
-    classes_by_target_by_source = defaultdict(lambda: defaultdict(set))
-    if os.path.exists(self.depfile):
-      with open(self.depfile, 'r') as deps:
-        section = 0
-        for dep in deps.readlines():
-          line = dep.strip()
-          if '-------' == line:
-            section += 1
-          elif ScalaCompiler._SECTIONS[section] == 'source_to_class':
-            src, cls = line.split('->')
-            sourcefile = os.path.relpath(os.path.join(self.outputdir, src.strip()), get_buildroot())
-            if sourcefile in sources:
-              classfile = os.path.relpath(os.path.join(self.outputdir, cls.strip()), self.outputdir)
-              target = target_by_source[sourcefile]
-              relsrc = os.path.relpath(sourcefile, target.target_base)
-              classes_by_target_by_source[target][relsrc].add(classfile)
-    return classes_by_target_by_source
+  def write_plugin_info(self, target):
+    basedir = os.path.join(self._resources_dir, target.id)
+    with safe_open(os.path.join(basedir, _PLUGIN_INFO_FILE), 'w') as f:
+      f.write(textwrap.dedent('''
+        <plugin>
+          <name>%s</name>
+          <classname>%s</classname>
+        </plugin>
+      ''' % (target.plugin, target.classname)).strip())
+    return basedir

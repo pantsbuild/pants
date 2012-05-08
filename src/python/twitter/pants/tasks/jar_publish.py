@@ -32,7 +32,7 @@ from twitter.common.config import Properties
 from twitter.common.dirutil import safe_open, safe_rmtree
 
 from twitter.pants import get_buildroot, is_exported as provides, is_internal, is_java, pants
-from twitter.pants.base import Address, BuildFile, ParseContext, Target
+from twitter.pants.base import Address, ParseContext, Target
 from twitter.pants.base.generator import Generator, TemplateData
 from twitter.pants.targets import InternalTarget, AnnotationProcessor, JavaLibrary, ScalaLibrary
 from twitter.pants.tasks import binary_utils, Task, TaskError
@@ -546,12 +546,10 @@ class JarPublish(Task):
           jvmargs = []
           auth = repo['auth']
           if auth:
-            buildfile = BuildFile(get_buildroot(), '.', must_exist=False)
-            def load_credentials():
-              return list(pants(auth).resolve()).pop()
-            credentials = ParseContext(buildfile).do_in_context(load_credentials)
-            jvmargs.append(credentials.username())
-            jvmargs.append(credentials.password())
+            with ParseContext.temp():
+              credentials = pants(auth).resolve().next()
+              jvmargs.append(credentials.username())
+              jvmargs.append(credentials.password())
 
           # Do the publish
           ivysettings = self.generate_ivysettings(published, publish_local=path)
