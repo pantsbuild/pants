@@ -171,6 +171,12 @@ def is_doc(target):
   return isinstance(target, Doc)
 
 
+def is_jar_library(target):
+  """Returns True if the target is an external jar library."""
+
+  return isinstance(target, JarLibrary)
+
+
 def is_java(target):
   """Returns True if the target has or generates java sources."""
 
@@ -179,6 +185,7 @@ def is_java(target):
     isinstance(target, JavaProtobufLibrary)) or (
     isinstance(target, JavaTests)) or (
     is_thrift(target))
+
 
 def is_thrift(target):
   """Returns True if the target has thrift IDL sources."""
@@ -214,6 +221,12 @@ def is_test(t):
   return isinstance(t, JavaTests) or isinstance(t, ScalaTests) or isinstance(t, PythonTests)
 
 
+def is_jar_dependency(dep):
+  """Returns True if the dependency is an external jar."""
+
+  return isinstance(dep, JarDependency)
+
+
 # bind this as late as possible
 pants = fancy_pants
 
@@ -244,6 +257,7 @@ __all__ = (
   'is_doc',
   'is_exported',
   'is_internal',
+  'is_jar_library',
   'is_java',
   'is_jvm',
   'is_python',

@@ -32,7 +32,7 @@ from twitter.pants.targets.exportable_jvm_library import ExportableJvmLibrary
 from twitter.pants.targets.java_library import JavaLibrary
 from twitter.pants.targets.jvm_binary import JvmBinary
 from twitter.pants.targets.scala_library import ScalaLibrary
-from twitter.pants.tasks import binary_utils, Task, TaskError
+from twitter.pants.tasks import binary_utils, TaskError
 from twitter.pants.tasks.binary_utils import profile_classpath
 from twitter.pants.tasks.jvm_binary_task import JvmBinaryTask
 
@@ -74,7 +74,7 @@ class IdeGen(JvmBinaryTask):
                                  "compiles them and adds them to the project classpath.")
 
   def __init__(self, context):
-    Task.__init__(self, context)
+    JvmBinaryTask.__init__(self, context)
 
     self.project_name = context.options.ide_gen_project_name
     self.python = context.options.ide_gen_python

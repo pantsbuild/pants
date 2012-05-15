@@ -64,7 +64,7 @@ class JarDependency(object):
     return self
 
   def intransitive(self):
-    """Declares this Dependency intransitive, indicating only the jar for the depenency itself
+    """Declares this Dependency intransitive, indicating only the jar for the dependency itself
     should be downloaded and placed on the classpath"""
 
     self.transitive = False

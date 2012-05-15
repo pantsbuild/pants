@@ -30,6 +30,7 @@ from twitter.common.dirutil import safe_mkdir, safe_open
 from twitter.pants import get_buildroot, is_internal, is_jvm
 from twitter.pants.base.generator import Generator, TemplateData
 from twitter.pants.tasks import binary_utils, TaskError
+from twitter.pants.tasks.ivy_utils import IvyUtils
 from twitter.pants.tasks.nailgun_task import NailgunTask
 
 
@@ -69,7 +70,7 @@ class IvyResolve(NailgunTask):
     NailgunTask.__init__(self, context, classpath=classpath, workdir=nailgun_dir)
 
     self._ivy_settings = context.config.get('ivy', 'ivy_settings')
-    self._cachedir = context.config.get('ivy-resolve', 'cache_dir')
+    self._cachedir = context.config.get('ivy', 'cache_dir')
     self._confs = context.config.getlist('ivy-resolve', 'confs')
     self._transitive = context.config.getbool('ivy-resolve', 'transitive')
     self._args = context.config.getlist('ivy-resolve', 'args')
@@ -85,6 +86,7 @@ class IvyResolve(NailgunTask):
     self._outdir = context.options.ivy_resolve_outdir or os.path.join(self._work_dir, 'reports')
     self._open = context.options.ivy_resolve_open
     self._report = self._open or context.options.ivy_resolve_report
+    self._ivy_utils = IvyUtils(context, self._cachedir)
 
     def parse_override(override):
       match = re.match(r'^([^#]+)#([^=]+)=([^\s]+)$', override)
@@ -157,12 +159,13 @@ class IvyResolve(NailgunTask):
       target_ivyxml = os.path.join(target_workdir, 'ivy.xml')
       safe_link(target_ivyxml, ivyxml_symlink)
 
-    with self._cachepath(self._classpath_file) as classpath:
-      with self.context.state('classpath', []) as cp:
-        for path in classpath:
-          if self._is_jar(path):
-            for conf in self._confs:
-              cp.append((conf, path.strip()))
+    if os.path.exists(self._classpath_file):
+      with self._cachepath(self._classpath_file) as classpath:
+        with self.context.state('classpath', []) as cp:
+          for path in classpath:
+            if self._is_jar(path):
+              for conf in self._confs:
+                cp.append((conf, path.strip()))
 
     if self._report:
       self._generate_ivy_report()
@@ -174,7 +177,7 @@ class IvyResolve(NailgunTask):
         self._mapjars(genmap, target)
 
   def _generate_ivy(self, jars, excludes, ivyxml):
-    org, name = self._identify()
+    org, name = self._ivy_utils.identify()
     template_data = TemplateData(
       org=org,
       module=name,
@@ -195,7 +198,7 @@ class IvyResolve(NailgunTask):
     classpath = binary_utils.nailgun_profile_classpath(self, self._profile)
 
     reports = []
-    org, name = self._identify()
+    org, name = self._ivy_utils.identify()
     xsl = os.path.join(self._cachedir, 'ivy-report.xsl')
     safe_mkdir(self._outdir, clean=True)
     for conf in self._confs:
@@ -204,7 +207,7 @@ class IvyResolve(NailgunTask):
         name=name,
         conf=conf
       )
-      xml = os.path.join(self._cachedir, '%(org)s-%(name)s-%(conf)s.xml' % params)
+      xml = self._ivy_utils.xml_report_path(conf)
       out = os.path.join(self._outdir, '%(org)s-%(name)s-%(conf)s.html' % params)
       args = ['-IN', xml, '-XSL', xsl, '-OUT', out]
       self.runjava('org.apache.xalan.xslt.Process', classpath=classpath, args=args)
@@ -217,16 +220,6 @@ class IvyResolve(NailgunTask):
 
     if self._open:
       binary_utils.open(*reports)
-
-  def _identify(self):
-    if len(self.context.target_roots) == 1:
-      target = self.context.target_roots[0]
-      if hasattr(target, 'provides') and target.provides:
-        return target.provides.org, target.provides.name
-      else:
-        return 'internal', target.id
-    else:
-      return 'internal', self.context.id
 
   def _calculate_classpath(self, targets):
     jars = set()

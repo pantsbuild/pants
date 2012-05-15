@@ -23,10 +23,6 @@ from twitter.pants.tasks import Task
 from twitter.pants.tasks.binary_utils import profile_classpath, runjava
 from twitter.pants.tasks.jvm_task import JvmTask
 
-def is_jvm(target):
-  return isinstance(target, JavaLibrary) or isinstance(target, JavaTests) or \
-         isinstance(target, ScalaLibrary) or isinstance(target, ScalaTests)
-
 
 class ScalaRepl(JvmTask):
   @classmethod

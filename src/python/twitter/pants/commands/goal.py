@@ -588,6 +588,14 @@ goal(
 ).install().with_description('Create an Eclipse project from the given targets.')
 
 
+from twitter.pants.tasks.provides import Provides
+
+goal(
+  name='provides',
+  action=Provides,
+  dependencies=['jar']
+).install().with_description('Emit the list of symbols provided by the given targets.')
+
 from twitter.pants.tasks.python.setup import SetupPythonEnvironment
 
 goal(
