@@ -14,48 +14,22 @@
 # limitations under the License.
 # ==================================================================================================
 
+from collections import namedtuple, defaultdict
 import os
 import xml
 
 from twitter.common.collections import OrderedSet
 
 
-class IvyModuleRef(object):
-  def __init__(self, org, name, rev, conf):
-    self.org = org
-    self.name = name
-    self.rev = rev
-    self.conf = conf
+IvyModuleRef = namedtuple('IvyModuleRef', ['org', 'name', 'rev', 'conf'])
+IvyArtifact = namedtuple('IvyArtifact', ['path'])
+IvyModule = namedtuple('IvyModule', ['ref', 'artifacts', 'callers'])
 
-  def __eq__(self, other):
-    return self.org == other.org and self.name == other.name and self.rev == other.rev and self.conf == other.conf
-
-  def __hash__(self):
-    return hash(repr(self))
-
-  def __repr__(self):
-    return "(%s, %s, %s, %s)" % (self.org, self.name, self.rev, self.conf)
-
-class IvyArtifact(object):
-  def __init__(self, path):
-    self.path = path
-
-  def __repr__(self):
-    return self.path
-
-class IvyModule(object):
-  def __init__(self, ref, artifacts, callers):
-    self.ref = ref
-    self.artifacts = artifacts
-    self.callers = callers  # A list of IvyModuleRefs of modules that require this module.
-
-  def __repr__(self):
-    return repr([self.ref, self.artifacts, self.callers])
 
 class IvyInfo(object):
   def __init__(self):
     self.modules_by_ref = {}  # Map from ref to referenced module.
-    self.deps_by_caller = {}  # Map from ref of caller to refs of modules required by that caller.
+    self.deps_by_caller = defaultdict(list)  # Map from ref of caller to refs of modules required by that caller.
 
   def add_module(self, module):
     self.modules_by_ref[module.ref] = module
@@ -63,9 +37,6 @@ class IvyInfo(object):
       if caller not in self.deps_by_caller:
         self.deps_by_caller[caller] = OrderedSet()
       self.deps_by_caller[caller].add(module.ref)
-
-  def __repr__(self):
-    return repr(self.modules_by_ref)
 
 
 class IvyUtils(object):
