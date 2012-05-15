@@ -29,13 +29,11 @@ IvyModule = namedtuple('IvyModule', ['ref', 'artifacts', 'callers'])
 class IvyInfo(object):
   def __init__(self):
     self.modules_by_ref = {}  # Map from ref to referenced module.
-    self.deps_by_caller = defaultdict(list)  # Map from ref of caller to refs of modules required by that caller.
+    self.deps_by_caller = defaultdict(OrderedSet)  # Map from ref of caller to refs of modules required by that caller.
 
   def add_module(self, module):
     self.modules_by_ref[module.ref] = module
     for caller in module.callers:
-      if caller not in self.deps_by_caller:
-        self.deps_by_caller[caller] = OrderedSet()
       self.deps_by_caller[caller].add(module.ref)
 
 
