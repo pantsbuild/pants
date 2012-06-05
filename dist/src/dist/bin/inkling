@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+
+# flags
+unset debug_command
+
+# get the source location for this script; handles symlinks
+function get_script_path {
+  local source="${BASH_SOURCE[0]}"
+  while [ -h "$source" ] ; do
+    local linked="$(readlink "$source")"
+    local dir="$(cd -P $(dirname "$source") && cd -P $(dirname "$linked") && pwd)"
+    source="$dir/$(basename "$linked")"
+  done
+  echo ${source}
+}
+
+# script details
+declare -r script_path=$(get_script_path)
+declare -r script_name=$(basename "$script_path")
+declare -r script_dir="$(cd -P "$(dirname "$script_path")" && pwd)"
+
+# directories
+declare -r base_dir="$(cd "$script_dir/.." && pwd)"
+declare -r lib_dir="$base_dir/lib"
+
+# debug command before executing
+function exec_command {
+  [[ -n "$debug_command" ]] && echo "" && for arg in "$@"; do echo "$arg"; done && echo "";
+  "$@"
+}
+
+# arguments
+declare -a java_args
+declare -a args
+
+# process arguments
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -V*)
+      java_args=("${java_args[@]}" "${1:2}")
+      args=("${args[@]}" "$1")
+      shift
+      ;;
+    -D*)
+      java_args=("${java_args[@]}" "$1")
+      args=("${args[@]}" "$1")
+      shift
+      ;;
+    -debug-command)
+      debug_command=1
+      shift
+      ;;
+    *)
+      args=("${args[@]}" "$1")
+      shift
+      ;;
+  esac
+done
+
+# reset "$@"
+set -- "${args[@]}"
+
+# allow setting of java command
+if [[ -z "$JAVACMD" && -n "$JAVA_HOME" && -x "$JAVA_HOME/bin/java" ]]; then
+  JAVACMD="$JAVA_HOME/bin/java"
+fi
+
+# run inkling
+exec_command \
+  "${JAVACMD:=java}" \
+  $JAVA_OPTS \
+  $INKLING_OPTS \
+  "${java_args[@]}" \
+  -Dinkling.home="$base_dir" \
+  -classpath "$lib_dir/*" \
+  com.typesafe.inkling.Main "$@"
