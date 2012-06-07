@@ -20,10 +20,12 @@ object Inkling extends Build {
     file("."),
     settings = buildSettings ++ Version.settings ++ Publish.settings ++ Seq(
       resolvers += "Sonatype Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots",
+      resolvers += "Typesafe Third-party" at "http://repo.typesafe.com/typesafe/third-party",
       libraryDependencies ++= Seq(
         "com.typesafe.sbt" % "incremental-compiler" % sbtVersion,
         "com.typesafe.sbt" % "compiler-interface" % sbtVersion classifier "sources",
-        "jline" % "jline" % "1.0"
+        "jline" % "jline" % "1.0" % "optional",
+        "com.martiansoftware" % "nailgun" % "0.7.1" % "optional"
       )
     )
   )

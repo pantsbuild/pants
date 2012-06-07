@@ -14,8 +14,6 @@ case class Settings(
   version: Boolean = false,
   quiet: Boolean = false,
   logLevel: Level.Value = Level.Info,
-  jvmOptions: Seq[String] = Seq.empty,
-  defines: Seq[String] = Seq.empty,
   sources: Seq[File] = Seq.empty,
   classpath: Seq[File] = Seq.empty,
   classesDirectory: File = new File("."),
@@ -29,7 +27,8 @@ case class Settings(
   compileOrder: CompileOrder = CompileOrder.Mixed,
   analysisCache: Option[File] = None,
   analysisMap: Map[File, File] = Map.empty,
-  residentLimit: Int = 0)
+  residentLimit: Int = 0,
+  properties: Seq[String] = Seq.empty)
 
 object Settings {
   val options = Seq(
@@ -38,8 +37,6 @@ object Settings {
     boolean( ("-quiet", "-q"),               "Silence all logging",                        (s: Settings) => s.copy(quiet = true)),
     boolean( "-debug",                       "Set log level to debug",                     (s: Settings) => s.copy(logLevel = Level.Debug)),
     string(  "-log-level", "level",          "Set log level (debug|info|warn|error)",      (s: Settings, l: String) => s.copy(logLevel = Level.withName(l))),
-    prefix(  "-V", "<flag>",                 "Set JVM flag directly for this process",     (s: Settings, o: String) => s.copy(jvmOptions = s.jvmOptions :+ o)),
-    prefix(  "-D", "property=value",         "Pass property to runtime system",            (s: Settings, o: String) => s.copy(defines = s.defines :+ o)),
     path(    ("-classpath", "-cp"), "path",  "Specify the classpath",                      (s: Settings, cp: Seq[File]) => s.copy(classpath = cp)),
     file(    "-d", "directory",              "Destination for compiled classes",           (s: Settings, f: File) => s.copy(classesDirectory = f)),
     file(    "-scala-home", "directory",     "Scala home directory (for locating jars)",   (s: Settings, f: File) => s.copy(scalaHome = Some(f))),
@@ -52,7 +49,12 @@ object Settings {
     string(  "-compile-order", "order",      "Compile order for Scala and Java sources",   (s: Settings, o: String) => s.copy(compileOrder = compileOrder(o))),
     file(    "-analysis-cache", "file",      "Cache file for compile analysis",            (s: Settings, f: File) => s.copy(analysisCache = Some(f))),
     fileMap( "-analysis-map",                "Upstream analysis mapping (file:file,...)",  (s: Settings, m: Map[File, File]) => s.copy(analysisMap = m)),
-    int(     "-resident-limit", "int",       "Set maximum number of resident compilers",   (s: Settings, i: Int) => s.copy(residentLimit = i))
+    int(     "-resident-limit", "int",       "Set maximum number of resident compilers",   (s: Settings, i: Int) => s.copy(residentLimit = i)),
+    prefix(  "-D", "property=value",         "Pass property to runtime system",            (s: Settings, o: String) => s.copy(properties = s.properties :+ o)),
+    dummy(   "-V<flag>",                     "Set JVM flag directly for this process"),
+    dummy(   "-nailed",                      "Run as daemon with nailgun server"),
+    dummy(   "-port",                        "Set nailgun port (if nailed)"),
+    dummy(   "-shutdown",                    "Shutdown nailgun server (if nailed)")
   )
 
   val allOptions: Set[OptionDef[Settings]] = options.toSet
@@ -82,6 +84,24 @@ object Settings {
     }
   }
 
+  def normalise(settings: Settings, cwd: Option[File]): Settings = {
+    if (cwd.isEmpty) settings
+    else {
+      import settings._
+      settings.copy(
+        sources = Util.normaliseSeq(cwd)(sources),
+        classpath = Util.normaliseSeq(cwd)(classpath),
+        classesDirectory = Util.normalise(cwd)(classesDirectory),
+        scalaHome = Util.normaliseOpt(cwd)(scalaHome),
+        scalaCompiler = Util.normaliseOpt(cwd)(scalaCompiler),
+        scalaLibrary = Util.normaliseOpt(cwd)(scalaLibrary),
+        javaHome = Util.normaliseOpt(cwd)(javaHome),
+        analysisCache = Util.normaliseOpt(cwd)(analysisCache),
+        analysisMap = Util.normaliseMap(cwd)(analysisMap)
+      )
+    }
+  }
+
   def boolean(opt: String, desc: String, action: Settings => Settings) = new BooleanOption[Settings](Seq(opt), desc, action)
   def boolean(opts: (String, String), desc: String, action: Settings => Settings) = new BooleanOption[Settings](Seq(opts._1, opts._2), desc, action)
   def string(opt: String, arg: String, desc: String, action: (Settings, String) => Settings) = new StringOption[Settings](Seq(opt), arg, desc, action)
@@ -90,4 +110,5 @@ object Settings {
   def path(opts: (String, String), arg: String, desc: String, action: (Settings, Seq[File]) => Settings) = new PathOption[Settings](Seq(opts._1, opts._2), arg, desc, action)
   def prefix(pre: String, arg: String, desc: String, action: (Settings, String) => Settings) = new PrefixOption[Settings](pre, arg, desc, action)
   def fileMap(opt: String, desc: String, action: (Settings, Map[File, File]) => Settings) = new FileMapOption[Settings](Seq(opt), desc, action)
+  def dummy(opt: String, desc: String) = new DummyOption[Settings](opt, desc)
 }

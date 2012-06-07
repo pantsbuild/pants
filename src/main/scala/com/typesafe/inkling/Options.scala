@@ -154,4 +154,12 @@ extends ArgumentOption[Map[File, File], Context] {
   }
 }
 
-
+class DummyOption[Context](
+  val optionHelp: String,
+  val description: String)
+extends OptionDef[Context] {
+  def options: Seq[String] = Seq.empty
+  def process(context: Context, args: Seq[String]) = Parsed(context, args.tail)
+  override def claims(option: String): Boolean = false
+  override def help = optionHelp
+}

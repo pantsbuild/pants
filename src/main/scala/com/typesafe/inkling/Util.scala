@@ -4,6 +4,7 @@
 
 package com.typesafe.inkling
 
+import java.io.File
 import sbt.{ Level, Logger }
 
 object Util {
@@ -42,6 +43,24 @@ object Util {
     java.text.DateFormat.getDateTimeInstance().format(new java.util.Date(time))
   }
 
+  // normalising files
+
+  def normalise(cwd: Option[File])(file: File): File = {
+    if (cwd.isDefined && !file.isAbsolute) new File(cwd.get, file.getPath) else file
+  }
+
+  def normaliseOpt(cwd: Option[File])(optFile: Option[File]): Option[File] = {
+    if (cwd.isDefined) optFile map normalise(cwd) else optFile
+  }
+
+  def normaliseSeq(cwd: Option[File])(files: Seq[File]): Seq[File] = {
+    if (cwd.isDefined) files map normalise(cwd) else files
+  }
+
+  def normaliseMap(cwd: Option[File])(mapped: Map[File, File]): Map[File, File] = {
+    if (cwd.isDefined) mapped map { case (l, r) => (normalise(cwd)(l), normalise(cwd)(r)) } else mapped
+  }
+
   // properties
 
   def propertyFromResource(resource: String, property: String, classLoader: ClassLoader): Option[String] = {
@@ -56,6 +75,13 @@ object Util {
     catch { case e: Exception => }
     finally { stream.close }
     props
+  }
+
+  def setProperties(props: Seq[String]): Unit = {
+    for (prop <- props) {
+      val kv = prop split "="
+      if (kv.length == 2) System.setProperty(kv(0), kv(1))
+    }
   }
 
   // debug output

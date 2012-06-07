@@ -4,15 +4,21 @@
 
 package com.typesafe.inkling
 
+import java.io.File
 import sbt.inc.Analysis
 import sbt.Level
 import xsbti.CompileFailed
 
 object Main {
-  def main(args: Array[String]): Unit = {
+  def main(args: Array[String]): Unit = run(args, None)
+
+  def run(args: Array[String], cwd: Option[File]): Unit = {
     val startTime = System.currentTimeMillis
 
-    val Parsed(settings, residual, errors) = Settings.parse(args)
+    val Parsed(rawSettings, residual, errors) = Settings.parse(args)
+    val settings = Settings.normalise(rawSettings, cwd)
+
+    if (cwd.isDefined) Util.setProperties(settings.properties)
 
     val log = Util.newLogger(settings.quiet, settings.logLevel)
     val isDebug = (!settings.quiet && settings.logLevel == Level.Debug)
