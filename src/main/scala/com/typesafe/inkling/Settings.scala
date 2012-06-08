@@ -54,6 +54,7 @@ object Settings {
     dummy(   "-V<flag>",                     "Set JVM flag directly for this process"),
     dummy(   "-nailed",                      "Run as daemon with nailgun server"),
     dummy(   "-port",                        "Set nailgun port (if nailed)"),
+    dummy(   "-status",                      "Report nailgun server status (if nailed)"),
     dummy(   "-shutdown",                    "Shutdown nailgun server (if nailed)")
   )
 

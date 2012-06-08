@@ -6,6 +6,7 @@ package com.typesafe.inkling
 
 import java.lang.ref.SoftReference
 import java.util.{ LinkedHashMap, Map }
+import scala.collection.JavaConverters._
 
 object Cache {
   final val DefaultInitialSize = 8
@@ -39,6 +40,11 @@ class Cache[K, V](initialSize: Int, val maxSize: Int) {
 
   def clear(): Unit = synchronized {
     cache.clear()
+  }
+
+  def entries(): Set[(K, V)] = synchronized {
+    val entrySet = cache.entrySet.asScala
+    entrySet flatMap { e => Option(e.getValue.get) map ((e.getKey, _)) } toSet
   }
 
   def stats(): Cache.Stats = synchronized {

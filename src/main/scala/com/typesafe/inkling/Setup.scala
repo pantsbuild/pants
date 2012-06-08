@@ -96,7 +96,8 @@ object Setup {
       "compiler interface sources" -> compilerInterfaceSrc,
       "java home" -> javaHome,
       "cache directory" -> cacheDir,
-      "resident compiler limit" -> maxCompilers)
+      "resident compiler limit" -> maxCompilers,
+      "logging" -> logging)
     Util.show(("setup", values), output)
   }
 }
