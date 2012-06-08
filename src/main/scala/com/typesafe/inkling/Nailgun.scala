@@ -13,7 +13,7 @@ object Nailgun {
   val DefaultPort = 4655
 
   def main(args: Array[String]): Unit = {
-    val port = try args(0).toInt catch { case e: Exception => DefaultPort }
+    val port = try args(0).toInt catch { case _: Exception => DefaultPort }
     start(port)
   }
 
@@ -42,7 +42,7 @@ object Nailgun {
       // give some time to shutdown
       var count = 0
       while (server.isRunning && (count < 50)) {
-        try { Thread.sleep(100) } catch { case e: InterruptedException => }
+        try { Thread.sleep(100) } catch { case _: InterruptedException => }
         count += 1
       }
     }

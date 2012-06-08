@@ -15,18 +15,19 @@ case class Setup(
   javaHome: Option[File],
   cacheDir: File,
   maxCompilers: Int,
-  log: xsbti.Logger)
+  logging: String)
 
 object Setup {
   val Command = "inkling"
   val Description = "scala incremental compiler"
 
-  def apply(settings: Settings, log: xsbti.Logger): Setup = {
+  def apply(settings: Settings): Setup = {
     import settings._
     val compiler = chooseScalaCompiler(scalaCompiler, scalaHome)
     val library = chooseScalaLibrary(scalaLibrary, scalaHome)
     val cacheDir = Defaults.inklingDir / inklingVersion.published
-    Setup(compiler, library, Defaults.sbtInterface, Defaults.compilerInterfaceSrc, javaHome, cacheDir, residentLimit, log)
+    val logging = Util.logging(settings.quiet, settings.logLevel)
+    Setup(compiler, library, Defaults.sbtInterface, Defaults.compilerInterfaceSrc, javaHome, cacheDir, residentLimit, logging)
   }
 
   def chooseScalaCompiler(userSet: Option[File], scalaHome: Option[File]) = {
@@ -38,23 +39,25 @@ object Setup {
   }
 
   object Defaults {
-    val dirProperty = Command + ".dir"
-    val homeProperty = Command + ".home"
+    val homeProperty = prop("home")
 
-    val userHome = fileProperty("user.home")
-    val inklingDir = optFileProperty(dirProperty).getOrElse(userHome / ("." + Command)).getCanonicalFile
-    val inklingHome = optFileProperty(homeProperty).map(_.getCanonicalFile)
+    val userHome = Util.fileProperty("user.home")
+    val inklingDir = Util.optFileProperty(prop("dir")).getOrElse(userHome / ("." + Command)).getCanonicalFile
+    val inklingHome = Util.optFileProperty(homeProperty).map(_.getCanonicalFile)
 
     val sbtInterface = optLibOrEmpty(inklingHome, "sbt-interface.jar")
     val compilerInterfaceSrc = optLibOrEmpty(inklingHome, "compiler-interface-sources.jar")
 
     val scalaCompiler = optLibOrEmpty(inklingHome, "scala-compiler.jar")
     val scalaLibrary = optLibOrEmpty(inklingHome, "scala-library.jar")
+
+    val cacheLimit = Util.intProperty(prop("cache.limit"), 5)
+    val loggerCacheLimit = Util.intProperty(prop("logger.cache.limit"), cacheLimit)
+    val compilerCacheLimit = Util.intProperty(prop("compiler.cache.limit"), cacheLimit)
+    val analysisCacheLimit = Util.intProperty(prop("analysis.cache.limit"), cacheLimit)
+
+    def prop(name: String) = Command + "." + name
   }
-
-  def fileProperty(name: String): File = new File(System.getProperty(name, ""))
-
-  def optFileProperty(name: String): Option[File] = Option(System.getProperty(name, null)).map(new File(_))
 
   def optLib(homeDir: Option[File], name: String): Option[File] = {
     homeDir flatMap { home =>

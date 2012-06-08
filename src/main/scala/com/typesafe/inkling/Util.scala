@@ -11,6 +11,16 @@ object Util {
 
   // logging
 
+  val logCache = Cache[String, Logger](Setup.Defaults.loggerCacheLimit)
+
+  def logger(quiet: Boolean, level: Level.Value): Logger = {
+    logCache.get(logging(quiet, level))(newLogger(quiet, level))
+  }
+
+  def logging(quiet: Boolean, level: Level.Value): String = {
+    if (quiet) "quiet" else level.toString
+  }
+
   class SilentLogger extends Logger {
     def trace(t: => Throwable): Unit = ()
     def success(message: => String): Unit = ()
@@ -62,6 +72,15 @@ object Util {
   }
 
   // properties
+
+  def intProperty(name: String, default: Int): Int = {
+    val value = System.getProperty(name)
+    if (value ne null) try value.toInt catch { case _: Exception => default } else default
+  }
+
+  def fileProperty(name: String): File = new File(System.getProperty(name, ""))
+
+  def optFileProperty(name: String): Option[File] = Option(System.getProperty(name, null)).map(new File(_))
 
   def propertyFromResource(resource: String, property: String, classLoader: ClassLoader): Option[String] = {
     val props = propertiesFromResource(resource, classLoader)

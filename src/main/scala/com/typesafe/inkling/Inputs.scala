@@ -5,6 +5,7 @@
 package com.typesafe.inkling
 
 import java.io.File
+import sbt.compiler.IC
 import sbt.inc.{ Analysis, Locate }
 import sbt.Path._
 import xsbti.compile.CompileOrder
@@ -38,7 +39,7 @@ object Inputs {
   def analysisFor(file: File, exclude: File, mapped: Map[File, File]): Analysis = {
     if (file != exclude && file.isDirectory) {
       val cacheFile = normalise(mapped.getOrElse(file, defaultCacheLocation(file)))
-      AnalysisCache.get(cacheFile)
+      Compiler.analysisCache.get(cacheFile)(IC.readAnalysis(cacheFile))
     } else Analysis.Empty
   }
 

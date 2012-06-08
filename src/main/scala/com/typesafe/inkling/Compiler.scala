@@ -17,13 +17,15 @@ object Compiler {
   val CompilerInterfaceId = "compiler-interface"
   val JavaClassVersion = System.getProperty("java.class.version")
 
-  def apply(setup: Setup): Compiler = {
+  val analysisCache = Cache[File, Analysis](Setup.Defaults.analysisCacheLimit)
+
+  def apply(setup: Setup, log: Logger): Compiler = {
     val compilerCache = if (setup.maxCompilers <= 0) CompilerCache.fresh else CompilerCache(setup.maxCompilers)
     val instance = scalaInstance(setup)
-    val interfaceJar = compilerInterface(setup, instance)
-    val scalac = IC.newScalaCompiler(instance, interfaceJar, ClasspathOptions.boot, setup.log)
+    val interfaceJar = compilerInterface(setup, instance, log)
+    val scalac = IC.newScalaCompiler(instance, interfaceJar, ClasspathOptions.boot, log)
     val javac = AggressiveCompile.directOrFork(instance, ClasspathOptions.javac(false), setup.javaHome)
-    new Compiler(scalac, javac, compilerCache, setup.log)
+    new Compiler(scalac, javac, compilerCache, log)
   }
 
   def scalaInstance(setup: Setup): ScalaInstance = {
@@ -38,12 +40,12 @@ object Compiler {
     Util.propertyFromResource("compiler.properties", "version.number", scalaLoader)
   }
 
-  def compilerInterface(setup: Setup, scalaInstance: ScalaInstance): File = {
+  def compilerInterface(setup: Setup, scalaInstance: ScalaInstance, log: Logger): File = {
     val dir = setup.cacheDir / interfaceId(scalaInstance.actualVersion)
     val interfaceJar = dir / (CompilerInterfaceId + ".jar")
     if (!interfaceJar.exists()) {
       dir.mkdirs()
-      IC.compileInterfaceJar(CompilerInterfaceId, setup.compilerInterfaceSrc, interfaceJar, setup.sbtInterface, scalaInstance, setup.log)
+      IC.compileInterfaceJar(CompilerInterfaceId, setup.compilerInterfaceSrc, interfaceJar, setup.sbtInterface, scalaInstance, log)
     }
     interfaceJar
   }
@@ -58,7 +60,8 @@ class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler, cache: GlobalsCac
     val cp = autoClasspath(classesDirectory, scalac.scalaInstance.libraryJar, javaOnly, classpath)
     val getAnalysis: File => Option[Analysis] = analysisMap.get _
     val analysis = doCompile(scalac, javac, sources, cp, classesDirectory, cache, scalacOptions, javacOptions, getAnalysis, definesClass, 100, compileOrder, false)(log)
-    AnalysisCache.put(cacheFile, analysis)
+    Compiler.analysisCache.put(cacheFile, analysis)
+    analysis
   }
 
   def autoClasspath(classesDirectory: File, scalaLibrary: File, javaOnly: Boolean, classpath: Seq[File]): Seq[File] = {

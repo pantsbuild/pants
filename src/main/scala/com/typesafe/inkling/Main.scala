@@ -10,6 +10,8 @@ import sbt.Level
 import xsbti.CompileFailed
 
 object Main {
+  val compilerCache = Cache[Setup, Compiler](Setup.Defaults.compilerCacheLimit)
+
   def main(args: Array[String]): Unit = run(args, None)
 
   def run(args: Array[String], cwd: Option[File]): Unit = {
@@ -20,7 +22,7 @@ object Main {
 
     if (cwd.isDefined) Util.setProperties(settings.properties)
 
-    val log = Util.newLogger(settings.quiet, settings.logLevel)
+    val log = Util.logger(settings.quiet, settings.logLevel)
     val isDebug = (!settings.quiet && settings.logLevel == Level.Debug)
 
     if (!errors.isEmpty) {
@@ -46,7 +48,7 @@ object Main {
       sys.exit(1)
     }
 
-    val setup = Setup(settings, log)
+    val setup = Setup(settings)
     val inputs = Inputs(settings)
 
     if (isDebug) {
@@ -56,8 +58,8 @@ object Main {
     }
 
     try {
-      val compiler = Compiler(setup)
-      log.debug("compiler = " + compiler)
+      val compiler = compilerCache.get(setup)(Compiler(setup, log))
+      log.debug("compiler = %s [%s]" format (compiler, compiler.hashCode.toHexString))
       compiler.compile(inputs)
       log.info("Compile success " + Util.timing(startTime))
     } catch {
