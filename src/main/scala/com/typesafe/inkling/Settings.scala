@@ -18,8 +18,7 @@ case class Settings(
   classpath: Seq[File] = Seq.empty,
   classesDirectory: File = new File("."),
   scalaHome: Option[File] = None,
-  scalaCompiler: Option[File] = None,
-  scalaLibrary: Option[File] = None,
+  scalaPath: Seq[File] = Seq.empty,
   scalacOptions: Seq[String] = Seq.empty,
   javaHome: Option[File] = None,
   javaOnly: Boolean = false,
@@ -40,8 +39,7 @@ object Settings {
     path(    ("-classpath", "-cp"), "path",  "Specify the classpath",                      (s: Settings, cp: Seq[File]) => s.copy(classpath = cp)),
     file(    "-d", "directory",              "Destination for compiled classes",           (s: Settings, f: File) => s.copy(classesDirectory = f)),
     file(    "-scala-home", "directory",     "Scala home directory (for locating jars)",   (s: Settings, f: File) => s.copy(scalaHome = Some(f))),
-    file(    "-scala-compiler", "jar",       "Location of Scala compiler",                 (s: Settings, f: File) => s.copy(scalaCompiler = Some(f))),
-    file(    "-scala-library", "jar",        "Location of Scala library",                  (s: Settings, f: File) => s.copy(scalaLibrary = Some(f))),
+    path(    "-scala-path", "path",          "Specify all Scala jars directly",            (s: Settings, js: Seq[File]) => s.copy(scalaPath = js)),
     prefix(  "-S", "<scalac-option>",        "Pass option to scalac",                      (s: Settings, o: String) => s.copy(scalacOptions = s.scalacOptions :+ o)),
     file(    "-java-home", "directory",      "Java home directory (to select javac)",      (s: Settings, f: File) => s.copy(javaHome = Some(f))),
     prefix(  "-J", "<javac-option>",         "Pass option to javac",                       (s: Settings, o: String) => s.copy(javacOptions = s.javacOptions :+ o)),
@@ -94,8 +92,7 @@ object Settings {
         classpath = Util.normaliseSeq(cwd)(classpath),
         classesDirectory = Util.normalise(cwd)(classesDirectory),
         scalaHome = Util.normaliseOpt(cwd)(scalaHome),
-        scalaCompiler = Util.normaliseOpt(cwd)(scalaCompiler),
-        scalaLibrary = Util.normaliseOpt(cwd)(scalaLibrary),
+        scalaPath = Util.normaliseSeq(cwd)(scalaPath),
         javaHome = Util.normaliseOpt(cwd)(javaHome),
         analysisCache = Util.normaliseOpt(cwd)(analysisCache),
         analysisMap = Util.normaliseMap(cwd)(analysisMap)
@@ -108,6 +105,7 @@ object Settings {
   def string(opt: String, arg: String, desc: String, action: (Settings, String) => Settings) = new StringOption[Settings](Seq(opt), arg, desc, action)
   def int(opt: String, arg: String, desc: String, action: (Settings, Int) => Settings) = new IntOption[Settings](Seq(opt), arg, desc, action)
   def file(opt: String, arg: String, desc: String, action: (Settings, File) => Settings) = new FileOption[Settings](Seq(opt), arg, desc, action)
+  def path(opt: String, arg: String, desc: String, action: (Settings, Seq[File]) => Settings) = new PathOption[Settings](Seq(opt), arg, desc, action)
   def path(opts: (String, String), arg: String, desc: String, action: (Settings, Seq[File]) => Settings) = new PathOption[Settings](Seq(opts._1, opts._2), arg, desc, action)
   def prefix(pre: String, arg: String, desc: String, action: (Settings, String) => Settings) = new PrefixOption[Settings](pre, arg, desc, action)
   def fileMap(opt: String, desc: String, action: (Settings, Map[File, File]) => Settings) = new FileMapOption[Settings](Seq(opt), desc, action)

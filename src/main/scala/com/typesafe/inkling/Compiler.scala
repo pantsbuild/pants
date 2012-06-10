@@ -29,9 +29,10 @@ object Compiler {
   }
 
   def scalaInstance(setup: Setup): ScalaInstance = {
-    val loader = scalaLoader(Seq(setup.scalaLibrary, setup.scalaCompiler))
+    import setup.{ scalaCompiler, scalaLibrary, scalaExtra}
+    val loader = scalaLoader(Seq(scalaLibrary, scalaCompiler) ++ scalaExtra)
     val version = scalaVersion(loader)
-    new ScalaInstance(version.getOrElse("unknown"), loader, setup.scalaLibrary, setup.scalaCompiler, Seq.empty, version)
+    new ScalaInstance(version.getOrElse("unknown"), loader, scalaLibrary, scalaCompiler, scalaExtra, version)
   }
 
   def scalaLoader(jars: Seq[File]) = new URLClassLoader(toURLs(jars), sbt.classpath.ClasspathUtilities.rootLoader)

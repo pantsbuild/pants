@@ -78,6 +78,11 @@ object Util {
     if (value ne null) try value.toInt catch { case _: Exception => default } else default
   }
 
+  def stringSetProperty(name: String, default: Set[String]): Set[String] = {
+    val value = System.getProperty(name)
+    if (value ne null) (value split ",").toSet else default
+  }
+
   def fileProperty(name: String): File = new File(System.getProperty(name, ""))
 
   def optFileProperty(name: String): Option[File] = Option(System.getProperty(name, null)).map(new File(_))

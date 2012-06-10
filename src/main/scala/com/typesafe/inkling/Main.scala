@@ -44,7 +44,7 @@ object Main {
     }
 
     if (Setup.Defaults.inklingHome.isEmpty) {
-      log.error("Need %s property to be defined" format Setup.Defaults.homeProperty)
+      log.error("Need %s property to be defined" format Setup.HomeProperty)
       sys.exit(1)
     }
 
