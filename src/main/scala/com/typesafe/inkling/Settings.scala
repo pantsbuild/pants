@@ -9,6 +9,9 @@ import sbt.Level
 import sbt.Path._
 import xsbti.compile.CompileOrder
 
+/**
+ * All parsed command-line options.
+ */
 case class Settings(
   help: Boolean = false,
   version: Boolean = false,
@@ -30,6 +33,9 @@ case class Settings(
   properties: Seq[String] = Seq.empty)
 
 object Settings {
+  /**
+   * All available command-line options.
+   */
   val options = Seq(
     boolean( ("-help", "-h"),                "Print this usage message",                   (s: Settings) => s.copy(help = true)),
     boolean( "-version",                     "Print version",                              (s: Settings) => s.copy(version = true)),
@@ -58,6 +64,9 @@ object Settings {
 
   val allOptions: Set[OptionDef[Settings]] = options.toSet
 
+  /**
+   * Print out the usage message.
+   */
   def printUsage(): Unit = {
     val column = options.map(_.help.length).max + 2
     println("Usage: %s <options> <sources>" format Setup.Command)
@@ -65,8 +74,15 @@ object Settings {
     println()
   }
 
+  /**
+   * Anything starting with '-' is considered an option, not a source file.
+   */
   def isOpt(s: String) = s startsWith "-"
 
+  /**
+   * Parse all args into a Settings object.
+   * Residual args are either unknown options or source files.
+   */
   def parse(args: Seq[String]): Parsed[Settings] = {
     val Parsed(settings, remaining, errors) = Options.parse(Settings(), allOptions, args, stopOnError = false)
     val (unknown, residual) = remaining partition isOpt
@@ -75,6 +91,9 @@ object Settings {
     Parsed(settings.copy(sources = sources), Seq.empty, errors ++ unknownErrors)
   }
 
+  /**
+   * Create a CompileOrder value based on string input.
+   */
   def compileOrder(order: String): CompileOrder = {
     order.toLowerCase match {
       case "mixed"                                       => CompileOrder.Mixed
@@ -83,6 +102,9 @@ object Settings {
     }
   }
 
+  /**
+   * Normalise all relative paths to the actual current working directory, if provided.
+   */
   def normalise(settings: Settings, cwd: Option[File]): Settings = {
     if (cwd.isEmpty) settings
     else {
@@ -99,6 +121,8 @@ object Settings {
       )
     }
   }
+
+  // helpers for creating options
 
   def boolean(opt: String, desc: String, action: Settings => Settings) = new BooleanOption[Settings](Seq(opt), desc, action)
   def boolean(opts: (String, String), desc: String, action: Settings => Settings) = new BooleanOption[Settings](Seq(opts._1, opts._2), desc, action)

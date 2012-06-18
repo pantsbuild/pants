@@ -9,22 +9,35 @@ import sbt.inc.Analysis
 import sbt.Level
 import xsbti.CompileFailed
 
+/**
+ * Command-line main class.
+ */
 object Main {
+  /**
+   * Static cache for inkling compilers.
+   */
   val compilerCache = Cache[Setup, Compiler](Setup.Defaults.compilerCacheLimit)
 
   def main(args: Array[String]): Unit = run(args, None)
 
+  /**
+   * Compile run. Current working directory can be provided (for nailed inkling).
+   */
   def run(args: Array[String], cwd: Option[File]): Unit = {
     val startTime = System.currentTimeMillis
 
     val Parsed(rawSettings, residual, errors) = Settings.parse(args)
+
+    // normalise relative paths to the current working directory (if provided)
     val settings = Settings.normalise(rawSettings, cwd)
 
+    // if nailed then also set any system properties provided
     if (cwd.isDefined) Util.setProperties(settings.properties)
 
     val log = Util.logger(settings.quiet, settings.logLevel)
     val isDebug = (!settings.quiet && settings.logLevel == Level.Debug)
 
+    // bail out on any command-line option errors
     if (!errors.isEmpty) {
       for (error <- errors) log.error(error)
       log.error("See %s -help for information about options" format Setup.Command)
@@ -35,6 +48,7 @@ object Main {
 
     if (settings.help) Settings.printUsage()
 
+    // if there are no sources provided, print version and usage by default
     if (settings.sources.isEmpty) {
       if (!settings.version && !settings.help) {
         Setup.printVersion()
@@ -43,6 +57,7 @@ object Main {
       sys.exit(1)
     }
 
+    // we need some of the jars in inkling home, always needs to be provided
     if (Setup.Defaults.inklingHome.isEmpty) {
       log.error("Need %s property to be defined" format Setup.HomeProperty)
       sys.exit(1)
@@ -55,8 +70,10 @@ object Main {
       val debug: String => Unit = log.debug(_)
       Setup.show(setup, debug)
       Inputs.show(inputs, debug)
+      debug("Setup and Inputs parsed " + Util.timing(startTime))
     }
 
+    // run the compile
     try {
       val compiler = compilerCache.get(setup)(Compiler(setup, log))
       log.debug("compiler = %s [%s]" format (compiler, compiler.hashCode.toHexString))

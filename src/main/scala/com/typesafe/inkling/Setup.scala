@@ -7,6 +7,9 @@ package com.typesafe.inkling
 import java.io.File
 import sbt.Path._
 
+/**
+ * All setup options for an inkling compiler.
+ */
 case class Setup(
   scalaCompiler: File,
   scalaLibrary: File,
@@ -31,6 +34,9 @@ object Setup {
   val SbtInterfaceName = "sbt-interface.jar"
   val CompilerInterfaceSourcesName = "compiler-interface-sources.jar"
 
+  /**
+   * Create compiler setup from command-line settings.
+   */
   def apply(settings: Settings): Setup = {
     val (compiler, library, extra) = scalaJars(settings.scalaPath, settings.scalaHome)
     val compilerJar = compiler.getCanonicalFile
@@ -43,16 +49,27 @@ object Setup {
     Setup(compilerJar, libraryJar, extraJars, Defaults.sbtInterface, Defaults.compilerInterfaceSrc, javaHome, cacheDir, maxCompilers, logging)
   }
 
+  /**
+   * Select the scala jars.
+   * Prefer the scala-path setting, then the scala-home setting, otherwise use bundled scala.
+   */
   def scalaJars(scalaPath: Seq[File], scalaHome: Option[File]): (File, File, Seq[File]) = {
     splitScala(scalaPath) orElse splitScala(allLibs(scalaHome), Defaults.scalaExcluded) getOrElse Defaults.scalaJars
   }
 
+  /**
+   * Distinguish the compiler and library jars.
+   */
   def splitScala(jars: Seq[File], excluded: Set[String] = Set.empty): Option[(File, File, Seq[File])] = {
     val filtered = jars filterNot (excluded contains _.getName)
     val (compiler, other) = filtered partition (_.getName == ScalaCompilerName)
     val (library, extra) = other partition (_.getName == ScalaLibraryName)
     if (compiler.nonEmpty && library.nonEmpty) Some(compiler(0), library(0), extra) else None
   }
+
+  //
+  // Default setup
+  //
 
   object Defaults {
     val userHome = Util.fileProperty("user.home")
@@ -89,8 +106,18 @@ object Setup {
     optLib(homeDir, name) getOrElse new File("")
   }
 
+  //
+  // Inkling version
+  //
+
+  /**
+   * Full inkling version info.
+   */
   case class Version(published: String, timestamp: String, commit: String)
 
+  /**
+   * Get the inkling version from a generated properties file.
+   */
   lazy val inklingVersion: Version = {
     val props = Util.propertiesFromResource("inkling.version.properties", getClass.getClassLoader)
     Version(
@@ -100,14 +127,27 @@ object Setup {
     )
   }
 
+  /**
+   * For snapshots the inkling version includes timestamp and commit.
+   */
   lazy val versionString: String = {
     import inklingVersion._
     if (published.endsWith("-SNAPSHOT")) "%s %s-%s" format (published, timestamp, commit take 10)
     else published
   }
 
+  /**
+   * Print the inkling version to standard out.
+   */
   def printVersion(): Unit = println("%s (%s) %s" format (Command, Description, versionString))
 
+  //
+  // Debug
+  //
+
+  /**
+   * Debug output for compiler setup.
+   */
   def show(setup: Setup, output: String => Unit): Unit = {
     import setup._
     val values = Seq(

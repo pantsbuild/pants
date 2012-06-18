@@ -7,6 +7,9 @@ package com.typesafe.inkling
 import java.io.{ File, IOException }
 import scala.annotation.tailrec
 
+/**
+ * Parsing command-line options, immutably.
+ */
 object Options {
   def parse[Context](context: Context, options: Set[OptionDef[Context]], args: Seq[String], stopOnError: Boolean): Parsed[Context] =
     parseOptions(context, options, args, Seq.empty, Seq.empty, stopOnError)

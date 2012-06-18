@@ -9,24 +9,41 @@ import sbt.{ Level, Logger }
 
 object Util {
 
-  // logging
+  //
+  // Logging
+  //
 
+  /**
+   * Static cache for loggers.
+   */
   val logCache = Cache[String, Logger](Setup.Defaults.loggerCacheLimit)
 
+  /**
+   * Get a logger, cached or created.
+   */
   def logger(quiet: Boolean, level: Level.Value): Logger = {
     logCache.get(logging(quiet, level))(newLogger(quiet, level))
   }
 
+  /**
+   * String representation of logging configuration. Used for Setup as cache key.
+   */
   def logging(quiet: Boolean, level: Level.Value): String = {
     if (quiet) "quiet" else level.toString
   }
 
+  /**
+   * A logger that does nothing.
+   */
   class SilentLogger extends Logger {
     def trace(t: => Throwable): Unit = ()
     def success(message: => String): Unit = ()
     def log(level: Level.Value, message: => String): Unit = ()
   }
 
+  /**
+   * Create a new logger based on quiet and level settings.
+   */
   def newLogger(quiet: Boolean, level: Level.Value): Logger = {
     if (quiet) {
       new SilentLogger
@@ -35,13 +52,21 @@ object Util {
     }
   }
 
-  // time
+  //
+  // Time
+  //
 
+  /**
+   * Current timestamp and time passed since start time.
+   */
   def timing(start: Long): String = {
     val end = System.currentTimeMillis
     "at %s [%s]" format (dateTime(end), duration(end - start))
   }
 
+  /**
+   * Format a minutes:seconds.millis time.
+   */
   def duration(millis: Long): String = {
     val secs = millis / 1000
     val (m, s, ms) = (secs / 60, secs % 60, millis % 1000)
@@ -49,49 +74,86 @@ object Util {
     else "%d.%03ds" format (s, ms)
   }
 
+  /**
+   * Creating a readable timestamp.
+   */
   def dateTime(time: Long): String = {
     java.text.DateFormat.getDateTimeInstance().format(new java.util.Date(time))
   }
 
-  // normalising files
+  //
+  // Normalising files
+  //
 
+  /**
+   * Normalise file in relation to actual current working directory.
+   */
   def normalise(cwd: Option[File])(file: File): File = {
     if (cwd.isDefined && !file.isAbsolute) new File(cwd.get, file.getPath) else file
   }
 
+  /**
+   * Normalise optional file in relation to actual current working directory.
+   */
   def normaliseOpt(cwd: Option[File])(optFile: Option[File]): Option[File] = {
     if (cwd.isDefined) optFile map normalise(cwd) else optFile
   }
 
+  /**
+   * Normalise sequence of files in relation to actual current working directory.
+   */
   def normaliseSeq(cwd: Option[File])(files: Seq[File]): Seq[File] = {
     if (cwd.isDefined) files map normalise(cwd) else files
   }
 
+  /**
+   * Normalise file map in relation to actual current working directory.
+   */
   def normaliseMap(cwd: Option[File])(mapped: Map[File, File]): Map[File, File] = {
     if (cwd.isDefined) mapped map { case (l, r) => (normalise(cwd)(l), normalise(cwd)(r)) } else mapped
   }
 
-  // properties
+  //
+  // Properties
+  //
 
+  /**
+   * Create int from system property.
+   */
   def intProperty(name: String, default: Int): Int = {
     val value = System.getProperty(name)
     if (value ne null) try value.toInt catch { case _: Exception => default } else default
   }
 
+  /**
+   * Create set of strings, split by comma, from system property.
+   */
   def stringSetProperty(name: String, default: Set[String]): Set[String] = {
     val value = System.getProperty(name)
     if (value ne null) (value split ",").toSet else default
   }
 
+  /**
+   * Create a file, default empty, from system property.
+   */
   def fileProperty(name: String): File = new File(System.getProperty(name, ""))
 
+  /**
+   * Create an option file from system property.
+   */
   def optFileProperty(name: String): Option[File] = Option(System.getProperty(name, null)).map(new File(_))
 
+  /**
+   * Get a property from a properties file resource in the classloader.
+   */
   def propertyFromResource(resource: String, property: String, classLoader: ClassLoader): Option[String] = {
     val props = propertiesFromResource(resource, classLoader)
     Option(props.getProperty(property))
   }
 
+  /**
+   * Get all properties from a properties file resource in the classloader.
+   */
   def propertiesFromResource(resource: String, classLoader: ClassLoader): java.util.Properties = {
     val props = new java.util.Properties
     val stream = classLoader.getResourceAsStream(resource)
@@ -101,6 +163,9 @@ object Util {
     props
   }
 
+  /**
+   * Set system properties.
+   */
   def setProperties(props: Seq[String]): Unit = {
     for (prop <- props) {
       val kv = prop split "="
@@ -108,8 +173,13 @@ object Util {
     }
   }
 
-  // debug output
+  //
+  // Debug output
+  //
 
+  /**
+   * General utility for displaying objects for debug output.
+   */
   def show(thing: Any, output: String => Unit, prefix: String = "", level: Int = 0): Unit = {
     def out(s: String) = output(("   " * level) + s)
     thing match {
