@@ -6,7 +6,7 @@ import sbt._
 import sbt.Keys._
 
 object Inkling extends Build {
-  val sbtVersion = "0.12.0-RC1"
+  val sbtVersion = "0.12.0-RC2"
 
   lazy val buildSettings = Defaults.defaultSettings ++ Seq(
     organization := "com.typesafe.inkling",
