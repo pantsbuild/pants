@@ -9,9 +9,9 @@ import java.net.URLClassLoader
 import sbt.{ ClasspathOptions, ScalaInstance }
 import sbt.compiler.{ AggressiveCompile, AnalyzingCompiler, CompilerCache, IC }
 import sbt.inc.Analysis
-import sbt.Logger
 import sbt.Path._
 import xsbti.compile.{ JavaCompiler, GlobalsCache }
+import xsbti.Logger
 
 object Compiler {
   val CompilerInterfaceId = "compiler-interface"
@@ -33,6 +33,11 @@ object Compiler {
     val javac = AggressiveCompile.directOrFork(instance, ClasspathOptions.javac(false), setup.javaHome)
     new Compiler(scalac, javac, compilerCache, log)
   }
+
+  /**
+   * Java API for creating compiler.
+   */
+  def create(setup: Setup, log: Logger): Compiler = apply(setup, log)
 
   /**
    * Create the scala instance for the compiler. Includes creating the classloader.

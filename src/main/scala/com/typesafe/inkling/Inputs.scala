@@ -5,9 +5,11 @@
 package com.typesafe.inkling
 
 import java.io.File
+import java.util.{ List => JList, Map => JMap }
 import sbt.compiler.IC
 import sbt.inc.{ Analysis, Locate }
 import sbt.Path._
+import scala.collection.JavaConverters._
 import xsbti.compile.CompileOrder
 
 /**
@@ -30,15 +32,57 @@ object Inputs {
    * Create inputs based on command-line settings.
    */
   def apply(settings: Settings): Inputs = {
-    import settings.{ scalacOptions, javacOptions, javaOnly, compileOrder }
-    val classpath = settings.classpath map normalise
-    val sources = settings.sources map normalise
-    val classesDirectory = normalise(settings.classesDirectory)
-    val cacheFile = normalise(settings.analysisCache.getOrElse(defaultCacheLocation(classesDirectory)))
-    val upstreamAnalysis = settings.analysisMap map { case (k, v) => (normalise(k), normalise(v)) }
-    val analysisMap = (classpath map { file => (file, analysisFor(file, classesDirectory, upstreamAnalysis)) }).toMap
-    new Inputs(classpath, sources, classesDirectory, scalacOptions, javacOptions, cacheFile, analysisMap, Locate.definesClass, javaOnly, compileOrder)
+    import settings._
+    inputs(classpath, sources, classesDirectory, scalacOptions, javacOptions, analysisCache, analysisMap, javaOnly, compileOrder)
   }
+
+  /**
+   * Create normalised and defaulted Inputs.
+   */
+  def inputs(
+    classpath: Seq[File],
+    sources: Seq[File],
+    classesDirectory: File,
+    scalacOptions: Seq[String],
+    javacOptions: Seq[String],
+    analysisCache: Option[File],
+    analysisCacheMap: Map[File, File],
+    javaOnly: Boolean,
+    compileOrder: CompileOrder): Inputs =
+  {
+    val normalise: File => File = { _.getCanonicalFile }
+    val cp = classpath map normalise
+    val srcs = sources map normalise
+    val classes = normalise(classesDirectory)
+    val cacheFile = normalise(analysisCache.getOrElse(defaultCacheLocation(classesDirectory)))
+    val upstreamAnalysis = analysisCacheMap map { case (k, v) => (normalise(k), normalise(v)) }
+    val analysisMap = (classpath map { file => (file, analysisFor(file, classesDirectory, upstreamAnalysis)) }).toMap
+    new Inputs(cp, srcs, classes, scalacOptions, javacOptions, cacheFile, analysisMap, Locate.definesClass, javaOnly, compileOrder)
+  }
+
+  /**
+   * Java API for creating Inputs.
+   */
+  def create(
+    classpath: JList[File],
+    sources: JList[File],
+    classesDirectory: File,
+    scalacOptions: JList[String],
+    javacOptions: JList[String],
+    analysisCache: File,
+    analysisMap: JMap[File, File],
+    compileOrder: String): Inputs =
+  inputs(
+    classpath.asScala,
+    sources.asScala,
+    classesDirectory,
+    scalacOptions.asScala,
+    javacOptions.asScala,
+    Option(analysisCache),
+    analysisMap.asScala.toMap,
+    false,
+    Settings.compileOrder(compileOrder)
+  )
 
   /**
    * By default the cache location is relative to the classes directory (for example, target/classes/../cache/classes).
@@ -52,15 +96,17 @@ object Inputs {
    */
   def analysisFor(file: File, exclude: File, mapped: Map[File, File]): Analysis = {
     if (file != exclude && file.isDirectory) {
-      val cacheFile = normalise(mapped.getOrElse(file, defaultCacheLocation(file)))
+      val cacheFile = mapped.getOrElse(file, defaultCacheLocation(file)).getCanonicalFile
       Compiler.analysisCache.get(cacheFile)(IC.readAnalysis(cacheFile))
     } else Analysis.Empty
   }
 
   /**
-   * Normalise to canonical paths.
+   * Debug output for inputs.
    */
-  def normalise: File => File = { _.getCanonicalFile }
+  def debug(inputs: Inputs, log: xsbti.Logger): Unit = {
+    show(inputs, s => log.debug(sbt.Logger.f0(s)))
+  }
 
   /**
    * Debug output for inputs.

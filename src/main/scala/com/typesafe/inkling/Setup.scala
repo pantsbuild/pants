@@ -5,7 +5,9 @@
 package com.typesafe.inkling
 
 import java.io.File
+import java.util.{ List => JList }
 import sbt.Path._
+import scala.collection.JavaConverters._
 
 /**
  * All setup options for an inkling compiler.
@@ -38,16 +40,56 @@ object Setup {
    * Create compiler setup from command-line settings.
    */
   def apply(settings: Settings): Setup = {
-    val (compiler, library, extra) = scalaJars(settings.scalaPath, settings.scalaHome)
-    val compilerJar = compiler.getCanonicalFile
-    val libraryJar = library.getCanonicalFile
-    val extraJars = extra map (_.getCanonicalFile)
-    val javaHome = settings.javaHome map (_.getCanonicalFile)
-    val cacheDir = Defaults.inklingDir / inklingVersion.published
-    val maxCompilers = settings.residentLimit
-    val logging = Util.logging(settings.quiet, settings.logLevel)
-    Setup(compilerJar, libraryJar, extraJars, Defaults.sbtInterface, Defaults.compilerInterfaceSrc, javaHome, cacheDir, maxCompilers, logging)
+    import settings._
+    val (compiler, library, extra) = scalaJars(scalaPath, scalaHome)
+    val logging = Util.logging(quiet, logLevel)
+    setup(compiler, library, extra, Defaults.sbtInterface, Defaults.compilerInterfaceSrc, javaHome, residentLimit, logging)
   }
+
+  /**
+   * Create normalised and defaulted Setup.
+   */
+  def setup(
+    scalaCompiler: File,
+    scalaLibrary: File,
+    scalaExtra: Seq[File],
+    sbtInterface: File,
+    compilerInterfaceSrc: File,
+    javaHomeDir: Option[File],
+    maxCompilers: Int,
+    logging: String): Setup =
+  {
+    val normalise: File => File = { _.getCanonicalFile }
+    val compilerJar = normalise(scalaCompiler)
+    val libraryJar = normalise(scalaLibrary)
+    val extraJars = scalaExtra map normalise
+    val javaHome = javaHomeDir map normalise
+    val cacheDir = inklingCacheDir
+    Setup(compilerJar, libraryJar, extraJars, sbtInterface, compilerInterfaceSrc, javaHome, cacheDir, maxCompilers, logging)
+  }
+
+  /**
+   * Java API for creating Setup.
+   */
+  def create(
+    scalaCompiler: File,
+    scalaLibrary: File,
+    scalaExtra: JList[File],
+    sbtInterface: File,
+    compilerInterfaceSrc: File,
+    javaHome: File,
+    maxCompilers: Int,
+    logging: String): Setup =
+  setup(
+    scalaCompiler,
+    scalaLibrary,
+    scalaExtra.asScala,
+    sbtInterface,
+    compilerInterfaceSrc,
+    Option(javaHome),
+    maxCompilers,
+    logging
+  )
 
   /**
    * Select the scala jars.
@@ -66,6 +108,11 @@ object Setup {
     val (library, extra) = other partition (_.getName == ScalaLibraryName)
     if (compiler.nonEmpty && library.nonEmpty) Some(compiler(0), library(0), extra) else None
   }
+
+  /**
+   * Inkling cache directory.
+   */
+  def inklingCacheDir = Defaults.inklingDir / inklingVersion.published
 
   //
   // Default setup
@@ -144,6 +191,13 @@ object Setup {
   //
   // Debug
   //
+
+  /**
+   * Debug output for inputs.
+   */
+  def debug(setup: Setup, log: xsbti.Logger): Unit = {
+    show(setup, s => log.debug(sbt.Logger.f0(s)))
+  }
 
   /**
    * Debug output for compiler setup.
