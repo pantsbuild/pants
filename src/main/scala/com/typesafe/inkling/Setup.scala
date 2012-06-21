@@ -72,8 +72,7 @@ object Setup {
     scalaExtra: JList[File],
     sbtInterface: File,
     compilerInterfaceSrc: File,
-    javaHome: File,
-    maxCompilers: Int): Setup =
+    javaHome: File): Setup =
   setup(
     scalaCompiler,
     scalaLibrary,
