@@ -20,8 +20,7 @@ case class Setup(
   compilerInterfaceSrc: File,
   javaHome: Option[File],
   cacheDir: File,
-  maxCompilers: Int,
-  logging: String)
+  maxCompilers: Int)
 
 object Setup {
   val Command = "inkling"
@@ -42,8 +41,7 @@ object Setup {
   def apply(settings: Settings): Setup = {
     import settings._
     val (compiler, library, extra) = scalaJars(scalaPath, scalaHome)
-    val logging = Util.logging(quiet, logLevel)
-    setup(compiler, library, extra, Defaults.sbtInterface, Defaults.compilerInterfaceSrc, javaHome, residentLimit, logging)
+    setup(compiler, library, extra, Defaults.sbtInterface, Defaults.compilerInterfaceSrc, javaHome, residentLimit)
   }
 
   /**
@@ -56,8 +54,7 @@ object Setup {
     sbtInterface: File,
     compilerInterfaceSrc: File,
     javaHomeDir: Option[File],
-    maxCompilers: Int,
-    logging: String): Setup =
+    maxCompilers: Int): Setup =
   {
     val normalise: File => File = { _.getCanonicalFile }
     val compilerJar = normalise(scalaCompiler)
@@ -65,7 +62,7 @@ object Setup {
     val extraJars = scalaExtra map normalise
     val javaHome = javaHomeDir map normalise
     val cacheDir = inklingCacheDir
-    Setup(compilerJar, libraryJar, extraJars, sbtInterface, compilerInterfaceSrc, javaHome, cacheDir, maxCompilers, logging)
+    Setup(compilerJar, libraryJar, extraJars, sbtInterface, compilerInterfaceSrc, javaHome, cacheDir, maxCompilers)
   }
 
   /**
@@ -78,8 +75,7 @@ object Setup {
     sbtInterface: File,
     compilerInterfaceSrc: File,
     javaHome: File,
-    maxCompilers: Int,
-    logging: String): Setup =
+    maxCompilers: Int): Setup =
   setup(
     scalaCompiler,
     scalaLibrary,
@@ -87,8 +83,7 @@ object Setup {
     sbtInterface,
     compilerInterfaceSrc,
     Option(javaHome),
-    maxCompilers,
-    logging
+    maxCompilers
   )
 
   /**
@@ -212,8 +207,7 @@ object Setup {
       "compiler interface sources" -> compilerInterfaceSrc,
       "java home" -> javaHome,
       "cache directory" -> cacheDir,
-      "resident compiler limit" -> maxCompilers,
-      "logging" -> logging)
+      "resident compiler limit" -> maxCompilers)
     Util.show(("setup", values), output)
   }
 }

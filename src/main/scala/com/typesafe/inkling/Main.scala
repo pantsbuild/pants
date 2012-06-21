@@ -77,7 +77,7 @@ object Main {
     try {
       val compiler = compilerCache.get(setup)(Compiler(setup, log))
       log.debug("compiler = %s [%s]" format (compiler, compiler.hashCode.toHexString))
-      compiler.compile(inputs)
+      compiler.compile(inputs)(log)
       log.info("Compile success " + Util.timing(startTime))
     } catch {
       case e: CompileFailed =>

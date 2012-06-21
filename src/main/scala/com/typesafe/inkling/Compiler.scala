@@ -31,7 +31,7 @@ object Compiler {
     val interfaceJar = compilerInterface(setup, instance, log)
     val scalac = IC.newScalaCompiler(instance, interfaceJar, ClasspathOptions.boot, log)
     val javac = AggressiveCompile.directOrFork(instance, ClasspathOptions.javac(false), setup.javaHome)
-    new Compiler(scalac, javac, compilerCache, log)
+    new Compiler(scalac, javac, compilerCache)
   }
 
   /**
@@ -81,12 +81,12 @@ object Compiler {
 /**
  * An inkling compiler for incremental recompilation.
  */
-class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler, cache: GlobalsCache, log: Logger) {
+class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler, cache: GlobalsCache) {
 
   /**
    * Run a compile. The resulting analysis is also cached in memory.
    */
-  def compile(inputs: Inputs): Analysis = {
+  def compile(inputs: Inputs)(log: Logger): Analysis = {
     import inputs._
     val doCompile = new AggressiveCompile(cacheFile)
     val cp = autoClasspath(classesDirectory, scalac.scalaInstance.libraryJar, javaOnly, classpath)

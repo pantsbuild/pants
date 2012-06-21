@@ -26,7 +26,7 @@ object Util {
   }
 
   /**
-   * String representation of logging configuration. Used for Setup as cache key.
+   * String representation of logging configuration.
    */
   def logging(quiet: Boolean, level: Level.Value): String = {
     if (quiet) "quiet" else level.toString
