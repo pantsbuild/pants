@@ -59,7 +59,7 @@ object Nailgun {
    * Output all currently cached inkling compilers.
    */
   def status(context: NGContext): Unit = {
-    val entries = Main.compilerCache.entries
+    val entries = Compiler.cache.entries
     context.out.println("Nailgun server running with %s cached compilers" format entries.size)
     entries foreach {
       case (setup, compiler) =>

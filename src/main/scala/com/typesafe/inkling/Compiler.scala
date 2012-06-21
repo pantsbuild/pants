@@ -18,30 +18,42 @@ object Compiler {
   val JavaClassVersion = System.getProperty("java.class.version")
 
   /**
+   * Static cache for inkling compilers.
+   */
+  val cache = Cache[Setup, Compiler](Setup.Defaults.compilerCacheLimit)
+
+  /**
+   * Static cache for resident scala compilers.
+   */
+  val compilerCache: GlobalsCache = createCompilerCache(Setup.Defaults.residentCacheLimit)
+
+  /**
    * Static cache for compile results.
    */
   val analysisCache = Cache[File, Analysis](Setup.Defaults.analysisCacheLimit)
 
   /**
-   * Static cache for scala compilers.
+   * Get or create an inkling compiler based on compiler setup.
    */
-  val compilerCache: GlobalsCache = createCompilerCache(Setup.Defaults.residentCacheLimit)
+  def apply(setup: Setup, log: Logger): Compiler = {
+    cache.get(setup)(create(setup, log))
+  }
+
+  /**
+   * Java API for creating compiler.
+   */
+  def getOrCreate(setup: Setup, log: Logger): Compiler = apply(setup, log)
 
   /**
    * Create a new inkling compiler based on compiler setup.
    */
-  def apply(setup: Setup, log: Logger): Compiler = {
+  def create(setup: Setup, log: Logger): Compiler = {
     val instance = scalaInstance(setup)
     val interfaceJar = compilerInterface(setup, instance, log)
     val scalac = IC.newScalaCompiler(instance, interfaceJar, ClasspathOptions.boot, log)
     val javac = AggressiveCompile.directOrFork(instance, ClasspathOptions.javac(false), setup.javaHome)
     new Compiler(scalac, javac)
   }
-
-  /**
-   * Java API for creating compiler.
-   */
-  def create(setup: Setup, log: Logger): Compiler = apply(setup, log)
 
   /**
    * Create new globals cache.

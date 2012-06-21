@@ -13,11 +13,6 @@ import xsbti.CompileFailed
  * Command-line main class.
  */
 object Main {
-  /**
-   * Static cache for inkling compilers.
-   */
-  val compilerCache = Cache[Setup, Compiler](Setup.Defaults.compilerCacheLimit)
-
   def main(args: Array[String]): Unit = run(args, None)
 
   /**
@@ -75,8 +70,8 @@ object Main {
 
     // run the compile
     try {
-      val compiler = compilerCache.get(setup)(Compiler(setup, log))
-      log.debug("compiler = %s [%s]" format (compiler, compiler.hashCode.toHexString))
+      val compiler = Compiler(setup, log)
+      log.debug("Inkling compiler = %s [%s]" format (compiler, compiler.hashCode.toHexString))
       compiler.compile(inputs)(log)
       log.info("Compile success " + Util.timing(startTime))
     } catch {
