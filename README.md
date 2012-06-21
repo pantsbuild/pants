@@ -71,8 +71,8 @@ To run inkling as a build daemon add the ``-nailed`` option to all commands, or
 Nailgun client binaries for common platforms are bundled with inkling. If an
 ``ng`` client is on the current path then this will be used instead.
 
-To shutdown the inkling server run ``inkling -nailed -shutdown``. To list
-currently cached inkling compilers use ``inkling -nailed -status``.
+To shutdown the inkling server run ``inkling -shutdown``. To list currently
+cached inkling compilers use ``inkling -status``.
 
 [Nailgun]: http://www.martiansoftware.com/nailgun
 
