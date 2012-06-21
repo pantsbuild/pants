@@ -60,7 +60,14 @@ object Nailgun {
    */
   def status(context: NGContext): Unit = {
     val entries = Compiler.cache.entries
-    context.out.println("Nailgun server running with %s cached compilers" format entries.size)
+    val counted = Util.counted(entries.size, "cached compiler", "", "s")
+    context.out.println("Nailgun server running with " + counted)
+    context.out.println("")
+    context.out.println("Version = " + Setup.versionString)
+    context.out.println("")
+    context.out.println("Inkling compiler cache limit = " + Setup.Defaults.compilerCacheLimit)
+    context.out.println("Resident scalac cache limit = " + Setup.Defaults.residentCacheLimit)
+    context.out.println("Analysis cache limit = " + Setup.Defaults.analysisCacheLimit)
     entries foreach {
       case (setup, compiler) =>
         context.out.println("")

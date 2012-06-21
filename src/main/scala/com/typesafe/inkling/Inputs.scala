@@ -123,6 +123,6 @@ object Inputs {
       "analysis map" -> analysisMap,
       "java only" -> javaOnly,
       "compile order" -> compileOrder)
-    Util.show(("inputs", values), output)
+    Util.show(("Inputs", values), output)
   }
 }

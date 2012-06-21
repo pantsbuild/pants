@@ -84,6 +84,9 @@ done
 # reset "$@"
 set -- "${args[@]}"
 
+# allow -status and -shutdown without -nailed
+[[ -n "$status" || -n "$shutdown" ]] && nailed=1
+
 # allow setting of java command
 if [[ -z "$JAVACMD" && -n "$JAVA_HOME" && -x "$JAVA_HOME/bin/java" ]]; then
   JAVACMD="$JAVA_HOME/bin/java"

@@ -194,4 +194,8 @@ object Util {
       case any => out(prefix + any.toString)
     }
   }
+
+  def counted(count: Int, prefix: String, single: String, plural: String): String = {
+    count.toString + " " + prefix + (if (count == 1) single else plural)
+  }
 }
