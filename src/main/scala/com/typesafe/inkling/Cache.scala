@@ -5,7 +5,8 @@
 package com.typesafe.inkling
 
 import java.lang.ref.SoftReference
-import java.util.{ LinkedHashMap, Map }
+import java.util.{ LinkedHashMap, Map => JMap }
+import scala.collection.breakOut
 import scala.collection.JavaConverters._
 
 /**
@@ -28,6 +29,8 @@ class Cache[K, V](initialSize: Int, val maxSize: Int) {
 
   private[this] var hits = 0
   private[this] var misses = 0
+
+  type Entry = JMap.Entry[K, SoftReference[V]]
 
   /**
    * Get a value from the cache.
@@ -62,8 +65,8 @@ class Cache[K, V](initialSize: Int, val maxSize: Int) {
    * Get all (key, value) pairs currently cached.
    */
   def entries(): Set[(K, V)] = synchronized {
-    val entrySet = cache.entrySet.asScala
-    entrySet flatMap { e => Option(e.getValue.get) map ((e.getKey, _)) } toSet
+    def kv(e: Entry) = Option(e.getValue.get) map (e.getKey -> _)
+    cache.entrySet.asScala.flatMap(kv)(breakOut)
   }
 
   /**
@@ -85,6 +88,6 @@ class Cache[K, V](initialSize: Int, val maxSize: Int) {
 
   private[this] def createMap[A, B](initial: Int, max: Int): LinkedHashMap[A, SoftReference[B]] =
     new LinkedHashMap[A, SoftReference[B]](initial, 0.75f, true) {
-      override def removeEldestEntry(eldest: Map.Entry[A, SoftReference[B]]): Boolean = size > max
+      override def removeEldestEntry(eldest: JMap.Entry[A, SoftReference[B]]): Boolean = size > max
     }
 }
