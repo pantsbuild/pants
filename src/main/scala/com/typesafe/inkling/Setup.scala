@@ -19,8 +19,7 @@ case class Setup(
   sbtInterface: File,
   compilerInterfaceSrc: File,
   javaHome: Option[File],
-  cacheDir: File,
-  maxCompilers: Int)
+  cacheDir: File)
 
 object Setup {
   val Command = "inkling"
@@ -41,7 +40,7 @@ object Setup {
   def apply(settings: Settings): Setup = {
     import settings._
     val (compiler, library, extra) = scalaJars(scalaPath, scalaHome)
-    setup(compiler, library, extra, Defaults.sbtInterface, Defaults.compilerInterfaceSrc, javaHome, residentLimit)
+    setup(compiler, library, extra, Defaults.sbtInterface, Defaults.compilerInterfaceSrc, javaHome)
   }
 
   /**
@@ -53,8 +52,7 @@ object Setup {
     scalaExtra: Seq[File],
     sbtInterface: File,
     compilerInterfaceSrc: File,
-    javaHomeDir: Option[File],
-    maxCompilers: Int): Setup =
+    javaHomeDir: Option[File]): Setup =
   {
     val normalise: File => File = { _.getCanonicalFile }
     val compilerJar = normalise(scalaCompiler)
@@ -62,7 +60,7 @@ object Setup {
     val extraJars = scalaExtra map normalise
     val javaHome = javaHomeDir map normalise
     val cacheDir = inklingCacheDir
-    Setup(compilerJar, libraryJar, extraJars, sbtInterface, compilerInterfaceSrc, javaHome, cacheDir, maxCompilers)
+    Setup(compilerJar, libraryJar, extraJars, sbtInterface, compilerInterfaceSrc, javaHome, cacheDir)
   }
 
   /**
@@ -82,8 +80,7 @@ object Setup {
     scalaExtra.asScala,
     sbtInterface,
     compilerInterfaceSrc,
-    Option(javaHome),
-    maxCompilers
+    Option(javaHome)
   )
 
   /**
@@ -132,6 +129,7 @@ object Setup {
     val loggerCacheLimit = Util.intProperty(prop("logger.cache.limit"), cacheLimit)
     val compilerCacheLimit = Util.intProperty(prop("compiler.cache.limit"), cacheLimit)
     val analysisCacheLimit = Util.intProperty(prop("analysis.cache.limit"), cacheLimit)
+    val residentCacheLimit = Util.intProperty(prop("resident.cache.limit"), cacheLimit)
   }
 
   def prop(name: String) = Command + "." + name
@@ -206,8 +204,7 @@ object Setup {
       "sbt interface" -> sbtInterface,
       "compiler interface sources" -> compilerInterfaceSrc,
       "java home" -> javaHome,
-      "cache directory" -> cacheDir,
-      "resident compiler limit" -> maxCompilers)
+      "cache directory" -> cacheDir)
     Util.show(("setup", values), output)
   }
 }

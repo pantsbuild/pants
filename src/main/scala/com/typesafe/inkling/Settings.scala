@@ -29,7 +29,6 @@ case class Settings(
   compileOrder: CompileOrder = CompileOrder.Mixed,
   analysisCache: Option[File] = None,
   analysisMap: Map[File, File] = Map.empty,
-  residentLimit: Int = 0,
   properties: Seq[String] = Seq.empty)
 
 object Settings {
@@ -53,7 +52,6 @@ object Settings {
     string(  "-compile-order", "order",      "Compile order for Scala and Java sources",   (s: Settings, o: String) => s.copy(compileOrder = compileOrder(o))),
     file(    "-analysis-cache", "file",      "Cache file for compile analysis",            (s: Settings, f: File) => s.copy(analysisCache = Some(f))),
     fileMap( "-analysis-map",                "Upstream analysis mapping (file:file,...)",  (s: Settings, m: Map[File, File]) => s.copy(analysisMap = m)),
-    int(     "-resident-limit", "int",       "Set maximum number of resident compilers",   (s: Settings, i: Int) => s.copy(residentLimit = i)),
     prefix(  "-D", "property=value",         "Pass property to runtime system",            (s: Settings, o: String) => s.copy(properties = s.properties :+ o)),
     dummy(   "-V<flag>",                     "Set JVM flag directly for this process"),
     dummy(   "-nailed",                      "Run as daemon with nailgun server"),

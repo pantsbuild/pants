@@ -23,21 +23,32 @@ object Compiler {
   val analysisCache = Cache[File, Analysis](Setup.Defaults.analysisCacheLimit)
 
   /**
+   * Static cache for scala compilers.
+   */
+  val compilerCache: GlobalsCache = createCompilerCache(Setup.Defaults.residentCacheLimit)
+
+  /**
    * Create a new inkling compiler based on compiler setup.
    */
   def apply(setup: Setup, log: Logger): Compiler = {
-    val compilerCache = if (setup.maxCompilers <= 0) CompilerCache.fresh else CompilerCache(setup.maxCompilers)
     val instance = scalaInstance(setup)
     val interfaceJar = compilerInterface(setup, instance, log)
     val scalac = IC.newScalaCompiler(instance, interfaceJar, ClasspathOptions.boot, log)
     val javac = AggressiveCompile.directOrFork(instance, ClasspathOptions.javac(false), setup.javaHome)
-    new Compiler(scalac, javac, compilerCache)
+    new Compiler(scalac, javac)
   }
 
   /**
    * Java API for creating compiler.
    */
   def create(setup: Setup, log: Logger): Compiler = apply(setup, log)
+
+  /**
+   * Create new globals cache.
+   */
+  def createCompilerCache(maxCompilers: Int): GlobalsCache = {
+    if (maxCompilers <= 0) CompilerCache.fresh else CompilerCache(maxCompilers)
+  }
 
   /**
    * Create the scala instance for the compiler. Includes creating the classloader.
@@ -81,7 +92,7 @@ object Compiler {
 /**
  * An inkling compiler for incremental recompilation.
  */
-class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler, cache: GlobalsCache) {
+class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler) {
 
   /**
    * Run a compile. The resulting analysis is also cached in memory.
@@ -90,8 +101,9 @@ class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler, cache: GlobalsCac
     import inputs._
     val doCompile = new AggressiveCompile(cacheFile)
     val cp = autoClasspath(classesDirectory, scalac.scalaInstance.libraryJar, javaOnly, classpath)
+    val globalsCache = Compiler.compilerCache
     val getAnalysis: File => Option[Analysis] = analysisMap.get _
-    val analysis = doCompile(scalac, javac, sources, cp, classesDirectory, cache, scalacOptions, javacOptions, getAnalysis, definesClass, 100, compileOrder, false)(log)
+    val analysis = doCompile(scalac, javac, sources, cp, classesDirectory, globalsCache, scalacOptions, javacOptions, getAnalysis, definesClass, 100, compileOrder, false)(log)
     Compiler.analysisCache.put(cacheFile, analysis)
     analysis
   }
