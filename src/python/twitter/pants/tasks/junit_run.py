@@ -298,9 +298,12 @@ class JUnitRun(JvmTask):
     classes_by_source = self.context.products.get('classes')
     def relpath_toclassname(path):
       classes = classes_by_source.get(path)
-      for base, classes in classes.items():
-        for cls in classes:
-          yield JUnitRun.classfile_to_classname(cls)
+      if classes is None:  # Some files may yield no classes (e.g., tests that have been commented out).
+        self.context.log.warn('No classes found for file %s' % path)
+      else:
+        for base, classes in classes.items():
+          for cls in classes:
+            yield JUnitRun.classfile_to_classname(cls)
 
     if basedir:
       for classname in relpath_toclassname(classname):
