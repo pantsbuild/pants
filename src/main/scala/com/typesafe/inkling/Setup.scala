@@ -28,9 +28,11 @@ object Setup {
   val HomeProperty = prop("home")
   val DirProperty = prop("dir")
 
+  val ScalaCompilerId = "scala-compiler"
+  val ScalaLibraryId = "scala-library"
+
   val ScalaCompilerName = "scala-compiler.jar"
   val ScalaLibraryName = "scala-library.jar"
-
   val SbtInterfaceName = "sbt-interface.jar"
   val CompilerInterfaceSourcesName = "compiler-interface-sources.jar"
 
@@ -95,8 +97,8 @@ object Setup {
    */
   def splitScala(jars: Seq[File], excluded: Set[String] = Set.empty): Option[(File, File, Seq[File])] = {
     val filtered = jars filterNot (excluded contains _.getName)
-    val (compiler, other) = filtered partition (_.getName == ScalaCompilerName)
-    val (library, extra) = other partition (_.getName == ScalaLibraryName)
+    val (compiler, other) = filtered partition (_.getName contains ScalaCompilerId)
+    val (library, extra) = other partition (_.getName contains ScalaLibraryId)
     if (compiler.nonEmpty && library.nonEmpty) Some(compiler(0), library(0), extra) else None
   }
 

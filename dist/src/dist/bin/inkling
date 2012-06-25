@@ -49,7 +49,7 @@ function fork_command {
 
 # nailgun settings
 declare nailgun_port=4655
-unset nailed status shutdown
+unset nailed start status shutdown
 
 # arguments
 declare -a java_args
@@ -62,6 +62,7 @@ while [[ $# -gt 0 ]] ; do
 
     -nailed) nailed=1; shift ;;
     -port) nailgun_port="$2"; shift 2 ;;
+    -start) start=1; shift ;;
     -status) status=1; shift ;;
     -shutdown) shutdown=1; shift ;;
 
@@ -84,8 +85,8 @@ done
 # reset "$@"
 set -- "${args[@]}"
 
-# allow -status and -shutdown without -nailed
-[[ -n "$status" || -n "$shutdown" ]] && nailed=1
+# allow start, status, and shutdown without nailed
+[[ -n "$start" || -n "$status" || -n "$shutdown" ]] && nailed=1
 
 # allow setting of java command
 if [[ -z "$JAVACMD" && -n "$JAVA_HOME" && -x "$JAVA_HOME/bin/java" ]]; then
@@ -155,6 +156,8 @@ if [ -n "$nailed" ] && can_nailgun ; then
     check_port $nailgun_port && nailgun shutdown
   elif [ -n "$status" ] ; then
     check_port $nailgun_port && nailgun status
+  elif [ -n "$start" ] ; then
+    nailgun status
   else
     nailgun inkling "$@"
   fi
