@@ -2,7 +2,7 @@
 #
 # Copyright (C) 2012 Typesafe, Inc. <http://www.typesafe.com>
 #
-# Start script for inkling
+# Start script for zinc
 
 # flags
 unset debug_command
@@ -48,7 +48,7 @@ function fork_command {
 }
 
 # nailgun settings
-declare nailgun_port=4655
+declare nailgun_port=3030
 unset nailed start status shutdown
 
 # arguments
@@ -105,8 +105,8 @@ declare optXXReservedCodeCacheSize="-XX:ReservedCodeCacheSize=192m"
 [[ -n "$nailed" ]]  && optMode="-server"
 
 # process java options
-# allows overriding defaults in JAVA_OPTS, INKLING_OPTS, or -V args
-declare all_opts=($JAVA_OPTS $INKLING_OPTS ${java_args[@]})
+# allows overriding defaults in JAVA_OPTS, ZINC_OPTS, or -V args
+declare all_opts=($JAVA_OPTS $ZINC_OPTS ${java_args[@]})
 declare -a other_opts
 for opt in ${all_opts[@]} ; do
   case "$opt" in
@@ -136,9 +136,9 @@ function nailgun {
     fork_command \
       "$java_cmd" \
       "${java_options[@]}" \
-      -Dinkling.home="$base_dir" \
+      -Dzinc.home="$base_dir" \
       -classpath "$lib_dir/*" \
-      com.typesafe.inkling.Nailgun $nailgun_port
+      com.typesafe.zinc.Nailgun $nailgun_port
     # give some time for startup
     local attempts=50
     while ! check_port $nailgun_port ; do
@@ -151,7 +151,7 @@ function nailgun {
 }
 
 if [ -n "$nailed" ] && can_nailgun ; then
-  # run inkling via nailgun client
+  # run zinc via nailgun client
   if [ -n "$shutdown" ] ; then
     check_port $nailgun_port && nailgun shutdown
   elif [ -n "$status" ] ; then
@@ -159,14 +159,14 @@ if [ -n "$nailed" ] && can_nailgun ; then
   elif [ -n "$start" ] ; then
     nailgun status
   else
-    nailgun inkling "$@"
+    nailgun zinc "$@"
   fi
 else
-  # run inkling directly
+  # run zinc directly
   exec_command \
     "$java_cmd" \
     "${java_options[@]}" \
-    -Dinkling.home="$base_dir" \
+    -Dzinc.home="$base_dir" \
     -classpath "$lib_dir/*" \
-    com.typesafe.inkling.Main "$@"
+    com.typesafe.zinc.Main "$@"
 fi

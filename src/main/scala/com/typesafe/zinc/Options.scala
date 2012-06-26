@@ -2,7 +2,7 @@
  * Copyright (C) 2012 Typesafe, Inc. <http://www.typesafe.com>
  */
 
-package com.typesafe.inkling
+package com.typesafe.zinc
 
 import java.io.{ File, IOException }
 import scala.annotation.tailrec

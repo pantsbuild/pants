@@ -2,7 +2,7 @@
  * Copyright (C) 2012 Typesafe, Inc. <http://www.typesafe.com>
  */
 
-package com.typesafe.inkling
+package com.typesafe.zinc
 
 import com.martiansoftware.nailgun.NGConstants
 import java.io.{ DataInputStream, File, OutputStream }
@@ -37,27 +37,27 @@ class NailgunClient(val address: InetAddress, val port: Int) {
   def this(port: Int) = this(InetAddress.getByName(null), port)
 
   /**
-   * Send an inkling command to a currently running nailgun server.
+   * Send an zinc command to a currently running nailgun server.
    * All output goes to specified output streams. Exit code is returned.
-   * @throws java.net.ConnectException if the inkling server is not available
+   * @throws java.net.ConnectException if the zinc server is not available
    */
   @throws(classOf[java.net.ConnectException])
   def run(args: Seq[String], cwd: File, out: OutputStream, err: OutputStream): Int =
-    send("inkling", args, cwd, out, err)
+    send("zinc", args, cwd, out, err)
 
   /**
-   * Java API for sending an inkling command to a currently running nailgun server.
+   * Java API for sending an zinc command to a currently running nailgun server.
    * All output goes to specified output streams. Exit code is returned.
-   * @throws java.net.ConnectException if the inkling server is not available
+   * @throws java.net.ConnectException if the zinc server is not available
    */
   def run(args: JList[String], cwd: File, out: OutputStream, err: OutputStream): Int =
-    send("inkling", args.asScala, cwd, out, err)
+    send("zinc", args.asScala, cwd, out, err)
 
   /**
    * Send a command to a currently running nailgun server.
-   * Possible commands are "inkling", "status", and "shutdown".
+   * Possible commands are "zinc", "status", and "shutdown".
    * All output goes to specified output streams. Exit code is returned.
-   * @throws java.net.ConnectException if the inkling server is not available
+   * @throws java.net.ConnectException if the zinc server is not available
    */
   def send(command: String, args: Seq[String], cwd: File, out: OutputStream, err: OutputStream): Int = {
     val socket = new Socket(address, port)

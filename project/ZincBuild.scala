@@ -5,18 +5,18 @@
 import sbt._
 import sbt.Keys._
 
-object Inkling extends Build {
+object ZincBuild extends Build {
   val sbtVersion = "0.12.0-RC2"
 
   lazy val buildSettings = Defaults.defaultSettings ++ Seq(
-    organization := "com.typesafe.inkling",
+    organization := "com.typesafe.zinc",
     version := "0.1.0-SNAPSHOT",
     scalaVersion := "2.9.2",
     crossPaths := false
   )
 
-  lazy val inkling = Project(
-    "inkling",
+  lazy val zinc = Project(
+    "zinc",
     file("."),
     settings = buildSettings ++ Version.settings ++ Publish.settings ++ Seq(
       resolvers += "Sonatype Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots",

@@ -1,7 +1,7 @@
-Inkling
-=======
+Zinc
+====
 
-Inkling is a stand-alone version of [sbt]'s incremental compiler.
+Zinc is a stand-alone version of [sbt]'s incremental compiler.
 
 [sbt]: http://github.com/harrah/xsbt
 
@@ -9,19 +9,19 @@ Inkling is a stand-alone version of [sbt]'s incremental compiler.
 Build
 -----
 
-Inkling is built using sbt 0.11.3. To create the full distribution:
+Zinc is built using sbt 0.11.3. To create the full distribution:
 
     sbt dist/create
 
-Published distributions can be found in the [inkling repo].
+Published distributions can be found in the [zinc repo].
 
-[inkling repo]: http://repo.typesafe.com/typesafe/inkling/com/typesafe/inkling/dist/
+[zinc repo]: http://repo.typesafe.com/typesafe/zinc/com/typesafe/zinc/dist/
 
 
 Options
 -------
 
-To get information about options run ``inkling -help``.
+To get information about options run ``zinc -help``.
 
 ### Compile
 
@@ -42,7 +42,7 @@ Using ``-scala-path`` the compiler, library, and any extra jars (like scala-refl
 can be listed directly as a path.
 
 If no options are passed to locate a version of Scala then Scala 2.9.2 is used
-by default (which is bundled with inkling).
+by default (which is bundled with zinc).
 
 To pass options to scalac simply prefix with ``-S``. For example, deprecation
 warnings can be enabled with ``-S-deprecation``.
@@ -61,18 +61,18 @@ specified with ``-compile-order``, where the available orders are ``Mixed``,
 
 ### Nailed
 
-Inkling comes with built-in [Nailgun] integration. Running with Nailgun provides
-inkling as a server, communicating commands via a client, keeping cached
+Zinc comes with built-in [Nailgun] integration. Running with Nailgun provides
+zinc as a server, communicating commands via a client, keeping cached
 compilers in a warm running JVM and avoiding startup and load times.
 
-To run inkling as a build daemon add the ``-nailed`` option to all commands, or
-``alias inkling="inkling -nailed"``.
+To run zinc as a build daemon add the ``-nailed`` option to all commands, or
+``alias zinc="zinc -nailed"``.
 
-Nailgun client binaries for common platforms are bundled with inkling. If an
+Nailgun client binaries for common platforms are bundled with zinc. If an
 ``ng`` client is on the current path then this will be used instead.
 
-To shutdown the inkling server run ``inkling -shutdown``. To list currently
-cached inkling compilers use ``inkling -status``.
+To shutdown the zinc server run ``zinc -shutdown``. To list currently cached
+zinc compilers use ``zinc -status``.
 
 [Nailgun]: http://www.martiansoftware.com/nailgun
 

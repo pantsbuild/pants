@@ -2,7 +2,7 @@
  * Copyright (C) 2012 Typesafe, Inc. <http://www.typesafe.com>
  */
 
-package com.typesafe.inkling
+package com.typesafe.zinc
 
 import java.io.File
 import sbt.inc.Analysis
@@ -16,7 +16,7 @@ object Main {
   def main(args: Array[String]): Unit = run(args, None)
 
   /**
-   * Compile run. Current working directory can be provided (for nailed inkling).
+   * Compile run. Current working directory can be provided (for nailed zinc).
    */
   def run(args: Array[String], cwd: Option[File]): Unit = {
     val startTime = System.currentTimeMillis
@@ -52,8 +52,8 @@ object Main {
       sys.exit(1)
     }
 
-    // we need some of the jars in inkling home, always needs to be provided
-    if (Setup.Defaults.inklingHome.isEmpty) {
+    // we need some of the jars in zinc home, always needs to be provided
+    if (Setup.Defaults.zincHome.isEmpty) {
       log.error("Need %s property to be defined" format Setup.HomeProperty)
       sys.exit(1)
     }
@@ -71,7 +71,7 @@ object Main {
     // run the compile
     try {
       val compiler = Compiler(setup, log)
-      log.debug("Inkling compiler = %s [%s]" format (compiler, compiler.hashCode.toHexString))
+      log.debug("Zinc compiler = %s [%s]" format (compiler, compiler.hashCode.toHexString))
       compiler.compile(inputs)(log)
       log.info("Compile success " + Util.timing(startTime))
     } catch {

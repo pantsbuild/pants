@@ -2,7 +2,7 @@
  * Copyright (C) 2012 Typesafe, Inc. <http://www.typesafe.com>
  */
 
-package com.typesafe.inkling
+package com.typesafe.zinc
 
 import java.io.File
 import java.util.{ List => JList }
@@ -10,7 +10,7 @@ import sbt.Path._
 import scala.collection.JavaConverters._
 
 /**
- * All setup options for an inkling compiler.
+ * All setup options for an zinc compiler.
  */
 case class Setup(
   scalaCompiler: File,
@@ -22,7 +22,7 @@ case class Setup(
   cacheDir: File)
 
 object Setup {
-  val Command = "inkling"
+  val Command = "zinc"
   val Description = "scala incremental compiler"
 
   val HomeProperty = prop("home")
@@ -61,7 +61,7 @@ object Setup {
     val libraryJar = normalise(scalaLibrary)
     val extraJars = scalaExtra map normalise
     val javaHome = javaHomeDir map normalise
-    val cacheDir = inklingCacheDir
+    val cacheDir = zincCacheDir
     Setup(compilerJar, libraryJar, extraJars, sbtInterface, compilerInterfaceSrc, javaHome, cacheDir)
   }
 
@@ -103,9 +103,9 @@ object Setup {
   }
 
   /**
-   * Inkling cache directory.
+   * Zinc cache directory.
    */
-  def inklingCacheDir = Defaults.inklingDir / inklingVersion.published
+  def zincCacheDir = Defaults.zincDir / zincVersion.published
 
   //
   // Default setup
@@ -113,14 +113,14 @@ object Setup {
 
   object Defaults {
     val userHome = Util.fileProperty("user.home")
-    val inklingDir = Util.optFileProperty(DirProperty).getOrElse(userHome / ("." + Command)).getCanonicalFile
-    val inklingHome = Util.optFileProperty(HomeProperty).map(_.getCanonicalFile)
+    val zincDir = Util.optFileProperty(DirProperty).getOrElse(userHome / ("." + Command)).getCanonicalFile
+    val zincHome = Util.optFileProperty(HomeProperty).map(_.getCanonicalFile)
 
-    val sbtInterface = optLibOrEmpty(inklingHome, SbtInterfaceName)
-    val compilerInterfaceSrc = optLibOrEmpty(inklingHome, CompilerInterfaceSourcesName)
+    val sbtInterface = optLibOrEmpty(zincHome, SbtInterfaceName)
+    val compilerInterfaceSrc = optLibOrEmpty(zincHome, CompilerInterfaceSourcesName)
 
-    val scalaCompiler = optLibOrEmpty(inklingHome, ScalaCompilerName)
-    val scalaLibrary = optLibOrEmpty(inklingHome, ScalaLibraryName)
+    val scalaCompiler = optLibOrEmpty(zincHome, ScalaCompilerName)
+    val scalaLibrary = optLibOrEmpty(zincHome, ScalaLibraryName)
     val scalaExtra = Seq.empty[File]
     val scalaJars = (scalaCompiler, scalaLibrary, scalaExtra)
     val defaultScalaExcluded = Set("jansi.jar", "jline.jar", "scala-partest.jar", "scala-swing.jar", "scalacheck.jar", "scalap.jar")
@@ -148,19 +148,19 @@ object Setup {
   }
 
   //
-  // Inkling version
+  // Zinc version
   //
 
   /**
-   * Full inkling version info.
+   * Full zinc version info.
    */
   case class Version(published: String, timestamp: String, commit: String)
 
   /**
-   * Get the inkling version from a generated properties file.
+   * Get the zinc version from a generated properties file.
    */
-  lazy val inklingVersion: Version = {
-    val props = Util.propertiesFromResource("inkling.version.properties", getClass.getClassLoader)
+  lazy val zincVersion: Version = {
+    val props = Util.propertiesFromResource("zinc.version.properties", getClass.getClassLoader)
     Version(
       props.getProperty("version", "unknown"),
       props.getProperty("timestamp", ""),
@@ -169,16 +169,16 @@ object Setup {
   }
 
   /**
-   * For snapshots the inkling version includes timestamp and commit.
+   * For snapshots the zinc version includes timestamp and commit.
    */
   lazy val versionString: String = {
-    import inklingVersion._
+    import zincVersion._
     if (published.endsWith("-SNAPSHOT")) "%s %s-%s" format (published, timestamp, commit take 10)
     else published
   }
 
   /**
-   * Print the inkling version to standard out.
+   * Print the zinc version to standard out.
    */
   def printVersion(): Unit = println("%s (%s) %s" format (Command, Description, versionString))
 

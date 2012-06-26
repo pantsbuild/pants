@@ -15,20 +15,20 @@ object Dist {
 
   lazy val settings: Seq[Setting[_]] = Seq(
     distBase <<= sourceDirectory / "dist",
-    distLibs <<= projectLibs(inklingProject),
-    distTarget <<= (crossTarget, version) { (dir, v) => dir / ("inkling-" + v) },
+    distLibs <<= projectLibs(zincProject),
+    distTarget <<= (crossTarget, version) { (dir, v) => dir / ("zinc-" + v) },
     create <<= (distBase, distLibs, distTarget, streams) map createDist,
     packageTgz <<= (create, crossTarget, streams) map createTgz,
     Keys.`package` <<= packageTgz,
-    artifact in packageTgz := Artifact("inkling", "tgz", "tgz"),
+    artifact in packageTgz := Artifact("zinc", "tgz", "tgz"),
     publishMavenStyle := true,
     publishArtifact in makePom := false,
     publishArtifact := false,
-    publishTo := Some("inkling repo" at "http://repo.typesafe.com/typesafe/inkling"),
+    publishTo := Some("zinc repo" at "http://repo.typesafe.com/typesafe/zinc"),
     credentials += Credentials(Path.userHome / ".ivy2" / "typesafe-credentials")
   ) ++ addArtifact(artifact in packageTgz, packageTgz)
 
-  def inklingProject: ProjectReference = LocalProject(Inkling.inkling.id)
+  def zincProject: ProjectReference = LocalProject(ZincBuild.zinc.id)
 
   def projectLibs(project: ProjectReference): Initialize[Task[Seq[(File, String)]]] = {
     (packageBin in (project, Compile), artifact in project, managedClasspath in (project, Compile)) map {

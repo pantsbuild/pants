@@ -2,7 +2,7 @@
  * Copyright (C) 2012 Typesafe, Inc. <http://www.typesafe.com>
  */
 
-package com.typesafe.inkling
+package com.typesafe.zinc
 
 import com.martiansoftware.nailgun.{ Alias, AliasManager, NGContext, NGServer }
 import java.io.File
@@ -10,7 +10,7 @@ import java.io.File
 class Nailgun // for classOf
 
 object Nailgun {
-  val DefaultPort = 4655
+  val DefaultPort = 3030
 
   /**
    * Run the nailgun server. Accepts a port number as argument.
@@ -22,16 +22,16 @@ object Nailgun {
 
   /**
    * Start the nailgun server.
-   * Available aliased commands are 'inkling', 'status', and 'shutdown'.
+   * Available aliased commands are 'zinc', 'status', and 'shutdown'.
    */
   def start(port: Int): Unit = {
     val server = new NGServer(null, port)
     val am = server.getAliasManager
-    am.addAlias(new Alias("inkling", "scala incremental compiler", classOf[Nailgun]))
+    am.addAlias(new Alias("zinc", "scala incremental compiler", classOf[Nailgun]))
     am.addAlias(new Alias("status", "status of nailgun server", classOf[Nailgun]))
     am.addAlias(new Alias("shutdown", "shutdown the nailgun server", classOf[Nailgun]))
     val thread = new Thread(server)
-    thread.setName("InklingNailgun(%s)" format port)
+    thread.setName("ZincNailgun(%s)" format port)
     thread.start()
     Runtime.getRuntime().addShutdownHook(new ShutdownHook(server))
   }
@@ -41,7 +41,7 @@ object Nailgun {
    */
   def nailMain(context: NGContext): Unit = {
     context.getCommand match {
-      case "inkling"  => inkling(context)
+      case "zinc"     => zinc(context)
       case "status"   => status(context)
       case "shutdown" => shutdown(context)
       case cmd        => context.err.println("Unknown command: " + cmd)
@@ -49,14 +49,14 @@ object Nailgun {
   }
 
   /**
-   * Run the inkling compile command, from the actual working directory.
+   * Run the zinc compile command, from the actual working directory.
    */
-  def inkling(context: NGContext): Unit = {
+  def zinc(context: NGContext): Unit = {
     Main.run(context.getArgs, Some(new File(context.getWorkingDirectory)))
   }
 
   /**
-   * Output all currently cached inkling compilers.
+   * Output all currently cached zinc compilers.
    */
   def status(context: NGContext): Unit = {
     val entries = Compiler.cache.entries
@@ -65,7 +65,7 @@ object Nailgun {
     context.out.println("")
     context.out.println("Version = " + Setup.versionString)
     context.out.println("")
-    context.out.println("Inkling compiler cache limit = " + Setup.Defaults.compilerCacheLimit)
+    context.out.println("Zinc compiler cache limit = " + Setup.Defaults.compilerCacheLimit)
     context.out.println("Resident scalac cache limit = " + Setup.Defaults.residentCacheLimit)
     context.out.println("Analysis cache limit = " + Setup.Defaults.analysisCacheLimit)
     entries foreach {
@@ -77,7 +77,7 @@ object Nailgun {
   }
 
   /**
-   * Shutdown the inkling nailgun server.
+   * Shutdown the zinc nailgun server.
    */
   def shutdown(context: NGContext): Unit = {
     context.getNGServer.shutdown(true)

@@ -21,7 +21,7 @@ object Version {
   }
 
   def generateFile(version: String, commit: String, dir: File, analysis: Analysis, s: TaskStreams): Seq[File] = {
-    val file = dir / "inkling.version.properties"
+    val file = dir / "zinc.version.properties"
     val formatter = new java.text.SimpleDateFormat("yyyyMMdd-HHmmss")
     formatter.setTimeZone(TimeZone.getTimeZone("GMT"))
     val timestamp = formatter.format(new Date)

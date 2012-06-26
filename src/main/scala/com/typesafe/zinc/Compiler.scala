@@ -2,7 +2,7 @@
  * Copyright (C) 2012 Typesafe, Inc. <http://www.typesafe.com>
  */
 
-package com.typesafe.inkling
+package com.typesafe.zinc
 
 import java.io.File
 import java.net.URLClassLoader
@@ -18,7 +18,7 @@ object Compiler {
   val JavaClassVersion = System.getProperty("java.class.version")
 
   /**
-   * Static cache for inkling compilers.
+   * Static cache for zinc compilers.
    */
   val cache = Cache[Setup, Compiler](Setup.Defaults.compilerCacheLimit)
 
@@ -33,7 +33,7 @@ object Compiler {
   val analysisCache = Cache[File, Analysis](Setup.Defaults.analysisCacheLimit)
 
   /**
-   * Get or create an inkling compiler based on compiler setup.
+   * Get or create an zinc compiler based on compiler setup.
    */
   def apply(setup: Setup, log: Logger): Compiler = {
     cache.get(setup)(create(setup, log))
@@ -45,7 +45,7 @@ object Compiler {
   def getOrCreate(setup: Setup, log: Logger): Compiler = apply(setup, log)
 
   /**
-   * Create a new inkling compiler based on compiler setup.
+   * Create a new zinc compiler based on compiler setup.
    */
   def create(setup: Setup, log: Logger): Compiler = {
     val instance = scalaInstance(setup)
@@ -73,7 +73,7 @@ object Compiler {
   }
 
   /**
-   * Create a new classloader with the root loader as parent (to avoid inkling itself being included).
+   * Create a new classloader with the root loader as parent (to avoid zinc itself being included).
    */
   def scalaLoader(jars: Seq[File]) = new URLClassLoader(toURLs(jars), sbt.classpath.ClasspathUtilities.rootLoader)
 
@@ -102,7 +102,7 @@ object Compiler {
 }
 
 /**
- * An inkling compiler for incremental recompilation.
+ * An zinc compiler for incremental recompilation.
  */
 class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler) {
 

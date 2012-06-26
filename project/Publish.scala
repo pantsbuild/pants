@@ -23,12 +23,12 @@ object Publish {
     credentials += Credentials(Path.userHome / ".ivy2" / "sonatype-credentials"),
     pgpPassphrase in GlobalScope := Util.environment("pgp.passphrase", "PGP_PASSPHRASE") map (_.toArray),
     publishArtifact in Test := false,
-    homepage := Some(url("https://github.com/typesafehub/inkling")),
+    homepage := Some(url("https://github.com/typesafehub/zinc")),
     licenses := Seq("Apache 2" -> url("http://www.apache.org/licenses/LICENSE-2.0")),
     pomExtra := {
       <scm>
-        <url>https://github.com/typesafehub/inkling</url>
-        <connection>scm:git:git@github.com:typesafehub/inkling.git</connection>
+        <url>https://github.com/typesafehub/zinc</url>
+        <connection>scm:git:git@github.com:typesafehub/zinc.git</connection>
       </scm>
       <developers>
         <developer>
