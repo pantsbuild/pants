@@ -27,6 +27,7 @@ from twitter.pants import is_scala, is_scalac_plugin
 from twitter.pants.targets.scala_library import ScalaLibrary
 from twitter.pants.targets.scala_tests import ScalaTests
 from twitter.pants.targets import resolve_target_sources
+from twitter.pants.targets.internal import InternalTarget
 from twitter.pants.tasks import TaskError
 from twitter.pants.tasks.binary_utils import nailgun_profile_classpath
 from twitter.pants.tasks.jvm_compiler_dependencies import Dependencies
@@ -47,6 +48,12 @@ class ScalaCompile(NailgunTask):
                             action="callback", callback=mkflag.set_bool,
                             help="[%default] Compile scala code with all configured warnings "
                                  "enabled.")
+
+    option_group.add_option(mkflag("flatten"), mkflag("flatten", negate=True),
+                            dest="scala_compile_flatten", default=True,
+                            action="callback", callback=mkflag.set_bool,
+                            help="[%default] Compile scala code for all dependencies in a "
+                                 "single pass.")
 
   def __init__(self, context):
     NailgunTask.__init__(self, context, workdir=context.config.get('scala-compile', 'nailgun_dir'))
@@ -73,10 +80,19 @@ class ScalaCompile(NailgunTask):
     else:
       self._args.extend(context.config.getlist('scala-compile', 'no_warning_args'))
 
+    self._flatten = context.options.scala_compile_flatten
     self._confs = context.config.getlist('scala-compile', 'confs')
     self._depfile = os.path.join(workdir, 'dependencies')
 
   def execute(self, targets):
+    if not self._flatten and len(targets) > 1:
+      topologically_sorted_targets = filter(is_scala, reversed(InternalTarget.sort_targets(targets)))
+      for target in topologically_sorted_targets:
+        self.execute([target])
+      return
+
+    self.context.log.info('Compiling targets %s' % str(targets))
+
     scala_targets = filter(is_scala, targets)
     if scala_targets:
       with self.context.state('classpath', []) as cp:
