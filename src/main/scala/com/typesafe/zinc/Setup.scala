@@ -41,7 +41,7 @@ object Setup {
    */
   def apply(settings: Settings): Setup = {
     import settings._
-    val (compiler, library, extra) = scalaJars(scalaPath, scalaHome)
+    val (compiler, library, extra) = scalaJars(scala)
     setup(compiler, library, extra, Defaults.sbtInterface, Defaults.compilerInterfaceSrc, javaHome)
   }
 
@@ -86,10 +86,17 @@ object Setup {
 
   /**
    * Select the scala jars.
-   * Prefer the scala-path setting, then the scala-home setting, otherwise use bundled scala.
+   *
+   * Prefer the explicit scala-compiler, scala-library, and scala-extra settings,
+   * then the scala-path setting, then the scala-home setting. Default to bundled scala.
    */
-  def scalaJars(scalaPath: Seq[File], scalaHome: Option[File]): (File, File, Seq[File]) = {
-    splitScala(scalaPath) orElse splitScala(allLibs(scalaHome), Defaults.scalaExcluded) getOrElse Defaults.scalaJars
+  def scalaJars(scala: ScalaLocation): (File, File, Seq[File]) = {
+    val (compiler, library, extra) = {
+      splitScala(scala.path) orElse
+      splitScala(allLibs(scala.home), Defaults.scalaExcluded) getOrElse
+      Defaults.scalaJars
+    }
+    (scala.compiler getOrElse compiler, scala.library getOrElse library, scala.extra ++ extra)
   }
 
   /**

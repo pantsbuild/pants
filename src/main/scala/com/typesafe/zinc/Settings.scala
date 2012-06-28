@@ -20,8 +20,7 @@ case class Settings(
   sources: Seq[File] = Seq.empty,
   classpath: Seq[File] = Seq.empty,
   classesDirectory: File = new File("."),
-  scalaHome: Option[File] = None,
-  scalaPath: Seq[File] = Seq.empty,
+  scala: ScalaLocation = ScalaLocation(),
   scalacOptions: Seq[String] = Seq.empty,
   javaHome: Option[File] = None,
   javaOnly: Boolean = false,
@@ -30,6 +29,16 @@ case class Settings(
   analysisCache: Option[File] = None,
   analysisMap: Map[File, File] = Map.empty,
   properties: Seq[String] = Seq.empty)
+
+/**
+ * Alternative ways to locate the scala jars.
+ */
+case class ScalaLocation(
+  home: Option[File] = None,
+  path: Seq[File] = Seq.empty,
+  compiler: Option[File] = None,
+  library: Option[File] = None,
+  extra: Seq[File] = Seq.empty)
 
 object Settings {
   /**
@@ -43,8 +52,11 @@ object Settings {
     string(  "-log-level", "level",          "Set log level (debug|info|warn|error)",      (s: Settings, l: String) => s.copy(logLevel = Level.withName(l))),
     path(    ("-classpath", "-cp"), "path",  "Specify the classpath",                      (s: Settings, cp: Seq[File]) => s.copy(classpath = cp)),
     file(    "-d", "directory",              "Destination for compiled classes",           (s: Settings, f: File) => s.copy(classesDirectory = f)),
-    file(    "-scala-home", "directory",     "Scala home directory (for locating jars)",   (s: Settings, f: File) => s.copy(scalaHome = Some(f))),
-    path(    "-scala-path", "path",          "Specify all Scala jars directly",            (s: Settings, js: Seq[File]) => s.copy(scalaPath = js)),
+    file(    "-scala-home", "directory",     "Scala home directory (for locating jars)",   (s: Settings, f: File) => s.copy(scala = s.scala.copy(home = Some(f)))),
+    path(    "-scala-path", "path",          "Specify all Scala jars directly",            (s: Settings, sp: Seq[File]) => s.copy(scala = s.scala.copy(path = sp))),
+    file(    "-scala-compiler", "file",      "Specify Scala compiler jar directly" ,       (s: Settings, f: File) => s.copy(scala = s.scala.copy(compiler = Some(f)))),
+    file(    "-scala-library", "file",       "Specify Scala library jar directly" ,        (s: Settings, f: File) => s.copy(scala = s.scala.copy(library = Some(f)))),
+    path(    "-scala-extra", "path",         "Specify extra Scala jars directly",          (s: Settings, e: Seq[File]) => s.copy(scala = s.scala.copy(extra = e))),
     prefix(  "-S", "<scalac-option>",        "Pass option to scalac",                      (s: Settings, o: String) => s.copy(scalacOptions = s.scalacOptions :+ o)),
     file(    "-java-home", "directory",      "Java home directory (to select javac)",      (s: Settings, f: File) => s.copy(javaHome = Some(f))),
     prefix(  "-J", "<javac-option>",         "Pass option to javac",                       (s: Settings, o: String) => s.copy(javacOptions = s.javacOptions :+ o)),
@@ -112,8 +124,13 @@ object Settings {
         sources = Util.normaliseSeq(cwd)(sources),
         classpath = Util.normaliseSeq(cwd)(classpath),
         classesDirectory = Util.normalise(cwd)(classesDirectory),
-        scalaHome = Util.normaliseOpt(cwd)(scalaHome),
-        scalaPath = Util.normaliseSeq(cwd)(scalaPath),
+        scala = scala.copy(
+          home = Util.normaliseOpt(cwd)(scala.home),
+          path = Util.normaliseSeq(cwd)(scala.path),
+          compiler = Util.normaliseOpt(cwd)(scala.compiler),
+          library = Util.normaliseOpt(cwd)(scala.library),
+          extra = Util.normaliseSeq(cwd)(scala.extra)
+        ),
         javaHome = Util.normaliseOpt(cwd)(javaHome),
         analysisCache = Util.normaliseOpt(cwd)(analysisCache),
         analysisMap = Util.normaliseMap(cwd)(analysisMap)
