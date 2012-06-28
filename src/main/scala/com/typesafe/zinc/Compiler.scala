@@ -33,7 +33,7 @@ object Compiler {
   val analysisCache = Cache[File, Analysis](Setup.Defaults.analysisCacheLimit)
 
   /**
-   * Get or create an zinc compiler based on compiler setup.
+   * Get or create a zinc compiler based on compiler setup.
    */
   def apply(setup: Setup, log: Logger): Compiler = {
     cache.get(setup)(create(setup, log))

@@ -46,7 +46,7 @@ class ZincClient(val address: InetAddress, val port: Int) {
     send("zinc", args, cwd, out, err)
 
   /**
-   * Java API for sending an zinc command to a currently running nailgun server.
+   * Java API for sending a zinc command to a currently running nailgun server.
    * All output goes to specified output streams. Exit code is returned.
    * @throws java.net.ConnectException if the zinc server is not available
    */

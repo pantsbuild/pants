@@ -10,7 +10,7 @@ import sbt.Path._
 import scala.collection.JavaConverters._
 
 /**
- * All setup options for an zinc compiler.
+ * All setup options for a zinc compiler.
  */
 case class Setup(
   scalaCompiler: File,
