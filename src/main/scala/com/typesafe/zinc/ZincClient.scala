@@ -12,7 +12,7 @@ import java.util.{ List => JList }
 import scala.annotation.tailrec
 import scala.collection.JavaConverters._
 
-object NailgunClient {
+object ZincClient {
   object Chunk {
     val Argument  = NGConstants.CHUNKTYPE_ARGUMENT
     val Command   = NGConstants.CHUNKTYPE_COMMAND
@@ -32,12 +32,12 @@ object NailgunClient {
 /**
  * Client for talking directly to a nailgun server from another JVM.
  */
-class NailgunClient(val address: InetAddress, val port: Int) {
+class ZincClient(val address: InetAddress, val port: Int) {
   def this(address: String, port: Int) = this(InetAddress.getByName(address), port)
   def this(port: Int) = this(InetAddress.getByName(null), port)
 
   /**
-   * Send an zinc command to a currently running nailgun server.
+   * Send a zinc command to a currently running nailgun server.
    * All output goes to specified output streams. Exit code is returned.
    * @throws java.net.ConnectException if the zinc server is not available
    */
@@ -78,7 +78,7 @@ class NailgunClient(val address: InetAddress, val port: Int) {
   }
 
   private def sendCommand(command: String, args: Seq[String], cwd: File, out: OutputStream): Unit = {
-    import NailgunClient.Chunk.{ Argument, Command, Directory }
+    import ZincClient.Chunk.{ Argument, Command, Directory }
     args foreach { arg => putChunk(Argument, arg, out) }
     putChunk(Directory, cwd.getCanonicalPath, out)
     putChunk(Command, command, out)
@@ -86,7 +86,7 @@ class NailgunClient(val address: InetAddress, val port: Int) {
 
   @tailrec
   private def receiveOutput(in: DataInputStream, out: OutputStream, err: OutputStream): Int = {
-    import NailgunClient.Chunk.{ Exit, StdOut, StdErr }
+    import ZincClient.Chunk.{ Exit, StdOut, StdErr }
     val exitCode =
       try {
         val (chunkType, data) = getChunk(in)
@@ -96,7 +96,7 @@ class NailgunClient(val address: InetAddress, val port: Int) {
           case StdErr => err.write(data); None
         }
       } catch {
-        case _: Exception => Some(NailgunClient.Exception.ClientReceive)
+        case _: Exception => Some(ZincClient.Exception.ClientReceive)
       }
     if (exitCode.isDefined) exitCode.get else receiveOutput(in, out, err)
   }
