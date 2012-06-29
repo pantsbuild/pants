@@ -70,9 +70,9 @@ class ZincClient(val address: InetAddress, val port: Int) {
   }
 
   /**
-   * Check if a nailgun server is currently running.
+   * Check if a nailgun server is currently available.
    */
-  def isRunning(): Boolean = {
+  def serverAvailable(): Boolean = {
     try { (new Socket(address, port)).close(); true }
     catch { case _: java.net.ConnectException => false }
   }

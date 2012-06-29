@@ -29,7 +29,7 @@ object Main {
     // if nailed then also set any system properties provided
     if (cwd.isDefined) Util.setProperties(settings.properties)
 
-    val log = Util.logger(settings.quiet, settings.logLevel)
+    val log = Util.logger(settings.quiet, settings.logLevel, settings.color)
     val isDebug = (!settings.quiet && settings.logLevel == Level.Debug)
 
     // bail out on any command-line option errors
@@ -77,6 +77,7 @@ object Main {
     } catch {
       case e: CompileFailed =>
         log.error("Compile failed " + Util.timing(startTime))
+        sys.exit(1)
     }
   }
 }
