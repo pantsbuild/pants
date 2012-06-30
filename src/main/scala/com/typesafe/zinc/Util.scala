@@ -174,6 +174,63 @@ object Util {
   }
 
   //
+  // Timers
+  //
+
+  /**
+   * Simple duration regular expression.
+   */
+  val Duration = """(\d+)([hms])""".r
+
+  /**
+   * Milliseconds from string duration of the form Nh|Nm|Ns, otherwise default.
+   */
+  def duration(arg: String, default: Long): Long =
+    arg match {
+      case Duration(length, unit) =>
+        val multiplier = unit match {
+          case "h" => 60 * 60 * 1000
+          case "m" => 60 * 1000
+          case "s" => 1000
+          case _ => 0
+        }
+        try { length.toLong * multiplier } catch { case _: Exception => default }
+      case _ => default
+    }
+
+  /**
+   * Schedule a resettable timer.
+   */
+  def timer(delay: Long)(body: => Unit) = new Alarm(delay)(body)
+
+  /**
+   * Resettable timer.
+   */
+  class Alarm(delay: Long)(body: => Unit) {
+    import java.util.{ Timer, TimerTask }
+
+    private[this] var timer: Timer = _
+    private[this] var task: TimerTask = _
+
+    schedule()
+
+    private[this] def schedule(): Unit = {
+      if ((task eq null) && delay > 0) {
+        if (timer eq null) timer = new Timer(true) // daemon = true
+        task = new TimerTask { def run = body }
+        timer.schedule(task, delay)
+      }
+    }
+
+    def reset(): Unit = synchronized {
+      if (task ne null) { task.cancel(); task = null }
+      schedule()
+    }
+
+    def cancel(): Unit = if (timer ne null) timer.cancel()
+  }
+
+  //
   // Debug output
   //
 
