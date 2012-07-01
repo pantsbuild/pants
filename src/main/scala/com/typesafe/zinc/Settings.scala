@@ -29,6 +29,7 @@ case class Settings(
   compileOrder: CompileOrder = CompileOrder.Mixed,
   analysisCache: Option[File] = None,
   analysisMap: Map[File, File] = Map.empty,
+  sbt: SbtJars = SbtJars(),
   properties: Seq[String] = Seq.empty)
 
 /**
@@ -40,6 +41,13 @@ case class ScalaLocation(
   compiler: Option[File] = None,
   library: Option[File] = None,
   extra: Seq[File] = Seq.empty)
+
+/**
+ * Locating the sbt jars needed for zinc compile.
+ */
+case class SbtJars(
+  sbtInterface: Option[File] = None,
+  compilerInterfaceSrc: Option[File] = None)
 
 object Settings {
   /**
@@ -66,6 +74,8 @@ object Settings {
     string(  "-compile-order", "order",      "Compile order for Scala and Java sources",   (s: Settings, o: String) => s.copy(compileOrder = compileOrder(o))),
     file(    "-analysis-cache", "file",      "Cache file for compile analysis",            (s: Settings, f: File) => s.copy(analysisCache = Some(f))),
     fileMap( "-analysis-map",                "Upstream analysis mapping (file:file,...)",  (s: Settings, m: Map[File, File]) => s.copy(analysisMap = m)),
+    file(    "-sbt-interface", "file",       "Specify sbt interface jar",                  (s: Settings, f: File) => s.copy(sbt = s.sbt.copy(sbtInterface = Some(f)))),
+    file(    "-compiler-interface", "file",  "Specify compiler interface sources jar",     (s: Settings, f: File) => s.copy(sbt = s.sbt.copy(compilerInterfaceSrc = Some(f)))),
     prefix(  "-D", "property=value",         "Pass property to runtime system",            (s: Settings, o: String) => s.copy(properties = s.properties :+ o)),
     dummy(   "-V<flag>",                     "Set JVM flag directly for this process"),
     dummy(   "-nailed",                      "Run as daemon with nailgun server"),

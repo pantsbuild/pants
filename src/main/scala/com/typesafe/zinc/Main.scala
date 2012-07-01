@@ -52,14 +52,14 @@ object Main {
       sys.exit(1)
     }
 
-    // we need some of the jars in zinc home, always needs to be provided
-    if (Setup.Defaults.zincHome.isEmpty) {
-      log.error("Need %s property to be defined" format Setup.HomeProperty)
-      sys.exit(1)
-    }
-
     val setup = Setup(settings)
     val inputs = Inputs(settings)
+
+    // check we have all necessary files
+    if (!Setup.verify(setup, log)) {
+      log.error("See %s -help for information about locating necessary files" format Setup.Command)
+      sys.exit(1)
+    }
 
     if (isDebug) {
       val debug: String => Unit = log.debug(_)

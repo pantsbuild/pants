@@ -40,9 +40,10 @@ object Setup {
    * Create compiler setup from command-line settings.
    */
   def apply(settings: Settings): Setup = {
-    import settings._
-    val (compiler, library, extra) = scalaJars(scala)
-    setup(compiler, library, extra, Defaults.sbtInterface, Defaults.compilerInterfaceSrc, javaHome)
+    val (compiler, library, extra) = scalaJars(settings.scala)
+    val sbtInterface = settings.sbt.sbtInterface getOrElse Defaults.sbtInterface
+    val compilerInterfaceSrc = settings.sbt.compilerInterfaceSrc getOrElse Defaults.compilerInterfaceSrc
+    setup(compiler, library, extra, sbtInterface, compilerInterfaceSrc, settings.javaHome)
   }
 
   /**
@@ -114,6 +115,26 @@ object Setup {
    */
   def zincCacheDir = Defaults.zincDir / zincVersion.published
 
+  /**
+   * Verify that necessary jars exist.
+   */
+  def verify(setup: Setup, log: sbt.Logger): Boolean = {
+    val scalaCompiler = requireFile(setup.scalaCompiler, log)
+    val scalaLibrary = requireFile(setup.scalaLibrary, log)
+    val sbtInterface = requireFile(setup.sbtInterface, log)
+    val compilerInterfaceSrc = requireFile(setup.compilerInterfaceSrc, log)
+    (scalaCompiler && scalaLibrary && sbtInterface && compilerInterfaceSrc)
+  }
+
+  /**
+   * Check file exists. Log error if it doesn't.
+   */
+  def requireFile(file: File, log: sbt.Logger): Boolean = {
+    val exists = file.exists
+    if (!exists) log.error("Required file not found: " + file.getName)
+    exists
+  }
+
   //
   // Default setup
   //
@@ -123,11 +144,11 @@ object Setup {
     val zincDir = Util.optFileProperty(DirProperty).getOrElse(userHome / ("." + Command)).getCanonicalFile
     val zincHome = Util.optFileProperty(HomeProperty).map(_.getCanonicalFile)
 
-    val sbtInterface = optLibOrEmpty(zincHome, SbtInterfaceName)
-    val compilerInterfaceSrc = optLibOrEmpty(zincHome, CompilerInterfaceSourcesName)
+    val sbtInterface = optLibOrDefault(zincHome, SbtInterfaceName)
+    val compilerInterfaceSrc = optLibOrDefault(zincHome, CompilerInterfaceSourcesName)
 
-    val scalaCompiler = optLibOrEmpty(zincHome, ScalaCompilerName)
-    val scalaLibrary = optLibOrEmpty(zincHome, ScalaLibraryName)
+    val scalaCompiler = optLibOrDefault(zincHome, ScalaCompilerName)
+    val scalaLibrary = optLibOrDefault(zincHome, ScalaLibraryName)
     val scalaExtra = Seq.empty[File]
     val scalaJars = (scalaCompiler, scalaLibrary, scalaExtra)
     val defaultScalaExcluded = Set("jansi.jar", "jline.jar", "scala-partest.jar", "scala-swing.jar", "scalacheck.jar", "scalap.jar")
@@ -149,8 +170,8 @@ object Setup {
     allLibs(homeDir) find (_.getName == name)
   }
 
-  def optLibOrEmpty(homeDir: Option[File], name: String): File = {
-    optLib(homeDir, name) getOrElse new File("")
+  def optLibOrDefault(homeDir: Option[File], name: String): File = {
+    optLib(homeDir, name) getOrElse new File(name)
   }
 
   //
