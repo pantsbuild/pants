@@ -54,30 +54,43 @@ object Settings {
    * All available command-line options.
    */
   val options = Seq(
+    header("Output options:"),
     boolean( ("-help", "-h"),                "Print this usage message",                   (s: Settings) => s.copy(help = true)),
     boolean( "-version",                     "Print version",                              (s: Settings) => s.copy(version = true)),
     boolean( ("-quiet", "-q"),               "Silence all logging",                        (s: Settings) => s.copy(quiet = true)),
     boolean( "-debug",                       "Set log level to debug",                     (s: Settings) => s.copy(logLevel = Level.Debug)),
     string(  "-log-level", "level",          "Set log level (debug|info|warn|error)",      (s: Settings, l: String) => s.copy(logLevel = Level.withName(l))),
     boolean( "-no-color",                    "No color in logging",                        (s: Settings) => s.copy(color = false)),
+
+    header("Compile options:"),
     path(    ("-classpath", "-cp"), "path",  "Specify the classpath",                      (s: Settings, cp: Seq[File]) => s.copy(classpath = cp)),
     file(    "-d", "directory",              "Destination for compiled classes",           (s: Settings, f: File) => s.copy(classesDirectory = f)),
+
+    header("Scala options:"),
     file(    "-scala-home", "directory",     "Scala home directory (for locating jars)",   (s: Settings, f: File) => s.copy(scala = s.scala.copy(home = Some(f)))),
     path(    "-scala-path", "path",          "Specify all Scala jars directly",            (s: Settings, sp: Seq[File]) => s.copy(scala = s.scala.copy(path = sp))),
     file(    "-scala-compiler", "file",      "Specify Scala compiler jar directly" ,       (s: Settings, f: File) => s.copy(scala = s.scala.copy(compiler = Some(f)))),
     file(    "-scala-library", "file",       "Specify Scala library jar directly" ,        (s: Settings, f: File) => s.copy(scala = s.scala.copy(library = Some(f)))),
     path(    "-scala-extra", "path",         "Specify extra Scala jars directly",          (s: Settings, e: Seq[File]) => s.copy(scala = s.scala.copy(extra = e))),
     prefix(  "-S", "<scalac-option>",        "Pass option to scalac",                      (s: Settings, o: String) => s.copy(scalacOptions = s.scalacOptions :+ o)),
+
+    header("Java options:"),
     file(    "-java-home", "directory",      "Java home directory (to select javac)",      (s: Settings, f: File) => s.copy(javaHome = Some(f))),
-    prefix(  "-J", "<javac-option>",         "Pass option to javac",                       (s: Settings, o: String) => s.copy(javacOptions = s.javacOptions :+ o)),
-    boolean( "-java-only",                   "Don't add scala library to classpath",       (s: Settings) => s.copy(javaOnly = true)),
     string(  "-compile-order", "order",      "Compile order for Scala and Java sources",   (s: Settings, o: String) => s.copy(compileOrder = compileOrder(o))),
+    boolean( "-java-only",                   "Don't add scala library to classpath",       (s: Settings) => s.copy(javaOnly = true)),
+    prefix(  "-J", "<javac-option>",         "Pass option to javac",                       (s: Settings, o: String) => s.copy(javacOptions = s.javacOptions :+ o)),
+
+    header("sbt options:"),
     file(    "-analysis-cache", "file",      "Cache file for compile analysis",            (s: Settings, f: File) => s.copy(analysisCache = Some(f))),
     fileMap( "-analysis-map",                "Upstream analysis mapping (file:file,...)",  (s: Settings, m: Map[File, File]) => s.copy(analysisMap = m)),
     file(    "-sbt-interface", "file",       "Specify sbt interface jar",                  (s: Settings, f: File) => s.copy(sbt = s.sbt.copy(sbtInterface = Some(f)))),
     file(    "-compiler-interface", "file",  "Specify compiler interface sources jar",     (s: Settings, f: File) => s.copy(sbt = s.sbt.copy(compilerInterfaceSrc = Some(f)))),
+
+    header("JVM options:"),
     prefix(  "-D", "property=value",         "Pass property to runtime system",            (s: Settings, o: String) => s.copy(properties = s.properties :+ o)),
     dummy(   "-V<flag>",                     "Set JVM flag directly for this process"),
+
+    header("Nailgun options:"),
     dummy(   "-nailed",                      "Run as daemon with nailgun server"),
     dummy(   "-port",                        "Set nailgun port (if nailed)"),
     dummy(   "-start",                       "Ensure nailgun server is running (if nailed)"),
@@ -92,9 +105,9 @@ object Settings {
    * Print out the usage message.
    */
   def printUsage(): Unit = {
-    val column = options.map(_.help.length).max + 2
+    val column = options.map(_.length).max + 2
     println("Usage: %s <options> <sources>" format Setup.Command)
-    options foreach { opt => println("  " + opt.help.padTo(column, ' ') + opt.description) }
+    options foreach { opt => if (opt.extraline) println(); println(opt.usage(column)) }
     println()
   }
 
@@ -162,5 +175,6 @@ object Settings {
   def path(opts: (String, String), arg: String, desc: String, action: (Settings, Seq[File]) => Settings) = new PathOption[Settings](Seq(opts._1, opts._2), arg, desc, action)
   def prefix(pre: String, arg: String, desc: String, action: (Settings, String) => Settings) = new PrefixOption[Settings](pre, arg, desc, action)
   def fileMap(opt: String, desc: String, action: (Settings, Map[File, File]) => Settings) = new FileMapOption[Settings](Seq(opt), desc, action)
+  def header(label: String) = new HeaderOption[Settings](label)
   def dummy(opt: String, desc: String) = new DummyOption[Settings](opt, desc)
 }

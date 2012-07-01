@@ -40,6 +40,9 @@ abstract class OptionDef[Context] {
 
   def claims(option: String): Boolean = options contains option
   def help: String = options mkString (" | ")
+  def length: Int = help.length
+  def usage(column: Int): String = ("  " + help.padTo(column, ' ') + description)
+  def extraline: Boolean = false
 }
 
 abstract class FlagOption[Context] extends OptionDef[Context] {
@@ -155,6 +158,19 @@ extends ArgumentOption[Map[File, File], Context] {
     val p = pair split ':'
     if (p.length == 2) Some((new File(p(0)), new File(p(1)))) else None
   }
+}
+
+class HeaderOption[Context](
+  val header: String)
+extends OptionDef[Context] {
+  def options: Seq[String] = Seq.empty
+  def description = ""
+  def process(context: Context, args: Seq[String]) = Parsed(context, args.tail)
+  override def claims(option: String): Boolean = false
+  override def help = ""
+  override def length = 0
+  override def usage(column: Int) = header
+  override def extraline = true
 }
 
 class DummyOption[Context](
