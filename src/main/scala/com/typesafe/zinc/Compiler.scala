@@ -109,7 +109,12 @@ class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler) {
   /**
    * Run a compile. The resulting analysis is also cached in memory.
    */
-  def compile(inputs: Inputs)(log: Logger): Analysis = {
+  def compile(inputs: Inputs)(log: Logger): Analysis = compile(inputs, None)(log)
+
+  /**
+   * Run a compile. The resulting analysis is also cached in memory.
+   */
+  def compile(inputs: Inputs, cwd: Option[File])(log: Logger): Analysis = {
     import inputs._
     val doCompile = new AggressiveCompile(cacheFile)
     val cp = autoClasspath(classesDirectory, scalac.scalaInstance.libraryJar, javaOnly, classpath)
@@ -117,6 +122,7 @@ class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler) {
     val getAnalysis: File => Option[Analysis] = analysisMap.get _
     val analysis = doCompile(scalac, javac, sources, cp, classesDirectory, globalsCache, scalacOptions, javacOptions, getAnalysis, definesClass, 100, compileOrder, false)(log)
     Compiler.analysisCache.put(cacheFile, analysis)
+    Util.printRelations(analysis, outputRelations, cwd)
     analysis
   }
 

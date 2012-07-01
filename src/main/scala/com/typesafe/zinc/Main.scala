@@ -72,7 +72,7 @@ object Main {
     try {
       val compiler = Compiler(setup, log)
       log.debug("Zinc compiler = %s [%s]" format (compiler, compiler.hashCode.toHexString))
-      compiler.compile(inputs)(log)
+      compiler.compile(inputs, cwd)(log)
       log.info("Compile success " + Util.timing(startTime))
     } catch {
       case e: CompileFailed =>

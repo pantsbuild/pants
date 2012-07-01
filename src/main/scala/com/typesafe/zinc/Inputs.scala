@@ -25,7 +25,8 @@ case class Inputs(
   analysisMap: Map[File, Analysis],
   definesClass: File => String => Boolean,
   javaOnly: Boolean,
-  compileOrder: CompileOrder)
+  compileOrder: CompileOrder,
+  outputRelations: Option[File])
 
 object Inputs {
   /**
@@ -33,7 +34,7 @@ object Inputs {
    */
   def apply(settings: Settings): Inputs = {
     import settings._
-    inputs(classpath, sources, classesDirectory, scalacOptions, javacOptions, analysisCache, analysisMap, javaOnly, compileOrder)
+    inputs(classpath, sources, classesDirectory, scalacOptions, javacOptions, analysisCache, analysisMap, javaOnly, compileOrder, outputRelations)
   }
 
   /**
@@ -48,7 +49,8 @@ object Inputs {
     analysisCache: Option[File],
     analysisCacheMap: Map[File, File],
     javaOnly: Boolean,
-    compileOrder: CompileOrder): Inputs =
+    compileOrder: CompileOrder,
+    outputRelations: Option[File]): Inputs =
   {
     val normalise: File => File = { _.getCanonicalFile }
     val cp = classpath map normalise
@@ -57,7 +59,8 @@ object Inputs {
     val cacheFile = normalise(analysisCache.getOrElse(defaultCacheLocation(classesDirectory)))
     val upstreamAnalysis = analysisCacheMap map { case (k, v) => (normalise(k), normalise(v)) }
     val analysisMap = (classpath map { file => (file, analysisFor(file, classesDirectory, upstreamAnalysis)) }).toMap
-    new Inputs(cp, srcs, classes, scalacOptions, javacOptions, cacheFile, analysisMap, Locate.definesClass, javaOnly, compileOrder)
+    val printRelations = outputRelations map normalise
+    new Inputs(cp, srcs, classes, scalacOptions, javacOptions, cacheFile, analysisMap, Locate.definesClass, javaOnly, compileOrder, printRelations)
   }
 
   /**
@@ -81,7 +84,8 @@ object Inputs {
     Option(analysisCache),
     analysisMap.asScala.toMap,
     false,
-    Settings.compileOrder(compileOrder)
+    Settings.compileOrder(compileOrder),
+    None
   )
 
   /**
@@ -122,7 +126,8 @@ object Inputs {
       "cache file" -> cacheFile,
       "analysis map" -> analysisMap,
       "java only" -> javaOnly,
-      "compile order" -> compileOrder)
+      "compile order" -> compileOrder,
+      "output relations" -> outputRelations)
     Util.show(("Inputs", values), output)
   }
 }

@@ -30,6 +30,7 @@ case class Settings(
   analysisCache: Option[File] = None,
   analysisMap: Map[File, File] = Map.empty,
   sbt: SbtJars = SbtJars(),
+  outputRelations: Option[File] = None,
   properties: Seq[String] = Seq.empty)
 
 /**
@@ -85,6 +86,7 @@ object Settings {
     fileMap( "-analysis-map",                "Upstream analysis mapping (file:file,...)",  (s: Settings, m: Map[File, File]) => s.copy(analysisMap = m)),
     file(    "-sbt-interface", "file",       "Specify sbt interface jar",                  (s: Settings, f: File) => s.copy(sbt = s.sbt.copy(sbtInterface = Some(f)))),
     file(    "-compiler-interface", "file",  "Specify compiler interface sources jar",     (s: Settings, f: File) => s.copy(sbt = s.sbt.copy(compilerInterfaceSrc = Some(f)))),
+    file(    "-output-relations", "file",    "Print readable analysis relations to file",  (s: Settings, f: File) => s.copy(outputRelations = Some(f))),
 
     header("JVM options:"),
     prefix(  "-D", "property=value",         "Pass property to runtime system",            (s: Settings, o: String) => s.copy(properties = s.properties :+ o)),
@@ -159,7 +161,12 @@ object Settings {
         ),
         javaHome = Util.normaliseOpt(cwd)(javaHome),
         analysisCache = Util.normaliseOpt(cwd)(analysisCache),
-        analysisMap = Util.normaliseMap(cwd)(analysisMap)
+        analysisMap = Util.normaliseMap(cwd)(analysisMap),
+        sbt = sbt.copy(
+          sbtInterface = Util.normaliseOpt(cwd)(sbt.sbtInterface),
+          compilerInterfaceSrc = Util.normaliseOpt(cwd)(sbt.compilerInterfaceSrc)
+        ),
+        outputRelations = Util.normaliseOpt(cwd)(outputRelations)
       )
     }
   }

@@ -141,6 +141,7 @@ object Setup {
 
   object Defaults {
     val userHome = Util.fileProperty("user.home")
+    val userDir = Util.fileProperty("user.dir")
     val zincDir = Util.optFileProperty(DirProperty).getOrElse(userHome / ("." + Command)).getCanonicalFile
     val zincHome = Util.optFileProperty(HomeProperty).map(_.getCanonicalFile)
 
