@@ -42,9 +42,8 @@ needs to contain a ``lib`` directory with the Scala jars).
 Using ``-scala-path`` the compiler, library, and any extra jars (like scala
 reflect) can be listed directly as a path.
 
-Using ``-scala-library`` to directly specify the Scala library, ``-scala-
-compiler`` to specify the Scala compiler, and ``-scala-extra`` to specify any
-extra Scala jars.
+Using ``-scala-library`` to directly specify the Scala library, ``-scala-compiler``
+to specify the Scala compiler, and ``-scala-extra`` to specify any extra Scala jars.
 
 If no options are passed to locate a version of Scala then Scala 2.9.2 is used
 by default (which is bundled with zinc).
