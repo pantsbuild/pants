@@ -137,7 +137,6 @@ object Setup {
     val compilerCacheLimit = Util.intProperty(prop("compiler.cache.limit"), cacheLimit)
     val residentCacheLimit = Util.intProperty(prop("resident.cache.limit"), cacheLimit)
     val analysisCacheLimit = Util.intProperty(prop("analysis.cache.limit"), cacheLimit)
-    val loggerCacheLimit = Util.intProperty(prop("logger.cache.limit"), cacheLimit)
   }
 
   def prop(name: String) = Command + "." + name
