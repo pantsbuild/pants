@@ -32,14 +32,19 @@ considered to be a source file.
 
 ### Scala
 
-To specify which Scala version to compile with, use either the ``-scala-home`` or
-``-scala-path`` options.
+Zinc needs to locate the Scala compiler jar, Scala library jar, and any extra
+Scala jars (like Scala reflect). There are three alternative ways to specify
+the Scala jars.
 
 Using ``-scala-home`` point to the base directory of a Scala distribution (which
 needs to contain a ``lib`` directory with the Scala jars).
 
-Using ``-scala-path`` the compiler, library, and any extra jars (like scala-reflect)
-can be listed directly as a path.
+Using ``-scala-path`` the compiler, library, and any extra jars (like scala
+reflect) can be listed directly as a path.
+
+Using ``-scala-library`` to directly specify the Scala library, ``-scala-
+compiler`` to specify the Scala compiler, and ``-scala-extra`` to specify any
+extra Scala jars.
 
 If no options are passed to locate a version of Scala then Scala 2.9.2 is used
 by default (which is bundled with zinc).
@@ -52,12 +57,12 @@ warnings can be enabled with ``-S-deprecation``.
 To select a different ``javac`` to compile Java sources, use the ``-java-home``
 option. To pass options to javac, prefix with ``-J``.
 
-If only Java sources are being compiled then the ``-java-only`` option can be
-added to avoid the Scala library jar being automatically added to the classpath.
-
 If mixed Java and Scala sources are being compiled then the compile order can be
 specified with ``-compile-order``, where the available orders are ``Mixed``,
 ``JavaThenScala``, or ``ScalaThenJava``. The default order is ``Mixed``.
+
+If only Java sources are being compiled then the ``-java-only`` option can be
+added to avoid the Scala library jar being automatically added to the classpath.
 
 ### Nailed
 
