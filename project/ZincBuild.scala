@@ -6,7 +6,7 @@ import sbt._
 import sbt.Keys._
 
 object ZincBuild extends Build {
-  val sbtVersion = "0.12.0-RC2"
+  val sbtVersion = "0.12.0-RC3"
 
   lazy val buildSettings = Defaults.defaultSettings ++ Seq(
     organization := "com.typesafe.zinc",
