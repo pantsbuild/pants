@@ -153,7 +153,7 @@ class Task(object):
 
 
   @contextmanager
-  def changed(self, targets, only_buildfiles=False, invalidate_dependants=False):
+  def changed(self, targets, only_buildfiles=False, invalidate_dependants=False, invalidate_globally=False):
     """
       Yields an iterable over the targets that have changed since the last check to a with block.
       If no exceptions are thrown by work in the block, the cache is updated for the targets,
@@ -163,6 +163,7 @@ class Task(object):
       :targets The targets to check for changes.
       :only_buildfiles If True, then just the target's BUILD files are checked for changes.
       :invalidate_dependants If True then any targets depending on changed targets are invalidated
+      :invalidate_globally If True then if any target has changed, all targets are invalidated.
       :returns: the subset of targets that have changed
     """
 
@@ -187,7 +188,11 @@ class Task(object):
       for target in (self.context.dependants(lambda t: t in cache_manager.changed.keys())).keys():
         cache_manager.invalidate(target)
 
-    if invalidate_dependants:
+    if invalidate_globally and cache_manager.changed:
+      for target in targets:
+        cache_manager.invalidate(target)
+
+    if invalidate_dependants or invalidate_globally:
       if cache_manager.foreign_invalidated_targets:
         self.context.log.info('Invalidated %d dependant targets '
                               'for the next round' % cache_manager.foreign_invalidated_targets)
@@ -198,9 +203,14 @@ class Task(object):
           len(cache_manager.changed)
         )
         if cache_manager.invalidated_files:
-          msg += ' and %d files in %d invalidated dependant targets' % (
+          if invalidate_globally:
+            invalidation_msg = 'globally invalidated'
+          else:
+            invalidation_msg = 'invalidated dependant'
+          msg += ' and %d files in %d %s targets' % (
             cache_manager.invalidated_files,
-            cache_manager.invalidated_targets
+            cache_manager.invalidated_targets,
+            invalidation_msg
           )
         self.context.log.info(msg)
     elif cache_manager.changed_files:

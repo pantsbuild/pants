@@ -35,9 +35,29 @@ class Dependencies(object):
 
   _CLASS_FILE_NAME_PARSER = re.compile(r'(?:\$.*)*\.class$')
 
-  def __init__(self, outputdir, depfile):
+  def __init__(self, outputdir):
     self.outputdir = outputdir
-    self.depfile = depfile
+    self.classes_by_source = defaultdict(set)
+    self.buildroot = get_buildroot()
+
+  def load(self, depfile):
+    """Load an existing depfile, if any, into this object. Any existing mappings are discarded."""
+    self.classes_by_source = defaultdict(set)
+    if os.path.exists(depfile):
+      with open(depfile, 'r') as deps:
+        for dep in deps.readlines():
+          src, cls = dep.strip().split('->')
+          sourcefile = os.path.relpath(os.path.join(self.outputdir, src.strip()), self.buildroot)
+          classfile = os.path.relpath(os.path.join(self.outputdir, cls.strip()), self.outputdir)
+          self.classes_by_source[sourcefile].add(classfile)
+
+  def merge(self, other_deps):
+    """
+    Merges the other deps into this object. The other deps will take precedence. In other words, if the other
+    deps provide any mapping for a source file, all that source file's existing mappings will be dropped.
+    """
+    for sourcefile, classfiles in other_deps.classes_by_source.items():
+      self.classes_by_source[sourcefile] = classfiles.copy()
 
   def findclasses(self, targets):
     """
@@ -53,7 +73,6 @@ class Dependencies(object):
             [os.path.join(outdir, cls) for cls in classes]
           ))
     """
-
     sources = set()
     target_by_source = dict()
     for target in targets:
@@ -63,14 +82,9 @@ class Dependencies(object):
         sources.add(src)
 
     classes_by_target_by_source = defaultdict(lambda: defaultdict(set))
-    if os.path.exists(self.depfile):
-      with open(self.depfile, 'r') as deps:
-        for dep in deps.readlines():
-          src, cls = dep.strip().split('->')
-          sourcefile = os.path.relpath(os.path.join(self.outputdir, src.strip()), get_buildroot())
-          if sourcefile in sources:
-            classfile = os.path.relpath(os.path.join(self.outputdir, cls.strip()), self.outputdir)
-            target = target_by_source[sourcefile]
-            relsrc = os.path.relpath(sourcefile, target.target_base)
-            classes_by_target_by_source[target][relsrc].add(classfile)
+    for sourcefile, classfiles in self.classes_by_source.items():
+      if sourcefile in sources:
+        target = target_by_source[sourcefile]
+        relsrc = os.path.relpath(sourcefile, target.target_base)
+        classes_by_target_by_source[target][relsrc] = classfiles
     return classes_by_target_by_source
