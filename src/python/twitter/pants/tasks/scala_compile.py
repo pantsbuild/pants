@@ -124,7 +124,7 @@ class ScalaCompile(NailgunTask):
           if not (self._incremental and not self._flatten):
             cp.insert(0, (conf, self._classes_dir))
 
-      if not self._flatten and len(scala_targets) > 1:
+      if not self._flatten:
         upstream_analysis_caches = OrderedDict()  # output dir -> analysis cache file for the classes in that dir.
         for target in scala_targets:
           self.execute_single_compilation([target], cp, upstream_analysis_caches)
@@ -160,10 +160,8 @@ class ScalaCompile(NailgunTask):
     # Compute the id of this compilation. We try to make it human-readable.
     if len(scala_targets) == 1:
       compilation_id = scala_targets[0].id
-    elif len(self.context.target_roots) == 1:
-      compilation_id = self.context.target_roots[0].id
     else:
-      compilation_id = self.context.id
+      compilation_id = self.context.identify(scala_targets)
 
     depfile = os.path.join(self._depfile_dir, compilation_id) + '.dependencies'
 
@@ -211,6 +209,7 @@ class ScalaCompile(NailgunTask):
                 shutil.copy(f, os.path.join(self._classes_dir, os.path.relpath(f, output_dir)))
 
     # Read in the deps created either just now or by a previous compiler run on these targets.
+    self.context.log.debug('Reading dependencies from ' + depfile)
     deps = Dependencies(output_dir)
     deps.load(depfile)
     self._deps.merge(deps)

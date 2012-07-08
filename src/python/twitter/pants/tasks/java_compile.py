@@ -119,7 +119,7 @@ class JavaCompile(NailgunTask):
           cp.insert(0, (conf, self._resources_dir))
           cp.insert(0, (conf, self._classes_dir))
 
-      if not self._flatten and len(java_targets) > 1:
+      if not self._flatten:
         for target in java_targets:
           self.execute_single_compilation([target], cp)
       else:
@@ -149,10 +149,8 @@ class JavaCompile(NailgunTask):
     # Compute the id of this compilation. We try to make it human-readable.
     if len(java_targets) == 1:
       compilation_id = java_targets[0].id
-    elif len(self.context.target_roots) == 1:
-      compilation_id = self.context.target_roots[0].id
     else:
-      compilation_id = self.context.id
+      compilation_id = self.context.identify(java_targets)
 
     depfile = os.path.join(self._depfile_dir, compilation_id) + '.dependencies'
 
