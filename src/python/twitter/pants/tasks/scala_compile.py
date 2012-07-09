@@ -17,7 +17,6 @@
 __author__ = 'John Sirois'
 
 import os
-import shutil
 import textwrap
 
 from collections import defaultdict
@@ -106,9 +105,6 @@ class ScalaCompile(NailgunTask):
     self._confs = context.config.getlist('scala-compile', 'confs')
     self._depfile_dir = os.path.join(workdir, 'depfiles')
     self._deps = Dependencies(self._classes_dir)
-    self._zinc_home = os.path.join(context.config.get('ivy-profiles', 'workdir'), self._zinc_profile + '.libs')
-    self._jar_workdir = context.config.get('jar-create', 'workdir')
-
 
   def execute(self, targets):
     scala_targets = filter(is_scala, reversed(InternalTarget.sort_targets(targets)))
@@ -199,14 +195,14 @@ class ScalaCompile(NailgunTask):
           if result != 0:
             raise TaskError('%s returned %d' % (self._main, result))
           if output_dir != self._classes_dir:
-            # Copy class files emitted in this compilation to the central classes dir.
+            # Link class files emitted in this compilation into the central classes dir.
             for (dirpath, dirnames, filenames) in os.walk(output_dir):
               for d in [os.path.join(dirpath, x) for x in dirnames]:
                 dir = os.path.join(self._classes_dir, os.path.relpath(d, output_dir))
                 if not os.path.isdir(dir):
                   os.mkdir(dir)
               for f in [os.path.join(dirpath, x) for x in filenames]:
-                shutil.copy(f, os.path.join(self._classes_dir, os.path.relpath(f, output_dir)))
+                os.link(f, os.path.join(self._classes_dir, os.path.relpath(f, output_dir)))
 
     # Read in the deps created either just now or by a previous compiler run on these targets.
     self.context.log.debug('Reading dependencies from ' + depfile)
@@ -252,12 +248,12 @@ class ScalaCompile(NailgunTask):
       # To pass options to scalac simply prefix with -S.
       args = ['-S' + x for x in compiler_args]
       if len(upstream_analysis_caches) > 0:
-        args.extend([ '-analysis-map', ','.join(['%s:%s' % (k, v) for k, v in upstream_analysis_caches.items()]) ])
+        args.extend([ '-analysis-map', ','.join(['%s:%s' % kv for kv in upstream_analysis_caches.items()]) ])
       upstream_jars = upstream_analysis_caches.keys()
 
       zinc_classpath = nailgun_profile_classpath(self, self._zinc_profile)
       zinc_jars = ScalaCompile.identify_zinc_jars(compiler_classpath, zinc_classpath)
-      for (name, jarpath) in zinc_jars.items():
+      for (name, jarpath) in zinc_jars.items():  # The zinc jar names are also the flag names.
         args.extend(['-%s' % name, jarpath])
       args.extend([
         '-analysis-cache', analysis_cache,
@@ -297,11 +293,18 @@ class ScalaCompile(NailgunTask):
       ''' % (target.plugin, target.classname)).strip())
     return basedir
 
+  # These are the names of the various jars zinc needs. They are, conveniently and non-coincidentally,
+  # the names of the flags used to pass the jar locations to zinc.
   compiler_jar_names = [ 'scala-library', 'scala-compiler' ]  # Compiler version.
   zinc_jar_names = [ 'compiler-interface', 'sbt-interface' ]  # Other jars zinc needs to be pointed to.
 
   @staticmethod
   def identify_zinc_jars(compiler_classpath, zinc_classpath):
+    """Find the named jars in the compiler and zinc classpaths.
+    
+    TODO: When profiles migrate to regular pants jar() deps instead of ivy.xml files we can make these
+          mappings explicit instead of deriving them by jar name heuristics.
+    """
     ret = OrderedDict()
     ret.update(ScalaCompile.identify_jars(ScalaCompile.compiler_jar_names, compiler_classpath))
     ret.update(ScalaCompile.identify_jars(ScalaCompile.zinc_jar_names, zinc_classpath))
