@@ -202,7 +202,10 @@ class ScalaCompile(NailgunTask):
                 if not os.path.isdir(dir):
                   os.mkdir(dir)
               for f in [os.path.join(dirpath, x) for x in filenames]:
-                os.link(f, os.path.join(self._classes_dir, os.path.relpath(f, output_dir)))
+                outfile = os.path.join(self._classes_dir, os.path.relpath(f, output_dir))
+                if os.path.exists(outfile):
+                  os.unlink(outfile)
+                os.link(f, outfile)
 
     # Read in the deps created either just now or by a previous compiler run on these targets.
     self.context.log.debug('Reading dependencies from ' + depfile)
