@@ -71,10 +71,11 @@ class Command:
     self.root_dir = root_dir
 
     # Override the OptionParser's error with more useful output
-    def error(message = None):
+    def error(message = None, show_help = True):
       if message:
         print(message + '\n')
-      parser.print_help()
+      if show_help:
+        parser.print_help()
       parser.exit(status = 1)
     parser.error = error
     self.error = error
@@ -91,8 +92,8 @@ class Command:
 
     pass
 
-  def error(self, message = None):
-    """Reports the error message followed by pants help and then exits."""
+  def error(self, message = None, show_help = True):
+    """Reports the error message, optionally followed by pants help, and then exits."""
 
   def run(self, lock):
     """Subcommands that are serialized() should override if they need the ability to interact with

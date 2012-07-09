@@ -33,6 +33,7 @@ from twitter.pants import get_buildroot, goal, group, is_apt, is_scala
 from twitter.pants.base import Address, BuildFile, Config, ParseContext, Target
 from twitter.pants.base.rcfile import RcFile
 from twitter.pants.commands import Command
+from twitter.pants.targets import InternalTarget
 from twitter.pants.tasks import Task, TaskError
 from twitter.pants.goal import Context, GoalError, Phase
 
@@ -192,7 +193,9 @@ class Goal(Command):
       for key, exc in errors.items():
         if exc:
           msg.write('\n  %s =>\n    %s' % (key, '\n      '.join(exc.splitlines())))
-      self.error(msg.getvalue())
+      # The help message for goal is extremely verbose, and will obscure the
+      # actual error message, so we don't show it in this case.
+      self.error(msg.getvalue(), show_help = False)
 
   def add_targets(self, error, dir, buildfile):
     try:
@@ -348,6 +351,13 @@ class Goal(Command):
       Phase.setup_parser(parser, args, self.phases)
 
   def run(self, lock):
+    with self.check_errors("Target contains a dependency cycle") as error:
+      for target in self.targets:
+        try:
+          InternalTarget.check_cycles(target)
+        except InternalTarget.CycleException as e:
+          error(target.id)
+
     timer = None
     if self.options.time:
       class Timer(object):
