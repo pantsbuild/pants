@@ -22,6 +22,8 @@ import re
 from collections import defaultdict
 
 from twitter.pants import get_buildroot
+from twitter.pants.tasks import TaskError
+
 
 class Dependencies(object):
   """
@@ -41,7 +43,7 @@ class Dependencies(object):
     self.buildroot = get_buildroot()
 
   def load(self, depfile):
-    """Load an existing depfile, if any, into this object. Any existing mappings are discarded."""
+    """Load an existing depfile into this object. Any existing mappings are discarded."""
     self.classes_by_source = defaultdict(set)
     if os.path.exists(depfile):
       with open(depfile, 'r') as deps:
@@ -50,6 +52,8 @@ class Dependencies(object):
           sourcefile = os.path.relpath(os.path.join(self.outputdir, src.strip()), self.buildroot)
           classfile = os.path.relpath(os.path.join(self.outputdir, cls.strip()), self.outputdir)
           self.classes_by_source[sourcefile].add(classfile)
+    else:
+      raise TaskError('No depfile at %s' % depfile)
 
   def merge(self, other_deps):
     """

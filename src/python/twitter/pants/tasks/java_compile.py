@@ -152,7 +152,15 @@ class JavaCompile(NailgunTask):
     else:
       compilation_id = self.context.identify(java_targets)
 
-    depfile = os.path.join(self._depfile_dir, compilation_id) + '.dependencies'
+    if self._flatten:
+      # If compiling in flat mode, we let all dependencies aggregate into a single well-known depfile. This
+      # allows us to build different targets in different invocations without losing dependency information
+      # from any of them.
+      depfile = os.path.join(self._depfile_dir, 'dependencies.flat')
+    else:
+      # If not in flat mode, we let each compilation have its own depfile, to avoid quadratic behavior (each
+      # compilation will read in the entire depfile, add its stuff to it and write it out again).
+      depfile = os.path.join(self._depfile_dir, compilation_id) + '.dependencies'
 
     with self.changed(java_targets, invalidate_dependants=True) as changed:
       sources_by_target, processors, fingerprint = self.calculate_sources(changed)
