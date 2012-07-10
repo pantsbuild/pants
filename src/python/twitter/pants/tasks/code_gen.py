@@ -124,6 +124,9 @@ class CodeGen(Task):
         genmap = self.context.products.get(lang)
         for gentarget, langtarget in langtarget_by_gentarget.items():
           genmap.add(gentarget, get_buildroot(), [langtarget])
+          # Transfer dependencies from gentarget to its synthetic counterpart.
           for dep in self.getdependencies(gentarget):
-            if self.is_gentarget(dep):
+            if self.is_gentarget(dep):  # Translate the dep to its synthetic counterpart.
               self.updatedependencies(langtarget, langtarget_by_gentarget[dep])
+            else:  # Depend directly on the dep.
+              self.updatedependencies(langtarget, dep)

@@ -58,8 +58,7 @@ class ThriftstoreDMLGen(CodeGen):
         thrift_dml_lib = self.context.add_new_target(dml_lib_target.target_base, # Dir where sources are relative to
                                                      JavaThriftLibrary,
                                                      name=dml_lib_target.id,
-                                                     sources=dml_lib_target.sources,
-                                                     dependencies=dml_lib_target.dependencies)
+                                                     sources=dml_lib_target.sources)
         # Add one generated JavaLibrary target (whose sources we will fill in later on)
         java_dml_lib = self.context.add_new_target(self.gen_thriftstore_java_dir,
                                                    JavaLibrary,
