@@ -106,6 +106,9 @@ class ScalaCompile(NailgunTask):
     self._depfile_dir = os.path.join(workdir, 'depfiles')
     self._deps = Dependencies(self._classes_dir)
 
+  def invalidate_for(self):
+    return [self._incremental, self._flatten]
+
   def execute(self, targets):
     scala_targets = filter(is_scala, reversed(InternalTarget.sort_targets(targets)))
     if scala_targets:

@@ -108,6 +108,9 @@ class JavaCompile(NailgunTask):
 
     self._confs = context.config.getlist('java-compile', 'confs')
 
+  def invalidate_for(self):
+    return [self._flatten]
+
   def execute(self, targets):
     java_targets = filter(JavaCompile._is_java, reversed(InternalTarget.sort_targets(targets)))
     if java_targets:

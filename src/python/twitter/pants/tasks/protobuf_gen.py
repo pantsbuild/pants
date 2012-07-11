@@ -78,6 +78,9 @@ class ProtobufGen(CodeGen):
   def invalidate_for(self):
     return self.gen_langs
 
+  def invalidate_for_files(self):
+    return [self.protobuf_binary]
+
   def is_gentarget(self, target):
     return isinstance(target, JavaProtobufLibrary)
 

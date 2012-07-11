@@ -5,6 +5,7 @@ except ImportError:
 
 from collections import defaultdict
 from contextlib import contextmanager
+import hashlib
 import os
 
 from twitter.common.collections import OrderedSet
@@ -55,6 +56,13 @@ class Task(object):
       Subclasses can override and return an object that should be checked for changes when using
       changed to manage target invalidation.  If the pickled form of returned object changes
       between runs all targets will be invalidated.
+    """
+
+  def invalidate_for_files(self):
+    """
+      Subclasses can override and return a list of full paths to extra files that should be checked
+      for changes when using changed to manage target invalidation. This is useful for tracking
+      changes to pre-built build tools, e.g., the thrift compiler.
     """
 
   class CacheManager(object):
@@ -170,7 +178,22 @@ class Task(object):
     safe_mkdir(self._basedir)
     cache_manager = Task.CacheManager(BuildCache(self._basedir), targets, only_buildfiles)
 
+    # invalidate_for() may return an iterable that isn't a set, so we ensure a set here.
     check = self.invalidate_for()
+    if check is not None:
+      check = set(check)
+
+    check_files = self.invalidate_for_files()
+    if check_files is not None:
+      check_files = set(check_files)
+      if check is None:
+        check = set()
+      for f in check_files:
+        sha = hashlib.sha1()
+        with open(f, "rb") as fd:
+          sha.update(fd.read())
+        check = check.add(sha.hexdigest())
+
     if check is not None:
       with safe_open(self._extradata, 'w') as pickled:
         pickle.dump(check, pickled)

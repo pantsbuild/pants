@@ -87,6 +87,9 @@ class ThriftGen(CodeGen):
   def invalidate_for(self):
     return self.gen_langs
 
+  def invalidate_for_files(self):
+    return [self.thrift_binary]
+
   def is_gentarget(self, target):
     return isinstance(target, JavaThriftLibrary) or isinstance(target, PythonThriftLibrary)
 
