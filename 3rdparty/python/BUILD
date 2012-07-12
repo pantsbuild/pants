@@ -226,3 +226,7 @@ python_library(
 python_library(
   name = 'pytz',
   dependencies = [egg("pytz-2012b-py2.6.egg")])
+
+python_library(
+  name = 'python-daemon',
+  dependencies = [egg("python_daemon-1.6-py2.6.egg")])

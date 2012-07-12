@@ -33,6 +33,7 @@ python_library(
     python_requirement("pygments"),
     python_requirement("pylint", version_filter=pylint_build_filter),
     python_requirement("pytest"),
+    python_requirement("python_daemon"),
   ]
 )
 

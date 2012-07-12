@@ -16,6 +16,7 @@
 
 __author__ = 'jsirois'
 
+import daemon
 import inspect
 import os
 import sys
@@ -445,6 +446,17 @@ goal(
   dependencies=['invalidate']
 ).install().with_description('Cleans all intermediate build output')
 
+def async_safe_rmtree(root):
+  new_path = root + '.deletable.%f' % time.time()
+  os.rename(root, new_path)
+  with daemon.DaemonContext():
+    safe_rmtree(new_path)
+
+goal(
+  name='clean-all-async',
+  action=lambda ctx: async_safe_rmtree(ctx.config.getdefault('pants_workdir')),
+  dependencies=['invalidate']
+).install().with_description('Cleans all intermediate build output in a background process')
 
 if NailgunTask.killall:
   class NailgunKillall(Task):
