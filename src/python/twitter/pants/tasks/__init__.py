@@ -40,7 +40,6 @@ class Task(object):
 
     self._build_cache = context.config.get('tasks', 'build_cache')
     self._basedir = os.path.join(self._build_cache, self.__class__.__name__)
-    self._extradata = os.path.join(self._basedir, Task.EXTRA_DATA)
 
   def invalidate(self, all=False):
     safe_rmtree(self._build_cache if all else self._basedir)
@@ -195,10 +194,12 @@ class Task(object):
         check = check.add(sha.hexdigest())
 
     if check is not None:
-      with safe_open(self._extradata, 'w') as pickled:
+      extradata_id = self.context.maybe_readable_identify(targets) + '.extra.data'
+      extradata = os.path.join(self._basedir, extradata_id)
+      with safe_open(extradata, 'w') as pickled:
         pickle.dump(check, pickled)
 
-      cache_key = cache_manager.check_content(Task.EXTRA_DATA, [self._extradata])
+      cache_key = cache_manager.check_content(extradata_id, [extradata])
       if cache_key:
         self.context.log.debug('invalidating all targets for %s' % self.__class__.__name__)
         for target in targets:

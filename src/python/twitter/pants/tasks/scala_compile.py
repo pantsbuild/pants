@@ -156,11 +156,7 @@ class ScalaCompile(NailgunTask):
     """Execute a single compilation, updating upstream_analysis_caches if needed."""
     self.context.log.info('Compiling targets %s' % str(scala_targets))
 
-    # Compute the id of this compilation. We try to make it human-readable.
-    if len(scala_targets) == 1:
-      compilation_id = scala_targets[0].id
-    else:
-      compilation_id = self.context.identify(scala_targets)
+    compilation_id = self.context.maybe_readable_identify(scala_targets)
 
     if self._flatten:
       # If compiling in flat mode, we let all dependencies aggregate into a single well-known depfile. This

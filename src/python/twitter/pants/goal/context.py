@@ -78,6 +78,13 @@ class Context(object):
       id.update(target.id)
     return id.hexdigest()
 
+  def maybe_readable_identify(self, targets):
+    if len(targets) == 1:
+      id = targets[0].id
+    else:
+      id = self.identify(targets)
+    return id
+
   def __str__(self):
     return 'Context(id:%s, state:%s, targets:%s)' % (self.id, self.state, self.targets())
 

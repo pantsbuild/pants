@@ -149,11 +149,7 @@ class JavaCompile(NailgunTask):
   def execute_single_compilation(self, java_targets, cp):
     self.context.log.info('Compiling targets %s' % str(java_targets))
 
-    # Compute the id of this compilation. We try to make it human-readable.
-    if len(java_targets) == 1:
-      compilation_id = java_targets[0].id
-    else:
-      compilation_id = self.context.identify(java_targets)
+    compilation_id = self.context.maybe_readable_identify(java_targets)
 
     if self._flatten:
       # If compiling in flat mode, we let all dependencies aggregate into a single well-known depfile. This
