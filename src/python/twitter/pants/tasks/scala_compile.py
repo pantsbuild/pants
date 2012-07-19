@@ -22,7 +22,7 @@ import textwrap
 from collections import defaultdict
 
 from twitter.common.collections import OrderedDict
-from twitter.common.dirutil import safe_mkdir, safe_open, safe_rmtree
+from twitter.common.dirutil import safe_mkdir, safe_open
 
 from twitter.pants import is_scala, is_scalac_plugin
 from twitter.pants.targets.scala_library import ScalaLibrary
@@ -31,7 +31,6 @@ from twitter.pants.targets import resolve_target_sources
 from twitter.pants.targets.internal import InternalTarget
 from twitter.pants.tasks import TaskError
 from twitter.pants.tasks.binary_utils import nailgun_profile_classpath
-from twitter.pants.tasks.jar_create import JarCreate, jarname
 from twitter.pants.tasks.jvm_compiler_dependencies import Dependencies
 from twitter.pants.tasks.nailgun_task import NailgunTask
 
@@ -57,17 +56,8 @@ class ScalaCompile(NailgunTask):
                             help="[%default] Compile scala code for all dependencies in a "
                                  "single compilation.")
 
-    option_group.add_option(mkflag("incremental"), mkflag("incremental", negate=True),
-                            dest="scala_compile_incremental",
-                            action="callback", callback=mkflag.set_bool,
-                            help="[%default] Use the incremental scala compiler.")
-
-
   def __init__(self, context):
     NailgunTask.__init__(self, context, workdir=context.config.get('scala-compile', 'nailgun_dir'))
-    self._incremental = \
-      context.options.scala_compile_incremental if context.options.scala_compile_incremental is not None else \
-      context.config.getbool('scala-compile', 'default_to_incremental')
 
     self._flatten = \
       context.options.scala_compile_flatten if context.options.scala_compile_flatten is not None else \
@@ -90,10 +80,7 @@ class ScalaCompile(NailgunTask):
     self._analysis_cache_dir = os.path.join(workdir, 'analysis_cache')
     self._resources_dir = os.path.join(workdir, 'resources')
 
-    if self._incremental:
-      self._main = context.config.get('scala-compile', 'zinc-main')
-    else:
-      self._main = context.config.get('scala-compile', 'main')
+    self._main = context.config.get('scala-compile', 'main')
 
     self._args = context.config.getlist('scala-compile', 'args')
     self._jvm_args = context.config.getlist('scala-compile', 'jvm_args')
@@ -107,7 +94,7 @@ class ScalaCompile(NailgunTask):
     self._deps = Dependencies(self._classes_dir)
 
   def invalidate_for(self):
-    return [self._incremental, self._flatten]
+    return [self._flatten]
 
   def execute(self, targets):
     scala_targets = filter(is_scala, reversed(InternalTarget.sort_targets(targets)))
@@ -118,9 +105,9 @@ class ScalaCompile(NailgunTask):
       with self.context.state('classpath', []) as cp:
         for conf in self._confs:
           cp.insert(0, (conf, self._resources_dir))
-          # If we're compiling incrementally and not flattening, we don't want the classes dir on the classpath
-          # yet, as we want zinc to see only the per-compilation output dirs, so it can map them to analysis caches.
-          if not (self._incremental and not self._flatten):
+          # If we're not flattening, we don't want the classes dir on the classpath yet, as we want zinc to
+          # see only the per-compilation output dirs, so it can map them to analysis caches.
+          if self._flatten:
             cp.insert(0, (conf, self._classes_dir))
 
       if not self._flatten:
@@ -130,7 +117,7 @@ class ScalaCompile(NailgunTask):
       else:
         self.execute_single_compilation(scala_targets, cp, {})
 
-      if self._incremental and not self._flatten:
+      if not self._flatten:
         # Now we can add the global output dir, so that subsequent goals can see it.
         with self.context.state('classpath', []) as cp:
           for conf in self._confs:
@@ -168,21 +155,17 @@ class ScalaCompile(NailgunTask):
       # compilation will read in the entire depfile, add its stuff to it and write it out again).
       depfile = os.path.join(self._depfile_dir, compilation_id) + '.dependencies'
 
-    if self._incremental:
-      if self._flatten:
-        output_dir = self._classes_dir
-        analysis_cache = os.path.join(self._analysis_cache_dir, compilation_id) + '.flat'
-      else:
-        # When compiling incrementally *and* in multiple compilations, each compilation must output to
-        # its own directory, so zinc can then associate those with the analysis caches of previous compilations.
-        # So we compile into a compilation-specific directory and then copy the results out to the real output dir.
-        output_dir = os.path.join(self._incremental_classes_dir, compilation_id)
-        analysis_cache = os.path.join(self._analysis_cache_dir, compilation_id)
-    else:
+    if self._flatten:
       output_dir = self._classes_dir
-      analysis_cache = None
+      analysis_cache = os.path.join(self._analysis_cache_dir, compilation_id) + '.flat'
+    else:
+      # When compiling with multiple compilations, each compilation must output to its own directory, so zinc
+      # can then associate those with the analysis caches of previous compilations.
+      # So we compile into a compilation-specific directory and then copy the results out to the real output dir.
+      output_dir = os.path.join(self._incremental_classes_dir, compilation_id)
+      analysis_cache = os.path.join(self._analysis_cache_dir, compilation_id)
 
-    if self._incremental and self._flatten:
+    if self._flatten:
       # We must defer dependency analysis to zinc. If we exclude files from a repeat build, zinc will assume
       # the files were deleted and will nuke the corresponding class files.
       invalidate_globally = True
@@ -220,7 +203,7 @@ class ScalaCompile(NailgunTask):
     deps.load(depfile)
     self._deps.merge(deps)
 
-    if self._incremental and not self._flatten:
+    if not self._flatten:
       upstream_analysis_caches[output_dir] = analysis_cache
 
   def calculate_sources(self, targets):
@@ -254,35 +237,29 @@ class ScalaCompile(NailgunTask):
     ])
     compiler_args.extend(self._args)
 
-    if self._incremental:
-      # To pass options to scalac simply prefix with -S.
-      args = ['-S' + x for x in compiler_args]
-      if len(upstream_analysis_caches) > 0:
-        args.extend([ '-analysis-map', ','.join(['%s:%s' % kv for kv in upstream_analysis_caches.items()]) ])
-      upstream_jars = upstream_analysis_caches.keys()
+    # To pass options to scalac simply prefix with -S.
+    args = ['-S' + x for x in compiler_args]
 
-      zinc_classpath = nailgun_profile_classpath(self, self._zinc_profile)
-      zinc_jars = ScalaCompile.identify_zinc_jars(compiler_classpath, zinc_classpath)
-      for (name, jarpath) in zinc_jars.items():  # The zinc jar names are also the flag names.
-        args.extend(['-%s' % name, jarpath])
-      args.extend([
-        '-analysis-cache', analysis_cache,
-        '-log-level', self.context.options.log_level or 'info',
-        '-classpath', ':'.join(zinc_classpath + classpath + upstream_jars)
-      ])
-      run_classpath = zinc_classpath
-    else:
-      args = compiler_args + ['-classpath', ':'.join(compiler_classpath + classpath)]
-      run_classpath = compiler_classpath
+    if len(upstream_analysis_caches) > 0:
+      args.extend([ '-analysis-map', ','.join(['%s:%s' % kv for kv in upstream_analysis_caches.items()]) ])
+    upstream_jars = upstream_analysis_caches.keys()
 
+    zinc_classpath = nailgun_profile_classpath(self, self._zinc_profile)
+    zinc_jars = ScalaCompile.identify_zinc_jars(compiler_classpath, zinc_classpath)
+    for (name, jarpath) in zinc_jars.items():  # The zinc jar names are also the flag names.
+      args.extend(['-%s' % name, jarpath])
 
     args.extend([
+      '-analysis-cache', analysis_cache,
+      '-log-level', self.context.options.log_level or 'info',
+      '-classpath', ':'.join(zinc_classpath + classpath + upstream_jars),
       '-d', output_dir
     ])
 
     args.extend(sources)
+
     self.context.log.debug('Executing: %s %s' % (self._main, ' '.join(args)))
-    return self.runjava(self._main, classpath=run_classpath, args=args, jvmargs=self._jvm_args)
+    return self.runjava(self._main, classpath=zinc_classpath, args=args, jvmargs=self._jvm_args)
 
   def get_depemitter_plugin(self):
     depemitter_classpath = nailgun_profile_classpath(self, self._depemitter_profile)
