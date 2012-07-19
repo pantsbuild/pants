@@ -34,7 +34,7 @@ function exec_command {
     for arg in "$@"; do echo "$arg"; done
     echo ""
   fi
-  exec "$@"
+  "$@"
 }
 
 # debug command before forking
@@ -156,6 +156,8 @@ if [ -n "$nailed" ] && can_nailgun ; then
   # run zinc via nailgun client
   if [ -n "$shutdown" ] ; then
     check_port $nailgun_port && nailgun shutdown
+    exitcode="$?"
+    [[ $exitcode -eq 0 || $exitcode -eq 227 ]]
   elif [ -n "$status" ] ; then
     check_port $nailgun_port && nailgun status
   elif [ -n "$start" ] ; then

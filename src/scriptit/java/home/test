@@ -1,0 +1,5 @@
+# setting java home
+
+zinc -debug -java-home {{java.home}} A.java
+
+exists A.class

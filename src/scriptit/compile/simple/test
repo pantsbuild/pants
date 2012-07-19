@@ -1,0 +1,5 @@
+# simple two file compile test
+
+zinc -debug A.scala B.scala
+
+exists A.class B.class

@@ -18,7 +18,7 @@ object ZincBuild extends Build {
   lazy val zinc = Project(
     "zinc",
     file("."),
-    settings = buildSettings ++ Version.settings ++ Publish.settings ++ Seq(
+    settings = buildSettings ++ Version.settings ++ Publish.settings ++ Scriptit.settings ++ Seq(
       resolvers += "Sonatype Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots",
       resolvers += "Typesafe Third-party" at "http://repo.typesafe.com/typesafe/third-party",
       libraryDependencies ++= Seq(

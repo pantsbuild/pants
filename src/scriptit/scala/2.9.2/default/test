@@ -1,0 +1,5 @@
+# default to scala 2.9.2
+
+zinc -debug A.scala
+
+exists A.class
