@@ -156,9 +156,9 @@ object Setup {
     val scalaExcluded = Util.stringSetProperty(prop("scala.excluded"), defaultScalaExcluded)
 
     val cacheLimit = Util.intProperty(prop("cache.limit"), 5)
-    val compilerCacheLimit = Util.intProperty(prop("compiler.cache.limit"), cacheLimit)
-    val residentCacheLimit = Util.intProperty(prop("resident.cache.limit"), cacheLimit)
     val analysisCacheLimit = Util.intProperty(prop("analysis.cache.limit"), cacheLimit)
+    val compilerCacheLimit = Util.intProperty(prop("compiler.cache.limit"), cacheLimit)
+    val residentCacheLimit = Util.intProperty(prop("resident.cache.limit"), 0)
   }
 
   def prop(name: String) = Command + "." + name
