@@ -3,8 +3,7 @@ from collections import defaultdict
 class Products(object):
   class ProductMapping(object):
     """
-      Maps products of a given type by target.  Its assumed that all products of a given type for
-      a given target are emitted to a single base directory.
+      Maps products of a given type by target. Each product is a map from basedir to a list of files in that dir.
     """
 
     def __init__(self, typename):
@@ -27,8 +26,9 @@ class Products(object):
 
     def get(self, target):
       """
-        Returns the product mapping for the given target as a tuple of (basedir, products list).
-        Can return None if there is no mapping for the given target.
+        Returns the product mapping for the given target as a map of <basedir> -> <products list>.
+        If no mapping exists, returns an empty map whose values default to empty lists. So you
+        can use the result without checking for None.
       """
       return self.by_target.get(target)
 

@@ -17,6 +17,7 @@
 __author__ = 'John Sirois'
 
 import os
+import shutil
 import textwrap
 
 from collections import defaultdict
@@ -99,29 +100,27 @@ class ScalaCompile(NailgunTask):
   def execute(self, targets):
     scala_targets = filter(is_scala, reversed(InternalTarget.sort_targets(targets)))
     if scala_targets:
-      safe_mkdir(self._classes_dir)
       safe_mkdir(self._depfile_dir)
+      safe_mkdir(self._analysis_cache_dir)
+
+      # Map from output directory to { analysis_cache_dir, [ analysis_cache_file ]}
+      upstream_analysis_caches = self.context.products.get('upstream')
 
       with self.context.state('classpath', []) as cp:
         for conf in self._confs:
           cp.insert(0, (conf, self._resources_dir))
-          # If we're not flattening, we don't want the classes dir on the classpath yet, as we want zinc to
-          # see only the per-compilation output dirs, so it can map them to analysis caches.
-          if self._flatten:
-            cp.insert(0, (conf, self._classes_dir))
 
-      if not self._flatten:
-        upstream_analysis_caches = OrderedDict()  # output dir -> analysis cache file for the classes in that dir.
+      if self._flatten:
+        self.execute_single_compilation(scala_targets, cp, upstream_analysis_caches)
+      else:
         for target in scala_targets:
           self.execute_single_compilation([target], cp, upstream_analysis_caches)
-      else:
-        self.execute_single_compilation(scala_targets, cp, {})
 
-      if not self._flatten:
-        # Now we can add the global output dir, so that subsequent goals can see it.
-        with self.context.state('classpath', []) as cp:
-          for conf in self._confs:
-            cp.insert(0, (conf, self._classes_dir))
+
+      # Now we can add the global output dir, so that subsequent goals can see it.
+      with self.context.state('classpath', []) as cp:
+        for conf in self._confs:
+          cp.insert(0, (conf, self._classes_dir))
 
       if self.context.products.isrequired('classes'):
         genmap = self.context.products.get('classes')
@@ -145,32 +144,16 @@ class ScalaCompile(NailgunTask):
 
     compilation_id = self.context.maybe_readable_identify(scala_targets)
 
-    if self._flatten:
-      # If compiling in flat mode, we let all dependencies aggregate into a single well-known depfile. This
-      # allows us to build different targets in different invocations without losing dependency information
-      # from any of them.
-      depfile = os.path.join(self._depfile_dir, 'dependencies.flat')
-    else:
-      # If not in flat mode, we let each compilation have its own depfile, to avoid quadratic behavior (each
-      # compilation will read in the entire depfile, add its stuff to it and write it out again).
-      depfile = os.path.join(self._depfile_dir, compilation_id) + '.dependencies'
+    # Each compilation must output to its own directory, so zinc can then associate those with the appropriate
+    # analysis caches of previous compilations. We then copy the results out to the real output dir.
+    output_dir = os.path.join(self._incremental_classes_dir, compilation_id)
+    depfile = os.path.join(self._depfile_dir, compilation_id) + '.dependencies'
+    analysis_cache = os.path.join(self._analysis_cache_dir, compilation_id) + '.analysis_cache'
 
-    if self._flatten:
-      output_dir = self._classes_dir
-      analysis_cache = os.path.join(self._analysis_cache_dir, compilation_id) + '.flat'
-    else:
-      # When compiling with multiple compilations, each compilation must output to its own directory, so zinc
-      # can then associate those with the analysis caches of previous compilations.
-      # So we compile into a compilation-specific directory and then copy the results out to the real output dir.
-      output_dir = os.path.join(self._incremental_classes_dir, compilation_id)
-      analysis_cache = os.path.join(self._analysis_cache_dir, compilation_id)
+    # We must defer dependency analysis to zinc. If we exclude files from a repeat build, zinc will assume
+    # the files were deleted and will nuke the corresponding class files.
+    invalidate_globally = self._flatten
 
-    if self._flatten:
-      # We must defer dependency analysis to zinc. If we exclude files from a repeat build, zinc will assume
-      # the files were deleted and will nuke the corresponding class files.
-      invalidate_globally = True
-    else:
-      invalidate_globally = False
     with self.changed(scala_targets, invalidate_dependants=True,
                       invalidate_globally=invalidate_globally) as changed_targets:
       sources_by_target = self.calculate_sources(changed_targets)
@@ -184,18 +167,8 @@ class ScalaCompile(NailgunTask):
           result = self.compile(classpath, sources, output_dir, analysis_cache, upstream_analysis_caches, depfile)
           if result != 0:
             raise TaskError('%s returned %d' % (self._main, result))
-          if output_dir != self._classes_dir:
-            # Link class files emitted in this compilation into the central classes dir.
-            for (dirpath, dirnames, filenames) in os.walk(output_dir):
-              for d in [os.path.join(dirpath, x) for x in dirnames]:
-                dir = os.path.join(self._classes_dir, os.path.relpath(d, output_dir))
-                if not os.path.isdir(dir):
-                  os.mkdir(dir)
-              for f in [os.path.join(dirpath, x) for x in filenames]:
-                outfile = os.path.join(self._classes_dir, os.path.relpath(f, output_dir))
-                if os.path.exists(outfile):
-                  os.unlink(outfile)
-                os.link(f, outfile)
+          # Link class files emitted in this compilation into the central classes dir.
+          self.link_all(output_dir, self._classes_dir)
 
     # Read in the deps created either just now or by a previous compiler run on these targets.
     self.context.log.debug('Reading dependencies from ' + depfile)
@@ -203,8 +176,9 @@ class ScalaCompile(NailgunTask):
     deps.load(depfile)
     self._deps.merge(deps)
 
-    if not self._flatten:
-      upstream_analysis_caches[output_dir] = analysis_cache
+    analysis_cache_parts = os.path.split(analysis_cache)
+    upstream_analysis_caches.add(output_dir, analysis_cache_parts[0], [ analysis_cache_parts[1] ])
+    return compilation_id
 
   def calculate_sources(self, targets):
     sources = defaultdict(set)
@@ -224,9 +198,7 @@ class ScalaCompile(NailgunTask):
 
   def compile(self, classpath, sources, output_dir, analysis_cache, upstream_analysis_caches, depfile):
     safe_mkdir(output_dir)
-
     compiler_classpath = nailgun_profile_classpath(self, self._compile_profile)
-
     compiler_args = []
 
     # TODO(John Sirois): separate compiler profile from runtime profile
@@ -240,9 +212,21 @@ class ScalaCompile(NailgunTask):
     # To pass options to scalac simply prefix with -S.
     args = ['-S' + x for x in compiler_args]
 
-    if len(upstream_analysis_caches) > 0:
-      args.extend([ '-analysis-map', ','.join(['%s:%s' % kv for kv in upstream_analysis_caches.items()]) ])
-    upstream_jars = upstream_analysis_caches.keys()
+    def analysis_cache_full_path(analysis_cache_product):
+      # We expect the argument to be { analysis_cache_dir, [ analysis_cache_file ]}.
+      if len(analysis_cache_product) != 1:
+        raise TaskError('There can only be one analysis cache file per output directory')
+      analysis_cache_dir, analysis_cache_files = analysis_cache_product.iteritems().next()
+      if len(analysis_cache_files) != 1:
+        raise TaskError('There can only be one analysis cache file per output directory')
+      return os.path.join(analysis_cache_dir, analysis_cache_files[0])
+
+    # Strings of <output dir>:<full path to analysis cache file for the classes in that dir>.
+    analysis_map = OrderedDict([ (k, analysis_cache_full_path(v)) for k, v in upstream_analysis_caches.by_target.items() ])
+
+    if len(analysis_map) > 0:
+      args.extend([ '-analysis-map', ','.join(['%s:%s' % kv for kv in analysis_map.items()]) ])
+    upstream_classes_dirs = analysis_map.keys()
 
     zinc_classpath = nailgun_profile_classpath(self, self._zinc_profile)
     zinc_jars = ScalaCompile.identify_zinc_jars(compiler_classpath, zinc_classpath)
@@ -252,7 +236,7 @@ class ScalaCompile(NailgunTask):
     args.extend([
       '-analysis-cache', analysis_cache,
       '-log-level', self.context.options.log_level or 'info',
-      '-classpath', ':'.join(zinc_classpath + classpath + upstream_jars),
+      '-classpath', ':'.join(zinc_classpath + classpath + upstream_classes_dirs),
       '-d', output_dir
     ])
 
@@ -313,3 +297,16 @@ class ScalaCompile(NailgunTask):
       else:
         jars_by_name[name] = jar_for_name
     return jars_by_name
+
+  def link_all(self, srcdir, dstdir):
+    safe_mkdir(dstdir)
+    for (dirpath, dirnames, filenames) in os.walk(srcdir):
+      for d in [os.path.join(dirpath, x) for x in dirnames]:
+        dir = os.path.join(dstdir, os.path.relpath(d, srcdir))
+        if not os.path.isdir(dir):
+          os.mkdir(dir)
+      for f in [os.path.join(dirpath, x) for x in filenames]:
+        outfile = os.path.join(dstdir, os.path.relpath(f, srcdir))
+        if os.path.exists(outfile):
+          os.unlink(outfile)
+        os.link(f, outfile)
