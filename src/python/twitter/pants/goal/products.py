@@ -24,6 +24,10 @@ class Products(object):
       else:
         return self.by_target[target][basedir]
 
+    def has(self, target):
+      """Returns whether we have a mapping for the specified target."""
+      return target in self.by_target
+
     def get(self, target):
       """
         Returns the product mapping for the given target as a map of <basedir> -> <products list>.
@@ -31,6 +35,13 @@ class Products(object):
         can use the result without checking for None.
       """
       return self.by_target.get(target)
+
+    def itermappings(self):
+      """
+        Returns an iterable over all pairs (target, product) in this mapping.
+        Each product is itself a map of <basedir> -> <products list>.
+      """
+      return self.by_target.iteritems()
 
     def keys_for(self, basedir, file):
       """Returns the set of keys the given mapped product is registered under."""

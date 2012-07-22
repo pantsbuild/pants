@@ -177,7 +177,10 @@ class ScalaCompile(NailgunTask):
     self._deps.merge(deps)
 
     analysis_cache_parts = os.path.split(analysis_cache)
-    upstream_analysis_caches.add(output_dir, analysis_cache_parts[0], [ analysis_cache_parts[1] ])
+    if not upstream_analysis_caches.has(output_dir):
+      # A previous chunk might have already updated this. It is certainly possible for a later chunk to
+      # independently depend on some target that a previous chunk already built.
+      upstream_analysis_caches.add(output_dir, analysis_cache_parts[0], [ analysis_cache_parts[1] ])
     return compilation_id
 
   def calculate_sources(self, targets):
@@ -222,7 +225,8 @@ class ScalaCompile(NailgunTask):
       return os.path.join(analysis_cache_dir, analysis_cache_files[0])
 
     # Strings of <output dir>:<full path to analysis cache file for the classes in that dir>.
-    analysis_map = OrderedDict([ (k, analysis_cache_full_path(v)) for k, v in upstream_analysis_caches.by_target.items() ])
+    analysis_map = \
+      OrderedDict([ (k, analysis_cache_full_path(v)) for k, v in upstream_analysis_caches.itermappings() ])
 
     if len(analysis_map) > 0:
       args.extend([ '-analysis-map', ','.join(['%s:%s' % kv for kv in analysis_map.items()]) ])
