@@ -22,10 +22,11 @@ PANTS_EXE=$MY_DIR/src/python/twitter/pants/bin/pants_exe.py
 MAKO_EGG=$MY_DIR/3rdparty/python/Mako-0.4.0-py2.6.egg
 MARKDOWN_EGG=$MY_DIR/3rdparty/python/Markdown-2.1.1-py2.6.egg
 PYGMENTS_EGG=$MY_DIR/3rdparty/python/Pygments-1.4-py2.6.egg
+PYTHON_DAEMON_EGG=$MY_DIR/3rdparty/python/python_daemon-1.6-py2.6.egg
 
 function run_pants_bare() {
   source $VIRTUAL_PYTHON/bin/activate
-  PYTHONPATH=$MAKO_EGG:$MARKDOWN_EGG:$PYGMENTS_EGG:$MY_DIR/src/python python $PANTS_EXE "$@"
+  PYTHONPATH=$MAKO_EGG:$MARKDOWN_EGG:$PYGMENTS_EGG:$PYTHON_DAEMON_EGG:$MY_DIR/src/python python $PANTS_EXE "$@"
   deactivate
 }
 
