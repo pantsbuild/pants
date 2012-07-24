@@ -41,9 +41,9 @@ class JvmRun(JvmTask):
       action="callback", callback=mkflag.set_bool, default=False,
       help = "[%default] Run binary with a debugger")
 
-    option_group.add_option(mkflag("only-print-cmd-line"), dest = "only_print_cmd_line",
-      action="store_true", default=False,
-      help = "[%default] Instead of running, just print the cmd line needed to run")
+    option_group.add_option(mkflag("only-dump-cmd-line"), dest = "only_dump_cmd_line",
+      action="store", default=None,
+      help = "[%default] Instead of running, just dump the cmd line to this file")
 
   def __init__(self, context):
     Task.__init__(self, context)
@@ -58,7 +58,7 @@ class JvmRun(JvmTask):
     if context.options.run_debug:
       self.jvm_args.extend(context.config.getlist('jvm', 'debug_args'))
     self.confs = context.config.getlist('jvm-run', 'confs')
-    self.only_print_cmd_line = context.options.only_print_cmd_line
+    self.only_dump_cmd_line = context.options.only_dump_cmd_line
 
   def execute(self, targets):
     # Run the first target that is a binary.
@@ -70,7 +70,7 @@ class JvmRun(JvmTask):
         classpath=(self.classpath(confs=self.confs)),
         main=main,
         args=self.args,
-        only_print_cmd_line=self.only_print_cmd_line
+        only_dump_cmd_line=self.only_dump_cmd_line
       )
       if result != 0:
         raise TaskError()

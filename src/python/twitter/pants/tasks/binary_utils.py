@@ -125,7 +125,7 @@ def safe_classpath(logger=None):
     yield
 
 
-def runjava(jvmargs=None, classpath=None, main=None, args=None, only_print_cmd_line=False):
+def runjava(jvmargs=None, classpath=None, main=None, args=None, only_dump_cmd_line=None):
   """Spawns a java process with the supplied configuration and returns its exit code."""
   cmd = ['java']
   if jvmargs:
@@ -137,8 +137,9 @@ def runjava(jvmargs=None, classpath=None, main=None, args=None, only_print_cmd_l
   if args:
     cmd.extend(args)
 
-  if only_print_cmd_line:
-    print(' '.join(cmd))
+  if only_dump_cmd_line is not None:
+    with safe_open(only_dump_cmd_line, 'w') as fd:
+      fd.write(' '.join(cmd))
     return 0
   else:
     log.debug('Executing: %s' % ' '.join(cmd))
@@ -196,6 +197,7 @@ def profile_classpath(profile, java_runner=None, config=None, ivy_jar=None, ivy_
   return [os.path.join(profile_libdir, jar) for jar in os.listdir(profile_libdir)]
 
 
+# TODO: In this module this will collide with the global open(), which seems like a bad idea.
 def open(*files):
   """Attempts to open the given files using the preferred native viewer or editor."""
   if files:
