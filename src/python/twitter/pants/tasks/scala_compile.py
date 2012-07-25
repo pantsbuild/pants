@@ -58,9 +58,9 @@ class ScalaCompile(NailgunTask):
                                  "single compilation.")
 
     option_group.add_option(mkflag("color"), mkflag("color", negate=True),
-                            dest="scala_compile_color", default=True,
+                            dest="scala_compile_color",
                             action="callback", callback=mkflag.set_bool,
-                            help="[%default] Enable color in logging.")
+                            help="[True] Enable color in logging.")
 
   def __init__(self, context):
     NailgunTask.__init__(self, context, workdir=context.config.get('scala-compile', 'nailgun_dir'))
@@ -69,10 +69,10 @@ class ScalaCompile(NailgunTask):
       context.options.scala_compile_flatten if context.options.scala_compile_flatten is not None else \
       context.config.getbool('scala-compile', 'default_to_flatten')
 
-    self._color = (
-      context.options.scala_compile_color
-      and context.config.getbool('scala-compile', 'color', default=True)
-    )
+    # We use the scala_compile_color flag if it is explicitly set on the command line.
+    self._color = \
+      context.options.scala_compile_color if context.options.scala_compile_color is not None else \
+      context.config.getbool('scala-compile', 'color', default=True)
 
     self._compile_profile = context.config.get('scala-compile', 'compile-profile')  # The target scala version.
     self._zinc_profile = context.config.get('scala-compile', 'zinc-profile')
