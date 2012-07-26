@@ -125,7 +125,7 @@ def safe_classpath(logger=None):
     yield
 
 
-def runjava(jvmargs=None, classpath=None, main=None, args=None, only_dump_cmd_line=None):
+def runjava(jvmargs=None, classpath=None, main=None, args=None, only_write_cmd_line_to=None):
   """Spawns a java process with the supplied configuration and returns its exit code."""
   cmd = ['java']
   if jvmargs:
@@ -137,9 +137,8 @@ def runjava(jvmargs=None, classpath=None, main=None, args=None, only_dump_cmd_li
   if args:
     cmd.extend(args)
 
-  if only_dump_cmd_line is not None:
-    with safe_open(only_dump_cmd_line, 'w') as fd:
-      fd.write(' '.join(cmd))
+  if only_write_cmd_line_to is not None:
+    only_write_cmd_line_to.write(' '.join(cmd))
     return 0
   else:
     log.debug('Executing: %s' % ' '.join(cmd))

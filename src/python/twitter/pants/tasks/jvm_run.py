@@ -18,6 +18,7 @@ __author__ = 'Benjy Weinberger'
 
 import shlex
 
+from twitter.common.dirutil import safe_open
 from twitter.pants.targets import JvmBinary
 from twitter.pants.tasks import Task, TaskError
 from twitter.pants.tasks.binary_utils import runjava
@@ -41,9 +42,9 @@ class JvmRun(JvmTask):
       action="callback", callback=mkflag.set_bool, default=False,
       help = "[%default] Run binary with a debugger")
 
-    option_group.add_option(mkflag("only-dump-cmd-line"), dest = "only_dump_cmd_line",
+    option_group.add_option(mkflag("only-write-cmd-line"), dest = "only_write_cmd_line",
       action="store", default=None,
-      help = "[%default] Instead of running, just dump the cmd line to this file")
+      help = "[%default] Instead of running, just write the cmd line to this file")
 
   def __init__(self, context):
     Task.__init__(self, context)
@@ -58,19 +59,27 @@ class JvmRun(JvmTask):
     if context.options.run_debug:
       self.jvm_args.extend(context.config.getlist('jvm', 'debug_args'))
     self.confs = context.config.getlist('jvm-run', 'confs')
-    self.only_dump_cmd_line = context.options.only_dump_cmd_line
+    self.only_write_cmd_line = context.options.only_write_cmd_line
 
   def execute(self, targets):
     # Run the first target that is a binary.
     binaries = filter(is_binary, targets)
     if len(binaries) > 0:  # We only run the first one.
       main = binaries[0].main
-      result = runjava(
-        jvmargs=self.jvm_args,
-        classpath=(self.classpath(confs=self.confs)),
-        main=main,
-        args=self.args,
-        only_dump_cmd_line=self.only_dump_cmd_line
-      )
-      if result != 0:
-        raise TaskError()
+
+      def run_binary(only_write_cmd_line_to):
+        result = runjava(
+          jvmargs=self.jvm_args,
+          classpath=(self.classpath(confs=self.confs)),
+          main=main,
+          args=self.args,
+          only_write_cmd_line_to=only_write_cmd_line_to
+        )
+        if result != 0:
+          raise TaskError()
+
+      if self.only_write_cmd_line is None:
+        run_binary(None)
+      else:
+        with safe_open(self.only_write_cmd_line, 'w') as fd:
+          run_binary(fd)
