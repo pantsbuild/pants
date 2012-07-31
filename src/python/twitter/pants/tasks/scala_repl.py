@@ -29,6 +29,8 @@ class ScalaRepl(JvmTask):
   def setup_parser(cls, option_group, args, mkflag):
     option_group.add_option(mkflag("jvmargs"), dest = "run_jvmargs", action="append",
       help = "Run the repl in a jvm with these extra jvm args.")
+    option_group.add_option(mkflag("args"), dest = "run_args", action="append",
+                            help = "run the repl in a jvm with extra args.")
 
   def __init__(self, context):
     Task.__init__(self, context)
@@ -40,6 +42,9 @@ class ScalaRepl(JvmTask):
     self.profile = context.config.get('scala-repl', 'profile')
     self.main = context.config.get('scala-repl', 'main')
     self.args = context.config.getlist('scala-repl', 'args', default=[])
+    if context.options.run_args:
+      for arg in context.options.run_args:
+        self.args.extend(shlex.split(arg))
 
   def execute(self, targets):
     runjava(
