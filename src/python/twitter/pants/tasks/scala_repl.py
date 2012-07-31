@@ -39,12 +39,13 @@ class ScalaRepl(JvmTask):
     self.confs = context.config.getlist('scala-repl', 'confs')
     self.profile = context.config.get('scala-repl', 'profile')
     self.main = context.config.get('scala-repl', 'main')
+    self.args = context.config.getlist('scala-repl', 'args', default=[])
 
   def execute(self, targets):
     runjava(
       jvmargs=self.jvm_args,
       classpath=self.classpath(profile_classpath(self.profile), confs=self.confs),
       main=self.main,
-      args=[]
+      args=self.args
     )
 
