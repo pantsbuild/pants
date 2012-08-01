@@ -63,6 +63,7 @@ class JvmRun(JvmTask):
 
   def execute(self, targets):
     # Run the first target that is a binary.
+    self.context.lock.release()
     binaries = filter(is_binary, targets)
     if len(binaries) > 0:  # We only run the first one.
       main = binaries[0].main
