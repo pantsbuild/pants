@@ -24,8 +24,8 @@ object Dist {
     publishMavenStyle := true,
     publishArtifact in makePom := false,
     publishArtifact := false,
-    publishTo := Some("zinc repo" at "http://repo.typesafe.com/typesafe/zinc"),
-    credentials := Seq(Credentials(Path.userHome / ".ivy2" / "typesafe-credentials"))
+    publishTo := Some("zinc repo" at "http://typesafe.artifactoryonline.com/typesafe/zinc"),
+    credentials += Credentials(Path.userHome / ".ivy2" / "artifactory-credentials")
   ) ++ addArtifact(artifact in packageTgz, packageTgz)
 
   def zincProject: ProjectReference = LocalProject(ZincBuild.zinc.id)
