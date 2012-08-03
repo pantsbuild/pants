@@ -24,6 +24,7 @@ object Scriptit {
     scriptitCommands <+= (Dist.create in ZincBuild.dist) map Commands.zincCommand,
     scriptitScalaVersions := Seq("2.9.2", "2.10.0-M6"),
     scriptitProperties <<= (appConfiguration, scriptitScalaVersions) map scalaProperties,
+    scriptitProperties ++= javaProperties,
     scriptit <<= scriptitTask
   )
 
@@ -77,6 +78,11 @@ object Scriptit {
         property("home") -> provider.libraryJar.getParentFile.getParentFile.getAbsolutePath
       )
     }).toMap
+  }
+
+  def javaProperties: Map[String, String] = {
+    val javaHome = Option(System getenv "JAVA_HOME") orElse Option(System getProperty "java.home") getOrElse ""
+    Map("java.home" -> javaHome)
   }
 }
 
