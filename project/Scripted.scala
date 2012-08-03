@@ -181,6 +181,8 @@ object Script {
   // Running
   //
 
+  import java.io.{ BufferedReader, InputStream, InputStreamReader, IOException, StringWriter }
+  import java.lang.{ ProcessBuilder => JProcessBuilder }
   import scala.annotation.tailrec
   import scala.Console.{ BLUE, GREEN, RED, RESET }
 
@@ -278,11 +280,38 @@ object Script {
 
     def zinc(dist: File)(baseDir: File, args: Seq[String]): Result = {
       val zinc = dist / "bin" / "zinc"
-      val buffer = new StringBuffer
-      val io = new ProcessIO(BasicIO.input(false), BasicIO.processFully(buffer), BasicIO.processFully(buffer), _ => false)
-      val exitCode = Process(zinc.getAbsolutePath +: args, baseDir).run(io).exitValue()
-      val output = buffer.toString
+      run(zinc.getAbsolutePath +: args, baseDir)
+    }
+
+    def run(command: Seq[String], cwd: File): Result = {
+      val builder = new JProcessBuilder(command.toArray: _*)
+      builder.directory(cwd)
+      builder.redirectErrorStream(true)
+      val process = builder.start()
+      val stream = process.getInputStream
+      process.waitFor()
+      val output = readFully(stream)
+      val exitCode = process.exitValue
       if (exitCode == 0) Success(output) else Failure(output)
+    }
+
+    def readFully(stream: InputStream): String = {
+      val writer = new StringWriter
+      if (stream ne null) {
+        val buffer = new Array[Char](1024)
+        try {
+          val reader = new BufferedReader(new InputStreamReader(stream))
+          var n = 0
+          while ({ n = reader.read(buffer); n != -1 }) {
+            writer.write(buffer, 0, n)
+          }
+        } catch {
+          case e: IOException =>
+        } finally {
+          stream.close()
+        }
+      }
+      writer.toString()
     }
 
     def mkdir(baseDir: File, paths: Seq[String]): Result = {
