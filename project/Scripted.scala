@@ -273,7 +273,7 @@ object Script {
     def zinc(dist: File)(baseDir: File, args: Seq[String]): Result = {
       val zinc = dist / "bin" / "zinc"
       val buffer = new StringBuffer
-      val io = new ProcessIO(BasicIO.input(false), BasicIO.processFully(buffer), BasicIO.processFully(buffer))
+      val io = new ProcessIO(BasicIO.input(false), BasicIO.processFully(buffer), BasicIO.processFully(buffer), _ => false)
       val exitCode = Process(zinc.getAbsolutePath +: args, baseDir).run(io).exitValue()
       val output = buffer.toString
       if (exitCode == 0) Success(output) else Failure(output)
