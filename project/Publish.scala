@@ -20,7 +20,7 @@ object Publish {
       else if (v.endsWith("SNAPSHOT")) Some("snapshots" at SnapshotRepository)
       else Some("releases" at ReleaseRepository)
     },
-    credentials += Credentials(Path.userHome / ".ivy2" / "sonatype-credentials"),
+    credentials := Seq(Credentials(Path.userHome / ".ivy2" / "sonatype-credentials")),
     pgpPassphrase in GlobalScope := Util.environment("pgp.passphrase", "PGP_PASSPHRASE") map (_.toArray),
     publishArtifact in Test := false,
     homepage := Some(url("https://github.com/typesafehub/zinc")),
