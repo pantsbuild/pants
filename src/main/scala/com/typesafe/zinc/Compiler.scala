@@ -6,8 +6,8 @@ package com.typesafe.zinc
 
 import java.io.File
 import java.net.URLClassLoader
-import sbt.{ ClasspathOptions, ScalaInstance }
-import sbt.compiler.{ AggressiveCompile, AnalyzingCompiler, CompilerCache, IC }
+import sbt.{ ClasspathOptions, LoggerReporter, ScalaInstance }
+import sbt.compiler.{ AggressiveCompile, AnalyzingCompiler, CompilerCache, CompileOutput, IC }
 import sbt.inc.Analysis
 import sbt.Path._
 import xsbti.compile.{ JavaCompiler, GlobalsCache }
@@ -118,9 +118,13 @@ class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler) {
     import inputs._
     val doCompile = new AggressiveCompile(cacheFile)
     val cp = autoClasspath(classesDirectory, scalac.scalaInstance.libraryJar, javaOnly, classpath)
+    val compileOutput = CompileOutput(classesDirectory)
     val globalsCache = Compiler.compilerCache
+    val progress = None
     val getAnalysis: File => Option[Analysis] = analysisMap.get _
-    val analysis = doCompile(scalac, javac, sources, cp, classesDirectory, globalsCache, scalacOptions, javacOptions, getAnalysis, definesClass, 100, compileOrder, false)(log)
+    val maxErrors = 100
+    val reporter = new LoggerReporter(maxErrors, log)
+    val analysis = doCompile(scalac, javac, sources, cp, compileOutput, globalsCache, progress, scalacOptions, javacOptions, getAnalysis, definesClass, reporter, compileOrder, false)(log)
     Compiler.analysisCache.put(cacheFile, analysis)
     Util.printRelations(analysis, outputRelations, cwd)
     analysis
