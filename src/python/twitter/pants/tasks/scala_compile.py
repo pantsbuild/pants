@@ -62,7 +62,7 @@ class ScalaCompile(NailgunTask):
                             action="callback", callback=mkflag.set_bool,
                             help="[True] Enable color in logging.")
 
-  def __init__(self, context, workdir=None):
+  def __init__(self, context):
     NailgunTask.__init__(self, context, workdir=context.config.get('scala-compile', 'nailgun_dir'))
 
     self._flatten = \
@@ -85,8 +85,7 @@ class ScalaCompile(NailgunTask):
     for target in context.targets(is_scala):
       target.update_dependencies(scaladeps)
 
-    if workdir is None:
-      workdir = context.config.get('scala-compile', 'workdir')
+    workdir = context.config.get('scala-compile', 'workdir')
     self._incremental_classes_dir = os.path.join(workdir, 'incremental.classes')
     self._classes_dir = os.path.join(workdir, 'classes')
     self._analysis_cache_dir = os.path.join(workdir, 'analysis_cache')
@@ -153,24 +152,20 @@ class ScalaCompile(NailgunTask):
     """Execute a single compilation, updating upstream_analysis_caches if needed."""
     self.context.log.info('Compiling targets %s' % str(scala_targets))
 
-    if self._flatten:
-      compilation_id = 'flat'
-      output_dir = self._classes_dir
-    else:
-      compilation_id = Target.maybe_readable_identify(scala_targets)
-      # Each compilation must output to its own directory, so zinc can then associate those with the appropriate
-      # analysis caches of previous compilations. We then copy the results out to the real output dir.
-      output_dir = os.path.join(self._incremental_classes_dir, compilation_id)
+    compilation_id = self.context.maybe_readable_identify(scala_targets)
 
+    # Each compilation must output to its own directory, so zinc can then associate those with the appropriate
+    # analysis caches of previous compilations. We then copy the results out to the real output dir.
+    output_dir = os.path.join(self._incremental_classes_dir, compilation_id)
     depfile = os.path.join(self._depfile_dir, compilation_id) + '.dependencies'
     analysis_cache = os.path.join(self._analysis_cache_dir, compilation_id) + '.analysis_cache'
 
-    # Note that we invalidate globally, i.e., if any target has changed then we pass them all on to zinc for
-    # dependency analysis. This is because if we exclude files from a repeat build, zinc will assume
+    # We must defer dependency analysis to zinc. If we exclude files from a repeat build, zinc will assume
     # the files were deleted and will nuke the corresponding class files.
+    invalidate_globally = self._flatten
 
     with self.changed(scala_targets, invalidate_dependants=True,
-                      invalidate_globally=True) as changed_targets:
+                      invalidate_globally=invalidate_globally) as changed_targets:
       sources_by_target = self.calculate_sources(changed_targets)
       if sources_by_target:
         sources = reduce(lambda all, sources: all.union(sources), sources_by_target.values())
@@ -182,9 +177,8 @@ class ScalaCompile(NailgunTask):
           result = self.compile(classpath, sources, output_dir, analysis_cache, upstream_analysis_caches, depfile)
           if result != 0:
             raise TaskError('%s returned %d' % (self._main, result))
-          if output_dir != self._classes_dir:
-            # Link class files emitted in this compilation into the central classes dir.
-            self.link_all(output_dir, self._classes_dir)
+          # Link class files emitted in this compilation into the central classes dir.
+          self.link_all(output_dir, self._classes_dir)
 
     # Read in the deps created either just now or by a previous compiler run on these targets.
     self.context.log.debug('Reading dependencies from ' + depfile)

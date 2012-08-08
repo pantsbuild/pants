@@ -172,7 +172,7 @@ class Phase(PhaseBase):
     phases = [Phase(name) for name in names]
     Phase.setup_parser(parser, [], phases)
     options, _ = parser.parse_args([])
-    context = Context(context.config, options, context.target_roots, log=context.log)
+    context = Context(context.config, options, context.target_roots, context.log)
     return Phase.attempt(context, phases)
 
   @staticmethod

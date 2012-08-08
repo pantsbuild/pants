@@ -47,21 +47,20 @@ class List(Task):
                             help="[%default] List all goals even if no description is available.")
 
   def execute(self, targets):
-    self.context.lock.release()
-    print('Installed goals:')
-    documented_rows = []
-    undocumented = []
-    max_width = 0
-    for phase, _ in Phase.all():
-      if phase.description:
-        documented_rows.append((phase.name, phase.description))
-        max_width = max(max_width, len(phase.name))
-      elif self.context.options.goal_list_all:
-        undocumented.append(phase.name)
-    for name, description in documented_rows:
-      print('  %s: %s' % (name.rjust(max_width), description))
-    if undocumented:
-      print('\nUndocumented goals:\n  %s' % ' '.join(undocumented))
+     print('Installed goals:')
+     documented_rows = []
+     undocumented = []
+     max_width = 0
+     for phase, _ in Phase.all():
+       if phase.description:
+         documented_rows.append((phase.name, phase.description))
+         max_width = max(max_width, len(phase.name))
+       elif self.context.options.goal_list_all:
+         undocumented.append(phase.name)
+     for name, description in documented_rows:
+       print('  %s: %s' % (name.rjust(max_width), description))
+     if undocumented:
+       print('\nUndocumented goals:\n  %s' % ' '.join(undocumented))
 
 
 goal(name='goals', action=List).install().with_description('List all documented goals.')
