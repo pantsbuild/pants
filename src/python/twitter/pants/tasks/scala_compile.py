@@ -23,7 +23,7 @@ import textwrap
 from collections import defaultdict
 
 from twitter.common.collections import OrderedDict
-from twitter.common.dirutil import safe_mkdir, safe_open
+from twitter.common.dirutil import safe_mkdir, safe_open, touch
 
 from twitter.pants import is_scala, is_scalac_plugin
 from twitter.pants.targets.scala_library import ScalaLibrary
@@ -176,8 +176,7 @@ class ScalaCompile(NailgunTask):
         sources = reduce(lambda all, sources: all.union(sources), sources_by_target.values())
         if not sources:
           # Create an empty depfile, since downstream code may assume that a depfile exists.
-          with open(depfile, 'w'):
-            pass
+          touch(depfile)
           self.context.log.warn('Skipping scala compile for targets with no sources:\n  %s' %
                                 '\n  '.join(str(t) for t in sources_by_target.keys()))
         else:
