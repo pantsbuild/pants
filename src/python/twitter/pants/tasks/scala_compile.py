@@ -175,6 +175,9 @@ class ScalaCompile(NailgunTask):
       if sources_by_target:
         sources = reduce(lambda all, sources: all.union(sources), sources_by_target.values())
         if not sources:
+          # Create an empty depfile, since downstream code may assume that a depfile exists.
+          with open(depfile, 'w'):
+            pass
           self.context.log.warn('Skipping scala compile for targets with no sources:\n  %s' %
                                 '\n  '.join(str(t) for t in sources_by_target.keys()))
         else:
