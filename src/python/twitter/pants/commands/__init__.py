@@ -108,4 +108,9 @@ class Command:
     failure."""
     raise NotImplementedError('Either run(lock) or execute() must be over-ridden.')
 
+  def cleanup(self):
+    """Called on SIGINT (e.g., when the user hits ctrl-c).
+    Subcommands may override to perform cleanup before exit."""
+    pass
+
 Command._register_modules()

@@ -36,6 +36,7 @@ from twitter.pants.base.rcfile import RcFile
 from twitter.pants.commands import Command
 from twitter.pants.targets import InternalTarget
 from twitter.pants.tasks import Task, TaskError
+from twitter.pants.tasks.nailgun_task import NailgunTask
 from twitter.pants.goal import Context, GoalError, Phase
 
 StringIO = Compatibility.StringIO
@@ -410,6 +411,11 @@ class Goal(Command):
 
     return Phase.attempt(context, self.phases, timer=timer)
 
+  def cleanup(self):
+    if NailgunTask.killall:
+      NailgunTask.killall(log)
+    sys.exit(1)
+
 
 # Install all default pants provided goals
 from twitter.pants.targets import JavaLibrary, JavaTests
@@ -425,14 +431,12 @@ from twitter.pants.tasks.javadoc_gen import JavadocGen
 from twitter.pants.tasks.junit_run import JUnitRun
 from twitter.pants.tasks.jvm_run import JvmRun
 from twitter.pants.tasks.markdown_to_html import MarkdownToHtml
-from twitter.pants.tasks.nailgun_task import NailgunTask
 from twitter.pants.tasks.pathdeps import PathDeps
 from twitter.pants.tasks.protobuf_gen import ProtobufGen
 from twitter.pants.tasks.scala_compile import ScalaCompile
 from twitter.pants.tasks.scala_repl import ScalaRepl
 from twitter.pants.tasks.specs_run import SpecsRun
 from twitter.pants.tasks.thrift_gen import ThriftGen
-from twitter.pants.tasks.thriftstore_dml_gen import ThriftstoreDMLGen
 
 
 class Invalidator(Task):
@@ -463,14 +467,14 @@ if NailgunTask.killall:
   class NailgunKillall(Task):
     @classmethod
     def setup_parser(cls, option_group, args, mkflag):
-      option_group.add_option(mkflag("everywhere"), dest="ng_killall_evywhere",
+      option_group.add_option(mkflag("everywhere"), dest="ng_killall_everywhere",
                               default=False, action="store_true",
                               help="[%default] Kill all nailguns servers launched by pants for "
                                    "all workspaces on the system.")
 
     def execute(self, targets):
       if NailgunTask.killall:
-        NailgunTask.killall(self.context.log, everywhere=self.context.options.ng_killall_evywhere)
+        NailgunTask.killall(self.context.log, everywhere=self.context.options.ng_killall_everywhere)
 
   ng_killall = goal(name='ng-killall', action=NailgunKillall)
   ng_killall.install().with_description('Kill any running nailgun servers spawned by pants.')

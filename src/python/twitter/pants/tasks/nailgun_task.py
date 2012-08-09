@@ -253,7 +253,8 @@ try:
   def killall(log, everywhere=False):
     for proc in _find_ngs(everywhere=everywhere):
       try:
-        NailgunTask._log_kill(log, proc.pid)
+        if log:
+          NailgunTask._log_kill(log, proc.pid)
         proc.kill()
       except (psutil.AccessDenied, psutil.NoSuchProcess):
         pass
