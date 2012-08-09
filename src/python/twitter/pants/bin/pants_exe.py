@@ -25,7 +25,6 @@ from twitter.pants.commands import Command
 
 import optparse
 import os
-import signal
 import sys
 import traceback
 
@@ -155,12 +154,11 @@ def _run():
   else:
     lock = Lock.unlocked()
   try:
-    def sighandler(signum, frame):
-      command.cleanup()
-
-    signal.signal(signal.SIGINT, sighandler)
     result = command.run(lock)
     _do_exit(result)
+  except KeyboardInterrupt, e:
+    command.cleanup()
+    raise e
   finally:
     lock.release()
 

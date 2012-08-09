@@ -412,6 +412,8 @@ class Goal(Command):
     return Phase.attempt(context, self.phases, timer=timer)
 
   def cleanup(self):
+    # TODO: Make this more selective? Only kill nailguns that affect state? E.g., checkstyle
+    # may not need to be killed.
     if NailgunTask.killall:
       NailgunTask.killall(log)
     sys.exit(1)
