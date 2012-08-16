@@ -48,7 +48,8 @@ class JavaThriftLibrary(ExportableJvmLibrary):
                                   excludes,
                                   buildflags,
                                   is_meta)
-    self.is_codegen = True
+    self.add_label('java')
+    self.add_label('codegen')
 
   def _as_jar_dependency(self):
     return ExportableJvmLibrary._as_jar_dependency(self).with_sources()

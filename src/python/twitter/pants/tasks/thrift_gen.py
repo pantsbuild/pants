@@ -175,7 +175,7 @@ class ThriftGen(CodeGen):
                                       sources=genfiles,
                                       dependencies=self.gen_java.deps)
     tgt.id = target.id
-    tgt.is_codegen = True
+    tgt.add_label('codegen')
     for dependee in dependees:
       dependee.update_dependencies([tgt])
     return tgt

@@ -40,6 +40,8 @@ class JavaTests(JvmTarget):
         for this target"""
 
     JvmTarget.__init__(self, name, sources, dependencies, excludes, buildflags, is_meta)
+    self.add_label('java')
+    self.add_label('tests')
 
   def _create_template_data(self):
     jar_dependency, id, exported = self._get_artifact_info()

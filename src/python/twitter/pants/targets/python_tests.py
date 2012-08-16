@@ -30,6 +30,8 @@ class PythonTests(PythonTarget):
       soft_dependencies: Whether or not we should ignore dependency resolution
                          errors for this test.  [Default: False]
     """
+    self.add_label('python')
+    self.add_label('tests')
     self._timeout = timeout
     self._soft_dependencies = bool(soft_dependencies)
     PythonTarget.__init__(self, name, sources, resources, dependencies)
