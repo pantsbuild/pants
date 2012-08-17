@@ -148,14 +148,17 @@ class FileMapOption[Context](
 extends ArgumentOption[Map[File, File], Context] {
   val argument = "mapping"
 
+  val argSeparator = ','
+  val pairSeparator = File.pathSeparatorChar
+
   def parse(arg: String): Option[Map[File, File]] = {
-    val pairs = arg split ','
+    val pairs = arg split argSeparator
     val files = pairs map parseFilePair
     if (files exists (_.isEmpty)) None else Some(files.flatten.toMap)
   }
 
   def parseFilePair(pair: String): Option[(File, File)] = {
-    val p = pair split ':'
+    val p = pair split pairSeparator
     if (p.length == 2) Some((new File(p(0)), new File(p(1)))) else None
   }
 }
