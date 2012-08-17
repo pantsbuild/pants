@@ -41,6 +41,10 @@ _PLUGIN_INFO_FILE = 'scalac-plugin.xml'
 
 
 class ScalaCompile(NailgunTask):
+  @staticmethod
+  def _has_scala_sources(target):
+    return isinstance(target, ScalaLibrary) or isinstance(target, ScalaTests)
+
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
     NailgunTask.setup_parser(option_group, args, mkflag)
@@ -109,7 +113,7 @@ class ScalaCompile(NailgunTask):
     return [self._flatten]
 
   def execute(self, targets):
-    scala_targets = filter(is_scala, reversed(InternalTarget.sort_targets(targets)))
+    scala_targets = filter(ScalaCompile._has_scala_sources, reversed(InternalTarget.sort_targets(targets)))
     if scala_targets:
       safe_mkdir(self._depfile_dir)
       safe_mkdir(self._analysis_cache_dir)

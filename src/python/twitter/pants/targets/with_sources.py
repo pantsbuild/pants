@@ -26,7 +26,6 @@ class TargetWithSources(Target):
   def __init__(self, name, is_meta=False):
     Target.__init__(self, name, is_meta)
 
-    self.add_label('sources')
     self.target_base = SourceRoot.find(self)
 
   def expand_files(self, recursive=True, include_buildfile=True):

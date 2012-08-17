@@ -58,7 +58,6 @@ class ScalaLibrary(ExportableJvmLibrary):
                                   buildflags,
                                   is_meta)
 
-    self.add_label('scala')
     self.java_sources = java_sources
 
     base_parent = os.path.dirname(self.target_base)

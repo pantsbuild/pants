@@ -35,7 +35,6 @@ class ExportableJvmLibrary(JvmTarget):
     self.provides = provides
 
     JvmTarget.__init__(self, name, sources, dependencies, excludes, buildflags, is_meta)
-    self.add_label('exportable')
 
   def _provides(self):
     return self.provides

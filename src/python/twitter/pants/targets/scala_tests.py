@@ -48,8 +48,6 @@ class ScalaTests(JvmTarget):
                        excludes,
                        buildflags,
                        is_meta)
-    self.add_label('scala')
-    self.add_label('tests')
     self.java_sources = java_sources
 
   def _create_template_data(self):

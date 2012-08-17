@@ -63,7 +63,7 @@ _JMAKE_ERROR_CODES.update((256+code, msg) for code, msg in _JMAKE_ERROR_CODES.it
 
 class JavaCompile(NailgunTask):
   @staticmethod
-  def _is_java(target):
+  def _has_java_sources(target):
     return is_apt(target) or isinstance(target, JavaLibrary) or isinstance(target, JavaTests)
 
   @classmethod
@@ -112,7 +112,7 @@ class JavaCompile(NailgunTask):
     return [self._flatten]
 
   def execute(self, targets):
-    java_targets = filter(JavaCompile._is_java, reversed(InternalTarget.sort_targets(targets)))
+    java_targets = filter(JavaCompile._has_java_sources, reversed(InternalTarget.sort_targets(targets)))
     if java_targets:
       safe_mkdir(self._classes_dir)
       safe_mkdir(self._depfile_dir)

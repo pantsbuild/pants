@@ -22,7 +22,7 @@ import sys
 
 from twitter.common.dirutil import safe_mkdir, safe_open
 
-from twitter.pants import is_codegen, is_java, is_scala, is_test
+from twitter.pants import get_buildroot, is_java, is_scala, is_test
 from twitter.pants.tasks import binary_utils, Task, TaskError
 from twitter.pants.tasks.binary_utils import profile_classpath, runjava, safe_args
 from twitter.pants.tasks.jvm_task import JvmTask
@@ -260,7 +260,7 @@ class JUnitRun(JvmTask):
       classes_under_test = set()
       classes_by_source = self.context.products.get('classes')
       def add_sources_under_test(tgt):
-        if is_java(tgt) and not is_test(tgt) and not is_codegen(tgt):
+        if is_java(tgt) and not is_test(tgt) and not tgt.is_codegen:
           for source in tgt.sources:
             classes = classes_by_source.get(source)
             if classes:

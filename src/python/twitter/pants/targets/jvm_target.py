@@ -16,6 +16,7 @@
 
 import os
 
+from twitter.pants.base import TargetDefinitionException
 from twitter.pants.targets.internal import InternalTarget
 from twitter.pants.targets.jar_dependency import JarDependency
 from twitter.pants.targets.with_sources import TargetWithSources
@@ -31,7 +32,6 @@ class JvmTarget(InternalTarget, TargetWithSources):
     InternalTarget.__init__(self, name, dependencies, is_meta)
     TargetWithSources.__init__(self, name, is_meta)
 
-    self.add_label('jvm')
     self.sources = self._resolve_paths(self.target_base, sources) or []
     self.excludes = excludes or []
     self.buildflags = buildflags or []

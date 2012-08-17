@@ -54,7 +54,6 @@ class JavaLibrary(ExportableJvmLibrary):
                                   buildflags,
                                   is_meta)
 
-    self.add_label('java')
     self.sibling_resources_base = os.path.join(os.path.dirname(self.target_base), 'resources')
     self.resources = self._resolve_paths(self.sibling_resources_base, resources)
     self.deployjar = deployjar

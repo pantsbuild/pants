@@ -32,9 +32,8 @@ class Pants(Target):
         return Address.parse(parse_context.buildfile.root_dir, spec, False)
 
     self.address = parse_address()
-    # We must disable the re-init check, because our funky __getattr__ breaks it.
-    # We're not involved in any multiple inheritance, so it's OK to disable it here.
-    Target.__init__(self, self.address.target_name, False, reinit_check=False)
+
+    Target.__init__(self, self.address.target_name, False)
 
   def register(self):
     # A pants target is a pointer, do not register it as an actual target (see resolve).
