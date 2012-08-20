@@ -116,32 +116,22 @@ wiki = Wiki
 
 def has_sources(target):
   """Returns True if the target has sources."""
-
-  return isinstance(target, TargetWithSources)
+  return target.has_label('sources')
 
 
 def is_exported(target):
   """Returns True if the target provides an artifact exportable from the repo."""
-
-  return isinstance(target, ExportableJvmLibrary) and target.provides
+  return target.has_label('exportable')
 
 
 def is_internal(target):
   """Returns True if the target is internal to the repo (ie: it might have dependencies)."""
-
-  return isinstance(target, InternalTarget)
+  return target.has_label('internal')
 
 
 def is_jvm(target):
   """Returns True if the target produces jvm bytecode."""
-
-  return isinstance(target, JvmTarget)
-
-
-def is_apt(target):
-  """Returns True if the target produces annotation processors."""
-
-  return isinstance(target, AnnotationProcessor)
+  return target.has_label('jvm')
 
 
 def has_jvm_targets(targets):
@@ -165,65 +155,52 @@ def extract_jvm_targets(targets):
         yield real_target
 
 
+def is_codegen(target):
+  """Returns True if the target is a codegen target."""
+  return target.has_label('codegen')
+
 def is_doc(target):
   """Returns True if the target is a documentation target."""
-
-  return isinstance(target, Doc)
+  return target.has_label('doc')
 
 
 def is_jar_library(target):
   """Returns True if the target is an external jar library."""
-
-  return isinstance(target, JarLibrary)
+  return target.has_label('jars')
 
 
 def is_java(target):
   """Returns True if the target has or generates java sources."""
-
-  return isinstance(target, JavaLibrary) or (
-    isinstance(target, AnnotationProcessor)) or (
-    isinstance(target, JavaProtobufLibrary)) or (
-    isinstance(target, JavaTests)) or (
-    is_thrift(target))
-
-
-def is_thrift(target):
-  """Returns True if the target has thrift IDL sources."""
-
-  return isinstance(target, JavaThriftLibrary)
+  return target.has_label('java')
 
 
 def is_apt(target):
   """Returns True if the target exports an annotation processor."""
-
-  return isinstance(target, AnnotationProcessor)
+  return target.has_label('apt')
 
 
 def is_python(target):
   """Returns True if the target has python sources."""
-
-  return isinstance(target, PythonTarget)
+  return target.has_label('python')
 
 
 def is_scala(target):
   """Returns True if the target has scala sources."""
-
-  return isinstance(target, ScalaLibrary) or isinstance(target, ScalaTests)
+  return target.has_label('scala')
 
 
 def is_scalac_plugin(target):
-  return isinstance(target, ScalacPlugin)
+  """Returns True if the target builds a scalac plugin."""
+  return target.has_label('scalac_plugin')
 
 
 def is_test(t):
   """Returns True if the target is comprised of tests."""
-
-  return isinstance(t, JavaTests) or isinstance(t, ScalaTests) or isinstance(t, PythonTests)
+  return t.has_label('tests')
 
 
 def is_jar_dependency(dep):
   """Returns True if the dependency is an external jar."""
-
   return isinstance(dep, JarDependency)
 
 

@@ -25,6 +25,7 @@ from twitter.pants import (
   get_buildroot,
   has_sources,
   is_apt,
+  is_codegen,
   is_java,
   is_scala,
   is_test
@@ -126,7 +127,7 @@ class Ide(Command):
 
     foil = list(all_targets)[0]
     def is_cp(target):
-      return target.is_codegen \
+      return is_codegen(target) \
              or is_apt(target) \
              or (skip_java and is_java(target)) \
              or (skip_scala and is_scala(target))
@@ -240,7 +241,7 @@ class Project(object):
 
     def source_target(target):
       return has_sources(target) \
-          and (not target.is_codegen
+          and (not is_codegen(target)
                and not (self.skip_java and is_java(target))
                and not (self.skip_scala and is_scala(target)))
 

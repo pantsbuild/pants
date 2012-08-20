@@ -16,6 +16,7 @@
 
 import os
 import collections
+import traceback
 
 from twitter.common.collections import OrderedSet
 from twitter.common.decorators import deprecated_with_warning
@@ -68,15 +69,19 @@ class Target(object):
       ParseContext(address.buildfile).parse()
       return lookup()
 
-  def __init__(self, name, is_meta):
-    self.name = name
-    self.is_meta = is_meta
-    self.is_codegen = False
-    self.description = None
+  def __init__(self, name, is_meta, reinit_check=True):
+    # This check prevents double-initialization in multiple-inheritance situations.
+    if not reinit_check or not hasattr(self, '_initialized'):
+      self.name = name
+      self.is_meta = is_meta
+      self.description = None
 
-    self.address = self.locate()
-    self.id = self._create_id()
-    self.register()
+      self.address = self.locate()
+      self.id = self._create_id()
+
+      self.labels = set()
+      self.register()
+      self._initialized = True
 
   def _post_construct(self, func, *args, **kwargs):
     """Registers a command to invoke after this target's BUILD file is parsed."""
@@ -141,6 +146,15 @@ class Target(object):
   def with_description(self, description):
     self.description = description
     return self
+
+  def add_label(self, label):
+    self.labels.add(label)
+
+  def remove_label(self, label):
+    self.labels.remove(label)
+
+  def has_label(self, label):
+    return label in self.labels
 
   def __eq__(self, other):
     result = other and (

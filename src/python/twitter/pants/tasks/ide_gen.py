@@ -23,6 +23,7 @@ from twitter.pants import (
   extract_jvm_targets,
   get_buildroot,
   has_sources,
+  is_codegen,
   is_java,
   is_scala,
   is_test,
@@ -161,7 +162,7 @@ class IdeGen(JvmBinaryTask):
     """
     def is_cp(target):
       return (
-        target.is_codegen
+        is_codegen(target)
 
         # Some IDEs need annotation processors pre-compiled, others are smart enough to detect and
         # proceed in 2 compile rounds
@@ -362,7 +363,7 @@ class Project(object):
 
     def source_target(target):
       return (self.transitive or target in self.targets) and has_sources(target) \
-          and (not target.is_codegen
+          and (not is_codegen(target)
                and not (self.skip_java and is_java(target))
                and not (self.skip_scala and is_scala(target)))
 

@@ -17,6 +17,7 @@
 __author__ = 'John Sirios'
 
 from twitter.common.collections import OrderedSet
+from twitter.pants import is_codegen
 from twitter.pants.ant.ide import _extract_target
 
 import unittest
@@ -37,14 +38,15 @@ class MockTarget(object):
     self.excludes = []
     self.rev = rev
 
-
   def __repr__(self):
     return self.name
-
 
   def walk(self, func, unused_predicate):
     if not self.rev:
       func(self)
+
+  def has_label(self, name):
+    return name == 'codegen' and self.is_codegen
 
 
 # TODO(John Sirois): test --no-{java,scala} behavior
@@ -95,7 +97,7 @@ class IdeTest(unittest.TestCase):
 
     internal_deps, jar_deps = _extract_target(
       [a, e, j],
-      lambda target: target.is_apt or target.is_codegen
+      lambda target: target.is_apt or is_codegen(target)
     )
 
     self.assertEquals(OrderedSet([c, b]), internal_deps,

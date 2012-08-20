@@ -28,6 +28,7 @@ class Doc(InternalTarget, TargetWithSources):
     TargetWithSources.__init__(self, name)
     if not sources:
       raise TargetDefinitionException(self, 'No sources specified')
+    self.add_label('doc')
     self.name = name
     self.sources = self._resolve_paths(self.target_base, sources)
     self.resources = self._resolve_paths(self.target_base, resources) if resources else []

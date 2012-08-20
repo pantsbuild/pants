@@ -47,6 +47,6 @@ class ScalacPlugin(ScalaLibrary):
 
     ScalaLibrary.__init__(self, name, sources, java_sources, provides, dependencies, excludes,
                           resources)
-
+    self.add_label('scalac_plugin')
     self.plugin = plugin or name
     self.classname = classname

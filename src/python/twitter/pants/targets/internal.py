@@ -153,6 +153,7 @@ class InternalTarget(Target):
   def __init__(self, name, dependencies, is_meta):
     Target.__init__(self, name, is_meta)
 
+    self.add_label('internal')
     self.dependencies = OrderedSet()
     self.internal_dependencies = OrderedSet()
     self.jar_dependencies = OrderedSet()

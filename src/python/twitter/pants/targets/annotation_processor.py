@@ -51,6 +51,8 @@ class AnnotationProcessor(ExportableJvmLibrary):
                                   (),
                                   is_meta)
 
+    self.add_label('java')
+    self.add_label('apt')
     self.resources = self._resolve_paths(ExportableJvmLibrary.RESOURCES_BASE_DIR, resources)
     self.processors = processors
 

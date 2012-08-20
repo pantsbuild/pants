@@ -28,7 +28,7 @@ class JarLibrary(Target):
 
     assert len(dependencies) > 0, "At least one dependency must be specified"
     Target.__init__(self, name, False)
-
+    self.add_label('jars')
     self.dependencies = dependencies
 
   def resolve(self):
