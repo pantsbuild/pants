@@ -84,7 +84,7 @@ class JarCreate(Task):
     self.confs = context.config.getlist('jar-create', 'confs')
     self.compression = ZIP_DEFLATED if options.jar_create_compressed else ZIP_STORED
 
-    self.jar_classes = options.jar_create_classes or products.isrequired('jars')
+    self.jar_classes = products.isrequired('jars') or options.jar_create_classes
     if self.jar_classes:
       products.require('classes')
 
