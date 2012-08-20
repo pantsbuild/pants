@@ -99,6 +99,8 @@ class Help(Task):
 
 goal(name='help', action=Help).install().with_description('Provide help for the specified goal.')
 
+def _set_bool(option, opt_str, value, parser):
+  setattr(parser.values, option.dest, not opt_str.startswith("--no"))
 
 class Goal(Command):
   """Lists installed goals or else executes a named goal."""
@@ -115,6 +117,13 @@ class Goal(Command):
     Option("-l", "--level", dest="log_level", type="choice", choices=['debug', 'info', 'warn'],
            help="[info] Sets the logging level to one of 'debug', 'info' or 'warn', implies -v "
                   "if set."),
+    Option("--read-from-artifact-cache", "--no-read-from-artifact-cache", action="callback",
+      callback=_set_bool, dest="read_from_artifact_cache", default=False,
+      help="Whether to read artifacts from cache instead of building them, when possible."),
+    Option("--write-to-artifact-cache", "--no-write-to-artifact-cache", action="callback",
+      callback=_set_bool, dest="write_to_artifact_cache", default=False,
+      help="Whether to write artifacts to cache ."),
+
     Option("--all", dest="target_directory", action="append",
            help="DEPRECATED: Use [dir]: with no flag in a normal target position on the command "
                   "line. (Adds all targets found in the given directory's BUILD file. Can be "
@@ -122,7 +131,7 @@ class Goal(Command):
     Option("--all-recursive", dest="recursive_directory", action="append",
            help="DEPRECATED: Use [dir]:: with no flag in a normal target position on the command "
                   "line. (Adds all targets found recursively under the given directory. Can be "
-                  "specified more than once to add more than one root target directory to scan.)")
+                  "specified more than once to add more than one root target directory to scan.)"),
   ]
 
   @staticmethod
@@ -443,9 +452,16 @@ from twitter.pants.tasks.thrift_gen import ThriftGen
 
 class Invalidator(Task):
   def execute(self, targets):
-    self.invalidate(all=True)
-goal(name='invalidate', action=Invalidator).install().with_description('Invalidate all caches')
+    build_invalidator_dir = self.context.config.get('tasks', 'build_invalidator')
+    safe_rmtree(build_invalidator_dir)
+goal(name='invalidate', action=Invalidator).install().with_description('Invalidate all targets')
 
+class ArtifactCacheWiper(Task):
+  def execute(self, targets):
+    artifact_cache_dir = self.context.config.get('tasks', 'artifact_cache')
+    safe_rmtree(artifact_cache_dir)
+goal(name='wipe-local-artifact-cache', action=ArtifactCacheWiper
+).install().with_description('Delete all cached artifacts')
 
 goal(
   name='clean-all',

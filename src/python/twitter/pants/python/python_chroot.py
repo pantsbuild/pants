@@ -31,7 +31,8 @@ from twitter.common.python.platforms import Platform
 from twitter.pants.targets import PythonBinary
 
 from twitter.pants.base import Config
-from twitter.pants.base.build_cache import BuildCache
+from twitter.pants.base.artifact_cache import ArtifactCache
+from twitter.pants.base.build_invalidator import CacheKeyGenerator
 from twitter.pants.python.antlr_builder import PythonAntlrBuilder
 from twitter.pants.python.thrift_builder import PythonThriftBuilder
 
@@ -73,13 +74,19 @@ class ReqResolver(object):
 
 
 class PythonChroot(object):
+  class BuildFailureException(Exception):
+    def __init__(self, msg):
+      Exception.__init__(self, msg)
+
   def __init__(self, target, root_dir, extra_targets=None, builder=None):
     self._config = Config.load()
 
     self._target = target
     self._root = root_dir
-    self._cache = BuildCache(os.path.join(self._config.get('python-setup', 'artifact_cache'),
-      '%s' % PythonIdentity.get()))
+    self._key_generator = CacheKeyGenerator()
+    artifact_cache_root = \
+      os.path.join(self._config.get('python-setup', 'artifact_cache'), '%s' % PythonIdentity.get())
+    self._artifact_cache = ArtifactCache(artifact_cache_root)
     self._extra_targets = list(extra_targets) if extra_targets is not None else []
     self._resolver = PythonResolver([self._target] + self._extra_targets)
     self._builder = builder or PEXBuilder(tempfile.mkdtemp())
@@ -140,14 +147,13 @@ class PythonChroot(object):
     self._dump_built_library(library, PythonAntlrBuilder(library, self._root))
 
   def _dump_built_library(self, library, builder):
-    # TODO(wickman) Port this over to the Installer+Distiller and stop using
-    # BuildCache.
+    # TODO(wickman): Port this over to the Installer+Distiller and stop using ArtifactCache.
     absolute_sources = library.expand_files()
     absolute_sources.sort()
-    cache_key = self._cache.key_for(library.id, absolute_sources)
-    if not self._cache.needs_update(cache_key):
+    cache_key = self._key_generator.key_for(library.id, absolute_sources)
+    if self._artifact_cache.has(cache_key):
       self.debug('  Generating (cached) %s...' % library)
-      self._cache.use_cached_files(cache_key, self._builder.add_dependency_file)
+      self._artifact_cache.use_cached_files(cache_key, self._builder.add_dependency_file)
     else:
       self.debug('  Generating %s...' % library)
       egg_file = builder.build_egg()
@@ -158,7 +164,7 @@ class PythonChroot(object):
           cache_key.hash + '_' + os.path.basename(egg_file))
       self.debug('       %s => %s' % (src_egg_file, dst_egg_file))
       os.rename(src_egg_file, dst_egg_file)
-      self._cache.update(cache_key, [dst_egg_file])
+      self._artifact_cache.insert(cache_key, [dst_egg_file])
       self._builder.add_egg(dst_egg_file)
 
   def dump(self):

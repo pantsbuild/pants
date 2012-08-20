@@ -104,12 +104,12 @@ class CodeGen(Task):
         for dependee, gentargets in gentargets_by_dependee.items()
       ))
 
-    with self.changed(gentargets, invalidate_dependants=True) as changed_targets:
-      changed = set(changed_targets)
+    with self.invalidated(gentargets, invalidate_dependants=True) as invalidated:
+      invalid_targets = set(invalidated.invalid_targets())
       for lang, tgts in gentargets_bylang.items():
-        lang_changed = changed.intersection(tgts)
-        if lang_changed:
-          self.genlang(lang, lang_changed)
+        lang_invalid = invalid_targets.intersection(tgts)
+        if lang_invalid:
+          self.genlang(lang, lang_invalid)
 
     # Link synthetic targets for all in-play gen targets
     for lang, tgts in gentargets_bylang.items():

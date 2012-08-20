@@ -74,16 +74,16 @@ class JavadocGen(Task):
     if catalog and self.combined:
       raise TaskError('Cannot provide javadoc target mappings for combined output')
 
-    with self.changed(filter(is_java, targets)) as changed_targets:
+    with self.invalidated(filter(is_java, targets)) as invalidated:
       safe_mkdir(self._output_dir)
       with self.context.state('classpath', []) as cp:
         classpath = [jar for conf, jar in cp if conf in self.confs]
 
         def find_javadoc_targets():
           if self.transitive:
-            return changed_targets
+            return invalidated.invalid_targets()
           else:
-            return set(changed_targets).intersection(set(self.context.target_roots))
+            return set(invalidated.invalid_targets()).intersection(set(self.context.target_roots))
 
         javadoc_targets = list(filter(is_java, find_javadoc_targets()))
         if self.combined:

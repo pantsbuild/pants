@@ -138,8 +138,8 @@ class IvyResolve(NailgunTask):
 
     target_workdir = os.path.join(self._work_dir, dirname_for_requested_targets(targets))
     target_classpath_file = os.path.join(target_workdir, 'classpath')
-    with self.changed(filter(is_classpath, targets), only_buildfiles=True) as changed_deps:
-      if changed_deps:
+    with self.invalidated(filter(is_classpath, targets), only_buildfiles=True) as invalidated:
+      if invalidated.invalid_targets():
         self._exec_ivy(target_workdir, targets, [
           '-cachepath', target_classpath_file,
           '-confs'

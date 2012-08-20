@@ -14,6 +14,7 @@
 # limitations under the License.
 # ==================================================================================================
 
+import hashlib
 import os
 import collections
 import traceback
@@ -21,6 +22,7 @@ import traceback
 from twitter.common.collections import OrderedSet
 from twitter.common.decorators import deprecated_with_warning
 from twitter.pants.base.address import Address
+from twitter.pants.base.hash_utils import hash_all
 from twitter.pants.base.parse_context import ParseContext
 
 class TargetDefinitionException(Exception):
@@ -35,6 +37,21 @@ class Target(object):
 
   _targets_by_address = {}
   _addresses_by_buildfile = collections.defaultdict(OrderedSet)
+
+  @staticmethod
+  def identify(targets):
+    """Generates an id for a set of targets."""
+    # If you change this implementation, consider changing CacheKeyGenerator.combine_cache_keys to match.
+    return hash_all([target.id for target in targets])
+
+  @staticmethod
+  def maybe_readable_identify(targets):
+    """Generates an id for a set of targets, but if the set is a single target, makes it the target id."""
+    if len(targets) == 1:
+      id = targets[0].id
+    else:
+      id = Target.identify(targets)
+    return id
 
   @classmethod
   def get_all_addresses(cls, buildfile):

@@ -1,28 +1,90 @@
-try:
-  import cPickle as pickle
-except ImportError:
-  import pickle
+# ==================================================================================================
+# Copyright 2011 Twitter, Inc.
+# --------------------------------------------------------------------------------------------------
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this work except in compliance with the License.
+# You may obtain a copy of the License in the LICENSE file, or at:
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ==================================================================================================
 
-from collections import defaultdict
 from contextlib import contextmanager
 import hashlib
 import os
+import shutil
 
-from twitter.common.collections import OrderedSet
-from twitter.common.dirutil import safe_rmtree, safe_mkdir, safe_open
-
-from twitter.pants.base.build_cache import BuildCache, NO_SOURCES, TARGET_SOURCES
-from twitter.pants.targets import JarDependency
+from twitter.pants.base.artifact_cache import ArtifactCache
+from twitter.pants.base.build_invalidator import CacheKeyGenerator
+from twitter.pants.tasks.cache_manager import CacheManager, VersionedTargetSet
 
 
 class TaskError(Exception):
   """Raised to indicate a task has failed."""
+
 
 class TargetError(TaskError):
   """Raised to indicate a task has failed for a subset of targets"""
   def __init__(self, targets, *args, **kwargs):
     TaskError.__init__(self, *args, **kwargs)
     self.targets = targets
+
+
+class InvalidationResult(object):
+  """
+    An InvalidationResult represents the result of invalidating a set of targets.
+
+    A task can get individual target info for use in non-flat compiles, or combined info for
+    all invalid tasks or all tasks, for flat compiles.
+  """
+  def __init__(self, all_versioned_targets):
+    def combine_versioned_targets(vts):
+      targets = []
+      for vt in vts:
+        targets.extend(vt.targets)
+      cache_key = CacheKeyGenerator.combine_cache_keys([vt.cache_key for vt in vts])
+      valid = all([vt.valid for vt in vts])
+      return VersionedTargetSet(targets, cache_key, valid)
+
+    self._all_versioned_targets = all_versioned_targets
+    self._combined_all_versioned_targets = combine_versioned_targets(self._all_versioned_targets)
+
+    self._invalid_versioned_targets = filter(lambda x: not x.valid, all_versioned_targets)
+    self._combined_invalid_versioned_targets = combine_versioned_targets(self._invalid_versioned_targets)
+
+  def all_versioned_targets(self):
+    """A list of VersionedTargetSet objects, one per target."""
+    return self._all_versioned_targets
+
+  def combined_all_versioned_targets(self):
+    """A single VersionedTargetSet representing all targets together."""
+    return self._combined_all_versioned_targets
+
+  def invalid_versioned_targets(self):
+    """A list of VersionedTargetSet objects, one per invalid target."""
+    return self._invalid_versioned_targets
+
+  def combined_invalid_versioned_targets(self):
+    """A single VersionedTargetSet representing all invalid targets together."""
+    return self._combined_invalid_versioned_targets
+
+  def all_targets(self):
+    """A list of all underlying targets."""
+    return self._combined_all_versioned_targets.targets
+
+  def invalid_targets(self):
+    """A list of all underlying targets that are invalid."""
+    return self._combined_invalid_versioned_targets.targets
+
+  def has_invalid_targets(self):
+    """Whether at least one of the targets in this result are invalid."""
+    return len(self._combined_invalid_versioned_targets.targets) > 0
+
 
 class Task(object):
   @classmethod
@@ -33,16 +95,23 @@ class Task(object):
       tasks.
     """
 
-  EXTRA_DATA = 'extra.data'
-
   def __init__(self, context):
     self.context = context
+    self._cache_key_generator = CacheKeyGenerator()
+    # TODO: Shared, remote build cache.
+    self._artifact_cache = ArtifactCache(context.config.get('tasks', 'artifact_cache'))
+    self._build_invalidator_dir = os.path.join(context.config.get('tasks', 'build_invalidator'), self.product_type())
 
-    self._build_cache = context.config.get('tasks', 'build_cache')
-    self._basedir = os.path.join(self._build_cache, self.__class__.__name__)
+  def product_type(self):
+    """
+      By default, each task is considered as creating a unique product type.
+      Subclasses can override this to specify a shared product type, e.g., 'classes'.
 
-  def invalidate(self, all=False):
-    safe_rmtree(self._build_cache if all else self._basedir)
+      Tasks with the same product type can invalidate each other's targets, e.g., if a ScalaLibrary
+      depends on a JavaLibrary, a change to the JavaLibrary will invalidated the ScalaLibrary because
+      they both have the same product type.
+    """
+    return self.__class__.__name__
 
   def execute(self, targets):
     """
@@ -52,207 +121,143 @@ class Task(object):
 
   def invalidate_for(self):
     """
-      Subclasses can override and return an object that should be checked for changes when using
-      changed to manage target invalidation.  If the pickled form of returned object changes
+      Subclasses can override and return an object that should be checked for changes when
+      managing target invalidation.  If the pickled form of returned object changes
       between runs all targets will be invalidated.
     """
+    return None
 
   def invalidate_for_files(self):
     """
-      Subclasses can override and return a list of full paths to extra files that should be checked
-      for changes when using changed to manage target invalidation. This is useful for tracking
+      Subclasses can override and return a list of full paths to extra, non-source files that should
+      be checked for changes when managing target invalidation. This is useful for tracking
       changes to pre-built build tools, e.g., the thrift compiler.
     """
-
-  class CacheManager(object):
-    """
-      Manages cache checks, updates and invalidation keeping track of basic change and invalidation
-      statistics.
-    """
-    def __init__(self, cache, targets, only_externaldeps):
-      self._cache = cache
-      self._targets = set(targets)
-      self._sources = NO_SOURCES if only_externaldeps else TARGET_SOURCES
-
-      self.changed_files = 0
-      self.invalidated_files = 0
-      self.invalidated_targets = 0
-      self.foreign_invalidated_targets = 0
-      self.changed = defaultdict(list)
-
-    def check_content(self, identifier, files):
-      """
-        Checks if identified content has changed and invalidates it if so.
-
-        :id An identifier for the tracked content.
-        :files The files containing the content to track changes for.
-        :returns: The cache key for this content.
-      """
-      cache_key = self._cache.key_for(identifier, files)
-      if self._cache.needs_update(cache_key):
-        return cache_key
-
-    def check(self, target):
-      """Checks if a target has changed and invalidates it if so."""
-      cache_key = self._key_for(target)
-      if cache_key and self._cache.needs_update(cache_key):
-        self._invalidate(target, cache_key)
-
-    def update(self, cache_key):
-      """Mark a changed or invalidated target as successfully processed."""
-      self._cache.update(cache_key)
-
-    def invalidate(self, target, cache_key=None):
-      """Forcefully mark a target as changed."""
-      self._invalidate(target, cache_key or self._key_for(target), indirect=True)
-
-    def _key_for(self, target):
-      return self._cache.key_for_target(
-        target,
-        sources=self._sources,
-        fingerprint_extra=lambda sha: self._fingerprint_jardeps(target, sha)
-      )
-
-    _JAR_HASH_KEYS = (
-      'org',
-      'name',
-      'rev',
-      'force',
-      'excludes',
-      'transitive',
-      'ext',
-      'url',
-      '_configurations'
-    )
-
-    def _fingerprint_jardeps(self, target, sha):
-      internaltargets = OrderedSet()
-      alltargets = OrderedSet()
-      def fingerprint_external(target):
-        internaltargets.add(target)
-        if hasattr(target, 'dependencies'):
-          alltargets.update(target.dependencies)
-      target.walk(fingerprint_external)
-
-      for external_target in alltargets - internaltargets:
-        # TODO(John Sirois): Hashing on external targets should have a formal api - we happen to
-        # know jars are special and python requirements __str__ works for this purpose.
-        if isinstance(external_target, JarDependency):
-          jarid = ''
-          for key in Task.CacheManager._JAR_HASH_KEYS:
-            jarid += str(getattr(external_target, key))
-          sha.update(jarid)
-        else:
-          sha.update(str(external_target))
-
-    def _invalidate(self, target, cache_key, indirect=False):
-      if target in self._targets:
-        self.changed[target].append(cache_key)
-        if indirect:
-          self.invalidated_files += len(cache_key.sources)
-          self.invalidated_targets += 1
-        else:
-          self.changed_files += len(cache_key.sources)
-      else:
-        # invalidate a target to be processed in a subsequent round - this handles goal groups
-        self._cache.invalidate(cache_key)
-        self.foreign_invalidated_targets += 1
-
+    return []
 
   @contextmanager
-  def changed(self, targets, only_buildfiles=False, invalidate_dependants=False, invalidate_globally=False):
+  def invalidated(self, targets, only_buildfiles=False, invalidate_dependants=False):
     """
-      Yields an iterable over the targets that have changed since the last check to a with block.
-      If no exceptions are thrown by work in the block, the cache is updated for the targets,
-      otherwise if a TargetError is thrown by the work in the block all targets except those in the
-      TargetError are cached.
+      Checks targets for invalidation.
+
+      Yields the result to a with block. If no exceptions are thrown by work in the block, the
+      cache is updated for the targets, otherwise if a TargetError is thrown by the work in the
+      block all targets except those in the TargetError are cached.
 
       :targets The targets to check for changes.
       :only_buildfiles If True, then just the target's BUILD files are checked for changes.
-      :invalidate_dependants If True then any targets depending on changed targets are invalidated
-      :invalidate_globally If True then if any target has changed, all targets are invalidated.
-      :returns: the subset of targets that have changed
+      :invalidate_dependants If True then any targets depending on changed targets are invalidated.
+      :returns: an InvalidationResult reflecting the invalidated targets.
     """
-
-    safe_mkdir(self._basedir)
-    cache_manager = Task.CacheManager(BuildCache(self._basedir), targets, only_buildfiles)
-
     # invalidate_for() may return an iterable that isn't a set, so we ensure a set here.
-    check = self.invalidate_for()
-    if check is not None:
-      check = set(check)
+    extra_data = []
+    extra_data.append(self.invalidate_for())
 
-    check_files = self.invalidate_for_files()
-    if check_files is not None:
-      check_files = set(check_files)
-      if check is None:
-        check = set()
-      for f in check_files:
-        sha = hashlib.sha1()
-        with open(f, "rb") as fd:
-          sha.update(fd.read())
-        check = check.add(sha.hexdigest())
+    for f in self.invalidate_for_files():
+      sha = hashlib.sha1()
+      with open(f, "rb") as fd:
+        sha.update(fd.read())
+      extra_data.append(sha.hexdigest())
 
-    if check is not None:
-      extradata_id = self.context.maybe_readable_identify(targets) + '.extra.data'
-      extradata = os.path.join(self._basedir, extradata_id)
-      with safe_open(extradata, 'w') as pickled:
-        pickle.dump(check, pickled)
+    cache_manager = CacheManager(self._cache_key_generator, self._build_invalidator_dir,
+      targets, extra_data, only_buildfiles)
 
-      cache_key = cache_manager.check_content(extradata_id, [extradata])
-      if cache_key:
-        self.context.log.debug('invalidating all targets for %s' % self.__class__.__name__)
-        for target in targets:
-          cache_manager.invalidate(target, cache_key)
+    # Check for directly changed targets.
+    all_versioned_targets = [ cache_manager.check(target) for target in targets ]
+    directly_changed_targets = set(vt.targets[0] for vt in all_versioned_targets if not vt.valid)
+    versioned_targets_by_target = dict([(vt.targets[0], vt) for vt in all_versioned_targets])
 
-    for target in targets:
-      cache_manager.check(target)
+    # Now add any extra targets we need to invalidate.
+    if invalidate_dependants:
+      for target in (self.context.dependants(lambda t: t in directly_changed_targets)).keys():
+        if target in versioned_targets_by_target:
+          vt = versioned_targets_by_target.get(target)
+          cache_key = vt.cache_key
+          vt.valid = False
+        else:  # The target isn't in targets (it belongs to a future round).
+          cache_key = None
+        cache_manager.invalidate(target, cache_key)
 
-    if invalidate_dependants and cache_manager.changed:
-      for target in (self.context.dependants(lambda t: t in cache_manager.changed.keys())).keys():
-        cache_manager.invalidate(target)
+    # Now we're done with invalidation, so can create the result.
+    invalidation_result = InvalidationResult(all_versioned_targets)
+    num_invalid_targets = len(invalidation_result.invalid_targets())
 
-    if invalidate_globally and cache_manager.changed:
-      for target in targets:
-        cache_manager.invalidate(target)
+    # Do some reporting.
+    if cache_manager.foreign_invalidated_targets:
+      self.context.log.info('Invalidated %d dependent targets '
+                            'for the next round' % cache_manager.foreign_invalidated_targets)
 
-    if invalidate_dependants or invalidate_globally:
-      if cache_manager.foreign_invalidated_targets:
-        self.context.log.info('Invalidated %d dependant targets '
-                              'for the next round' % cache_manager.foreign_invalidated_targets)
-
-      if cache_manager.changed_files:
-        msg = 'Operating on %d files in %d changed targets' % (
-          cache_manager.changed_files,
-          len(cache_manager.changed)
-        )
-        if cache_manager.invalidated_files:
-          if invalidate_globally:
-            invalidation_msg = 'globally invalidated'
-          else:
-            invalidation_msg = 'invalidated dependant'
-          msg += ' and %d files in %d %s targets' % (
-            cache_manager.invalidated_files,
-            cache_manager.invalidated_targets,
-            invalidation_msg
-          )
-        self.context.log.info(msg)
-    elif cache_manager.changed_files:
-      self.context.log.info('Operating on %d files in %d changed targets' % (
+    if cache_manager.changed_files:
+      msg = 'Operating on %d files in %d changed targets' % (
         cache_manager.changed_files,
-        len(cache_manager.changed)
-      ))
+        cache_manager.changed_targets,
+      )
+      if cache_manager.invalidated_files:
+        msg += ' and %d files in %d invalidated dependent targets' % (
+          cache_manager.invalidated_files,
+          cache_manager.invalidated_targets
+        )
+      self.context.log.info(msg)
 
+    # Yield the result, and then update the cache.
     try:
-      yield cache_manager.changed.keys()
-      for cache_keys in cache_manager.changed.values():
-        for cache_key in cache_keys:
-          cache_manager.update(cache_key)
+      if num_invalid_targets > 0:
+        self.context.log.debug('Invalidated targets %s' % invalidation_result.invalid_targets())
+      yield invalidation_result
+      for vt in invalidation_result.invalid_versioned_targets():
+        cache_manager.update(vt.cache_key)
+
     except TargetError as e:
-      for target, cache_keys in cache_manager.changed.items():
-        if target not in e.targets:
-          for cache_key in cache_keys:
-            cache_manager.update(cache_key)
+      # TODO: This partial updating isn't used (yet?). Nowhere in the code do we raise a TargetError.
+      for vt in invalidation_result.invalid_versioned_targets():
+        if len(vt.targets) != 1:
+          raise Exception, 'Logic error: vt should represent a single target'
+        if vt.targets[0] not in e.targets:
+          cache_manager.update(vt.cache_key)
+
+  @contextmanager
+  def check_artifact_cache(self, versioned_targets, build_artifacts, artifact_root):
+    """
+      See if we have required artifacts in the cache.
+
+      If we do (and reading from the artifact cache is enabled) then we copy the artifacts from the cache.
+      If we don't (and writing to the artifact cache is enabled) then we will copy the artifacts into
+      the cache when the context is exited.
+
+      Therefore the usage idiom is as follows:
+
+      with self.check_artifact_cache(...) as build:
+        if build:
+          ... build the necessary artifacts ...
+
+      :versioned_targets a VersionedTargetSet representing a specific version of a set of targets.
+      :build_artifacts a list of paths to which the artifacts will be written.
+      :artifact_root If not None, the artifact paths will be cached relative to this dir.
+      :returns: True if the caller must build the artifacts, False otherwise.
+    """
+    artifact_key = versioned_targets.cache_key
+    targets = versioned_targets.targets
+    if self.context.options.read_from_artifact_cache and self._artifact_cache.has(artifact_key):
+      self.context.log.info('Using cached artifacts for %s' % targets)
+      self._artifact_cache.use_cached_files(artifact_key,
+        lambda src, reldest: shutil.copy(src, os.path.join(artifact_root, reldest)))
+      yield False  # Caller need not rebuild
+    else:
+      self.context.log.info('No cached artifacts for %s' % targets)
+      yield True  # Caller must rebuild.
+
+      if self.context.options.write_to_artifact_cache:
+        if self._artifact_cache.has(artifact_key):
+          # If we get here it means read_from_artifact_cache is false, so we've rebuilt.
+          # We can verify that what we built is identical to the cached version.
+          # If not, there's a dangerous bug, so we want to warn about this loudly.
+          if self.context.options.verify_artifact_cache:
+            pass  # TODO: verification logic
+        else:
+          # if the caller provided paths to artifacts but we didn't previously have them in the cache,
+          # we assume that they are now created, and store them in the artifact cache.
+          self.context.log.info('Caching artifacts for %s' % str(targets))
+          self._artifact_cache.insert(artifact_key, build_artifacts, artifact_root)
 
 __all__ = (
   'TaskError',

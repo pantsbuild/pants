@@ -56,8 +56,8 @@ class Checkstyle(NailgunTask):
 
   def execute(self, targets):
     if not self.context.options.checkstyle_skip:
-      with self.changed(filter(Checkstyle._is_checked, targets)) as changed_targets:
-        sources = self.calculate_sources(changed_targets)
+      with self.invalidated(filter(Checkstyle._is_checked, targets)) as invalidated:
+        sources = self.calculate_sources(invalidated.invalid_targets())
         if sources:
           result = self.checkstyle(sources)
           if result != 0:

@@ -17,7 +17,6 @@
 __author__ = 'John Sirois'
 
 import os
-import shutil
 import textwrap
 
 from collections import defaultdict
@@ -26,6 +25,7 @@ from twitter.common.collections import OrderedDict
 from twitter.common.dirutil import safe_mkdir, safe_open, touch
 
 from twitter.pants import is_scala, is_scalac_plugin
+from twitter.pants.base.target import Target
 from twitter.pants.targets.scala_library import ScalaLibrary
 from twitter.pants.targets.scala_tests import ScalaTests
 from twitter.pants.targets import resolve_target_sources
@@ -89,12 +89,11 @@ class ScalaCompile(NailgunTask):
     for target in context.targets(is_scala):
       target.update_dependencies(scaladeps)
 
-    if workdir is None:
-      workdir = context.config.get('scala-compile', 'workdir')
-    self._incremental_classes_dir = os.path.join(workdir, 'incremental.classes')
-    self._classes_dir = os.path.join(workdir, 'classes')
-    self._analysis_cache_dir = os.path.join(workdir, 'analysis_cache')
-    self._resources_dir = os.path.join(workdir, 'resources')
+    self._workdir = context.config.get('scala-compile', 'workdir') if workdir is None else workdir
+    self._incremental_classes_dir = os.path.join(self._workdir, 'incremental.classes')
+    self._classes_dir = os.path.join(self._workdir, 'classes')
+    self._analysis_cache_dir = os.path.join(self._workdir, 'analysis_cache')
+    self._resources_dir = os.path.join(self._workdir, 'resources')
 
     self._main = context.config.get('scala-compile', 'main')
 
@@ -106,11 +105,14 @@ class ScalaCompile(NailgunTask):
       self._args.extend(context.config.getlist('scala-compile', 'no_warning_args'))
 
     self._confs = context.config.getlist('scala-compile', 'confs')
-    self._depfile_dir = os.path.join(workdir, 'depfiles')
+    self._depfile_dir = os.path.join(self._workdir, 'depfiles')
     self._deps = Dependencies(self._classes_dir)
 
+  def product_type(self):
+    return 'classes'
+
   def invalidate_for(self):
-    return [self._flatten]
+    return self._flatten
 
   def execute(self, targets):
     scala_targets = filter(ScalaCompile._has_scala_sources, reversed(InternalTarget.sort_targets(targets)))
@@ -125,22 +127,27 @@ class ScalaCompile(NailgunTask):
         for conf in self._confs:
           cp.insert(0, (conf, self._resources_dir))
 
-      if self._flatten:
-        self.execute_single_compilation(scala_targets, cp, upstream_analysis_caches)
-      else:
-        for target in scala_targets:
-          self.execute_single_compilation([target], cp, upstream_analysis_caches)
+      with self.invalidated(scala_targets, invalidate_dependants=True) as invalidated:
+        if self._flatten:
+          # We must defer invalidation to zinc. If we exclude files from a repeat build, zinc will assume
+          # the files were deleted and will nuke the corresponding class files. So we build all_targets
+          # in one pass and let zinc figure it out.
+          self.execute_single_compilation(invalidated.combined_all_versioned_targets(), cp, upstream_analysis_caches)
+        else:
+          # We must pass all targets,even valid ones, to execute_single_compilation(), so it can
+          # track the deps and the upstream analysis map correctly.
+          for vt in invalidated.all_versioned_targets():
+            self.execute_single_compilation(vt, cp, upstream_analysis_caches)
 
-
-      # Now we can add the global output dir, so that subsequent goals can see it.
+      # Now we add the global output dir, so that subsequent goals can see it.
       with self.context.state('classpath', []) as cp:
         for conf in self._confs:
           cp.insert(0, (conf, self._classes_dir))
 
+      # Map generated classes to the owning targets and sources.
       if self.context.products.isrequired('classes'):
         genmap = self.context.products.get('classes')
 
-        # Map generated classes to the owning targets and sources.
         for target, classes_by_source in self._deps.findclasses(scala_targets).items():
           for source, classes in classes_by_source.items():
             genmap.add(source, self._classes_dir, classes)
@@ -153,15 +160,13 @@ class ScalaCompile(NailgunTask):
             basedir = self.write_plugin_info(target)
             genmap.add(target, basedir, [_PLUGIN_INFO_FILE])
 
-  def execute_single_compilation(self, scala_targets, cp, upstream_analysis_caches):
+  def execute_single_compilation(self, versioned_target_set, cp, upstream_analysis_caches):
     """Execute a single compilation, updating upstream_analysis_caches if needed."""
-    self.context.log.info('Compiling targets %s' % str(scala_targets))
-
     if self._flatten:
       compilation_id = 'flat'
       output_dir = self._classes_dir
     else:
-      compilation_id = Target.maybe_readable_identify(scala_targets)
+      compilation_id = Target.maybe_readable_identify(versioned_target_set.targets)
       # Each compilation must output to its own directory, so zinc can then associate those with the appropriate
       # analysis caches of previous compilations. We then copy the results out to the real output dir.
       output_dir = os.path.join(self._incremental_classes_dir, compilation_id)
@@ -169,28 +174,33 @@ class ScalaCompile(NailgunTask):
     depfile = os.path.join(self._depfile_dir, compilation_id) + '.dependencies'
     analysis_cache = os.path.join(self._analysis_cache_dir, compilation_id) + '.analysis_cache'
 
-    # Note that we invalidate globally, i.e., if any target has changed then we pass them all on to zinc for
-    # dependency analysis. This is because if we exclude files from a repeat build, zinc will assume
-    # the files were deleted and will nuke the corresponding class files.
+    safe_mkdir(output_dir)
 
-    with self.changed(scala_targets, invalidate_dependants=True,
-                      invalidate_globally=True) as changed_targets:
-      sources_by_target = self.calculate_sources(changed_targets)
-      if sources_by_target:
-        sources = reduce(lambda all, sources: all.union(sources), sources_by_target.values())
-        if not sources:
-          # Create an empty depfile, since downstream code may assume that a depfile exists.
-          touch(depfile)
-          self.context.log.warn('Skipping scala compile for targets with no sources:\n  %s' %
-                                '\n  '.join(str(t) for t in sources_by_target.keys()))
-        else:
-          classpath = [jar for conf, jar in cp if conf in self._confs]
-          result = self.compile(classpath, sources, output_dir, analysis_cache, upstream_analysis_caches, depfile)
-          if result != 0:
-            raise TaskError('%s returned %d' % (self._main, result))
-          if output_dir != self._classes_dir:
-            # Link class files emitted in this compilation into the central classes dir.
-            self.link_all(output_dir, self._classes_dir)
+    if not versioned_target_set.valid:
+      with self.check_artifact_cache(versioned_target_set,
+                                     build_artifacts=[output_dir, depfile, analysis_cache],
+                                     artifact_root=self._workdir) as needs_building:
+        if needs_building:
+          self.context.log.info('Compiling targets %s' % versioned_target_set.targets)
+          sources_by_target = self.calculate_sources(versioned_target_set.targets)
+          if sources_by_target:
+            sources = reduce(lambda all, sources: all.union(sources), sources_by_target.values())
+            if not sources:
+              touch(depfile)  # Create an empty depfile, since downstream code may assume that one exists.
+              self.context.log.warn('Skipping scala compile for targets with no sources:\n  %s' %
+                                    '\n  '.join(str(t) for t in sources_by_target.keys()))
+            else:
+              classpath = [jar for conf, jar in cp if conf in self._confs]
+              result = self.compile(classpath, sources, output_dir, analysis_cache, upstream_analysis_caches, depfile)
+              if result != 0:
+                raise TaskError('%s returned %d' % (self._main, result))
+
+        # Regardless of whether we built or pulled from the artifact cache, we have to link
+        # the emitted class files into the central classes dir.
+        if output_dir != self._classes_dir:
+          self.link_all(output_dir, self._classes_dir)
+
+    # Note that the following post-processing steps must happen even for valid targets.
 
     # Read in the deps created either just now or by a previous compiler run on these targets.
     self.context.log.debug('Reading dependencies from ' + depfile)
@@ -198,12 +208,12 @@ class ScalaCompile(NailgunTask):
     deps.load(depfile)
     self._deps.merge(deps)
 
+    # Update the upstream analysis map.
     analysis_cache_parts = os.path.split(analysis_cache)
     if not upstream_analysis_caches.has(output_dir):
       # A previous chunk might have already updated this. It is certainly possible for a later chunk to
       # independently depend on some target that a previous chunk already built.
       upstream_analysis_caches.add(output_dir, analysis_cache_parts[0], [ analysis_cache_parts[1] ])
-    return compilation_id
 
   def calculate_sources(self, targets):
     sources = defaultdict(set)
@@ -222,7 +232,6 @@ class ScalaCompile(NailgunTask):
     return sources
 
   def compile(self, classpath, sources, output_dir, analysis_cache, upstream_analysis_caches, depfile):
-    safe_mkdir(output_dir)
     compiler_classpath = nailgun_profile_classpath(self, self._compile_profile)
     compiler_args = []
 
@@ -298,6 +307,19 @@ class ScalaCompile(NailgunTask):
   compiler_jar_names = [ 'scala-library', 'scala-compiler' ]  # Compiler version.
   zinc_jar_names = [ 'compiler-interface', 'sbt-interface' ]  # Other jars zinc needs to be pointed to.
 
+  def link_all(self, srcdir, dstdir):
+    safe_mkdir(dstdir)
+    for (dirpath, dirnames, filenames) in os.walk(srcdir):
+      for d in [os.path.join(dirpath, x) for x in dirnames]:
+        dir = os.path.join(dstdir, os.path.relpath(d, srcdir))
+        if not os.path.isdir(dir):
+          os.mkdir(dir)
+      for f in [os.path.join(dirpath, x) for x in filenames]:
+        outfile = os.path.join(dstdir, os.path.relpath(f, srcdir))
+        if os.path.exists(outfile):
+          os.unlink(outfile)
+        os.link(f, outfile)
+
   @staticmethod
   def identify_zinc_jars(compiler_classpath, zinc_classpath):
     """Find the named jars in the compiler and zinc classpaths.
@@ -326,16 +348,3 @@ class ScalaCompile(NailgunTask):
       else:
         jars_by_name[name] = jar_for_name
     return jars_by_name
-
-  def link_all(self, srcdir, dstdir):
-    safe_mkdir(dstdir)
-    for (dirpath, dirnames, filenames) in os.walk(srcdir):
-      for d in [os.path.join(dirpath, x) for x in dirnames]:
-        dir = os.path.join(dstdir, os.path.relpath(d, srcdir))
-        if not os.path.isdir(dir):
-          os.mkdir(dir)
-      for f in [os.path.join(dirpath, x) for x in filenames]:
-        outfile = os.path.join(dstdir, os.path.relpath(f, srcdir))
-        if os.path.exists(outfile):
-          os.unlink(outfile)
-        os.link(f, outfile)

@@ -14,12 +14,11 @@
 # limitations under the License.
 # ==================================================================================================
 
-from twitter.pants.base.build_cache import BuildCache
+from twitter.pants.base.build_invalidator import BuildInvalidator, CacheKeyGenerator
 from twitter.common.contextutil import temporary_dir
 from contextlib import contextmanager
 import os
 import hashlib
-import shutil
 import tempfile
 
 
@@ -36,45 +35,31 @@ def test_env(content=TEST_CONTENT):
     with tempfile.NamedTemporaryFile() as f:
       f.write(content)
       f.flush()
-      yield f, BuildCache(d)
+      yield f, CacheKeyGenerator(), BuildInvalidator(d)
 
 
 def test_cache_key_hash():
-  with test_env() as (f, cache):
-    key = cache.key_for('test', [f.name])
+  with test_env() as (f, keygen, cache):
+    key = keygen.key_for('test', [f.name])
     assert key.hash == expected_hash(f)
 
 
 def test_needs_update_missing_key():
-  with test_env() as (f, cache):
-    key = cache.key_for('test', [f.name])
+  with test_env() as (f, keygen, cache):
+    key = keygen.key_for('test', [f.name])
     assert cache.needs_update(key)
 
 
 def test_needs_update_after_change():
-  with test_env() as (f, cache):
-    key = cache.key_for('test', [f.name])
+  with test_env() as (f, keygen, cache):
+    key = keygen.key_for('test', [f.name])
     assert cache.needs_update(key)
-    cache.update(key, [f.name])
+    cache.update(key)
     assert not cache.needs_update(key)
     f.truncate()
     f.write('elmo')
     f.flush()
-    key = cache.key_for('test', [f.name])
+    key = keygen.key_for('test', [f.name])
     assert cache.needs_update(key)
-    cache.update(key, [f.name])
+    cache.update(key)
     assert not cache.needs_update(key)
-
-
-def test_use_cache():
-  with test_env() as (f, cache):
-    key = cache.key_for('test', [f.name])
-    cache.update(key, [f.name])
-    key = cache.key_for('test', [f.name])
-    with temporary_dir() as staging:
-      abs_fn = os.path.join(staging, os.path.basename(f.name))
-      assert not os.path.exists(abs_fn)
-      cache.use_cached_files(key, lambda s, d: shutil.copyfile(s, os.path.join(staging, d)))
-      assert os.path.exists(abs_fn)
-      with open(abs_fn) as fd:
-        assert fd.read() == TEST_CONTENT

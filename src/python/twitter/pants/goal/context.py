@@ -9,6 +9,7 @@ from twitter.common.dirutil import Lock
 
 from twitter.pants import SourceRoot
 from twitter.pants.base import ParseContext
+from twitter.pants.base.target import Target
 from twitter.pants.targets import Pants
 from twitter.pants.goal.products import Products
 
@@ -72,19 +73,6 @@ class Context(object):
     """
     return self._target_roots
 
-  def identify(self, targets):
-    id = hashlib.md5()
-    for target in targets:
-      id.update(target.id)
-    return id.hexdigest()
-
-  def maybe_readable_identify(self, targets):
-    if len(targets) == 1:
-      id = targets[0].id
-    else:
-      id = self.identify(targets)
-    return id
-
   def __str__(self):
     return 'Context(id:%s, state:%s, targets:%s)' % (self.id, self.state, self.targets())
 
@@ -96,7 +84,7 @@ class Context(object):
     self._targets = OrderedSet()
     for target in target_roots:
       self.add_target(target)
-    self.id = self.identify(self._targets)
+    self.id = Target.identify(self._targets)
 
   def add_target(self, target):
     """Adds a target and its transitive dependencies to the run context.

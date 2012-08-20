@@ -65,7 +65,7 @@ class ThriftstoreDMLGen(CodeGen):
                                                    name=dml_lib_target.id,
                                                    sources=[],
                                                    dependencies=self.javadeps)
-        java_dml_lib.id = dml_lib_target.id
+        java_dml_lib.id = dml_lib_target.id + '.thriftstore_dml_gen'
         java_dml_lib.add_label('codegen')
         java_dml_lib.update_dependencies([thrift_dml_lib])
         self.gen_dml_jls[dml_lib_target] = java_dml_lib
