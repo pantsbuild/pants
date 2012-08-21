@@ -139,33 +139,36 @@ class IvyResolve(NailgunTask):
     target_workdir = os.path.join(self._work_dir, dirname_for_requested_targets(targets))
     target_classpath_file = os.path.join(target_workdir, 'classpath')
     with self.invalidated(filter(is_classpath, targets), only_buildfiles=True) as invalidated:
-      if invalidated.invalid_targets():
+      # Note that it's possible for all targets to be valid but for no classpath file to exist at
+      # target_classpath_file, e.g., if we previously build a superset of targets.
+      if invalidated.invalid_targets() or not os.path.exists(target_classpath_file):
         self._exec_ivy(target_workdir, targets, [
           '-cachepath', target_classpath_file,
           '-confs'
         ] + self._confs)
 
-    if os.path.exists(target_classpath_file):
-      def safe_link(src, dest):
-        if os.path.exists(dest):
-          os.unlink(dest)
-        os.symlink(src, dest)
+    if not os.path.exists(target_classpath_file):
+      raise TaskError, 'Ivy failed to create classpath file at %s' % target_classpath_file
 
-      # Symlink to the current classpath file.
-      safe_link(target_classpath_file, self._classpath_file)
+    def safe_link(src, dest):
+      if os.path.exists(dest):
+        os.unlink(dest)
+      os.symlink(src, dest)
 
-      # Symlink to the current ivy.xml file (useful for IDEs that read it).
-      ivyxml_symlink = os.path.join(self._work_dir, 'ivy.xml')
-      target_ivyxml = os.path.join(target_workdir, 'ivy.xml')
-      safe_link(target_ivyxml, ivyxml_symlink)
+    # Symlink to the current classpath file.
+    safe_link(target_classpath_file, self._classpath_file)
 
-    if os.path.exists(self._classpath_file):
-      with self._cachepath(self._classpath_file) as classpath:
-        with self.context.state('classpath', []) as cp:
-          for path in classpath:
-            if self._is_jar(path):
-              for conf in self._confs:
-                cp.append((conf, path.strip()))
+    # Symlink to the current ivy.xml file (useful for IDEs that read it).
+    ivyxml_symlink = os.path.join(self._work_dir, 'ivy.xml')
+    target_ivyxml = os.path.join(target_workdir, 'ivy.xml')
+    safe_link(target_ivyxml, ivyxml_symlink)
+
+    with self._cachepath(self._classpath_file) as classpath:
+      with self.context.state('classpath', []) as cp:
+        for path in classpath:
+          if self._is_jar(path):
+            for conf in self._confs:
+              cp.append((conf, path.strip()))
 
     if self._report:
       self._generate_ivy_report()
