@@ -91,7 +91,7 @@ class ScalaCompile(NailgunTask):
 
     self._workdir = context.config.get('scala-compile', 'workdir') if workdir is None else workdir
     self._incremental_classes_dir = os.path.join(self._workdir, 'incremental.classes')
-    self._classes_dir = os.path.join(self._workdir, 'classes')
+    self._flat_classes_dir = os.path.join(self._workdir, 'classes')
     self._analysis_cache_dir = os.path.join(self._workdir, 'analysis_cache')
     self._resources_dir = os.path.join(self._workdir, 'resources')
 
@@ -106,7 +106,6 @@ class ScalaCompile(NailgunTask):
 
     self._confs = context.config.getlist('scala-compile', 'confs')
     self._depfile_dir = os.path.join(self._workdir, 'depfiles')
-    self._deps = Dependencies(self._classes_dir)
 
   def product_type(self):
     return 'classes'
@@ -139,32 +138,11 @@ class ScalaCompile(NailgunTask):
           for vt in invalidated.all_versioned_targets():
             self.execute_single_compilation(vt, cp, upstream_analysis_caches)
 
-      # Now we add the global output dir, so that subsequent goals can see it.
-      with self.context.state('classpath', []) as cp:
-        for conf in self._confs:
-          cp.insert(0, (conf, self._classes_dir))
-
-      # Map generated classes to the owning targets and sources.
-      if self.context.products.isrequired('classes'):
-        genmap = self.context.products.get('classes')
-
-        for target, classes_by_source in self._deps.findclasses(scala_targets).items():
-          for source, classes in classes_by_source.items():
-            genmap.add(source, self._classes_dir, classes)
-            genmap.add(target, self._classes_dir, classes)
-
-        # TODO(John Sirois): Map target.resources in the same way
-        # Create and Map scala plugin info files to the owning targets.
-        for target in scala_targets:
-          if is_scalac_plugin(target) and target.classname:
-            basedir = self.write_plugin_info(target)
-            genmap.add(target, basedir, [_PLUGIN_INFO_FILE])
-
   def execute_single_compilation(self, versioned_target_set, cp, upstream_analysis_caches):
     """Execute a single compilation, updating upstream_analysis_caches if needed."""
     if self._flatten:
       compilation_id = 'flat'
-      output_dir = self._classes_dir
+      output_dir = self._flat_classes_dir
     else:
       compilation_id = Target.maybe_readable_identify(versioned_target_set.targets)
       # Each compilation must output to its own directory, so zinc can then associate those with the appropriate
@@ -195,18 +173,27 @@ class ScalaCompile(NailgunTask):
               if result != 0:
                 raise TaskError('%s returned %d' % (self._main, result))
 
-        # Regardless of whether we built or pulled from the artifact cache, we have to link
-        # the emitted class files into the central classes dir.
-        if output_dir != self._classes_dir:
-          self.link_all(output_dir, self._classes_dir)
-
     # Note that the following post-processing steps must happen even for valid targets.
 
     # Read in the deps created either just now or by a previous compiler run on these targets.
-    self.context.log.debug('Reading dependencies from ' + depfile)
-    deps = Dependencies(output_dir)
-    deps.load(depfile)
-    self._deps.merge(deps)
+    if self.context.products.isrequired('classes'):
+      self.context.log.debug('Reading dependencies from ' + depfile)
+      deps = Dependencies(output_dir)
+      deps.load(depfile)
+
+      genmap = self.context.products.get('classes')
+
+      for target, classes_by_source in deps.findclasses(versioned_target_set.targets).items():
+        for source, classes in classes_by_source.items():
+          genmap.add(source, output_dir, classes)
+          genmap.add(target, output_dir, classes)
+
+      # TODO(John Sirois): Map target.resources in the same way
+      # Create and Map scala plugin info files to the owning targets.
+      for target in versioned_target_set.targets:
+        if is_scalac_plugin(target) and target.classname:
+          basedir = self.write_plugin_info(target)
+          genmap.add(target, basedir, [_PLUGIN_INFO_FILE])
 
     # Update the upstream analysis map.
     analysis_cache_parts = os.path.split(analysis_cache)
@@ -214,6 +201,11 @@ class ScalaCompile(NailgunTask):
       # A previous chunk might have already updated this. It is certainly possible for a later chunk to
       # independently depend on some target that a previous chunk already built.
       upstream_analysis_caches.add(output_dir, analysis_cache_parts[0], [ analysis_cache_parts[1] ])
+
+    # Update the classpath.
+    with self.context.state('classpath', []) as cp:
+      for conf in self._confs:
+        cp.insert(0, (conf, output_dir))
 
   def calculate_sources(self, targets):
     sources = defaultdict(set)
@@ -261,7 +253,6 @@ class ScalaCompile(NailgunTask):
 
     if len(analysis_map) > 0:
       args.extend([ '-analysis-map', ','.join(['%s:%s' % kv for kv in analysis_map.items()]) ])
-    upstream_classes_dirs = analysis_map.keys()
 
     zinc_classpath = nailgun_profile_classpath(self, self._zinc_profile)
     zinc_jars = ScalaCompile.identify_zinc_jars(compiler_classpath, zinc_classpath)
@@ -271,7 +262,7 @@ class ScalaCompile(NailgunTask):
     args.extend([
       '-analysis-cache', analysis_cache,
       '-log-level', self.context.options.log_level or 'info',
-      '-classpath', ':'.join(zinc_classpath + classpath + upstream_classes_dirs),
+      '-classpath', ':'.join(zinc_classpath + classpath),
       '-d', output_dir
     ])
 
@@ -306,19 +297,6 @@ class ScalaCompile(NailgunTask):
   # the names of the flags used to pass the jar locations to zinc.
   compiler_jar_names = [ 'scala-library', 'scala-compiler' ]  # Compiler version.
   zinc_jar_names = [ 'compiler-interface', 'sbt-interface' ]  # Other jars zinc needs to be pointed to.
-
-  def link_all(self, srcdir, dstdir):
-    safe_mkdir(dstdir)
-    for (dirpath, dirnames, filenames) in os.walk(srcdir):
-      for d in [os.path.join(dirpath, x) for x in dirnames]:
-        dir = os.path.join(dstdir, os.path.relpath(d, srcdir))
-        if not os.path.isdir(dir):
-          os.mkdir(dir)
-      for f in [os.path.join(dirpath, x) for x in filenames]:
-        outfile = os.path.join(dstdir, os.path.relpath(f, srcdir))
-        if os.path.exists(outfile):
-          os.unlink(outfile)
-        os.link(f, outfile)
 
   @staticmethod
   def identify_zinc_jars(compiler_classpath, zinc_classpath):
