@@ -58,7 +58,10 @@ class InvalidationResult(object):
     self._combined_invalid_versioned_targets = combine_versioned_targets(self._invalid_versioned_targets)
 
   def all_versioned_targets(self):
-    """A list of VersionedTargetSet objects, one per target."""
+    """A list of VersionedTargetSet objects, one per target.
+
+    Targets are in topological order, that is if B depends on A then B comes after A in the list.
+    """
     return self._all_versioned_targets
 
   def combined_all_versioned_targets(self):
@@ -74,11 +77,11 @@ class InvalidationResult(object):
     return self._combined_invalid_versioned_targets
 
   def all_targets(self):
-    """A list of all underlying targets."""
+    """A list of all underlying targets, in topological order."""
     return self._combined_all_versioned_targets.targets
 
   def invalid_targets(self):
-    """A list of all underlying targets that are invalid."""
+    """A list of all underlying targets that are invalid, in topological order."""
     return self._combined_invalid_versioned_targets.targets
 
   def has_invalid_targets(self):
@@ -160,44 +163,18 @@ class Task(object):
       extra_data.append(sha.hexdigest())
 
     cache_manager = CacheManager(self._cache_key_generator, self._build_invalidator_dir,
-      targets, extra_data, only_buildfiles)
+      targets, invalidate_dependants, extra_data, only_buildfiles)
 
     # Check for directly changed targets.
-    all_versioned_targets = [ cache_manager.check(target) for target in targets ]
-    directly_changed_targets = set(vt.targets[0] for vt in all_versioned_targets if not vt.valid)
-    versioned_targets_by_target = dict([(vt.targets[0], vt) for vt in all_versioned_targets])
-
-    # Now add any extra targets we need to invalidate.
-    if invalidate_dependants:
-      for target in (self.context.dependants(lambda t: t in directly_changed_targets)).keys():
-        if target in versioned_targets_by_target:
-          vt = versioned_targets_by_target.get(target)
-          cache_key = vt.cache_key
-          vt.valid = False
-        else:  # The target isn't in targets (it belongs to a future round).
-          cache_key = None
-        cache_manager.invalidate(target, cache_key)
-
-    # Now we're done with invalidation, so can create the result.
+    all_versioned_targets = cache_manager.check(targets)
     invalidation_result = InvalidationResult(all_versioned_targets)
     num_invalid_targets = len(invalidation_result.invalid_targets())
 
     # Do some reporting.
-    if cache_manager.foreign_invalidated_targets:
-      self.context.log.info('Invalidated %d dependent targets '
-                            'for the next round' % cache_manager.foreign_invalidated_targets)
-
-    if cache_manager.changed_files:
-      msg = 'Operating on %d files in %d changed targets' % (
-        cache_manager.changed_files,
-        cache_manager.changed_targets,
-      )
-      if cache_manager.invalidated_files:
-        msg += ' and %d files in %d invalidated dependent targets' % (
-          cache_manager.invalidated_files,
-          cache_manager.invalidated_targets
-        )
-      self.context.log.info(msg)
+    if num_invalid_targets > 0:
+      num_files = reduce(lambda x, y: x + y,
+        [vt.cache_key.num_sources for vt in all_versioned_targets if not vt.valid], 0)
+      self.context.log.info('Operating on %d files in %d invalidated targets' % (num_files, num_invalid_targets))
 
     # Yield the result, and then update the cache.
     try:

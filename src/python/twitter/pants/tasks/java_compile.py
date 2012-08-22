@@ -25,7 +25,6 @@ from twitter.common.dirutil import safe_open, safe_mkdir, touch
 from twitter.pants import is_apt
 from twitter.pants.base.target import Target
 from twitter.pants.targets import JavaLibrary, JavaTests
-from twitter.pants.targets.internal import InternalTarget
 from twitter.pants.tasks import TaskError
 from twitter.pants.tasks.binary_utils import nailgun_profile_classpath
 from twitter.pants.tasks.jvm_compiler_dependencies import Dependencies
@@ -116,7 +115,7 @@ class JavaCompile(NailgunTask):
     return self._flatten
 
   def execute(self, targets):
-    java_targets = filter(JavaCompile._has_java_sources, reversed(InternalTarget.sort_targets(targets)))
+    java_targets = filter(JavaCompile._has_java_sources, targets)
     if java_targets:
       safe_mkdir(self._classes_dir)
       safe_mkdir(self._depfile_dir)

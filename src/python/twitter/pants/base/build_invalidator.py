@@ -21,6 +21,7 @@ import os
 from abc import ABCMeta, abstractmethod
 from collections import namedtuple
 
+from twitter.common.dirutil import safe_mkdir
 from twitter.common.lang import Compatibility
 from twitter.pants.base.hash_utils import hash_all
 
@@ -161,11 +162,7 @@ class BuildInvalidator(object):
 
   def __init__(self, root):
     self._root = os.path.join(root, str(BuildInvalidator.VERSION))
-    try:
-      os.makedirs(self._root)
-    except OSError as e:
-      if e.errno != errno.EEXIST:
-        raise
+    safe_mkdir(self._root)
 
   def invalidate(self, cache_key):
     """Invalidates this cache key.
@@ -192,20 +189,33 @@ class BuildInvalidator(object):
     """
     self._write_sha(cache_key)
 
+  def existing_hash(self, id):
+    """Returns the existing hash for the specified id.
+
+    Returns None if there is no existing hash for this id."""
+    return self._read_sha_by_id(id)
+
   def has_key(self, cache_key):
     return os.path.exists(self._sha_file(cache_key))
 
   def _sha_file(self, cache_key):
-    return os.path.join(self._root, cache_key.id) + '.hash'
+    return self._sha_file_by_id(cache_key.id)
+
+  def _sha_file_by_id(self, id):
+    return os.path.join(self._root, id) + '.hash'
 
   def _write_sha(self, cache_key):
     with open(self._sha_file(cache_key), 'w') as fd:
       fd.write(cache_key.hash)
 
   def _read_sha(self, cache_key):
+    return self._read_sha_by_id(cache_key.id)
+
+  def _read_sha_by_id(self, id):
     try:
-      with open(self._sha_file(cache_key), 'rb') as fd:
+      with open(self._sha_file_by_id(id), 'rb') as fd:
         return fd.read().strip()
     except IOError as e:
       if e.errno != errno.ENOENT:
         raise
+      return None  # File doesn't exist.

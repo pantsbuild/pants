@@ -29,7 +29,6 @@ from twitter.pants.base.target import Target
 from twitter.pants.targets.scala_library import ScalaLibrary
 from twitter.pants.targets.scala_tests import ScalaTests
 from twitter.pants.targets import resolve_target_sources
-from twitter.pants.targets.internal import InternalTarget
 from twitter.pants.tasks import TaskError
 from twitter.pants.tasks.binary_utils import nailgun_profile_classpath
 from twitter.pants.tasks.jvm_compiler_dependencies import Dependencies
@@ -114,7 +113,7 @@ class ScalaCompile(NailgunTask):
     return self._flatten
 
   def execute(self, targets):
-    scala_targets = filter(ScalaCompile._has_scala_sources, reversed(InternalTarget.sort_targets(targets)))
+    scala_targets = filter(ScalaCompile._has_scala_sources, targets)
     if scala_targets:
       safe_mkdir(self._depfile_dir)
       safe_mkdir(self._analysis_cache_dir)

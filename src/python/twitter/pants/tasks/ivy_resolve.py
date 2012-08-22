@@ -136,9 +136,10 @@ class IvyResolve(NailgunTask):
     def is_classpath(t):
       return is_internal(t) and any(jar for jar in t.jar_dependencies if jar.rev)
 
+    classpath_targets = filter(is_classpath, targets)
     target_workdir = os.path.join(self._work_dir, dirname_for_requested_targets(targets))
     target_classpath_file = os.path.join(target_workdir, 'classpath')
-    with self.invalidated(filter(is_classpath, targets), only_buildfiles=True) as invalidated:
+    with self.invalidated(classpath_targets, only_buildfiles=True, invalidate_dependants=True) as invalidated:
       # Note that it's possible for all targets to be valid but for no classpath file to exist at
       # target_classpath_file, e.g., if we previously build a superset of targets.
       if invalidated.invalid_targets() or not os.path.exists(target_classpath_file):
