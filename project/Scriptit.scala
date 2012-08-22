@@ -273,6 +273,7 @@ object Script {
       Command("copy", copy),
       Command("exists", exists),
       Command("delete", delete),
+      Command("show", show),
       Command("sleep", sleep)
     )
 
@@ -375,6 +376,17 @@ object Script {
       val existed = file.exists
       IO.delete(file)
       existed
+    }
+
+    def show(baseDir: File, paths: Seq[String]): Result = {
+      val output = paths map (path => showFile(pathToFile(baseDir, path)))
+      Success(output mkString "\n")
+    }
+
+    def showFile(file: File): String = {
+      val path = file.getAbsolutePath + ":\n"
+      val contents = if (file.exists) IO.read(file) else ""
+      path + contents
     }
 
     def sleep(baseDir: File, args: Seq[String]): Result = {

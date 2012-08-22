@@ -27,10 +27,8 @@ case class Settings(
   javaOnly: Boolean = false,
   javacOptions: Seq[String] = Seq.empty,
   compileOrder: CompileOrder = CompileOrder.Mixed,
-  analysisCache: Option[File] = None,
-  analysisMap: Map[File, File] = Map.empty,
   sbt: SbtJars = SbtJars(),
-  outputRelations: Option[File] = None,
+  analysis: AnalysisOptions = AnalysisOptions(),
   properties: Seq[String] = Seq.empty)
 
 /**
@@ -49,6 +47,16 @@ case class ScalaLocation(
 case class SbtJars(
   sbtInterface: Option[File] = None,
   compilerInterfaceSrc: Option[File] = None)
+
+/**
+ * Configuration for sbt analysis and analysis output options.
+ */
+case class AnalysisOptions(
+  cache: Option[File] = None,
+  cacheMap: Map[File, File] = Map.empty,
+  outputRelations: Option[File] = None,
+  outputProducts: Option[File] = None
+)
 
 object Settings {
   /**
@@ -82,11 +90,14 @@ object Settings {
     prefix(  "-J", "<javac-option>",         "Pass option to javac",                       (s: Settings, o: String) => s.copy(javacOptions = s.javacOptions :+ o)),
 
     header("sbt options:"),
-    file(    "-analysis-cache", "file",      "Cache file for compile analysis",            (s: Settings, f: File) => s.copy(analysisCache = Some(f))),
-    fileMap( "-analysis-map",                "Upstream analysis mapping (file:file,...)",  (s: Settings, m: Map[File, File]) => s.copy(analysisMap = m)),
     file(    "-sbt-interface", "file",       "Specify sbt interface jar",                  (s: Settings, f: File) => s.copy(sbt = s.sbt.copy(sbtInterface = Some(f)))),
     file(    "-compiler-interface", "file",  "Specify compiler interface sources jar",     (s: Settings, f: File) => s.copy(sbt = s.sbt.copy(compilerInterfaceSrc = Some(f)))),
-    file(    "-output-relations", "file",    "Print readable analysis relations to file",  (s: Settings, f: File) => s.copy(outputRelations = Some(f))),
+
+    header("Analysis options:"),
+    file(    "-analysis-cache", "file",      "Cache file for compile analysis",            (s: Settings, f: File) => s.copy(analysis = s.analysis.copy(cache = Some(f)))),
+    fileMap( "-analysis-map",                "Upstream analysis mapping (file:file,...)",  (s: Settings, m: Map[File, File]) => s.copy(analysis = s.analysis.copy(cacheMap = m))),
+    file(    "-output-relations", "file",    "Print readable analysis relations to file",  (s: Settings, f: File) => s.copy(analysis = s.analysis.copy(outputRelations = Some(f)))),
+    file(    "-output-products", "file",     "Print readable source products to file",     (s: Settings, f: File) => s.copy(analysis = s.analysis.copy(outputProducts = Some(f)))),
 
     header("JVM options:"),
     prefix(  "-D", "property=value",         "Pass property to runtime system",            (s: Settings, o: String) => s.copy(properties = s.properties :+ o)),
@@ -160,13 +171,16 @@ object Settings {
           extra = Util.normaliseSeq(cwd)(scala.extra)
         ),
         javaHome = Util.normaliseOpt(cwd)(javaHome),
-        analysisCache = Util.normaliseOpt(cwd)(analysisCache),
-        analysisMap = Util.normaliseMap(cwd)(analysisMap),
         sbt = sbt.copy(
           sbtInterface = Util.normaliseOpt(cwd)(sbt.sbtInterface),
           compilerInterfaceSrc = Util.normaliseOpt(cwd)(sbt.compilerInterfaceSrc)
         ),
-        outputRelations = Util.normaliseOpt(cwd)(outputRelations)
+        analysis = analysis.copy(
+          cache = Util.normaliseOpt(cwd)(analysis.cache),
+          cacheMap = Util.normaliseMap(cwd)(analysis.cacheMap),
+          outputRelations = Util.normaliseOpt(cwd)(analysis.outputRelations),
+          outputProducts = Util.normaliseOpt(cwd)(analysis.outputProducts)
+        )
       )
     }
   }

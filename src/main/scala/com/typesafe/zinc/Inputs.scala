@@ -26,7 +26,8 @@ case class Inputs(
   definesClass: File => String => Boolean,
   javaOnly: Boolean,
   compileOrder: CompileOrder,
-  outputRelations: Option[File])
+  outputRelations: Option[File],
+  outputProducts: Option[File])
 
 object Inputs {
   /**
@@ -34,7 +35,7 @@ object Inputs {
    */
   def apply(settings: Settings): Inputs = {
     import settings._
-    inputs(classpath, sources, classesDirectory, scalacOptions, javacOptions, analysisCache, analysisMap, javaOnly, compileOrder, outputRelations)
+    inputs(classpath, sources, classesDirectory, scalacOptions, javacOptions, analysis.cache, analysis.cacheMap, javaOnly, compileOrder, analysis.outputRelations, analysis.outputProducts)
   }
 
   /**
@@ -50,7 +51,8 @@ object Inputs {
     analysisCacheMap: Map[File, File],
     javaOnly: Boolean,
     compileOrder: CompileOrder,
-    outputRelations: Option[File]): Inputs =
+    outputRelations: Option[File],
+    outputProducts: Option[File]): Inputs =
   {
     val normalise: File => File = { _.getCanonicalFile }
     val cp = classpath map normalise
@@ -60,7 +62,8 @@ object Inputs {
     val upstreamAnalysis = analysisCacheMap map { case (k, v) => (normalise(k), normalise(v)) }
     val analysisMap = (classpath map { file => (file, analysisFor(file, classesDirectory, upstreamAnalysis)) }).toMap
     val printRelations = outputRelations map normalise
-    new Inputs(cp, srcs, classes, scalacOptions, javacOptions, cacheFile, analysisMap, Locate.definesClass, javaOnly, compileOrder, printRelations)
+    val printProducts = outputProducts map normalise
+    new Inputs(cp, srcs, classes, scalacOptions, javacOptions, cacheFile, analysisMap, Locate.definesClass, javaOnly, compileOrder, printRelations, printProducts)
   }
 
   /**
@@ -83,9 +86,10 @@ object Inputs {
     javacOptions.asScala,
     Option(analysisCache),
     analysisMap.asScala.toMap,
-    false,
+    javaOnly = false,
     Settings.compileOrder(compileOrder),
-    None
+    outputRelations = None,
+    outputProducts = None
   )
 
   /**
@@ -127,7 +131,8 @@ object Inputs {
       "analysis map" -> analysisMap,
       "java only" -> javaOnly,
       "compile order" -> compileOrder,
-      "output relations" -> outputRelations)
+      "output relations" -> outputRelations,
+      "output products" -> outputProducts)
     Util.show(("Inputs", values), output)
   }
 }

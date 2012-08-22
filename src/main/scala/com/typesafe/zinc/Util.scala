@@ -5,8 +5,7 @@
 package com.typesafe.zinc
 
 import java.io.File
-import sbt.{ ConsoleLogger, Level, Logger, Relation }
-import sbt.inc.Analysis
+import sbt.{ ConsoleLogger, Level, Logger }
 
 object Util {
 
@@ -64,7 +63,7 @@ object Util {
   }
 
   //
-  // Normalising files
+  // Files
   //
 
   /**
@@ -93,6 +92,14 @@ object Util {
    */
   def normaliseMap(cwd: Option[File])(mapped: Map[File, File]): Map[File, File] = {
     if (cwd.isDefined) mapped map { case (l, r) => (normalise(cwd)(l), normalise(cwd)(r)) } else mapped
+  }
+
+  /**
+   * Fully relativize a path, relative to any other base.
+   */
+  def relativize(base: File, path: File): String = {
+    import scala.tools.nsc.io.Path._
+    (base relativize path).toString
   }
 
   //
@@ -210,37 +217,6 @@ object Util {
     }
 
     def cancel(): Unit = if (timer ne null) timer.cancel()
-  }
-
-  //
-  // Analysis
-  //
-
-  /**
-   * Print analysis relations to file.
-   */
-  def printRelations(analysis: Analysis, output: Option[File], cwd: Option[File]): Unit = {
-    for (file <- output) {
-      val userDir = (cwd getOrElse Setup.Defaults.userDir) + "/"
-      def noCwd(path: String) = path stripPrefix userDir
-      def keyValue(kv: (Any, Any)) = "   " + noCwd(kv._1.toString) + " -> " + noCwd(kv._2.toString)
-      def relation(r: Relation[_, _]) = (r.all.toSeq map keyValue).sorted.mkString("\n")
-      import analysis.relations.{ srcProd, binaryDep, internalSrcDep, externalDep, classes }
-      val relationStrings = Seq(srcProd, binaryDep, internalSrcDep, externalDep, classes) map relation
-      val output = """
-        |products:
-        |%s
-        |binary dependencies:
-        |%s
-        |source dependencies:
-        |%s
-        |external dependencies:
-        |%s
-        |class names:
-        |%s
-        """.trim.stripMargin.format(relationStrings: _*)
-      sbt.IO.write(file, output)
-    }
   }
 
   //

@@ -102,7 +102,7 @@ object Compiler {
 }
 
 /**
- * An zinc compiler for incremental recompilation.
+ * A zinc compiler for incremental recompilation.
  */
 class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler) {
 
@@ -126,7 +126,7 @@ class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler) {
     val reporter = new LoggerReporter(maxErrors, log)
     val analysis = doCompile(scalac, javac, sources, cp, compileOutput, globalsCache, progress, scalacOptions, javacOptions, getAnalysis, definesClass, reporter, compileOrder, false)(log)
     Compiler.analysisCache.put(cacheFile, analysis)
-    Util.printRelations(analysis, outputRelations, cwd)
+    SbtAnalysis.printOutputs(analysis, outputRelations, outputProducts, cwd, classesDirectory)
     analysis
   }
 
