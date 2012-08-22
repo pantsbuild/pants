@@ -79,7 +79,6 @@ class ScalaCompile(NailgunTask):
 
     self._compile_profile = context.config.get('scala-compile', 'compile-profile')  # The target scala version.
     self._zinc_profile = context.config.get('scala-compile', 'zinc-profile')
-    self._depemitter_profile = context.config.get('scala-compile', 'dependencies-plugin-profile')
 
     # All scala targets implicitly depend on the selected scala runtime.
     scaladeps = []
@@ -224,18 +223,9 @@ class ScalaCompile(NailgunTask):
 
   def compile(self, classpath, sources, output_dir, analysis_cache, upstream_analysis_caches, depfile):
     compiler_classpath = nailgun_profile_classpath(self, self._compile_profile)
-    compiler_args = []
-
-    # TODO(John Sirois): separate compiler profile from runtime profile
-    compiler_args.extend([
-      # Support for outputting a dependencies file of source -> class
-      '-Xplugin:%s' % self.get_depemitter_plugin(),
-      '-P:depemitter:file:%s' % depfile
-    ])
-    compiler_args.extend(self._args)
 
     # To pass options to scalac simply prefix with -S.
-    args = ['-S' + x for x in compiler_args]
+    args = ['-S' + x for x in self._args]
 
     def analysis_cache_full_path(analysis_cache_product):
       # We expect the argument to be { analysis_cache_dir, [ analysis_cache_file ]}.
@@ -262,6 +252,7 @@ class ScalaCompile(NailgunTask):
       '-analysis-cache', analysis_cache,
       '-log-level', self.context.options.log_level or 'info',
       '-classpath', ':'.join(zinc_classpath + classpath),
+      '-output-products', depfile,
       '-d', output_dir
     ])
 
@@ -272,14 +263,6 @@ class ScalaCompile(NailgunTask):
 
     self.context.log.debug('Executing: %s %s' % (self._main, ' '.join(args)))
     return self.runjava(self._main, classpath=zinc_classpath, args=args, jvmargs=self._jvm_args)
-
-  def get_depemitter_plugin(self):
-    depemitter_classpath = nailgun_profile_classpath(self, self._depemitter_profile)
-    depemitter_jar = depemitter_classpath.pop()
-    if depemitter_classpath:
-      raise TaskError('Expected only 1 jar for the depemitter plugin, '
-                      'found these extra: ' % depemitter_classpath)
-    return depemitter_jar
 
   def write_plugin_info(self, target):
     basedir = os.path.join(self._resources_dir, target.id)
