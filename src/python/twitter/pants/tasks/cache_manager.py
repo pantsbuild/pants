@@ -64,7 +64,7 @@ class CacheManager(object):
 
     # We must check the targets in this order, to ensure correctness if invalidate_dependents=True, since
     # we use earlier cache keys to compute later cache keys in this case.
-    ordered_targets = reversed(InternalTarget.sort_targets(targets))
+    ordered_targets = self._order_target_list(targets)
     versioned_targets = []
 
     # Map from id to current fingerprint of the target with that id. We update this as we iterate, in
@@ -111,6 +111,13 @@ class CacheManager(object):
   def update(self, cache_key):
     """Mark a changed or invalidated target as successfully processed."""
     self._invalidator.update(cache_key)
+
+  def _order_target_list(self, targets):
+    """Orders the targets topologically, from least to most dependent."""
+    target_ids = set([x.id for x in targets])
+    ordered_targets_and_deps = reversed(InternalTarget.sort_targets(targets))
+    # Return just the ones that were originally in targets.
+    return filter(lambda x: x.id in target_ids, ordered_targets_and_deps)
 
   def _key_for(self, target, dependency_keys):
     def fingerprint_extra(sha):
