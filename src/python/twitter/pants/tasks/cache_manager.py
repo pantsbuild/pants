@@ -82,12 +82,14 @@ class CacheManager(object):
           if isinstance(dep, Target):
             hash = id_to_hash.get(dep.id, None)
             if hash is None:
-              # It must have been processed in a prior round, and therefore the hash should
+              # It may have been processed in a prior round, and therefore the hash should
               # have been written out by the invalidator.
               hash = self._invalidator.existing_hash(dep.id)
-              if hash is None:
-                raise Exception, 'Logic error: no hash for target %s that is a dependency of %s' % (dep, target)
-            dependency_keys.add(hash)
+              # Note that hash may be None here, indicating that the dependency will not be processed
+              # until a later phase. For example, if a codegen target depends on a library target (because
+              # the generated code needs that library).
+            if hash is not None:
+              dependency_keys.add(hash)
           elif isinstance(dep, JarDependency):
             jarid = ''
             for key in CacheManager._JAR_HASH_KEYS:
