@@ -101,7 +101,7 @@ class CacheManager(object):
           # know jars are special and python requirements __str__ works for this purpose.
       cache_key = self._key_for(target, dependency_keys)
       id_to_hash[target.id] = cache_key.hash
-      if cache_key and self._invalidator.needs_update(cache_key):
+      if self._invalidator.needs_update(cache_key):
         self._invalidator.invalidate(cache_key)
         valid = False
       else:
