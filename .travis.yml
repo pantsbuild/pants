@@ -1,7 +1,7 @@
 python:
   - "2.6"
 before_install:
-  - sudo apt-get install -qq openjdk6
+  - sudo apt-get install -qq openjdk-6-jdk
 script: ./pants goal clean-all test tests/java/com/twitter/common:all
 notifications:
   email:
