@@ -39,8 +39,8 @@ class Cache[K, V](initialSize: Int, val maxSize: Int) {
   def get(key: K)(value: => V): V = synchronized {
     cache.get(key) match {
       case null => missed(key, value)
-      case ref => ref.get match {
-        case null => missed(key, value)
+      case ref  => ref.get match {
+        case null   => missed(key, value)
         case cached => hit(key, cached)
       }
     }

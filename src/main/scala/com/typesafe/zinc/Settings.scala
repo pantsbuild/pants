@@ -13,50 +13,50 @@ import xsbti.compile.CompileOrder
  * All parsed command-line options.
  */
 case class Settings(
-  help: Boolean = false,
-  version: Boolean = false,
-  quiet: Boolean = false,
-  logLevel: Level.Value = Level.Info,
-  color: Boolean = true,
-  sources: Seq[File] = Seq.empty,
-  classpath: Seq[File] = Seq.empty,
-  classesDirectory: File = new File("."),
-  scala: ScalaLocation = ScalaLocation(),
+  help: Boolean              = false,
+  version: Boolean           = false,
+  quiet: Boolean             = false,
+  logLevel: Level.Value      = Level.Info,
+  color: Boolean             = true,
+  sources: Seq[File]         = Seq.empty,
+  classpath: Seq[File]       = Seq.empty,
+  classesDirectory: File     = new File("."),
+  scala: ScalaLocation       = ScalaLocation(),
   scalacOptions: Seq[String] = Seq.empty,
-  javaHome: Option[File] = None,
-  javaOnly: Boolean = false,
-  javacOptions: Seq[String] = Seq.empty,
+  javaHome: Option[File]     = None,
+  javaOnly: Boolean          = false,
+  javacOptions: Seq[String]  = Seq.empty,
   compileOrder: CompileOrder = CompileOrder.Mixed,
-  sbt: SbtJars = SbtJars(),
-  analysis: AnalysisOptions = AnalysisOptions(),
-  properties: Seq[String] = Seq.empty)
+  sbt: SbtJars               = SbtJars(),
+  analysis: AnalysisOptions  = AnalysisOptions(),
+  properties: Seq[String]    = Seq.empty)
 
 /**
  * Alternative ways to locate the scala jars.
  */
 case class ScalaLocation(
-  home: Option[File] = None,
-  path: Seq[File] = Seq.empty,
+  home: Option[File]     = None,
+  path: Seq[File]        = Seq.empty,
   compiler: Option[File] = None,
-  library: Option[File] = None,
-  extra: Seq[File] = Seq.empty)
+  library: Option[File]  = None,
+  extra: Seq[File]       = Seq.empty)
 
 /**
  * Locating the sbt jars needed for zinc compile.
  */
 case class SbtJars(
-  sbtInterface: Option[File] = None,
+  sbtInterface: Option[File]         = None,
   compilerInterfaceSrc: Option[File] = None)
 
 /**
  * Configuration for sbt analysis and analysis output options.
  */
 case class AnalysisOptions(
-  cache: Option[File] = None,
-  cacheMap: Map[File, File] = Map.empty,
-  forceClean: Boolean = false,
+  cache: Option[File]           = None,
+  cacheMap: Map[File, File]     = Map.empty,
+  forceClean: Boolean           = false,
   outputRelations: Option[File] = None,
-  outputProducts: Option[File] = None
+  outputProducts: Option[File]  = None
 )
 
 object Settings {

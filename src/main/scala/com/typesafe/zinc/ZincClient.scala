@@ -60,9 +60,9 @@ class ZincClient(val address: InetAddress, val port: Int) {
    * @throws java.net.ConnectException if the zinc server is not available
    */
   def send(command: String, args: Seq[String], cwd: File, out: OutputStream, err: OutputStream): Int = {
-    val socket = new Socket(address, port)
+    val socket  = new Socket(address, port)
     val sockout = socket.getOutputStream
-    val sockin = new DataInputStream(socket.getInputStream)
+    val sockin  = new DataInputStream(socket.getInputStream)
     sendCommand(command, args, cwd, sockout)
     val exitCode = receiveOutput(sockin, out, err)
     sockout.close(); sockin.close(); socket.close()
@@ -91,7 +91,7 @@ class ZincClient(val address: InetAddress, val port: Int) {
       try {
         val (chunkType, data) = getChunk(in)
         chunkType match {
-          case Exit => Some(new String(data).toInt)
+          case Exit   => Some(new String(data).toInt)
           case StdOut => out.write(data); None
           case StdErr => err.write(data); None
         }

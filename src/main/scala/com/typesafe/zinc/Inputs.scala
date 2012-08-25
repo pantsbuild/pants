@@ -36,7 +36,19 @@ object Inputs {
    */
   def apply(settings: Settings): Inputs = {
     import settings._
-    inputs(classpath, sources, classesDirectory, scalacOptions, javacOptions, analysis.cache, analysis.cacheMap, analysis.forceClean, javaOnly, compileOrder, analysis.outputRelations, analysis.outputProducts)
+    inputs(
+      classpath,
+      sources,
+      classesDirectory,
+      scalacOptions,
+      javacOptions,
+      analysis.cache,
+      analysis.cacheMap,
+      analysis.forceClean,
+      javaOnly,
+      compileOrder,
+      analysis.outputRelations,
+      analysis.outputProducts)
   }
 
   /**
@@ -57,14 +69,14 @@ object Inputs {
     outputProducts: Option[File]): Inputs =
   {
     val normalise: File => File = { _.getCanonicalFile }
-    val cp = classpath map normalise
-    val srcs = sources map normalise
-    val classes = normalise(classesDirectory)
-    val cacheFile = normalise(analysisCache.getOrElse(defaultCacheLocation(classesDirectory)))
+    val cp               = classpath map normalise
+    val srcs             = sources map normalise
+    val classes          = normalise(classesDirectory)
+    val cacheFile        = normalise(analysisCache.getOrElse(defaultCacheLocation(classesDirectory)))
     val upstreamAnalysis = analysisCacheMap map { case (k, v) => (normalise(k), normalise(v)) }
-    val analysisMap = (classpath map { file => (file, analysisFor(file, classesDirectory, upstreamAnalysis)) }).toMap
-    val printRelations = outputRelations map normalise
-    val printProducts = outputProducts map normalise
+    val analysisMap      = (classpath map { file => (file, analysisFor(file, classesDirectory, upstreamAnalysis)) }).toMap
+    val printRelations   = outputRelations map normalise
+    val printProducts    = outputProducts map normalise
     new Inputs(cp, srcs, classes, scalacOptions, javacOptions, cacheFile, analysisMap, forceClean, Locate.definesClass, javaOnly, compileOrder, printRelations, printProducts)
   }
 
@@ -130,18 +142,18 @@ object Inputs {
   def show(inputs: Inputs, output: String => Unit): Unit = {
     import inputs._
     val values = Seq(
-      "classpath" -> classpath,
-      "sources" -> sources,
+      "classpath"        -> classpath,
+      "sources"          -> sources,
       "output directory" -> classesDirectory,
-      "scalac options" -> scalacOptions,
-      "javac options" -> javacOptions,
-      "cache file" -> cacheFile,
-      "analysis map" -> analysisMap,
-      "force clean" -> forceClean,
-      "java only" -> javaOnly,
-      "compile order" -> compileOrder,
+      "scalac options"   -> scalacOptions,
+      "javac options"    -> javacOptions,
+      "cache file"       -> cacheFile,
+      "analysis map"     -> analysisMap,
+      "force clean"      -> forceClean,
+      "java only"        -> javaOnly,
+      "compile order"    -> compileOrder,
       "output relations" -> outputRelations,
-      "output products" -> outputProducts)
+      "output products"  -> outputProducts)
     Util.show(("Inputs", values), output)
   }
 }

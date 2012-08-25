@@ -196,7 +196,7 @@ object Util {
           case "h" => 60 * 60 * 1000
           case "m" => 60 * 1000
           case "s" => 1000
-          case _ => 0
+          case _   => 0
         }
         try { length.toLong * multiplier } catch { case _: Exception => default }
       case _ => default

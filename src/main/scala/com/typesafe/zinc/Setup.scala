@@ -22,18 +22,18 @@ case class Setup(
   cacheDir: File)
 
 object Setup {
-  val Command = "zinc"
+  val Command     = "zinc"
   val Description = "scala incremental compiler"
 
   val HomeProperty = prop("home")
-  val DirProperty = prop("dir")
+  val DirProperty  = prop("dir")
 
   val ScalaCompilerId = "scala-compiler"
-  val ScalaLibraryId = "scala-library"
+  val ScalaLibraryId  = "scala-library"
 
-  val ScalaCompilerName = "scala-compiler.jar"
-  val ScalaLibraryName = "scala-library.jar"
-  val SbtInterfaceName = "sbt-interface.jar"
+  val ScalaCompilerName            = "scala-compiler.jar"
+  val ScalaLibraryName             = "scala-library.jar"
+  val SbtInterfaceName             = "sbt-interface.jar"
   val CompilerInterfaceSourcesName = "compiler-interface-sources.jar"
 
   /**
@@ -59,10 +59,10 @@ object Setup {
   {
     val normalise: File => File = { _.getCanonicalFile }
     val compilerJar = normalise(scalaCompiler)
-    val libraryJar = normalise(scalaLibrary)
-    val extraJars = scalaExtra map normalise
-    val javaHome = javaHomeDir map normalise
-    val cacheDir = zincCacheDir
+    val libraryJar  = normalise(scalaLibrary)
+    val extraJars   = scalaExtra map normalise
+    val javaHome    = javaHomeDir map normalise
+    val cacheDir    = zincCacheDir
     Setup(compilerJar, libraryJar, extraJars, sbtInterface, compilerInterfaceSrc, javaHome, cacheDir)
   }
 
@@ -140,21 +140,21 @@ object Setup {
 
   object Defaults {
     val userHome = Util.fileProperty("user.home")
-    val userDir = Util.fileProperty("user.dir")
-    val zincDir = Util.optFileProperty(DirProperty).getOrElse(userHome / ("." + Command)).getCanonicalFile
+    val userDir  = Util.fileProperty("user.dir")
+    val zincDir  = Util.optFileProperty(DirProperty).getOrElse(userHome / ("." + Command)).getCanonicalFile
     val zincHome = Util.optFileProperty(HomeProperty).map(_.getCanonicalFile)
 
-    val sbtInterface = optLibOrDefault(zincHome, SbtInterfaceName)
+    val sbtInterface         = optLibOrDefault(zincHome, SbtInterfaceName)
     val compilerInterfaceSrc = optLibOrDefault(zincHome, CompilerInterfaceSourcesName)
 
-    val scalaCompiler = optLibOrDefault(zincHome, ScalaCompilerName)
-    val scalaLibrary = optLibOrDefault(zincHome, ScalaLibraryName)
-    val scalaExtra = Seq.empty[File]
-    val scalaJars = (scalaCompiler, scalaLibrary, scalaExtra)
+    val scalaCompiler        = optLibOrDefault(zincHome, ScalaCompilerName)
+    val scalaLibrary         = optLibOrDefault(zincHome, ScalaLibraryName)
+    val scalaExtra           = Seq.empty[File]
+    val scalaJars            = (scalaCompiler, scalaLibrary, scalaExtra)
     val defaultScalaExcluded = Set("jansi.jar", "jline.jar", "scala-partest.jar", "scala-swing.jar", "scalacheck.jar", "scalap.jar")
-    val scalaExcluded = Util.stringSetProperty(prop("scala.excluded"), defaultScalaExcluded)
+    val scalaExcluded        = Util.stringSetProperty(prop("scala.excluded"), defaultScalaExcluded)
 
-    val cacheLimit = Util.intProperty(prop("cache.limit"), 5)
+    val cacheLimit         = Util.intProperty(prop("cache.limit"), 5)
     val analysisCacheLimit = Util.intProperty(prop("analysis.cache.limit"), cacheLimit)
     val compilerCacheLimit = Util.intProperty(prop("compiler.cache.limit"), cacheLimit)
     val residentCacheLimit = Util.intProperty(prop("resident.cache.limit"), 0)
@@ -226,13 +226,13 @@ object Setup {
   def show(setup: Setup, output: String => Unit): Unit = {
     import setup._
     val values = Seq(
-      "scala compiler" -> scalaCompiler,
-      "scala library" -> scalaLibrary,
-      "scala extra" -> scalaExtra,
-      "sbt interface" -> sbtInterface,
+      "scala compiler"             -> scalaCompiler,
+      "scala library"              -> scalaLibrary,
+      "scala extra"                -> scalaExtra,
+      "sbt interface"              -> sbtInterface,
       "compiler interface sources" -> compilerInterfaceSrc,
-      "java home" -> javaHome,
-      "cache directory" -> cacheDir)
+      "java home"                  -> javaHome,
+      "cache directory"            -> cacheDir)
     Util.show(("Setup", values), output)
   }
 }

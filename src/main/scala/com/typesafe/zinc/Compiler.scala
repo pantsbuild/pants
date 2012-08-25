@@ -48,10 +48,10 @@ object Compiler {
    * Create a new zinc compiler based on compiler setup.
    */
   def create(setup: Setup, log: Logger): Compiler = {
-    val instance = scalaInstance(setup)
+    val instance     = scalaInstance(setup)
     val interfaceJar = compilerInterface(setup, instance, log)
-    val scalac = IC.newScalaCompiler(instance, interfaceJar, ClasspathOptions.boot, log)
-    val javac = AggressiveCompile.directOrFork(instance, ClasspathOptions.javac(false), setup.javaHome)
+    val scalac       = IC.newScalaCompiler(instance, interfaceJar, ClasspathOptions.boot, log)
+    val javac        = AggressiveCompile.directOrFork(instance, ClasspathOptions.javac(false), setup.javaHome)
     new Compiler(scalac, javac)
   }
 
@@ -120,14 +120,14 @@ class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler) {
       val emptyAnalysis = (Compiler.analysisCache.get(cacheFile)(IC.readAnalysis(cacheFile)) eq Analysis.Empty)
       if (emptyAnalysis) Util.cleanAllClasses(classesDirectory)
     }
-    val doCompile = new AggressiveCompile(cacheFile)
-    val cp = autoClasspath(classesDirectory, scalac.scalaInstance.libraryJar, javaOnly, classpath)
+    val doCompile     = new AggressiveCompile(cacheFile)
+    val cp            = autoClasspath(classesDirectory, scalac.scalaInstance.libraryJar, javaOnly, classpath)
     val compileOutput = CompileOutput(classesDirectory)
-    val globalsCache = Compiler.residentCache
-    val progress = None
+    val globalsCache  = Compiler.residentCache
+    val progress      = None
+    val maxErrors     = 100
+    val reporter      = new LoggerReporter(maxErrors, log)
     val getAnalysis: File => Option[Analysis] = analysisMap.get _
-    val maxErrors = 100
-    val reporter = new LoggerReporter(maxErrors, log)
     val analysis = doCompile(scalac, javac, sources, cp, compileOutput, globalsCache, progress, scalacOptions, javacOptions, getAnalysis, definesClass, reporter, compileOrder, false)(log)
     Compiler.analysisCache.put(cacheFile, analysis)
     SbtAnalysis.printOutputs(analysis, outputRelations, outputProducts, cwd, classesDirectory)
