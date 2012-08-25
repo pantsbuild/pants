@@ -119,11 +119,10 @@ object Setup {
    * Verify that necessary jars exist.
    */
   def verify(setup: Setup, log: sbt.Logger): Boolean = {
-    val scalaCompiler = requireFile(setup.scalaCompiler, log)
-    val scalaLibrary = requireFile(setup.scalaLibrary, log)
-    val sbtInterface = requireFile(setup.sbtInterface, log)
-    val compilerInterfaceSrc = requireFile(setup.compilerInterfaceSrc, log)
-    (scalaCompiler && scalaLibrary && sbtInterface && compilerInterfaceSrc)
+    requireFile(setup.scalaCompiler, log) &&
+    requireFile(setup.scalaLibrary, log) &&
+    requireFile(setup.sbtInterface, log) &&
+    requireFile(setup.compilerInterfaceSrc, log)
   }
 
   /**

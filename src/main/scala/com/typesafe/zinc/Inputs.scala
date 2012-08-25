@@ -94,8 +94,16 @@ object Inputs {
 
   /**
    * By default the cache location is relative to the classes directory (for example, target/classes/../cache/classes).
+   * If not writable then the fallback is within the zinc cache directory.
    */
-  def defaultCacheLocation(file: File) = file.getParentFile / "cache" / file.getName
+  def defaultCacheLocation(classesDir: File) = {
+    val alongside = classesDir.getParentFile / "cache"
+    if (alongside.mkdirs) {
+     alongside / classesDir.getName
+    } else {
+      Setup.zincCacheDir / "analysis-cache" / classesDir.getCanonicalPath
+    }
+  }
 
   /**
    * Get the analysis for a compile run, based on the output directory.

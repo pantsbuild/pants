@@ -61,6 +61,11 @@ object Main {
       sys.exit(1)
     }
 
+    // warn about cache file location when under zinc cache dir
+    if (inputs.cacheFile.getCanonicalPath startsWith Setup.zincCacheDir.getPath) {
+      log.warn("Default cache file location not accessible. Using " + inputs.cacheFile.getPath)
+    }
+
     if (isDebug) {
       val debug: String => Unit = log.debug(_)
       Setup.show(setup, debug)
@@ -77,6 +82,10 @@ object Main {
     } catch {
       case e: CompileFailed =>
         log.error("Compile failed " + Util.timing(startTime))
+        sys.exit(1)
+      case e: Exception =>
+        if (isDebug) e.printStackTrace
+        log.error("Error: " + e.toString)
         sys.exit(1)
     }
   }
