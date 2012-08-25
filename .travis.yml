@@ -1,8 +1,7 @@
-language: java
-jdk:
-  - openjdk6
 python:
   - "2.6"
+before_install:
+  - sudo apt-get install -qq openjdk6
 script: ./pants goal clean-all test tests/java/com/twitter/common:all
 notifications:
   email:
