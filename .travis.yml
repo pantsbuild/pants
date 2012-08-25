@@ -1,0 +1,10 @@
+language: java
+jdk:
+  - openjdk6
+python:
+  - "2.6"
+script: ./pants goal clean-all test tests/java/com/twitter/common:all
+notifications:
+  email:
+      - john.sirois@gmail.com
+
