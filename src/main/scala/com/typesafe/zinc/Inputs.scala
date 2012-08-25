@@ -23,6 +23,7 @@ case class Inputs(
   javacOptions: Seq[String],
   cacheFile: File,
   analysisMap: Map[File, Analysis],
+  forceClean: Boolean,
   definesClass: File => String => Boolean,
   javaOnly: Boolean,
   compileOrder: CompileOrder,
@@ -35,7 +36,7 @@ object Inputs {
    */
   def apply(settings: Settings): Inputs = {
     import settings._
-    inputs(classpath, sources, classesDirectory, scalacOptions, javacOptions, analysis.cache, analysis.cacheMap, javaOnly, compileOrder, analysis.outputRelations, analysis.outputProducts)
+    inputs(classpath, sources, classesDirectory, scalacOptions, javacOptions, analysis.cache, analysis.cacheMap, analysis.forceClean, javaOnly, compileOrder, analysis.outputRelations, analysis.outputProducts)
   }
 
   /**
@@ -49,6 +50,7 @@ object Inputs {
     javacOptions: Seq[String],
     analysisCache: Option[File],
     analysisCacheMap: Map[File, File],
+    forceClean: Boolean,
     javaOnly: Boolean,
     compileOrder: CompileOrder,
     outputRelations: Option[File],
@@ -63,7 +65,7 @@ object Inputs {
     val analysisMap = (classpath map { file => (file, analysisFor(file, classesDirectory, upstreamAnalysis)) }).toMap
     val printRelations = outputRelations map normalise
     val printProducts = outputProducts map normalise
-    new Inputs(cp, srcs, classes, scalacOptions, javacOptions, cacheFile, analysisMap, Locate.definesClass, javaOnly, compileOrder, printRelations, printProducts)
+    new Inputs(cp, srcs, classes, scalacOptions, javacOptions, cacheFile, analysisMap, forceClean, Locate.definesClass, javaOnly, compileOrder, printRelations, printProducts)
   }
 
   /**
@@ -86,6 +88,7 @@ object Inputs {
     javacOptions.asScala,
     Option(analysisCache),
     analysisMap.asScala.toMap,
+    forceClean = false,
     javaOnly = false,
     Settings.compileOrder(compileOrder),
     outputRelations = None,
@@ -97,12 +100,9 @@ object Inputs {
    * If not writable then the fallback is within the zinc cache directory.
    */
   def defaultCacheLocation(classesDir: File) = {
-    val alongside = classesDir.getParentFile / "cache"
-    if (alongside.mkdirs) {
-     alongside / classesDir.getName
-    } else {
-      Setup.zincCacheDir / "analysis-cache" / classesDir.getCanonicalPath
-    }
+    val alongside = classesDir.getParentFile / "cache" / classesDir.getName
+    if (Util.checkWritable(alongside)) alongside
+    else Setup.zincCacheDir / "analysis-cache" / classesDir.getCanonicalPath
   }
 
   /**
@@ -137,6 +137,7 @@ object Inputs {
       "javac options" -> javacOptions,
       "cache file" -> cacheFile,
       "analysis map" -> analysisMap,
+      "force clean" -> forceClean,
       "java only" -> javaOnly,
       "compile order" -> compileOrder,
       "output relations" -> outputRelations,

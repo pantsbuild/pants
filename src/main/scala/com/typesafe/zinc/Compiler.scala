@@ -20,12 +20,12 @@ object Compiler {
   /**
    * Static cache for zinc compilers.
    */
-  val cache = Cache[Setup, Compiler](Setup.Defaults.compilerCacheLimit)
+  val compilerCache = Cache[Setup, Compiler](Setup.Defaults.compilerCacheLimit)
 
   /**
    * Static cache for resident scala compilers.
    */
-  val compilerCache: GlobalsCache = createCompilerCache(Setup.Defaults.residentCacheLimit)
+  val residentCache: GlobalsCache = createResidentCache(Setup.Defaults.residentCacheLimit)
 
   /**
    * Static cache for compile results.
@@ -36,7 +36,7 @@ object Compiler {
    * Get or create a zinc compiler based on compiler setup.
    */
   def apply(setup: Setup, log: Logger): Compiler = {
-    cache.get(setup)(create(setup, log))
+    compilerCache.get(setup)(create(setup, log))
   }
 
   /**
@@ -58,7 +58,7 @@ object Compiler {
   /**
    * Create new globals cache.
    */
-  def createCompilerCache(maxCompilers: Int): GlobalsCache = {
+  def createResidentCache(maxCompilers: Int): GlobalsCache = {
     if (maxCompilers <= 0) CompilerCache.fresh else CompilerCache(maxCompilers)
   }
 
@@ -116,10 +116,14 @@ class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler) {
    */
   def compile(inputs: Inputs, cwd: Option[File])(log: Logger): Analysis = {
     import inputs._
+    if (forceClean) {
+      val emptyAnalysis = (Compiler.analysisCache.get(cacheFile)(IC.readAnalysis(cacheFile)) eq Analysis.Empty)
+      if (emptyAnalysis) Util.cleanAllClasses(classesDirectory)
+    }
     val doCompile = new AggressiveCompile(cacheFile)
     val cp = autoClasspath(classesDirectory, scalac.scalaInstance.libraryJar, javaOnly, classpath)
     val compileOutput = CompileOutput(classesDirectory)
-    val globalsCache = Compiler.compilerCache
+    val globalsCache = Compiler.residentCache
     val progress = None
     val getAnalysis: File => Option[Analysis] = analysisMap.get _
     val maxErrors = 100

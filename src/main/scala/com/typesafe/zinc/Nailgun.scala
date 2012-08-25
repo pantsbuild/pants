@@ -65,7 +65,7 @@ object Nailgun {
    * Output all currently cached zinc compilers.
    */
   def status(context: NGContext): Unit = {
-    val entries = Compiler.cache.entries
+    val entries = Compiler.compilerCache.entries
     val counted = Util.counted(entries.size, "cached compiler", "", "s")
     context.out.println("Nailgun server running with " + counted)
     context.out.println("")

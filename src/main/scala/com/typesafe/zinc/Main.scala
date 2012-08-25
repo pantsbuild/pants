@@ -85,7 +85,7 @@ object Main {
         sys.exit(1)
       case e: Exception =>
         if (isDebug) e.printStackTrace
-        log.error("Error: " + e.toString)
+        log.error(e.getMessage)
         sys.exit(1)
     }
   }

@@ -5,7 +5,7 @@
 package com.typesafe.zinc
 
 import java.io.File
-import sbt.{ ConsoleLogger, Level, Logger }
+import sbt.{ ConsoleLogger, IO, Level, Logger }
 
 object Util {
 
@@ -100,6 +100,21 @@ object Util {
   def relativize(base: File, path: File): String = {
     import scala.tools.nsc.io.Path._
     (base relativize path).toString
+  }
+
+  /**
+   * Check a file is writable, create it if it doesn't exist.
+   */
+  def checkWritable(file: File) = {
+    try { IO.touch(file); true } catch { case e: Exception => false }
+  }
+
+  /**
+   * Clean all class files from a directory.
+   */
+  def cleanAllClasses(dir: File): Unit = {
+    import sbt.Path._
+    IO.delete((dir ** "*.class").get)
   }
 
   //
