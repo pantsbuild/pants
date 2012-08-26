@@ -48,8 +48,9 @@ object Main {
       if (!settings.version && !settings.help) {
         Setup.printVersion()
         Settings.printUsage()
+        sys.exit(1)
       }
-      sys.exit(1)
+      sys.exit(0)
     }
 
     val setup = Setup(settings)
