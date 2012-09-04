@@ -141,6 +141,20 @@ extends OptionDef[Context] {
   override def help = prefix + argument
 }
 
+class FilePairOption[Context](
+  val options: Seq[String],
+  val argument: String,
+  val description: String,
+  val action: (Context, (File, File)) => Context)
+extends ArgumentOption[(File, File), Context] {
+  val pairSeparator = File.pathSeparatorChar
+
+  def parse(arg: String): Option[(File, File)] = {
+    val p = arg split pairSeparator
+    if (p.length == 2) Some((new File(p(0)), new File(p(1)))) else None
+  }
+}
+
 class FileMapOption[Context](
   val options: Seq[String],
   val description: String,

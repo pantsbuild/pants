@@ -1,0 +1,16 @@
+# test split analysis utility
+
+zinc -nailed -analysis-cache analysis/abc -d classes -output-relations relations/abc a/A.scala b/B.scala c/C.scala
+
+zinc -nailed -analysis -cache analysis/abc -split a:analysis/a,b:analysis/b,c:analysis/c
+
+zinc -nailed -analysis-cache analysis/a -d classes -output-relations relations/a a/A.scala
+zinc -nailed -analysis-cache analysis/b -d classes -output-relations relations/b b/B.scala
+zinc -nailed -analysis-cache analysis/c -d classes -output-relations relations/c c/C.scala
+
+zinc -shutdown
+
+show relations/abc
+show relations/a
+show relations/b
+show relations/c

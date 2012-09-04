@@ -125,7 +125,7 @@ object Inputs {
   def analysisFor(file: File, exclude: File, mapped: Map[File, File]): Analysis = {
     if (file != exclude && file.isDirectory) {
       val cacheFile = mapped.getOrElse(file, defaultCacheLocation(file)).getCanonicalFile
-      Compiler.analysisCache.get(cacheFile)(IC.readAnalysis(cacheFile))
+      Compiler.analysis(cacheFile)
     } else Analysis.Empty
   }
 

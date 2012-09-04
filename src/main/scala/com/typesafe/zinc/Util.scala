@@ -81,6 +81,13 @@ object Util {
   }
 
   /**
+   * Normalise file pair in relation to actual current working directory.
+   */
+  def normalisePair(cwd: Option[File])(pair: (File, File)): (File, File) = {
+    if (cwd.isDefined) (normalise(cwd)(pair._1), normalise(cwd)(pair._2)) else pair
+  }
+
+  /**
    * Normalise sequence of files in relation to actual current working directory.
    */
   def normaliseSeq(cwd: Option[File])(files: Seq[File]): Seq[File] = {

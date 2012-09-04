@@ -43,6 +43,17 @@ object Main {
 
     if (settings.help) Settings.printUsage()
 
+    // analysis manipulation utilities
+    if (settings.analysisUtil.run) {
+      val exitCode = try {
+        SbtAnalysis.runUtil(settings.analysisUtil, log)
+      } catch {
+        case e: Exception => log.error(e.getMessage)
+        sys.exit(1)
+      }
+      sys.exit(0) // only run analysis utilities
+    }
+
     // if there are no sources provided, print version and usage by default
     if (settings.sources.isEmpty) {
       if (!settings.version && !settings.help) {

@@ -29,6 +29,7 @@ case class Settings(
   compileOrder: CompileOrder = CompileOrder.Mixed,
   sbt: SbtJars               = SbtJars(),
   analysis: AnalysisOptions  = AnalysisOptions(),
+  analysisUtil: AnalysisUtil = AnalysisUtil(),
   properties: Seq[String]    = Seq.empty)
 
 /**
@@ -57,6 +58,18 @@ case class AnalysisOptions(
   forceClean: Boolean           = false,
   outputRelations: Option[File] = None,
   outputProducts: Option[File]  = None
+)
+
+/**
+ * Configuration for analysis manipulation utilities.
+ */
+case class AnalysisUtil(
+  run: Boolean                 = false,
+  cache: Option[File]          = None,
+  merge: Seq[File]             = Seq.empty,
+  rebase: Option[(File, File)] = None,
+  split: Map[File, File]       = Map.empty,
+  reload: Seq[File]            = Seq.empty
 )
 
 object Settings {
@@ -111,7 +124,15 @@ object Settings {
     dummy(   "-start",                       "Ensure nailgun server is running (if nailed)"),
     dummy(   "-status",                      "Report nailgun server status (if nailed)"),
     dummy(   "-shutdown",                    "Shutdown nailgun server (if nailed)"),
-    dummy(   "-idle-timeout <duration>",     "Set idle timeout (Nh|Nm|Ns) (if nailed)")
+    dummy(   "-idle-timeout <duration>",     "Set idle timeout (Nh|Nm|Ns) (if nailed)"),
+
+    header("Analysis manipulation utilities:"),
+    boolean( "-analysis",                    "Run analysis manipulation utilities",        (s: Settings) => s.copy(analysisUtil = s.analysisUtil.copy(run = true))),
+    file(    "-cache", "file",               "Analysis cache file to alter",               (s: Settings, f: File) => s.copy(analysisUtil = s.analysisUtil.copy(cache = Some(f)))),
+    path(    "-merge", "path",               "Merge analyses, overwrite cached analysis",  (s: Settings, ap: Seq[File]) => s.copy(analysisUtil = s.analysisUtil.copy(merge = ap))),
+    filePair("-rebase", "from:to",           "Rebase all analysis product paths",          (s: Settings, p: (File, File)) => s.copy(analysisUtil = s.analysisUtil.copy(rebase = Some(p)))),
+    fileMap( "-split",                       "Split analysis by source directory",         (s: Settings, m: Map[File, File]) => s.copy(analysisUtil = s.analysisUtil.copy(split = m))),
+    file(    "-reload", "cache-file",        "Reload analysis from cache file",            (s: Settings, f: File) => s.copy(analysisUtil = s.analysisUtil.copy(reload = s.analysisUtil.reload :+ f)))
   )
 
   val allOptions: Set[OptionDef[Settings]] = options.toSet
@@ -182,6 +203,13 @@ object Settings {
           cacheMap = Util.normaliseMap(cwd)(analysis.cacheMap),
           outputRelations = Util.normaliseOpt(cwd)(analysis.outputRelations),
           outputProducts = Util.normaliseOpt(cwd)(analysis.outputProducts)
+        ),
+        analysisUtil = analysisUtil.copy(
+          cache = Util.normaliseOpt(cwd)(analysisUtil.cache),
+          merge = Util.normaliseSeq(cwd)(analysisUtil.merge),
+          rebase = analysisUtil.rebase map Util.normalisePair(cwd),
+          split = Util.normaliseMap(cwd)(analysisUtil.split),
+          reload = Util.normaliseSeq(cwd)(analysisUtil.reload)
         )
       )
     }
@@ -197,6 +225,7 @@ object Settings {
   def path(opt: String, arg: String, desc: String, action: (Settings, Seq[File]) => Settings) = new PathOption[Settings](Seq(opt), arg, desc, action)
   def path(opts: (String, String), arg: String, desc: String, action: (Settings, Seq[File]) => Settings) = new PathOption[Settings](Seq(opts._1, opts._2), arg, desc, action)
   def prefix(pre: String, arg: String, desc: String, action: (Settings, String) => Settings) = new PrefixOption[Settings](pre, arg, desc, action)
+  def filePair(opt: String, arg: String, desc: String, action: (Settings, (File, File)) => Settings) = new FilePairOption[Settings](Seq(opt), arg, desc, action)
   def fileMap(opt: String, desc: String, action: (Settings, Map[File, File]) => Settings) = new FileMapOption[Settings](Seq(opt), desc, action)
   def header(label: String) = new HeaderOption[Settings](label)
   def dummy(opt: String, desc: String) = new DummyOption[Settings](opt, desc)

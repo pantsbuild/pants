@@ -6,9 +6,9 @@ package com.typesafe.zinc
 
 import java.io.File
 import java.net.URLClassLoader
-import sbt.{ ClasspathOptions, LoggerReporter, ScalaInstance }
+import sbt.{ ClasspathOptions, CompileOptions, CompileSetup, LoggerReporter, ScalaInstance }
 import sbt.compiler.{ AggressiveCompile, AnalyzingCompiler, CompilerCache, CompileOutput, IC }
-import sbt.inc.Analysis
+import sbt.inc.{ Analysis, AnalysisStore, FileBasedStore }
 import sbt.Path._
 import xsbti.compile.{ JavaCompiler, GlobalsCache }
 import xsbti.Logger
@@ -28,9 +28,9 @@ object Compiler {
   val residentCache: GlobalsCache = createResidentCache(Setup.Defaults.residentCacheLimit)
 
   /**
-   * Static cache for compile results.
+   * Static cache for compile analyses.
    */
-  val analysisCache = Cache[File, Analysis](Setup.Defaults.analysisCacheLimit)
+  val analysisCache = Cache[File, AnalysisStore](Setup.Defaults.analysisCacheLimit)
 
   /**
    * Get or create a zinc compiler based on compiler setup.
@@ -60,6 +60,36 @@ object Compiler {
    */
   def createResidentCache(maxCompilers: Int): GlobalsCache = {
     if (maxCompilers <= 0) CompilerCache.fresh else CompilerCache(maxCompilers)
+  }
+
+  /**
+   * Get or create an analysis store.
+   */
+  def analysisStore(cacheFile: File): AnalysisStore = {
+    analysisCache.get(cacheFile)(createAnalysisStore(cacheFile))
+  }
+
+  /**
+   * Create a new analysis store based on a cache file.
+   */
+  def createAnalysisStore(cacheFile: File): AnalysisStore = {
+    import sbinary.DefaultProtocol.{immutableMapFormat, immutableSetFormat, StringFormat, tuple2Format}
+    import sbt.inc.AnalysisFormats._
+    AnalysisStore.sync(AnalysisStore.cached(FileBasedStore(cacheFile)))
+  }
+
+  /**
+   * Get an analysis, lookup by cache file.
+   */
+  def analysis(cacheFile: File): Analysis = {
+    analysisStore(cacheFile).get map (_._1) getOrElse Analysis.Empty
+  }
+
+  /**
+   * Check whether an analysis is empty.
+   */
+  def analysisIsEmpty(cacheFile: File): Boolean = {
+    analysis(cacheFile) eq Analysis.Empty
   }
 
   /**
@@ -116,20 +146,19 @@ class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler) {
    */
   def compile(inputs: Inputs, cwd: Option[File])(log: Logger): Analysis = {
     import inputs._
-    if (forceClean) {
-      val emptyAnalysis = (Compiler.analysisCache.get(cacheFile)(IC.readAnalysis(cacheFile)) eq Analysis.Empty)
-      if (emptyAnalysis) Util.cleanAllClasses(classesDirectory)
-    }
-    val doCompile     = new AggressiveCompile(cacheFile)
+    if (forceClean && Compiler.analysisIsEmpty(cacheFile)) Util.cleanAllClasses(classesDirectory)
+    val getAnalysis: File => Option[Analysis] = analysisMap.get _
+    val aggressive    = new AggressiveCompile(cacheFile)
     val cp            = autoClasspath(classesDirectory, scalac.scalaInstance.libraryJar, javaOnly, classpath)
     val compileOutput = CompileOutput(classesDirectory)
     val globalsCache  = Compiler.residentCache
     val progress      = None
     val maxErrors     = 100
     val reporter      = new LoggerReporter(maxErrors, log)
-    val getAnalysis: File => Option[Analysis] = analysisMap.get _
-    val analysis = doCompile(scalac, javac, sources, cp, compileOutput, globalsCache, progress, scalacOptions, javacOptions, getAnalysis, definesClass, reporter, compileOrder, false)(log)
-    Compiler.analysisCache.put(cacheFile, analysis)
+    val skip          = false
+    val compileSetup  = new CompileSetup(compileOutput, new CompileOptions(scalacOptions, javacOptions), scalac.scalaInstance.actualVersion, compileOrder)
+    val analysisStore = Compiler.analysisStore(cacheFile)
+    val analysis      = aggressive.compile1(sources, cp, compileSetup, progress, analysisStore, getAnalysis, definesClass, scalac, javac, reporter, skip, globalsCache)(log)
     SbtAnalysis.printOutputs(analysis, outputRelations, outputProducts, cwd, classesDirectory)
     analysis
   }
