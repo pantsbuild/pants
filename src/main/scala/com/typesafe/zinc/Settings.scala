@@ -101,7 +101,7 @@ object Settings {
     file(    "-java-home", "directory",      "Java home directory (to select javac)",      (s: Settings, f: File) => s.copy(javaHome = Some(f))),
     string(  "-compile-order", "order",      "Compile order for Scala and Java sources",   (s: Settings, o: String) => s.copy(compileOrder = compileOrder(o))),
     boolean( "-java-only",                   "Don't add scala library to classpath",       (s: Settings) => s.copy(javaOnly = true)),
-    prefix(  "-J", "<javac-option>",         "Pass option to javac",                       (s: Settings, o: String) => s.copy(javacOptions = s.javacOptions :+ o)),
+    prefix(  "-C", "<javac-option>",         "Pass option to javac",                       (s: Settings, o: String) => s.copy(javacOptions = s.javacOptions :+ o)),
 
     header("sbt options:"),
     file(    "-sbt-interface", "file",       "Specify sbt interface jar",                  (s: Settings, f: File) => s.copy(sbt = s.sbt.copy(sbtInterface = Some(f)))),
@@ -116,7 +116,7 @@ object Settings {
 
     header("JVM options:"),
     prefix(  "-D", "property=value",         "Pass property to runtime system",            (s: Settings, o: String) => s.copy(properties = s.properties :+ o)),
-    dummy(   "-V<flag>",                     "Set JVM flag directly for this process"),
+    dummy(   "-J<flag>",                     "Set JVM flag directly for this process"),
 
     header("Nailgun options:"),
     dummy(   "-nailed",                      "Run as daemon with nailgun server"),

@@ -73,7 +73,7 @@ while [[ $# -gt 0 ]] ; do
       args=("${args[@]}" "$1")
       shift ;;
 
-    -V*)
+    -J*)
       java_args=("${java_args[@]}" "${1:2}")
       args=("${args[@]}" "$1")
       shift ;;
