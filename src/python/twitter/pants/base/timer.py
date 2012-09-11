@@ -1,5 +1,5 @@
 # ==================================================================================================
-# Copyright 2011 Twitter, Inc.
+# Copyright 2012 Twitter, Inc.
 # --------------------------------------------------------------------------------------------------
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this work except in compliance with the License.
@@ -74,7 +74,7 @@ class Timer(object):
       pos = timing.label.find(':')
       if pos != -1:
         prefix = timing.label[0:pos]
-        if prefix == last_prefix:
+        if prefix == last_prefix and not timing.overlapping:
           total_time_for_prefix += total_time
           num_timings_with_prefix += 1
         else:
