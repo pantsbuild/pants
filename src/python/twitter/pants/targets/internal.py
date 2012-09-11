@@ -34,8 +34,8 @@ class InternalTarget(Target):
   def check_cycles(cls, internal_target):
     """Validates the given InternalTarget has no circular dependencies.  Raises CycleException if
     it does."""
-
-    dep_stack = OrderedSet()
+    dep_stack = OrderedSet()  # The DFS stack.
+    visited = set()  # Prevent expensive re-checking of subgraphs.
 
     def descend(internal_dep):
       if internal_dep in dep_stack:
@@ -43,7 +43,9 @@ class InternalTarget(Target):
       if hasattr(internal_dep, 'internal_dependencies'):
         dep_stack.add(internal_dep)
         for dep in internal_dep.internal_dependencies:
-          descend(dep)
+          if dep not in visited:
+            descend(dep)
+            visited.add(dep)
         dep_stack.remove(internal_dep)
 
     descend(internal_target)
