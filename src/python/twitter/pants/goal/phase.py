@@ -88,43 +88,15 @@ class Phase(PhaseBase):
       Attempts to reach the goals for the supplied phases, optionally recording phase timings and
       then logging then when all specified phases have completed.
     """
-
-    start = timer.now() if timer else None
     executed = OrderedDict()
 
     # I'd rather do this in a finally block below, but some goals os.fork and each of these cause
     # finally to run, printing goal timings multiple times instead of once at the end.
-    def print_timings():
+    def emit_timings():
       if timer:
-        timer.log('Timing report')
-        timer.log('=============')
         for phase, timings in executed.items():
-          phase_time = None
           for goal, times in timings.items():
-            if len(times) > 1:
-              timer.log('[%(phase)s:%(goal)s(%(numsteps)d)] %(timings)s -> %(total).3fs' % {
-                'phase': phase,
-                'goal': goal,
-                'numsteps': len(times),
-                'timings': ','.join('%.3fs' % time for time in times),
-                'total': sum(times)
-              })
-            else:
-              timer.log('[%(phase)s:%(goal)s] %(total).3fs' % {
-                'phase': phase,
-                'goal': goal,
-                'total': sum(times)
-              })
-            if not phase_time:
-              phase_time = 0
-            phase_time += sum(times)
-          if len(timings) > 1:
-            timer.log('[%(phase)s] total: %(total).3fs' % {
-              'phase': phase,
-              'total': phase_time
-            })
-        elapsed = timer.now() - start
-        timer.log('total: %.3fs' % elapsed)
+            timer.log('%s:%s' % (phase, goal), times)
 
     try:
       # Prepare tasks roots to leaves and allow for goals introducing new goals in existing phases.
@@ -155,7 +127,7 @@ class Phase(PhaseBase):
       for phase in phases:
         Group.execute(phase, tasks_by_goal, context, executed, timer=timer)
 
-      print_timings()
+      emit_timings()
       return 0
     except (TaskError, GoalError) as e:
       message = '%s' % e
@@ -163,7 +135,7 @@ class Phase(PhaseBase):
         print('\nFAILURE: %s\n' % e)
       else:
         print('\nFAILURE\n')
-      print_timings()
+      emit_timings()
       return 1
 
   @staticmethod

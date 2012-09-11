@@ -31,7 +31,7 @@ from twitter.common.collections import OrderedSet
 from twitter.common.dirutil import safe_mkdir, safe_rmtree
 from twitter.common.lang import Compatibility
 from twitter.pants import get_buildroot, goal, group, is_apt, is_codegen, is_scala
-from twitter.pants.base import Address, BuildFile, Config, ParseContext, Target
+from twitter.pants.base import Address, BuildFile, Config, ParseContext, Target, Timer
 from twitter.pants.base.rcfile import RcFile
 from twitter.pants.commands import Command
 from twitter.pants.targets import InternalTarget
@@ -174,6 +174,9 @@ class Goal(Command):
 
   def __init__(self, root_dir, parser, args):
     self.targets = []
+    # Note that we can't gate this on the self.options.time flag, because self.options is
+    # only set up in Command.__init__, and only after it calls setup_parser(), which uses the timer.
+    self.timer = Timer()
     Command.__init__(self, root_dir, parser, args)
 
   @contextmanager
@@ -320,19 +323,21 @@ class Goal(Command):
 
       # Bootstrap goals by loading any configured bootstrap BUILD files
       with self.check_errors('The following bootstrap_buildfiles cannot be loaded:') as error:
-        for path in self.config.getlist('goals', 'bootstrap_buildfiles', default = []):
-          try:
-            buildfile = BuildFile(get_buildroot(), os.path.relpath(path, get_buildroot()))
-            ParseContext(buildfile).parse()
-          except (TypeError, ImportError, TaskError, GoalError):
-            error(path, include_traceback=True)
-          except (IOError, SyntaxError):
-            error(path)
+        with self.timer.timing('parse:bootstrap'):
+          for path in self.config.getlist('goals', 'bootstrap_buildfiles', default = []):
+            try:
+              buildfile = BuildFile(get_buildroot(), os.path.relpath(path, get_buildroot()))
+              ParseContext(buildfile).parse()
+            except (TypeError, ImportError, TaskError, GoalError):
+              error(path, include_traceback=True)
+            except (IOError, SyntaxError):
+              error(path)
 
       # Bootstrap user goals by loading any BUILD files implied by targets
       with self.check_errors('The following targets could not be loaded:') as error:
-        for spec in specs:
-          self.parse_spec(error, spec)
+        with self.timer.timing('parse:BUILD'):
+          for spec in specs:
+            self.parse_spec(error, spec)
 
       self.phases = [Phase(goal) for goal in goals]
 
@@ -364,20 +369,12 @@ class Goal(Command):
 
   def run(self, lock):
     with self.check_errors("Target contains a dependency cycle") as error:
-      for target in self.targets:
-        try:
-          InternalTarget.check_cycles(target)
-        except InternalTarget.CycleException as e:
-          error(target.id)
-
-    timer = None
-    if self.options.time:
-      class Timer(object):
-        def now(self):
-          return time.time()
-        def log(self, message):
-          print(message)
-      timer = Timer()
+      with self.timer.timing('parse:check_cycles'):
+        for target in self.targets:
+          try:
+            InternalTarget.check_cycles(target)
+          except InternalTarget.CycleException as e:
+            error(target.id)
 
     logger = None
     if self.options.log or self.options.log_level:
@@ -418,7 +415,12 @@ class Goal(Command):
     if logger:
       logger.debug('Operating on targets: %s', self.targets)
 
-    return Phase.attempt(context, self.phases, timer=timer)
+    ret = Phase.attempt(context, self.phases, timer=self.timer if self.options.time else None)
+    if self.options.time:
+      print('Timing report')
+      print('=============')
+      self.timer.print_timings()
+    return ret
 
   def cleanup(self):
     # TODO: Make this more selective? Only kill nailguns that affect state? E.g., checkstyle
