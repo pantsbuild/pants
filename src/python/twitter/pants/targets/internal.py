@@ -62,7 +62,7 @@ class InternalTarget(Target):
     def invert(target):
       if target not in visited:
         visited.add(target)
-        if target.internal_dependencies:
+        if hasattr(target, 'internal_dependencies') and target.internal_dependencies:
           for internal_dependency in target.internal_dependencies:
             if isinstance(internal_dependency, InternalTarget):
               inverted_deps[internal_dependency].add(target)
