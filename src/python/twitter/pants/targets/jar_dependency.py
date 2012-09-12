@@ -80,7 +80,7 @@ class JarDependency(object):
 
   # TODO: This is necessary duck-typing because in some places JarDependency is treated like
   # a Target, even though it doesn't extend Target. Probably best to fix that.
-  def has_label(self):
+  def has_label(self, label):
     return False
 
   def __eq__(self, other):
