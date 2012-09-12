@@ -135,6 +135,7 @@ class ScalaCompile(NailgunTask):
           # track the deps and the upstream analysis map correctly.
           for vt in invalidated.all_versioned_targets():
             self.execute_single_compilation(vt, cp, upstream_analysis_caches)
+            invalidated.update_versioned_target(vt)
 
   def execute_single_compilation(self, versioned_target_set, cp, upstream_analysis_caches):
     """Execute a single compilation, updating upstream_analysis_caches if needed."""

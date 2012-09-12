@@ -134,6 +134,7 @@ class JavaCompile(NailgunTask):
           # track the per-target deps correctly.
           for vt in invalidated.all_versioned_targets():
             self.execute_single_compilation(vt, cp)
+            invalidated.update_versioned_target(vt)
 
       if self.context.products.isrequired('classes'):
         genmap = self.context.products.get('classes')

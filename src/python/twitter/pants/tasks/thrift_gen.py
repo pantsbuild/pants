@@ -132,8 +132,7 @@ class ThriftGen(CodeGen):
       log.debug('Executing: %s' % ' '.join(cmd))
       processes.append(subprocess.Popen(cmd))
 
-    # TODO(John Sirois): Use map sources to targets and use TargetError to invalidate less thrift
-    # targets onfailure
+    # TODO(John Sirois): Use map sources to targets and invalidate less thrift targets on failure.
     if sum(p.wait() for p in processes) != 0:
       raise TaskError
 

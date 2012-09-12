@@ -27,14 +27,6 @@ from twitter.pants.tasks.cache_manager import CacheManager, VersionedTargetSet
 class TaskError(Exception):
   """Raised to indicate a task has failed."""
 
-
-class TargetError(TaskError):
-  """Raised to indicate a task has failed for a subset of targets"""
-  def __init__(self, targets, *args, **kwargs):
-    TaskError.__init__(self, *args, **kwargs)
-    self.targets = targets
-
-
 class InvalidationResult(object):
   """
     An InvalidationResult represents the result of invalidating a set of targets.
@@ -42,7 +34,7 @@ class InvalidationResult(object):
     A task can get individual target info for use in non-flat compiles, or combined info for
     all invalid tasks or all tasks, for flat compiles.
   """
-  def __init__(self, all_versioned_targets):
+  def __init__(self, cache_manager, all_versioned_targets):
     def combine_versioned_targets(vts):
       targets = []
       for vt in vts:
@@ -51,6 +43,7 @@ class InvalidationResult(object):
       valid = all([vt.valid for vt in vts])
       return VersionedTargetSet(targets, cache_key, valid)
 
+    self._cache_manager = cache_manager
     self._all_versioned_targets = all_versioned_targets
     self._combined_all_versioned_targets = combine_versioned_targets(self._all_versioned_targets)
 
@@ -87,6 +80,12 @@ class InvalidationResult(object):
   def has_invalid_targets(self):
     """Whether at least one of the targets in this result are invalid."""
     return len(self._combined_invalid_versioned_targets.targets) > 0
+
+  def update_versioned_target(self, vt):
+    """Subclasses may call this when building target-by-target, to mark partial progress as valid.
+
+    This is useful so that a failure on a later target doesn't require the earlier targets to be rebuilt."""
+    self._cache_manager.update(vt.cache_key)
 
 
 class Task(object):
@@ -144,8 +143,7 @@ class Task(object):
       Checks targets for invalidation.
 
       Yields the result to a with block. If no exceptions are thrown by work in the block, the
-      cache is updated for the targets, otherwise if a TargetError is thrown by the work in the
-      block all targets except those in the TargetError are cached.
+      cache is updated for the targets.
 
       :targets The targets to check for changes.
       :only_buildfiles If True, then just the target's BUILD files are checked for changes.
@@ -167,7 +165,7 @@ class Task(object):
 
     # Check for directly changed targets.
     all_versioned_targets = cache_manager.check(targets)
-    invalidation_result = InvalidationResult(all_versioned_targets)
+    invalidation_result = InvalidationResult(cache_manager, all_versioned_targets)
     num_invalid_targets = len(invalidation_result.invalid_targets())
 
     # Do some reporting.
@@ -177,20 +175,11 @@ class Task(object):
       self.context.log.info('Operating on %d files in %d invalidated targets' % (num_files, num_invalid_targets))
 
     # Yield the result, and then update the cache.
-    try:
-      if num_invalid_targets > 0:
-        self.context.log.debug('Invalidated targets %s' % invalidation_result.invalid_targets())
-      yield invalidation_result
-      for vt in invalidation_result.invalid_versioned_targets():
-        cache_manager.update(vt.cache_key)
-
-    except TargetError as e:
-      # TODO: This partial updating isn't used (yet?). Nowhere in the code do we raise a TargetError.
-      for vt in invalidation_result.invalid_versioned_targets():
-        if len(vt.targets) != 1:
-          raise Exception, 'Logic error: vt should represent a single target'
-        if vt.targets[0] not in e.targets:
-          cache_manager.update(vt.cache_key)
+    if num_invalid_targets > 0:
+      self.context.log.debug('Invalidated targets %s' % invalidation_result.invalid_targets())
+    yield invalidation_result
+    for vt in invalidation_result.invalid_versioned_targets():
+      cache_manager.update(vt.cache_key)
 
   @contextmanager
   def check_artifact_cache(self, versioned_targets, build_artifacts, artifact_root):
@@ -238,6 +227,5 @@ class Task(object):
 
 __all__ = (
   'TaskError',
-  'TargetError',
   'Task'
 )
