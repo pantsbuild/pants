@@ -5,7 +5,7 @@
 package com.typesafe.zinc
 
 import com.martiansoftware.nailgun.NGConstants
-import java.io.{ DataInputStream, File, OutputStream }
+import java.io.{ ByteArrayOutputStream, DataInputStream, File, OutputStream }
 import java.net.{ InetAddress, Socket }
 import java.nio.ByteBuffer
 import java.util.{ List => JList }
@@ -73,8 +73,13 @@ class ZincClient(val address: InetAddress, val port: Int) {
    * Check if a nailgun server is currently available.
    */
   def serverAvailable(): Boolean = {
-    try { (new Socket(address, port)).close(); true }
-    catch { case _: java.net.ConnectException => false }
+    try {
+      val dummyOut = new ByteArrayOutputStream
+      val exitCode = send("ng-version", Seq.empty, Setup.Defaults.userDir, dummyOut, dummyOut)
+      exitCode == 0
+    } catch {
+      case _: java.io.IOException => false
+    }
   }
 
   private def sendCommand(command: String, args: Seq[String], cwd: File, out: OutputStream): Unit = {
