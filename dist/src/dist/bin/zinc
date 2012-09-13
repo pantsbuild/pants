@@ -107,7 +107,7 @@ declare optXXReservedCodeCacheSize="-XX:ReservedCodeCacheSize=192m"
 [[ -n "$nailed" ]]  && optMode="-server"
 
 # process java options
-# allows overriding defaults in JAVA_OPTS, ZINC_OPTS, or -V args
+# allows overriding defaults in JAVA_OPTS, ZINC_OPTS, or -J args
 declare all_opts=($JAVA_OPTS $ZINC_OPTS ${java_args[@]})
 declare -a other_opts
 for opt in ${all_opts[@]} ; do
@@ -132,14 +132,30 @@ function check_port {
   nc -z -n -w 1 127.0.0.1 $1 > /dev/null 2>&1
 }
 
+function zinc_classpath {
+  local cp=""
+  for jar in $lib_dir/* ; do
+    if [[ -z "$cp" ]]; then
+      cp="$jar"
+    else
+      cp="$cp:$jar"
+    fi
+  done
+  if uname | grep -iq "cygwin" ; then
+    cp="$(cygpath --windows --path "$cp")"
+  fi
+  echo $cp
+}
+
 function nailgun {
   # start nailgun if not already running
   if ! check_port $nailgun_port ; then
+    local classpath=$(zinc_classpath)
     fork_command \
       "$java_cmd" \
       "${java_options[@]}" \
       -Dzinc.home="$base_dir" \
-      -classpath "$lib_dir/*" \
+      -classpath "$classpath" \
       com.typesafe.zinc.Nailgun $nailgun_port $timeout
     # give some time for startup
     local attempts=50
