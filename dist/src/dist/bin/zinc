@@ -75,7 +75,8 @@ while [[ $# -gt 0 ]] ; do
 
     -J*)
       java_args=("${java_args[@]}" "${1:2}")
-      args=("${args[@]}" "$1")
+      # need zinc not to error out on -J arguments to keep them in args
+      # args=("${args[@]}" "$1")
       shift ;;
 
     *)
