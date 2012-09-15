@@ -182,10 +182,11 @@ if [ -n "$nailed" ] && can_nailgun ; then
   fi
 else
   # run zinc directly
+  classpath=$(zinc_classpath)
   exec_command \
     "$java_cmd" \
     "${java_options[@]}" \
     -Dzinc.home="$base_dir" \
-    -classpath "$lib_dir/*" \
+    -classpath "$classpath" \
     com.typesafe.zinc.Main "$@"
 fi
