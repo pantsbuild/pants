@@ -31,7 +31,7 @@ from twitter.common.python.platforms import Platform
 from twitter.pants.targets import PythonBinary
 
 from twitter.pants.base import Config
-from twitter.pants.base.artifact_cache import ArtifactCache
+from twitter.pants.base.artifact_cache import FileBasedArtifactCache
 from twitter.pants.base.build_invalidator import CacheKeyGenerator
 from twitter.pants.python.antlr_builder import PythonAntlrBuilder
 from twitter.pants.python.thrift_builder import PythonThriftBuilder
@@ -84,14 +84,16 @@ class PythonChroot(object):
     self._target = target
     self._root = root_dir
     self._key_generator = CacheKeyGenerator()
-    artifact_cache_root = \
-      os.path.join(self._config.get('python-setup', 'artifact_cache'), '%s' % PythonIdentity.get())
-    self._artifact_cache = ArtifactCache(artifact_cache_root)
     self._extra_targets = list(extra_targets) if extra_targets is not None else []
     self._resolver = PythonResolver([self._target] + self._extra_targets)
     self._builder = builder or PEXBuilder(tempfile.mkdtemp())
     self._platforms = (Platform.current(),)
     self._pythons = (sys.version[:3],)
+
+    artifact_cache_root = \
+      os.path.join(self._config.get('python-setup', 'artifact_cache'), '%s' % PythonIdentity.get())
+    self._artifact_cache = FileBasedArtifactCache(None, self._root, artifact_cache_root,
+      self._builder.add_dependency_file)
 
     # TODO(wickman) Should this be in the binary builder?
     if isinstance(self._target, PythonBinary):
@@ -147,13 +149,13 @@ class PythonChroot(object):
     self._dump_built_library(library, PythonAntlrBuilder(library, self._root))
 
   def _dump_built_library(self, library, builder):
-    # TODO(wickman): Port this over to the Installer+Distiller and stop using ArtifactCache.
+    # TODO(wickman): Port this over to the Installer+Distiller and stop using FileBasedArtifactCache.
     absolute_sources = library.expand_files()
     absolute_sources.sort()
     cache_key = self._key_generator.key_for(library.id, absolute_sources)
     if self._artifact_cache.has(cache_key):
       self.debug('  Generating (cached) %s...' % library)
-      self._artifact_cache.use_cached_files(cache_key, self._builder.add_dependency_file)
+      self._artifact_cache.use_cached_files(cache_key)
     else:
       self.debug('  Generating %s...' % library)
       egg_file = builder.build_egg()

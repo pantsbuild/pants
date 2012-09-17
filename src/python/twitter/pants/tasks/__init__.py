@@ -17,9 +17,8 @@
 from contextlib import contextmanager
 import hashlib
 import os
-import shutil
 
-from twitter.pants.base.artifact_cache import ArtifactCache
+from twitter.pants.base.artifact_cache import create_artifact_cache
 from twitter.pants.base.build_invalidator import CacheKeyGenerator
 from twitter.pants.tasks.cache_manager import CacheManager, VersionedTargetSet
 
@@ -100,9 +99,21 @@ class Task(object):
   def __init__(self, context):
     self.context = context
     self._cache_key_generator = CacheKeyGenerator()
-    # TODO: Shared, remote build cache.
-    self._artifact_cache = ArtifactCache(context.config.get('tasks', 'artifact_cache'))
+    self._artifact_cache = None
     self._build_invalidator_dir = os.path.join(context.config.get('tasks', 'build_invalidator'), self.product_type())
+
+  def setup_artifact_cache(self, spec):
+    """
+      Subclasses can call this in their __init__ method to set up artifact caching for that task type.
+
+      spec should be a list of urls/file path prefixes, which are used in that order.
+      By default, no artifact caching is used. Subclasses must not only set up the cache, but check it
+      explicitly with check_artifact_cache().
+    """
+    if len(spec) > 0:
+      pants_workdir = self.context.config.getdefault('pants_workdir')
+      self._artifact_cache =create_artifact_cache(self.context, pants_workdir, spec)
+
 
   def product_type(self):
     """
@@ -182,7 +193,7 @@ class Task(object):
       cache_manager.update(vt.cache_key)
 
   @contextmanager
-  def check_artifact_cache(self, versioned_targets, build_artifacts, artifact_root):
+  def check_artifact_cache(self, versioned_targets, build_artifacts):
     """
       See if we have required artifacts in the cache.
 
@@ -197,33 +208,31 @@ class Task(object):
           ... build the necessary artifacts ...
 
       :versioned_targets a VersionedTargetSet representing a specific version of a set of targets.
-      :build_artifacts a list of paths to which the artifacts will be written.
-      :artifact_root If not None, the artifact paths will be cached relative to this dir.
-      :returns: True if the caller must build the artifacts, False otherwise.
+      :build_artifacts a list of paths to which the artifacts will be written. These must be under pants_workdir.
+      :returns: False if the caller must build the artifacts, True otherwise.
     """
+    if self._artifact_cache is None:
+      yield False
+      return
     artifact_key = versioned_targets.cache_key
     targets = versioned_targets.targets
-    if self.context.options.read_from_artifact_cache and self._artifact_cache.has(artifact_key):
-      self.context.log.info('Using cached artifacts for %s' % targets)
-      self._artifact_cache.use_cached_files(artifact_key,
-        lambda src, reldest: shutil.copy(src, os.path.join(artifact_root, reldest)))
-      yield False  # Caller need not rebuild
-    else:
-      self.context.log.info('No cached artifacts for %s' % targets)
-      yield True  # Caller must rebuild.
+    using_cached = False
+    if self.context.options.read_from_artifact_cache:
+      if self._artifact_cache.use_cached_files(artifact_key):
+        self.context.log.info('Using cached artifacts for %s' % targets)
+        using_cached = True
+      else:
+        self.context.log.info('No cached artifacts for %s' % targets)
 
-      if self.context.options.write_to_artifact_cache:
-        if self._artifact_cache.has(artifact_key):
-          # If we get here it means read_from_artifact_cache is false, so we've rebuilt.
-          # We can verify that what we built is identical to the cached version.
-          # If not, there's a dangerous bug, so we want to warn about this loudly.
-          if self.context.options.verify_artifact_cache:
-            pass  # TODO: verification logic
-        else:
-          # if the caller provided paths to artifacts but we didn't previously have them in the cache,
-          # we assume that they are now created, and store them in the artifact cache.
-          self.context.log.info('Caching artifacts for %s' % str(targets))
-          self._artifact_cache.insert(artifact_key, build_artifacts, artifact_root)
+    yield using_cached
+
+    if not using_cached and self.context.options.write_to_artifact_cache:
+      if self.context.options.verify_artifact_cache:
+        pass  # TODO: verification logic
+      self.context.log.info('Caching artifacts for %s' % str(targets))
+      self._artifact_cache.insert(artifact_key, build_artifacts)
+
+
 
 __all__ = (
   'TaskError',

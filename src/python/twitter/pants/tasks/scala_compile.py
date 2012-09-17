@@ -105,6 +105,9 @@ class ScalaCompile(NailgunTask):
     self._confs = context.config.getlist('scala-compile', 'confs')
     self._depfile_dir = os.path.join(self._workdir, 'depfiles')
 
+    artifact_cache_spec = context.config.getlist('scala-compile', 'artifact_caches')
+    self.setup_artifact_cache(artifact_cache_spec)
+
   def product_type(self):
     return 'classes'
 
@@ -155,15 +158,16 @@ class ScalaCompile(NailgunTask):
 
     if not versioned_target_set.valid:
       with self.check_artifact_cache(versioned_target_set,
-                                     build_artifacts=[output_dir, depfile, analysis_cache],
-                                     artifact_root=self._workdir) as needs_building:
-        if needs_building:
+                                     build_artifacts=[output_dir, depfile, analysis_cache]) as in_cache:
+        if not in_cache:
           self.context.log.info('Compiling targets %s' % versioned_target_set.targets)
           sources_by_target = self.calculate_sources(versioned_target_set.targets)
           if sources_by_target:
             sources = reduce(lambda all, sources: all.union(sources), sources_by_target.values())
             if not sources:
-              touch(depfile)  # Create an empty depfile, since downstream code may assume that one exists.
+              # Create empty files, since downstream code may assume that these exist.
+              touch(depfile)
+              touch(analysis_cache)
               self.context.log.warn('Skipping scala compile for targets with no sources:\n  %s' %
                                     '\n  '.join(str(t) for t in sources_by_target.keys()))
             else:

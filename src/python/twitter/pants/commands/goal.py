@@ -123,7 +123,9 @@ class Goal(Command):
     Option("--write-to-artifact-cache", "--no-write-to-artifact-cache", action="callback",
       callback=_set_bool, dest="write_to_artifact_cache", default=False,
       help="Whether to write artifacts to cache ."),
-
+    Option("--verify-artifact-cache", "--no-verify-artifact-cache", action="callback",
+      callback=_set_bool, dest="verify_artifact_cache", default=False,
+      help="Whether to verify that cached artifacts are identical after rebuilding them."),
     Option("--all", dest="target_directory", action="append",
            help="DEPRECATED: Use [dir]: with no flag in a normal target position on the command "
                   "line. (Adds all targets found in the given directory's BUILD file. Can be "
