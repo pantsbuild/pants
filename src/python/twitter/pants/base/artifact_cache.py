@@ -83,7 +83,10 @@ class ArtifactCache(object):
       except Exception:
         print('IMPORTANT: failed to delete %s on error. Your artifact cache may be corrupted. '
               'Please delete manually.' % cache_key)
-      self.context.log.error(traceback.format_exc())
+      if self.context:
+        self.context.log.error(traceback.format_exc())
+      else:
+        traceback.print_exc()
       raise e
 
   def try_insert(self, cache_key, build_artifacts):
@@ -138,8 +141,7 @@ class FileBasedArtifactCache(ArtifactCache):
       assert not rel_path.startswith('..'), \
         'Artifact %s is not under artifact root %s' % (artifact, self.artifact_root)
       artifact_dest = os.path.join(cache_dir, rel_path)
-      dir_name = os.path.dirname(artifact_dest)
-      safe_mkdir(dir_name)
+      safe_mkdir(os.path.dirname(artifact_dest))
       if os.path.isdir(artifact):
         shutil.copytree(artifact, artifact_dest)
       else:
@@ -226,7 +228,8 @@ class RESTfulArtifactCache(ArtifactCache):
         if len(data) < read_size:
           done = True
         total_bytes += len(data)
-        self.context.log.debug('Read %d bytes' % total_bytes)
+        if self.context:
+          self.context.log.debug('Read %d bytes' % total_bytes)
       outfile.close()
       if total_bytes != expected_size:
         raise Exception, 'Read only %d bytes from %d expected' % (total_bytes, expected_size)

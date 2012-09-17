@@ -20,6 +20,7 @@ import SocketServer
 import os
 
 from threading import Thread
+from twitter.common.dirutil import safe_mkdir
 from twitter.pants.base.artifact_cache import CombinedArtifactCache, FileBasedArtifactCache, \
   RESTfulArtifactCache, create_artifact_cache
 from twitter.pants.base.build_invalidator import CacheKey
@@ -39,6 +40,7 @@ class SimpleRESTHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
     path = self.translate_path(self.path)
     content_length = int(self.headers.getheader('content-length'))
     content = self.rfile.read(content_length)
+    safe_mkdir(os.path.dirname(path))
     with open(path, 'wb') as outfile:
       outfile.write(content)
     self.send_response(200)
@@ -91,7 +93,7 @@ def test_restful_cache():
         httpd_thread = Thread(target=httpd.serve_forever)
         httpd_thread.start()
         with temporary_dir() as artifact_root:
-          artifact_cache = RESTfulArtifactCache(artifact_root, 'http://localhost:%d' % port)
+          artifact_cache = RESTfulArtifactCache(None, artifact_root, 'http://localhost:%d' % port)
           do_test_artifact_cache(artifact_cache)
   finally:
     if httpd:
