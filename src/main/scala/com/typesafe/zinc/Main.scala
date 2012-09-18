@@ -97,7 +97,8 @@ object Main {
         sys.exit(1)
       case e: Exception =>
         if (isDebug) e.printStackTrace
-        log.error(e.getMessage)
+        val message = e.getMessage
+        if (message ne null) log.error(message)
         sys.exit(1)
     }
   }

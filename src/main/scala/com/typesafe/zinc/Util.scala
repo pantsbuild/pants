@@ -170,7 +170,7 @@ object Util {
     val stream = classLoader.getResourceAsStream(resource)
     try { props.load(stream) }
     catch { case e: Exception => }
-    finally { stream.close }
+    finally { if (stream ne null) stream.close }
     props
   }
 
