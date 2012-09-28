@@ -38,7 +38,7 @@ def create_artifact_cache(context, artifact_root, spec):
   if isinstance(spec, basestring):
     if spec.startswith('/'):
       return FileBasedArtifactCache(context, artifact_root, spec)
-    elif spec.startswith('http://'):
+    elif spec.startswith('http://') or spec.startswith('https://'):
       return RESTfulArtifactCache(context, artifact_root, spec)
     else:
       raise Exception, 'Invalid artifact cache spec: %s' % spec
@@ -181,13 +181,16 @@ class RESTfulArtifactCache(ArtifactCache):
     """
     ArtifactCache.__init__(self, context, artifact_root)
     parsed_url = urlparse.urlparse(url_base)
-    if parsed_url.scheme != 'http':
-      raise Exception, 'RESTfulArtifactCache only supports HTTP'
+    if parsed_url.scheme == 'http':
+      self._ssl = False
+    elif parsed_url.scheme == 'https':
+      self._ssl = True
+    else:
+      raise Exception, 'RESTfulArtifactCache only supports HTTP and HTTPS'
     self._netloc = parsed_url.netloc
     self._path_prefix = parsed_url.path
     if self._path_prefix.endswith('/'):
       self._path_prefix = self._path_prefix[:-1]
-    self._conn = self._connect()
     self.compress = compress
 
   def try_insert(self, cache_key, build_artifacts):
@@ -201,7 +204,7 @@ class RESTfulArtifactCache(ArtifactCache):
 
       with open(tarfile.name, 'rb') as infile:
         if not self._request('PUT', path, body=infile):
-          raise Exception, 'Failed to PUT to http://%s/%s. Error: 404' % (self._netloc, path)
+          raise Exception, 'Failed to PUT to %s. Error: 404' % self._url_string(path)
 
   def has(self, cache_key):
     path = self._path_for_key(cache_key)
@@ -248,22 +251,29 @@ class RESTfulArtifactCache(ArtifactCache):
     return '%s/%s/%s.tar.bz2' % (self._path_prefix, cache_key.id, cache_key.hash)
 
   def _connect(self):
-    return httplib.HTTPConnection(self._netloc)
+    if self._ssl:
+      return httplib.HTTPSConnection(self._netloc)
+    else:
+      return httplib.HTTPConnection(self._netloc)
 
   # Returns a response if we get a 200, None if we get a 404 and raises an exception otherwise.
   def _request(self, method, path, body=None):
     if self.context:
-      self.context.log.info('Sending %s request to http://%s%s' % (method, self._netloc, path))
-    self._conn = self._connect()
-    self._conn.request(method, path, body=body)
-    response = self._conn.getresponse()
+      self.context.log.info('Sending %s request to %s' % (method, self._url_string(path)))
+    # TODO(benjy): Keep connection open and reuse?
+    conn = self._connect()
+    conn.request(method, path, body=body)
+    response = conn.getresponse()
     if response.status == 200:  # TODO: Can HEAD return 204? It would be correct, but I've not seen it happen.
       return response
     elif response.status == 404:
       return None
     else:
-      raise Exception, 'Failed to %s to http://%s/%s. Error: %d %s' % \
-                       (method, self._netloc, path, response.status, response.reason)
+      raise Exception, 'Failed to %s %s. Error: %d %s' % \
+                       (method, self._url_string(path), response.status, response.reason)
+
+  def _url_string(self, path):
+    return '%s://%s%s' % (('https' if self._ssl else 'http'), self._netloc, path)
 
 
 class CombinedArtifactCache(ArtifactCache):
