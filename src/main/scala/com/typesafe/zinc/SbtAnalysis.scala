@@ -120,7 +120,7 @@ object SbtAnalysis {
    * Run an analysis split. The analyses are split by source directory and overwrite
    * the mapped analysis cache files.
    */
-  def runSplit(cache: Option[File], mapping: Map[File, File]): Unit = {
+  def runSplit(cache: Option[File], mapping: Map[Seq[File], File]): Unit = {
     if (mapping.nonEmpty) {
       cache match {
         case None => throw new Exception("No cache file specified")
@@ -128,8 +128,8 @@ object SbtAnalysis {
           Compiler.analysisStore(cacheFile).get match {
             case None => throw new Exception("No analysis cache found at: " + cacheFile)
             case Some ((analysis, compileSetup)) =>
-              for ((sourceDir, splitCache) <- mapping) {
-                val outsideSources = findOutsideSources(analysis, sourceDir)
+              for ((sources, splitCache) <- mapping) {
+                val outsideSources = findOutsideSources(analysis, sources)
                 val splitAnalysis = analysis -- outsideSources
                 Compiler.analysisStore(splitCache).set(splitAnalysis, compileSetup)
               }
@@ -139,10 +139,17 @@ object SbtAnalysis {
   }
 
   /**
-   * Find all sources in the analysis outside a given source directory.
+   * Find all sources not in a specified set of sources.
+   *
+   * If set of sources is a single directory, finds all sources outside that directory.
    */
-  def findOutsideSources(analysis: Analysis, sourceDir: File): Set[File] = {
-    (analysis.relations.srcProd.all map (_._1) filter { src => IO.relativize(sourceDir, src).isEmpty }).toSet
+  def findOutsideSources(analysis: Analysis, sources: Seq[File]): Set[File] = {
+    val pathSet = Set(sources map { f => f.getCanonicalPath } : _*)
+    if (pathSet.size == 1 && sources.head.isDirectory)
+      (analysis.relations.srcProd.all map (_._1) filter { src => IO.relativize(sources.head, src).isEmpty }).toSet
+    else {
+      (analysis.relations.srcProd.all map (_._1) filter { src => !pathSet.contains(src.getCanonicalPath) }).toSet
+    }
   }
 
   /**

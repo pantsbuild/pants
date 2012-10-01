@@ -102,6 +102,13 @@ object Util {
   }
 
   /**
+   * Normalise file sequence map in relation to actual current working directory.
+   */
+  def normaliseSeqMap(cwd: Option[File])(mapped: Map[Seq[File], File]): Map[Seq[File], File] = {
+    if (cwd.isDefined) mapped map { case (l, r) => (normaliseSeq(cwd)(l), normalise(cwd)(r)) } else mapped
+  }
+
+  /**
    * Fully relativize a path, relative to any other base.
    */
   def relativize(base: File, path: File): String = {
