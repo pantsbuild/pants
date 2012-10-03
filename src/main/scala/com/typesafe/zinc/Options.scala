@@ -4,7 +4,7 @@
 
 package com.typesafe.zinc
 
-import java.io.{ File, IOException }
+import java.io.File
 import scala.annotation.tailrec
 
 /**
@@ -116,11 +116,7 @@ class PathOption[Context](
   val description: String,
   val action: (Context, Seq[File]) => Context)
 extends ArgumentOption[Seq[File], Context] {
-  def parse(arg: String): Option[Seq[File]] = {
-    val expanded = scala.tools.nsc.util.ClassPath.expandPath(arg)
-    val files = expanded map (new File(_))
-    Some(files)
-  }
+  def parse(arg: String): Option[Seq[File]] = ParseHelpers.parseFileSeq(arg)
 }
 
 class PrefixOption[Context](
@@ -177,6 +173,43 @@ extends ArgumentOption[Map[File, File], Context] {
   }
 }
 
+class FileSeqMapOption[Context](
+  val options: Seq[String],
+  val description: String,
+  val action: (Context, Map[Seq[File], File]) => Context)
+        extends ArgumentOption[Map[Seq[File], File], Context] {
+  val argument = "mapping"
+
+  val argSeparator = ','
+  val openSeq = '{'
+  val closeSeq = '}'
+  val pairSeparator = File.pathSeparatorChar
+
+  def parse(arg: String): Option[Map[Seq[File], File]] = {
+    val pairs = arg split argSeparator
+    val files = pairs map parseFileSeqPair
+    if (files exists (_.isEmpty)) None else Some(files.flatten.toMap)
+  }
+
+  def parseFileSeqPair(pair: String): Option[(Seq[File], File)] = {
+    val pairSeparatorIdx = pair lastIndexOf pairSeparator
+    if (pairSeparatorIdx == -1) {
+      None
+    } else {
+      val p = Array(pair.substring(0, pairSeparatorIdx), pair.substring(pairSeparatorIdx + 1))
+      parseFileSeq(p(0)) match {
+        case Some(fileSeq) => Some((fileSeq, new File(p(1))))
+        case None => None
+      }
+    }
+  }
+
+  def parseFileSeq(arg: String): Option[Seq[File]] = {
+    val seqArg = if (arg.head == openSeq && arg.last == closeSeq) arg.init.tail else arg
+    ParseHelpers.parseFileSeq(seqArg)
+  }
+}
+
 class HeaderOption[Context](
   val header: String)
 extends OptionDef[Context] {
@@ -198,4 +231,12 @@ extends OptionDef[Context] {
   def process(context: Context, args: Seq[String]) = Parsed(context, args.tail)
   override def claims(option: String): Boolean = false
   override def help = optionHelp
+}
+
+object ParseHelpers {
+  def parseFileSeq(arg: String): Option[Seq[File]] = {
+    val expanded = scala.tools.nsc.util.ClassPath.expandPath(arg)
+    val files = expanded map (new File(_))
+    Some(files)
+  }
 }
