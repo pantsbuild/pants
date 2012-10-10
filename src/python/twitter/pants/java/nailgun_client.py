@@ -173,7 +173,8 @@ class NailgunClient(object):
                ins=sys.stdin,
                out=sys.stdout,
                err=sys.stderr,
-               work_dir=None):
+               work_dir=None,
+               dry_run=False):
     """
       Creates a nailgun client that can be used to issue zero or more nailgun commands.
 
@@ -192,6 +193,7 @@ class NailgunClient(object):
     self._out = out
     self._err = err
     self._work_dir = work_dir or os.path.abspath(os.path.curdir)
+    self._dry_run = dry_run
 
     self.execute = self.__call__
 
@@ -204,8 +206,12 @@ class NailgunClient(object):
       Executes the given main_class with any supplied args in the given environment.  Returns
       the exit code of the main_class.
     """
-
     environment = dict(ENV_DEFAULTS.items() + environment.items())
+
+    if self._dry_run:
+      print('********** NailgunClient dry run: %s %s with environment [%s]' %\
+            (main_class, ' '.join(args), ', '.join(['%s=%s' % e for e in environment.items()])))
+      return 0
 
     sock = self.try_connect()
     if not sock:

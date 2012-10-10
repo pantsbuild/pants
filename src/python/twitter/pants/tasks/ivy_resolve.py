@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==================================================================================================
-from twitter.pants.targets.jar_dependency import JarDependency
 
 __author__ = 'John Sirois'
 
@@ -139,10 +138,10 @@ class IvyResolve(NailgunTask):
     classpath_targets = filter(is_classpath, targets)
     target_workdir = os.path.join(self._work_dir, dirname_for_requested_targets(targets))
     target_classpath_file = os.path.join(target_workdir, 'classpath')
-    with self.invalidated(classpath_targets, only_buildfiles=True, invalidate_dependants=True) as invalidated:
+    with self.invalidated(classpath_targets, only_buildfiles=True, invalidate_dependants=True) as invalidation_check:
       # Note that it's possible for all targets to be valid but for no classpath file to exist at
       # target_classpath_file, e.g., if we previously build a superset of targets.
-      if invalidated.invalid_targets() or not os.path.exists(target_classpath_file):
+      if len(invalidation_check.invalid_vts) > 0 or not os.path.exists(target_classpath_file):
         self._exec_ivy(target_workdir, targets, [
           '-cachepath', target_classpath_file,
           '-confs'

@@ -117,6 +117,8 @@ class Goal(Command):
     Option("-l", "--level", dest="log_level", type="choice", choices=['debug', 'info', 'warn'],
            help="[info] Sets the logging level to one of 'debug', 'info' or 'warn', implies -v "
                   "if set."),
+    Option("-n", "--dry-run", action="store_true", dest="dry_run", default=False,
+      help="Print the commands that would be run, without actually running them."),
     Option("--read-from-artifact-cache", "--no-read-from-artifact-cache", action="callback",
       callback=_set_bool, dest="read_from_artifact_cache", default=False,
       help="Whether to read artifacts from cache instead of building them, when possible."),
@@ -370,6 +372,8 @@ class Goal(Command):
       Phase.setup_parser(parser, args, self.phases)
 
   def run(self, lock):
+    if self.options.dry_run:
+      print '****** Dry Run ******'
     with self.check_errors("Target contains a dependency cycle") as error:
       with self.timer.timing('parse:check_cycles'):
         for target in self.targets:
