@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==================================================================================================
+from twitter.pants.targets.jar_dependency import JarDependency
 
 __author__ = 'John Sirois'
 
@@ -63,13 +64,16 @@ class IvyResolve(NailgunTask):
     option_group.add_option(mkflag("outdir"), dest="ivy_resolve_outdir",
                             help="Emit ivy report outputs in to this directory.")
 
+    option_group.add_option(mkflag("cache"), dest="ivy_resolve_cache",
+      help="Use this directory as the ivy cache, instead of the default specified in pants.ini.")
+
   def __init__(self, context):
     classpath = context.config.getlist('ivy', 'classpath')
     nailgun_dir = context.config.get('ivy-resolve', 'nailgun_dir')
     NailgunTask.__init__(self, context, classpath=classpath, workdir=nailgun_dir)
 
     self._ivy_settings = context.config.get('ivy', 'ivy_settings')
-    self._cachedir = context.config.get('ivy', 'cache_dir')
+    self._cachedir = context.options.ivy_resolve_cache or context.config.get('ivy', 'cache_dir')
     self._confs = context.config.getlist('ivy-resolve', 'confs')
     self._transitive = context.config.getbool('ivy-resolve', 'transitive')
     self._args = context.config.getlist('ivy-resolve', 'args')
@@ -138,10 +142,10 @@ class IvyResolve(NailgunTask):
     classpath_targets = filter(is_classpath, targets)
     target_workdir = os.path.join(self._work_dir, dirname_for_requested_targets(targets))
     target_classpath_file = os.path.join(target_workdir, 'classpath')
-    with self.invalidated(classpath_targets, only_buildfiles=True, invalidate_dependants=True) as invalidation_check:
+    with self.invalidated(classpath_targets, only_buildfiles=True, invalidate_dependants=True) as invalidated:
       # Note that it's possible for all targets to be valid but for no classpath file to exist at
       # target_classpath_file, e.g., if we previously build a superset of targets.
-      if len(invalidation_check.invalid_vts) > 0 or not os.path.exists(target_classpath_file):
+      if invalidated.invalid_targets() or not os.path.exists(target_classpath_file):
         self._exec_ivy(target_workdir, targets, [
           '-cachepath', target_classpath_file,
           '-confs'

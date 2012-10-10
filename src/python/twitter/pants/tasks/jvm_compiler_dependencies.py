@@ -17,6 +17,7 @@
 __author__ = 'John Sirois'
 
 import os
+import re
 
 from collections import defaultdict
 
@@ -32,9 +33,10 @@ class Dependencies(object):
     [source file path] -> [class file path]
 
     All paths are assumed to be normalized to be relative to the classfile output directory.
-    Depfiles are written either by instances of this class or directly by compilers, such as
-    jmake and zinc.
   """
+
+  _CLASS_FILE_NAME_PARSER = re.compile(r'(?:\$.*)*\.class$')
+
   def __init__(self, outputdir):
     self.outputdir = outputdir
     self.classes_by_source = defaultdict(set)
@@ -52,25 +54,6 @@ class Dependencies(object):
           self.classes_by_source[sourcefile].add(classfile)
     else:
       raise TaskError('No depfile at %s' % depfile)
-
-  def save(self, depfile):
-    """Save this object to a depfile. Any existing mappings in the file are overwitten."""
-    with open(depfile, 'w') as deps:
-      for sourcefile, classfiles in self.classes_by_source.items():
-        src = os.path.relpath(os.path.join(self.buildroot, sourcefile), self.outputdir)
-        for cls in classfiles:
-          deps.write(src)
-          deps.write(' -> ')
-          deps.write(cls)
-          deps.write('\n')
-
-  def add(self, sourcefile, classfiles):
-    """Add a mapping to this object.
-
-    sourcefile is assumed to be relative to the build root (note: unlike in depfiles).
-    classfiles are assumed to be relative to the output directory.
-    """
-    self.classes_by_source[sourcefile].update(classfiles)
 
   def merge(self, other_deps):
     """

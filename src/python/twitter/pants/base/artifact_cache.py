@@ -75,11 +75,8 @@ class ArtifactCache(object):
     cache_key: A CacheKey object.
     build_artifacts: List of paths to generated artifacts. These must be under pants_workdir.
     """
-    # It's OK for artifacts not to exist- we assume that the build didn't need to create them
-    # in this case (e.g., a no-op build on an empty target).
-    build_artifacts_that_exist = filter(lambda f: os.path.exists(f), build_artifacts)
     try:
-      self.try_insert(cache_key, build_artifacts_that_exist)
+      self.try_insert(cache_key, build_artifacts)
     except Exception as e:
       try:
         self.delete(cache_key)

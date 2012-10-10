@@ -16,7 +16,6 @@
 
 __author__ = 'John Sirois'
 
-import StringIO
 import os
 import re
 import subprocess
@@ -112,13 +111,7 @@ class NailgunTask(Task):
         self._ng_shutdown()
         raise e
     else:
-      only_write_cmd_line_to = StringIO.StringIO() if self.dry_run else None
-      ret = binary_utils.runjava(main=main, classpath=cp, args=args, jvmargs=jvmargs,
-        only_write_cmd_line_to=only_write_cmd_line_to)
-      if only_write_cmd_line_to:
-        print('********** Direct Java dry run: %s' % only_write_cmd_line_to.getvalue())
-        only_write_cmd_line_to.close()
-      return ret
+      return binary_utils.runjava(main=main, classpath=cp, args=args, jvmargs=jvmargs)
 
   def _ng_shutdown(self):
     endpoint = self._get_nailgun_endpoint()
@@ -198,7 +191,7 @@ class NailgunTask(Task):
 
   def _create_ngclient(self, port):
     return NailgunClient(port=port, work_dir=get_buildroot(), ins=self._stdin, out=self._stdout,
-                         err=self._stderr, dry_run=self.dry_run)
+                         err=self._stderr)
 
   def _spawn_nailgun_server(self):
     log.info('No ng server found, spawning...')
