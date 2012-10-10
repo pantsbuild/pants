@@ -1,5 +1,0 @@
-# use scala 2.10.0 jars
-
-zinc -debug -scala-library {{scala.2.10.0-M6.library}} -scala-compiler {{scala.2.10.0-M6.compiler}} -scala-extra {{scala.2.10.0-M6.extra}} A.scala
-
-exists A.class
