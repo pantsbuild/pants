@@ -65,7 +65,8 @@ class IvyResolve(NailgunTask):
                             help="Emit ivy report outputs in to this directory.")
 
     option_group.add_option(mkflag("cache"), dest="ivy_resolve_cache",
-                            help="Use this directory as the ivy cache, instead of the default specified in pants.ini.")
+                            help="Use this directory as the ivy cache, instead of the " \
+                                 "default specified in pants.ini.")
 
   def __init__(self, context):
     classpath = context.config.getlist('ivy', 'classpath')
