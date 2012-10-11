@@ -47,6 +47,7 @@ class ScalaRepl(JvmTask):
         self.args.extend(shlex.split(arg))
 
   def execute(self, targets):
+    self.context.lock.release()
     runjava(
       jvmargs=self.jvm_args,
       classpath=self.classpath(profile_classpath(self.profile), confs=self.confs),
