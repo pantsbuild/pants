@@ -251,6 +251,7 @@ class IvyResolve(NailgunTask):
       transitive = jar.transitive,
       ext = jar.ext,
       url = jar.url,
+      test_jar = jar.test_jar,
       configurations = ';'.join(jar._configurations),
     )
     override = self._overrides.get((jar.org, jar.name))
