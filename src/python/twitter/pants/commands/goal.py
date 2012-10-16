@@ -602,6 +602,11 @@ goal(
 ).install('run').with_description('Run a (currently JVM only) binary target.')
 
 goal(
+  name='jvm-run-dirty',
+  action=JvmRun
+  ).install('run-dirty').with_description('Run a (currently JVM only) binary target, using\n' +
+    'only currently existing binaries, skipping compilation')
+goal(
   name='scala-repl',
   action=ScalaRepl,
   dependencies=['compile']
