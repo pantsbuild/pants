@@ -609,6 +609,13 @@ goal(
   'Run a (currently Scala only) REPL with the classpath set according to the targets.')
 
 goal(
+  name='scala-repl-dirty',
+  action=ScalaRepl
+).install('repl-dirty').with_description(
+  'Run a (currently Scala only) REPL with the classpath set according to the targets, \n' +
+    'using the currently existing binaries, skipping compilation')
+
+goal(
   name='filedeps',
   action=FileDeps
 ).install('filedeps').with_description('Print out a list of all files the target depends on')
