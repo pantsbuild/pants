@@ -14,7 +14,7 @@
 # limitations under the License.
 # ==================================================================================================
 
-__author__ = 'John Sirois'
+__author__ = 'John Sirios'
 
 from twitter.pants.targets import InternalTarget
 from twitter.pants.testutils import MockTarget

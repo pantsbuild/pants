@@ -72,7 +72,7 @@ class ThriftstoreDMLGen(CodeGen):
         java_dml_lib.update_dependencies([thrift_dml_lib])
         self.gen_dml_jls[dml_lib_target] = java_dml_lib
 
-      for dependee, dmls in context.dependents(is_thriftstore_dml_instance).items():
+      for dependee, dmls in context.dependants(is_thriftstore_dml_instance).items():
         jls = map(lambda dml: self.gen_dml_jls[dml], dmls)
         dependee.update_dependencies(jls)
 

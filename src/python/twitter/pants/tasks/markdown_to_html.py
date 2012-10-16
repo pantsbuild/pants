@@ -139,7 +139,7 @@ class MarkdownToHtml(Task):
     roots = set()
     interior_nodes = set()
     if self.open:
-      dependencies_by_page = self.context.dependents(on_predicate=is_page, from_predicate=is_page)
+      dependencies_by_page = self.context.dependants(on_predicate=is_page, from_predicate=is_page)
       roots.update(dependencies_by_page.keys())
       for dependencies in dependencies_by_page.values():
         interior_nodes.update(dependencies)

@@ -78,7 +78,7 @@ class CodeGen(Task):
   def execute(self, targets):
     gentargets = [t for t in targets if self.is_gentarget(t)]
     capabilities = self.genlangs() # lang_name => predicate
-    gentargets_by_dependee = self.context.dependents(
+    gentargets_by_dependee = self.context.dependants(
       on_predicate=self.is_gentarget,
       from_predicate=lambda t: not self.is_gentarget(t)
     )
@@ -104,7 +104,7 @@ class CodeGen(Task):
         for dependee, gentargets in gentargets_by_dependee.items()
       ))
 
-    with self.invalidated(gentargets, invalidate_dependents=True) as invalidation_check:
+    with self.invalidated(gentargets, invalidate_dependants=True) as invalidation_check:
       invalid_targets = set()
       for vt in invalidation_check.invalid_vts:
         invalid_targets.update(vt.targets)

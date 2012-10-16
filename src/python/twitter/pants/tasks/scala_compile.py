@@ -36,11 +36,9 @@ from twitter.pants.targets.scala_tests import ScalaTests
 from twitter.pants.targets import resolve_target_sources
 from twitter.pants.tasks import TaskError
 from twitter.pants.tasks.binary_utils import nailgun_profile_classpath
-from twitter.pants.tasks.cache_manager import VersionedTargetSet
 from twitter.pants.tasks.jvm_compiler_dependencies import Dependencies
 from twitter.pants.tasks.jvm_dependency_cache import JvmDependencyCache
 from twitter.pants.tasks.nailgun_task import NailgunTask
-from twitter.pants.python import NaiveParallelizer
 
 
 # Well known metadata file required to register scalac plugins with nsc.
@@ -69,10 +67,6 @@ class ScalaCompile(NailgunTask):
       help="Roughly how many source files to attempt to compile together. Set to a large number to compile " \
            "all sources together. Set this to 0 to compile target-by-target. Default is set in pants.ini.")
 
-    option_group.add_option(mkflag("max-parallel"), dest="scala_compile_max_num_parallel_compiles",
-      action="store", type="int", default=0,
-      help="Use up to this many parallel invocations of Zinc while compiling scala files.")
-
     option_group.add_option(mkflag("color"), mkflag("color", negate=True),
                             dest="scala_compile_color",
                             action="callback", callback=mkflag.set_bool,
@@ -93,9 +87,6 @@ class ScalaCompile(NailgunTask):
     self.check_unnecessary_deps = context.options.scala_check_unnecessary_deps
     if self.check_missing_deps:
       JvmDependencyCache.init_product_requirements(self)
-    self._parallelize_compilation = True if context.options.scala_compile_max_num_parallel_compiles > 0 else False
-
-    self._num_parallel_compiles = context.options.scala_compile_max_num_parallel_compiles
 
     # We use the scala_compile_color flag if it is explicitly set on the command line.
     self._color = \
@@ -165,12 +156,6 @@ class ScalaCompile(NailgunTask):
     return True
 
   def execute(self, targets):
-    self.context.log.info(
-      'scala compiling %d targets in %s' % (
-        len(targets),
-        (("parallel (%s)" % str(self._num_parallel_compiles)) if self._parallelize_compilation else "serial")))
-    for target in targets:
-      self.context.log.debug("\t%s" % target.id)
     scala_targets = filter(ScalaCompile._has_scala_sources, targets)
     if scala_targets:
       safe_mkdir(self._depfile_dir)
@@ -185,53 +170,21 @@ class ScalaCompile(NailgunTask):
           for jar in self._plugin_jars:
             cp.insert(0, (conf, jar))
 
-      with self.invalidated(scala_targets, invalidate_dependents=True,
-        partition_size_hint=self._partition_size_hint,
-        is_parallel_compile=self._parallelize_compilation) as invalidation_check:
-
+      with self.invalidated(scala_targets, invalidate_dependants=True,
+          partition_size_hint=self._partition_size_hint) as invalidation_check:
         for vt in invalidation_check.all_vts:
           if vt.valid:  # Don't compile, just post-process.
             self.post_process(vt, upstream_analysis_caches, split_artifact=False)
-            continue
-
-        if self._parallelize_compilation:
-          def live_compile_cmd(versioned_target_set):
-            return self.execute_single_compilation(
-              versioned_target_set,
-              cp,
-              upstream_analysis_caches,
-              True)
-
-          def live_post_compile_cmd(versioned_target_set):
-            if not self.dry_run:
-              self.post_process(versioned_target_set, upstream_analysis_caches, split_artifact=True)
-              versioned_target_set.update()
-
-          def dry_run_compile_cmd(versioned_target_nodes):
-            print "dry run compiling nodes: {%s}" % ','.join([t.data.id for t in versioned_target_nodes])
-            return None
-
-          compile_cmd = dry_run_compile_cmd if self.dry_run else live_compile_cmd
-          post_compile_cmd = None if self.dry_run else live_post_compile_cmd
-
-          NaiveParallelizer(
-            self.context.log,
-            invalidation_check._invalid_target_tree,
-            self._num_parallel_compiles,
-            compile_cmd,
-            post_compile_cmd).execute()
-
-        else:
-          for vt in invalidation_check.invalid_vts_partitioned:
-            # Compile, using partitions for efficiency.
-            self.execute_single_compilation(vt, cp, upstream_analysis_caches)
-            if not self.dry_run:
-              vt.update()
+        for vt in invalidation_check.invalid_vts_partitioned:
+          # Compile, using partitions for efficiency.
+          self.execute_single_compilation(vt, cp, upstream_analysis_caches)
+          if not self.dry_run:
+            vt.update()
 
       upstream_cache_files = set()
       for (_, cache_list_entry) in upstream_analysis_caches.itermappings():
         for d in cache_list_entry.keys():
-          for cache in cache_list_entry[d]:
+          for cache in cache_list_entry[d]: 
             upstream_cache_files.add(os.path.join(d, cache))
 
       deps_cache = JvmDependencyCache(self, scala_targets, upstream_cache_files)
@@ -247,12 +200,11 @@ class ScalaCompile(NailgunTask):
     analysis_cache = os.path.join(self._analysis_cache_dir, compilation_id) + '.analysis_cache'
     return output_dir, depfile, analysis_cache
 
-  def execute_single_compilation(self, versioned_target_set, cp, upstream_analysis_caches, run_async=False):
+  def execute_single_compilation(self, versioned_target_set, cp, upstream_analysis_caches):
     """Execute a single compilation, updating upstream_analysis_caches if needed."""
     output_dir, depfile, analysis_cache = self.create_output_paths(versioned_target_set.targets)
     safe_mkdir(output_dir)
 
-    result = None
     if not versioned_target_set.valid:
       with self.check_artifact_cache(versioned_target_set,
                                      build_artifacts=[output_dir, depfile, analysis_cache]) as in_cache:
@@ -267,16 +219,10 @@ class ScalaCompile(NailgunTask):
                                     '\n  '.join(str(t) for t in sources_by_target.keys()))
             else:
               classpath = [jar for conf, jar in cp if conf in self._confs]
-              result = self.compile(classpath, sources,
-                output_dir, analysis_cache, upstream_analysis_caches, depfile, run_async=run_async)
-              if result != 0 and not run_async:
+              result = self.compile(classpath, sources, output_dir, analysis_cache, upstream_analysis_caches, depfile)
+              if result != 0:
                 raise TaskError('%s returned %d' % (self._main, result))
-    if not run_async:
-      # If we're running asynchronously, the compile has just been spawned and is (in all likelihood) still running). Worry about calling this later.
-      # TODO(ryan): incorporate this into a more unified "post-compile-command", possibly also encompassing the update()
-      # logic handled in the Parallelizer's post_compile_cmd above.
-      self.post_process(versioned_target_set, upstream_analysis_caches, split_artifact=True)
-    return result
+    self.post_process(versioned_target_set, upstream_analysis_caches, split_artifact=True)
 
   # Post-processing steps that must happen even for valid targets.
   def post_process(self, vt, upstream_analysis_caches, split_artifact):
@@ -334,7 +280,7 @@ class ScalaCompile(NailgunTask):
       collect_sources(target)
     return sources
 
-  def compile(self, classpath, sources, output_dir, analysis_cache, upstream_analysis_caches, depfile, run_async=False):
+  def compile(self, classpath, sources, output_dir, analysis_cache, upstream_analysis_caches, depfile):
     # To pass options to scalac simply prefix with -S.
     args = ['-S' + x for x in self._args]
 
@@ -371,7 +317,7 @@ class ScalaCompile(NailgunTask):
     args.extend(sources)
 
     self.context.log.debug('Executing: %s %s' % (self._main, ' '.join(args)))
-    return self.runjava(self._main, classpath=self._zinc_classpath, args=args, jvmargs=self._jvm_args, run_async=run_async)
+    return self.runjava(self._main, classpath=self._zinc_classpath, args=args, jvmargs=self._jvm_args)
 
   # Splits an artifact representing several targets into target-by-target artifacts.
   # Creates an output classes dir, a depfile and an analysis file for each target.

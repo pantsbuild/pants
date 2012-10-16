@@ -17,7 +17,6 @@
 from .address import Address
 from .build_file import BuildFile
 from .config import Config
-from .double_dag import DoubleDag
 from .fileset import Fileset
 from .parse_context import ContextError, ParseContext
 from .target import Target, TargetDefinitionException

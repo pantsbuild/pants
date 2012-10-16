@@ -125,7 +125,7 @@ class JavaCompile(NailgunTask):
           cp.insert(0, (conf, self._resources_dir))
           cp.insert(0, (conf, self._classes_dir))
 
-      with self.invalidated(java_targets, invalidate_dependents=True,
+      with self.invalidated(java_targets, invalidate_dependants=True,
           partition_size_hint=self._partition_size_hint) as invalidation_check:
         for vt in invalidation_check.all_vts:
           if vt.valid:  # Don't compile, just post-process.
@@ -217,7 +217,7 @@ class JavaCompile(NailgunTask):
       collect_sources(target)
     return sources, processors, Target.identify(targets)
 
-  def compile(self, classpath, sources, fingerprint, depfile, run_async=False):
+  def compile(self, classpath, sources, fingerprint, depfile):
     jmake_classpath = nailgun_profile_classpath(self, self._jmake_profile)
 
     args = [
@@ -236,9 +236,7 @@ class JavaCompile(NailgunTask):
     args.extend(self._args)
     args.extend(sources)
     log.debug('Executing: %s %s' % (_JMAKE_MAIN, ' '.join(args)))
-    if run_async:
-      log.info('\nRunning async: %s\n' % ' '.join(sources))
-    return self.runjava(_JMAKE_MAIN, classpath=jmake_classpath, args=args, jvmargs=self._jvm_args, run_async=run_async)
+    return self.runjava(_JMAKE_MAIN, classpath=jmake_classpath, args=args, jvmargs=self._jvm_args)
 
   def split_depfile(self, deps, versioned_target_set):
     if len(versioned_target_set.targets) <= 1:

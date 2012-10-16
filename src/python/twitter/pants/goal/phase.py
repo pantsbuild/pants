@@ -88,7 +88,7 @@ class Phase(PhaseBase):
           yield goal
 
   @staticmethod
-  def attempt(context, phases):
+  def attempt(context, phases, timer=None):
     """
       Attempts to reach the goals for the supplied phases, optionally recording phase timings and
       then logging then when all specified phases have completed.
@@ -98,10 +98,10 @@ class Phase(PhaseBase):
     # I'd rather do this in a finally block below, but some goals os.fork and each of these cause
     # finally to run, printing goal timings multiple times instead of once at the end.
     def emit_timings():
-      if context.timer:
+      if timer:
         for phase, timings in executed.items():
           for goal, times in timings.items():
-            context.timer.log('%s:%s' % (phase, goal), times)
+            timer.log('%s:%s' % (phase, goal), times)
 
     try:
       # Prepare tasks roots to leaves and allow for goals introducing new goals in existing phases.
@@ -130,7 +130,7 @@ class Phase(PhaseBase):
         'Executing goals in phases %s' % ' -> '.join(map(str, reversed(expanded)))
       )
       for phase in phases:
-        Group.execute(phase, tasks_by_goal, context, executed)
+        Group.execute(phase, tasks_by_goal, context, executed, timer=timer)
 
       emit_timings()
       return 0
@@ -177,7 +177,7 @@ class Phase(PhaseBase):
       after: Places the goal after the named goal in the execution list
     """
 
-    if int(first) + int(replace) + int(bool(before)) + int(bool(after)) > 1:
+    if (first or replace or before or after) and not (first ^ replace ^ bool(before) ^ bool(after)):
       raise GoalError('Can only specify one of first, replace, before or after')
 
     Phase._phase_by_goal[goal] = self

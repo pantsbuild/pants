@@ -73,9 +73,6 @@ class Goal(object):
 
       self._task = FuncTask
 
-  def __repr__(self):
-    return "Goal(%s-%s; %s)" % (self.name, self.group, ','.join([str(d) for d in self.dependencies]))
-
   @property
   def task_type(self):
     return self._task
