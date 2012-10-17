@@ -172,7 +172,10 @@ class Goal(Command):
   # TODO(John Sirois): revisit wholesale locking when we move py support into pants new
   @classmethod
   def serialized(cls):
-    return True
+    # Goal serialization is now handled in goal execution during group processing.
+    # The goal command doesn't need to hold the serialization lock; individual goals will
+    # acquire the lock if they need to be serialized.
+    return False
 
   def __init__(self, root_dir, parser, args):
     self.targets = []

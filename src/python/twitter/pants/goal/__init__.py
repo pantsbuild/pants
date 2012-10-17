@@ -30,7 +30,9 @@ from twitter.pants.goal.phase import Phase
 
 
 class Goal(object):
-  def __init__(self, name, action, group=None, dependencies=None):
+  # self.serialize==true if the goal requires the lock.
+  def __init__(self, name, action, group=None, dependencies=None, serialize=True):
+    self.serialize = serialize
     self.name = name
     self.group = group
     self.dependencies = [Phase(d) for d in dependencies] if dependencies else []

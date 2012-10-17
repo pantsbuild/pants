@@ -79,7 +79,7 @@ limitations under the License.
         % endif
       />
       % endif
-			% if dependency.test-jar: 
+			% if dependency.test_jar: 
 			<artifact name="${dependency.module}" type="test-jar" ext="jar" m:classifier="tests"/>
 			<artifact name="${dependency.module}" type="jar" ext="jar" />
 			% endif
