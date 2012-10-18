@@ -28,19 +28,19 @@ class ContextTest(unittest.TestCase):
     cls.config = Config.load()
 
 
-  def test_dependants_empty(self):
+  def test_dependents_empty(self):
     context = Context(ContextTest.config, options={}, target_roots=[])
-    dependees = context.dependants()
+    dependees = context.dependents()
     self.assertEquals(0, len(dependees))
 
 
-  def test_dependants_direct(self):
+  def test_dependents_direct(self):
     a = MockTarget('a')
     b = MockTarget('b', [a])
     c = MockTarget('c', [b])
     d = MockTarget('d', [c, a])
     e = MockTarget('e', [d])
     context = Context(ContextTest.config, options={}, target_roots=[a, b, c, d, e])
-    dependees = context.dependants(lambda t: t in set([e, c]))
+    dependees = context.dependents(lambda t: t in set([e, c]))
     self.assertEquals(set([c]), dependees.pop(d))
     self.assertEquals(0, len(dependees))

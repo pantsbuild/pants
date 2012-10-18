@@ -14,7 +14,7 @@
 # limitations under the License.
 # ==================================================================================================
 
-__author__ = 'John Sirios'
+__author__ = 'John Sirois'
 
 from twitter.pants.base.generator import TemplateData
 
