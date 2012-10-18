@@ -125,7 +125,7 @@ class JavaCompile(NailgunTask):
           cp.insert(0, (conf, self._resources_dir))
           cp.insert(0, (conf, self._classes_dir))
 
-      with self.invalidated(java_targets, invalidate_dependants=True,
+      with self.invalidated(java_targets, invalidate_dependents=True,
           partition_size_hint=self._partition_size_hint) as invalidation_check:
         for vt in invalidation_check.all_vts:
           if vt.valid:  # Don't compile, just post-process.

@@ -174,7 +174,7 @@ class Context(object):
     """
     return filter(predicate, self._targets)
 
-  def dependants(self, on_predicate=None, from_predicate=None):
+  def dependents(self, on_predicate=None, from_predicate=None):
     """Returns  a map from targets that satisfy the from_predicate to targets they depend on that
       satisfy the on_predicate.
     """
