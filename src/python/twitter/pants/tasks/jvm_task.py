@@ -18,7 +18,8 @@ __author__ = 'John Sirois'
 
 import os
 
-from twitter.pants import get_buildroot
+from twitter.pants import get_buildroot, is_test
+from twitter.pants.targets import JvmTarget
 from twitter.pants.tasks import Task
 
 class JvmTask(Task):
@@ -27,9 +28,15 @@ class JvmTask(Task):
     with self.context.state('classpath', []) as cp:
       classpath.extend(jar for conf, jar in cp if not confs or conf in confs)
 
-    # TODO(John Sirois): undo cheeseball! - derive src/resources from target attribute and then
-    # later fix tests to declare their resources as well?
-    classpath.extend(os.path.join(get_buildroot(), path)
-                     for path in ('src/resources', 'tests/resources'))
+    # TODO(John Sirois): Fixup jvm test targets to declare their resources and fixup resources to
+    # be their own target libraries or tests then depend on:
+    # http://jira.local.twitter.com/browse/AWESOME-108
+    bases = set()
+    for target in self.context.targets():
+      if isinstance(target, JvmTarget) and (is_test(target) or hasattr(target, 'resources')):
+        if target.target_base not in bases:
+          sibling_resources_base = os.path.join(os.path.dirname(target.target_base), 'resources')
+          classpath.append(os.path.join(get_buildroot(), sibling_resources_base))
+          bases.add(target.target_base)
 
     return classpath
