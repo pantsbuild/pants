@@ -1,9 +1,5 @@
-
-from __future__ import print_function
-
 import hashlib
 import os
-import sys  
 
 from collections import defaultdict
 from contextlib import contextmanager
@@ -11,24 +7,11 @@ from contextlib import contextmanager
 from twitter.common.collections import OrderedSet
 from twitter.common.dirutil import Lock
 
-from twitter.pants import get_buildroot
 from twitter.pants import SourceRoot
 from twitter.pants.base import ParseContext
 from twitter.pants.base.target import Target
 from twitter.pants.targets import Pants
 from twitter.pants.goal.products import Products
-
-# Utility definition for grabbing process info for locking, with python version workarounds.
-try:
-  import psutil
-
-  def _process_info(pid):
-    process = psutil.Process(pid)
-    return '%d (%s)' % (pid, ' '.join(process.cmdline))
-except ImportError:
-  def _process_info(pid):
-    return '%d' % pid
-
 
 class Context(object):
   """Contains the context for a single run of pants.
@@ -45,14 +28,13 @@ class Context(object):
     def info(self, msg): pass
     def warn(self, msg): pass
 
-  def __init__(self, config, options, target_roots, lock=Lock.unlocked(), log=None):
+  def __init__(self, config, options, target_roots, lock=None, log=None):
     self._config = config
     self._options = options
-    self._lock = lock
+    self._lock = lock or Lock.unlocked()
     self._log = log or Context.Log()
     self._state = {}
     self._products = Products()
-    self._buildroot = get_buildroot()
 
     self.replace_targets(target_roots)
 
@@ -93,28 +75,6 @@ class Context(object):
 
   def __str__(self):
     return 'Context(id:%s, state:%s, targets:%s)' % (self.id, self.state, self.targets())
-
-  def acquire_lock(self):
-    """ Acquire the global lock for the root directory associated with this context. When
-    a goal requires serialization, it will call this to acquire the lock.
-    """
-    def onwait(pid):
-      print('Waiting on pants process %s to complete' % _process_info(pid), file=sys.stderr)
-      return True
-    if self._lock.is_unlocked():
-      runfile = os.path.join(self._buildroot, '.pants.run')
-      self._lock = Lock.acquire(runfile, onwait=onwait)
-
-  def release_lock(self):
-    """Release the global lock if it's held.
-    Returns True if the lock was held before this call.
-    """
-    if self._lock is Lock.unlocked():
-      return False
-    else:
-      self._lock.release()
-      self._lock = Lock.unlocked()
-      return True
 
   def replace_targets(self, target_roots):
     """Replaces all targets in the context with the given roots and their transitive

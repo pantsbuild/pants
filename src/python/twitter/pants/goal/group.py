@@ -8,14 +8,6 @@ class Group(object):
   def execute(phase, tasks_by_goal, context, executed, timer=None):
     """Executes the named phase against the current context tracking goal executions in executed."""
 
-    def _acquire_lock_if_needed(goal):
-      """If the goal about to be executed requires the lock, then acquire it. If not,
-         then make sure it's released."""
-      if goal.serialize:
-        context.acquire_lock()
-      else:
-        context.release_lock()
-
     def execute_task(name, task, targets):
       """Execute and time a single goal that has had all of its dependencies satisfied."""
       start = timer.now() if timer else None
@@ -54,24 +46,19 @@ class Group(object):
             goals_by_group[group_name].append(goal)
         else:
           runqueue.append((None, [goal]))
-      try:
-        for group_name, goals in runqueue:
-          if not group_name:
-            goal = goals[0]
-            _acquire_lock_if_needed(goal)
-            context.log.info('[%s:%s]' % (phase, goal.name))
-            execute_task(goal.name, tasks_by_goal[goal], context.targets())
-          else:
-            for chunk in Group.create_chunks(context, goals):
-              for goal in goals:
-                _acquire_lock_if_needed(goal)
-                goal_chunk = filter(goal.group.predicate, chunk)
-                if len(goal_chunk) > 0:
-                  context.log.info('[%s:%s:%s]' % (phase, group_name, goal.name))
-                  execute_task(goal.name, tasks_by_goal[goal], goal_chunk)
-      finally:
-        # Once the goals are satisfied, make sure that the lock isn't still being held.
-        context.release_lock()
+
+      for group_name, goals in runqueue:
+        if not group_name:
+          goal = goals[0]
+          context.log.info('[%s:%s]' % (phase, goal.name))
+          execute_task(goal.name, tasks_by_goal[goal], context.targets())
+        else:
+          for chunk in Group.create_chunks(context, goals):
+            for goal in goals:
+              goal_chunk = filter(goal.group.predicate, chunk)
+              if len(goal_chunk) > 0:
+                context.log.info('[%s:%s:%s]' % (phase, group_name, goal.name))
+                execute_task(goal.name, tasks_by_goal[goal], goal_chunk)
 
   @staticmethod
   def create_chunks(context, goals):

@@ -204,7 +204,6 @@ class NailgunClient(object):
       Executes the given main_class with any supplied args in the given environment.  Returns
       the exit code of the main_class.
     """
-
     environment = dict(ENV_DEFAULTS.items() + environment.items())
 
     sock = self.try_connect()

@@ -70,24 +70,24 @@ class CacheKeyGenerator(object):
   """Generates cache keys for versions of target sets."""
 
   @staticmethod
-  def combine_cache_keys(per_target_cache_keys):
-    """Returns a cache key for a set of targets that already have cache keys.
+  def combine_cache_keys(cache_keys):
+    """Returns a cache key for a list of target sets that already have cache keys.
 
-    This operation is 'idempotent' in the sense that if per_target_cache_keys contains a single key
+    This operation is 'idempotent' in the sense that if cache_keys contains a single key
     then that key is returned.
 
     Note that this operation is commutative but not associative.  We use the term 'combine' rather than
     'merge' or 'union' to remind the user of this. Associativity is not a necessary property, in practice.
     """
-    if len(per_target_cache_keys) == 1:
-      return per_target_cache_keys[0]
+    if len(cache_keys) == 1:
+      return cache_keys[0]
     else:
-      cache_keys = sorted(per_target_cache_keys)  # For commutativity.
+      sorted_cache_keys = sorted(cache_keys)  # For commutativity.
       # Note that combined_id for a list of targets is the same as Target.identify([targets]),
       # for convenience when debugging, but it doesn't have to be for correctness.
-      combined_id = hash_all([cache_key.id for cache_key in cache_keys])
-      combined_hash = hash_all([cache_key.hash for cache_key in cache_keys])
-      combined_num_sources = reduce(lambda x, y: x + y, [cache_key.num_sources for cache_key in cache_keys], 0)
+      combined_id = hash_all([cache_key.id for cache_key in sorted_cache_keys])
+      combined_hash = hash_all([cache_key.hash for cache_key in sorted_cache_keys])
+      combined_num_sources = reduce(lambda x, y: x + y, [cache_key.num_sources for cache_key in sorted_cache_keys], 0)
       return CacheKey(combined_id, combined_hash, combined_num_sources)
 
   def key_for_target(self, target, sources=TARGET_SOURCES, fingerprint_extra=None):
@@ -164,15 +164,6 @@ class BuildInvalidator(object):
     self._root = os.path.join(root, str(BuildInvalidator.VERSION))
     safe_mkdir(self._root)
 
-  def invalidate(self, cache_key):
-    """Invalidates this cache key.
-
-    :param cache_key: A CacheKey object (as returned by BuildInvalidator.key_for().
-    """
-    sha_file = self._sha_file(cache_key)
-    if os.path.exists(sha_file):
-      os.unlink(sha_file)
-
   def needs_update(self, cache_key):
     """Check if the given cached item is invalid.
 
@@ -194,9 +185,6 @@ class BuildInvalidator(object):
 
     Returns None if there is no existing hash for this id."""
     return self._read_sha_by_id(id)
-
-  def has_key(self, cache_key):
-    return os.path.exists(self._sha_file(cache_key))
 
   def _sha_file(self, cache_key):
     return self._sha_file_by_id(cache_key.id)

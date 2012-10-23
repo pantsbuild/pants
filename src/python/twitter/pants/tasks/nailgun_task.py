@@ -16,6 +16,7 @@
 
 __author__ = 'John Sirois'
 
+import StringIO
 import os
 import re
 import subprocess
@@ -103,15 +104,29 @@ class NailgunTask(Task):
     cp = (self._classpath or []) + (classpath or [])
     if self._daemon:
       nailgun = self._get_nailgun_client()
+
+      def call_nailgun(main_class, *args):
+        if self.dry_run:
+          print('********** NailgunClient dry run: %s %s' % (main_class, ' '.join(args)))
+          return 0
+        else:
+          return nailgun(main_class, *args)
+
       try:
         if cp:
-          nailgun('ng-cp', *[os.path.relpath(jar, get_buildroot()) for jar in cp])
-        return nailgun(main, *args)
+          call_nailgun('ng-cp', *[os.path.relpath(jar, get_buildroot()) for jar in cp])
+        return call_nailgun(main, *args)
       except NailgunError as e:
         self._ng_shutdown()
         raise e
     else:
-      return binary_utils.runjava(main=main, classpath=cp, args=args, jvmargs=jvmargs)
+      only_write_cmd_line_to = StringIO.StringIO() if self.dry_run else None
+      ret = binary_utils.runjava(main=main, classpath=cp, args=args, jvmargs=jvmargs,
+        only_write_cmd_line_to=only_write_cmd_line_to)
+      if only_write_cmd_line_to:
+        print('********** Direct Java dry run: %s' % only_write_cmd_line_to.getvalue())
+        only_write_cmd_line_to.close()
+      return ret
 
   def _ng_shutdown(self):
     endpoint = self._get_nailgun_endpoint()

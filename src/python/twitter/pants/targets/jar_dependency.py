@@ -39,7 +39,7 @@ class JarDependency(object):
   javadocs with {@link}s to the jar's classes will be properly hyperlinked.
   """
 
-  def __init__(self, org, name, rev = None, force = False, ext = None, url = None, apidocs = None, test_jar = False):
+  def __init__(self, org, name, rev = None, force = False, ext = None, url = None, apidocs = None):
     self.org = org
     self.name = name
     self.rev = rev
@@ -50,7 +50,6 @@ class JarDependency(object):
     self.url = url
     self.apidocs = apidocs
     self.id = None
-    self.test_jar = test_jar
     self._configurations = [ 'default' ]
 
     # Support legacy method names

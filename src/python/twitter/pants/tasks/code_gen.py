@@ -104,8 +104,10 @@ class CodeGen(Task):
         for dependee, gentargets in gentargets_by_dependee.items()
       ))
 
-    with self.invalidated(gentargets, invalidate_dependants=True) as invalidated:
-      invalid_targets = set(invalidated.invalid_targets())
+    with self.invalidated(gentargets, invalidate_dependants=True) as invalidation_check:
+      invalid_targets = set()
+      for vt in invalidation_check.invalid_vts:
+        invalid_targets.update(vt.targets)
       for lang, tgts in gentargets_bylang.items():
         lang_invalid = invalid_targets.intersection(tgts)
         if lang_invalid:
