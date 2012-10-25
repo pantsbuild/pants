@@ -85,9 +85,9 @@ class JavaCompile(NailgunTask):
     NailgunTask.__init__(self, context, workdir=context.config.get('java-compile', 'nailgun_dir'))
 
     self._partition_size_hint = \
-    context.options.java_compile_partition_size_hint \
-    if context.options.java_compile_partition_size_hint != -1 else \
-    context.config.getint('java-compile', 'partition_size_hint')
+      context.options.java_compile_partition_size_hint \
+      if context.options.java_compile_partition_size_hint != -1 \
+      else context.config.getint('java-compile', 'partition_size_hint')
 
     workdir = context.config.get('java-compile', 'workdir')
     self._classes_dir = os.path.join(workdir, 'classes')
