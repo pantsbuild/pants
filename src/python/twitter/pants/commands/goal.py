@@ -174,7 +174,10 @@ class Goal(Command):
   # TODO(John Sirois): revisit wholesale locking when we move py support into pants new
   @classmethod
   def serialized(cls):
-    return True
+    # Goal serialization is now handled in goal execution during group processing.
+    # The goal command doesn't need to hold the serialization lock; individual goals will
+    # acquire the lock if they need to be serialized.
+    return False
 
   def __init__(self, root_dir, parser, args):
     self.targets = []
@@ -607,11 +610,23 @@ goal(
 ).install('run').with_description('Run a (currently JVM only) binary target.')
 
 goal(
+  name='jvm-run-dirty',
+  action=JvmRun
+  ).install('run-dirty').with_description('Run a (currently JVM only) binary target, using\n' +
+    'only currently existing binaries, skipping compilation')
+goal(
   name='scala-repl',
   action=ScalaRepl,
   dependencies=['compile']
 ).install('repl').with_description(
   'Run a (currently Scala only) REPL with the classpath set according to the targets.')
+
+goal(
+  name='scala-repl-dirty',
+  action=ScalaRepl
+).install('repl-dirty').with_description(
+  'Run a (currently Scala only) REPL with the classpath set according to the targets, \n' +
+    'using the currently existing binaries, skipping compilation')
 
 goal(
   name='filedeps',
