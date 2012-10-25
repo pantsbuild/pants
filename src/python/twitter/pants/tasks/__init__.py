@@ -162,8 +162,8 @@ class Task(object):
 
     Therefore the usage idiom is as follows:
 
-    with self.check_artifact_cache(...) as build:
-      if build:
+    with self.check_artifact_cache(...) as in_cache:
+      if not in_cache:
         ... build the necessary artifacts ...
 
     versioned_targets: a VersionedTargetSet representing a specific version of a set of targets.
