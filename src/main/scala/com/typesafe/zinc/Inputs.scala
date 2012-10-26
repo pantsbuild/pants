@@ -118,15 +118,21 @@ object Inputs {
   }
 
   /**
-   * Get the analysis for a compile run, based on the output directory.
-   * Checks the analysis map setting for the cache location, otherwise default location.
+   * Get the possible cache location for a classpath entry. Checks the upstream analysis map
+   * for the cache location, otherwise uses the default location for output directories.
+   */
+  def cacheFor(file: File, exclude: File, mapped: Map[File, File]): Option[File] = {
+    if (file == exclude) None else mapped.get(file) orElse {
+      if (file.isDirectory) Some(defaultCacheLocation(file)) else None
+    }
+  }
+
+  /**
+   * Get the analysis for a compile run, based on a classpath entry.
    * If not cached in memory, reads from the cache file.
    */
   def analysisFor(file: File, exclude: File, mapped: Map[File, File]): Analysis = {
-    if (file != exclude && file.isDirectory) {
-      val cacheFile = mapped.getOrElse(file, defaultCacheLocation(file)).getCanonicalFile
-      Compiler.analysis(cacheFile)
-    } else Analysis.Empty
+    cacheFor(file, exclude, mapped) map Compiler.analysis getOrElse Analysis.Empty
   }
 
   /**
