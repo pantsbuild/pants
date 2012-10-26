@@ -5,8 +5,10 @@
 package com.typesafe.zinc
 
 import java.io.File
+import java.util.{ List => JList }
 import sbt.Level
 import sbt.Path._
+import scala.collection.JavaConverters._
 import xsbti.compile.CompileOrder
 
 /**
@@ -41,6 +43,35 @@ case class ScalaLocation(
   compiler: Option[File] = None,
   library: Option[File]  = None,
   extra: Seq[File]       = Seq.empty)
+
+object ScalaLocation {
+  /**
+   * Java API for creating ScalaLocation.
+   */
+  def create(
+    home: File,
+    path: JList[File],
+    compiler: File,
+    library: File,
+    extra: JList[File]): ScalaLocation =
+  ScalaLocation(
+    Option(home),
+    path.asScala,
+    Option(compiler),
+    Option(library),
+    extra.asScala
+  )
+
+  /**
+   * Java API for creating ScalaLocation with scala home.
+   */
+  def fromHome(home: File) = ScalaLocation(home = Option(home))
+
+  /**
+   * Java API for creating ScalaLocation with scala path.
+   */
+  def fromPath(path: JList[File]) = ScalaLocation(path = path.asScala)
+}
 
 /**
  * Locating the sbt jars needed for zinc compile.

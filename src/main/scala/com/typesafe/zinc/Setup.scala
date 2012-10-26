@@ -86,6 +86,26 @@ object Setup {
   )
 
   /**
+   * Java API for creating Setup with ScalaLocation.
+   */
+  def create(
+    scalaLocation: ScalaLocation,
+    sbtInterface: File,
+    compilerInterfaceSrc: File,
+    javaHome: File): Setup =
+  {
+    val (scalaCompiler, scalaLibrary, scalaExtra) = scalaJars(scalaLocation)
+    setup(
+      scalaCompiler,
+      scalaLibrary,
+      scalaExtra,
+      sbtInterface,
+      compilerInterfaceSrc,
+      Option(javaHome)
+    )
+  }
+
+  /**
    * Select the scala jars.
    *
    * Prefer the explicit scala-compiler, scala-library, and scala-extra settings,
