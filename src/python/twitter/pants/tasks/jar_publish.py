@@ -635,12 +635,15 @@ class JarPublish(Task):
       user=getpass.getuser(),
       cause='with forced revision' if (org, name) in self.overrides else '(autoinc)'
     )
-    self.check_call(['git', 'pull', '--ff-only', '--tags', 'origin', 'master'])
+    # Note: we do a separate fetch and merge, because git pull may be a fetch+rebase,
+    # which won't work with fast-forwarding.
+    self.check_call(['git', 'fetch', '--tags', 'origin', 'master'])
+    self.check_call(['git', 'merge', '--ff-only', 'origin', 'master'])
     self.check_call(['git', 'tag' , '-a',
                      '-m', 'Publish of %(coordinate)s initiated by %(user)s %(cause)s' % args,
                      '%(org)s-%(name)s-%(rev)s' % args, sha])
 
-    self.check_call(['git', 'commit' , '-a',
+    self.check_call(['git', 'commit' , '--no-verify', '-a',
                      '-m', 'pants build committing publish data for push of '
                            '%(coordinate)s' % args])
 

@@ -14,18 +14,17 @@
 # limitations under the License.
 # ==================================================================================================
 
-
 __author__ = 'John Sirois'
 
-import errno
 import os
 import shutil
 import textwrap
 
 from collections import defaultdict
+from xml.etree import ElementTree
 
 from twitter.common.collections import OrderedDict
-from twitter.common.contextutil import temporary_dir
+from twitter.common.contextutil import open_zip as open_jar, temporary_dir
 from twitter.common.dirutil import safe_mkdir, safe_open, safe_rmtree
 
 from twitter.pants import get_buildroot, is_scala, is_scalac_plugin
@@ -58,6 +57,10 @@ class ScalaCompile(NailgunTask):
                             help="[%default] Compile scala code with all configured warnings "
                                  "enabled.")
 
+    option_group.add_option(mkflag("plugins"), dest="plugins", default=None,
+      action="store", type="string",
+      help="Use these scalac plugins. Default is set in pants.ini")
+
     option_group.add_option(mkflag("partition-size-hint"), dest="scala_compile_partition_size_hint",
       action="store", type="int", default=-1,
       help="Roughly how many source files to attempt to compile together. Set to a large number to compile " \
@@ -82,6 +85,7 @@ class ScalaCompile(NailgunTask):
 
     self._compile_profile = context.config.get('scala-compile', 'compile-profile')  # The target scala version.
     self._zinc_profile = context.config.get('scala-compile', 'zinc-profile')
+    plugins_profile = context.config.get('scala-compile', 'scalac-plugins-profile')
 
     self._zinc_classpath = nailgun_profile_classpath(self, self._zinc_profile)
     compiler_classpath = nailgun_profile_classpath(self, self._compile_profile)
@@ -89,6 +93,8 @@ class ScalaCompile(NailgunTask):
     self._zinc_jar_args = []
     for (name, jarpath) in zinc_jars.items():  # The zinc jar names are also the flag names.
       self._zinc_jar_args.extend(['-%s' % name, jarpath])
+
+    self._plugin_jars = nailgun_profile_classpath(self, plugins_profile) if plugins_profile else []
 
     # All scala targets implicitly depend on the selected scala runtime.
     scaladeps = []
@@ -110,6 +116,18 @@ class ScalaCompile(NailgunTask):
       self._args.extend(context.config.getlist('scala-compile', 'warning_args'))
     else:
       self._args.extend(context.config.getlist('scala-compile', 'no_warning_args'))
+
+    plugin_names = context.options.plugins.split(',') if context.options.plugins is not None \
+      else context.config.getlist('scala-compile', 'scalac-plugins', default=[])
+
+    plugin_args = dict(context.config.getlist('scala-compile', 'scalac-plugin-args', default=[]))
+
+    active_plugins = ScalaCompile.find_plugins(plugin_names, self._plugin_jars)
+
+    for name, jar in active_plugins.items():
+      self._args.append('-Xplugin:%s' % jar)
+      for arg in plugin_args.get(name, []):
+        self._args.append('-P:%s:%s' % (name, arg))
 
     self._confs = context.config.getlist('scala-compile', 'confs')
     self._depfile_dir = os.path.join(self._workdir, 'depfiles')
@@ -135,6 +153,8 @@ class ScalaCompile(NailgunTask):
       with self.context.state('classpath', []) as cp:
         for conf in self._confs:
           cp.insert(0, (conf, self._resources_dir))
+          for jar in self._plugin_jars:
+            cp.insert(0, (conf, jar))
 
       with self.invalidated(scala_targets, invalidate_dependants=True,
           partition_size_hint=self._partition_size_hint) as invalidation_check:
@@ -451,3 +471,32 @@ class ScalaCompile(NailgunTask):
       else:
         jars_by_name[name] = jar_for_name
     return jars_by_name
+
+  @staticmethod
+  def find_plugins(plugin_names, plugin_jars):
+    """Returns a map from plugin name to plugin jar."""
+    plugin_names = set(plugin_names)
+    plugins = {}
+    # plugin_jars is the universe of all possible plugins and their transitive deps.
+    # Here we select the ones to actually use.
+    for jar in plugin_jars:
+      with open_jar(jar, 'r') as jarfile:
+        try:
+          plugin_info_file = jarfile.open(_PLUGIN_INFO_FILE, 'r')  # Not a context manager, sadly.
+          plugin_info = ElementTree.parse(plugin_info_file).getroot()
+          plugin_info_file.close()
+          if plugin_info.tag != 'plugin':
+            raise TaskError, 'File %s in %s is not a valid scalac plugin descriptor' % (_PLUGIN_INFO_FILE, jar)
+          name = plugin_info.find('name').text
+          if name in plugin_names:
+            if name in plugins:
+              raise TaskError, 'Plugin %s defined in %s and in %s' % (name, plugins[name], jar)
+            plugins[name] = jar
+        except KeyError:
+          pass
+
+    unresolved_plugins = plugin_names - set(plugins.keys())
+    if len(unresolved_plugins) > 0:
+      raise TaskError, 'Could not find requested plugins: %s' % list(unresolved_plugins)
+    return plugins
+

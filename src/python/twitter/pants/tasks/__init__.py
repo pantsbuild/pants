@@ -118,7 +118,6 @@ class Task(object):
     Yields an InvalidationCheck object reflecting the (partitioned) targets. If no exceptions are
     thrown by work in the block, the cache is updated for the targets.
     """
-    # invalidate_for() may return an iterable that isn't a set, so we ensure a set here.
     extra_data = []
     extra_data.append(self.invalidate_for())
 
