@@ -186,7 +186,7 @@ class ScalaCompile(NailgunTask):
     output_dir, depfile, analysis_cache = self.create_output_paths(vt.targets)
     if not self.dry_run:
       # Read in the deps created either just now or by a previous compiler run on these targets.
-      if self.context.products.isrequired('classes') and os.path.exists(depfile):
+      if os.path.exists(depfile):
         self.context.log.debug('Reading dependencies from ' + depfile)
         deps = Dependencies(output_dir)
         deps.load(depfile)
@@ -194,19 +194,19 @@ class ScalaCompile(NailgunTask):
         if split_artifact:
           self.split_artifact(deps, vt)
 
-        genmap = self.context.products.get('classes')
+        if self.context.products.isrequired('classes') :
+          genmap = self.context.products.get('classes')
+          for target, classes_by_source in deps.findclasses(vt.targets).items():
+            for source, classes in classes_by_source.items():
+              genmap.add(source, output_dir, classes)
+              genmap.add(target, output_dir, classes)
 
-        for target, classes_by_source in deps.findclasses(vt.targets).items():
-          for source, classes in classes_by_source.items():
-            genmap.add(source, output_dir, classes)
-            genmap.add(target, output_dir, classes)
-
-        # TODO(John Sirois): Map target.resources in the same way
-        # Create and Map scala plugin info files to the owning targets.
-        for target in vt.targets:
-          if is_scalac_plugin(target) and target.classname:
-            basedir = self.write_plugin_info(target)
-            genmap.add(target, basedir, [_PLUGIN_INFO_FILE])
+          # TODO(John Sirois): Map target.resources in the same way
+          # Create and Map scala plugin info files to the owning targets.
+          for target in vt.targets:
+            if is_scalac_plugin(target) and target.classname:
+              basedir = self.write_plugin_info(target)
+              genmap.add(target, basedir, [_PLUGIN_INFO_FILE])
 
     # Update the upstream analysis map.
     if os.path.exists(analysis_cache):
