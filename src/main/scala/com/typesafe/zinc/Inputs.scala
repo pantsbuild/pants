@@ -74,7 +74,7 @@ object Inputs {
     val classes          = normalise(classesDirectory)
     val cacheFile        = normalise(analysisCache.getOrElse(defaultCacheLocation(classesDirectory)))
     val upstreamAnalysis = analysisCacheMap map { case (k, v) => (normalise(k), normalise(v)) }
-    val analysisMap      = (classpath map { file => (file, analysisFor(file, classesDirectory, upstreamAnalysis)) }).toMap
+    val analysisMap      = (cp map { file => (file, analysisFor(file, classes, upstreamAnalysis)) }).toMap
     val printRelations   = outputRelations map normalise
     val printProducts    = outputProducts map normalise
     new Inputs(cp, srcs, classes, scalacOptions, javacOptions, cacheFile, analysisMap, forceClean, Locate.definesClass, javaOnly, compileOrder, printRelations, printProducts)
