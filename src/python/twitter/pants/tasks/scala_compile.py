@@ -21,6 +21,7 @@ import shutil
 import textwrap
 
 from collections import defaultdict
+from contextlib import closing
 from xml.etree import ElementTree
 
 from twitter.common.collections import OrderedDict
@@ -58,8 +59,7 @@ class ScalaCompile(NailgunTask):
                                  "enabled.")
 
     option_group.add_option(mkflag("plugins"), dest="plugins", default=None,
-      action="store", type="string",
-      help="Use these scalac plugins. Default is set in pants.ini")
+      action="append", help="Use these scalac plugins. Default is set in pants.ini.")
 
     option_group.add_option(mkflag("partition-size-hint"), dest="scala_compile_partition_size_hint",
       action="store", type="int", default=-1,
@@ -117,10 +117,12 @@ class ScalaCompile(NailgunTask):
     else:
       self._args.extend(context.config.getlist('scala-compile', 'no_warning_args'))
 
-    plugin_names = context.options.plugins.split(',') if context.options.plugins is not None \
+    # Allow multiple flags and also comma-separated values in a single flag.
+    plugin_names = [p for val in context.options.plugins for p in val.split(',')] \
+      if context.options.plugins is not None \
       else context.config.getlist('scala-compile', 'scalac-plugins', default=[])
 
-    plugin_args = dict(context.config.getlist('scala-compile', 'scalac-plugin-args', default=[]))
+    plugin_args = context.config.getdict('scala-compile', 'scalac-plugin-args', default={})
 
     active_plugins = ScalaCompile.find_plugins(plugin_names, self._plugin_jars)
 
@@ -482,9 +484,9 @@ class ScalaCompile(NailgunTask):
     for jar in plugin_jars:
       with open_jar(jar, 'r') as jarfile:
         try:
-          plugin_info_file = jarfile.open(_PLUGIN_INFO_FILE, 'r')  # Not a context manager, sadly.
-          plugin_info = ElementTree.parse(plugin_info_file).getroot()
-          plugin_info_file.close()
+          with closing(jarfile.open(_PLUGIN_INFO_FILE, 'r')) as plugin_info_file:
+            plugin_info = ElementTree.parse(plugin_info_file).getroot()
+            plugin_info_file.close()
           if plugin_info.tag != 'plugin':
             raise TaskError, 'File %s in %s is not a valid scalac plugin descriptor' % (_PLUGIN_INFO_FILE, jar)
           name = plugin_info.find('name').text
