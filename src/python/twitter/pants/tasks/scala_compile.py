@@ -486,7 +486,6 @@ class ScalaCompile(NailgunTask):
         try:
           with closing(jarfile.open(_PLUGIN_INFO_FILE, 'r')) as plugin_info_file:
             plugin_info = ElementTree.parse(plugin_info_file).getroot()
-            plugin_info_file.close()
           if plugin_info.tag != 'plugin':
             raise TaskError, 'File %s in %s is not a valid scalac plugin descriptor' % (_PLUGIN_INFO_FILE, jar)
           name = plugin_info.find('name').text
