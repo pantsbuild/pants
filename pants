@@ -28,6 +28,7 @@ PYTHON_DAEMON_EGG=$MY_DIR/3rdparty/python/python_daemon-1.6-py2.6.egg
 function run_pants_bare() {
   source $VIRTUAL_PYTHON/bin/activate
   PYTHONPATH=$MAKO_EGG:$MARKDOWN_EGG:$PYGMENTS_EGG:$PYSTACHE_EGG:$PYTHON_DAEMON_EGG:$MY_DIR/src/python python $PANTS_EXE "$@"
+  ret=$?
   deactivate
 }
 
@@ -63,6 +64,7 @@ if [ ! -z "${PANTS_DEV}" ]; then
   # ./pants.pex py src/python/twitter/pants "$@"
   echo "*** running pants in dev mode from $PANTS_EXE ***"
   run_pants_bare "$@"
+  exit $ret
 else
   ${MY_DIR}/pants.pex "$@"
 fi
