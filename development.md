@@ -55,3 +55,24 @@ previous test run with:
     sbt> last scriptit
 
 Failures in tests will automatically show the full debug output.
+
+
+Local sbt
+---------
+
+To build zinc against a locally published version of sbt, the sbt jars need to
+first be republished for maven. This is done with the [sbt-republish] project.
+
+First publish sbt itself locally with:
+
+    sbt> publish-local
+
+In the sbt-republish project publish sbt to the local maven repository, and
+under com.typesafe.sbt, with:
+
+    sbt> set every publishLocally := true
+    sbt> publish
+
+In the zinc project only use the local version of sbt with:
+
+    sbt> set resolveSbtLocally := true

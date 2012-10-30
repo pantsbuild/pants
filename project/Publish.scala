@@ -6,18 +6,15 @@ import sbt._
 import sbt.Keys._
 
 object Publish {
-  val ReleaseRepository = "https://oss.sonatype.org/service/local/staging/deploy/maven2"
-  val SnapshotRepository = "https://oss.sonatype.org/content/repositories/snapshots"
-
   val publishLocally = SettingKey[Boolean]("publish-locally")
 
   lazy val settings: Seq[Setting[_]] = Seq(
     publishMavenStyle := true,
     publishLocally := false,
     publishTo <<= (version, publishLocally) { (v, local) =>
-      if (local) Some(Resolver.file("m2", Path.userHome / ".m2" / "repository"))
-      else if (v.endsWith("SNAPSHOT")) Some("snapshots" at SnapshotRepository)
-      else Some("releases" at ReleaseRepository)
+      if (local) Some(Opts.resolver.mavenLocalFile)
+      else if (v.endsWith("SNAPSHOT")) Some(Opts.resolver.sonatypeSnapshots)
+      else Some(Opts.resolver.sonatypeStaging)
     },
     credentials += Credentials(Path.userHome / ".ivy2" / "sonatype-credentials"),
     publishArtifact in Test := false,
