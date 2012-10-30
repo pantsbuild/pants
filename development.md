@@ -61,18 +61,21 @@ Local sbt
 ---------
 
 To build zinc against a locally published version of sbt, the sbt jars need to
-first be republished for maven. This is done with the [sbt-republish] project.
+be republished for maven under `com.typesafe.sbt`.
 
-First publish sbt itself locally with:
+First publish [sbt] itself locally with:
 
     sbt> publish-local
 
-In the sbt-republish project publish sbt to the local maven repository, and
-under com.typesafe.sbt, with:
+Use the [sbt-republish] project to publish sbt to the local maven repository
+with:
 
     sbt> set every publishLocally := true
     sbt> publish
 
-In the zinc project only use the local version of sbt with:
+In the zinc project use only the local version of sbt with this setting:
 
     sbt> set resolveSbtLocally := true
+
+[sbt]: https://github.com/harrah/xsbt
+[sbt-republish]: https://github.com/typesafehub/sbt-republish
