@@ -19,16 +19,14 @@ Publish Locally
 ---------------
 
 The zinc libraries can also be published locally to the local ivy or maven
-repositories. Publishing requires pgp signing, but this can be turned off.
+repositories.
 
-Publish to `~/.ivy2/local` (without signing):
+Publish to `~/.ivy2/local`:
 
-    sbt> set skip in com.jsuereth.pgp.sbtplugin.PgpKeys.pgpSigner := true
     sbt> publish-local
 
-Publish to `~/.m2/repository` (without signing):
+Publish to `~/.m2/repository`:
 
-    sbt> set skip in com.jsuereth.pgp.sbtplugin.PgpKeys.pgpSigner := true
     sbt> set Publish.publishLocally := true
     sbt> publish
 

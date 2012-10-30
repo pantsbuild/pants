@@ -4,7 +4,6 @@
 
 import sbt._
 import sbt.Keys._
-import com.jsuereth.pgp.sbtplugin.PgpKeys.pgpPassphrase
 
 object Publish {
   val ReleaseRepository = "https://oss.sonatype.org/service/local/staging/deploy/maven2"
@@ -21,7 +20,6 @@ object Publish {
       else Some("releases" at ReleaseRepository)
     },
     credentials += Credentials(Path.userHome / ".ivy2" / "sonatype-credentials"),
-    pgpPassphrase in GlobalScope := Util.environment("pgp.passphrase", "PGP_PASSPHRASE") map (_.toArray),
     publishArtifact in Test := false,
     homepage := Some(url("https://github.com/typesafehub/zinc")),
     licenses := Seq("Apache 2" -> url("http://www.apache.org/licenses/LICENSE-2.0")),
