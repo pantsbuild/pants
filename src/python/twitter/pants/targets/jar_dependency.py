@@ -37,9 +37,12 @@ class JarDependency(object):
 
   If the dependency has API docs available online, these can be noted with apidocs and generated
   javadocs with {@link}s to the jar's classes will be properly hyperlinked.
+
+  If you want to include a classifier variant of a jar, use the classifiers param. This takes a list of
+  classifiers. Include 'default' in the list to also pull in the classifier-less variant of the jar.
   """
 
-  def __init__(self, org, name, rev = None, force = False, ext = None, url = None, apidocs = None, test_jar = False):
+  def __init__(self, org, name, rev = None, force = False, ext = None, url = None, apidocs = None, classifiers = []):
     self.org = org
     self.name = name
     self.rev = rev
@@ -50,7 +53,7 @@ class JarDependency(object):
     self.url = url
     self.apidocs = apidocs
     self.id = None
-    self.test_jar = test_jar
+    self.classifiers = classifiers if type(classifiers) == list else [ classifiers ]
     self._configurations = [ 'default' ]
 
     # Support legacy method names
@@ -121,5 +124,6 @@ class JarDependency(object):
       transitive = self.transitive,
       ext = self.ext,
       url = self.url,
+      classifiers = self.classifiers,
       configurations = ';'.join(self._configurations),
     )

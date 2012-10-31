@@ -69,7 +69,7 @@ limitations under the License.
                 transitive="false"
       % endif
     >
-      % if dependency.ext or dependency.url:
+      % if dependency.ext or dependency.url or "default" in dependency.classifiers:
       <artifact name="${dependency.module}"
         % if dependency.ext:
         ext="${dependency.ext}"
@@ -79,10 +79,13 @@ limitations under the License.
         % endif
       />
       % endif
-			% if dependency.test_jar: 
-			<artifact name="${dependency.module}" type="test-jar" ext="jar" m:classifier="tests"/>
-			<artifact name="${dependency.module}" type="jar" ext="jar" />
-			% endif
+      % if dependency.classifiers:
+        % for classifier in dependency.classifiers:
+          % if classifier != "default":
+            <artifact name="${dependency.module}" type="${classifier}" m:classifier="${classifier}" ext="jar" />
+          % endif
+        % endfor
+      % endif
       % if dependency.excludes:
         % for exclude in dependency.excludes:
           % if exclude.name:
