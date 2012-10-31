@@ -6,6 +6,7 @@ package com.typesafe.zinc
 
 import com.martiansoftware.nailgun.{ Alias, AliasManager, NGContext, NGServer }
 import java.io.File
+import sbt.Path
 
 class Nailgun // for classOf
 
@@ -22,6 +23,38 @@ object Nailgun {
     val port = try args(0).toInt catch { case _: Exception => DefaultPort }
     val timeout = try Util.duration(args(1), DefaultTimeout) catch { case _: Exception => DefaultTimeout }
     start(port, timeout)
+  }
+
+  /**
+   * Start a nailgun server in a separate process.
+   */
+  def fork(options: Seq[String], classpath: Seq[File], port: Int = DefaultPort, timeout: String = "0"): Unit = {
+    val classpathOpts = Seq("-classpath", Path.makeString(classpath))
+    val mainOpts = Seq(classOf[Nailgun].getName, port.toString, timeout)
+    val cmd = Seq("java") ++ addDefaultOptions(options) ++ classpathOpts ++ mainOpts
+    println(cmd)
+    Runtime.getRuntime.exec(cmd.toArray)
+  }
+
+  /**
+   * Add default JVM options.
+   */
+  def addDefaultOptions(options: Seq[String]): Seq[String] = {
+    var optMode, optXms, optXmx, optXXMaxPermSize, optXXReservedCodeCacheSize = ""
+    var otherOpts = Seq.empty[String]
+    for (opt <- options) {
+      if (opt == "-client" || opt == "-server") optMode = opt
+      else if (opt startsWith "-Xms") optXms = opt
+      else if (opt startsWith "-Xmx") optXmx = opt
+      else if (opt startsWith "-XX:MaxPermSize") optXXMaxPermSize = opt
+      else if (opt startsWith "-XX:ReservedCodeCacheSize") optXXReservedCodeCacheSize = opt
+      else otherOpts :+= opt
+    }
+    if (optMode.isEmpty) optMode = "-server"
+    if (optXms.isEmpty && optXmx.isEmpty) { optXms = "-Xms1024m"; optXmx="-Xmx1024m" }
+    if (optXXMaxPermSize.isEmpty) optXXMaxPermSize = "-XX:MaxPermSize=384m"
+    if (optXXReservedCodeCacheSize.isEmpty) optXXReservedCodeCacheSize = "-XX:ReservedCodeCacheSize=192m"
+    Seq(optMode, optXms, optXmx, optXXMaxPermSize, optXXReservedCodeCacheSize) ++ otherOpts
   }
 
   /**

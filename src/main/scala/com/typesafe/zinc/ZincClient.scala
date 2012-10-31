@@ -35,6 +35,7 @@ object ZincClient {
 class ZincClient(val address: InetAddress, val port: Int) {
   def this(address: String, port: Int) = this(InetAddress.getByName(address), port)
   def this(port: Int) = this(InetAddress.getByName(null), port)
+  def this() = this(Nailgun.DefaultPort)
 
   /**
    * Send a zinc command to a currently running nailgun server.
@@ -81,6 +82,28 @@ class ZincClient(val address: InetAddress, val port: Int) {
       case _: java.io.IOException => false
     }
   }
+
+  /**
+   * Start a zinc server in a separate process, if not already available.
+   */
+  def requireServer(options: Seq[String], classpath: Seq[File], timeout: String): Boolean = {
+    if (!serverAvailable) {
+      Nailgun.fork(options, classpath, port, timeout)
+      // give some time for startup
+      var count = 0
+      while (!serverAvailable && (count < 50)) {
+        try { Thread.sleep(100) } catch { case _: InterruptedException => }
+        count += 1
+      }
+    }
+    serverAvailable
+  }
+
+  /**
+   * Java API to start a zinc server in a separate process, if not already available.
+   */
+  def requireServer(options: JList[String], classpath: JList[File], timeout: String): Boolean =
+    requireServer(options.asScala, classpath.asScala, timeout)
 
   private def sendCommand(command: String, args: Seq[String], cwd: File, out: OutputStream): Unit = {
     import ZincClient.Chunk.{ Argument, Command, Directory }
