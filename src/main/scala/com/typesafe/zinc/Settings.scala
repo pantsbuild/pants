@@ -80,6 +80,22 @@ case class SbtJars(
   sbtInterface: Option[File]         = None,
   compilerInterfaceSrc: Option[File] = None)
 
+object SbtJars {
+  /**
+   * Select the sbt jars from a path.
+   */
+  def fromPath(path: Seq[File]): SbtJars = {
+    val sbtInterface = path find (_.getName matches Setup.SbtInterface.pattern)
+    val compilerInterfaceSrc = path find (_.getName matches Setup.CompilerInterfaceSources.pattern)
+    SbtJars(sbtInterface, compilerInterfaceSrc)
+  }
+
+  /**
+   * Java API for selecting sbt jars from a path.
+   */
+  def fromPath(path: JList[File]): SbtJars = fromPath(path.asScala)
+}
+
 /**
  * Configuration for sbt analysis and analysis output options.
  */

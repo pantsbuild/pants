@@ -21,6 +21,21 @@ case class Setup(
   javaHome: Option[File],
   cacheDir: File)
 
+/**
+ * Jar file description for locating jars.
+ */
+case class JarFile(name: String, classifier: Option[String] = None) {
+  val versionPattern = "(-.*)?"
+  val classifierString = classifier map ("-" + _) getOrElse ""
+  val extension = "jar"
+  val pattern = name + versionPattern + classifierString + "." + extension
+  val default = name + classifierString + "." + extension
+}
+
+object JarFile {
+  def apply(name: String, classifier: String): JarFile = JarFile(name, Some(classifier))
+}
+
 object Setup {
   val Command     = "zinc"
   val Description = "scala incremental compiler"
@@ -28,21 +43,17 @@ object Setup {
   val HomeProperty = prop("home")
   val DirProperty  = prop("dir")
 
-  val ScalaCompilerId = "scala-compiler"
-  val ScalaLibraryId  = "scala-library"
-
-  val ScalaCompilerName            = "scala-compiler.jar"
-  val ScalaLibraryName             = "scala-library.jar"
-  val SbtInterfaceName             = "sbt-interface.jar"
-  val CompilerInterfaceSourcesName = "compiler-interface-sources.jar"
+  val ScalaCompiler            = JarFile("scala-compiler")
+  val ScalaLibrary             = JarFile("scala-library")
+  val SbtInterface             = JarFile("sbt-interface")
+  val CompilerInterfaceSources = JarFile("compiler-interface", "sources")
 
   /**
    * Create compiler setup from command-line settings.
    */
   def apply(settings: Settings): Setup = {
-    val (compiler, library, extra) = scalaJars(settings.scala)
-    val sbtInterface = settings.sbt.sbtInterface getOrElse Defaults.sbtInterface
-    val compilerInterfaceSrc = settings.sbt.compilerInterfaceSrc getOrElse Defaults.compilerInterfaceSrc
+    val (compiler, library, extra) = selectScalaJars(settings.scala)
+    val (sbtInterface, compilerInterfaceSrc) = selectSbtJars(settings.sbt)
     setup(compiler, library, extra, sbtInterface, compilerInterfaceSrc, settings.javaHome)
   }
 
@@ -58,12 +69,14 @@ object Setup {
     javaHomeDir: Option[File]): Setup =
   {
     val normalise: File => File = { _.getCanonicalFile }
-    val compilerJar = normalise(scalaCompiler)
-    val libraryJar  = normalise(scalaLibrary)
-    val extraJars   = scalaExtra map normalise
-    val javaHome    = javaHomeDir map normalise
-    val cacheDir    = zincCacheDir
-    Setup(compilerJar, libraryJar, extraJars, sbtInterface, compilerInterfaceSrc, javaHome, cacheDir)
+    val compilerJar          = normalise(scalaCompiler)
+    val libraryJar           = normalise(scalaLibrary)
+    val extraJars            = scalaExtra map normalise
+    val sbtInterfaceJar      = normalise(sbtInterface)
+    val compilerInterfaceJar = normalise(compilerInterfaceSrc)
+    val javaHome             = javaHomeDir map normalise
+    val cacheDir             = zincCacheDir
+    Setup(compilerJar, libraryJar, extraJars, sbtInterfaceJar, compilerInterfaceJar, javaHome, cacheDir)
   }
 
   /**
@@ -86,15 +99,15 @@ object Setup {
   )
 
   /**
-   * Java API for creating Setup with ScalaLocation.
+   * Java API for creating Setup with ScalaLocation and SbtJars.
    */
   def create(
     scalaLocation: ScalaLocation,
-    sbtInterface: File,
-    compilerInterfaceSrc: File,
+    sbtJars: SbtJars,
     javaHome: File): Setup =
   {
-    val (scalaCompiler, scalaLibrary, scalaExtra) = scalaJars(scalaLocation)
+    val (scalaCompiler, scalaLibrary, scalaExtra) = selectScalaJars(scalaLocation)
+    val (sbtInterface, compilerInterfaceSrc) = selectSbtJars(sbtJars)
     setup(
       scalaCompiler,
       scalaLibrary,
@@ -111,7 +124,7 @@ object Setup {
    * Prefer the explicit scala-compiler, scala-library, and scala-extra settings,
    * then the scala-path setting, then the scala-home setting. Default to bundled scala.
    */
-  def scalaJars(scala: ScalaLocation): (File, File, Seq[File]) = {
+  def selectScalaJars(scala: ScalaLocation): (File, File, Seq[File]) = {
     val (compiler, library, extra) = {
       splitScala(scala.path) orElse
       splitScala(allLibs(scala.home), Defaults.scalaExcluded) getOrElse
@@ -125,9 +138,18 @@ object Setup {
    */
   def splitScala(jars: Seq[File], excluded: Set[String] = Set.empty): Option[(File, File, Seq[File])] = {
     val filtered = jars filterNot (excluded contains _.getName)
-    val (compiler, other) = filtered partition (_.getName contains ScalaCompilerId)
-    val (library, extra) = other partition (_.getName contains ScalaLibraryId)
+    val (compiler, other) = filtered partition (_.getName matches ScalaCompiler.pattern)
+    val (library, extra) = other partition (_.getName matches ScalaLibrary.pattern)
     if (compiler.nonEmpty && library.nonEmpty) Some(compiler(0), library(0), extra) else None
+  }
+
+  /**
+   * Select the sbt jars.
+   */
+  def selectSbtJars(sbt: SbtJars): (File, File) = {
+    val sbtInterface = sbt.sbtInterface getOrElse Defaults.sbtInterface
+    val compilerInterfaceSrc = sbt.compilerInterfaceSrc getOrElse Defaults.compilerInterfaceSrc
+    (sbtInterface, compilerInterfaceSrc)
   }
 
   /**
@@ -164,11 +186,11 @@ object Setup {
     val zincDir  = Util.optFileProperty(DirProperty).getOrElse(userHome / ("." + Command)).getCanonicalFile
     val zincHome = Util.optFileProperty(HomeProperty).map(_.getCanonicalFile)
 
-    val sbtInterface         = optLibOrDefault(zincHome, SbtInterfaceName)
-    val compilerInterfaceSrc = optLibOrDefault(zincHome, CompilerInterfaceSourcesName)
+    val sbtInterface         = optLibOrDefault(zincHome, SbtInterface)
+    val compilerInterfaceSrc = optLibOrDefault(zincHome, CompilerInterfaceSources)
 
-    val scalaCompiler        = optLibOrDefault(zincHome, ScalaCompilerName)
-    val scalaLibrary         = optLibOrDefault(zincHome, ScalaLibraryName)
+    val scalaCompiler        = optLibOrDefault(zincHome, ScalaCompiler)
+    val scalaLibrary         = optLibOrDefault(zincHome, ScalaLibrary)
     val scalaExtra           = Seq.empty[File]
     val scalaJars            = (scalaCompiler, scalaLibrary, scalaExtra)
     val defaultScalaExcluded = Set("jansi.jar", "jline.jar", "scala-partest.jar", "scala-swing.jar", "scalacheck.jar", "scalap.jar")
@@ -186,12 +208,12 @@ object Setup {
     homeDir map { home => (home / "lib" ** "*.jar").get } getOrElse Seq.empty
   }
 
-  def optLib(homeDir: Option[File], name: String): Option[File] = {
-    allLibs(homeDir) find (_.getName == name)
+  def optLib(homeDir: Option[File], jar: JarFile): Option[File] = {
+    allLibs(homeDir) find (_.getName matches jar.pattern)
   }
 
-  def optLibOrDefault(homeDir: Option[File], name: String): File = {
-    optLib(homeDir, name) getOrElse new File(name)
+  def optLibOrDefault(homeDir: Option[File], jar: JarFile): File = {
+    optLib(homeDir, jar) getOrElse new File(jar.default)
   }
 
   //
