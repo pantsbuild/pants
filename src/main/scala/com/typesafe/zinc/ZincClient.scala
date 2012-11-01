@@ -51,8 +51,30 @@ class ZincClient(val address: InetAddress, val port: Int) {
    * All output goes to specified output streams. Exit code is returned.
    * @throws java.net.ConnectException if the zinc server is not available
    */
+  @throws(classOf[java.net.ConnectException])
   def run(args: JList[String], cwd: File, out: OutputStream, err: OutputStream): Int =
     send("zinc", args.asScala, cwd, out, err)
+
+  /**
+   * Run a single argument-less nailgun command to a single output stream.
+   * Exit code is returned.
+   * @throws java.net.ConnectException if the zinc server is not available
+   */
+  @throws(classOf[java.net.ConnectException])
+  def run(command: String, out: OutputStream): Int = {
+    send(command, Seq.empty, Setup.Defaults.userDir, out, out)
+  }
+
+  /**
+   * Run a single argument-less nailgun command, with dummy output streams
+   * and default working directory. Exit code is returned.
+   * @throws java.net.ConnectException if the zinc server is not available
+   */
+  @throws(classOf[java.net.ConnectException])
+  def run(command: String): Int = {
+    val dummyOut = new ByteArrayOutputStream
+    send(command, Seq.empty, Setup.Defaults.userDir, dummyOut, dummyOut)
+  }
 
   /**
    * Send a command to a currently running nailgun server.
@@ -75,8 +97,7 @@ class ZincClient(val address: InetAddress, val port: Int) {
    */
   def serverAvailable(): Boolean = {
     try {
-      val dummyOut = new ByteArrayOutputStream
-      val exitCode = send("ng-version", Seq.empty, Setup.Defaults.userDir, dummyOut, dummyOut)
+      val exitCode = run("ng-version")
       exitCode == 0
     } catch {
       case _: java.io.IOException => false
@@ -104,6 +125,39 @@ class ZincClient(val address: InetAddress, val port: Int) {
    */
   def requireServer(options: JList[String], classpath: JList[File], timeout: String): Boolean =
     requireServer(options.asScala, classpath.asScala, timeout)
+
+  /**
+   * Output server status by sending the "status" command.
+   */
+  def serverStatus(out: OutputStream): Boolean = {
+    try {
+      val exitCode = run("status", out)
+      exitCode == 0
+    } catch {
+      case _: java.io.IOException => false
+    }
+  }
+
+  /**
+   * Return server status as a string.
+   */
+  def serverStatus(): String = {
+    val bytes = new ByteArrayOutputStream
+    val success = serverStatus(bytes)
+    bytes.toString
+  }
+
+  /**
+   * Shutdown any running zinc server by sending the "shutdown" command.
+   */
+  def shutdownServer(): Boolean = {
+    try {
+      val exitCode = run("shutdown")
+      exitCode == 0 || exitCode == ZincClient.Exception.ClientReceive
+    } catch {
+      case _: java.io.IOException => false
+    }
+  }
 
   private def sendCommand(command: String, args: Seq[String], cwd: File, out: OutputStream): Unit = {
     import ZincClient.Chunk.{ Argument, Command, Directory }
