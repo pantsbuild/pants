@@ -32,7 +32,6 @@ object Nailgun {
     val classpathOpts = Seq("-classpath", Path.makeString(classpath))
     val mainOpts = Seq(classOf[Nailgun].getName, port.toString, timeout)
     val cmd = Seq("java") ++ addDefaultOptions(options) ++ classpathOpts ++ mainOpts
-    println(cmd)
     Runtime.getRuntime.exec(cmd.toArray)
   }
 
