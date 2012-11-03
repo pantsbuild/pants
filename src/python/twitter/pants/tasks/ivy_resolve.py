@@ -248,9 +248,7 @@ class IvyResolve(NailgunTask):
       force = jar.force,
       excludes = [self._generate_exclude_template(exclude) for exclude in jar.excludes],
       transitive = jar.transitive,
-      ext = jar.ext,
-      url = jar.url,
-      classifiers = jar.classifiers,
+      artifacts = jar.artifacts,
       configurations = ';'.join(jar._configurations),
     )
     override = self._overrides.get((jar.org, jar.name))
