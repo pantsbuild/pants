@@ -7,7 +7,8 @@ package com.typesafe.zinc
 import java.io.File
 import sbt.{ CompileSetup, IO, Logger, Path, Relation }
 import sbt.compiler.CompileOutput
-import sbt.inc.{ Analysis, Relations, Stamps }
+import sbt.inc.{ APIs, Analysis, Relations, SourceInfos, Stamps }
+import scala.annotation.tailrec
 import xsbti.compile.SingleOutput
 
 object SbtAnalysis {
@@ -55,48 +56,84 @@ object SbtAnalysis {
   }
 
   /**
-   * Run an analysis rebase. Rebase all products in the analysis, and the output directory
+   * Run an analysis rebase. Rebase all paths in the analysis, and the output directory
    * in the compile setup.
    */
-  def runRebase(cache: Option[File], rebase: Option[(File, File)]): Unit = {
-    if (rebase.isDefined) {
+  def runRebase(cache: Option[File], rebase: Map[File, File]): Unit = {
+    if (!rebase.isEmpty) {
       cache match {
         case None => throw new Exception("No cache file specified")
         case Some(cacheFile) =>
           val analysisStore = Compiler.analysisStore(cacheFile)
           analysisStore.get match {
             case None => throw new Exception("No analysis cache found at: " + cacheFile)
-            case Some((analysis, compileSetup)) =>
-              rebase match {
-                case Some((oldBase, newBase)) =>
-                  val newAnalysis = rebaseProducts(analysis, oldBase, newBase)
-                  val newSetup = rebaseSetup(compileSetup, oldBase, newBase)
-                  analysisStore.set(newAnalysis, newSetup)
-                case None =>
-              }
+            case Some((analysis, compileSetup)) => {
+              val multiRebasingMapper = createMultiRebasingMapper(rebase)
+              val newAnalysis = rebaseAnalysis(analysis, multiRebasingMapper)
+              val newSetup = rebaseSetup(compileSetup, multiRebasingMapper)
+              analysisStore.set(newAnalysis, newSetup)
+            }
           }
       }
     }
   }
 
+
   /**
-   * Rebase all products in an analysis.
+   * Create a mapper function that performs multiple rebases. For a given file, it uses the first
+   * rebase it finds that matches, if any. The order of rebases is underfined, so it's highly
+   * recommended that there never be two rebases A1->B1, A2->B2 such that A1 is a prefix of A2.
    */
-  def rebaseProducts(analysis: Analysis, oldBase: File, newBase: File): Analysis = {
-    val mapper = Path.rebase(oldBase, newBase)
-    analysis.copy(rebaseStamps(analysis.stamps, mapper), analysis.apis, rebaseRelations(analysis.relations, mapper), analysis.infos)
+  def createMultiRebasingMapper(rebase: Map[File, File]): File => Option[File] = {
+    val mappers = rebase map { x: (File, File) => Path.rebase(x._1, x._2) } toList
+
+    @tailrec
+    def tryRebase(f: File, mappers: List[File => Option[File]]): Option[File] = mappers match {
+      case Nil => None
+      case mapper :: tail => mapper(f) match {
+        case None => tryRebase(f, tail)
+        case fileOpt => fileOpt
+      }
+    }
+
+    tryRebase(_, mappers)
+  }
+
+  /**
+   * Rebase all paths in an analysis.
+   */
+  def rebaseAnalysis(analysis: Analysis, mapper: File => Option[File]): Analysis = {
+    analysis.copy(rebaseStamps(analysis.stamps, mapper), rebaseAPIs(analysis.apis, mapper),
+      rebaseRelations(analysis.relations, mapper), rebaseInfos(analysis.infos, mapper))
   }
 
   def rebaseStamps(stamps: Stamps, mapper: File => Option[File]): Stamps = {
-    Stamps(rebaseFileMap(stamps.products, mapper), stamps.sources, stamps.binaries, stamps.classNames)
+    def rebase[A](fileMap: Map[File, A]) = rebaseFileMap(fileMap, mapper)
+    Stamps(rebase(stamps.products), rebase(stamps.sources), rebase(stamps.binaries), rebase(stamps.classNames))
+  }
+
+  def rebaseAPIs(apis: APIs, mapper: File => Option[File]): APIs = {
+    APIs(rebaseFileMap(apis.internal, mapper), apis.external)
   }
 
   def rebaseRelations(relations: Relations, mapper: File => Option[File]): Relations = {
-    Relations.make(rebaseRelation(relations.srcProd, mapper), relations.binaryDep, relations.internalSrcDep, relations.externalDep, relations.classes)
+    def rebase(rel: Relation[File, File]) = rebaseRelation(rel, mapper)
+    def rebaseExt(rel: Relation[File, String]) = rebaseExtRelation(rel, mapper)
+    Relations.make(rebase(relations.srcProd), rebase(relations.binaryDep), rebase(relations.internalSrcDep),
+      rebaseExt(relations.externalDep), rebaseExt(relations.classes))
+  }
+
+  def rebaseInfos(infos: SourceInfos, mapper: File => Option[File]): SourceInfos = {
+    SourceInfos.make(rebaseFileMap(infos.allInfos, mapper))
   }
 
   def rebaseRelation(relation: Relation[File, File], mapper: File => Option[File]): Relation[File, File] = {
-    Relation.make(rebaseFileSetMap(relation.forwardMap, mapper), rebaseFileMap(relation.reverseMap, mapper))
+    def rebase(fileMap: Map[File, Set[File]]) = rebaseFileSetMap(rebaseFileMap(fileMap, mapper), mapper)
+    Relation.make(rebase(relation.forwardMap), rebase(relation.reverseMap))
+  }
+
+  def rebaseExtRelation(relation: Relation[File, String], mapper: File => Option[File]): Relation[File, String] = {
+    Relation.make(rebaseFileMap(relation.forwardMap, mapper), rebaseFileSetMap(relation.reverseMap, mapper))
   }
 
   def rebaseFileMap[A](fileMap: Map[File, A], mapper: File => Option[File]): Map[File, A] = {
@@ -110,9 +147,8 @@ object SbtAnalysis {
   /**
    * Rebase the output directory of a compile setup.
    */
-  def rebaseSetup(setup: CompileSetup, oldBase: File, newBase: File): CompileSetup = {
+  def rebaseSetup(setup: CompileSetup, mapper: File => Option[File]): CompileSetup = {
     val output = Some(setup.output) collect { case single: SingleOutput => single.outputDirectory }
-    val mapper = Path.rebase(oldBase, newBase)
     output flatMap mapper map { dir => new CompileSetup(CompileOutput(dir), setup.options, setup.compilerVersion, setup.order) } getOrElse setup
   }
 

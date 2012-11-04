@@ -114,7 +114,7 @@ case class AnalysisUtil(
   run: Boolean                 = false,
   cache: Option[File]          = None,
   merge: Seq[File]             = Seq.empty,
-  rebase: Option[(File, File)] = None,
+  rebase: Map[File, File]      = Map.empty,
   split: Map[Seq[File], File]  = Map.empty,
   reload: Seq[File]            = Seq.empty
 )
@@ -174,12 +174,12 @@ object Settings {
     dummy(   "-idle-timeout <duration>",     "Set idle timeout (Nh|Nm|Ns) (if nailed)"),
 
     header("Analysis manipulation utilities:"),
-    boolean( "-analysis",                    "Run analysis manipulation utilities",        (s: Settings) => s.copy(analysisUtil = s.analysisUtil.copy(run = true))),
-    file(    "-cache", "file",               "Analysis cache file to alter",               (s: Settings, f: File) => s.copy(analysisUtil = s.analysisUtil.copy(cache = Some(f)))),
-    path(    "-merge", "path",               "Merge analyses, overwrite cached analysis",  (s: Settings, ap: Seq[File]) => s.copy(analysisUtil = s.analysisUtil.copy(merge = ap))),
-    filePair("-rebase", "from:to",           "Rebase all analysis product paths",          (s: Settings, p: (File, File)) => s.copy(analysisUtil = s.analysisUtil.copy(rebase = Some(p)))),
-    fileSeqMap( "-split",                    "Split analysis by source directory",         (s: Settings, m: Map[Seq[File], File]) => s.copy(analysisUtil = s.analysisUtil.copy(split = m))),
-    file(    "-reload", "cache-file",        "Reload analysis from cache file",            (s: Settings, f: File) => s.copy(analysisUtil = s.analysisUtil.copy(reload = s.analysisUtil.reload :+ f)))
+    boolean(   "-analysis",                    "Run analysis manipulation utilities",        (s: Settings) => s.copy(analysisUtil = s.analysisUtil.copy(run = true))),
+    file(      "-cache", "file",               "Analysis cache file to alter",               (s: Settings, f: File) => s.copy(analysisUtil = s.analysisUtil.copy(cache = Some(f)))),
+    path(      "-merge", "path",               "Merge analyses, overwrite cached analysis",  (s: Settings, ap: Seq[File]) => s.copy(analysisUtil = s.analysisUtil.copy(merge = ap))),
+    fileMap(   "-rebase",                      "Rebase all analysis paths (from:to,...)",    (s: Settings, m: Map[File, File]) => s.copy(analysisUtil = s.analysisUtil.copy(rebase = m))),
+    fileSeqMap("-split",                       "Split analysis by source directory",         (s: Settings, m: Map[Seq[File], File]) => s.copy(analysisUtil = s.analysisUtil.copy(split = m))),
+    file(      "-reload", "cache-file",        "Reload analysis from cache file",            (s: Settings, f: File) => s.copy(analysisUtil = s.analysisUtil.copy(reload = s.analysisUtil.reload :+ f)))
   )
 
   val allOptions: Set[OptionDef[Settings]] = options.toSet
