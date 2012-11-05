@@ -39,10 +39,11 @@ class JarDependency(object):
   javadocs with {@link}s to the jar's classes will be properly hyperlinked.
 
   If you want to include a classifier variant of a jar, use the classifier param. If you want to include
-  multiple artifacts with differing classifiers, use with_artifact
+  multiple artifacts with differing classifiers, use with_artifact.
   """
 
-  def __init__(self, org, name, rev = None, force = False, ext = None, url = None, apidocs = None, type_ = None, classifier = None):
+  def __init__(self, org, name, rev = None, force = False, ext = None, url = None,
+               apidocs = None, type_ = None, classifier = None):
     self.org = org
     self.name = name
     self.rev = rev
@@ -86,7 +87,8 @@ class JarDependency(object):
     self._configurations.append('docs')
     return self
 
-  def with_artifact(self, name = None, ext = None, url = None, type_ = None, classifier = None, configuration = None):
+  def with_artifact(self, name = None, ext = None, url = None, type_ = None,
+                    classifier = None, configuration = None):
     self.artifacts.append(Artifact(name, ext, url, type_, classifier, configuration))
     return self
 
@@ -141,7 +143,8 @@ class Artifact(object):
   http://ant.apache.org/ivy/history/latest-milestone/ivyfile/artifact.html
   """
 
-  def __init__(self, name = None, ext = None, url = None, type_ = None, classifier = None, conf = None):
+  def __init__(self, name = None, ext = None, url = None, type_ = None,
+               classifier = None, conf = None):
     self.name = name
     self.ext = ext
     self.url = url
