@@ -37,26 +37,34 @@ class JarDependency(object):
 
   If the dependency has API docs available online, these can be noted with apidocs and generated
   javadocs with {@link}s to the jar's classes will be properly hyperlinked.
+
+  If you want to include a classifier variant of a jar, use the classifier param. If you want to include
+  multiple artifacts with differing classifiers, use with_artifact.
   """
 
-  def __init__(self, org, name, rev = None, force = False, ext = None, url = None, apidocs = None, test_jar = False):
+  def __init__(self, org, name, rev = None, force = False, ext = None, url = None,
+               apidocs = None, type_ = None, classifier = None):
     self.org = org
     self.name = name
     self.rev = rev
     self.force = force
     self.excludes = []
     self.transitive = True
-    self.ext = ext
-    self.url = url
     self.apidocs = apidocs
+    self.artifacts = []
+    if ext or url or type_ or classifier:
+      self.with_artifact(name=name, ext=ext, url=url, type_=type_, classifier=classifier)
     self.id = None
-    self.test_jar = test_jar
     self._configurations = [ 'default' ]
 
     # Support legacy method names
     # TODO(John Sirois): introduce a deprecation cycle for these and then kill
     self.withSources = self.with_sources
     self.withDocs = self.with_sources
+
+    # Legacy variables needed by ivy jar publish
+    self.ext = ext
+    self.url = url
 
   def exclude(self, org, name = None):
     """Adds a transitive dependency of this jar to the exclude list."""
@@ -77,6 +85,11 @@ class JarDependency(object):
 
   def with_docs(self):
     self._configurations.append('docs')
+    return self
+
+  def with_artifact(self, name = None, ext = None, url = None, type_ = None,
+                    classifier = None, configuration = None):
+    self.artifacts.append(Artifact(name, ext, url, type_, classifier, configuration))
     return self
 
   # TODO: This is necessary duck-typing because in some places JarDependency is treated like
@@ -119,7 +132,22 @@ class JarDependency(object):
       force = self.force,
       excludes = self.excludes,
       transitive = self.transitive,
-      ext = self.ext,
-      url = self.url,
+      artifacts = self.artifacts,
       configurations = ';'.join(self._configurations),
     )
+
+class Artifact(object):
+  """
+  Specification for an Ivy Artifact for this jar dependency.
+
+  http://ant.apache.org/ivy/history/latest-milestone/ivyfile/artifact.html
+  """
+
+  def __init__(self, name = None, ext = None, url = None, type_ = None,
+               classifier = None, conf = None):
+    self.name = name
+    self.ext = ext
+    self.url = url
+    self.type_ = type_
+    self.classifier = classifier
+    self.conf = conf

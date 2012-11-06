@@ -233,7 +233,6 @@ class CacheManager(object):
     'force',
     'excludes',
     'transitive',
-    'ext',
-    'url',
-    '_configurations'
+    '_configurations',
+    'artifacts'
     )
