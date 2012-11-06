@@ -29,12 +29,14 @@ from twitter.pants import (
   is_test,
   is_apt)
 from twitter.pants.base.target import Target
+from twitter.pants.goal.phase import Phase
 from twitter.pants.targets.exportable_jvm_library import ExportableJvmLibrary
 from twitter.pants.targets.java_library import JavaLibrary
 from twitter.pants.targets.jvm_binary import JvmBinary
 from twitter.pants.targets.scala_library import ScalaLibrary
 from twitter.pants.tasks import binary_utils, TaskError
 from twitter.pants.tasks.binary_utils import profile_classpath
+from twitter.pants.tasks.checkstyle import Checkstyle
 from twitter.pants.tasks.jvm_binary_task import JvmBinaryTask
 
 __author__ = 'John Sirois'
@@ -476,7 +478,8 @@ class Project(object):
     return targets
 
   def configure_profiles(self, scala_compiler_profile):
-    self.checkstyle_classpath = profile_classpath('checkstyle')
+    checkstyle_enabled = len(Phase.goals_of_type(Checkstyle)) > 0
+    self.checkstyle_classpath = profile_classpath('checkstyle') if checkstyle_enabled else []
     self.scala_compiler_classpath = []
     if self.has_scala:
       self.scala_compiler_classpath.extend(profile_classpath(scala_compiler_profile))

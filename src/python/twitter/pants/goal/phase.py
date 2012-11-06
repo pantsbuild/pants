@@ -42,6 +42,11 @@ class Phase(PhaseBase):
     return Phase._phase_by_goal[goal]
 
   @staticmethod
+  def goals_of_type(goal_class):
+    """Returns all installed goals of the specified type."""
+    return [goal for goal in Phase._phase_by_goal.keys() if isinstance(goal, goal_class)]
+
+  @staticmethod
   def setup_parser(parser, args, phases):
     def do_setup_parser(phase, setup):
       for goal in phase.goals():

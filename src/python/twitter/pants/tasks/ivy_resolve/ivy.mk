@@ -69,30 +69,20 @@ limitations under the License.
                 transitive="false"
       % endif
     >
-      % if dependency.artifacts:
-        % for artifact in dependency.artifacts:
-            <artifact
-              % if artifact.name:
-              name="${artifact.name}"
-              % endif
-              % if artifact.ext:
-              ext="${artifact.ext}"
-              % endif
-              % if artifact.url:
-              url="${artifact.url}"
-              % endif
-              % if artifact.type_:
-              type="${artifact.type_}"
-              % endif
-              % if artifact.classifier:
-              m:classifier="${artifact.classifier}"
-              % endif
-              % if artifact.conf:
-              conf="${artifact.conf}"
-              % endif
-            />
-        % endfor
+      % if dependency.ext or dependency.url:
+      <artifact name="${dependency.module}"
+        % if dependency.ext:
+        ext="${dependency.ext}"
+        % endif
+        % if dependency.url:
+        url="${dependency.url}"
+        % endif
+      />
       % endif
+			% if dependency.test_jar: 
+			<artifact name="${dependency.module}" type="test-jar" ext="jar" m:classifier="tests"/>
+			<artifact name="${dependency.module}" type="jar" ext="jar" />
+			% endif
       % if dependency.excludes:
         % for exclude in dependency.excludes:
           % if exclude.name:
