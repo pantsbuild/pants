@@ -158,16 +158,21 @@ object SbtAnalysis {
    */
   def runSplit(cache: Option[File], mapping: Map[Seq[File], File]): Unit = {
     if (mapping.nonEmpty) {
+      val expandedMapping: Map[File, File] = for {
+        (srcs, analysis) <- mapping
+        src <- srcs
+      } yield (src, analysis)
       cache match {
         case None => throw new Exception("No cache file specified")
         case Some(cacheFile) =>
           Compiler.analysisStore(cacheFile).get match {
             case None => throw new Exception("No analysis cache found at: " + cacheFile)
             case Some ((analysis, compileSetup)) =>
-              for ((sources, splitCache) <- mapping) {
-                val outsideSources = findOutsideSources(analysis, sources)
-                val splitAnalysis = analysis -- outsideSources
-                Compiler.analysisStore(splitCache).set(splitAnalysis, compileSetup)
+              for ((splitCacheOpt, splitAnalysis) <- analysis.groupBy(expandedMapping.get _)) {
+                splitCacheOpt match {
+                  case None =>
+                  case Some(splitCache) => Compiler.analysisStore(splitCache).set(splitAnalysis, compileSetup)
+                }
               }
           }
       }
