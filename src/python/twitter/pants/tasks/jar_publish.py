@@ -252,8 +252,6 @@ class IvyWriter(DependencyWriter):
   def jardep(self, jar):
     return self._jardep(jar,
       transitive=jar.transitive,
-      ext=jar.ext,
-      url=jar.url,
       configurations=';'.join(jar._configurations)
     )
 
