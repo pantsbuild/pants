@@ -81,7 +81,8 @@ class ScalaCompile(NailgunTask):
 
     # We use the scala_compile_color flag if it is explicitly set on the command line.
     self._color = \
-      context.options.scala_compile_color or context.config.getbool('scala-compile', 'color', default=True)
+      context.options.scala_compile_color if context.options.scala_compile_color is not None else \
+      context.config.getbool('scala-compile', 'color', default=True)
 
     self._compile_profile = context.config.get('scala-compile', 'compile-profile')  # The target scala version.
     self._zinc_profile = context.config.get('scala-compile', 'zinc-profile')
