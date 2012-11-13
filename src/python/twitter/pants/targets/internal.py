@@ -25,30 +25,10 @@ class InternalTarget(Target):
   class CycleException(Exception):
     """Thrown when a circular dependency is detected."""
 
-    def __init__(self, precedents, cycle):
-      Exception.__init__(self, 'Cycle detected along path:\n\t%s' % (
-        ' ->\n\t'.join(str(target.address) for target in list(precedents) + [ cycle ])
+    def __init__(self, cycle):
+      Exception.__init__(self, 'Cycle detected:\n\t%s' % (
+        ' ->\n\t'.join(str(target.address) for target in cycle)
       ))
-
-  @classmethod
-  def check_cycles(cls, internal_target):
-    """Validates the given InternalTarget has no circular dependencies.  Raises CycleException if
-    it does."""
-    dep_stack = OrderedSet()  # The DFS stack.
-    visited = set()  # Prevent expensive re-checking of subgraphs.
-
-    def descend(internal_dep):
-      if internal_dep in dep_stack:
-        raise InternalTarget.CycleException(dep_stack, internal_dep)
-      if hasattr(internal_dep, 'internal_dependencies'):
-        dep_stack.add(internal_dep)
-        for dep in internal_dep.internal_dependencies:
-          if dep not in visited:
-            descend(dep)
-            visited.add(dep)
-        dep_stack.remove(internal_dep)
-
-    descend(internal_target)
 
   @classmethod
   def sort_targets(cls, internal_targets):
@@ -58,17 +38,25 @@ class InternalTarget(Target):
     roots = OrderedSet()
     inverted_deps = collections.defaultdict(OrderedSet) # target -> dependent targets
     visited = set()
+    path = OrderedSet()
 
     def invert(target):
+      if target in path:
+        path_list = list(path)
+        cycle_head = path_list.index(target)
+        cycle = path_list[cycle_head:] + [target]
+        raise InternalTarget.CycleException(cycle)
+      path.add(target)
       if target not in visited:
         visited.add(target)
         if getattr(target, 'internal_dependencies', None):
           for internal_dependency in target.internal_dependencies:
-            if isinstance(internal_dependency, InternalTarget):
+            if hasattr(internal_dependency, 'internal_dependencies'):
               inverted_deps[internal_dependency].add(target)
               invert(internal_dependency)
         else:
           roots.add(target)
+      path.remove(target)
 
     for internal_target in internal_targets:
       invert(internal_target)

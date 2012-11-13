@@ -377,13 +377,6 @@ class Goal(Command):
   def run(self, lock):
     if self.options.dry_run:
       print '****** Dry Run ******'
-    with self.check_errors("Target contains a dependency cycle") as error:
-      with self.timer.timing('parse:check_cycles'):
-        for target in self.targets:
-          try:
-            InternalTarget.check_cycles(target)
-          except InternalTarget.CycleException as e:
-            error(target.id)
 
     logger = None
     if self.options.log or self.options.log_level:

@@ -33,10 +33,10 @@ class InternalTargetTest(unittest.TestCase):
     a = MockTarget('a')
 
     # no cycles yet
-    InternalTarget.check_cycles(a)
-    a.internal_dependencies = [ a ]
+    InternalTarget.sort_targets([a])
+    a.internal_dependencies = [a]
     try:
-      InternalTarget.check_cycles(a)
+      InternalTarget.sort_targets([a])
       self.fail("Expected a cycle to be detected")
     except InternalTarget.CycleException:
       # expected
@@ -48,11 +48,11 @@ class InternalTargetTest(unittest.TestCase):
     a = MockTarget('a', c, b)
 
     # no cycles yet
-    InternalTarget.check_cycles(a)
+    InternalTarget.sort_targets([a])
 
-    c.internal_dependencies = [ a ]
+    c.internal_dependencies = [a]
     try:
-      InternalTarget.check_cycles(a)
+      InternalTarget.sort_targets([a])
       self.fail("Expected a cycle to be detected")
     except InternalTarget.CycleException:
       # expected
