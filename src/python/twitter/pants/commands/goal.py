@@ -596,27 +596,36 @@ goal(
   dependencies=['binary']
 ).install().with_description('Create an application bundle from binary targets.')
 
+# run doesn't need the serialization lock. It's reasonable to run some code
+# in a workspace while there's a compile going on unrelated code.
 goal(
   name='jvm-run',
   action=JvmRun,
-  dependencies=['compile']
+  dependencies=['compile'],
+  serialize=False,
 ).install('run').with_description('Run a (currently JVM only) binary target.')
 
 goal(
   name='jvm-run-dirty',
-  action=JvmRun
+  action=JvmRun,
+  serialize=False,
   ).install('run-dirty').with_description('Run a (currently JVM only) binary target, using\n' +
     'only currently existing binaries, skipping compilation')
+
+# repl doesn't need the serialization lock. It's reasonable to have
+# a repl running in a workspace while there's a compile going on unrelated code.
 goal(
   name='scala-repl',
   action=ScalaRepl,
-  dependencies=['compile']
+  dependencies=['compile'],
+  serialize=False,
 ).install('repl').with_description(
   'Run a (currently Scala only) REPL with the classpath set according to the targets.')
 
 goal(
   name='scala-repl-dirty',
-  action=ScalaRepl
+  action=ScalaRepl,
+  serialize=False,
 ).install('repl-dirty').with_description(
   'Run a (currently Scala only) REPL with the classpath set according to the targets, \n' +
     'using the currently existing binaries, skipping compilation')

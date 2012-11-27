@@ -5,16 +5,8 @@ from twitter.pants.tasks import TaskError
 
 class Group(object):
   @staticmethod
-  def execute(phase, tasks_by_goal, context, executed, timer=None):
+  def execute(phase, tasks_by_goal, context, executed, already_locked=False, timer=None):
     """Executes the named phase against the current context tracking goal executions in executed."""
-
-    def _acquire_lock_if_needed(goal):
-      """If the goal about to be executed requires the lock, then acquire it. If not,
-         then make sure it's released."""
-      if goal.serialize:
-        context.acquire_lock()
-      else:
-        context.release_lock()
 
     def execute_task(name, task, targets):
       """Execute and time a single goal that has had all of its dependencies satisfied."""
@@ -32,6 +24,14 @@ class Group(object):
           phase_timings[name].append(elapsed)
 
     if phase not in executed:
+      # Note the locking strategy: We lock the first time we need to, and hold the lock until we're done,
+      # even if some of our deps don't themselves need to be serialized. This is because we may implicitly rely
+      # on pristine state from an earlier phase.
+      locked = False
+
+      if not already_locked and phase.serialize():
+        context.acquire_lock()
+        locked = True
       # Satisfy dependencies first
       goals = phase.goals()
       if not goals:
@@ -39,7 +39,7 @@ class Group(object):
 
       for goal in goals:
         for dependency in goal.dependencies:
-          Group.execute(dependency, tasks_by_goal, context, executed, timer=timer)
+          Group.execute(dependency, tasks_by_goal, context, executed, already_locked=locked, timer=timer)
 
       runqueue = []
       goals_by_group = {}
@@ -54,23 +54,23 @@ class Group(object):
             goals_by_group[group_name].append(goal)
         else:
           runqueue.append((None, [goal]))
-      try:
-        for group_name, goals in runqueue:
-          if not group_name:
-            goal = goals[0]
-            _acquire_lock_if_needed(goal)
-            context.log.info('[%s:%s]' % (phase, goal.name))
-            execute_task(goal.name, tasks_by_goal[goal], context.targets())
-          else:
-            for chunk in Group.create_chunks(context, goals):
-              for goal in goals:
-                _acquire_lock_if_needed(goal)
-                goal_chunk = filter(goal.group.predicate, chunk)
-                if len(goal_chunk) > 0:
-                  context.log.info('[%s:%s:%s]' % (phase, group_name, goal.name))
-                  execute_task(goal.name, tasks_by_goal[goal], goal_chunk)
-      finally:
-        # Once the goals are satisfied, make sure that the lock isn't still being held.
+
+      for group_name, goals in runqueue:
+        if not group_name:
+          goal = goals[0]
+          context.log.info('[%s:%s]' % (phase, goal.name))
+          execute_task(goal.name, tasks_by_goal[goal], context.targets())
+        else:
+          for chunk in Group.create_chunks(context, goals):
+            for goal in goals:
+              goal_chunk = filter(goal.group.predicate, chunk)
+              if len(goal_chunk) > 0:
+                context.log.info('[%s:%s:%s]' % (phase, group_name, goal.name))
+                execute_task(goal.name, tasks_by_goal[goal], goal_chunk)
+
+      # Can't put this in a finally block because some tasks fork, and the forked processes would
+      # execute this block as well.
+      if locked:
         context.release_lock()
 
   @staticmethod

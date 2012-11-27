@@ -1,9 +1,8 @@
 
 from __future__ import print_function
 
-import hashlib
 import os
-import sys  
+import sys
 
 from collections import defaultdict
 from contextlib import contextmanager
@@ -109,7 +108,7 @@ class Context(object):
     """Release the global lock if it's held.
     Returns True if the lock was held before this call.
     """
-    if self._lock is Lock.unlocked():
+    if self._lock.is_unlocked():
       return False
     else:
       self._lock.release()

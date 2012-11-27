@@ -18,19 +18,12 @@ __author__ = 'Benjy Weinberger'
 
 import shlex
 
-from twitter.pants.targets import JavaLibrary, JavaTests, ScalaLibrary, ScalaTests
 from twitter.pants.tasks import Task
 from twitter.pants.tasks.binary_utils import profile_classpath, runjava
 from twitter.pants.tasks.jvm_task import JvmTask
 
 
 class ScalaRepl(JvmTask):
-  # ScalaRepl doesn't need the serialization lock. It's reasonable to have
-  # a repl running in a workspace while there's a compile going on unrelated code.
-  @classmethod
-  def serialized(cls):
-    return False
-
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
     option_group.add_option(mkflag("jvmargs"), dest = "run_jvmargs", action="append",

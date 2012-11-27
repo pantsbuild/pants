@@ -229,5 +229,8 @@ class Phase(PhaseBase):
   def goals(self):
     return Phase._goals_by_phase[self]
 
+  def serialize(self):
+    return any([x.serialize for x in self.goals()])
+
   def __repr__(self):
     return self.name
