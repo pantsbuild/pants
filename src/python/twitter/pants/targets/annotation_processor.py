@@ -53,7 +53,8 @@ class AnnotationProcessor(ExportableJvmLibrary):
 
     self.add_label('java')
     self.add_label('apt')
-    self.resources = self._resolve_paths(ExportableJvmLibrary.RESOURCES_BASE_DIR, resources)
+    self.sibling_resources_base = os.path.join(os.path.dirname(self.target_base), 'resources')
+    self.resources = self._resolve_paths(self.sibling_resources_base, resources)
     self.processors = processors
 
   def _create_template_data(self):
@@ -61,8 +62,7 @@ class AnnotationProcessor(ExportableJvmLibrary):
     if self.sources:
       allsources += [ os.path.join(self.target_base, source) for source in self.sources ]
     if self.resources:
-      allsources += [ os.path.join(ExportableJvmLibrary.RESOURCES_BASE_DIR, res)
-                      for res in self.resources ]
+      allsources += [ os.path.join(self.sibling_resources_base, res) for res in self.resources ]
 
     return ExportableJvmLibrary._create_template_data(self).extend(
       resources = self.resources,

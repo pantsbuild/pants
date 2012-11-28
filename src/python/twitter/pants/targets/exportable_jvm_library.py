@@ -19,8 +19,6 @@ from twitter.pants.targets.jvm_target import JvmTarget
 
 class ExportableJvmLibrary(JvmTarget):
   """A baseclass for java targets that support being exported to an artifact repository."""
-  RESOURCES_BASE_DIR = 'src/resources'
-
   def __init__(self,
                name,
                sources,

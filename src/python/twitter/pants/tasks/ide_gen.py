@@ -393,14 +393,12 @@ class Project(object):
         self.has_scala = not self.skip_scala and (self.has_scala or is_scala(target))
 
         if isinstance(target, JavaLibrary) or isinstance(target, ScalaLibrary):
-          # TODO(John Sirois): this does not handle test resources, make test resources 1st class
-          # in ant build and punch this through to pants model
           resources = set()
           if target.resources:
             resources.update(target.resources)
           if resources:
             self.resource_extensions.update(Project.extract_resource_extensions(resources))
-            configure_source_sets(ExportableJvmLibrary.RESOURCES_BASE_DIR,
+            configure_source_sets(target.sibling_resources_base,
                                   resources,
                                   is_test = False)
 
