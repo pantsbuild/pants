@@ -25,6 +25,7 @@ import subprocess
 
 from twitter.common.dirutil import safe_rmtree
 from twitter.common.dirutil.chroot import RelativeChroot
+from twitter.pants import Config
 from twitter.pants.python.egg_builder import EggBuilder
 
 class PythonThriftBuilder(object):
@@ -46,6 +47,11 @@ class PythonThriftBuilder(object):
     self.detected_packages = set()
     self.detected_namespace_packages = set()
 
+    # TODO: Temporary hack where we reparse pants.ini. Right now it's too difficult to plumb
+    # it through, and this will all be ported to "new pants" soon anyway.
+    config = Config.load()
+    self.platmap = config.getdict('py', 'thrift-platmap')
+
   def __del__(self):
     self.cleanup()
 
@@ -55,21 +61,12 @@ class PythonThriftBuilder(object):
   def cleanup(self):
     safe_rmtree(self.chroot.path())
 
-  @staticmethod
-  def thrift_binary(root_dir):
-    # TODO(Brian Wickman):  Will we ever need to make this smarter?
-    PLATMAP = {
-      ('darwin', 'i386'): ['mac', '10.6', '0.5.0-finagle', 'thrift'],
-      ('darwin', 'x86_64'): ['mac', '10.6', '0.5.0-finagle', 'thrift'],
-      ('darwin', 'x86_64'): ['mac', '10.7', '0.5.0-finagle', 'thrift'],
-      ('linux',  'x86_64'): ['linux', 'x86_64', '0.5.0-finagle', 'thrift'],
-      ('linux',  'i686') : ['linux', 'i386', '0.5.0-finagle', 'thrift']
-    }
+  def thrift_binary(self, root_dir):
     uname = os.uname()
     platform = (uname[0].lower(), uname[4])
-    if platform not in PLATMAP:
+    if platform not in self.platmap:
       raise PythonThriftBuilder.UnknownPlatformException(platform)
-    return os.path.join(root_dir, 'build-support', 'bin', 'thrift', *PLATMAP[platform])
+    return os.path.join(root_dir, 'build-support', 'bin', 'thrift', *self.platmap[platform])
 
   def run_thrifts(self):
     for src in self.target.sources:
@@ -83,7 +80,7 @@ class PythonThriftBuilder(object):
     thrift_abs_path = os.path.abspath(thrift_abs_path)
 
     args = [
-      PythonThriftBuilder.thrift_binary(self.root),
+      self.thrift_binary(self.root),
       '--gen',
       'py:new_style',
       '-o',
