@@ -263,6 +263,11 @@ class IvyResolve(NailgunTask):
       yield (path.strip() for path in cp.read().split(os.pathsep) if path.strip())
 
   def _mapjars(self, genmap, target):
+    """
+    Parameters:
+      genmap: the jar_dependencies ProductMapping entry for the required products.
+      target: the target whose jar dependencies are being retrieved.
+    """
     mapdir = os.path.join(self._classpath_dir, target.id)
     safe_mkdir(mapdir, clean=True)
     ivyargs = [

@@ -36,12 +36,12 @@ from twitter.pants.targets import resolve_target_sources
 from twitter.pants.tasks import TaskError
 from twitter.pants.tasks.binary_utils import nailgun_profile_classpath
 from twitter.pants.tasks.jvm_compiler_dependencies import Dependencies
+from twitter.pants.tasks.jvm_dependency_cache import JvmDependencyCache
 from twitter.pants.tasks.nailgun_task import NailgunTask
-
+from twitter.pants.targets.jvm_target import JvmTarget
 
 # Well known metadata file required to register scalac plugins with nsc.
 _PLUGIN_INFO_FILE = 'scalac-plugin.xml'
-
 
 class ScalaCompile(NailgunTask):
   @staticmethod
@@ -71,6 +71,13 @@ class ScalaCompile(NailgunTask):
                             action="callback", callback=mkflag.set_bool,
                             help="[True] Enable color in logging.")
 
+    option_group.add_option(mkflag("check-missing-deps"), mkflag("check-missing-deps", negate=True),
+                            dest="scala_check_missing_deps",
+                            action="callback", callback=mkflag.set_bool,
+                            default=False,
+                            help="[%default] Check for undeclared dependencies in scala code")
+
+
   def __init__(self, context, workdir=None):
     NailgunTask.__init__(self, context, workdir=context.config.get('scala-compile', 'nailgun_dir'))
 
@@ -78,6 +85,11 @@ class ScalaCompile(NailgunTask):
       context.options.scala_compile_partition_size_hint \
       if context.options.scala_compile_partition_size_hint != -1 else \
       context.config.getint('scala-compile', 'partition_size_hint')
+
+    self.check_missing_deps = context.options.scala_check_missing_deps
+
+    if self.check_missing_deps:
+      JvmDependencyCache.init_product_requirements(self)
 
     # We use the scala_compile_color flag if it is explicitly set on the command line.
     self._color = \
@@ -169,6 +181,34 @@ class ScalaCompile(NailgunTask):
           self.execute_single_compilation(vt, cp, upstream_analysis_caches)
           if not self.dry_run:
             vt.update()
+      if self.check_missing_deps:
+        deps_cache = JvmDependencyCache(self, scala_targets)
+        (deps_by_target, jar_deps_by_target) = deps_cache.get_compilation_dependencies()
+        for target in deps_by_target:
+          deps = deps_by_target[target].copy()
+          jar_deps = jar_deps_by_target[target].copy()
+          target.walk(lambda target: self._dependency_walk_work(deps, jar_deps, target))
+          if len(deps) > 0:
+            # for now, just print a message. Later, upgrade this to really generate
+            # an error.
+            for dep_target in deps:
+              print ("Error: target %s has undeclared compilation dependency on %s," %
+                     (target.address, dep_target.address))
+              print ("because source file %s depends on class %s" %
+                     deps_cache.get_dependency_blame(target, dep_target))
+          if len(jar_deps) > 0:
+            for jd in jar_deps:
+              print ("Error: target %s needs to depend on jar_dependency %s.%s" %
+                    (target.address, jd.org, jd.name))
+
+
+  def _dependency_walk_work(self, deps, jar_deps, target):
+    if target in deps:
+      deps.remove(target)
+    if isinstance(target, JvmTarget):
+      for jar_dep in target.dependencies:
+        if jar_dep in jar_deps:
+          jar_deps.remove(jar_dep)
 
   def create_output_paths(self, targets):
     compilation_id = Target.maybe_readable_identify(targets)

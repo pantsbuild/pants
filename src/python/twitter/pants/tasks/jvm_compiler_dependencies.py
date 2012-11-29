@@ -109,3 +109,4 @@ class Dependencies(object):
         relsrc = os.path.relpath(sourcefile, target.target_base)
         classes_by_target_by_source[target][relsrc] = classfiles
     return classes_by_target_by_source
+
