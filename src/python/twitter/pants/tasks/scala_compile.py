@@ -184,6 +184,7 @@ class ScalaCompile(NailgunTask):
       if self.check_missing_deps:
         deps_cache = JvmDependencyCache(self, scala_targets)
         (deps_by_target, jar_deps_by_target) = deps_cache.get_compilation_dependencies()
+        found_missing_deps = False
         for target in deps_by_target:
           deps = deps_by_target[target].copy()
           jar_deps = jar_deps_by_target[target].copy()
@@ -191,6 +192,7 @@ class ScalaCompile(NailgunTask):
           if len(deps) > 0:
             # for now, just print a message. Later, upgrade this to really generate
             # an error.
+            found_missing_deps = True
             genmap = self.context.products.get('missing_deps')
             genmap.add(target, self.context._buildroot, [x.derived_from.address.reference() for x in deps])
             for dep_target in deps:
@@ -199,9 +201,12 @@ class ScalaCompile(NailgunTask):
               print ("       because source file %s depends on class %s" %
                      deps_cache.get_dependency_blame(target, dep_target))
           if len(jar_deps) > 0:
+            found_missing_deps = True
             for jd in jar_deps:
               print ("Error: target %s needs to depend on jar_dependency %s.%s" %
                     (target.address, jd.org, jd.name))
+        if found_missing_deps:
+          raise TaskError('Missing dependencies detected.')
 
 
   def _dependency_walk_work(self, deps, jar_deps, target):
