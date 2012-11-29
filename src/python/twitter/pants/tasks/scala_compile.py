@@ -191,6 +191,8 @@ class ScalaCompile(NailgunTask):
           if len(deps) > 0:
             # for now, just print a message. Later, upgrade this to really generate
             # an error.
+            genmap = self.context.products.get('missing_deps')
+            genmap.add(target, self.context._buildroot, [x.derived_from.address.reference() for x in deps])
             for dep_target in deps:
               print ("Error: target %s has undeclared compilation dependency on %s," %
                      (target.address, dep_target.derived_from.address.reference()))

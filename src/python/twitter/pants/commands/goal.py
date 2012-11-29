@@ -435,6 +435,7 @@ class Goal(Command):
 # Install all default pants provided goals
 from twitter.pants.targets import JavaLibrary, JavaTests
 from twitter.pants.tasks.binary_create import BinaryCreate
+from twitter.pants.tasks.build_lint import BuildLint
 from twitter.pants.tasks.bundle_create import BundleCreate
 from twitter.pants.tasks.checkstyle import Checkstyle
 from twitter.pants.tasks.filedeps import FileDeps
@@ -643,6 +644,13 @@ goal(
 ).install('pathdeps').with_description(
   'Print out a list of all paths containing build files the target depends on')
 
+goal(
+  name='buildlint',
+  action=BuildLint,
+  dependencies=['compile'],  # To pick up missing deps.
+).install()
+
+
 from twitter.pants.tasks.idea_gen import IdeaGen
 
 goal(
@@ -668,6 +676,7 @@ goal(
   action=Provides,
   dependencies=['jar']
 ).install().with_description('Emit the list of symbols provided by the given targets.')
+
 
 from twitter.pants.tasks.python.setup import SetupPythonEnvironment
 
