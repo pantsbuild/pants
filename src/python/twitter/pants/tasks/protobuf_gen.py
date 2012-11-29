@@ -146,7 +146,8 @@ class ProtobufGen(CodeGen):
                                       name=target.id,
                                       provides=target.provides,
                                       sources=genfiles,
-                                      dependencies=self.javadeps)
+                                      dependencies=self.javadeps,
+                                      derived_from=target)
     tgt.id = target.id + '.protobuf_gen'
     tgt.add_label('codegen')
     for dependee in dependees:

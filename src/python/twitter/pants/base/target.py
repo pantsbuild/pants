@@ -14,16 +14,15 @@
 # limitations under the License.
 # ==================================================================================================
 
-import hashlib
-import os
 import collections
-import traceback
+import os
 
 from twitter.common.collections import OrderedSet
 from twitter.common.decorators import deprecated_with_warning
 from twitter.pants.base.address import Address
 from twitter.pants.base.hash_utils import hash_all
 from twitter.pants.base.parse_context import ParseContext
+
 
 class TargetDefinitionException(Exception):
   """Thrown on errors in target definitions."""
@@ -99,6 +98,10 @@ class Target(object):
       self.labels = set()
       self.register()
       self._initialized = True
+
+      # For synthetic codegen targets this will be the original target from which
+      # the target was synthesized.
+      self.derived_from = self
 
   def _post_construct(self, func, *args, **kwargs):
     """Registers a command to invoke after this target's BUILD file is parsed."""

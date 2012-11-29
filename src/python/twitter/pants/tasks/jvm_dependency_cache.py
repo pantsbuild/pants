@@ -21,7 +21,6 @@ from collections import defaultdict
 from zipfile import ZipFile
 
 from twitter.common.java.class_file import ClassFile
-from twitter.pants.base.target import Target
 from twitter.pants.targets.jar_dependency import JarDependency
 from twitter.pants.targets.jvm_target import JvmTarget
 

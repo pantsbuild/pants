@@ -30,6 +30,7 @@ from twitter.common.dirutil import safe_mkdir, safe_open, safe_rmtree
 
 from twitter.pants import get_buildroot, is_scala, is_scalac_plugin
 from twitter.pants.base.target import Target
+from twitter.pants.targets.jvm_target import JvmTarget
 from twitter.pants.targets.scala_library import ScalaLibrary
 from twitter.pants.targets.scala_tests import ScalaTests
 from twitter.pants.targets import resolve_target_sources
@@ -38,7 +39,7 @@ from twitter.pants.tasks.binary_utils import nailgun_profile_classpath
 from twitter.pants.tasks.jvm_compiler_dependencies import Dependencies
 from twitter.pants.tasks.jvm_dependency_cache import JvmDependencyCache
 from twitter.pants.tasks.nailgun_task import NailgunTask
-from twitter.pants.targets.jvm_target import JvmTarget
+
 
 # Well known metadata file required to register scalac plugins with nsc.
 _PLUGIN_INFO_FILE = 'scalac-plugin.xml'
@@ -87,7 +88,6 @@ class ScalaCompile(NailgunTask):
       context.config.getint('scala-compile', 'partition_size_hint')
 
     self.check_missing_deps = context.options.scala_check_missing_deps
-
     if self.check_missing_deps:
       JvmDependencyCache.init_product_requirements(self)
 
@@ -193,8 +193,8 @@ class ScalaCompile(NailgunTask):
             # an error.
             for dep_target in deps:
               print ("Error: target %s has undeclared compilation dependency on %s," %
-                     (target.address, dep_target.address))
-              print ("because source file %s depends on class %s" %
+                     (target.address, dep_target.derived_from.address.reference()))
+              print ("       because source file %s depends on class %s" %
                      deps_cache.get_dependency_blame(target, dep_target))
           if len(jar_deps) > 0:
             for jd in jar_deps:

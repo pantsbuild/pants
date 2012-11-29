@@ -28,6 +28,10 @@ class BuildFile(object):
   _PATTERN = re.compile('^%s(\.[a-z]+)?$' % _CANONICAL_NAME)
 
   @staticmethod
+  def is_buildfile(name):
+    return BuildFile._is_buildfile_name(os.path.basename(name))
+
+  @staticmethod
   def _is_buildfile_name(name):
     return BuildFile._PATTERN.match(name)
 

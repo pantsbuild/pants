@@ -30,11 +30,19 @@ class Products(object):
 
     def get(self, target):
       """
-        Returns the product mapping for the given target as a map of <basedir> -> <products list>.
+        Returns the product mapping for the given target as a map of <basedir> -> <products list>,
+        or None if no such product exists.
+      """
+      return self.by_target.get(target)
+
+    def __getitem__(self, target):
+      """
+        Support for subscripting into this mapping. Returns the product mapping for the given target
+        as a map of <basedir> -> <products list>.
         If no mapping exists, returns an empty map whose values default to empty lists. So you
         can use the result without checking for None.
       """
-      return self.by_target.get(target)
+      return self.by_target[target]
 
     def itermappings(self):
       """
