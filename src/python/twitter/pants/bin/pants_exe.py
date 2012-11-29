@@ -18,6 +18,7 @@ from __future__ import print_function
 
 from twitter.common.dirutil import Lock
 
+from twitter.common.process import ProcessProviderFactory
 from twitter.pants import get_buildroot, get_version
 from twitter.pants.base import Address
 from twitter.pants.base.rcfile import RcFile
@@ -116,16 +117,12 @@ def _parse_command(root_dir, args):
   return Command.get_command(command), args
 
 
-try:
-  import psutil
-
-  def _process_info(pid):
-    process = psutil.Process(pid)
-    return '%d (%s)' % (pid, ' '.join(process.cmdline))
-except ImportError:
-  def _process_info(pid):
-    return '%d' % pid
-
+def _process_info(pid):
+  ps = ProcessProviderFactory.get()
+  ps.collect_set([pid])
+  handle = ps.get_handle(pid)
+  cmdline = handle.cmdline()
+  return '%d (%s)' % (pid, cmdline)
 
 def _run():
   root_dir = get_buildroot()

@@ -486,23 +486,25 @@ goal(
   dependencies=['invalidate']
 ).install().with_description('Cleans all intermediate build output in a background process')
 
-if NailgunTask.killall:
-  class NailgunKillall(Task):
-    @classmethod
-    def setup_parser(cls, option_group, args, mkflag):
-      option_group.add_option(mkflag("everywhere"), dest="ng_killall_everywhere",
-                              default=False, action="store_true",
-                              help="[%default] Kill all nailguns servers launched by pants for "
-                                   "all workspaces on the system.")
 
-    def execute(self, targets):
-      if NailgunTask.killall:
-        NailgunTask.killall(self.context.log, everywhere=self.context.options.ng_killall_everywhere)
+class NailgunKillall(Task):
+  @classmethod
+  def setup_parser(cls, option_group, args, mkflag):
+    option_group.add_option(mkflag("everywhere"), dest="ng_killall_everywhere",
+                            default=False, action="store_true",
+                            help="[%default] Kill all nailguns servers launched by pants for "
+                                 "all workspaces on the system.")
 
-  ng_killall = goal(name='ng-killall', action=NailgunKillall)
-  ng_killall.install().with_description('Kill any running nailgun servers spawned by pants.')
+  def execute(self, targets):
+    if NailgunTask.killall:
+      NailgunTask.killall(self.context.log, everywhere=self.context.options.ng_killall_everywhere)
+    else:
+      raise NotImplementedError, 'NailgunKillall not implemented on this platform'
 
-  ng_killall.install('clean-all', first=True)
+ng_killall = goal(name='ng-killall', action=NailgunKillall)
+ng_killall.install().with_description('Kill any running nailgun servers spawned by pants.')
+
+ng_killall.install('clean-all', first=True)
 
 
 # TODO(John Sirois): Resolve eggs
