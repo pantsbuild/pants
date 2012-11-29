@@ -26,29 +26,29 @@ def pylint_build_filter():
 python_library(
   name = 'pants-deps',
   dependencies = [
-    python_requirement("elementtree"),
+    python_requirement('elementtree'),
     python_requirement('mako'),
     python_requirement('markdown'),
     python_requirement('psutil'),
-    python_requirement("pygments"),
-    python_requirement("pylint", version_filter=pylint_build_filter),
-    python_requirement("pytest"),
-    python_requirement("python_daemon"),
+    python_requirement('pygments'),
+    python_requirement('pylint', version_filter=pylint_build_filter),
+    python_requirement('pytest'),
+    python_requirement('python_daemon'),
   ]
 )
 
 python_library(
   name = 'pants-lib',
   dependencies = [
-    pants("src/python/twitter/common"),
-    pants("src/python/twitter/common/app"),
-    pants("src/python/twitter/common/confluence"),
-    pants("src/python/twitter/common/dirutil"),
-    pants("src/python/twitter/common/lang"),
-    pants("src/python/twitter/common/process"),
-    pants("src/python/twitter/common/python"),
-    pants("src/python/twitter/common/java"),
-    pants(":pants-deps"),
+    pants('src/python/twitter/common'),
+    pants('src/python/twitter/common/app'),
+    pants('src/python/twitter/common/confluence'),
+    pants('src/python/twitter/common/dirutil'),
+    pants('src/python/twitter/common/java'),
+    pants('src/python/twitter/common/lang'),
+    pants('src/python/twitter/common/process'),
+    pants('src/python/twitter/common/python'),
+    pants(':pants-deps'),
   ],
   sources = PANTS_SOURCES,
   resources = PANTS_RESOURCES
@@ -57,7 +57,7 @@ python_library(
 python_binary(
   name = 'pants',
   dependencies = [
-    pants(":pants-lib")
+    pants(':pants-lib'),
   ],
   source = 'bin/pants_exe.py',
 )
@@ -66,7 +66,7 @@ python_binary(
   name = 'ng',
   dependencies = [
     pants('src/python/twitter/common/app'),
-    pants('src/python/twitter/common/log')
+    pants('src/python/twitter/common/log'),
   ],
   source = 'java/nailgun_client.py',
 )
@@ -77,7 +77,7 @@ page(name = 'readme',
   source = 'README.md',
   dependencies = [
     pants('src/python/twitter/pants/docs:migration'),
-    pants(':install')
+    pants(':install'),
   ]
 )
 

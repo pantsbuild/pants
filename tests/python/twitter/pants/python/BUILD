@@ -24,13 +24,17 @@ python_test_suite(name = 'all',
 
 python_tests(name = 'test_antlr_builder',
   sources = ['test_antlr_builder.py'],
-  dependencies = [ pants('src/python/twitter/pants:pants-lib'),
-                   pants('src/antlr/twitter/pants/python/test:eval'),
-                   pants('src/antlr/twitter/pants/python/test:csv')]
+  dependencies = [
+    pants('src/antlr/twitter/pants/python/test:csv'),
+    pants('src/antlr/twitter/pants/python/test:eval'),
+    pants('src/python/twitter/pants:pants-lib'),
+  ]
 )
 
 python_tests(name = 'test_thrift_namespace_packages',
   sources = ['test_thrift_namespace_packages.py'],
-  dependencies = [ pants('src/thrift/com/twitter/pants/testing:duck-py'),
-                   pants('src/thrift/com/twitter/pants/testing:goose-py') ]
+  dependencies = [
+    pants('src/thrift/com/twitter/pants/testing:duck-py'),
+    pants('src/thrift/com/twitter/pants/testing:goose-py'),
+  ]
 )
