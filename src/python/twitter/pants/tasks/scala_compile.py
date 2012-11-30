@@ -200,11 +200,11 @@ class ScalaCompile(NailgunTask):
                      (target.address, dep_target.derived_from.address.reference()))
               print ("       because source file %s depends on class %s" %
                      deps_cache.get_dependency_blame(target, dep_target))
-          if len(jar_deps) > 0:
-            found_missing_deps = True
-            for jd in jar_deps:
-              print ("Error: target %s needs to depend on jar_dependency %s.%s" %
-                    (target.address, jd.org, jd.name))
+          #if len(jar_deps) > 0:
+          #  found_missing_deps = True
+          #  for jd in jar_deps:
+          #    print ("Error: target %s needs to depend on jar_dependency %s.%s" %
+          #          (target.address, jd.org, jd.name))
         if found_missing_deps:
           raise TaskError('Missing dependencies detected.')
 
