@@ -23,12 +23,11 @@ object ZincBuild extends Build {
     settings = buildSettings ++ Version.settings ++ Publish.settings ++ Scriptit.settings ++ Seq(
       resolveSbtLocally := false,
       resolvers <+= resolveSbtLocally { local => if (local) Resolver.mavenLocal else Opts.resolver.sonatypeSnapshots },
-      resolvers += "typesafe-third-party" at "http://repo.typesafe.com/typesafe/third-party",
       libraryDependencies ++= Seq(
         "com.typesafe.sbt" % "incremental-compiler" % sbtVersion,
         "com.typesafe.sbt" % "compiler-interface" % sbtVersion classifier "sources",
         "jline" % "jline" % "1.0" % "optional",
-        "com.martiansoftware" % "nailgun" % "0.7.1" % "optional"
+        "com.martiansoftware" % "nailgun-server" % "0.9.1" % "optional"
       )
     )
   )

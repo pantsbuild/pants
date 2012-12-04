@@ -183,21 +183,21 @@ class ZincClient(val address: InetAddress, val port: Int) {
     if (exitCode.isDefined) exitCode.get else receiveOutput(in, out, err)
   }
 
-  private def createHeader(size: Int, chunkType: Char): Array[Byte] = {
-    ByteBuffer.allocate(5).putInt(size).put(chunkType.toByte).array
+  private def createHeader(size: Int, chunkType: Byte): Array[Byte] = {
+    ByteBuffer.allocate(5).putInt(size).put(chunkType).array
   }
 
-  private def readHeader(array: Array[Byte]): (Int, Char) = {
+  private def readHeader(array: Array[Byte]): (Int, Byte) = {
     val buffer = ByteBuffer.wrap(array, 0, 5)
-    (buffer.getInt, buffer.get.toChar)
+    (buffer.getInt, buffer.get)
   }
 
-  private def putChunk(chunkType: Char, data: String, output: OutputStream): Unit = {
+  private def putChunk(chunkType: Byte, data: String, output: OutputStream): Unit = {
     output.write(createHeader(data.length, chunkType))
     output.write(data.getBytes)
   }
 
-  private def getChunk(input: DataInputStream): (Char, Array[Byte]) = {
+  private def getChunk(input: DataInputStream): (Byte, Array[Byte]) = {
     val header = Array.ofDim[Byte](5)
     input.readFully(header)
     val (size, chunkType) = readHeader(header)

@@ -1,6 +1,6 @@
 /*   
 
-  Copyright 2004, Martian Software, Inc.
+  Copyright 2004-2012, Martian Software, Inc.
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -36,8 +36,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <fcntl.h>
 
-#define NAILGUN_VERSION "0.7.1"
+#define NAILGUN_VERSION "0.9.0"
 
 #define BUFSIZE (2048)
 
@@ -76,26 +77,41 @@
 #define NAILGUN_CLIENT_NAME "ng"
 #define CHUNK_HEADER_LEN (5)
 
-#define NAILGUN_SOCKET_FAILED (999)
-#define NAILGUN_CONNECT_FAILED (998)
-#define NAILGUN_UNEXPECTED_CHUNKTYPE (997)
-#define NAILGUN_EXCEPTION_ON_SERVER (996)
-#define NAILGUN_CONNECTION_BROKEN (995)
-#define NAILGUN_BAD_ARGUMENTS (994)
+#define NAILGUN_SOCKET_FAILED (231)
+#define NAILGUN_CONNECT_FAILED (230)
+#define NAILGUN_UNEXPECTED_CHUNKTYPE (229)
+#define NAILGUN_EXCEPTION_ON_SERVER (228)
+#define NAILGUN_CONNECTION_BROKEN (227)
+#define NAILGUN_BAD_ARGUMENTS (226)
 
 #define CHUNKTYPE_STDIN '0'
 #define CHUNKTYPE_STDOUT '1'
 #define CHUNKTYPE_STDERR '2'
 #define CHUNKTYPE_STDIN_EOF '.'
 #define CHUNKTYPE_ARG 'A'
+#define CHUNKTYPE_LONGARG 'L'
 #define CHUNKTYPE_ENV 'E'
 #define CHUNKTYPE_DIR 'D'
 #define CHUNKTYPE_CMD 'C'
 #define CHUNKTYPE_EXIT 'X'
+#define CHUNKTYPE_STARTINPUT 'S'
 
+/*
+   the following is required to compile for hp-ux
+   originally posted at http://jira.codehaus.org/browse/JRUBY-2346
+*/
+#ifndef MSG_WAITALL
+#define MSG_WAITALL 0x40 /* wait for full request or error */
+#endif
 
 /* the socket connected to the nailgun server */
 int nailgunsocket = 0;
+
+/* buffer used for receiving and writing nail output chunks */
+char buf[BUFSIZE];
+
+/* track whether or not we've been told to send stdin to server */
+int startedInput = 0;
 
 /**
  * Clean up the application.
@@ -195,13 +211,45 @@ void sendHeader(unsigned int size, char chunkType) {
 }
 
 /**
+ * Sends the contents of the specified file as a long argument (--nailgun-filearg)
+ * This is sent as one or more chunks of type CHUNK_LONGARG.  The end of the argument
+ * is indicated by an empty chunk.
+ *
+ * @param filename the name of the file to send.
+ * @return nonzero on failure
+ */
+int sendFileArg(char *filename) {
+  int i, f;
+  
+  if ((f = open(filename, O_RDONLY)) < 0) {
+    perror("--nailgun-filearg");
+    return 1;  
+  }
+
+  i = read(f, buf, BUFSIZE);
+  while (i > 0) {
+    sendHeader(i, CHUNKTYPE_LONGARG);
+    sendAll(nailgunsocket, buf, i);
+    i = read(f, buf, BUFSIZE);
+  }
+  if (i < 0) {
+    perror("--nailgun-filearg");
+    return 1;
+  }
+  sendHeader(0, CHUNKTYPE_LONGARG);
+  
+  close(f);
+  return 0;
+}
+
+/**
  * Sends a null-terminated string with the specified chunk type.
  *
  * @param chunkType the chunk type identifier
  * @param text the null-terminated string to send
  */
 void sendText(char chunkType, char *text) {
-  int len = strlen(text);
+  int len = text ? strlen(text) : 0;
   sendHeader(len, chunkType);
   sendAll(nailgunsocket, text, len);
 }
@@ -230,6 +278,8 @@ void recvToFD(HANDLE destFD, char *buf, unsigned long len) {
     int thisPass = 0;
     
     thisPass = recv(nailgunsocket, buf, bytesToRead, MSG_WAITALL);
+    if (thisPass < bytesToRead) handleSocketClose();
+    
    
     bytesRead += thisPass;
 
@@ -278,43 +328,6 @@ void processExit(char *buf, unsigned long len) {
   cleanUpAndExit(exitcode);
 }
 
-/**
- * Processes data from the nailgun server.
- */
-void processnailgunstream() {
-  /* buffer used for receiving and writing nail output chunks */
-  char buf[BUFSIZE];
-
-  /*for (;;) {*/
-    int bytesRead = 0;
-    unsigned long len;
-    char chunkType;
-
-    bytesRead = recv(nailgunsocket, buf, CHUNK_HEADER_LEN, 0);
-
-    if (bytesRead < CHUNK_HEADER_LEN) {
-      handleSocketClose();
-    }
-  
-    len = ((buf[0] << 24) & 0xff000000)
-      | ((buf[1] << 16) & 0x00ff0000)
-      | ((buf[2] << 8) & 0x0000ff00)
-      | ((buf[3]) & 0x000000ff);
-  
-    chunkType = buf[4];
-  
-    switch(chunkType) {
-      case CHUNKTYPE_STDOUT: recvToFD(NG_STDOUT_FILENO, buf, len);
-            break;
-      case CHUNKTYPE_STDERR: recvToFD(NG_STDERR_FILENO, buf, len);
-            break;
-      case CHUNKTYPE_EXIT:   processExit(buf, len);
-            break;
-      default:  fprintf(stderr, "Unexpected chunk type %d ('%c')\n", chunkType, chunkType);
-          cleanUpAndExit(NAILGUN_UNEXPECTED_CHUNKTYPE);
-    }
-  /*}*/
-}
 
 /**
  * Sends len bytes from buf to the nailgun server in a stdin chunk.
@@ -341,19 +354,19 @@ void processEof() {
  */
 DWORD WINAPI processStdin (LPVOID lpParameter) {
   /* buffer used for reading and sending stdin chunks */
-  char buf[BUFSIZE];
+  char wbuf[BUFSIZE];
 
   for (;;) {
     DWORD numberOfBytes = 0;
 
-    if (!ReadFile(NG_STDIN_FILENO, buf, BUFSIZE, &numberOfBytes, NULL)) {
+    if (!ReadFile(NG_STDIN_FILENO, wbuf, BUFSIZE, &numberOfBytes, NULL)) {
       if (numberOfBytes != 0) {
         handleError();
       }
     }
 
     if (numberOfBytes > 0) {
-      sendStdin(buf, numberOfBytes);
+      sendStdin(wbuf, numberOfBytes);
     } else {
       processEof();
       break;
@@ -396,25 +409,76 @@ void initSockets () {
  * Initialise the asynchronous io.
  */
 void initIo () {
-  SECURITY_ATTRIBUTES securityAttributes;
-  DWORD threadId = 0;
-
   /* create non-blocking console io */
   AllocConsole();
+  
+  NG_STDIN_FILENO = GetStdHandle(STD_INPUT_HANDLE);
+  NG_STDOUT_FILENO = GetStdHandle(STD_OUTPUT_HANDLE);
+  NG_STDERR_FILENO = GetStdHandle(STD_ERROR_HANDLE);
+}
+#endif
+
+#ifdef WIN32
+/**
+ * Initialise the asynchronous io.
+ */
+void winStartInput () {
+  SECURITY_ATTRIBUTES securityAttributes;
+  DWORD threadId = 0;
 
   securityAttributes.bInheritHandle = TRUE;
   securityAttributes.lpSecurityDescriptor = NULL;
   securityAttributes.nLength = 0;
   
-  NG_STDIN_FILENO = GetStdHandle(STD_INPUT_HANDLE);
-  NG_STDOUT_FILENO = GetStdHandle(STD_OUTPUT_HANDLE);
-  NG_STDERR_FILENO = GetStdHandle(STD_ERROR_HANDLE);
-   
   if (!CreateThread(&securityAttributes, 0, &processStdin, NULL, 0, &threadId)) {
     handleError();
   }
 }
 #endif
+
+/**
+ * Processes data from the nailgun server.
+ */
+void processnailgunstream() {
+
+  /*for (;;) {*/
+    int bytesRead = 0;
+    unsigned long len;
+    char chunkType;
+
+    bytesRead = recv(nailgunsocket, buf, CHUNK_HEADER_LEN, MSG_WAITALL);
+
+    if (bytesRead < CHUNK_HEADER_LEN) {
+      handleSocketClose();
+    }
+  
+    len = ((buf[0] << 24) & 0xff000000)
+      | ((buf[1] << 16) & 0x00ff0000)
+      | ((buf[2] << 8) & 0x0000ff00)
+      | ((buf[3]) & 0x000000ff);
+  
+    chunkType = buf[4];
+  
+    switch(chunkType) {
+      case CHUNKTYPE_STDOUT: recvToFD(NG_STDOUT_FILENO, buf, len);
+            break;
+      case CHUNKTYPE_STDERR: recvToFD(NG_STDERR_FILENO, buf, len);
+            break;
+      case CHUNKTYPE_EXIT:   processExit(buf, len);
+            break;
+      case CHUNKTYPE_STARTINPUT:
+            if (!startedInput) {
+                #ifdef WIN32
+                winStartInput();
+                #endif
+      		startedInput = 1;
+      	    }
+            break;
+      default:  fprintf(stderr, "Unexpected chunk type %d ('%c')\n", chunkType, chunkType);
+          cleanUpAndExit(NAILGUN_UNEXPECTED_CHUNKTYPE);
+    }
+  /*}*/
+}
 
 /**
  * Trims any path info from the beginning of argv[0] to determine
@@ -446,7 +510,7 @@ int isNailgunClientName(char *s) {
  * Displays usage info and bails
  */
 void usage(int exitcode) {
-
+  fprintf(stderr, "NailGun v%s\n\n", NAILGUN_VERSION);
   fprintf(stderr, "Usage: ng class [--nailgun-options] [args]\n");
   fprintf(stderr, "          (to execute a class)\n");
   fprintf(stderr, "   or: ng alias [--nailgun-options] [args]\n");
@@ -461,9 +525,15 @@ void usage(int exitcode) {
   fprintf(stderr, "   --nailgun-version           print product version and exit\n");
   fprintf(stderr, "   --nailgun-showversion       print product version and continue\n");
   fprintf(stderr, "   --nailgun-server            to specify the address of the nailgun server\n");
-  fprintf(stderr, "                               (default is localhost)\n");
+  fprintf(stderr, "                               (default is NAILGUN_SERVER environment variable\n");
+  fprintf(stderr, "                               if set, otherwise localhost)\n");
   fprintf(stderr, "   --nailgun-port              to specify the port of the nailgun server\n");
-  fprintf(stderr, "                               (default is 2113)\n");
+  fprintf(stderr, "                               (default is NAILGUN_PORT environment variable\n");
+  fprintf(stderr, "                               if set, otherwise 2113)\n");  
+  fprintf(stderr, "   --nailgun-filearg FILE      places the entire contents of FILE into the\n");
+  fprintf(stderr, "                               next argument, which is interpreted as a string\n");
+  fprintf(stderr, "                               using the server's default character set.  May be\n");
+  fprintf(stderr, "                               specified more than once.\n");
   fprintf(stderr, "   --nailgun-help              print this message and exit\n");
 
   cleanUpAndExit(exitcode);
@@ -510,7 +580,16 @@ int main(int argc, char *argv[], char *env[]) {
   if (isNailgunClientName(cmd)) {
     cmd = NULL;
   }
-  
+
+  /* if executing just the ng client with no arguments or -h|--help, then
+     display usage and exit.  Don't handle -h|--help if a command other than
+     ng or ng.exe was used, since the appropriate nail should then handle
+     --help. */
+  if (cmd == NULL && 
+        (argc == 1 || 
+	  (argc == 2 && strcmp("--help", argv[1]) == 0) ||
+	  (argc == 2 && strcmp("-h", argv[1]) == 0))) usage(0);
+     
   firstArgIndex = 1;
 
   /* quite possibly the lamest commandline parsing ever. 
@@ -529,6 +608,9 @@ int main(int argc, char *argv[], char *env[]) {
       nailgun_port = argv[i + 1];
       argv[i] = argv[i + 1]= NULL;
       ++i;
+    } else if (!strcmp("--nailgun-filearg", argv[i])) {
+      /* just verify usage here.  do the rest when sending args. */
+      if (i == argc - 1) usage (NAILGUN_BAD_ARGUMENTS);
     } else if (!strcmp("--nailgun-version", argv[i])) {
       printf("NailGun client version %s\n", NAILGUN_VERSION);
       cleanUpAndExit(0);
@@ -581,7 +663,11 @@ int main(int argc, char *argv[], char *env[]) {
      marked some arguments NULL if we read them to specify the
      nailgun server and/or port */
   for(i = firstArgIndex; i < argc; ++i) {
-    if (argv[i] != NULL) sendText(CHUNKTYPE_ARG, argv[i]);
+    if (argv[i] != NULL) {
+      if (!strcmp("--nailgun-filearg", argv[i])) {
+        sendFileArg(argv[++i]);
+      } else sendText(CHUNKTYPE_ARG, argv[i]);
+    }
   }
 
   /* now send environment */  
@@ -612,7 +698,7 @@ int main(int argc, char *argv[], char *env[]) {
       FD_ZERO(&readfds);
 
       /* don't select on stdin if we've already reached its end */
-      if (!eof) {
+      if (startedInput && !eof) {
 	FD_SET(NG_STDIN_FILENO, &readfds);
       }
 
