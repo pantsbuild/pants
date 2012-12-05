@@ -5,7 +5,7 @@ from twitter.pants.tasks import TaskError
 
 class Group(object):
   @staticmethod
-  def execute(phase, tasks_by_goal, context, executed, already_locked=False, timer=None):
+  def execute(phase, tasks_by_goal, context, executed, timer=None):
     """Executes the named phase against the current context tracking goal executions in executed."""
 
     def execute_task(name, task, targets):
@@ -27,11 +27,11 @@ class Group(object):
       # Note the locking strategy: We lock the first time we need to, and hold the lock until we're done,
       # even if some of our deps don't themselves need to be serialized. This is because we may implicitly rely
       # on pristine state from an earlier phase.
-      locked = False
+      locked_by_me = False
 
-      if not already_locked and phase.serialize():
+      if context.is_unlocked() and phase.serialize():
         context.acquire_lock()
-        locked = True
+        locked_by_me = True
       # Satisfy dependencies first
       goals = phase.goals()
       if not goals:
@@ -39,7 +39,7 @@ class Group(object):
 
       for goal in goals:
         for dependency in goal.dependencies:
-          Group.execute(dependency, tasks_by_goal, context, executed, already_locked=locked, timer=timer)
+          Group.execute(dependency, tasks_by_goal, context, executed, timer=timer)
 
       runqueue = []
       goals_by_group = {}
@@ -70,7 +70,7 @@ class Group(object):
 
       # Can't put this in a finally block because some tasks fork, and the forked processes would
       # execute this block as well.
-      if locked:
+      if locked_by_me:
         context.release_lock()
 
   @staticmethod

@@ -114,6 +114,10 @@ class Context(object):
       self._lock = Lock.unlocked()
       return True
 
+  def is_unlocked(self):
+    """Whether the global lock object is actively holding the lock."""
+    return self._lock.is_unlocked()
+
   def replace_targets(self, target_roots):
     """Replaces all targets in the context with the given roots and their transitive
     dependencies.
