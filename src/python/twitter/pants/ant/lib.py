@@ -22,9 +22,10 @@ import shutil
 import subprocess
 import traceback
 
+from mako.template import Template
+
 from twitter.pants import has_jvm_targets, is_jvm
 from twitter.pants.ant import bang
-from twitter.pants.base.generator import Generator
 from twitter.pants.base.builder import Builder
 from twitter.pants.targets import (
   JarDependency,
@@ -53,7 +54,7 @@ class AntBuilder(Builder):
   def _generate(cls, root_dir, template, template_data, output_filename):
     with open(output_filename, 'w') as output:
       template_path = os.path.join(_TEMPLATE_BASEDIR, '%s.mk' % template)
-      generator = Generator(pkgutil.get_data(__name__, template_path),
+      generator = MakoGenerator(pkgutil.get_data(__name__, template_path),
           root_dir = root_dir, lib = template_data)
       generator.write(output)
 
@@ -196,3 +197,20 @@ class AntBuilder(Builder):
       return bang.extract_target(targets, name)
     else:
       return foil
+
+class MakoGenerator(object):
+  """Generates pants intermediary output files using a configured mako template."""
+
+  _module_directory = '/tmp/pants-%s' % os.environ['USER']
+
+  def __init__(self, template_text, **template_data):
+    self._template = Template(text = template_text,
+      module_directory = MakoGenerator._module_directory)
+    self.template_data = template_data
+
+  def write(self, stream):
+    """Applies the template to the template data and writes the result to the given file-like
+    stream."""
+
+    stream.write(self._template.render(**self.template_data))
+

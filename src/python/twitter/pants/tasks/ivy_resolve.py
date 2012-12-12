@@ -80,7 +80,7 @@ class IvyResolve(NailgunTask):
 
     self._profile = context.config.get('ivy-resolve', 'profile')
 
-    self._template_path = os.path.join('ivy_resolve', 'ivy.mk')
+    self._template_path = os.path.join('ivy_resolve', 'ivy.mustache')
 
     self._work_dir = context.config.get('ivy-resolve', 'workdir')
     self._classpath_file = os.path.join(self._work_dir, 'classpath')
@@ -197,8 +197,8 @@ class IvyResolve(NailgunTask):
     safe_mkdir(os.path.dirname(ivyxml))
     with open(ivyxml, 'w') as output:
       generator = Generator(pkgutil.get_data(__name__, self._template_path),
-                            root_dir = get_buildroot(),
-                            lib = template_data)
+        root_dir = get_buildroot(),
+        lib = template_data)
       generator.write(output)
 
   def _generate_ivy_report(self):

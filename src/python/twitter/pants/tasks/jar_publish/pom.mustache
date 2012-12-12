@@ -24,31 +24,31 @@ limitations under the License.
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
 
   <modelVersion>4.0.0</modelVersion>
-  <groupId>${artifact.org}</groupId>
-  <artifactId>${artifact.name}</artifactId>
+  <groupId>{{artifact.org}}</groupId>
+  <artifactId>{{artifact.name}}</artifactId>
   <packaging>jar</packaging>
-  <version>${artifact.rev}</version>
+  <version>{{artifact.rev}}</version>
 
-  % if artifact.dependencies:
+  {{#artifact.has_dependencies}}
   <dependencies>
-    % for dependency in artifact.dependencies:
+    {{#artifact.dependencies}}
     <dependency>
-      <groupId>${dependency.org}</groupId>
-      <artifactId>${dependency.name}</artifactId>
-      <version>${dependency.rev}</version>
-      <scope>${dependency.scope}</scope>
-      % if dependency.excludes:
+      <groupId>{{org}}</groupId>
+      <artifactId>{{name}}</artifactId>
+      <version>{{rev}}</version>
+      <scope>{{scope}}</scope>
+      {{#has_excludes}}
       <exclusions>
-        % for exclude in dependency.excludes:
+        {{#excludes}}
         <exclusion>
-          <groupId>${exclude.org}</groupId>
-          <artifactId>${exclude.name}</artifactId>
+          <groupId>{{org}}</groupId>
+          <artifactId>{{name}}</artifactId>
         </exclusion>
-        % endfor
+        {{/excludes}}
       </exclusions>
-      % endif
+      {{/has_excludes}}
     </dependency>
-    % endfor
+    {{/artifact.dependencies}}
   </dependencies>
-  % endif
+  {{/artifact.has_dependencies}}
 </project>

@@ -315,7 +315,7 @@ class Project(object):
         _, ext = os.path.splitext(resource)
         yield ext
 
-  def __init__(self, name, has_python, skip_java, skip_scala, root_dir,
+  def __init__(self, name,has_python, skip_java, skip_scala, root_dir,
                checkstyle_suppression_files, debug_port, targets, transitive):
     """Creates a new, unconfigured, Project based at root_dir and comprised of the sources visible
     to the given targets."""

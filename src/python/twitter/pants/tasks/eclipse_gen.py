@@ -15,7 +15,6 @@
 # ==================================================================================================
 import os
 import pkgutil
-import shutil
 
 from collections import defaultdict
 
@@ -25,6 +24,7 @@ from twitter.common.dirutil import safe_mkdir, safe_open
 from twitter.pants import get_buildroot
 from twitter.pants.base.generator import TemplateData, Generator
 from twitter.pants.tasks.ide_gen import IdeGen
+
 
 __author__ = 'John Sirois'
 
@@ -62,11 +62,11 @@ class EclipseGen(IdeGen):
     IdeGen.__init__(self, context)
 
     eclipse_version = _VERSIONS[context.options.eclipse_gen_version]
-    self.project_template = os.path.join(_TEMPLATE_BASEDIR, 'project-%s.mk' % eclipse_version)
-    self.classpath_template = os.path.join(_TEMPLATE_BASEDIR, 'classpath-%s.mk' % eclipse_version)
-    self.apt_template = os.path.join(_TEMPLATE_BASEDIR, 'factorypath-%s.mk' % eclipse_version)
-    self.pydev_template = os.path.join(_TEMPLATE_BASEDIR, 'pydevproject-%s.mk' % eclipse_version)
-    self.debug_template = os.path.join(_TEMPLATE_BASEDIR, 'debug-launcher-%s.mk' % eclipse_version)
+    self.project_template = os.path.join(_TEMPLATE_BASEDIR, 'project-%s.mustache' % eclipse_version)
+    self.classpath_template = os.path.join(_TEMPLATE_BASEDIR, 'classpath-%s.mustache' % eclipse_version)
+    self.apt_template = os.path.join(_TEMPLATE_BASEDIR, 'factorypath-%s.mustache' % eclipse_version)
+    self.pydev_template = os.path.join(_TEMPLATE_BASEDIR, 'pydevproject-%s.mustache' % eclipse_version)
+    self.debug_template = os.path.join(_TEMPLATE_BASEDIR, 'debug-launcher-%s.mustache' % eclipse_version)
 
     self.project_filename = os.path.join(self.cwd, '.project')
     self.classpath_filename = os.path.join(self.cwd, '.classpath')
@@ -81,19 +81,24 @@ class EclipseGen(IdeGen):
       return os.path.join(source_set.root_dir, source_set.source_base)
 
     source_bases = {}
+    def add_source_base(path, id):
+      source_bases[path] = id
+
     for source_set in project.sources:
-      source_bases[base_path(source_set)] = linked_folder_id(source_set.source_base)
+      add_source_base(base_path(source_set), linked_folder_id(source_set.source_base))
     if project.has_python:
       for source_set in project.py_sources:
-        source_bases[base_path(source_set)] = linked_folder_id(source_set.source_base)
+        add_source_base(base_path(source_set), linked_folder_id(source_set.source_base))
       for source_set in project.py_libs:
-        source_bases[base_path(source_set)] = linked_folder_id(source_set.source_base)
+        add_source_base(base_path(source_set), linked_folder_id(source_set.source_base))
 
     def create_source_template(base, includes=None, excludes=None):
       return TemplateData(
         base=source_bases[base],
         includes=includes or [],
         excludes=excludes or [],
+        joined_includes = '|'.join(includes) if includes else '',
+        joined_excludes = '|'.join(excludes) if excludes else '',
       )
 
     def create_sourcepath(base, sources):
@@ -115,11 +120,12 @@ class EclipseGen(IdeGen):
         lib_path = source_set.path if source_set.path.endswith('.egg') else '%s/' % source_set.path
         pythonpaths.append(create_source_template(base_path(source_set), includes=[lib_path]))
 
+    source_bases_list = [{'path': path, 'id': id} for (path, id) in source_bases.items()]
     configured_project = TemplateData(
       name=self.project_name,
       has_python=project.has_python,
       has_scala=project.has_scala and not project.skip_scala,
-      source_bases=source_bases.items(),
+      source_bases=source_bases_list,
       pythonpaths=pythonpaths,
       debug_port=project.debug_port,
     )
@@ -137,9 +143,9 @@ class EclipseGen(IdeGen):
       for classpath_entry in classpath_entries:
         jar = classpath_entry.jar
         source_jar = classpath_entry.source_jar
-        libs.append((
-          os.path.relpath(jar, self.cwd),
-          os.path.relpath(source_jar, self.cwd) if source_jar else None
+        libs.append(TemplateData(
+          jar=os.path.relpath(jar, self.cwd),
+          source_jar=os.path.relpath(source_jar, self.cwd) if source_jar else None
         ))
     add_jarlibs(project.internal_jars)
     add_jarlibs(project.external_jars)
@@ -174,7 +180,7 @@ class EclipseGen(IdeGen):
 
       # The easiest way to make sure eclipse sees all annotation processors is to put all libs on
       # the apt factorypath - this does not seem to hurt eclipse performance in any noticeable way.
-      jarpaths=libs
+      jarpaths=["('%s', %s)" % (lib.jar, "'%s'" % lib.source_jar if lib.source_jar else 'None') for lib in libs]
     )
     with open(self.apt_filename, 'w') as output:
       Generator(pkgutil.get_data(__name__, self.apt_template),

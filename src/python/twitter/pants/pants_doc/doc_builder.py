@@ -38,7 +38,7 @@ class DocBuilder(object):
     self.root_dir = root_dir
 
   def build(self, targets, _):
-    template_path = os.path.join(_TEMPLATE_BASEDIR, 'doc.mk')
+    template_path = os.path.join(_TEMPLATE_BASEDIR, 'doc.mustache')
     template = pkgutil.get_data(__name__, template_path)
     for target in targets:
       assert is_doc(target), 'DocBuilder can only build DocTargets, given %s' % str(target)

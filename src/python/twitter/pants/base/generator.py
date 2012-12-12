@@ -16,24 +16,30 @@
 
 from __future__ import print_function
 
-import sys
-
-class PantsBootstrapError(ImportError):
-  pass
-
-try:
-  from mako.template import Template
-except ImportError:
-  raise PantsBootstrapError("Could not properly bootstrap Pants because Mako is missing!")
-
-import os
 import pprint
+import pystache
+
+
+def _expand(map):
+  # Add has_foo for each foo in the map that evaluates to true.
+  # Mustache needs this, especially in cases where foo is a list.
+  # Note: if the original map contains has_foo, it will take precedence over our synthetic has_foo.
+  def set_to_map(x):
+    # Pystache can't handle sets, so we convert to maps of key->True.
+    if isinstance(x, set):
+      return dict([(k, True) for k in x])
+    else:
+      return x
+  items = [(key, set_to_map(val)) for (key, val) in map.items()]
+  ret = dict([('has_' + key, True) for (key, val) in items if val])
+  ret.update(dict(items))
+  return ret
 
 class TemplateData(dict):
-  """Encapsulates data for a mako template as a property-addressable read-only map-like struct."""
+  """Encapsulates data for a mustache template as a property-addressable read-only map-like struct."""
 
   def __init__(self, **kwargs):
-    dict.__init__(self, kwargs)
+    dict.__init__(self, _expand(kwargs))
 
   def extend(self, **kwargs):
     """Returns a new TemplateData with this template's data overlayed by the key value pairs
@@ -56,17 +62,14 @@ class TemplateData(dict):
     return 'TemplateData(%s)' % pprint.pformat(self)
 
 class Generator(object):
-  """Generates pants intermediary output files using a configured mako template."""
-
-  _module_directory = '/tmp/pants-%s' % os.environ['USER']
+  """Generates pants intermediary output files using a configured mustache template."""
 
   def __init__(self, template_text, **template_data):
-    self._template = Template(text = template_text,
-                              module_directory = Generator._module_directory)
+    self._template =  pystache.parse(unicode(template_text))
     self.template_data = template_data
 
   def write(self, stream):
     """Applies the template to the template data and writes the result to the given file-like
     stream."""
+    stream.write(pystache.render(self._template, self.template_data))
 
-    stream.write(self._template.render(**self.template_data))

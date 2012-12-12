@@ -26,6 +26,7 @@ from twitter.pants import get_buildroot
 from twitter.pants.base.generator import TemplateData, Generator
 from twitter.pants.tasks.ide_gen import IdeGen, Project
 
+
 __author__ = 'John Sirois'
 
 
@@ -85,8 +86,8 @@ class IdeaGen(IdeGen):
     self.java_encoding = context.options.idea_gen_java_encoding
 
     idea_version = _VERSIONS[context.options.idea_gen_version]
-    self.project_template = os.path.join(_TEMPLATE_BASEDIR, 'project-%s.mk' % idea_version)
-    self.module_template = os.path.join(_TEMPLATE_BASEDIR, 'module-%s.mk' % idea_version)
+    self.project_template = os.path.join(_TEMPLATE_BASEDIR, 'project-%s.mustache' % idea_version)
+    self.module_template = os.path.join(_TEMPLATE_BASEDIR, 'module-%s.mustache' % idea_version)
 
     self.project_filename = os.path.join(self.cwd, '%s.ipr' % self.project_name)
     self.module_filename = os.path.join(self.work_dir, '%s.iml' % self.project_name)
@@ -145,6 +146,8 @@ class IdeaGen(IdeGen):
       extra_components = [],
     )
 
+    existing_project_components = None
+    existing_module_components = None
     if not self.nomerge:
       # Grab the existing components, which may include customized ones.
       existing_project_components = self._parse_xml_component_elements(self.project_filename)

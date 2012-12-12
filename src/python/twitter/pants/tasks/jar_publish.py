@@ -230,7 +230,7 @@ class PomWriter(DependencyWriter):
 
 class IvyWriter(DependencyWriter):
   def __init__(self, get_db):
-    super(IvyWriter, self).__init__(get_db, os.path.join('ivy_resolve', 'ivy.mk'))
+    super(IvyWriter, self).__init__(get_db, os.path.join('ivy_resolve', 'ivy.mustache'))
 
   def templateargs(self, target_jar, confs=None):
     return dict(lib=target_jar.extend(
@@ -666,14 +666,14 @@ class JarPublish(Task):
       raise TaskError(failuremsg or '%s failed with exit code %d' % (' '.join(cmd), result))
 
   def generate_ivysettings(self, publishedjars, publish_local=None):
-    template = pkgutil.get_data(__name__, os.path.join('jar_publish', 'ivysettings.mk'))
+    template = pkgutil.get_data(__name__, os.path.join('jar_publish', 'ivysettings.mustache'))
     with safe_open(os.path.join(self.outdir, 'ivysettings.xml'), 'w') as wrapper:
       generator = Generator(template,
-                            ivysettings=self.ivysettings,
-                            dir=self.outdir,
-                            cachedir=self.cachedir,
-                            published=[TemplateData(org=jar.org, name=jar.name)
-                                       for jar in publishedjars],
-                            publish_local=publish_local)
+        ivysettings=self.ivysettings,
+        dir=self.outdir,
+        cachedir=self.cachedir,
+        published=[TemplateData(org=jar.org, name=jar.name)
+                   for jar in publishedjars],
+        publish_local=publish_local)
       generator.write(wrapper)
       return wrapper.name

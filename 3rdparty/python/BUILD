@@ -147,7 +147,7 @@ python_library(
 
 python_library(
   name = 'pystache',
-  dependencies = [egg('pystache-0.3.1-py2.6.egg')])
+  dependencies = [egg('pystache-0.5.3-py2.6.egg')])
 
 python_library(
   name = 'lxml',

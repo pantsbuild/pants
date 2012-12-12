@@ -24,10 +24,10 @@ limitations under the License.
             xsi:noNamespaceSchemaLocation="http://ant.apache.org/ivy/schemas/ivy.xsd"
             xmlns:m="http://ant.apache.org/ivy/maven">
 
-  <info organisation="${lib.org}" module="${lib.module}"
-  % if lib.version:
-    revision="${lib.version}"
-  % endif
+  <info organisation="{{lib.org}}" module="{{lib.module}}"
+  {{#lib.version}}
+    revision="{{lib.version}}"
+  {{/lib.version}}
   />
 
   <configurations defaultconfmapping="default->default(compile),runtime();sources->sources;docs->@,javadoc">
@@ -39,80 +39,76 @@ limitations under the License.
     <conf name="provided" description="provided by target environment"/>
   </configurations>
 
-  % if lib.publications:
+  {{#lib.has_publications}}
   <publications>
     <artifact conf="default" type="jar" ext="jar"/>
     <artifact conf="default" type="pom" ext="pom"/>
-    % if 'sources' in lib.publications:
+    {{#lib.publications.sources}}
     <artifact conf="sources" type="source" m:classifier="sources" ext="jar"/>
-    % endif
-    % if 'docs' in lib.publications:
+    {{/lib.publications.sources}}
+    {{#lib.publications.docs}}
     <artifact conf="docs" type="doc" m:classifier="javadoc" ext="jar"/>
-    % endif
-    % if 'changelog' in lib.publications:
+    {{/lib.publications.docs}}
+    {{#lib.publications.changelog}}
     <artifact conf="changelog" type="CHANGELOG" m:classifier="CHANGELOG" ext="txt"/>
-    % endif
+    {{/lib.publications.changelog}}
   </publications>
-  % endif
+  {{/lib.has_publications}}
 
-  % if lib.dependencies:
+  {{#lib.has_dependencies}}
   <dependencies>
-    % for dependency in lib.dependencies:
-    <dependency org="${dependency.org}"
-                name="${dependency.module}"
-                rev="${dependency.version}"
-      % if dependency.force:
+    {{#lib.dependencies}}
+    <dependency org="{{org}}"
+                name="{{module}}"
+                rev="{{version}}"
+      {{#force}}
                 force="true"
-      % endif
-                conf="${dependency.configurations}"
-      % if not dependency.transitive:
+      {{/force}}
+                conf="{{configurations}}"
+      {{^transitive}}
                 transitive="false"
-      % endif
+      {{/transitive}}
     >
-      % if dependency.artifacts:
-        % for artifact in dependency.artifacts:
+      {{#artifacts}}
             <artifact
-              % if artifact.name:
-              name="${artifact.name}"
-              % endif
-              % if artifact.ext:
-              ext="${artifact.ext}"
-              % endif
-              % if artifact.url:
-              url="${artifact.url}"
-              % endif
-              % if artifact.type_:
-              type="${artifact.type_}"
-              % endif
-              % if artifact.classifier:
-              m:classifier="${artifact.classifier}"
-              % endif
-              % if artifact.conf:
-              conf="${artifact.conf}"
-              % endif
+              {{#name}}
+              name="{{name}}"
+              {{/name}}
+              {{#ext}}
+              ext="{{ext}}"
+              {{/ext}}
+              {{#url}}
+              url="{{url}}"
+              {{/url}}
+              {{#type_}}
+              type="{{type_}}"
+              {{/type_}}
+              {{#classifier}}
+              m:classifier="{{classifier}}"
+              {{/classifier}}
+              {{#conf}}
+              conf="{{conf}}"
+              {{/conf}}
             />
-        % endfor
-      % endif
-      % if dependency.excludes:
-        % for exclude in dependency.excludes:
-          % if exclude.name:
-      <exclude matcher="exactOrRegexp" org="${exclude.org}" module="${exclude.name}"/>
-          % else:
-      <exclude matcher="exactOrRegexp" org="${exclude.org}"/>
-          % endif
-        % endfor
-      % endif
+      {{/artifacts}}
+      {{#excludes}}
+          {{#name}}
+      <exclude matcher="exactOrRegexp" org="{{org}}" module="{{name}}"/>
+          {{/name}}
+          {{^name}}
+      <exclude matcher="exactOrRegexp" org="{{org}}"/>
+          {{/name}}
+      {{/excludes}}
     </dependency>
-    % endfor
-    % if lib.excludes:
-      % for exclude in lib.excludes:
-        % if exclude.name:
-    <exclude matcher="exactOrRegexp" org="${exclude.org}" module="${exclude.name}"/>
-        % else:
-    <exclude matcher="exactOrRegexp" org="${exclude.org}"/>
-        % endif
-      % endfor
-    % endif
+    {{/lib.dependencies}}
+    {{#lib.excludes}}
+        {{#name}}
+    <exclude matcher="exactOrRegexp" org="{{org}}" module="{{name}}"/>
+        {{/name}}
+        {{^name}}
+    <exclude matcher="exactOrRegexp" org="{{org}}"/>
+        {{/name}}
+    {{/lib.excludes}}
   </dependencies>
-  % endif
+  {{/lib.has_dependencies}}
 </ivy-module>

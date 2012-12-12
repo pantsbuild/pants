@@ -27,11 +27,11 @@ python_library(
   name = 'pants-deps',
   dependencies = [
     python_requirement('elementtree'),
-    python_requirement('mako'),
+    python_requirement('mako'),  # TODO: Remove after getting rid of the doc command.
     python_requirement('markdown'),
-    python_requirement('psutil'),
     python_requirement('pygments'),
     python_requirement('pylint', version_filter=pylint_build_filter),
+    python_requirement('pystache'),
     python_requirement('pytest'),
     python_requirement('python_daemon'),
   ]
