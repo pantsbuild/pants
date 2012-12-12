@@ -31,6 +31,7 @@ class JvmTarget(InternalTarget, TargetWithSources):
     InternalTarget.__init__(self, name, dependencies, is_meta)
     TargetWithSources.__init__(self, name, is_meta)
 
+    self.declared_dependencies = set(dependencies or [])
     self.add_label('jvm')
     self.sources = self._resolve_paths(self.target_base, sources) or []
     self.excludes = excludes or []

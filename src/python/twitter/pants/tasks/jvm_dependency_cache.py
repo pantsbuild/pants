@@ -23,12 +23,26 @@ from zipfile import ZipFile
 from twitter.common.java.class_file import ClassFile
 from twitter.pants.targets.jar_dependency import JarDependency
 from twitter.pants.targets.jvm_target import JvmTarget
+from twitter.pants.tasks import TaskError
 
 
 class JvmDependencyCache(object):
   """
   Class which computes and stores information about the compilation dependencies
   of targets for jvm-based languages.
+
+  The behavior of this is determined by flags set in the compilation task's context.
+  The flags (set by command-line options) are:
+  - check_missing_deps: the master flag, which determines whether the dependency checks should
+     be run at all.
+  - check_intransitive_deps: a flag which determines whether or not to generate errors about
+    intransitive dependency errors, where a target has a dependency on another target which
+    it doesn't declare, but which is part of its transitive dependency graph. If this is set
+    to "none", intransitive errors won't be reported. If "warn", then it will print warning
+    messages, but will not cause the build to fail, and will not populate build products with the errors.
+    If "error", then the messages will be printed, build products populated, and the build will fail.
+  - check_unnecessary_deps: if set to True, then warning messages will be printed about dependencies
+    that are declared, but not actually required.
   """
 
   @staticmethod
@@ -43,6 +57,37 @@ class JvmDependencyCache(object):
     task.context.products.require('classes')
     task.context.products.require('jar_dependencies',
               predicate = lambda x: JvmDependencyCache._requires_jardeps(task, x))
+
+  @classmethod
+  def setup_parser(cls, option_group, args, mkflag):
+    """
+    Set up command-line options for dependency checking.
+    Any jvm compilation task that wants to use dependency analysis can call this from
+    its setup_parser method to add the appropriate options for dependency testing.
+
+    See scala_compile.py for an example.
+    """
+    option_group.add_option(mkflag("check-missing-deps"), mkflag("check-missing-deps", negate=True),
+                            dest="scala_check_missing_deps",
+                            action="callback", callback=mkflag.set_bool,
+                            default=False,
+                            help="[%default] Check for undeclared dependencies in scala code")
+
+    # This flag should eventually be removed once code is in compliance.
+    option_group.add_option(mkflag("check-missing-intransitive-deps"),
+                            type="choice",
+                            action='store',
+                            dest='scala_check_intransitive_deps',
+                            choices=['none', 'warn', 'error'],
+                            default='none',
+                            help="[%default] Enable errors for undeclared deps that don't cause compilation" \
+                                  "errors, because the dependencies are provided transitively.")
+    option_group.add_option(mkflag("check-unnecessary-deps"),
+                            mkflag("check-unnecessary-deps", negate=True),
+                            dest='scala_check_unnecessary_deps',
+                            action="callback", callback=mkflag.set_bool,
+                            default=False,
+                            help="[%default] Enable warnings for declared dependencies that are not needed.")
 
 
   @staticmethod
@@ -61,13 +106,18 @@ class JvmDependencyCache(object):
     """
     Parameters:
       compile_task: the compilation task which is producing the build products that
-        we'll use to perform the analysis.
+        we'll use to perform the analysis. Flag settings are also retrieved from the
+        task context.
       targets: the set of targets to analyze. These should all be target types that
          inherit from jvm_target, and contain source files that will be compiled into
           jvm class files.
     """
+    self.check_missing_deps = compile_task.context.options.scala_check_missing_deps
+    self.check_intransitive_deps = compile_task.context.options.scala_check_intransitive_deps
+    self.check_unnecessary_deps = compile_task.context.options.scala_check_unnecessary_deps
     self.task = compile_task
     self.targets = targets
+
     # class_deps_by_target contains the computed mappings from each target to
     # the set of classes it depends on.
     self.class_deps_by_target = defaultdict(set)
@@ -214,6 +264,7 @@ class JvmDependencyCache(object):
     Returns: a target-to-target mapping from targets to targets that they depend on.
        If this was already computed, return the already computed result.
     """
+
     if self.computed_deps is not None:
       return (self.computed_deps, self.computed_jar_deps)
 
@@ -256,3 +307,67 @@ class JvmDependencyCache(object):
         if cl in self.targets_by_class and to_target in self.targets_by_class[cl]:
           return (source, cl)
     return (None, None)
+
+  def check_undeclared_dependencies(self):
+    """
+    Performs the undeclared dependencies/overdeclared dependencies checks,
+    generating warnings/error messages and (depending on flag settings),
+    setting build products for the detected errors.
+    """
+    if not self.check_missing_deps:
+        return
+    (deps_by_target, jar_deps_by_target) = self.get_compilation_dependencies()
+    found_missing_deps = False
+    for target in deps_by_target:
+      computed_deps = deps_by_target[target]
+      computed_jar_deps = jar_deps_by_target[target]
+
+      # Make copies of the computed deps. Then we'll walk the declared deps,
+      # removing everything that was declared; what's left are the undeclared deps.
+      undeclared_deps = computed_deps.copy()
+      undeclared_jar_deps = computed_jar_deps.copy()
+      target.walk(lambda target: self._dependency_walk_work(undeclared_deps, undeclared_jar_deps, target))
+      # The immediate (intransitive) missing deps are everything that isn't declared as a dep
+      # of this target.
+      immediate_missing_deps = computed_deps.difference(target.dependencies).difference([target])
+      if len(undeclared_deps) > 0:
+        found_missing_deps = True
+        genmap = self.task.context.products.get('missing_deps')
+        genmap.add(target, self.task.context._buildroot, [x.derived_from.address.reference() for x in undeclared_deps])
+        for dep_target in undeclared_deps:
+          print ("Error: target %s has undeclared compilation dependency on %s," %
+                 (target.address, dep_target.derived_from.address.reference()))
+          print ("       because source file %s depends on class %s" %
+                 self.get_dependency_blame(target, dep_target))
+          immediate_missing_deps.discard(dep_target)
+      #if len(jar_deps) > 0:
+      #  found_missing_deps = True
+      #  for jd in jar_deps:
+      #    print ("Error: target %s needs to depend on jar_dependency %s.%s" %
+      #          (target.address, jd.org, jd.name))
+      if self.check_intransitive_deps != "none":
+        if len(immediate_missing_deps) > 0:
+          genmap = self.task.context.products.get('missing_deps')
+          if self.check_intransitive_deps == "error":
+            found_missing_deps = True
+            genmap.add(target, self.context._buildroot,
+                       [x.derived_from.address.reference() for x in immediate_missing_deps])
+          for missing in immediate_missing_deps:
+            print ("Error: target %s depends on %s which is only declared transitively" % (target, missing))
+      if self.check_unnecessary_deps:
+        overdeps = (target.declared_dependencies).difference(computed_deps)
+        if len(overdeps) > 0:
+          for d in overdeps:
+            print ("Warning: target %s declares un-needed dependency on: %s" % (target, d))
+
+    if found_missing_deps:
+      raise TaskError('Missing dependencies detected.')
+
+
+  def _dependency_walk_work(self, deps, jar_deps, target):
+    if target in deps:
+      deps.remove(target)
+    if isinstance(target, JvmTarget):
+      for jar_dep in target.dependencies:
+        if jar_dep in jar_deps:
+          jar_deps.remove(jar_dep)

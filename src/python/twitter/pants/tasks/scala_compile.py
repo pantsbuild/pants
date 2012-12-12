@@ -71,12 +71,7 @@ class ScalaCompile(NailgunTask):
                             dest="scala_compile_color",
                             action="callback", callback=mkflag.set_bool,
                             help="[True] Enable color in logging.")
-
-    option_group.add_option(mkflag("check-missing-deps"), mkflag("check-missing-deps", negate=True),
-                            dest="scala_check_missing_deps",
-                            action="callback", callback=mkflag.set_bool,
-                            default=False,
-                            help="[%default] Check for undeclared dependencies in scala code")
+    JvmDependencyCache.setup_parser(option_group, args, mkflag)
 
 
   def __init__(self, context, workdir=None):
@@ -88,6 +83,8 @@ class ScalaCompile(NailgunTask):
       context.config.getint('scala-compile', 'partition_size_hint')
 
     self.check_missing_deps = context.options.scala_check_missing_deps
+    self.check_intransitive_deps = context.options.scala_check_intransitive_deps
+    self.check_unnecessary_deps = context.options.scala_check_unnecessary_deps
     if self.check_missing_deps:
       JvmDependencyCache.init_product_requirements(self)
 
@@ -181,41 +178,8 @@ class ScalaCompile(NailgunTask):
           self.execute_single_compilation(vt, cp, upstream_analysis_caches)
           if not self.dry_run:
             vt.update()
-      if self.check_missing_deps:
-        deps_cache = JvmDependencyCache(self, scala_targets)
-        (deps_by_target, jar_deps_by_target) = deps_cache.get_compilation_dependencies()
-        found_missing_deps = False
-        for target in deps_by_target:
-          deps = deps_by_target[target].copy()
-          jar_deps = jar_deps_by_target[target].copy()
-          target.walk(lambda target: self._dependency_walk_work(deps, jar_deps, target))
-          if len(deps) > 0:
-            # for now, just print a message. Later, upgrade this to really generate
-            # an error.
-            found_missing_deps = True
-            genmap = self.context.products.get('missing_deps')
-            genmap.add(target, self.context._buildroot, [x.derived_from.address.reference() for x in deps])
-            for dep_target in deps:
-              print ("Error: target %s has undeclared compilation dependency on %s," %
-                     (target.address, dep_target.derived_from.address.reference()))
-              print ("       because source file %s depends on class %s" %
-                     deps_cache.get_dependency_blame(target, dep_target))
-          #if len(jar_deps) > 0:
-          #  found_missing_deps = True
-          #  for jd in jar_deps:
-          #    print ("Error: target %s needs to depend on jar_dependency %s.%s" %
-          #          (target.address, jd.org, jd.name))
-        if found_missing_deps:
-          raise TaskError('Missing dependencies detected.')
-
-
-  def _dependency_walk_work(self, deps, jar_deps, target):
-    if target in deps:
-      deps.remove(target)
-    if isinstance(target, JvmTarget):
-      for jar_dep in target.dependencies:
-        if jar_dep in jar_deps:
-          jar_deps.remove(jar_dep)
+      deps_cache = JvmDependencyCache(self, scala_targets)
+      deps_cache.check_undeclared_dependencies()
 
   def create_output_paths(self, targets):
     compilation_id = Target.maybe_readable_identify(targets)
