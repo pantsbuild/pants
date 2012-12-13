@@ -249,7 +249,7 @@ class NailgunTask(Task):
       sys.exit(0)
 
 
-# Pick implementations for killall and _find. We try to avoid needing psutil, as it uses
+# Pick implementations for killall and _find. We don't use psutil, as it uses
 # native code and so is not portable, leading to packaging and deployment headaches.
 # TODO: Extract this to a class and add a paired test guarded by
 # http://pytest.org/latest/skipping.html#skipping.
@@ -321,59 +321,9 @@ if plat.startswith('linux') or plat.startswith('macosx'):
 
 else:
   # This is some other platform. In practice, it's likely that the cmds above will work
-  # on this platform (pants assumes a UNIX variant), so it may be better to test that
-  # out and modify the condition above appropriately. Still, we want to at least try
-  # and make things work.
-  try:
-    import psutil
-
-    def _find_ngs(everywhere=False):
-      def cmdline_matches(cmdline):
-        if everywhere:
-          return any(filter(lambda arg: arg.startswith(NailgunTask.PANTS_NG_ARG_PREFIX), cmdline))
-        else:
-          return NailgunTask.PANTS_NG_ARG in cmdline
-
-      for proc in psutil.process_iter():
-        try:
-          if 'java' == proc.name and cmdline_matches(proc.cmdline):
-            yield proc
-        except (psutil.AccessDenied, psutil.NoSuchProcess):
-          pass
-
-
-    def killall(log, everywhere=False):
-      for proc in _find_ngs(everywhere=everywhere):
-        try:
-          NailgunTask._log_kill(log, proc.pid)
-          proc.kill()
-        except (psutil.AccessDenied, psutil.NoSuchProcess):
-          pass
-
-    NailgunTask.killall = staticmethod(killall)
-
-
-    def _find_ng_listen_port(proc):
-      for connection in proc.get_connections(kind='tcp'):
-        if connection.status == 'LISTEN':
-          host, port = connection.local_address
-          return port
-      return None
-
-
-    def _find(pidfile):
-      pidfile_arg = NailgunTask.create_pidfile_arg(pidfile)
-      for proc in _find_ngs(everywhere=False):
-        try:
-          if pidfile_arg in proc.cmdline:
-            port = _find_ng_listen_port(proc)
-            if port:
-              return proc.pid, port
-        except (psutil.AccessDenied, psutil.NoSuchProcess):
-          pass
-      return None
-
-    NailgunTask._find = staticmethod(_find)
-  except ImportError:
-    NailgunTask.killall = None
-    NailgunTask._find = None
+  # on this platform (pants assumes a UNIX variant), so test that out and modify the
+  # condition above appropriately. Note: This is unlikely to be your biggest headache
+  # in porting pants to this other platform, since many pants tasks spawn subprocesses
+  # for various commands, and none of them have been tested on unsupported platforms.
+  NailgunTask.killall = None
+  NailgunTask._find = None
