@@ -53,18 +53,22 @@ object Main {
       sys.exit(0) // only run analysis utilities
     }
 
-    // if there are no sources provided, print version and usage by default
-    if (settings.sources.isEmpty) {
-      if (!settings.version && !settings.help) {
+    val inputs = Inputs(settings)
+    val setup = Setup(settings)
+
+    // if there are no sources provided, print outputs based on current analysis if requested,
+    // else print version and usage by default
+    if (inputs.sources.isEmpty) {
+      if (inputs.outputProducts.isDefined || inputs.outputRelations.isDefined) {
+        SbtAnalysis.printOutputs(Compiler.analysis(inputs.cacheFile),
+          inputs.outputRelations, inputs.outputProducts, cwd, inputs.classesDirectory)
+      } else if (!settings.version && !settings.help) {
         Setup.printVersion()
         Settings.printUsage()
         sys.exit(1)
       }
       sys.exit(0)
     }
-
-    val setup = Setup(settings)
-    val inputs = Inputs(settings)
 
     // check we have all necessary files
     if (!Setup.verify(setup, log)) {
