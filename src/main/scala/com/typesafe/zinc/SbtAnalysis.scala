@@ -5,9 +5,9 @@
 package com.typesafe.zinc
 
 import java.io.File
-import sbt.{ CompileSetup, IO, Logger, Path, Relation }
 import sbt.compiler.CompileOutput
 import sbt.inc.{ APIs, Analysis, Relations, SourceInfos, Stamps }
+import sbt.{ CompileSetup, IO, Logger, Relation }
 import scala.annotation.tailrec
 import xsbti.compile.SingleOutput
 
@@ -80,23 +80,34 @@ object SbtAnalysis {
 
 
   /**
-   * Create a mapper function that performs multiple rebases. For a given file, it uses the first
-   * rebase it finds that matches, if any. The order of rebases is underfined, so it's highly
-   * recommended that there never be two rebases A1->B1, A2->B2 such that A1 is a prefix of A2.
+   * Create a mapper function that performs multiple rebases. For a given file, it uses the first rebase
+   * it finds in which the source base is a prefix of the file path. If no matching rebase is found, it
+   * returns the original path unchanged.
+   *
+   * The order of rebases is undefined, so it's highly recommended that there never be two
+   * rebases A1->B1, A2->B2 such that A1 is a prefix of A2.
+   *
+   * Note that this doesn't need to do general-purpose relative rebasing for paths with ../ etc. So it
+   * uses a naive prefix-matching algorithm.
    */
+
   def createMultiRebasingMapper(rebase: Map[File, File]): File => Option[File] = {
-    val mappers = rebase map { x: (File, File) => Path.rebase(x._1, x._2) } toList
+    def singleRebase(fromBase: String, toBase: String)(path: String): Option[String] =
+      if (path.startsWith(fromBase)) Some(toBase + path.substring(fromBase.length)) else None
+
+    val rebasers: List[String => Option[String]] =
+      rebase map { x: (File, File) => singleRebase(x._1.getCanonicalPath, x._2.getCanonicalPath) _ } toList
 
     @tailrec
-    def tryRebase(f: File, mappers: List[File => Option[File]]): Option[File] = mappers match {
-      case Nil => None
-      case mapper :: tail => mapper(f) match {
-        case None => tryRebase(f, tail)
+    def tryRebase(path: String, rebasers: List[String => Option[String]]): Option[String] = rebasers match {
+      case Nil => Some(path)
+      case rebaser :: tail => rebaser(path) match {
+        case None => tryRebase(path, tail)
         case fileOpt => fileOpt
       }
     }
 
-    tryRebase(_, mappers)
+    f: File => tryRebase(f.getCanonicalPath, rebasers) map { new File(_) }
   }
 
   /**
