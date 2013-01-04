@@ -10,6 +10,12 @@ zinc -nailed -analysis -cache analysis/abc -merge analysis/a:analysis/b:analysis
 
 zinc -nailed -analysis-cache analysis/abc -d classes -output-relations relations/abc a/A.scala b/B.scala c/C.scala
 
+# rerun, this time with text mirroring
+notexists analysis/abc.relations
+zinc -nailed -analysis -cache analysis/abc -mirror-cache-as-text -merge analysis/a:analysis/b:analysis/c
+exists analysis/abc.relations
+
+
 zinc -shutdown
 
 show relations/abc

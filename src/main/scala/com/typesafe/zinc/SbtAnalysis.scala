@@ -16,10 +16,12 @@ object SbtAnalysis {
   /**
    * Run analysis manipulation utilities.
    */
-  def runUtil(util: AnalysisUtil, log: Logger): Unit = {
-    runMerge(util.cache, util.merge)
-    runRebase(util.cache, util.rebase)
-    runSplit(util.cache, util.split)
+  def runUtil(util: AnalysisUtil, log: Logger,
+              mirrorCacheAsText: Boolean = false,
+              cwd: Option[File] = None): Unit = {
+    runMerge(util.cache, util.merge, mirrorCacheAsText, cwd)
+    runRebase(util.cache, util.rebase, mirrorCacheAsText, cwd)
+    runSplit(util.cache, util.split, mirrorCacheAsText, cwd)
     runReload(util.reload)
   }
 
@@ -27,14 +29,21 @@ object SbtAnalysis {
    * Run an analysis merge. The given analyses should share the same compile setup.
    * The merged analysis will overwrite whatever is in the combined analysis cache.
    */
-  def runMerge(combinedCache: Option[File], cacheFiles: Seq[File]): Unit = {
+  def runMerge(combinedCache: Option[File], cacheFiles: Seq[File],
+               mirrorCacheAsText: Boolean = false,
+               cwd: Option[File] = None): Unit = {
     if (cacheFiles.nonEmpty) {
       combinedCache match {
         case None => throw new Exception("No cache file specified")
         case Some(cacheFile) =>
           val analysisStore = Compiler.analysisStore(cacheFile)
           mergeAnalyses(cacheFiles) match {
-            case Some((mergedAnalysis, mergedSetup)) => analysisStore.set(mergedAnalysis, mergedSetup)
+            case Some((mergedAnalysis, mergedSetup)) => {
+                analysisStore.set(mergedAnalysis, mergedSetup)
+                if (mirrorCacheAsText) {
+                  printRelations(mergedAnalysis, Some(new File(cacheFile.getPath() + ".relations")), cwd)
+                }
+              }
             case None =>
           }
       }
@@ -59,7 +68,8 @@ object SbtAnalysis {
    * Run an analysis rebase. Rebase all paths in the analysis, and the output directory
    * in the compile setup.
    */
-  def runRebase(cache: Option[File], rebase: Map[File, File]): Unit = {
+  def runRebase(cache: Option[File], rebase: Map[File, File],
+                mirrorCacheAsText: Boolean, cwd: Option[File]): Unit = {
     if (!rebase.isEmpty) {
       cache match {
         case None => throw new Exception("No cache file specified")
@@ -72,6 +82,9 @@ object SbtAnalysis {
               val newAnalysis = rebaseAnalysis(analysis, multiRebasingMapper)
               val newSetup = rebaseSetup(compileSetup, multiRebasingMapper)
               analysisStore.set(newAnalysis, newSetup)
+              if (mirrorCacheAsText) {
+                printRelations(analysis, Some(new File(cacheFile.getPath() + ".relations")), cwd)
+              }
             }
           }
       }
@@ -167,7 +180,9 @@ object SbtAnalysis {
    * Run an analysis split. The analyses are split by source directory and overwrite
    * the mapped analysis cache files.
    */
-  def runSplit(cache: Option[File], mapping: Map[Seq[File], File]): Unit = {
+  def runSplit(cache: Option[File], mapping: Map[Seq[File], File],
+              mirrorCacheAsText: Boolean = false,
+              cwd: Option[File] = None): Unit = {
     if (mapping.nonEmpty) {
       val expandedMapping: Map[File, File] = for {
         (srcs, analysis) <- mapping
@@ -182,7 +197,11 @@ object SbtAnalysis {
               for ((splitCacheOpt, splitAnalysis) <- analysis.groupBy(expandedMapping.get _)) {
                 splitCacheOpt match {
                   case None =>
-                  case Some(splitCache) => Compiler.analysisStore(splitCache).set(splitAnalysis, compileSetup)
+                  case Some(splitCache) =>
+                    Compiler.analysisStore(splitCache).set(splitAnalysis, compileSetup)
+                    if (mirrorCacheAsText) {
+                      printRelations(splitAnalysis, Some(splitCache.getPath() + ".relations"), cwd)
+                    }
                 }
               }
           }

@@ -272,6 +272,7 @@ object Script {
       Command("mkdir", mkdir),
       Command("copy", copy),
       Command("exists", exists),
+      Command("notexists", notexists),
       Command("delete", delete),
       Command("show", show),
       Command("sleep", sleep)
@@ -364,6 +365,15 @@ object Script {
       val absent = paths filter (path => !pathToFile(baseDir, path).exists)
       if (absent.isEmpty) Success("Files exist: " + listed(paths))
       else Failure("Files do not exist: " + listed(absent))
+    }
+
+    /** A command which verifies that a file does not exist, to ensure that
+      * optional outputs are only generated when they should.
+      */
+    def notexists(baseDir: File, paths: Seq[String]): Result = {
+      val present = paths filter (path => pathToFile(baseDir, path).exists)
+      if (present.isEmpty) Success("Files don't exists: " + listed(paths))
+      else Failure("Files should not exist: " + listed(present))
     }
 
     def delete(baseDir: File, paths: Seq[String]): Result = {

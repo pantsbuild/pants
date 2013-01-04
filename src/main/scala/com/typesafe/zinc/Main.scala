@@ -45,7 +45,7 @@ object Main {
     // analysis manipulation utilities
     if (settings.analysisUtil.run) {
       val exitCode = try {
-        SbtAnalysis.runUtil(settings.analysisUtil, log)
+        SbtAnalysis.runUtil(settings.analysisUtil, log, settings.analysis.mirrorCacheAsText, cwd)
       } catch {
         case e: Exception => log.error(e.getMessage)
         sys.exit(1)
