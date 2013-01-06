@@ -5,7 +5,7 @@ Zinc is a stand-alone version of [sbt]'s incremental compiler.
 
 Download the [latest stable version][download].
 
-[sbt]: http://github.com/harrah/xsbt
+[sbt]: http://github.com/sbt/sbt
 [download]: http://repo.typesafe.com/typesafe/zinc/com/typesafe/zinc/dist/0.1.4/zinc-0.1.4.tgz
 
 
