@@ -99,6 +99,16 @@ cache file for any upstreams projects should also be provided with the
 ``-analysis-map`` option.
 
 
+Contributions
+-------------------
+
+Contributions via GitHub pull requests are gladly accepted from their original
+author. Before we can accept pull requests, you will need to agree to the
+[Typesafe Contributor License Agreement][cla] online, using your GitHub account.
+
+[cla]: http://www.typesafe.com/contribute/cla
+
+
 License
 -------
 
