@@ -154,7 +154,7 @@ class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler) {
     val globalsCache  = Compiler.residentCache
     val progress      = None
     val maxErrors     = 100
-    val reporter      = new LoggerReporter(maxErrors, log)
+    val reporter      = new LoggerReporter(maxErrors, log, identity)
     val skip          = false
     val compileSetup  = new CompileSetup(compileOutput, new CompileOptions(scalacOptions, javacOptions), scalac.scalaInstance.actualVersion, compileOrder)
     val analysisStore = Compiler.analysisStore(cacheFile)

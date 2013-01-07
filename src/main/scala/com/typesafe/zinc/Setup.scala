@@ -45,6 +45,7 @@ object Setup {
 
   val ScalaCompiler            = JarFile("scala-compiler")
   val ScalaLibrary             = JarFile("scala-library")
+  val ScalaReflect             = JarFile("scala-reflect")
   val SbtInterface             = JarFile("sbt-interface")
   val CompilerInterfaceSources = JarFile("compiler-interface", "sources")
 
@@ -191,7 +192,7 @@ object Setup {
 
     val scalaCompiler        = optLibOrDefault(zincHome, ScalaCompiler)
     val scalaLibrary         = optLibOrDefault(zincHome, ScalaLibrary)
-    val scalaExtra           = Seq.empty[File]
+    val scalaExtra           = Seq(optLibOrDefault(zincHome, ScalaReflect))
     val scalaJars            = (scalaCompiler, scalaLibrary, scalaExtra)
     val defaultScalaExcluded = Set("jansi.jar", "jline.jar", "scala-partest.jar", "scala-swing.jar", "scalacheck.jar", "scalap.jar")
     val scalaExcluded        = Util.stringSetProperty(prop("scala.excluded"), defaultScalaExcluded)
