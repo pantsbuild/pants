@@ -1,5 +1,0 @@
-# use scala 2.10.0 home
-
-zinc -debug -scala-home {{scala.2.10.0-RC1.home}} A.scala
-
-exists A.class

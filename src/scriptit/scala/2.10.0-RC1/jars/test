@@ -1,5 +1,0 @@
-# use scala 2.10.0 jars
-
-zinc -debug -scala-library {{scala.2.10.0-RC1.library}} -scala-compiler {{scala.2.10.0-RC1.compiler}} -scala-extra {{scala.2.10.0-RC1.extra}} A.scala
-
-exists A.class
