@@ -18,8 +18,8 @@ show r1
 
 show r2
 
-notexists a2.relations
-zinc -nailed -mirror-cache-as-text -analysis -cache a2 -rebase c1:c2
+! exists a2.relations
+zinc -nailed -mirror-analysis -analysis -cache a2 -rebase c1:c2
 exists a2.relations
 
 

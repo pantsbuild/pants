@@ -105,7 +105,7 @@ case class AnalysisOptions(
   forceClean: Boolean           = false,
   outputRelations: Option[File] = None,
   outputProducts: Option[File]  = None,
-  mirrorCacheAsText: Boolean = false
+  mirrorAnalysis: Boolean = false
 )
 
 /**
@@ -159,8 +159,8 @@ object Settings {
     file(    "-analysis-cache", "file",      "Cache file for compile analysis",            (s: Settings, f: File) => s.copy(analysis = s.analysis.copy(cache = Some(f)))),
     fileMap( "-analysis-map",                "Upstream analysis mapping (file:file,...)",  (s: Settings, m: Map[File, File]) => s.copy(analysis = s.analysis.copy(cacheMap = m))),
     boolean( "-force-clean",                 "Force clean classes on empty analysis",      (s: Settings) => s.copy(analysis = s.analysis.copy(forceClean = true))),
-    boolean("-mirror-cache-as-text",  "Store a side-mirror of the analysis cache as readable text",
-            (s: Settings) => s.copy(analysis = s.analysis.copy(mirrorCacheAsText = true))),
+    boolean("-mirror-analysis",  "Store a side-mirror of the analysis cache as readable text",
+            (s: Settings) => s.copy(analysis = s.analysis.copy(mirrorAnalysis = true))),
     file(    "-output-relations", "file",    "Print readable analysis relations to file",  (s: Settings, f: File) => s.copy(analysis = s.analysis.copy(outputRelations = Some(f)))),
     file(    "-output-products", "file",     "Print readable source products to file",     (s: Settings, f: File) => s.copy(analysis = s.analysis.copy(outputProducts = Some(f)))),
 

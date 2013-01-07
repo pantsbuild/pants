@@ -28,7 +28,8 @@ case class Inputs(
   javaOnly: Boolean,
   compileOrder: CompileOrder,
   outputRelations: Option[File],
-  outputProducts: Option[File])
+  outputProducts: Option[File],
+  mirrorAnalysis: Boolean)
 
 object Inputs {
   /**
@@ -48,7 +49,8 @@ object Inputs {
       javaOnly,
       compileOrder,
       analysis.outputRelations,
-      analysis.outputProducts)
+      analysis.outputProducts,
+      analysis.mirrorAnalysis)
   }
 
   /**
@@ -66,7 +68,8 @@ object Inputs {
     javaOnly: Boolean,
     compileOrder: CompileOrder,
     outputRelations: Option[File],
-    outputProducts: Option[File]): Inputs =
+    outputProducts: Option[File],
+    mirrorAnalysis: Boolean): Inputs =
   {
     val normalise: File => File = { _.getCanonicalFile }
     val cp               = classpath map normalise
@@ -77,7 +80,7 @@ object Inputs {
     val analysisMap      = (cp map { file => (file, analysisFor(file, classes, upstreamAnalysis)) }).toMap
     val printRelations   = outputRelations map normalise
     val printProducts    = outputProducts map normalise
-    new Inputs(cp, srcs, classes, scalacOptions, javacOptions, cacheFile, analysisMap, forceClean, Locate.definesClass, javaOnly, compileOrder, printRelations, printProducts)
+    new Inputs(cp, srcs, classes, scalacOptions, javacOptions, cacheFile, analysisMap, forceClean, Locate.definesClass, javaOnly, compileOrder, printRelations, printProducts, mirrorAnalysis)
   }
 
   /**
@@ -91,7 +94,8 @@ object Inputs {
     javacOptions: JList[String],
     analysisCache: File,
     analysisMap: JMap[File, File],
-    compileOrder: String): Inputs =
+    compileOrder: String,
+    mirrorAnalysisCache: Boolean): Inputs =
   inputs(
     classpath.asScala,
     sources.asScala,
@@ -104,7 +108,8 @@ object Inputs {
     javaOnly = false,
     Settings.compileOrder(compileOrder),
     outputRelations = None,
-    outputProducts = None
+    outputProducts = None,
+    mirrorAnalysis = mirrorAnalysisCache
   )
 
   /**
