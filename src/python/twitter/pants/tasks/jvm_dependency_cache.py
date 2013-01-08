@@ -89,18 +89,6 @@ class JvmDependencyCache(object):
                             help="[%default] Enable warnings for declared dependencies that are not needed.")
 
 
-  @staticmethod
-  def _requires_jardeps(task, target):
-    """
-    Hack to make sure that the ivy task is not invoked more than once per compilation target.
-    """
-    if not task._computed_jar_products and isinstance(target, JvmTarget):
-      task._computed_jar_products = True
-      return True
-    else:
-      return False
-
-
   def __init__(self, compile_task, targets, upstream_analysis_caches):
     """
     Parameters:
