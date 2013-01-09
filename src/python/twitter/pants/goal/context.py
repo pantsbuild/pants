@@ -125,10 +125,10 @@ class Context(object):
     self._target_roots = target_roots
     self._targets = OrderedSet()
     for target in target_roots:
-      self.add_target(target)
+      self._add_target(target)
     self.id = Target.identify(self._targets)
 
-  def add_target(self, target):
+  def _add_target(self, target):
     """Adds a target and its transitive dependencies to the run context.
 
     The target is not added to the target roots.
@@ -149,7 +149,7 @@ class Context(object):
     else:
       derived_from = None
     target = self._create_new_target(target_base, target_type, *args, **kwargs)
-    self.add_target(target)
+    self._add_target(target)
     if derived_from:
       target.derived_from = derived_from
     return target
