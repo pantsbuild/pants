@@ -17,6 +17,7 @@ bin/
 build/
 codegen/classes/
 htmlcov/
+lib/
 dist
 out
 pants.pex
