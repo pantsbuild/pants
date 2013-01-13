@@ -111,3 +111,6 @@ class Group(object):
   def __init__(self, name, predicate):
     self.name = name
     self.predicate = predicate
+
+  def __repr__(self):
+    return "Group(%s,%s)" % (self.name, self.predicate.__name__)
