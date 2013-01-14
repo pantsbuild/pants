@@ -89,13 +89,13 @@ class CacheManager(object):
     the input targets, possibly partitioning them, and are in topological order.
     The caller can inspect these in order and, e.g., rebuild the invalid ones.
     """
-    all_vts = self._validate(targets)
+    all_vts = self._sort_and_validate_targets(targets)
     invalid_vts = filter(lambda vt: not vt.valid, all_vts)
     all_vts_partitioned = self._partition_versioned_targets(all_vts, partition_size_hint)
     invalid_vts_partitioned = self._partition_versioned_targets(invalid_vts, partition_size_hint)
     return InvalidationCheck(all_vts, all_vts_partitioned, invalid_vts, invalid_vts_partitioned)
 
-  def _validate(self, targets):
+  def _sort_and_validate_targets(self, targets):
     """Validate each target.
 
     Returns a topologically ordered set of VersionedTargets, each representing one input target.
