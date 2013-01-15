@@ -22,6 +22,7 @@ import re
 import signal
 import subprocess
 import sys
+import threading
 import time
 
 from twitter.common import log
@@ -55,6 +56,20 @@ class _safe_open(object):
   def __exit__(self, exctype, value, traceback):
     self._file.close()
 
+class NailgunThread(threading.Thread):
+  def __init__(self, nailgun, main, *args):
+    threading.Thread.__init__(self, group=None, target=None, name=None)
+    self.args = args
+    self.main = main
+    self.nailgun = nailgun
+    self.returncode = None
+  def run(self):
+    self.returncode = self.nailgun(self.main, *self.args)
+  def poll(self):
+    return self.returncode
+  def wait(self):
+    self.join()
+    return self.returncode
 
 class NailgunTask(Task):
   # Used to identify we own a given java nailgun server
@@ -96,7 +111,7 @@ class NailgunTask(Task):
     self._ng_out = os.path.join(workdir, 'stdout')
     self._ng_err = os.path.join(workdir, 'stderr')
 
-  def runjava(self, main, classpath=None, args=None, jvmargs=None):
+  def runjava(self, main, classpath=None, args=None, jvmargs=None, run_async=False):
     """
       Runs the java main using the given classpath and args.  If --no-ng-daemons is specified then
       the java main is run in a freshly spawned subprocess, otherwise a persistent nailgun server
@@ -107,24 +122,29 @@ class NailgunTask(Task):
     if self._daemon:
       nailgun = self._get_nailgun_client()
 
-      def call_nailgun(main_class, *args):
+      def call_nailgun(main_class, is_async, *args):
         if self.dry_run:
           print('********** NailgunClient dry run: %s %s' % (main_class, ' '.join(args)))
           return 0
+        elif is_async:
+          t = NailgunThread(nailgun, main_class, *args)
+          t.start()
+          return t
         else:
           return nailgun(main_class, *args)
 
       try:
         if cp:
-          call_nailgun('ng-cp', *[os.path.relpath(jar, get_buildroot()) for jar in cp])
-        return call_nailgun(main, *args)
+          call_nailgun('ng-cp', False, *[os.path.relpath(jar, get_buildroot()) for jar in cp])
+        return call_nailgun(main, run_async, *args)
       except NailgunError as e:
         self._ng_shutdown()
         raise e
     else:
       only_write_cmd_line_to = StringIO.StringIO() if self.dry_run else None
       ret = binary_utils.runjava(main=main, classpath=cp, args=args, jvmargs=jvmargs,
-        only_write_cmd_line_to=only_write_cmd_line_to)
+        only_write_cmd_line_to=only_write_cmd_line_to,
+        run_async=run_async)
       if only_write_cmd_line_to:
         print('********** Direct Java dry run: %s' % only_write_cmd_line_to.getvalue())
         only_write_cmd_line_to.close()

@@ -3,6 +3,7 @@ __author__ = 'Ryan Williams'
 import unittest
 
 from twitter.pants.base.build_invalidator import CacheKey, CacheKeyGenerator
+from twitter.pants.goal.context import Context
 from twitter.pants.tasks import CacheManager
 from twitter.pants.tasks.cache_manager import VersionedTargetSet
 from twitter.pants.targets import InternalTarget
@@ -31,7 +32,7 @@ class AppendingCacheKeyGenerator(CacheKeyGenerator):
 
 class TestCacheManager(CacheManager):
   def __init__(self):
-    CacheManager.__init__(self, AppendingCacheKeyGenerator(), '/tmp/', True, None, False)
+    CacheManager.__init__(self, AppendingCacheKeyGenerator(), '/tmp/', True, None, False, Context.Log())
 
 def print_vt(vt):
   print '%d (%s) %s: [ %s ]' % (len(vt.targets), vt.cache_key, vt.valid, ', '.join(['%s(%s)' % (vt.targets[i].id, vt.per_target_cache_keys[i]) for i in range(len(vt.targets))]))

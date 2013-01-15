@@ -217,7 +217,7 @@ class JavaCompile(NailgunTask):
       collect_sources(target)
     return sources, processors, Target.identify(targets)
 
-  def compile(self, classpath, sources, fingerprint, depfile):
+  def compile(self, classpath, sources, fingerprint, depfile, run_async=False):
     jmake_classpath = nailgun_profile_classpath(self, self._jmake_profile)
 
     args = [
@@ -236,7 +236,9 @@ class JavaCompile(NailgunTask):
     args.extend(self._args)
     args.extend(sources)
     log.debug('Executing: %s %s' % (_JMAKE_MAIN, ' '.join(args)))
-    return self.runjava(_JMAKE_MAIN, classpath=jmake_classpath, args=args, jvmargs=self._jvm_args)
+    if run_async:
+      log.info('\nRunning async: %s\n' % ' '.join(sources))
+    return self.runjava(_JMAKE_MAIN, classpath=jmake_classpath, args=args, jvmargs=self._jvm_args, run_async=run_async)
 
   def split_depfile(self, deps, versioned_target_set):
     if len(versioned_target_set.targets) <= 1:

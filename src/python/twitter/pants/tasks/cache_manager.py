@@ -20,6 +20,7 @@ except ImportError:
   import pickle
 
 from twitter.pants.base.build_invalidator import BuildInvalidator, CacheKeyGenerator, NO_SOURCES, TARGET_SOURCES
+from twitter.pants.base.double_dag import DoubleDag
 from twitter.pants.base.target import Target
 from twitter.pants.targets import JarDependency, TargetWithSources
 from twitter.pants.targets.internal import InternalTarget
@@ -73,29 +74,42 @@ class VersionedTarget(VersionedTargetSet):
 # Tasks may need to perform no, some or all operations on either of these, depending on how they
 # are implemented.
 class InvalidationCheck(object):
-  def __init__(self, all_vts, all_vts_partitioned, invalid_vts, invalid_vts_partitioned):
+  def __init__(self, all_vts, invalid_vts):
     # All the targets, valid and invalid.
     self.all_vts = all_vts
-
-    # All the targets, partitioned if so requested.
-    self.all_vts_partitioned = all_vts_partitioned
 
     # Just the invalid targets.
     self.invalid_vts = invalid_vts
 
+class PartitionedInvalidationCheck(InvalidationCheck):
+  def __init__(self, all_vts, all_vts_partitioned, invalid_vts, invalid_vts_partitioned):
+    InvalidationCheck.__init__(self, all_vts, invalid_vts)
+
+    # All the targets, partitioned if so requested.
+    self.all_vts_partitioned = all_vts_partitioned
+
     # Just the invalid targets, partitioned if so requested.
     self.invalid_vts_partitioned = invalid_vts_partitioned
+
+class DagifiedInvalidationCheck(InvalidationCheck):
+  def __init__(self, all_vts, invalid_vts, invalid_target_tree):
+    InvalidationCheck.__init__(self, all_vts, invalid_vts)
+
+    # A doubly-linked DAG of VersionedTargets.
+    self._invalid_target_tree = invalid_target_tree
+
 
 class CacheManager(object):
   """Manages cache checks, updates and invalidation keeping track of basic change
   and invalidation statistics.
   """
   def __init__(self, cache_key_generator, build_invalidator_dir,
-               invalidate_dependents, extra_data, only_externaldeps):
+               invalidate_dependents, extra_data, only_externaldeps, logger):
     self._cache_key_generator = cache_key_generator
     self._invalidate_dependents = invalidate_dependents
     self._extra_data = pickle.dumps(extra_data)  # extra_data may be None.
     self._sources = NO_SOURCES if only_externaldeps else TARGET_SOURCES
+    self._logger = logger
 
     self._invalidator = BuildInvalidator(build_invalidator_dir)
 
@@ -105,7 +119,7 @@ class CacheManager(object):
       self._invalidator.update(cache_key)
     self._invalidator.update(vts.cache_key)
 
-  def check(self, targets, partition_size_hint):
+  def invalidate_and_partition(self, targets, partition_size_hint):
     """Checks whether each of the targets has changed and invalidates it if so.
 
     Returns a list of VersionedTargetSet objects (either valid or invalid). The returned sets 'cover'
@@ -116,7 +130,19 @@ class CacheManager(object):
     invalid_vts = filter(lambda vt: not vt.valid, all_vts)
     all_vts_partitioned = self._partition_versioned_targets(all_vts, partition_size_hint)
     invalid_vts_partitioned = self._partition_versioned_targets(invalid_vts, partition_size_hint)
-    return InvalidationCheck(all_vts, all_vts_partitioned, invalid_vts, invalid_vts_partitioned)
+    return PartitionedInvalidationCheck(all_vts, all_vts_partitioned, invalid_vts, invalid_vts_partitioned)
+
+  def invalidate_and_dagify(self, targets):
+    """Checks whether each of the targets has changed and invalidates it if so.
+
+    Returns lists of valid and invalid VersionedTarget objects as well as a doubly-linked DAG of the invalid targets
+    that the caller can use to plan compilation partitions.
+    """
+    all_vts = self._sort_and_validate_targets(targets)
+    invalid_vts = filter(lambda vt: not vt.valid, all_vts)
+    self._logger.info("got %d invalid vts" % len(invalid_vts))
+    invalid_target_tree = DoubleDag(invalid_vts, lambda t: filter(lambda d: not d.valid, t.dependencies), self._logger)
+    return DagifiedInvalidationCheck(all_vts, invalid_vts, invalid_target_tree)
 
   def _sort_and_validate_targets(self, targets):
     """Validate each target.
