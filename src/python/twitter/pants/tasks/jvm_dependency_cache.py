@@ -209,7 +209,6 @@ class JvmDependencyCache(object):
       return (self.computed_src_deps, self.computed_jar_deps)
     self.computed_src_deps = defaultdict(set)
     self.computed_jar_deps = defaultdict(set)
-
     _, _, analysis_cache = self.task.create_output_paths(self.targets)
     self.merged_analysis_cache = ZincMergedAnalysisCache(self.task.generated_caches, self.upstream_analysis_caches)
 
