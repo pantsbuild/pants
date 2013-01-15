@@ -29,7 +29,7 @@ limitations under the License.
   <packaging>jar</packaging>
   <version>{{artifact.rev}}</version>
 
-  {{#artifact.has_dependencies}}
+  {{#artifact.dependencies?}}
   <dependencies>
     {{#artifact.dependencies}}
     <dependency>
@@ -37,7 +37,7 @@ limitations under the License.
       <artifactId>{{name}}</artifactId>
       <version>{{rev}}</version>
       <scope>{{scope}}</scope>
-      {{#has_excludes}}
+      {{#excludes?}}
       <exclusions>
         {{#excludes}}
         <exclusion>
@@ -46,9 +46,9 @@ limitations under the License.
         </exclusion>
         {{/excludes}}
       </exclusions>
-      {{/has_excludes}}
+      {{/excludes?}}
     </dependency>
     {{/artifact.dependencies}}
   </dependencies>
-  {{/artifact.has_dependencies}}
+  {{/artifact.dependencies?}}
 </project>

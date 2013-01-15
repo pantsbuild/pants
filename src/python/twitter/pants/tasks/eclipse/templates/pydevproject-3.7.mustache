@@ -26,14 +26,14 @@ limitations under the License.
   <pydev_property name="org.python.pydev.PYTHON_PROJECT_VERSION">python 2.6</pydev_property>
   <pydev_pathproperty name="org.python.pydev.PROJECT_SOURCE_PATH">
     {{#project.pythonpaths}}
-      {{#has_includes}}
+      {{#includes?}}
         {{#includes}}
     <path>/{{project.name}}/{{base}}/{{.}}</path>
         {{/includes}}
-      {{/has_includes}}
-      {{^has_includes}}
+      {{/includes?}}
+      {{^includes?}}
     <path>/{{project.name}}/{{base}}</path>
-      {{/has_includes}}
+      {{/includes?}}
     {{/project.pythonpaths}}
   </pydev_pathproperty>
 </pydev_project>

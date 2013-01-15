@@ -65,7 +65,7 @@ limitations under the License.
     </configuration>
   </component>
 
-  {{#project.has_scala}}
+  {{#project.scala?}}
   <component name="ScalacSettings">
     <option name="USE_FSC" value="{{#project.scala.fsc}}true{{/project.scala.fsc}}{{^project.scala.fsc}}false{{/project.scala.fsc}}"/>
   </component>
@@ -80,7 +80,7 @@ limitations under the License.
       <SOURCES />
     </library>
   </component>
-  {{/project.has_scala}}
+  {{/project.scala?}}
 
   <component name="VcsDirectoryMappings">
     <mapping directory="{{project.root_dir}}" vcs="Git"/>

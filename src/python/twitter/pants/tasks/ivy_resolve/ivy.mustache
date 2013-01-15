@@ -39,7 +39,7 @@ limitations under the License.
     <conf name="provided" description="provided by target environment"/>
   </configurations>
 
-  {{#lib.has_publications}}
+  {{#lib.publications?}}
   <publications>
     <artifact conf="default" type="jar" ext="jar"/>
     <artifact conf="default" type="pom" ext="pom"/>
@@ -53,9 +53,9 @@ limitations under the License.
     <artifact conf="changelog" type="CHANGELOG" m:classifier="CHANGELOG" ext="txt"/>
     {{/lib.publications.changelog}}
   </publications>
-  {{/lib.has_publications}}
+  {{/lib.publications?}}
 
-  {{#lib.has_dependencies}}
+  {{#lib.dependencies?}}
   <dependencies>
     {{#lib.dependencies}}
     <dependency org="{{org}}"
@@ -110,5 +110,5 @@ limitations under the License.
         {{/name}}
     {{/lib.excludes}}
   </dependencies>
-  {{/lib.has_dependencies}}
+  {{/lib.dependencies?}}
 </ivy-module>

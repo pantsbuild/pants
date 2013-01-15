@@ -21,9 +21,10 @@ import pystache
 
 
 def _expand(map):
-  # Add has_foo for each foo in the map that evaluates to true.
-  # Mustache needs this, especially in cases where foo is a list.
-  # Note: if the original map contains has_foo, it will take precedence over our synthetic has_foo.
+  # Add foo? for each foo in the map that evaluates to true.
+  # Mustache needs this, especially in cases where foo is a list: there is no way to render a
+  # block exactly once iff a list is not empty.
+  # Note: if the original map contains foo?, it will take precedence over our synthetic foo?.
   def set_to_map(x):
     # Pystache can't handle sets, so we convert to maps of key->True.
     if isinstance(x, set):
@@ -31,7 +32,7 @@ def _expand(map):
     else:
       return x
   items = [(key, set_to_map(val)) for (key, val) in map.items()]
-  ret = dict([('has_' + key, True) for (key, val) in items if val])
+  ret = dict([(key + '?', True) for (key, val) in items if val and not key.endswith('?')])
   ret.update(dict(items))
   return ret
 

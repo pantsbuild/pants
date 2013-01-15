@@ -27,39 +27,39 @@ limitations under the License.
   <buildSpec>
     {{! For whatever reason in a mixed scala/java project, the only jvm builder must be the scala
         builder circa eclipse 3.6}}
-    {{#project.has_scala}}
+    {{#project.scala?}}
     <buildCommand>
       <name>org.scala-ide.sdt.core.scalabuilder</name>
       <arguments>
       </arguments>
     </buildCommand>
-    {{/project.has_scala}}
-    {{^project.has_scala}}
+    {{/project.scala?}}
+    {{^project.scala?}}
     <buildCommand>
       <name>org.eclipse.jdt.core.javabuilder</name>
       <arguments>
       </arguments>
     </buildCommand>
-    {{/project.has_scala}}
-    {{#project.has_python}}
+    {{/project.scala?}}
+    {{#project.python?}}
     <buildCommand>
       <name>org.python.pydev.PyDevBuilder</name>
       <arguments>
       </arguments>
     </buildCommand>
-    {{/project.has_python}}
+    {{/project.python?}}
   </buildSpec>
   <natures>
-    {{#project.has_scala}}
+    {{#project.scala?}}
     <nature>org.scala-ide.sdt.core.scalanature</nature>
-    {{/project.has_scala}}
+    {{/project.scala?}}
     <nature>org.eclipse.jdt.core.javanature</nature>
-    {{#project.has_python}}
+    {{#project.python?}}
     <nature>org.python.pydev.pythonNature</nature>
-    {{/project.has_python}}
+    {{/project.python?}}
   </natures>
 
-  {{#project.has_source_bases}}
+  {{#project.source?_bases}}
   <linkedResources>
     {{#project.source_bases}}
     <link>
@@ -70,6 +70,6 @@ limitations under the License.
     </link>
     {{/project.source_bases}}
   </linkedResources>
-  {{/project.has_source_bases}}
+  {{/project.source?_bases}}
 
 </projectDescription>
