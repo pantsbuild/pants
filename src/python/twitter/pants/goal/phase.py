@@ -177,7 +177,7 @@ class Phase(PhaseBase):
       after: Places the goal after the named goal in the execution list
     """
 
-    if (first or replace or before or after) and (int(first) + int(replace) + int(bool(before)) + int(bool(after))) > 1:
+    if int(first) + int(replace) + int(bool(before)) + int(bool(after)) > 1:
       raise GoalError('Can only specify one of first, replace, before or after')
 
     Phase._phase_by_goal[goal] = self
