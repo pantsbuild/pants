@@ -4,7 +4,7 @@ import unittest
 
 from twitter.pants.base import DoubleDag
 from twitter.pants.goal import Context
-from twitter.pants.test import MockTarget
+from twitter.pants.testutils import MockTarget
 
 def make_dag(nodes):
   return DoubleDag(nodes, lambda t: t.dependencies, Context.Log())

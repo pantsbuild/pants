@@ -20,7 +20,7 @@ import unittest
 
 from twitter.pants.base import Config
 from twitter.pants.goal import Context
-from twitter.pants.test import MockTarget
+from twitter.pants.testutils import MockTarget
 
 class ContextTest(unittest.TestCase):
   @classmethod

@@ -7,7 +7,7 @@ from twitter.pants.goal.context import Context
 from twitter.pants.tasks import CacheManager
 from twitter.pants.tasks.cache_manager import VersionedTargetSet
 from twitter.pants.targets import InternalTarget
-from twitter.pants.test import MockTarget
+from twitter.pants.testutils import MockTarget
 
 class AppendingCacheKeyGenerator(CacheKeyGenerator):
   """Generates cache keys for versions of target sets."""
