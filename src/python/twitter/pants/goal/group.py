@@ -5,16 +5,16 @@ from twitter.pants.tasks import TaskError
 
 class Group(object):
   @staticmethod
-  def execute(phase, tasks_by_goal, context, executed, timer=None):
+  def execute(phase, tasks_by_goal, context, executed):
     """Executes the named phase against the current context tracking goal executions in executed."""
 
     def execute_task(name, task, targets):
       """Execute and time a single goal that has had all of its dependencies satisfied."""
-      start = timer.now() if timer else None
+      start = context.timer.now() if context.timer else None
       try:
         task.execute(targets)
       finally:
-        elapsed = timer.now() - start if timer else None
+        elapsed = context.timer.now() - start if context.timer else None
         if phase not in executed:
           executed[phase] = OrderedDict()
         if elapsed:
@@ -39,7 +39,7 @@ class Group(object):
 
       for goal in goals:
         for dependency in goal.dependencies:
-          Group.execute(dependency, tasks_by_goal, context, executed, timer=timer)
+          Group.execute(dependency, tasks_by_goal, context, executed)
 
       runqueue = []
       goals_by_group = {}

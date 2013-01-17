@@ -88,7 +88,7 @@ class Phase(PhaseBase):
           yield goal
 
   @staticmethod
-  def attempt(context, phases, timer=None):
+  def attempt(context, phases):
     """
       Attempts to reach the goals for the supplied phases, optionally recording phase timings and
       then logging then when all specified phases have completed.
@@ -98,10 +98,10 @@ class Phase(PhaseBase):
     # I'd rather do this in a finally block below, but some goals os.fork and each of these cause
     # finally to run, printing goal timings multiple times instead of once at the end.
     def emit_timings():
-      if timer:
+      if context.timer:
         for phase, timings in executed.items():
           for goal, times in timings.items():
-            timer.log('%s:%s' % (phase, goal), times)
+            context.timer.log('%s:%s' % (phase, goal), times)
 
     try:
       # Prepare tasks roots to leaves and allow for goals introducing new goals in existing phases.
@@ -130,7 +130,7 @@ class Phase(PhaseBase):
         'Executing goals in phases %s' % ' -> '.join(map(str, reversed(expanded)))
       )
       for phase in phases:
-        Group.execute(phase, tasks_by_goal, context, executed, timer=timer)
+        Group.execute(phase, tasks_by_goal, context, executed)
 
       emit_timings()
       return 0
