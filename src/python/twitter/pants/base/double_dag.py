@@ -25,7 +25,7 @@ class DoubleDag(object):
     - a method (remove_nodes) that removes nodes and updates the set of leaves appropriately
     - the inverse method (restore_nodes)
 
-  These are useful for the order in which to compile what groups of targets.
+  These are useful for computing the order in which to compile what groups of targets.
   """
   def __init__(self, objects, child_fn, logger):
     self._child_fn = child_fn
