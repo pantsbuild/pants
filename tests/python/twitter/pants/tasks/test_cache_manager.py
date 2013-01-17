@@ -2,6 +2,8 @@ __author__ = 'Ryan Williams'
 
 import unittest
 
+import shutil
+import tempfile
 from twitter.pants.base.build_invalidator import CacheKey, CacheKeyGenerator
 from twitter.pants.goal.context import Context
 from twitter.pants.tasks import CacheManager
@@ -31,8 +33,9 @@ class AppendingCacheKeyGenerator(CacheKeyGenerator):
 
 
 class TestCacheManager(CacheManager):
-  def __init__(self):
-    CacheManager.__init__(self, AppendingCacheKeyGenerator(), '/tmp/', True, None, False, Context.Log())
+  def __init__(self, tmpdir):
+    CacheManager.__init__(self, AppendingCacheKeyGenerator(), tmpdir, True, None, False, Context.Log())
+
 
 def print_vt(vt):
   print '%d (%s) %s: [ %s ]' % (len(vt.targets), vt.cache_key, vt.valid, ', '.join(['%s(%s)' % (vt.targets[i].id, vt.per_target_cache_keys[i]) for i in range(len(vt.targets))]))
@@ -40,7 +43,11 @@ def print_vt(vt):
 class CacheManagerTest(unittest.TestCase):
 
   def setUp(self):
-    self.cache_manager = TestCacheManager()
+    self._dir = tempfile.mkdtemp()
+    self.cache_manager = TestCacheManager(self._dir)
+
+  def tearDown(self):
+    shutil.rmtree(self._dir, ignore_errors=True)
 
   def make_vts(self, target):
     return VersionedTargetSet(self.cache_manager, [ target ], [ target.id ])
