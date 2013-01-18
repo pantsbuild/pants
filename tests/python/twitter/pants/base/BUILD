@@ -21,5 +21,6 @@ python_tests(name = 'base',
     pants('src/python/twitter/common/dirutil'),
     pants('src/python/twitter/pants:pants-deps'),
     pants('src/python/twitter/pants:pants-lib'),
+    pants('tests/python/twitter/pants/testutils'),
   ]
 )

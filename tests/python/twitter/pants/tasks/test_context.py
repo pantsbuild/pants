@@ -20,38 +20,27 @@ import unittest
 
 from twitter.pants.base import Config
 from twitter.pants.goal import Context
+from twitter.pants.testutils import MockTarget
 
-
-class MockTarget(object):
-  def __init__(self, id, *dependencies):
-    self.id = id
-    self.dependencies = dependencies or []
-  def resolve(self):
-    yield self
-  def walk(self, work):
-    work(self)
-    for dep in self.dependencies:
-      dep.walk(work)
-    
 class ContextTest(unittest.TestCase):
   @classmethod
   def setUpClass(cls):
     cls.config = Config.load()
 
 
-  def test_dependants_empty(self):
+  def test_dependents_empty(self):
     context = Context(ContextTest.config, options={}, target_roots=[])
-    dependees = context.dependants()
+    dependees = context.dependents()
     self.assertEquals(0, len(dependees))
 
 
-  def test_dependants_direct(self):
+  def test_dependents_direct(self):
     a = MockTarget('a')
-    b = MockTarget('b', a)
-    c = MockTarget('c', b)
-    d = MockTarget('d', c, a)
-    e = MockTarget('e', d)
+    b = MockTarget('b', [a])
+    c = MockTarget('c', [b])
+    d = MockTarget('d', [c, a])
+    e = MockTarget('e', [d])
     context = Context(ContextTest.config, options={}, target_roots=[a, b, c, d, e])
-    dependees = context.dependants(lambda t: t in set([e, c]))
+    dependees = context.dependents(lambda t: t in set([e, c]))
     self.assertEquals(set([c]), dependees.pop(d))
     self.assertEquals(0, len(dependees))

@@ -33,7 +33,7 @@ def create_artifact_cache(context, artifact_root, spec):
     as a path or URL prefix to a cache root. If it's a list of strings, it returns an appropriate
     combined cache.
   """
-  if len(spec) == 0:
+  if not spec:
     raise Exception, 'Empty artifact cache spec'
   if isinstance(spec, basestring):
     if spec.startswith('/'):
@@ -282,7 +282,7 @@ class RESTfulArtifactCache(ArtifactCache):
 class CombinedArtifactCache(ArtifactCache):
   """An artifact cache that delegates to a list of other caches."""
   def __init__(self, artifact_caches):
-    if len(artifact_caches) == 0:
+    if not artifact_caches:
       raise Exception, 'Must provide at least one underlying artifact cache'
     context = artifact_caches[0].context
     artifact_root = artifact_caches[0].artifact_root
