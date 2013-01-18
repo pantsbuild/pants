@@ -46,7 +46,18 @@ class VersionedTargetSet(object):
 
   @staticmethod
   def from_versioned_targets(versioned_targets):
-    cache_manager = list(versioned_targets)[0]._cache_manager
+    first_target = versioned_targets_list[0]
+    cache_manager = first_target._cache_manager
+
+    # Quick sanity check; all the versioned targets should have the same cache manager.
+    # TODO(ryan): the way VersionedTargets store their own links to a single CacheManager instance feels hacky;
+    # see if there's a cleaner way for callers to handle awareness of the CacheManager.
+    for versioned_target in versioned_targets:
+      if versioned_target._cache_manager != cache_manager:
+        raise Exception(
+          "Attempting to combine versioned targets %s and %s with different CacheMananger instances: %s and %s" % (
+            str(first_target), str(versioned_target), str(cache_manager), str(versioned_target._cache_manager)))
+
     targets = [ vt.target for vt in versioned_targets ]
     cache_keys = [ vt.cache_key for vt in versioned_targets ]
     return VersionedTargetSet(cache_manager, targets, cache_keys)
@@ -60,6 +71,8 @@ class VersionedTargetSet(object):
 
 
 class VersionedTarget(VersionedTargetSet):
+  """This class represents a singleton VersionedTargetSet, and has links to VersionedTargets that the wrapped target
+  depends on (after having resolvied through any "alias" targets."""
   def __init__(self, cache_manager, target, cache_key):
     VersionedTargetSet.__init__(self, cache_manager, [ target ], [ cache_key ])
     self.target = target
