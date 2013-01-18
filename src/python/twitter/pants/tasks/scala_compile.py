@@ -170,7 +170,7 @@ class ScalaCompile(NailgunTask):
           for jar in self._plugin_jars:
             cp.insert(0, (conf, jar))
 
-      with self.invalidated(scala_targets, invalidate_dependents=True,
+      with self.invalidated(scala_targets, invalidate_dependants=True,
           partition_size_hint=self._partition_size_hint) as invalidation_check:
         for vt in invalidation_check.all_vts:
           if vt.valid:  # Don't compile, just post-process.

@@ -402,13 +402,7 @@ class Goal(Command):
       for dir in self.options.target_directory:
         self.add_target_directory(dir)
 
-    context = Context(
-      self.config,
-      self.options,
-      self.targets,
-      lock=lock,
-      log=logger,
-      timer=self.timer if self.options.time else None)
+    context = Context(self.config, self.options, self.targets, lock=lock, log=logger)
 
     unknown = []
     for phase in self.phases:
@@ -423,7 +417,7 @@ class Goal(Command):
     if logger:
       logger.debug('Operating on targets: %s', self.targets)
 
-    ret = Phase.attempt(context, self.phases)
+    ret = Phase.attempt(context, self.phases, timer=self.timer if self.options.time else None)
     if self.options.time:
       print('Timing report')
       print('=============')

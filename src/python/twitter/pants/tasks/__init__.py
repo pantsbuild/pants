@@ -100,18 +100,15 @@ class Task(object):
     return []
 
   @contextmanager
-  def invalidated(self,
-                  targets,
-                  only_buildfiles = False,
-                  invalidate_dependents = False,
-                  partition_size_hint = sys.maxint):
+  def invalidated(self, targets, only_buildfiles=False, invalidate_dependants=False,
+                  partition_size_hint=sys.maxint):
     """Checks targets for invalidation. Subclasses call this to figure out what to work on.
 
     targets: The targets to check for changes.
 
     only_buildfiles: If True, then only the target's BUILD files are checked for changes, not its sources.
 
-    invalidate_dependents: If True then any targets depending on changed targets are invalidated.
+    invalidate_dependants: If True then any targets depending on changed targets are invalidated.
 
     partition_size_hint: Each VersionedTargetSet in the yielded list will represent targets containing roughly
     this number of source files, if possible. Set to sys.maxint for a single VersionedTargetSet. Set to 0 for
@@ -131,7 +128,7 @@ class Task(object):
       extra_data.append(sha.hexdigest())
 
     cache_manager = CacheManager(self._cache_key_generator, self._build_invalidator_dir,
-      invalidate_dependents, extra_data, only_buildfiles)
+      invalidate_dependants, extra_data, only_buildfiles)
 
     invalidation_check = cache_manager.check(targets, partition_size_hint)
 

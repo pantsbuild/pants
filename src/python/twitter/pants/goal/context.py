@@ -43,7 +43,7 @@ class Context(object):
     def info(self, msg): pass
     def warn(self, msg): pass
 
-  def __init__(self, config, options, target_roots, lock=Lock.unlocked(), log=None, timer=None):
+  def __init__(self, config, options, target_roots, lock=Lock.unlocked(), log=None):
     self._config = config
     self._options = options
     self._lock = lock
@@ -51,7 +51,6 @@ class Context(object):
     self._state = {}
     self._products = Products()
     self._buildroot = get_buildroot()
-    self.timer = timer
 
     self.replace_targets(target_roots)
 
@@ -126,10 +125,10 @@ class Context(object):
     self._target_roots = target_roots
     self._targets = OrderedSet()
     for target in target_roots:
-      self._add_target(target)
+      self.add_target(target)
     self.id = Target.identify(self._targets)
 
-  def _add_target(self, target):
+  def add_target(self, target):
     """Adds a target and its transitive dependencies to the run context.
 
     The target is not added to the target roots.
@@ -150,7 +149,7 @@ class Context(object):
     else:
       derived_from = None
     target = self._create_new_target(target_base, target_type, *args, **kwargs)
-    self._add_target(target)
+    self.add_target(target)
     if derived_from:
       target.derived_from = derived_from
     return target
@@ -175,7 +174,7 @@ class Context(object):
     """
     return filter(predicate, self._targets)
 
-  def dependents(self, on_predicate=None, from_predicate=None):
+  def dependants(self, on_predicate=None, from_predicate=None):
     """Returns  a map from targets that satisfy the from_predicate to targets they depend on that
       satisfy the on_predicate.
     """

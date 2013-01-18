@@ -14,13 +14,19 @@
 # limitations under the License.
 # ==================================================================================================
 
-__author__ = 'John Sirois'
+__author__ = 'John Sirios'
 
 from twitter.pants.targets import InternalTarget
-from twitter.pants.testutils import MockTarget
 
 import unittest
 
+class MockTarget(object):
+  def __init__(self, address, *internal_dependencies):
+    self.address = address
+    self.internal_dependencies = internal_dependencies
+
+  def __repr__(self):
+    return self.address
 
 class InternalTargetTest(unittest.TestCase):
   def testDetectCycleDirect(self):
@@ -38,8 +44,8 @@ class InternalTargetTest(unittest.TestCase):
 
   def testDetectIndirect(self):
     c = MockTarget('c')
-    b = MockTarget('b', [ c ])
-    a = MockTarget('a', [ c, b ])
+    b = MockTarget('b', c)
+    a = MockTarget('a', c, b)
 
     # no cycles yet
     InternalTarget.sort_targets([a])
@@ -51,15 +57,3 @@ class InternalTargetTest(unittest.TestCase):
     except InternalTarget.CycleException:
       # expected
       pass
-
-  def testSort(self):
-    a = MockTarget('a', [])
-    b = MockTarget('b', [a])
-    c = MockTarget('c', [b])
-    d = MockTarget('d', [c, a])
-    e = MockTarget('e', [d])
-
-    self.assertEquals(InternalTarget.sort_targets([a,b,c,d,e]), [e,d,c,b,a])
-    self.assertEquals(InternalTarget.sort_targets([b,d,a,e,c]), [e,d,c,b,a])
-    self.assertEquals(InternalTarget.sort_targets([e,d,c,b,a]), [e,d,c,b,a])
-

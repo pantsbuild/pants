@@ -14,7 +14,7 @@
 # limitations under the License.
 # ==================================================================================================
 
-__author__ = 'John Sirois'
+__author__ = 'John Sirios'
 
 from twitter.common.collections import OrderedSet
 from twitter.pants import is_codegen

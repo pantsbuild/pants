@@ -54,7 +54,7 @@ class JarDependency(object):
     self.artifacts = []
     if ext or url or type_ or classifier:
       self.with_artifact(name=name, ext=ext, url=url, type_=type_, classifier=classifier)
-    self.id = "%s-%s-%s" % (self.org, self.name, self.rev)
+    self.id = None
     self._configurations = [ 'default' ]
 
     # Support legacy method names
@@ -116,7 +116,7 @@ class JarDependency(object):
     return not self.__eq__(other)
 
   def __repr__(self):
-    return self.id
+    return "%s-%s-%s" % (self.org, self.name, self.rev)
 
   def resolve(self):
     yield self
