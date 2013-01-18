@@ -15,6 +15,7 @@
 # ==================================================================================================
 
 from twitter.pants.base.generator import TemplateData
+from twitter.pants.targets.util import resolve
 
 class Artifact(object):
   """Represents a jvm artifact ala maven or ivy."""
@@ -30,7 +31,7 @@ class Artifact(object):
     self.org = org
     self.name = name
     self.rev = None
-    repos = list(repo.resolve())
+    repos = list(resolve(repo).resolve())
     if len(repos) != 1:
       raise Exception("An artifact must have exactly 1 repo, given: %s" % repos)
     self.repo = repos[0]

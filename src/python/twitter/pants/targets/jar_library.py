@@ -16,6 +16,7 @@
 
 from twitter.pants.base import Target
 from twitter.pants.base.generator import TemplateData
+from twitter.pants.targets.util import resolve
 
 class JarLibrary(Target):
   """Serves as a proxy for one or more JarDependencies or JavaTargets."""
@@ -29,7 +30,7 @@ class JarLibrary(Target):
     assert len(dependencies) > 0, "At least one dependency must be specified"
     Target.__init__(self, name, False)
     self.add_label('jars')
-    self.dependencies = dependencies
+    self.dependencies = resolve(dependencies)
 
   def resolve(self):
     for dependency in self.dependencies:

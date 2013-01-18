@@ -18,6 +18,7 @@ from twitter.common.collections import OrderedSet
 import collections
 
 from twitter.pants.base import Target
+from twitter.pants.targets.util import resolve
 
 class InternalTarget(Target):
   """A baseclass for targets that support an optional dependency set."""
@@ -143,6 +144,8 @@ class InternalTarget(Target):
   def __init__(self, name, dependencies, is_meta):
     Target.__init__(self, name, is_meta)
 
+    processed_dependencies = resolve(dependencies)
+
     self.add_label('internal')
     self.dependencies = OrderedSet()
     self.internal_dependencies = OrderedSet()
@@ -154,11 +157,11 @@ class InternalTarget(Target):
     # non-addressable targets - which is what meta-targets really are once created.
     if is_meta:
       # Meta targets are built outside any parse context - so update dependencies immediately
-      self.update_dependencies(dependencies)
+      self.update_dependencies(processed_dependencies)
     else:
       # Defer dependency resolution after parsing the current BUILD file to allow for forward
       # references
-      self._post_construct(self.update_dependencies, dependencies)
+      self._post_construct(self.update_dependencies, processed_dependencies)
 
   def update_dependencies(self, dependencies):
     if dependencies:
