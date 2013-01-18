@@ -106,19 +106,19 @@ Here's a (non-real) example of a single build target:
     :::python
     scala_library(
       name = 'util',
-      dependencies = [pants('3rdparty:commons-math'),
-                      pants('3rdparty:flume'),
-                      pants('3rdparty:heapaudit'),
-                      pants('3rdparty:ostrich'),
-                      pants('3rdparty:rogue'),
-                      pants('3rdparty:scala-tools-time'),
-                      pants('3rdparty:scalaj-collection'),
-                      pants('3rdparty:s2'),
-                      pants('3rdparty:thrift'),
-                      pants('3rdparty:twitter-util'),
-                      pants('core/src/main/scala/com/foursquare/auth'),
-                      pants('core/src/main/scala/com/foursquare/i18n:localization'),
-                      pants(':base')],
+      dependencies = ['3rdparty:commons-math',
+                      '3rdparty:flume',
+                      '3rdparty:heapaudit',
+                      '3rdparty:ostrich',
+                      '3rdparty:rogue',
+                      '3rdparty:scala-tools-time',
+                      '3rdparty:scalaj-collection',
+                      '3rdparty:s2',
+                      '3rdparty:thrift',
+                      '3rdparty:twitter-util',
+                      'core/src/main/scala/com/foursquare/auth',
+                      'core/src/main/scala/com/foursquare/i18n:localization',
+                      ':base'],
       sources = rglobs('*.scala'),
     )
 
@@ -133,12 +133,12 @@ fully-qualified name of the target is
 core/src/main/scala/com/foursquare/base:util.
 * The dependencies are expressed as a list of other build targets,
 wrapped by the invocation pants(). Note that the dependency on
-pants('core/src/main/scala/com/foursquare/auth') has no :<name>
+'core/src/main/scala/com/foursquare/auth' has no :<name>
 suffix. This is because Pants offers the following shorthand: if a
 target has the same name as the directory the BUILD file is in, you
 can omit the name. So this dependency is short for
-pants('core/src/main/scala/com/foursquare/auth:auth'). Note also the
-dependency on pants(':base'). That's shorthand for "the target named
+'core/src/main/scala/com/foursquare/auth:auth'. Note also the
+dependency on ':base'. That's shorthand for "the target named
 'base' in this build file."
 * The sources are expressed as a list of file paths relative to the
 BUILD file's directory. In most cases it's not convenient to enumerate
