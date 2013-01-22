@@ -16,6 +16,7 @@
 
 __author__ = 'Ryan Williams'
 
+from twitter.common.lang import Compatibility
 from twitter.pants.targets.pants_target import Pants
 
 def resolve(arg, clazz=Pants):
@@ -26,7 +27,7 @@ def resolve(arg, clazz=Pants):
     - list of strings and other miscellaneous objects gets its strings wrapped in Pants() targets
   """
 
-  if isinstance(arg, basestring):
+  if isinstance(arg, Compatibility.string):
     # Strings get wrapped in a given class (default Pants).
     return clazz(arg)
 
