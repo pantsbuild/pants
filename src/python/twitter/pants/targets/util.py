@@ -17,23 +17,25 @@
 __author__ = 'Ryan Williams'
 
 from twitter.pants.targets.pants_target import Pants
-from twitter.pants.base import Target
 
 def resolve(arg, clazz=Pants):
   """Wraps strings in Pants() targets, for BUILD file convenience.
 
     - single string literal gets wrapped in Pants() target
-    - single Target is left alone
-    - list of strings and Targets gets its strings wrapped in Pants() targets, returning a list Targets
+    - single object is left alone
+    - list of strings and other miscellaneous objects gets its strings wrapped in Pants() targets
   """
 
-  if arg is None:
-    return None
-
   if isinstance(arg, str):
+    # Strings get wrapped in a given class (default Pants).
     return clazz(arg)
 
-  if isinstance(arg, Target):
+  # NOTE(ryan): if arg is a non-iterable object, just return it. Ideally we'd check isinstance(arg, Target) here, but
+  # some things that Targets depend on are not themselves subclasses of Target, notably JarDependencies.
+  try:
+    [ e for e in arg ]
+  except TypeError:
     return arg
 
-  return [clazz(dependency) if isinstance(dependency, str) else dependency for dependency in arg]
+  # If arg is in fact iterable, recurse on its elements.
+  return [resolve(dependency, clazz=clazz) for dependency in arg]

@@ -8,7 +8,12 @@ class MockPantsTarget(Target):
     self.foo = spec
 
   def __eq__(self, other):
+    if not isinstance(other, MockPantsTarget):
+      return False
     return self.foo == other.foo
+
+  def __repr__(self):
+    return "MockPantsTarget(%s)" % str(self.foo)
 
 
 from twitter.pants.targets.util import resolve
@@ -28,3 +33,8 @@ class ResolveTest(unittest.TestCase):
     self.assertEquals(
       resolve([MockPantsTarget("1"), "2", MockPantsTarget("3"), "4", "5"], clazz=MockPantsTarget),
       [MockPantsTarget("1"), MockPantsTarget("2"), MockPantsTarget("3"), MockPantsTarget("4"), MockPantsTarget("5")])
+
+  def testNonTarget(self):
+    self.assertEquals(
+      resolve([MockPantsTarget(1), [4, 'asdf'], "qwer",], clazz=MockPantsTarget),
+      [MockPantsTarget(1), [4, MockPantsTarget('asdf')], MockPantsTarget('qwer')])
