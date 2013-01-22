@@ -1,9 +1,9 @@
 __author__ = 'Ryan Williams'
 
 import unittest
-from twitter.pants.targets import Pants
+from twitter.pants.base import Target
 
-class MockPantsTarget(object):
+class MockPantsTarget(Target):
   def __init__(self, spec):
     self.foo = spec
 
