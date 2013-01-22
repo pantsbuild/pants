@@ -56,7 +56,11 @@ class ZincMergedAnalysisCache(object):
       self.parse(c)
 
   def parse(self, cachepath):
-    zincfile = open("%s.relations" % cachepath, "r")
+    try:
+      zincfile = open("%s.relations" % cachepath, "r")
+    except IOError:
+      print "Warning: analysis cache file %s not found" % zincfile
+      return
     mode = None
     for line in zincfile:
       if line.startswith("products:"):
