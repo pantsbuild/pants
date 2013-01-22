@@ -29,13 +29,12 @@ def resolve(arg, clazz=Pants):
   """
 
   if isinstance(arg, Compatibility.string):
-    # Strings get wrapped in a given class (default Pants).
     return clazz(arg)
   elif isinstance(arg, Iterable):
     # If arg is iterable, recurse on its elements.
     return [resolve(dependency, clazz=clazz) for dependency in arg]
   else:
-    # NOTE(ryan): if arg is a non-iterable object, just return it. Ideally we'd check isinstance(arg, Target) here, but
-    # some things that Targets depend on are not themselves subclasses of Target, notably JarDependencies.
+    # NOTE(ryan): Ideally we'd check isinstance(arg, Target) here, but some things that Targets depend on are not
+    # themselves subclasses of Target, notably JarDependencies.
     return arg
 
