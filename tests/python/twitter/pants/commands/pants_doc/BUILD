@@ -17,8 +17,8 @@
 doc(
   name = 'pants_doc',
   dependencies = [
-    'src/java/com/twitter/common/quantity',
-    'src/java/com/twitter/common/base'
+    pants('src/java/com/twitter/common/quantity'),
+    pants('src/java/com/twitter/common/base')
   ],
   sources = globs('*.md'),
   resources = globs('**/*.html')

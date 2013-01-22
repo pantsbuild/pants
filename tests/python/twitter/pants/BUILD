@@ -16,11 +16,11 @@
 
 python_test_suite(name = 'all',
   dependencies = [
-    'tests/python/twitter/pants/ant',
-    'tests/python/twitter/pants/base',
-    'tests/python/twitter/pants/commands',
-    'tests/python/twitter/pants/python:all',
-    'tests/python/twitter/pants/targets',
-    'tests/python/twitter/pants/tasks',
+    pants('tests/python/twitter/pants/ant'),
+    pants('tests/python/twitter/pants/base'),
+    pants('tests/python/twitter/pants/commands'),
+    pants('tests/python/twitter/pants/python:all'),
+    pants('tests/python/twitter/pants/targets'),
+    pants('tests/python/twitter/pants/tasks'),
   ]
 )

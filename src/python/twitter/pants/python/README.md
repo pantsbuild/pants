@@ -150,7 +150,7 @@ python_binary(
   name = "hello_world",
   source = "hello_world.py",
   dependencies = [
-    "src/python/twitter/common/app",
+    pants("src/python/twitter/common/app"),
   ]
 )
 ```
@@ -207,7 +207,7 @@ targets take the form `<path>:<target name>` with the special cases:
 1. in the case of `path/to/directory/BUILD:target`, the `BUILD` component may be elided and instead `path/to/directory:target` may be used
 2. `path/to/directory` is short form for `path/to/directory:directory`, so `src/python/twitter/common/app` is short form for `src/python/twitter/common/app/BUILD:app`
 
-`src/python/twitter/tutorial/BUILD` referenced `'src/python/twitter/common/app'` in its
+`src/python/twitter/tutorial/BUILD` referenced `pants('src/python/twitter/common/app')` in its
 dependencies.  The `pants()` keyword is akin to a "pointer dereference" for an address.  It will point
 to whatever target is described at that address, in this case a `python_library` target:
 
@@ -218,11 +218,11 @@ python_library(
   name = "app",
   sources = globs('*.py'),
   dependencies = [
-    'src/python/twitter/common/dirutil',
-    'src/python/twitter/common/lang',
-    'src/python/twitter/common/options',
-    'src/python/twitter/common/util',
-    'src/python/twitter/common/app/modules',
+    pants('src/python/twitter/common/dirutil'),
+    pants('src/python/twitter/common/lang'),
+    pants('src/python/twitter/common/options'),
+    pants('src/python/twitter/common/util'),
+    pants('src/python/twitter/common/app/modules'),
   ]
 )
 ```
@@ -406,14 +406,14 @@ python_binary(
   name = "hello_world",
   source = "hello_world.py",
   dependencies = [
-    ":hello_world_lib"
+    pants(":hello_world_lib")
   ]
 )
 
 python_library(
   name = "hello_world_lib",
   dependencies = [
-    "src/python/twitter/common/app",
+    pants("src/python/twitter/common/app"),
     python_requirement("tornado"),
     python_requirement("psutil"),
   ]

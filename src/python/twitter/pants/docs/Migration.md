@@ -64,7 +64,7 @@ You'd add a new jvm_binary target:
     jvm_binary(name='main_deploy',
       basename='runner',
       main='com.twitter.osprey.RunnerMain',
-      dependencies=[':main']
+      dependencies=[pants(':main')]
     )
 
 The jvm_binary target effectively extracts the information needed to
@@ -145,7 +145,7 @@ be under the top-level project directory. In `osprey/BUILD` you'd add:
     :::python
     jvm_app(name='runner-app',
       basename='runner',
-      binary = 'src/java/com/twitter/osprey:main_deploy',
+      binary = pants('src/java/com/twitter/osprey:main_deploy'),
       bundles = [
         bundle().add(rglobs('data/*'))
         bundle(relative_to='common').add(rglobs('common/*')),

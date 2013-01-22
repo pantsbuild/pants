@@ -16,5 +16,5 @@
 
 python_tests(name = 'commands',
   sources = globs('*.py'),
-  dependencies = ['src/python/twitter/pants:pants-lib']
+  dependencies = [pants('src/python/twitter/pants:pants-lib')]
 )

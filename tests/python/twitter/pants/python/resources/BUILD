@@ -31,19 +31,19 @@ python_library(
 
 python_binary(
   name = 'eggdrop_soup_zipsafe_egg',
-  dependencies = [':zipsafe_egg'],
+  dependencies = [pants(':zipsafe_egg')],
   source = ['eggdrop_soup.py'],
 )
 
 python_binary(
   name = 'eggdrop_soup_not_zipsafe_egg',
-  dependencies = [':not_zipsafe_egg'],
+  dependencies = [pants(':not_zipsafe_egg')],
   source = ['eggdrop_soup.py'],
 )
 
 python_binary(
   name = 'eggdrop_soup_not_zipsafe_egg_dir',
-  dependencies = [':not_zipsafe_egg_dir'],
+  dependencies = [pants(':not_zipsafe_egg_dir')],
   source = ['eggdrop_soup.py'],
 )
 
