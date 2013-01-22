@@ -4,5 +4,5 @@ python_library(
   sources = globs('*.py'),
   dependencies = [
     python_requirement('mock'),
-    pants('src/python/twitter/pants:pants-lib'),
+    'src/python/twitter/pants:pants-lib',
 ])

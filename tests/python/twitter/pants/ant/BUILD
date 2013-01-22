@@ -17,7 +17,7 @@
 python_tests(name = 'ant',
   sources = globs('*.py'),
   dependencies = [
-    pants('src/python/twitter/pants:pants-deps'),
-    pants('src/python/twitter/pants:pants-lib'),
+    'src/python/twitter/pants:pants-deps',
+    'src/python/twitter/pants:pants-lib',
   ]
 )
