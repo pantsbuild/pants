@@ -26,7 +26,7 @@ def resolve(arg, clazz=Pants):
     - list of strings and other miscellaneous objects gets its strings wrapped in Pants() targets
   """
 
-  if isinstance(arg, str):
+  if isinstance(arg, basestring):
     # Strings get wrapped in a given class (default Pants).
     return clazz(arg)
 

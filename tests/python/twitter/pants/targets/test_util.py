@@ -23,6 +23,9 @@ class ResolveTest(unittest.TestCase):
   def testString(self):
     self.assertEquals(resolve("asdf", clazz=MockPantsTarget).foo, "asdf")
 
+  def testUnicodeString(self):
+    self.assertEquals(resolve(u"asdf", clazz=MockPantsTarget).foo, u"asdf")
+
   def testNone(self):
     self.assertEquals(resolve(None, clazz=MockPantsTarget), None)
 
