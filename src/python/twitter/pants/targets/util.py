@@ -18,7 +18,7 @@ __author__ = 'Ryan Williams'
 
 from twitter.pants.targets.pants_target import Pants
 
-def resolve(arg):
+def resolve(arg, clazz=Pants):
   """Wraps strings in Pants() targets, for BUILD file convenience.
 
     - single string literal gets wrapped in Pants() target
@@ -30,9 +30,9 @@ def resolve(arg):
     return None
 
   if isinstance(arg, str):
-    return Pants(arg)
+    return clazz(arg)
 
-  if isinstance(arg, Pants):
+  if isinstance(arg, clazz):
     return arg
 
-  return [Pants(dependency) if isinstance(dependency, str) else dependency for dependency in arg]
+  return [clazz(dependency) if isinstance(dependency, str) else dependency for dependency in arg]
