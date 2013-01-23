@@ -18,6 +18,7 @@ import os
 
 from twitter.common.lang import Compatibility
 from twitter.pants.base import Fileset, Target, TargetDefinitionException
+from twitter.pants.targets import util
 from twitter.pants.targets.jvm_target import JvmTarget
 
 class JvmBinary(JvmTarget):
@@ -114,7 +115,7 @@ class JvmApp(Target):
     if not binary:
       raise TargetDefinitionException(self, 'binary is required')
 
-    binaries = list(binary.resolve())
+    binaries = list(util.resolve(binary).resolve())
     if len(binaries) != 1 or not isinstance(binaries[0], JvmBinary):
       raise TargetDefinitionException(self, 'must supply exactly 1 JvmBinary, got %s' % binary)
     self.binary = binaries[0]
