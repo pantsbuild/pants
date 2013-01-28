@@ -67,6 +67,11 @@ class ScalaLibrary(ExportableJvmLibrary):
 
     self.deployjar = deployjar
 
+    # All scala targets implicitly depend on the selected scala runtime.
+    for spec in self._config.getlist('scala-compile', 'scaladeps'):
+      self.add_injected_dependency(spec)
+
+
   def _create_template_data(self):
     allsources = []
     if self.sources:
@@ -80,3 +85,4 @@ class ScalaLibrary(ExportableJvmLibrary):
       deploy_jar = self.deployjar,
       allsources = allsources,
     )
+

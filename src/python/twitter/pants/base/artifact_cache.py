@@ -82,15 +82,15 @@ class ArtifactCache(object):
       self.try_insert(cache_key, build_artifacts_that_exist)
     except Exception as e:
       try:
-        err_msg = 'Error while writing to artifact cache: %s. Deleting, just in case.' % e
-        if self.context:
-          self.context.log.error(err_msg)
-        else:
-          print(err_msg)
         self.delete(cache_key)
       except Exception:
         print('IMPORTANT: failed to delete %s on error. Your artifact cache may be corrupted. '
-              'Please delete manually.' % cache_key.id)
+              'Please delete manually.' % cache_key)
+      if self.context:
+        self.context.log.error(traceback.format_exc())
+      else:
+        traceback.print_exc()
+      raise e
 
   def try_insert(self, cache_key, build_artifacts):
     """Attempt to cache the output of a build, without error-handling.

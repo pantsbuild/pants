@@ -17,7 +17,7 @@
 from twitter.common.collections import OrderedSet
 import collections
 
-from twitter.pants.base import Target
+from twitter.pants.base import Config, Target
 from twitter.pants.targets.util import resolve
 
 class InternalTarget(Target):
@@ -30,6 +30,9 @@ class InternalTarget(Target):
       Exception.__init__(self, 'Cycle detected:\n\t%s' % (
         ' ->\n\t'.join(str(target.address) for target in cycle)
       ))
+
+
+  _config = Config.load()
 
   @classmethod
   def sort_targets(cls, internal_targets):
@@ -144,6 +147,7 @@ class InternalTarget(Target):
   def __init__(self, name, dependencies, is_meta):
     Target.__init__(self, name, is_meta)
 
+    self._injected_deps = []
     processed_dependencies = resolve(dependencies)
 
     self.add_label('internal')
@@ -162,6 +166,15 @@ class InternalTarget(Target):
       # Defer dependency resolution after parsing the current BUILD file to allow for forward
       # references
       self._post_construct(self.update_dependencies, processed_dependencies)
+
+    self._post_construct(self.inject_dependencies)
+
+  def add_injected_dependency(self, spec):
+    self._injected_deps.append(spec)
+
+
+  def inject_dependencies(self):
+    self.update_dependencies(resolve(self._injected_deps))
 
   def update_dependencies(self, dependencies):
     if dependencies:

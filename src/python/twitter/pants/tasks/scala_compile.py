@@ -25,21 +25,21 @@ from contextlib import closing
 from xml.etree import ElementTree
 
 from twitter.common.collections import OrderedDict
-from twitter.common.contextutil import open_zip as open_jar, temporary_dir, temporary_file_path
+from twitter.common.contextutil import open_zip as open_jar, temporary_dir
 from twitter.common.dirutil import safe_mkdir, safe_open, safe_rmtree
 
 from twitter.pants import get_buildroot, is_scala, is_scalac_plugin
 from twitter.pants.base.target import Target
+from twitter.pants.targets.jvm_target import JvmTarget
 from twitter.pants.targets.scala_library import ScalaLibrary
 from twitter.pants.targets.scala_tests import ScalaTests
 from twitter.pants.targets import resolve_target_sources
 from twitter.pants.tasks import TaskError
-from twitter.pants.tasks.binary_utils import find_java_home, nailgun_profile_classpath
+from twitter.pants.tasks.binary_utils import nailgun_profile_classpath
 from twitter.pants.tasks.jvm_compiler_dependencies import Dependencies
 from twitter.pants.tasks.jvm_dependency_cache import JvmDependencyCache
 from twitter.pants.tasks.nailgun_task import NailgunTask
 
-# TODO: This class is getting huge. Should probably break it up.
 
 # Well known metadata file required to register scalac plugins with nsc.
 _PLUGIN_INFO_FILE = 'scalac-plugin.xml'
@@ -76,7 +76,6 @@ class ScalaCompile(NailgunTask):
 
   def __init__(self, context, workdir=None):
     NailgunTask.__init__(self, context, workdir=context.config.get('scala-compile', 'nailgun_dir'))
-    self._pants_home = get_buildroot()
 
     self._partition_size_hint = \
       context.options.scala_compile_partition_size_hint \
@@ -109,13 +108,6 @@ class ScalaCompile(NailgunTask):
 
     self._plugin_jars = nailgun_profile_classpath(self, plugins_profile) if plugins_profile else []
 
-    # All scala targets implicitly depend on the selected scala runtime.
-    scaladeps = []
-    for spec in context.config.getlist('scala-compile', 'scaladeps'):
-      scaladeps.extend(context.resolve(spec))
-    for target in context.targets(is_scala):
-      target.update_dependencies(scaladeps)
-
     self._workdir = context.config.get('scala-compile', 'workdir') if workdir is None else workdir
     self._classes_dir = os.path.join(self._workdir, 'classes')
     self._analysis_cache_dir = os.path.join(self._workdir, 'analysis_cache')
@@ -137,7 +129,7 @@ class ScalaCompile(NailgunTask):
 
     plugin_args = context.config.getdict('scala-compile', 'scalac-plugin-args', default={})
 
-    active_plugins = self.find_plugins(plugin_names)
+    active_plugins = ScalaCompile.find_plugins(plugin_names, self._plugin_jars)
 
     for name, jar in active_plugins.items():
       self._args.append('-Xplugin:%s' % jar)
@@ -149,9 +141,6 @@ class ScalaCompile(NailgunTask):
 
     artifact_cache_spec = context.config.getlist('scala-compile', 'artifact_caches')
     self.setup_artifact_cache(artifact_cache_spec)
-
-    self._java_home = os.path.dirname(find_java_home())
-    self._ivy_home = context.config.get('ivy', 'cache_dir')
 
   def product_type(self):
     return 'classes'
@@ -207,23 +196,12 @@ class ScalaCompile(NailgunTask):
   def execute_single_compilation(self, versioned_target_set, cp, upstream_analysis_caches):
     """Execute a single compilation, updating upstream_analysis_caches if needed."""
     output_dir, depfile, analysis_cache = self.create_output_paths(versioned_target_set.targets)
-    portable_analysis_cache = analysis_cache + '.portable'
     safe_mkdir(output_dir)
 
     if not versioned_target_set.valid:
       with self.check_artifact_cache(versioned_target_set,
-                                     build_artifacts=[output_dir, depfile, portable_analysis_cache]) as in_cache:
-        if in_cache:
-          # Localize the portable analysis cache we got from the cache. Work on a tmpfile, for safety.
-          with temporary_file_path() as tmp_analysis_cache:
-            shutil.copy(portable_analysis_cache, tmp_analysis_cache)
-            rebasings = [
-              (ScalaCompile.IVY_HOME_PLACEHOLDER, self._ivy_home),
-              (ScalaCompile.PANTS_HOME_PLACEHOLDER, self._pants_home),
-            ]
-            self.run_zinc_rebase(cache=tmp_analysis_cache, rebasings=rebasings)
-            shutil.copy(tmp_analysis_cache, analysis_cache)
-        else:
+                                     build_artifacts=[output_dir, depfile, analysis_cache]) as in_cache:
+        if not in_cache:
           self.merge_artifact(versioned_target_set)  # Get what we can from previous builds.
           self.context.log.info('Compiling targets %s' % versioned_target_set.targets)
           sources_by_target = self.calculate_sources(versioned_target_set.targets)
@@ -237,26 +215,6 @@ class ScalaCompile(NailgunTask):
               result = self.compile(classpath, sources, output_dir, analysis_cache, upstream_analysis_caches, depfile)
               if result != 0:
                 raise TaskError('%s returned %d' % (self._main, result))
-              # Make the just-created analysis cache portable. Work on a tmpfile, for safety.
-              #
-              # NOTE: We can't port references to deps on the Java home. This is because different JVM
-              # implementations on different systems have different structures, and there's not
-              # necessarily a 1-1 mapping between Java jars on different systems. Instead we simply
-              # drop those references from the analysis cache.
-              #
-              # In practice the JVM changes rarely, and it should be fine to require a full rebuild
-              # in those rare cases.
-              #
-              # TODO: Do this only if we're writing to the artifact cache?
-              with temporary_file_path() as tmp_analysis_cache:
-                shutil.copy(analysis_cache, tmp_analysis_cache)
-                rebasings = [
-                  (self._java_home, ''),  # Erase java deps.
-                  (self._ivy_home, ScalaCompile.IVY_HOME_PLACEHOLDER),
-                  (self._pants_home, ScalaCompile.PANTS_HOME_PLACEHOLDER),
-                ]
-                self.run_zinc_rebase(cache=tmp_analysis_cache, rebasings=rebasings)
-                shutil.copy(tmp_analysis_cache, portable_analysis_cache)
     self.post_process(versioned_target_set, upstream_analysis_caches, split_artifact=True)
 
   # Post-processing steps that must happen even for valid targets.
@@ -332,11 +290,14 @@ class ScalaCompile(NailgunTask):
     analysis_map = \
       OrderedDict([ (k, analysis_cache_full_path(v)) for k, v in upstream_analysis_caches.itermappings() ])
 
+    args.extend(self._zinc_jar_args)
+
     if len(analysis_map) > 0:
       args.extend([ '-analysis-map', ','.join(['%s:%s' % kv for kv in analysis_map.items()]) ])
 
     args.extend([
       '-analysis-cache', analysis_cache,
+      '-log-level', self.context.options.log_level or 'info',
       '-classpath', ':'.join(self._zinc_classpath + classpath),
       '-output-products', depfile,
       '-mirror-analysis',
@@ -349,7 +310,7 @@ class ScalaCompile(NailgunTask):
     args.extend(sources)
 
     self.context.log.debug('Executing: %s %s' % (self._main, ' '.join(args)))
-    return self.run_zinc(args)
+    return self.runjava(self._main, classpath=self._zinc_classpath, args=args, jvmargs=self._jvm_args)
 
   # Splits an artifact representing several targets into target-by-target artifacts.
   # Creates an output classes dir, a depfile and an analysis file for each target.
@@ -358,6 +319,7 @@ class ScalaCompile(NailgunTask):
   def split_artifact(self, deps, versioned_target_set):
     if len(versioned_target_set.targets) <= 1:
       return
+    buildroot = get_buildroot()
     classes_by_source_by_target = deps.findclasses(versioned_target_set.targets)
     src_output_dir, _, src_analysis_cache = self.create_output_paths(versioned_target_set.targets)
     analysis_splits = []  # List of triples of (list of sources, destination output dir, destination analysis cache).
@@ -375,7 +337,7 @@ class ScalaCompile(NailgunTask):
       for source, classes in classes_by_source.items():
         src = os.path.join(target.target_base, source)
         dst_deps.add(src, classes)
-        source_abspath = os.path.join(self._pants_home, target.target_base, source)
+        source_abspath = os.path.join(buildroot, target.target_base, source)
         sources.append(source_abspath)
         for cls in classes:
           # Copy the class file.
@@ -385,19 +347,32 @@ class ScalaCompile(NailgunTask):
       dst_deps.save(dst_depfile)
       analysis_splits.append((sources, dst_output_dir, dst_analysis_cache))
       self.generated_caches.add(os.path.join(dst_output_dir, dst_analysis_cache))
-    # Split the analysis files.
+    # Use zinc to split the analysis files.
     if os.path.exists(src_analysis_cache):
-      if self.run_zinc_split(src_cache=src_analysis_cache, splits=[(x[0], x[2]) for x in analysis_splits]):
+      analysis_args = []
+      analysis_args.extend(self._zinc_jar_args)
+      analysis_args.extend([
+        '-log-level', self.context.options.log_level or 'info',
+        '-analysis',
+        '-mirror-analysis'
+        ])
+      split_args = analysis_args + [
+        '-cache', src_analysis_cache,
+        '-split', ','.join(['{%s}:%s' % (':'.join(x[0]), x[2]) for x in analysis_splits]),
+        ]
+      if self.runjava(self._main, classpath=self._zinc_classpath, args=split_args, jvmargs=self._jvm_args):
         raise TaskError, 'zinc failed to split analysis files %s from %s' %\
                          (':'.join([x[2] for x in analysis_splits]), src_analysis_cache)
 
       # Now rebase the newly created analysis files.
       for split in analysis_splits:
         dst_analysis_cache = split[2]
-        dst_output_dir = split[1]
         if os.path.exists(dst_analysis_cache):
-          rebasings = [(src_output_dir, dst_output_dir)]
-          if self.run_zinc_rebase(cache=dst_analysis_cache, rebasings=rebasings):
+          rebase_args = analysis_args + [
+            '-cache', dst_analysis_cache,
+            '-rebase', '%s:%s' % (src_output_dir, split[1]),
+            ]
+          if self.runjava(self._main, classpath=self._zinc_classpath, args=rebase_args, jvmargs=self._jvm_args):
             raise TaskError, 'In split_artifact: zinc failed to rebase analysis file %s' % dst_analysis_cache
 
   # Merges artifacts representing the individual targets in a VersionedTargetSet into one artifact for that set.
@@ -414,6 +389,14 @@ class ScalaCompile(NailgunTask):
       safe_rmtree(dst_output_dir)
       safe_mkdir(dst_output_dir)
       src_analysis_caches = []
+
+      analysis_args = []
+      analysis_args.extend(self._zinc_jar_args)
+      analysis_args.extend([
+        '-log-level', self.context.options.log_level or 'info',
+        '-analysis',
+        '-mirror-analysis'
+        ])
 
       # TODO: Do we actually need to merge deps? Zinc will stomp them anyway on success.
       dst_deps = Dependencies(dst_output_dir)
@@ -439,67 +422,31 @@ class ScalaCompile(NailgunTask):
                 safe_mkdir(os.path.dirname(dst))
                 os.link(src, dst)
 
-          # Rebase a copy of the per-target analysis files prior to merging.
+          # Use zinc to rebase a copy of the per-target analysis files prior to merging.
           if os.path.exists(src_analysis_cache):
             src_analysis_cache_tmp = \
               os.path.join(tmpdir, os.path.relpath(src_analysis_cache, self._analysis_cache_dir))
             shutil.copyfile(src_analysis_cache, src_analysis_cache_tmp)
             src_analysis_caches.append(src_analysis_cache_tmp)
-            if self.run_zinc_rebase(cache=src_analysis_cache_tmp, rebasings=[(src_output_dir, dst_output_dir)]):
+            rebase_args = analysis_args + [
+              '-cache', src_analysis_cache_tmp,
+              '-rebase', '%s:%s' % (src_output_dir, dst_output_dir),
+              ]
+            if self.runjava(self._main, classpath=self._zinc_classpath, args=rebase_args, jvmargs=self._jvm_args):
               self.context.log.warn('In merge_artifact: zinc failed to rebase analysis file %s. ' \
               'Target may require a full rebuild.' % src_analysis_cache_tmp)
 
       dst_deps.save(dst_depfile)
 
-      if self.run_zinc_merge(src_caches=src_analysis_caches, dst_cache=dst_analysis_cache):
+      # Use zinc to merge the analysis files.
+      merge_args = analysis_args + [
+        '-cache', dst_analysis_cache,
+        '-merge', ':'.join(src_analysis_caches),
+      ]
+      if self.runjava(self._main, classpath=self._zinc_classpath, args=merge_args, jvmargs=self._jvm_args):
         raise TaskError, 'zinc failed to merge analysis files %s to %s' % \
                          (':'.join(src_analysis_caches), dst_analysis_cache)
 
-
-  def run_zinc(self, args):
-    zinc_args = [
-      '-log-level', self.context.options.log_level or 'info',
-      ]
-    zinc_args.extend(self._zinc_jar_args)
-    zinc_args.extend(args)
-    return self.runjava(self._main, classpath=self._zinc_classpath, args=zinc_args, jvmargs=self._jvm_args)
-
-  # Run zinc in analysis manipulation mode.
-  def run_zinc_analysis(self, cache, args):
-    zinc_analysis_args = [
-      '-analysis',
-      '-cache', cache,
-      ]
-    zinc_analysis_args.extend(args)
-    return self.run_zinc(args=zinc_analysis_args)
-
-  # src_cache - split this analysis cache.
-  # splits - a list of (sources, dst_cache), where sources is a list of the sources whose analysis
-  #          should be split into dst_cache.
-  def run_zinc_split(self, src_cache, splits):
-    zinc_split_args = [
-      '-split', ','.join(['{%s}:%s' % (':'.join(x[0]), x[1]) for x in splits]),
-      ]
-    return self.run_zinc_analysis(cache=src_cache, args=zinc_split_args)
-
-  # src_caches - a list of caches to merge into dst_cache.
-  def run_zinc_merge(self, src_caches, dst_cache):
-    zinc_merge_args = [
-      '-merge', ':'.join(src_caches),
-      ]
-    return self.run_zinc_analysis(cache=dst_cache, args=zinc_merge_args)
-
-  # cache - the analysis cache to rebase.
-  # rebasings - a list of pairs (rebase_from, rebase_to). Behavior is undefined if any rebase_from
-  # is a prefix of any other, as there is no guarantee that rebasings are applied in a particular order.
-  def run_zinc_rebase(self, cache, rebasings):
-    zinc_rebase_args = [
-      '-rebase', ','.join(['%s:%s' % rebasing for rebasing in rebasings]),
-      ]
-    return self.run_zinc_analysis(cache=cache, args=zinc_rebase_args)
-
-  IVY_HOME_PLACEHOLDER = '/IVY_HOME_PLACEHOLDER'
-  PANTS_HOME_PLACEHOLDER = '/PANTS_HOME_PLACEHOLDER'
 
   def write_plugin_info(self, target):
     basedir = os.path.join(self._resources_dir, target.id)
@@ -546,13 +493,14 @@ class ScalaCompile(NailgunTask):
         jars_by_name[name] = jar_for_name
     return jars_by_name
 
-  def find_plugins(self, plugin_names):
+  @staticmethod
+  def find_plugins(plugin_names, plugin_jars):
     """Returns a map from plugin name to plugin jar."""
     plugin_names = set(plugin_names)
     plugins = {}
     # plugin_jars is the universe of all possible plugins and their transitive deps.
     # Here we select the ones to actually use.
-    for jar in self._plugin_jars:
+    for jar in plugin_jars:
       with open_jar(jar, 'r') as jarfile:
         try:
           with closing(jarfile.open(_PLUGIN_INFO_FILE, 'r')) as plugin_info_file:
@@ -563,9 +511,7 @@ class ScalaCompile(NailgunTask):
           if name in plugin_names:
             if name in plugins:
               raise TaskError, 'Plugin %s defined in %s and in %s' % (name, plugins[name], jar)
-            # It's important to use relative paths, as the compiler flags get embedded in the zinc
-            # analysis file, and we port those between systems via the artifact cache.
-            plugins[name] = os.path.relpath(jar, self._pants_home)
+            plugins[name] = jar
         except KeyError:
           pass
 

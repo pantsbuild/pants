@@ -131,7 +131,7 @@ class Task(object):
       extra_data.append(sha.hexdigest())
 
     cache_manager = CacheManager(self._cache_key_generator, self._build_invalidator_dir,
-      invalidate_dependents, extra_data, only_buildfiles)
+      invalidate_dependents, extra_data, only_externaldeps=only_buildfiles)
 
     invalidation_check = cache_manager.check(targets, partition_size_hint)
 
