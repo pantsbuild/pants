@@ -24,11 +24,7 @@ limitations under the License.
             xsi:noNamespaceSchemaLocation="http://ant.apache.org/ivy/schemas/ivy.xsd"
             xmlns:m="http://ant.apache.org/ivy/maven">
 
-  <info organisation="{{lib.org}}" module="{{lib.module}}"
-  {{#lib.version}}
-    revision="{{lib.version}}"
-  {{/lib.version}}
-  />
+  <info organisation="{{lib.org}}" module="{{lib.module}}" {{#lib.version}}revision="{{.}}"{{/lib.version}}/>
 
   <configurations defaultconfmapping="default->default(compile),runtime();sources->sources;docs->@,javadoc">
     <conf name="default" description="normal build"/>
@@ -43,15 +39,9 @@ limitations under the License.
   <publications>
     <artifact conf="default" type="jar" ext="jar"/>
     <artifact conf="default" type="pom" ext="pom"/>
-    {{#lib.publications.sources}}
-    <artifact conf="sources" type="source" m:classifier="sources" ext="jar"/>
-    {{/lib.publications.sources}}
-    {{#lib.publications.docs}}
-    <artifact conf="docs" type="doc" m:classifier="javadoc" ext="jar"/>
-    {{/lib.publications.docs}}
-    {{#lib.publications.changelog}}
-    <artifact conf="changelog" type="CHANGELOG" m:classifier="CHANGELOG" ext="txt"/>
-    {{/lib.publications.changelog}}
+    {{#lib.publications.sources}}<artifact conf="sources" type="source" m:classifier="sources" ext="jar"/>{{/lib.publications.sources}}
+    {{#lib.publications.docs}}<artifact conf="docs" type="doc" m:classifier="javadoc" ext="jar"/>{{/lib.publications.docs}}
+    {{#lib.publications.changelog}}<artifact conf="changelog" type="CHANGELOG" m:classifier="CHANGELOG" ext="txt"/>{{/lib.publications.changelog}}
   </publications>
   {{/lib.publications?}}
 
@@ -61,53 +51,29 @@ limitations under the License.
     <dependency org="{{org}}"
                 name="{{module}}"
                 rev="{{version}}"
-      {{#force}}
-                force="true"
-      {{/force}}
+                {{#force}}force="true"{{/force}}
                 conf="{{configurations}}"
-      {{^transitive}}
-                transitive="false"
-      {{/transitive}}
+                {{^transitive}}transitive="false"{{/transitive}}
     >
       {{#artifacts}}
-            <artifact
-              {{#name}}
-              name="{{name}}"
-              {{/name}}
-              {{#ext}}
-              ext="{{ext}}"
-              {{/ext}}
-              {{#url}}
-              url="{{url}}"
-              {{/url}}
-              {{#type_}}
-              type="{{type_}}"
-              {{/type_}}
-              {{#classifier}}
-              m:classifier="{{classifier}}"
-              {{/classifier}}
-              {{#conf}}
-              conf="{{conf}}"
-              {{/conf}}
-            />
+      <artifact
+        {{#name}}name="{{.}}"{{/name}}
+        {{#ext}}ext="{{.}}"{{/ext}}
+        {{#url}}url="{{.}}"{{/url}}
+        {{#type_}}type="{{.}}"{{/type_}}
+        {{#classifier}}m:classifier="{{.}}"{{/classifier}}
+        {{#conf}}conf="{{.}}"{{/conf}}
+      />
       {{/artifacts}}
       {{#excludes}}
-          {{#name}}
-      <exclude matcher="exactOrRegexp" org="{{org}}" module="{{name}}"/>
-          {{/name}}
-          {{^name}}
-      <exclude matcher="exactOrRegexp" org="{{org}}"/>
-          {{/name}}
+      {{#name}}<exclude matcher="exactOrRegexp" org="{{org}}" module="{{name}}"/>{{/name}}
+      {{^name}}<exclude matcher="exactOrRegexp" org="{{org}}"/>{{/name}}
       {{/excludes}}
     </dependency>
     {{/lib.dependencies}}
     {{#lib.excludes}}
-        {{#name}}
-    <exclude matcher="exactOrRegexp" org="{{org}}" module="{{name}}"/>
-        {{/name}}
-        {{^name}}
-    <exclude matcher="exactOrRegexp" org="{{org}}"/>
-        {{/name}}
+    {{#name}}<exclude matcher="exactOrRegexp" org="{{org}}" module="{{name}}"/>{{/name}}
+    {{^name}}<exclude matcher="exactOrRegexp" org="{{org}}"/>{{/name}}
     {{/lib.excludes}}
   </dependencies>
   {{/lib.dependencies?}}

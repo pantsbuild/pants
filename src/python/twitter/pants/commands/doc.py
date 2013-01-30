@@ -22,6 +22,7 @@ from . import Command
 
 import json
 import os
+import pkgutil
 import shutil
 import subprocess
 import traceback
@@ -33,8 +34,8 @@ from twitter.common.collections import OrderedSet
 from twitter.common.config import Properties
 from twitter.pants import is_exported, is_jvm, is_doc
 from twitter.pants.base import Address, Target
+from twitter.pants.base.generator import Generator
 from twitter.pants.targets import JavaLibrary
-from twitter.pants.ant import AntBuilder
 from twitter.pants.pants_doc import DocBuilder
 
 _ASSETS_DIR = 'doc/assets'
@@ -260,7 +261,12 @@ class Doc(Command):
 
   def _create_ivy_file(self, target, target_path):
     ivy_file = os.path.abspath(os.path.join(target_path, 'ivy.xml'))
-    AntBuilder.generate_ivy(self.root_dir, ivy_file, target)
+    template_data = target._create_template_data()
+    template_path = os.path.join('ivy_resolve', 'ivy.mustache')
+    generator = Generator(pkgutil.get_data('twitter.pants.tasks', template_path),
+                          root_dir=self.root_dir, lib=template_data)
+    with open(ivy_file, 'w') as outfile:
+      generator.write(outfile)
     return ivy_file
 
   def _create_artifact_data(self, targets, target_path):
