@@ -14,13 +14,10 @@
 # limitations under the License.
 # ==================================================================================================
 
-python_test_suite(name = 'all',
+python_tests(name = 'ant',
+  sources = globs('*.py'),
   dependencies = [
-    'tests/python/twitter/pants/ant',
-    'tests/python/twitter/pants/base',
-    'tests/python/twitter/pants/commands',
-    'tests/python/twitter/pants/python:all',
-    'tests/python/twitter/pants/targets',
-    'tests/python/twitter/pants/tasks',
+    'src/python/twitter/pants:pants-deps',
+    'src/python/twitter/pants:pants-lib',
   ]
 )
