@@ -51,47 +51,46 @@ class ZincMergedAnalysisCache(object):
     # Map from scala sources to the classes that they depend on. (Not class files, source files, but just classes.
     self.external_deps = defaultdict(set)
     # Map from scala sources to the classes that they provide. (Again, not class files, fully-qualified class names.)
-    self.class_names = defaultdict(set)
+    self.class_names = defaultdict(set) 
     for c in self.caches:
       self.parse(c)
 
   def parse(self, cachepath):
-    zincfile = "%s.relations" % cachepath
     try:
-      zincfile = open(zincfile, "r")
-    except IOError:
-      print "Warning: analysis cache file %s not found" % zincfile
-      return
-    mode = None
-    for line in zincfile:
-      if line.startswith("products:"):
-        mode = "products"
-      elif line.startswith("binary dependencies:"):
-        mode = "binary"
-      elif line.startswith("source dependencies:"):
-        mode = "source"
-      elif line.startswith("external dependencies:"):
-        mode = "external"
-      elif line.startswith("class names:"):
-        mode = "class"
-      else:
-        (src, sep, dep) = line.partition("->")
-        src = src.strip()
-        dep = dep.strip()
-        if sep == "" and line != "\n":
-            print ("Syntax error: line is neither a modeline nor a dep. '%s'"  %
-                    line)
-            continue
-        if mode == "products":
-          self.products[src].add(dep)
-        elif mode == "binary":
-          self.binary_deps[src].add(dep)
-        elif mode == "source":
-          self.source_deps[src].add(dep)
-        elif mode == "external":
-          self.external_deps[src].add(dep)
-        elif mode == "class":
-          self.class_names[src].add(dep)
+      zincfile = open("%s.relations" % cachepath, "r")
+      mode = None
+      for line in zincfile:
+        if line.startswith("products:"):
+          mode = "products"
+        elif line.startswith("binary dependencies:"):
+          mode = "binary"
+        elif line.startswith("source dependencies:"):
+          mode = "source"
+        elif line.startswith("external dependencies:"):
+          mode = "external"
+        elif line.startswith("class names:"):
+          mode = "class"
         else:
-          print "Unprocessed line, mode = %s" % mode
+          (src, sep, dep) = line.partition("->")
+          src = src.strip()
+          dep = dep.strip()
+          if sep == "" and line != "\n":
+              print ("Syntax error: line is neither a modeline nor a dep. '%s'"  %
+                      line)
+              continue
+          if mode == "products":
+            self.products[src].add(dep)
+          elif mode == "binary":
+            self.binary_deps[src].add(dep)
+          elif mode == "source":
+            self.source_deps[src].add(dep)
+          elif mode == "external":
+            self.external_deps[src].add(dep)
+          elif mode == "class":
+            self.class_names[src].add(dep)
+          else:
+            print "Unprocessed line, mode = %s" % mode
+    except IOError:
+      print "Warning: analysis cache file %s not found" % cachepath
+      return
 

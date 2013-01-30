@@ -16,7 +16,6 @@
 
 python_test_suite(name = 'all',
   dependencies = [
-    'tests/python/twitter/pants/ant',
     'tests/python/twitter/pants/base',
     'tests/python/twitter/pants/commands',
     'tests/python/twitter/pants/python:all',
