@@ -34,6 +34,9 @@ class JvmTarget(InternalTarget, TargetWithSources):
     self.declared_dependencies = set(dependencies or [])
     self.add_label('jvm')
     self.sources = self._resolve_paths(self.target_base, sources) or []
+    for source in self.sources:
+      rel_path = os.path.join(self.target_base, source)
+      TargetWithSources.register_source(rel_path, self)
     self.excludes = excludes or []
     self.buildflags = buildflags or []
 

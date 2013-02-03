@@ -87,6 +87,14 @@ class Address(object):
   def __ne__(self, other):
     return not self.__eq__(other)
 
+  def pretty(self, buildfile_path=None):
+    dirname = os.path.dirname(self.buildfile.relpath)
+    if buildfile_path and dirname == os.path.dirname(buildfile_path):
+      return ':%s' % self.target_name
+    if os.path.basename(dirname) == self.target_name:
+      return dirname
+    return '%s:%s' % (dirname, self.target_name)
+
   def __repr__(self):
     return "%s:%s%s" % (
       self.buildfile,

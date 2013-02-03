@@ -16,6 +16,8 @@
 
 import os
 
+from collections import defaultdict
+
 from twitter.common.contextutil import pushd
 from twitter.common.lang import Compatibility
 from twitter.pants import get_buildroot
@@ -23,6 +25,13 @@ from twitter.pants.base import Target
 from twitter.pants.targets.sources import SourceRoot
 
 class TargetWithSources(Target):
+
+  _source_to_targets = defaultdict(set)
+
+  @classmethod
+  def register_source(cls, source, target):
+    cls._source_to_targets[source].add(target)
+
   def __init__(self, name, is_meta=False):
     Target.__init__(self, name, is_meta)
 
