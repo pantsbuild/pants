@@ -42,6 +42,7 @@ python_library(
     'src/python/twitter/common',
     'src/python/twitter/common/app',
     'src/python/twitter/common/confluence',
+    'src/python/twitter/common/contextutil',
     'src/python/twitter/common/dirutil',
     'src/python/twitter/common/java',
     'src/python/twitter/common/lang',

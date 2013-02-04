@@ -26,7 +26,7 @@ from twitter.pants.tasks.cache_manager import CacheManager
 
 class TaskError(Exception):
   """Raised to indicate a task has failed."""
-
+  pass
 
 class Task(object):
   @classmethod

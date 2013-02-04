@@ -190,6 +190,7 @@ class RESTfulArtifactCache(ArtifactCache):
       self._ssl = True
     else:
       raise Exception, 'RESTfulArtifactCache only supports HTTP and HTTPS'
+    self._timeout_secs = 2.0
     self._netloc = parsed_url.netloc
     self._path_prefix = parsed_url.path
     if self._path_prefix.endswith('/'):
@@ -255,9 +256,9 @@ class RESTfulArtifactCache(ArtifactCache):
 
   def _connect(self):
     if self._ssl:
-      return httplib.HTTPSConnection(self._netloc)
+      return httplib.HTTPSConnection(self._netloc, timeout=self._timeout_secs)
     else:
-      return httplib.HTTPConnection(self._netloc)
+      return httplib.HTTPConnection(self._netloc, timeout=self._timeout_secs)
 
   # Returns a response if we get a 200, None if we get a 404 and raises an exception otherwise.
   def _request(self, method, path, body=None):
