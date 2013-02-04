@@ -34,9 +34,11 @@ class JvmTask(Task):
     bases = set()
     for target in self.context.targets():
       if isinstance(target, JvmTarget) and (is_test(target) or hasattr(target, 'resources')):
-        if target.target_base not in bases:
-          sibling_resources_base = os.path.join(os.path.dirname(target.target_base), 'resources')
-          classpath.append(os.path.join(get_buildroot(), sibling_resources_base))
-          bases.add(target.target_base)
+        sibling_resources_base = os.path.join(os.path.dirname(target.target_base), 'resources')
+        if sibling_resources_base not in bases:
+          sibling_resources_full_path = os.path.join(get_buildroot(), sibling_resources_base)
+          if os.path.isdir(sibling_resources_full_path):
+            classpath.append(sibling_resources_full_path)
+          bases.add(sibling_resources_base)
 
     return classpath
