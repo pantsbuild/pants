@@ -169,7 +169,11 @@ extends ArgumentOption[Map[File, File], Context] {
 
   def parseFilePair(pair: String): Option[(File, File)] = {
     val p = pair split pairSeparator
-    if (p.length == 2) Some((new File(p(0)), new File(p(1)))) else None
+    p.length match {
+      case 1 => Some((new File(p(0)), new File("")))
+      case 2 => Some((new File(p(0)), new File(p(1))))
+      case _ => None
+    }
   }
 }
 
