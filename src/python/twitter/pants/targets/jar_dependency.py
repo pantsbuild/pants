@@ -151,3 +151,6 @@ class Artifact(object):
     self.type_ = type_
     self.classifier = classifier
     self.conf = conf
+
+  def __repr__(self):
+    return '%s:%s:%s:%s:%s:%s' % (self.name, self.ext, self.url, self.type_, self.classifier, self.conf)
