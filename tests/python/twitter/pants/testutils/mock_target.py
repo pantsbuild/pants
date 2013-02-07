@@ -1,9 +1,9 @@
 
 __author__ = 'Ryan Williams'
 
-from twitter.pants.targets import InternalTarget
+from twitter.pants.targets import InternalTarget, TargetWithSources
 
-class MockTarget(InternalTarget):
+class MockTarget(InternalTarget, TargetWithSources):
 
   def __init__(self, id, dependencies = None, num_sources = 0):
     self.id = id
