@@ -62,9 +62,11 @@ class Address(object):
     self.target_name = target_name
     self.is_meta = is_meta
 
-  def reference(self):
+  def reference(self, referencing_buildfile_path=None):
     """How to reference this address in a BUILD file."""
     dirname = os.path.dirname(self.buildfile.relpath)
+    if referencing_buildfile_path and dirname == os.path.dirname(referencing_buildfile_path):
+      return ':%s' % self.target_name
     if os.path.basename(dirname) != self.target_name:
       ret = '%s:%s' % (dirname, self.target_name)
     else:
@@ -86,14 +88,6 @@ class Address(object):
 
   def __ne__(self, other):
     return not self.__eq__(other)
-
-  def pretty(self, buildfile_path=None):
-    dirname = os.path.dirname(self.buildfile.relpath)
-    if buildfile_path and dirname == os.path.dirname(buildfile_path):
-      return ':%s' % self.target_name
-    if os.path.basename(dirname) == self.target_name:
-      return dirname
-    return '%s:%s' % (dirname, self.target_name)
 
   def __repr__(self):
     return "%s:%s%s" % (
