@@ -210,7 +210,7 @@ class DependencyWriter(object):
 
 class PomWriter(DependencyWriter):
   def __init__(self, get_db):
-    super(PomWriter, self).__init__(get_db, os.path.join('jar_publish', 'pom.mk'))
+    super(PomWriter, self).__init__(get_db, os.path.join('jar_publish', 'pom.mustache'))
 
   def templateargs(self, target_jar, confs=None):
     return dict(artifact=target_jar)
