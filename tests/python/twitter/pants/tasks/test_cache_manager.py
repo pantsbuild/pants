@@ -6,8 +6,7 @@ import shutil
 import tempfile
 from twitter.pants.base.build_invalidator import CacheKey, CacheKeyGenerator
 from twitter.pants.tasks import CacheManager
-from twitter.pants.tasks.cache_manager import VersionedTargetSet
-from twitter.pants.targets import InternalTarget
+from twitter.pants.tasks.cache_manager import InvalidationCheck
 from twitter.pants.testutils import MockTarget
 
 class AppendingCacheKeyGenerator(CacheKeyGenerator):
@@ -19,8 +18,8 @@ class AppendingCacheKeyGenerator(CacheKeyGenerator):
       return cache_keys[0]
     else:
       sorted_cache_keys = sorted(cache_keys)  # For commutativity.
-      combined_id = [cache_key.id for cache_key in sorted_cache_keys].join(',')
-      combined_hash = [cache_key.hash for cache_key in sorted_cache_keys].join(',')
+      combined_id = ','.join([cache_key.id for cache_key in sorted_cache_keys])
+      combined_hash = ','.join([cache_key.hash for cache_key in sorted_cache_keys])
       combined_num_sources = reduce(lambda x, y: x + y, [cache_key.num_sources for cache_key in sorted_cache_keys], 0)
       return CacheKey(combined_id, combined_hash, combined_num_sources)
 
@@ -37,7 +36,7 @@ class TestCacheManager(CacheManager):
 
 
 def print_vt(vt):
-  print '%d (%s) %s: [ %s ]' % (len(vt.targets), vt.cache_key, vt.valid, ', '.join(['%s(%s)' % (vt.targets[i].id, vt.per_target_cache_keys[i]) for i in range(len(vt.targets))]))
+  print '%d (%s) %s: [ %s ]' % (len(vt.targets), vt.cache_key, vt.valid, ', '.join(['%s(%s)' % (v.id, v.cache_key) for v in vt.versioned_targets]))
 
 class CacheManagerTest(unittest.TestCase):
 
@@ -49,7 +48,7 @@ class CacheManagerTest(unittest.TestCase):
     shutil.rmtree(self._dir, ignore_errors=True)
 
   def make_vts(self, target):
-    return VersionedTargetSet(self.cache_manager, [ target ], [ target.id ])
+    return VersionedTarget(self.cache_manager, target, target.id)
 
   def test_partition(self):
     a = MockTarget('a', [], 1)
@@ -73,7 +72,8 @@ class CacheManagerTest(unittest.TestCase):
     vts_targets = [vt.targets[0] for vt in all_vts]
     self.assertEquals(set(targets), set(vts_targets))
 
-    partitioned = self.cache_manager._partition_versioned_targets(all_vts, 3)
+    ic = InvalidationCheck(all_vts, [], 3)
+    partitioned = ic.all_vts_partitioned
 
     [ print_vt(vt) for vt in partitioned ]
 

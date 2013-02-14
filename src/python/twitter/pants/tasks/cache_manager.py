@@ -33,15 +33,14 @@ from twitter.pants.targets.internal import InternalTarget
 #  - When checking the artifact cache, this can also be used to represent a list of targets
 #    that are built together into a single artifact.
 class VersionedTargetSet(object):
-  def __init__(self, cache_manager, targets, per_target_cache_keys):
+  def __init__(self, cache_manager, versioned_targets):
     self._cache_manager = cache_manager
-    self.per_target_cache_keys = per_target_cache_keys
-
-    self.cache_key = CacheKeyGenerator.combine_cache_keys(per_target_cache_keys)
+    self.versioned_targets = versioned_targets
+    self.targets = [vt.target for vt in versioned_targets]
+    # The following line is a no-op if cache_key was set in the VersionedTarget __init__ method.
+    self.cache_key = CacheKeyGenerator.combine_cache_keys([vt.cache_key for vt in versioned_targets])
     self.num_sources = self.cache_key.num_sources
     self.valid = not cache_manager.needs_update(self.cache_key)
-    self.targets = targets
-
 
   @staticmethod
   def from_versioned_targets(versioned_targets):
@@ -56,10 +55,7 @@ class VersionedTargetSet(object):
         raise Exception(
           "Attempting to combine versioned targets %s and %s with different CacheMananger instances: %s and %s" % (
             str(first_target), str(versioned_target), str(cache_manager), str(versioned_target._cache_manager)))
-
-    targets = [ vt.target for vt in versioned_targets ]
-    cache_keys = [ vt.cache_key for vt in versioned_targets ]
-    return VersionedTargetSet(cache_manager, targets, cache_keys)
+    return VersionedTargetSet(cache_manager, versioned_targets)
 
   def update(self):
     self._cache_manager.update(self)
@@ -73,8 +69,10 @@ class VersionedTarget(VersionedTargetSet):
   """This class represents a singleton VersionedTargetSet, and has links to VersionedTargets that the wrapped target
   depends on (after having resolvied through any "alias" targets."""
   def __init__(self, cache_manager, target, cache_key):
-    VersionedTargetSet.__init__(self, cache_manager, [ target ], [ cache_key ])
     self.target = target
+    self.cache_key = cache_key
+    # Must come after the assigments above, as they are used in the parent's __init__.
+    VersionedTargetSet.__init__(self, cache_manager, [self])
     self.id = target.id
     self.dependencies = set([])
     if not isinstance(target, TargetWithSources):
@@ -86,22 +84,80 @@ class VersionedTarget(VersionedTargetSet):
 # Tasks may need to perform no, some or all operations on either of these, depending on how they
 # are implemented.
 class InvalidationCheck(object):
-  def __init__(self, all_vts, all_vts_partitioned, invalid_vts, invalid_vts_partitioned):
+  @staticmethod
+  def _partition_versioned_targets(versioned_targets, partition_size_hint):
+    """Groups versioned targets so that each group has roughly the same number of sources.
+
+    versioned_targets is a list of VersionedTarget objects  [ vt1, vt2, vt3, vt4, vt5, vt6, ...].
+
+    Returns a list of VersionedTargetSet objects, e.g., [ VT1, VT2, VT3, ...] representing the
+    same underlying targets. E.g., VT1 is the combination of [vt1, vt2, vt3], VT2 is the combination
+    of [vt4, vt5] and VT3 is [vt6].
+
+    The new versioned targets are chosen to have roughly partition_size_hint sources.
+
+    This is useful as a compromise between flat mode, where we build all targets in a
+    single compiler invocation, and non-flat mode, where we invoke a compiler for each target,
+    which may lead to lots of compiler startup overhead. A task can choose instead to build one
+    group at a time.
+    """
+    res = []
+
+    # Hack around the python outer scope problem.
+    class VtGroup(object):
+      def __init__(self):
+        self.vts = []
+        self.total_sources = 0
+
+    current_group = VtGroup()
+
+    def add_to_current_group(vt):
+      current_group.vts.append(vt)
+      current_group.total_sources += vt.num_sources
+
+    def close_current_group():
+      if len(current_group.vts) > 0:
+        new_vt = VersionedTargetSet.from_versioned_targets(current_group.vts)
+        res.append(new_vt)
+        current_group.vts = []
+        current_group.total_sources = 0
+
+    for vt in versioned_targets:
+      add_to_current_group(vt)
+      if current_group.total_sources > partition_size_hint:
+        if current_group.total_sources > 1.5 * partition_size_hint and len(current_group.vts) > 1:
+          # Too big. Close the current group without this vt and add it to the next one.
+          current_group.vts.pop()
+          close_current_group()
+          add_to_current_group(vt)
+        else:
+          close_current_group()
+    close_current_group()  # Close the last group, if any.
+
+    return res
+
+  def __init__(self, all_vts, invalid_vts, partition_size_hint=None):
     # All the targets, valid and invalid.
     self.all_vts = all_vts
 
     # All the targets, partitioned if so requested.
-    self.all_vts_partitioned = all_vts_partitioned
+    self.all_vts_partitioned = \
+      InvalidationCheck._partition_versioned_targets(all_vts, partition_size_hint) if partition_size_hint \
+      else all_vts
 
     # Just the invalid targets.
     self.invalid_vts = invalid_vts
 
     # Just the invalid targets, partitioned if so requested.
-    self.invalid_vts_partitioned = invalid_vts_partitioned
+    self.invalid_vts_partitioned = \
+      InvalidationCheck._partition_versioned_targets(invalid_vts, partition_size_hint) if partition_size_hint \
+      else invalid_vts
+
 
 class CacheManager(object):
   """Manages cache checks, updates and invalidation keeping track of basic change
   and invalidation statistics.
+  Note that this is distinct from the ArtifactCache concept, and should probably be renamed.
   """
   def __init__(self, cache_key_generator, build_invalidator_dir,
                invalidate_dependents, extra_data, only_externaldeps):
@@ -114,11 +170,11 @@ class CacheManager(object):
 
   def update(self, vts):
     """Mark a changed or invalidated VersionedTargetSet as successfully processed."""
-    for cache_key in vts.per_target_cache_keys:
-      self._invalidator.update(cache_key)
+    for vt in vts.versioned_targets:
+      self._invalidator.update(vt.cache_key)
     self._invalidator.update(vts.cache_key)
 
-  def check(self, targets, partition_size_hint):
+  def check(self, targets, partition_size_hint=None):
     """Checks whether each of the targets has changed and invalidates it if so.
 
     Returns a list of VersionedTargetSet objects (either valid or invalid). The returned sets 'cover'
@@ -127,9 +183,7 @@ class CacheManager(object):
     """
     all_vts = self._sort_and_validate_targets(targets)
     invalid_vts = filter(lambda vt: not vt.valid, all_vts)
-    all_vts_partitioned = self._partition_versioned_targets(all_vts, partition_size_hint)
-    invalid_vts_partitioned = self._partition_versioned_targets(invalid_vts, partition_size_hint)
-    return InvalidationCheck(all_vts, all_vts_partitioned, invalid_vts, invalid_vts_partitioned)
+    return InvalidationCheck(all_vts, invalid_vts, partition_size_hint)
 
   def _sort_and_validate_targets(self, targets):
     """Validate each target.
@@ -237,57 +291,6 @@ class CacheManager(object):
     ordered_targets_and_deps = reversed(reverse_ordered_targets_and_deps)
     # Return just the ones that were originally in targets.
     return filter(lambda x: x.id in target_ids, ordered_targets_and_deps)
-
-  def _partition_versioned_targets(self, versioned_targets, partition_size_hint):
-    """Groups versioned targets so that each group has roughly the same number of sources.
-
-    versioned_targets is a list of VersionedTarget objects  [ vt1, vt2, vt3, vt4, vt5, vt6, ...].
-
-    Returns a list of VersionedTargetSet objects, e.g., [ VT1, VT2, VT3, ...] representing the
-    same underlying targets. E.g., VT1 is the combination of [vt1, vt2, vt3], VT2 is the combination
-    of [vt4, vt5] and VT3 is [vt6].
-
-    The new versioned targets are chosen to have roughly partition_size_hint sources.
-
-    This is useful as a compromise between flat mode, where we build all targets in a
-    single compiler invocation, and non-flat mode, where we invoke a compiler for each target,
-    which may lead to lots of compiler startup overhead. A task can choose instead to build one
-    group at a time.
-    """
-    res = []
-
-    # Hack around the python outer scope problem.
-    class VtGroup(object):
-      def __init__(self):
-        self.vts = []
-        self.total_sources = 0
-
-    current_group = VtGroup()
-
-    def add_to_current_group(vt):
-      current_group.vts.append(vt)
-      current_group.total_sources += vt.num_sources
-
-    def close_current_group():
-      if len(current_group.vts) > 0:
-        new_vt = VersionedTargetSet.from_versioned_targets(current_group.vts)
-        res.append(new_vt)
-        current_group.vts = []
-        current_group.total_sources = 0
-
-    for vt in versioned_targets:
-      add_to_current_group(vt)
-      if current_group.total_sources > partition_size_hint:
-        if current_group.total_sources > 1.5 * partition_size_hint and len(current_group.vts) > 1:
-          # Too big. Close the current group without this vt and add it to the next one.
-          current_group.vts.pop()
-          close_current_group()
-          add_to_current_group(vt)
-        else:
-          close_current_group()
-    close_current_group()  # Close the last group, if any.
-
-    return res
 
   def _key_for(self, target, dependency_keys):
     def fingerprint_extra(sha):

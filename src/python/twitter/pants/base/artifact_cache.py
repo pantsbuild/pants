@@ -17,7 +17,6 @@
 import httplib
 import os
 import shutil
-import traceback
 import urlparse
 
 from twitter.common.contextutil import open_tar, temporary_file
@@ -216,34 +215,44 @@ class RESTfulArtifactCache(ArtifactCache):
     return response is not None
 
   def use_cached_files(self, cache_key):
-    path = self._path_for_key(cache_key)
-    response = self._request('GET', path)
-    if response is None:
-      return False
-    expected_size = int(response.getheader('content-length', -1))
-    if expected_size == -1:
-      raise Exception, 'No content-length header in HTTP response'
-    read_size = 4 * 1024 * 1024 # 4 MB
-    done = False
-    if self.context:
-      self.context.log.info('Reading %d bytes' % expected_size)
-    with temporary_file() as outfile:
-      total_bytes = 0
-      while not done:
-        data = response.read(read_size)
-        outfile.write(data)
-        if len(data) < read_size:
-          done = True
-        total_bytes += len(data)
-        if self.context:
-          self.context.log.debug('Read %d bytes' % total_bytes)
-      outfile.close()
-      if total_bytes != expected_size:
-        raise Exception, 'Read only %d bytes from %d expected' % (total_bytes, expected_size)
-      mode = 'r:bz2' if self.compress else 'r'
-      with open_tar(outfile.name, mode) as tarfile:
-        tarfile.extractall(self.artifact_root)
-    return True
+    # This implementation fetches the appropriate tarball and extracts it.
+    try:
+      # Send an HTTP request for the tarball.
+      path = self._path_for_key(cache_key)
+      response = self._request('GET', path)
+      if response is None:
+        return False
+      expected_size = int(response.getheader('content-length', -1))
+      if expected_size == -1:
+        raise Exception, 'No content-length header in HTTP response'
+      read_size = 4 * 1024 * 1024 # 4 MB
+      done = False
+      if self.context:
+        self.context.log.info('Reading %d bytes' % expected_size)
+      # Read the data in a loop.
+      with temporary_file() as outfile:
+        total_bytes = 0
+        while not done:
+          data = response.read(read_size)
+          outfile.write(data)
+          if len(data) < read_size:
+            done = True
+          total_bytes += len(data)
+          if self.context:
+            self.context.log.debug('Read %d bytes' % total_bytes)
+        outfile.close()
+        # Check the size.
+        if total_bytes != expected_size:
+          raise Exception, 'Read only %d bytes from %d expected' % (total_bytes, expected_size)
+        # Extract the tarfile.
+        mode = 'r:bz2' if self.compress else 'r'
+        with open_tar(outfile.name, mode) as tarfile:
+          tarfile.extractall(self.artifact_root)
+      return True
+    except Exception, e:
+      if self.context:
+        self.context.log.warn('Error while reading from artifact cache: %s' % e)
+        return False
 
   def delete(self, cache_key):
     path = self._path_for_key(cache_key)
