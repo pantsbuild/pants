@@ -393,8 +393,7 @@ class ScalaCompile(NailgunTask):
 
     def do_split(src_analysis_file, splits):
       if os.path.exists(src_analysis_file):
-        splits=[(x.sources, x.dst_analysis_file) for x in splits]
-        if self._zinc_utils.run_zinc_split(src_analysis_file, splits):
+        if self._zinc_utils.run_zinc_split(src_analysis_file, [(x.sources, x.dst_analysis_file) for x in splits]):
           raise TaskError, 'zinc failed to split analysis files %s from %s' %\
                            (':'.join([x.dst_analysis_file for x in splits]), src_analysis_file)
         for split in splits:
