@@ -255,7 +255,8 @@ class ScalaCompile(NailgunTask):
             # Relativize the analysis.
             # TODO: Relativize before splitting? This will require changes to Zinc, which currently
             # eliminates paths it doesn't recognize (including our placeholders) when splitting.
-            if self._zinc_utils.relativize_analysis_file(vt_analysis_file, vt_portable_analysis_file):
+            if os.path.exists(vt_analysis_file) and \
+                self._zinc_utils.relativize_analysis_file(vt_analysis_file, vt_portable_analysis_file):
               raise TaskError('Zinc failed to relativize analysis file: %s' % vt_analysis_file)
             # Write the per-target artifacts to the cache.
             artifacts = [vt_classes_dir, vt_depfile, vt_portable_analysis_file]
