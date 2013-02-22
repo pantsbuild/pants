@@ -83,7 +83,7 @@ object SbtAnalysis {
               val newSetup = rebaseSetup(compileSetup, multiRebasingMapper)
               analysisStore.set(newAnalysis, newSetup)
               if (mirrorAnalysis) {
-                printRelations(analysis, Some(new File(cacheFile.getPath() + ".relations")), cwd)
+                printRelations(newAnalysis, Some(new File(cacheFile.getPath() + ".relations")), cwd)
               }
             }
           }
