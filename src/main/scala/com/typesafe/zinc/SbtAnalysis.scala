@@ -111,12 +111,12 @@ object SbtAnalysis {
 
     val rebasers: List[PartialFunction[String, Option[String]]] =
       rebase map { x: (File, File) =>
-        createSingleRebaser(x._1.getCanonicalPath, if (x._2.getPath.isEmpty) None else Some(x._2.getCanonicalPath))
+        createSingleRebaser(x._1.getAbsolutePath, if (x._2.getPath.isEmpty) None else Some(x._2.getAbsolutePath))
       } toList
 
     val multiRebaser: PartialFunction[String, Option[String]] =
       rebasers reduceLeft (_ orElse _) orElse { case s: String => Some(s) }
-    f: File => multiRebaser(f.getCanonicalPath) map { new File(_) }
+    f: File => multiRebaser(f.getAbsolutePath) map { new File(_) }
   }
 
   /**
@@ -211,11 +211,11 @@ object SbtAnalysis {
    * If set of sources is a single directory, finds all sources outside that directory.
    */
   def findOutsideSources(analysis: Analysis, sources: Seq[File]): Set[File] = {
-    val pathSet = Set(sources map { f => f.getCanonicalPath } : _*)
+    val pathSet = Set(sources map { f => f.getAbsolutePath } : _*)
     if (pathSet.size == 1 && sources.head.isDirectory)
       (analysis.relations.srcProd.all map (_._1) filter { src => IO.relativize(sources.head, src).isEmpty }).toSet
     else {
-      (analysis.relations.srcProd.all map (_._1) filter { src => !pathSet.contains(src.getCanonicalPath) }).toSet
+      (analysis.relations.srcProd.all map (_._1) filter { src => !pathSet.contains(src.getAbsolutePath) }).toSet
     }
   }
 
