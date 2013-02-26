@@ -35,6 +35,14 @@ class ParseContext(object):
   _active = collections.deque([])
   _parsed = set()
 
+  _strs_to_exec = [
+    "from twitter.pants import *",
+    "from twitter.common.quantity import Amount, Time",
+  ]
+  @classmethod
+  def add_to_exec_context(cls, str_to_exec):
+    cls._strs_to_exec.append(str_to_exec)
+
   @staticmethod
   def locate():
     """Attempts to find the current root directory and buildfile.  If there is an active parse
@@ -93,10 +101,9 @@ class ParseContext(object):
       ParseContext._parsed.update(buildfile_family)
 
       pants_context = {}
-      ast1 = compile("from twitter.pants import *", "<string>", "exec")
-      ast2 = compile("from twitter.common.quantity import Amount, Time", "<string>", "exec")
-      Compatibility.exec_function(ast1, pants_context)
-      Compatibility.exec_function(ast2, pants_context)
+      for str_to_exec in self._strs_to_exec:
+        ast = compile(str_to_exec, '<string>', 'exec')
+        Compatibility.exec_function(ast, pants_context)
 
       with ParseContext.activate(self):
         start = os.path.abspath(os.curdir)
