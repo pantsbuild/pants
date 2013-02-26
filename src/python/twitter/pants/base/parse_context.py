@@ -39,8 +39,16 @@ class ParseContext(object):
     "from twitter.pants import *",
     "from twitter.common.quantity import Amount, Time",
   ]
+
   @classmethod
   def add_to_exec_context(cls, str_to_exec):
+    """This hook allows for adding symbols to the execution context in which BUILD files are
+    parsed. This should only be used for importing symbols that are used fairly ubiquitously in
+    BUILD files, and possibly for appending to sys.path to get local python code on the python
+    path.
+
+    This will be phased out in favor of a more robust plugin architecture that supports import
+    injection and path amendment."""
     cls._strs_to_exec.append(str_to_exec)
 
   @staticmethod
