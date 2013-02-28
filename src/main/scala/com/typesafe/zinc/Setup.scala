@@ -36,6 +36,11 @@ object JarFile {
   def apply(name: String, classifier: String): JarFile = JarFile(name, Some(classifier))
 }
 
+/**
+ * The scala jars split into compiler, library, and extra.
+ */
+case class ScalaJars(compiler: File, library: File, extra: Seq[File])
+
 object Setup {
   val Command     = "zinc"
   val Description = "scala incremental compiler"
@@ -53,9 +58,9 @@ object Setup {
    * Create compiler setup from command-line settings.
    */
   def apply(settings: Settings): Setup = {
-    val (compiler, library, extra) = selectScalaJars(settings.scala)
+    val scalaJars = selectScalaJars(settings.scala)
     val (sbtInterface, compilerInterfaceSrc) = selectSbtJars(settings.sbt)
-    setup(compiler, library, extra, sbtInterface, compilerInterfaceSrc, settings.javaHome)
+    setup(scalaJars.compiler, scalaJars.library, scalaJars.extra, sbtInterface, compilerInterfaceSrc, settings.javaHome)
   }
 
   /**
@@ -107,12 +112,12 @@ object Setup {
     sbtJars: SbtJars,
     javaHome: File): Setup =
   {
-    val (scalaCompiler, scalaLibrary, scalaExtra) = selectScalaJars(scalaLocation)
+    val scalaJars = selectScalaJars(scalaLocation)
     val (sbtInterface, compilerInterfaceSrc) = selectSbtJars(sbtJars)
     setup(
-      scalaCompiler,
-      scalaLibrary,
-      scalaExtra,
+      scalaJars.compiler,
+      scalaJars.library,
+      scalaJars.extra,
       sbtInterface,
       compilerInterfaceSrc,
       Option(javaHome)
@@ -125,23 +130,27 @@ object Setup {
    * Prefer the explicit scala-compiler, scala-library, and scala-extra settings,
    * then the scala-path setting, then the scala-home setting. Default to bundled scala.
    */
-  def selectScalaJars(scala: ScalaLocation): (File, File, Seq[File]) = {
-    val (compiler, library, extra) = {
+  def selectScalaJars(scala: ScalaLocation): ScalaJars = {
+    val jars = {
       splitScala(scala.path) orElse
       splitScala(allLibs(scala.home), Defaults.scalaExcluded) getOrElse
       Defaults.scalaJars
     }
-    (scala.compiler getOrElse compiler, scala.library getOrElse library, scala.extra ++ extra)
+    ScalaJars(
+      scala.compiler getOrElse jars.compiler,
+      scala.library getOrElse jars.library,
+      scala.extra ++ jars.extra
+    )
   }
 
   /**
    * Distinguish the compiler and library jars.
    */
-  def splitScala(jars: Seq[File], excluded: Set[String] = Set.empty): Option[(File, File, Seq[File])] = {
+  def splitScala(jars: Seq[File], excluded: Set[String] = Set.empty): Option[ScalaJars] = {
     val filtered = jars filterNot (excluded contains _.getName)
     val (compiler, other) = filtered partition (_.getName matches ScalaCompiler.pattern)
     val (library, extra) = other partition (_.getName matches ScalaLibrary.pattern)
-    if (compiler.nonEmpty && library.nonEmpty) Some(compiler(0), library(0), extra) else None
+    if (compiler.nonEmpty && library.nonEmpty) Some(ScalaJars(compiler(0), library(0), extra)) else None
   }
 
   /**
@@ -193,7 +202,7 @@ object Setup {
     val scalaCompiler        = optLibOrDefault(zincHome, ScalaCompiler)
     val scalaLibrary         = optLibOrDefault(zincHome, ScalaLibrary)
     val scalaExtra           = Seq(optLibOrDefault(zincHome, ScalaReflect))
-    val scalaJars            = (scalaCompiler, scalaLibrary, scalaExtra)
+    val scalaJars            = ScalaJars(scalaCompiler, scalaLibrary, scalaExtra)
     val defaultScalaExcluded = Set("jansi.jar", "jline.jar", "scala-partest.jar", "scala-swing.jar", "scalacheck.jar", "scalap.jar")
     val scalaExcluded        = Util.stringSetProperty(prop("scala.excluded"), defaultScalaExcluded)
 

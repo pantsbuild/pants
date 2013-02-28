@@ -110,9 +110,9 @@ object SbtAnalysis {
     }
 
     val rebasers: List[PartialFunction[String, Option[String]]] =
-      rebase map { x: (File, File) =>
+      (rebase map { x: (File, File) =>
         createSingleRebaser(x._1.getAbsolutePath, if (x._2.getPath.isEmpty) None else Some(x._2.getAbsolutePath))
-      } toList
+      }).toList
 
     val multiRebaser: PartialFunction[String, Option[String]] =
       rebasers reduceLeft (_ orElse _) orElse { case s: String => Some(s) }

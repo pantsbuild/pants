@@ -149,7 +149,7 @@ class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler) {
     if (forceClean && Compiler.analysisIsEmpty(cacheFile)) Util.cleanAllClasses(classesDirectory)
     val getAnalysis: File => Option[Analysis] = analysisMap.get _
     val aggressive    = new AggressiveCompile(cacheFile)
-    val cp            = autoClasspath(classesDirectory, scalac.scalaInstance.libraryJar, javaOnly, classpath)
+    val cp            = autoClasspath(classesDirectory, scalac.scalaInstance.allJars, javaOnly, classpath)
     val compileOutput = CompileOutput(classesDirectory)
     val globalsCache  = Compiler.residentCache
     val progress      = None
@@ -170,9 +170,12 @@ class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler) {
   /**
    * Automatically add the output directory and scala library to the classpath.
    */
-  def autoClasspath(classesDirectory: File, scalaLibrary: File, javaOnly: Boolean, classpath: Seq[File]): Seq[File] = {
+  def autoClasspath(classesDirectory: File, allScalaJars: Seq[File], javaOnly: Boolean, classpath: Seq[File]): Seq[File] = {
     if (javaOnly) classesDirectory +: classpath
-    else classesDirectory +: scalaLibrary +: classpath
+    else Setup.splitScala(allScalaJars) match {
+      case Some(scalaJars) => classesDirectory +: scalaJars.library +: classpath
+      case None            => classesDirectory +: classpath
+    }
   }
 
   override def toString = "Compiler(Scala %s)" format scalac.scalaInstance.actualVersion
