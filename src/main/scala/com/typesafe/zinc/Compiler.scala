@@ -8,7 +8,7 @@ import java.io.File
 import java.net.URLClassLoader
 import sbt.{ ClasspathOptions, CompileOptions, CompileSetup, LoggerReporter, ScalaInstance }
 import sbt.compiler.{ AggressiveCompile, AnalyzingCompiler, CompilerCache, CompileOutput, IC }
-import sbt.inc.{ Analysis, AnalysisStore, FileBasedStore, IncOptions }
+import sbt.inc.{ Analysis, AnalysisStore, FileBasedStore }
 import sbt.Path._
 import xsbti.compile.{ JavaCompiler, GlobalsCache }
 import xsbti.Logger
@@ -158,7 +158,6 @@ class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler) {
     val skip          = false
     val compileSetup  = new CompileSetup(compileOutput, new CompileOptions(scalacOptions, javacOptions), scalac.scalaInstance.actualVersion, compileOrder)
     val analysisStore = Compiler.analysisStore(cacheFile)
-    val incOptions    = IncOptions.Default
     val analysis      = aggressive.compile1(sources, cp, compileSetup, progress, analysisStore, getAnalysis, definesClass, scalac, javac, reporter, skip, globalsCache, incOptions)(log)
     if (mirrorAnalysis) {
       SbtAnalysis.printRelations(analysis, Some(new File(cacheFile.getPath() + ".relations")), cwd)

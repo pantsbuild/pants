@@ -6,6 +6,7 @@ package com.typesafe.zinc
 
 import java.io.File
 import java.util.{ List => JList }
+import sbt.inc.IncOptions
 import sbt.Level
 import sbt.Path._
 import scala.collection.JavaConverters._
@@ -30,6 +31,7 @@ case class Settings(
   javacOptions: Seq[String]  = Seq.empty,
   compileOrder: CompileOrder = CompileOrder.Mixed,
   sbt: SbtJars               = SbtJars(),
+  incOptions: IncOptions     = IncOptions.Default,
   analysis: AnalysisOptions  = AnalysisOptions(),
   analysisUtil: AnalysisUtil = AnalysisUtil(),
   properties: Seq[String]    = Seq.empty)
@@ -155,6 +157,13 @@ object Settings {
     file(      "-sbt-interface", "file",       "Specify sbt interface jar",                  (s: Settings, f: File) => s.copy(sbt = s.sbt.copy(sbtInterface = Some(f)))),
     file(      "-compiler-interface", "file",  "Specify compiler interface sources jar",     (s: Settings, f: File) => s.copy(sbt = s.sbt.copy(compilerInterfaceSrc = Some(f)))),
 
+    header("Incremental compiler options:"),
+    int(       "-transitive-step", "n",        "Steps before transitive closure",            (s: Settings, i: Int) => s.copy(incOptions = s.incOptions.copy(transitiveStep = i))),
+    fraction(  "-recompile-all-fraction", "x", "Limit before recompiling all sources",       (s: Settings, d: Double) => s.copy(incOptions = s.incOptions.copy(recompileAllFraction = d))),
+    boolean(   "-debug-relations",             "Enable debug logging of analysis relations", (s: Settings) => s.copy(incOptions = s.incOptions.copy(relationsDebug = true))),
+    boolean(   "-debug-api",                   "Enable analysis API debugging",              (s: Settings) => s.copy(incOptions = s.incOptions.copy(apiDebug = true))),
+    file(      "-api-dump", "directory",       "Destination for analysis API dump",          (s: Settings, f: File) => s.copy(incOptions = s.incOptions.copy(apiDumpDirectory = Some(f)))),
+
     header("Analysis options:"),
     file(      "-analysis-cache", "file",      "Cache file for compile analysis",            (s: Settings, f: File) => s.copy(analysis = s.analysis.copy(cache = Some(f)))),
     fileMap(   "-analysis-map",                "Upstream analysis mapping (file:file,...)",  (s: Settings, m: Map[File, File]) => s.copy(analysis = s.analysis.copy(cacheMap = m))),
@@ -247,6 +256,9 @@ object Settings {
           sbtInterface = Util.normaliseOpt(cwd)(sbt.sbtInterface),
           compilerInterfaceSrc = Util.normaliseOpt(cwd)(sbt.compilerInterfaceSrc)
         ),
+        incOptions = incOptions.copy(
+          apiDumpDirectory = Util.normaliseOpt(cwd)(incOptions.apiDumpDirectory)
+        ),
         analysis = analysis.copy(
           cache = Util.normaliseOpt(cwd)(analysis.cache),
           cacheMap = Util.normaliseMap(cwd)(analysis.cacheMap),
@@ -270,6 +282,8 @@ object Settings {
   def boolean(opts: (String, String), desc: String, action: Settings => Settings) = new BooleanOption[Settings](Seq(opts._1, opts._2), desc, action)
   def string(opt: String, arg: String, desc: String, action: (Settings, String) => Settings) = new StringOption[Settings](Seq(opt), arg, desc, action)
   def int(opt: String, arg: String, desc: String, action: (Settings, Int) => Settings) = new IntOption[Settings](Seq(opt), arg, desc, action)
+  def double(opt: String, arg: String, desc: String, action: (Settings, Double) => Settings) = new DoubleOption[Settings](Seq(opt), arg, desc, action)
+  def fraction(opt: String, arg: String, desc: String, action: (Settings, Double) => Settings) = new FractionOption[Settings](Seq(opt), arg, desc, action)
   def file(opt: String, arg: String, desc: String, action: (Settings, File) => Settings) = new FileOption[Settings](Seq(opt), arg, desc, action)
   def path(opt: String, arg: String, desc: String, action: (Settings, Seq[File]) => Settings) = new PathOption[Settings](Seq(opt), arg, desc, action)
   def path(opts: (String, String), arg: String, desc: String, action: (Settings, Seq[File]) => Settings) = new PathOption[Settings](Seq(opts._1, opts._2), arg, desc, action)

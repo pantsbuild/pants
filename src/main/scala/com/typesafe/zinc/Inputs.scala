@@ -7,7 +7,7 @@ package com.typesafe.zinc
 import java.io.File
 import java.util.{ List => JList, Map => JMap }
 import sbt.compiler.IC
-import sbt.inc.{ Analysis, Locate }
+import sbt.inc.{ Analysis, IncOptions, Locate }
 import sbt.Path._
 import scala.collection.JavaConverters._
 import xsbti.compile.CompileOrder
@@ -27,6 +27,7 @@ case class Inputs(
   definesClass: File => String => Boolean,
   javaOnly: Boolean,
   compileOrder: CompileOrder,
+  incOptions: IncOptions,
   outputRelations: Option[File],
   outputProducts: Option[File],
   mirrorAnalysis: Boolean)
@@ -48,6 +49,7 @@ object Inputs {
       analysis.forceClean,
       javaOnly,
       compileOrder,
+      incOptions,
       analysis.outputRelations,
       analysis.outputProducts,
       analysis.mirrorAnalysis)
@@ -67,6 +69,7 @@ object Inputs {
     forceClean: Boolean,
     javaOnly: Boolean,
     compileOrder: CompileOrder,
+    incOptions: IncOptions,
     outputRelations: Option[File],
     outputProducts: Option[File],
     mirrorAnalysis: Boolean): Inputs =
@@ -78,9 +81,10 @@ object Inputs {
     val cacheFile        = normalise(analysisCache.getOrElse(defaultCacheLocation(classesDirectory)))
     val upstreamAnalysis = analysisCacheMap map { case (k, v) => (normalise(k), normalise(v)) }
     val analysisMap      = (cp map { file => (file, analysisFor(file, classes, upstreamAnalysis)) }).toMap
+    val incOpts          = incOptions.copy(apiDumpDirectory = incOptions.apiDumpDirectory map normalise)
     val printRelations   = outputRelations map normalise
     val printProducts    = outputProducts map normalise
-    new Inputs(cp, srcs, classes, scalacOptions, javacOptions, cacheFile, analysisMap, forceClean, Locate.definesClass, javaOnly, compileOrder, printRelations, printProducts, mirrorAnalysis)
+    new Inputs(cp, srcs, classes, scalacOptions, javacOptions, cacheFile, analysisMap, forceClean, Locate.definesClass, javaOnly, compileOrder, incOpts, printRelations, printProducts, mirrorAnalysis)
   }
 
   /**
@@ -95,6 +99,7 @@ object Inputs {
     analysisCache: File,
     analysisMap: JMap[File, File],
     compileOrder: String,
+    incOptions: IncOptions,
     mirrorAnalysisCache: Boolean): Inputs =
   inputs(
     classpath.asScala,
@@ -107,6 +112,7 @@ object Inputs {
     forceClean = false,
     javaOnly = false,
     Settings.compileOrder(compileOrder),
+    incOptions,
     outputRelations = None,
     outputProducts = None,
     mirrorAnalysis = mirrorAnalysisCache
@@ -152,19 +158,30 @@ object Inputs {
    */
   def show(inputs: Inputs, output: String => Unit): Unit = {
     import inputs._
+
+    val incOpts = Seq(
+      "transitive step"        -> incOptions.transitiveStep,
+      "recompile all fraction" -> incOptions.recompileAllFraction,
+      "debug relations"        -> incOptions.relationsDebug,
+      "debug api"              -> incOptions.apiDebug,
+      "api dump"               -> incOptions.apiDumpDirectory
+    )
+
     val values = Seq(
-      "classpath"        -> classpath,
-      "sources"          -> sources,
-      "output directory" -> classesDirectory,
-      "scalac options"   -> scalacOptions,
-      "javac options"    -> javacOptions,
-      "cache file"       -> cacheFile,
-      "analysis map"     -> analysisMap,
-      "force clean"      -> forceClean,
-      "java only"        -> javaOnly,
-      "compile order"    -> compileOrder,
-      "output relations" -> outputRelations,
-      "output products"  -> outputProducts)
+      "classpath"                    -> classpath,
+      "sources"                      -> sources,
+      "output directory"             -> classesDirectory,
+      "scalac options"               -> scalacOptions,
+      "javac options"                -> javacOptions,
+      "cache file"                   -> cacheFile,
+      "analysis map"                 -> analysisMap,
+      "force clean"                  -> forceClean,
+      "java only"                    -> javaOnly,
+      "compile order"                -> compileOrder,
+      "incremental compiler options" -> incOpts,
+      "output relations"             -> outputRelations,
+      "output products"              -> outputProducts)
+
     Util.show(("Inputs", values), output)
   }
 }

@@ -99,6 +99,32 @@ extends ArgumentOption[Int, Context] {
   }
 }
 
+class DoubleOption[Context](
+  val options: Seq[String],
+  val argument: String,
+  val description: String,
+  val action: (Context, Double) => Context)
+extends ArgumentOption[Double, Context] {
+  def parse(arg: String): Option[Double] = {
+    try { Some(arg.toDouble) }
+    catch { case _: NumberFormatException => None }
+  }
+}
+
+class FractionOption[Context](
+  val options: Seq[String],
+  val argument: String,
+  val description: String,
+  val action: (Context, Double) => Context)
+extends ArgumentOption[Double, Context] {
+  def parse(arg: String): Option[Double] = {
+    try {
+      val fraction = arg.toDouble
+      if (fraction < 0.0 || fraction > 1.0) None else Some(fraction)
+    } catch { case _: NumberFormatException => None }
+  }
+}
+
 class FileOption[Context](
   val options: Seq[String],
   val argument: String,
