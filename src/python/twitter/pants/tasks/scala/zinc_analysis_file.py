@@ -25,7 +25,7 @@ class ZincAnalysisCollection(object):
   This contains the information from a collection of Zinc analysis files, merged together,
   for use in dependency analysis.
   """
-  def __init__(self, analysis_files):
+  def __init__(self, analysis_files, stop_after=None):
     # The analysis files we gather information from.
     self.analysis_files = analysis_files
 
@@ -43,52 +43,63 @@ class ZincAnalysisCollection(object):
     # But PrettyEnumeration *is* included in the list of classes in external_deps.
     self.source_deps = defaultdict(set)
 
-    # Map from scala sources to the classes that they depend on. (Not class files, source files, but just classes.
+    # Map from scala sources to the classes that they depend on.
+    # (Not class files but just classes.)
     self.external_deps = defaultdict(set)
 
-    # Map from scala sources to the classes that they provide. (Again, not class files, fully-qualified class names.)
+    # Map from scala sources to the classes that they provide.
+    # (Again, not class files, fully-qualified class names.)
     self.class_names = defaultdict(set)
 
     for c in self.analysis_files:
-      self.parse(c)
+      self.parse(c, stop_after)
 
-  def parse(self, analysis_file_path):
-    zincfile = "%s.relations" % analysis_file_path
+  def parse(self, analysis_file_path, stop_after):
+    zincfile = '%s.relations' % analysis_file_path
     try:
-      zincfile = open(zincfile, "r")
+      zincfile = open(zincfile, 'r')
     except IOError:
-      print "Warning: analysis file %s not found" % analysis_file_path
+      print 'Warning: analysis file %s not found' % analysis_file_path
       return
     mode = None
-    for line in zincfile:
-      if line.startswith("products:"):
-        mode = "products"
-      elif line.startswith("binary dependencies:"):
-        mode = "binary"
-      elif line.startswith("source dependencies:"):
-        mode = "source"
-      elif line.startswith("external dependencies:"):
-        mode = "external"
-      elif line.startswith("class names:"):
-        mode = "class"
+
+    def change_mode_to(new_mode):
+      if mode == stop_after:
+        return 'done'
       else:
-        (src, sep, dep) = line.partition("->")
+        return new_mode
+
+    for line in zincfile:
+      if line.startswith('products:'):
+        mode = change_mode_to('products')
+      elif line.startswith('binary dependencies:'):
+        mode = change_mode_to('binary')
+      elif line.startswith('source dependencies:'):
+        mode = change_mode_to('source')
+      elif line.startswith('external dependencies:'):
+        mode = change_mode_to('external')
+      elif line.startswith('class names:'):
+        mode = change_mode_to('class')
+      else:
+        (src, sep, dep) = line.partition('->')
         src = src.strip()
         dep = dep.strip()
-        if sep == "" and line != "\n":
-            print ("Syntax error: line is neither a modeline nor a dep. '%s'"  %
+        if sep == '' and line != '\n':
+            print ('Syntax error: line is neither a modeline nor a dep. "%s"'  %
                     line)
             continue
-        if mode == "products":
+        if mode == 'products':
           self.products[src].add(dep)
-        elif mode == "binary":
+        elif mode == 'binary':
           self.binary_deps[src].add(dep)
-        elif mode == "source":
+        elif mode == 'source':
           self.source_deps[src].add(dep)
-        elif mode == "external":
+        elif mode == 'external':
           self.external_deps[src].add(dep)
-        elif mode == "class":
+        elif mode == 'class':
           self.class_names[src].add(dep)
         else:
-          print "Unprocessed line, mode = %s" % mode
+          print 'Unprocessed line, mode = %s' % mode
+      if mode == 'done':
+        return
 

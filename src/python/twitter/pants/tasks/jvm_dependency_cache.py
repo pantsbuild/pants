@@ -22,7 +22,7 @@ from collections import defaultdict
 from twitter.pants.targets.jar_dependency import JarDependency
 from twitter.pants.targets.jvm_target import JvmTarget
 from twitter.pants.tasks import TaskError
-from twitter.pants.tasks.zinc_analysis_file import ZincAnalysisCollection
+from twitter.pants.tasks.scala.zinc_analysis_file import ZincAnalysisCollection
 
 
 class JvmDependencyCache(object):

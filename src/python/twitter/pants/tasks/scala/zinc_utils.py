@@ -47,7 +47,8 @@ class ZincUtils(object):
 
     self._pants_home = get_buildroot()
 
-    self._compile_profile = context.config.get('scala-compile', 'compile-profile')  # The target scala version.
+    # The target scala version.
+    self._compile_profile = context.config.get('scala-compile', 'compile-profile')
     self._zinc_profile = context.config.get('scala-compile', 'zinc-profile')
     self._plugins_profile = context.config.get('scala-compile', 'scalac-plugins-profile')
 
@@ -60,12 +61,12 @@ class ZincUtils(object):
     else:
       self._scalac_args.extend(context.config.getlist('scala-compile', 'no_warning_args'))
 
-    def classpath_for_profile(profile):
+    def cp_for_profile(profile):
       return profile_classpath(profile, java_runner=self._java_runner, config=self._context.config)
 
-    self._zinc_classpath = classpath_for_profile(self._zinc_profile)
-    self._compiler_classpath = classpath_for_profile(self._compile_profile)
-    self._plugin_jars = classpath_for_profile(self._plugins_profile) if self._plugins_profile else []
+    self._zinc_classpath = cp_for_profile(self._zinc_profile)
+    self._compiler_classpath = cp_for_profile(self._compile_profile)
+    self._plugin_jars = cp_for_profile(self._plugins_profile) if self._plugins_profile else []
 
     zinc_jars = ZincUtils.identify_zinc_jars(self._compiler_classpath, self._zinc_classpath)
     self._zinc_jar_args = []
@@ -85,8 +86,8 @@ class ZincUtils(object):
         self._scalac_args.append('-P:%s:%s' % (name, arg))
 
     # For localizing/relativizing analysis files.
-    self._java_home = os.path.dirname(find_java_home())
-    self._ivy_home = context.config.get('ivy', 'cache_dir')
+    self._java_home = os.path.realpath(os.path.dirname(find_java_home()))
+    self._ivy_home = os.path.realpath(context.config.get('ivy', 'cache_dir'))
 
   def plugin_jars(self):
     """The jars containing code for enabled plugins."""
@@ -101,19 +102,20 @@ class ZincUtils(object):
       zinc_args.append('-no-color')
     zinc_args.extend(self._zinc_jar_args)
     zinc_args.extend(args)
-    return self._java_runner(self._main, classpath=self._zinc_classpath, args=zinc_args, jvmargs=self._jvm_args)
+    return self._java_runner(self._main, classpath=self._zinc_classpath,
+                             args=zinc_args, jvmargs=self._jvm_args)
 
-  def compile(self, classpath, sources, output_dir, analysis_file, upstream_analysis_files, depfile):
+  def compile(self, classpath, sources, output_dir, analysis_file, upstream_analysis_files):
     # To pass options to scalac simply prefix with -S.
     args = ['-S' + x for x in self._scalac_args]
 
     if len(upstream_analysis_files) > 0:
-      args.extend([ '-analysis-map', ','.join(['%s:%s' % kv for kv in upstream_analysis_files.items()]) ])
+      args.extend(
+        ['-analysis-map', ','.join(['%s:%s' % kv for kv in upstream_analysis_files.items()])])
 
     args.extend([
       '-analysis-cache', analysis_file,
       '-classpath', ':'.join(self._zinc_classpath + classpath),
-      '-output-products', depfile,
       '-d', output_dir
     ])
     args.extend(sources)
@@ -124,7 +126,7 @@ class ZincUtils(object):
     zinc_analysis_args = [
       '-analysis',
       '-cache', analysis_file,
-      ]
+    ]
     zinc_analysis_args.extend(args)
     return self.run_zinc(args=zinc_analysis_args)
 
@@ -134,23 +136,24 @@ class ZincUtils(object):
   def run_zinc_split(self, src_analysis_file, splits):
     zinc_split_args = [
       '-split', ','.join(['{%s}:%s' % (':'.join(x[0]), x[1]) for x in splits]),
-      ]
+    ]
     return self.run_zinc_analysis(src_analysis_file, zinc_split_args)
 
   # src_analysis_files - a list of analysis files to merge into dst_analysis_file.
   def run_zinc_merge(self, src_analysis_files, dst_analysis_file):
     zinc_merge_args = [
       '-merge', ':'.join(src_analysis_files),
-      ]
+    ]
     return self.run_zinc_analysis(dst_analysis_file, zinc_merge_args)
 
   # cache - the analysis cache to rebase.
-  # rebasings - a list of pairs (rebase_from, rebase_to). Behavior is undefined if any rebase_from
-  # is a prefix of any other, as there is no guarantee that rebasings are applied in a particular order.
+  # rebasings - a list of pairs (rebase_from, rebase_to). Behavior is undefined if any
+  # rebase_from is a prefix of any other, as there is no guarantee that rebasings are
+  # applied in a particular order.
   def run_zinc_rebase(self, analysis_file, rebasings):
     zinc_rebase_args = [
       '-rebase', ','.join(['%s:%s' % rebasing for rebasing in rebasings]),
-      ]
+    ]
     return self.run_zinc_analysis(analysis_file, zinc_rebase_args)
 
   IVY_HOME_PLACEHOLDER = '/IVY_HOME_PLACEHOLDER'
@@ -205,17 +208,17 @@ class ZincUtils(object):
       ''' % (target.plugin, target.classname)).strip())
     return basedir, _PLUGIN_INFO_FILE
 
-  # These are the names of the various jars zinc needs. They are, conveniently and non-coincidentally,
-  # the names of the flags used to pass the jar locations to zinc.
-  compiler_jar_names = [ 'scala-library', 'scala-compiler' ]  # Compiler version.
-  zinc_jar_names = [ 'compiler-interface', 'sbt-interface' ]  # Other jars zinc needs to be pointed to.
+  # These are the names of the various jars zinc needs. They are, conveniently and
+  # non-coincidentally, the names of the flags used to pass the jar locations to zinc.
+  compiler_jar_names = ['scala-library', 'scala-compiler']  # Compiler version.
+  zinc_jar_names = ['compiler-interface', 'sbt-interface']  # Other jars zinc needs pointers to.
 
   @staticmethod
   def identify_zinc_jars(compiler_classpath, zinc_classpath):
     """Find the named jars in the compiler and zinc classpaths.
 
-    TODO: When profiles migrate to regular pants jar() deps instead of ivy.xml files we can make these
-          mappings explicit instead of deriving them by jar name heuristics.
+    TODO: When profiles migrate to regular pants jar() deps instead of ivy.xml files we can
+          make these mappings explicit instead of deriving them by jar name heuristics.
     """
     ret = OrderedDict()
     ret.update(ZincUtils.identify_jars(ZincUtils.compiler_jar_names, compiler_classpath))
@@ -251,11 +254,12 @@ class ZincUtils(object):
           with closing(jarfile.open(_PLUGIN_INFO_FILE, 'r')) as plugin_info_file:
             plugin_info = ElementTree.parse(plugin_info_file).getroot()
           if plugin_info.tag != 'plugin':
-            raise TaskError, 'File %s in %s is not a valid scalac plugin descriptor' % (_PLUGIN_INFO_FILE, jar)
+            raise TaskError(
+              'File %s in %s is not a valid scalac plugin descriptor' % (_PLUGIN_INFO_FILE, jar))
           name = plugin_info.find('name').text
           if name in plugin_names:
             if name in plugins:
-              raise TaskError, 'Plugin %s defined in %s and in %s' % (name, plugins[name], jar)
+              raise TaskError('Plugin %s defined in %s and in %s' % (name, plugins[name], jar))
             # It's important to use relative paths, as the compiler flags get embedded in the zinc
             # analysis file, and we port those between systems via the artifact cache.
             plugins[name] = os.path.relpath(jar, self._pants_home)
@@ -264,5 +268,5 @@ class ZincUtils(object):
 
     unresolved_plugins = plugin_names - set(plugins.keys())
     if len(unresolved_plugins) > 0:
-      raise TaskError, 'Could not find requested plugins: %s' % list(unresolved_plugins)
+      raise TaskError('Could not find requested plugins: %s' % list(unresolved_plugins))
     return plugins
