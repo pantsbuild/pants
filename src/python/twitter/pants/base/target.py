@@ -57,6 +57,7 @@ class Target(object):
   @staticmethod
   def maybe_readable_combine_ids(ids):
     """Generates combined id for a set of ids, but if the set is a single id, just use that."""
+    ids = list(ids)  # We can't len a generator.
     return ids[0] if len(ids) == 1 else Target.combine_ids(ids)
 
   @classmethod
