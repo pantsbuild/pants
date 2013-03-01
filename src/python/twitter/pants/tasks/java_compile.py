@@ -1,4 +1,4 @@
-# ==================================================================================================
+# ================================================================================================== 
 # Copyright 2011 Twitter, Inc.
 # --------------------------------------------------------------------------------------------------
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -280,7 +280,7 @@ class JavaCompile(NailgunTask):
         src_deps.load(src_depfile)
         dst_deps.merge(src_deps)
 
-    dst_deps.save(dst_depfile) 
+    dst_deps.save(dst_depfile)
 
   def write_processor_info(self, processor_info_file, processors):
     with safe_open(processor_info_file, 'w') as f:

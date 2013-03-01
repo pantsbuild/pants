@@ -358,7 +358,7 @@ class _MergedZincArtifact(_ZincArtifact):
     return targets_by_package
 
   def _maybe_hardlink(self, src, dst):
-    if os.path.exists(src):
+    if os.path.exists(src): 
       if os.path.exists(dst):
         if not os.path.samefile(src, dst):
           os.unlink(dst)
