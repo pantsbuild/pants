@@ -477,7 +477,7 @@ class IvyResolve(NailgunTask):
 
   def _map_jar(self, path):
     """Subclasses can override to determine whether a given path represents a mappable artifact."""
-    return path.endswith('.jar') or path.endswith('.war')
+    return path.endswith('.jar')
 
   def _exec_ivy(self, target_workdir, targets, args):
     ivyxml = os.path.join(target_workdir, 'ivy.xml')

@@ -65,32 +65,10 @@ class Config(object):
     return ConfigParser.SafeConfigParser(standard_defaults)
 
   def __init__(self, configparser, configpath):
-    # Base Config
     self.configparser = configparser
     with open(configpath) as ini:
       self.configparser.readfp(ini, filename=configpath)
     self.file = configpath
-
-    # Overrides
-    # 
-    # This feature allows a second configuration file which will override 
-    # pants.ini to be specified.  The file is currently specified via an env
-    # variable because the cmd line flags are parsed after config is loaded.
-    # 
-    # The main use of the extra file is to have different settings based on
-    # the environment.  For example, the setting used to compile or locations
-    # of caches might be different between a developer's local environment
-    # and the environment used to build and publish artifacts (e.g. Jenkins)
-    # 
-    # The files cannot reference each other's values, so make sure each one is 
-    # internally consistent
-    self.overrides_path = os.environ.get('PANTS_CONFIG_OVERRIDE')
-    self.overrides_parser = None
-    if self.overrides_path is not None:
-      self.overrides_path = os.path.join(get_buildroot(), self.overrides_path)
-      self.overrides_parser = Config.create_parser()
-      with open(self.overrides_path) as o_ini:
-        self.overrides_parser.readfp(o_ini, filename=self.overrides_path)
 
   def getbool(self, section, option, default=None):
     """Equivalent to calling get with expected type string"""
@@ -128,22 +106,10 @@ class Config(object):
     """
     return self._getinstance(section, option, type, default=default)
 
-  def _has_option(self, section, option):
-    if self.overrides_parser and self.overrides_parser.has_option(section, option):
-      return True
-    elif self.configparser.has_option(section, option):
-      return True
-    return False
-
-  def _get_value(self, section, option):
-    if self.overrides_parser and self.overrides_parser.has_option(section, option):
-      return self.overrides_parser.get(section, option)
-    return self.configparser.get(section, option)
-
   def _getinstance(self, section, option, type, default=None):
-    if not self._has_option(section, option):
+    if not self.configparser.has_option(section, option):
       return default
-    raw_value = self._get_value(section, option)
+    raw_value = self.configparser.get(section, option)
     if issubclass(type, str):
       return raw_value
 

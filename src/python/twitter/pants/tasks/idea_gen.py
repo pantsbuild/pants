@@ -205,7 +205,7 @@ class IdeaGen(IdeGen):
         jdk=self.java_jdk,
         language_level = 'JDK_1_%d' % self.java_language_level
       ),
-      resource_extensions=project.resource_extensions,
+      resource_extensions=list(project.resource_extensions),
       scala=scala,
       checkstyle_suppression_files=','.join(project.checkstyle_suppression_files),
       checkstyle_classpath=';'.join(project.checkstyle_classpath),
