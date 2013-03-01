@@ -40,7 +40,7 @@ class Target(object):
   @staticmethod
   def identify(targets):
     """Generates an id for a set of targets."""
-    return Target.combine_ids([target.id for target in targets])
+    return Target.combine_ids(target.id for target in targets)
 
   @staticmethod
   def maybe_readable_identify(targets):
@@ -57,11 +57,7 @@ class Target(object):
   @staticmethod
   def maybe_readable_combine_ids(ids):
     """Generates combined id for a set of ids, but if the set is a single id, just use that."""
-    if len(ids) == 1:
-      id = ids[0]
-    else:
-      id = Target.combine_ids(ids)
-    return id
+    return ids[0] if len(ids) == 1 else Target.combine_ids(ids)
 
   @classmethod
   def get_all_addresses(cls, buildfile):

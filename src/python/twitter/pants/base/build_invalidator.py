@@ -84,10 +84,9 @@ class CacheKeyGenerator(object):
     if len(cache_keys) == 1:
       return cache_keys[0]
     else:
-      combined_id = Target.maybe_readable_combine_ids([cache_key.id for cache_key in cache_keys])
-      combined_hash = hash_all(sorted([cache_key.hash for cache_key in cache_keys]))
-      combined_num_sources = \
-        reduce(lambda x, y: x + y, [cache_key.num_sources for cache_key in cache_keys], 0)
+      combined_id = Target.maybe_readable_combine_ids(cache_key.id for cache_key in cache_keys)
+      combined_hash = hash_all(sorted(cache_key.hash for cache_key in cache_keys))
+      combined_num_sources = sum(cache_key.num_sources for cache_key in cache_keys)
       return CacheKey(combined_id, combined_hash, combined_num_sources)
 
   def key_for_target(self, target, sources=TARGET_SOURCES, fingerprint_extra=None):

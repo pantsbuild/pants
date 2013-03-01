@@ -105,8 +105,8 @@ class Task(object):
     return []
 
   @contextmanager
-  def invalidated(self, targets, only_buildfiles = False, invalidate_dependents = False,
-                  partition_size_hint = sys.maxint):
+  def invalidated(self, targets, only_buildfiles=False, invalidate_dependents=False,
+                  partition_size_hint=sys.maxint):
     """Checks targets for invalidation, first checking the artifact cache.
     Subclasses call this to figure out what to work on.
 
