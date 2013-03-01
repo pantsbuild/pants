@@ -24,14 +24,15 @@ from collections import namedtuple
 from twitter.common.dirutil import safe_mkdir
 from twitter.common.lang import Compatibility
 from twitter.pants.base.hash_utils import hash_all
+from twitter.pants.base.target import Target
 
 
 # A CacheKey represents some version of a set of targets.
 #  - id identifies the set of targets.
-#  - hash is a fingerprint of all invalidating inputs to the build step, i.e., it uniquely determines
-#    a given version of the artifacts created when building the target set.
-#  - num_sources is the number of source files used to build this version of the target set. Needed only
-#    for displaying stats.
+#  - hash is a fingerprint of all invalidating inputs to the build step, i.e., it uniquely
+#    determines a given version of the artifacts created when building the target set.
+#  - num_sources is the number of source files used to build this version of the target set.
+#    Needed only for displaying stats.
 
 CacheKey = namedtuple('CacheKey', ['id', 'hash', 'num_sources'])
 
@@ -76,18 +77,17 @@ class CacheKeyGenerator(object):
     This operation is 'idempotent' in the sense that if cache_keys contains a single key
     then that key is returned.
 
-    Note that this operation is commutative but not associative.  We use the term 'combine' rather than
-    'merge' or 'union' to remind the user of this. Associativity is not a necessary property, in practice.
+    Note that this operation is commutative but not associative.  We use the term 'combine' rather
+    than 'merge' or 'union' to remind the user of this. Associativity is not a necessary property,
+    in practice.
     """
     if len(cache_keys) == 1:
       return cache_keys[0]
     else:
-      sorted_cache_keys = sorted(cache_keys)  # For commutativity.
-      # Note that combined_id for a list of targets is the same as Target.identify([targets]),
-      # for convenience when debugging, but it doesn't have to be for correctness.
-      combined_id = hash_all([cache_key.id for cache_key in sorted_cache_keys])
-      combined_hash = hash_all([cache_key.hash for cache_key in sorted_cache_keys])
-      combined_num_sources = reduce(lambda x, y: x + y, [cache_key.num_sources for cache_key in sorted_cache_keys], 0)
+      combined_id = Target.maybe_readable_combine_ids([cache_key.id for cache_key in cache_keys])
+      combined_hash = hash_all(sorted([cache_key.hash for cache_key in cache_keys]))
+      combined_num_sources = \
+        reduce(lambda x, y: x + y, [cache_key.num_sources for cache_key in cache_keys], 0)
       return CacheKey(combined_id, combined_hash, combined_num_sources)
 
   def key_for_target(self, target, sources=TARGET_SOURCES, fingerprint_extra=None):
@@ -98,7 +98,7 @@ class CacheKeyGenerator(object):
 
     :target: The target to create a CacheKey for.
     :sources: A source scope to select from the target for hashing, defaults to TARGET_SOURCES.
-    :fingerprint_extra: A function that accepts a sha hash and updates it with extra fingerprint data.
+    :fingerprint_extra: A function that accepts a sha hash and updates it with extra fprint data.
     """
     if not fingerprint_extra:
       if not sources or not sources.valid(target):
