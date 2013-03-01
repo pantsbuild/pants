@@ -110,8 +110,11 @@ class ZincUtils(object):
     args = ['-S' + x for x in self._scalac_args]
 
     if len(upstream_analysis_files) > 0:
+      # upstream_analysis_files is a map to pairs of (artifact_file, class_basedir).
+      # For the command-line argument here, we need to change that to map the same keys
+      # to just the artifact_file.
       args.extend(
-        ['-analysis-map', ','.join(['%s:%s' % kv for kv in upstream_analysis_files.items()])])
+        ['-analysis-map', ','.join(['%s:%s' % (kv[0], kv[1].analysis_file) for kv in upstream_analysis_files.items()])])
 
     args.extend([
       '-analysis-cache', analysis_file,

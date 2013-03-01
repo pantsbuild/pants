@@ -66,7 +66,8 @@ class ZincArtifactState(object):
     if not os.path.exists(artifact.analysis_file):
       return {}
     len_rel_classes_dir = len(artifact.classes_dir) - len(get_buildroot())
-    analysis = ZincAnalysisCollection([artifact.analysis_file], stop_after='products')
+    analysis = ZincAnalysisCollection(stop_after='products')
+    analysis.add_and_parse_file(artifact.analysis_file, artifact.classes_dir)
     classes_by_src = {}
     for src, classes in analysis.products.items():
       classes_by_src[src] = [cls[len_rel_classes_dir:] for cls in classes]

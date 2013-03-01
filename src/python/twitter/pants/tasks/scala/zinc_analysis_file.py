@@ -25,15 +25,31 @@ class ZincAnalysisCollection(object):
   This contains the information from a collection of Zinc analysis files, merged together,
   for use in dependency analysis.
   """
-  def __init__(self, analysis_files, stop_after=None):
+  def __init__(self,
+               stop_after=None,
+               package_prefixes=['com', 'org', 'net']):
+    """
+    Params:
+    - stop_after: a boolean flag. If true, only part of the analysis file will be parsed.
+    - package_prefixes: a list of package names that identify package roots. When translating
+      class file paths to class names, these are the package names where the conversion
+      will stop.
+    """
+    self.stop_after = stop_after
+    self.package_prefixes = set(package_prefixes)
+
     # The analysis files we gather information from.
-    self.analysis_files = analysis_files
+    self.analysis_files = []
 
     # Map from scala source files to the class files generated from that source
     self.products = defaultdict(set)
+    # map from scala source files to the classes generated from that source.
+    self.product_classes = defaultdict(set)
 
-    # Map from scala sources to jar files they depend on. (And, rarely, class files.)
+    # Map from scala sources to jar files or class filesthey depend on.
     self.binary_deps = defaultdict(set)
+    # Map from scala sources to classes that they depend on.
+    self.binary_dep_classes = defaultdict(set)
 
     # Map from scala sources to the source files providing the classes that they depend on
     # The set of source files here does *not* appear to include inheritance!
@@ -51,11 +67,63 @@ class ZincAnalysisCollection(object):
     # (Again, not class files, fully-qualified class names.)
     self.class_names = defaultdict(set)
 
-    for c in self.analysis_files:
-      self.parse(c, stop_after)
+  def _classfile_to_classname(self, classfile, basedir):
+    """
+    Convert a class file path referenced in an analysis file to the
+    name of the class contained in it.
 
-  def parse(self, analysis_file_path, stop_after):
-    zincfile = '%s.relations' % analysis_file_path
+    In zinc relations from the analysis files, binary class dependencies 
+    and compilation products are specifies as pathnames relative to the
+    the build root, like ".pants.d/scalac/classes/6b94834/com/pkg/Foo.class".
+    For dependency analysis, we need to convert that the name of the 
+    class contained in the class file, like "com.pkg.Foo".
+    """
+
+    def _isValidPackageSegment(seg):
+      # The class name from a class file will be the result of stripping out anything
+      # that doesn't look like a valid packagename segment. So, for example, if there is a path 
+      # segement containing a ".", that's not a valid package segment.
+      # A package segment is valid if:
+      # - All path segments after it are valid, and
+      # - its name is a valid package identifier name in JVM code (so no "." characters,
+      #    no "-" characters), and
+      # - it is less than 30 characters long. (This is an ugly heuristic which appears
+      #    to work, but which I'm uncomfortable with.
+      # - it is not named "classes". (This is another ugly heuristic.)
+      if seg.find(".") != -1 or seg.find("-") != -1 or len(seg) > 30:
+        return False
+      else:
+        return True
+
+    if not classfile.endswith(".class"):
+      return None
+    # strip '.class' from the end
+    classfile = classfile[:-6]
+    # If it's a path relative to the known basedir, strip that off.
+    if classfile.startswith(basedir):
+      classfile = classfile[len(basedir):]
+      return classfile.replace('/', '.')
+    else:
+      # Segment the path, and find the trailing segment that consists of valid
+      # package elements.
+      segments = classfile.split("/")
+      segments.reverse()
+      # The root name of the class is the last segment of the pathname
+      # with ".class" removed.
+      classname = segments[0]
+      for seg in segments[1:]:
+        if _isValidPackageSegment(seg):
+          classname = "%s.%s" % (seg, classname)
+          if seg in self.package_prefixes:
+            return classname
+        else:
+          return classname
+    # If we reach here, none of the segments were valid, so this wasn't
+    # a valid classfile path.
+    return None
+
+  def add_and_parse_file(self, analysis_file, classes_dir):
+    zincfile = '%s.relations' % analysis_file
     try:
       zincfile = open(zincfile, 'r')
     except IOError:
@@ -64,7 +132,7 @@ class ZincAnalysisCollection(object):
     mode = None
 
     def change_mode_to(new_mode):
-      if mode == stop_after:
+      if mode == self.stop_after:
         return 'done'
       else:
         return new_mode
@@ -90,8 +158,14 @@ class ZincAnalysisCollection(object):
             continue
         if mode == 'products':
           self.products[src].add(dep)
+          cl = self._classfile_to_classname(dep, classes_dir)
+          if cl is not None:
+            self.product_classes[src].add(cl)
         elif mode == 'binary':
           self.binary_deps[src].add(dep)
+          cl = self._classfile_to_classname(dep, classes_dir)
+          if cl is not None:
+            self.binary_dep_classes[src].add(cl)
         elif mode == 'source':
           self.source_deps[src].add(dep)
         elif mode == 'external':

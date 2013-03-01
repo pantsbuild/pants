@@ -148,7 +148,7 @@ class InternalTarget(Target):
     Target.__init__(self, name, is_meta)
 
     self._injected_deps = []
-    processed_dependencies = resolve(dependencies)
+    self.processed_dependencies = resolve(dependencies)
 
     self.add_label('internal')
     self.dependencies = OrderedSet()
@@ -161,11 +161,11 @@ class InternalTarget(Target):
     # non-addressable targets - which is what meta-targets really are once created.
     if is_meta:
       # Meta targets are built outside any parse context - so update dependencies immediately
-      self.update_dependencies(processed_dependencies)
+      self.update_dependencies(self.processed_dependencies)
     else:
       # Defer dependency resolution after parsing the current BUILD file to allow for forward
       # references
-      self._post_construct(self.update_dependencies, processed_dependencies)
+      self._post_construct(self.update_dependencies, self.processed_dependencies)
 
     self._post_construct(self.inject_dependencies)
 
