@@ -27,9 +27,7 @@ from twitter.pants.tasks.scala.zinc_analysis_file import ZincAnalysisCollection
 
 
 class JvmDependencyCache(object):
-  """
-  Class which computes and stores information about the compilation dependencies
-  of targets for jvm-based languages.
+  """ Class which computes compilation dependencies of targets for jvm-based languages.
 
   The behavior of this is determined by flags set in the compilation task's context.
   The flags (set by command-line options) are:
@@ -48,8 +46,7 @@ class JvmDependencyCache(object):
 
   @staticmethod
   def init_product_requirements(task):
-    """
-    Set the compilation product requirements that are needed for dependency analysis.
+    """ Set the compilation product requirements that are needed for dependency analysis.
 
     Parameters:
       task: the task whose products should be set.
@@ -60,8 +57,8 @@ class JvmDependencyCache(object):
 
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
-    """
-    Set up command-line options for dependency checking.
+    """ Set up command-line options for dependency checking.
+
     Any jvm compilation task that wants to use dependency analysis can call this from
     its setup_parser method to add the appropriate options for dependency testing.
 
@@ -101,6 +98,13 @@ class JvmDependencyCache(object):
                jvm class files.
       all_analysis_files: The analysis files of the targets to analyze, and all their deps.
     """
+
+    # The package prefixes are part of a hack to make it possible to use the
+    # zinc caches for dependency analysis. We need to be able to convert from
+    # a class file path and the name of the class contained in the file, without
+    # expending the cost of reading every class file to find its name.
+    # The package prefixes are the names of the root packages - typically
+    # "com", "org", "net".
     self.package_prefixes = context.config.getlist('scala-compile', 
                                                    'dep-analysis-package-prefixes')
     if self.package_prefixes is None:
@@ -137,29 +141,20 @@ class JvmDependencyCache(object):
     self.computed_deps = None
 
   def _get_jardep_dependencies(self, target):
-    """
-    Walks the dependency graph for a target, getting the transitive closure of
-    its set of declared jar dependencies.
-    """
+    """ Gets the transitive closure of the the set of declared jar dependencies. """
     result = []
     target.walk(lambda t: self._walk_jardeps(t, result))
     return set(result)
 
   def _walk_jardeps(self, target, result):
-    """
-    A dependency walker for extracting jar dependencies from the dependency graph
-    of targets in this compilation task.
-    """
+    """A dependency walker for extracting jar dependencies"""
     if isinstance(target, JarDependency):
       result.append(target)
     if isinstance(target, JvmTarget):
       result.extend(target.jar_dependencies)
 
   def _compute_jardep_contents(self):
-    """
-    Compute the information needed by deps analysis for the set of classes that come from
-    jars in jar_dependency targets. This is messier that it should be, because of
-    the strange way that jar_dependency targets are treated by pants.
+    """ Compute the relations between jar dependencies and jar files.
 
     Returns: a pair of maps, (jars_by_target, targets_by_jar) describing the mappings between 
        jars and the targets that contain those jars.
@@ -191,17 +186,15 @@ class JvmDependencyCache(object):
     return ivy_jars_by_target, ivy_targets_by_jar
 
   def _normalize_source_path(self, target, src):
-    """
+    """ Normalize a source file relative to the target that provides it.
+
     Given a target and a source file path specified by that target, produce a normalized
     path for the source file that matches the pathname used in the zinc analysis files.
     """
     return os.path.join(target.target_base, src)
 
   def get_analysis_collection(self):
-    """
-    Populates and retrieves the merged analysis collection for the targets
-    covered by a compilation session.
-    """
+    """ Populates and retrieves the merged analysis collection for this compilation """
 
     if self.zinc_analysis_collection is None:
       self.zinc_analysis_collection = \
@@ -213,24 +206,21 @@ class JvmDependencyCache(object):
     return self.zinc_analysis_collection
 
   def get_targets_by_class(self):
-    """
-    Memoizing getter for a map from classes to the targets that provide them.
-    """
+    """ Memoizing getter for a map from classes to the targets that provide them. """
     if self.targets_by_class is None:
       self._compute_classfile_dependency_relations()
     return self.targets_by_class
 
   def get_binary_deps_by_target(self):
-    """
-    Memoizing getter for a map from targets to their binary dependencies.
-    """
+    """ Memoizing getter for a map from targets to their binary dependencies. """
     if self.binary_deps_by_target is None:
       self._compute_classfile_dependency_relations()
     return self.binary_deps_by_target
       
   def _compute_classfile_dependency_relations(self):
-    """
-    Walk through the zinc analysis relations that are expressed in terms of
+    """ Compute the dependency relations based on binary and classname deps.
+
+    Walks through the zinc analysis relations that are expressed in terms of
     dependencies on class files, and translate class file references to class
     references.
 
@@ -238,8 +228,8 @@ class JvmDependencyCache(object):
     store cached analysis results. It updates two values:
 
      - targets_by_class is a map from product classes to the targets that provided them, and
-     -  binary_deps_by_target is a map from targets to the classes that zinc reported they
-       have a binary dependence on.
+     - binary_deps_by_target is a map from targets to the classes that zinc reported they
+       have a binary dependency on.
     """    
     zinc_analysis = self.get_analysis_collection()
     targets_by_class = defaultdict(set)
@@ -262,25 +252,19 @@ class JvmDependencyCache(object):
     self.binary_deps_by_target = binary_deps_by_target
 
   def get_sources_by_target(self):
-    """
-    Memoizing getter for a map from targets to the sources provided by those targets.
-    """
+    """ Memoizing getter for a map from targets to the sources provided by those targets. """
     if self.sources_by_target is None:
       self._compute_source_relations()
     return self.sources_by_target
 
   def get_targets_by_source(self):
-    """
-    Memoizing getter for a map from sources to the targets that provide those sources.
-    """
+    """ Memoizing getter for a map from sources to the targets that provide those sources. """
     if self.targets_by_source is None:
       self._compute_source_relations()
     return self.targets_by_source
 
   def _compute_source_relations(self):
-    """
-    The code that actually computes the values of targets_by_source and sources_by_target.
-    """
+    """ Compute the targets_by_source and sources_by_target maps. """
     self.sources_by_target = defaultdict(set)
     self.targets_by_source = defaultdict(set)
     for target in self.targets:
@@ -290,10 +274,7 @@ class JvmDependencyCache(object):
     return (self.sources_by_target, self.targets_by_source)
 
   def _check_overlapping_sources(self, targets_by_source):
-    """
-    Detect overlapping targets: if a source file is included in more
-     than one target, then we have an overlap.
-     """
+    """ Detect overlapping targets where if a source file is included in more than one target """
     overlapping_sources = set()
     for s in targets_by_source:
       if len(targets_by_source[s]) > 1:
@@ -301,10 +282,7 @@ class JvmDependencyCache(object):
         print "Error: source file %s included in multiple targets %s" % (s, targets_by_source[s])
     
   def get_computed_jar_dependency_relations(self):
-    """
-    Compute maps from target to the jars that the target provides, and
-    the inverse from jars to the target that provides them.
-    """
+    """  Compute maps from target to the jars that the target provides """
     # Figure out which jars are in which targets, and then use with the zinc
     (self.ivy_jars_by_target, self.ivy_targets_by_jar) = self._compute_jardep_contents()
     computed_jar_deps = defaultdict(set)
@@ -318,9 +296,7 @@ class JvmDependencyCache(object):
 
   def get_compilation_dependencies(self, sources_by_target, targets_by_source,
                                    targets_by_product, binary_deps_by_target):
-    """
-    Computes a map from the source files in a target to class files that the source file
-    depends on.
+    """ Compute a map from the source files in a target to class files that it depends on
 
     Note: this code currently relies on the relations report generated by the zinc incremental
     scala compiler. If other languages/compilers want to use this code, they need to provide
@@ -373,8 +349,8 @@ class JvmDependencyCache(object):
     return self.computed_deps, self.computed_jar_deps
 
   def get_dependency_blame(self, from_target, to_target, targets_by_class):
-    """
-    Figures out why target A depends on target B according the the dependency analysis.
+    """ Figures out why target A depends on target B according the the dependency analysis.
+
     Generates a tuple which can be used to generate a message like:
      "*from_target* depends on *to_target* because *from_target*'s source file X
       depends on *to_target*'s class Y."
@@ -402,8 +378,8 @@ class JvmDependencyCache(object):
 
   def get_missing_deps_for_target(self, target, computed_deps, computed_jar_deps,
                                   targets_by_class):
-    """
-    Compute the missing dependencies for a specific target.
+    """  Compute the missing dependencies for a specific target.
+
     Parameters:
       target: the target
       computed_deps: the computed dependencies for the target.
@@ -447,10 +423,10 @@ class JvmDependencyCache(object):
 
 
   def check_undeclared_dependencies(self):
-    """
-    Performs the undeclared dependencies/overdeclared dependencies checks,
-    generating warnings/error messages and (depending on flag settings),
-    setting build products for the detected errors.
+    """ Performs the undeclared dependencies/overdeclared dependencies checks.
+
+    For each dependency issue discovered, generates warnings/error messages and
+    (depending on flag settings), setting build products.
     """
     if not self.check_missing_deps:
         return
@@ -483,8 +459,8 @@ class JvmDependencyCache(object):
       raise TaskError('Missing dependencies detected.')
 
   def check_unnecessary_deps(self, target, computed_deps):
-    """
-    Generate warning messages about unnecessary declared dependencies.
+    """ Generate warning messages about unnecessary declared dependencies.
+
     Params:
       target: the target to be checked for undeclared dependencies
       computed_deps: the actual dependencies computed for that target.

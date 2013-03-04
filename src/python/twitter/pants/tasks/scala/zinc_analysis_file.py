@@ -46,7 +46,7 @@ class ZincAnalysisCollection(object):
     # map from scala source files to the classes generated from that source.
     self.product_classes = defaultdict(set)
 
-    # Map from scala sources to jar files or class filesthey depend on.
+    # Map from scala sources to jar files or class files they depend on.
     self.binary_deps = defaultdict(set)
     # Map from scala sources to classes that they depend on.
     self.binary_dep_classes = defaultdict(set)
@@ -68,9 +68,7 @@ class ZincAnalysisCollection(object):
     self.class_names = defaultdict(set)
 
   def _classfile_to_classname(self, classfile, basedir):
-    """
-    Convert a class file path referenced in an analysis file to the
-    name of the class contained in it.
+    """ Convert a class file referenced in an analysis file to the name of the class
 
     In zinc relations from the analysis files, binary class dependencies 
     and compilation products are specifies as pathnames relative to the
@@ -79,7 +77,7 @@ class ZincAnalysisCollection(object):
     class contained in the class file, like "com.pkg.Foo".
     """
 
-    def _isValidPackageSegment(seg):
+    def _is_valid_package_segment(seg):
       # The class name from a class file will be the result of stripping out anything
       # that doesn't look like a valid packagename segment. So, for example, if there is a path 
       # segement containing a ".", that's not a valid package segment.
@@ -112,7 +110,7 @@ class ZincAnalysisCollection(object):
       # with ".class" removed.
       classname = segments[0]
       for seg in segments[1:]:
-        if _isValidPackageSegment(seg):
+        if _is_valid_package_segment(seg):
           classname = "%s.%s" % (seg, classname)
           if seg in self.package_prefixes:
             return classname
