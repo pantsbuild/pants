@@ -125,7 +125,7 @@ class ZincAnalysisCollection(object):
     try:
       zincfile = open(zincfile, 'r')
     except IOError:
-      print 'Warning: analysis file %s not found' % analysis_file_path
+      print 'Warning: analysis file %s not found' % analysis_file
       return
     mode = None
 
