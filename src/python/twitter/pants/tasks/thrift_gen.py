@@ -88,6 +88,8 @@ class ThriftGen(CodeGen):
     return self.gen_langs
 
   def invalidate_for_files(self):
+    # TODO: This will prevent artifact caching across platforms.
+    # Find some cross-platform way to assert the thrift binary version.
     return [self.thrift_binary]
 
   def is_gentarget(self, target):

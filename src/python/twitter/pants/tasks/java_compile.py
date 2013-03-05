@@ -108,6 +108,10 @@ class JavaCompile(NailgunTask):
 
     self._confs = context.config.getlist('java-compile', 'confs')
 
+    # The artifact cache to read from/write to.
+    artifact_cache_spec = context.config.getlist('java-compile', 'artifact_caches')
+    self.setup_artifact_cache(artifact_cache_spec)
+
   def product_type(self):
     return 'classes'
 
@@ -155,38 +159,48 @@ class JavaCompile(NailgunTask):
               self.write_processor_info(processor_info_file, target.processors)
               genmap.add(target, basedir, [_PROCESSOR_INFO_FILE])
 
-  def execute_single_compilation(self, versioned_targets, cp):
+  def execute_single_compilation(self, vt, cp):
     # TODO: Use the artifact cache.
 
-    depfile = self.create_depfile_path(versioned_targets.targets)
+    depfile = self.create_depfile_path(vt.targets)
 
-    if not versioned_targets.valid:
-      self.merge_depfile(versioned_targets)  # Get what we can from previous builds.
-      self.context.log.info('Compiling targets %s' % str(versioned_targets.targets))
-      sources_by_target, processors, fingerprint = self.calculate_sources(versioned_targets.targets)
-      if sources_by_target:
-        sources = reduce(lambda all, sources: all.union(sources), sources_by_target.values())
-        if not sources:
-          self.context.log.warn('Skipping java compile for targets with no sources:\n  %s' %
-                                '\n  '.join(str(t) for t in sources_by_target.keys()))
-        else:
-          classpath = [jar for conf, jar in cp if conf in self._confs]
-          result = self.compile(classpath, sources, fingerprint, depfile)
-          if result != 0:
-            default_message = 'Unexpected error - %s returned %d' % (_JMAKE_MAIN, result)
-            raise TaskError(_JMAKE_ERROR_CODES.get(result, default_message))
+    self.merge_depfile(vt)  # Get what we can from previous builds.
+    self.context.log.info('Compiling targets %s' % str(vt.targets))
+    sources_by_target, processors, fingerprint = self.calculate_sources(vt.targets)
+    if sources_by_target:
+      sources = reduce(lambda all, sources: all.union(sources), sources_by_target.values())
+      if not sources:
+        self.context.log.warn('Skipping java compile for targets with no sources:\n  %s' %
+                              '\n  '.join(str(t) for t in sources_by_target.keys()))
+      else:
+        classpath = [jar for conf, jar in cp if conf in self._confs]
+        result = self.compile(classpath, sources, fingerprint, depfile)
+        if result != 0:
+          default_message = 'Unexpected error - %s returned %d' % (_JMAKE_MAIN, result)
+          raise TaskError(_JMAKE_ERROR_CODES.get(result, default_message))
 
-        if processors and not self.dry_run:
-          # Produce a monolithic apt processor service info file for further compilation rounds
-          # and the unit test classpath.
-          processor_info_file = os.path.join(self._classes_dir, _PROCESSOR_INFO_FILE)
-          if os.path.exists(processor_info_file):
-            with safe_open(processor_info_file, 'r') as f:
-              for processor in f:
-                processors.add(processor.strip())
-          self.write_processor_info(processor_info_file, processors)
+      # NOTE: Currently all classfiles go into one global classes_dir. If we compile in
+      # multiple partitions the second one will cache all the classes of the first one.
+      # This won't result in error, but is wasteful. Currently, however, Java compilation
+      # is done in a single pass, so this won't occur in practice.
+      # TODO: Handle this case better. Separate classes dirs for each partition, like for scala?
+      artifact_files = [self._classes_dir, depfile]
 
-    self.post_process(versioned_targets)
+      if processors and not self.dry_run:
+        # Produce a monolithic apt processor service info file for further compilation rounds
+        # and the unit test classpath.
+        processor_info_file = os.path.join(self._classes_dir, _PROCESSOR_INFO_FILE)
+        if os.path.exists(processor_info_file):
+          with safe_open(processor_info_file, 'r') as f:
+            for processor in f:
+              processors.add(processor.strip())
+        self.write_processor_info(processor_info_file, processors)
+        artifact_files.append(processor_info_file)
+
+      if self._artifact_cache and self.context.options.write_to_artifact_cache:
+        self.update_artifact_cache(vt, artifact_files)
+
+    self.post_process(vt)
 
   # Post-processing steps that must happen even for valid targets.
   def post_process(self, versioned_targets):

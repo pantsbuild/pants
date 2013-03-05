@@ -23,8 +23,9 @@ from twitter.common.contextutil import open_tar, temporary_file
 from twitter.common.dirutil import safe_mkdir, safe_rmtree
 
 
-# Note throughout the distinction between the artifact_root (which is where the artifacts are originally built
-# and where the cache restores them to) and the cache root path/URL (which is where the artifacts are cached).
+# Note throughout the distinction between the artifact_root (which is where the artifacts are
+# originally built and where the cache restores them to) and the cache root path/URL (which is
+# where the artifacts are cached).
 
 def create_artifact_cache(context, artifact_root, spec):
   """
@@ -33,18 +34,21 @@ def create_artifact_cache(context, artifact_root, spec):
     combined cache.
   """
   if not spec:
-    raise Exception, 'Empty artifact cache spec'
+    raise ArtifactCacheError('Empty artifact cache spec')
   if isinstance(spec, basestring):
     if spec.startswith('/'):
       return FileBasedArtifactCache(context, artifact_root, spec)
     elif spec.startswith('http://') or spec.startswith('https://'):
       return RESTfulArtifactCache(context, artifact_root, spec)
     else:
-      raise Exception, 'Invalid artifact cache spec: %s' % spec
+      raise ArtifactCacheError('Invalid artifact cache spec: %s' % spec)
   elif isinstance(spec, (list, tuple)):
     caches = [ create_artifact_cache(context, artifact_root, x) for x in spec ]
     return CombinedArtifactCache(caches)
 
+
+class ArtifactCacheError(Exception):
+  pass
 
 class ArtifactCache(object):
   """
@@ -126,8 +130,9 @@ class FileBasedArtifactCache(ArtifactCache):
   def __init__(self, context, artifact_root, cache_root, copy_fn=None):
     """
     cache_root: The locally cached files are stored under this directory.
-    copy_fn: An optional function with the signature copy_fn(absolute_src_path, relative_dst_path) that
-        will copy cached files into the desired destination. If unspecified, a simple file copy is used.
+    copy_fn: An optional function with the signature copy_fn(absolute_src_path, relative_dst_path)
+             that will copy cached files into the desired destination. If unspecified, a simple
+             file copy is used.
     """
     ArtifactCache.__init__(self, context, artifact_root)
     self._cache_root = cache_root
@@ -188,7 +193,7 @@ class RESTfulArtifactCache(ArtifactCache):
     elif parsed_url.scheme == 'https':
       self._ssl = True
     else:
-      raise Exception, 'RESTfulArtifactCache only supports HTTP and HTTPS'
+      raise ArtifactCacheError('RESTfulArtifactCache only supports HTTP and HTTPS')
     self._timeout_secs = 2.0
     self._netloc = parsed_url.netloc
     self._path_prefix = parsed_url.path
@@ -202,12 +207,13 @@ class RESTfulArtifactCache(ArtifactCache):
       mode = 'w:bz2' if self.compress else 'w'
       with open_tar(tarfile, mode, dereference=True) as tarout:
         for artifact in build_artifacts:
-          tarout.add(artifact, os.path.relpath(artifact, self.artifact_root))  # Adds dirs recursively.
+          # Adds dirs recursively.
+          tarout.add(artifact, os.path.relpath(artifact, self.artifact_root))
       tarfile.close()
 
       with open(tarfile.name, 'rb') as infile:
         if not self._request('PUT', path, body=infile):
-          raise Exception, 'Failed to PUT to %s. Error: 404' % self._url_string(path)
+          raise ArtifactCacheError('Failed to PUT to %s. Error: 404' % self._url_string(path))
 
   def has(self, cache_key):
     path = self._path_for_key(cache_key)
@@ -224,11 +230,12 @@ class RESTfulArtifactCache(ArtifactCache):
         return False
       expected_size = int(response.getheader('content-length', -1))
       if expected_size == -1:
-        raise Exception, 'No content-length header in HTTP response'
+        raise ArtifactCacheError('No content-length header in HTTP response')
       read_size = 4 * 1024 * 1024 # 4 MB
       done = False
       if self.context:
-        self.context.log.info('Reading %d bytes' % expected_size)
+        self.context.log.info('Reading %d bytes from artifact cache at %s' %
+                              (expected_size, self._url_string(path)))
       # Read the data in a loop.
       with temporary_file() as outfile:
         total_bytes = 0
@@ -243,7 +250,8 @@ class RESTfulArtifactCache(ArtifactCache):
         outfile.close()
         # Check the size.
         if total_bytes != expected_size:
-          raise Exception, 'Read only %d bytes from %d expected' % (total_bytes, expected_size)
+          raise ArtifactCacheError('Read only %d bytes from %d expected' %
+                                   (total_bytes, expected_size))
         # Extract the tarfile.
         mode = 'r:bz2' if self.compress else 'r'
         with open_tar(outfile.name, mode) as tarfile:
@@ -272,18 +280,18 @@ class RESTfulArtifactCache(ArtifactCache):
   # Returns a response if we get a 200, None if we get a 404 and raises an exception otherwise.
   def _request(self, method, path, body=None):
     if self.context:
-      self.context.log.info('Sending %s request to %s' % (method, self._url_string(path)))
+      self.context.log.debug('Sending %s request to %s' % (method, self._url_string(path)))
     # TODO(benjy): Keep connection open and reuse?
     conn = self._connect()
     conn.request(method, path, body=body)
     response = conn.getresponse()
-    if response.status == 200:  # TODO: Can HEAD return 204? It would be correct, but I've not seen it happen.
+    if response.status == 200:  # TODO: Can HEAD return 204? I've not seen it happen.
       return response
     elif response.status == 404:
       return None
     else:
-      raise Exception, 'Failed to %s %s. Error: %d %s' % \
-                       (method, self._url_string(path), response.status, response.reason)
+      raise ArtifactCacheError('Failed to %s %s. Error: %d %s' % \
+                       (method, self._url_string(path), response.status, response.reason))
 
   def _url_string(self, path):
     return '%s://%s%s' % (('https' if self._ssl else 'http'), self._netloc, path)
@@ -293,11 +301,11 @@ class CombinedArtifactCache(ArtifactCache):
   """An artifact cache that delegates to a list of other caches."""
   def __init__(self, artifact_caches):
     if not artifact_caches:
-      raise Exception, 'Must provide at least one underlying artifact cache'
+      raise ArtifactCacheError('Must provide at least one underlying artifact cache')
     context = artifact_caches[0].context
     artifact_root = artifact_caches[0].artifact_root
     if any([x.context != context or x.artifact_root != artifact_root for x in artifact_caches]):
-      raise Exception, 'Combined artifact caches must all have the same artifact root.'
+      raise ArtifactCacheError('Combined artifact caches must all have the same artifact root.')
     ArtifactCache.__init__(self, context, artifact_root)
     self._artifact_caches = artifact_caches
 

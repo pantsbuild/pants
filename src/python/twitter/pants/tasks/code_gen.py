@@ -22,43 +22,39 @@ from twitter.pants import get_buildroot
 from twitter.pants.tasks import Task
 
 class CodeGen(Task):
-  """
-    Encapsulates the common machinery for codegen targets that support multiple output languages.
-    This Task will only invoke code generation for changed targets and for the set of languages
-    in the active context that require codegen unless forced.
+  """Encapsulates the common machinery for codegen targets that support multiple output languages.
+
+  This Task will only invoke code generation for changed targets and for the set of languages
+  in the active context that require codegen unless forced.
   """
 
   def is_gentarget(self, target):
-    """
-      Subclasses must override and return True if the target is a target it handles generating
-      code for.
-    """
+    """Subclass must return True if it handles generating for the target."""
     raise NotImplementedError
 
   def is_forced(self, lang):
-    """
-      Subclasses should override and return True if they wish to force code generation for the
-      given language.
-    """
+    """Subclass may return True to force code generation for the given language."""
     return False
 
   def genlangs(self):
-    """
-      Subclasses must override and return a dict mapping supported generation target language names
-      to a predicate that can select targets consuming that language.
+    """Subclass must use this to identify the targets consuming each language it generates for.
+
+    Return value is a dict mapping supported generation target language names
+    to a predicate that can select targets consuming that language.
     """
     raise NotImplementedError
 
   def genlang(self, lang, targets):
-    """
-      Subclasses must override and generate code in :lang for the given targets.
+    """Subclass must override and generate code in :lang for the given targets.
+
+    May return a list of dirs/files to be stored in the artifact cache.
     """
     raise NotImplementedError
 
   def createtarget(self, lang, gentarget, dependees):
-    """
-      Subclasses must override and create a synthetic target containing the sources generated for
-      the given :gentarget.
+    """Subclass must override and create a synthetic target.
+
+     The target must contain the sources generated for the given gentarget.
     """
     raise NotImplementedError
 
@@ -105,13 +101,15 @@ class CodeGen(Task):
       ))
 
     with self.invalidated(gentargets, invalidate_dependents=True) as invalidation_check:
-      invalid_targets = set()
-      for vt in invalidation_check.invalid_vts:
-        invalid_targets.update(vt.targets)
-      for lang, tgts in gentargets_bylang.items():
-        lang_invalid = invalid_targets.intersection(tgts)
-        if lang_invalid:
-          self.genlang(lang, lang_invalid)
+      for vt in invalidation_check.invalid_vts_partitioned:
+        invalid_targets = set(vt.targets)
+        artifact_files = []
+        for lang, tgts in gentargets_bylang.items():
+          lang_invalid = invalid_targets.intersection(tgts)
+          if lang_invalid:
+            artifact_files.extend(self.genlang(lang, lang_invalid) or [])
+        if self._artifact_cache and self.context.options.write_to_artifact_cache and artifact_files:
+          self.update_artifact_cache(vt, artifact_files)
 
     # Link synthetic targets for all in-play gen targets
     for lang, tgts in gentargets_bylang.items():

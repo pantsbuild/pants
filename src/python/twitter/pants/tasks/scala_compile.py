@@ -141,6 +141,7 @@ class ScalaCompile(NailgunTask):
     # Localize the analysis files we read from the artifact cache.
     for vt in vts:
       analysis_file = self._artifact_factory.analysis_file_for_targets(vt.targets)
+      self.context.log.debug('Localizing analysis file %s' % analysis_file)
       if self._zinc_utils.localize_analysis_file(ZincArtifactFactory.portable(analysis_file),
                                                  analysis_file):
         self.context.log.warn('Zinc failed to localize analysis file: %s. Incremental rebuild' \

@@ -121,6 +121,7 @@ class _ZincArtifact(object):
     self.analysis_file = analysis_file
     self.portable_analysis_file = ZincArtifactFactory.portable(analysis_file)
     self.relations_file = analysis_file + '.relations'  # The human-readable zinc relations file.
+    self.log = self.factory.context.log
 
   def current_state(self):
     """Returns the current state of this artifact."""
@@ -176,19 +177,19 @@ class _MergedZincArtifact(_ZincArtifact):
       for artifact in self.underlying_artifacts:
         # Rebase a copy of the per-target analysis files to reflect the merged classes dir.
         if os.path.exists(artifact.classes_dir) and os.path.exists(artifact.analysis_file):
+          self.log.debug('Rebasing analysis file %s before merging' % artifact.analysis_file)
           analysis_file_tmp = os.path.join(tmpdir, artifact.artifact_id)
           shutil.copyfile(artifact.analysis_file, analysis_file_tmp)
           artifact_analysis_files.append(analysis_file_tmp)
           if self.factory.zinc_utils.run_zinc_rebase(analysis_file_tmp,
                                                      [(artifact.classes_dir, self.classes_dir)]):
-            self.factory.context.log.warn(
-              'Zinc failed to rebase analysis file %s. Target may require a full rebuild.' %
-              analysis_file_tmp)
+            self.log.warn('Zinc failed to rebase analysis file %s. ' \
+                          'Target may require a full rebuild.' % analysis_file_tmp)
 
+      self.log.debug('Merging into analysis file %s' % self.analysis_file)
       if self.factory.zinc_utils.run_zinc_merge(artifact_analysis_files, self.analysis_file):
-        self.factory.context.log.warn(
-          'zinc failed to merge analysis files %s to %s. Target may require a full rebuild.' % \
-                               (':'.join(artifact_analysis_files), self.analysis_file))
+        self.log.warn('zinc failed to merge analysis files %s to %s. Target may require a full ' \
+                      'rebuild.' % (':'.join(artifact_analysis_files), self.analysis_file))
 
   def _merge_classes_dir(self, state):
     """Merge the classes dirs from the underlying artifacts into a single dir.
@@ -199,6 +200,7 @@ class _MergedZincArtifact(_ZincArtifact):
     """
     if len(self.underlying_artifacts) <= 1:
       return
+    self.log.debug('Merging classes dirs into %s' % self.classes_dir)
     symlinkable_packages = self._symlinkable_packages(state)
     for artifact in self.underlying_artifacts:
       classnames_by_package = defaultdict(list)
@@ -223,10 +225,7 @@ class _MergedZincArtifact(_ZincArtifact):
           for classname in classnames:
             src = os.path.join(artifact_package_dir, classname)
             dst = os.path.join(merged_package_dir, classname)
-            # dst may already exist if we have overlapping targets. It's not a good idea
-            # to have those, but until we enforce it, we must allow it here.
-            if os.path.exists(src) and not os.path.exists(dst):
-              os.link(src, dst)
+            self._maybe_hardlink(src, dst)
 
   def split(self, old_state=None, portable=False):
     """Actually split the merged artifact into per-target artifacts."""
@@ -264,11 +263,13 @@ class _MergedZincArtifact(_ZincArtifact):
       splits.append(SplitInfo(artifact.sources, artifact.classes_dir, _analysis(artifact)))
 
     split_args = [(x.sources, x.dst_analysis_file) for x in splits]
+    self.log.debug('Splitting analysis file %s' % analysis_to_split)
     if self.factory.zinc_utils.run_zinc_split(analysis_to_split, split_args):
       raise TaskError('zinc failed to split analysis files %s from %s' % \
                       (':'.join([x.dst_analysis_file for x in splits]), analysis_to_split))
     for split in splits:
       if os.path.exists(split.dst_analysis_file):
+        self.log.debug('Rebasing analysis file %s after split' % split.dst_analysis_file)
         if self.factory.zinc_utils.run_zinc_rebase(split.dst_analysis_file,
                                                    [(self.classes_dir, split.dst_classes_dir)]):
           raise TaskError('Zinc failed to rebase analysis file %s' % split.dst_analysis_file)
@@ -285,6 +286,7 @@ class _MergedZincArtifact(_ZincArtifact):
         ret[os.path.dirname(cls)].append(os.path.basename(cls))
       return ret
 
+    self.log.debug('Splitting classes dir %s' % self.classes_dir)
     if diff:
       new_or_changed_classnames_by_package = map_classes_by_package(diff.new_or_changed_classes)
       deleted_classnames_by_package = map_classes_by_package(diff.deleted_classes)
@@ -322,7 +324,7 @@ class _MergedZincArtifact(_ZincArtifact):
             if not diff or classname in new_or_changed_classnames:
               src = os.path.join(merged_package_dir, classname)
               dst = os.path.join(artifact_package_dir, classname)
-              shutil.copyfile(src, dst)
+              self._maybe_hardlink(src, dst)
           if diff:
             for classname in deleted_classnames_by_package.get(package, []):
               path = os.path.join(artifact_package_dir, classname)
@@ -354,4 +356,13 @@ class _MergedZincArtifact(_ZincArtifact):
       for cls in classes:
         targets_by_package[os.path.dirname(cls)].add(target)
     return targets_by_package
+
+  def _maybe_hardlink(self, src, dst):
+    if os.path.exists(src):
+      if os.path.exists(dst):
+        if not os.path.samefile(src, dst):
+          os.unlink(dst)
+          os.link(src, dst)
+      else:
+        os.link(src, dst)
 
