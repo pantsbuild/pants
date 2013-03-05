@@ -160,8 +160,6 @@ class JavaCompile(NailgunTask):
               genmap.add(target, basedir, [_PROCESSOR_INFO_FILE])
 
   def execute_single_compilation(self, vt, cp):
-    # TODO: Use the artifact cache.
-
     depfile = self.create_depfile_path(vt.targets)
 
     self.merge_depfile(vt)  # Get what we can from previous builds.
