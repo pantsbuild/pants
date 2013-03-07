@@ -1,4 +1,4 @@
-# ================================================================================================== 
+# ==================================================================================================
 # Copyright 2011 Twitter, Inc.
 # --------------------------------------------------------------------------------------------------
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -25,7 +25,7 @@ from twitter.common.dirutil import safe_open, safe_mkdir
 from twitter.pants import is_apt
 from twitter.pants.base.target import Target
 from twitter.pants.targets import JavaLibrary, JavaTests
-from twitter.pants.tasks import TaskError
+from twitter.pants.tasks import TaskError, Task
 from twitter.pants.tasks.binary_utils import nailgun_profile_classpath
 from twitter.pants.tasks.jvm_compiler_dependencies import Dependencies
 from twitter.pants.tasks.nailgun_task import NailgunTask
@@ -131,14 +131,19 @@ class JavaCompile(NailgunTask):
 
       with self.invalidated(java_targets, invalidate_dependents=True,
           partition_size_hint=self._partition_size_hint) as invalidation_check:
-        for vt in invalidation_check.all_vts:
-          if vt.valid:  # Don't compile, just post-process.
-            self.post_process(vt)
         for vt in invalidation_check.invalid_vts_partitioned:
           # Compile, using partitions for efficiency.
           self.execute_single_compilation(vt, cp)
           if not self.dry_run:
             vt.update()
+
+        for vt in invalidation_check.all_vts:
+          depfile = self.create_depfile_path(vt.targets)
+          if not self.dry_run and os.path.exists(depfile):
+            # Read in the deps created either just now or by a previous run on these targets.
+            deps = Dependencies(self._classes_dir)
+            deps.load(depfile)
+            self._deps.merge(deps)
 
       if not self.dry_run:
         if self.context.products.isrequired('classes'):
@@ -147,6 +152,7 @@ class JavaCompile(NailgunTask):
           # Map generated classes to the owning targets and sources.
           for target, classes_by_source in self._deps.findclasses(java_targets).items():
             for source, classes in classes_by_source.items():
+              print 'ADDING %s %s %s' % (source, target, classes)
               genmap.add(source, self._classes_dir, classes)
               genmap.add(target, self._classes_dir, classes)
 
@@ -176,6 +182,7 @@ class JavaCompile(NailgunTask):
         if result != 0:
           default_message = 'Unexpected error - %s returned %d' % (_JMAKE_MAIN, result)
           raise TaskError(_JMAKE_ERROR_CODES.get(result, default_message))
+        self.split_depfile(vt)
 
       # NOTE: Currently all classfiles go into one global classes_dir. If we compile in
       # multiple partitions the second one will cache all the classes of the first one.
@@ -197,18 +204,6 @@ class JavaCompile(NailgunTask):
 
       if self._artifact_cache and self.context.options.write_to_artifact_cache:
         self.update_artifact_cache(vt, artifact_files)
-
-    self.post_process(vt)
-
-  # Post-processing steps that must happen even for valid targets.
-  def post_process(self, versioned_targets):
-    depfile = self.create_depfile_path(versioned_targets.targets)
-    if not self.dry_run and os.path.exists(depfile):
-      # Read in the deps created either just now or by a previous compiler run on these targets.
-      deps = Dependencies(self._classes_dir)
-      deps.load(depfile)
-      self.split_depfile(deps, versioned_targets)
-      self._deps.merge(deps)
 
   def create_depfile_path(self, targets):
     compilation_id = Target.maybe_readable_identify(targets)
@@ -250,11 +245,24 @@ class JavaCompile(NailgunTask):
     log.debug('Executing: %s %s' % (_JMAKE_MAIN, ' '.join(args)))
     return self.runjava(_JMAKE_MAIN, classpath=jmake_classpath, args=args, jvmargs=self._jvm_args)
 
-  def split_depfile(self, deps, versioned_target_set):
-    if len(versioned_target_set.targets) <= 1:
+  def check_artifact_cache(self, vts):
+    # Special handling for java artifacts.
+    cached_vts, uncached_vts = Task.check_artifact_cache(self, vts)
+
+    for vt in cached_vts:
+      self.split_depfile(vt)
+    return cached_vts, uncached_vts
+
+  def split_depfile(self, vt):
+    depfile = self.create_depfile_path(vt.targets)
+    if len(vt.targets) <= 1 or not os.path.exists(depfile) or self.dry_run:
       return
-    classes_by_source_by_target = deps.findclasses(versioned_target_set.targets)
-    for target in versioned_target_set.targets:
+
+    deps = Dependencies(self._classes_dir)
+    deps.load(depfile)
+
+    classes_by_source_by_target = deps.findclasses(vt.targets)
+    for target in vt.targets:
       classes_by_source = classes_by_source_by_target.get(target, {})
       dst_depfile = self.create_depfile_path([target])
       dst_deps = Dependencies(self._classes_dir)
