@@ -152,7 +152,6 @@ class JavaCompile(NailgunTask):
           # Map generated classes to the owning targets and sources.
           for target, classes_by_source in self._deps.findclasses(java_targets).items():
             for source, classes in classes_by_source.items():
-              print 'ADDING %s %s %s' % (source, target, classes)
               genmap.add(source, self._classes_dir, classes)
               genmap.add(target, self._classes_dir, classes)
 
