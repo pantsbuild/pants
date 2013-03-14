@@ -9,17 +9,9 @@ mkdir -p $BOOTSTRAP_BIN
 mkdir -p $BOOTSTRAP_ENVIRONMENT
 mkdir -p $CACHE
 
-
-if ! which python; then
+if ! which python2.6; then
   echo No python interpreter found on the path.  Python will not work\!
   exit 1
-fi
-
-# Get Python version. For example, Python 2.7.1 -> 27
-py_version=$(python --version 2>&1 | awk -F' ' '{ print $2 }' | awk -F. '{ print $1$2 }')
-if [ "$py_version" -lt 26 ]; then
-  echo 'Python interpreter needs to be version 2.6+.'
-  exit 2
 fi
 
 if ! test -f $BOOTSTRAP_BIN/bootstrap; then
