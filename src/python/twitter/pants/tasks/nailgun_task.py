@@ -189,11 +189,14 @@ class NailgunTask(Task):
         started = ng_out.readline()
         if started:
           port = self._parse_nailgun_port(started)
-          with open(self._pidfile, 'a') as pidfile:
-            pidfile.write(':%d\n' % port)
-          nailgun = self._create_ngclient(port)
-          log.debug('Detected ng server up on port %d' % port)
-          break
+          if os.path.exists(self._pidfile):
+            # The child tine has written the pid, so we may now add the port.
+            with open(self._pidfile, 'a') as pidfile:
+              pidfile.write(':%d\n' % port)
+            nailgun = self._create_ngclient(port)
+            log.debug('Detected ng server up on port %d' % port)
+            break
+        time.sleep(0.1)
 
     attempt = 0
     while True:
@@ -216,6 +219,8 @@ class NailgunTask(Task):
     with _safe_open(self._ng_out, 'w'):
       pass # truncate
 
+    if os.path.exists(self._pidfile):
+      os.remove(self._pidfile)  # So we know when the child has written it.
     pid = os.fork()
     if pid != 0:
       # In the parent tine - block on ng being up for connections
