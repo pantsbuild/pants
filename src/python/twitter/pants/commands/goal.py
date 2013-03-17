@@ -325,6 +325,8 @@ class Goal(Command):
     else:
       goals, specs = Goal.parse_args(args)
 
+      self.requested_goals = goals
+
       # TODO(John Sirois): kill PANTS_NEW and its usages when pants.new is rolled out
       ParseContext.enable_pantsnew()
 
@@ -406,6 +408,7 @@ class Goal(Command):
       self.config,
       self.options,
       self.targets,
+      requested_goals=self.requested_goals,
       lock=lock,
       log=logger,
       timer=self.timer if self.options.time else None)
