@@ -120,12 +120,9 @@ object Inputs {
 
   /**
    * By default the cache location is relative to the classes directory (for example, target/classes/../cache/classes).
-   * If not writable then the fallback is within the zinc cache directory.
    */
   def defaultCacheLocation(classesDir: File) = {
-    val alongside = classesDir.getParentFile / "cache" / classesDir.getName
-    if (Util.checkWritable(alongside)) alongside
-    else Setup.zincCacheDir / "analysis-cache" / classesDir.getCanonicalPath
+    classesDir.getParentFile / "cache" / classesDir.getName
   }
 
   /**
@@ -144,6 +141,24 @@ object Inputs {
    */
   def analysisFor(file: File, exclude: File, mapped: Map[File, File]): Analysis = {
     cacheFor(file, exclude, mapped) map Compiler.analysis getOrElse Analysis.Empty
+  }
+
+  /**
+   * Verify inputs and update if necessary.
+   * Currently checks that the cache file is writable.
+   */
+  def verify(inputs: Inputs): Inputs = {
+    inputs.copy(cacheFile = verifyCacheFile(inputs.cacheFile, inputs.classesDirectory))
+  }
+
+  /**
+   * Check that the cache file is writable.
+   * If not writable then the fallback is within the zinc cache directory.
+   *
+   */
+  def verifyCacheFile(cacheFile: File, classesDir: File): File = {
+    if (Util.checkWritable(cacheFile)) cacheFile
+    else Setup.zincCacheDir / "analysis-cache" / classesDir.getCanonicalPath
   }
 
   /**
