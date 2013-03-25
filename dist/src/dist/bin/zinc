@@ -192,6 +192,7 @@ else
     "$java_cmd" \
     "${java_options[@]}" \
     -Dzinc.home="$base_dir" \
+    -Djline.shutdownhook=false \
     -classpath "$classpath" \
     com.typesafe.zinc.Main "$@"
 fi
