@@ -1,5 +1,7 @@
 # test rebase analysis utility
 
+! zinc -status
+
 zinc -nailed -analysis-cache a1 -d c1 -output-relations r1 A.scala
 
 copy a1 a2

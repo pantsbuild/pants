@@ -1,5 +1,7 @@
 # test split analysis utility
 
+! zinc -status
+
 zinc -nailed -analysis-cache analysis/abc -d classes -output-relations relations/abc a/A1.scala b/B1.scala c/C1.scala
 
 zinc -nailed -analysis -cache analysis/abc -split a:analysis/a,b:analysis/b,c:analysis/c

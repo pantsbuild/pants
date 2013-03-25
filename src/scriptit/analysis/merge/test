@@ -1,5 +1,7 @@
 # test merge analysis utility
 
+! zinc -status
+
 zinc -nailed -analysis-cache analysis/a -d classes a/A.scala
 
 zinc -nailed -analysis-cache analysis/b -d classes b/B.scala
@@ -14,7 +16,6 @@ zinc -nailed -analysis-cache analysis/abc -d classes -output-relations relations
 ! exists analysis/abc.relations
 zinc -nailed -analysis -cache analysis/abc -mirror-analysis -merge analysis/a:analysis/b:analysis/c
 exists analysis/abc.relations
-
 
 zinc -shutdown
 

@@ -1,5 +1,7 @@
 # simple two module compile test
 
+! zinc -status
+
 zinc -nailed -debug -d a/target/classes a/src/A.scala
 
 exists a/target/classes/A.class

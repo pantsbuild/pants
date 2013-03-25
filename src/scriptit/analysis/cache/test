@@ -1,5 +1,7 @@
 # set analysis cache options
 
+! zinc -status
+
 zinc -nailed -debug -d a/target/classes -analysis-cache a/target/analysis/compile a/src/A.scala
 
 exists a/target/classes/A.class a/target/analysis/compile

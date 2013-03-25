@@ -1,5 +1,7 @@
 # setting jvm options
 
+! zinc -status
+
 zinc -start -debug-command -J-Xms256m -J-Xmx256m
 
 zinc -shutdown

@@ -1,5 +1,7 @@
 # test reload analysis utility
 
+! zinc -status
+
 zinc -nailed -analysis-cache a2 -d c2 A.scala
 
 zinc -nailed -analysis-cache a1 -d c1 A.scala
