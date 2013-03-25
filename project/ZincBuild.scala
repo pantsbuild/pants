@@ -26,7 +26,6 @@ object ZincBuild extends Build {
       libraryDependencies ++= Seq(
         "com.typesafe.sbt" % "incremental-compiler" % sbtVersion,
         "com.typesafe.sbt" % "compiler-interface" % sbtVersion classifier "sources",
-        "jline" % "jline" % "1.0" % "optional",
         "com.martiansoftware" % "nailgun-server" % "0.9.1" % "optional"
       ),
       scalacOptions ++= Seq("-feature", "-deprecation", "-Xlint")
