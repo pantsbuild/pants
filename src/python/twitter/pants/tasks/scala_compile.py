@@ -63,8 +63,7 @@ class ScalaCompile(NailgunTask):
     NailgunTask.__init__(self, context, workdir=context.config.get('scala-compile', 'nailgun_dir'))
 
     # Set up the zinc utils.
-    # Command line switch overrides color setting set in pants.ini
-    color = context.options.scala_compile_color if context.options.scala_compile_color is not None else \
+    color = context.options.scala_compile_color or \
             context.config.getbool('scala-compile', 'color', default=True)
 
     self._zinc_utils = ZincUtils(context=context, java_runner=self.runjava, color=color)
