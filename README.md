@@ -52,7 +52,9 @@ If no options are passed to locate a version of Scala then Scala 2.9.2 is used
 by default (which is bundled with zinc).
 
 To pass options to scalac simply prefix with ``-S``. For example, deprecation
-warnings can be enabled with ``-S-deprecation``.
+warnings can be enabled with ``-S-deprecation``. For multi-part options add the
+``-S`` prefix to all parts. For example, the sourcepath option can be specified
+with ``-S-sourcepath -S/the/source/path``.
 
 ### Java
 
