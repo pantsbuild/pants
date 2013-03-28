@@ -59,7 +59,7 @@ with ``-S-sourcepath -S/the/source/path``.
 ### Java
 
 To select a different ``javac`` to compile Java sources, use the ``-java-home``
-option. To pass options to javac, prefix with ``-J``.
+option. To pass options to javac, prefix with ``-C``.
 
 If mixed Java and Scala sources are being compiled then the compile order can be
 specified with ``-compile-order``, where the available orders are ``Mixed``,
