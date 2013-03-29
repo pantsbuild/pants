@@ -50,6 +50,7 @@ class BuildLint(Task):
     context.products.require('missing_deps')
     self.transitive = context.options.buildlint_transitive
     self.actions = set(context.options.buildlint_actions)
+    self.include_intransitive = context.options.buildlint_include_intransitive
     # Manually apply the default. Can't use flag default, because action is 'append', so
     # diffs would always be printed, even if we only wanted to rewrite.
     if not self.actions:
@@ -69,11 +70,13 @@ class BuildLint(Task):
     if self.transitive:
       for target in targets:
         add_buildfile_for_target(target, genmap_trans)
-        add_buildfile_for_target(target, genmap_intrans)
+        if self.include_intransitive: 
+          add_buildfile_for_target(target, genmap_intrans)
     else:
       for target in self.context.target_roots:
         add_buildfile_for_target(target, genmap_trans)
-        add_buildfile_for_target(target, genmap_intrans)
+        if self.include_intransitive: 
+          add_buildfile_for_target(target, genmap_intrans)
 
     for buildfile_path, missing_dep_map in buildfile_paths.items():
       self._fix_lint(buildfile_path, missing_dep_map)
