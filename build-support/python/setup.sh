@@ -17,7 +17,7 @@ if [ ! $PY ]; then
 fi
 
 # Get Python version. For example, Python 2.7.1 -> 27
-py_version=$(python --version 2>&1 | awk -F' ' '{ print $2 }' | awk -F. '{ print $1$2 }')
+py_version=$($PY --version 2>&1 | awk -F' ' '{ print $2 }' | awk -F. '{ print $1$2 }')
 if [ "${py_version}" -lt 26 ]; then
   echo 'Python interpreter needs to be version 2.6+.'
   exit 2
