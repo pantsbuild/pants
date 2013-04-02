@@ -68,7 +68,7 @@ class JvmDependencyCache(object):
                                                                  negate=True),
                             dest="scala_check_missing_deps",
                             action="callback", callback=mkflag.set_bool,
-                            default=False,
+                            default=True,
                             help="[%default] Check for undeclared dependencies in scala code")
 
     # This flag should eventually be removed once code is in compliance.
@@ -387,7 +387,7 @@ class JvmDependencyCache(object):
       targets_by_class: a mapping specifying which classes are produced by which targets.
 
     Return:
-      (undeclared_deps, undeclared_immediate_deps)
+      (undeclared_deps, intransitive_undeclared_deps)
     """
     # Make copies of the computed deps. Then we'll walk the declared deps,
     # removing everything that was declared; what's left are the undeclared deps.
@@ -395,11 +395,11 @@ class JvmDependencyCache(object):
     undeclared_jar_deps = computed_jar_deps.copy()
     target.walk(lambda target: \
       self._dependency_walk_work(undeclared_deps, undeclared_jar_deps, target))
-    # The immediate (intransitive) missing deps are everything that isn't declared as a dep
+    # The intransitive missing deps are everything that isn't declared as a dep
     # of this target.
-    immediate_undeclared_deps = \
+    intransitive_undeclared_deps = \
         computed_deps.difference(target.dependencies).difference([target])
-    if len(undeclared_deps) > 0:
+    if not target.has_label("synthetic") and len(undeclared_deps) > 0:
       genmap = self.context.products.get('missing_deps')
       genmap.add(target, self.context._buildroot,
                  [ x.derived_from.address.reference() for x in undeclared_deps])
@@ -408,18 +408,18 @@ class JvmDependencyCache(object):
                (target.address, dep_target.derived_from.address.reference()))
         print ("       because source file %s depends on class %s" %
                self.get_dependency_blame(target, dep_target, targets_by_class))
-        immediate_undeclared_deps.discard(dep_target)
-    if self.check_intransitive_deps is not 'none' and len(immediate_undeclared_deps) > 0:
-      genmap = self.context.products.get('missing_immediate_deps')
+        intransitive_undeclared_deps.discard(dep_target)
+    if self.check_intransitive_deps is not 'none' and len(intransitive_undeclared_deps) > 0:
+      genmap = self.context.products.get('missing_intransitive_deps')
       genmap.add(target, self.context._buildroot, \
-        [ x.derived_from.address.reference() for x in immediate_undeclared_deps])
-      for dep_target in immediate_undeclared_deps:
+        [ x.derived_from.address.reference() for x in intransitive_undeclared_deps])
+      for dep_target in intransitive_undeclared_deps:
         print ("Error: target %s has undeclared intransitive compilation dependency on %s," %
                (target.address, dep_target.derived_from.address.reference()))
         print ("       because source file %s depends on class %s" %
                self.get_dependency_blame(target, dep_target, targets_by_class))
 
-    return undeclared_deps, immediate_undeclared_deps
+    return undeclared_deps, intransitive_undeclared_deps
 
 
   def check_undeclared_dependencies(self):

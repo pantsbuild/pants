@@ -121,6 +121,7 @@ class CodeGen(Task):
             target,
             dependees_by_gentarget.get(target, [])
           )
+          langtarget_by_gentarget[target].add_label("synthetic")
         genmap = self.context.products.get(lang)
         for gentarget, langtarget in langtarget_by_gentarget.items():
           genmap.add(gentarget, get_buildroot(), [langtarget])
