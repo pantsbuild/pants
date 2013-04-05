@@ -179,6 +179,14 @@ class BuildInvalidator(object):
     """
     self._write_sha(cache_key)
 
+  def force_invalidate(self, cache_key):
+    """Force-invalidate the cached item."""
+    try:
+      os.unlink(self._sha_file(cache_key))
+    except OSError as e:
+      if e.errno != errno.ENOENT:
+        raise
+
   def existing_hash(self, id):
     """Returns the existing hash for the specified id.
 
