@@ -1,5 +1,5 @@
 # ==================================================================================================
-# Copyright 2011 Twitter, Inc.
+# Copyright 2013 Twitter, Inc.
 # --------------------------------------------------------------------------------------------------
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this work except in compliance with the License.
@@ -19,7 +19,6 @@ __author__ = 'Mark C. Chu-Carroll'
 import os
 from collections import defaultdict
 
-from twitter.pants.base.target import Target
 from twitter.pants.targets.jar_dependency import JarDependency
 from twitter.pants.targets.jvm_target import JvmTarget
 from twitter.pants.tasks import TaskError
@@ -445,12 +444,7 @@ class JvmDependencyCache(object):
       undeclared_deps, immediate_undeclared_deps = \
         self.get_missing_deps_for_target(target, computed_deps, computed_jar_deps,
                                          targets_by_class)
-
-      #if len(jar_deps) > 0:
-      #  found_missing_deps = True
-      #  for jd in jar_deps:
-      #    print ("Error: target %s needs to depend on jar_dependency %s.%s" %
-      #          (target.address, jd.org, jd.name))
+      found_missing_deps = found_missing_deps or undeclared_deps or immediate_undeclared_deps
 
       if self.check_unnecessary_deps and not target.has_label('synthetic'):
         self.check_unnecessary_deps(target, computed_deps)
