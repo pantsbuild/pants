@@ -150,7 +150,7 @@ class _MergedZincArtifact(_ZincArtifact):
                            classes_dir, analysis_file)
     self.underlying_artifacts = underlying_artifacts
 
-  def merge(self):
+  def merge(self, force=False):
     """Actually combines the underlying artifacts into a single merged one.
 
     Creates a single merged analysis file and a single merged classes dir.
@@ -162,12 +162,12 @@ class _MergedZincArtifact(_ZincArtifact):
     # copying files around.
 
     # Must merge analysis before computing current state.
-    if not os.path.exists(self.analysis_file):
+    if force or not os.path.exists(self.analysis_file):
       self._merge_analysis()
 
     current_state = self.current_state()
 
-    if not os.path.exists(self.classes_dir):
+    if force or not os.path.exists(self.classes_dir):
       self._merge_classes_dir(current_state)
     return current_state
 
@@ -204,6 +204,7 @@ class _MergedZincArtifact(_ZincArtifact):
     if len(self.underlying_artifacts) <= 1:
       return
     self.log.debug('Merging classes dirs into %s' % self.classes_dir)
+    safe_rmtree(self.classes_dir)
     symlinkable_packages = self._symlinkable_packages(state)
     for artifact in self.underlying_artifacts:
       classnames_by_package = defaultdict(list)

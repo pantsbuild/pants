@@ -185,7 +185,13 @@ class ScalaCompile(NailgunTask):
       # We must do this even if we're not going to compile, because the merged output dir
       # will go on the classpath of downstream tasks. We can't put the per-target dirs
       # on the classpath because Zinc doesn't handle large numbers of upstream deps well.
-      current_state = merged_artifact.merge()
+      current_state = merged_artifact.merge(force=not vts.valid)
+
+      # Note: vts.valid tells us if the merged artifact is valid. If not, we recreate it
+      # above. [not vt.valid for vt in vts.versioned_targets] tells us if anything needs
+      # to be recompiled. The distinction is important: all the underlying targets may be
+      # valid because they were built in some other pants run with different partitions,
+      # but this partition may still be invalid and need merging.
 
       # Invoke the compiler if needed.
       if any([not vt.valid for vt in vts.versioned_targets]):
