@@ -473,11 +473,7 @@ class JvmDependencyCache(object):
       all_intransitive_undeclared_deps = \
           all_intransitive_undeclared_deps.union(immediate_undeclared_deps)
 
-      #if len(jar_deps) > 0:
-      #  found_missing_deps = True
-      #  for jd in jar_deps:
-      #    print ("Error: target %s needs to depend on jar_dependency %s.%s" %
-      #          (target.address, jd.org, jd.name))
+      # TODO(markcc): add checks for missing jar dependencies.
 
       if self.check_unnecessary_deps:
         if not target.has_label('synthetic'):
