@@ -110,6 +110,8 @@ class Goal(Command):
   GLOBAL_OPTIONS = [
     Option("-x", "--time", action="store_true", dest="time", default=False,
            help="Times goal phases and outputs a report."),
+    Option("-k", "--kill-nailguns", action="store_true", dest="cleanup_nailguns", default=False,
+           help="Kill nailguns before exiting"),
     Option("-v", "--log", action="store_true", dest="log", default=False,
            help="[%default] Logs extra build output."),
     Option("-d", "--logdir", dest="logdir",
@@ -427,10 +429,18 @@ class Goal(Command):
       logger.debug('Operating on targets: %s', self.targets)
 
     ret = Phase.attempt(context, self.phases)
+
+    if self.options.cleanup_nailguns or self.config.get('nailgun', 'autokill', default = False):
+      if log:
+        log.debug('auto-killing nailguns')
+      if NailgunTask.killall:
+        NailgunTask.killall(log)
+
     if self.options.time:
       print('Timing report')
       print('=============')
       self.timer.print_timings()
+
     return ret
 
   def cleanup(self):
