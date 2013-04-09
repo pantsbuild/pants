@@ -31,10 +31,6 @@ class JarLibrary(Target):
     Target.__init__(self, name, False)
     self.add_label('jars')
     self.dependencies = resolve(dependencies)
-    self.dependency_addresses = set()
-    for dependency in self.dependencies:
-      if hasattr(dependency, 'address'):
-        self.dependency_addresses.add(dependency.address)
 
   def resolve(self):
     for dependency in self.dependencies:

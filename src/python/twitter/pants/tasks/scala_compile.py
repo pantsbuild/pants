@@ -17,7 +17,7 @@
 __author__ = 'Benjy Weinberger'
 
 import os
-
+ 
 from collections import namedtuple
 from twitter.pants import  is_scalac_plugin, get_buildroot
 from twitter.pants.targets.scala_library import ScalaLibrary
@@ -185,23 +185,13 @@ class ScalaCompile(NailgunTask):
       # We must do this even if we're not going to compile, because the merged output dir
       # will go on the classpath of downstream tasks. We can't put the per-target dirs
       # on the classpath because Zinc doesn't handle large numbers of upstream deps well.
-      current_state = merged_artifact.merge(force=not vts.valid)
-
-      # Note: vts.valid tells us if the merged artifact is valid. If not, we recreate it
-      # above. [not vt.valid for vt in vts.versioned_targets] tells us if anything needs
-      # to be recompiled. The distinction is important: all the underlying targets may be
-      # valid because they were built in some other pants run with different partitions,
-      # but this partition may still be invalid and need merging.
+      current_state = merged_artifact.merge()
 
       # Invoke the compiler if needed.
       if any([not vt.valid for vt in vts.versioned_targets]):
         old_state = current_state
         classpath = [entry for conf, entry in cp if conf in self._confs]
         self.context.log.info('Compiling targets %s' % vts.targets)
-        # Zinc may delete classfiles, then later exit on a compilation error. Then if the
-        # change triggering the error is reverted, we won't rebuild to restore the missing
-        # classfiles. So we force-invalidate here, to be on the safe side.
-        vts.force_invalidate()
         if self._zinc_utils.compile(classpath, merged_artifact.sources, merged_artifact.classes_dir,
                                     merged_artifact.analysis_file, upstream_analysis_map):
           raise TaskError('Compile failed.')

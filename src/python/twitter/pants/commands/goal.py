@@ -694,15 +694,3 @@ goal(
   action=SetupPythonEnvironment,
 ).install('setup').with_description(
 "Setup the target's build environment.")
-
-from twitter.pants.tasks.paths import Path, Paths
-
-goal(
-  name='path',
-  action=Path,
-).install().with_description('Find a dependency path from one target to another')
-
-goal(
-  name='paths',
-  action=Paths,
-).install().with_description('Find all dependency paths from one target to another')

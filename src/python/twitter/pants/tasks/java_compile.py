@@ -154,34 +154,22 @@ class JavaCompile(NailgunTask):
             for source, classes in classes_by_source.items():
               genmap.add(source, self._classes_dir, classes)
               genmap.add(target, self._classes_dir, classes)
+
           # TODO(John Sirois): Map target.resources in the same way
           # 'Map' (rewrite) annotation processor service info files to the owning targets.
           for target in java_targets:
             if is_apt(target) and target.processors:
-                basedir = os.path.join(self._resources_dir, Target.maybe_readable_identify([target]))
-                processor_info_file = os.path.join(basedir, _PROCESSOR_INFO_FILE)
-                self.write_processor_info(processor_info_file, target.processors)
-                genmap.add(target, basedir, [_PROCESSOR_INFO_FILE])
-
-        # Produce a monolithic apt processor service info file for further compilation rounds
-        # and the unit test classpath.
-        all_processors = set()
-        for target in java_targets:
-          if is_apt(target) and target.processors:
-            all_processors.update(target.processors)
-        processor_info_file = os.path.join(self._classes_dir, _PROCESSOR_INFO_FILE)
-        if os.path.exists(processor_info_file):
-          with safe_open(processor_info_file, 'r') as f:
-            for processor in f:
-              all_processors.add(processor.strip())
-        self.write_processor_info(processor_info_file, all_processors)
+              basedir = os.path.join(self._resources_dir, target.id)
+              processor_info_file = os.path.join(basedir, _PROCESSOR_INFO_FILE)
+              self.write_processor_info(processor_info_file, target.processors)
+              genmap.add(target, basedir, [_PROCESSOR_INFO_FILE])
 
   def execute_single_compilation(self, vt, cp):
     depfile = self.create_depfile_path(vt.targets)
 
     self.merge_depfile(vt)  # Get what we can from previous builds.
     self.context.log.info('Compiling targets %s' % str(vt.targets))
-    sources_by_target, fingerprint = self.calculate_sources(vt.targets)
+    sources_by_target, processors, fingerprint = self.calculate_sources(vt.targets)
     if sources_by_target:
       sources = reduce(lambda all, sources: all.union(sources), sources_by_target.values())
       if not sources:
@@ -195,21 +183,26 @@ class JavaCompile(NailgunTask):
           raise TaskError(_JMAKE_ERROR_CODES.get(result, default_message))
         self.split_depfile(vt)
 
-      all_artifact_files = [depfile]
+      # NOTE: Currently all classfiles go into one global classes_dir. If we compile in
+      # multiple partitions the second one will cache all the classes of the first one.
+      # This won't result in error, but is wasteful. Currently, however, Java compilation
+      # is done in a single pass, so this won't occur in practice.
+      # TODO: Handle this case better. Separate classes dirs for each partition, like for scala?
+      artifact_files = [self._classes_dir, depfile]
+
+      if processors and not self.dry_run:
+        # Produce a monolithic apt processor service info file for further compilation rounds
+        # and the unit test classpath.
+        processor_info_file = os.path.join(self._classes_dir, _PROCESSOR_INFO_FILE)
+        if os.path.exists(processor_info_file):
+          with safe_open(processor_info_file, 'r') as f:
+            for processor in f:
+              processors.add(processor.strip())
+        self.write_processor_info(processor_info_file, processors)
+        artifact_files.append(processor_info_file)
 
       if self._artifact_cache and self.context.options.write_to_artifact_cache:
-        deps = Dependencies(self._classes_dir)
-        deps.load(depfile)
-        for single_vt in vt.versioned_targets:
-          per_target_depfile = self.create_depfile_path([single_vt.target])
-          per_target_artifact_files = [per_target_depfile]
-          for _, classes_by_source in deps.findclasses([single_vt.target]).items():
-            for _, classes in classes_by_source.items():
-              classfile_paths = [os.path.join(self._classes_dir, cls) for cls in classes]
-              per_target_artifact_files.extend(classfile_paths)
-              all_artifact_files.extend(classfile_paths)
-            self.update_artifact_cache(single_vt, per_target_artifact_files)
-        self.update_artifact_cache(vt, all_artifact_files)
+        self.update_artifact_cache(vt, artifact_files)
 
   def create_depfile_path(self, targets):
     compilation_id = Target.maybe_readable_identify(targets)
@@ -217,15 +210,18 @@ class JavaCompile(NailgunTask):
 
   def calculate_sources(self, targets):
     sources = defaultdict(set)
+    processors = set()
     def collect_sources(target):
       src = (os.path.join(target.target_base, source)
              for source in target.sources if source.endswith('.java'))
       if src:
         sources[target].update(src)
+        if is_apt(target) and target.processors:
+          processors.update(target.processors)
 
     for target in targets:
       collect_sources(target)
-    return sources, Target.identify(targets)
+    return sources, processors, Target.identify(targets)
 
   def compile(self, classpath, sources, fingerprint, depfile):
     jmake_classpath = nailgun_profile_classpath(self, self._jmake_profile)

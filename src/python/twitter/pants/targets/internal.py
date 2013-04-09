@@ -151,7 +151,6 @@ class InternalTarget(Target):
     self.processed_dependencies = resolve(dependencies)
 
     self.add_label('internal')
-    self.dependency_addresses = OrderedSet()
     self.dependencies = OrderedSet()
     self.internal_dependencies = OrderedSet()
     self.jar_dependencies = OrderedSet()
@@ -180,8 +179,6 @@ class InternalTarget(Target):
   def update_dependencies(self, dependencies):
     if dependencies:
       for dependency in dependencies:
-        if hasattr(dependency, 'address'):
-          self.dependency_addresses.add(dependency.address)
         for resolved_dependency in dependency.resolve():
           self.dependencies.add(resolved_dependency)
           if isinstance(resolved_dependency, InternalTarget):

@@ -85,8 +85,7 @@ class Dependencies(object):
       Returns a mapping from a target to its source to classes mapping.
       For example:
 
-      dependencies = Dependencies(outdir)
-      dependencies.load(depfile)
+      dependencies = Dependencies(outdir, depfile)
       mapping = dependencies.findclasses(targets)
       for target, src_to_classes in mapping.items():
         for source, classes in src_to_classes.items():

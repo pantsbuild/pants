@@ -50,7 +50,7 @@ class BuildLint(Task):
     context.products.require('missing_deps')
     self.transitive = context.options.buildlint_transitive
     self.actions = set(context.options.buildlint_actions)
-    self.include_intransitive = context.options.buildlint_include_intransitive
+    self.include_intransitive = context.options.builtlint_include_intransitive
     # Manually apply the default. Can't use flag default, because action is 'append', so
     # diffs would always be printed, even if we only wanted to rewrite.
     if not self.actions:

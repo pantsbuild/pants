@@ -59,9 +59,7 @@ class VersionedTargetSet(object):
 
   def update(self):
     self._cache_manager.update(self)
-
-  def force_invalidate(self):
-    self._cache_manager.force_invalidate(self)
+    self.valid = True
 
   def __repr__(self):
     return "VTS(%s. %d)" % (','.join(target.id for target in self.targets), 1 if self.valid else 0)
@@ -174,17 +172,7 @@ class CacheManager(object):
     """Mark a changed or invalidated VersionedTargetSet as successfully processed."""
     for vt in vts.versioned_targets:
       self._invalidator.update(vt.cache_key)
-      vt.valid = True
     self._invalidator.update(vts.cache_key)
-    vts.valid = True
-
-  def force_invalidate(self, vts):
-    """Force invalidation of a VersionedTargetSet."""
-    for vt in vts.versioned_targets:
-      self._invalidator.force_invalidate(vt.cache_key)
-      vt.valid = False
-    self._invalidator.force_invalidate(vts.cache_key)
-    vts.valid = False
 
   def check(self, targets, partition_size_hint=None):
     """Checks whether each of the targets has changed and invalidates it if so.
@@ -307,7 +295,7 @@ class CacheManager(object):
   def _key_for(self, target, dependency_keys):
     def fingerprint_extra(sha):
       sha.update(self._extra_data)
-      for key in sorted(dependency_keys):  # Sort to ensure hashing in a consistent order.
+      for key in dependency_keys:
         sha.update(key)
 
     return self._cache_key_generator.key_for_target(
