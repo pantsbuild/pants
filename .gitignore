@@ -7,6 +7,7 @@
 .idea
 .pants.d
 .pants.run
+.pids
 .project
 .settings
 .classpath
