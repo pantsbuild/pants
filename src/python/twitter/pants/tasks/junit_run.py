@@ -251,6 +251,7 @@ class JUnitRun(JvmTask):
           finally:
             generate_reports()
         else:
+          self.context.lock.release()
           run_tests(junit_classpath, 'com.twitter.common.testing.runner.JUnitConsoleRunner')
 
   def get_coverage_patterns(self, targets):
