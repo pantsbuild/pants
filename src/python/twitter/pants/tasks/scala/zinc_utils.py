@@ -182,6 +182,9 @@ class ZincUtils(object):
       exit_code = self.run_zinc_rebase(tmp_analysis_file, rebasings)
       if not exit_code:
         shutil.copy(tmp_analysis_file, dst)
+      # clean up the file.
+      if os.path.exists(temp_analysis_file):
+        os.remove(tmp_analysis_file)
       return exit_code
 
   def localize_analysis_file(self, src, dst):
@@ -198,6 +201,7 @@ class ZincUtils(object):
         dst_relations_file = dst + '.relations'
         if os.path.exists(tmp_relations_file):
           shutil.copy(tmp_relations_file, dst_relations_file)
+          os.remove(tmp_relations_file)
       return exit_code
 
   def write_plugin_info(self, resources_dir, target):
