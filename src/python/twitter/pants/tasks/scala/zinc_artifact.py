@@ -175,7 +175,7 @@ class _MergedZincArtifact(_ZincArtifact):
     """Merge the analysis files from the underlying artifacts into a single file."""
     if len(self.underlying_artifacts) <= 1:
       return
-    with temporary_dir(cleanup=False) as tmpdir:
+    with temporary_dir() as tmpdir:
       artifact_analysis_files = []
       for artifact in self.underlying_artifacts:
         # Rebase a copy of the per-target analysis files to reflect the merged classes dir.
