@@ -43,6 +43,8 @@ class PathFinder(Task):
       raise TaskError('Finding paths from string %s to non-string %s' % (to_str, str(from_str)))
     return from_str, to_str
 
+  examined_targets = set()
+
   @classmethod
   def _find_paths(cls, from_target, to_target, log, find_all):
     from_target, to_target = cls._coerce_to_targets(from_target, to_target)
@@ -60,6 +62,10 @@ class PathFinder(Task):
 
       path, indent = queue.pop(0)
       next_target = path[-1]
+      if not find_all and next_target in cls.examined_targets:
+        continue
+      cls.examined_targets.add(next_target)
+
       log.debug('%sexamining %s' % ('  ' * indent, next_target))
 
       if next_target == to_target:
