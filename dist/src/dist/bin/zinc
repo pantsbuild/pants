@@ -138,7 +138,7 @@ function check_port {
 
 function zinc_classpath {
   local cp=""
-  for jar in $lib_dir/* ; do
+  for jar in "$lib_dir"/* ; do
     if [[ -z "$cp" ]]; then
       cp="$jar"
     else
@@ -169,7 +169,7 @@ function nailgun {
       sleep 0.1
     done
   fi
-  exec_command $script_dir/nailgun --nailgun-port $nailgun_port "$@"
+  exec_command "$script_dir/nailgun" --nailgun-port $nailgun_port "$@"
 }
 
 if [ -n "$nailed" ] && can_nailgun ; then
