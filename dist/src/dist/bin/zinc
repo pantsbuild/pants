@@ -136,6 +136,11 @@ function check_port {
   nc -z -n -w 1 127.0.0.1 $1 > /dev/null 2>&1
 }
 
+# check cygwin
+function is_cygwin {
+  uname | grep -iq "cygwin"
+}
+
 function zinc_classpath {
   local cp=""
   for jar in "$lib_dir"/* ; do
@@ -145,11 +150,18 @@ function zinc_classpath {
       cp="$cp:$jar"
     fi
   done
-  if uname | grep -iq "cygwin" ; then
+  if is_cygwin ; then
     cp="$(cygpath --windows --path "$cp")"
   fi
   echo $cp
 }
+
+# get platform-specific home path
+function get_home_path {
+  is_cygwin && echo $(cygpath --windows "$base_dir") || echo "$base_dir"
+}
+
+declare -r home_path="$(get_home_path)"
 
 function nailgun {
   # start nailgun if not already running
@@ -158,7 +170,7 @@ function nailgun {
     fork_command \
       "$java_cmd" \
       "${java_options[@]}" \
-      -Dzinc.home="$base_dir" \
+      -Dzinc.home="$home_path" \
       -classpath "$classpath" \
       com.typesafe.zinc.Nailgun $nailgun_port $timeout
     # give some time for startup
@@ -191,7 +203,7 @@ else
   exec_command \
     "$java_cmd" \
     "${java_options[@]}" \
-    -Dzinc.home="$base_dir" \
+    -Dzinc.home="$home_path" \
     -Djline.shutdownhook=false \
     -classpath "$classpath" \
     com.typesafe.zinc.Main "$@"
