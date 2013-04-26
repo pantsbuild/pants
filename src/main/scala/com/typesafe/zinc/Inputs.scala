@@ -158,7 +158,7 @@ object Inputs {
    */
   def verifyCacheFile(cacheFile: File, classesDir: File): File = {
     if (Util.checkWritable(cacheFile)) cacheFile
-    else Setup.zincCacheDir / "analysis-cache" / classesDir.getCanonicalPath
+    else Setup.zincCacheDir / "analysis-cache" / Util.pathHash(classesDir)
   }
 
   /**

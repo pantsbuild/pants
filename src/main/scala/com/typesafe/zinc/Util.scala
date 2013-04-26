@@ -5,7 +5,7 @@
 package com.typesafe.zinc
 
 import java.io.File
-import sbt.{ ConsoleLogger, IO, Level, Logger }
+import sbt.{ ConsoleLogger, Hash, IO, Level, Logger }
 
 object Util {
 
@@ -129,6 +129,13 @@ object Util {
   def cleanAllClasses(dir: File): Unit = {
     import sbt.Path._
     IO.delete((dir ** "*.class").get)
+  }
+
+  /**
+   * Hash of a file's canonical path.
+   */
+  def pathHash(file: File): String = {
+    Hash.toHex(Hash(file.getCanonicalPath))
   }
 
   //
