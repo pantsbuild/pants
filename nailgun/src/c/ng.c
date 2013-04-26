@@ -47,7 +47,7 @@
 	HANDLE NG_STDOUT_FILENO;
 	HANDLE NG_STDERR_FILENO;
 	#define FILE_SEPARATOR '\\'
-	#define MSG_WAITALL 0
+	#define MSG_WAITALL 0x8 /* wait for full request or error */
 #else
 	#define NG_STDIN_FILENO STDIN_FILENO
 	#define NG_STDOUT_FILENO STDOUT_FILENO
