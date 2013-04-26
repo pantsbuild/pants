@@ -127,13 +127,31 @@ done
 # combined java options
 declare java_options=($optMode $optXms $optXmx $optXXMaxPermSize $optXXReservedCodeCacheSize ${other_opts[@]})
 
-function can_nailgun {
+function can_netcat {
   # check nc command exists for port scanning
   type -P nc > /dev/null 2>&1
 }
 
-function check_port {
+function check_port_netcat {
   nc -z -n -w 1 127.0.0.1 $1 > /dev/null 2>&1
+}
+
+function check_port_bash {
+  # will only work if bash has tcp redirects enabled
+  eval '6<>/dev/tcp/127.0.0.1/$1' > /dev/null 2>&1
+  exitcode="$?"
+  # close connections
+  exec 6>&-
+  exec 6<&-
+  [[ $exitcode -eq 0 ]]
+}
+
+function check_port {
+  if can_netcat ; then
+    check_port_netcat $1
+  else
+    check_port_bash $1
+  fi
 }
 
 # check cygwin
@@ -203,7 +221,7 @@ function nailgun {
   exec_command "$script_dir/nailgun" --nailgun-port $nailgun_port "$@"
 }
 
-if [ -n "$nailed" ] && can_nailgun ; then
+if [ -n "$nailed" ] ; then
   # run zinc via nailgun client
   if [ -n "$shutdown" ] ; then
     check_port $nailgun_port && nailgun shutdown
