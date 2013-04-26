@@ -2,10 +2,10 @@
 # MinGW32 to cross-compile for windows.  To install and
 # configure MinGW32 on linux, see http://www.mingw.org
 
-
-# This is where the mingw32 compiler exists in Ubuntu 8.04.
-# Your compiler location may vary.
-WIN32_CC=/usr/bin/i586-mingw32msvc-gcc
+# mingw32 compiler
+# On Ubuntu 8.04 this is at:
+# WIN32_CC=/usr/bin/i586-mingw32msvc-gcc
+WIN32_CC=mingw32-gcc
 
 CC=gcc
 CFLAGS=-Wall -pedantic -s -O3
