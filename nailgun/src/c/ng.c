@@ -38,7 +38,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-#define NAILGUN_VERSION "0.9.0"
+#define NAILGUN_VERSION "0.9.1"
 
 #define BUFSIZE (2048)
 
