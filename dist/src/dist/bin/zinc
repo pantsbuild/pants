@@ -137,9 +137,10 @@ function check_port {
 }
 
 # check cygwin
-function is_cygwin {
-  uname | grep -iq "cygwin"
-}
+declare cygwin=false
+if [[ "$OSTYPE" == "cygwin" ]]; then
+  cygwin=true
+fi
 
 function zinc_classpath {
   local cp=""
@@ -150,18 +151,36 @@ function zinc_classpath {
       cp="$cp:$jar"
     fi
   done
-  if is_cygwin ; then
+  if $cygwin ; then
     cp="$(cygpath --windows --path "$cp")"
   fi
   echo $cp
 }
 
-# get platform-specific home path
-function get_home_path {
-  is_cygwin && echo $(cygpath --windows "$base_dir") || echo "$base_dir"
+# get platform-specific path
+function native_path {
+  local path="$1"
+  if $cygwin ; then
+    path="$(cygpath --windows "$path")"
+  fi
+  echo $path
 }
 
-declare -r home_path="$(get_home_path)"
+declare -r home_path="$(native_path "$base_dir")"
+
+# check cygwin term for jline
+declare cygterm=false
+if $cygwin ; then
+  case "$TERM" in
+    rxvt* | xterm* | vt*) cygterm=true ;;
+  esac
+fi
+
+# force jline unix terminal under cygwin
+if $cygterm ; then
+  java_options=(${java_options[@]} "-Djline.terminal=jline.UnixTerminal")
+  stty -icanon min 1 -echo > /dev/null 2>&1
+fi
 
 function nailgun {
   # start nailgun if not already running
@@ -208,3 +227,11 @@ else
     -classpath "$classpath" \
     com.typesafe.zinc.Main "$@"
 fi
+
+exitcode="$?"
+
+if $cygterm ; then
+  stty icanon echo > /dev/null 2>&1
+fi
+
+exit $exitcode
