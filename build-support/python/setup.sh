@@ -43,7 +43,14 @@ pushd $CACHE >& /dev/null
   gzip -cd virtualenv-1.7.1.2.tar.gz | tar -xf - >& /dev/null
 popd >& /dev/null
 
-if $PYTHON $CACHE/virtualenv-1.7.1.2/virtualenv.py -p $PY --distribute $BOOTSTRAP_ENVIRONMENT; then
+function virtualenv() {
+  $PYTHON $CACHE/virtualenv-1.7.1.2/virtualenv.py "$@"
+}
+
+if virtualenv -p $PY --distribute $BOOTSTRAP_ENVIRONMENT; then
+  # Fixup pip script - in some environments the shebang line is too long leading to a  pip script
+  # that will not run.
+  virtualenv --relocatable $BOOTSTRAP_ENVIRONMENT
   source $BOOTSTRAP_ENVIRONMENT/bin/activate
   for pkg in distribute pystache; do
     pip install \
