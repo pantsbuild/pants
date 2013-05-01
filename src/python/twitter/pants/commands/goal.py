@@ -199,7 +199,7 @@ class Goal(Command):
         filename = frame[1]
         lineno = frame[2]
         funcname = frame[3]
-        code = ''.join(frame[4])
+        code = ''.join(frame[4]) if frame[4] else None
         traceback.print_list([(filename, lineno, funcname, code)], file=msg)
       if exc_type:
         msg.write(''.join(traceback.format_exception_only(exc_type, exc_value)))

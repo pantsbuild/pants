@@ -24,7 +24,7 @@ from contextlib import closing
 from xml.etree import ElementTree
 
 from twitter.common.collections import OrderedDict
-from twitter.common.contextutil import open_zip as open_jar, temporary_file_path
+from twitter.common.contextutil import open_zip as open_jar, temporary_dir
 from twitter.common.dirutil import  safe_open
 
 from twitter.pants import get_buildroot
@@ -172,7 +172,8 @@ class ZincUtils(object):
     #
     # In practice the JVM changes rarely, and it should be fine to require a full rebuild
     # in those rare cases.
-    with temporary_file_path() as tmp_analysis_file:
+    with temporary_dir() as tmp_analysis_dir:
+      tmp_analysis_file = os.path.join(tmp_analysis_dir, "analysis")
       shutil.copy(src, tmp_analysis_file)
       rebasings = [
         (self._java_home, ''),  # Erase java deps.
@@ -185,7 +186,8 @@ class ZincUtils(object):
       return exit_code
 
   def localize_analysis_file(self, src, dst):
-    with temporary_file_path() as tmp_analysis_file:
+    with temporary_dir() as tmp_analysis_dir:
+      tmp_analysis_file = os.path.join(tmp_analysis_dir, "analysis")
       shutil.copy(src, tmp_analysis_file)
       rebasings = [
         (ZincUtils.IVY_HOME_PLACEHOLDER, self._ivy_home),

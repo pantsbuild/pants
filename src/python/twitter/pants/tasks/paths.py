@@ -1,7 +1,5 @@
 __author__ = 'ryan'
 
-import copy
-
 from twitter.common.lang import Compatibility
 from twitter.pants import get_buildroot
 from twitter.pants.base import Address, Target
@@ -13,6 +11,14 @@ class PathFinder(Task):
     Task.__init__(self, context)
     self.log = context.log
     self.target_roots = context.target_roots
+
+  @classmethod
+  def some_path(cls, from_str, to_str, log):
+    return cls._find_paths(from_str, to_str, log, find_all=False)
+
+  @classmethod
+  def all_paths(cls, from_str, to_str, log):
+    return cls._find_paths(from_str, to_str, log, find_all=True)
 
   @classmethod
   def _coerce_to_targets(cls, from_str, to_str):
@@ -38,66 +44,35 @@ class PathFinder(Task):
     return from_str, to_str
 
   @classmethod
-  def _find_paths(cls, from_target, to_target, log):
-    from_target, to_target = cls._coerce_to_targets(from_target, to_target)
-
-    log.debug('Looking for all paths from %s to %s' % (from_target.address.reference(), to_target.address.reference()))
-
-    paths = cls._find_paths_rec(from_target, to_target)
-    print 'Found %d paths' % len(paths)
-    print ''
-    for path in paths:
-      log.debug('\t[%s]' % ', '.join([target.address.reference() for target in path]))
-
-  all_paths = {}
-  @classmethod
-  def _find_paths_rec(cls, from_target, to_target):
-    if from_target == to_target:
-      return [[from_target]]
-
-    if from_target not in cls.all_paths or to_target not in cls.all_paths[from_target]:
-      paths = []
-      if hasattr(from_target, 'dependency_addresses'):
-        for address in from_target.dependency_addresses:
-          dep = Target.get(address)
-          for path in cls._find_paths_rec(dep, to_target):
-            new_path = copy.copy(path)
-            new_path.insert(0, from_target)
-            paths.append(new_path)
-
-      if from_target not in cls.all_paths:
-        cls.all_paths[from_target] = {}
-      cls.all_paths[from_target][to_target] = paths
-
-    return cls.all_paths[from_target][to_target]
-
-  examined_targets = set()
-
-  @classmethod
-  def _find_path(cls, from_target, to_target, log):
+  def _find_paths(cls, from_target, to_target, log, find_all):
     from_target, to_target = cls._coerce_to_targets(from_target, to_target)
 
     log.debug('Looking for path from %s to %s' % (from_target.address.reference(), to_target.address.reference()))
 
+    paths_found = False
+
     queue = [([from_target], 0)]
     while True:
       if not queue:
-        print 'no path found from %s to %s!' % (from_target.address.reference(), to_target.address.reference())
+        if not paths_found:
+          print 'no path found from %s to %s!' % (from_target.address.reference(), to_target.address.reference())
         break
 
       path, indent = queue.pop(0)
       next_target = path[-1]
-      if next_target in cls.examined_targets:
-        continue
-      cls.examined_targets.add(next_target)
-
       log.debug('%sexamining %s' % ('  ' * indent, next_target))
 
       if next_target == to_target:
-        print ''
+        if paths_found:
+          print ''
+        else:
+          paths_found = True
         for target in path:
           print '%s' % target.address.reference()
-        break
+        if find_all:
+          continue
+        else:
+          break
 
       if hasattr(next_target, 'dependency_addresses'):
         for address in next_target.dependency_addresses:
@@ -111,7 +86,7 @@ class Path(PathFinder):
     if len(self.target_roots) != 2:
       raise TaskError('Specify two targets please (found %d)' % len(self.target_roots))
 
-    self._find_path(self.target_roots[0], self.target_roots[1], self.log)
+    self.some_path(self.target_roots[0], self.target_roots[1], self.log)
 
 class Paths(PathFinder):
 
@@ -119,4 +94,4 @@ class Paths(PathFinder):
     if len(self.target_roots) != 2:
       raise TaskError('Specify two targets please (found %d)' % len(self.target_roots))
 
-    self._find_paths(self.target_roots[0], self.target_roots[1], self.log)
+    self.all_paths(self.target_roots[0], self.target_roots[1], self.log)

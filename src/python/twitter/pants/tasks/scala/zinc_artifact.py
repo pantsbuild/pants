@@ -175,7 +175,7 @@ class _MergedZincArtifact(_ZincArtifact):
     """Merge the analysis files from the underlying artifacts into a single file."""
     if len(self.underlying_artifacts) <= 1:
       return
-    with temporary_dir(cleanup=False) as tmpdir:
+    with temporary_dir() as tmpdir:
       artifact_analysis_files = []
       for artifact in self.underlying_artifacts:
         # Rebase a copy of the per-target analysis files to reflect the merged classes dir.
@@ -212,6 +212,8 @@ class _MergedZincArtifact(_ZincArtifact):
         classnames_by_package[os.path.dirname(cls)].append(os.path.basename(cls))
 
       for package, classnames in classnames_by_package.items():
+        if package == "":
+          raise  TaskError("Found class files %s with empty package" % classnames)
         artifact_package_dir = os.path.join(artifact.classes_dir, package)
         merged_package_dir = os.path.join(self.classes_dir, package)
 
@@ -304,6 +306,8 @@ class _MergedZincArtifact(_ZincArtifact):
         map_classes_by_package(state.classes_by_target.get(artifact.targets[0], []))
 
       for package, classnames in classnames_by_package.items():
+        if package == "":
+          raise  TaskError("Found class files %s with empty package" % classnames)
         artifact_package_dir = os.path.join(artifact.classes_dir, package)
         merged_package_dir = os.path.join(self.classes_dir, package)
 
