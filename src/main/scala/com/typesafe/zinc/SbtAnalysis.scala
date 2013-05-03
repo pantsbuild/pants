@@ -139,8 +139,10 @@ object SbtAnalysis {
   def rebaseRelations(relations: Relations, mapper: File => Option[File]): Relations = {
     def rebase(rel: Relation[File, File]) = rebaseRelation(rel, mapper)
     def rebaseExt(rel: Relation[File, String]) = rebaseExtRelation(rel, mapper)
-    Relations.make(rebase(relations.srcProd), rebase(relations.binaryDep), rebase(relations.internalSrcDep),
-      rebaseExt(relations.externalDep), rebaseExt(relations.classes))
+    Relations.make(rebase(relations.srcProd), rebase(relations.binaryDep),
+      Relations.makeSource(rebase(relations.direct.internal), rebaseExt(relations.direct.external)),
+      Relations.makeSource(rebase(relations.publicInherited.internal), rebaseExt(relations.publicInherited.external)),
+      rebaseExt(relations.classes))
   }
 
   def rebaseInfos(infos: SourceInfos, mapper: File => Option[File]): SourceInfos = {
