@@ -14,13 +14,14 @@
 # limitations under the License.
 # ==================================================================================================
 
-from twitter.pants.base import Target
+from twitter.pants.base import manual, Target
 
 from .external_dependency import ExternalDependency
 
 from pkg_resources import Requirement
 
 
+@manual.builddict(tags=["python"])
 class PythonRequirement(Target, ExternalDependency):
   """Pants wrapper around pkg_resources.Requirement"""
 
@@ -35,7 +36,7 @@ class PythonRequirement(Target, ExternalDependency):
     self._version_filter = version_filter or (lambda py, pl: True)
     # TODO(wickman) Unify this with PythonTarget .compatibility
     self.compatibility = compatibility or ['']
-    Target.__init__(self, self._name, exclusives=exclusives)
+    super(Target, self).__init__(self._name, exclusives=exclusives)
 
   def should_build(self, python, platform):
     return self._version_filter(python, platform)

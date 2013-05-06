@@ -17,18 +17,21 @@
 from __future__ import print_function
 
 import copy
-import hashlib
+import functools
 import getpass
+import hashlib
+import logging
 import os
 import pkgutil
 import shutil
-import subprocess
+import sys
 
 from collections import defaultdict
 
 from twitter.common.collections import OrderedDict, OrderedSet
 from twitter.common.config import Properties
 from twitter.common.dirutil import safe_open, safe_rmtree
+from twitter.common.log.options import LogOptions
 
 from twitter.pants import (
   binary_util,
@@ -36,76 +39,26 @@ from twitter.pants import (
   get_scm)
 from twitter.pants.base import Address, Target
 from twitter.pants.base.generator import Generator, TemplateData
+from twitter.pants.ivy import Bootstrapper, Ivy
 from twitter.pants.targets import (
-  InternalTarget,
-  AnnotationProcessor,
-  JavaLibrary,
-  ScalaLibrary,
-  JavaThriftLibrary)
-from twitter.pants.tasks import Task, TaskError
+    AnnotationProcessor,
+    InternalTarget,
+    JavaLibrary,
+    JavaThriftLibrary,
+    Resources,
+    ScalaLibrary,
+    ThriftJar,
+    ThriftLibrary)
+from twitter.pants.tasks.scm_publish import ScmPublish, Semver
 
-class Semver(object):
-  @staticmethod
-  def parse(version):
-    components = version.split('.', 3)
-    if len(components) != 3:
-      raise ValueError
-    major, minor, patch = components
-    def to_i(component):
-      try:
-        return int(component)
-      except (TypeError, ValueError):
-        raise ValueError('Invalid revision component %s in %s - '
-                         'must be an integer' % (component, version))
-    return Semver(to_i(major), to_i(minor), to_i(patch))
-
-  def __init__(self, major, minor, patch, snapshot=False):
-    self.major = major
-    self.minor = minor
-    self.patch = patch
-    self.snapshot = snapshot
-
-  def bump(self):
-    # A bump of a snapshot discards snapshot status
-    return Semver(self.major, self.minor, self.patch + 1)
-
-  def make_snapshot(self):
-    return Semver(self.major, self.minor, self.patch, snapshot=True)
-
-  def version(self):
-    return '%s.%s.%s' % (
-      self.major,
-      self.minor,
-      ('%s-SNAPSHOT' % self.patch) if self.snapshot else self.patch
-    )
-
-  def __eq__(self, other):
-    return self.__cmp__(other) == 0
-
-  def __cmp__(self, other):
-    diff = self.major - other.major
-    if not diff:
-      diff = self.minor - other.minor
-      if not diff:
-        diff = self.patch - other.patch
-        if not diff:
-          if self.snapshot and not other.snapshot:
-            diff = 1
-          elif not self.snapshot and other.snapshot:
-            diff = -1
-          else:
-            diff = 0
-    return diff
-
-  def __repr__(self):
-    return 'Semver(%s)' % self.version()
+from . import Task, TaskError
 
 
 class PushDb(object):
   @staticmethod
-  def load(file):
+  def load(path):
     """Loads a pushdb maintained in a properties file at the given path."""
-    with open(file, 'r') as props:
+    with open(path, 'r') as props:
       properties = Properties.load(props)
       return PushDb(properties)
 
@@ -139,7 +92,7 @@ class PushDb(object):
     db_set('revision.fingerprint', fingerprint)
 
   def _accessors_for_target(self, target):
-    jar_dep, id, exported = target._get_artifact_info()
+    jar_dep, _, exported = target.get_artifact_info()
     if not exported:
       raise ValueError
 
@@ -154,9 +107,9 @@ class PushDb(object):
 
     return jar_dep, getter, setter
 
-  def dump(self, file):
+  def dump(self, path):
     """Saves the pushdb as a properties file to the given path."""
-    with open(file, 'w') as props:
+    with open(path, 'w') as props:
       Properties.dump(self._props, props)
 
 
@@ -174,7 +127,7 @@ class DependencyWriter(object):
     def as_jar(internal_target, is_tgt=False):
       jar, _, _, _ = self.get_db(internal_target).as_jar_with_version(internal_target)
       if synth and is_tgt:
-        jar.name = jar.name + '-only'
+        jar.name += '-only'
       return jar
 
     # TODO(John Sirois): a dict is used here to de-dup codegen targets which have both the original
@@ -183,14 +136,15 @@ class DependencyWriter(object):
     # the graph
     dependencies = OrderedDict()
     internal_codegen = {}
-    for dep in target.internal_dependencies:
+    for dep in target_internal_dependencies(target):
       jar = as_jar(dep)
       dependencies[(jar.org, jar.name)] = self.internaldep(jar, dep, synth)
       if dep.is_codegen:
         internal_codegen[jar.name] = jar.name
     for jar in target.jar_dependencies:
       if jar.rev:
-        dependencies[(jar.org, jar.name)] = self.jardep(jar)
+        classifier = jar.classifier if isinstance(jar, ThriftJar) else None
+        dependencies[(jar.org, jar.name)] = self.jardep(jar, classifier=classifier)
     target_jar = self.internaldep(as_jar(target, is_tgt=True)).extend(
       dependencies=dependencies.values()
     )
@@ -214,7 +168,7 @@ class DependencyWriter(object):
     """
     raise NotImplementedError()
 
-  def jardep(self, jar_dependency):
+  def jardep(self, jar_dependency, classifier=None):
     """Subclasses must return a template data for the given external jar dependency."""
     raise NotImplementedError()
 
@@ -229,19 +183,19 @@ class PomWriter(DependencyWriter):
   def templateargs(self, target_jar, confs=None, synth=False):
     return dict(artifact=target_jar)
 
-  def jardep(self, jar, classifier=None):
+  def jardep(self, jar, classifier=None, synth=False):
     return TemplateData(
       org=jar.org,
-      name=jar.name + ('-only' if classifier == 'idl' else ''),
+      name=jar.name + ('-only' if synth else ''),
       rev=jar.rev,
-      scope='runtime' if classifier == 'idl' else 'compile',
-      classifier=classifier,
+      scope='compile',
+      classifier=(classifier if classifier is not None else jar.classifier),
       excludes=[self.create_exclude(exclude) for exclude in jar.excludes if exclude.name]
     )
 
   def internaldep(self, jar_dependency, dep=None, synth=False):
-    classifier = 'idl' if dep and dep.is_codegen and synth else None
-    return self.jardep(jar_dependency, classifier=classifier)
+    classifier = 'idl' if (dep.is_codegen and synth) or isinstance(dep, ThriftLibrary) else None
+    return self.jardep(jar_dependency, classifier=classifier, synth=synth)
 
 
 class IvyWriter(DependencyWriter):
@@ -251,13 +205,14 @@ class IvyWriter(DependencyWriter):
   def templateargs(self, target_jar, confs=None, synth=False):
     return dict(lib=target_jar.extend(
       is_idl=synth,
-      publications=dict((conf, True) for conf in confs or ()),
+      publications=set(confs) if confs else set(),
+      overrides=None
     ))
 
-  def _jardep(self, jar, transitive=True, configurations='default', classifier=None):
+  def _jardep(self, jar, transitive=True, configurations='default', classifier=None, synth=False):
     return TemplateData(
       org=jar.org,
-      module=jar.name + ('-only' if classifier == 'idl' else ''),
+      module=jar.name + ('-only' if synth else ''),
       version=jar.rev,
       mutable=False,
       force=jar.force,
@@ -268,20 +223,24 @@ class IvyWriter(DependencyWriter):
       configurations=configurations,
     )
 
-  def jardep(self, jar):
+  def jardep(self, jar, classifier=None):
     return self._jardep(jar,
       transitive=jar.transitive,
-      configurations=';'.join(jar._configurations)
+      configurations=';'.join(jar._configurations),
+      classifier=classifier
     )
 
   def internaldep(self, jar_dependency, dep=None, synth=False):
-    classifier = 'idl' if dep and dep.is_codegen and synth else None
+    classifier = 'idl' if dep.is_codegen and synth else None
     return self._jardep(jar_dependency, classifier=classifier)
 
 
 def is_exported(target):
-  return (target.is_exported and 
-          isinstance(target, (AnnotationProcessor, JavaLibrary, ScalaLibrary)))
+  return target.is_exported and (
+    isinstance(target, AnnotationProcessor)
+    or isinstance(target, JavaLibrary)
+    or isinstance(target, ScalaLibrary)
+  )
 
 
 def coordinate(org, name, rev=None):
@@ -292,7 +251,69 @@ def jar_coordinate(jar, rev=None):
   return coordinate(jar.org, jar.name, rev or jar.rev)
 
 
-class JarPublish(Task):
+def target_internal_dependencies(target):
+  return filter(lambda tgt: not isinstance(tgt, Resources), target.internal_dependencies)
+
+
+class JarPublish(ScmPublish, Task):
+  """Publish jars to a maven repository.
+
+  At a high-level, pants uses `Apache Ivy <http://ant.apache.org/ivy/>`_ to
+  publish artifacts to Maven-style repositories. Pants performs prerequisite
+  tasks like compiling, creating jars, and generating ``pom.xml`` files then
+  invokes Ivy to actually publish the artifacts, so publishing is largely
+  configured in ``ivysettings.xml``. ``BUILD`` and ``pants.ini`` files
+  primarily provide linkage between publishable targets and the
+  Ivy ``resolvers`` used to publish them.
+
+  The following target types are publishable: :ref:`bdict_java_library`,
+  :ref:`bdict_scala_library`, :ref:`bdict_thrift_library`,
+  :ref:`bdict_annotation_processor`.
+  Targets to publish and their dependencies must be publishable target
+  types and specify the ``provides`` argument. One exception is
+  :ref:`bdict_jar`\s - pants will generate a pom file that
+  depends on the already-published jar.
+
+  Example usage: ::
+
+     # By default pants will perform a dry-run.
+     ./pants goal clean-all publish src/java/com/twitter/mybird
+
+     # Actually publish.
+     ./pants goal clean-all publish src/java/com/twitter/mybird --no-publish-dryrun
+
+  Please see ``./pants goal publish -h`` for a detailed description of all
+  publishing options.
+
+  Publishing can be configured in ``pants.ini`` as follows.
+
+  ``jar-publish`` section:
+
+  * ``repos`` - Required dictionary of settings for repos that may be pushed to.
+  * ``ivy_jvmargs`` - Optional list of JVM command-line args when invoking Ivy.
+  * ``restrict_push_branches`` - Optional list of branches to restrict publishing to.
+
+  Example pants.ini jar-publish repos dictionary: ::
+
+     repos = {
+       # repository target name is paired with this key
+       'myrepo': {
+         # ivysettings.xml resolver to use for publishing
+         'resolver': 'maven.twttr.com',
+         # ivy configurations to publish
+         'confs': ['default', 'sources', 'docs'],
+         # address of a Credentials target to use when publishing
+         'auth': 'address/of/credentials/BUILD:target',
+         # help message if unable to initialize the Credentials target.
+         'help': 'Please check your credentials and try again.',
+       },
+     }
+
+  Additionally the ``ivy`` section ``ivy_settings`` property specifies which
+  Ivy settings file to use when publishing is required.
+  """
+
+  _CONFIG_SECTION = 'jar-publish'
 
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
@@ -340,7 +361,7 @@ class JarPublish(Task):
                                  "changes since the last push.")
 
     flag = mkflag('override')
-    option_group.add_option(flag, action='append', dest='jar_publish_overrides',
+    option_group.add_option(flag, action='append', dest='jar_publish_override',
                             help='''Specifies a published jar revision override in the form:
                             ([org]#[name]|[target spec])=[new revision]
 
@@ -361,43 +382,42 @@ class JarPublish(Task):
                             %(flag)s=src/java/com/twitter/common/base
                             ''' % dict(flag=flag))
 
-  def __init__(self, context, scm=None, restrict_push_branches=None):
+  def __init__(self, context, scm=None):
     Task.__init__(self, context)
-
-    self.scm = scm or get_scm()
-
-    if self.scm is None:
-      raise TaskError('Cannot publish JAR files without a configured source-control system.')
-
-    self.restrict_push_branches = frozenset(restrict_push_branches or ())
-    self.outdir = context.config.get('jar-publish', 'workdir')
+    ScmPublish.__init__(self, scm or get_scm(),
+                        self.context.config.getlist(
+                          JarPublish._CONFIG_SECTION, 'restrict_push_branches'))
+    self.outdir = os.path.join(context.config.getdefault('pants_workdir'), 'publish')
     self.cachedir = os.path.join(self.outdir, 'cache')
+
+    self._jvmargs = context.config.getlist(JarPublish._CONFIG_SECTION, 'ivy_jvmargs', default=[])
 
     if context.options.jar_publish_local:
       local_repo = dict(
         resolver='publish_local',
         path=os.path.abspath(os.path.expanduser(context.options.jar_publish_local)),
-        confs=context.config.getlist('jar-publish', 'publish_local_confs', default=['*']),
+        confs=['*'],
         auth=None
       )
       self.repos = defaultdict(lambda: local_repo)
       self.commit = False
       self.snapshot = context.options.jar_publish_local_snapshot
     else:
-      self.repos = context.config.getdict('jar-publish', 'repos')
+      self.repos = context.config.getdict(JarPublish._CONFIG_SECTION, 'repos')
       for repo, data in self.repos.items():
         auth = data.get('auth')
         if auth:
           credentials = context.resolve(auth).next()
-          user = credentials.username()
-          password = credentials.password()
-          self.context.log.debug('Found auth for repo: %s %s:%s' % (repo, user, password))
-          data['auth'] = (user, password)
+          user = credentials.username(data['resolver'])
+          password = credentials.password(data['resolver'])
+          self.context.log.debug('Found auth for repo=%s user=%s' % (repo, user))
+          self.repos[repo]['username'] = user
+          self.repos[repo]['password'] = password
       self.commit = context.options.jar_publish_commit
       self.snapshot = False
 
     self.ivycp = context.config.getlist('ivy', 'classpath')
-    self.ivysettings = context.config.get('ivy', 'ivy_settings')
+    self.ivysettings = context.config.get('jar-publish', 'ivy_settings')
 
     self.dryrun = context.options.jar_publish_dryrun
     self.transitive = context.options.jar_publish_transitive
@@ -427,7 +447,7 @@ class JarPublish(Task):
           raise TaskError('No BUILD file could be found at %s' % coordinate)
 
     self.overrides = {}
-    if context.options.jar_publish_overrides:
+    if context.options.jar_publish_override:
       def parse_override(override):
         try:
           coordinate, rev = override.split('=', 1)
@@ -439,7 +459,7 @@ class JarPublish(Task):
         except ValueError:
           raise TaskError('Invalid override: %s' % override)
 
-      self.overrides.update(parse_override(o) for o in context.options.jar_publish_overrides)
+      self.overrides.update(parse_override(o) for o in context.options.jar_publish_override)
 
     self.restart_at = None
     if context.options.jar_publish_restart_at:
@@ -448,97 +468,95 @@ class JarPublish(Task):
     context.products.require('jars')
     context.products.require('source_jars')
     context.products.require('idl_jars')
-    context.products.require('javadoc_jars')
 
   def execute(self, targets):
-    self.check_clean_master()
+    self.check_clean_master(commit=(not self.dryrun and self.commit))
 
     exported_targets = self.exported_targets()
     self.check_targets(exported_targets)
 
     pushdbs = {}
-    def get_db(target):
-      if target.provides is None:
-        raise TaskError('trying to publish target %r which does not provide an artifact' % target)
-      dbfile = target.provides.repo.push_db
+
+    def get_db(tgt):
+      # TODO(tdesai) Handle resource type in get_db.
+      if tgt.provides is None:
+        raise TaskError('trying to publish target %r which does not provide an artifact' % tgt)
+      dbfile = tgt.provides.repo.push_db
       result = pushdbs.get(dbfile)
       if not result:
         db = PushDb.load(dbfile)
-        repo = self.repos[target.provides.repo.name]
+        repo = self.repos[tgt.provides.repo.name]
         result = (db, dbfile, repo)
         pushdbs[dbfile] = result
       return result
 
-    def fingerprint_internal(target):
-      if not target.is_internal:
-        raise ValueError('Expected an internal target for fingerprinting, got %s' % target)
-      pushdb, _, _ = get_db(target)
-      _, _, _, fingerprint = pushdb.as_jar_with_version(target)
+    def get_pushdb(tgt):
+      return get_db(tgt)[0]
+
+    def fingerprint_internal(tgt):
+      if not tgt.is_internal:
+        raise ValueError('Expected an internal target for fingerprinting, got %s' % tgt)
+      pushdb, _, _ = get_db(tgt)
+      _, _, _, fingerprint = pushdb.as_jar_with_version(tgt)
       return fingerprint or '0.0.0'
 
-    def lookup_synthetic_target(target):
-      # lookup the source target that generated this synthetic target
-      revmap = self.context.products.get('java:rev')
-      if revmap.get(target):
-        for _, codegen_targets in revmap.get(target).items():
-          for codegen_target in codegen_targets:
-            # TODO(phom) this only works for Thrift Library, not Protobuf
-            if isinstance(codegen_target, JavaThriftLibrary):
-              return codegen_target
+    def lookup_synthetic_target(tgt):
+      # TODO(phom) this only works for Thrift Library, not Protobuf
+      return tgt.derived_from if isinstance(tgt.derived_from, JavaThriftLibrary) else None
 
-    def stage_artifacts(target, jar, version, changelog, confs=None, synth_target=None):
-      def artifact_path(name=None, suffix='', extension='jar', artifact_ext=''):
-        return os.path.join(self.outdir, jar.org, jar.name + artifact_ext,
-                            '%s%s-%s%s.%s' % (
-                              (name or jar.name),
-                              artifact_ext if name != 'ivy' else '',
-                              version,
-                              suffix,
-                              extension
-                            ))
+    def artifact_path(jar, version, name=None, suffix='', extension='jar', artifact_ext=''):
+      return os.path.join(self.outdir, jar.org, jar.name + artifact_ext,
+                          '%s%s-%s%s.%s' % ((name or jar.name),
+                                            artifact_ext if name != 'ivy' else '',
+                                            version,
+                                            suffix,
+                                            extension))
 
-      def get_pushdb(target):
-        return get_db(target)[0]
+    def stage_artifact(tgt, jar, version, changelog, confs=None, artifact_ext='', synth=False):
+      def path(name=None, suffix='', extension='jar'):
+        return artifact_path(jar, version, name=name, suffix=suffix, extension=extension,
+                             artifact_ext=artifact_ext)
 
-      with safe_open(artifact_path(suffix='-CHANGELOG', extension='txt'), 'w') as changelog_file:
+      with safe_open(path(suffix='-CHANGELOG', extension='txt'), 'w') as changelog_file:
         changelog_file.write(changelog)
-      ivyxml = artifact_path(name='ivy', extension='xml')
-      IvyWriter(get_pushdb).write(target, ivyxml, confs)
-      PomWriter(get_pushdb).write(target, artifact_path(extension='pom'))
+      ivyxml = path(name='ivy', extension='xml')
 
-      idl_ivyxml = None
-      if synth_target:
-        changelog_path = artifact_path(suffix='-CHANGELOG', extension='txt', artifact_ext='-only')
-        with safe_open(changelog_path, 'w') as changelog_file:
-          changelog_file.write(changelog)
-        idl_ivyxml = artifact_path(name='ivy', extension='xml', artifact_ext='-only')
-        # use idl publication spec in ivy for idl artifact
-        IvyWriter(get_pushdb).write(synth_target, idl_ivyxml, ['idl'], synth=True)
-        PomWriter(get_pushdb).write(synth_target,
-                                    artifact_path(extension='pom', artifact_ext='-only'),
-                                    synth=True)
+      IvyWriter(get_pushdb).write(tgt, ivyxml, confs=confs, synth=synth)
+      PomWriter(get_pushdb).write(tgt, path(extension='pom'), synth=synth)
 
-      def copy(tgt, typename, suffix='', artifact_ext=''):
-        genmap = self.context.products.get(typename)
-        mapping = genmap.get(tgt)
-        if not mapping:
-          print('no mapping for %s' % tgt)
-        else:
-          for basedir, jars in mapping.items():
-            for artifact in jars:
-              path = artifact_path(suffix=suffix, artifact_ext=artifact_ext)
-              shutil.copy(os.path.join(basedir, artifact), path)
+      return ivyxml
 
-      copy(target, typename='jars')
-      copy(target, typename='source_jars', suffix='-sources')
-      if (synth_target):
-        copy(synth_target, typename='idl_jars', suffix='-idl', artifact_ext='-only')
+    def copy_artifact(tgt, version, typename, suffix='', artifact_ext=''):
+      genmap = self.context.products.get(typename)
+      for basedir, jars in genmap.get(tgt).items():
+        for artifact in jars:
+          path = artifact_path(jar, version, suffix=suffix, artifact_ext=artifact_ext)
+          shutil.copy(os.path.join(basedir, artifact), path)
 
-      if target.is_java:
-        copy(target, typename='javadoc_jars', suffix='-javadoc')
+    def stage_artifacts(tgt, jar, version, changelog, confs=None, synth_target=None):
+      is_idl = isinstance(tgt, ThriftLibrary)
+      class_target = None if is_idl else tgt
+      idl_target = synth_target or (tgt if is_idl else None)
 
+      class_ivyxml_path = idl_ivyxml_path = None
+      if class_target:
+        class_ivyxml_path = stage_artifact(tgt, jar, version, changelog, confs)
+        copy_artifact(tgt, version, typename='jars')
+        copy_artifact(tgt, version, typename='source_jars', suffix='-sources')
 
-      return ivyxml, idl_ivyxml
+        jarmap = self.context.products.get('javadoc_jars')
+        if not jarmap.empty() and (tgt.is_java or tgt.is_scala):
+          copy_artifact(tgt, version, typename='javadoc_jars', suffix='-javadoc')
+
+      if idl_target:
+        synth = bool(synth_target)
+        artifact_ext = '-only' if synth else ''
+        idl_ivyxml_path = stage_artifact(idl_target, jar, version, changelog, confs=['idl'],
+                                         artifact_ext=artifact_ext, synth=synth)
+        copy_artifact(idl_target, version, typename='idl_jars', suffix='-idl',
+                      artifact_ext=artifact_ext)
+
+      return class_ivyxml_path, idl_ivyxml_path
 
     if self.overrides:
       print('Publishing with revision overrides:\n  %s' % '\n  '.join(
@@ -558,7 +576,7 @@ class JarPublish(Task):
       if synth_target:
         # add idl artifact to the published cache
         tmp_jar = copy.copy(jar)
-        tmp_jar.name = tmp_jar.name + '-only'
+        tmp_jar.name += '-only'
         published.append(tmp_jar)
       published.append(jar)
 
@@ -601,12 +619,13 @@ class JarPublish(Task):
             print('\nChanges for %s since %s @ %s:\n\n%s' % (
               coordinate(jar.org, jar.name), semver.version(), sha, changelog
             ))
-          push = raw_input('Publish %s with revision %s ? [y|N] ' % (
-            coordinate(jar.org, jar.name), newver.version()
-          ))
-          print('\n')
-          if push.strip().lower() != 'y':
-            raise TaskError('User aborted push')
+          if os.isatty(sys.stdin.fileno()):
+            push = raw_input('Publish %s with revision %s ? [y|N] ' % (
+              coordinate(jar.org, jar.name), newver.version()
+            ))
+            print('\n')
+            if push.strip().lower() != 'y':
+              raise TaskError('User aborted push')
 
         pushdb.set_version(target, newver, head_sha, newfingerprint)
 
@@ -620,39 +639,23 @@ class JarPublish(Task):
           path = repo.get('path')
 
           # Get authentication for the publish repo if needed
-          jvm_options = []
-          auth = repo['auth']
-          if auth:
-            user, password = auth
-            jvm_options.append('-Dlogin=%s' % user)
-            jvm_options.append('-Dpassword=%s' % password)
+          jvm_args = self._jvmargs
+          if repo.get('auth'):
+            user = repo.get('username')
+            password = repo.get('password')
+            if user and password:
+              jvm_args.append('-Dlogin=%s' % user)
+              jvm_args.append('-Dpassword=%s' % password)
+            else:
+              raise TaskError('Unable to publish to %s. %s' %
+                              (repo['resolver'], repo.get('help', '')))
 
           # Do the publish
-          ivysettings = self.generate_ivysettings(published, publish_local=path)
-          args = [
-            '-settings', ivysettings,
-            '-ivy', ivyxml,
-            '-deliverto', '%s/[organisation]/[module]/ivy-[revision].xml' % self.outdir,
-            '-publish', resolver,
-            '-publishpattern',
-              '%s/[organisation]/[module]/[artifact]-[revision](-[classifier]).[ext]' % self.outdir,
-            '-revision', newver.version(),
-            '-m2compatible',
-          ]
-          if self.snapshot:
-            args.append('-overwrite')
-
-          result = binary_util.runjava_indivisible(jvm_options=jvm_options, classpath=self.ivycp,
-                                                   args=args, workunit_name='ivy')
-          if result != 0:
-            raise TaskError('Failed to push %s - ivy failed with %d' % (
-              jar_coordinate(jar, newver.version()), result)
-            )
-
-          if (synth_target):
+          def publish(ivyxml_path):
+            ivysettings = self.generate_ivysettings(published, publish_local=path)
             args = [
               '-settings', ivysettings,
-              '-ivy', idl_ivyxml,
+              '-ivy', ivyxml_path,
               '-deliverto', '%s/[organisation]/[module]/ivy-[revision].xml' % self.outdir,
               '-publish', resolver,
               '-publishpattern', '%s/[organisation]/[module]/'
@@ -660,39 +663,87 @@ class JarPublish(Task):
               '-revision', newver.version(),
               '-m2compatible',
             ]
+
+            if LogOptions.stderr_log_level() == logging.DEBUG:
+              args.append('-verbose')
+
             if self.snapshot:
               args.append('-overwrite')
 
-            result = binary_util.runjava_indivisible(jvm_options=jvm_options, classpath=self.ivycp,
-                                                     args=args, workunit_name='ivy')
-            if result != 0:
-              raise TaskError('Failed to push %s - ivy failed with %d' % (
-                jar_coordinate(jar, newver.version()), result)
-              )
+            try:
+              ivy = Bootstrapper.default_ivy()
+              ivy.execute(args, jvm_args=jvm_args)
+            except (Bootstrapper.Error, Ivy.Error) as e:
+              raise TaskError('Failed to push %s! %s' % (jar_coordinate(jar, newver.version()), e))
+
+          if ivyxml:
+            publish(ivyxml)
+          if idl_ivyxml:
+            publish(idl_ivyxml)
 
           if self.commit:
+            org = jar.org
+            name = jar.name
+            rev = newver.version()
+            args = dict(
+              org=org,
+              name=name,
+              rev=rev,
+              coordinate=coordinate(org, name, rev),
+              user=getpass.getuser(),
+              cause='with forced revision' if (org, name) in self.overrides else '(autoinc)'
+            )
+
             pushdb.dump(dbfile)
-            self.commit_push(jar.org, jar.name, newver.version(), head_sha)
+            self.commit_push(coordinate(org, name, rev))
+            self.scm.refresh()
+            self.scm.tag('%(org)s-%(name)s-%(rev)s' % args,
+                         message='Publish of %(coordinate)s initiated by %(user)s %(cause)s' % args)
 
   def check_targets(self, targets):
-    invalid = filter(lambda (t, reason): reason, zip(targets, map(self.is_invalid, targets)))
-    if invalid:
-      target_reasons = '\n\t'.join('%s: %s' % (tgt.address, reason) for tgt, reason in invalid)
-      params = dict(
-        roots=' '.join(str(t.address) for t in self.context.target_roots),
-        reasons=target_reasons
-      )
-      raise TaskError('The following targets must be fixed or removed in order to '
-                      'publish %(roots)s:\n\t%(reasons)s' % params)
+    invalid = defaultdict(set)
 
-  def is_invalid(self, target):
-    if not target.sources:
-      return 'No sources'
+    def collect(publish_target, walked_target):
+      if hasattr(walked_target, "sources") and not walked_target.sources:
+        invalid[publish_target].add((walked_target, 'No sources.'))
+      if hasattr(walked_target, "provides") and not walked_target.provides:
+        invalid[publish_target].add((walked_target, 'Does not provide an artifact.'))
+
+    for target in targets:
+      target.walk(functools.partial(collect, target))
+
+    if invalid:
+      msg = list()
+      for target, reasons in sorted(invalid.items(), reverse=True):
+        msg.append('\n  Cannot publish %s due to:' % target.address)
+        for invalid_target, reason in sorted(reasons, reverse=True):
+          msg.append('\n    %s - %s' % (invalid_target.address, reason))
+
+      raise TaskError('The following errors must be resolved to publish.%s' % ''.join(msg))
 
   def exported_targets(self):
-    candidates = set(self.context.targets() if self.transitive else self.context.target_roots)
-    def exportable(target):
-      return target in candidates and is_exported(target) and target.is_internal
+    candidates = set()
+    if self.transitive:
+      candidates.update(self.context.targets())
+    else:
+      candidates.update(self.context.target_roots)
+
+      def get_synthetic(lang, target):
+        mappings = self.context.products.get(lang).get(target)
+        if mappings:
+          for generated in mappings.itervalues():
+            for synthetic in generated:
+              yield synthetic
+
+      # Handle the case where a code gen target is in the listed roots and the thus the publishable
+      # target is a synthetic twin generated by a code gen task upstream.
+      for candidate in self.context.target_roots:
+        candidates.update(get_synthetic('java', candidate))
+        candidates.update(get_synthetic('scala', candidate))
+
+    def exportable(tgt):
+      return tgt in candidates and is_exported(tgt)
+
     return OrderedSet(filter(exportable,
                              reversed(InternalTarget.sort_targets(filter(exportable, candidates)))))
 
@@ -710,7 +761,8 @@ class JarPublish(Task):
     for jarsig in sorted([jar_coordinate(j) for j in target.jar_dependencies if j.rev]):
       sha.update(jarsig)
 
-    internal_dependencies = sorted(target.internal_dependencies, key=lambda t: t.id)
+    # TODO(tdesai) Handle resource type in get_db.
+    internal_dependencies = sorted(target_internal_dependencies(target), key=lambda t: t.id)
     for internal_target in internal_dependencies:
       fingerprint = fingerprint_internal(internal_target)
       sha.update(fingerprint)
@@ -721,57 +773,6 @@ class JarPublish(Task):
     return self.scm.changelog(from_commit=sha,
                               files=[os.path.join(target.target_base, source)
                                      for source in target.sources])
-
-  def check_clean_master(self):
-    if self.dryrun or not self.commit:
-      print('Skipping check for a clean master in test mode.')
-    else:
-      if self.restrict_push_branches:
-        branch = self.scm.branch_name
-        if branch not in self.restrict_push_branches:
-          raise TaskError('Can only push from %s, currently on branch: %s' % (
-            ' '.join(sorted(self.restrict_push_branches)), branch
-          ))
-
-      changed_files = self.scm.changed_files()
-      if changed_files:
-        raise TaskError('Can only push from a clean branch, found : %s' % ' '.join(changed_files))
-
-  def commit_push(self, org, name, rev, sha):
-    args = dict(
-      org=org,
-      name=name,
-      rev=rev,
-      coordinate=coordinate(org, name, rev),
-      user=getpass.getuser(),
-      cause='with forced revision' if (org, name) in self.overrides else '(autoinc)'
-    )
-
-    self.scm.refresh()
-    self.scm.commit('pants build committing publish data for push of %(coordinate)s' % args)
-
-    self.scm.refresh()
-    self.scm.tag('%(org)s-%(name)s-%(rev)s' % args,
-                 message='Publish of %(coordinate)s initiated by %(user)s %(cause)s' % args)
-
-  def check_call(self, cmd, failuremsg=None):
-    self.log_call(cmd)
-    result = subprocess.call(cmd)
-    self.check_result(cmd, result, failuremsg)
-
-  def check_output(self, cmd, failuremsg=None):
-    self.log_call(cmd)
-    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    out, err = process.communicate()
-    self.check_result(cmd, process.returncode, failuremsg)
-    return out
-
-  def log_call(self, cmd):
-    self.context.log.debug('Executing: %s' % ' '.join(cmd))
-
-  def check_result(self, cmd, result, failuremsg=None):
-    if result != 0:
-      raise TaskError(failuremsg or '%s failed with exit code %d' % (' '.join(cmd), result))
 
   def generate_ivysettings(self, publishedjars, publish_local=None):
     template_relpath = os.path.join('templates', 'jar_publish', 'ivysettings.mustache')

@@ -13,30 +13,41 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==================================================================================================
-import re
+
+from __future__ import print_function
+
+import daemon
 import inspect
 import multiprocessing
 import os
+import re
 import sys
 import signal
 import socket
 import time
 import traceback
+
 from contextlib import contextmanager
+from functools import wraps
 from optparse import Option, OptionParser
 
-import daemon
-
 from twitter.common import log
+from twitter.common.log.options import LogOptions
 from twitter.common.collections import OrderedSet
-from twitter.common.dirutil import safe_rmtree
+from twitter.common.dirutil import safe_mkdir, safe_rmtree
 from twitter.common.lang import Compatibility
-from twitter.pants import binary_util
-from twitter.pants.base.build_environment import get_buildroot
-from twitter.pants.goal import Goal as goal, Group as group
-from twitter.pants.base import Address, BuildFile, Config, ParseContext, Target
+from twitter.pants import get_buildroot, goal, group, has_sources, is_apt
+from twitter.pants.base import (
+    Address,
+    BuildFile,
+    Config,
+    ParseContext,
+    Target,
+    TargetDefinitionException)
 from twitter.pants.base.rcfile import RcFile
+from twitter.pants.buildtimestats import BuildTimeStats
 from twitter.pants.commands import Command
+from twitter.pants.engine import Engine, GroupEngine
 from twitter.pants.goal.initialize_reporting import update_reporting
 from twitter.pants.base.workunit import WorkUnit
 from twitter.pants.reporting.reporting_server import ReportingServer, ReportingServerManager
@@ -44,6 +55,8 @@ from twitter.pants.tasks import Task, TaskError
 from twitter.pants.tasks.console_task import ConsoleTask
 from twitter.pants.tasks.nailgun_task import NailgunTask
 from twitter.pants.goal import Context, GoalError, Phase
+from twitter.pants.tasks import Task, TaskError
+from twitter.pants.tasks.targets_help import TargetsHelp
 
 
 try:
@@ -73,7 +86,6 @@ class List(Task):
                             help="[%default] List all goals even if no description is available.")
 
   def execute(self, targets):
-    self.context.lock.release()
     print('Installed goals:')
     documented_rows = []
     undocumented = []
@@ -91,6 +103,9 @@ class List(Task):
 
 
 goal(name='goals', action=List).install().with_description('List all documented goals.')
+
+
+goal(name='targets', action=TargetsHelp).install().with_description('List all target types.')
 
 
 class Help(Task):
@@ -182,6 +197,10 @@ class Goal(Command):
            help="Times goal phases and outputs a report."),
     Option("-e", "--explain", action="store_true", dest="explain", default=False,
            help="Explain the execution of goals."),
+    Option("--force-stats-upload", dest="force_upload", action="store_true", default=False,
+           help="[%default] Forces pants runtime stats upload after every pants runs"),
+    Option("-v", "--log", action="store_true", dest="log", default=False,
+           help="[%default] Logs extra build output."),
     Option("-k", "--kill-nailguns", action="store_true", dest="cleanup_nailguns", default=False,
            help="Kill nailguns before exiting"),
     Option("-d", "--logdir", dest="logdir",
@@ -263,6 +282,25 @@ class Goal(Command):
 
     return goals, specs
 
+  @staticmethod
+  def execute(context, *names):
+    parser = OptionParser()
+    phases = [Phase(name) for name in names]
+    Phase.setup_parser(parser, [], phases)
+    options, _ = parser.parse_args([])
+    context = Context(context.config, options, context.target_roots, log=context.log)
+    return Goal._execute(context, phases, print_timing=False, force_stats_upload=False)
+
+  @staticmethod
+  def _execute(context, phases, print_timing, force_stats_upload):
+    build_stats = None
+    if context.config.getdefault('stats_collection', bool, default=False):
+      user = context.config.getdefault('user')
+      build_stats = BuildTimeStats(user, force_stats_upload)
+    engine = GroupEngine(print_timing=print_timing, build_stats=build_stats)
+    return engine.execute(context, phases)
+
+  # TODO(John Sirois): revisit wholesale locking when we move py support into pants new
   @classmethod
   def serialized(cls):
     # Goal serialization is now handled in goal execution during group processing.
@@ -389,7 +427,7 @@ class Goal(Command):
                                                   '\n    '.join(str(a) for a in siblings)))
               except (TypeError, ImportError, TaskError, GoalError):
                 error(spec, include_traceback=True)
-              except (IOError, SyntaxError):
+              except (IOError, SyntaxError, TargetDefinitionException):
                 error(spec)
 
       self.phases = [Phase(goal) for goal in goals]
@@ -403,14 +441,14 @@ class Goal(Command):
         # register the task class hierarchy fully qualified names so we can apply defaults to
         # baseclasses.
 
-        all_goals = Phase.execution_order(Phase(goal) for goal in goals)
         sections = OrderedSet()
-        for goal in all_goals:
-          sections.add(goal.name)
-          for clazz in goal.task_type.mro():
-            if clazz == Task:
-              break
-            sections.add('%s.%s' % (clazz.__module__, clazz.__name__))
+        for phase in Engine.execution_order(self.phases):
+          for goal in phase.goals():
+            sections.add(goal.name)
+            for clazz in goal.task_type.mro():
+              if clazz == Task:
+                break
+              sections.add('%s.%s' % (clazz.__module__, clazz.__name__))
 
         augmented_args = rcfile.apply_defaults(sections, args)
         if augmented_args != args:
@@ -442,7 +480,6 @@ class Goal(Command):
       requested_goals=self.requested_goals,
       lock=lock)
 
-    # TODO: Time to get rid of this hack.
     if self.options.recursive_directory:
       context.log.warn(
         '--all-recursive is deprecated, use a target spec with the form [dir]:: instead')
@@ -462,8 +499,8 @@ class Goal(Command):
     if unknown:
       return _list_goals(context, 'Unknown goal(s): %s' % ' '.join(phase.name for phase in unknown))
 
-    ret = Phase.attempt(context, self.phases)
-    return ret
+    return Goal._execute(context, self.phases, print_timing=self.options.time,
+                         force_stats_upload=self.options.force_upload)
 
   def cleanup(self):
     # TODO: Make this more selective? Only kill nailguns that affect state? E.g., checkstyle
@@ -475,15 +512,29 @@ class Goal(Command):
 # Install all default pants provided goals
 from twitter.pants.targets import JavaTests as junit_tests
 from twitter.pants.targets import Benchmark, JvmBinary
+from twitter.pants import junit_tests
+from twitter.pants.targets import (
+  Benchmark,
+  JavaLibrary,
+  JvmBinary,
+  ScalacPlugin,
+  ScalaLibrary,
+  ScalaTests)
 from twitter.pants.tasks.antlr_gen import AntlrGen
 from twitter.pants.tasks.benchmark_run import BenchmarkRun
 from twitter.pants.tasks.binary_create import BinaryCreate
+from twitter.pants.tasks.builddictionary import BuildBuildDictionary
 from twitter.pants.tasks.bootstrap_jvm_tools import BootstrapJvmTools
 from twitter.pants.tasks.build_lint import BuildLint
 from twitter.pants.tasks.bundle_create import BundleCreate
 from twitter.pants.tasks.checkstyle import Checkstyle
+from twitter.pants.tasks.check_published_deps import CheckPublishedDeps
+from twitter.pants.tasks.detect_duplicates import DuplicateDetector
+from twitter.pants.tasks.extract import Extract
 from twitter.pants.tasks.check_exclusives import CheckExclusives
 from twitter.pants.tasks.filedeps import FileDeps
+from twitter.pants.tasks.idl_extract import IdlExtract
+from twitter.pants.tasks.idl_resolve import IdlResolve
 from twitter.pants.tasks.ivy_resolve import IvyResolve
 from twitter.pants.tasks.jar_create import JarCreate
 from twitter.pants.tasks.jvm_compile.java.java_compile import JavaCompile
@@ -492,6 +543,7 @@ from twitter.pants.tasks.scaladoc_gen import ScaladocGen
 from twitter.pants.tasks.junit_run import JUnitRun
 from twitter.pants.tasks.jvm_run import JvmRun
 from twitter.pants.tasks.markdown_to_html import MarkdownToHtml
+from twitter.pants.tasks.nailgun_task import NailgunTask
 from twitter.pants.tasks.listtargets import ListTargets
 from twitter.pants.tasks.pathdeps import PathDeps
 from twitter.pants.tasks.prepare_resources import PrepareResources
@@ -687,13 +739,25 @@ goal(name='check-exclusives',
   dependencies=['gen'],
   action=CheckExclusives).install('check-exclusives').with_description(
   'Check exclusives declarations to verify that dependencies are consistent.')
+extract',
+  action=Extract,
+  ).install('resolve-idl')
+
+goal(
+  name='idl-extract',
+  action=IdlExtract,
+  ).install('resolve-idl')
 
 # TODO(John Sirois): gen attempted as the sole Goal should gen for all known gen types but
 # recognize flags to narrow the gen set
-goal(name='thrift', action=ThriftGen).install('gen').with_description('Generate code.')
-goal(name='scrooge', action=ScroogeGen).install('gen')
-goal(name='protoc', action=ProtobufGen).install('gen')
-goal(name='antlr', action=AntlrGen).install('gen')
+goal(name='thrift', action=ThriftGen,
+  dependencies=['resolve-idl']).install('gen').with_description('Generate code.')
+goal(name='scrooge', action=ScroogeGen,
+  dependencies=['resolve-idl']).install('gen')
+goal(name='protoc', action=ProtobufGen,
+  dependencies=['resolve-idl']).install('gen')
+goal(name='antlr', action=AntlrGen,
+  dependencies=['resolve-idl']).install('gen')
 
 goal(
   name='checkstyle',
@@ -712,12 +776,12 @@ def _has_sources(target, extension):
 # TODO: Make chunking only take into account the targets actually acted on? This would require
 # task types to declare formally the targets they act on.
 def _is_java(target):
-  return (target.is_java or 
+  return (target.is_java or
           (isinstance(target, (JvmBinary, junit_tests, Benchmark))
-           and _has_sources(target, '.java')))
+           and _has_sources(target, '.java'))) and not target.is_apt
 
 def _is_scala(target):
-  return (target.is_scala or 
+  return (target.is_scala or
           (isinstance(target, (JvmBinary, junit_tests, Benchmark))
            and _has_sources(target, '.scala')))
 
@@ -741,7 +805,9 @@ goal(name='java',
      group=group('jvm', _is_java),
      dependencies=['gen', 'resolve', 'check-exclusives', 'bootstrap']).install('compile')
 
+
 goal(name='prepare', action=PrepareResources).install('resources')
+
 
 # TODO(John Sirois): pydoc also
 goal(name='javadoc',
@@ -758,9 +824,37 @@ if MarkdownToHtml.AVAILABLE:
   ).install('markdown').with_description('Generate html from markdown docs.')
 
 
+class ScaladocJarShim(ScaladocGen):
+  def __init__(self, context, output_dir=None, confs=None):
+    super(ScaladocJarShim, self).__init__(context,
+                                          output_dir=output_dir,
+                                          confs=confs,
+                                          active=False)
+
+
+class JavadocJarShim(JavadocGen):
+  def __init__(self, context, output_dir=None, confs=None):
+    super(JavadocJarShim, self).__init__(context,
+                                         output_dir=output_dir,
+                                         confs=confs,
+                                         active=False)
+
+
+class JarCreateGoal(JarCreate):
+  def __init__(self, context):
+    super(JarCreateGoal, self).__init__(context, False)
+
+goal(name='javadoc_publish',
+     action=JavadocJarShim).install('jar')
+goal(name='scaladoc_publish',
+     action=ScaladocJarShim).install('jar')
 goal(name='jar',
-     action=JarCreate,
+     action=JarCreateGoal,
      dependencies=['compile', 'resources', 'bootstrap']).install('jar').with_description('Create one or more jars.')
+goal(name='check_published_deps',
+     action=CheckPublishedDeps
+).install('check_published_deps').with_description(
+  'Find references to outdated artifacts published from this BUILD tree.')
 
 
 goal(name='junit',
@@ -782,6 +876,10 @@ goal(
   dependencies=['jar', 'bootstrap']
 ).install().with_description('Create a jvm binary jar.')
 goal(
+  name='dup',
+  action=DuplicateDetector,
+).install('binary')
+goal(
   name='bundle',
   action=BundleCreate,
   dependencies=['binary', 'bootstrap']
@@ -789,6 +887,12 @@ goal(
 
 # run doesn't need the serialization lock. It's reasonable to run some code
 # in a workspace while there's a compile going on unrelated code.
+goal(
+  name='detect-duplicates',
+  action=DuplicateDetector,
+  dependencies=['jar']
+).install().with_description('Detect duplicate classes and resources on the classpath.')
+
 goal(
   name='jvm-run',
   action=JvmRun,
@@ -940,3 +1044,19 @@ goal(
   name='filter',
   action=Filter
 ).install().with_description('Filter the input targets based on various criteria.')
+
+
+from twitter.pants.tasks.sorttargets import SortTargets
+
+goal(
+  name='sort',
+  action=SortTargets
+).install().with_description('Topologically sort the input targets.')
+
+
+from twitter.pants.tasks.roots import ListRoots
+
+goal(
+  name='roots',
+  action=ListRoots,
+).install('roots').with_description("Prints the source roots and associated target types defined in the repo.")

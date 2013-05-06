@@ -44,6 +44,12 @@ def test_cache_key_hash():
     assert key.hash == expected_hash(f)
 
 
+def test_cache_key_path():
+  with test_env() as (f, cache):
+    key = cache.key_for('test', [f.name])
+    assert key.filename == os.path.join(cache._root, key.filename)
+
+
 def test_needs_update_missing_key():
   with test_env() as (f, keygen, cache):
     key = keygen.key_for('test', [f.name])

@@ -15,6 +15,7 @@
 # ==================================================================================================
 
 from .address import Address
+from .build_manual import get_builddict_info, manual
 from .build_file import BuildFile
 from .config import Config
 from .parse_context import ContextError, ParseContext
@@ -27,6 +28,8 @@ __all__ = (
   'BuildFile',
   'Config',
   'ContextError',
+  'get_builddict_info',
+  'manual',
   'ParseContext',
   'Target',
   'TargetDefinitionException',

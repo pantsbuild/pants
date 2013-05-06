@@ -17,17 +17,22 @@
 import collections
 import copy
 
-from twitter.common.collections import OrderedSet
+from functools import partial
+
+from twitter.common.collections import maybe_list, OrderedSet
 
 from twitter.pants.base import Target, TargetDefinitionException
 
+from .anonymous import AnonymousDeps
+from .external_dependency import ExternalDependency
+from .jar_dependency import JarDependency
 from .util import resolve
 
 
 class InternalTarget(Target):
   """A baseclass for targets that support an optional dependency set."""
 
-  class CycleException(TargetDefinitionException):
+  class CycleException(Exception):
     """Thrown when a circular dependency is detected."""
     def __init__(self, cycle):
       Exception.__init__(self, 'Cycle detected:\n\t%s' % (
@@ -85,7 +90,7 @@ class InternalTarget(Target):
     grouped where possible by target type as categorized by the given discriminator.
     """
 
-    sorted_targets = InternalTarget.sort_targets(internal_targets)
+    sorted_targets = filter(discriminator, cls.sort_targets(internal_targets))
 
     # can do no better for any of these:
     # []
@@ -123,29 +128,52 @@ class InternalTarget(Target):
                 sorted_targets[k] = sorted_targets[k - 1]
                 sorted_targets[k - 1] = look_ahead_target
               else:
-                break # out of k
+                break  # out of k
 
-            break # out of j
+            break  # out of j
 
-        if not scanned_back: # done with coalescing the current type, move on to next
+        if not scanned_back:  # done with coalescing the current type, move on to next
           current_type = discriminator(current_target)
 
     return sorted_targets
 
+  def sort(self):
+    """Returns a list of targets this target depends on sorted from most dependent to least."""
+    return self.sort_targets([self])
+
+  def coalesce(self, discriminator):
+    """Returns a list of targets this target depends on sorted from most dependent to least and
+    grouped where possible by target type as categorized by the given discriminator.
+    """
+    return self.coalesce_targets([self], discriminator)
+
   def __init__(self, name, dependencies, exclusives=None):
+    """
+    :param string name: The name of this module target, addressable via pants via the
+      portion of the spec following the colon.
+    :param dependencies: List of :class:`twitter.pants.base.target.Target` instances
+      this target depends on.
+    :type dependencies: list of targets
+    """
     Target.__init__(self, name, exclusives=exclusives)
     self._injected_deps = []
     self.processed_dependencies = resolve(dependencies)
 
     self.add_labels('internal')
     self.dependency_addresses = OrderedSet()
-    self.dependencies = OrderedSet()
-    self.internal_dependencies = OrderedSet()
-    self.jar_dependencies = OrderedSet()
 
-    # TODO(John Sirois): just use the more general check: if parsing: delay(doit) else: doit()
-    # Fix how target _ids are built / addresses to not require a BUILD file - ie: support anonymous,
-    # non-addressable targets - which is what meta-targets really are once created.
+    self._dependencies = OrderedSet()
+    self._internal_dependencies = OrderedSet()
+    self._jar_dependencies = OrderedSet()
+
+    self._deps = dependencies
+    if dependencies:
+      maybe_list(dependencies,
+                 expected_type=(ExternalDependency, AnonymousDeps, Target),
+                 raise_type=partial(TargetDefinitionException, self))
+
+    # TODO(John Sirois): XXX reconcile _post_constructs below with @property style delayed
+    # resolution,
 
     # Defer dependency resolution after parsing the current BUILD file to allow for forward
     # references
@@ -159,26 +187,55 @@ class InternalTarget(Target):
   def inject_dependencies(self):
     self.update_dependencies(resolve(self._injected_deps))
 
+  @property
+  def dependencies(self):
+    self._maybe_apply_deps()
+    return self._dependencies
+
+  @property
+  def internal_dependencies(self):
+    self._maybe_apply_deps()
+    return self._internal_dependencies
+
+  @property
+  def jar_dependencies(self):
+    self._maybe_apply_deps()
+    return self._jar_dependencies
+
+  def _maybe_apply_deps(self):
+    if self._deps is not None:
+      self.update_dependencies(self._deps)
+      self._deps = None
+
   def update_dependencies(self, dependencies):
     if dependencies:
       for dependency in dependencies:
         if hasattr(dependency, 'address'):
           self.dependency_addresses.add(dependency.address)
+        if not hasattr(dependency, "resolve"):
+          raise TargetDefinitionException(self, 'Cannot add %s as a dependency of %s'
+                                                % (dependency, self))
         for resolved_dependency in dependency.resolve():
           if resolved_dependency.is_concrete and not self.valid_dependency(resolved_dependency):
             raise TargetDefinitionException(self, 'Cannot add %s as a dependency of %s'
                                                   % (resolved_dependency, self))
-          self.dependencies.add(resolved_dependency)
+          self._dependencies.add(resolved_dependency)
           if isinstance(resolved_dependency, InternalTarget):
-            self.internal_dependencies.add(resolved_dependency)
-          if hasattr(resolved_dependency, '_as_jar_dependencies'):
-            self.jar_dependencies.update(resolved_dependency._as_jar_dependencies())
+            self._internal_dependencies.add(resolved_dependency)
+      self._jar_dependencies = OrderedSet(filter(lambda tgt: isinstance(tgt, JarDependency),
+                                                 self._dependencies - self._internal_dependencies))
 
   def valid_dependency(self, dep):
     """Subclasses can over-ride to reject invalid dependencies."""
     return True
 
-  def _walk(self, walked, work, predicate = None):
+  def replace_dependency(self, dependency, replacement):
+    self._dependencies.discard(dependency)
+    self._internal_dependencies.discard(dependency)
+    self._jar_dependencies.discard(dependency)
+    self.update_dependencies([replacement])
+
+  def _walk(self, walked, work, predicate=None):
     Target._walk(self, walked, work, predicate)
     for dep in self.dependencies:
       if isinstance(dep, Target) and not dep in walked:

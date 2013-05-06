@@ -20,7 +20,7 @@ from twitter.common.collections import maybe_list
 from twitter.common.lang import Compatibility
 from twitter.common.python.pex_info import PexInfo
 
-from twitter.pants.base import Target, TargetDefinitionException
+from twitter.pants.base import manual, Target, TargetDefinitionException
 
 from .python_target import PythonTarget
 
@@ -89,8 +89,7 @@ class PythonBinary(PythonTarget):
     )
 
     if not isinstance(platforms, (list, tuple)) and not isinstance(platforms, Compatibility.string):
-      raise TargetDefinitionException(self,
-          'platforms must be a list, tuple or string.')
+      raise TargetDefinitionException(self, 'platforms must be a list, tuple or string.')
 
     self._entry_point = entry_point
     self._inherit_path = bool(inherit_path)

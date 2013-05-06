@@ -17,28 +17,33 @@
 python_library(name='base-test',
   sources=['build_root_test.py'],
   dependencies=[
-    pants("src/python/twitter/pants:pants-lib"),
-    pants("src/python/twitter/pants:pants-deps"),
+    pants('src/python/twitter/pants:pants-lib'),
+    pants('src/python/twitter/pants:pants-deps'),
   ]
 )
 
 python_tests(name='utils',
   sources=globs('test_*.py'),
-  dependencies = [
-    pants("src/python/twitter/pants:pants-lib"),
-    pants("src/python/twitter/pants:pants-deps"),
+  dependencies=[
+    pants(':base-test'),
+    pants('src/python/twitter/pants:pants-lib'),
+    pants('src/python/twitter/pants:pants-deps'),
   ]
 )
 
-python_test_suite(name = 'all',
-  dependencies = [
+python_test_suite(name='all',
+  dependencies=[
     pants(':utils'),
     pants('tests/python/twitter/pants/base'),
     pants('tests/python/twitter/pants/buildtimestats'),
     pants('tests/python/twitter/pants/cache'),
     pants('tests/python/twitter/pants/commands'),
+    pants('tests/python/twitter/pants/engine'),
     pants('tests/python/twitter/pants/fs'),
     pants('tests/python/twitter/pants/java'),
+    pants('tests/python/twitter/pants/java/distribution'),
+    pants('tests/python/twitter/pants/net/http'),
+    pants('tests/python/twitter/pants/process'),
     pants('tests/python/twitter/pants/python:all'),
     pants('tests/python/twitter/pants/reporting'),
     pants('tests/python/twitter/pants/scm'),

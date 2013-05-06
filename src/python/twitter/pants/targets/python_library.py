@@ -14,9 +14,11 @@
 # limitations under the License.
 # ==================================================================================================
 
+from twitter.pants.base import manual
 from twitter.pants.targets.python_target import PythonTarget
 
 
+@manual.builddict(tags=["python"])
 class PythonLibrary(PythonTarget):
   """Produces a Python library."""
 

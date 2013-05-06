@@ -124,7 +124,7 @@ class RunTracker(object):
     self.report.start_workunit(self._main_root_workunit)
 
   @contextmanager
-  def new_workunit(self, name, labels=list(), cmd=''):
+  def new_workunit(self, name, labels=None, cmd=''):
     """Creates a (hierarchical) subunit of work for the purpose of timing and reporting.
 
     - name: A short name for this work. E.g., 'resolve', 'compile', 'scala', 'zinc'.
@@ -152,7 +152,7 @@ class RunTracker(object):
         self._threadlocal.current_workunit = parent
 
   @contextmanager
-  def new_workunit_under_parent(self, name, parent, labels=list(), cmd=''):
+  def new_workunit_under_parent(self, name, parent, labels=None, cmd=''):
     """Creates a (hierarchical) subunit of work for the purpose of timing and reporting.
 
     - name: A short name for this work. E.g., 'resolve', 'compile', 'scala', 'zinc'.

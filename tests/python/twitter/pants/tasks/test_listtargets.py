@@ -67,7 +67,7 @@ class ListTargetsTest(BaseListTargetsTest):
     def create_library(path, *libs):
       libs = libs or [Lib(os.path.basename(os.path.dirname(cls.build_path(path))))]
       for lib in libs:
-        target = "java_library(name='%s', provides=%s)\n" % (lib.name, lib.provides)
+        target = "java_library(name='%s', provides=%s, sources=[])\n" % (lib.name, lib.provides)
         cls.create_target(path, target)
 
     create_library('a')

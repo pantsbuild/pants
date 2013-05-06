@@ -14,34 +14,43 @@
 # limitations under the License.
 # ==================================================================================================
 
-from twitter.pants.targets.exportable_jvm_library import ExportableJvmLibrary
+from twitter.pants.base import manual
+
+from .java_thrift_library import JavaThriftLibrary
 
 
- # TODO(Anand) Remove this from pants proper when a code adjoinment mechanism exists
- # or ok if/when thriftstore is open sourced as well..
-class JavaThriftstoreDMLLibrary(ExportableJvmLibrary):
+# TODO(Anand): Remove this from pants proper when a code adjoinment mechanism exists
+# or ok if/when thriftstore is open sourced as well..
+@manual.builddict(tags=["java"])
+class JavaThriftstoreDMLLibrary(JavaThriftLibrary):
   """Defines a target that builds java stubs from a thriftstore DDL file."""
 
   def __init__(self,
                name,
                sources,
-               dependencies = None,
+               provides=None,
+               dependencies=None,
                exclusives=None):
-    """name: The name of this module target, addressable via pants via the portion of the spec
-        following the colon
-    sources: A list of paths containing the thriftstore source files this module's jar is compiled from
-    dependencies: An optional list of Dependency objects specifying the binary (jar) dependencies of
-        this module.
-    exclusives:   An optional map of exclusives tags. See CheckExclusives for details.
+    """
+    :param string name: The name of this target, which combined with this
+      build file defines the target :class:`twitter.pants.base.address.Address`.
+    :param sources: A list of filenames representing the source code
+      this library is compiled from.
+    :type sources: list of strings
+    :param Artifact provides:
+      The :class:`twitter.pants.targets.artifact.Artifact`
+      to publish that represents this target outside the repo.
+    :param dependencies: List of :class:`twitter.pants.base.target.Target` instances
+      this target depends on.
+    :type dependencies: list of targets
     """
 
-    ExportableJvmLibrary.__init__(self,
-                                  name,
-                                  sources,
-                                  provides = None,
-                                  dependencies = dependencies,
-                                  exclusives = exclusives)
+    JavaThriftLibrary.__init__(self,
+                               name,
+                               sources,
+                               provides=provides,
+                               compiler='scrooge',
+                               language='java',
+                               dependencies=dependencies,
+                               exclusives=exclusives)
     self.add_labels('codegen', 'java')
-
-  def _as_jar_dependency(self):
-    return ExportableJvmLibrary._as_jar_dependency(self).with_sources()

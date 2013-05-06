@@ -18,19 +18,80 @@ import os
 
 from collections import Sequence
 
+from twitter.common.dirutil.fileset import Fileset
+from twitter.common.lang import Compatibility
+
 from twitter.pants.base import ParseContext, Target
-from twitter.pants.targets.with_sources import TargetWithSources
+
+from .internal import InternalTarget
+from .with_sources import TargetWithSources
 
 
-class Resources(TargetWithSources):
-  """Describes a set of resource files to be embedded in a library or binary."""
+class Resources(InternalTarget, TargetWithSources):
+  """Describes a set of resource files to be embedded in a library or binary.
+
+  If your target compiles to the JVM (e.g., ``java_library``,
+  ``scala_library``, ``junit_tests``), you might have files
+  that you need to access as resources. Each of these targets has an optional
+  argument called ``resources`` that expects a list of target addresses that
+  resolve to targets whose type is resource.
+
+  In the ``jar`` goal, the resource files are placed in the resulting `.jar`.
+  """
+
+  def __init__(self, name, sources):
+    """
+    :param string name: The name of this target, which combined with this
+      build file defines the target :class:`twitter.pants.base.address.Address`.
+    :param sources: A list of filenames representing the resources
+      this library provides.
+    """
+    # TODO(John Sirois): XXX Review why this is an InternalTarget
+    InternalTarget.__init__(self, name)
+    TargetWithSources.__init__(self, name, sources=sources)
 
 
 class WithLegacyResources(TargetWithSources):
   """Collects resources whether they are specified using globs against an assumed parallel
-  'resources' directory or they are Resources targets
+  'resources' directory or they are Resources targets.
+
+  Resource handling is currently in transition, and two forms are available.
+
+  New style:
+
+  ::
+
+    # `resources' is a first-class target type.
+    resources(name='mybird',
+      sources=['list', 'of', 'resources']
+    )
+
+    # Dependees depend on one or more `resources' targets.
+    resources=[pants('src/resources/com/twitter/mybird')]
+
+  Old style:
+
+  ::
+
+    # Resources can be a fileset.
+    resources=globs('*.txt')
+
+    # Resources can be a list of filenames.
+    resources=['list', 'of', 'files']
+
+  Please note mixing old/new styles is not supported.
+
   """
+
   def __init__(self, name, sources=None, resources=None, exclusives=None):
+    """
+    :param string name: The name of this target, which combined with this
+      build file defines the target :class:`twitter.pants.base.address.Address`.
+    :param sources: A list of filenames representing the source code
+      this library is compiled from.
+    :param resources: One or more :class:`twitter.pants.targets.resources.Resources`
+      xor a list of filenames representing the resources this library provides.
+    """
     TargetWithSources.__init__(self, name, sources=sources, exclusives=exclusives)
 
     if resources is not None:
@@ -40,11 +101,11 @@ class WithLegacyResources(TargetWithSources):
         concrete_targets = [t for t in item.resolve() if t.is_concrete]
         return all(isinstance(t, Resources) for t in concrete_targets)
 
-      if is_resources(resources):
-        self.resources = list(self.resolve_all(resources, Resources))
-      elif isinstance(resources, Sequence) and all(map(is_resources, resources)):
-        self.resources = list(self.resolve_all(resources, Resources))
-      else:
+      resources_seq = resources if isinstance(resources, Sequence) else [resources]
+      if all(map(is_resources, resources_seq)):
+        self.resources = list(self.resolve_all(resources_seq, Resources))
+      elif (all(map(lambda resource: isinstance(resource, Fileset)
+            or isinstance(resource, Compatibility.string), resources_seq))):
         # Handle parallel resource dir globs.
         # For example, for a java_library target base of src/main/java:
         #   src/main/java/com/twitter/base/BUILD
@@ -60,3 +121,9 @@ class WithLegacyResources(TargetWithSources):
         resources_dir = os.path.join(sibling_resources_base, base_relpath)
         with ParseContext.temp(basedir=resources_dir):
           self.resources = [Resources(name, resources)]
+      else:
+        raise ValueError('Target %s resources are invalid: %s' % (self.address, resources))
+
+      # Add the resources to dependencies.
+      if isinstance(self, InternalTarget):
+        self.update_dependencies(self.resources)

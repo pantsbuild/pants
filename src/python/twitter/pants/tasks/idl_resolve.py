@@ -18,7 +18,8 @@ __author__ = 'Phil Hom'
 
 import os
 
-from twitter.pants.tasks.ivy_resolve import IvyResolve
+from .extract import Extract
+from .ivy_resolve import IvyResolve
 
 
 class IdlResolve(IvyResolve):
@@ -47,9 +48,13 @@ class IdlResolve(IvyResolve):
   def _mapto_dir(self):
     return os.path.join(self._work_dir, 'mapped-idls')
 
-  def _map_jar(self, path):
-    is_idl = path.endswith('-idl.jar')
-    if not is_idl and super(IdlResolve, self)._map_jar(path):
+  def _map_jar(self, org, name, conf, path):
+    # The spec says idl only jars should have an idl classifier and depend only on other such
+    # artifacts, but in practice the spec is often not met.  It's useful to allow direct
+    # registration of jars containing idl no matter the form of the jar.  We do restrict transitive
+    # idl deps however to those that conform with the spec.
+    is_idl = Extract.is_registered_jar(org, name) or path.endswith('-idl.jar')
+    if not is_idl and super(IdlResolve, self)._map_jar(org, name, conf, path):
       self.context.log.warn('Ignoring invalid idl dependency: %s' % path)
     return is_idl
 

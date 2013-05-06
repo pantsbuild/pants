@@ -16,10 +16,27 @@
 
 import os
 
+from twitter.common.lang import Compatibility
 from twitter.pants.base.build_file import BuildFile
 
 class Address(object):
-  """Represents a BUILD file target address."""
+  """A target address.
+
+  An address is a unique name representing a
+  :class:`twitter.pants.base.target.Target`. Its composed of the
+  :class:`twitter.pants.base.build_file.BuildFile` plus target name.
+
+  While not their only use, a noteworthy use of addresses is specifying
+  target dependencies. For example:
+
+  ::
+
+    some_target(name='mytarget',
+      dependencies=[pants('path/to/buildfile:targetname')]
+    )
+
+  Where ``path/to/buildfile:targetname`` is the dependent target address.
+  """
 
   @classmethod
   def parse(cls, root_dir, spec, is_relative=True):
@@ -51,6 +68,12 @@ class Address(object):
     return Address(buildfile, name)
 
   def __init__(self, buildfile, target_name):
+    """
+    :param BuildFile buildfile: A BuildFile defined in the repo.
+    :param string target_name: The name of a target defined in buildfile.
+    """
+    assert isinstance(buildfile, BuildFile)
+    assert isinstance(target_name, Compatibility.string)
     self.buildfile = buildfile
     self.target_name = target_name
 

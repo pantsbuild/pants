@@ -16,11 +16,24 @@
 
 import unittest
 
+from twitter.pants.base import ParseContext
+from twitter.pants.base.target import Target, TargetDefinitionException
 from twitter.pants.targets import InternalTarget
 from twitter.pants.testutils import MockTarget
 
 
 class InternalTargetTest(unittest.TestCase):
+
+  def test_validation(self):
+    with ParseContext.temp('InternalTargetTest/test_validation'):
+      InternalTarget(name="valid", dependencies=None)
+      self.assertRaises(TargetDefinitionException, InternalTarget,
+                        name=1, dependencies=None)
+
+      InternalTarget(name="valid2", dependencies=Target(name='mybird'))
+      self.assertRaises(TargetDefinitionException, InternalTarget,
+                        name='valid3', dependencies=1)
+
   def test_detect_cycle_direct(self):
     a = MockTarget('a')
 

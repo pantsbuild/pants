@@ -23,7 +23,7 @@ import sys
 from twitter.common import app
 from twitter.common.log import LogOptions
 
-from twitter.pants.java.nailgun_client import DEFAULT_NG_HOST, DEFAULT_NG_PORT, NailgunClient
+from twitter.pants.java import NailgunClient
 
 
 # TODO(John Sirois): Extract this to a file a release toolchain can edit.
@@ -45,13 +45,13 @@ app.add_option('--nailgun-showversion',
 app.add_option('--nailgun-server',
                dest='ng_host',
                metavar='HOST',
-               default=DEFAULT_NG_HOST,
+               default=NailgunClient.DEFAULT_NG_HOST,
                help='to specify the address of the nailgun server (default is %default)')
 
 app.add_option('--nailgun-port',
                dest='ng_port',
                metavar='PORT',
-               default=DEFAULT_NG_PORT,
+               default=NailgunClient.DEFAULT_NG_PORT,
                type='int',
                help='to specify the port of the nailgun server (default is %default)')
 

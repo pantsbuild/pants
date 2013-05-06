@@ -56,12 +56,14 @@ class Context(object):
     def fatal(self, *msg_elements): self._run_tracker.log(Report.FATAL, *msg_elements)
 
   def __init__(self, config, options, run_tracker, target_roots, requested_goals=None,
-               lock=None, log=None):
+               lock=None, log=None, target_base=None):
     self._config = config
     self._options = options
     self.run_tracker = run_tracker
     self._lock = lock or Lock.unlocked()
     self._log = log or Context.Log(run_tracker)
+    self._target_base = target_base or Target
+
     self._state = {}
     self._products = Products()
     self._buildroot = get_buildroot()
@@ -160,7 +162,7 @@ class Context(object):
     return self.run_tracker.background_worker_pool()
 
   @contextmanager
-  def new_workunit(self, name, labels=list(), cmd=''):
+  def new_workunit(self, name, labels=None, cmd=''):
     """Create a new workunit under the calling thread's current workunit."""
     with self.run_tracker.new_workunit(name=name, labels=labels, cmd=cmd) as workunit:
       yield workunit
@@ -208,7 +210,7 @@ class Context(object):
     The target is not added to the target roots.
     """
     def add_targets(tgt):
-      self._targets.update(tgt for tgt in tgt.resolve() if isinstance(tgt, Target))
+      self._targets.update(tgt for tgt in tgt.resolve() if isinstance(tgt, self._target_base))
     target.walk(add_targets)
 
   def add_new_target(self, target_base, target_type, *args, **kwargs):

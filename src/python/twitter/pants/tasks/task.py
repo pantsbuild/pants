@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==================================================================================================
+
 from collections import defaultdict
 
 import itertools
@@ -24,22 +25,22 @@ import threading
 from contextlib import contextmanager
 
 from twitter.common.collections.orderedset import OrderedSet
-from twitter.common.dirutil import safe_mkdir
+
 from twitter.pants import Config
-from twitter.pants.base.worker_pool import Work
-from twitter.pants.cache import create_artifact_cache
-
+from twitter.pants.base.build_invalidator import BuildInvalidator, CacheKeyGenerator
 from twitter.pants.base.hash_utils import hash_file
-from twitter.pants.base.build_invalidator import CacheKeyGenerator
-from twitter.pants.binary_util import runjava_indivisible
-from twitter.pants.cache.read_write_artifact_cache import ReadWriteArtifactCache
+from twitter.pants.base.worker_pool import Work
 from twitter.pants.base.workunit import WorkUnit
+from twitter.pants.cache import create_artifact_cache
+from twitter.pants.cache.read_write_artifact_cache import ReadWriteArtifactCache
+from twitter.pants.ivy import Bootstrapper
+from twitter.pants.java import Executor, SubprocessExecutor
 from twitter.pants.reporting.reporting_utils import items_to_report_element
-from twitter.pants.tasks.jvm_tool_bootstrapper import JvmToolBootstrapper
-from twitter.pants.tasks.cache_manager import CacheManager, InvalidationCheck, VersionedTargetSet
-from twitter.pants.tasks.ivy_utils import IvyUtils
-from twitter.pants.tasks.task_error import TaskError
 
+from .jvm_tool_bootstrapper import JvmToolBootstrapper
+from .cache_manager import CacheManager, InvalidationCheck, VersionedTargetSet
+from .ivy_utils import IvyUtils
+from .task_error import TaskError
 
 
 class Task(object):
@@ -51,14 +52,15 @@ class Task(object):
     """Set up the cmd-line parser.
 
     Subclasses can add flags to the pants command line using the given option group.
-    Flag names should be created with mkflag([name]) to ensure flags are properly namespaced
+    Flag names should be created with mkflag([name]) to ensure flags are properly name-spaced
     amongst other tasks.
     """
 
   def __init__(self, context):
     self.context = context
     self.dry_run = self.can_dry_run() and context.options.dry_run
-    self._cache_key_generator = CacheKeyGenerator(context.config.getdefault('cache_key_gen_version', default=None))
+    self._cache_key_generator = CacheKeyGenerator(context.config.getdefault('cache_key_gen_version',
+                                                                            default=None))
     self._read_artifact_cache_spec = None
     self._write_artifact_cache_spec = None
     self._artifact_cache = None
@@ -70,11 +72,11 @@ class Task(object):
   def register_jvm_tool(self, key, target_addrs):
     self._jvm_tool_bootstrapper.register_jvm_tool(key, target_addrs)
 
-  def tool_classpath(self, key, java_runner=None):
-    return self._jvm_tool_bootstrapper.get_jvm_tool_classpath(key, java_runner)
+  def tool_classpath(self, key, executor=None):
+    return self._jvm_tool_bootstrapper.get_jvm_tool_classpath(key, executor)
 
-  def lazy_tool_classpath(self, key, java_runner=None):
-    return self._jvm_tool_bootstrapper.get_lazy_jvm_tool_classpath(key, java_runner)
+  def lazy_tool_classpath(self, key, executor=None):
+    return self._jvm_tool_bootstrapper.get_lazy_jvm_tool_classpath(key, executor)
 
   def setup_artifact_cache_from_config(self, config_section=None):
     """Subclasses can call this in their __init__() to set up artifact caching for that task type.
@@ -107,11 +109,11 @@ class Task(object):
 
   def get_artifact_cache(self):
     with self._artifact_cache_setup_lock:
-      if self._artifact_cache is None and \
-        (self._read_artifact_cache_spec or self._write_artifact_cache_spec):
-        self._artifact_cache = \
-          ReadWriteArtifactCache(self._create_artifact_cache(self._read_artifact_cache_spec, 'will read from'),
-                                 self._create_artifact_cache(self._write_artifact_cache_spec, 'will write to'))
+      if (self._artifact_cache is None
+          and (self._read_artifact_cache_spec or self._write_artifact_cache_spec)):
+        self._artifact_cache = ReadWriteArtifactCache(
+            self._create_artifact_cache(self._read_artifact_cache_spec, 'will read from'),
+            self._create_artifact_cache(self._write_artifact_cache_spec, 'will write to'))
       return self._artifact_cache
 
   def artifact_cache_reads_enabled(self):
@@ -163,6 +165,10 @@ class Task(object):
     changes to pre-built build tools, e.g., the thrift compiler.
     """
     return []
+
+  def invalidate(self):
+    """Invalidates all targets for this task."""
+    BuildInvalidator(self._build_invalidator_dir).force_invalidate_all()
 
   @contextmanager
   def invalidated(self, targets, only_buildfiles=False, invalidate_dependents=False,
@@ -295,7 +301,7 @@ class Task(object):
 
     vts_artifactfiles_pairs - a list of pairs (vts, artifactfiles) where
       - vts is single VersionedTargetSet.
-      - artifactfiles is a list of absolute paths to artifacts for the VersionedTargetSet.
+      - artifactfiles is a list of paths to artifacts for the VersionedTargetSet.
     """
     update_artifact_cache_work = self.get_update_artifact_cache_work(vts_artifactfiles_pairs)
     if update_artifact_cache_work:
@@ -334,15 +340,19 @@ class Task(object):
       items_to_report_element([t.address.reference() for t in targets], 'target'),
       suffix)
 
-  def ivy_resolve(self, targets, java_runner=None, symlink_ivyxml=False, silent=False,
+  def ivy_resolve(self, targets, executor=None, symlink_ivyxml=False, silent=False,
                   workunit_name=None, workunit_labels=None):
-    java_runner = java_runner or runjava_indivisible
+
+    if executor and not isinstance(executor, Executor):
+      raise ValueError('The executor must be an Executor instance, given %s of type %s'
+                       % (executor, type(executor)))
+    ivy = Bootstrapper.default_ivy(java_executor=executor)
 
     targets = set(targets)
 
     if not targets:
       return []
-    
+
     work_dir = self.context.config.get('ivy-resolve', 'workdir')
     confs = self.context.config.getlist('ivy-resolve', 'confs')
 
@@ -355,11 +365,7 @@ class Task(object):
       target_classpath_file = os.path.join(target_workdir, 'classpath')
       raw_target_classpath_file = target_classpath_file + '.raw'
       raw_target_classpath_file_tmp = raw_target_classpath_file + '.tmp'
-      # A common dir for symlinks into the ivy2 cache. This ensures that paths to jars
-      # in artifact-cached analysis files are consistent across systems.
-      # Note that we have one global, well-known symlink dir, again so that paths are
-      # consistent across builds.
-      symlink_dir = os.path.join(work_dir, 'jars')
+      symlink_dir = os.path.join(target_workdir, 'jars')
 
       # Note that it's possible for all targets to be valid but for no classpath file to exist at
       # target_classpath_file, e.g., if we previously built a superset of targets.
@@ -388,7 +394,8 @@ class Task(object):
           exec_ivy()
 
         if not os.path.exists(raw_target_classpath_file_tmp):
-          raise TaskError('Ivy failed to create classpath file at %s' % raw_target_classpath_file_tmp)
+          raise TaskError('Ivy failed to create classpath file at %s'
+                          % raw_target_classpath_file_tmp)
         shutil.move(raw_target_classpath_file_tmp, raw_target_classpath_file)
 
         if self.artifact_cache_writes_enabled():
@@ -397,8 +404,8 @@ class Task(object):
     # Make our actual classpath be symlinks, so that the paths are uniform across systems.
     # Note that we must do this even if we read the raw_target_classpath_file from the artifact
     # cache. If we cache the target_classpath_file we won't know how to create the symlinks.
-    symlink_map = IvyUtils.symlink_cachepath(self.context.ivy_home, raw_target_classpath_file,
-                                             symlink_dir, target_classpath_file)
+    symlink_map = IvyUtils.symlink_cachepath(raw_target_classpath_file, symlink_dir,
+                                             target_classpath_file)
     with Task.symlink_map_lock:
       all_symlinks_map = self.context.products.get_data('symlink_map') or defaultdict(list)
       for path, symlink in symlink_map.items():

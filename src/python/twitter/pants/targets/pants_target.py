@@ -14,13 +14,25 @@
 # limitations under the License.
 # ==================================================================================================
 
-from twitter.pants.base import ParseContext, Target, Address
+from twitter.pants.base import Address, manual, ParseContext, Target, TargetDefinitionException
 
 
+@manual.builddict(tags=["anylang"])
 class Pants(Target):
-  """A pointer to a pants target."""
+  """A pointer to a pants target.
+
+  Useful, for example, in a target's dependencies list. One target can depend
+  on several others; Each pants() target refers to one of those.
+  """
+
+  _DEFINITION_ERROR_MSG = ("An invalid pants pointer has been specified. "
+                           "Please identify this reference and correct the issue: ")
 
   def __init__(self, spec, exclusives=None):
+    """
+    :param string spec: target address. E.g.,
+      src/main/java/com/twitter/common/util/BUILD:util
+    """
     # it's critical the spec is parsed 1st, the results are needed elsewhere in constructor flow
     parse_context = ParseContext.locate()
 
@@ -32,7 +44,11 @@ class Pants(Target):
       else:
         return Address.parse(parse_context.buildfile.root_dir, spec, False)
 
-    self.address = parse_address()
+    try:
+      self.address = parse_address()
+    except IOError as e:
+      self.address = parse_context.buildfile.relpath
+      raise TargetDefinitionException(self, '%s%s' % (self._DEFINITION_ERROR_MSG, e))
 
     # We must disable the re-init check, because our funky __getattr__ breaks it.
     # We're not involved in any multiple inheritance, so it's OK to disable it here.
@@ -43,14 +59,14 @@ class Pants(Target):
     # A pants target is a pointer, do not register it as an actual target (see resolve).
     pass
 
-  def locate(self):
+  def _locate(self):
     return self.address
 
   def resolve(self):
     # De-reference this pants pointer to an actual parsed target.
     resolved = Target.get(self.address)
     if not resolved:
-      raise KeyError("Failed to find target for: %s" % self.address)
+      raise TargetDefinitionException(self, '%s%s' % (self._DEFINITION_ERROR_MSG, self.address))
     for dep in resolved.resolve():
       yield dep
 

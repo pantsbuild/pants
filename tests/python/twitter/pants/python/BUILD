@@ -20,7 +20,6 @@ python_test_suite(name = 'all',
     pants(':test_antlr_builder'),
     pants(':test_resolver'),
     pants(':test_thrift_namespace_packages'),
-    pants(':test_subprocess_call_with_args')
   ]
 )
 
@@ -48,10 +47,3 @@ python_tests(name = 'test_resolver',
   ]
 )
 
-python_tests(name = 'test_subprocess_call_with_args',
-  sources = ['test_subprocess_call_with_args.py'],
-  dependencies = [
-    pants('src/python/twitter/common/python'),
-    pants('src/python/twitter/pants:pants-lib')
-  ]
-)

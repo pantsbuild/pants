@@ -22,6 +22,7 @@ import traceback
 from twitter.common.collections import OrderedSet
 
 from twitter.pants.base import Address, Config, Target
+from twitter.pants.targets import InternalTarget
 from twitter.pants.python import PythonBuilder
 from twitter.pants.python.interpreter_cache import PythonInterpreterCache
 
@@ -87,6 +88,11 @@ class Build(Command):
         target = Target.get(address)
       except:
         self.error("Problem parsing BUILD target %s: %s" % (address, traceback.format_exc()))
+
+      try:
+        InternalTarget.check_cycles(target)
+      except InternalTarget.CycleException as e:
+        self.error("Target contains an internal dependency cycle: %s" % e)
 
       if not target:
         self.error("Target %s does not exist" % address)

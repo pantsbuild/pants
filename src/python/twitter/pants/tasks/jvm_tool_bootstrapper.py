@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# ===================================================================================================
+# ==================================================================================================
 
 from twitter.pants.tasks.task_error import TaskError
 
@@ -21,14 +21,14 @@ class JvmToolBootstrapper(object):
   def __init__(self, products):
     self._products = products
 
-  def get_jvm_tool_classpath(self, key, java_runner=None):
+  def get_jvm_tool_classpath(self, key, executor=None):
     """Get a classpath for the tool previously registered under the key.
 
     Returns a list of paths.
     """
-    return self.get_lazy_jvm_tool_classpath(key, java_runner)()
+    return self.get_lazy_jvm_tool_classpath(key, executor)()
 
-  def get_lazy_jvm_tool_classpath(self, key, java_runner=None):
+  def get_lazy_jvm_tool_classpath(self, key, executor=None):
     """Get a lazy classpath for the tool previously registered under the key.
 
     Returns a no-arg callable. Invoking it returns a list of paths.
@@ -37,7 +37,7 @@ class JvmToolBootstrapper(object):
     callback = callback_product_map.get(key)
     if not callback:
       raise TaskError('No bootstrap callback registered for %s' % key)
-    return lambda: callback(java_runner=java_runner)
+    return lambda: callback(executor=executor)
 
   def register_jvm_tool(self, key, tools):
     """Register a list of targets against a key.
@@ -51,7 +51,8 @@ class JvmToolBootstrapper(object):
     # It's OK to re-register with the same value, but not to change the value.
     if existing is not None:
       if existing != tools:
-        raise TaskError('Attemping to change tools under %s from %s to %s.' % (key, existing, tools))
+        raise TaskError('Attemping to change tools under %s from %s to %s.'
+                        % (key, existing, tools))
     else:
       tool_product_map[key] = tools
       self._products.set_data('jvm_build_tools', tool_product_map)

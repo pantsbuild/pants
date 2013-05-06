@@ -52,7 +52,15 @@ class BaseDependenciesTest(ConsoleTaskTest):
 
   @classmethod
   def scala_library(cls, path, name, deps=()):
-    cls.define_target(path, name, 'scala_library', deps)
+    cls.create_target(path, dedent('''
+      scala_library(name='%(name)s',
+        dependencies=[%(deps)s],
+        sources=[],
+      )
+    ''' % dict(
+      name=name,
+      deps=','.join(deps))
+    ))
 
 
 class DependenciesEmptyTest(BaseDependenciesTest):
