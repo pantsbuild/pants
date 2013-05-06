@@ -235,7 +235,7 @@ class PomWriter(DependencyWriter):
       name=jar.name + ('-only' if classifier == 'idl' else ''),
       rev=jar.rev,
       scope='runtime' if classifier == 'idl' else 'compile',
-      classifier=classifier,
+      classifier=(classifier if classifier is not None else jar.classifier),
       excludes=[self.create_exclude(exclude) for exclude in jar.excludes if exclude.name]
     )
 
