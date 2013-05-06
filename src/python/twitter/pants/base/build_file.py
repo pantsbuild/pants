@@ -28,15 +28,11 @@ class BuildFile(object):
   _PATTERN = re.compile('^%s(\.[a-z]+)?$' % _CANONICAL_NAME)
 
   @staticmethod
-  def is_buildfile(name):
-    return BuildFile._is_buildfile_name(os.path.basename(name))
-
-  @staticmethod
   def _is_buildfile_name(name):
     return BuildFile._PATTERN.match(name)
 
   @staticmethod
-  def scan_buildfiles(root_dir, base_path = None):
+  def scan_buildfiles(root_dir, base_path=None):
     """Looks for all BUILD files under base_path"""
 
     buildfiles = []
@@ -65,7 +61,7 @@ class BuildFile(object):
 
     if must_exist:
       if not os.path.exists(buildfile):
-        raise IOError("BUILD file does not exist at: %s" % (buildfile))
+        raise IOError("BUILD file does not exist at: %s" % buildfile)
 
       if not BuildFile._is_buildfile_name(os.path.basename(buildfile)):
         raise IOError("%s is not a BUILD file" % buildfile)
@@ -73,8 +69,8 @@ class BuildFile(object):
       if not os.path.exists(buildfile):
         raise IOError("BUILD file does not exist at: %s" % buildfile)
 
-    self.root_dir = root_dir
-    self.full_path = buildfile
+    self.root_dir = os.path.realpath(root_dir)
+    self.full_path = os.path.realpath(buildfile)
 
     self.name = os.path.basename(self.full_path)
     self.parent_path = os.path.dirname(self.full_path)
