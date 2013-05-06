@@ -19,7 +19,11 @@ import time
 from collections import namedtuple
 from contextlib import contextmanager
 
+from twitter.common.lang import Compatibility
+
+
 Timing = namedtuple('Timing', ['label', 'times', 'overlapping'])
+
 
 class Timer(object):
   def __init__(self):
@@ -40,7 +44,7 @@ class Timer(object):
     self.log(label, [elapsed])
 
   def now(self):
-    return time.time()
+    return time.monotonic() if Compatibility.PY3 else time.time()
 
   def log(self, label, times, overlapping=False):
     """Code that has to measure its own timings directly can log them here.
@@ -48,7 +52,8 @@ class Timer(object):
     If labels are of the form prefix:suffix, then the sum of all times of consecutively-logged
     timings with the same prefix will also be logged.
 
-    Set overlapping to True if you're logging a timing that overlaps with other, already-logged timings.
+    Set overlapping to True if you're logging a timing that overlaps with other, already-logged
+    timings.
     """
     self._timings.append(Timing(label, times, overlapping))
 
@@ -97,6 +102,3 @@ class Timer(object):
         })
     maybe_print_timings_for_prefix()
     print('total: %.3fs' % grand_total_time)
-
-
-

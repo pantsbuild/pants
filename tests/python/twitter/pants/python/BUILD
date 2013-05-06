@@ -17,8 +17,10 @@
 
 python_test_suite(name = 'all',
   dependencies = [
-    ':test_antlr_builder',
-    ':test_thrift_namespace_packages',
+    pants(':test_antlr_builder'),
+    pants(':test_python_chroot'),
+    pants(':test_thrift_namespace_packages'),
+    pants(':test_subprocess_call_with_args')
   ]
 )
 
@@ -33,8 +35,23 @@ python_tests(name = 'test_antlr_builder',
 
 python_tests(name = 'test_thrift_namespace_packages',
   sources = ['test_thrift_namespace_packages.py'],
+  dependencies = [ pants('src/thrift/com/twitter/pants/testing:duck-py'),
+                   pants('src/thrift/com/twitter/pants/testing:goose-py') ]
+)
+
+python_tests(name = 'test_python_chroot',
+  sources = ['test_python_chroot.py'],
   dependencies = [
-    'src/thrift/com/twitter/pants/testing:duck-py',
-    'src/thrift/com/twitter/pants/testing:goose-py',
+    pants('src/python/twitter/common/config'),
+    pants('src/python/twitter/common/python'),
+    pants('src/python/twitter/pants:pants-lib')
+  ]
+)
+
+python_tests(name = 'test_subprocess_call_with_args',
+  sources = ['test_subprocess_call_with_args.py'],
+  dependencies = [
+    pants('src/python/twitter/common/python'),
+    pants('src/python/twitter/pants:pants-lib')
   ]
 )

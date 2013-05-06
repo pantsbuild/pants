@@ -13,9 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==================================================================================================
-import os
 
 from twitter.pants.targets.exportable_jvm_library import ExportableJvmLibrary
+
 
  # TODO(Anand) Remove this from pants proper when a code adjoinment mechanism exists
  # or ok if/when thriftstore is open sourced as well..
@@ -39,16 +39,7 @@ class JavaThriftstoreDMLLibrary(ExportableJvmLibrary):
                                   sources,
                                   provides = None,
                                   dependencies = dependencies)
-    self.add_label('codegen')
+    self.add_labels('codegen')
 
   def _as_jar_dependency(self):
     return ExportableJvmLibrary._as_jar_dependency(self).with_sources()
-
-  def _create_template_data(self):
-    allsources = []
-    if self.sources:
-      allsources += list(os.path.join(self.target_base, src) for src in self.sources)
-
-    return ExportableJvmLibrary._create_template_data(self).extend(
-      allsources = allsources,
-    )

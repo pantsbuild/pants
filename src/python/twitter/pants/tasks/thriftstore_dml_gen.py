@@ -4,19 +4,14 @@ __author__ = 'Anand Madhavan'
 # or ok if/when thriftstore is open sourced as well
 
 import os
-import re
 import subprocess
 
-from collections import defaultdict
-
-from twitter.common import log
 from twitter.common.collections import OrderedSet
 from twitter.common.dirutil import safe_mkdir
 
 from twitter.pants import is_jvm
 from twitter.pants.targets import JavaLibrary, JavaThriftstoreDMLLibrary, JavaThriftLibrary
 from twitter.pants.tasks import TaskError
-from twitter.pants.tasks.binary_utils import select_binary
 from twitter.pants.tasks.code_gen import CodeGen
 
 class ThriftstoreDMLGen(CodeGen):
@@ -27,7 +22,7 @@ class ThriftstoreDMLGen(CodeGen):
 
   def __init__(self, context):
     CodeGen.__init__(self, context)
-    self.thriftstore_admin = context.config.get('thriftstore-dml-gen', 'thriftstore-admin')
+    self.thriftstore_codegen = context.config.get('thriftstore-dml-gen', 'thriftstore-codegen')
 
     self.output_dir = (context.options.thriftstore_gen_create_outdir
       or context.config.get('thriftstore-dml-gen', 'workdir'))
@@ -59,6 +54,7 @@ class ThriftstoreDMLGen(CodeGen):
                                                      JavaThriftLibrary,
                                                      name=dml_lib_target.id,
                                                      sources=dml_lib_target.sources,
+                                                     dependencies=dml_lib_target.dependencies,
                                                      derived_from=dml_lib_target)
         # Add one generated JavaLibrary target (whose sources we will fill in later on)
         java_dml_lib = self.context.add_new_target(self.gen_thriftstore_java_dir,
@@ -68,7 +64,7 @@ class ThriftstoreDMLGen(CodeGen):
                                                    dependencies=self.javadeps,
                                                    derived_from=dml_lib_target)
         java_dml_lib.id = dml_lib_target.id + '.thriftstore_dml_gen'
-        java_dml_lib.add_label('codegen')
+        java_dml_lib.add_labels('codegen', 'synthetic')
         java_dml_lib.update_dependencies([thrift_dml_lib])
         self.gen_dml_jls[dml_lib_target] = java_dml_lib
 
@@ -96,7 +92,7 @@ class ThriftstoreDMLGen(CodeGen):
     safe_mkdir(self.gen_thriftstore_java_dir)
 
     args = [
-      self.thriftstore_admin,
+      self.thriftstore_codegen,
       'dml',
       '-o', self.gen_thriftstore_java_dir
     ]
@@ -126,12 +122,12 @@ class ThriftstoreDMLGen(CodeGen):
     else:
       raise TaskError('Unrecognized thrift gen lang: %s' % lang)
 
-  def _calculate_genfiles(self, source):
+  def _calculate_genfiles(self, sources):
     args = [
-      self.thriftstore_admin,
-      'parse',
-      source
+      self.thriftstore_codegen,
+      'parse'
     ]
+    args.extend(sources)
     self.context.log.debug('Executing: %s' % ' '.join(args))
     p = subprocess.Popen(args,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
     output, error = p.communicate()
@@ -141,8 +137,6 @@ class ThriftstoreDMLGen(CodeGen):
     return thriftstore_classes
 
   def _create_java_target(self, target):
-    genfiles = []
-    for source in target.sources:
-      genfiles.extend(self._calculate_genfiles(os.path.join(target.target_base, source)))
-    self.gen_dml_jls[target].sources = genfiles
+    source_files = [os.path.join(target.target_base, source) for source in target.sources]
+    self.gen_dml_jls[target].sources = self._calculate_genfiles(source_files)
     return self.gen_dml_jls[target]

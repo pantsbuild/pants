@@ -17,8 +17,10 @@
 import collections
 import os
 
-from twitter.common.collections import OrderedSet
+from twitter.common.collections import OrderedSet, maybe_list
 from twitter.common.decorators import deprecated_with_warning
+
+from twitter.pants import is_concrete
 from twitter.pants.base.address import Address
 from twitter.pants.base.hash_utils import hash_all
 from twitter.pants.base.parse_context import ParseContext
@@ -31,8 +33,11 @@ class TargetDefinitionException(Exception):
 
 
 class Target(object):
-  """The baseclass for all pants targets.  Handles registration of a target amongst all parsed
-  targets as well as location of the target parse context."""
+  """The baseclass for all pants targets.
+
+  Handles registration of a target amongst all parsed targets as well as location of the target
+  parse context.
+  """
 
   _targets_by_address = {}
   _addresses_by_buildfile = collections.defaultdict(OrderedSet)
@@ -66,8 +71,8 @@ class Target(object):
     parses the buildfile to find all the addresses it contains and then returns them."""
 
     def lookup():
-      if buildfile in Target._addresses_by_buildfile:
-        return Target._addresses_by_buildfile[buildfile]
+      if buildfile in cls._addresses_by_buildfile:
+        return cls._addresses_by_buildfile[buildfile]
       else:
         return OrderedSet()
 
@@ -78,13 +83,18 @@ class Target(object):
       ParseContext(buildfile).parse()
       return lookup()
 
-  @staticmethod
-  def get(address):
+  @classmethod
+  def _clear_all_addresses(cls):
+    cls._targets_by_address = {}
+    cls._addresses_by_buildfile = collections.defaultdict(OrderedSet)
+
+  @classmethod
+  def get(cls, address):
     """Returns the specified module target if already parsed; otherwise, parses the buildfile in the
     context of its parent directory and returns the parsed target."""
 
     def lookup():
-      return Target._targets_by_address[address] if address in Target._targets_by_address else None
+      return cls._targets_by_address[address] if address in cls._targets_by_address else None
 
     target = lookup()
     if target:
@@ -93,14 +103,29 @@ class Target(object):
       ParseContext(address.buildfile).parse()
       return lookup()
 
-  def __init__(self, name, is_meta, reinit_check=True):
+  @classmethod
+  def resolve_all(cls, targets, *expected_types):
+    """Yield the resolved concrete targets checking each is a subclass of one of the expected types
+    if specified.
+    """
+    if targets:
+      for target in maybe_list(targets, expected_type=Target):
+        for resolved in filter(is_concrete, target.resolve()):
+          if expected_types and not isinstance(resolved, expected_types):
+            raise TypeError('%s requires types: %s and found %s' % (cls, expected_types, resolved))
+          yield resolved
+
+  def __init__(self, name, reinit_check=True):
     # This check prevents double-initialization in multiple-inheritance situations.
+    # TODO(John Sirois): fix target inheritance - use super() to linearize or use alternatives to
+    # multiple inheritance.
     if not reinit_check or not hasattr(self, '_initialized'):
       self.name = name
-      self.is_meta = is_meta
       self.description = None
 
       self.address = self.locate()
+
+      # TODO(John Sirois): id is a builtin - use another name
       self.id = self._create_id()
 
       self.labels = set()
@@ -128,23 +153,24 @@ class Target(object):
 
   def locate(self):
     parse_context = ParseContext.locate()
-    return Address(parse_context.buildfile, self.name, self.is_meta)
+    return Address(parse_context.buildfile, self.name)
 
   def register(self):
-    existing = Target._targets_by_address.get(self.address)
+    existing = self._targets_by_address.get(self.address)
     if existing and existing.address.buildfile != self.address.buildfile:
-      raise KeyError("%s already defined in a sibling BUILD file: %s" % (
+      raise KeyError("%s defined in %s already defined in a sibling BUILD file: %s" % (
         self.address,
-        existing.address,
+        self.address.buildfile.full_path,
+        existing.address.buildfile.full_path,
       ))
 
-    Target._targets_by_address[self.address] = self
-    Target._addresses_by_buildfile[self.address.buildfile].add(self.address)
+    self._targets_by_address[self.address] = self
+    self._addresses_by_buildfile[self.address.buildfile].add(self.address)
 
   def resolve(self):
     yield self
 
-  def walk(self, work, predicate = None):
+  def walk(self, work, predicate=None):
     """Performs a walk of this target's dependency graph visiting each node exactly once.  If a
     predicate is supplied it will be used to test each target before handing the target to work and
     descending.  Work can return targets in which case these will be added to the walk candidate set
@@ -152,9 +178,9 @@ class Target(object):
 
     self._walk(set(), work, predicate)
 
-  def _walk(self, walked, work, predicate = None):
+  def _walk(self, walked, work, predicate=None):
     for target in self.resolve():
-      if target not in walked and isinstance(target, Target):
+      if target not in walked:
         walked.add(target)
         if not predicate or predicate(target):
           additional_targets = work(target)
@@ -165,7 +191,6 @@ class Target(object):
               if hasattr(additional_target, '_walk'):
                 additional_target._walk(walked, work, predicate)
 
-
   # TODO(John Sirois): Kill this method once ant backend is gone
   @deprecated_with_warning("you're using deprecated pants commands, http://go/pantsmigration")
   def do_in_context(self, work):
@@ -175,8 +200,8 @@ class Target(object):
     self.description = description
     return self
 
-  def add_label(self, label):
-    self.labels.add(label)
+  def add_labels(self, *label):
+    self.labels.update(label)
 
   def remove_label(self, label):
     self.labels.remove(label)
@@ -198,3 +223,5 @@ class Target(object):
 
   def __repr__(self):
     return "%s(%s)" % (type(self).__name__, self.address)
+
+Target._clear_all_addresses()

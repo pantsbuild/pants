@@ -1,8 +1,0 @@
-setup_nonzipegg.py
-lib/__init__.py
-lib/my_lib.py
-not_zipsafe_egg.egg-info/PKG-INFO
-not_zipsafe_egg.egg-info/SOURCES.txt
-not_zipsafe_egg.egg-info/dependency_links.txt
-not_zipsafe_egg.egg-info/not-zip-safe
-not_zipsafe_egg.egg-info/top_level.txt

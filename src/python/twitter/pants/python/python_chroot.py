@@ -18,91 +18,121 @@ from __future__ import print_function
 
 __author__ = 'Brian Wickman'
 
+from collections import defaultdict
 import os
 import sys
 import tempfile
 
-
 from twitter.common.collections import OrderedSet
 from twitter.common.dirutil import safe_rmtree
 from twitter.common.python.interpreter import PythonIdentity
+from twitter.common.python.pex_builder import PEXBuilder
 from twitter.common.python.platforms import Platform
 
-from twitter.pants.targets import PythonBinary
-
+from twitter.pants import is_concrete
 from twitter.pants.base import Config
 from twitter.pants.base.artifact_cache import FileBasedArtifactCache
 from twitter.pants.base.build_invalidator import CacheKeyGenerator
-from twitter.pants.python.antlr_builder import PythonAntlrBuilder
-from twitter.pants.python.thrift_builder import PythonThriftBuilder
+from twitter.pants.targets import (
+    PythonAntlrLibrary,
+    PythonBinary,
+    PythonLibrary,
+    PythonRequirement,
+    PythonTests,
+    PythonThriftLibrary)
 
-from twitter.common.python.fetcher import Fetcher
-from twitter.common.python.pex_builder import PEXBuilder
-
-from twitter.pants.python.resolver import PythonResolver, SilentResolver
+from .antlr_builder import PythonAntlrBuilder
+from .thrift_builder import PythonThriftBuilder
 
 
-class ReqResolver(object):
-  @staticmethod
-  def fetcher(config):
-    return Fetcher(
-      repositories = config.getlist('python-setup', 'repos', []),
-      indices = config.getlist('python-setup', 'indices', []),
-      external = config.getbool('python-setup', 'allow_pypi', True),
-      download_cache = config.get('python-setup', 'cache', default=None))
+def get_platforms(platform_list):
+  def translate(platform):
+    return Platform.current() if platform == 'current' else platform
+  return tuple(map(translate, platform_list))
 
-  @staticmethod
-  def resolver(config, platform, python):
-    return SilentResolver(
-      caches = config.getlist('python-setup', 'local_eggs') +
-                [config.get('python-setup', 'install_cache')],
-      install_cache = config.get('python-setup', 'install_cache'),
-      fetcher = ReqResolver.fetcher(config),
-      platform = platform,
-      python = python)
 
-  @staticmethod
-  def resolve(requirements, config, platforms, pythons, ignore_errors=False):
-    reqset = OrderedSet()
+class MultiResolver(object):
+  """
+    A multi-platform Requirement resolver for Pants.
+  """
+  @classmethod
+  def from_target(cls, config, target, conn_timeout=None):
+    from twitter.common.python.fetcher import PyPIFetcher, Fetcher
+    from twitter.common.python.resolver import Resolver
+    from twitter.common.python.http import Crawler
+    from twitter.common.quantity import Amount, Time
+
+    conn_timeout_amount = Amount(conn_timeout, Time.SECONDS) if conn_timeout is not None else None
+
+    crawler = Crawler(cache=config.get('python-setup', 'download_cache'),
+                      conn_timeout=conn_timeout_amount)
+
+    fetchers = []
+    fetchers.extend(Fetcher([url]) for url in config.getlist('python-repos', 'repos', []))
+    fetchers.extend(PyPIFetcher(url) for url in config.getlist('python-repos', 'indices', []))
+
+    platforms = config.getlist('python-setup', 'platforms', ['current'])
+    if isinstance(target, PythonBinary) and target.platforms:
+      platforms = target.platforms
+
+    return cls(
+        platforms=get_platforms(platforms),
+        resolver=Resolver(cache=config.get('python-setup', 'install_cache'),
+                          crawler=crawler,
+                          fetchers=fetchers,
+                          install_cache=config.get('python-setup', 'install_cache'),
+                          conn_timeout=conn_timeout_amount))
+
+  def __init__(self, platforms, resolver):
+    self._resolver = resolver
+    self._platforms = platforms
+
+  def resolve(self, requirements):
     requirements = list(requirements)
-    for platform in platforms:
-      for python in pythons:
-        resolver = ReqResolver.resolver(config, platform, python)
-        for dist in resolver.resolve(requirements, ignore_errors=ignore_errors):
-          reqset.add(dist)
-    return list(reqset)
+    for platform in self._platforms:
+      self._resolver.resolve(requirements, platform=platform)
+    return self._resolver.distributions()
 
 
 class PythonChroot(object):
+  _VALID_DEPENDENCIES = {
+    PythonLibrary: 'libraries',
+    PythonRequirement: 'reqs',
+    PythonBinary: 'binaries',
+    PythonThriftLibrary: 'thrifts',
+    PythonAntlrLibrary: 'antlrs',
+    PythonTests: 'tests'
+  }
+
+  class InvalidDependencyException(Exception):
+    def __init__(self, target):
+      Exception.__init__(self, "Not a valid Python dependency! Found: %s" % target)
+
   class BuildFailureException(Exception):
     def __init__(self, msg):
       Exception.__init__(self, msg)
 
-  def __init__(self, target, root_dir, extra_targets=None, builder=None):
+  def __init__(self, target, root_dir, extra_targets=None, builder=None, conn_timeout=None):
     self._config = Config.load()
-
     self._target = target
     self._root = root_dir
     self._key_generator = CacheKeyGenerator()
     self._extra_targets = list(extra_targets) if extra_targets is not None else []
-    self._resolver = PythonResolver([self._target] + self._extra_targets)
+    self._resolver = MultiResolver.from_target(self._config, target, conn_timeout=conn_timeout)
     self._builder = builder or PEXBuilder(tempfile.mkdtemp())
-    self._platforms = (Platform.current(),)
-    self._pythons = (sys.version[:3],)
 
-    artifact_cache_root = \
-      os.path.join(self._config.get('python-setup', 'artifact_cache'), '%s' % PythonIdentity.get())
+    artifact_cache_root = os.path.join(self._config.get('python-setup', 'artifact_cache'),
+                                       '%s' % PythonIdentity.get())
     self._artifact_cache = FileBasedArtifactCache(None, self._root, artifact_cache_root,
-      self._builder.add_dependency_file)
-
-    # TODO(wickman) Should this be in the binary builder?
-    if isinstance(self._target, PythonBinary):
-      self._platforms = self._target._platforms
-      self._pythons = self._target._interpreters
+                                                  self._builder.add_dependency_file)
 
   def __del__(self):
     if os.getenv('PANTS_LEAVE_CHROOT') is None:
       safe_rmtree(self.path())
+
+  @property
+  def builder(self):
+    return self._builder
 
   def debug(self, msg, indent=0):
     if os.getenv('PANTS_VERBOSE') is not None:
@@ -143,13 +173,13 @@ class PythonChroot(object):
     self._builder.set_executable(src, os.path.basename(src))
 
   def _dump_thrift_library(self, library):
-    self._dump_built_library(library, PythonThriftBuilder(library, self._root))
+    self._dump_built_library(library, PythonThriftBuilder(library, self._root, self._config))
 
   def _dump_antlr_library(self, library):
     self._dump_built_library(library, PythonAntlrBuilder(library, self._root))
 
   def _dump_built_library(self, library, builder):
-    # TODO(wickman): Port this over to the Installer+Distiller and stop using FileBasedArtifactCache.
+    # TODO(wickman): Port this over to the Installer+Distiller and stop using ArtifactCache.
     absolute_sources = library.expand_files()
     absolute_sources.sort()
     cache_key = self._key_generator.key_for(library.id, absolute_sources)
@@ -169,10 +199,23 @@ class PythonChroot(object):
       self._artifact_cache.insert(cache_key, [dst_egg_file])
       self._builder.add_egg(dst_egg_file)
 
+  def resolve(self, targets):
+    children = defaultdict(OrderedSet)
+    def add_dep(trg):
+      if is_concrete(trg):
+        for target_type, target_key in self._VALID_DEPENDENCIES.items():
+          if isinstance(trg, target_type):
+            children[target_key].add(trg)
+            return
+      raise self.InvalidDependencyException(trg)
+    for target in targets:
+      target.walk(add_dep)
+    return children
+
   def dump(self):
     self.debug('Building PythonBinary %s:' % self._target)
 
-    targets = self._resolver.resolve()
+    targets = self.resolve([self._target] + self._extra_targets)
 
     for lib in targets['libraries']:
       self._dump_library(lib)
@@ -183,14 +226,21 @@ class PythonChroot(object):
         continue
       self._dump_requirement(req._requirement, req._dynamic, req._repository)
 
-    for dist in ReqResolver.resolve(
-        (req._requirement for req in targets['reqs'] if req.should_build()),
-        self._config, self._platforms, self._pythons,
-        ignore_errors=self._builder.info().ignore_errors):
+    for dist in self._resolver.resolve(
+        req._requirement for req in targets['reqs'] if req.should_build()):
       self._dump_distribution(dist)
 
-    for thr in targets['thrifts']:
-      self._dump_thrift_library(thr)
+    if targets['thrifts']:
+      thrift_versions = set()
+      for thr in targets['thrifts']:
+        self._dump_thrift_library(thr)
+        thrift_versions.add(thr.thrift_version)
+      if len(thrift_versions) > 1:
+        print('WARNING: Target has multiple thrift versions!')
+      for version in thrift_versions:
+        self._builder.add_requirement('thrift==%s' % version)
+        for dist in self._resolver.resolve('thrift==%s' % version for version in thrift_versions):
+          self._dump_distribution(dist)
 
     for antlr in targets['antlrs']:
       self._dump_antlr_library(antlr)

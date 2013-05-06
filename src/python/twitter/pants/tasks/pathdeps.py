@@ -20,4 +20,4 @@ __author__ = 'Dave Buchfuhrer'
 
 class PathDeps(ConsoleTask):
   def console_output(self, targets):
-    return set(target.address.buildfile.parent_path for target in targets)
+    return set(t.address.buildfile.parent_path for t in targets if hasattr(t, 'address'))

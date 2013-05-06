@@ -14,7 +14,9 @@
 # limitations under the License.
 # ==================================================================================================
 
+from twitter.pants import is_concrete
 from twitter.pants.base import ParseContext, Target, Address
+
 
 class Pants(Target):
   """A pointer to a pants target."""
@@ -32,9 +34,10 @@ class Pants(Target):
         return Address.parse(parse_context.buildfile.root_dir, spec, False)
 
     self.address = parse_address()
+
     # We must disable the re-init check, because our funky __getattr__ breaks it.
     # We're not involved in any multiple inheritance, so it's OK to disable it here.
-    Target.__init__(self, self.address.target_name, False, reinit_check=False)
+    Target.__init__(self, self.address.target_name, reinit_check=False)
 
   def register(self):
     # A pants target is a pointer, do not register it as an actual target (see resolve).
@@ -52,11 +55,11 @@ class Pants(Target):
       yield dep
 
   def get(self):
+    """De-reference this pants pointer to a single target.
+
+    If the pointer aliases more than one target a LookupError is raised.
     """
-      De-reference this pants pointer to a single target.  If the pointer aliases more than one
-      target a LookupError is raised.
-    """
-    resolved = list(self.resolve())
+    resolved = list(filter(is_concrete, self.resolve()))
     if len(resolved) > 1:
       raise LookupError('%s points to more than one target: %s' % (self, resolved))
     return resolved.pop()

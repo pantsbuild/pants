@@ -45,11 +45,11 @@ class EggBuilder(object):
     with pushd(egg_root):
       with environment_as(PYTHONPATH = ':'.join(sys.path)):
         po = subprocess.Popen(args, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-        rv = po.wait()
+        comm = po.communicate()
+        rv = po.returncode
       eggs = os.path.abspath(os.path.join('dist', '*.egg'))
       eggs = glob.glob(eggs)
       if rv != 0 or len(eggs) != 1:
-        comm = po.communicate()
         print('egg generation failed (return value=%d, num eggs=%d)' % (rv, len(eggs)),
           file=sys.stderr)
         print('STDOUT', file=sys.stderr)

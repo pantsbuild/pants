@@ -72,7 +72,8 @@ def subprocess_call(cmdline):
 def install_virtualenv(context, interpreter):
   virtualenv_cache = context.config.get('python-setup', 'bootstrap_cache')
   virtualenv_target = context.config.get('python-setup', 'virtualenv_target')
-  pip_repos = context.config.getlist('python-setup', 'repos')
+  allow_pypi = context.config.getbool('python-repos', 'allow_pypi', default=False)
+  pip_repos = context.config.getlist('python-repos', 'repos', default=[])
   if not os.path.exists(virtualenv_target):
     raise TaskError('Could not find installed virtualenv!')
 
@@ -116,10 +117,11 @@ def install_virtualenv(context, interpreter):
     INSTALL_VIRTUALENV_PACKAGE = """
       source %(environment)s/bin/activate
       %(environment)s/bin/pip install --download-cache=%(cache)s \
-         %(f_repositories)s --no-index -U %(package)s
+         %(pypi_index)s %(f_repositories)s -U %(package)s
     """ % {
       'environment': environment_install_path,
       'cache': virtualenv_cache,
+      'pypi_index': '' if allow_pypi else '--no-index',
       'f_repositories': ' '.join('-f %s' % repository for repository in pip_repos),
       'package': pkg
     }

@@ -121,9 +121,13 @@ class CodeGen(Task):
             target,
             dependees_by_gentarget.get(target, [])
           )
-          langtarget_by_gentarget[target].add_label("synthetic")
+          langtarget_by_gentarget[target].add_labels("synthetic")
         genmap = self.context.products.get(lang)
+        # synmap is a reverse map
+        # such as a map of java library target generated from java thrift target
+        synmap = self.context.products.get(lang + ':rev')
         for gentarget, langtarget in langtarget_by_gentarget.items():
+          synmap.add(langtarget, get_buildroot(), [gentarget])
           genmap.add(gentarget, get_buildroot(), [langtarget])
           # Transfer dependencies from gentarget to its synthetic counterpart.
           for dep in self.getdependencies(gentarget):

@@ -2,12 +2,14 @@ __author__ = 'Ryan Williams'
 
 import unittest
 
-from twitter.pants.base import DoubleDag
+from twitter.pants.base.double_dag import DoubleDag
 from twitter.pants.goal import Context
 from twitter.pants.testutils import MockTarget
 
+
 def make_dag(nodes):
   return DoubleDag(nodes, lambda t: t.dependencies, Context.Log())
+
 
 class DoubleDagTest(unittest.TestCase):
 
@@ -39,7 +41,6 @@ class DoubleDagTest(unittest.TestCase):
     test_dag(make_dag([a, b, c, d, e]))
     test_dag(make_dag([a, b, e, d, c]))
     test_dag(make_dag([d, a, c, e, b]))
-
 
   def test_binary_search_dag(self):
 
@@ -111,7 +112,6 @@ class DoubleDagTest(unittest.TestCase):
       self.check_dag_node(dag, c, [a], [d])
       self.check_dag_node(dag, b, [a], [d])
       self.check_dag_node(dag, a, [], [b, c])
-
 
     test_diamond_dag(make_dag([a, b, c, d]))
     test_diamond_dag(make_dag([d, c, b, a]))

@@ -21,46 +21,38 @@ from twitter.pants.base.build_file import BuildFile
 class Address(object):
   """Represents a BUILD file target address."""
 
-  _META_SUFFIX = '!'
-
   @classmethod
-  def _parse_meta(cls, string):
-    is_meta = string.endswith(Address._META_SUFFIX)
-    parsed = string[:-1] if is_meta else string
-    return parsed, is_meta
+  def parse(cls, root_dir, spec, is_relative=True):
+    """Parses the given spec into an Address.
 
-  @classmethod
-  def parse(cls, root_dir, pathish, is_relative = True):
-    """Parses pathish into an Address.  A pathish can be one of:
+    An address spec can be one of:
     1.) the (relative) path of a BUILD file
     2.) the (relative) path of a directory containing a BUILD file child
     3.) either of 1 or 2 with a ':[module name]' suffix
     4.) a bare ':[module name]' indicating the BUILD file to use is the one in the current directory
 
-    If the pathish does not have a module suffix the targeted module name is taken to be the same
-    name as the BUILD file's containing directory.  In this way the containing directory name
-    becomes the 'default' module target for pants.
+    If the spec does not have a target name suffix the target name is taken to be the same name
+    as the BUILD file's parent directory.  In this way the containing directory name
+    becomes the 'default' target name for a BUILD file.
 
-    If there is no BUILD file at the path pointed to, or if there is but the specified module target
-    is not defined in the BUILD file, an IOError is raised."""
+    If there is no BUILD file at the path pointed to, or if there is but the specified target name
+    is not defined in the BUILD file, an IOError is raised.
+    """
 
-    parts = pathish.split(':') if not pathish.startswith(':') else [ '.', pathish[1:] ]
-    path, is_meta = Address._parse_meta(parts[0])
+    if spec.startswith(':'):
+      spec = '.' + spec
+    parts = spec.split(':', 1)
+    path = parts[0]
     if is_relative:
       path = os.path.relpath(os.path.abspath(path), root_dir)
     buildfile = BuildFile(root_dir, path)
 
-    if len(parts) == 1:
-      parent_name = os.path.basename(os.path.dirname(buildfile.relpath))
-      return Address(buildfile, parent_name, is_meta)
-    else:
-      target_name, is_meta = Address._parse_meta(':'.join(parts[1:]))
-      return Address(buildfile, target_name, is_meta)
+    name = os.path.basename(os.path.dirname(buildfile.relpath)) if len(parts) == 1 else parts[1]
+    return Address(buildfile, name)
 
-  def __init__(self, buildfile, target_name, is_meta):
+  def __init__(self, buildfile, target_name):
     self.buildfile = buildfile
     self.target_name = target_name
-    self.is_meta = is_meta
 
   def reference(self, referencing_buildfile_path=None):
     """How to reference this address in a BUILD file."""
@@ -72,6 +64,16 @@ class Address(object):
     else:
       ret = dirname
     return ret
+
+  def reference(self, referencing_buildfile_path=None):
+    """How to reference this address in a BUILD file."""
+    dirname = os.path.dirname(self.buildfile.relpath)
+    if referencing_buildfile_path and dirname == os.path.dirname(referencing_buildfile_path):
+      return ':%s' % self.target_name
+    elif os.path.basename(dirname) != self.target_name:
+      return '%s:%s' % (dirname, self.target_name)
+    else:
+      return dirname
 
   def __eq__(self, other):
     result = other and (
@@ -90,8 +92,4 @@ class Address(object):
     return not self.__eq__(other)
 
   def __repr__(self):
-    return "%s:%s%s" % (
-      self.buildfile,
-      self.target_name,
-      Address._META_SUFFIX if self.is_meta else ''
-    )
+    return "%s:%s" % (self.buildfile, self.target_name)

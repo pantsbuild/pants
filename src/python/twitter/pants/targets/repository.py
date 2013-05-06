@@ -24,7 +24,7 @@ class Repository(Target):
     url: the url used to access the repo and retrieve artifacts or artifact metadata
     push_db: the data file associated with this repo that records artifact push history"""
 
-    Target.__init__(self, name, False)
+    Target.__init__(self, name)
 
     self.name = name
     self.url = url

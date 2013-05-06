@@ -32,10 +32,11 @@ except ImportError:
   _HAVE_PYLINT = False
 
 class PythonLintBuilder(object):
-  def __init__(self, targets, args, root_dir):
+  def __init__(self, targets, args, root_dir, conn_timeout=None):
     self.targets = targets
     self.args = args
     self.root_dir = root_dir
+    self._conn_timeout = conn_timeout
 
   def run(self):
     if not _HAVE_PYLINT:
@@ -45,7 +46,9 @@ class PythonLintBuilder(object):
 
   def _run_lint(self, target, args):
     chroot = PythonChroot(target, self.root_dir, extra_targets=[
-      Target.get(Address.parse(self.root_dir, '3rdparty/python:pylint'))])
+      Target.get(Address.parse(self.root_dir, '3rdparty/python:pylint'))],
+      conn_timeout=self._conn_timeout)
+    chroot.builder.info().ignore_errors = True
     builder = chroot.dump()
     builder.info().entry_point = 'pylint.lint'
     builder.freeze()

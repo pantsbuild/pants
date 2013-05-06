@@ -29,7 +29,7 @@ from twitter.pants.python.python_chroot import PythonChroot
 class PythonBinaryBuilder(object):
   class NotABinaryTargetException(Exception): pass
 
-  def __init__(self, target, args, root_dir):
+  def __init__(self, target, args, root_dir, conn_timeout=None):
     self.target = target
     if not isinstance(target, PythonBinary):
       raise PythonBinaryBuilder.NotABinaryTargetException(
@@ -50,7 +50,7 @@ class PythonBinaryBuilder(object):
     self.builder.info().entry_point = target._entry_point
     self.builder.info().ignore_errors = target._ignore_errors
 
-    self.chroot = PythonChroot(target, root_dir, builder=self.builder)
+    self.chroot = PythonChroot(target, root_dir, builder=self.builder, conn_timeout=conn_timeout)
 
   def run(self):
     print('Building PythonBinary %s:' % self.target)

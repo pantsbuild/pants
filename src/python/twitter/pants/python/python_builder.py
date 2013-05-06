@@ -28,7 +28,7 @@ class PythonBuilder(Builder):
   def __init__(self, ferror, root_dir):
     Builder.__init__(self, ferror, root_dir)
 
-  def build(self, targets, args):
+  def build(self, targets, args, conn_timeout=None):
     test_targets = []
     binary_targets = []
 
@@ -39,7 +39,10 @@ class PythonBuilder(Builder):
       real_args = list(args)
       real_args.remove('pylint')
       for target in targets:
-        PythonLintBuilder([target], real_args, self.root_dir).run()
+        try:
+          PythonLintBuilder([target], real_args, self.root_dir, conn_timeout=conn_timeout).run()
+        except Exception as e:
+          print('Failed to run lint for %s: %s' % (target, e))
       return 0
 
     # PythonBuilder supports PythonTests and PythonBinaries
@@ -49,11 +52,11 @@ class PythonBuilder(Builder):
       elif isinstance(target, PythonBinary):
         binary_targets.append(target)
 
-    rv = PythonTestBuilder(test_targets, args, self.root_dir).run()
+    rv = PythonTestBuilder(test_targets, args, self.root_dir, conn_timeout=conn_timeout).run()
     if rv != 0: return rv
 
     for binary_target in binary_targets:
-      rv = PythonBinaryBuilder(binary_target, args, self.root_dir).run()
+      rv = PythonBinaryBuilder(binary_target, args, self.root_dir, conn_timeout=conn_timeout).run()
       if rv != 0: return rv
 
     return 0

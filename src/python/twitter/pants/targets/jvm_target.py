@@ -16,40 +16,29 @@
 
 import os
 
-from twitter.pants.targets.internal import InternalTarget
-from twitter.pants.targets.jar_dependency import JarDependency
-from twitter.pants.targets.with_sources import TargetWithSources
+from .internal import InternalTarget
+from .jar_dependency import JarDependency
+from .with_sources import TargetWithSources
+
 
 class JvmTarget(InternalTarget, TargetWithSources):
   """A base class for all java module targets that provides path and dependency translation."""
 
-  def __init__(self, name, sources, dependencies,
-               excludes=None,
-               buildflags=None,
-               is_meta=False,
-               configurations=None):
-    InternalTarget.__init__(self, name, dependencies, is_meta)
-    TargetWithSources.__init__(self, name, is_meta)
+  def __init__(self, name, sources, dependencies, excludes=None, configurations=None):
+    InternalTarget.__init__(self, name, dependencies)
+    TargetWithSources.__init__(self, name, sources)
 
     self.declared_dependencies = set(dependencies or [])
-    self.add_label('jvm')
-    self.sources = self._resolve_paths(self.target_base, sources) or []
+    self.add_labels('jvm')
     for source in self.sources:
       rel_path = os.path.join(self.target_base, source)
       TargetWithSources.register_source(rel_path, self)
     self.excludes = excludes or []
-    self.buildflags = buildflags or []
-
-    custom_antxml = '%s.xml' % self.name
-    buildfile = self.address.buildfile.full_path
-    custom_antxml_path = os.path.join(os.path.dirname(buildfile), custom_antxml)
-    self.custom_antxml_path = custom_antxml_path if os.path.exists(custom_antxml_path) else None
-
     self.configurations = configurations
 
   def _as_jar_dependency(self):
     jar_dependency, _, _ = self._get_artifact_info()
-    jar = JarDependency(org = jar_dependency.org, name = jar_dependency.name, rev = None)
+    jar = JarDependency(org=jar_dependency.org, name=jar_dependency.name, rev=None)
     jar.id = self.id
     return jar
 
@@ -66,7 +55,7 @@ class JvmTarget(InternalTarget, TargetWithSources):
 
     id = "%s-%s" % (provides.org, provides.name) if exported else self.id
 
-    return JarDependency(org = org, name = module, rev = version), id, exported
+    return JarDependency(org=org, name=module, rev=version), id, exported
 
   def _provides(self):
     return None

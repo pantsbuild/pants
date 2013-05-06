@@ -1,5 +1,5 @@
 # ==================================================================================================
-# Copyright 2011 Twitter, Inc.
+# Copyright 2012 Twitter, Inc.
 # --------------------------------------------------------------------------------------------------
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this work except in compliance with the License.
@@ -19,43 +19,52 @@ try:
 except ImportError:
   import pickle
 
-from twitter.pants.base.build_invalidator import BuildInvalidator, CacheKeyGenerator, NO_SOURCES, TARGET_SOURCES
+from twitter.pants import has_sources
+from twitter.pants.base.build_invalidator import (
+    BuildInvalidator,
+    CacheKeyGenerator,
+    NO_SOURCES,
+    TARGET_SOURCES)
 from twitter.pants.base.target import Target
-from twitter.pants.targets import JarDependency, TargetWithSources
+from twitter.pants.targets import TargetWithSources
+from twitter.pants.targets.external_dependency import ExternalDependency
 from twitter.pants.targets.internal import InternalTarget
 
 
-# A VersionedTargetSet represents a list of targets, a corresponding CacheKey, and a flag determining
-# whether the list of targets is currently valid.
-#
-#  - When invalidating a single target, this can be used to represent that target as a singleton.
-#
-#  - When checking the artifact cache, this can also be used to represent a list of targets
-#    that are built together into a single artifact.
 class VersionedTargetSet(object):
+  """Represents a list of targets, a corresponding CacheKey, and a flag determining whether the
+  list of targets is currently valid.
+
+  When invalidating a single target, this can be used to represent that target as a singleton.
+  When checking the artifact cache, this can also be used to represent a list of targets that are
+  built together into a single artifact.
+  """
+
+  @classmethod
+  def from_versioned_targets(cls, versioned_targets):
+    first_target = versioned_targets[0]
+    cache_manager = first_target._cache_manager
+
+    # Quick sanity check; all the versioned targets should have the same cache manager.
+    # TODO(ryan): the way VersionedTargets store their own links to a single CacheManager instance
+    # feels hacky; see if there's a cleaner way for callers to handle awareness of the CacheManager.
+    for versioned_target in versioned_targets:
+      if versioned_target._cache_manager != cache_manager:
+        raise ValueError("Attempting to combine versioned targets %s and %s with different"
+                         " CacheManager instances: %s and %s" % (first_target, versioned_target,
+                                                                 cache_manager,
+                                                                 versioned_target._cache_manager))
+    return cls(cache_manager, versioned_targets)
+
   def __init__(self, cache_manager, versioned_targets):
     self._cache_manager = cache_manager
     self.versioned_targets = versioned_targets
     self.targets = [vt.target for vt in versioned_targets]
     # The following line is a no-op if cache_key was set in the VersionedTarget __init__ method.
-    self.cache_key = CacheKeyGenerator.combine_cache_keys([vt.cache_key for vt in versioned_targets])
+    self.cache_key = CacheKeyGenerator.combine_cache_keys([vt.cache_key
+                                                           for vt in versioned_targets])
     self.num_sources = self.cache_key.num_sources
     self.valid = not cache_manager.needs_update(self.cache_key)
-
-  @staticmethod
-  def from_versioned_targets(versioned_targets):
-    first_target = versioned_targets[0]
-    cache_manager = first_target._cache_manager
-
-    # Quick sanity check; all the versioned targets should have the same cache manager.
-    # TODO(ryan): the way VersionedTargets store their own links to a single CacheManager instance feels hacky;
-    # see if there's a cleaner way for callers to handle awareness of the CacheManager.
-    for versioned_target in versioned_targets:
-      if versioned_target._cache_manager != cache_manager:
-        raise Exception(
-          "Attempting to combine versioned targets %s and %s with different CacheMananger instances: %s and %s" % (
-            str(first_target), str(versioned_target), str(cache_manager), str(versioned_target._cache_manager)))
-    return VersionedTargetSet(cache_manager, versioned_targets)
 
   def update(self):
     self._cache_manager.update(self)
@@ -68,17 +77,19 @@ class VersionedTargetSet(object):
 
 
 class VersionedTarget(VersionedTargetSet):
-  """This class represents a singleton VersionedTargetSet, and has links to VersionedTargets that the wrapped target
-  depends on (after having resolvied through any "alias" targets."""
+  """This class represents a singleton VersionedTargetSet, and has links to VersionedTargets that
+  the wrapped target depends on (after having resolved through any "alias" targets.
+  """
   def __init__(self, cache_manager, target, cache_key):
+    if not isinstance(target, TargetWithSources):
+      raise ValueError("The target %s must support sources and does not." % target.id)
+
     self.target = target
     self.cache_key = cache_key
-    # Must come after the assigments above, as they are used in the parent's __init__.
+    # Must come after the assignments above, as they are used in the parent's __init__.
     VersionedTargetSet.__init__(self, cache_manager, [self])
     self.id = target.id
-    self.dependencies = set([])
-    if not isinstance(target, TargetWithSources):
-      raise Exception("Making VersionedTarget for target %s that doesn't have any sources" % target.id)
+    self.dependencies = set()
 
 
 # The result of calling check() on a CacheManager.
@@ -86,13 +97,13 @@ class VersionedTarget(VersionedTargetSet):
 # Tasks may need to perform no, some or all operations on either of these, depending on how they
 # are implemented.
 class InvalidationCheck(object):
-  @staticmethod
-  def _partition_versioned_targets(versioned_targets, partition_size_hint):
+  @classmethod
+  def _partition_versioned_targets(cls, versioned_targets, partition_size_hint):
     """Groups versioned targets so that each group has roughly the same number of sources.
 
-    versioned_targets is a list of VersionedTarget objects  [ vt1, vt2, vt3, vt4, vt5, vt6, ...].
+    versioned_targets is a list of VersionedTarget objects  [vt1, vt2, vt3, vt4, vt5, vt6, ...].
 
-    Returns a list of VersionedTargetSet objects, e.g., [ VT1, VT2, VT3, ...] representing the
+    Returns a list of VersionedTargetSet objects, e.g., [VT1, VT2, VT3, ...] representing the
     same underlying targets. E.g., VT1 is the combination of [vt1, vt2, vt3], VT2 is the combination
     of [vt4, vt5] and VT3 is [vt6].
 
@@ -126,14 +137,13 @@ class InvalidationCheck(object):
 
     for vt in versioned_targets:
       add_to_current_group(vt)
-      if current_group.total_sources > partition_size_hint:
-        if current_group.total_sources > 1.5 * partition_size_hint and len(current_group.vts) > 1:
-          # Too big. Close the current group without this vt and add it to the next one.
-          current_group.vts.pop()
-          close_current_group()
-          add_to_current_group(vt)
-        else:
-          close_current_group()
+      if current_group.total_sources > 1.5 * partition_size_hint and len(current_group.vts) > 1:
+        # Too big. Close the current group without this vt and add it to the next one.
+        current_group.vts.pop()
+        close_current_group()
+        add_to_current_group(vt)
+      elif current_group.total_sources > partition_size_hint:
+        close_current_group()
     close_current_group()  # Close the last group, if any.
 
     return res
@@ -143,17 +153,15 @@ class InvalidationCheck(object):
     self.all_vts = all_vts
 
     # All the targets, partitioned if so requested.
-    self.all_vts_partitioned = \
-      InvalidationCheck._partition_versioned_targets(all_vts, partition_size_hint) if partition_size_hint \
-      else all_vts
+    self.all_vts_partitioned = self._partition_versioned_targets(
+      all_vts, partition_size_hint) if partition_size_hint else all_vts
 
     # Just the invalid targets.
     self.invalid_vts = invalid_vts
 
     # Just the invalid targets, partitioned if so requested.
-    self.invalid_vts_partitioned = \
-      InvalidationCheck._partition_versioned_targets(invalid_vts, partition_size_hint) if partition_size_hint \
-      else invalid_vts
+    self.invalid_vts_partitioned = self._partition_versioned_targets(
+        invalid_vts, partition_size_hint) if partition_size_hint else invalid_vts
 
 
 class CacheManager(object):
@@ -189,8 +197,8 @@ class CacheManager(object):
   def check(self, targets, partition_size_hint=None):
     """Checks whether each of the targets has changed and invalidates it if so.
 
-    Returns a list of VersionedTargetSet objects (either valid or invalid). The returned sets 'cover'
-    the input targets, possibly partitioning them, and are in topological order.
+    Returns a list of VersionedTargetSet objects (either valid or invalid). The returned sets
+    'cover' the input targets, possibly partitioning them, and are in topological order.
     The caller can inspect these in order and, e.g., rebuild the invalid ones.
     """
     all_vts = self._sort_and_validate_targets(targets)
@@ -202,8 +210,8 @@ class CacheManager(object):
 
     Returns a topologically ordered set of VersionedTargets, each representing one input target.
     """
-    # We must check the targets in this order, to ensure correctness if invalidate_dependents=True, since
-    # we use earlier cache keys to compute later cache keys in this case.
+    # We must check the targets in this order, to ensure correctness if invalidate_dependents=True,
+    # since we use earlier cache keys to compute later cache keys in this case.
     ordered_targets = self._order_target_list(targets)
 
     # This will be a list of VersionedTargets that correspond to @targets.
@@ -212,8 +220,9 @@ class CacheManager(object):
     # This will be a mapping from each target to its corresponding VersionedTarget.
     versioned_targets_by_target = {}
 
-    # Map from id to current fingerprint of the target with that id. We update this as we iterate, in
-    # topological order, so when handling a target, this will already contain all its deps (in this round).
+    # Map from id to current fingerprint of the target with that id. We update this as we iterate,
+    # in topological order, so when handling a target, this will already contain all its deps (in
+    # this round).
     id_to_hash = {}
 
     for target in ordered_targets:
@@ -222,28 +231,23 @@ class CacheManager(object):
         # Note that we only need to do this for the immediate deps, because those will already
         # reflect changes in their own deps.
         for dep in target.dependencies:
-          # We rely on the fact that any deps have already been processed, either in an earlier round or
-          # because they came first in ordered_targets.
-          if isinstance(dep, Target):
+          # We rely on the fact that any deps have already been processed, either in an earlier
+          # round or because they came first in ordered_targets.
+          if isinstance(dep, ExternalDependency):
+            dependency_keys.add(dep.cache_key())
+          elif isinstance(dep, Target):
             hash = id_to_hash.get(dep.id, None)
             if hash is None:
               # It may have been processed in a prior round, and therefore the hash should
               # have been written out by the invalidator.
               hash = self._invalidator.existing_hash(dep.id)
-              # Note that hash may be None here, indicating that the dependency will not be processed
-              # until a later phase. For example, if a codegen target depends on a library target (because
-              # the generated code needs that library).
+              # Note that hash may be None here, indicating that the dependency will not be
+              # processed until a later phase. For example, if a codegen target depends on a
+              # library target (because the generated code needs that library).
             if hash is not None:
               dependency_keys.add(hash)
-          elif isinstance(dep, JarDependency):
-            jarid = ''
-            for key in CacheManager._JAR_HASH_KEYS:
-              jarid += str(getattr(dep, key))
-            dependency_keys.add(jarid)
           else:
-            dependency_keys.add(str(dep))
-            # TODO(John Sirois): Hashing on external targets should have a formal api - we happen to
-            # know jars are special and python requirements __str__ works for this purpose.
+            raise ValueError('Cannot calculate a cache_key for a dependency: %s' % dep)
       cache_key = self._key_for(target, dependency_keys)
       id_to_hash[target.id] = cache_key.hash
 
@@ -253,32 +257,35 @@ class CacheManager(object):
       # Add the new VersionedTarget to the list of computed VersionedTargets.
       versioned_targets.append(versioned_target)
 
-      # Add to the mapping from Targets to VersionedTargets, for use in hooking up VersionedTarget dependencies below.
+      # Add to the mapping from Targets to VersionedTargets, for use in hooking up VersionedTarget
+      # dependencies below.
       versioned_targets_by_target[target] = versioned_target
 
-    # Having created all applicable VersionedTargets, now we build the VersionedTarget dependency graph, looking
-    # through targets that don't correspond to VersionedTargets themselves.
+    # Having created all applicable VersionedTargets, now we build the VersionedTarget dependency
+    # graph, looking through targets that don't correspond to VersionedTargets themselves.
     versioned_target_deps_by_target = {}
 
     def get_versioned_target_deps_for_target(target):
-      # For every dependency of @target, we will store its corresponding VersionedTarget here. For dependencies that
-      # don't correspond to a VersionedTarget (e.g. pass-through dependency wrappers), we will resolve their actual
-      # dependencies and find VersionedTargets for them.
+      # For every dependency of @target, we will store its corresponding VersionedTarget here. For
+      # dependencies that don't correspond to a VersionedTarget (e.g. pass-through dependency
+      # wrappers), we will resolve their actual dependencies and find VersionedTargets for them.
       versioned_target_deps = set([])
       if hasattr(target, 'dependencies'):
         for dep in target.dependencies:
           for dependency in dep.resolve():
             if dependency in versioned_targets_by_target:
-              # If there exists a VersionedTarget corresponding to this Target, store it and continue.
+              # If there exists a VersionedTarget corresponding to this Target, store it and
+              # continue.
               versioned_target_deps.add(versioned_targets_by_target[dependency])
             elif dependency in versioned_target_deps_by_target:
-              # Otherwise, see if we've already resolved this dependency to the VersionedTargets it depends on, and use
-              # those.
+              # Otherwise, see if we've already resolved this dependency to the VersionedTargets it
+              # depends on, and use those.
               versioned_target_deps.update(versioned_target_deps_by_target[dependency])
             else:
-              # Otherwise, compute the VersionedTargets that correspond to this dependency's dependencies, cache and
-              # use the computed result.
-              versioned_target_deps_by_target[dependency] = get_versioned_target_deps_for_target(dependency)
+              # Otherwise, compute the VersionedTargets that correspond to this dependency's
+              # dependencies, cache and use the computed result.
+              versioned_target_deps_by_target[dependency] = get_versioned_target_deps_for_target(
+                  dependency)
               versioned_target_deps.update(versioned_target_deps_by_target[dependency])
 
       # Return the VersionedTarget dependencies that this target's VersionedTarget should depend on.
@@ -295,14 +302,8 @@ class CacheManager(object):
 
   def _order_target_list(self, targets):
     """Orders the targets topologically, from least to most dependent."""
-    target_ids = set([x.id for x in targets])
-
-    # Most to least dependent.
-    reverse_ordered_targets_and_deps = InternalTarget.sort_targets(targets)
-    # Least to most dependent. We must build in this order.
-    ordered_targets_and_deps = reversed(reverse_ordered_targets_and_deps)
-    # Return just the ones that were originally in targets.
-    return filter(lambda x: x.id in target_ids, ordered_targets_and_deps)
+    targets = set(filter(has_sources, targets))
+    return filter(targets.__contains__, reversed(InternalTarget.sort_targets(targets)))
 
   def _key_for(self, target, dependency_keys):
     def fingerprint_extra(sha):
@@ -316,13 +317,3 @@ class CacheManager(object):
       fingerprint_extra=fingerprint_extra
     )
 
-  _JAR_HASH_KEYS = (
-    'org',
-    'name',
-    'rev',
-    'force',
-    'excludes',
-    'transitive',
-    '_configurations',
-    'artifacts'
-    )

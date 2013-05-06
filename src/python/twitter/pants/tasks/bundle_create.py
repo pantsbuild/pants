@@ -14,65 +14,20 @@
 # limitations under the License.
 # ==================================================================================================
 
-__author__ = 'John Sirois'
-
 import os
 
 from zipfile import ZIP_DEFLATED
 
-from twitter.common.collections import OrderedDict, OrderedSet
-from twitter.common.contextutil import open_tar, open_zip
+from twitter.common.collections import OrderedSet
+from twitter.common.contextutil import open_zip
 from twitter.common.dirutil import safe_mkdir
 
 from twitter.pants import get_buildroot
+from twitter.pants.fs import archive
 from twitter.pants.java import Manifest
 from twitter.pants.targets import JvmApp
 from twitter.pants.tasks import TaskError
 from twitter.pants.tasks.jvm_binary_task import JvmBinaryTask
-
-
-class Archiver(object):
-  def archive(self, basedir, outdir, name):
-    """
-      Archivers should archive all files found under basedir to a file at outdir of the given name.
-    """
-
-
-class TarArchiver(Archiver):
-  def __init__(self, mode, extension):
-    Archiver.__init__(self)
-    self.mode = mode
-    self.extension = extension
-
-  def archive(self, basedir, outdir, name):
-    tarpath = os.path.join(outdir, '%s.%s' % (name, self.extension))
-    with open_tar(tarpath, self.mode, dereference=True) as tar:
-      tar.add(basedir, arcname='')
-    return tarpath
-
-
-class ZipArchiver(Archiver):
-  def __init__(self, compression):
-    Archiver.__init__(self)
-    self.compression = compression
-
-  def archive(self, basedir, outdir, name):
-    zippath = os.path.join(outdir, '%s.zip' % name)
-    with open_zip(zippath, 'w', compression=ZIP_DEFLATED) as zip:
-      for root, _, files in os.walk(basedir):
-        for file in files:
-          full_path = os.path.join(root, file)
-          relpath = os.path.relpath(full_path, basedir)
-          zip.write(full_path, relpath)
-    return zippath
-
-
-ARCHIVER_BY_TYPE = OrderedDict(
-  tar=TarArchiver('w:', 'tar'),
-  tbz2=TarArchiver('w:bz2', 'tar.bz2'),
-  tgz=TarArchiver('w:gz', 'tar.gz'),
-  zip=ZipArchiver(ZIP_DEFLATED)
-)
 
 
 class BundleCreate(JvmBinaryTask):
@@ -80,10 +35,18 @@ class BundleCreate(JvmBinaryTask):
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
     JvmBinaryTask.setup_parser(option_group, args, mkflag)
-    option_group.add_option(mkflag("archive"), dest="bundle_create_archive",
-                            type="choice", choices=list(ARCHIVER_BY_TYPE.keys()),
+
+    archive_flag = mkflag("archive")
+    option_group.add_option(archive_flag, dest="bundle_create_archive",
+                            type="choice", choices=list(archive.TYPE_NAMES),
                             help="[%%default] Create an archive from the bundle. "
-                                 "Choose from %s" % ARCHIVER_BY_TYPE.keys())
+                                 "Choose from %s" % sorted(archive.TYPE_NAMES))
+
+    option_group.add_option(mkflag("archive-prefix"), mkflag("archive-prefix", negate=True),
+                            dest="bundle_create_prefix", default=False,
+                            action="callback", callback=mkflag.set_bool,
+                            help="[%%default] Used in conjunction with %s this packs the archive "
+                                 "with its basename as the path prefix." % archive_flag)
 
   def __init__(self, context):
     JvmBinaryTask.__init__(self, context)
@@ -93,11 +56,13 @@ class BundleCreate(JvmBinaryTask):
       or context.config.get('bundle-create', 'outdir')
     )
 
+    self.prefix = context.options.bundle_create_prefix
+
     def fill_archiver_type():
       self.archiver_type = context.options.bundle_create_archive
       # If no option specified, check if anyone is requiring it
       if not self.archiver_type:
-        for archive_type in ARCHIVER_BY_TYPE.keys():
+        for archive_type in archive.TYPE_NAMES:
           if context.products.isrequired(archive_type):
             self.archiver_type = archive_type
 
@@ -111,12 +76,17 @@ class BundleCreate(JvmBinaryTask):
     def is_app(target):
       return isinstance(target, JvmApp)
 
-    archiver = ARCHIVER_BY_TYPE[self.archiver_type] if self.archiver_type else None
+    archiver = archive.archiver(self.archiver_type) if self.archiver_type else None
     for app in filter(is_app, targets):
       basedir = self.bundle(app)
       if archiver:
         archivemap = self.context.products.get(self.archiver_type)
-        archivepath = archiver.archive(basedir, self.outdir, app.basename)
+        archivepath = archiver.create(
+          basedir,
+          self.outdir,
+          app.basename,
+          prefix=app.basename if self.prefix else None
+        )
         archivemap.add(app, self.outdir, [archivepath])
         self.context.log.info('created %s' % os.path.relpath(archivepath, get_buildroot()))
 

@@ -14,7 +14,6 @@
 # limitations under the License.
 # ==================================================================================================
 
-import hashlib
 import itertools
 import os
 import sys
@@ -23,14 +22,23 @@ from contextlib import contextmanager
 from multiprocessing.pool import ThreadPool
 
 from twitter.common.collections.orderedset import OrderedSet
+
 from twitter.pants.base.artifact_cache import create_artifact_cache
+from twitter.pants.base.hash_utils import hash_file
 from twitter.pants.base.build_invalidator import CacheKeyGenerator
 from twitter.pants.tasks.cache_manager import CacheManager, InvalidationCheck
+from twitter.pants.tasks.cache_manager import CacheManager, VersionedTargetSet
+
+
+__all__ = (
+    'TaskError',
+    'Task'
+)
 
 
 class TaskError(Exception):
   """Raised to indicate a task has failed."""
-  pass
+
 
 class Task(object):
   @classmethod
@@ -47,8 +55,8 @@ class Task(object):
     self.dry_run = self.can_dry_run() and self.context.options.dry_run
     self._cache_key_generator = CacheKeyGenerator()
     self._artifact_cache = None
-    self._build_invalidator_dir = \
-      os.path.join(context.config.get('tasks', 'build_invalidator'), self.product_type())
+    self._build_invalidator_dir = os.path.join(context.config.get('tasks', 'build_invalidator'),
+                                               self.product_type())
 
   def setup_artifact_cache(self, spec):
     """Subclasses can call this in their __init__() to set up artifact caching for that task type.
@@ -107,23 +115,52 @@ class Task(object):
   @contextmanager
   def invalidated(self, targets, only_buildfiles=False, invalidate_dependents=False,
                   partition_size_hint=sys.maxint):
+    """Checks targets for invalidation. Subclasses call this to figure out what to work on.
+
+    targets:               The targets to check for changes.
+    only_buildfiles:       If True, then only the target's BUILD files are checked for changes, not
+                           its sources.
+    invalidate_dependents: If True then any targets depending on changed targets are invalidated.
+    partition_size_hint:   Each VersionedTargetSet in the yielded list will represent targets
+                           containing roughly this number of source files, if possible. Set to
+                           sys.maxint for a single VersionedTargetSet. Set to 0 for one
+                           VersionedTargetSet per target. It is up to the caller to do the right
+                           thing with whatever partitioning it asks for.
+
+    Yields an InvalidationCheck object reflecting the (partitioned) targets.
+
+    If no exceptions are thrown by work in the block, the build cache is updated for the targets.
+    Note: the artifact cache is not updated, that must be done manually.
+    """
+    with self.invalidated_with_artifact_cache_check(targets,
+                                                    only_buildfiles,
+                                                    invalidate_dependents,
+                                                    partition_size_hint) as check:
+      yield check
+
+
+  @contextmanager
+  def invalidated_with_artifact_cache_check(self,
+                                            targets,
+                                            only_buildfiles=False,
+                                            invalidate_dependents=False,
+                                            partition_size_hint=sys.maxint):
     """Checks targets for invalidation, first checking the artifact cache.
     Subclasses call this to figure out what to work on.
 
-    targets: The targets to check for changes.
-
-    only_buildfiles: If True, then only the target's BUILD files are checked for changes,
-                     not its sources.
-
+    targets:               The targets to check for changes.
+    only_buildfiles:       If True, then only the target's BUILD files are checked for changes, not
+                           its sources.
     invalidate_dependents: If True then any targets depending on changed targets are invalidated.
+    partition_size_hint:   Each VersionedTargetSet in the yielded list will represent targets
+                           containing roughly this number of source files, if possible. Set to
+                           sys.maxint for a single VersionedTargetSet. Set to 0 for one
+                           VersionedTargetSet per target. It is up to the caller to do the right
+                           thing with whatever partitioning it asks for.
 
-    partition_size_hint: Each VersionedTargetSet in the yielded list will represent targets
-                         containing roughly this number of source files, if possible. Set to
-                         sys.maxint for a single VersionedTargetSet. Set to 0 for one
-                         VersionedTargetSet per target. It is up to the caller to do the right
-                         thing with whatever partitioning it asks for.
-
-    Yields an InvalidationCheck object reflecting the (partitioned) targets.
+    Yields a pair of (invalidation_check, cached_vts) where invalidation_check is an
+    InvalidationCheck object reflecting the (partitioned) targets, and cached_vts is a list of
+    VersionedTargets that were satisfied from the artifact cache.
 
     If no exceptions are thrown by work in the block, the build cache is updated for the targets.
     Note: the artifact cache is not updated, that must be done manually.
@@ -131,30 +168,30 @@ class Task(object):
     extra_data = []
     extra_data.append(self.invalidate_for())
 
-    for f in sorted(self.invalidate_for_files()):
-      sha = hashlib.sha1()
-      with open(f, "rb") as fd:
-        sha.update(fd.read())
-      extra_data.append(sha.hexdigest())
+    for f in self.invalidate_for_files():
+      extra_data.append(hash_file(f))
 
-    cache_manager = CacheManager(self._cache_key_generator, self._build_invalidator_dir,
-      invalidate_dependents, extra_data, only_externaldeps=only_buildfiles)
+    cache_manager = CacheManager(self._cache_key_generator,
+                                 self._build_invalidator_dir,
+                                 invalidate_dependents,
+                                 extra_data,
+                                 only_externaldeps=only_buildfiles)
 
     initial_invalidation_check = cache_manager.check(targets, partition_size_hint)
 
     # See if we have entire partitions cached.
-    partitions_to_check = \
-      [vt for vt in initial_invalidation_check.all_vts_partitioned if not vt.valid]
+    partitions_to_check = [vt for vt in initial_invalidation_check.all_vts_partitioned
+                           if not vt.valid]
     cached_partitions, uncached_partitions = self.check_artifact_cache(partitions_to_check)
 
     # See if we have any individual targets from the uncached partitions.
-    vts_to_check = [vt for vt in itertools.chain.from_iterable(
-      [x.versioned_targets for x in uncached_partitions]) if not vt.valid]
+    uncached_vts = [x.versioned_targets for x in uncached_partitions]
+    vts_to_check = [vt for vt in itertools.chain.from_iterable(uncached_vts) if not vt.valid]
     cached_targets, uncached_targets = self.check_artifact_cache(vts_to_check)
 
     # Now that we've checked the cache, re-partition whatever is still invalid.
-    invalidation_check = \
-      InvalidationCheck(initial_invalidation_check.all_vts, uncached_targets, partition_size_hint)
+    invalidation_check = InvalidationCheck(initial_invalidation_check.all_vts, uncached_targets,
+                                           partition_size_hint)
 
     # Do some reporting.
     num_invalid_partitions = len(invalidation_check.invalid_vts_partitioned)
@@ -164,10 +201,12 @@ class Task(object):
       if not vt.valid:
         num_invalid_targets += len(vt.targets)
         num_invalid_sources += vt.cache_key.num_sources
+
+    # Do some reporting.
     if num_invalid_partitions > 0:
-      self.context.log.info('Operating on %d files in %d invalidated targets in %d ' \
-                            'target partitions' % \
-                            (num_invalid_sources, num_invalid_targets, num_invalid_partitions))
+      self.context.log.info('Operating on %d files in %d invalidated targets in %d target'
+                            ' partitions' % (num_invalid_sources, num_invalid_targets,
+                                             num_invalid_partitions))
 
     # Yield the result, and then mark the targets as up to date.
     yield invalidation_check
@@ -204,17 +243,11 @@ class Task(object):
   def update_artifact_cache(self, vt, build_artifacts):
     """Write to the artifact cache, if we're configured to.
 
-    vt - a single VersionedTargetSet.
-    build_artifacts - the paths to the artifacts for the VersionedTargetSet.
+    vts:             A single VersionedTargetSet.
+    build_artifacts: The paths to the artifacts for the VersionedTargetSet.
     """
     if self._artifact_cache and self.context.options.write_to_artifact_cache:
         if self.context.options.verify_artifact_cache:
           pass  # TODO: Verify that the artifact we just built is identical to the cached one.
         self.context.log.info('Caching artifacts for %s' % str(vt.targets))
         self._artifact_cache.insert(vt.cache_key, build_artifacts)
-
-
-__all__ = (
-  'TaskError',
-  'Task'
-)

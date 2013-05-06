@@ -14,27 +14,35 @@
 # limitations under the License.
 # ==================================================================================================
 
-__author__ = 'John Sirois'
-
 import functools
 import os
 
 from contextlib import contextmanager
 from zipfile import ZIP_STORED, ZIP_DEFLATED
 
-from twitter.common.contextutil import open_zip as open_jar
 from twitter.common.dirutil import safe_mkdir
 
-from twitter.pants import get_buildroot, is_apt, JavaLibrary, JavaTests, ScalaLibrary, ScalaTests
+from twitter.pants import (
+    get_buildroot,
+    has_resources,
+    has_sources,
+    is_exported)
+from twitter.pants.java import open_jar
 from twitter.pants.tasks import Task, TaskError
 
 
 def is_java(target):
-  return is_apt(target) or isinstance(target, JavaLibrary) or isinstance(target, JavaTests)
+  return has_sources(target, '.java')
 
 
 def is_jvm(target):
-  return is_java(target) or isinstance(target, ScalaLibrary) or isinstance(target, ScalaTests)
+  return is_java(target) or has_sources(target, '.scala')
+
+
+def is_idl(target):
+  # TODO(Phil Hom): can be changed to is_codegen when previous hackweek thrift download hacks are
+  # removed
+  return is_exported(target) and has_sources(target, '.thrift')
 
 
 def jarname(target):
@@ -72,6 +80,10 @@ class JarCreate(Task):
                             dest="jar_create_javadoc", default=False,
                             action="callback", callback=mkflag.set_bool,
                             help="[%default] Create javadoc jars.")
+    option_group.add_option(mkflag("idl"), mkflag("idl", negate=True),
+                            dest="jar_create_idl", default=False,
+                            action="callback", callback=mkflag.set_bool,
+                            help="[%default] Create Thrift jars.")
 
   def __init__(self, context):
     Task.__init__(self, context)
@@ -87,6 +99,10 @@ class JarCreate(Task):
     self.jar_classes = products.isrequired('jars') or options.jar_create_classes
     if self.jar_classes:
       products.require('classes')
+
+    self.jar_idl = products.isrequired('idl_jars') or options.jar_create_idl
+    if self.jar_idl:
+      products.require('idl')
 
     self.jar_javadoc = products.isrequired('javadoc_jars') or options.jar_create_javadoc
     if self.jar_javadoc:
@@ -111,6 +127,9 @@ class JarCreate(Task):
                self.context.products.get('classes'),
                functools.partial(add_genjar, 'jars'))
 
+    if self.jar_idl:
+      self.idljar(jar_targets(is_idl), functools.partial(add_genjar, 'idl_jars'))
+
     if self.jar_sources:
       self.sourcejar(jar_targets(is_jvm), functools.partial(add_genjar, 'source_jars'))
 
@@ -133,19 +152,34 @@ class JarCreate(Task):
   def jar(self, jvm_targets, genmap, add_genjar):
     for target in jvm_targets:
       generated = genmap.get(target)
-      if generated:
+      if generated or has_resources(target):
         jar_name = '%s.jar' % jarname(target)
         add_genjar(target, jar_name)
         jar_path = os.path.join(self._output_dir, jar_name)
         with self.create_jar(target, jar_path) as zip:
-          for basedir, classfiles in generated.items():
-            for classfile in classfiles:
-              zip.write(os.path.join(basedir, classfile), classfile)
+          if generated:
+            for basedir, classfiles in generated.items():
+              for classfile in classfiles:
+                zip.write(os.path.join(basedir, classfile), classfile)
 
-          if hasattr(target, 'resources') and target.resources:
-            sibling_resources_base = os.path.join(os.path.dirname(target.target_base), 'resources')
-            for resource in target.resources:
-              zip.write(os.path.join(get_buildroot(), sibling_resources_base, resource), resource)
+          if has_resources(target):
+            resources_genmap = self.context.products.get('resources')
+            if resources_genmap:
+              for resources in target.resources:
+                resource_map = resources_genmap.get(resources)
+                if resource_map:
+                  for basedir, files in resource_map.items():
+                    for resource in files:
+                      zip.write(os.path.join(basedir, resource), resource)
+
+  def idljar(self, jvm_targets, add_genjar):
+    for target in jvm_targets:
+      jar_name = '%s-idl.jar' % jarname(target)
+      add_genjar(target, jar_name)
+      jar_path = os.path.join(self._output_dir, jar_name)
+      with self.create_jar(target, jar_path) as zh:
+        for source in target.sources:
+          zh.write(os.path.join(target.target_base, source), source)
 
   def sourcejar(self, jvm_targets, add_genjar):
     for target in jvm_targets:
@@ -155,6 +189,11 @@ class JarCreate(Task):
       with self.create_jar(target, jar_path) as zip:
         for source in target.sources:
           zip.write(os.path.join(target.target_base, source), source)
+
+        if has_resources(target):
+          for resources in target.resources:
+            for resource in resources.sources:
+              zip.write(os.path.join(get_buildroot(), resources.target_base, resource), resource)
 
   def javadocjar(self, java_targets, genmap, add_genjar):
     for target in java_targets:

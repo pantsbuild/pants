@@ -17,6 +17,7 @@
 __author__ = 'Mark C. Chu-Carroll'
 
 import os
+
 from collections import defaultdict
 
 from twitter.pants.base.target import Target

@@ -14,22 +14,15 @@
 # limitations under the License.
 # ==================================================================================================
 
-import os
+from .exportable_jvm_library import ExportableJvmLibrary
+from .resources import WithLegacyResources
 
-from twitter.pants.targets.exportable_jvm_library import ExportableJvmLibrary
 
-class JavaLibrary(ExportableJvmLibrary):
+class JavaLibrary(ExportableJvmLibrary, WithLegacyResources):
   """Defines a target that produces a java library."""
 
-  def __init__(self, name,
-               sources = None,
-               provides = None,
-               dependencies = None,
-               excludes = None,
-               resources = None,
-               deployjar = False,
-               buildflags = None,
-               is_meta = False):
+  def __init__(self, name, sources=None, provides=None, dependencies=None, excludes=None,
+               resources=None, deployjar=False, buildflags=None):
 
     """name: The name of this module target, addressable via pants via the portion of the spec
         following the colon
@@ -41,34 +34,13 @@ class JavaLibrary(ExportableJvmLibrary):
         transitive dependencies against.
     resources: An optional list of paths containing (filterable) text file resources to place in
         this module's jar
-    deployjar: An optional boolean that turns on generation of a monolithic deploy jar
-    buildflags: A list of additional command line arguments to pass to the underlying build system
-        for this target"""
+    deployjar: DEPRECATED - An optional boolean that turns on generation of a monolithic deploy
+        jar - now ignored.
+    buildflags: DEPRECATED - A list of additional command line arguments to pass to the underlying
+        build system for this target - now ignored.
+    """
 
-    ExportableJvmLibrary.__init__(self,
-                                  name,
-                                  sources,
-                                  provides,
-                                  dependencies,
-                                  excludes,
-                                  buildflags,
-                                  is_meta)
+    ExportableJvmLibrary.__init__(self, name, sources, provides, dependencies, excludes)
+    WithLegacyResources.__init__(self, name, sources=sources, resources=resources)
 
-    self.add_label('java')
-    self.sibling_resources_base = os.path.join(os.path.dirname(self.target_base), 'resources')
-    self.resources = self._resolve_paths(self.sibling_resources_base, resources)
-    self.deployjar = deployjar
-
-  def _create_template_data(self):
-    allsources = []
-    if self.sources:
-      allsources += list(os.path.join(self.target_base, source) for source in self.sources)
-    if self.resources:
-      allsources += list(os.path.join(self.sibling_resources_base, res) for res in self.resources)
-
-    return ExportableJvmLibrary._create_template_data(self).extend(
-      resources = self.resources,
-      deploy_jar = self.deployjar,
-      allsources = allsources,
-      processors = []
-    )
+    self.add_labels('java')

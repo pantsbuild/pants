@@ -14,8 +14,6 @@
 # limitations under the License.
 # ==================================================================================================
 
-from twitter.pants.base.generator import TemplateData
-
 class Exclude(object):
   """Represents a dependency exclude pattern to filter transitive dependencies against."""
 
@@ -40,9 +38,3 @@ class Exclude(object):
 
   def __repr__(self):
     return "Exclude(org='%s', name=%s)" % (self.org, ('%s' % self.name) if self.name else None)
-
-  def _create_template_data(self):
-    return TemplateData(
-      org = self.org,
-      name = self.name,
-    )

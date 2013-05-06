@@ -51,11 +51,20 @@ Solution:
     $ rm -f pants.pex
     $ ./pants
 
+## `OSError: [Errno 2] No such file or directory: '/path/to/science/build-support/profiles/foobar.libs'` ##
+
+You've somehow lost or removed required libraries (e.g. jars for `nailgun`, `jmake`) which support
+various pants goals.
+
+Solution:
+
+    $ git clean -fdx build-support/profiles
+    $ ./pants goal clean-all
+
 ## Almost any problem ##
 
 Almost any problem can be solved by fully clearing out all caches and rebuilding pants:
 
     $ build-support/python/clean.sh
-    $ git clean -fdx build-support
+    $ ./science-tools/check_environment.sh
     $ ./pants
-

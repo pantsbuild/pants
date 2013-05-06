@@ -14,13 +14,17 @@
 # limitations under the License.
 # ==================================================================================================
 
+from twitter.common.collections import maybe_list
 from twitter.common.quantity import Amount, Time
 from twitter.pants.targets.python_target import PythonTarget
 
 
 class PythonTests(PythonTarget):
-  def __init__(self, name, sources, resources=None, dependencies=None,
+  def __init__(self, name, sources,
+               resources=None,
+               dependencies=None,
                timeout=Amount(2, Time.MINUTES),
+               coverage=None,
                soft_dependencies=False):
     """
       name / sources / resources / dependencies: See PythonLibrary target
@@ -29,16 +33,22 @@ class PythonTests(PythonTarget):
                 [Default: 2 minutes]
       soft_dependencies: Whether or not we should ignore dependency resolution
                          errors for this test.  [Default: False]
+      coverage: the module(s) whose coverage should be generated, e.g.
+                'twitter.common.log' or ['twitter.common.log', 'twitter.common.http']
     """
     self._timeout = timeout
     self._soft_dependencies = bool(soft_dependencies)
+    self._coverage = maybe_list(coverage) if coverage is not None else []
     PythonTarget.__init__(self, name, sources, resources, dependencies)
-    self.add_label('python')
-    self.add_label('tests')
+    self.add_labels('python', 'tests')
 
   @property
   def timeout(self):
     return self._timeout
+
+  @property
+  def coverage(self):
+    return self._coverage
 
 
 class PythonTestSuite(PythonTarget):

@@ -16,8 +16,9 @@
 
 from twitter.pants.targets.python_target import PythonTarget
 
+
 class PythonLibrary(PythonTarget):
-  def __init__(self, name, sources=(), resources=(), dependencies=(), module=""):
+  def __init__(self, name, sources=(), resources=(), dependencies=(), provides=None, module=""):
     """
       name = Name of library
       sources = Python source files
@@ -26,6 +27,7 @@ class PythonLibrary(PythonTarget):
         resources in a .zip-module friendly way.)
       dependencies = other PythonLibraries, Eggs or internal Pants targets
       module = everything beneath module is relative to this module name, None if root namespace
+      provides = A Python artifact that this library provides
     """
-    PythonTarget.__init__(self, name, sources, resources, dependencies)
+    PythonTarget.__init__(self, name, sources, resources, dependencies, provides)
     self.module = module

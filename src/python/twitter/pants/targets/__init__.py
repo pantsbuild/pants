@@ -16,6 +16,7 @@
 
 import os
 
+
 def resolve_target_sources(target_sources, extension):
   """given a list of pants targets, extract their sources as a list"""
   resolved_sources = []
@@ -28,49 +29,57 @@ def resolve_target_sources(target_sources, extension):
             for source in resolved.sources if source.endswith(extension))
   return resolved_sources
 
-from twitter.pants.targets.annotation_processor import AnnotationProcessor
-from twitter.pants.targets.artifact import Artifact
-from twitter.pants.targets.credentials import Credentials
-from twitter.pants.targets.doc import Doc, Page, Wiki
-from twitter.pants.targets.exclude import Exclude
-from twitter.pants.targets.exportable_jvm_library import ExportableJvmLibrary
-from twitter.pants.targets.internal import InternalTarget
-from twitter.pants.targets.jar_dependency import JarDependency
-from twitter.pants.targets.jar_library import JarLibrary
-from twitter.pants.targets.java_library import JavaLibrary
-from twitter.pants.targets.java_thrift_library import JavaThriftLibrary
-from twitter.pants.targets.java_thriftstore_dml_library import JavaThriftstoreDMLLibrary
-from twitter.pants.targets.java_protobuf_library import JavaProtobufLibrary
-from twitter.pants.targets.java_tests import JavaTests
-from twitter.pants.targets.jvm_binary import Bundle, JvmApp, JvmBinary
-from twitter.pants.targets.jvm_target import JvmTarget
-from twitter.pants.targets.pants_target import Pants
-from twitter.pants.targets.python_binary import PythonBinary
-from twitter.pants.targets.python_egg import PythonEgg
-from twitter.pants.targets.python_library import PythonLibrary
-from twitter.pants.targets.python_antlr_library import PythonAntlrLibrary
-from twitter.pants.targets.python_thrift_library import PythonThriftLibrary
-from twitter.pants.targets.python_requirement import PythonRequirement
-from twitter.pants.targets.python_target import PythonTarget
-from twitter.pants.targets.python_tests import PythonTests, PythonTestSuite
-from twitter.pants.targets.repository import Repository
-from twitter.pants.targets.scala_library import ScalaLibrary
-from twitter.pants.targets.scala_tests import ScalaTests
-from twitter.pants.targets.scalac_plugin import ScalacPlugin
-from twitter.pants.targets.sources import SourceRoot
-from twitter.pants.targets.with_sources import TargetWithSources
 
-__all__ = [
+from .annotation_processor import AnnotationProcessor
+from .artifact import Artifact
+from .benchmark import Benchmark
+from .credentials import Credentials
+from .doc import Page, Wiki
+from .exclude import Exclude
+from .exportable_jvm_library import ExportableJvmLibrary
+from .internal import InternalTarget
+from .jar_dependency import JarDependency
+from .jar_library import JarLibrary
+from .java_antlr_library import JavaAntlrLibrary
+from .java_library import JavaLibrary
+from .java_thrift_library import JavaThriftLibrary
+from .java_thriftstore_dml_library import JavaThriftstoreDMLLibrary
+from .java_protobuf_library import JavaProtobufLibrary
+from .java_tests import JavaTests
+from .jvm_binary import Bundle, JvmApp, JvmBinary
+from .jvm_target import JvmTarget
+from .oink_query import OinkQuery
+from .pants_target import Pants
+from .python_artifact import PythonArtifact
+from .python_binary import PythonBinary
+from .python_egg import PythonEgg
+from .python_library import PythonLibrary
+from .python_antlr_library import PythonAntlrLibrary
+from .python_thrift_library import PythonThriftLibrary
+from .python_requirement import PythonRequirement
+from .python_target import PythonTarget
+from .python_tests import PythonTests, PythonTestSuite
+from .repository import Repository
+from .resources import Resources
+from .scala_library import ScalaLibrary
+from .scala_tests import ScalaTests
+from .scalac_plugin import ScalacPlugin
+from .sources import SourceRoot
+from .with_sources import TargetWithSources
+
+
+__all__ = (
   'AnnotationProcessor',
   'Artifact',
+  'Benchmark',
   'Bundle',
   'Credentials',
-  'Doc',
   'Exclude',
   'ExportableJvmLibrary',
   'InternalTarget',
   'JarDependency',
   'JarLibrary',
+  'JavaAntlrLibrary',
   'JavaLibrary',
   'JavaThriftLibrary',
   # TODO(Anand) Remove this from pants proper when a code adjoinment mechanism exists
@@ -81,8 +90,10 @@ __all__ = [
   'JvmApp',
   'JvmBinary',
   'JvmTarget',
+  'OinkQuery',
   'Page',
   'Pants',
+  'PythonArtifact',
   'PythonBinary',
   'PythonEgg',
   'PythonLibrary',
@@ -93,10 +104,11 @@ __all__ = [
   'PythonTests',
   'PythonTestSuite',
   'Repository',
+  'Resources',
   'ScalaLibrary',
   'ScalaTests',
   'ScalacPlugin',
   'SourceRoot',
   'TargetWithSources',
   'Wiki'
-]
+)

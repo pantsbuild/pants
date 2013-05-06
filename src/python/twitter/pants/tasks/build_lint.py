@@ -35,11 +35,12 @@ class BuildLint(Task):
       action="callback", callback=mkflag.set_bool,
       help="[%default] apply lint rules transitively to all dependency buildfiles.")
 
-    option_group.add_option(mkflag("include-intransitive-deps"), mkflag("include-intransitive-deps", negate=True),
-      dest="builtlint_include_intransitive", default=False,
+    option_group.add_option(mkflag("include-intransitive-deps"),
+      mkflag("include-intransitive-deps", negate=True),
+      dest="buildlint_include_intransitive", default=False,
       action="callback", callback=mkflag.set_bool,
       help="[%default] correct both simple missing dependencies and intransitive missing deps")
-      
+
 
     option_group.add_option(mkflag("action"), dest="buildlint_actions", default=[],
       action="append", type="choice", choices=['diff', 'rewrite'],
@@ -70,12 +71,12 @@ class BuildLint(Task):
     if self.transitive:
       for target in targets:
         add_buildfile_for_target(target, genmap_trans)
-        if self.include_intransitive: 
+        if self.include_intransitive:
           add_buildfile_for_target(target, genmap_intrans)
     else:
       for target in self.context.target_roots:
         add_buildfile_for_target(target, genmap_trans)
-        if self.include_intransitive: 
+        if self.include_intransitive:
           add_buildfile_for_target(target, genmap_intrans)
 
     for buildfile_path, missing_dep_map in buildfile_paths.items():

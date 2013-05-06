@@ -29,7 +29,7 @@ from twitter.common.dirutil import  safe_open
 
 from twitter.pants import get_buildroot
 from twitter.pants.tasks import TaskError
-from twitter.pants.tasks.binary_utils import find_java_home, profile_classpath
+from twitter.pants.binary_util import find_java_home, profile_classpath
 
 
 # Well known metadata file required to register scalac plugins with nsc.

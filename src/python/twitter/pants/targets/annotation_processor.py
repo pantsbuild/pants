@@ -14,20 +14,15 @@
 # limitations under the License.
 # ==================================================================================================
 
-import os
+from .exportable_jvm_library import ExportableJvmLibrary
+from .resources import WithLegacyResources
 
-from twitter.pants.targets.exportable_jvm_library import ExportableJvmLibrary
 
-class AnnotationProcessor(ExportableJvmLibrary):
+class AnnotationProcessor(ExportableJvmLibrary, WithLegacyResources):
   """Defines a target that produces a java library containing one or more annotation processors."""
 
-  def __init__(self, name, sources,
-               provides = None,
-               dependencies = None,
-               excludes = None,
-               resources = None,
-               processors = None,
-               is_meta = False):
+  def __init__(self, name, sources, provides=None, dependencies=None, excludes=None, resources=None,
+               processors=None):
 
     """name: The name of this module target, addressable via pants via the portion of the spec
         following the colon
@@ -40,33 +35,10 @@ class AnnotationProcessor(ExportableJvmLibrary):
     resources: An optional list of paths containing (filterable) text file resources to place in
         this module's jar
     processors: a list of the fully qualified class names of the annotation processors this library
-        exports"""
+        exports
+    """
 
-    ExportableJvmLibrary.__init__(self,
-                                  name,
-                                  sources,
-                                  provides,
-                                  dependencies,
-                                  excludes,
-                                  (),
-                                  is_meta)
-
-    self.add_label('java')
-    self.add_label('apt')
-    self.sibling_resources_base = os.path.join(os.path.dirname(self.target_base), 'resources')
-    self.resources = self._resolve_paths(self.sibling_resources_base, resources)
+    ExportableJvmLibrary.__init__(self, name, sources, provides, dependencies, excludes)
+    WithLegacyResources.__init__(self, name, sources=sources, resources=resources)
+    self.add_labels('java', 'apt')
     self.processors = processors
-
-  def _create_template_data(self):
-    allsources = []
-    if self.sources:
-      allsources += [ os.path.join(self.target_base, source) for source in self.sources ]
-    if self.resources:
-      allsources += [ os.path.join(self.sibling_resources_base, res) for res in self.resources ]
-
-    return ExportableJvmLibrary._create_template_data(self).extend(
-      resources = self.resources,
-      deploy_jar = False,
-      allsources = allsources,
-      processors = self.processors
-    )

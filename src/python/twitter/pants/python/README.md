@@ -178,7 +178,7 @@ by the BUILD file that sits next to the `pants` command:
 ```python
 # Define the repository layout
 
-source_root('src/antlr', doc, page, python_antlr_library)
+source_root('src/antlr', doc, page, java_antlr_library, python_antlr_library)
 source_root('src/java', annotation_processor, doc, jvm_binary, java_library, page)
 source_root('src/protobuf', doc, java_protobuf_library, page)
 source_root('src/python', doc, page, python_binary, python_library)

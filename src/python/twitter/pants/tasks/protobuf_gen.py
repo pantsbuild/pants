@@ -14,8 +14,6 @@
 # limitations under the License.
 # ==================================================================================================
 
-__author__ = 'John Sirois'
-
 import re
 import os
 import subprocess
@@ -27,9 +25,9 @@ from twitter.common.collections import OrderedSet
 from twitter.common.dirutil import safe_mkdir
 
 from twitter.pants import is_jvm, is_python
+from twitter.pants.binary_util import select_binary
 from twitter.pants.targets import JavaLibrary, JavaProtobufLibrary, PythonLibrary
 from twitter.pants.tasks import TaskError
-from twitter.pants.tasks.binary_utils import select_binary
 from twitter.pants.tasks.code_gen import CodeGen
 
 
@@ -47,12 +45,8 @@ class ProtobufGen(CodeGen):
   def __init__(self, context):
     CodeGen.__init__(self, context)
 
-    self.protobuf_binary = select_binary(
-      context.config.get('protobuf-gen', 'supportdir'),
-      context.config.get('protobuf-gen', 'version'),
-      'protoc'
-    )
-
+    self.protoc_supportdir = self.context.config.get('protobuf-gen', 'supportdir')
+    self.protoc_version = self.context.config.get('protobuf-gen', 'version')
     self.output_dir = (
       context.options.protobuf_gen_create_outdir
       or context.config.get('protobuf-gen', 'workdir')
@@ -74,6 +68,13 @@ class ProtobufGen(CodeGen):
     for lang in ('java', 'python'):
       if self.context.products.isrequired(lang):
         self.gen_langs.add(lang)
+
+    self.protobuf_binary = select_binary(
+      self.protoc_supportdir,
+      self.protoc_version,
+      'protoc',
+      context.config
+    )
 
   def invalidate_for(self):
     return self.gen_langs
@@ -149,7 +150,6 @@ class ProtobufGen(CodeGen):
                                       dependencies=self.javadeps,
                                       derived_from=target)
     tgt.id = target.id + '.protobuf_gen'
-    tgt.add_label('codegen')
     for dependee in dependees:
       dependee.update_dependencies([tgt])
     return tgt

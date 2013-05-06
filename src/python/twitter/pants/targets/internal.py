@@ -14,33 +14,35 @@
 # limitations under the License.
 # ==================================================================================================
 
-from twitter.common.collections import OrderedSet
 import collections
 
-from twitter.pants.base import Config, Target
-from twitter.pants.targets.util import resolve
+from twitter.common.collections import OrderedSet
+
+from twitter.pants import is_concrete
+from twitter.pants.base import Target, TargetDefinitionException
+
+from .util import resolve
+
 
 class InternalTarget(Target):
   """A baseclass for targets that support an optional dependency set."""
 
-  class CycleException(Exception):
+  class CycleException(TargetDefinitionException):
     """Thrown when a circular dependency is detected."""
 
     def __init__(self, cycle):
       Exception.__init__(self, 'Cycle detected:\n\t%s' % (
-        ' ->\n\t'.join(str(target.address) for target in cycle)
+          ' ->\n\t'.join(str(target.address) for target in cycle)
       ))
-
-
-  _config = Config.load()
 
   @classmethod
   def sort_targets(cls, internal_targets):
     """Returns a list of targets that internal_targets depend on sorted from most dependent to
-    least."""
+    least.
+    """
 
     roots = OrderedSet()
-    inverted_deps = collections.defaultdict(OrderedSet) # target -> dependent targets
+    inverted_deps = collections.defaultdict(OrderedSet)  # target -> dependent targets
     visited = set()
     path = OrderedSet()
 
@@ -49,7 +51,7 @@ class InternalTarget(Target):
         path_list = list(path)
         cycle_head = path_list.index(target)
         cycle = path_list[cycle_head:] + [target]
-        raise InternalTarget.CycleException(cycle)
+        raise cls.CycleException(cycle)
       path.add(target)
       if target not in visited:
         visited.add(target)
@@ -65,7 +67,7 @@ class InternalTarget(Target):
     for internal_target in internal_targets:
       invert(internal_target)
 
-    sorted = []
+    ordered = []
     visited.clear()
 
     def topological_sort(target):
@@ -74,17 +76,18 @@ class InternalTarget(Target):
         if target in inverted_deps:
           for dep in inverted_deps[target]:
             topological_sort(dep)
-        sorted.append(target)
+        ordered.append(target)
 
     for root in roots:
       topological_sort(root)
 
-    return sorted
+    return ordered
 
   @classmethod
   def coalesce_targets(cls, internal_targets, discriminator):
     """Returns a list of targets internal_targets depend on sorted from most dependent to least and
-    grouped where possible by target type as categorized by the given discriminator."""
+    grouped where possible by target type as categorized by the given discriminator.
+    """
 
     sorted_targets = InternalTarget.sort_targets(internal_targets)
 
@@ -136,43 +139,39 @@ class InternalTarget(Target):
   def sort(self):
     """Returns a list of targets this target depends on sorted from most dependent to least."""
 
-    return InternalTarget.sort_targets([ self ])
+    return InternalTarget.sort_targets([self])
 
   def coalesce(self, discriminator):
     """Returns a list of targets this target depends on sorted from most dependent to least and
-    grouped where possible by target type as categorized by the given discriminator."""
+    grouped where possible by target type as categorized by the given discriminator.
+    """
 
-    return InternalTarget.coalesce_targets([ self ], discriminator)
+    return InternalTarget.coalesce_targets([self], discriminator)
 
-  def __init__(self, name, dependencies, is_meta):
-    Target.__init__(self, name, is_meta)
+  def __init__(self, name, dependencies):
+    Target.__init__(self, name)
 
     self._injected_deps = []
     self.processed_dependencies = resolve(dependencies)
 
-    self.add_label('internal')
+    self.add_labels('internal')
     self.dependency_addresses = OrderedSet()
     self.dependencies = OrderedSet()
     self.internal_dependencies = OrderedSet()
     self.jar_dependencies = OrderedSet()
 
-    # TODO(John Sirois): if meta targets were truly built outside parse contexts - we could instead
-    # just use the more general check: if parsing: delay(doit) else: doit()
+    # TODO(John Sirois): just use the more general check: if parsing: delay(doit) else: doit()
     # Fix how target _ids are built / addresses to not require a BUILD file - ie: support anonymous,
     # non-addressable targets - which is what meta-targets really are once created.
-    if is_meta:
-      # Meta targets are built outside any parse context - so update dependencies immediately
-      self.update_dependencies(self.processed_dependencies)
-    else:
-      # Defer dependency resolution after parsing the current BUILD file to allow for forward
-      # references
-      self._post_construct(self.update_dependencies, self.processed_dependencies)
+
+    # Defer dependency resolution after parsing the current BUILD file to allow for forward
+    # references
+    self._post_construct(self.update_dependencies, self.processed_dependencies)
 
     self._post_construct(self.inject_dependencies)
 
   def add_injected_dependency(self, spec):
     self._injected_deps.append(spec)
-
 
   def inject_dependencies(self):
     self.update_dependencies(resolve(self._injected_deps))
@@ -183,11 +182,18 @@ class InternalTarget(Target):
         if hasattr(dependency, 'address'):
           self.dependency_addresses.add(dependency.address)
         for resolved_dependency in dependency.resolve():
+          if is_concrete(resolved_dependency) and not self.valid_dependency(resolved_dependency):
+            raise TargetDefinitionException(self, 'Cannot add %s as a dependency of %s'
+                                                  % (resolved_dependency, self))
           self.dependencies.add(resolved_dependency)
           if isinstance(resolved_dependency, InternalTarget):
             self.internal_dependencies.add(resolved_dependency)
           if hasattr(resolved_dependency, '_as_jar_dependencies'):
             self.jar_dependencies.update(resolved_dependency._as_jar_dependencies())
+
+  def valid_dependency(self, dep):
+    """Subclasses can over-ride to reject invalid dependencies."""
+    return True
 
   def replace_dependency(self, dependency, replacement):
     self.dependencies.discard(dependency)

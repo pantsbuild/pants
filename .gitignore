@@ -1,3 +1,10 @@
+*.class
+*.iml
+*.ipr
+*.iws
+*.pyc
+*.hprof
+*.swp
 *~
 *#
 .#*
@@ -7,6 +14,7 @@
 .idea
 .pants.d
 .pants.run
+.pants.stats
 .pids
 .project
 .settings
@@ -17,10 +25,11 @@
 bin/
 build/
 codegen/classes/
+dist/
 htmlcov/
+ivy/
 lib/
-dist
-out
+out/
 pants.pex
 target
 ivy
@@ -31,7 +40,8 @@ ivy
 *.pyc
 *.hprof
 *.swp
-scalding/data/
-src/cpp/julpan0/build*
-src/cpp/julpan0/data
-src/cpp/julpan0/third_party_data/
+target
+GPATH
+GRTAGS
+GSYMS
+GTAGS

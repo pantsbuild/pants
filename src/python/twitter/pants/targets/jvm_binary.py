@@ -16,10 +16,16 @@
 
 import os
 
+from twitter.common.dirutil import Fileset
 from twitter.common.lang import Compatibility
-from twitter.pants.base import Fileset, Target, TargetDefinitionException
+from twitter.pants import is_concrete
+from twitter.pants.base import TargetDefinitionException
 from twitter.pants.targets import util
-from twitter.pants.targets.jvm_target import JvmTarget
+
+from .internal import InternalTarget
+from .jvm_target import JvmTarget
+from .resources import Resources
+
 
 class JvmBinary(JvmTarget):
   """
@@ -32,6 +38,7 @@ class JvmBinary(JvmTarget):
                main=None,
                basename=None,
                source=None,
+               resources=None,
                dependencies=None,
                excludes=None,
                deploy_excludes=None,
@@ -52,7 +59,9 @@ class JvmBinary(JvmTarget):
 
     self.main = main
     self.basename = basename or name
+    self.resources = list(self.resolve_all(resources, Resources))
     self.deploy_excludes = deploy_excludes or []
+
 
 class RelativeToMapper(object):
   """A mapper that maps files specified relative to a base directory."""
@@ -83,7 +92,7 @@ class Bundle(object):
 
     if relative_to:
       base = os.path.abspath(relative_to)
-      if not os.path.exists(base) and os.path.isdir(base):
+      if not os.path.isdir(base):
         raise ValueError('Could not find a directory to bundle relative to at %s' % base)
       self.mapper = RelativeToMapper(base)
     else:
@@ -106,19 +115,21 @@ class Bundle(object):
     return 'Bundle(%s, %s)' % (self.mapper, self.filemap)
 
 
-class JvmApp(Target):
+class JvmApp(InternalTarget):
   """Defines a jvm app package consisting of a binary plus additional bundles of files."""
 
   def __init__(self, name, binary, bundles, basename=None):
-    Target.__init__(self, name, is_meta=False)
+    InternalTarget.__init__(self, name, dependencies=[])
 
     if not binary:
       raise TargetDefinitionException(self, 'binary is required')
 
-    binaries = list(util.resolve(binary).resolve())
+    binaries = list(filter(is_concrete, util.resolve(binary).resolve()))
     if len(binaries) != 1 or not isinstance(binaries[0], JvmBinary):
       raise TargetDefinitionException(self, 'must supply exactly 1 JvmBinary, got %s' % binary)
     self.binary = binaries[0]
+
+    self._post_construct(self.update_dependencies, binaries)
 
     if not bundles:
       raise TargetDefinitionException(self, 'bundles must be specified')
@@ -147,7 +158,3 @@ class JvmApp(Target):
                                             'got %s' % bundles)
 
     self.basename = basename or name
-
-  def _walk(self, walked, work, predicate=None):
-    Target._walk(self, walked, work, predicate)
-    self.binary._walk(walked, work, predicate)

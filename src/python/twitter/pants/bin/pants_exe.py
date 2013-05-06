@@ -16,6 +16,11 @@
 
 from __future__ import print_function
 
+import optparse
+import os
+import sys
+import traceback
+
 from twitter.common.dirutil import Lock
 
 from twitter.common.process import ProcessProviderFactory
@@ -23,11 +28,6 @@ from twitter.pants import get_buildroot, get_version
 from twitter.pants.base import Address
 from twitter.pants.base.rcfile import RcFile
 from twitter.pants.commands import Command
-
-import optparse
-import os
-import sys
-import traceback
 
 
 _HELP_ALIASES = set([
@@ -37,30 +37,14 @@ _HELP_ALIASES = set([
 ])
 
 _BUILD_COMMAND = 'build'
-
-# Support legacy pants invocation syntax when the only subcommand was Build and the spec was
-# supplied as an option instead of an argument
-_BUILD_ALIASES = set([
-  '-s',
-  '--spec',
-  '-f',
-])
-
 _LOG_EXIT_OPTION = '--log-exit'
-
-
-def _log_exit(result):
-  if result == 0:
-    print("Pants executed successfully")
-  else:
-    print("Pants failed with error %s" % result)
-
+_VERSION_OPTION = '--version'
 
 def _do_exit(result=0, msg=None):
   if msg:
     print(msg, file=sys.stderr)
-  if _LOG_EXIT_OPTION in sys.argv:
-    _log_exit(result)
+  if _LOG_EXIT_OPTION in sys.argv and result == 0:
+    print("\nSUCCESS\n")
   sys.exit(result)
 
 
@@ -82,21 +66,21 @@ def _help(version, root_dir):
   print("""Default subcommand flags can be stored in ~/.pantsrc using the 'options' key of a
 section named for the subcommand in ini style format, ie:
   [build]
-  options: --fast""")
+  options: --log-exit""")
   _exit_and_fail()
 
 
 def _add_default_options(command, args):
   expanded_options = RcFile(paths=['~/.pantsrc']).apply_defaults([command], args)
   if expanded_options != args:
-    print("(using ~/.pantsrc expansion: pants %s %s)" % (command, ' '.join(expanded_options)))
+    print("(using ~/.pantsrc expansion: pants %s %s)" % (command, ' '.join(expanded_options)),
+          file=sys.stderr)
   return expanded_options
 
 
 def _synthesize_command(root_dir, args):
   command = args[0]
 
-  command = _BUILD_COMMAND if command in _BUILD_ALIASES else command
   if command in Command.all_commands():
     subcommand_args = args[1:] if len(args) > 1 else []
     return command, _add_default_options(command, subcommand_args)
@@ -125,9 +109,11 @@ def _process_info(pid):
   return '%d (%s)' % (pid, cmdline)
 
 def _run():
-  root_dir = get_buildroot()
   version = get_version()
+  if len(sys.argv) == 2 and sys.argv[1] == _VERSION_OPTION:
+    _do_exit(version)
 
+  root_dir = get_buildroot()
   if not os.path.exists(root_dir):
     _exit_and_fail('PANTS_BUILD_ROOT does not point to a valid path: %s' % root_dir)
 
@@ -136,10 +122,13 @@ def _run():
 
   command_class, command_args = _parse_command(root_dir, sys.argv[1:])
 
-  parser = optparse.OptionParser(version = '%%prog %s' % version)
+  parser = optparse.OptionParser(version=version)
   RcFile.install_disable_rc_option(parser)
-  parser.add_option(_LOG_EXIT_OPTION, action = 'store_true', dest = 'log_exit',
-                    default = False, help = 'Log an exit message on success or failure')
+  parser.add_option(_LOG_EXIT_OPTION,
+                    action='store_true',
+                    default=False,
+                    dest='log_exit',
+                    help = 'Log an exit message on success or failure.')
   command = command_class(root_dir, parser, command_args)
 
   if command.serialized():

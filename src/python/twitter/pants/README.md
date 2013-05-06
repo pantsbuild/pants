@@ -6,29 +6,60 @@ your BUILD files in order.
 
 # What is Pants?
 
-Pants is a build tool. It is similar in some regards to make, maven,
-ant, gradle, sbt, etc. However  pants differs in some important
-design goals. Pants seeks to optimize for
+Pants is a build tool. This document introduces Pants to folks who want to use
+it to build code. If someone else has already
+[[set up your codebase to work with Pants|pants('src/python/twitter/pants/docs:setuprepo')]]
+and you want to know how to get your code built, read on.
+If you're setting up pants with some new code and discover that it doesn't
+know about your tools/compilers, you'll also want to read
+[[Pants Internals|pants('src/python/twitter/pants/docs:internals')]]
+to learn how to add support for these tools to Pants.
+
+Pants is similar to make, maven, ant, gradle, sbt, etc.;
+but pants differs in some important design goals. Pants optimizes for
 
 * building multiple, dependent projects from source
 * building projects in a variety of languages
 * speed of build execution
 
-At a high level, Pants reads build descriptions stored in BUILD files,
-constructs a DAG of targets, and executes a specified set of goals
-against those targets.
+This guide explains how to use Pants and author its BUILD files.
 
-The DAG is expressed as a collection of targets (the vertices) and
-dependencies (the edges). Targets and dependencies are explicitly
-provided by the coder in build files, traditionally named BUILD,
-dotted all over the codebase. A Pants build "sees" only the target
-it's building, and the transitive dependencies of that target. It
-doesn't attempt to build entire source trees.It doesn't know, or care,
-about the large-scale structure of the codebase. This is the key to
-its scalability.
+You invoke pants with a _goal_ (like `test` or `compile`) and the
+_build targets_ to use (like
+`src/main/java/com/twitter/common/util/BUILD:util`). For example,
 
-This guide will explain how to author BUILD files and how to use the
-Pants tool.
+    pants goal test src/main/java/com/twitter/common/util/BUILD:util
+
+Goals (the "verbs" of Pants) produce new files from Targets (the "nouns").
+
+As a code author, you define your code's _build targets_ in BUILD files.
+A build target might produce some output file[s];
+it might have sources and/or depend on other build targets.
+There might be several BUILD files in the codebase; a target in
+one can depend on a target in another. Typically, a directory's BUILD
+file defines the target[s] whose sources are files in that directory.
+Pants reads BUILD files and computes the dependency graph of build targets.
+
+For example, a BUILD file might define a library buildable from the `*.py`
+files in its directory, depending on another target, `3rdparty/thrift-0.7`.
+
+    # commons/src/python/twitter/common/rpc/BUILD 2013 February
+    python_library(name = 'rpc',
+      sources = globs('*.py'),
+      dependencies = [ '3rdparty/python:thrift-0.7' ])
+
+Pants looks at the build targets (and their
+dependencies and <em>their</em> dependencies, and so on) to determine
+what needs to be tested/compiled. A goal can depend on another; e.g., if you
+invoke the `test` goal but haven't compiled, pants knows to compile first.
+
+A _product_ is the output of a goal: `.class` files, `.jar` files,
+generated source files, etc.
+
+A Pants build "sees" only the target it's building and the transitive
+dependencies of that target. It doesn't attempt to build entire source trees.
+This approach works well for a big repository containing several projects,
+where a tool that insists on building everything would bog down.
 
 # Installing and Troubleshooting Pants Installations
 
@@ -36,126 +67,121 @@ See [[installation instructions|pants('src/python/twitter/pants:install')]].
 
 # Using Pants
 
-Pants is invoked via the pants script, usually located in the root of
-your source repository. When you invoke pants you specify one or more
+Pants is invoked via the `pants` script, usually located in the root of
+your source repository. When you invoke pants, you specify one or more
 goals, one or more targets to run those goals against, and zero or
 more command line options.
 
-## Listing Goals
+A pants command line has the general form
 
-The "goal" command is an intermediate artefact of the migration
-from "pants.old" to "pants.new". In the near future the goal command
-will disappear.
+    pants goal <goal(s)> <target(s)> <option(s)>
 
-Running pants goal with no actual goal to run will list all currently
-installed goals
+Options don't need to be at the end. These both work:
+
+    pants goal compile --compile-scalac-warnings test src/main/scala/myproject
+    pants goal compile test src/main/scala/myproject --compile-scalac-warnings
+
+To see a goal's configuration flags, use `pants goal help _goal_`, e.g.
+
+    pants goal help compile
+
+(The `goal` command is an intermediate artifact of the
+migration from "pants.old" to "pants.new". In the near future, the `goal`
+command will disappear. We'll use `pants` _foo_ instead of `pants goal` _foo_.)
+
+**Goals available:** Run `pants goal` to list all installed goals:
 
     [local ~/projects/science]$ ./pants goal
     Installed goals:
-          binary: Create a jvm binary jar.
-          bundle: Create an application bundle from binary targets.
+      binary: Create a jvm binary jar.
+      bundle: Create an application bundle from binary targets.
       checkstyle: Run checkstyle against java source code.
       ......
 
-Goals may depend on each other. For example the "compile" goal depends
-on the "resolve" goal, so running compile will resolve any unresolved
-jar dependencies via ivy.
+# BUILD Files
 
-## Pants Command Lines
+A BUILD file defines build targets. `pants` uses the Python
+interpreter to parse the BUILD files; thus, build targets look a lot like Python
+constructors with keyword args and can be augmented with Python code as needed.
+A BUILD file may contain multiple build targets.
 
-A pants command line has the general form
+## Parts of a Typical BUILD Target
 
-    pants goal <goal(s)> <target(s)> <argument(s)>
-
-If multiple goals are specified, you must separate goals from targets
-with the gnu style "--" separator, e.g.
-
-    pants goal compile test doc -- src/java/myproject
-
-Flags can be placed anywhere in the command line, e.g.
-
-    pants goal compile --compile-scalac-warnings test -- src/scala/myproject
-    pants goal compile test -- src/scala/myproject --compile-scalac-warnings
-
-Available configuration flags can be found using the --help option,
-e.g.
-
-    pants goal compile --help
-
-## Targets, Goals, Products, Groups
-
-As a user of pants, your core objects of interest are targets, goals
-and groups. A target specifies something that exists in or should be
-produced by the build. This includes sets of source files,
-documentation, libraries, and others. They are the nouns of your
-build. Goals are the verbs. They define actions that should be taken
-on targets.
-
-## A Simple BUILD file
-
-Build files use a very simple, readable set of python classes for
-expressing targets and dependencies. Although it looks like a DSL, it
-is all constructurs and kwargs However they are really just Python
-files, and so can be augmented with Python code as needed. A BUILD
-file may contain multiple build targets.
-
-### Library Dependencies
-
-Here's a (non-real) example of a single build target:
+A `BUILD` target looks something like this:
 
     :::python
     scala_library(
       name = 'util',
       dependencies = ['3rdparty:commons-math',
-                      '3rdparty:flume',
-                      '3rdparty:heapaudit',
-                      '3rdparty:ostrich',
-                      '3rdparty:rogue',
-                      '3rdparty:scala-tools-time',
-                      '3rdparty:scalaj-collection',
-                      '3rdparty:s2',
                       '3rdparty:thrift',
-                      '3rdparty:twitter-util',
-                      'core/src/main/scala/com/foursquare/auth',
-                      'core/src/main/scala/com/foursquare/i18n:localization',
+                      'src/main/scala/com/foursquare/auth',
                       ':base'],
       sources = rglobs('*.scala'),
     )
 
-* The type of target (in this case scala\_library) determines what
-actions, if any, are taken to build it: which compilers to invoke and
-so on. Pants also supports java\_library and python\_library.
-* We refer to build targets by the full path of the BUILD file plus
-their name, which therefore only needs to be unique within its own
-BUILD file. In this case the build target is called util, and it's in,
-say,core/src/main/scala/com/foursquare/base/BUILD, so the
-fully-qualified name of the target is
-core/src/main/scala/com/foursquare/base:util.
-* The dependencies are expressed as a list of other build targets,
-wrapped by the invocation pants(). Note that the dependency on
-'core/src/main/scala/com/foursquare/auth' has no :<name>
-suffix. This is because Pants offers the following shorthand: if a
-target has the same name as the directory the BUILD file is in, you
-can omit the name. So this dependency is short for
-'core/src/main/scala/com/foursquare/auth:auth'. Note also the
-dependency on ':base'. That's shorthand for "the target named
-'base' in this build file."
-* The sources are expressed as a list of file paths relative to the
-BUILD file's directory. In most cases it's not convenient to enumerate
-the files explicitly, so you can specify them with globs(<file
-pattern>), which matches in the BUILD file's directory, or
-rglobs(<file pattern>), which matches in the entire subtree rooted at
-the BUILD file. Note that these are just functions that return a list
-of file paths, so you can add or remove individual files, and
-basically do any list manipulation you want.
-* If the BUILD files specify a cycle, Pants will detect it and error
-out (actually, it doesn't currently due to a bug, but that will be
-fixed soon).
+Different target types support different arguments. The following parts of
+a BUILD target are pretty common:
 
-### External Dependencies
+**type** A target's type, here `scala_library`, expresses, roughly, the
+important thing you can build from this target.
+Some target types: `python_binary`, `python_library`, `jvm_binary`, and
+`java_library`. A `binary` is a runnable thing. A `library` isn't runnable,
+but might be linked together with other things to produce a binary.
 
-External libraries are, by convention, specified in a BUILD file in a
-top-level directory called 3rdparty. These targets look like this:
+**name** We use a target's name to refer to the target; this name should be
+unique within its BUILD file. You use this name at the command line, e.g.,
+the `util` in `pants goal compile foo/BUILD:util`. You also use this name
+in BUILD files when one target refers to another, e.g., in `dependencies`:
+
+**dependencies** List of other targets which this target depends upon. Normally,
+these targets define the things that this target imports.
+The dependency on `src/main/scala/com/foursquare/auth` has no `:<name>`
+suffix. This uses a shorthand: if a target's name is the same as its BUILD
+file's directory, you can omit the name. This dependency is short for
+`pants('src/main/scala/com/foursquare/auth/BUILD:auth')`. The
+`pants(':base')` dependency is shorthand for "the target named 'base' in this
+BUILD file."
+If dependencies specify a cycle, Pants detects it and errors out.
+
+**sources** List of source files. The `globs('*.java')` function or
+`rglobs('*.java')` recursive glob function could come in handy here.
+
+## Library Targets
+
+To define an "importable" thing, you want a library target type, such as
+`java_library`, `python_library`, `jar`, or `python_dependency` (Python egg).
+
+    :::python
+    scala_library(
+      name = 'util',
+      dependencies = ['3rdparty:commons-math',
+                      '3rdparty:thrift',
+                      'core/src/main/scala/com/foursquare/auth',
+                      ':base'],
+      sources = rglobs('*.scala'),
+    )
+
+A target whose code imports this target's code should list this target
+in its `dependencies`.
+
+## Binary Targets
+
+To define a "runnable" thing, you want a `jvm_binary` or `python_binary` target.
+A binary probably has a `main` and dependencies. (We encourage a binary's
+main to be separate from the libraries it uses to run, if any.)
+
+    :::python
+    jvm_binary(name = 'junit-runner-main',
+      main = 'com.twitter.common.testing.runner.JUnitConsoleRunner',
+      dependencies = [ ':junit-runner' ])
+
+## External Dependencies
+
+Not everything's source code is in your repository.
+By convention, we keep build information about external libraries in a
+directory tree whose root is called `3rdparty.`
+
+*Java Jars*
 
     :::python
     jar_library(name='jackson',
@@ -166,70 +192,125 @@ top-level directory called 3rdparty. These targets look like this:
       ]
     )
 
-The name of the target is simply a convenient alias for an external
-jar (or multiple jars). Naturally, these targets have no sources
-argument. Each jar dependency is specified in the usual Ivy manner.
+The target name is a convenient alias for an external
+jar (or, as in this example, multiple jars). These `jar`
+targets have no `sources` argument, but instead the
+information `ivy` uses to fetch the jars.
 
-## pants.ini
+*Python*
+
+    :::python
+    python_library(
+      name='beautifulsoup',
+      dependencies=[python_requirement('BeautifulSoup==3.2.0')]
+    )
+    python_library(
+      name='markdown',
+      dependencies=[python_requirement('markdown')]
+    )
+
+The target name is a convenient alias. The `dependencies` is a list of one
+or more `python_requirement` targets. The `python_requirement` can refer
+to a `pkg_resources`
+[requirements string](http://packages.python.org/distribute/pkg_resources.html#requirements-parsing).
+Pants looks in a few places for Python `.egg`s as configured in your
+`python.ini` file's `python-repos` section.
+
+To use the external Python module, another python target could have a
+dependency:
+
+    :::python
+    python_binary(name = 'mach_turtle',
+      source = 'mach_turtle.py',
+      dependencies = [pants('3rdparty/python:beautifulsoup')]
+    )
+
+...and the Python script's import would look like
+
+    :::python
+    from BeautifulSoup import BeautifulSoup
+
+## Test Targets
+
+Your test code might live in a directory separate from the main source tree.
+BUILD files defining test targets probably live in that directory tree.
+
+    :::python
+    # in test/scala/com/twitter/common/args/BUILD
+    scala_tests(name = 'args',
+      dependencies = [
+        '3rdparty:specs',
+        'src/scala/com/twitter/common/args:flags',
+        'src/java/com/twitter/common/args:args',
+      ],
+      sources = rglobs('*Spec.scala'))
+
+The test target depends upon the targets whose code it tests. This isn't just
+logical, it's handy, too: you can compute dependencies to figure out what tests
+to run if you change some target's code.
+
+    # Forgot your test's name but know you changed src/main/python/foo:foo?
+    pants goal test `./pants goal dependees src/main/python/foo:foo`
+
+    # Run dependees' tests, for src/main/python/foo:foo too.
+    pants goal test `./pants goal dependees src/main/python/foo:foo --dependees-transitive`
+
+# pants.ini
 
 Pants is intended to be used in a wide variety of source repositories,
-and as such is highly customizable via a pants.ini file located in the
+and as such is highly customizable via a `pants.ini` file located in the
 root of your source repository. You can modify a broad range of
 settings here, including specific binaries to use in your toolchain,
 arguments to pass to tools, etc.
 
 # Common Tasks
 
-## Compiling Source
+**Compiling**
 
-    pants goal compile src/java/yourproject
+    pants goal compile src/main/java/yourproject
 
-## Running Tests
+**Running Tests**
 
-    pants goal test test/java/yourproject
+    pants goal test src/test/java/yourproject
 
-## Packaging Binaries
+**Packaging Binaries**
 
 To create a jar containing just the code built by a target, use the
-jar goal.
+`jar` goal:
 
-    pants goal jar src/java/yourproject
+    pants goal jar src/main/java/yourproject
 
-Pants also supports building two variants of "fat" jars. If you add
-the --jar-transitive flag to the jar goal it will include all code
-built in your repository, even if it comes from a dependent target. As
-an example, if projectB depends on projectA, then
+To deploy a "fat" jar that contains code for a `jvm_binary` target and its
+dependencies, use the `binary` goal and the `--binary-deployjar` flag:
 
-    pants goal jar src/java/projectB
+    pants goal binary --binary-deployjar src/main/java/yourproject
 
-will only include sources for projectB, but
+**Invalidation**
 
-    pants goal jar --jar-transitive src/java/projectB
+The `invalidate` goal clears pants' internal state.
 
-will produce a jar with sources for both projectA _and_ projectB. To
-deploy a "superfat" jar that contains code for a target and all its
-internal and external dependencies, use the "binary" goal.
+    pants goal invalidate compile src/main/java/yourproject
 
-    pants goal binary src/java/yourproject
+invalidates pants' caches. In most cases, this forces a clean build.
 
-## invalidation
+**Cleaning Up**
 
-the invalidate goal clears pants' internal state
-
-    pants goal invalidate compile src/java/yourproject
-
-invalidates pants' caches, which in most cases forces a clean build.
-
-## cleaning up
-
-The clean-all goal does a more vigorous cleaning of pants' state.
+The `clean-all` goal does a more vigorous cleaning of pants' state.
 
     pants goal clean-all
 
 Actually removes the pants workdir, and kills any background processes
 used by pants in the current repository.
 
-## Publishing
+**Publishing**
+
+TODO: this
+
+**Adding jar dependencies**
+
+TODO: this
+
+**Generating Source**
 
 TODO: this
 
@@ -239,37 +320,35 @@ TODO: add a brief description and example of each target.
 
 ## annotation_processor
 
-## doc
-
 ## exclude
 
-## jar_dependency
+## jar
 
 ## jar_library
 
 ## java_library
 
-## java_protobuf_library
+## java\_protobuf_library
 
 ## java_tests
 
-## java_thrift_library
+## java\_thrift_library
 
 ## jvm_binary
 
+## page
+
 ## pants
 
-## python_antlr_library
+## python\_antlr_library
 
 ## python_binary
-
-## python_egg
 
 ## python_requirement
 
 ## python_tests
 
-## python_thrift_library
+## python\_thrift_library
 
 ## repository
 
@@ -283,85 +362,7 @@ TODO: add a brief description and example of each target.
 
 TODO: add description, examples of extensions
 
-# Pants Internals
-
-TODO: this
-
-## .pants.d
-
-## BUILD file parsing
-
-## ivy resolution
-
-## hashing
-
-## task batching
-
-## product mapping
-
-## sapling?
 =======
-
-## What is Pants?
-
-## Using Pants
-
-#### Listing Goals
-
-#### Pants Command Lines
-
-#### A Simple BUILD file
-
-#### Goals, Groups, and Targets
-
-#### Dependencies in BUILD files
-
-#### Extending BUILD files with goals
-
-#### pants.ini
-
-#### 3rdparty
-
-## Common Tasks
-
-#### Adding jar dependencies
-
-#### Generating Source
-
-#### Compiling Source
-
-#### Running Tests
-
-#### Packaging Binaries
-
-#### Publishing
-
-## Pants Internals
-
-#### .pants.d
-
-#### BUILD file parsing
-
-#### ivy resolution
-
-#### hashing
-
-#### task batching
-
-#### product mapping
-
-#### sapling?
-
-#### groups
-
-Many goals produce output, referred to as products.
-Products are .class files, .jar files, and generated source files.
-
-Groups are a way of coordinating goals that produce similar products.
-For instance scalac and javac both produce .class files. The javac
-goal for a target may depend on the products of scalac on a target,
-and vice versa, thus it may be necessary to interleave scalac and
-javac runs, and so we put them into the "jvm" group.
 
 ## Credits
 

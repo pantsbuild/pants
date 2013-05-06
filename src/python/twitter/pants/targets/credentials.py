@@ -25,7 +25,7 @@ class Credentials(Target):
       :username Either a constant username value or else a callable that can fetch one
       :password Either a constant password value or else a callable that can fetch one
     """
-    Target.__init__(self, name, False)
+    Target.__init__(self, name)
     self._username = username if callable(username) else lambda: username
     self._password = password if callable(password) else lambda: password
 

@@ -22,10 +22,9 @@ import sys
 from twitter.common.collections import OrderedSet
 from twitter.common.contextutil import open_zip as open_jar
 from twitter.pants import is_jar_dependency, is_jar_library, is_jvm
-from twitter.pants.tasks import Task, TaskError
+from twitter.pants.tasks import Task
 from twitter.pants.tasks.ivy_utils import IvyModuleRef, IvyUtils
 from twitter.pants.targets.jvm_binary import JvmBinary
-from twitter.pants.tasks.jvm_binary_task import JvmBinaryTask
 
 
 class Provides(Task):
@@ -82,11 +81,11 @@ class Provides(Task):
               do_write('\n')
       print 'Wrote provides information to %s' % outpath
 
-
   def get_jar_paths(self, ivyinfo, target, conf):
     jar_paths = OrderedSet()
     if is_jar_library(target):
-      # Jar library proxies jar dependencies or jvm targets, so the jars are just those of the dependencies.
+      # Jar library proxies jar dependencies or jvm targets, so the jars are just those of the
+      # dependencies.
       for paths in [ self.get_jar_paths(ivyinfo, dep, conf) for dep in target.dependencies ]:
         jar_paths.update(paths)
     elif is_jar_dependency(target):

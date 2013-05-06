@@ -19,61 +19,75 @@ from __future__ import print_function
 import os
 import sys
 
-_VERSION = '0.0.3'
+from .version import VERSION as _VERSION
+
 
 def get_version():
   return _VERSION
 
 
-_BUILD_ROOT = None
+_BUILDROOT = None
+
 
 def get_buildroot():
-  global _BUILD_ROOT
-  if not _BUILD_ROOT:
+  """Returns the pants ROOT_DIR, calculating it if needed."""
+
+  global _BUILDROOT
+  if not _BUILDROOT:
     if 'PANTS_BUILD_ROOT' in os.environ:
-      _BUILD_ROOT = os.path.realpath(os.environ['PANTS_BUILD_ROOT'])
+      set_buildroot(os.environ['PANTS_BUILD_ROOT'])
     else:
-      build_root = os.path.abspath(os.getcwd())
-      while not os.path.exists(os.path.join(build_root, '.git')):
-        if build_root != os.path.dirname(build_root):
-          build_root = os.path.dirname(build_root)
+      buildroot = os.path.abspath(os.getcwd())
+      while not os.path.exists(os.path.join(buildroot, 'pants.ini')):
+        if buildroot != os.path.dirname(buildroot):
+          buildroot = os.path.dirname(buildroot)
         else:
-          print('Could not find .git root!', file=sys.stderr)
+          print('Could not find pants.ini!', file=sys.stderr)
           sys.exit(1)
-      _BUILD_ROOT = os.path.realpath(build_root)
-  return _BUILD_ROOT
+      set_buildroot(buildroot)
+  return _BUILDROOT
 
 
-import fnmatch
-import glob
+def set_buildroot(path):
+  """Sets the pants ROOT_DIR.
 
-from functools import reduce
-
-from twitter.pants.base import Fileset
-
-
-def globs(*globspecs):
-  """Returns a Fileset that combines the lists of files returned by glob.glob for each globspec."""
-
-  def combine(files, globspec):
-    return files ^ set(glob.glob(globspec))
-  return Fileset(lambda: reduce(combine, globspecs, set()))
+  Generally only useful for tests.
+  """
+  if not os.path.exists(path):
+    raise ValueError('Build root does not exist: %s' % path)
+  global _BUILDROOT
+  _BUILDROOT = os.path.realpath(path)
 
 
-def rglobs(*globspecs):
-  """Returns a Fileset that does a recursive scan under the current directory combining the lists of
-  files returned that would be returned by glob.glob for each globspec."""
+from twitter.pants.scm import Scm
 
-  root = os.curdir
-  def recursive_globs():
-    for base, _, files in os.walk(root):
-      for filename in files:
-        path = os.path.relpath(os.path.normpath(os.path.join(base, filename)), root)
-        for globspec in globspecs:
-          if fnmatch.fnmatch(path, globspec):
-            yield path
+_SCM = None
 
-  return Fileset(lambda: set(recursive_globs()))
+
+def get_scm():
+  """Returns the pants Scm if any."""
+  return _SCM
+
+
+def set_scm(scm):
+  """Sets the pants Scm."""
+  if scm is not None:
+    if not isinstance(scm, Scm):
+      raise ValueError('The scm must be an instance of Scm, given %s' % scm)
+    global _SCM
+    _SCM = scm
+
+
+from twitter.common.dirutil import Fileset
+
+globs = Fileset.globs
+rglobs = Fileset.rglobs
+
+
+def is_concrete(target):
+  """Returns true if a target resolves to itself."""
+  targets = list(target.resolve())
+  return len(targets) == 1 and targets[0] == target
 
 
 from twitter.pants.targets import *
@@ -81,24 +95,27 @@ from twitter.pants.targets import *
 # aliases
 annotation_processor = AnnotationProcessor
 artifact = Artifact
+benchmark = Benchmark
 bundle = Bundle
 credentials = Credentials
 dependencies = jar_library = JarLibrary
-doc = Doc
 egg = PythonEgg
 exclude = Exclude
 fancy_pants = Pants
 jar = JarDependency
 java_library = JavaLibrary
+java_antlr_library = JavaAntlrLibrary
 java_protobuf_library = JavaProtobufLibrary
-java_tests = JavaTests
+junit_tests = java_tests = JavaTests
 java_thrift_library = JavaThriftLibrary
 # TODO(Anand) Remove this from pants proper when a code adjoinment mechanism exists
 # or ok if/when thriftstore is open sourced as well
 java_thriftstore_dml_library = JavaThriftstoreDMLLibrary
 jvm_binary = JvmBinary
 jvm_app = JvmApp
+oink_query = OinkQuery
 page = Page
+python_artifact = setup_py = PythonArtifact
 python_binary = PythonBinary
 python_library = PythonLibrary
 python_antlr_library = PythonAntlrLibrary
@@ -107,26 +124,45 @@ python_thrift_library = PythonThriftLibrary
 python_tests = PythonTests
 python_test_suite = PythonTestSuite
 repo = Repository
+resources = Resources
 scala_library = ScalaLibrary
-scala_tests = ScalaTests
+scala_specs = scala_tests = ScalaTests
 scalac_plugin = ScalacPlugin
 source_root = SourceRoot
 wiki = Wiki
 
 
-def has_sources(target):
-  """Returns True if the target has sources."""
-  return target.has_label('sources')
+def has_sources(target, extension=None):
+  """Returns True if the target has sources.
+
+  If an extension is supplied the target is further checked for at least 1 source with the given
+  extension.
+  """
+  return (target.has_label('sources')
+          and (not extension
+               or (hasattr(target, 'sources')
+                   and any(source.endswith(extension) for source in target.sources))))
+
+
+def has_resources(target):
+  """Returns True if the target has an associated set of Resources."""
+  return hasattr(target, 'resources') and target.resources
 
 
 def is_exported(target):
   """Returns True if the target provides an artifact exportable from the repo."""
-  return target.has_label('exportable')
+  # TODO(John Sirois): fixup predicate dipping down into details here.
+  return target.has_label('exportable') and target.provides
 
 
 def is_internal(target):
   """Returns True if the target is internal to the repo (ie: it might have dependencies)."""
   return target.has_label('internal')
+
+
+def is_jar(target):
+  """Returns True if the target is a jar."""
+  return isinstance(target, JarDependency)
 
 
 def is_jvm(target):
@@ -143,8 +179,8 @@ def has_jvm_targets(targets):
 
 def extract_jvm_targets(targets):
   """Returns an iterator over the jvm targets the given sequence of targets resolve to.  The given
-  targets can be a mix of types and any non jvm targets (as determined by is_jvm(...) will be
-  filtered out from the returned iterator."""
+  targets can be a mix of types and only valid jvm targets (as determined by is_jvm(...) will be
+  returned by the iterator."""
 
   for target in targets:
     if target is None:
@@ -159,10 +195,6 @@ def is_codegen(target):
   """Returns True if the target is a codegen target."""
   return target.has_label('codegen')
 
-def is_doc(target):
-  """Returns True if the target is a documentation target."""
-  return target.has_label('doc')
-
 
 def is_jar_library(target):
   """Returns True if the target is an external jar library."""
@@ -172,6 +204,16 @@ def is_jar_library(target):
 def is_java(target):
   """Returns True if the target has or generates java sources."""
   return target.has_label('java')
+
+
+def is_jvm_app(target):
+  """Returns True if the target produces a java application with bundled auxiliary files."""
+  return isinstance(target, JvmApp)
+
+
+def is_thrift(target):
+  """Returns True if the target has thrift IDL sources."""
+  return isinstance(target, JavaThriftLibrary)
 
 
 def is_apt(target):
@@ -204,6 +246,28 @@ def is_jar_dependency(dep):
   return isinstance(dep, JarDependency)
 
 
+def maven_layout():
+  """Sets up typical maven project source roots for all built-in pants target types."""
+
+  source_root('src/main/antlr', java_antlr_library, page, python_antlr_library)
+  source_root('src/main/java', annotation_processor, java_library, jvm_binary, page)
+  source_root('src/main/protobuf', java_protobuf_library, page)
+  source_root('src/main/python', page, python_binary, python_library)
+  source_root('src/main/resources', page, resources)
+  source_root('src/main/scala', jvm_binary, page, scala_library)
+  source_root('src/main/thrift', java_thrift_library, page, python_thrift_library)
+
+  source_root('src/test/java', java_library, junit_tests, page)
+  source_root('src/test/python', page, python_library, python_tests, python_test_suite)
+  source_root('src/test/resources', page, resources)
+  source_root('src/test/scala', junit_tests, page, scala_library, scala_specs)
+
+
+def is_jar_dependency(dep):
+  """Returns True if the dependency is an external jar."""
+  return isinstance(dep, JarDependency)
+
+
 # bind this as late as possible
 pants = fancy_pants
 
@@ -216,24 +280,37 @@ goal = Goal
 group = Group
 phase = Phase
 
+
+# TODO(John Sirois): Update to dynamic linking when http://jira.local.twitter.com/browse/AWESOME-243
+# is avaiable.
+# bind twitter-specific idl helper
+from twitter.pants.tasks.extract import Extract
+
+compiled_idl = Extract.compiled_idl
+
+
 __all__ = (
   'annotation_processor',
   'artifact',
+  'benchmark',
   'bundle',
+  'compiled_idl',
   'credentials',
   'dependencies',
-  'doc',
   'exclude',
   'egg',
   'get_buildroot',
+  'get_scm',
   'get_version',
   'globs',
   'goal',
   'group',
   'is_apt',
-  'is_doc',
+  'is_codegen',
   'is_exported',
   'is_internal',
+  'is_jar_library',
+  'is_jar',
   'is_jar_library',
   'is_java',
   'is_jvm',
@@ -242,17 +319,22 @@ __all__ = (
   'is_test',
   'jar',
   'jar_library',
+  'java_antlr_library',
   'java_library',
   'java_protobuf_library',
   'java_tests',
   'java_thrift_library',
   'java_thriftstore_dml_library',
+  'junit_tests',
   'jvm_app',
   'jvm_binary',
+  'maven_layout',
+  'oink_query',
   'page',
   'pants',
   'phase',
   'python_antlr_library',
+  'python_artifact',
   'python_binary',
   'python_library',
   'python_requirement',
@@ -260,10 +342,13 @@ __all__ = (
   'python_test_suite',
   'python_thrift_library',
   'repo',
+  'resources',
   'rglobs',
   'scala_library',
+  'scala_specs',
   'scala_tests',
   'scalac_plugin',
+  'setup_py',
   'source_root',
   'wiki',
   'Config',

@@ -14,17 +14,14 @@
 # limitations under the License.
 # ==================================================================================================
 
-__author__ = 'John Sirois'
-
 import os
 import re
 import sys
 
 from twitter.common.dirutil import safe_mkdir, safe_open
 
-from twitter.pants import is_codegen, is_java, is_scala, is_test
-from twitter.pants.tasks import binary_utils, Task, TaskError
-from twitter.pants.tasks.binary_utils import profile_classpath, runjava, safe_args
+from twitter.pants import binary_util, is_codegen, is_java, is_scala, is_test, junit_tests
+from twitter.pants.tasks import Task, TaskError
 from twitter.pants.tasks.jvm_task import JvmTask
 
 class JUnitRun(JvmTask):
@@ -42,6 +39,10 @@ class JUnitRun(JvmTask):
                             dest = "junit_run_fail_fast",
                             action="callback", callback=mkflag.set_bool, default=False,
                             help = "[%default] Fail fast on the first test failure in a suite")
+
+    option_group.add_option(mkflag("batch-size"), type = "int", default=sys.maxint,
+                            dest = "junit_run_batch_size",
+                            help = "[ALL] Runs at most this many tests in a single test process.")
 
     option_group.add_option(mkflag("jvmargs"), dest = "junit_run_jvmargs", action="append",
                             help = "Runs junit tests in a jvm with these extra jvm args.")
@@ -61,6 +62,22 @@ class JUnitRun(JvmTask):
                             action="callback", callback=mkflag.set_bool, default=False,
                             help = "[%default] Causes an xml report to be output for each test "
                                    "class that is run.")
+
+    option_group.add_option(mkflag("per-test-timer"), mkflag("per-test-timer", negate=True),
+                            dest = "junit_run_per_test_timer",
+                            action="callback", callback=mkflag.set_bool, default=False,
+                            help = "[%default] Shows progress and timer for each test "
+                                   "class that is run.")
+
+    option_group.add_option(mkflag("default-parallel"), mkflag("default-parallel", negate=True),
+                            dest = "junit_run_default_parallel",
+                            action="callback", callback=mkflag.set_bool, default=False,
+                            help = "[%default] Whether to run classes without @TestParallel or "
+                                   "@TestSerial annotations in parallel.")
+
+    option_group.add_option(mkflag("parallel-threads"), type = "int", default=0,
+                            dest = "junit_run_parallel_threads",
+                            help = "Number of threads to run tests in parallel. 0 for autoset.")
 
     option_group.add_option(mkflag("coverage"), mkflag("coverage", negate=True),
                             dest = "junit_run_coverage",
@@ -134,6 +151,9 @@ class JUnitRun(JvmTask):
       or context.config.get('junit-run', 'workdir')
     )
 
+    self.batch_size = context.options.junit_run_batch_size
+    self.fail_fast = context.options.junit_run_fail_fast
+
     self.coverage = context.options.junit_run_coverage
     self.coverage_filters = context.options.junit_run_coverage_patterns or []
     self.coverage_dir = os.path.join(self.outdir, 'coverage')
@@ -155,41 +175,61 @@ class JUnitRun(JvmTask):
     self.coverage = self.coverage or self.coverage_report_html_open
     self.coverage_html_file = os.path.join(self.coverage_dir, 'html', 'index.html')
 
-    self.flags = []
+    self.opts = []
     if context.options.junit_run_xmlreport or context.options.junit_run_suppress_output:
-      if context.options.junit_run_fail_fast:
-        self.flags.append('-fail-fast')
+      if self.fail_fast:
+        self.opts.append('-fail-fast')
       if context.options.junit_run_xmlreport:
-        self.flags.append('-xmlreport')
-      self.flags.append('-suppress-output')
-      self.flags.append('-outdir')
-      self.flags.append(self.outdir)
+        self.opts.append('-xmlreport')
+      self.opts.append('-suppress-output')
+      self.opts.append('-outdir')
+      self.opts.append(self.outdir)
+
+    if context.options.junit_run_per_test_timer:
+      self.opts.append('-per-test-timer')
+    if context.options.junit_run_default_parallel:
+      self.opts.append('-default-parallel')
+    self.opts.append('-parallel-threads')
+    self.opts.append(str(context.options.junit_run_parallel_threads))
+
+  def _partition(self, tests):
+    stride = min(self.batch_size, len(tests))
+    for i in xrange(0, len(tests), stride):
+      yield tests[i:i+stride]
 
   def execute(self, targets):
     if not self.context.options.junit_run_skip:
       tests = list(self.normalize_test_classes() if self.test_classes
                                                  else self.calculate_tests(targets))
       if tests:
-        junit_classpath = self.classpath(profile_classpath(self.junit_profile), confs=self.confs)
+        junit_classpath = self.classpath(binary_util.profile_classpath(self.junit_profile),
+                                         confs=self.confs)
 
         def run_tests(classpath, main, jvmargs=None):
-          with safe_args(tests) as all_tests:
-            result = runjava(
-              jvmargs=(jvmargs or []) + self.java_args,
-              classpath=classpath,
-              main=main,
-              args=self.flags + all_tests
-            )
-            if result != 0:
-              raise TaskError()
+          # TODO(John Sirois): Integrated batching with the test runner.  As things stand we get
+          # results summaries for example for each batch but no overall summary.
+          # http://jira.local.twitter.com/browse/AWESOME-1114
+          result = 0
+          for batch in self._partition(tests):
+            with binary_util.safe_args(batch) as batch_tests:
+              result += abs(binary_util.runjava_indivisible(
+                jvmargs=(jvmargs or []) + self.java_args,
+                classpath=classpath,
+                main=main,
+                opts=self.opts, args=batch_tests
+              ))
+              if result != 0 and self.fail_fast:
+                break
+          if result != 0:
+            raise TaskError()
 
         if self.coverage:
-          emma_classpath = profile_classpath(self.emma_profile)
+          emma_classpath = binary_util.profile_classpath(self.emma_profile)
 
           def instrument_code():
             safe_mkdir(self.coverage_instrument_dir, clean=True)
-            with safe_args(self.get_coverage_patterns(targets)) as patterns:
-              args = [
+            with binary_util.safe_args(self.get_coverage_patterns(targets)) as patterns:
+              opts = [
                 'instr',
                 '-out', self.coverage_metadata_file,
                 '-d', self.coverage_instrument_dir,
@@ -197,37 +237,43 @@ class JUnitRun(JvmTask):
                 '-exit'
               ]
               for pattern in patterns:
-                args.extend(['-filter', pattern])
-              result = runjava(classpath=emma_classpath, main='emma', args=args)
+                opts.extend(['-filter', pattern])
+              result = binary_util.runjava_indivisible(classpath=emma_classpath, main='emma',
+                                                       opts=opts)
               if result != 0:
                 raise TaskError('Emma instrumentation failed with: %d' % result)
 
           def generate_reports():
-            args = [
+            opts = [
               'report',
               '-in', self.coverage_metadata_file,
               '-in', self.coverage_file,
               '-exit'
             ]
-            source_bases = set(t.target_base for t in targets)
+            source_bases = set()
+            def collect_source_base(target):
+              if self.is_coverage_target(target):
+                source_bases.add(target.target_base)
+            for target in self.test_target_candidates(targets):
+              target.walk(collect_source_base)
             for source_base in source_bases:
-              args.extend(['-sp', source_base])
+              opts.extend(['-sp', source_base])
 
             sorting = ['-Dreport.sort', '+name,+class,+method,+block']
             if self.coverage_report_console:
-              args.extend(['-r', 'txt',
+              opts.extend(['-r', 'txt',
                            '-Dreport.txt.out.file=%s' % self.coverage_console_file] + sorting)
             if self.coverage_report_xml:
-              args.extend(['-r', 'xml','-Dreport.xml.out.file=%s' % self.coverage_xml_file])
+              opts.extend(['-r', 'xml','-Dreport.xml.out.file=%s' % self.coverage_xml_file])
             if self.coverage_report_html:
-              args.extend(['-r', 'html',
+              opts.extend(['-r', 'html',
                            '-Dreport.html.out.file=%s' % self.coverage_html_file,
                            '-Dreport.out.encoding=UTF-8'] + sorting)
 
-            result = runjava(
+            result = binary_util.runjava_indivisible(
               classpath=emma_classpath,
               main='emma',
-              args=args
+              opts=opts
             )
             if result != 0:
               raise TaskError('Failed to emma generate code coverage reports: %d' % result)
@@ -236,7 +282,7 @@ class JUnitRun(JvmTask):
               with safe_open(self.coverage_console_file) as console_report:
                 sys.stdout.write(console_report.read())
             if self.coverage_report_html_open:
-              binary_utils.open(self.coverage_html_file)
+              binary_util.ui_open(self.coverage_html_file)
 
           instrument_code()
           try:
@@ -254,6 +300,9 @@ class JUnitRun(JvmTask):
           self.context.lock.release()
           run_tests(junit_classpath, 'com.twitter.common.testing.runner.JUnitConsoleRunner')
 
+  def is_coverage_target(self, tgt):
+    return (is_java(tgt) or is_scala(tgt)) and not is_test(tgt) and not is_codegen(tgt)
+
   def get_coverage_patterns(self, targets):
     if self.coverage_filters:
       return self.coverage_filters
@@ -261,7 +310,7 @@ class JUnitRun(JvmTask):
       classes_under_test = set()
       classes_by_source = self.context.products.get('classes')
       def add_sources_under_test(tgt):
-        if is_java(tgt) and not is_test(tgt) and not is_codegen(tgt):
+        if self.is_coverage_target(tgt):
           for source in tgt.sources:
             classes = classes_by_source.get(source)
             if classes:
@@ -279,12 +328,16 @@ class JUnitRun(JvmTask):
       for c in self.normalize(cls):
         yield c
 
-  def calculate_tests(self, targets):
+  def test_target_candidates(self, targets):
     for target in targets:
-      if (is_java(target) or is_scala(target)) and is_test(target):
-        for test in target.sources:
-          for cls in self.normalize(test, target.target_base):
-            yield cls
+      if isinstance(target, junit_tests):
+        yield target
+
+  def calculate_tests(self, targets):
+    for target in self.test_target_candidates(targets):
+      for test in target.sources:
+        for cls in self.normalize(test, target.target_base):
+          yield cls
 
   @staticmethod
   def classfile_to_classname(cls):
@@ -299,8 +352,10 @@ class JUnitRun(JvmTask):
     classes_by_source = self.context.products.get('classes')
     def relpath_toclassname(path):
       classes = classes_by_source.get(path)
-      if classes is None:  # Some files may yield no classes (e.g., tests that have been commented out).
-        self.context.log.warn('No classes found for file %s' % path)
+      if not classes:
+        # Its perfectly valid - if questionable - to have a source file with no classes when, for
+        # example, the source file has all its code commented out.
+        self.context.log.warn('File %s contains no classes' % os.path.join(basedir, path))
       else:
         for base, classes in classes.items():
           for cls in classes:
@@ -316,7 +371,7 @@ class JUnitRun(JvmTask):
     else:
       yield classname + methodname
 
-PACKAGE_PARSER = re.compile(r'^\s*package\s+([\w.]+)\s*;\s*')
+PACKAGE_PARSER = re.compile(r'^\s*package\s+([\w.]+)\s*;?\s*')
 
 def calculate_basedir(file):
   with open(file, 'r') as source:

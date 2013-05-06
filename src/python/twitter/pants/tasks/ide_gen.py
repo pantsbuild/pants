@@ -13,33 +13,49 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==================================================================================================
+
 import os
 import shutil
 
+from collections import defaultdict
+
 from twitter.common.collections.orderedset import OrderedSet
 from twitter.common.dirutil import safe_mkdir
+from twitter.pants.targets.jvm_target import JvmTarget
 
 from twitter.pants import (
+  binary_util,
   extract_jvm_targets,
   get_buildroot,
+  has_resources,
   has_sources,
   is_codegen,
-  is_java,
-  is_scala,
+  is_java as _is_java,
+  is_scala as _is_scala,
   is_test,
   is_apt)
 from twitter.pants.base.target import Target
 from twitter.pants.goal.phase import Phase
-from twitter.pants.targets.exportable_jvm_library import ExportableJvmLibrary
-from twitter.pants.targets.java_library import JavaLibrary
 from twitter.pants.targets.jvm_binary import JvmBinary
-from twitter.pants.targets.scala_library import ScalaLibrary
-from twitter.pants.tasks import binary_utils, TaskError
-from twitter.pants.tasks.binary_utils import profile_classpath
+from twitter.pants.tasks import TaskError
 from twitter.pants.tasks.checkstyle import Checkstyle
 from twitter.pants.tasks.jvm_binary_task import JvmBinaryTask
 
-__author__ = 'John Sirois'
+
+# We use custom checks for scala and java targets here for 2 reasons:
+# 1.) jvm_binary could have either a scala or java source file attached so we can't do a pure
+#     target type test
+# 2.) the target may be under development in which case it may not have sources yet - its pretty
+#     common to write a BUILD and ./pants goal idea the target inside to start development at which
+#     point there are no source files yet - and the developer intents to add them using the ide.
+
+def is_scala(target):
+  return has_sources(target, '.scala') or _is_scala(target)
+
+
+def is_java(target):
+  return has_sources(target, '.java') or _is_java(target)
+
 
 class IdeGen(JvmBinaryTask):
   @classmethod
@@ -48,10 +64,10 @@ class IdeGen(JvmBinaryTask):
                             help="[%default] Specifies the name to use for the generated project.")
 
     gen_dir = mkflag("project-dir")
-    option_group.add_option(gen_dir, dest = "ide_gen_project_dir",
+    option_group.add_option(gen_dir, dest="ide_gen_project_dir",
                             help="[%default] Specifies the directory to output the generated "
                                 "project files to.")
-    option_group.add_option(mkflag("project-cwd"), dest = "ide_gen_project_cwd",
+    option_group.add_option(mkflag("project-cwd"), dest="ide_gen_project_cwd",
                             help="[%%default] Specifies the directory the generated project should "
                                  "use as the cwd for processes it launches.  Note that specifying "
                                  "this trumps %s and not all project related files will be stored "
@@ -71,6 +87,18 @@ class IdeGen(JvmBinaryTask):
                             action="callback", callback=mkflag.set_bool, dest='ide_gen_java',
                             help="[%default] Includes java sources in the project; otherwise "
                                  "compiles them and adds them to the project classpath.")
+    java_language_level = mkflag("java-language-level")
+    # TODO(John Sirois): Advance the default to 7 when 8 is released.
+    option_group.add_option(java_language_level, default=6,
+                            dest="ide_gen_java_language_level", type="int",
+                            help="[%default] Sets the java language and jdk used to compile the "
+                                 "project's java sources.")
+    option_group.add_option(mkflag("java-jdk-name"), default=None,
+                            dest="ide_gen_java_jdk",
+                            help="Sets the jdk used to compile the project's java sources. If "
+                                 "unset the default jdk name for the "
+                                 "%s is used." % java_language_level)
+
     option_group.add_option(mkflag("scala"), mkflag("scala", negate=True), default=True,
                             action="callback", callback=mkflag.set_bool, dest='ide_gen_scala',
                             help="[%default] Includes scala sources in the project; otherwise "
@@ -84,13 +112,22 @@ class IdeGen(JvmBinaryTask):
     self.skip_java = not context.options.ide_gen_java
     self.skip_scala = not context.options.ide_gen_scala
 
-    self.work_dir = (
+    self.java_language_level = context.options.ide_gen_java_language_level
+    if context.options.ide_gen_java_jdk:
+      self.java_jdk = context.options.ide_gen_java_jdk
+    else:
+      self.java_jdk = '1.%d' % self.java_language_level
+
+    self.work_dir = os.path.abspath(
       context.options.ide_gen_project_dir
       or os.path.join(
         context.config.get('ide', 'workdir'), self.__class__.__name__, self.project_name
       )
     )
-    self.cwd = context.options.ide_gen_project_cwd or self.work_dir
+    self.cwd = (
+      os.path.abspath(context.options.ide_gen_project_cwd) if context.options.ide_gen_project_cwd
+      else self.work_dir
+    )
 
     self.intransitive = context.options.ide_gen_intransitive
 
@@ -179,11 +216,12 @@ class IdeGen(JvmBinaryTask):
     excludes = OrderedSet()
     compile = OrderedSet()
     def prune(target):
-      if target.excludes:
-        excludes.update(target.excludes)
-      jars.update(jar for jar in target.jar_dependencies if jar.rev)
-      if is_cp(target):
-        target.walk(compile.add)
+      if isinstance(target, JvmTarget):
+        if target.excludes:
+          excludes.update(target.excludes)
+        jars.update(jar for jar in target.jar_dependencies if jar.rev)
+        if is_cp(target):
+          target.walk(compile.add)
 
     for target in targets:
       target.walk(prune)
@@ -266,7 +304,7 @@ class IdeGen(JvmBinaryTask):
 
     idefile = self.generate_project(self._project)
     if idefile:
-      binary_utils.open(idefile)
+      binary_util.ui_open(idefile)
 
   def generate_project(self, project):
     raise NotImplementedError('Subclasses must generate a project for an ide')
@@ -315,7 +353,7 @@ class Project(object):
         _, ext = os.path.splitext(resource)
         yield ext
 
-  def __init__(self, name,has_python, skip_java, skip_scala, root_dir,
+  def __init__(self, name, has_python, skip_java, skip_scala, root_dir,
                checkstyle_suppression_files, debug_port, targets, transitive):
     """Creates a new, unconfigured, Project based at root_dir and comprised of the sources visible
     to the given targets."""
@@ -392,15 +430,13 @@ class Project(object):
 
         self.has_scala = not self.skip_scala and (self.has_scala or is_scala(target))
 
-        if isinstance(target, JavaLibrary) or isinstance(target, ScalaLibrary):
-          resources = set()
-          if target.resources:
-            resources.update(target.resources)
-          if resources:
+        if has_resources(target):
+          resources_by_basedir = defaultdict(set)
+          for resources in target.resources:
+            resources_by_basedir[resources.target_base].update(resources.sources)
+          for basedir, resources in resources_by_basedir.items():
             self.resource_extensions.update(Project.extract_resource_extensions(resources))
-            configure_source_sets(target.sibling_resources_base,
-                                  resources,
-                                  is_test = False)
+            configure_source_sets(basedir, resources, is_test=False)
 
         if target.sources:
           test = is_test(target)
@@ -477,8 +513,9 @@ class Project(object):
 
   def configure_profiles(self, scala_compiler_profile):
     checkstyle_enabled = len(Phase.goals_of_type(Checkstyle)) > 0
-    self.checkstyle_classpath = profile_classpath('checkstyle') if checkstyle_enabled else []
+    self.checkstyle_classpath = (binary_util.profile_classpath('checkstyle') if checkstyle_enabled
+                                 else [])
     self.scala_compiler_classpath = []
     if self.has_scala:
-      self.scala_compiler_classpath.extend(profile_classpath(scala_compiler_profile))
+      self.scala_compiler_classpath.extend(binary_util.profile_classpath(scala_compiler_profile))
 

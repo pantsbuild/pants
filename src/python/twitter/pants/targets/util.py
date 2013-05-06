@@ -17,8 +17,11 @@
 __author__ = 'Ryan Williams'
 
 from collections import Iterable
+
 from twitter.common.lang import Compatibility
-from twitter.pants.targets.pants_target import Pants
+
+from .pants_target import Pants
+
 
 def resolve(arg, clazz=Pants):
   """Wraps strings in Pants() targets, for BUILD file convenience.
@@ -27,14 +30,13 @@ def resolve(arg, clazz=Pants):
     - single object is left alone
     - list of strings and other miscellaneous objects gets its strings wrapped in Pants() targets
   """
-
   if isinstance(arg, Compatibility.string):
     return clazz(arg)
   elif isinstance(arg, Iterable):
     # If arg is iterable, recurse on its elements.
     return [resolve(dependency, clazz=clazz) for dependency in arg]
   else:
-    # NOTE(ryan): Ideally we'd check isinstance(arg, Target) here, but some things that Targets depend on are not
-    # themselves subclasses of Target, notably JarDependencies.
+    # NOTE(ryan): Ideally we'd check isinstance(arg, Target) here, but some things that Targets
+    # depend on are not themselves subclasses of Target, notably JarDependencies.
     return arg
 

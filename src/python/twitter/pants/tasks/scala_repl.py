@@ -17,9 +17,10 @@
 __author__ = 'Benjy Weinberger'
 
 import shlex
+import subprocess
 
+from twitter.pants.binary_util import profile_classpath, runjava_indivisible
 from twitter.pants.tasks import Task
-from twitter.pants.tasks.binary_utils import profile_classpath, runjava
 from twitter.pants.tasks.jvm_task import JvmTask
 
 
@@ -46,11 +47,36 @@ class ScalaRepl(JvmTask):
         self.args.extend(shlex.split(arg))
 
   def execute(self, targets):
+    # The repl session may last a while, allow concurrent pants activity during this pants idle
+    # period.
     self.context.lock.release()
-    runjava(
-      jvmargs=self.jvm_args,
-      classpath=self.classpath(profile_classpath(self.profile), confs=self.confs),
-      main=self.main,
-      args=self.args
-    )
 
+    self.save_stty_options()
+    try:
+      runjava_indivisible(
+        jvmargs=self.jvm_args,
+        classpath=self.classpath(profile_classpath(self.profile), confs=self.confs),
+        main=self.main,
+        args=self.args
+      )
+    except KeyboardInterrupt:
+      # TODO(John Sirois): Confirm with Steve Gury that finally does not work on mac and an
+      # explicit catch of KeyboardInterrupt is required.
+      pass
+    self.restore_ssty_options()
+
+  def save_stty_options(self):
+    """
+    The scala REPL changes some stty parameters and doesn't save/restore them after
+    execution, so if you have a terminal with non-default stty options, you end
+    up to a broken terminal (need to do a 'reset').
+    """
+    self.stty_options = self.run_cmd("stty -g 2>/dev/null")
+
+  def restore_ssty_options(self):
+    self.run_cmd("stty " + self.stty_options)
+
+  def run_cmd(self, cmd):
+    po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
+    stdout, _ = po.communicate()
+    return stdout

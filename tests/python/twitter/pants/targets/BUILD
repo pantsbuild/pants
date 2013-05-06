@@ -17,6 +17,8 @@
 python_tests(name = 'targets',
   sources = globs('*.py'),
   dependencies = [
-    "src/python/twitter/pants:pants-lib",
-    "tests/python/twitter/pants/testutils"
-])
+    pants("src/python/twitter/pants:pants-lib"),
+    pants('tests/python/twitter/pants:base-test'),
+    pants('tests/python/twitter/pants/testutils'),
+  ]
+)

@@ -18,21 +18,20 @@ __author__ = 'Benjy Weinberger'
 
 import os
 
-from collections import namedtuple
-from twitter.pants import  is_scalac_plugin, get_buildroot
+from twitter.pants import has_sources, is_scalac_plugin, get_buildroot
 from twitter.pants.targets.scala_library import ScalaLibrary
-from twitter.pants.targets.scala_tests import ScalaTests
 from twitter.pants.tasks import Task, TaskError
 from twitter.pants.tasks.jvm_dependency_cache import JvmDependencyCache
 from twitter.pants.tasks.nailgun_task import NailgunTask
 from twitter.pants.tasks.scala.zinc_artifact import ZincArtifactFactory, AnalysisFileSpec
 from twitter.pants.tasks.scala.zinc_utils import ZincUtils
 
-class ScalaCompile(NailgunTask):
-  @staticmethod
-  def _has_scala_sources(target):
-    return isinstance(target, ScalaLibrary) or isinstance(target, ScalaTests)
 
+def _is_scala(target):
+  return has_sources(target, '.scala')
+
+
+class ScalaCompile(NailgunTask):
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
     NailgunTask.setup_parser(option_group, args, mkflag)
@@ -59,29 +58,34 @@ class ScalaCompile(NailgunTask):
     JvmDependencyCache.setup_parser(option_group, args, mkflag)
 
 
-  def __init__(self, context, workdir=None):
+  def __init__(self, context):
     NailgunTask.__init__(self, context, workdir=context.config.get('scala-compile', 'nailgun_dir'))
 
     # Set up the zinc utils.
     # Command line switch overrides color setting set in pants.ini
-    color = context.options.scala_compile_color if context.options.scala_compile_color is not None else \
-            context.config.getbool('scala-compile', 'color', default=True)
+    color = (context.options.scala_compile_color if context.options.scala_compile_color is not None
+             else context.config.getbool('scala-compile', 'color', default=True))
 
     self._zinc_utils = ZincUtils(context=context, java_runner=self.runjava, color=color)
 
     # The rough number of source files to build in each compiler pass.
-    self._partition_size_hint = \
-      context.options.scala_compile_partition_size_hint \
-      if context.options.scala_compile_partition_size_hint != -1 else \
-      context.config.getint('scala-compile', 'partition_size_hint')
+    self._partition_size_hint = (context.options.scala_compile_partition_size_hint
+                                 if context.options.scala_compile_partition_size_hint != -1
+                                 else context.config.getint('scala-compile', 'partition_size_hint',
+                                                            default=1000))
 
     # Set up dep checking if needed.
     if context.options.scala_check_missing_deps:
       JvmDependencyCache.init_product_requirements(self)
 
+    self._opts = context.config.getlist('scala-compile', 'args')
+    if context.options.scala_compile_warnings:
+      self._opts.extend(context.config.getlist('scala-compile', 'warning_args'))
+    else:
+      self._opts.extend(context.config.getlist('scala-compile', 'no_warning_args'))
+
     # Various output directories.
-    self._buildroot = get_buildroot()
-    workdir = context.config.get('scala-compile', 'workdir') if workdir is None else workdir
+    workdir = context.config.get('scala-compile', 'workdir')
     self._resources_dir = os.path.join(workdir, 'resources')
     self._artifact_factory = ZincArtifactFactory(workdir, self.context, self._zinc_utils)
 
@@ -92,6 +96,15 @@ class ScalaCompile(NailgunTask):
     artifact_cache_spec = context.config.getlist('scala-compile', 'artifact_caches')
     self.setup_artifact_cache(artifact_cache_spec)
 
+    # If we are compiling scala libraries with circular deps on java libraries we need to make sure
+    # those cycle deps are present.
+    self._inject_java_cycles()
+
+  def _inject_java_cycles(self):
+    for scala_target in self.context.targets(lambda t: isinstance(t, ScalaLibrary)):
+      for java_target in scala_target.java_sources:
+        self.context.add_target(java_target)
+
   def product_type(self):
     return 'classes'
 
@@ -99,7 +112,7 @@ class ScalaCompile(NailgunTask):
     return True
 
   def execute(self, targets):
-    scala_targets = filter(ScalaCompile._has_scala_sources, targets)
+    scala_targets = filter(_is_scala, targets)
     if not scala_targets:
       return
 

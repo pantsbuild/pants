@@ -14,9 +14,10 @@
 # limitations under the License.
 # ==================================================================================================
 
-from twitter.pants.base import Target
-from twitter.pants.base.generator import TemplateData
-from twitter.pants.targets.util import resolve
+from twitter.pants.base import Target, TargetDefinitionException
+
+from .util import resolve
+
 
 class JarLibrary(Target):
   """Serves as a proxy for one or more JarDependencies or JavaTargets."""
@@ -25,11 +26,15 @@ class JarLibrary(Target):
     """name: The name of this module target, addressable via pants via the portion of the spec
         following the colon
     dependencies: one or more JarDependencies this JarLibrary bundles or Pants pointing to other
-        JarLibraries or JavaTargets"""
+        JarLibraries or JavaTargets
+    """
 
-    assert len(dependencies) > 0, "At least one dependency must be specified"
-    Target.__init__(self, name, False)
-    self.add_label('jars')
+    Target.__init__(self, name)
+
+    if dependencies is None:
+      raise TargetDefinitionException(self, "A dependencies list must be supplied even if empty.")
+
+    self.add_labels('jars')
     self.dependencies = resolve(dependencies)
     self.dependency_addresses = set()
     for dependency in self.dependencies:
@@ -37,13 +42,7 @@ class JarLibrary(Target):
         self.dependency_addresses.add(dependency.address)
 
   def resolve(self):
+    yield self
     for dependency in self.dependencies:
       for resolved_dependency in dependency.resolve():
         yield resolved_dependency
-
-  def _create_template_data(self):
-    return TemplateData(
-      org = 'internal',
-      module = self.id,
-      version = None
-    )

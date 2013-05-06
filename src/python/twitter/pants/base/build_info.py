@@ -14,42 +14,24 @@
 # limitations under the License.
 # ==================================================================================================
 
-from collections import namedtuple
 import getpass
-import os
 import socket
-import subprocess
+
+from collections import namedtuple
 from time import strftime, localtime
 
-def safe_call(cmd):
-  po = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-  so, se = po.communicate()
-  if po.returncode == 0:
-    return so
-  return ""
+from twitter.pants import get_buildroot, get_scm
 
-def get_build_root():
-  build_root = os.path.abspath(os.getcwd())
-  while not os.path.exists(os.path.join(build_root, '.git')):
-    if build_root == os.path.dirname(build_root):
-      break
-    build_root = os.path.dirname(build_root)
-  return os.path.realpath(build_root)
+BuildInfo = namedtuple('BuildInfo', 'date time timestamp branch tag sha user machine path')
 
-BuildInfo = namedtuple('BuildInfo', 'date time timestamp branch tag sha name machine path')
+def get_build_info(scm=None):
+  """Calculates the current BuildInfo using the supplied scm or else the globally configured one."""
+  buildroot = get_buildroot()
+  scm = scm or get_scm()
 
-def get_build_info():
-  buildroot = get_build_root()
-
-  revision = safe_call(['git', 'rev-parse', 'HEAD']).strip().decode('utf-8')
-  tag = safe_call(['git', 'describe', '--always']).strip()
-  tag = 'none' if b'cannot' in tag else tag.decode('utf-8')
-  branchname = revision
-  for branchname in safe_call(['git', 'branch']).splitlines():
-    if branchname.startswith(b'* '):
-      branchname = branchname[2:].strip().decode('utf-8')
-      break
-
+  revision = scm.commit_id
+  tag = scm.tag_name or 'none'
+  branchname = scm.branch_name or revision
   now = localtime()
   return BuildInfo(
     date=strftime('%A %b %d, %Y', now),
@@ -58,6 +40,6 @@ def get_build_info():
     branch=branchname,
     tag=tag,
     sha=revision,
-    name=getpass.getuser(),
+    user=getpass.getuser(),
     machine=socket.gethostname(),
     path=buildroot)

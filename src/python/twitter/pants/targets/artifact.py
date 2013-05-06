@@ -14,7 +14,6 @@
 # limitations under the License.
 # ==================================================================================================
 
-from twitter.pants.base.generator import TemplateData
 from twitter.pants.targets.util import resolve
 
 class Artifact(object):
@@ -55,13 +54,3 @@ class Artifact(object):
 
   def __repr__(self):
     return "%s-%s -> %s" % (self.org, self.name, self.repo)
-
-  def _create_template_data(self):
-    return TemplateData(
-      org=self.org,
-      module=self.name,
-      version=self.rev,
-      repo=self.repo.name,
-      description=self.description
-    )
-

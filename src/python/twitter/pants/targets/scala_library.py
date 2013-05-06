@@ -14,75 +14,58 @@
 # limitations under the License.
 # ==================================================================================================
 
-import os
+from twitter.common.collections import maybe_list
 
-from twitter.pants.targets import resolve_target_sources
-from twitter.pants.targets.exportable_jvm_library import ExportableJvmLibrary
+from twitter.pants.base import Target
 
-class ScalaLibrary(ExportableJvmLibrary):
-  """Defines a target that produces a scala library."""
+from .exportable_jvm_library import ExportableJvmLibrary
+from .resources import WithLegacyResources
 
-  def __init__(self, name,
-               sources = None,
-               java_sources = None,
-               provides = None,
-               dependencies = None,
-               excludes = None,
-               resources = None,
-               deployjar = False,
-               buildflags = None,
-               is_meta = False):
-
-    """name: The name of this module target, addressable via pants via the portion of the spec
-        following the colon
-    sources: A list of paths containing the scala source files this module's jar is compiled from
-    java_sources: An optional list of paths containing the java sources this module's jar is in part
-        compiled from
-    provides: An optional Dependency object indicating the The ivy artifact to export
-    dependencies: An optional list of Dependency objects specifying the binary (jar) dependencies of
-        this module.
-    excludes: An optional list of dependency exclude patterns to filter all of this module's
-        transitive dependencies against.
-    resources: An optional list of paths containing (filterable) text file resources to place in
-        this module's jar
-    deployjar: An optional boolean that turns on generation of a monolithic deploy jar
-    buildflags: A list of additional command line arguments to pass to the underlying build system
-        for this target"""
-
-    ExportableJvmLibrary.__init__(self,
-                                  name,
-                                  sources,
-                                  provides,
-                                  dependencies,
-                                  excludes,
-                                  buildflags,
-                                  is_meta)
-
-    self.add_label('scala')
-    self.java_sources = java_sources
-
-    base_parent = os.path.dirname(self.target_base)
-    self.sibling_resources_base = os.path.join(base_parent, 'resources')
-    self.resources = self._resolve_paths(self.sibling_resources_base, resources)
-
-    self.deployjar = deployjar
-
-    # All scala targets implicitly depend on the selected scala runtime.
-    for spec in self._config.getlist('scala-compile', 'scaladeps'):
-      self.add_injected_dependency(spec)
+from . import JavaLibrary
 
 
-  def _create_template_data(self):
-    allsources = []
-    if self.sources:
-      allsources += list(os.path.join(self.target_base, source) for source in self.sources)
-    if self.resources:
-      allsources += list(os.path.join(self.sibling_resources_base, res) for res in self.resources)
+class ScalaLibrary(ExportableJvmLibrary, WithLegacyResources):
+  """Defines the source code and dependencies of a scala library."""
 
-    return ExportableJvmLibrary._create_template_data(self).extend(
-      java_sources = resolve_target_sources(self.java_sources, '.java'),
-      resources = self.resources,
-      deploy_jar = self.deployjar,
-      allsources = allsources,
-    )
+  def __init__(self, name, sources=None, java_sources=None, provides=None, dependencies=None,
+               excludes=None, resources=None, deployjar=False, buildflags=None):
 
+    """name:      The name of this target, addressable via pants via the portion of the address spec
+                  following the colon.
+    sources:      A list of paths containing the scala source files this scala library is composed
+                  of.
+    java_sources: An optional JavaLibrary target or list of targets containing the java libraries
+                  this library has a circular dependency on.  Prefer using dependencies to express
+                  non-circular dependencies.
+    provides:     An optional Dependency object indicating the The ivy artifact to export
+    dependencies: An optional list of local and remote dependencies of this library.
+    excludes:     An optional list of dependency Exclude objects to filter all of this module's
+                  transitive dependencies against.
+    resources:    An optional list of paths (DEPRECATED) or Resource targets containing resources
+                  that belong on this library's classpath.
+    deployjar:    DEPRECATED - An optional boolean that turns on generation of a monolithic deploy
+                  jar - now ignored.
+    buildflags:   DEPRECATED - A list of additional command line arguments to pass to the underlying
+                  build system for this target - now ignored.
+    """
+
+    ExportableJvmLibrary.__init__(self, name, sources, provides, dependencies, excludes)
+    WithLegacyResources.__init__(self, name, sources=sources, resources=resources)
+
+    self.add_labels('scala')
+
+    # Defer resolves until done parsing the current BUILD file, certain source_root arrangements
+    # might allow java and scala sources to co-mingle and so have targets in the same BUILD.
+    self._post_construct(self._link_java_cycles, java_sources)
+
+  def _link_java_cycles(self, java_sources):
+    if java_sources:
+      self.java_sources = list(Target.resolve_all(maybe_list(java_sources, Target), JavaLibrary))
+    else:
+      self.java_sources = []
+
+    # We have circular java/scala dep, add an inbound dependency edge from java to scala in this
+    # case to force scala compilation to precede java - since scalac supports generating java stubs
+    # for these cycles and javac does not this is both necessary and always correct.
+    for java_target in self.java_sources:
+      java_target.update_dependencies([self])

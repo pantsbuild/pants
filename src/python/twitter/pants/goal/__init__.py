@@ -29,8 +29,31 @@ class GoalError(Exception):
 from twitter.pants.goal.phase import Phase
 
 
+class Mkflag(object):
+  """A factory for namespaced flags."""
+
+  def __init__(self, namespace):
+    """Creates a new Mkflag that will use the given namespace to prefix the flags it creates.
+
+    namespace: Either a function accepting a separator string that returns a prefix string for the
+               flag or else a fixed prefix string for all flags.
+    """
+    self._namespace = namespace if callable(namespace) else lambda sep: namespace
+
+  def __call__(self, name, negate=False):
+    """Creates a prefixed flag with an optional negated prefix.
+
+    name: The simple flag name to be prefixed.
+    negate: True to prefix the flag with '--no-'.
+    """
+    return '--%s%s-%s' % ('no-' if negate else '', self._namespace('-'), name)
+
+  def set_bool(self, option, opt_str, _, parser):
+    """An Option callback to parse bool flags that recognizes the --no- negation prefix."""
+    setattr(parser.values, option.dest, not opt_str.startswith("--no"))
+
+
 class Goal(object):
-  # self.serialize==true if the goal requires the lock.
   def __init__(self, name, action, group=None, dependencies=None, serialize=True):
     """Parameters:
        name: the name of the goal.
@@ -74,7 +97,7 @@ class Goal(object):
       self._task = FuncTask
 
   def __repr__(self):
-    return "Goal(%s-%s; %s)" % (self.name, self.group, ','.join([str(d) for d in self.dependencies]))
+    return "Goal(%s-%s; %s)" % (self.name, self.group, ','.join(map(str, self.dependencies)))
 
   @property
   def task_type(self):
@@ -85,18 +108,10 @@ class Goal(object):
     def namespace(sep):
       phase_leader = phase.goals() == [self] or self.name == phase.name
       return self.name if phase_leader else '%s%s%s' % (phase.name, sep, self.name)
+    mkflag = Mkflag(namespace)
 
     group = OptionGroup(parser, title = namespace(':'))
-
-    def mkflag(arg_name, negate=False):
-      return '--%s%s-%s' % ('no-' if negate else '', namespace('-'), arg_name)
-
-    def set_bool(option, opt_str, value, parser):
-      setattr(parser.values, option.dest, not opt_str.startswith("--no"))
-    mkflag.set_bool = set_bool
-
     self._task.setup_parser(group, args, mkflag)
-
     if group.option_list:
       parser.add_option_group(group)
 

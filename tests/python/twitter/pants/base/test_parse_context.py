@@ -20,13 +20,16 @@ import os
 import pytest
 import unittest
 
-from twitter.common.contextutil import temporary_dir
-from twitter.pants.base import BuildFile, ContextError, ParseContext
+from textwrap import dedent
 
-def create_buildfile(root_dir, relpath, content=''):
+from twitter.common.contextutil import temporary_dir
+from twitter.common.dirutil import safe_mkdir
+from twitter.pants.base import Address, BuildFile, ContextError, ParseContext, Target
+
+def create_buildfile(root_dir, relpath, name='BUILD', content=''):
   path = os.path.join(root_dir, relpath)
-  os.makedirs(path)
-  buildfile = os.path.join(path, 'BUILD')
+  safe_mkdir(path)
+  buildfile = os.path.join(path, name)
   with open(buildfile, 'a') as f:
     f.write(content)
   return BuildFile(root_dir, relpath)
@@ -50,10 +53,11 @@ class ParseContextTest(unittest.TestCase):
   def test_parse(self):
     with temporary_dir() as root_dir:
       buildfile = create_buildfile(root_dir, 'a',
-'''
-with open('b', 'w') as b:
-  b.write('jack spratt')
-'''.strip())
+        content=dedent('''
+          with open('b', 'w') as b:
+            b.write('jack spratt')
+        ''').strip()
+      )
       b_file = os.path.join(root_dir, 'a', 'b')
       self.assertFalse(os.path.exists(b_file))
       ParseContext(buildfile).parse()
@@ -68,17 +72,50 @@ with open('b', 'w') as b:
 
     with temporary_dir() as root_dir:
       buildfile = create_buildfile(root_dir, 'a',
-'''import os
-from twitter.pants.base import ParseContext
-def leave_a_trail(file, contents=''):
-  with open(file, 'w') as b:
-    b.write(contents)
-b_file = os.path.join(os.path.dirname(__file__), 'b')
-ParseContext.locate().on_context_exit(leave_a_trail, b_file, contents='42')
-assert not os.path.exists(b_file), 'Expected context exit action to be delayed.'
-'''.strip())
+        content=dedent('''
+          import os
+          from twitter.pants.base import ParseContext
+          def leave_a_trail(file, contents=''):
+            with open(file, 'w') as b:
+              b.write(contents)
+          b_file = os.path.join(os.path.dirname(__file__), 'b')
+          ParseContext.locate().on_context_exit(leave_a_trail, b_file, contents='42')
+          assert not os.path.exists(b_file), 'Expected context exit action to be delayed.'
+        ''').strip()
+      )
       b_file = os.path.join(root_dir, 'a', 'b')
       self.assertFalse(os.path.exists(b_file))
       ParseContext(buildfile).parse()
       with open(b_file, 'r') as b:
         self.assertEquals('42', b.read())
+
+  def test_sibling_references(self):
+    with temporary_dir() as root_dir:
+      buildfile = create_buildfile(root_dir, 'a', name='BUILD',
+        content=dedent('''
+          dependencies(name='util',
+            dependencies=[
+              jar(org='com.twitter', name='util', rev='0.0.1')
+            ]
+          )
+        ''').strip()
+      )
+      sibling = create_buildfile(root_dir, 'a', name='BUILD.sibling',
+        content=dedent('''
+          dependencies(name='util-ex',
+            dependencies=[
+              pants(':util'),
+              jar(org='com.twitter', name='util-ex', rev='0.0.1')
+            ]
+          )
+        ''').strip()
+      )
+      ParseContext(buildfile).parse()
+
+      utilex = Target.get(Address.parse(root_dir, 'a:util-ex', is_relative=False))
+      utilex_deps = set(utilex.resolve())
+
+      util = Target.get(Address.parse(root_dir, 'a:util', is_relative=False))
+      util_deps = set(util.resolve())
+
+      self.assertEquals(util_deps, util_deps.intersection(utilex_deps))

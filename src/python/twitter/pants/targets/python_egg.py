@@ -18,11 +18,12 @@ __author__ = 'Brian Wickman'
 
 import os
 import glob
+from zipimport import zipimporter
 
 from pkg_resources import Distribution, EggMetadata, PathMetadata
 
-from twitter.common.python.importer import EggZipImporter
 from twitter.pants.targets.python_requirement import PythonRequirement
+
 
 def PythonEgg(egg_glob):
   eggs = glob.glob(egg_glob)
@@ -32,7 +33,7 @@ def PythonEgg(egg_glob):
     if os.path.isdir(egg):
       metadata = PathMetadata(egg, os.path.join(egg, 'EGG-INFO'))
     else:
-      metadata = EggMetadata(EggZipImporter(egg))
+      metadata = EggMetadata(zipimporter(egg))
     dist = Distribution.from_filename(egg, metadata=metadata)
     requirements.add(dist.as_requirement())
 

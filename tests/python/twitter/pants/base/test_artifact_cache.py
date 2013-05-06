@@ -20,11 +20,16 @@ import SocketServer
 import os
 
 from threading import Thread
-from twitter.common.dirutil import safe_mkdir
-from twitter.pants.base.artifact_cache import CombinedArtifactCache, FileBasedArtifactCache, \
-  RESTfulArtifactCache, create_artifact_cache
-from twitter.pants.base.build_invalidator import CacheKey
+
 from twitter.common.contextutil import pushd, temporary_dir, temporary_file
+from twitter.common.dirutil import safe_mkdir
+
+from twitter.pants.base.artifact_cache import (
+    CombinedArtifactCache,
+    FileBasedArtifactCache,
+    RESTfulArtifactCache,
+    create_artifact_cache)
+from twitter.pants.base.build_invalidator import CacheKey
 
 
 # A very trivial server that serves files under the cwd.
@@ -56,7 +61,6 @@ class SimpleRESTHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
     self.end_headers()
 
 
-
 TEST_CONTENT1 = 'muppet'
 TEST_CONTENT2 = 'kermit'
 
@@ -82,6 +86,7 @@ def test_local_cache():
       artifact_cache = FileBasedArtifactCache(None, artifact_root, cache_root)
       do_test_artifact_cache(artifact_cache)
 
+
 def test_restful_cache():
   httpd = None
   httpd_thread = None
@@ -100,6 +105,7 @@ def test_restful_cache():
       httpd.shutdown()
     if httpd_thread:
       httpd_thread.join()
+
 
 def do_test_artifact_cache(artifact_cache):
   key = CacheKey('muppet_key', 'fake_hash', 42)

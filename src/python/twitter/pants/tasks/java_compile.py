@@ -14,19 +14,16 @@
 # limitations under the License.
 # ==================================================================================================
 
-__author__ = 'John Sirois'
+import os
+import shlex
 
 from collections import defaultdict
 
-import os
-
-from twitter.common import log
 from twitter.common.dirutil import safe_open, safe_mkdir
-from twitter.pants import is_apt
+
+from twitter.pants import has_sources, is_apt, Task
 from twitter.pants.base.target import Target
-from twitter.pants.targets import JavaLibrary, JavaTests
-from twitter.pants.tasks import TaskError, Task
-from twitter.pants.tasks.binary_utils import nailgun_profile_classpath
+from twitter.pants.tasks import TaskError
 from twitter.pants.tasks.jvm_compiler_dependencies import Dependencies
 from twitter.pants.tasks.nailgun_task import NailgunTask
 
@@ -61,11 +58,11 @@ _JMAKE_ERROR_CODES = {
 _JMAKE_ERROR_CODES.update((256+code, msg) for code, msg in _JMAKE_ERROR_CODES.items())
 
 
-class JavaCompile(NailgunTask):
-  @staticmethod
-  def _has_java_sources(target):
-    return is_apt(target) or isinstance(target, JavaLibrary) or isinstance(target, JavaTests)
+def _is_java(target):
+  return has_sources(target, '.java')
 
+
+class JavaCompile(NailgunTask):
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
     NailgunTask.setup_parser(option_group, args, mkflag)
@@ -76,18 +73,23 @@ class JavaCompile(NailgunTask):
                             help="[%default] Compile java code with all configured warnings "
                                  "enabled.")
 
+    option_group.add_option(mkflag("args"), dest="java_compile_args", action="append",
+                            help="Pass these extra args to javac.")
+
     option_group.add_option(mkflag("partition-size-hint"), dest="java_compile_partition_size_hint",
-      action="store", type="int", default=-1,
-      help="Roughly how many source files to attempt to compile together. Set to a large number to compile "\
-           "all sources together. Set this to 0 to compile target-by-target. Default is set in pants.ini.")
+                            action="store", type="int", default=-1,
+                            help="Roughly how many source files to attempt to compile together. Set"
+                                 " to a large number to compile all sources together. Set this to 0"
+                                 " to compile target-by-target. Default is set in pants.ini.")
 
   def __init__(self, context):
     NailgunTask.__init__(self, context, workdir=context.config.get('java-compile', 'nailgun_dir'))
 
-    self._partition_size_hint = \
-      context.options.java_compile_partition_size_hint \
-      if context.options.java_compile_partition_size_hint != -1 \
-      else context.config.getint('java-compile', 'partition_size_hint')
+    if context.options.java_compile_partition_size_hint != -1:
+      self._partition_size_hint = context.options.java_compile_partition_size_hint
+    else:
+      self._partition_size_hint = context.config.getint('java-compile', 'partition_size_hint',
+                                                        default=1000)
 
     workdir = context.config.get('java-compile', 'workdir')
     self._classes_dir = os.path.join(workdir, 'classes')
@@ -98,13 +100,20 @@ class JavaCompile(NailgunTask):
     self._jmake_profile = context.config.get('java-compile', 'jmake-profile')
     self._compiler_profile = context.config.get('java-compile', 'compiler-profile')
 
-    self._args = context.config.getlist('java-compile', 'args')
+    self._opts = context.config.getlist('java-compile', 'args')
     self._jvm_args = context.config.getlist('java-compile', 'jvm_args')
 
-    if context.options.java_compile_warnings:
-      self._args.extend(context.config.getlist('java-compile', 'warning_args'))
+    self._javac_opts = []
+    if context.options.java_compile_args:
+      for arg in context.options.java_compile_args:
+        self._javac_opts.extend(shlex.split(arg))
     else:
-      self._args.extend(context.config.getlist('java-compile', 'no_warning_args'))
+      self._javac_opts.extend(context.config.getlist('java-compile', 'javac_args', default=[]))
+
+    if context.options.java_compile_warnings:
+      self._opts.extend(context.config.getlist('java-compile', 'warning_args'))
+    else:
+      self._opts.extend(context.config.getlist('java-compile', 'no_warning_args'))
 
     self._confs = context.config.getlist('java-compile', 'confs')
 
@@ -119,7 +128,7 @@ class JavaCompile(NailgunTask):
     return True
 
   def execute(self, targets):
-    java_targets = filter(JavaCompile._has_java_sources, targets)
+    java_targets = filter(_is_java, targets)
     if java_targets:
       safe_mkdir(self._classes_dir)
       safe_mkdir(self._depfile_dir)
@@ -130,7 +139,7 @@ class JavaCompile(NailgunTask):
           cp.insert(0, (conf, self._classes_dir))
 
       with self.invalidated(java_targets, invalidate_dependents=True,
-          partition_size_hint=self._partition_size_hint) as invalidation_check:
+                            partition_size_hint=self._partition_size_hint) as invalidation_check:
         for vt in invalidation_check.invalid_vts_partitioned:
           # Compile, using partitions for efficiency.
           self.execute_single_compilation(vt, cp)
@@ -148,20 +157,20 @@ class JavaCompile(NailgunTask):
       if not self.dry_run:
         if self.context.products.isrequired('classes'):
           genmap = self.context.products.get('classes')
-
           # Map generated classes to the owning targets and sources.
           for target, classes_by_source in self._deps.findclasses(java_targets).items():
             for source, classes in classes_by_source.items():
               genmap.add(source, self._classes_dir, classes)
               genmap.add(target, self._classes_dir, classes)
+
           # TODO(John Sirois): Map target.resources in the same way
           # 'Map' (rewrite) annotation processor service info files to the owning targets.
           for target in java_targets:
             if is_apt(target) and target.processors:
-                basedir = os.path.join(self._resources_dir, Target.maybe_readable_identify([target]))
-                processor_info_file = os.path.join(basedir, _PROCESSOR_INFO_FILE)
-                self.write_processor_info(processor_info_file, target.processors)
-                genmap.add(target, basedir, [_PROCESSOR_INFO_FILE])
+              basedir = os.path.join(self._resources_dir, Target.maybe_readable_identify([target]))
+              processor_info_file = os.path.join(basedir, _PROCESSOR_INFO_FILE)
+              self.write_processor_info(processor_info_file, target.processors)
+              genmap.add(target, basedir, [_PROCESSOR_INFO_FILE])
 
         # Produce a monolithic apt processor service info file for further compilation rounds
         # and the unit test classpath.
@@ -228,25 +237,25 @@ class JavaCompile(NailgunTask):
     return sources, Target.identify(targets)
 
   def compile(self, classpath, sources, fingerprint, depfile):
-    jmake_classpath = nailgun_profile_classpath(self, self._jmake_profile)
+    jmake_classpath = self.profile_classpath(self._jmake_profile)
 
-    args = [
+    opts = [
       '-classpath', ':'.join(classpath),
       '-d', self._classes_dir,
       '-pdb', os.path.join(self._classes_dir, '%s.dependencies.pdb' % fingerprint),
     ]
 
-    compiler_classpath = nailgun_profile_classpath(self, self._compiler_profile)
-    args.extend([
+    compiler_classpath = self.profile_classpath(self._compiler_profile)
+    opts.extend([
       '-jcpath', ':'.join(compiler_classpath),
       '-jcmainclass', 'com.twitter.common.tools.Compiler',
       '-C-Tdependencyfile', '-C%s' % depfile,
     ])
+    opts.extend(map(lambda arg: '-C%s' % arg, self._javac_opts))
 
-    args.extend(self._args)
-    args.extend(sources)
-    log.debug('Executing: %s %s' % (_JMAKE_MAIN, ' '.join(args)))
-    return self.runjava(_JMAKE_MAIN, classpath=jmake_classpath, args=args, jvmargs=self._jvm_args)
+    opts.extend(self._opts)
+    return self.runjava_indivisible(_JMAKE_MAIN, classpath=jmake_classpath, opts=opts, args=sources,
+                                    jvmargs=self._jvm_args)
 
   def check_artifact_cache(self, vts):
     # Special handling for java artifacts.

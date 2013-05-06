@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==================================================================================================
+
 import os
 import pkgutil
 import shutil
@@ -22,21 +23,28 @@ from xml.dom import minidom
 
 from twitter.common.dirutil import safe_mkdir
 
-from twitter.pants import get_buildroot
+from twitter.pants import get_buildroot, JavaTests, ScalaTests, SourceRoot
 from twitter.pants.base.generator import TemplateData, Generator
 from twitter.pants.tasks.ide_gen import IdeGen, Project
 
 
-__author__ = 'John Sirois'
-
-
-_TEMPLATE_BASEDIR = 'idea/templates'
+_TEMPLATE_BASEDIR = 'templates/idea'
 
 
 _VERSIONS = {
-  '9': '11', # 9 and 11 are ipr/iml compatible
-  '10': '11', # 9 and 11 are ipr/iml compatible
-  '11': '11'
+  '9': '12', # 9 and 12 are ipr/iml compatible
+  '10': '12', # 10 and 12 are ipr/iml compatible
+  '11': '12', # 11 and 12 are ipr/iml compatible
+  '12': '12'
+}
+
+
+_SCALA_VERSION_DEFAULT = '2.9'
+_SCALA_VERSIONS = {
+  '2.8':                  'Scala 2.8',
+  _SCALA_VERSION_DEFAULT: 'Scala 2.9',
+  '2.10':                 'Scala 2.10',
+  '2.10-virt':            'Scala 2.10 virtualized'
 }
 
 
@@ -46,33 +54,45 @@ class IdeaGen(IdeGen):
     IdeGen.setup_parser(option_group, args, mkflag)
 
     supported_versions = sorted(list(_VERSIONS.keys()))
-    option_group.add_option(mkflag("idea-version"), dest = "idea_gen_version",
-                            default = '11', type = "choice", choices = supported_versions,
-                            help = "[%%default] The IntelliJ IDEA version the project "
+    option_group.add_option(mkflag("idea-version"), dest="idea_gen_version",
+                            default='11', type="choice", choices=supported_versions,
+                            help="[%%default] The IntelliJ IDEA version the project "
                                    "configuration should be generated for; can be one of: " \
                                    "%s" % supported_versions)
 
-    option_group.add_option(mkflag("merge"), mkflag("merge", negate=True), default = True,
-                            action="callback", callback=mkflag.set_bool, dest = "idea_gen_merge",
-                            help = "[%default] Merge any manual customizations in existing "
+    option_group.add_option(mkflag("merge"), mkflag("merge", negate=True), default=True,
+                            action="callback", callback=mkflag.set_bool, dest="idea_gen_merge",
+                            help="[%default] Merge any manual customizations in existing "
                                    "Intellij IDEA configuration. If False, manual customizations "
                                    "will be over-written.")
 
-    option_group.add_option(mkflag("open"), mkflag("open", negate=True), default = True,
-                            action="callback", callback=mkflag.set_bool, dest = "idea_gen_open",
-                            help = "[%default] Attempts top open the generated project in IDEA.")
+    option_group.add_option(mkflag("open"), mkflag("open", negate=True), default=True,
+                            action="callback", callback=mkflag.set_bool, dest="idea_gen_open",
+                            help="[%default] Attempts top open the generated project in IDEA.")
 
-    option_group.add_option(mkflag("bash"), mkflag("bash", negate=True), default = False,
-                            action="callback", callback=mkflag.set_bool, dest = "idea_gen_bash",
-                            help = "Adds a bash facet to the generated project configuration.")
-    option_group.add_option(mkflag("fsc"), mkflag("fsc", negate=True), default = False,
-                            action="callback", callback=mkflag.set_bool, dest = "idea_gen_fsc",
-                            help = "If the project contains any scala targets this specifies the "
+    option_group.add_option(mkflag("bash"), mkflag("bash", negate=True), default=False,
+                            action="callback", callback=mkflag.set_bool, dest="idea_gen_bash",
+                            help="Adds a bash facet to the generated project configuration.")
+
+    option_group.add_option(mkflag("scala-language-level"), default=_SCALA_VERSION_DEFAULT,
+                            type="choice", choices=_SCALA_VERSIONS.keys(),
+                            dest="idea_scala_language_level",
+                            help="[%default] Set the scala language level used for IDEA linting.")
+    option_group.add_option(mkflag("scala-maximum-heap-size"),
+                            dest="idea_gen_scala_maximum_heap_size",
+                            help="[%default] Sets the maximum heap size (in megabytes) for scalac.")
+    option_group.add_option(mkflag("fsc"), mkflag("fsc", negate=True), default=False,
+                            action="callback", callback=mkflag.set_bool, dest="idea_gen_fsc",
+                            help="If the project contains any scala targets this specifies the "
                                    "fsc compiler should be enabled.")
-    option_group.add_option(mkflag("java-encoding"), default = "UTF-8",
-                            dest = "idea_gen_java_encoding",
-                            help = "[%default] Sets the file encoding for java files in this "
+
+    option_group.add_option(mkflag("java-encoding"), default="UTF-8",
+                            dest="idea_gen_java_encoding",
+                            help="[%default] Sets the file encoding for java files in this "
                                    "project.")
+    option_group.add_option(mkflag("java-maximum-heap-size"),
+                            dest="idea_gen_java_maximum_heap_size",
+                            help="[%default] Sets the maximum heap size (in megabytes) for javac.")
 
   def __init__(self, context):
     IdeGen.__init__(self, context)
@@ -82,8 +102,19 @@ class IdeaGen(IdeGen):
     self.nomerge = not context.options.idea_gen_merge
     self.open = context.options.idea_gen_open
     self.bash = context.options.idea_gen_bash
+
+    self.scala_language_level = _SCALA_VERSIONS.get(context.options.idea_scala_language_level, None)
+    self.scala_maximum_heap_size = (
+      context.options.idea_gen_scala_maximum_heap_size
+      or context.config.getint('idea', 'scala_maximum_heap_size_mb', default=512)
+    )
     self.fsc = context.options.idea_gen_fsc
+
     self.java_encoding = context.options.idea_gen_java_encoding
+    self.java_maximum_heap_size = (
+      context.options.idea_gen_java_maximum_heap_size
+      or context.config.getint('idea', 'java_maximum_heap_size_mb', default=128)
+    )
 
     idea_version = _VERSIONS[context.options.idea_gen_version]
     self.project_template = os.path.join(_TEMPLATE_BASEDIR, 'project-%s.mustache' % idea_version)
@@ -93,38 +124,71 @@ class IdeaGen(IdeGen):
     self.module_filename = os.path.join(self.work_dir, '%s.iml' % self.project_name)
 
   def generate_project(self, project):
+    def is_test_target_type(ttype):
+      return issubclass(ttype, (JavaTests, ScalaTests))
+
+    is_test_by_base = {}
+
+    def is_test(source_set):
+      if source_set.is_test:
+        return True
+
+      # Non test targets that otherwise live in test target roots (say a java_library), must
+      # be marked as test for IDEA to correctly link the targets with the test code that uses
+      # them.
+      base = source_set.source_base
+      if base not in is_test_by_base:
+        is_test_by_base[base] = any(map(is_test_target_type, SourceRoot.types(base)))
+      istest = is_test_by_base[base]
+      if istest:
+        self.context.log.debug('Marked non-test source set as test (%s, %s)' % (
+          source_set.source_base, source_set.path
+        ))
+      return istest
+
     def create_content_root(source_set):
       root_relative_path = os.path.join(source_set.source_base, source_set.path) \
                            if source_set.path else source_set.source_base
+
+      sources = TemplateData(
+        path=root_relative_path,
+        package_prefix=source_set.path.replace('/', '.') if source_set.path else None,
+        is_test=is_test(source_set)
+      )
+
       return TemplateData(
-        path = root_relative_path,
-        sources = [ TemplateData(
-          path = root_relative_path,
-          package_prefix = source_set.path.replace('/', '.') if source_set.path else None,
-          is_test = source_set.is_test,
-        ) ],
-        exclude_paths = [ os.path.join(source_set.source_base, x) for x in source_set.excludes ],
+        path=root_relative_path,
+        sources=[sources],
+        exclude_paths=[os.path.join(source_set.source_base, x) for x in source_set.excludes],
       )
 
     content_roots = [create_content_root(source_set) for source_set in project.sources]
     if project.has_python:
       content_roots.extend(create_content_root(source_set) for source_set in project.py_sources)
 
+    scala = None
+    if project.has_scala:
+      scala = TemplateData(
+        language_level=self.scala_language_level,
+        maximum_heap_size=self.scala_maximum_heap_size,
+        fsc=self.fsc,
+        compiler_classpath=project.scala_compiler_classpath
+      )
+
     configured_module = TemplateData(
-      root_dir = get_buildroot(),
-      path = self.module_filename,
-      content_roots = content_roots,
-      has_bash = self.bash,
-      has_python = project.has_python,
-      has_scala = project.has_scala,
-      has_tests = project.has_tests,
-      internal_jars = [cp_entry.jar for cp_entry in project.internal_jars],
-      internal_source_jars = [cp_entry.source_jar for cp_entry in project.internal_jars
-                              if cp_entry.source_jar],
-      external_jars = [cp_entry.jar for cp_entry in project.external_jars],
-      external_source_jars = [cp_entry.source_jar for cp_entry in project.external_jars
-                              if cp_entry.source_jar],
-      extra_components = [],
+      root_dir=get_buildroot(),
+      path=self.module_filename,
+      content_roots=content_roots,
+      bash=self.bash,
+      python=project.has_python,
+      scala=scala,
+      internal_jars=[cp_entry.jar for cp_entry in project.internal_jars],
+      internal_source_jars=[cp_entry.source_jar for cp_entry in project.internal_jars
+                            if cp_entry.source_jar],
+      external_jars=[cp_entry.jar for cp_entry in project.external_jars],
+      external_source_jars=[cp_entry.source_jar for cp_entry in project.external_jars
+                            if cp_entry.source_jar],
+      extra_components=[],
     )
 
     outdir = os.path.abspath(self.intellij_output_dir)
@@ -132,18 +196,21 @@ class IdeaGen(IdeGen):
       os.makedirs(outdir)
 
     configured_project = TemplateData(
-      root_dir = get_buildroot(),
-      outdir = outdir,
-      modules = [ configured_module ],
-      java_encoding = self.java_encoding,
-      resource_extensions = self._get_resource_extensions(project),
-      has_scala = project.has_scala,
-      scala_compiler_classpath = project.scala_compiler_classpath,
-      scala = TemplateData(fsc = self.fsc) if project.has_scala else None,
-      checkstyle_suppression_files = ','.join(project.checkstyle_suppression_files),
-      checkstyle_classpath = ';'.join(project.checkstyle_classpath),
+      root_dir=get_buildroot(),
+      outdir=outdir,
+      modules=[ configured_module ],
+      java=TemplateData(
+        encoding=self.java_encoding,
+        maximum_heap_size=self.java_maximum_heap_size,
+        jdk=self.java_jdk,
+        language_level = 'JDK_1_%d' % self.java_language_level
+      ),
+      resource_extensions=project.resource_extensions,
+      scala=scala,
+      checkstyle_suppression_files=','.join(project.checkstyle_suppression_files),
+      checkstyle_classpath=';'.join(project.checkstyle_classpath),
       debug_port=project.debug_port,
-      extra_components = [],
+      extra_components=[],
     )
 
     existing_project_components = None

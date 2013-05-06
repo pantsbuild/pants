@@ -12,7 +12,7 @@ mkdir -p $CACHE
 
 
 if [ ! $PY ]; then
-  echo No python interpreter found on the path.  Python will not work\!
+  echo 'No python interpreter found on the path.  Python will not work!'
   exit 1
 fi
 
@@ -31,7 +31,7 @@ PYTHON=$BOOTSTRAP_BIN/bootstrap
 
 pushd $CACHE >& /dev/null
   if ! test -f virtualenv-1.7.1.2.tar.gz; then
-    echo Installing virtualenv
+    echo 'Installing virtualenv' 1>&2
     for url in \
       http://pypi.python.org/packages/source/v/virtualenv/virtualenv-1.7.1.2.tar.gz \
       https://svn.twitter.biz/science-binaries/home/third_party/python/virtualenv-1.7.1.2.tar.gz; do
@@ -45,7 +45,7 @@ popd >& /dev/null
 
 if $PYTHON $CACHE/virtualenv-1.7.1.2/virtualenv.py -p $PY --distribute $BOOTSTRAP_ENVIRONMENT; then
   source $BOOTSTRAP_ENVIRONMENT/bin/activate
-  for pkg in mako distribute; do
+  for pkg in distribute pystache; do
     pip install \
       --download-cache=$CACHE \
       -f https://svn.twitter.biz/science-binaries/home/third_party/python \

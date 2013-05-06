@@ -14,24 +14,11 @@
 # limitations under the License.
 # ==================================================================================================
 
-__author__ = 'Mark McBride'
+from twitter.pants.base import Target
 
-from twitter.pants.base import Target, TargetDefinitionException
-from twitter.pants.targets.pants_target import Pants
-from twitter.pants.targets.internal import InternalTarget
-from twitter.pants.targets.with_sources import TargetWithSources
-
-class Doc(InternalTarget, TargetWithSources):
-  """A target that processes documentation in a directory"""
-  def __init__(self, name, dependencies=(), sources=None, resources=None):
-    InternalTarget.__init__(self, name, dependencies, None)
-    TargetWithSources.__init__(self, name)
-    if not sources:
-      raise TargetDefinitionException(self, 'No sources specified')
-    self.add_label('doc')
-    self.name = name
-    self.sources = self._resolve_paths(self.target_base, sources)
-    self.resources = self._resolve_paths(self.target_base, resources) if resources else []
+from .internal import InternalTarget
+from .pants_target import Pants
+from .with_sources import TargetWithSources
 
 
 class Wiki(Target):
@@ -40,30 +27,26 @@ class Wiki(Target):
   def __init__(self, name, url_builder):
     """:url_builder a function that accepts a page target and an optional wiki :config dict and
     returns a tuple of (alias, fully qualified url)."""
-    Target.__init__(self, name, is_meta=False)
+    Target.__init__(self, name)
     self.url_builder = url_builder
 
 
 class Page(InternalTarget, TargetWithSources):
   """A target that identifies a single documentation page."""
   def __init__(self, name, source, dependencies=None, resources=None):
-    InternalTarget.__init__(self, name, dependencies, is_meta=False)
-    TargetWithSources.__init__(self, name)
-
-    self.sources = self._resolve_paths(self.target_base, [source])
-    self._source = self.sources.pop()
+    InternalTarget.__init__(self, name, dependencies)
+    TargetWithSources.__init__(self, name, sources=[source])
 
     self.resources = self._resolve_paths(self.target_base, resources) if resources else []
     self._wikis = {}
 
   @property
   def source(self):
-    return self._source
+    return self.sources[0]
 
   def register_wiki(self, wiki, **kwargs):
-    """
-      Adds this page to the given wiki for publishing.  Wiki-specific configuration is passed as
-      kwargs.
+    """Adds this page to the given wiki for publishing.  Wiki-specific configuration is passed as
+    kwargs.
     """
     if isinstance(wiki, Pants):
       wiki = wiki.get()

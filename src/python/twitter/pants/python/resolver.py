@@ -28,8 +28,8 @@ from twitter.common.collections import OrderedSet
 from twitter.common.python.fetcher import Fetcher
 from twitter.common.python.resolver import Resolver
 
+from twitter.pants import is_concrete
 from twitter.pants.base import Config
-from twitter.pants.base import Target, Address
 from twitter.pants.targets import (
   PythonBinary, PythonLibrary, PythonAntlrLibrary,
   PythonRequirement, PythonThriftLibrary, PythonTests)
@@ -80,17 +80,18 @@ class PythonResolver(object):
   def resolve(self):
     children = defaultdict(OrderedSet)
     def add_dep(trg):
-      for target_type, target_key in PythonResolver._VALID_DEPENDENCIES.items():
-        if isinstance(trg, target_type):
-          children[target_key].add(trg)
-          return
+      if is_concrete(trg):
+        for target_type, target_key in PythonResolver._VALID_DEPENDENCIES.items():
+          if isinstance(trg, target_type):
+            children[target_key].add(trg)
+            return
       raise PythonResolver.InvalidDependencyException(trg)
     for target in self._targets:
       target.walk(add_dep)
     return children
 
   def dump(self):
-    self.debug('Building PythonBinary %s:' % self._target)
+    self.debug('Building PythonBinary %s:' % self._targets)
 
     targets = self.resolve()
 

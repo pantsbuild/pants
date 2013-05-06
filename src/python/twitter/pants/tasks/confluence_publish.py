@@ -14,8 +14,6 @@
 # limitations under the License.
 # ==================================================================================================
 
-__author__ = 'John Sirois'
-
 import textwrap
 
 import os
@@ -23,16 +21,16 @@ import os
 from twitter.common.confluence import Confluence, ConfluenceError
 from twitter.common.dirutil import safe_open
 
+from twitter.pants import binary_util
 from twitter.pants.targets import Page
 from twitter.pants.tasks import Task, TaskError
-from twitter.pants.tasks import binary_utils
 
 class ConfluencePublish(Task):
 
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
-    option_group.add_option(mkflag("url"), dest="confluence_publish_url",
-                            help="The url of the confluence site to post to.")
+    cls.url_option = option_group.add_option(mkflag("url"), dest="confluence_publish_url",
+                                             help="The url of the confluence site to post to.")
 
     option_group.add_option(mkflag("force"), mkflag("force", negate=True),
                             dest = "confluence_publish_force",
@@ -46,6 +44,9 @@ class ConfluencePublish(Task):
                             help="[%default] Attempt to open the published confluence wiki page "
                                  "in a browser.")
 
+    option_group.add_option(mkflag("user"), dest="confluence_user",
+                            help="Confluence user name, defaults to unix user.")
+
   def __init__(self, context):
     Task.__init__(self, context)
 
@@ -54,10 +55,16 @@ class ConfluencePublish(Task):
       or context.config.get('confluence-publish', 'url')
     )
 
+    if not self.url:
+      raise TaskError("Unable to proceed publishing to confluence. Please configure a 'url' under "
+                      "the 'confluence-publish' heading in pants.ini or using the %s command line "
+                      "option." % self.url_option)
+
     self.force = context.options.confluence_publish_force
     self.open = context.options.confluence_publish_open
     self.context.products.require('markdown_html')
     self._wiki = None
+    self.user = context.options.confluence_user
 
   def wiki(self):
     raise NotImplementedError('Subclasses must provide the wiki target they are associated with')
@@ -93,7 +100,7 @@ class ConfluencePublish(Task):
           self.context.log.info('Published %s to %s' % (page, url))
 
     if self.open and urls:
-      binary_utils.open(*urls)
+      binary_util.ui_open(*urls)
 
   def publish_page(self, address, space, title, content, parent=None):
     body = textwrap.dedent('''
@@ -125,7 +132,7 @@ class ConfluencePublish(Task):
   def login(self):
     if not self._wiki:
       try:
-        self._wiki = Confluence.login(self.url)
+        self._wiki = Confluence.login(self.url, self.user)
       except ConfluenceError as e:
         raise TaskError('Failed to login to confluence: %s' % e)
     return self._wiki

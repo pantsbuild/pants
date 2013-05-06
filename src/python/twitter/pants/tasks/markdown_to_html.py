@@ -70,10 +70,11 @@ import re
 import textwrap
 
 from twitter.common.dirutil import safe_open
-from twitter.pants import get_buildroot
+
+from twitter.pants import binary_util, get_buildroot
 from twitter.pants.base import Address, Target
 from twitter.pants.targets import Page
-from twitter.pants.tasks import binary_utils, Task, TaskError
+from twitter.pants.tasks import Task, TaskError
 
 class MarkdownToHtml(Task):
   AVAILABLE = HAS_MARKDOWN
@@ -105,19 +106,22 @@ class MarkdownToHtml(Task):
 
     self.open = context.options.markdown_to_html_open
 
+    pants_workdir = context.config.getdefault('pants_workdir')
     self.outdir = (
       context.options.markdown_to_html_outdir
-      or context.config.get('markdown-to-html', 'workdir')
+      or context.config.get('markdown-to-html',
+                            'workdir',
+                            default=os.path.join(pants_workdir, 'markdown'))
     )
 
     self.extensions = set(
       context.options.markdown_to_html_extensions
-      or context.config.getlist('markdown-to-html', 'extensions', ['.md'])
+      or context.config.getlist('markdown-to-html', 'extensions', default=['.md', '.markdown'])
     )
 
     self.standalone = context.options.markdown_to_html_standalone
 
-    self.code_style = context.config.get('markdown-to-html', 'code-style')
+    self.code_style = context.config.get('markdown-to-html', 'code-style', default='friendly')
     if hasattr(context.options, 'markdown_to_html_code_style'):
       if context.options.markdown_to_html_code_style:
         self.code_style = context.options.markdown_to_html_code_style
@@ -187,7 +191,7 @@ class MarkdownToHtml(Task):
           process_page((wiki, page), basedir, wiki.url_builder, get_config)
 
     if show:
-      binary_utils.open(*show)
+      binary_util.ui_open(*show)
 
   PANTS_LINK = re.compile(r'''pants\(['"]([^)]+)['"]\)''')
 

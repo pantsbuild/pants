@@ -22,7 +22,7 @@ import sys
 from twitter.common.collections import OrderedSet
 from twitter.pants.base import BuildFile, Target
 
-class Command:
+class Command(object):
   """Baseclass for all pants subcommands."""
 
   @staticmethod
@@ -49,7 +49,7 @@ class Command:
             Command._commands[command_name] = kls
 
   @staticmethod
-  def scan_addresses(root_dir, base_path = None):
+  def scan_addresses(root_dir, base_path=None):
     """Parses all targets available in BUILD files under base_path and
     returns their addresses.  If no base_path is specified, root_dir is
     assumed to be the base_path"""
@@ -71,7 +71,7 @@ class Command:
     self.root_dir = root_dir
 
     # Override the OptionParser's error with more useful output
-    def error(message = None, show_help = True):
+    def error(message=None, show_help=True):
       if message:
         print(message + '\n')
       if show_help:
@@ -92,7 +92,7 @@ class Command:
 
     pass
 
-  def error(self, message = None, show_help = True):
+  def error(self, message=None, show_help=True):
     """Reports the error message, optionally followed by pants help, and then exits."""
 
   def run(self, lock):

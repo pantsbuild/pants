@@ -17,10 +17,11 @@
 python_tests(name = 'base',
   sources = globs('*.py'),
   dependencies = [
-    'src/python/twitter/common/collections',
-    'src/python/twitter/common/dirutil',
-    'src/python/twitter/pants:pants-deps',
-    'src/python/twitter/pants:pants-lib',
-    'tests/python/twitter/pants/testutils',
+    python_requirement('mox'),
+    pants("src/python/twitter/common/collections"),
+    pants("src/python/twitter/common/dirutil"),
+    pants("src/python/twitter/pants:pants-lib"),
+    pants("src/python/twitter/pants:pants-deps"),
+    pants("tests/python/twitter/pants/testutils"),
   ]
 )

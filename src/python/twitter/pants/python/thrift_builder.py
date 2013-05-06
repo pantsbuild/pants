@@ -25,8 +25,10 @@ import subprocess
 
 from twitter.common.dirutil import safe_rmtree
 from twitter.common.dirutil.chroot import RelativeChroot
-from twitter.pants import Config
+
 from twitter.pants.python.egg_builder import EggBuilder
+from twitter.pants.targets.python_thrift_library import PythonThriftLibrary
+from twitter.pants.thrift_util import calculate_compile_roots, select_thrift_binary
 
 class PythonThriftBuilder(object):
   """
@@ -37,20 +39,16 @@ class PythonThriftBuilder(object):
       Exception.__init__(self, "Unknown platform: %s!" % str(platform))
   class CodeGenerationException(Exception): pass
 
-  def __init__(self, target, root_dir):
+  def __init__(self, target, root_dir, config):
     self.target = target
     self.root = root_dir
+    self.config = config
     distdir = os.path.join(self.root, 'dist')
     self.chroot = RelativeChroot(root_dir, distdir, target.name)
     codegen_root = tempfile.mkdtemp(dir=self.chroot.path(), prefix='codegen.')
     self.codegen_root = os.path.relpath(codegen_root, self.chroot.path())
     self.detected_packages = set()
     self.detected_namespace_packages = set()
-
-    # TODO: Temporary hack where we reparse pants.ini. Right now it's too difficult to plumb
-    # it through, and this will all be ported to "new pants" soon anyway.
-    config = Config.load()
-    self.platmap = config.getdict('py', 'thrift-platmap')
 
   def __del__(self):
     self.cleanup()
@@ -61,31 +59,32 @@ class PythonThriftBuilder(object):
   def cleanup(self):
     safe_rmtree(self.chroot.path())
 
-  def thrift_binary(self, root_dir):
-    uname = os.uname()
-    platform = (uname[0].lower(), uname[4])
-    if platform not in self.platmap:
-      raise PythonThriftBuilder.UnknownPlatformException(platform)
-    return os.path.join(root_dir, 'build-support', 'bin', 'thrift', *self.platmap[platform])
-
   def run_thrifts(self):
-    for src in self.target.sources:
-      if not self._run_thrift(src):
+    def is_py_thrift(target):
+      return isinstance(target, PythonThriftLibrary)
+    bases, roots = calculate_compile_roots([self.target], is_py_thrift)
+
+    for src in roots:
+      if not self._run_thrift(src, bases):
         raise PythonThriftBuilder.CodeGenerationException(
           "Could not generate .py from %s!" % src)
 
-  def _run_thrift(self, source):
+  def _run_thrift(self, source, bases):
     thrift_file = source
-    thrift_abs_path = os.path.join(self.root, self.target.target_base, thrift_file)
+    thrift_abs_path = os.path.join(self.root, thrift_file)
     thrift_abs_path = os.path.abspath(thrift_abs_path)
 
     args = [
-      self.thrift_binary(self.root),
+      select_thrift_binary(self.config),
       '--gen',
       'py:new_style',
+      '-recurse',
       '-o',
-      self.codegen_root,
-      thrift_abs_path]
+      self.codegen_root
+    ]
+    for base in bases:
+      args.extend(('-I', base))
+    args.append(thrift_abs_path)
 
     cwd = os.getcwd()
     os.chdir(self.chroot.path())

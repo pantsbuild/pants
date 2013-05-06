@@ -14,8 +14,6 @@
 # limitations under the License.
 # ==================================================================================================
 
-__author__ = 'John Sirois'
-
 import os
 
 from collections import defaultdict
@@ -25,35 +23,34 @@ from twitter.pants import get_buildroot
 from twitter.pants.base import ParseContext
 
 class SourceRoot(object):
+  """Allows registration of a source root for a set of targets.
+
+  A source root is the base path sources for a particular language are found relative to.
+  Generally compilers or interpreters for the source will expect sources relative to a base path
+  and a source root allows calculation of the correct relative paths.
+
+  It is illegal to have nested source roots.
   """
-    Allows registration of a source root for a set of targets.
-
-    A source root is the base path sources for a particular language are found relative to.
-    Generally compilers or interpreters for the source will expect sources relative to a base path
-    and a source root allows calculation of the correct relative paths.
-
-    It is illegal to have nested source roots.
-  """
-
-  _ROOTS = defaultdict(OrderedSet)
+  _ROOTS_BY_TYPE = defaultdict(OrderedSet)
+  _TYPES_BY_ROOT = defaultdict(OrderedSet)
   _SEARCHED = set()
 
   @staticmethod
   def _register(sourceroot):
     for t in sourceroot.types:
-      SourceRoot._ROOTS[t].add(sourceroot.basedir)
+      SourceRoot._ROOTS_BY_TYPE[t].add(sourceroot.basedir)
+      SourceRoot._TYPES_BY_ROOT[sourceroot.basedir].add(t)
 
   @staticmethod
   def find(target):
-    """
-      Finds the source root for the given target target.  If none is registered, the parent
-      directory of the target's BUILD file is returned.
+    """Finds the source root for the given target.  If none is registered, the parent
+    directory of the target's BUILD file is returned.
     """
     target_path = os.path.relpath(target.address.buildfile.parent_path, get_buildroot())
 
     def _find():
       for typ in target.__class__.mro():
-        for root in SourceRoot._ROOTS.get(typ, ()):
+        for root in SourceRoot._ROOTS_BY_TYPE.get(typ, ()):
           if target_path.startswith(root):
             return root
 
@@ -75,6 +72,11 @@ class SourceRoot(object):
     return target_path
 
   @staticmethod
+  def types(root):
+    """Returns the set of target types rooted at root."""
+    return SourceRoot._TYPES_BY_ROOT[root]
+
+  @staticmethod
   def here(*types):
     """Registers the cwd as a source root for the given target types."""
     return SourceRoot.register(None, *types)
@@ -85,9 +87,10 @@ class SourceRoot(object):
     return SourceRoot(basedir, *types)
 
   def __init__(self, basedir, *types):
-    """
-      :basedir The base directory to resolve sources relative to
-      :types The target types to register :basedir: as a source root for
+    """Initializes a source root at basedir for the given target types.
+
+    :basedir The base directory to resolve sources relative to
+    :types The target types to register :basedir: as a source root for
     """
     basepath = os.path.abspath(basedir or os.path.curdir)
     if get_buildroot() != os.path.commonprefix((basepath, get_buildroot())):
