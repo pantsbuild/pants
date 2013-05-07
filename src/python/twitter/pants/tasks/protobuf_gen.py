@@ -14,8 +14,8 @@
 # limitations under the License.
 # ==================================================================================================
 
-import re
 import os
+import re
 import subprocess
 
 from collections import defaultdict
@@ -27,8 +27,10 @@ from twitter.common.dirutil import safe_mkdir
 from twitter.pants import is_jvm, is_python
 from twitter.pants.binary_util import select_binary
 from twitter.pants.targets import JavaLibrary, JavaProtobufLibrary, PythonLibrary
-from twitter.pants.tasks import TaskError
-from twitter.pants.tasks.code_gen import CodeGen
+
+from .code_gen import CodeGen
+
+from . import TaskError
 
 
 class ProtobufGen(CodeGen):
@@ -47,10 +49,8 @@ class ProtobufGen(CodeGen):
 
     self.protoc_supportdir = self.context.config.get('protobuf-gen', 'supportdir')
     self.protoc_version = self.context.config.get('protobuf-gen', 'version')
-    self.output_dir = (
-      context.options.protobuf_gen_create_outdir
-      or context.config.get('protobuf-gen', 'workdir')
-    )
+    self.output_dir = (context.options.protobuf_gen_create_outdir or
+                       context.config.get('protobuf-gen', 'workdir'))
 
     def resolve_deps(key):
       deps = OrderedSet()
@@ -116,15 +116,17 @@ class ProtobufGen(CodeGen):
     process = subprocess.Popen(args)
     result = process.wait()
     if result != 0:
-      raise TaskError
+      raise TaskError('%s ... exited non-zero (%i)' % (self.protobuf_binary, result))
 
   def _calculate_sources(self, targets):
     bases = set()
     sources = set()
+
     def collect_sources(target):
       if self.is_gentarget(target):
         bases.add(target.target_base)
         sources.update(os.path.join(target.target_base, source) for source in target.sources)
+
     for target in targets:
       target.walk(collect_sources)
     return bases, sources
@@ -171,7 +173,7 @@ class ProtobufGen(CodeGen):
 
 
 DEFAULT_PACKAGE_PARSER = re.compile(r'^\s*package\s+([^;]+)\s*;\s*$')
-OPTION_PARSER = re.compile(r'^\s*option\s+([^=]+)\s*=\s*([^\s]+);\s*$')
+OPTION_PARSER = re.compile(r'^\s*option\s+([^ =]+)\s*=\s*([^\s]+)\s*;\s*$')
 TYPE_PARSER = re.compile(r'^\s*(enum|message)\s+([^\s{]+).*')
 
 
@@ -198,22 +200,25 @@ def calculate_genfiles(path, source):
           name = match.group(1)
           value = match.group(2)
 
-          def string():
+          def string_value():
             return value.lstrip('"').rstrip('"')
 
-          def bool():
+          def bool_value():
             return value == 'true'
 
           if 'java_package' == name:
-            package = string()
+            package = string_value()
           elif 'java_outer_classname' == name:
-            outer_class_name = string()
+            outer_class_name = string_value()
           elif 'java_multiple_files' == name:
-            multiple_files = bool()
+            multiple_files = bool_value()
         else:
           match = TYPE_PARSER.match(line)
           if match:
-            types.add(match.group(1))
+            type_ = match.group(2)
+            types.add(type_)
+            if match.group(1) == 'message':
+              types.add('%sOrBuilder' % type_)
 
     genfiles = defaultdict(set)
     genfiles['py'].update(calculate_python_genfiles(source))
@@ -229,8 +234,10 @@ def calculate_python_genfiles(source):
 
 def calculate_java_genfiles(package, outer_class_name, types):
   basepath = package.replace('.', '/')
+
   def path(name):
     return os.path.join(basepath, '%s.java' % name)
+
   yield path(outer_class_name)
-  for type in types:
-    yield path(type)
+  for type_ in types:
+    yield path(type_)

@@ -82,8 +82,8 @@ class VersionedTarget(VersionedTargetSet):
   the wrapped target depends on (after having resolved through any "alias" targets.
   """
   def __init__(self, cache_manager, target, cache_key):
-    if not isinstance(target, Target):
-      raise ValueError("The target %s must be an instance of Target but is not." % target.id)
+    if not isinstance(target, TargetWithSources):
+      raise ValueError("The target %s must support sources and does not." % target.id)
 
     self.target = target
     self.cache_key = cache_key
@@ -303,7 +303,7 @@ class CacheManager(object):
 
   def _order_target_list(self, targets):
     """Orders the targets topologically, from least to most dependent."""
-    targets = set(t for t in targets if isinstance(t, Target))
+    targets = set(filter(has_sources, targets))
     return filter(targets.__contains__, reversed(InternalTarget.sort_targets(targets)))
 
   def _key_for(self, target, dependency_keys):

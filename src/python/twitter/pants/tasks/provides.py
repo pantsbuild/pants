@@ -41,9 +41,7 @@ class Provides(Task):
 
   def __init__(self, context):
     Task.__init__(self, context)
-    self.ivy_utils = IvyUtils(config=context.config,
-                              options=context.options,
-                              log=context.log)
+    self.ivy_utils = IvyUtils(context, context.config.get('ivy', 'cache_dir'))
     self.confs = context.config.getlist('ivy', 'confs')
     self.target_roots = context.target_roots
     self.transitive = context.options.provides_transitive
@@ -61,11 +59,10 @@ class Provides(Task):
 
   def execute(self, targets):
     for conf in self.confs:
-      outpath = os.path.join(self.outdir, '%s.%s.provides' % 
-                             (self.ivy_utils.identify(targets)[1], conf))
+      outpath = os.path.join(self.outdir, '%s.%s.provides' % (self.ivy_utils.identify()[1], conf))
       if self.transitive:
         outpath += '.transitive'
-      ivyinfo = self.ivy_utils.parse_xml_report(self.context, conf)
+      ivyinfo = self.ivy_utils.parse_xml_report(conf)
       jar_paths = OrderedSet()
       for root in self.target_roots:
         jar_paths.update(self.get_jar_paths(ivyinfo, root, conf))

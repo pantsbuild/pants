@@ -61,7 +61,7 @@ class Artifact(object):
     return ''.join(str(getattr(self, key)) for key in self._HASH_KEYS)
 
 
-class JarDependency(ExternalDependency):
+class  JarDependency(ExternalDependency):
   """Represents a binary jar dependency ala maven or ivy.  For the ivy dependency defined by:
     <dependency org="com.google.guava" name="guava" rev="r07"/>
 
@@ -136,7 +136,7 @@ class JarDependency(ExternalDependency):
         self.declared_exclusives[k] |= exclusives[k]
 
 
-  def exclude(self, org, name=None):
+  def exclude(self, org, name = None):
     """Adds a transitive dependency of this jar to the exclude list."""
 
     self.excludes.append(Exclude(org, name))

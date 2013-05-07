@@ -65,10 +65,7 @@ class ScalaCompile(NailgunTask):
 
     # Set up the zinc utils.
     color = not context.options.no_color
-    self._zinc_utils = ZincUtils(context=context,
-                                 nailgun_task=self,
-                                 color=color,
-                                 bootstrap_utils=self._bootstrap_utils)
+    self._zinc_utils = ZincUtils(context=context, nailgun_task=self, color=color)
 
     # The rough number of source files to build in each compiler pass.
     self._partition_size_hint = (context.options.scala_compile_partition_size_hint
@@ -104,9 +101,9 @@ class ScalaCompile(NailgunTask):
     self.context.products.require_data('exclusives_groups')
 
     self._local_artifact_cache_spec = \
-      context.config.getlist('scala-compile', 'local_artifact_caches', default=[])
+      context.config.getlist('scala-compile', 'local_artifact_caches2', default=[])
     self._remote_artifact_cache_spec = \
-      context.config.getlist('scala-compile', 'remote_artifact_caches', default=[])
+      context.config.getlist('scala-compile', 'remote_artifact_caches2', default=[])
 
     # A temporary, but well-known, dir to munge analysis files in before caching. It must be
     # well-known so we know where to find the files when we retrieve them from the cache.
@@ -365,10 +362,8 @@ class ScalaCompile(NailgunTask):
         Work(split, splits_args_tuples, 'split'),
         update_artifact_cache_work
       ]
-      background_workunit = self.context.run_tracker.get_background_root_workunit()
-      with self.context.new_workunit(name='cache',
-                                     labels=[WorkUnit.MULTITOOL],
-                                     parent=background_workunit) as parent:
+      with self.context.new_workunit(name='cache', labels=[WorkUnit.MULTITOOL],
+          parent=self.context.run_tracker.get_background_root_workunit()) as parent:
         self.context.submit_background_work_chain(work_chain, workunit_parent=parent)
 
   def check_artifact_cache(self, vts):
@@ -472,5 +467,5 @@ class ScalaCompile(NailgunTask):
       # TODO(John Sirois): Map target.resources in the same way
       # Create and Map scala plugin info files to the owning targets.
       if is_scalac_plugin(target) and target.classname:
-        basedir, plugin_info_file = ZincUtils.write_plugin_info(self._resources_dir, target)
+        basedir, plugin_info_file = self._zinc_utils.write_plugin_info(self._resources_dir, target)
         genmap.add(target, basedir, [plugin_info_file])

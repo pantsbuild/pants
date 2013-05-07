@@ -19,6 +19,7 @@ import shlex
 
 from collections import defaultdict
 import itertools
+import shutil
 
 from twitter.common.dirutil import safe_open, safe_mkdir, safe_rmtree
 
@@ -99,13 +100,8 @@ class JavaCompile(NailgunTask):
     safe_mkdir(self._classes_dir)
     safe_mkdir(self._depfile_dir)
 
-    self._external_tools = context.config.getlist('java-compile',
-                                                  'external-tools',
-                                                  default=[':jmake'])
-    self._compiler_bootstrap_tools = context.config.getlist('java-compile',
-                                                            'compiler-bootstrap-tools',
-                                                            default=[':java-compiler'])
-    self._bootstrap_utils.register_all([self._external_tools, self._compiler_bootstrap_tools])
+    self._jmake_profile = context.config.get('java-compile', 'jmake-profile')
+    self._compiler_profile = context.config.get('java-compile', 'compiler-profile')
 
     self._opts = context.config.getlist('java-compile', 'args')
     self._jvm_args = context.config.getlist('java-compile', 'jvm_args')
@@ -125,7 +121,7 @@ class JavaCompile(NailgunTask):
     self._confs = context.config.getlist('java-compile', 'confs')
     self.context.products.require_data('exclusives_groups')
 
-    artifact_cache_spec = context.config.getlist('java-compile', 'artifact_caches', default=[])
+    artifact_cache_spec = context.config.getlist('java-compile', 'artifact_caches2', default=[])
     self.setup_artifact_cache(artifact_cache_spec)
 
     # A temporary, but well-known, dir to munge analysis files in before caching. It must be
@@ -285,16 +281,15 @@ class JavaCompile(NailgunTask):
     return sources_by_target
 
   def compile(self, classpath, sources, fingerprint, depfile):
-    jmake_classpath = self._bootstrap_utils.get_jvm_build_tools_classpath(self._external_tools,
-                                                                          self.runjava_indivisible)
+    jmake_classpath = self.profile_classpath(self._jmake_profile)
+
     opts = [
       '-classpath', ':'.join(classpath),
       '-d', self._classes_dir,
       '-pdb', os.path.join(self._classes_dir, '%s.dependencies.pdb' % fingerprint),
     ]
 
-    compiler_classpath = self._bootstrap_utils.get_jvm_build_tools_classpath(self._compiler_bootstrap_tools,
-                                                                             self.runjava_indivisible)
+    compiler_classpath = self.profile_classpath(self._compiler_profile)
     opts.extend([
       '-jcpath', ':'.join(compiler_classpath),
       '-jcmainclass', 'com.twitter.common.tools.Compiler',
@@ -303,12 +298,8 @@ class JavaCompile(NailgunTask):
     opts.extend(map(lambda arg: '-C%s' % arg, self._javac_opts))
 
     opts.extend(self._opts)
-    return self.runjava_indivisible(_JMAKE_MAIN,
-                                    classpath=jmake_classpath,
-                                    opts=opts,
-                                    args=sources,
-                                    jvmargs=self._jvm_args,
-                                    workunit_name='jmake',
+    return self.runjava_indivisible(_JMAKE_MAIN, classpath=jmake_classpath, opts=opts, args=sources,
+                                    jvmargs=self._jvm_args, workunit_name='jmake',
                                     workunit_labels=[WorkUnit.COMPILER])
 
   def write_processor_info(self, processor_info_file, processors):

@@ -17,15 +17,15 @@
 class Exclude(object):
   """Represents a dependency exclude pattern to filter transitive dependencies against."""
 
-  def __init__(self, org, name=None):
+  def __init__(self, org, name = None):
     self.org = org
     self.name = name
 
   def __eq__(self, other):
-    return all([other,
-                type(other) == Exclude,
-                self.org == other.org,
-                self.name == other.name])
+    return other and (
+      type(other) == Exclude) and (
+      self.org == other.org) and (
+      self.name == other.name)
 
   def __hash__(self):
     value = 17

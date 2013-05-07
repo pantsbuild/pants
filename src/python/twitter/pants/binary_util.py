@@ -279,10 +279,8 @@ def _subprocess_call(cmd_with_args, call=subprocess.call, workunit_factory=None,
     workunit_labels = [WorkUnit.TOOL, WorkUnit.JVM]
     with workunit_factory(name=workunit_name, labels=workunit_labels, cmd=cmd_str) as workunit:
       try:
-        ret = call(cmd_with_args,
-                   stdout=workunit.output('stdout'),
-                   stderr=workunit.output('stderr'),
-                   **kwargs)
+        ret = call(cmd_with_args, stdout=workunit.output('stdout'),
+                   stderr=workunit.output('stderr'), **kwargs)
         workunit.set_outcome(WorkUnit.FAILURE if ret else WorkUnit.SUCCESS)
         return ret
       except OSError as e:
@@ -315,7 +313,6 @@ def _subprocess_call_with_args(cmd, args, call=subprocess.call,
       return result
     else:
       raise e
-
 
 def profile_classpath(profile, java_runner=None, config=None, ivy_jar=None, ivy_settings=None,
                       workunit_factory=None):

@@ -138,9 +138,10 @@ def has_sources(target, extension=None):
   If an extension is supplied the target is further checked for at least 1 source with the given
   extension.
   """
-  return (target.has_label('sources') and 
-          (not extension or
-           (hasattr(target, 'sources') and any(source.endswith(extension) for source in target.sources))))
+  return (target.has_label('sources')
+          and (not extension
+               or (hasattr(target, 'sources')
+                   and any(source.endswith(extension) for source in target.sources))))
 
 
 def has_resources(target):
