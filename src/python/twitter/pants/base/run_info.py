@@ -44,7 +44,7 @@ class RunInfo(object):
     with open(self._info_file, 'a') as outfile:
       for key, val in keyvals:
         key = key.strip()
-        val = str(val).strip()
+        val = val.strip()
         if ':' in key:
           raise Exception, 'info key must not contain a colon'
         outfile.write('%s: %s\n' % (key, val))
