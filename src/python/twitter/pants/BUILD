@@ -71,11 +71,6 @@ python_binary(
   dependencies = [
     pants(":pants-lib")
   ],
-  platforms = [
-    'current',
-    'macosx-10.4-x86_64',
-    'linux-x86_64'
-  ]
 )
 
 python_binary(
