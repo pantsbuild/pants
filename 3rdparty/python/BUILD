@@ -48,7 +48,7 @@ make_dep('ply')
 make_dep('porterstemmer', 'PorterStemmer==0.3')
 make_dep('poster', 'poster==0.8.2') # Twitter's monkeypatched poster
 make_dep('protobuf')
-make_dep('psutil')
+make_dep('psutil', 'psutil==0.5.0')
 make_dep('pycrypto')
 make_dep('pygments', 'Pygments==1.4')
 make_dep('pylint')
