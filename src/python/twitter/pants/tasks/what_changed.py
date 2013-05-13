@@ -125,6 +125,9 @@ class ScmWorkspace(Workspace):
 
     self._scm = scm or get_scm()
 
+    if self._scm is None:
+      raise self.WorkspaceError('Cannot figure out what changed without a configured source-control system.')
+
   def touched_files(self, parent):
     try:
       return self._scm.changed_files(from_commit=parent, include_untracked=True)

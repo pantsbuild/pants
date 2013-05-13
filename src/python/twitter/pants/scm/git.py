@@ -60,7 +60,7 @@ class Git(Scm):
   @property
   def branch_name(self):
     branch = self._check_output(['rev-parse', '--abbrev-ref', 'HEAD'],
-                                raise_type=Scm.LocalException)
+                                           raise_type=Scm.LocalException)
     branch = self._cleanse(branch)
     return None if branch == 'HEAD' else branch
 
@@ -91,35 +91,36 @@ class Git(Scm):
     return self._check_output(args, raise_type=Scm.LocalException)
 
   def refresh(self):
-    remote, merge = self._get_upstream()
-    self._check_call(['pull', '--ff-only', '--tags', remote, merge], raise_type=Scm.RemoteException)
+    remote, merge = self._get_remote()
+    self._check_call(['pull', '--ff-only', '--tags', remote, merge],
+                        raise_type=Scm.RemoteException)
 
   def tag(self, name, message=None):
-    self._check_call(['tag', '-a', '--message=%s' % (message or ''), name],
-                     raise_type=Scm.LocalException)
+    self._check_call(['tag' , '--annotate', '--message=%s' % (message or ''), name],
+                        raise_type=Scm.LocalException)
     self._push('refs/tags/%s' % name)
 
   def commit(self, message):
-    self._check_call(['commit', '--all', '--message=%s' % message], raise_type=Scm.LocalException)
+    self._check_call(['commit' , '--all', '--message=%s' % message],
+                        raise_type=Scm.LocalException)
     self._push()
 
   def _push(self, *refs):
-    remote, merge = self._get_upstream()
-    self._check_call(['push', remote, merge] + list(refs), raise_type=Scm.RemoteException)
+    remote, merge = self._get_remote()
+    self._check_call(['push' , remote, merge] + list(refs), raise_type=Scm.RemoteException)
 
-  def _get_upstream(self):
-    if not self._remote or not self._branch:
-      branch = self.branch_name
-      if not branch:
-        raise Scm.LocalException('Failed to determine local branch')
+  def _get_remote(self):
+    branch = self.branch_name
+    if not branch:
+      raise Scm.LocalException('Failed to determine local branch')
 
-      def get_local_config(key):
-        value = self._check_output(['config', '--local', '--get', key],
-                                   raise_type=Scm.LocalException)
-        return value.strip()
+    def get_local_config(key):
+      value = self._check_output(['config', '--local', '--get', key],
+                                            raise_type=Scm.LocalException)
+      return value.strip()
 
-      self._remote = self._remote or get_local_config('branch.%s.remote' % branch)
-      self._branch = self._branch or get_local_config('branch.%s.merge' % branch)
+    self._remote = self._remote or get_local_config('branch."%s".remote' % branch)
+    self._branch = self._branch or  get_local_config('branch."%s".merge' % branch)
     return self._remote, self._branch
 
   def _check_call(self, args, failure_msg=None, raise_type=None):

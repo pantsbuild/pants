@@ -69,13 +69,6 @@ def git_version():
 
 @pytest.mark.skipif("git_version() < Version('1.7.10')")
 class GitTest(unittest.TestCase):
-  @staticmethod
-  def init_repo(remote_name, remote):
-    subprocess.check_call(['git', 'init'])
-    subprocess.check_call(['git', 'config', 'user.email', 'you@example.com'])
-    subprocess.check_call(['git', 'config', 'user.name', 'Your Name'])
-    subprocess.check_call(['git', 'remote', 'add', remote_name, remote])
-
   @classmethod
   def setUpClass(cls):
     cls.origin = safe_mkdtemp()
@@ -88,14 +81,14 @@ class GitTest(unittest.TestCase):
     cls.readme_file = os.path.join(cls.worktree, 'README')
 
     with environment_as(GIT_DIR=cls.gitdir, GIT_WORK_TREE=cls.worktree):
-      cls.init_repo('depot', cls.origin)
+      subprocess.check_call(['git', 'init'])
+      subprocess.check_call(['git', 'remote', 'add', 'depot', cls.origin])
 
       touch(cls.readme_file)
       subprocess.check_call(['git', 'add', 'README'])
       subprocess.check_call(['git', 'commit', '-am', 'initial commit.'])
       subprocess.check_call(['git', 'tag', '-a', '-m', 'first tag', 'first'])
       subprocess.check_call(['git', 'push', '--tags', 'depot', 'master'])
-      subprocess.check_call(['git', 'branch', '--set-upstream', 'master', 'depot/master'])
 
       with safe_open(cls.readme_file, 'w') as readme:
         readme.write('Hello World.')
@@ -103,7 +96,8 @@ class GitTest(unittest.TestCase):
 
     cls.clone2 = safe_mkdtemp()
     with pushd(cls.clone2):
-      cls.init_repo('origin', cls.origin)
+      subprocess.check_call(['git', 'init'])
+      subprocess.check_call(['git', 'remote', 'add', 'origin', cls.origin])
       subprocess.check_call(['git', 'pull', '--tags', 'origin', 'master:master'])
 
       with safe_open(os.path.realpath('README'), 'a') as readme:
@@ -111,7 +105,7 @@ class GitTest(unittest.TestCase):
       subprocess.check_call(['git', 'commit', '-am', 'Update README 2.'])
       subprocess.check_call(['git', 'push', '--tags', 'origin', 'master'])
 
-    cls.git = Git(gitdir=cls.gitdir, worktree=cls.worktree)
+    cls.git = Git(gitdir=cls.gitdir, worktree=cls.worktree, remote='depot', branch='master')
 
   @classmethod
   def tearDownClass(cls):
@@ -157,7 +151,8 @@ class GitTest(unittest.TestCase):
 
     with temporary_dir() as clone:
       with pushd(clone):
-        self.init_repo('origin', self.origin)
+        subprocess.check_call(['git', 'init'])
+        subprocess.check_call(['git', 'remote', 'add', 'origin', self.origin])
         subprocess.check_call(['git', 'pull', '--tags', 'origin', 'master:master'])
 
         with open(os.path.realpath('README')) as readme:
