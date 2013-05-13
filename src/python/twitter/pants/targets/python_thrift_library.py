@@ -14,6 +14,8 @@
 # limitations under the License.
 # ==================================================================================================
 
+from twitter.common.collections import OrderedSet
+from .python_requirement import PythonRequirement
 from .python_target import PythonTarget
 
 
@@ -22,7 +24,7 @@ class PythonThriftLibrary(PythonTarget):
                sources = None,
                resources = None,
                dependencies = None,
-               thrift_version = None,
+               thrift_version = '0.9',
                provides=None):
     """
       name = Name of library

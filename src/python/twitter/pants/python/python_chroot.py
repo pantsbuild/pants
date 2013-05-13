@@ -231,12 +231,10 @@ class PythonChroot(object):
       self._dump_distribution(dist)
 
     if targets['thrifts']:
-      default_thrift_version = self._config.get('python-thrift', 'default-version', default='0.9')
       thrift_versions = set()
       for thr in targets['thrifts']:
         self._dump_thrift_library(thr)
-        thrift_version = thr.thrift_version or default_thrift_version
-        thrift_versions.add(thrift_version)
+        thrift_versions.add(thr.thrift_version)
       if len(thrift_versions) > 1:
         print('WARNING: Target has multiple thrift versions!')
       for version in thrift_versions:
