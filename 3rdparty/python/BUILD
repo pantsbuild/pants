@@ -21,6 +21,7 @@ def make_dep(name, dependency_name=None):
     dependencies=[python_requirement(dependency_name)]
   )
 
+make_dep('dingus', 'dingus==0.3.4')
 make_dep('antlr-3.1.3', 'antlr_python_runtime==3.1.3')
 make_dep('beautifulsoup', 'BeautifulSoup==3.2.0')
 make_dep('boto', 'boto==2.0')
