@@ -2,11 +2,19 @@ language: python
 
 python:
   - "2.6"
+  - "2.7"
 
 jdk:
+  - openjdk6
   - openjdk7
 
-script: "python --version && ./build-support/python/clean.sh && java -version && ./pants goal clean-all test tests/{java,scala}/com/twitter/common:: --no-ng-daemons -vx && ./pants tests/python/twitter/common:all -v && ./pants tests/python/twitter/pants:all -v"
+script: |
+  ./build-support/python/clean.sh \
+  && PANTS_VERBOSE=1 PEX_VERBOSE=1 PYTHON_VERBOSE=1 ./pants \
+  && java -version \
+  && ./pants goal clean-all test tests/{java,scala}/com/twitter/common:: --no-ng-daemons -vx \
+  && ./pants tests/python/twitter/common:all -v \
+  && ./pants tests/python/twitter/pants:all -v
 
 notifications:
   email:
