@@ -372,6 +372,10 @@ class JarPublish(Task):
     Task.__init__(self, context)
 
     self.scm = scm or get_scm()
+
+    if self.scm is None:
+      raise TaskError('Cannot publish JAR files without a configured source-control system.')
+
     self.restrict_push_branches = frozenset(restrict_push_branches or ())
     self.outdir = context.config.get('jar-publish', 'workdir')
     self.cachedir = os.path.join(self.outdir, 'cache')
