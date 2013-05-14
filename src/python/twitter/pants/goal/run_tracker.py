@@ -71,7 +71,9 @@ class RunTracker(object):
     self.options = None
 
   def start(self, report):
-    """Start tracking this pants run."""
+    """Start tracking this pants run.
+
+    report: an instance of pants.reporting.Report."""
     self._report = report
     self._report.open()
 
