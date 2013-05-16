@@ -69,6 +69,8 @@ class ConsoleReporter(Reporter):
 
   def handle_message(self, workunit, *msg_elements):
     """Implementation of Reporter callback."""
+    # If the element is a (msg, detail) pair, we ignore the detail. There's no
+    # useful way to display it on the console.
     elements = [e if isinstance(e, basestring) else e[0] for e in msg_elements]
     with self._lock:
       if not self._needs_newline[workunit.id]:

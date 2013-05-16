@@ -28,8 +28,9 @@ class Reporter(object):
   def handle_message(self, workunit, *msg_elements):
     """Handle a message reported by pants code.
 
-    msg_elements are either strings or lists (e.g., of targets), which can be specially formatted.
-    For example: ['Invalidated ', [Target1, Target2, ...]]
+    Each element in msg_elements is either a message or a (message, detail) pair.
+    A subclass must show the message, but may choose to show the detail in some
+    sensible way (e.g., when the message text is clicked on in a browser).
     """
     pass
 
