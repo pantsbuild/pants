@@ -16,23 +16,11 @@
 
 from __future__ import print_function
 
-import collections
 import pprint
 import pystache
 
 from twitter.common.lang import Compatibility
-
-def _expand(map):
-  # Pystache can't handle sets so convert to lists.
-  map = dict((k, list(v) if isinstance(v, collections.Set) else v) for k, v in map.items())
-
-  # Add foo? for each foo in the map that evaluates to true.
-  # Mustache needs this, especially in cases where foo is a list: there is no way to render a
-  # block exactly once iff a list is not empty.
-  # Note: if the original map contains foo?, it will take precedence over our synthetic foo?.
-  map.update((k + '?', True) for k, v in map.items() if v and not k.endswith('?'))
-
-  return map
+from twitter.pants.base.mustache import MustacheRenderer
 
 
 class TemplateData(dict):
@@ -40,7 +28,7 @@ class TemplateData(dict):
   """
 
   def __init__(self, **kwargs):
-    dict.__init__(self, _expand(kwargs))
+    dict.__init__(self, MustacheRenderer.expand(kwargs))
 
   def extend(self, **kwargs):
     """Returns a new TemplateData with this template's data overlayed by the key value pairs
