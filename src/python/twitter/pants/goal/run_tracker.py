@@ -26,7 +26,7 @@ class RunTracker(object):
   """
   def __init__(self, config):
     self.run_timestamp = time.time()  # A double, so we get subsecond precision for ids.
-    cmd_line = ' '.join(['pants'] + sys.argv[1:])
+    cmd_line = ' '.join(['./pants'] + sys.argv[1:])
 
     # run_id is safe for use in paths.
     millis = (self.run_timestamp * 1000) % 1000

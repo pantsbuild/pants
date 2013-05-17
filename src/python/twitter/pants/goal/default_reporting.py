@@ -39,5 +39,7 @@ def default_report(config, run_tracker):
   report.add_reporter('html', html_reporter)
 
   run_tracker.run_info.add_info('default_report', html_reporter.report_path())
+  port = config.getint('reporting', 'reporting_port', -1)
+  run_tracker.run_info.add_info('report_url', 'http://localhost:%d/run/%s' % (port, run_id))
 
   return report

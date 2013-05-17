@@ -592,6 +592,8 @@ class RunServer(Task):
       def report_launch():
         reporting_queue.put(
           'Launching server with pid %d at http://localhost:%d' % (os.getpid(), port))
+        reporting_queue.put(
+          'Automatically see latest run at http://localhost:%d/run/latest' % os.getpid())
 
       def done_reporting():
         reporting_queue.put(DONE)
@@ -614,6 +616,8 @@ class RunServer(Task):
       except socket.error, e:
         if e.errno == errno.EADDRINUSE:
           reporting_queue.put('Server already running at http://localhost:%d' % port)
+          reporting_queue.put(
+            'Automatically see latest run at http://localhost:%d/run/latest' % os.getpid())
           done_reporting()
           return
         else:
@@ -631,6 +635,13 @@ class RunServer(Task):
       self.context.log.info(s)
       s = reporting_queue.get()
     # The child process is done reporting, and is now in the server loop, so we can proceed.
+    url = self.context.run_tracker.run_info.get_info('report_url')
+    try:
+      from colors import bold, magenta
+      url = magenta(url)
+    except ImportError:
+      pass
+    self.context.log.info('See a report for this run at: %s' % url)
 
 
 goal(
@@ -679,6 +690,7 @@ goal(
 goal(
   name='extract',
   action=Extract,
+  dependencies=['server'],
 ).install('resolve-idl')
 
 # TODO(John Sirois): gen attempted as the sole Goal should gen for all known gen types but
