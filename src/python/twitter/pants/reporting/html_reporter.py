@@ -1,8 +1,6 @@
 import cgi
-import operator
 import os
 import re
-import urlparse
 import uuid
 from pystache.renderer import Renderer
 
@@ -75,7 +73,7 @@ class HtmlReporter(Reporter):
              'initially_open': is_test or not (is_tool or is_multitool),
              'is_tool': is_tool,
              'is_multitool': is_multitool }
-    args.update({ 'collapsible': lambda x: self._render_callable('collapsible', x, args) })
+    args.update({ 'collapsible': lambda x: self._renderer.render_callable('collapsible', x, args) })
 
     # Render the workunit's div.
     s = self._renderer.render_name('workunit_start', args)
@@ -203,7 +201,8 @@ class HtmlReporter(Reporter):
         element = [element]
       defaults = ('', None, None, False)
       # Map assumes None for missing values, so this will pick the default for those.
-      (text, detail, detail_id, detail_initially_visible) = map(operator.or_, element, defaults)
+      (text, detail, detail_id, detail_initially_visible) = \
+        map(lambda x, y: x or y, element, defaults)
       element_args = {'text': self._htmlify_text(text) }
       if detail is not None:
         detail_id = detail_id or uuid.uuid4()
@@ -229,27 +228,6 @@ class HtmlReporter(Reporter):
     if os.path.exists(self._html_dir):  # Make sure we're not immediately after a clean-all.
       with open(os.path.join(self._html_dir, filename), 'w') as f:
         f.write(s)
-
-  def _render_callable(self, inner_template_name, arg_string, outer_args):
-    """Handle a mustache callable.
-
-    In a mustache template, when foo is callable, {{#foo}}arg_string{{/foo}} is replaced with the
-    result of calling foo(arg_string). The callable must interpret arg_string.
-
-    This method provides an implementation of such a callable that does the following:
-      A) Parses the arg_string as CGI args.
-      B) Adds them to the original args that the enclosing template was rendered with.
-      C) Renders some other template against those args.
-      D) Returns the resulting text.
-    """
-    # First render the arg_string (mustache doesn't do this for you).
-    rendered_arg_string = self._renderer.render(arg_string, outer_args)
-    # Parse the inner args as CGI args.
-    inner_args = dict([(k, v[0]) for k, v in urlparse.parse_qs(rendered_arg_string).items()])
-    # Order matters: lets the inner args override the outer args.
-    args = dict(outer_args.items() + inner_args.items())
-    # Render.
-    return self._renderer.render_name(inner_template_name, args)
 
   def _htmlify_text(self, s):
     """Make text HTML-friendly."""
