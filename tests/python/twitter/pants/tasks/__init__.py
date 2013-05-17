@@ -55,7 +55,7 @@ def prepare_task(task_type, config=None, args=None, targets=None, **kwargs):
       ini.close()
       return Config.load()
 
-  context = Context(load_config(), options, targets or [])
+  context = Context(load_config(), options, None, targets or [])
   return task_type(context, **kwargs)
 
 

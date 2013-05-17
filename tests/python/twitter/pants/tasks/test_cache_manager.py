@@ -21,13 +21,13 @@ class AppendingCacheKeyGenerator(CacheKeyGenerator):
       combined_id = ','.join([cache_key.id for cache_key in sorted_cache_keys])
       combined_hash = ','.join([cache_key.hash for cache_key in sorted_cache_keys])
       combined_num_sources = reduce(lambda x, y: x + y, [cache_key.num_sources for cache_key in sorted_cache_keys], 0)
-      return CacheKey(combined_id, combined_hash, combined_num_sources)
+      return CacheKey(combined_id, combined_hash, combined_num_sources, [])
 
   def key_for_target(self, target, sources=None, fingerprint_extra=None):
-    return CacheKey(target.id, target.id, target.num_sources)
+    return CacheKey(target.id, target.id, target.num_sources, [])
 
   def key_for(self, id, sources):
-    return CacheKey(id, id, len(sources))
+    return CacheKey(id, id, len(sources), [])
 
 
 class TestCacheManager(CacheManager):

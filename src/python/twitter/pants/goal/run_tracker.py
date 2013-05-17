@@ -17,11 +17,9 @@ class RunTracker(object):
 
   run_tracker.start()
   with run_tracker.new_workunit('compile'):
-    with run_tracker.new_workunit('java') as workunit1:
-      workunit1.report('Compiling java.')
+    with run_tracker.new_workunit('java'):
       ...
-      workunit1.report('Done compiling java.')
-    with run_tracker.new_workunit('scala') as workunit2:
+    with run_tracker.new_workunit('scala'):
       ...
   run_tracker.close()
 
@@ -66,10 +64,6 @@ class RunTracker(object):
     # TODO: What does this mean when executing multiple workunits in parallel?
     self._current_workunit = None
 
-    # Set later, after options are parsed.
-    # TODO: Get rid of this. We only need it in one place, so find some other solution for that.
-    self.options = None
-
   def start(self, report):
     """Start tracking this pants run.
 
@@ -83,6 +77,11 @@ class RunTracker(object):
 
     self._report.start_workunit(self.root_workunit)
     self._current_workunit = self.root_workunit
+
+  def update_report_settings(self, updates_map):
+    """Modify reporting settings once we've got cmd-line flags etc."""
+    if self._report:
+      self._report.update_settings(updates_map)
 
   @contextmanager
   def new_workunit(self, name, labels=list(), cmd=''):
@@ -123,18 +122,21 @@ class RunTracker(object):
       self._current_workunit.end()
       self._current_workunit = self._current_workunit.parent
 
-  def report(self, *msg_elements):
+  def log(self, level, *msg_elements):
     """Log a message against the current workunit."""
-    self._report.message(self._current_workunit, *msg_elements)
+    self._report.log(self._current_workunit, level, *msg_elements)
 
   def end(self):
-    """This pants run is over, so stop tracking it."""
+    """This pants run is over, so stop tracking it.
+
+    Note: If end() has been called once, subsequent calls are no-ops."""
     while self._current_workunit:
       self._report.end_workunit(self._current_workunit)
       self._current_workunit.end()
       self._current_workunit = self._current_workunit.parent
     self._report.close()
     try:
-      self.run_info.add_info('outcome', self.root_workunit.outcome_string())
+      if self.run_info.get_info('outcome') is None:
+        self.run_info.add_info('outcome', self.root_workunit.outcome_string())
     except IOError:
       pass  # If the goal is clean-all then the run info dir no longer exists...

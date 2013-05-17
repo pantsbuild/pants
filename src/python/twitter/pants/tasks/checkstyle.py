@@ -86,4 +86,6 @@ class Checkstyle(NailgunTask):
           pf.write('%s=%s\n' % (k, v))
       opts.extend(['-p', properties_file])
 
-    return self.runjava(CHECKSTYLE_MAIN, classpath=classpath, opts=opts, args=sources)
+    return self.runjava(CHECKSTYLE_MAIN, classpath=classpath, opts=opts, args=sources,
+                        workunit_name='checkstyle')
+

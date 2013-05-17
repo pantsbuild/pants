@@ -152,6 +152,7 @@ class ThriftGen(CodeGen):
 
     sessions = []
     for source in sources:
+      self.context.log.info('Generating thrift for %s\n' % source)
       # Create a unique session dir for this thrift root.  Sources may be full paths but we only
       # need the path relative to the build root to ensure uniqueness.
       # TODO(John Sirois): file paths should be normalized early on and uniformly, fix the need to

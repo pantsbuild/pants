@@ -26,14 +26,8 @@ from twitter.common.collections.orderedset import OrderedSet
 from twitter.pants.base.artifact_cache import create_artifact_cache
 from twitter.pants.base.hash_utils import hash_file
 from twitter.pants.base.build_invalidator import CacheKeyGenerator
+from twitter.pants.reporting.reporting_utils import items_to_report_element
 from twitter.pants.tasks.cache_manager import CacheManager, InvalidationCheck
-from twitter.pants.tasks.cache_manager import CacheManager, VersionedTargetSet
-
-
-__all__ = (
-    'TaskError',
-    'Task'
-)
 
 
 class TaskError(Exception):
@@ -177,36 +171,58 @@ class Task(object):
                                  extra_data,
                                  only_externaldeps=only_buildfiles)
 
-    initial_invalidation_check = cache_manager.check(targets, partition_size_hint)
+    invalidation_check = cache_manager.check(targets, partition_size_hint)
 
     # See if we have entire partitions cached.
-    partitions_to_check = [vt for vt in initial_invalidation_check.all_vts_partitioned
-                           if not vt.valid]
-    cached_partitions, uncached_partitions = self.check_artifact_cache(partitions_to_check)
+    if self._artifact_cache and self.context.options.read_from_artifact_cache:
+      with self.context.new_workunit('cache'):
+        all_cached_targets = []
+        partitions_to_check = \
+          [vt for vt in invalidation_check.all_vts_partitioned if not vt.valid]
+        cached_partitions, uncached_partitions = self.check_artifact_cache(partitions_to_check)
+        for vt in cached_partitions:
+          for t in vt.targets:
+            all_cached_targets.append(t)
 
-    # See if we have any individual targets from the uncached partitions.
-    uncached_vts = [x.versioned_targets for x in uncached_partitions]
-    vts_to_check = [vt for vt in itertools.chain.from_iterable(uncached_vts) if not vt.valid]
-    cached_targets, uncached_targets = self.check_artifact_cache(vts_to_check)
+        # See if we have any individual targets from the uncached partitions.
+        vts_to_check = [vt for vt in itertools.chain.from_iterable(
+          [x.versioned_targets for x in uncached_partitions]) if not vt.valid]
+        cached_targets, uncached_targets = self.check_artifact_cache(vts_to_check)
+        for vt in cached_targets:
+          all_cached_targets.append(vt.target)
 
-    # Now that we've checked the cache, re-partition whatever is still invalid.
-    invalidation_check = InvalidationCheck(initial_invalidation_check.all_vts, uncached_targets,
-                                           partition_size_hint)
+      if all_cached_targets:
+        # Do some reporting.
+        for t in all_cached_targets:
+          self.context.run_tracker.artifact_cache_stats.add_hit('default', t)
+        self._report_targets('Using cached artifacts for ', all_cached_targets, '.')
+
+      # Now that we've checked the cache, re-partition whatever is still invalid.
+      if uncached_targets:
+        for vts in uncached_targets:
+          self.context.run_tracker.artifact_cache_stats.add_miss('default', vts.target)
+        self._report_targets('No cached artifacts for ',
+                             [vt.target for vt in uncached_targets], '.')
+      invalidation_check = \
+        InvalidationCheck(invalidation_check.all_vts, uncached_targets, partition_size_hint)
 
     # Do some reporting.
+    targets = []
+    sources = []
     num_invalid_partitions = len(invalidation_check.invalid_vts_partitioned)
-    num_invalid_targets = 0
-    num_invalid_sources = 0
-    for vt in invalidation_check.invalid_vts:
-      if not vt.valid:
-        num_invalid_targets += len(vt.targets)
-        num_invalid_sources += vt.cache_key.num_sources
-
-    # Do some reporting.
-    if num_invalid_partitions > 0:
-      self.context.log.info('Operating on %d files in %d invalidated targets in %d target'
-                            ' partitions' % (num_invalid_sources, num_invalid_targets,
-                                             num_invalid_partitions))
+    for vt in invalidation_check.invalid_vts_partitioned:
+      targets.extend(vt.targets)
+      sources.extend(vt.cache_key.sources)
+    if len(targets):
+      msg_elements = ['Invalidated ',
+                      items_to_report_element([t.address.reference() for t in targets], 'target')]
+      if len(sources) > 0:
+        msg_elements.append(' containing ')
+        msg_elements.append(items_to_report_element(sources, 'source file'))
+      if num_invalid_partitions > 1:
+        msg_elements.append(' in %d target partitions' % num_invalid_partitions)
+      msg_elements.append('.')
+      self.context.log.info(*msg_elements)
 
     # Yield the result, and then mark the targets as up to date.
     yield invalidation_check
@@ -224,7 +240,8 @@ class Task(object):
 
     cached_vts = []
     uncached_vts = OrderedSet(vts)
-    if self._artifact_cache and self.context.options.read_from_artifact_cache:
+
+    with self.context.new_workunit('check'):
       pool = ThreadPool(processes=6)
       res = pool.map(lambda vt: self._artifact_cache.use_cached_files(vt.cache_key),
                      vts, chunksize=1)
@@ -234,10 +251,7 @@ class Task(object):
         if was_in_cache:
           cached_vts.append(vt)
           uncached_vts.discard(vt)
-          self.context.log.info('Using cached artifacts for %s' % vt.targets)
           vt.update()
-        else:
-          self.context.log.info('No cached artifacts for %s' % vt.targets)
     return cached_vts, list(uncached_vts)
 
   def update_artifact_cache(self, vt, build_artifacts):
@@ -247,7 +261,20 @@ class Task(object):
     build_artifacts: The paths to the artifacts for the VersionedTargetSet.
     """
     if self._artifact_cache and self.context.options.write_to_artifact_cache:
-        if self.context.options.verify_artifact_cache:
-          pass  # TODO: Verify that the artifact we just built is identical to the cached one.
-        self.context.log.info('Caching artifacts for %s' % str(vt.targets))
-        self._artifact_cache.insert(vt.cache_key, build_artifacts)
+      with self.context.new_workunit('cache'):
+        with self.context.new_workunit('update'):
+          if self.context.options.verify_artifact_cache:
+            pass  # TODO: Verify that the artifact we just built is identical to the cached one.
+          self._report_targets('Caching artifacts for ', vt.targets, '.')
+          self._artifact_cache.insert(vt.cache_key, build_artifacts)
+
+  def _report_targets(self, prefix, targets, suffix):
+    self.context.log.info(
+      prefix,
+      items_to_report_element([t.address.reference() for t in targets], 'target'),
+      suffix)
+
+__all__ = (
+  'TaskError',
+  'Task'
+)

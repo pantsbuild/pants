@@ -12,17 +12,19 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# ==================================================================================================
+# ===================================================================================================
 
 __author__ = 'Benjy Weinberger'
 
 import os
 
-from twitter.pants import has_sources, is_scalac_plugin, get_buildroot
+from twitter.pants import has_sources, is_scalac_plugin
+from twitter.pants.goal.workunit import WorkUnit
 from twitter.pants.targets.scala_library import ScalaLibrary
 from twitter.pants.tasks import Task, TaskError
 from twitter.pants.tasks.jvm_dependency_cache import JvmDependencyCache
 from twitter.pants.tasks.nailgun_task import NailgunTask
+from twitter.pants.reporting.reporting_utils import items_to_report_element
 from twitter.pants.tasks.scala.zinc_artifact import ZincArtifactFactory, AnalysisFileSpec
 from twitter.pants.tasks.scala.zinc_utils import ZincUtils
 
@@ -66,7 +68,7 @@ class ScalaCompile(NailgunTask):
     color = (context.options.scala_compile_color if context.options.scala_compile_color is not None
              else context.config.getbool('scala-compile', 'color', default=True))
 
-    self._zinc_utils = ZincUtils(context=context, java_runner=self.runjava, color=color)
+    self._zinc_utils = ZincUtils(context=context, nailgun_task=self, color=color)
 
     # The rough number of source files to build in each compiler pass.
     self._partition_size_hint = (context.options.scala_compile_partition_size_hint
@@ -156,9 +158,8 @@ class ScalaCompile(NailgunTask):
     # Localize the analysis files we read from the artifact cache.
     for vt in vts:
       analysis_file = self._artifact_factory.analysis_file_for_targets(vt.targets)
-      self.context.log.debug('Localizing analysis file %s' % analysis_file.analysis_file)
-      if self._zinc_utils.localize_analysis_file(ZincArtifactFactory.portable(analysis_file.analysis_file),
-                                                 analysis_file.analysis_file):
+      if self._zinc_utils.localize_analysis_file(
+          ZincArtifactFactory.portable(analysis_file.analysis_file), analysis_file.analysis_file):
         self.context.log.warn('Zinc failed to localize analysis file: %s. Incremental rebuild' \
                               'of that target may not be possible.' % analysis_file)
 
@@ -166,17 +167,19 @@ class ScalaCompile(NailgunTask):
     # Special handling for scala artifacts.
     cached_vts, uncached_vts = Task.check_artifact_cache(self, vts)
 
-    # Localize the portable analysis files.
-    self._localize_portable_analysis_files(cached_vts)
+    if cached_vts:
+      # Localize the portable analysis files.
+      with self.context.new_workunit('localize', labels=[WorkUnit.MULTITOOL]):
+        self._localize_portable_analysis_files(cached_vts)
 
-    # Split any merged artifacts.
-    for vt in cached_vts:
-      if len(vt.targets) > 1:
-        artifacts = [self._artifact_factory.artifact_for_target(t) for t in vt.targets]
-        merged_artifact = self._artifact_factory.merged_artifact(artifacts)
-        merged_artifact.split()
-        for v in vt.versioned_targets:
-          v.update()
+      # Split any merged artifacts.
+      for vt in cached_vts:
+        if len(vt.targets) > 1:
+          artifacts = [self._artifact_factory.artifact_for_target(t) for t in vt.targets]
+          merged_artifact = self._artifact_factory.merged_artifact(artifacts)
+          merged_artifact.split()
+          for v in vt.versioned_targets:
+            v.update()
     return cached_vts, uncached_vts
 
   def _process_target_partition(self, vts, cp, upstream_analysis_map):
@@ -208,16 +211,22 @@ class ScalaCompile(NailgunTask):
 
       # Invoke the compiler if needed.
       if any([not vt.valid for vt in vts.versioned_targets]):
+        # Do some reporting.
+        prefix = 'Operating on a partition containing '
+        self.context.log.info(
+          prefix,
+          items_to_report_element([t.address.reference() for t in vts.targets], 'target'), '.')
         old_state = current_state
         classpath = [entry for conf, entry in cp if conf in self._confs]
-        self.context.log.info('Compiling targets %s' % vts.targets)
-        # Zinc may delete classfiles, then later exit on a compilation error. Then if the
-        # change triggering the error is reverted, we won't rebuild to restore the missing
-        # classfiles. So we force-invalidate here, to be on the safe side.
-        vts.force_invalidate()
-        if self._zinc_utils.compile(classpath, merged_artifact.sources, merged_artifact.classes_dir,
-                                    merged_artifact.analysis_file, upstream_analysis_map):
-          raise TaskError('Compile failed.')
+        with self.context.new_workunit('compile'):
+          # Zinc may delete classfiles, then later exit on a compilation error. Then if the
+          # change triggering the error is reverted, we won't rebuild to restore the missing
+          # classfiles. So we force-invalidate here, to be on the safe side.
+          vts.force_invalidate()
+          if self._zinc_utils.compile(classpath, merged_artifact.sources,
+                                      merged_artifact.classes_dir,
+                                      merged_artifact.analysis_file, upstream_analysis_map):
+            raise TaskError('Compile failed.')
 
         write_to_artifact_cache = self._artifact_cache and \
                                   self.context.options.write_to_artifact_cache

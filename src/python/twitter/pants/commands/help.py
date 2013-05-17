@@ -32,8 +32,8 @@ class Help(Command):
     parser.epilog = """Lists available commands with no arguments; otherwise prints help for the
                     specifed command."""
 
-  def __init__(self, root_dir, parser, argv):
-    Command.__init__(self, root_dir, parser, argv)
+  def __init__(self, run_tracker, root_dir, parser, argv):
+    Command.__init__(self, run_tracker, root_dir, parser, argv)
 
     if len(self.args) > 1:
       self.error("The help command accepts at most 1 argument.")

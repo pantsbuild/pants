@@ -649,7 +649,8 @@ class JarPublish(Task):
           if self.snapshot:
             opts.append('-overwrite')
 
-          result = binary_util.runjava_indivisible(jvmargs=jvmargs, classpath=self.ivycp, opts=opts)
+          result = binary_util.runjava_indivisible(jvmargs=jvmargs, classpath=self.ivycp,
+                                                   opts=opts, workunit_name='ivy')
           if result != 0:
             raise TaskError('Failed to push %s - ivy failed with %d' % (
               jar_coordinate(jar, newver.version()), result)
@@ -670,7 +671,7 @@ class JarPublish(Task):
               opts.append('-overwrite')
 
             result = binary_util.runjava_indivisible(jvmargs=jvmargs, classpath=self.ivycp,
-                                                     opts=opts)
+                                                     opts=opts, workunit_name='ivy')
             if result != 0:
               raise TaskError('Failed to push %s - ivy failed with %d' % (
                 jar_coordinate(jar, newver.version()), result)

@@ -63,11 +63,12 @@ class Command(object):
   def serialized(cls):
     return False
 
-  def __init__(self, root_dir, parser, args):
-    """root_dir: The root directory of the pants workspace
+  def __init__(self, run_tracker, root_dir, parser, args):
+    """run_tracker: The (already opened) RunTracker to track this run with
+    root_dir: The root directory of the pants workspace
     parser: an OptionParser
-    argv: the subcommand arguments to parse"""
-
+    args: the subcommand arguments to parse"""
+    self.run_tracker = run_tracker
     self.root_dir = root_dir
 
     # Override the OptionParser's error with more useful output

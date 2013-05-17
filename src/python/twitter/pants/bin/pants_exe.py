@@ -25,9 +25,10 @@ from twitter.common.dirutil import Lock
 
 from twitter.common.process import ProcessProviderFactory
 from twitter.pants import get_buildroot, get_version
-from twitter.pants.base import Address
+from twitter.pants.base import Address, Config
 from twitter.pants.base.rcfile import RcFile
 from twitter.pants.commands import Command
+from twitter.pants.goal import RunTracker, default_report
 
 
 _HELP_ALIASES = set([
@@ -129,24 +130,33 @@ def _run():
                     default=False,
                     dest='log_exit',
                     help = 'Log an exit message on success or failure.')
-  command = command_class(root_dir, parser, command_args)
 
-  if command.serialized():
-    def onwait(pid):
-      print('Waiting on pants process %s to complete' % _process_info(pid), file=sys.stderr)
-      return True
-    runfile = os.path.join(root_dir, '.pants.run')
-    lock = Lock.acquire(runfile, onwait=onwait)
-  else:
-    lock = Lock.unlocked()
+  config = Config.load()
+  run_tracker = RunTracker(config)
+  report = default_report(config, run_tracker)
+  run_tracker.start(report)
+
   try:
-    result = command.run(lock)
-    _do_exit(result)
-  except KeyboardInterrupt:
-    command.cleanup()
-    raise
+    command = command_class(run_tracker, root_dir, parser, command_args)
+
+    if command.serialized():
+      def onwait(pid):
+        print('Waiting on pants process %s to complete' % _process_info(pid), file=sys.stderr)
+        return True
+      runfile = os.path.join(root_dir, '.pants.run')
+      lock = Lock.acquire(runfile, onwait=onwait)
+    else:
+      lock = Lock.unlocked()
+    try:
+      result = command.run(lock)
+      _do_exit(result)
+    except KeyboardInterrupt:
+      command.cleanup()
+      raise
+    finally:
+      lock.release()
   finally:
-    lock.release()
+    run_tracker.end()
 
 
 def main():

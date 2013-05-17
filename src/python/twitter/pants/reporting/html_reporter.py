@@ -2,6 +2,8 @@ import cgi
 import os
 import re
 import uuid
+
+from collections import namedtuple
 from pystache.renderer import Renderer
 
 from twitter.common.dirutil import safe_mkdir
@@ -20,13 +22,18 @@ class HtmlReporter(Reporter):
   not accessed directly from the filesystem.
   """
 
-  def __init__(self, run_tracker, html_dir, template_dir):
-    Reporter.__init__(self, run_tracker)
+  # HTML reporting settings.
+  #   html_dir: Where the report files go.
+  #   template_dir: Where to find mustache templates.
+  Settings = namedtuple('Settings', Reporter.Settings._fields + ('html_dir', 'template_dir'))
+
+  def __init__(self, run_tracker, settings):
+    Reporter.__init__(self, run_tracker, settings)
      # The main report, and associated tool outputs, go under this dir.
-    self._html_dir = html_dir
+    self._html_dir = settings.html_dir
 
     # We render HTML from mustache templates.
-    self._renderer = MustacheRenderer(Renderer(search_dirs=template_dir))
+    self._renderer = MustacheRenderer(Renderer(search_dirs=settings.template_dir))
 
     # We serve files relative to the build root.
     self._buildroot = get_buildroot()
@@ -163,7 +170,7 @@ class HtmlReporter(Reporter):
       # We must flush in the same thread as the write.
       f.flush()
 
-  def handle_message(self, workunit, *msg_elements):
+  def do_handle_log(self, workunit, level, *msg_elements):
     """Implementation of Reporter callback."""
     content = self._render_message(*msg_elements)
 
@@ -182,7 +189,7 @@ class HtmlReporter(Reporter):
     elements = []
     detail_ids = []
     for element in msg_elements:
-      # Each element can be a message or a (message, detail) pair, as received by handle_message().
+      # Each element can be a message or a (message, detail) pair, as received by handle_log().
       #
       # However, as an internal implementation detail, we also allow an element to be a tuple
       # (message, detail, detail_initially_visible[, detail_id])

@@ -41,8 +41,8 @@ class Build(Command):
     parser.disable_interspersed_args()
     parser.epilog = """Builds the specified Python target(s). Use ./pants goal for JVM and other targets."""
 
-  def __init__(self, root_dir, parser, argv):
-    Command.__init__(self, root_dir, parser, argv)
+  def __init__(self, run_tracker, root_dir, parser, argv):
+    Command.__init__(self, run_tracker, root_dir, parser, argv)
 
     if not self.args:
       self.error("A spec argument is required")

@@ -16,12 +16,12 @@
 
 import errno
 import hashlib
+import itertools
 import os
 
 from abc import abstractmethod
 from collections import namedtuple
 
-from twitter.common.collections import maybe_list
 from twitter.common.dirutil import safe_mkdir
 from twitter.common.lang import Compatibility, Interface
 
@@ -33,10 +33,12 @@ from twitter.pants.base.target import Target
 #  - id identifies the set of targets.
 #  - hash is a fingerprint of all invalidating inputs to the build step, i.e., it uniquely
 #    determines a given version of the artifacts created when building the target set.
-#  - num_sources is the number of source files used to build this version of the target set. Needed
-#    only for displaying stats.
+#  - num_sources is the number of source files used to build this version of the target set.
+#    Needed only for display.
+#  - sources is an (optional) list of the source files used to compute this key.
+#    Needed only for display.
 
-CacheKey = namedtuple('CacheKey', ['id', 'hash', 'num_sources'])
+CacheKey = namedtuple('CacheKey', ['id', 'hash', 'num_sources', 'sources'])
 
 
 class SourceScope(Interface):
@@ -100,7 +102,9 @@ class CacheKeyGenerator(object):
       combined_id = Target.maybe_readable_combine_ids(cache_key.id for cache_key in cache_keys)
       combined_hash = hash_all(sorted(cache_key.hash for cache_key in cache_keys))
       combined_num_sources = sum(cache_key.num_sources for cache_key in cache_keys)
-      return CacheKey(combined_id, combined_hash, combined_num_sources)
+      combined_sources = \
+        sorted(list(itertools.chain(*[cache_key.sources for cache_key in cache_keys])))
+      return CacheKey(combined_id, combined_hash, combined_num_sources, combined_sources)
 
   def key_for_target(self, target, sources=TARGET_SOURCES, fingerprint_extra=None):
     """Get a key representing the given target and its sources.
@@ -120,10 +124,11 @@ class CacheKeyGenerator(object):
       sources = NO_SOURCES
 
     sha = hashlib.sha1()
-    num_sources = self._sources_hash(sha, sorted(sources.select(target)))
+    srcs = sorted(sources.select(target))
+    actual_srcs = self._sources_hash(sha, srcs)
     if fingerprint_extra:
       fingerprint_extra(sha)
-    return CacheKey(target.id, sha.hexdigest(), num_sources)
+    return CacheKey(target.id, sha.hexdigest(), len(actual_srcs), actual_srcs)
 
   def key_for(self, id, sources):
     """Get a cache key representing some id and its associated source files.
@@ -131,8 +136,8 @@ class CacheKeyGenerator(object):
     Useful primarily in tests. Normally we use key_for_target().
     """
     sha = hashlib.sha1()
-    num_sources = self._sources_hash(sha, maybe_list(sources))
-    return CacheKey(id, sha.hexdigest(), num_sources)
+    actual_srcs = self._sources_hash(sha, sources)
+    return CacheKey(id, sha.hexdigest(), len(actual_srcs), actual_srcs)
 
   def _walk_paths(self, paths):
     """Recursively walk the given paths.
@@ -151,15 +156,15 @@ class CacheKeyGenerator(object):
   def _sources_hash(self, sha, paths):
     """Update a SHA1 digest with the content of all files under the given paths.
 
-    :returns: The number of files found under the given paths.
+    :returns: The files found under the given paths.
     """
-    num_files = 0
+    files = []
     for relative_filename, filename in self._walk_paths(paths):
       with open(filename, "rb") as fd:
         sha.update(Compatibility.to_bytes(relative_filename))
         sha.update(fd.read())
-      num_files += 1
-    return num_files
+      files.append(filename)
+    return files
 
 
 # A persistent map from target set to cache key, which is a fingerprint of all

@@ -71,7 +71,8 @@ class BenchmarkRun(JvmTask):
       jvmargs=self.java_args,
       classpath=self.classpath(profile_classpath(self.profile), confs=self.confs),
       main='com.google.caliper.Runner',
-      opts=self.caliper_args
+      opts=self.caliper_args,
+      workunit_name='caliper'
     )
     if exit_code != 0:
       raise TaskError()

@@ -9,7 +9,7 @@ def items_to_report_element(items, item_type):
   Returns (message, detail) where message is the count of items (e.g., '26 targets')
   and detail is the text representation of the list of items, one per line.
 
-  The return value can be used as an argument to Report.message().
+  The return value can be used as an argument to Report.log().
 
   This is useful when we want to say "N targets" or "K sources"
   and allow the user to see which ones by clicking on that text.

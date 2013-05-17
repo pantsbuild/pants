@@ -22,21 +22,12 @@ from twitter.pants.goal.run_tracker import RunInfo
 # Google Prettyprint plugin files.
 PPP_RE=re.compile("""^lang-.*\.js$""")
 
-# Reporting server settings.
-#   info_dir: path to dir containing RunInfo files.
-#   template_dir: location of mustache template files.
-#   assets_dir: location of assets (js, css etc.)
-#   root: build root.
-#   allowed_clients: list of ips or ['ALL'].
-Settings = namedtuple('Settings',
-  ['info_dir', 'template_dir', 'assets_dir', 'root', 'allowed_clients'])
-
 
 class PantsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
-  """A handler that demultiplexes various pants reporting URLs.
-  """
+  """A handler that demultiplexes various pants reporting URLs."""
+
   def __init__(self, settings, renderer, request, client_address, server):
-    self._settings = settings
+    self._settings = settings  # An instance of ReportingServer.Settings.
     self._root = self._settings.root
     self._renderer = renderer
     self._client_address = client_address
@@ -68,6 +59,7 @@ class PantsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
       if path == '/':
         self._handle_runs('', {})
         return
+
       self._send_content('Invalid GET request %s' % self.path, 'text/html')
     except (IOError, ValueError):
       sys.stderr.write('Invalid GET request %s' % self.path)
@@ -316,6 +308,15 @@ class PantsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
 
 class ReportingServer(object):
+  # Reporting server settings.
+  #   info_dir: path to dir containing RunInfo files.
+  #   template_dir: location of mustache template files.
+  #   assets_dir: location of assets (js, css etc.)
+  #   root: build root.
+  #   allowed_clients: list of ips or ['ALL'].
+  Settings = namedtuple('Settings',
+    ['info_dir', 'template_dir', 'assets_dir', 'root', 'allowed_clients'])
+
   def __init__(self, port, settings):
     renderer = MustacheRenderer(Renderer(search_dirs=settings.template_dir))
 

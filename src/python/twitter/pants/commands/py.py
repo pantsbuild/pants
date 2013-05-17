@@ -51,8 +51,8 @@ class Py(Command):
                       help="show verbose output.")
     parser.epilog = """Interact with the chroot of the specified target."""
 
-  def __init__(self, root_dir, parser, argv):
-    Command.__init__(self, root_dir, parser, argv)
+  def __init__(self, run_tracker, root_dir, parser, argv):
+    Command.__init__(self, run_tracker, root_dir, parser, argv)
 
     if not self.args:
       self.error("A spec argument is required")

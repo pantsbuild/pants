@@ -75,7 +75,7 @@ class AntlrGen(CodeGen, NailgunTask):
 
       sources = self._calculate_sources([target])
       result = self.runjava_indivisible(java_main, classpath=antlr_classpath,
-                                        opts=antlr_opts, args=sources)
+                                        opts=antlr_opts, args=sources, workunit_name='antlr')
       if result != 0:
         raise TaskError
 

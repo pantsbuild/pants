@@ -137,27 +137,8 @@ class Phase(PhaseBase):
 
   @staticmethod
   def attempt(context, phases):
-    """
-      Attempts to reach the goals for the supplied phases, optionally recording phase timings and
-      then logging then when all specified phases have completed.
-    """
-    timer = context.timer or Timer()
-    start = timer.now()
+    """Attempts to reach the goals for the supplied phases."""
     executed = OrderedDict()
-
-    # I'd rather do this in a finally block below, but some goals os.fork and each of these cause
-    # finally to run, printing goal timings multiple times instead of once at the end.
-    def emit_timings():
-      elapsed = timer.now() - start
-      if context.config.getbool('build-time-stats', STATS_COLLECTION):
-        with context.timing('buildstats'):
-          build_stats = BuildTimeStats(context)
-          build_stats.record_stats(executed, elapsed)
-
-      if context.timer:
-        for phase, timings in executed.items():
-          for goal, times in timings.items():
-            context.timer.log('%s:%s' % (phase, goal), times)
 
     try:
       # Prepare tasks roots to leaves and allow for goals introducing new goals in existing phases.
@@ -193,24 +174,25 @@ class Phase(PhaseBase):
       for phase in phases:
         Group.execute(phase, tasks_by_goal, context, executed)
 
-      emit_timings()
-      return 0
+      ret = 0
     except (TargetDefinitionException, TaskError, GoalError) as e:
+
       message = '%s' % e
       if message:
         print('\nFAILURE: %s\n' % e)
       else:
         print('\nFAILURE\n')
-      emit_timings()
-      return 1
+      ret = 1
+    return ret
 
   @staticmethod
   def execute(context, *names):
+    # TODO(benjy): Is this code ever used?
     parser = OptionParser()
     phases = [Phase(name) for name in names]
     Phase.setup_parser(parser, [], phases)
     options, _ = parser.parse_args([])
-    context = Context(context.config, options, context.target_roots, log=context.log)
+    context = Context(context.config, options, None, context.target_roots, log=context.log)
     return Phase.attempt(context, phases)
 
   @staticmethod

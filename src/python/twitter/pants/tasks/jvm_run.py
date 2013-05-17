@@ -88,7 +88,9 @@ class JvmRun(JvmTask):
           classpath=(self.classpath(confs=self.confs)),
           main=main,
           args=self.args,
-          dryrun=dryrun
+          dryrun=dryrun,
+          workunit_factory=self.context.new_workunit,
+          workunit_name='run'
         )
         if dryrun:
           return result
@@ -99,4 +101,3 @@ class JvmRun(JvmTask):
       if self.only_write_cmd_line:
         with safe_open(self.only_write_cmd_line, 'w') as fd:
           fd.write(result)
-

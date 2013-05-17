@@ -21,8 +21,10 @@ import sys
 from twitter.common.dirutil import safe_mkdir, safe_open
 
 from twitter.pants import binary_util, is_codegen, is_java, is_scala, is_test, junit_tests
+from twitter.pants.goal.workunit import WorkUnit
 from twitter.pants.tasks import Task, TaskError
 from twitter.pants.tasks.jvm_task import JvmTask
+
 
 class JUnitRun(JvmTask):
   @classmethod
@@ -206,6 +208,9 @@ class JUnitRun(JvmTask):
                                          confs=self.confs)
 
         def run_tests(classpath, main, jvmargs=None):
+          def workunit_factory(name, labels=list(), cmd=''):
+            return self.context.new_workunit(name=name, labels=[WorkUnit.TEST] + labels, cmd=cmd)
+
           # TODO(John Sirois): Integrated batching with the test runner.  As things stand we get
           # results summaries for example for each batch but no overall summary.
           # http://jira.local.twitter.com/browse/AWESOME-1114
@@ -216,7 +221,10 @@ class JUnitRun(JvmTask):
                 jvmargs=(jvmargs or []) + self.java_args,
                 classpath=classpath,
                 main=main,
-                opts=self.opts, args=batch_tests
+                opts=self.opts,
+                args=batch_tests,
+                workunit_factory=workunit_factory,
+                workunit_name='run'
               ))
               if result != 0 and self.fail_fast:
                 break
@@ -239,7 +247,7 @@ class JUnitRun(JvmTask):
               for pattern in patterns:
                 opts.extend(['-filter', pattern])
               result = binary_util.runjava_indivisible(classpath=emma_classpath, main='emma',
-                                                       opts=opts)
+                                                       opts=opts, workunit_name='emma')
               if result != 0:
                 raise TaskError('Emma instrumentation failed with: %d' % result)
 
@@ -273,7 +281,8 @@ class JUnitRun(JvmTask):
             result = binary_util.runjava_indivisible(
               classpath=emma_classpath,
               main='emma',
-              opts=opts
+              opts=opts,
+              workunit_name='emma'
             )
             if result != 0:
               raise TaskError('Failed to emma generate code coverage reports: %d' % result)

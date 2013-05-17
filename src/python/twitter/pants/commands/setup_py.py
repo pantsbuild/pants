@@ -65,8 +65,8 @@ class SetupPy(Command):
                            "any additional parameters.  If no run command is specified, "
                            "pants will by default generate and dump the source distribution.")
 
-  def __init__(self, root_dir, parser, argv):
-    Command.__init__(self, root_dir, parser, argv)
+  def __init__(self, run_tracker, root_dir, parser, argv):
+    Command.__init__(self, run_tracker, root_dir, parser, argv)
 
     if not self.args:
       self.error("A spec argument is required")

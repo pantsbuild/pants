@@ -41,7 +41,7 @@ class JvmDependencyCache(object):
   - check_intransitive_deps: a flag which determines whether or not to generate errors about
     intransitive dependency errors, where a target has a dependency on another target which
     it doesn't declare, but which is part of its transitive dependency graph. If this is set
-    to "none", intransitive errors won't be reported. If "warn", then it will print warning
+    to 'none', intransitive errors won't be reported. If "warn", then it will print warning
     messages, but will not cause the build to fail, and will not populate build products with
     the errors. If "error", then the messages will be printed, build products populated, and
     the build will fail.
@@ -287,7 +287,8 @@ class JvmDependencyCache(object):
     for s in targets_by_source:
       if len(targets_by_source[s]) > 1:
         overlapping_sources.add(s)
-        print "Error: source file %s included in multiple targets %s" % (s, targets_by_source[s])
+        self.context.log.error(
+          "Error: source file %s included in multiple targets %s" % (s, targets_by_source[s]))
 
   def get_computed_jar_dependency_relations(self):
     """  Compute maps from target to the jars that the target provides """
@@ -348,10 +349,10 @@ class JvmDependencyCache(object):
       for classdep in self.class_deps_by_target[fromtarget]:
         if classdep in targets_by_class:
           self.computed_deps[fromtarget] |= targets_by_class[classdep]
+
     for fromtarget in self.source_deps_by_target:
       for totarget in self.source_deps_by_target[fromtarget]:
         self.computed_deps[fromtarget].add(totarget)
-
 
     # Figure out which jars are in which targets, and then use with the zinc
     # binary dependencies to figure out which jars belong to which targets.
@@ -426,20 +427,22 @@ class JvmDependencyCache(object):
            [ x.derived_from.address.reference() for x in undeclared_deps])
       genmap.add(target, self.context._buildroot, )
       for dep_target in undeclared_deps:
-        print ("Error: target %s has undeclared compilation dependency on %s," %
+        self.context.log.error("Error: target %s has undeclared compilation dependency on %s," %
                (target.address, dep_target.derived_from.address.reference()))
-        print ("       because source file %s depends on class %s" %
+        self.context.log.error("       because source file %s depends on class %s" %
                self.get_dependency_blame(target, dep_target, targets_by_class, targets_by_source))
         intransitive_undeclared_deps.discard(dep_target)
     if self.check_intransitive_deps is not 'none' and len(intransitive_undeclared_deps) > 0:
       genmap = self.context.products.get('missing_intransitive_deps')
-      genmap.add(target, self.context._buildroot, \
+      genmap.add(target, self.context._buildroot,
         [ x.derived_from.address.reference() for x in intransitive_undeclared_deps])
       for dep_target in intransitive_undeclared_deps:
-        print ("Error: target %s has undeclared intransitive compilation dependency on %s," %
-               (target.address, dep_target.derived_from.address.reference()))
-        print ("       because source file %s depends on class %s" %
-               self.get_dependency_blame(target, dep_target, targets_by_class, targets_by_source))
+        self.context.log.error(
+          "Error: target %s has undeclared intransitive compilation dependency on %s," %
+          (target.address.reference(), dep_target.derived_from.address.reference()))
+        self.context.log.error(
+          "       because source file %s depends on class %s" %
+          self.get_dependency_blame(target, dep_target, targets_by_class, targets_by_source))
 
     return undeclared_deps, intransitive_undeclared_deps
 
@@ -452,37 +455,39 @@ class JvmDependencyCache(object):
     """
     if not self.check_missing_deps:
         return
-    sources_by_target = self.get_sources_by_target()
-    targets_by_source = self.get_targets_by_source()
-    targets_by_class = self.get_targets_by_class()
-    binary_deps_by_target = self.get_binary_deps_by_target()
 
-    (deps_by_target, jar_deps_by_target) = \
-        self.get_compilation_dependencies(sources_by_target, targets_by_source,
-                                          targets_by_class, binary_deps_by_target)
-    found_missing_deps = False
-    all_undeclared_deps = set()
-    all_intransitive_undeclared_deps = set()
-    for target in deps_by_target:
-      computed_deps = deps_by_target[target]
-      computed_jar_deps = jar_deps_by_target[target]
-      undeclared_deps, immediate_undeclared_deps = \
-        self.get_missing_deps_for_target(target, computed_deps, computed_jar_deps,
-                                         targets_by_class, targets_by_source,
-                                         errorFilter)
-      all_undeclared_deps = all_undeclared_deps.union(undeclared_deps)
-      all_intransitive_undeclared_deps = \
-          all_intransitive_undeclared_deps.union(immediate_undeclared_deps)
+    with self.context.new_workunit(name='depcheck'):
+      sources_by_target = self.get_sources_by_target()
+      targets_by_source = self.get_targets_by_source()
+      targets_by_class = self.get_targets_by_class()
+      binary_deps_by_target = self.get_binary_deps_by_target()
 
-      # TODO(markcc): add checks for missing jar dependencies.
+      (deps_by_target, jar_deps_by_target) = \
+          self.get_compilation_dependencies(sources_by_target, targets_by_source,
+                                            targets_by_class, binary_deps_by_target)
+      found_missing_deps = False
+      all_undeclared_deps = set()
+      all_intransitive_undeclared_deps = set()
+      for target in deps_by_target:
+        computed_deps = deps_by_target[target]
+        computed_jar_deps = jar_deps_by_target[target]
+        undeclared_deps, immediate_undeclared_deps = \
+          self.get_missing_deps_for_target(target, computed_deps, computed_jar_deps,
+                                           targets_by_class, targets_by_source,
+                                           errorFilter)
+        all_undeclared_deps = all_undeclared_deps.union(undeclared_deps)
+        all_intransitive_undeclared_deps = \
+            all_intransitive_undeclared_deps.union(immediate_undeclared_deps)
 
-      if self.check_unnecessary_deps:
-        if not target.has_label('synthetic'):
-          self.check_target_unnecessary_deps(target, computed_deps)
+        # TODO(markcc): add checks for missing jar dependencies.
 
-    if len(all_undeclared_deps) > 0 or \
-      (self.check_intransitive_deps is not 'none' and len(all_intransitive_undeclared_deps) > 0):
-      raise TaskError('Missing dependencies detected.')
+        if self.check_unnecessary_deps:
+          if not target.has_label('synthetic'):
+            self.check_target_unnecessary_deps(target, computed_deps)
+
+      if len(all_undeclared_deps) > 0 or \
+        (self.check_intransitive_deps is not 'none' and len(all_intransitive_undeclared_deps) > 0):
+        raise TaskError('Missing dependencies detected.')
 
   def check_target_unnecessary_deps(self, target, computed_deps):
     """ Generate warning messages about unnecessary declared dependencies.
@@ -500,9 +505,8 @@ class JvmDependencyCache(object):
       if len(overdeps) > 0:
         for deptarget in overdeps:
           if isinstance(deptarget, JvmTarget) and not deptarget.has_label('synthetic'):
-            print ("Warning: target %s declares un-needed dependency on: %s" %
-                   (target, deptarget))
-
+            self.context.log.warn("Warning: target %s declares un-needed dependency on: %s" %
+              (target, deptarget))
 
   def _dependency_walk_work(self, deps, jar_deps, target):
     if target in deps:

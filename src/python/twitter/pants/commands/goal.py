@@ -14,38 +14,43 @@
 # limitations under the License.
 # ==================================================================================================
 
-from __future__ import print_function
-
+import atexit
+import errno
 import inspect
+import multiprocessing
 import os
 import sys
+import signal
+import socket
 import time
 import traceback
-
 from contextlib import contextmanager
 from optparse import Option, OptionParser
 
-try:
-  from colors import yellow, green, cyan
-except ImportError:
-  turn_off_colored_logging = True
-else:
-  turn_off_colored_logging = False
-
-from functools import wraps
+import daemon
 
 from twitter.common import log
 from twitter.common.collections import OrderedSet
 from twitter.common.dirutil import safe_mkdir, safe_rmtree
 from twitter.common.lang import Compatibility
-from twitter.pants import get_buildroot, goal, group, has_sources, is_apt, is_scala
-from twitter.pants.base import Address, BuildFile, Config, ParseContext, Target, Timer
+from twitter.pants import get_buildroot, goal, group, has_sources, is_apt
+from twitter.pants.base import Address, BuildFile, Config, ParseContext, Target
 from twitter.pants.base.rcfile import RcFile
 from twitter.pants.commands import Command
-from twitter.pants.targets import InternalTarget
+from twitter.pants.goal.workunit import WorkUnit
+from twitter.pants.reporting.report import Report
+from twitter.pants.reporting.reporting_server import ReportingServer
 from twitter.pants.tasks import Task, TaskError
 from twitter.pants.tasks.nailgun_task import NailgunTask
-from twitter.pants.goal import Context, GoalError, Phase
+from twitter.pants.goal import Context, GoalError, Phase, RunTracker, default_report
+
+
+try:
+  import colors
+except ImportError:
+  turn_off_colored_logging = True
+else:
+  turn_off_colored_logging = False
 
 StringIO = Compatibility.StringIO
 
@@ -170,12 +175,10 @@ class Goal(Command):
            help="Explain the execution of goals."),
     Option("-k", "--kill-nailguns", action="store_true", dest="cleanup_nailguns", default=False,
            help="Kill nailguns before exiting"),
-    Option("-v", "--log", action="store_true", dest="log", default=False,
-           help="[%default] Logs extra build output."),
     Option("-d", "--logdir", dest="logdir",
            help="[%default] Forks logs to files under this directory."),
     Option("-l", "--level", dest="log_level", type="choice", choices=['debug', 'info', 'warn'],
-           help="[info] Sets the logging level to one of 'debug', 'info' or 'warn', implies -v "
+           help="[info] Sets the logging level to one of 'debug', 'info' or 'warn'."
                 "if set."),
     Option("--no-colors", dest="no_color", action="store_true", default=turn_off_colored_logging,
            help="Do not colorize log messages."),
@@ -199,6 +202,8 @@ class Goal(Command):
                 "line. (Adds all targets found recursively under the given directory. Can be "
                 "specified more than once to add more than one root target directory to scan.)"),
   ]
+
+  output = None
 
   @staticmethod
   def add_global_options(parser):
@@ -240,12 +245,9 @@ class Goal(Command):
     # acquire the lock if they need to be serialized.
     return False
 
-  def __init__(self, root_dir, parser, args):
+  def __init__(self, run_tracker, root_dir, parser, args):
     self.targets = []
-    # Note that we can't gate this on the self.options.time flag, because self.options is
-    # only set up in Command.__init__, and only after it calls setup_parser(), which uses the timer.
-    self.timer = Timer()
-    Command.__init__(self, root_dir, parser, args)
+    Command.__init__(self, run_tracker, root_dir, parser, args)
 
   @contextmanager
   def check_errors(self, banner):
@@ -282,7 +284,6 @@ class Goal(Command):
 
   def setup_parser(self, parser, args):
     self.config = Config.load()
-
     Goal.add_global_options(parser)
 
     # We support attempting zero or more goals.  Multiple goals must be delimited from further
@@ -327,41 +328,44 @@ class Goal(Command):
       sys.exit(0)
     else:
       goals, specs = Goal.parse_args(args)
-
       self.requested_goals = goals
 
-      # Bootstrap goals by loading any configured bootstrap BUILD files
-      with self.check_errors('The following bootstrap_buildfiles cannot be loaded:') as error:
-        with self.timer.timing('parse:bootstrap'):
-          for path in self.config.getlist('goals', 'bootstrap_buildfiles', default=[]):
-            try:
-              buildfile = BuildFile(get_buildroot(), os.path.relpath(path, get_buildroot()))
-              ParseContext(buildfile).parse()
-            except (TypeError, ImportError, TaskError, GoalError):
-              error(path, include_traceback=True)
-            except (IOError, SyntaxError):
-              error(path)
+      with self.run_tracker.new_workunit(name='setup', labels=[WorkUnit.SETUP]):
+        # Bootstrap goals by loading any configured bootstrap BUILD files
+        with self.check_errors('The following bootstrap_buildfiles cannot be loaded:') as error:
+          with self.run_tracker.new_workunit(name='bootstrap', labels=[WorkUnit.SETUP]):
+            for path in self.config.getlist('goals', 'bootstrap_buildfiles', default = []):
+              try:
+                buildfile = BuildFile(get_buildroot(), os.path.relpath(path, get_buildroot()))
+                ParseContext(buildfile).parse()
+              except (TypeError, ImportError, TaskError, GoalError):
+                error(path, include_traceback=True)
+              except (IOError, SyntaxError):
+                error(path)
+        # Now that we've parsed the bootstrap BUILD files, and know about the SCM system.
+        self.run_tracker.run_info.add_scm_info()
 
-      # Bootstrap user goals by loading any BUILD files implied by targets
-      spec_parser = SpecParser(self.root_dir)
-      with self.check_errors('The following targets could not be loaded:') as error:
-        with self.timer.timing('parse:BUILD'):
-          for spec in specs:
-            try:
-              for target, address in spec_parser.parse(spec):
-                if target:
-                  self.targets.append(target)
-                  # Force early BUILD file loading if this target is an alias that expands to others.
-                  unused = list(target.resolve())
-                else:
-                  siblings = Target.get_all_addresses(address.buildfile)
-                  prompt = 'did you mean' if len(siblings) == 1 else 'maybe you meant one of these'
-                  error('%s => %s?:\n    %s' % (address, prompt,
-                                                '\n    '.join(str(a) for a in siblings)))
-            except (TypeError, ImportError, TaskError, GoalError):
-              error(spec, include_traceback=True)
-            except (IOError, SyntaxError):
-              error(spec)
+        # Bootstrap user goals by loading any BUILD files implied by targets.
+        spec_parser = SpecParser(self.root_dir)
+        with self.check_errors('The following targets could not be loaded:') as error:
+          with self.run_tracker.new_workunit(name='parse', labels=[WorkUnit.SETUP]):
+            for spec in specs:
+              try:
+                for target, address in spec_parser.parse(spec):
+                  if target:
+                    self.targets.append(target)
+                    # Force early BUILD file loading if this target is an alias that expands
+                    # to others.
+                    unused = list(target.resolve())
+                  else:
+                    siblings = Target.get_all_addresses(address.buildfile)
+                    prompt = 'did you mean' if len(siblings) == 1 else 'maybe you meant one of these'
+                    error('%s => %s?:\n    %s' % (address, prompt,
+                                                  '\n    '.join(str(a) for a in siblings)))
+              except (TypeError, ImportError, TaskError, GoalError):
+                error(spec, include_traceback=True)
+              except (IOError, SyntaxError):
+                error(spec)
 
       self.phases = [Phase(goal) for goal in goals]
 
@@ -387,56 +391,51 @@ class Goal(Command):
         if augmented_args != args:
           del args[:]
           args.extend(augmented_args)
-          print("(using pantsrc expansion: pants goal %s)" % ' '.join(augmented_args),
-                file=sys.stderr)
+          sys.stderr.write("(using pantsrc expansion: pants goal %s)\n" % ' '.join(augmented_args))
 
       Phase.setup_parser(parser, args, self.phases)
 
   def run(self, lock):
+    # Update the reporting settings, now that we have flags etc.
+
+    log_level = Report.log_level_from_string(self.options.log_level or 'info')
+    color = not self.options.no_color
+    timing = self.options.time
+    cache_stats = self.options.time  # TODO: Separate flag for this?
+
+    settings_updates_map = {
+      'console': {
+        'log_level': log_level, 'color': color, 'timing': timing, 'cache_stats': cache_stats
+      },
+      'html': {
+        'log_level': log_level
+      }
+    }
+    self.run_tracker.update_report_settings(settings_updates_map)
+    # TODO: Do something useful with --logdir.
+
     if self.options.dry_run:
-      print('****** Dry Run ******')
-
-    logger = None
-    if self.options.log or self.options.log_level:
-      log.LogOptions.set_stderr_log_level((self.options.log_level or 'info').upper())
-      logdir = self.options.logdir or self.config.get('goals', 'logdir', default=None)
-      if logdir:
-        safe_mkdir(logdir)
-        log.LogOptions.set_log_dir(logdir)
-        log.init('goals')
-      else:
-        log.init()
-      logger = log
-
-      if not self.options.no_color:
-        def colorwrapper(func, clrname):
-          @wraps(func)
-          def wrapper(msg, *args, **kwargs):
-            return func(clrname(msg), *args, **kwargs)
-          return wrapper
-
-        log.info = colorwrapper(log.info, green)
-        log.warn = colorwrapper(log.warn, yellow)
-        log.debug = colorwrapper(log.debug, cyan)
-
-    if self.options.recursive_directory:
-      log.warn('--all-recursive is deprecated, use a target spec with the form [dir]:: instead')
-      for dir in self.options.recursive_directory:
-        self.add_target_recursive(dir)
-
-    if self.options.target_directory:
-      log.warn('--all is deprecated, use a target spec with the form [dir]: instead')
-      for dir in self.options.target_directory:
-        self.add_target_directory(dir)
+      print '****** Dry Run ******'
 
     context = Context(
       self.config,
       self.options,
+      self.run_tracker,
       self.targets,
       requested_goals=self.requested_goals,
-      lock=lock,
-      log=logger,
-      timer=self.timer if self.options.time else None)
+      lock=lock)
+
+    # TODO: Time to get rid of this hack.
+    if self.options.recursive_directory:
+      context.log.warn(
+        '--all-recursive is deprecated, use a target spec with the form [dir]:: instead')
+      for dir in self.options.recursive_directory:
+        self.add_target_recursive(dir)
+
+    if self.options.target_directory:
+      context.log.warn('--all is deprecated, use a target spec with the form [dir]: instead')
+      for dir in self.options.target_directory:
+        self.add_target_directory(dir)
 
     unknown = []
     for phase in self.phases:
@@ -448,9 +447,6 @@ class Goal(Command):
       print('')
       return Phase.execute(context, 'goals')
 
-    if logger:
-      logger.debug('Operating on targets: %s' % self.targets)
-
     ret = Phase.attempt(context, self.phases)
 
     if self.options.cleanup_nailguns or self.config.get('nailgun', 'autokill', default = False):
@@ -458,11 +454,6 @@ class Goal(Command):
         log.debug('auto-killing nailguns')
       if NailgunTask.killall:
         NailgunTask.killall(log)
-
-    if self.options.time:
-      print('Timing report')
-      print('=============')
-      self.timer.print_timings()
 
     return ret
 
@@ -494,7 +485,6 @@ from twitter.pants.tasks.filedeps import FileDeps
 from twitter.pants.tasks.idl_resolve import IdlResolve
 from twitter.pants.tasks.ivy_resolve import IvyResolve
 from twitter.pants.tasks.jar_create import JarCreate
-from twitter.pants.tasks.jar_publish import JarPublish
 from twitter.pants.tasks.java_compile import JavaCompile
 from twitter.pants.tasks.javadoc_gen import JavadocGen
 from twitter.pants.tasks.scaladoc_gen import ScaladocGen
@@ -570,6 +560,110 @@ if NailgunTask.killall:
   ng_killall.install('clean-all', first=True)
 
 
+def get_port_and_pidfile(context):
+  port = context.options.port or context.config.getint('reporting', 'reporting_port')
+  # We don't put the pidfile in .pants.d, because we want to find it even after a clean.
+  # TODO: Fold pants.run and other pidfiles into here. Generalize the pidfile idiom into
+  # some central library.
+  pidfile = os.path.join(get_buildroot(), '.pids', 'port_%d.pid' % port)
+  return port, pidfile
+
+class RunServer(Task):
+  @classmethod
+  def setup_parser(cls, option_group, args, mkflag):
+    option_group.add_option(mkflag("port"), dest="port", action="store", type="int", default=0,
+      help="Serve on this port.")
+    option_group.add_option(mkflag("allowed-clients"), dest="allowed_clients",
+      default=["127.0.0.1"], action="append",
+      help="Only requests from these IPs may access this server. Useful for temporarily showing " \
+           "build results to a colleague. The special value ALL means any client may connect. " \
+           "Use with caution, as your source code is exposed to all allowed clients!")
+
+  def execute(self, targets):
+    DONE = '__done_reporting'
+
+    def run_server(reporting_queue):
+      (port, pidfile) = get_port_and_pidfile(self.context)
+      def write_pidfile():
+        safe_mkdir(os.path.dirname(pidfile))
+        with open(pidfile, 'w') as outfile:
+          outfile.write(str(os.getpid()))
+
+      def report_launch():
+        reporting_queue.put(
+          'Launching server with pid %d at http://localhost:%d' % (os.getpid(), port))
+
+      def done_reporting():
+        reporting_queue.put(DONE)
+
+      try:
+        # We mustn't block in the child, because the multiprocessing module enforces that the
+        # parent either kills or joins to it. Instead we fork a grandchild that inherits the queue
+        # but is allowed to block indefinitely on the server loop.
+        if not os.fork():
+          # Child process.
+          info_dir = self.context.config.getdefault('info_dir')
+          template_dir = self.context.config.get('reporting', 'reports_template_dir')
+          assets_dir = self.context.config.get('reporting', 'reports_assets_dir')
+          settings = ReportingServer.Settings(info_dir=info_dir, template_dir=template_dir,
+                                              assets_dir=assets_dir, root=get_buildroot(),
+                                              allowed_clients=self.context.options.allowed_clients)
+          server = ReportingServer(port, settings)
+          # Block forever here.
+          server.start(run_before_blocking=[write_pidfile, report_launch, done_reporting])
+      except socket.error, e:
+        if e.errno == errno.EADDRINUSE:
+          reporting_queue.put('Server already running at http://localhost:%d' % port)
+          done_reporting()
+          return
+        else:
+          done_reporting()
+          raise
+    # We do reporting on behalf of the child process (necessary, since reporting is buffered in a
+    # background thread). We use multiprocessing.Process() to spawn the child so we can use that
+    # module's inter-process Queue implementation.
+    reporting_queue = multiprocessing.Queue()
+    proc = multiprocessing.Process(target=run_server, args=[reporting_queue])
+    proc.daemon = True
+    proc.start()
+    s = reporting_queue.get()
+    while s != DONE:
+      self.context.log.info(s)
+      s = reporting_queue.get()
+    # The child process is done reporting, and is now in the server loop, so we can proceed.
+
+
+goal(
+  name='server',
+  action=RunServer,
+).install().with_description('Run the pants reporting server.')
+
+class KillServer(Task):
+  @classmethod
+  def setup_parser(cls, option_group, args, mkflag):
+    option_group.add_option(mkflag("port"), dest="port", action="store", type="int", default=0,
+      help="Serve on this port.")
+
+  def execute(self, targets):
+    (port, pidfile) = get_port_and_pidfile(self.context)
+    if os.path.exists(pidfile):
+      with open(pidfile, 'r') as infile:
+        pidstr = infile.read()
+      try:
+        os.unlink(pidfile)
+        pid = int(pidstr)
+        os.kill(pid, signal.SIGKILL)
+        self.context.log.info('Killed server with pid %d at http://localhost:%d\n' % (pid, port))
+      except (ValueError, OSError):
+        pass
+    else:
+      self.context.log.info('No server found.')
+
+goal(
+  name='killserver',
+  action=KillServer,
+).install().with_description('Kill the pants reporting server.')
+
 # TODO(John Sirois): Resolve eggs
 goal(
   name='ivy',
@@ -613,14 +707,13 @@ def is_java(target):
           or (isinstance(target, (JvmBinary, junit_tests, Benchmark))
               and has_sources(target, '.java')))
 
-
 def is_scala(target):
   return (isinstance(target, (ScalaLibrary, ScalaTests, ScalacPlugin))
           or (isinstance(target, (JvmBinary, junit_tests, Benchmark))
               and has_sources(target, '.scala')))
 
 
-goal(name='scalac',
+goal(name='scala',
      action=ScalaCompile,
      group=group('jvm', is_scala),
      dependencies=['gen', 'resolve']).install('compile').with_description(
@@ -630,7 +723,7 @@ goal(name='apt',
      action=JavaCompile,
      group=group('jvm', is_apt),
      dependencies=['gen', 'resolve']).install('compile')
-goal(name='javac',
+goal(name='java',
      action=JavaCompile,
      group=group('jvm', is_java),
      dependencies=['gen', 'resolve']).install('compile')

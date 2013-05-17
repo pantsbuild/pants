@@ -14,8 +14,6 @@
 # limitations under the License.
 # ==================================================================================================
 
-__author__ = 'Benjy Weinberger'
-
 import shlex
 import subprocess
 
@@ -50,14 +48,15 @@ class ScalaRepl(JvmTask):
     # The repl session may last a while, allow concurrent pants activity during this pants idle
     # period.
     self.context.lock.release()
-
     self.save_stty_options()
     try:
       runjava_indivisible(
         jvmargs=self.jvm_args,
         classpath=self.classpath(profile_classpath(self.profile), confs=self.confs),
         main=self.main,
-        args=self.args
+        args=self.args,
+        workunit_factory=self.context.new_workunit,
+        workunit_name='repl'
       )
     except KeyboardInterrupt:
       # TODO(John Sirois): Confirm with Steve Gury that finally does not work on mac and an

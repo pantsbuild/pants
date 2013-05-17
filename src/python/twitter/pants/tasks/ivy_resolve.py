@@ -299,7 +299,8 @@ class IvyResolve(NailgunTask):
       #xml = self._ivy_utils.xml_report_path(conf)
       out = os.path.join(self._outdir, '%(org)s-%(name)s-%(conf)s.html' % params)
       opts = ['-IN', xml, '-XSL', xsl, '-OUT', out]
-      if 0 != self.runjava_indivisible('org.apache.xalan.xslt.Process', classpath=classpath, opts=opts):
+      if 0 != self.runjava_indivisible('org.apache.xalan.xslt.Process', classpath=classpath,
+                                       opts=opts, workunit_name='report'):
         raise TaskError
       reports.append(out)
 
@@ -472,6 +473,6 @@ class IvyResolve(NailgunTask):
     ivy_opts.extend(self._opts)
     ivy_opts.extend(self._ivy_args)
 
-    result = self.runjava_indivisible('org.apache.ivy.Main', opts=ivy_opts)
+    result = self.runjava_indivisible('org.apache.ivy.Main', opts=ivy_opts, workunit_name='ivy')
     if result != 0:
       raise TaskError('org.apache.ivy.Main returned %d' % result)
