@@ -313,19 +313,6 @@ def _subprocess_call_with_args(cmd, args, call=subprocess.call,
     else:
       raise e
 
-
-def nailgun_profile_classpath(nailgun_task, profile, ivy_jar=None, ivy_settings=None,
-                              workunit_factory=None):
-  return profile_classpath(
-    profile,
-    java_runner=nailgun_task.runjava_indivisible,
-    config=nailgun_task.context.config,
-    ivy_jar=ivy_jar,
-    ivy_settings=ivy_settings,
-    workunit_factory=workunit_factory
-  )
-
-
 def profile_classpath(profile, java_runner=None, config=None, ivy_jar=None, ivy_settings=None,
                       workunit_factory=None):
   # TODO(John Sirois): consider rework when ant backend is gone and there is no more need to share
