@@ -176,7 +176,8 @@ class IdeGen(JvmBinaryTask):
                       checkstyle_suppression_files,
                       debug_port,
                       jvm_targets,
-                      not self.intransitive)
+                      not self.intransitive,
+                      self.context.new_workunit)
 
     if self.python:
       python_source_paths = self.context.config.getlist('ide', 'python_source_paths', default=[])
@@ -354,7 +355,7 @@ class Project(object):
         yield ext
 
   def __init__(self, name, has_python, skip_java, skip_scala, root_dir,
-               checkstyle_suppression_files, debug_port, targets, transitive):
+               checkstyle_suppression_files, debug_port, targets, transitive, workunit_factory):
     """Creates a new, unconfigured, Project based at root_dir and comprised of the sources visible
     to the given targets."""
 
@@ -362,6 +363,7 @@ class Project(object):
     self.root_dir = root_dir
     self.targets = OrderedSet(targets)
     self.transitive = transitive
+    self.workunit_factory = workunit_factory
 
     self.sources = []
     self.py_sources = []
@@ -513,9 +515,11 @@ class Project(object):
 
   def configure_profiles(self, scala_compiler_profile):
     checkstyle_enabled = len(Phase.goals_of_type(Checkstyle)) > 0
-    self.checkstyle_classpath = (binary_util.profile_classpath('checkstyle') if checkstyle_enabled
-                                 else [])
+    self.checkstyle_classpath = \
+      (binary_util.profile_classpath('checkstyle', workunit_factory=self.workunit_factory)
+       if checkstyle_enabled else [])
     self.scala_compiler_classpath = []
     if self.has_scala:
-      self.scala_compiler_classpath.extend(binary_util.profile_classpath(scala_compiler_profile))
+      self.scala_compiler_classpath.extend(binary_util.profile_classpath(scala_compiler_profile,
+        workunit_factory=self.workunit_factory))
 

@@ -67,6 +67,9 @@ class ConsoleReporter(Reporter):
                         workunit.start_delta_string(),
                         self._indent(workunit),
                         workunit.name if self.settings.indent else workunit.path()))
+      if workunit.has_label(WorkUnit.TEST):
+        # So that emitted output from test frameworks starts on a new line (see below).
+        sys.stdout.write(self._prefix(workunit, '\n'))
     sys.stdout.flush()
 
   def end_workunit(self, workunit):

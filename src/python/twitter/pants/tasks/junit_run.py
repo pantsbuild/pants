@@ -204,11 +204,11 @@ class JUnitRun(JvmTask):
       tests = list(self.normalize_test_classes() if self.test_classes
                                                  else self.calculate_tests(targets))
       if tests:
-        junit_classpath = self.classpath(binary_util.profile_classpath(self.junit_profile),
-                                         confs=self.confs)
+        junit_classpath = self.classpath(binary_util.profile_classpath(self.junit_profile,
+                            workunit_factory=self.context.new_workunit), confs=self.confs)
 
         def run_tests(classpath, main, jvmargs=None):
-          def workunit_factory(name, labels=list(), cmd=''):
+          def test_workunit_factory(name, labels=list(), cmd=''):
             return self.context.new_workunit(name=name, labels=[WorkUnit.TEST] + labels, cmd=cmd)
 
           # TODO(John Sirois): Integrated batching with the test runner.  As things stand we get
@@ -223,7 +223,7 @@ class JUnitRun(JvmTask):
                 main=main,
                 opts=self.opts,
                 args=batch_tests,
-                workunit_factory=workunit_factory,
+                workunit_factory=test_workunit_factory,
                 workunit_name='run'
               ))
               if result != 0 and self.fail_fast:
