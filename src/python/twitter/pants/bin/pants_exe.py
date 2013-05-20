@@ -29,6 +29,7 @@ from twitter.pants.base import Address, Config
 from twitter.pants.base.rcfile import RcFile
 from twitter.pants.commands import Command
 from twitter.pants.goal import RunTracker, default_report
+from twitter.pants.reporting.report import Report
 
 
 _HELP_ALIASES = set([
@@ -135,6 +136,15 @@ def _run():
   run_tracker = RunTracker(config)
   report = default_report(config, run_tracker)
   run_tracker.start(report)
+
+  url = run_tracker.run_info.get_info('report_url')
+  try:
+    from colors import magenta
+    url = magenta(url)
+  except ImportError:
+    pass
+  run_tracker.log(Report.INFO, 'See a report at: %s' % url)
+  run_tracker.log(Report.INFO, '(pants server will run a reporting server.)')
 
   try:
     command = command_class(run_tracker, root_dir, parser, command_args)
