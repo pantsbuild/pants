@@ -229,10 +229,8 @@ class ScalaCompile(NailgunTask):
         if write_to_artifact_cache:
           # Write the entire merged artifact, and each individual split artifact,
           # to the artifact cache, if needed.
-          self._update_artifact_cache(merged_artifact, vts)
-          for artifact, vt in zip(artifacts, vts.versioned_targets):
-            assert artifact.targets == vt.targets  # Something is horribly wrong if this fails.
-            self._update_artifact_cache(artifact, vt)
+          vts_artifact_pairs = zip(vts.versioned_targets, artifacts) + [(vts, merged_artifact)]
+          self._update_artifact_cache(vts_artifact_pairs)
 
       # Register the products, if needed. TODO: Make sure this is safe to call concurrently.
       # In practice the GIL will make it fine, but relying on that is insanitary.
@@ -255,14 +253,18 @@ class ScalaCompile(NailgunTask):
         basedir, plugin_info_file = self._zinc_utils.write_plugin_info(self._resources_dir, target)
         genmap.add(target, basedir, [plugin_info_file])
 
-  def _update_artifact_cache(self, artifact, vt):
+  def _update_artifact_cache(self, vts_artifact_pairs):
     # Relativize the analysis.
     # TODO: Relativize before splitting? This will require changes to Zinc, which currently
     # eliminates paths it doesn't recognize (including our placeholders) when splitting.
-    if os.path.exists(artifact.analysis_file) and \
-       self._zinc_utils.relativize_analysis_file(artifact.analysis_file,
-                                                 artifact.portable_analysis_file):
-      raise TaskError('Zinc failed to relativize analysis file: %s' % artifact.analysis_file)
-      # Write the per-target artifacts to the cache.
-    artifact_files = [artifact.classes_dir, artifact.portable_analysis_file]
-    self.update_artifact_cache(vt, artifact_files)
+    vts_artifactfiles_pairs = []
+    for vts, artifact in vts_artifact_pairs:
+      if os.path.exists(artifact.analysis_file) and \
+         self._zinc_utils.relativize_analysis_file(artifact.analysis_file,
+                                                   artifact.portable_analysis_file):
+        raise TaskError('Zinc failed to relativize analysis file: %s' % artifact.analysis_file)
+        # Write the per-target artifacts to the cache.
+      artifact_files = [artifact.classes_dir, artifact.portable_analysis_file]
+      vts_artifactfiles_pairs.append((vts, artifact_files))
+
+    self.update_artifact_cache(vts_artifactfiles_pairs)

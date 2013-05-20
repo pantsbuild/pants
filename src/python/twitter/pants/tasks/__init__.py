@@ -254,19 +254,24 @@ class Task(object):
           vt.update()
     return cached_vts, list(uncached_vts)
 
-  def update_artifact_cache(self, vt, build_artifacts):
+  def update_artifact_cache(self, vts_artifactfiles_pairs):
     """Write to the artifact cache, if we're configured to.
 
-    vts:             A single VersionedTargetSet.
-    build_artifacts: The paths to the artifacts for the VersionedTargetSet.
+    vts_artifactfiles_pairs - a list of pairs (vts, artifactfiles) where
+      - vts is single VersionedTargetSet.
+      - artifactfiles is a list of paths to artifacts for the VersionedTargetSet.
     """
     if self._artifact_cache and self.context.options.write_to_artifact_cache:
       with self.context.new_workunit('cache'):
         with self.context.new_workunit('update'):
-          if self.context.options.verify_artifact_cache:
-            pass  # TODO: Verify that the artifact we just built is identical to the cached one.
-          self._report_targets('Caching artifacts for ', vt.targets, '.')
-          self._artifact_cache.insert(vt.cache_key, build_artifacts)
+          targets = set()
+          for vts, artifactfiles in vts_artifactfiles_pairs:
+            targets.update([x.address.reference() for x in vts.targets])
+          for vts, artifactfiles in vts_artifactfiles_pairs:
+            if self.context.options.verify_artifact_cache:
+              pass  # TODO: Verify that the artifact we just built is identical to the cached one.
+            self._report_targets('Caching artifacts for ', list(targets), '.')
+            self._artifact_cache.insert(vts.cache_key, artifactfiles)
 
   def _report_targets(self, prefix, targets, suffix):
     self.context.log.info(

@@ -208,6 +208,7 @@ class JavaCompile(NailgunTask):
       if self._artifact_cache and self.context.options.write_to_artifact_cache:
         deps = Dependencies(self._classes_dir)
         deps.load(depfile)
+        vts_artifactfile_pairs = []
         for single_vt in vt.versioned_targets:
           per_target_depfile = self.create_depfile_path([single_vt.target])
           per_target_artifact_files = [per_target_depfile]
@@ -216,8 +217,9 @@ class JavaCompile(NailgunTask):
               classfile_paths = [os.path.join(self._classes_dir, cls) for cls in classes]
               per_target_artifact_files.extend(classfile_paths)
               all_artifact_files.extend(classfile_paths)
-            self.update_artifact_cache(single_vt, per_target_artifact_files)
-        self.update_artifact_cache(vt, all_artifact_files)
+            vts_artifactfile_pairs.append((single_vt, per_target_artifact_files))
+        vts_artifactfile_pairs.append((vt, all_artifact_files))
+        self.update_artifact_cache(vts_artifactfile_pairs)
 
   def create_depfile_path(self, targets):
     compilation_id = Target.maybe_readable_identify(targets)

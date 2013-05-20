@@ -109,7 +109,7 @@ class CodeGen(Task):
           if lang_invalid:
             artifact_files.extend(self.genlang(lang, lang_invalid) or [])
         if self._artifact_cache and self.context.options.write_to_artifact_cache and artifact_files:
-          self.update_artifact_cache(vt, artifact_files)
+          self.update_artifact_cache([(vt, artifact_files)])
 
     # Link synthetic targets for all in-play gen targets
     for lang, tgts in gentargets_bylang.items():
