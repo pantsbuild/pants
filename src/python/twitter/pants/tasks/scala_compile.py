@@ -258,13 +258,14 @@ class ScalaCompile(NailgunTask):
     # TODO: Relativize before splitting? This will require changes to Zinc, which currently
     # eliminates paths it doesn't recognize (including our placeholders) when splitting.
     vts_artifactfiles_pairs = []
-    for vts, artifact in vts_artifact_pairs:
-      if os.path.exists(artifact.analysis_file) and \
-         self._zinc_utils.relativize_analysis_file(artifact.analysis_file,
-                                                   artifact.portable_analysis_file):
-        raise TaskError('Zinc failed to relativize analysis file: %s' % artifact.analysis_file)
-        # Write the per-target artifacts to the cache.
-      artifact_files = [artifact.classes_dir, artifact.portable_analysis_file]
-      vts_artifactfiles_pairs.append((vts, artifact_files))
+    with self.context.new_workunit(name='cacheprep'):
+      with self.context.new_workunit(name='relativize', labels=[WorkUnit.MULTITOOL]):
+        for vts, artifact in vts_artifact_pairs:
+          if os.path.exists(artifact.analysis_file) and \
+              self._zinc_utils.relativize_analysis_file(artifact.analysis_file,
+                                                        artifact.portable_analysis_file):
+            raise TaskError('Zinc failed to relativize analysis file: %s' % artifact.analysis_file)
+          artifact_files = [artifact.classes_dir, artifact.portable_analysis_file]
+          vts_artifactfiles_pairs.append((vts, artifact_files))
 
     self.update_artifact_cache(vts_artifactfiles_pairs)

@@ -263,13 +263,12 @@ class Task(object):
     """
     if self._artifact_cache and self.context.options.write_to_artifact_cache:
       with self.context.new_workunit('cache'):
+        # Do some reporting.
+        targets = set()
+        for vts, artifactfiles in vts_artifactfiles_pairs:
+          targets.update(vts.targets)
+        self._report_targets('Caching artifacts for ', list(targets), '.')
         with self.context.new_workunit('update'):
-          # Do some reporting.
-          targets = set()
-          for vts, artifactfiles in vts_artifactfiles_pairs:
-            targets.update(vts.targets)
-          self._report_targets('Caching artifacts for ', list(targets), '.')
-
           # Cache the artifacts.
           for vts, artifactfiles in vts_artifactfiles_pairs:
             if self.context.options.verify_artifact_cache:
