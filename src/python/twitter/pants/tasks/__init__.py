@@ -264,13 +264,16 @@ class Task(object):
     if self._artifact_cache and self.context.options.write_to_artifact_cache:
       with self.context.new_workunit('cache'):
         with self.context.new_workunit('update'):
+          # Do some reporting.
           targets = set()
           for vts, artifactfiles in vts_artifactfiles_pairs:
-            targets.update([x.address.reference() for x in vts.targets])
+            targets.update(vts.targets)
+          self._report_targets('Caching artifacts for ', list(targets), '.')
+
+          # Cache the artifacts.
           for vts, artifactfiles in vts_artifactfiles_pairs:
             if self.context.options.verify_artifact_cache:
               pass  # TODO: Verify that the artifact we just built is identical to the cached one.
-            self._report_targets('Caching artifacts for ', list(targets), '.')
             self._artifact_cache.insert(vts.cache_key, artifactfiles)
 
   def _report_targets(self, prefix, targets, suffix):
