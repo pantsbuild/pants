@@ -53,10 +53,6 @@ class ScalaCompile(NailgunTask):
            'to compile all sources together. Set this to 0 to compile target-by-target. ' \
            'Default is set in pants.ini.')
 
-    option_group.add_option(mkflag('color'), mkflag('color', negate=True),
-                            dest='scala_compile_color',
-                            action='callback', callback=mkflag.set_bool,
-                            help='[True] Enable color in logging.')
     JvmDependencyCache.setup_parser(option_group, args, mkflag)
 
 
@@ -64,10 +60,7 @@ class ScalaCompile(NailgunTask):
     NailgunTask.__init__(self, context, workdir=context.config.get('scala-compile', 'nailgun_dir'))
 
     # Set up the zinc utils.
-    # Command line switch overrides color setting set in pants.ini
-    color = (context.options.scala_compile_color if context.options.scala_compile_color is not None
-             else context.config.getbool('scala-compile', 'color', default=True))
-
+    color = not context.options.no_color
     self._zinc_utils = ZincUtils(context=context, nailgun_task=self, color=color)
 
     # The rough number of source files to build in each compiler pass.
@@ -212,9 +205,10 @@ class ScalaCompile(NailgunTask):
       # Invoke the compiler if needed.
       if any([not vt.valid for vt in vts.versioned_targets]):
         # Do some reporting.
-        prefix = 'Operating on a partition containing '
         self.context.log.info(
-          prefix,
+          'Operating on a partition containing ',
+          items_to_report_element(vts.cache_key.sources, 'source'),
+          ' in ',
           items_to_report_element([t.address.reference() for t in vts.targets], 'target'), '.')
         old_state = current_state
         classpath = [entry for conf, entry in cp if conf in self._confs]

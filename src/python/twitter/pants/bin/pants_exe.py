@@ -138,13 +138,8 @@ def _run():
   run_tracker.start(report)
 
   url = run_tracker.run_info.get_info('report_url')
-  try:
-    from colors import magenta
-    url = magenta(url)
-  except ImportError:
-    pass
   run_tracker.log(Report.INFO, 'See a report at: %s' % url)
-  run_tracker.log(Report.INFO, '(pants server will run a reporting server.)')
+  run_tracker.log(Report.INFO, '(To run a reporting server: ./pants server)')
 
   try:
     command = command_class(run_tracker, root_dir, parser, command_args)
