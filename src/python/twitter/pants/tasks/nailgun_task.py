@@ -259,8 +259,8 @@ class NailgunTask(Task):
       time.sleep(0.1)
 
   def _create_ngclient(self, port, workunit):
-    return NailgunClient(port=port, work_dir=get_buildroot(), out=workunit.output('stdout'),
-                         err=workunit.output('stderr'))
+    return NailgunClient(port=port, work_dir=get_buildroot(), ins=None,
+                         out=workunit.output('stdout'), err=workunit.output('stderr'))
 
   def _spawn_nailgun_server(self, workunit):
     log.info('No ng server found, spawning...')
