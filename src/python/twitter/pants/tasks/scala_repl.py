@@ -18,6 +18,7 @@ import shlex
 import subprocess
 
 from twitter.pants.binary_util import profile_classpath, runjava_indivisible
+from twitter.pants.goal.workunit import WorkUnit
 from twitter.pants.tasks import Task
 from twitter.pants.tasks.jvm_task import JvmTask
 
@@ -49,13 +50,17 @@ class ScalaRepl(JvmTask):
     # period.
     self.context.lock.release()
     self.save_stty_options()
+
+    def repl_workunit_factory(name, labels=list(), cmd=''):
+      return self.context.new_workunit(name=name, labels=[WorkUnit.REPL] + labels, cmd=cmd)
+
     try:
       runjava_indivisible(
         jvmargs=self.jvm_args,
         classpath=self.classpath(profile_classpath(self.profile), confs=self.confs),
         main=self.main,
         args=self.args,
-        workunit_factory=self.context.new_workunit,
+        workunit_factory=repl_workunit_factory,
         workunit_name='repl'
       )
     except KeyboardInterrupt:

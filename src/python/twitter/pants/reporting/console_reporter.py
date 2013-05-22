@@ -95,7 +95,9 @@ class ConsoleReporter(Reporter):
     """Implementation of Reporter callback."""
     # Emit output from test frameworks, but not from other tools.
     # This is an arbitrary choice, but one that turns out to be useful to users in practice.
-    if workunit.has_label(WorkUnit.TEST):
+    if workunit.has_label(WorkUnit.TEST) or \
+       workunit.has_label(WorkUnit.REPL) or \
+       workunit.has_label(WorkUnit.RUN):
       sys.stdout.write(self._prefix(workunit, s))
       sys.stdout.flush()
 

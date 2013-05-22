@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==================================================================================================
+from twitter.pants.goal.workunit import WorkUnit
 
 __author__ = 'Benjy Weinberger'
 
@@ -83,13 +84,16 @@ class JvmRun(JvmTask):
       # TODO(John Sirois): Since --dry-run is plumbed throughout the Task infra it seems like we
       # should just be using that.  Ask Benjy why this particular task uses a custom file.
       def run_binary(dryrun=False):
+        def run_workunit_factory(name, labels=list(), cmd=''):
+          return self.context.new_workunit(name=name, labels=[WorkUnit.RUN] + labels, cmd=cmd)
+
         result = runjava_indivisible(
           jvmargs=self.jvm_args,
           classpath=(self.classpath(confs=self.confs)),
           main=main,
           args=self.args,
           dryrun=dryrun,
-          workunit_factory=self.context.new_workunit,
+          workunit_factory=run_workunit_factory,
           workunit_name='run'
         )
         if dryrun:

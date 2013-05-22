@@ -40,6 +40,7 @@ class WorkUnit(object):
   JVM = 7        # Running via the JVM.
   NAILGUN = 8    # Running via nailgun.
   REPL = 9
+  RUN = 10
 
   def __init__(self, run_tracker, parent, name, labels=(), cmd=''):
     """
