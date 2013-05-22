@@ -67,8 +67,8 @@ class ConsoleReporter(Reporter):
                         workunit.start_delta_string(),
                         self._indent(workunit),
                         workunit.name if self.settings.indent else workunit.path()))
-      if workunit.has_label(WorkUnit.TEST):
-        # So that emitted output from test frameworks starts on a new line (see below).
+      if self._show_output(workunit):
+        # So that emitted output starts on a new line (see below).
         sys.stdout.write(self._prefix(workunit, '\n'))
     sys.stdout.flush()
 
@@ -93,13 +93,24 @@ class ConsoleReporter(Reporter):
 
   def handle_output(self, workunit, label, s):
     """Implementation of Reporter callback."""
-    # Emit output from test frameworks, but not from other tools.
-    # This is an arbitrary choice, but one that turns out to be useful to users in practice.
-    if workunit.has_label(WorkUnit.TEST) or \
-       workunit.has_label(WorkUnit.REPL) or \
-       workunit.has_label(WorkUnit.RUN):
+    if self._show_output_indented(workunit):
       sys.stdout.write(self._prefix(workunit, s))
+    elif self._show_output_unindented(workunit):
+      sys.stdout.write(s)
       sys.stdout.flush()
+
+  # Emit output from some tools and not others.
+  # This is an arbitrary choice, but one that turns out to be useful to users in practice.
+
+  def _show_output(self, workunit):
+    return self._show_output_indented(workunit) or self._show_output_unindented(workunit)
+
+  def _show_output_indented(self, workunit):
+    return workunit.has_label(WorkUnit.COMPILER) or workunit.has_label(WorkUnit.TEST)
+
+  def _show_output_unindented(self, workunit):
+    # Indenting looks weird in these cases.
+    return workunit.has_label(WorkUnit.REPL) or workunit.has_label(WorkUnit.RUN)
 
   def _format_aggregated_timings(self, aggregated_timings):
     return '\n'.join(['%(timing).3f %(label)s' % x for x in aggregated_timings.get_all()])

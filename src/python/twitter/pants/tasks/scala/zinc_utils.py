@@ -14,8 +14,6 @@
 # limitations under the License.
 # ==================================================================================================
 
-__author__ = 'Benjy Weinberger'
-
 import os
 import shutil
 import textwrap
@@ -28,6 +26,7 @@ from twitter.common.contextutil import open_zip as open_jar, temporary_dir
 from twitter.common.dirutil import  safe_open
 
 from twitter.pants import get_buildroot
+from twitter.pants.goal.workunit import WorkUnit
 from twitter.pants.tasks import TaskError
 from twitter.pants.binary_util import find_java_home
 
@@ -41,7 +40,7 @@ class ZincUtils(object):
   Instances are immutable, and all methods are reentrant (assuming that the java_runner is).
   """
   def __init__(self, context, nailgun_task, color):
-    self._context = context
+    self.context = context
     self._nailgun_task = nailgun_task  # We run zinc on this task's behalf.
     self._color = color
 
@@ -91,9 +90,9 @@ class ZincUtils(object):
     """The jars containing code for enabled plugins."""
     return self._plugin_jars
 
-  def run_zinc(self, args, workunit_name='zinc'):
+  def run_zinc(self, args, workunit_name='zinc', workunit_labels=None):
     zinc_args = [
-      '-log-level', self._context.options.log_level or 'info',
+      '-log-level', self.context.options.log_level or 'info',
       '-mirror-analysis',
     ]
     if not self._color:
@@ -101,7 +100,8 @@ class ZincUtils(object):
     zinc_args.extend(self._zinc_jar_args)
     zinc_args.extend(args)
     return self._nailgun_task.runjava_indivisible(self._main, classpath=self._zinc_classpath,
-                             args=zinc_args, jvmargs=self._jvm_args, workunit_name=workunit_name)
+                             args=zinc_args, jvmargs=self._jvm_args, workunit_name=workunit_name,
+                             workunit_labels=workunit_labels)
 
   def compile(self, classpath, sources, output_dir, analysis_file, upstream_analysis_files):
     # To pass options to scalac simply prefix with -S.
@@ -121,7 +121,7 @@ class ZincUtils(object):
       '-d', output_dir
     ])
     args.extend(sources)
-    return self.run_zinc(args)
+    return self.run_zinc(args, workunit_labels=[WorkUnit.COMPILER])
 
   # Run zinc in analysis manipulation mode.
   def run_zinc_analysis(self, analysis_file, args, workunit_name='analysis'):

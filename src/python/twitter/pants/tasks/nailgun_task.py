@@ -91,13 +91,14 @@ class NailgunTask(Task):
     self._ng_err = os.path.join(workdir, 'stderr')
 
   def _runjava_common(self, runjava, main, classpath=None, opts=None, args=None, jvmargs=None,
-                      workunit_name=None):
+                      workunit_name=None, workunit_labels=None):
+    workunit_labels = workunit_labels[:] if workunit_labels else []
     cp = (self._classpath or []) + (classpath or [])
     cmd_str = \
       binary_util.runjava_cmd_str(jvmargs=jvmargs, classpath=cp, main=main, opts=opts, args=args)
     workunit_name = workunit_name or main
     if self._daemon:
-      workunit_labels = [WorkUnit.TOOL, WorkUnit.NAILGUN]
+      workunit_labels += [WorkUnit.TOOL, WorkUnit.NAILGUN]
       with self.context.new_workunit(name=workunit_name, labels=workunit_labels, cmd=cmd_str) \
           as workunit:
         nailgun = self._get_nailgun_client(workunit)
@@ -124,8 +125,10 @@ class NailgunTask(Task):
           self._ng_shutdown()
           raise e
     else:
+      def runjava_workunit_factory(name, labels=list(), cmd=''):
+        return self.context.new_workunit(name=name, labels=workunit_labels + labels, cmd=cmd)
       ret = runjava(main=main, classpath=cp, opts=opts, args=args, jvmargs=jvmargs,
-                    workunit_factory=self.context.new_workunit, workunit_name=workunit_name,
+                    workunit_factory=runjava_workunit_factory, workunit_name=workunit_name,
                     dryrun=self.dry_run)
       if self.dry_run:
         print('********** Direct Java dry run: %s' % ret)
@@ -146,7 +149,7 @@ class NailgunTask(Task):
                                 opts=opts, args=args, jvmargs=jvmargs, workunit_name=workunit_name)
 
   def runjava_indivisible(self, main, classpath=None, opts=None, args=None, jvmargs=None,
-                          workunit_name=None):
+                          workunit_name=None, workunit_labels=None):
     """Runs the java main using the given classpath and args.
 
     If --no-ng-daemons is specified then the java main is run in a freshly spawned subprocess,
@@ -156,7 +159,8 @@ class NailgunTask(Task):
     """
 
     return self._runjava_common(binary_util.runjava_indivisible, main=main, classpath=classpath,
-                                opts=opts, args=args, jvmargs=jvmargs, workunit_name=workunit_name)
+                                opts=opts, args=args, jvmargs=jvmargs, workunit_name=workunit_name,
+                                workunit_labels=workunit_labels)
 
   def profile_classpath(self, profile):
     """Ensures the classpath for the given profile ivy.xml is available and returns it as a list of

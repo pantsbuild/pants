@@ -29,18 +29,21 @@ class WorkUnit(object):
   # Labels describing a workunit.  Reporting code can use this to decide how to display
   # information about this workunit.
   #
-  # Note that a workunit can have multiple labels where this makes sense, e.g., TOOL and NAILGUN.
+  # Note that a workunit can have multiple labels where this makes sense, e.g., TOOL, COMPILER and NAILGUN.
   SETUP = 0      # Parsing build files etc.
   PHASE = 1      # Executing a phase.
   GOAL = 2       # Executing a goal.
   GROUP = 3      # Executing a group.
+
   TOOL = 4       # Single invocations of a tool.
   MULTITOOL = 5  # Multiple consecutive invocations of the same tool.
-  TEST = 6       # Running a test.
-  JVM = 7        # Running via the JVM.
-  NAILGUN = 8    # Running via nailgun.
-  REPL = 9
-  RUN = 10
+  COMPILER = 6   # Invocation of a compiler.
+
+  TEST = 7       # Running a test.
+  JVM = 8        # Running a tool via the JVM.
+  NAILGUN = 9    # Running a tool via nailgun.
+  RUN = 10       # Running a binary.
+  REPL = 11      # Running a repl.
 
   def __init__(self, run_tracker, parent, name, labels=(), cmd=''):
     """

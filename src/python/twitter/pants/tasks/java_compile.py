@@ -23,6 +23,7 @@ from twitter.common.dirutil import safe_open, safe_mkdir
 
 from twitter.pants import has_sources, is_apt, Task
 from twitter.pants.base.target import Target
+from twitter.pants.goal.workunit import WorkUnit
 from twitter.pants.tasks import TaskError
 from twitter.pants.tasks.jvm_compiler_dependencies import Dependencies
 from twitter.pants.tasks.nailgun_task import NailgunTask
@@ -256,7 +257,8 @@ class JavaCompile(NailgunTask):
 
     opts.extend(self._opts)
     return self.runjava_indivisible(_JMAKE_MAIN, classpath=jmake_classpath, opts=opts, args=sources,
-                                    jvmargs=self._jvm_args, workunit_name='jmake')
+                                    jvmargs=self._jvm_args, workunit_name='jmake',
+                                    workunit_labels=[WorkUnit.COMPILER])
 
   def check_artifact_cache(self, vts):
     # Special handling for java artifacts.
