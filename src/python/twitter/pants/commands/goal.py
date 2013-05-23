@@ -36,6 +36,7 @@ from twitter.pants import get_buildroot, goal, group, has_sources, is_apt
 from twitter.pants.base import Address, BuildFile, Config, ParseContext, Target
 from twitter.pants.base.rcfile import RcFile
 from twitter.pants.commands import Command
+from twitter.pants.goal.initialize_reporting import update_reporting
 from twitter.pants.goal.workunit import WorkUnit
 from twitter.pants.reporting.report import Report
 from twitter.pants.reporting.reporting_server import ReportingServer
@@ -179,6 +180,8 @@ class Goal(Command):
     Option("-l", "--level", dest="log_level", type="choice", choices=['debug', 'info', 'warn'],
            help="[info] Sets the logging level to one of 'debug', 'info' or 'warn'."
                 "if set."),
+    Option("-q", "--quiet", action="store_true", dest="quiet", default=False,
+           help="Squelches all console output apart from errors."),
     Option("--no-colors", dest="no_color", action="store_true", default=turn_off_colored_logging,
            help="Do not colorize log messages."),
     Option("-n", "--dry-run", action="store_true", dest="dry_run", default=False,
@@ -396,22 +399,7 @@ class Goal(Command):
 
   def run(self, lock):
     # Update the reporting settings, now that we have flags etc.
-
-    log_level = Report.log_level_from_string(self.options.log_level or 'info')
-    color = not self.options.no_color
-    timing = self.options.time
-    cache_stats = self.options.time  # TODO: Separate flag for this?
-
-    settings_updates_map = {
-      'console': {
-        'log_level': log_level, 'color': color, 'timing': timing, 'cache_stats': cache_stats
-      },
-      'html': {
-        'log_level': log_level
-      }
-    }
-    self.run_tracker.update_report_settings(settings_updates_map)
-    # TODO: Do something useful with --logdir.
+    update_reporting(self.options, self.run_tracker)
 
     if self.options.dry_run:
       print '****** Dry Run ******'

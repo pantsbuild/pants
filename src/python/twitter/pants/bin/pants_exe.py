@@ -28,7 +28,8 @@ from twitter.pants import get_buildroot, get_version
 from twitter.pants.base import Address, Config
 from twitter.pants.base.rcfile import RcFile
 from twitter.pants.commands import Command
-from twitter.pants.goal import RunTracker, default_report
+from twitter.pants.goal import RunTracker
+from twitter.pants.goal.initialize_reporting import initial_reporting
 from twitter.pants.reporting.report import Report
 
 
@@ -134,7 +135,7 @@ def _run():
 
   config = Config.load()
   run_tracker = RunTracker(config)
-  report = default_report(config, run_tracker)
+  report = initial_reporting(config, run_tracker)
   run_tracker.start(report)
 
   url = run_tracker.run_info.get_info('report_url')

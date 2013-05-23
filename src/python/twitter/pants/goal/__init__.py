@@ -138,7 +138,6 @@ class Goal(object):
 from twitter.pants.goal.context import Context
 from twitter.pants.goal.group import Group
 from twitter.pants.goal.run_tracker import RunTracker
-from twitter.pants.goal.default_reporting import default_report
 
 __all__ = (
   'Context',
@@ -147,5 +146,4 @@ __all__ = (
   'Group',
   'Phase',
   'RunTracker',
-  'default_report'
 )

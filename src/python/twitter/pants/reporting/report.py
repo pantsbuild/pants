@@ -40,22 +40,25 @@ class Report(object):
     # We synchronize on this, to support parallel execution.
     self._lock = threading.Lock()
 
-  def update_settings(self, updates_map):
-    """Modify reporting settings once we've got cmd-line flags etc.
-
-       updates_map - a map from reporter name to a k-v dict of updates.
-    """
-    for name, updates in updates_map.items():
-      if name in self._reporters:
-        self._reporters[name].update_settings(updates)
-
   def open(self):
-    for reporter in self._reporters.values():
-      reporter.open()
+    with self._lock:
+      for reporter in self._reporters.values():
+        reporter.open()
     self._emitter_thread.start()
 
+  # Note that if you addr/remove reporters after open() has been called you have
+  # to ensure that their state is set up correctly. Best only to do this with
+  # stateless reporters, such as ConsoleReporter.
+
   def add_reporter(self, name, reporter):
-    self._reporters[name] = reporter
+    with self._lock:
+      self._reporters[name] = reporter
+
+  def remove_reporter(self, name):
+    with self._lock:
+      ret = self._reporters[name]
+      del self._reporters[name]
+      return ret
 
   def start_workunit(self, workunit):
     with self._lock:
@@ -94,6 +97,7 @@ class Report(object):
   def _notify(self):
     # Notify for output in all workunits. Note that output may be coming in from workunits other
     # than the current one, if work is happening in parallel.
+    # Assumes self._lock is held by the caller.
     for workunit in self._workunits.values():
       for label, output in workunit.outputs().items():
         s = output.read()

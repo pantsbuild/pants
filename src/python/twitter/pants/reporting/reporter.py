@@ -17,10 +17,6 @@ class Reporter(object):
     self.run_tracker = run_tracker
     self.settings = settings
 
-  def update_settings(self, updates):
-    """Modify reporting settings once we've got cmd-line flags etc."""
-    self.settings = self.settings._replace(**updates)
-
   def open(self):
     """Begin the report."""
     pass

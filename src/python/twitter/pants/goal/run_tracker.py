@@ -55,7 +55,7 @@ class RunTracker(object):
       ArtifactCacheStats(os.path.join(self.info_dir, 'artifact_cache_stats'))
 
     # We report to this Report.
-    self._report = None
+    self.report = None
 
     # The workunit representing the entire pants run.
     self.root_workunit = None
@@ -68,20 +68,15 @@ class RunTracker(object):
     """Start tracking this pants run.
 
     report: an instance of pants.reporting.Report."""
-    self._report = report
-    self._report.open()
+    self.report = report
+    self.report.open()
 
     self.root_workunit = WorkUnit(run_tracker=self, parent=None,
                                   labels=[], name='all', cmd=None)
     self.root_workunit.start()
 
-    self._report.start_workunit(self.root_workunit)
+    self.report.start_workunit(self.root_workunit)
     self._current_workunit = self.root_workunit
-
-  def update_report_settings(self, updates_map):
-    """Modify reporting settings once we've got cmd-line flags etc."""
-    if self._report:
-      self._report.update_settings(updates_map)
 
   @contextmanager
   def new_workunit(self, name, labels=list(), cmd=''):
@@ -107,7 +102,7 @@ class RunTracker(object):
                                       name=name, labels=labels, cmd=cmd)
     self._current_workunit.start()
     try:
-      self._report.start_workunit(self._current_workunit)
+      self.report.start_workunit(self._current_workunit)
       yield self._current_workunit
     except KeyboardInterrupt:
       self._current_workunit.set_outcome(WorkUnit.ABORTED)
@@ -118,23 +113,23 @@ class RunTracker(object):
     else:
       self._current_workunit.set_outcome(WorkUnit.SUCCESS)
     finally:
-      self._report.end_workunit(self._current_workunit)
+      self.report.end_workunit(self._current_workunit)
       self._current_workunit.end()
       self._current_workunit = self._current_workunit.parent
 
   def log(self, level, *msg_elements):
     """Log a message against the current workunit."""
-    self._report.log(self._current_workunit, level, *msg_elements)
+    self.report.log(self._current_workunit, level, *msg_elements)
 
   def end(self):
     """This pants run is over, so stop tracking it.
 
     Note: If end() has been called once, subsequent calls are no-ops."""
     while self._current_workunit:
-      self._report.end_workunit(self._current_workunit)
+      self.report.end_workunit(self._current_workunit)
       self._current_workunit.end()
       self._current_workunit = self._current_workunit.parent
-    self._report.close()
+    self.report.close()
     try:
       if self.run_info.get_info('outcome') is None:
         self.run_info.add_info('outcome', self.root_workunit.outcome_string())
