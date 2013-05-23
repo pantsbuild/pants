@@ -41,35 +41,38 @@ class ConsoleReporter(Reporter):
   def close(self):
     """Implementation of Reporter callback."""
     if self.settings.timing:
-      print('\n')
-      print('Cumulative Timings')
-      print('==================')
-      print(self._format_aggregated_timings(self.run_tracker.cumulative_timings))
-      print('\n')
-      print('Self Timings')
-      print('============')
-      print(self._format_aggregated_timings(self.run_tracker.self_timings))
+      self._emit('\n')
+      self._emit('\nCumulative Timings')
+      self._emit('\n==================')
+      self._emit('\n')
+      self._emit(self._format_aggregated_timings(self.run_tracker.cumulative_timings))
+      self._emit('\n')
+      self._emit('\nSelf Timings')
+      self._emit('\n============')
+      self._emit('\n')
+      self._emit(self._format_aggregated_timings(self.run_tracker.self_timings))
     if self.settings.cache_stats:
-      print('\n')
-      print('Artifact Cache Stats')
-      print('====================')
-      print(self._format_artifact_cache_stats(self.run_tracker.artifact_cache_stats))
-    print('')
+      self._emit('\n')
+      self._emit('\nArtifact Cache Stats')
+      self._emit('\n====================')
+      self._emit('\n')
+      self._emit(self._format_artifact_cache_stats(self.run_tracker.artifact_cache_stats))
+    self._emit('\n')
 
   def start_workunit(self, workunit):
     """Implementation of Reporter callback."""
     if workunit.parent and workunit.parent.has_label(WorkUnit.MULTITOOL):
       # For brevity, we represent each consecutive invocation of a multitool with a dot.
-      sys.stdout.write('.')
+      self._emit('.')
     else:
-      sys.stdout.write('\n%s %s %s[%s]' %
+      self._emit('\n%s %s %s[%s]' %
                        (workunit.start_time_string(),
                         workunit.start_delta_string(),
                         self._indent(workunit),
                         workunit.name if self.settings.indent else workunit.path()))
       if self._show_output(workunit):
         # So that emitted output starts on a new line (see below).
-        sys.stdout.write(self._prefix(workunit, '\n'))
+        self._emit(self._prefix(workunit, '\n'))
     sys.stdout.flush()
 
   def end_workunit(self, workunit):
@@ -77,8 +80,8 @@ class ConsoleReporter(Reporter):
     if workunit.outcome() != WorkUnit.SUCCESS and not self._show_output(workunit):
       # Emit the suppressed workunit output, if any, to aid in debugging the problem.
       for name, outbuf in workunit.outputs().items():
-        sys.stdout.write(self._prefix(workunit, '\n==== %s ====\n' % name))
-        sys.stdout.write(self._prefix(workunit, outbuf.read_from(0)))
+        self._emit(self._prefix(workunit, '\n==== %s ====\n' % name))
+        self._emit(self._prefix(workunit, outbuf.read_from(0)))
         sys.stdout.flush()
 
   def do_handle_log(self, workunit, level, *msg_elements):
@@ -89,15 +92,18 @@ class ConsoleReporter(Reporter):
     msg = '\n' + ''.join(elements)
     if self.settings.color:
       msg = _colorfunc_map.get(level, lambda x: x)(msg)
-    sys.stdout.write(self._prefix(workunit, msg))
+    self._emit(self._prefix(workunit, msg))
 
   def handle_output(self, workunit, label, s):
     """Implementation of Reporter callback."""
     if self._show_output_indented(workunit):
-      sys.stdout.write(self._prefix(workunit, s))
+      self._emit(self._prefix(workunit, s))
     elif self._show_output_unindented(workunit):
-      sys.stdout.write(s)
+      self._emit(s)
       sys.stdout.flush()
+
+  def _emit(self, s):
+    sys.stdout.write(s)
 
   # Emit output from some tools and not others.
   # This is an arbitrary choice, but one that turns out to be useful to users in practice.
