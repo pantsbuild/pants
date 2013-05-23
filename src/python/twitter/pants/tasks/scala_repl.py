@@ -54,20 +54,25 @@ class ScalaRepl(JvmTask):
     def repl_workunit_factory(name, labels=list(), cmd=''):
       return self.context.new_workunit(name=name, labels=[WorkUnit.REPL] + labels, cmd=cmd)
 
-    try:
-      runjava_indivisible(
-        jvmargs=self.jvm_args,
-        classpath=self.classpath(profile_classpath(self.profile), confs=self.confs),
-        main=self.main,
-        args=self.args,
-        workunit_factory=repl_workunit_factory,
-        workunit_name='repl'
-      )
-    except KeyboardInterrupt:
-      # TODO(John Sirois): Confirm with Steve Gury that finally does not work on mac and an
-      # explicit catch of KeyboardInterrupt is required.
-      pass
-    self.restore_ssty_options()
+    kwargs = {
+      'jvmargs': self.jvm_args,
+      'classpath': self.classpath(profile_classpath(self.profile), confs=self.confs),
+      'main': self.main,
+      'args': self.args
+    }
+    # Capture the cmd_line.
+    cmd = runjava_indivisible(dryrun=True, **kwargs)
+    with self.context.new_workunit(name='repl', labels=[WorkUnit.REPL, WorkUnit.JVM], cmd=cmd):
+      # Now actually run the REPL. We don't let runjava_indivisible create a workunit because we
+      # want the REPL's output to go straight to stdout and not get buffered by the report.
+      print('')  # Start REPL output on a new line.
+      try:
+        runjava_indivisible(dryrun=False, **kwargs)
+      except KeyboardInterrupt:
+        # TODO(John Sirois): Confirm with Steve Gury that finally does not work on mac and an
+        # explicit catch of KeyboardInterrupt is required.
+        pass
+      self.restore_ssty_options()
 
   def save_stty_options(self):
     """
