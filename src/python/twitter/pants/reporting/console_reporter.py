@@ -74,8 +74,8 @@ class ConsoleReporter(Reporter):
 
   def end_workunit(self, workunit):
     """Implementation of Reporter callback."""
-    if workunit.outcome() != WorkUnit.SUCCESS:
-      # Emit the workunit output, if any, to aid in debugging the problem.
+    if workunit.outcome() != WorkUnit.SUCCESS and not self._show_output(workunit):
+      # Emit the suppressed workunit output, if any, to aid in debugging the problem.
       for name, outbuf in workunit.outputs().items():
         sys.stdout.write(self._prefix(workunit, '\n==== %s ====\n' % name))
         sys.stdout.write(self._prefix(workunit, outbuf.read_from(0)))
