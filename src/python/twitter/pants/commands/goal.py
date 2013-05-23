@@ -14,6 +14,8 @@
 # limitations under the License.
 # ==================================================================================================
 
+import daemon
+
 import errno
 import inspect
 import multiprocessing
@@ -23,10 +25,9 @@ import signal
 import socket
 import time
 import traceback
+
 from contextlib import contextmanager
 from optparse import Option, OptionParser
-
-import daemon
 
 from twitter.common import log
 from twitter.common.collections import OrderedSet
@@ -38,9 +39,9 @@ from twitter.pants.base.rcfile import RcFile
 from twitter.pants.commands import Command
 from twitter.pants.goal.initialize_reporting import update_reporting
 from twitter.pants.goal.workunit import WorkUnit
-from twitter.pants.reporting.report import Report
 from twitter.pants.reporting.reporting_server import ReportingServer
 from twitter.pants.tasks import Task, TaskError
+from twitter.pants.tasks.console_task import ConsoleTask
 from twitter.pants.tasks.nailgun_task import NailgunTask
 from twitter.pants.goal import Context, GoalError, Phase
 
@@ -399,7 +400,14 @@ class Goal(Command):
 
   def run(self, lock):
     # Update the reporting settings, now that we have flags etc.
-    update_reporting(self.options, self.run_tracker)
+    def is_console_task():
+      for phase in self.phases:
+        for goal in phase.goals():
+          if issubclass(goal.task_type, ConsoleTask):
+            return True
+      return False
+
+    update_reporting(self.options, is_console_task(), self.run_tracker)
 
     if self.options.dry_run:
       print '****** Dry Run ******'
