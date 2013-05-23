@@ -793,7 +793,7 @@ goal(
   name='jvm-run-dirty',
   action=JvmRun,
   serialize=False,
-).install('run-dirty').with_description('Run a (currently JVM only) binary target, using\n' +
+).install('run-dirty').with_description('Run a (currently JVM only) binary target, using ' +
   'only currently existing binaries, skipping compilation')
 
 # repl doesn't need the serialization lock. It's reasonable to have
@@ -811,7 +811,7 @@ goal(
   action=ScalaRepl,
   serialize=False,
 ).install('repl-dirty').with_description(
-  'Run a (currently Scala only) REPL with the classpath set according to the targets, \n' +
+  'Run a (currently Scala only) REPL with the classpath set according to the targets, ' +
   'using the currently existing binaries, skipping compilation')
 
 goal(
