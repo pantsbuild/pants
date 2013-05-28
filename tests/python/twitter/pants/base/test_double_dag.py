@@ -1,14 +1,12 @@
-__author__ = 'Ryan Williams'
-
 import unittest
 
 from twitter.pants.base.double_dag import DoubleDag
-from twitter.pants.goal import Context
-from twitter.pants.testutils import MockTarget
+from twitter.pants.reporting.report import Report
+from twitter.pants.testutils import MockLogger, MockTarget
 
 
 def make_dag(nodes):
-  return DoubleDag(nodes, lambda t: t.dependencies, Context.Log())
+  return DoubleDag(nodes, lambda t: t.dependencies, MockLogger(Report.INFO))
 
 
 class DoubleDagTest(unittest.TestCase):
