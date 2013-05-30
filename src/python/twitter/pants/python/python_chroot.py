@@ -15,6 +15,7 @@
 # ==================================================================================================
 
 from __future__ import print_function
+from twitter.pants.cache.file_based_artifact_cache import FileBasedArtifactCache
 
 __author__ = 'Brian Wickman'
 
@@ -31,7 +32,6 @@ from twitter.common.python.platforms import Platform
 
 from twitter.pants import is_concrete
 from twitter.pants.base import Config
-from twitter.pants.cache.artifact_cache import FileBasedArtifactCache
 from twitter.pants.base.build_invalidator import CacheKeyGenerator
 from twitter.pants.targets import (
     PythonAntlrLibrary,

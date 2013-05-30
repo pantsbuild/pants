@@ -22,8 +22,8 @@ from contextlib import contextmanager
 from multiprocessing.pool import ThreadPool
 
 from twitter.common.collections.orderedset import OrderedSet
+from twitter.pants.cache import create_artifact_cache
 
-from twitter.pants.cache.artifact_cache import create_artifact_cache
 from twitter.pants.base.hash_utils import hash_file
 from twitter.pants.base.build_invalidator import CacheKeyGenerator
 from twitter.pants.reporting.reporting_utils import items_to_report_element
