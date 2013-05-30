@@ -24,7 +24,7 @@ from threading import Thread
 from twitter.common.contextutil import pushd, temporary_dir, temporary_file
 from twitter.common.dirutil import safe_mkdir
 
-from twitter.pants.base.artifact_cache import (
+from twitter.pants.cache.artifact_cache import (
     CombinedArtifactCache,
     FileBasedArtifactCache,
     RESTfulArtifactCache,

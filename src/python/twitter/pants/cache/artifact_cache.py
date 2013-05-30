@@ -19,10 +19,10 @@ import os
 import shutil
 import urlparse
 
-from twitter.common.quantity import Amount, Data
 from twitter.common.contextutil import open_tar, temporary_file, temporary_file_path
 from twitter.common.dirutil import safe_mkdir, safe_rmtree
 from twitter.common.lang import Compatibility
+from twitter.common.quantity import Amount, Data
 
 # Note throughout the distinction between the artifact_root (which is where the artifacts are
 # originally built and where the cache restores them to) and the cache root path/URL (which is
