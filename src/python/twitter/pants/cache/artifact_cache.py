@@ -17,12 +17,12 @@ class ArtifactCache(object):
   class CacheError(Exception):
     """Indicates a problem writing to or reading from the cache."""
 
-  def __init__(self, context, artifact_root):
+  def __init__(self, log, artifact_root):
     """Create an ArtifactCache.
 
     All artifacts must be under artifact_root.
     """
-    self.context = context
+    self.log = log
     self.artifact_root = artifact_root
 
   def insert(self, cache_key, build_artifacts):
@@ -44,10 +44,7 @@ class ArtifactCache(object):
     except Exception as e:
       try:
         err_msg = 'Error while writing to artifact cache: %s. Deleting, just in case.' % e
-        if self.context:
-          self.context.log.error(err_msg)
-        else:
-          print(err_msg)
+        self.log.error(err_msg)
         self.delete(cache_key)
       except Exception:
         print('IMPORTANT: failed to delete %s on error. Your artifact cache may be corrupted. '

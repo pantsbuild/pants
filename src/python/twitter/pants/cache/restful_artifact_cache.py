@@ -11,13 +11,13 @@ class RESTfulArtifactCache(ArtifactCache):
 
   READ_SIZE = Amount(4, Data.MB).as_(Data.BYTES)
 
-  def __init__(self, context, artifact_root, url_base, compress=True):
+  def __init__(self, log, artifact_root, url_base, compress=True):
     """
     url_base: The prefix for urls on some RESTful service. We must be able to PUT and GET to any
               path under this base.
     compress: Whether to compress the artifacts before storing them.
     """
-    ArtifactCache.__init__(self, context, artifact_root)
+    ArtifactCache.__init__(self, log, artifact_root)
     parsed_url = urlparse.urlparse(url_base)
     if parsed_url.scheme == 'http':
       self._ssl = False
@@ -59,9 +59,8 @@ class RESTfulArtifactCache(ArtifactCache):
         raise self.CacheError('No content-length header in HTTP response')
 
       done = False
-      if self.context:
-        self.context.log.info('Reading %d bytes from artifact cache at %s' %
-                              (expected_size, self._url_string(path)))
+      self.log.info('Reading %d bytes from artifact cache at %s' %
+                    (expected_size, self._url_string(path)))
       # Read the data in a loop.
       with temporary_file() as outfile:
         total_bytes = 0
@@ -71,8 +70,7 @@ class RESTfulArtifactCache(ArtifactCache):
           if len(data) < self.READ_SIZE:
             done = True
           total_bytes += len(data)
-          if self.context:
-            self.context.log.debug('Read %d bytes' % total_bytes)
+          self.log.debug('Read %d bytes' % total_bytes)
         outfile.close()
         # Check the size.
         if total_bytes != expected_size:
@@ -84,8 +82,7 @@ class RESTfulArtifactCache(ArtifactCache):
           tarfile.extractall(self.artifact_root)
       return True
     except Exception, e:
-      if self.context:
-        self.context.log.warn('Error while reading from artifact cache: %s' % e)
+        self.log.warn('Error while reading from artifact cache: %s' % e)
         return False
 
   def delete(self, cache_key):
@@ -105,8 +102,7 @@ class RESTfulArtifactCache(ArtifactCache):
 
   # Returns a response if we get a 200, None if we get a 404 and raises an exception otherwise.
   def _request(self, method, path, body=None):
-    if self.context:
-      self.context.log.debug('Sending %s request to %s' % (method, self._url_string(path)))
+    self.log.debug('Sending %s request to %s' % (method, self._url_string(path)))
     # TODO(benjy): Keep connection open and reuse?
     conn = self._connect()
     conn.request(method, path, body=body)

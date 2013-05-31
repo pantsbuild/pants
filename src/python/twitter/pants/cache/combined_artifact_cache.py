@@ -6,11 +6,11 @@ class CombinedArtifactCache(ArtifactCache):
   def __init__(self, artifact_caches):
     if not artifact_caches:
       raise ValueError('Must provide at least one underlying artifact cache')
-    context = artifact_caches[0].context
+    log = artifact_caches[0].log
     artifact_root = artifact_caches[0].artifact_root
-    if any(x.context != context or x.artifact_root != artifact_root for x in artifact_caches):
+    if any(x.artifact_root != artifact_root for x in artifact_caches):
       raise ValueError('Combined artifact caches must all have the same artifact root.')
-    ArtifactCache.__init__(self, context, artifact_root)
+    ArtifactCache.__init__(self, log, artifact_root)
     self._artifact_caches = artifact_caches
 
   def insert(self, cache_key, build_artifacts):

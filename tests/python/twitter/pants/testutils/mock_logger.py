@@ -8,7 +8,7 @@ class MockLogger(object):
 
   Useful for testing without requiring the full RunTracker reporting framework.
   """
-  def __init__(self, level):
+  def __init__(self, level=Report.INFO):
     self._level = level
 
   def _maybe_log(self, level, *msg_elements):

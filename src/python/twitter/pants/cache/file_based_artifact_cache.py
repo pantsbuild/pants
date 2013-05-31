@@ -6,13 +6,13 @@ from twitter.pants.cache.artifact_cache import ArtifactCache
 
 class FileBasedArtifactCache(ArtifactCache):
   """An artifact cache that stores the artifacts in local files."""
-  def __init__(self, context, artifact_root, cache_root, copy_fn=None):
+  def __init__(self, log, artifact_root, cache_root, copy_fn=None):
     """
     cache_root: The locally cached files are stored under this directory.
     copy_fn: An optional function with the signature copy_fn(absolute_src_path, relative_dst_path) that
         will copy cached files into the desired destination. If unspecified, a simple file copy is used.
     """
-    ArtifactCache.__init__(self, context, artifact_root)
+    ArtifactCache.__init__(self, log, artifact_root)
     self._cache_root = cache_root
     self._copy_fn = copy_fn or (
       lambda src, rel_dst: shutil.copy(src, os.path.join(self.artifact_root, rel_dst)))

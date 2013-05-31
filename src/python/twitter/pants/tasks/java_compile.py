@@ -119,7 +119,7 @@ class JavaCompile(NailgunTask):
     self._confs = context.config.getlist('java-compile', 'confs')
 
     # The artifact cache to read from/write to.
-    artifact_cache_spec = context.config.getlist('java-compile', 'artifact_caches')
+    artifact_cache_spec = context.config.getlist('java-compile', 'artifact_caches', default=[])
     self.setup_artifact_cache(artifact_cache_spec)
 
   def product_type(self):
