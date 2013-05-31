@@ -1,32 +1,40 @@
+import httplib
 from multiprocessing.pool import ThreadPool
-import re
-import subprocess
+from twitter.common.contextutil import Timer
 
-_float_pattern = r'\d+.?\d*'
-_ping_pattern = r'round-trip min/avg/max/stddev = (%(flt)s)/(%(flt)s)/(%(flt)s)/(%(flt)s) ms' % \
-                { 'flt': _float_pattern }
-_ping_re = re.compile(_ping_pattern)
 
+# So we don't ping the same netloc multiple times for multiple different caches
+# (each Task has its own logical cache, even if they happen to share a netloc).
+_global_pinger_cache = {}  # netloc -> rt time in secs.
 
 class Pinger(object):
-  def ping(self, host):
-    proc = subprocess.Popen(["ping", "-t", "1", "-c", "1", "-q", host],
-                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    out, error = proc.communicate()
-    out = out.strip()
-    mo = _ping_re.search(out.strip())
-    if mo:
-      return float(mo.group(2))
-    else:
-      return None
+  def ping(self, netloc):
+    """Time a single roundtrip to the netloc.
 
-  def pings(self, hosts):
-    pool = ThreadPool(processes=len(hosts))
-    res = pool.map(self.ping, hosts, chunksize=1)
+    Note that we don't use actual ICMP pings, because cmd-line ping is
+    inflexible and platform-dependent, so shelling out to it is annoying,
+    and ICMP python libs can only be called by the superuser.
+    """
+    if netloc in _global_pinger_cache:
+      return _global_pinger_cache[netloc]
+
+    host, colon, portstr = netloc.partition(':')
+    port = int(portstr) if portstr else None
+    with Timer() as timer:
+      conn = httplib.HTTPConnection(host, port, timeout=1)
+      conn.request('HEAD', '/')   # Doesn't actually matter if this exists.
+      conn.getresponse()
+    rt_secs = timer.elapsed
+    _global_pinger_cache[netloc] = rt_secs
+    return rt_secs
+
+  def pings(self, netlocs):
+    pool = ThreadPool(processes=len(netlocs))
+    rt_secs = pool.map(self.ping, netlocs, chunksize=1)
     pool.close()
     pool.join()
-    return zip(hosts, res)
+    return zip(netlocs, rt_secs)
 
 
 if __name__ == '__main__':
-  print pings(['pantscache', '10.100.10.20'])
+  print Pinger().pings(['pantscache', '10.100.10.20'])

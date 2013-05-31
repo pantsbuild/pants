@@ -58,7 +58,7 @@ TEST_CONTENT2 = 'kermit'
 class TestArtifactCache(unittest.TestCase):
   def test_select_best_url(self):
     spec = 'http://host1|https://host2:666/path/to|http://host3/path/'
-    best = select_best_url(spec, MockPinger({'host1':  5, 'host2': 3, 'host3': 7}), MockLogger())
+    best = select_best_url(spec, MockPinger({'host1':  5, 'host2:666': 3, 'host3': 7}), MockLogger())
     self.assertEquals('https://host2:666/path/to', best)
 
   def test_cache_spec_parsing(self):
