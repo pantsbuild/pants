@@ -34,6 +34,7 @@ if ! ng_exists ; then
   declare platform=""
   case "$una" in
     *cygwin*)        platform="win32" ;;
+    *mingw32*)       platform="win32" ;;
     *darwin*x86_64*) platform="darwin64" ;;
     *darwin*)        platform="darwin32" ;;
     *linux*x86_64*)  platform="linux64" ;;
