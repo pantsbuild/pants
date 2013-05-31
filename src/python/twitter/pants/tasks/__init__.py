@@ -60,7 +60,7 @@ class Task(object):
     """
     if len(spec) > 0:
       pants_workdir = self.context.config.getdefault('pants_workdir')
-      self._artifact_cache = create_artifact_cache(self.context, pants_workdir, spec)
+      self._artifact_cache = create_artifact_cache(self.context.log, pants_workdir, spec)
 
   def product_type(self):
     """Set the product type for this task.
