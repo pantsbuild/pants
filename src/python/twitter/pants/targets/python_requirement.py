@@ -23,13 +23,14 @@ from .external_dependency import ExternalDependency
 class PythonRequirement(Target, ExternalDependency):
   """Pants wrapper around pkg_resources.Requirement"""
 
-  def __init__(self, requirement, dynamic=False, repository=None, name=None, version_filter=None):
+  def __init__(self, requirement, dynamic=False, repository=None, name=None, version_filter=None,
+              exclusives=None):
     self._requirement = Requirement.parse(requirement)
     self._name = name or self._requirement.project_name
     self._dynamic = dynamic
     self._repository = repository
     self._version_filter = version_filter or (lambda: True)
-    Target.__init__(self, self._name)
+    Target.__init__(self, self._name, exclusives=exclusives)
 
   def size(self):
     return 1

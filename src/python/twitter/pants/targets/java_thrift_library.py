@@ -33,7 +33,7 @@ class JavaThriftLibrary(ExportableJvmLibrary):
 
   def __init__(self, name, sources, provides=None, dependencies=None, excludes=None,
                compiler=_COMPILER_DEFAULT, language=_LANGUAGE_DEFAULT, rpc_style=_RPC_STYLE_DEFAULT,
-               namespace_map=None, buildflags=None):
+               namespace_map=None, buildflags=None, exclusives=None):
 
     """name: The name of this module target, addressable via pants via the portion of the spec
         following the colon
@@ -53,9 +53,12 @@ class JavaThriftLibrary(ExportableJvmLibrary):
     namespace_map: A dictionary of namespaces to remap (old: new)
     buildflags: DEPRECATED - A list of additional command line arguments to pass to the underlying
         build system for this target - now ignored.
+    exclusives:   An optional map of exclusives tags. See CheckExclusives for details.
+
     """
 
-    ExportableJvmLibrary.__init__(self, name, sources, provides, dependencies, excludes)
+    ExportableJvmLibrary.__init__(self, name, sources, provides, dependencies, excludes,
+                                  exclusives=exclusives)
     self.add_labels('codegen', 'java')
 
     def check_value_for_arg(arg, value, values):

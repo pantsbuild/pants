@@ -14,6 +14,7 @@
 # limitations under the License.
 # ==================================================================================================
 
+from collections import defaultdict
 from twitter.pants.targets.exclude import Exclude
 
 from .external_dependency import ExternalDependency
@@ -98,7 +99,7 @@ class  JarDependency(ExternalDependency):
   )
 
   def __init__(self, org, name, rev=None, force=False, ext=None, url=None, apidocs=None,
-               type_=None, classifier=None, mutable=None):
+               type_=None, classifier=None, mutable=None, exclusives=None):
     self.org = org
     self.name = name
     self.rev = rev
@@ -123,6 +124,12 @@ class  JarDependency(ExternalDependency):
     # Legacy variables needed by ivy jar publish
     self.ext = ext
     self.url = url
+
+    self.declared_exclusives = defaultdict(set)
+    if exclusives is not None:
+      for k in exclusives:
+        self.declared_exclusives[k] |= exclusives[k]
+
 
   def exclude(self, org, name = None):
     """Adds a transitive dependency of this jar to the exclude list."""

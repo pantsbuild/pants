@@ -34,8 +34,8 @@ class TargetWithSources(Target):
   def register_source(cls, source, target):
     cls._source_to_targets[source].add(target)
 
-  def __init__(self, name, sources=None):
-    Target.__init__(self, name)
+  def __init__(self, name, sources=None, exclusives=None):
+    Target.__init__(self, name, exclusives=exclusives)
 
     self.add_labels('sources')
     self.target_base = SourceRoot.find(self)

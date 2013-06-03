@@ -20,12 +20,13 @@ from .jvm_target import JvmTarget
 class ExportableJvmLibrary(JvmTarget):
   """A baseclass for java targets that support being exported to an artifact repository."""
 
-  def __init__(self, name, sources, provides=None, dependencies=None, excludes=None):
+  def __init__(self, name, sources, provides=None, dependencies=None, excludes=None,
+               exclusives=None):
     # It's critical that provides is set 1st since _provides() is called elsewhere in the
     # constructor flow.
     self.provides = provides
 
-    JvmTarget.__init__(self, name, sources, dependencies, excludes)
+    JvmTarget.__init__(self, name, sources, dependencies, excludes, exclusives=exclusives)
     self.add_labels('exportable')
 
   def _provides(self):

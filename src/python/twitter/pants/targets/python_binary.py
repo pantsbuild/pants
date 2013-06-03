@@ -34,7 +34,8 @@ class PythonBinary(PythonTarget):
                allow_pypi=False,
                platforms=(),
                interpreters=(Platform.python(),),
-               provides=None):
+               provides=None,
+               exclusives=None):
     """
       name: target name
 
@@ -90,7 +91,7 @@ class PythonBinary(PythonTarget):
 
     PythonTarget.__init__(self, name, [] if source is None else [source],
                           dependencies=dependencies,
-                          provides=provides)
+                          provides=provides, exclusives=exclusives)
 
   @property
   def platforms(self):

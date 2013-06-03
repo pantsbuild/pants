@@ -41,8 +41,10 @@ from twitter.pants.goal.initialize_reporting import update_reporting
 from twitter.pants.goal.workunit import WorkUnit
 from twitter.pants.reporting.reporting_server import ReportingServer
 from twitter.pants.tasks import Task, TaskError
+from twitter.pants.tasks.check_exclusives import CheckExclusives
 from twitter.pants.tasks.console_task import ConsoleTask
 from twitter.pants.tasks.nailgun_task import NailgunTask
+
 from twitter.pants.goal import Context, GoalError, Phase
 
 
@@ -673,8 +675,14 @@ goal(
 goal(
   name='ivy',
   action=IvyResolve,
-  dependencies=['gen']
+  dependencies=['gen', 'check_exclusives']
 ).install('resolve').with_description('Resolves jar dependencies and produces dependency reports.')
+
+goal(name='check_exclusives',
+  dependencies=['gen'],
+  action=CheckExclusives).install('check_exclusives').with_description(
+  'Check exclusives declarations to verify that dependencies are consistent.')
+
 
 goal(
   name='idl',
@@ -721,7 +729,7 @@ def is_scala(target):
 goal(name='scala',
      action=ScalaCompile,
      group=group('jvm', is_scala),
-     dependencies=['gen', 'resolve']).install('compile').with_description(
+     dependencies=['gen', 'resolve', 'check_exclusives']).install('compile').with_description(
        'Compile both generated and checked in code.'
      )
 goal(name='apt',
@@ -731,7 +739,7 @@ goal(name='apt',
 goal(name='java',
      action=JavaCompile,
      group=group('jvm', is_java),
-     dependencies=['gen', 'resolve']).install('compile')
+     dependencies=['gen', 'resolve', 'check_exclusives']).install('compile')
 
 
 goal(name='prepare', action=PrepareResources).install('resources')

@@ -24,8 +24,9 @@ from .with_sources import TargetWithSources
 class JvmTarget(InternalTarget, TargetWithSources):
   """A base class for all java module targets that provides path and dependency translation."""
 
-  def __init__(self, name, sources, dependencies, excludes=None, configurations=None):
-    InternalTarget.__init__(self, name, dependencies)
+  def __init__(self, name, sources, dependencies, excludes=None, configurations=None,
+               exclusives=None):
+    InternalTarget.__init__(self, name, dependencies, exclusives=exclusives)
     TargetWithSources.__init__(self, name, sources)
 
     self.declared_dependencies = set(dependencies or [])
@@ -38,7 +39,8 @@ class JvmTarget(InternalTarget, TargetWithSources):
 
   def _as_jar_dependency(self):
     jar_dependency, _, _ = self._get_artifact_info()
-    jar = JarDependency(org=jar_dependency.org, name=jar_dependency.name, rev=None)
+    jar = JarDependency(org=jar_dependency.org, name=jar_dependency.name, rev=None,
+                              exclusives=self.declared_exclusives)
     jar.id = self.id
     return jar
 

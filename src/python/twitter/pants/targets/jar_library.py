@@ -22,14 +22,15 @@ from .util import resolve
 class JarLibrary(Target):
   """Serves as a proxy for one or more JarDependencies or JavaTargets."""
 
-  def __init__(self, name, dependencies):
+  def __init__(self, name, dependencies, exclusives=None):
     """name: The name of this module target, addressable via pants via the portion of the spec
         following the colon
     dependencies: one or more JarDependencies this JarLibrary bundles or Pants pointing to other
         JarLibraries or JavaTargets
+    exclusives:   An optional map of exclusives tags. See CheckExclusives for details.
     """
 
-    Target.__init__(self, name)
+    Target.__init__(self, name, exclusives=exclusives)
 
     if dependencies is None:
       raise TargetDefinitionException(self, "A dependencies list must be supplied even if empty.")
@@ -40,6 +41,11 @@ class JarLibrary(Target):
     for dependency in self.dependencies:
       if hasattr(dependency, 'address'):
         self.dependency_addresses.add(dependency.address)
+      # If the dependency is one that supports exclusives, the JarLibrary's
+      # exclusives should be added to it.
+      if hasattr(dependency, 'declared_exclusives'):
+        for k in self.declared_exclusives:
+          dependency.declared_exclusives[k] |= self.declared_exclusives[k]
 
   def resolve(self):
     yield self

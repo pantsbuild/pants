@@ -23,8 +23,9 @@ from .with_sources import TargetWithSources
 
 
 class PythonTarget(TargetWithSources):
-  def __init__(self, name, sources, resources=None, dependencies=None, provides=None):
-    TargetWithSources.__init__(self, name, sources)
+  def __init__(self, name, sources, resources=None, dependencies=None, provides=None,
+               exclusives=None):
+    TargetWithSources.__init__(self, name, sources, exclusives=exclusives)
 
     processed_dependencies = resolve(dependencies)
 
@@ -34,6 +35,18 @@ class PythonTarget(TargetWithSources):
     self.provides = provides
     if self.provides:
       self.provides.library = self
+
+
+  def _propagate_exclusives(self):
+    self.exclusives = defaultdict(set)
+    for k in self.declared_exclusives:
+      self.exclusives[k] = self.declared_exclusives[k]
+    for t in self.dependencies:
+      if isinstance(t, Target):
+        t._propagate_exclusives()
+        self.add_to_exclusives(t.exclusives)
+      elif hasattr(t, "declared_exclusives"):
+        self.add_to_exclusives(t.declared_exclusives)
 
   def _walk(self, walked, work, predicate = None):
     Target._walk(self, walked, work, predicate)
