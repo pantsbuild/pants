@@ -32,7 +32,9 @@ class RESTfulArtifactCache(ArtifactCache):
 
   def try_insert(self, cache_key, build_artifacts):
     with temporary_file_path() as tarfile:
-      mode = 'w:bz2' if self.compress else 'w'
+      # In our tests, gzip is slightly less compressive than bzip2 on .class files,
+      # but decompression times are much faster.
+      mode = 'w:gz' if self.compress else 'w'
       with open_tar(tarfile, mode, dereference=True) as tarout:
         for artifact in build_artifacts:
           # Adds dirs recursively.
@@ -79,8 +81,7 @@ class RESTfulArtifactCache(ArtifactCache):
           raise self.CacheError('Read only %d bytes from %d expected' % (total_bytes,
                                                                          expected_size))
         # Extract the tarfile.
-        mode = 'r:bz2' if self.compress else 'r'
-        with open_tar(outfile.name, mode) as tarfile:
+        with open_tar(outfile.name, 'r') as tarfile:
           tarfile.extractall(self.artifact_root)
       return True
     except Exception as e:
@@ -94,7 +95,8 @@ class RESTfulArtifactCache(ArtifactCache):
   def _path_for_key(self, cache_key):
     # Note: it's important to use the id as well as the hash, because two different targets
     # may have the same hash if both have no sources, but we may still want to differentiate them.
-    return '%s/%s/%s.tar.bz2' % (self._path_prefix, cache_key.id, cache_key.hash)
+    return '%s/%s/%s.tar%s' % (self._path_prefix, cache_key.id, cache_key.hash,
+                               '.gz' if self.compress else '')
 
   def _connect(self):
     if self._ssl:
