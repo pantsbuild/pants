@@ -103,3 +103,27 @@ class Products(object):
   def get(self, typename):
     """Returns a ProductMapping for the given type name."""
     return self.require(typename)
+
+  def require_data(self, *typenames):
+    """ Registers a requirement that data produced by tasks is required.
+    Params:
+      typenames a list of names of data products that are should be generated.
+    """
+    for t in typenames:
+      self.data_products[t] = {}
+
+  def is_required_data(self, typename):
+    """ Checks if a particular data product is required by any tasks."""
+    return self.data_products.has_key(typename)
+
+  def get_data(self, typename):
+    """ Returns a data product, or None if the product isn't found."""
+    if self.data_products.has_key(typename):
+      return self.data_products[typename]
+    else:
+      return None
+
+  def set_data(self, typename, data):
+    """ Stores a required data product. If the product already exists, the value is replaced. """
+    self.data_products[typename] = data
+
