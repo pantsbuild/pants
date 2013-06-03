@@ -15,10 +15,13 @@ def select_best_url(spec, pinger, log):
             ', '.join(['%s: %3f ms' % p for p in pingtimes]))
   argmin = min(xrange(len(pingtimes)), key=lambda i: pingtimes[i][1])
   best_url = urls[argmin]
+  if pingtimes[argmin] == Pinger.UNREACHABLE:
+    return None
   log.debug('Best artifact cache is %s' % best_url)
   return best_url
 
-def create_artifact_cache(log, artifact_root, spec):
+
+def create_artifact_cache(log, artifact_root, spec, task_name):
   """Returns an artifact cache for the specified spec.
 
   spec can be:
@@ -31,14 +34,18 @@ def create_artifact_cache(log, artifact_root, spec):
     raise ValueError('Empty artifact cache spec')
   if isinstance(spec, basestring):
     if spec.startswith('/'):
-      log.info('Using local artifact cache at %s' % spec)
+      log.info('%s using local artifact cache at %s' % spec)
       return FileBasedArtifactCache(log, artifact_root, spec)
     elif spec.startswith('http://') or spec.startswith('https://'):
       best_url = select_best_url(spec, Pinger(), log)
-      log.info('Using remote artifact cache at %s' % best_url)
-      return RESTfulArtifactCache(log, artifact_root, best_url)
+      if best_url:
+        log.info('%s using remote artifact cache at %s' % (task_name, best_url))
+        return RESTfulArtifactCache(log, artifact_root, best_url)
+      else:
+        log.warn('No reachable artifact cache in %s.' % spec)
+        return None
     else:
       raise ValueError('Invalid artifact cache spec: %s' % spec)
   elif isinstance(spec, (list, tuple)):
-    caches = [ create_artifact_cache(log, artifact_root, x) for x in spec ]
+    caches = [ create_artifact_cache(log, artifact_root, x, task_name) for x in spec ]
     return CombinedArtifactCache(caches)

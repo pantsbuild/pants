@@ -30,8 +30,8 @@ class ArtifactCache(object):
 
     If there is an existing set of artifacts for this key they are deleted.
 
-    TODO: Check that they're equal? If they aren't it's a grave bug, since the key is supposed
-    to be a fingerprint of all possible inputs to the build.
+    TODO: Check that they're equal? They might not have to be if there are multiple equivalent
+          outputs.
 
     cache_key: A CacheKey object.
     build_artifacts: List of paths to generated artifacts. These must be under pants_workdir.
@@ -42,13 +42,12 @@ class ArtifactCache(object):
     try:
       self.try_insert(cache_key, build_artifacts_that_exist)
     except Exception as e:
+      err_msg = 'Error while writing to artifact cache: %s. Deleting, just in case.' % e
+      self.log.error(err_msg)
       try:
-        err_msg = 'Error while writing to artifact cache: %s. Deleting, just in case.' % e
-        self.log.error(err_msg)
         self.delete(cache_key)
       except Exception:
-        print('IMPORTANT: failed to delete %s on error. Your artifact cache may be corrupted. '
-              'Please delete manually.' % cache_key.id)
+        self.log.debug('Failed to delete %s on error.' % cache_key.id)
 
   def try_insert(self, cache_key, build_artifacts):
     """Attempt to cache the output of a build, without error-handling.

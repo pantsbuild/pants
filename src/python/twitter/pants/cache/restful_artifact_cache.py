@@ -9,7 +9,7 @@ from twitter.pants.cache.artifact_cache import ArtifactCache
 class RESTfulArtifactCache(ArtifactCache):
   """An artifact cache that stores the artifacts on a RESTful service."""
 
-  READ_SIZE = Amount(4, Data.MB).as_(Data.BYTES)
+  READ_SIZE = int(Amount(4, Data.MB).as_(Data.BYTES))
 
   def __init__(self, log, artifact_root, url_base, compress=True):
     """
@@ -61,27 +61,29 @@ class RESTfulArtifactCache(ArtifactCache):
       done = False
       self.log.info('Reading %d bytes from artifact cache at %s' %
                     (expected_size, self._url_string(path)))
-      # Read the data in a loop.
+
       with temporary_file() as outfile:
         total_bytes = 0
+        # Read the data in a loop.
         while not done:
           data = response.read(self.READ_SIZE)
           outfile.write(data)
           if len(data) < self.READ_SIZE:
             done = True
           total_bytes += len(data)
-          self.log.debug('Read %d bytes' % total_bytes)
         outfile.close()
+        self.log.debug('Read %d bytes' % total_bytes)
+
         # Check the size.
         if total_bytes != expected_size:
           raise self.CacheError('Read only %d bytes from %d expected' % (total_bytes,
                                                                          expected_size))
-          # Extract the tarfile.
+        # Extract the tarfile.
         mode = 'r:bz2' if self.compress else 'r'
         with open_tar(outfile.name, mode) as tarfile:
           tarfile.extractall(self.artifact_root)
       return True
-    except Exception, e:
+    except Exception as e:
         self.log.warn('Error while reading from artifact cache: %s' % e)
         return False
 
