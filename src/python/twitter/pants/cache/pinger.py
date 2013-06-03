@@ -4,12 +4,16 @@ import socket
 from twitter.common.contextutil import Timer
 
 
-# So we don't ping the same netloc multiple times for multiple different caches
-# (each Task has its own logical cache, even if they happen to share a netloc).
-_global_pinger_cache = {}  # netloc -> rt time in secs.
+_global_pinger_memo = {}  # netloc -> rt time in secs.
 
 class Pinger(object):
+  # Signifies that a netloc is unreachable.
   UNREACHABLE = 999999
+
+  def __init__(self, timeout, tries):
+    """Try pinging the given number of times, each with the given timeout."""
+    self._timeout = timeout
+    self._tries = tries
 
   def ping(self, netloc):
     """Time a single roundtrip to the netloc.
@@ -18,20 +22,23 @@ class Pinger(object):
     inflexible and platform-dependent, so shelling out to it is annoying,
     and the ICMP python lib can only be called by the superuser.
     """
-    if netloc in _global_pinger_cache:
-      return _global_pinger_cache[netloc]
+    if netloc in _global_pinger_memo:
+      return _global_pinger_memo[netloc]
 
     host, colon, portstr = netloc.partition(':')
     port = int(portstr) if portstr else None
-    try:
-      with Timer() as timer:
-        conn = httplib.HTTPConnection(host, port, timeout=1)
-        conn.request('HEAD', '/')   # Doesn't actually matter if this exists.
-        conn.getresponse()
-      rt_secs = timer.elapsed
-    except socket.timeout:
-      rt_secs = Pinger.UNREACHABLE
-    _global_pinger_cache[netloc] = rt_secs
+    rt_secs = Pinger.UNREACHABLE
+    for _ in xrange(self._tries):
+      try:
+        with Timer() as timer:
+          conn = httplib.HTTPConnection(host, port, timeout=self._timeout)
+          conn.request('HEAD', '/')   # Doesn't actually matter if this exists.
+          conn.getresponse()
+        new_rt_secs = timer.elapsed
+      except socket.timeout:
+        new_rt_secs = Pinger.UNREACHABLE
+      rt_secs = min(rt_secs, new_rt_secs)
+    _global_pinger_memo[netloc] = rt_secs
     return rt_secs
 
   def pings(self, netlocs):
@@ -40,7 +47,3 @@ class Pinger(object):
     pool.close()
     pool.join()
     return zip(netlocs, rt_secs)
-
-
-if __name__ == '__main__':
-  print Pinger().pings(['pantscache', '10.100.10.20'])

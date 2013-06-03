@@ -16,7 +16,7 @@ def select_best_url(spec, pinger, log):
   argmin = min(xrange(len(pingtimes)), key=lambda i: pingtimes[i][1])
   best_url = urls[argmin]
   if pingtimes[argmin] == Pinger.UNREACHABLE:
-    return None
+    return None  # No reachable artifact caches.
   log.debug('Best artifact cache is %s' % best_url)
   return best_url
 
@@ -37,7 +37,10 @@ def create_artifact_cache(log, artifact_root, spec, task_name):
       log.info('%s using local artifact cache at %s' % spec)
       return FileBasedArtifactCache(log, artifact_root, spec)
     elif spec.startswith('http://') or spec.startswith('https://'):
-      best_url = select_best_url(spec, Pinger(), log)
+      # Caches are supposed to be close, and we don't want to waste time pinging on no-op builds.
+      # So we ping twice with a short timeout.
+      pinger = Pinger(timeout=0.5, tries=2)
+      best_url = select_best_url(spec, pinger, log)
       if best_url:
         log.info('%s using remote artifact cache at %s' % (task_name, best_url))
         return RESTfulArtifactCache(log, artifact_root, best_url)
