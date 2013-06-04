@@ -20,31 +20,34 @@ class CheckExclusives(Task):
   The syntax of the exclusives attribute is:
       exclusives = {"id": "value", ...}
 
-  For example, suppose that we had two java targets, jliba and jlibb,
-  which used different versions of joda datetime.
+  For example, suppose that we had two java targets, jliba and jlibb. jliba uses
+  slf4j, which includes in its jar package an implementation of log4j. jlibb uses
+  log4j directly. But the version of log4j that's packaged inside of slf4j is
+  different from the version used by jlibb.
 
     java_library(name='jliba',
-       depedencies = ['joda-1.5'])
+       depedencies = ['slf4j-with-log4j-2.4'])
     java_library(name='jlibb',
-       dependencies=['joda-2.1'])
+       dependencies=['log4j-1.9'])
     java_binary(name='javabin', dependencies=[':jliba', ':jlibb'])
 
-  In this case, the binary target 'javabin' depends on both joda-1.5 and joda-2.1.
-  This should be a build error, but pants doesn't know that joda-1.5 and joda-2.1 are
-  different versions of the same library, and so it can't detect the error.
+  In this case, the binary target 'javabin' depends on both slf4j with its
+  packaged log4j version 2.4, and on log4j-1.9.
+  Pants doesn't know that the slf4j and log4j jar_dependencies contain
+  incompatible versions of the same library, and so it can't detect the error.
 
   With exclusives, the jar_library target for the joda libraries would declare
   exclusives tags:
 
-    jar_library(name='joda-1.5', exclusives={'joda': '1.5'})
-    jar_library(name='joda-2.1', exclusives={'joda': '2.1'})
+    jar_library(name='slf4j-with-log4j-2.4', exclusives={'log4j': '2.4'})
+    jar_library(name='joda-2.1', exclusives={'log4j': '1.9'})
 
   With the exclusives declared, pants can recognize that 'javabin' has conflicting
   dependencies, and can generate an appropriate error message.
 
-  If the build product exclusives_partitions is required, then a map
-  from exclusives keys to partitions of compatible exclusives will be
-  generated.
+  Data about exclusives is provided to other tasks via data build products.
+  If the build data product 'exclusives_groups' is required, then an
+  ExclusivesMapping object will be created.
   """
 
 

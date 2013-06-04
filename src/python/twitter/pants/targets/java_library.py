@@ -22,7 +22,7 @@ class JavaLibrary(ExportableJvmLibrary, WithLegacyResources):
   """Defines a target that produces a java library."""
 
   def __init__(self, name, sources=None, provides=None, dependencies=None, excludes=None,
-               resources=None, deployjar=False, buildflags=None, exclusives=exclusives):
+               resources=None, deployjar=False, buildflags=None, exclusives=None):
 
     """name: The name of this module target, addressable via pants via the portion of the spec
         following the colon

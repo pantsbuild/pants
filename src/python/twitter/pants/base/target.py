@@ -15,7 +15,6 @@
 # ==================================================================================================
 
 import collections
-import copy
 import os
 
 from twitter.common.collections import OrderedSet, maybe_list
@@ -167,10 +166,10 @@ class Target(object):
     if self.exclusives is None:
       self.exclusives = collections.defaultdict(set)
       self.add_to_exclusives(self.declared_exclusives)
-    # This may perform more work than necessary.
-    # We want to just traverse the immediate dependencies of this target,
-    # but for a general target, we can't do that. _propagate_exclusives is overridden
-    # in subclasses when possible to avoid the extra work.
+      # This may perform more work than necessary.
+      # We want to just traverse the immediate dependencies of this target,
+      # but for a general target, we can't do that. _propagate_exclusives is overridden
+      # in subclasses when possible to avoid the extra work.
       self.walk(lambda t: self._propagate_exclusives_work(t))
 
   def _propagate_exclusives_work(self, target):

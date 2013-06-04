@@ -9,7 +9,6 @@ class Products(object):
     def __init__(self, typename):
       self.typename = typename
       self.by_target = defaultdict(lambda: defaultdict(list))
-      self.data_products = {}
 
 
     def add(self, target, basedir, product_paths=None):
@@ -80,6 +79,7 @@ class Products(object):
 
   def __init__(self):
     self.products = {}
+    self.data_products = {}
     self.predicates_for_type = defaultdict(list)
 
   def require(self, typename, predicate=None):
