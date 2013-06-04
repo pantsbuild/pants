@@ -25,7 +25,7 @@ class RESTfulArtifactCache(ArtifactCache):
       self._ssl = True
     else:
       raise ValueError('RESTfulArtifactCache only supports HTTP and HTTPS')
-    self._timeout_secs = 2.0
+    self._timeout_secs = 4.0
     self._netloc = parsed_url.netloc
     self._path_prefix = parsed_url.path.rstrip('/')
     self.compress = compress
@@ -111,8 +111,8 @@ class RESTfulArtifactCache(ArtifactCache):
     conn = self._connect()
     conn.request(method, path, body=body)
     response = conn.getresponse()
-    # TODO: Can HEAD return 204? It would be correct, but I've not seen it happen.
-    if response.status == 200:
+    # Allow all 2XX responses. E.g., nginx returns 201 on PUT. HEAD may return 204.
+    if int(response.status / 100) == 2:
       return response
     elif response.status == 404:
       return None
