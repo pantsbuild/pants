@@ -34,7 +34,7 @@ def create_artifact_cache(log, artifact_root, spec, task_name):
     raise ValueError('Empty artifact cache spec')
   if isinstance(spec, basestring):
     if spec.startswith('/'):
-      log.info('%s using local artifact cache at %s' % spec)
+      log.info('%s using local artifact cache at %s' % (task_name, spec))
       return FileBasedArtifactCache(log, artifact_root, spec)
     elif spec.startswith('http://') or spec.startswith('https://'):
       # Caches are supposed to be close, and we don't want to waste time pinging on no-op builds.
