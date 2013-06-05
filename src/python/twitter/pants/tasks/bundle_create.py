@@ -16,6 +16,7 @@
 
 import os
 
+import errno
 from zipfile import ZIP_DEFLATED
 
 from twitter.common.collections import OrderedSet
@@ -102,8 +103,17 @@ class BundleCreate(JvmBinaryTask):
       os.mkdir(libdir)
 
       for basedir, externaljar in self.list_jar_dependencies(app.binary):
-        path = os.path.join(basedir, externaljar)
-        os.symlink(path, os.path.join(libdir, externaljar))
+        src = os.path.join(basedir, externaljar)
+        link_name = os.path.join(libdir, externaljar)
+        try:
+          os.symlink(src, link_name)
+        except OSError as e:
+          if e.errno == errno.EEXIST:
+            raise TaskError('Trying to symlink %s to %s, but it is already symlinked to %s. ' %
+                            (link_name, src, os.readlink(link_name)) +
+                            'Does the bundled target depend on multiple jvm_binary targets?')
+          else:
+            raise
         classpath.add(externaljar)
 
     for basedir, jars in self.context.products.get('jars').get(app.binary).items():
