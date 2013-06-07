@@ -78,7 +78,8 @@ class SpecsRun(JvmTask):
 
         result = runjava_indivisible(
           jvmargs=self.java_args,
-          classpath=self.classpath(profile_classpath(self.profile), confs=self.confs),
+          classpath=self.classpath(profile_classpath(self.profile), confs=self.confs,
+              exclusives_classpath=self.get_base_classpath_for_target(targets[0])),
           main='com.twitter.common.testing.ExplicitSpecsRunnerMain',
           opts=opts,
           workunit_factory=workunit_factory,

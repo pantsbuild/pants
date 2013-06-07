@@ -23,7 +23,8 @@ class PythonThriftLibrary(PythonTarget):
                resources = None,
                dependencies = None,
                thrift_version = None,
-               provides=None):
+               provides=None,
+               exclusives=None):
     """
       name = Name of library
       source = thrift source file
@@ -31,6 +32,7 @@ class PythonThriftLibrary(PythonTarget):
         recommended that your application uses the pkgutil package to access these
         resources in a .zip-module friendly way.)
       dependencies = other PythonLibraries, Eggs or internal Pants targets
+      exclusives:   An optional map of exclusives tags. See CheckExclusives for details.
     """
     self.thrift_version = thrift_version
-    PythonTarget.__init__(self, name, sources, resources, dependencies, provides)
+    PythonTarget.__init__(self, name, sources, resources, dependencies, provides, exclusives=exclusives)

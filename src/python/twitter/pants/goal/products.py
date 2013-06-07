@@ -84,12 +84,28 @@ class Products(object):
 
   def require(self, typename, predicate=None):
     """
-      Registers a requirement that products of the given type by mapped.  If a target predicate is
+      Registers a requirement that file products of the given type by mapped.  If a target predicate is
       supplied, only targets matching the predicate are mapped.
     """
     if predicate:
       self.predicates_for_type[typename].append(predicate)
     return self.products.setdefault(typename, Products.ProductMapping(typename))
+
+  def require_data(self, *typename):
+    for t in typename:
+      self.data_products[t] = {}
+
+  def is_required_data(self, typename):
+    return self.data_products.has_key(typename)
+
+  def get_data(self, typename):
+    if self.data_products.has_key(typename):
+      return self.data_products[typename]
+    else:
+      return None
+
+  def add_data(self, typename, data):
+    self.data_products[typename] = data
 
   def isrequired(self, typename):
     """

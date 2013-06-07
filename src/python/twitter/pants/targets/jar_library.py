@@ -29,12 +29,10 @@ class JarLibrary(Target):
         JarLibraries or JavaTargets
     exclusives:   An optional map of exclusives tags. See CheckExclusives for details.
     """
-
     Target.__init__(self, name, exclusives=exclusives)
 
     if dependencies is None:
       raise TargetDefinitionException(self, "A dependencies list must be supplied even if empty.")
-
     self.add_labels('jars')
     self.dependencies = resolve(dependencies)
     self.dependency_addresses = set()

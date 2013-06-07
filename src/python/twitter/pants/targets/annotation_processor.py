@@ -22,7 +22,7 @@ class AnnotationProcessor(ExportableJvmLibrary, WithLegacyResources):
   """Defines a target that produces a java library containing one or more annotation processors."""
 
   def __init__(self, name, sources, provides=None, dependencies=None, excludes=None, resources=None,
-               processors=None):
+               processors=None, exclusives=None):
 
     """name: The name of this module target, addressable via pants via the portion of the spec
         following the colon
@@ -36,9 +36,12 @@ class AnnotationProcessor(ExportableJvmLibrary, WithLegacyResources):
         this module's jar
     processors: a list of the fully qualified class names of the annotation processors this library
         exports
+    exclusives:   An optional map of exclusives tags. See CheckExclusives for details.
     """
 
-    ExportableJvmLibrary.__init__(self, name, sources, provides, dependencies, excludes)
-    WithLegacyResources.__init__(self, name, sources=sources, resources=resources)
+    ExportableJvmLibrary.__init__(self, name, sources, provides, dependencies, excludes,
+                                  exclusives=exclusives)
+    WithLegacyResources.__init__(self, name, sources=sources, resources=resources,
+                                 exclusives=exclusives)
     self.add_labels('java', 'apt')
     self.processors = processors

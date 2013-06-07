@@ -117,6 +117,7 @@ class JavaCompile(NailgunTask):
       self._opts.extend(context.config.getlist('java-compile', 'no_warning_args'))
 
     self._confs = context.config.getlist('java-compile', 'confs')
+    self.context.products.require_data('exclusives_groups')
 
     # The artifact cache to read from/write to.
     artifact_cache_spec = context.config.getlist('java-compile', 'artifact_caches', default=[])
@@ -134,16 +135,22 @@ class JavaCompile(NailgunTask):
       safe_mkdir(self._classes_dir)
       safe_mkdir(self._depfile_dir)
 
+      egroups = self.context.products.get_data('exclusives_groups')
+      group_id = egroups.get_group_key_for_target(java_targets[0])
       with self.context.state('classpath', []) as cp:
         for conf in self._confs:
           cp.insert(0, (conf, self._resources_dir))
+          egroups.update_compatible_classpaths(group_id, [(conf, self._resources_dir)])
           cp.insert(0, (conf, self._classes_dir))
+          egroups.update_compatible_classpaths(group_id, [(conf, self._classes_dir)])
+
 
       with self.invalidated(java_targets, invalidate_dependents=True,
                             partition_size_hint=self._partition_size_hint) as invalidation_check:
         for vt in invalidation_check.invalid_vts_partitioned:
           # Compile, using partitions for efficiency.
-          self.execute_single_compilation(vt, cp)
+          exclusives_classpath = egroups.get_classpath_for_group(group_id)
+          self.execute_single_compilation(vt, exclusives_classpath)
           if not self.dry_run:
             vt.update()
 

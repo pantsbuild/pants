@@ -151,7 +151,6 @@ class InternalTarget(Target):
 
   def __init__(self, name, dependencies, exclusives=None):
     Target.__init__(self, name, exclusives=exclusives)
-
     self._injected_deps = []
     self.processed_dependencies = resolve(dependencies)
 
@@ -231,3 +230,22 @@ class InternalTarget(Target):
           if additional_targets:
             for additional_target in additional_targets:
               additional_target._walk(walked, work, predicate)
+
+  def _propagate_exclusives(self):
+    # Note: this overrides Target._propagate_exclusives without
+    # calling the supermethod. Targets in pants do not necessarily
+    # have a dependencies field, or ever have their dependencies
+    # available at all pre-resolve. Subtypes of InternalTarget, however,
+    # do have well-defined dependency lists in their dependencies field,
+    # so we can do a better job propagating their exclusives quickly.
+    if self.exclusives is not None:
+      return
+    self.exclusives = copy.deepcopy(self.declared_exclusives)
+    for t in self.dependencies:
+      if isinstance(t, Target):
+        t._propagate_exclusives()
+        self.add_to_exclusives(t.exclusives)
+      elif hasattr(t, "declared_exclusives"):
+        self.add_to_exclusives(t.declared_exclusives)
+
+

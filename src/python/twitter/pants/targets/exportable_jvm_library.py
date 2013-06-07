@@ -19,7 +19,6 @@ from .jvm_target import JvmTarget
 
 class ExportableJvmLibrary(JvmTarget):
   """A baseclass for java targets that support being exported to an artifact repository."""
-
   def __init__(self, name, sources, provides=None, dependencies=None, excludes=None,
                exclusives=None):
     # It's critical that provides is set 1st since _provides() is called elsewhere in the
@@ -31,3 +30,4 @@ class ExportableJvmLibrary(JvmTarget):
 
   def _provides(self):
     return self.provides
+

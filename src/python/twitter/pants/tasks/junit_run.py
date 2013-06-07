@@ -132,8 +132,11 @@ class JUnitRun(JvmTask):
                             help = "[%%default] Redirects test output to files in %s.  "
                                    "Implied by %s" % (outdir, xmlreport))
 
+
   def __init__(self, context):
     Task.__init__(self, context)
+
+    context.products.require_data('exclusives_groups')
 
     self.confs = context.config.getlist('junit-run', 'confs')
     self.junit_profile = context.config.get('junit-run', 'junit_profile')
@@ -205,7 +208,8 @@ class JUnitRun(JvmTask):
                                                  else self.calculate_tests(targets))
       if tests:
         junit_classpath = self.classpath(binary_util.profile_classpath(self.junit_profile,
-                            workunit_factory=self.context.new_workunit), confs=self.confs)
+                            workunit_factory=self.context.new_workunit), confs=self.confs,
+                            exclusives_classpath=self.get_base_classpath_for_target(targets[0]))
 
         def run_tests(classpath, main, jvmargs=None):
           def test_workunit_factory(name, labels=list(), cmd=''):
@@ -214,6 +218,8 @@ class JUnitRun(JvmTask):
           # TODO(John Sirois): Integrated batching with the test runner.  As things stand we get
           # results summaries for example for each batch but no overall summary.
           # http://jira.local.twitter.com/browse/AWESOME-1114
+          # TODO(markcc): check that the goal/group infrastructure partitions
+          # tests in a way that respects exclusives.
           result = 0
           for batch in self._partition(tests):
             with binary_util.safe_args(batch) as batch_tests:

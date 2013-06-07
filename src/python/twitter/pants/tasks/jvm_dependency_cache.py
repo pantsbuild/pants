@@ -20,7 +20,6 @@ import os
 
 from collections import defaultdict
 
-from twitter.pants.base.target import Target
 from twitter.pants.targets.jar_dependency import JarDependency
 from twitter.pants.targets.jvm_target import JvmTarget
 from twitter.pants.tasks import TaskError

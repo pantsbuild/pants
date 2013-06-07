@@ -14,7 +14,6 @@
 # limitations under the License.
 # ==================================================================================================
 from collections import defaultdict
-
 from twitter.common.collections import OrderedSet
 from twitter.pants.base import Target
 
@@ -26,7 +25,6 @@ class PythonTarget(TargetWithSources):
   def __init__(self, name, sources, resources=None, dependencies=None, provides=None,
                exclusives=None):
     TargetWithSources.__init__(self, name, sources, exclusives=exclusives)
-
     processed_dependencies = resolve(dependencies)
 
     self.add_labels('python')
@@ -35,7 +33,6 @@ class PythonTarget(TargetWithSources):
     self.provides = provides
     if self.provides:
       self.provides.library = self
-
 
   def _propagate_exclusives(self):
     self.exclusives = defaultdict(set)

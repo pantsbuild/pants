@@ -44,6 +44,7 @@ class ScalacPlugin(ScalaLibrary):
       excludes:     An optional list of dependency exclude patterns to filter all of this module's
                     transitive dependencies against.
       resources:    An optional list of paths containing resources to place in this module's jar.
+      exclusives:   An optional map of exclusives tags. See CheckExclusives for details.
     """
 
     ScalaLibrary.__init__(self, name, sources, java_sources, provides, dependencies, excludes,

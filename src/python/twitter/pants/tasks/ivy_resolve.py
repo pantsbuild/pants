@@ -32,6 +32,7 @@ from twitter.pants import binary_util, get_buildroot, is_internal, is_jar, is_jv
 from twitter.pants.base.generator import Generator, TemplateData
 from twitter.pants.base.revision import Revision
 from twitter.pants.tasks import TaskError
+from twitter.pants.tasks.check_exclusives import CheckExclusives
 from twitter.pants.tasks.ivy_utils import IvyUtils
 from twitter.pants.tasks.nailgun_task import NailgunTask
 
@@ -110,6 +111,7 @@ class IvyResolve(NailgunTask):
     self._open = context.options.ivy_resolve_open
     self._report = self._open or context.options.ivy_resolve_report
     self._ivy_utils = IvyUtils(context, self._cachedir)
+    context.products.require_data('exclusives_groups')
 
     def parse_override(override):
       match = re.match(r'^([^#]+)#([^=]+)=([^\s]+)$', override)
@@ -161,45 +163,77 @@ class IvyResolve(NailgunTask):
         is_internal(target) and any(jar for jar in target.jar_dependencies if jar.rev)
       )
 
-    classpath_targets = OrderedSet()
-    for target in targets:
-      classpath_targets.update(filter(is_classpath, filter(is_concrete, target.resolve())))
 
-    target_workdir = os.path.join(self._work_dir, dirname_for_requested_targets(targets))
-    target_classpath_file = os.path.join(target_workdir, 'classpath')
-    with self.invalidated(classpath_targets, only_buildfiles=True,
-                          invalidate_dependents=True) as invalidation_check:
-      # Note that it's possible for all targets to be valid but for no classpath file to exist at
-      # target_classpath_file, e.g., if we previously build a superset of targets.
-      if len(invalidation_check.invalid_vts) > 0 or not os.path.exists(target_classpath_file):
-        self._exec_ivy(target_workdir, targets, [
-          '-cachepath', target_classpath_file,
-          '-confs'
-        ] + self._confs)
+    groups = self.context.products.get_data('exclusives_groups')
+    # Below, need to take the code that actually execs ivy, and invoke it once for each
+    # group. Then after running ivy, we need to take the resulting classpath, and load it into
+    # the build products.
 
-    if not os.path.exists(target_classpath_file):
-      raise TaskError('Ivy failed to create classpath file at %s' % target_classpath_file)
+    # The set of groups we need to consider is complicated:
+    # - If there are no conflicting exclusives (ie, there's only one entry in the map),
+    #   then we just do the one.
+    # - If there are conflicts, then there will be at least three entries in the groups map:
+    #   - the group with no exclusives (X)
+    #   - the two groups that are in conflict (A and B).
+    # In the latter case, we need to do the resolve twice: Once for A+X, and once for B+X,
+    # because things in A and B can depend on things in X; and so they can indirectly depend
+    # on the dependencies of X. (I think this well be covered by the computed transitive dependencies of
+    # A and B. But before pushing this change, review this comment, and make sure that this is
+    # working correctly.
+    group_keys = groups.get_group_keys()
+    none_group = groups.get_targets_for_group_key("")
 
-    def safe_link(src, dest):
-      if os.path.exists(dest):
-        os.unlink(dest)
-      os.symlink(src, dest)
+    for group_key in groups.get_group_keys():
+      # Narrow the groups target set to just the set of targets that we're supposed to build.
+      # Normally, this shouldn't be different from the contents of the group.
+      group_targets = groups.get_targets_for_group_key(group_key) & set(targets)
 
-    # Symlink to the current classpath file.
-    safe_link(target_classpath_file, self._classpath_file)
+      classpath_targets = OrderedSet()
+      for target in group_targets:
+        classpath_targets.update(filter(is_classpath, filter(is_concrete, target.resolve())))
 
-    # Symlink to the current ivy.xml file (useful for IDEs that read it).
-    ivyxml_symlink = os.path.join(self._work_dir, 'ivy.xml')
-    target_ivyxml = os.path.join(target_workdir, 'ivy.xml')
-    safe_link(target_ivyxml, ivyxml_symlink)
+      target_workdir = os.path.join(self._work_dir, dirname_for_requested_targets(group_targets))
+      target_classpath_file = os.path.join(target_workdir, 'classpath')
+      with self.invalidated(classpath_targets, only_buildfiles=True,
+                            invalidate_dependents=True) as invalidation_check:
+        # Note that it's possible for all targets to be valid but for no classpath file to exist at
+        # target_classpath_file, e.g., if we previously build a superset of targets.
+        if len(invalidation_check.invalid_vts) > 0 or not os.path.exists(target_classpath_file):
+          self._exec_ivy(target_workdir, targets, [
+            '-cachepath', target_classpath_file,
+            '-confs'
+          ] + self._confs)
 
-    if os.path.exists(self._classpath_file):
-      with self._cachepath(self._classpath_file) as classpath:
-        with self.context.state('classpath', []) as cp:
-          for path in classpath:
-            if self._map_jar(path):
-              for conf in self._confs:
-                cp.append((conf, path.strip()))
+      if not os.path.exists(target_classpath_file):
+        print ('Ivy failed to create classpath file at %s %s' % target_classpath_file)
+#      else:
+#        #  Read classpath file into memory, and push it into data products.
+#        with open(target_classpath_file, "r") as cp_file:
+#          classpath = cp_file.read().split(":")
+#          self.context.products.add_data("ivy_classpath", group_key, classpath)
+
+      def safe_link(src, dest):
+        if os.path.exists(dest):
+          os.unlink(dest)
+        os.symlink(src, dest)
+
+      # Symlink to the current classpath file.
+      safe_link(target_classpath_file, self._classpath_file)
+
+      # Symlink to the current ivy.xml file (useful for IDEs that read it).
+      ivyxml_symlink = os.path.join(self._work_dir, 'ivy.xml')
+      target_ivyxml = os.path.join(target_workdir, 'ivy.xml')
+      safe_link(target_ivyxml, ivyxml_symlink)
+
+      if os.path.exists(self._classpath_file):
+        with self._cachepath(self._classpath_file) as classpath:
+          group_cp = []
+          with self.context.state('classpath', []) as cp:
+            for path in classpath:
+              if self._map_jar(path):
+                for conf in self._confs:
+                  cp.append((conf, path.strip()))
+                  groups.update_compatible_classpaths(group_key, [(conf, path.strip())])
 
     if self._report:
       self._generate_ivy_report()

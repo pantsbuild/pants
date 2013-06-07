@@ -478,6 +478,7 @@ from twitter.pants.tasks.build_lint import BuildLint
 from twitter.pants.tasks.bundle_create import BundleCreate
 from twitter.pants.tasks.checkstyle import Checkstyle
 from twitter.pants.tasks.extract import Extract
+from twitter.pants.tasks.check_exclusives import CheckExclusives
 from twitter.pants.tasks.filedeps import FileDeps
 from twitter.pants.tasks.idl_resolve import IdlResolve
 from twitter.pants.tasks.ivy_resolve import IvyResolve
@@ -711,10 +712,6 @@ goal(
   dependencies=['gen', 'resolve']
 ).install().with_description('Run checkstyle against java source code.')
 
-# TODO(John Sirois): These group predicates could simplify to simple has_sources checks except for
-# the fact that sometimes 'aggregator' targets with no sources serve as a dependency link in the
-# wild.  Consider stomping this practice out and simplifying these predicates.
-
 def is_java(target):
   return (isinstance(target, JavaLibrary)
           or (isinstance(target, (JvmBinary, junit_tests, Benchmark))
@@ -741,9 +738,7 @@ goal(name='java',
      group=group('jvm', is_java),
      dependencies=['gen', 'resolve', 'check_exclusives']).install('compile')
 
-
 goal(name='prepare', action=PrepareResources).install('resources')
-
 
 # TODO(John Sirois): pydoc also
 goal(name='javadoc',

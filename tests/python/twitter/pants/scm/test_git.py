@@ -64,7 +64,7 @@ def git_version():
   process = subprocess.Popen(['git', '--version'], stdout=subprocess.PIPE)
   (stdout, stderr) = process.communicate()
   assert process.returncode == 0, "Failed to determine git version."
-  return Version(stdout.split(' ').pop())
+  return Version(stdout.split(' ')[2])
 
 
 @pytest.mark.skipif("git_version() < Version('1.7.10')")

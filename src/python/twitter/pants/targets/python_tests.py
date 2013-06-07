@@ -25,7 +25,8 @@ class PythonTests(PythonTarget):
                dependencies=None,
                timeout=Amount(2, Time.MINUTES),
                coverage=None,
-               soft_dependencies=False):
+               soft_dependencies=False,
+               exclusives=None):
     """
       name / sources / resources / dependencies: See PythonLibrary target
 
@@ -35,11 +36,12 @@ class PythonTests(PythonTarget):
                          errors for this test.  [Default: False]
       coverage: the module(s) whose coverage should be generated, e.g.
                 'twitter.common.log' or ['twitter.common.log', 'twitter.common.http']
+      exclusives:   An optional map of exclusives tags. See CheckExclusives for details.
     """
     self._timeout = timeout
     self._soft_dependencies = bool(soft_dependencies)
     self._coverage = maybe_list(coverage) if coverage is not None else []
-    PythonTarget.__init__(self, name, sources, resources, dependencies)
+    PythonTarget.__init__(self, name, sources, resources, dependencies, exclusives=exclusives)
     self.add_labels('python', 'tests')
 
   @property
@@ -52,5 +54,5 @@ class PythonTests(PythonTarget):
 
 
 class PythonTestSuite(PythonTarget):
-  def __init__(self, name, dependencies=None):
-    PythonTarget.__init__(self, name, (), (), dependencies)
+  def __init__(self, name, dependencies=None, exclusives=None):
+    PythonTarget.__init__(self, name, (), (), dependencies, exclusives=exclusives)

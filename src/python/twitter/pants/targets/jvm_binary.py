@@ -42,14 +42,16 @@ class JvmBinary(JvmTarget):
                dependencies=None,
                excludes=None,
                deploy_excludes=None,
-               configurations=None):
+               configurations=None,
+               exclusives=None):
 
     JvmTarget.__init__(self,
                        name=name,
                        sources=[source] if source else None,
                        dependencies=dependencies,
                        excludes=excludes,
-                       configurations=configurations)
+                       configurations=configurations,
+                       exclusives=exclusives)
 
     if main and not isinstance(main, Compatibility.string):
       raise TargetDefinitionException(self, 'main must be a fully qualified classname')

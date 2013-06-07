@@ -23,7 +23,8 @@ class PythonAntlrLibrary(PythonTarget):
                antlr_version = '3.1.3',
                sources = None,
                resources = None,
-               dependencies = None):
+               dependencies = None,
+               exclusives=None):
     """
       name = Name of library
       package = Python package to generate the parser in (there is no directive for this in ANTLR)
@@ -32,6 +33,7 @@ class PythonAntlrLibrary(PythonTarget):
         recommended that your application uses the pkgutil package to access these
         resources in a .zip-module friendly way.)
       dependencies = other PythonLibraries, Eggs or internal Pants targets
+      exclusives:   An optional map of exclusives tags. See CheckExclusives for details.
     """
 
     def get_all_deps():
@@ -41,7 +43,8 @@ class PythonAntlrLibrary(PythonTarget):
         all_deps.update(dependencies)
       return all_deps
 
-    PythonTarget.__init__(self, name, sources, resources, get_all_deps())
+    PythonTarget.__init__(self, name, sources, resources, get_all_deps(),
+                          exclusives=exclusives or {})
 
     self.module = module
     self.antlr_version = antlr_version

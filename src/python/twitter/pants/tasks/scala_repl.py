@@ -56,7 +56,8 @@ class ScalaRepl(JvmTask):
 
     kwargs = {
       'jvmargs': self.jvm_args,
-      'classpath': self.classpath(profile_classpath(self.profile), confs=self.confs),
+      'classpath': self.classpath(profile_classpath(self.profile), confs=self.confs,
+            exclusives_classpath=self.get_base_classpath_for_target(targets[0])),
       'main': self.main,
       'args': self.args
     }

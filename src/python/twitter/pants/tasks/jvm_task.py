@@ -23,10 +23,21 @@ from twitter.pants.tasks import Task
 
 
 class JvmTask(Task):
-  def classpath(self, cp=None, confs=None):
+  def get_base_classpath_for_target(self, target):
+    """Note: to use this method, the exclusives_groups data product
+    must be available. This should have been set by the prerequisite
+    java/scala compile."""
+    egroups = self.context.products.get_data('exclusives_groups')
+    group_key = egroups.get_group_key_for_target(target)
+    return egroups.get_classpath_for_group(group_key)
+
+  def classpath(self, cp=None, confs=None, exclusives_classpath=None):
     classpath = cp or []
-    with self.context.state('classpath', []) as cp:
-      classpath.extend(path for conf, path in cp if not confs or conf in confs)
+    if exclusives_classpath is None:
+      with self.context.state('classpath', []) as context_cp:
+        exclusives_classpath = context_cp
+
+    classpath.extend(path for conf, path in exclusives_classpath if not confs or conf in confs)
 
     def add_resource_paths(predicate):
       bases = set()

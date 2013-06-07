@@ -20,9 +20,7 @@ from twitter.pants.base import Target
 
 from .exportable_jvm_library import ExportableJvmLibrary
 from .resources import WithLegacyResources
-
 from . import JavaLibrary
-
 
 class ScalaLibrary(ExportableJvmLibrary, WithLegacyResources):
   """Defines the source code and dependencies of a scala library."""
@@ -30,7 +28,6 @@ class ScalaLibrary(ExportableJvmLibrary, WithLegacyResources):
   def __init__(self, name, sources=None, java_sources=None, provides=None, dependencies=None,
                excludes=None, resources=None, deployjar=False, buildflags=None,
                exclusives=None):
-
     """name:      The name of this target, addressable via pants via the portion of the address spec
                   following the colon.
     sources:      A list of paths containing the scala source files this scala library is composed
@@ -48,6 +45,7 @@ class ScalaLibrary(ExportableJvmLibrary, WithLegacyResources):
                   jar - now ignored.
     buildflags:   DEPRECATED - A list of additional command line arguments to pass to the underlying
                   build system for this target - now ignored.
+    exclusives:   An optional list of exclusives tags.
     """
 
     ExportableJvmLibrary.__init__(self, name, sources, provides, dependencies, excludes, exclusives=exclusives)

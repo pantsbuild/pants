@@ -16,6 +16,7 @@
 
 from collections import defaultdict
 from twitter.pants.targets.exclude import Exclude
+from collections import defaultdict
 
 from .external_dependency import ExternalDependency
 
@@ -115,6 +116,10 @@ class  JarDependency(ExternalDependency):
 
     self.id = "%s-%s-%s" % (self.org, self.name, self.rev)
     self._configurations = ['default']
+    self.declared_exclusives = defaultdict(set)
+    if exclusives is not None:
+      for k in exclusives:
+        self.declared_exclusives[k] |= exclusives[k]
 
     # Support legacy method names
     # TODO(John Sirois): introduce a deprecation cycle for these and then kill

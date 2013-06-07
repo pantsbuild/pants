@@ -47,6 +47,7 @@ class JvmTarget(InternalTarget, TargetWithSources):
   def _as_jar_dependencies(self):
     yield self._as_jar_dependency()
 
+
   def _get_artifact_info(self):
     provides = self._provides()
     exported = bool(provides)

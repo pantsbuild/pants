@@ -14,28 +14,27 @@
 # limitations under the License.
 # ==================================================================================================
 
-from twitter.pants.base import Target
 
+from twitter.pants.base import Target, TargetDefinitionException
 from .internal import InternalTarget
 from .pants_target import Pants
 from .with_sources import TargetWithSources
 
-
 class Wiki(Target):
   """A target that identifies a wiki where pages can be published"""
 
-  def __init__(self, name, url_builder):
+  def __init__(self, name, url_builder, exclusives=None):
     """:url_builder a function that accepts a page target and an optional wiki :config dict and
     returns a tuple of (alias, fully qualified url)."""
-    Target.__init__(self, name)
+    Target.__init__(self, name, is_meta=False, exclusives=exclusives)
     self.url_builder = url_builder
 
 
 class Page(InternalTarget, TargetWithSources):
   """A target that identifies a single documentation page."""
-  def __init__(self, name, source, dependencies=None, resources=None):
-    InternalTarget.__init__(self, name, dependencies)
-    TargetWithSources.__init__(self, name, sources=[source])
+  def __init__(self, name, source, dependencies=None, resources=None, exclusives=None):
+    InternalTarget.__init__(self, name, dependencies, exclusives=exclusives)
+    TargetWithSources.__init__(self, name, sources=[source], exclusives=exclusives)
 
     self.resources = self._resolve_paths(self.target_base, resources) if resources else []
     self._wikis = {}

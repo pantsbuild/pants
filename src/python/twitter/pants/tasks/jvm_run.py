@@ -62,6 +62,7 @@ class JvmRun(JvmTask):
       self.jvm_args.extend(context.config.getlist('jvm', 'debug_args'))
     self.confs = context.config.getlist('jvm-run', 'confs')
     self.only_write_cmd_line = context.options.only_write_cmd_line
+    context.products.require_data('exclusives_groups')
 
   def execute(self, targets):
     # The called binary may block for a while, allow concurrent pants activity during this pants
@@ -80,6 +81,9 @@ class JvmRun(JvmTask):
     binaries = filter(is_binary, targets)
     if len(binaries) > 0:  # We only run the first one.
       main = binaries[0].main
+      egroups = self.context.products.get_data('exclusives_groups')
+      group_key = egroups.get_group_key_for_target(binaries[0])
+      group_classpath = egroups.get_classpath_for_group(group_key)
 
       # TODO(John Sirois): Since --dry-run is plumbed throughout the Task infra it seems like we
       # should just be using that.  Ask Benjy why this particular task uses a custom file.

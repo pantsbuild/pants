@@ -62,7 +62,9 @@ class PythonBinary(PythonTarget):
 
       interpreters: the interpreter versions to target when building this binary.  by default the
                     current interpreter version (specify in the form: '2.6', '2.7', '3.2' etc.)
+      exclusives:   An optional map of exclusives tags. See CheckExclusives for details.
     """
+
     if source is None and dependencies is None:
       raise TargetDefinitionException(
           'ERROR: no source or dependencies declared for target %s' % name)

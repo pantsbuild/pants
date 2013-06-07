@@ -21,8 +21,7 @@ class JavaProtobufLibrary(ExportableJvmLibrary):
   """Defines a target that builds java stubs from a protobuf IDL file."""
 
   def __init__(self, name, sources, provides=None, dependencies=None, excludes=None,
-               buildflags=None):
-
+               buildflags=None, exclusives=None):
     """name: The name of this module target, addressable via pants via the portion of the spec
         following the colon
     sources: A list of paths containing the protobuf source files this modules jar is compiled from
@@ -33,9 +32,11 @@ class JavaProtobufLibrary(ExportableJvmLibrary):
         transitive dependencies against.
     buildflags: DEPRECATED - A list of additional command line arguments to pass to the underlying
         build system for this target - now ignored.
+    exclusives:   An optional map of exclusives tags. See CheckExclusives for details.
     """
 
-    ExportableJvmLibrary.__init__(self, name, sources, provides, dependencies, excludes)
+    ExportableJvmLibrary.__init__(self, name, sources, provides, dependencies, excludes,
+                                  exclusives=exclusives)
     self.add_labels('java', 'codegen')
 
   def _as_jar_dependency(self):
