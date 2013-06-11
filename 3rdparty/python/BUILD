@@ -16,10 +16,7 @@
 
 def make_dep(name, dependency_name=None):
   dependency_name = dependency_name or name
-  python_library(
-    name=name,
-    dependencies=[python_requirement(dependency_name)]
-  )
+  python_requirement(dependency_name, name=name)
 
 make_dep('antlr-3.1.3', 'antlr_python_runtime==3.1.3')
 make_dep('beautifulsoup', 'BeautifulSoup==3.2.0')
@@ -47,6 +44,8 @@ make_dep('lxml', 'lxml==2.3.1')
 make_dep('mako')
 make_dep('markdown')
 make_dep('markupsafe', 'MarkupSafe==0.15')
+make_dep('mock', 'mock==1.0.1')
+make_dep('mox')
 make_dep('MySQLdb', 'MySQL-python==1.2.3')
 make_dep('paramiko', 'paramiko==1.10.1')
 make_dep('pil', 'PIL==1.1.7')
@@ -66,6 +65,7 @@ make_dep('python-memcached', 'python-memcached==1.47')
 make_dep('python_twitter', 'python-twitter==0.8.2')
 make_dep('pytz')
 make_dep('pyyaml')
+make_dep('rbtools', 'RBTools==0.4.2')
 make_dep('redis', 'redis==2.4.9')
 make_dep('thrift')
 make_dep('tornado')
