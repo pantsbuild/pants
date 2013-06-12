@@ -5,6 +5,7 @@ from collections import defaultdict
 from copy import copy
 from itertools import chain
 import string
+import sys
 from twitter.pants.base import Target
 from twitter.pants.tasks import Task, TaskError
 from twitter.pants.targets import InternalTarget
@@ -166,6 +167,10 @@ class ExclusivesMapping(object):
     c depends on b.
     """
     def number_of_emptys(key):
+      if key == "<none>":
+        # A key with no exclusives at all is treated as if it has an infinite number
+        # of <none> tags.
+        return sys.maxint
       return string.count(key, "<none>")
 
     if self.ordering is not None:
@@ -173,13 +178,19 @@ class ExclusivesMapping(object):
     # The correct order is from least exclusives to most exclusives - a target can only depend on
     # other targets with fewer exclusives than itself.
     keys_by_empties = [ [] for l in range(len(self.key_to_targets)) ]
+    # Flag to indicate whether there are any groups without any exclusives.
+    no_exclusives = False
     for k in self.key_to_targets:
-      keys_by_empties[number_of_emptys(k)].append(k)
-    result = []
+      if k == "<none>":
+        no_exclusives = True
+      else:
+        keys_by_empties[number_of_emptys(k)].append(k)
+    result = [ ]
     for i in range(len(keys_by_empties)):
       for j in range(len(keys_by_empties[i])):
-
         result.append(keys_by_empties[i][j])
+    if no_exclusives:
+      result.append("<none>")
     result.reverse()
     self.ordering = result
     return self.ordering
