@@ -261,9 +261,6 @@ class ExclusivesMapping(object):
 
   def update_compatible_classpaths(self, group_key, path_additions):
     """ Update the classpath of all groups compatible with group_key, adding path_additions to their classpath."""
-    if group_key == '':
-      print "EMPTY GROUP KEY for additions: %s" % path_additions
-      raise 'Foo'
     for key in self.group_classpaths:
       if group_key is None or self._is_compatible(group_key, key):
         group_classpath = self.group_classpaths[key]
