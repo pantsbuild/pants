@@ -5,6 +5,7 @@ from collections import defaultdict
 from copy import copy
 from itertools import chain
 import string
+from twitter.pants.base import Target
 from twitter.pants.tasks import Task, TaskError
 from twitter.pants.targets import InternalTarget
 
@@ -188,10 +189,12 @@ class ExclusivesMapping(object):
     # in the conflicting keys list.
     target_key = []
     for k in self.conflicting_exclusives:
-      if len(target.exclusives[k]) > 0:
-        target_key.append("%s=%s" % (k, list(target.exclusives[k])[0]))
+      excl = target.exclusives if isinstance(target, Target) else target.declared_exclusives
+      if len(excl[k]) > 0:
+        target_key.append("%s=%s" % (k, list(excl[k])[0]))
       else:
         target_key.append("%s=<none>" % k)
+
     if target_key == []:
       return "<none>"
     else:
@@ -232,7 +235,7 @@ class ExclusivesMapping(object):
 
   def _key_to_map(self, key):
     result = {}
-    if key == '<none>':
+    if key == '<none>' or key == '':
       return result
     pairs = key.split(',')
     for p in pairs:
@@ -258,6 +261,9 @@ class ExclusivesMapping(object):
 
   def update_compatible_classpaths(self, group_key, path_additions):
     """ Update the classpath of all groups compatible with group_key, adding path_additions to their classpath."""
+    if group_key == '':
+      print "EMPTY GROUP KEY for additions: %s" % path_additions
+      raise 'Foo'
     for key in self.group_classpaths:
       if group_key is None or self._is_compatible(group_key, key):
         group_classpath = self.group_classpaths[key]

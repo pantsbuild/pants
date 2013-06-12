@@ -181,7 +181,7 @@ class IvyResolve(NailgunTask):
     # A and B. But before pushing this change, review this comment, and make sure that this is
     # working correctly.
     group_keys = groups.get_group_keys()
-    none_group = groups.get_targets_for_group_key("")
+    none_group = groups.get_targets_for_group_key("<none>")
 
     for group_key in groups.get_group_keys():
       # Narrow the groups target set to just the set of targets that we're supposed to build.
