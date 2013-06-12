@@ -36,9 +36,7 @@ make_dep('gflags', 'python-gflags')
 make_dep('git-python', 'GitPython')
 make_dep('jenkinsapi', 'jenkinsapi==0.1.16')
 make_dep('jira-python-0.9', 'jira-python==0.9')
-# TODO(wickman) Update this to kazoo==1.2 once they cut a release
-# with our patches.
-make_dep('kazoo', 'kazoo==1.1dev')
+make_dep('kazoo', 'kazoo==1.1')
 make_dep('ldap', 'python-ldap')
 make_dep('lxml', 'lxml==2.3.1')
 make_dep('mako')
