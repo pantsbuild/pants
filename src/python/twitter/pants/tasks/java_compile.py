@@ -137,12 +137,9 @@ class JavaCompile(NailgunTask):
 
       egroups = self.context.products.get_data('exclusives_groups')
       group_id = egroups.get_group_key_for_target(java_targets[0])
-      with self.context.state('classpath', []) as cp:
-        for conf in self._confs:
-          cp.insert(0, (conf, self._resources_dir))
-          egroups.update_compatible_classpaths(group_id, [(conf, self._resources_dir)])
-          cp.insert(0, (conf, self._classes_dir))
-          egroups.update_compatible_classpaths(group_id, [(conf, self._classes_dir)])
+      for conf in self._confs:
+        egroups.update_compatible_classpaths(group_id, [(conf, self._resources_dir)])
+        egroups.update_compatible_classpaths(group_id, [(conf, self._classes_dir)])
 
 
       with self.invalidated(java_targets, invalidate_dependents=True,

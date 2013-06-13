@@ -168,9 +168,7 @@ class ExclusivesMapping(object):
     """
     def number_of_emptys(key):
       if key == "<none>":
-        # A key with no exclusives at all is treated as if it has an infinite number
-        # of <none> tags.
-        return sys.maxint
+        return len(self.conflicting_keys)
       return string.count(key, "<none>")
 
     if self.ordering is not None:

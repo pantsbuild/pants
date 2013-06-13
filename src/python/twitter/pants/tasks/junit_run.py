@@ -218,8 +218,6 @@ class JUnitRun(JvmTask):
           # TODO(John Sirois): Integrated batching with the test runner.  As things stand we get
           # results summaries for example for each batch but no overall summary.
           # http://jira.local.twitter.com/browse/AWESOME-1114
-          # TODO(markcc): check that the goal/group infrastructure partitions
-          # tests in a way that respects exclusives.
           result = 0
           for batch in self._partition(tests):
             with binary_util.safe_args(batch) as batch_tests:

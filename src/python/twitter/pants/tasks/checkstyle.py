@@ -49,6 +49,7 @@ class Checkstyle(NailgunTask):
     self._work_dir = context.config.get('checkstyle', 'workdir')
     self._properties = context.config.getdict('checkstyle', 'properties')
     self._confs = context.config.getlist('checkstyle', 'confs')
+    self.context.products.require_data('exclusives_groups')
 
   def execute(self, targets):
     if not self.context.options.checkstyle_skip:
@@ -58,7 +59,7 @@ class Checkstyle(NailgunTask):
           invalid_targets.extend(vt.targets)
         sources = self.calculate_sources(invalid_targets)
         if sources:
-          result = self.checkstyle(sources)
+          result = self.checkstyle(sources, invalid_targets)
           if result != 0:
             raise TaskError('%s returned %d' % (CHECKSTYLE_MAIN, result))
 
@@ -69,10 +70,12 @@ class Checkstyle(NailgunTask):
                       for source in target.sources if source.endswith('.java')])
     return sources
 
-  def checkstyle(self, sources):
+  def checkstyle(self, sources, targets):
+    egroups = self.context.products.get_data('exclusives_groups')
+    etag = egroups.get_group_key_for_target(targets[0])
     classpath = self.profile_classpath(self._profile)
-    with self.context.state('classpath', []) as cp:
-      classpath.extend(jar for conf, jar in cp if conf in self._confs)
+    cp = egroups.get_classpath_for_group(etag)
+    classpath.extend(jar for conf, jar in cp if conf in self._confs)
 
     opts = [
       '-c', self._configuration_file,

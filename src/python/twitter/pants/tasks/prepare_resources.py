@@ -32,6 +32,7 @@ class PrepareResources(Task):
 
     self.workdir = context.config.get('prepare-resources', 'workdir')
     self.confs = context.config.getlist('prepare-resources', 'confs')
+    self.context.products.require_data('exclusives_groups')
 
   def execute(self, targets):
     def extract_resources(target):
@@ -59,9 +60,11 @@ class PrepareResources(Task):
                       os.path.join(resources_dir, resource))
 
     genmap = self.context.products.get('resources')
-    with self.context.state('classpath', []) as cp:
-      for resources in all_resources:
-        resources_dir = target_dir(resources)
-        genmap.add(resources, resources_dir, resources.sources)
-        for conf in self.confs:
-          cp.insert(0, (conf, resources_dir))
+    egroups = self.context.products.get_data('exclusives_groups')
+    group_key = egroups.get_group_key_for_target(targets[0])
+    cp = egroups.get_classpath_for_group(group_key)
+    for resources in all_resources:
+      resources_dir = target_dir(resources)
+      genmap.add(resources, resources_dir, resources.sources)
+      for conf in self.confs:
+        cp.insert(0, (conf, resources_dir))

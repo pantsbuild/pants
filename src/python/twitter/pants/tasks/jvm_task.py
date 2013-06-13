@@ -33,9 +33,6 @@ class JvmTask(Task):
 
   def classpath(self, cp=None, confs=None, exclusives_classpath=None):
     classpath = cp or []
-    if exclusives_classpath is None:
-      with self.context.state('classpath', []) as context_cp:
-        exclusives_classpath = context_cp
 
     classpath.extend(path for conf, path in exclusives_classpath if not confs or conf in confs)
 

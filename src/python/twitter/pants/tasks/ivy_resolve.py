@@ -206,11 +206,6 @@ class IvyResolve(NailgunTask):
 
       if not os.path.exists(target_classpath_file):
         print ('Ivy failed to create classpath file at %s %s' % target_classpath_file)
-#      else:
-#        #  Read classpath file into memory, and push it into data products.
-#        with open(target_classpath_file, "r") as cp_file:
-#          classpath = cp_file.read().split(":")
-#          self.context.products.add_data("ivy_classpath", group_key, classpath)
 
       def safe_link(src, dest):
         if os.path.exists(dest):
@@ -228,12 +223,10 @@ class IvyResolve(NailgunTask):
       if os.path.exists(self._classpath_file):
         with self._cachepath(self._classpath_file) as classpath:
           group_cp = []
-          with self.context.state('classpath', []) as cp:
-            for path in classpath:
-              if self._map_jar(path):
-                for conf in self._confs:
-                  cp.append((conf, path.strip()))
-                  groups.update_compatible_classpaths(group_key, [(conf, path.strip())])
+          for path in classpath:
+            if self._map_jar(path):
+              for conf in self._confs:
+                groups.update_compatible_classpaths(group_key, [(conf, path.strip())])
 
     if self._report:
       self._generate_ivy_report()
