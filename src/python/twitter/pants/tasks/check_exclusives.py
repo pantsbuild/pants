@@ -101,7 +101,8 @@ class CheckExclusives(Task):
       excl = t.get_all_exclusives()
       for key in excl:
         if len(excl[key]) > 1:
-          msg = 'target %s has more than 1 exclusives tag for key %s: %s' % (t, key, excl)
+          msg = 'target %s has more than one exclusives tag for key %s: %s' % \
+                (t.address.reference(), key, list(excl[key]))
           if self.signal_error:
             raise TaskError(msg)
           else:
