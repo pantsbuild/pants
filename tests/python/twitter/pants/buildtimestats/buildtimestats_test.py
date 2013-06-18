@@ -39,7 +39,7 @@ class BuildTimeStats(RealBuildTimeStats):
     """
     This method calls uploader in sync
     """
-    self._su = StatsUploader("locahost", "80", "buildtime.json", Amount(6, Time.HOURS),
+    self._su = StatsUploader("localhost", "80", "buildtime.json", Amount(6, Time.HOURS),
                               self._file, "dummy")
     self._su.upload_sync(stats)
 
