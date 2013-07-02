@@ -80,18 +80,13 @@ class PythonThriftBuilder(object):
       'py:new_style',
       '-recurse',
       '-o',
-      self.codegen_root
+      os.path.join(self.chroot.path(), self.codegen_root)
     ]
     for base in bases:
       args.extend(('-I', base))
     args.append(thrift_abs_path)
 
-    cwd = os.getcwd()
-    os.chdir(self.chroot.path())
-    try:
-      po = subprocess.Popen(args)
-    finally:
-      os.chdir(cwd)
+    po = subprocess.Popen(args)
     rv = po.wait()
     if rv != 0:
       comm = po.communicate()

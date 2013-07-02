@@ -57,13 +57,6 @@ else:
 StringIO = Compatibility.StringIO
 
 
-def _list_goals(context, message):
-  """Show all installed goals."""
-  context.log.error(message)
-  # Execute as if the user had run "./pants goals".
-  return Phase.execute(context, 'goals')
-
-
 class List(Task):
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
@@ -116,7 +109,9 @@ class Help(Task):
     parser.parse_args(['--help'])
 
   def list_goals(self, message):
-    return _list_goals(self.context, message)
+    print(message)
+    print()
+    return Phase.execute(self.context, 'goals')
 
 goal(name='help', action=Help).install().with_description('Provide help for the specified goal.')
 
@@ -444,7 +439,9 @@ class Goal(Command):
         unknown.append(phase)
 
     if unknown:
-      return _list_goals(context, 'Unknown goal(s): %s' % ' '.join(phase.name for phase in unknown))
+      print('Unknown goal(s): %s' % ' '.join(phase.name for phase in unknown))
+      print('')
+      return Phase.execute(context, 'goals')
 
     ret = Phase.attempt(context, self.phases)
 

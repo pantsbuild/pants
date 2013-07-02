@@ -187,12 +187,12 @@ class Phase(PhaseBase):
 
   @staticmethod
   def execute(context, *names):
-    """Run pants as if the named goals were specified on the command line by a user."""
+    # TODO(benjy): Is this code ever used?
     parser = OptionParser()
     phases = [Phase(name) for name in names]
     Phase.setup_parser(parser, [], phases)
     options, _ = parser.parse_args([])
-    context = Context(context.config, options, context.run_tracker, context.target_roots, log=context.log)
+    context = Context(context.config, options, None, context.target_roots, log=context.log)
     return Phase.attempt(context, phases)
 
   @staticmethod
