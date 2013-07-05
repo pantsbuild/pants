@@ -37,7 +37,7 @@ class JavaProtobufLibrary(ExportableJvmLibrary):
 
     ExportableJvmLibrary.__init__(self, name, sources, provides, dependencies, excludes,
                                   exclusives=exclusives)
-    self.add_labels('codegen', 'java')
+    self.add_labels('codegen')
 
   def _as_jar_dependency(self):
     return ExportableJvmLibrary._as_jar_dependency(self).with_sources()

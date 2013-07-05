@@ -56,7 +56,7 @@ class JavaThriftLibrary(ExportableJvmLibrary):
     """
     ExportableJvmLibrary.__init__(self, name, sources, provides, dependencies, excludes,
                                   exclusives=exclusives)
-    self.add_labels('codegen', 'java')
+    self.add_labels('codegen')
 
     def check_value_for_arg(arg, value, values):
       if value not in values:

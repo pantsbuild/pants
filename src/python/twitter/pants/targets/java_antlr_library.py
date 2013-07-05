@@ -47,7 +47,7 @@ class JavaAntlrLibrary(ExportableJvmLibrary):
                                   provides,
                                   dependencies,
                                   excludes)
-    self.add_labels('codegen', 'java')
+    self.add_labels('codegen')
 
     if compiler not in ['antlr3', 'antlr4']:
         raise ValueError("Illegal value for 'compiler': {}".format(compiler))
