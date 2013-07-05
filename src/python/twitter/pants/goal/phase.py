@@ -25,7 +25,6 @@ from optparse import OptionParser
 from twitter.common.collections import OrderedDict, OrderedSet
 
 from twitter.pants.base import TargetDefinitionException
-from twitter.pants.buildtimestats import BuildTimeStats
 from twitter.pants.tasks import TaskError
 
 from .context import Context
@@ -145,14 +144,14 @@ class Phase(PhaseBase):
       tasks_by_goal = {}
       expanded = OrderedSet()
       prepared = set()
-      round = 0
+      round_ = 0
       while True:
         goals = list(Phase.execution_order(phases))
         if set(goals) == prepared:
           break
         else:
-          round += 1
-          context.log.debug('Preparing goals in round %d' % round)
+          round_ += 1
+          context.log.debug('Preparing goals in round %d' % round_)
           for goal in reversed(goals):
             if goal not in prepared:
               phase = Phase.of(goal)

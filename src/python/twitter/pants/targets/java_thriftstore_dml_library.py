@@ -41,7 +41,7 @@ class JavaThriftstoreDMLLibrary(ExportableJvmLibrary):
                                   provides = None,
                                   dependencies = dependencies,
                                   exclusives = exclusives)
-    self.add_labels('codegen')
+    self.add_labels('codegen', 'java')
 
   def _as_jar_dependency(self):
     return ExportableJvmLibrary._as_jar_dependency(self).with_sources()

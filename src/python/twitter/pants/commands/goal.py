@@ -33,7 +33,7 @@ from twitter.common import log
 from twitter.common.collections import OrderedSet
 from twitter.common.dirutil import safe_mkdir, safe_rmtree
 from twitter.common.lang import Compatibility
-from twitter.pants import get_buildroot, goal, group, has_sources, is_apt
+from twitter.pants import get_buildroot, goal, group, has_sources, is_apt, is_java, is_scala
 from twitter.pants.base import Address, BuildFile, Config, ParseContext, Target
 from twitter.pants.base.rcfile import RcFile
 from twitter.pants.commands import Command
@@ -714,18 +714,25 @@ goal(
   dependencies=['gen', 'resolve']
 ).install().with_description('Run checkstyle against java source code.')
 
-# TODO: This should use the standard labels-based is_java/is_scala, plus whatever
-#       needs to happen for targets that can have both java and scala sources.
-#       This involves sorting out the ScalaTests/JavaTests/junit_tests/specs_tests thing first.
+# When chunking a group, we don't need a new chunk for targets with no sources at all
+# (which do sometimes exist, e.g., when creating a BUILD file ahead of its code).
+def _has_sources(target, extension):
+  return has_sources(target, extension) or target.has_label('sources') and not target.sources
+
+# Note: codegen targets shouldn't really be 'is_java' or 'is_scala', but right now they
+# are so they don't cause a lot of islands while chunking. The jvm group doesn't act on them
+# anyway (it acts on their synthetic counterparts) so it doesn't matter where they get chunked.
+# TODO: Make chunking only take into account the targets actually acted on? This would require
+# task types to declare formally the targets they act on.
 def _is_java(target):
-  return (isinstance(target, JavaLibrary)
+  return (is_java(target)
           or (isinstance(target, (JvmBinary, junit_tests, Benchmark))
-              and has_sources(target, '.java')))
+              and _has_sources(target, '.java')))
 
 def _is_scala(target):
-  return (isinstance(target, (ScalaLibrary, ScalaTests, ScalacPlugin))
+  return (is_scala(target)
           or (isinstance(target, (JvmBinary, junit_tests, Benchmark))
-              and has_sources(target, '.scala')))
+              and _has_sources(target, '.scala')))
 
 
 goal(name='scala',

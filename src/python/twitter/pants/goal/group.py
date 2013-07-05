@@ -169,7 +169,9 @@ class Group(object):
 
     context.log.debug('::: created chunks(%d)' % len(all_chunks))
     for i, chunk in enumerate(all_chunks):
-      context.log.debug('  chunk(%d):\n\t%s' % (i, '\n\t'.join(sorted(map(str, chunk)))))
+      flavor = discriminator(iter(chunk).next())
+      context.log.debug('  chunk(%d) [flavor=%s]:\n\t%s' %
+                        (i, flavor, '\n\t'.join(sorted(map(str, chunk)))))
 
     return all_chunks
 

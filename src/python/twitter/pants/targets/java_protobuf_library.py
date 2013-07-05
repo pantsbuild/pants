@@ -37,7 +37,9 @@ class JavaProtobufLibrary(ExportableJvmLibrary):
 
     ExportableJvmLibrary.__init__(self, name, sources, provides, dependencies, excludes,
                                   exclusives=exclusives)
-    self.add_labels('codegen')
+    # 'java' shouldn't be here, but is currently required to prevent lots of chunking islands.
+    # See comment in goal.py for details.
+    self.add_labels('codegen', 'java')
 
   def _as_jar_dependency(self):
     return ExportableJvmLibrary._as_jar_dependency(self).with_sources()

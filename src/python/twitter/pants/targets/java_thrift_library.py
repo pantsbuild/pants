@@ -56,7 +56,9 @@ class JavaThriftLibrary(ExportableJvmLibrary):
     """
     ExportableJvmLibrary.__init__(self, name, sources, provides, dependencies, excludes,
                                   exclusives=exclusives)
-    self.add_labels('codegen')
+    # 'java' shouldn't be here, but is currently required to prevent lots of chunking islands.
+    # See comment in goal.py for details.
+    self.add_labels('codegen', 'java')
 
     def check_value_for_arg(arg, value, values):
       if value not in values:
