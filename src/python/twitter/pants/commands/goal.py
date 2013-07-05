@@ -714,12 +714,15 @@ goal(
   dependencies=['gen', 'resolve']
 ).install().with_description('Run checkstyle against java source code.')
 
-def is_java(target):
+# TODO: This should use the standard labels-based is_java/is_scala, plus whatever
+#       needs to happen for targets that can have both java and scala sources.
+#       This involves sorting out the ScalaTests/JavaTests/junit_tests/specs_tests thing first.
+def _is_java(target):
   return (isinstance(target, JavaLibrary)
           or (isinstance(target, (JvmBinary, junit_tests, Benchmark))
               and has_sources(target, '.java')))
 
-def is_scala(target):
+def _is_scala(target):
   return (isinstance(target, (ScalaLibrary, ScalaTests, ScalacPlugin))
           or (isinstance(target, (JvmBinary, junit_tests, Benchmark))
               and has_sources(target, '.scala')))
@@ -727,7 +730,7 @@ def is_scala(target):
 
 goal(name='scala',
      action=ScalaCompile,
-     group=group('jvm', is_scala),
+     group=group('jvm', _is_scala),
      dependencies=['gen', 'resolve', 'check-exclusives']).install('compile').with_description(
        'Compile both generated and checked in code.'
      )
@@ -737,7 +740,7 @@ goal(name='apt',
      dependencies=['gen', 'resolve', 'check-exclusives']).install('compile')
 goal(name='java',
      action=JavaCompile,
-     group=group('jvm', is_java),
+     group=group('jvm', _is_java),
      dependencies=['gen', 'resolve', 'check-exclusives']).install('compile')
 
 goal(name='prepare', action=PrepareResources).install('resources')
