@@ -285,5 +285,5 @@ class ExclusivesMapping(object):
 
   def set_base_classpath_for_group(self, group_key, classpath):
     # set the initial classpath of the elements of group_key to classpath.
-    self._group_classpaths[group_key] = classpath
+    self._group_classpaths[group_key] = OrderedSet(classpath)
 
