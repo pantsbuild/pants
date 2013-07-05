@@ -32,7 +32,6 @@ from twitter.pants import binary_util, get_buildroot, is_internal, is_jar, is_jv
 from twitter.pants.base.generator import Generator, TemplateData
 from twitter.pants.base.revision import Revision
 from twitter.pants.tasks import TaskError
-from twitter.pants.tasks.check_exclusives import CheckExclusives
 from twitter.pants.tasks.ivy_utils import IvyUtils
 from twitter.pants.tasks.nailgun_task import NailgunTask
 
@@ -146,11 +145,9 @@ class IvyResolve(NailgunTask):
     return self.context.options.ivy_resolve_overrides
 
   def execute(self, targets):
+    """Resolves the specified confs for the configured targets and returns an iterator over
+    tuples of (conf, jar path).
     """
-      Resolves the specified confs for the configured targets and returns an iterator over tuples
-      of (conf, jar path).
-    """
-
     def dirname_for_requested_targets(targets):
       """Where we put the classpath file for this set of targets."""
       sha = hashlib.sha1()
@@ -163,8 +160,8 @@ class IvyResolve(NailgunTask):
         is_internal(target) and any(jar for jar in target.jar_dependencies if jar.rev)
       )
 
-
     groups = self.context.products.get_data('exclusives_groups')
+
     # Below, need to take the code that actually execs ivy, and invoke it once for each
     # group. Then after running ivy, we need to take the resulting classpath, and load it into
     # the build products.
@@ -180,9 +177,6 @@ class IvyResolve(NailgunTask):
     # on the dependencies of X. (I think this well be covered by the computed transitive dependencies of
     # A and B. But before pushing this change, review this comment, and make sure that this is
     # working correctly.
-    group_keys = groups.get_group_keys()
-    none_group = groups.get_targets_for_group_key("<none>")
-
     for group_key in groups.get_group_keys():
       # Narrow the groups target set to just the set of targets that we're supposed to build.
       # Normally, this shouldn't be different from the contents of the group.
@@ -198,7 +192,7 @@ class IvyResolve(NailgunTask):
                             invalidate_dependents=True) as invalidation_check:
         # Note that it's possible for all targets to be valid but for no classpath file to exist at
         # target_classpath_file, e.g., if we previously build a superset of targets.
-        if len(invalidation_check.invalid_vts) > 0 or not os.path.exists(target_classpath_file):
+        if invalidation_check.invalid_vts or not os.path.exists(target_classpath_file):
           self._exec_ivy(target_workdir, targets, [
             '-cachepath', target_classpath_file,
             '-confs'
@@ -212,6 +206,8 @@ class IvyResolve(NailgunTask):
           os.unlink(dest)
         os.symlink(src, dest)
 
+      # TODO(benjy): Is this symlinking valid in the presence of multiple exclusives groups?
+      # Should probably get rid of it and use a local artifact cache instead.
       # Symlink to the current classpath file.
       safe_link(target_classpath_file, self._classpath_file)
 
@@ -222,7 +218,6 @@ class IvyResolve(NailgunTask):
 
       if os.path.exists(self._classpath_file):
         with self._cachepath(self._classpath_file) as classpath:
-          group_cp = []
           for path in classpath:
             if self._map_jar(path):
               for conf in self._confs:
@@ -428,11 +423,11 @@ class IvyResolve(NailgunTask):
     return TemplateData(org=exclude.org, name=exclude.name)
 
   @contextmanager
-  def _cachepath(self, file):
-    if not os.path.exists(file):
+  def _cachepath(self, path):
+    if not os.path.exists(path):
       yield ()
     else:
-      with safe_open(file, 'r') as cp:
+      with safe_open(path, 'r') as cp:
         yield (path.strip() for path in cp.read().split(os.pathsep) if path.strip())
 
   def _mapjars(self, genmap, target):

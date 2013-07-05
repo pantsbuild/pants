@@ -6,7 +6,7 @@ import shutil
 import tempfile
 from twitter.pants.base.build_invalidator import CacheKey, CacheKeyGenerator
 from twitter.pants.tasks import CacheManager
-from twitter.pants.tasks.cache_manager import InvalidationCheck
+from twitter.pants.tasks.cache_manager import InvalidationCheck, VersionedTarget
 from twitter.pants.testutils import MockTarget
 
 class AppendingCacheKeyGenerator(CacheKeyGenerator):
@@ -26,8 +26,8 @@ class AppendingCacheKeyGenerator(CacheKeyGenerator):
   def key_for_target(self, target, sources=None, fingerprint_extra=None):
     return CacheKey(target.id, target.id, target.num_sources, [])
 
-  def key_for(self, id, sources):
-    return CacheKey(id, id, len(sources), [])
+  def key_for(self, tid, sources):
+    return CacheKey(tid, tid, len(sources), [])
 
 
 class TestCacheManager(CacheManager):

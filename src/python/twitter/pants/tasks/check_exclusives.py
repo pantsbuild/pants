@@ -1,3 +1,5 @@
+from twitter.common.collections import OrderedSet
+
 __author__ = 'Mark Chu-Carroll (markcc@foursquare.com)'
 
 
@@ -107,21 +109,24 @@ class CheckExclusives(Task):
             raise TaskError(msg)
           else:
             print "Warning: %s" % msg
+
     if self.context.products.is_required_data('exclusives_groups'):
-      mapping = ExclusivesMapping()
+      mapping = ExclusivesMapping(self.context)
       partition_keys = self._compute_exclusives_conflicts(targets)
       for key in partition_keys:
         mapping.add_conflict(key, partition_keys[key])
       mapping._populate_target_maps(targets)
       self.context.products.add_data('exclusives_groups', mapping)
 
+
 class ExclusivesMapping(object):
-  def __init__(self):
+  def __init__(self, context):
+    self.context = context
     self.conflicting_exclusives = {}
     self.key_to_targets = defaultdict(set)
     self.target_to_key = {}
     self.ordering = None
-    self.group_classpaths = {}
+    self._group_classpaths = {}  # key -> OrderedSet.
 
   def add_conflict(self, key, values):
     """Register a conflict on an exclusives key.
@@ -212,12 +217,12 @@ class ExclusivesMapping(object):
 
   def _populate_target_maps(self, targets):
     """ Populates maps of exclusive keys to targets, and vice versa."""
-    all_targets = []
+    all_targets = set()
     workqueue = copy(targets)
     while len(workqueue) > 0:
       t = workqueue.pop()
       if t not in all_targets:
-        all_targets.append(t)
+        all_targets.add(t)
         if isinstance(t, InternalTarget):
           workqueue += t.dependencies
 
@@ -225,8 +230,8 @@ class ExclusivesMapping(object):
       key = self._get_exclusives_key(t)
       if key == '':
         raise TaskError('Invalid empty group key')
-      if key not in self.group_classpaths:
-        self.group_classpaths[key] = []
+      if key not in self._group_classpaths:
+        self._group_classpaths[key] = OrderedSet()
       self.key_to_targets[key].add(t)
       self.target_to_key[t] = key
 
@@ -238,10 +243,10 @@ class ExclusivesMapping(object):
     classpath is updated during compilations to add the results of
     compiling a group to the classpaths of other groups that could depend on it.
     """
-    if group_key not in self.group_classpaths:
-      self.group_classpaths[group_key] = []
+    if group_key not in self._group_classpaths:
+      self._group_classpaths[group_key] = OrderedSet()
     # get the classpath to use for compiling targets within the group specified by group_key.
-    return self.group_classpaths[group_key]
+    return list(self._group_classpaths[group_key])
 
   def _key_to_map(self, key):
     result = {}
@@ -271,14 +276,14 @@ class ExclusivesMapping(object):
 
   def update_compatible_classpaths(self, group_key, path_additions):
     """ Update the classpath of all groups compatible with group_key, adding path_additions to their classpath."""
-    for key in self.group_classpaths:
+    for key in self._group_classpaths:
       if group_key is None or self._is_compatible(group_key, key):
-        group_classpath = self.group_classpaths[key]
+        group_classpath = self._group_classpaths[key]
         for cpel in path_additions:
           if cpel not in group_classpath:
-            group_classpath.append(cpel)
+            group_classpath.add(cpel)
 
   def set_base_classpath_for_group(self, group_key, classpath):
     # set the initial classpath of the elements of group_key to classpath.
-    self.group_classpaths[group_key] = classpath
+    self._group_classpaths[group_key] = classpath
 

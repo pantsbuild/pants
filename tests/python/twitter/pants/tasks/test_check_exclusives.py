@@ -1,13 +1,12 @@
 
-__author__ = 'Mark Chu-Carroll (markcc@foursquare.com)'
-
 import unittest
 
 from twitter.pants.base import Config
 from twitter.pants.goal import Context
 from twitter.pants.testutils import MockTarget
 from twitter.pants.tasks import TaskError
-from twitter.pants.tasks.check_exclusives import CheckExclusives, ExclusivesMapping
+from twitter.pants.tasks.check_exclusives import CheckExclusives
+
 
 class CheckExclusivesTest(unittest.TestCase):
   """Test of the CheckExclusives task."""

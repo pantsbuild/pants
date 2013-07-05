@@ -156,14 +156,21 @@ class _MergedZincArtifact(_ZincArtifact):
 
     Creates a single merged analysis file and a single merged classes dir.
     """
+    if len(self.underlying_artifacts) <= 1:
+      return self.current_state()
+
     # Note that if the merged analysis file already exists we don't re-merge it.
     # Ditto re the merged classes dir. In some unlikely corner cases they may
     # be less up to date than the artifact we could create by re-merging, but this
     # heuristic is worth it so that in the common case we don't spend a lot of time
     # copying files around.
-    if len(self.underlying_artifacts) <= 1:
+
+    # If this is a complete no-op, don't even create a workunit, as it would be confusing
+    # to the user to see spurious 'merge' work.
+    if not force and os.path.exists(self.analysis_file) and os.path.exists(self.classes_dir):
       return self.current_state()
 
+    # At least one of the analysis file or the classes dir doesn't exist, or we're forcing, so merge.
     with self.factory.context.new_workunit(name='merge'):
       # Must merge analysis before computing current state.
       if force or not os.path.exists(self.analysis_file):

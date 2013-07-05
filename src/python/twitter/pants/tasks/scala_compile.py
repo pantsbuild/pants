@@ -20,7 +20,6 @@ import os
 
 from twitter.pants import has_sources, is_scalac_plugin
 from twitter.pants.goal.workunit import WorkUnit
-from collections import defaultdict
 from twitter.pants.targets.scala_library import ScalaLibrary
 from twitter.pants.tasks import Task, TaskError
 from twitter.pants.tasks.jvm_dependency_cache import JvmDependencyCache
@@ -140,15 +139,15 @@ class ScalaCompile(NailgunTask):
               if os.path.exists(merged_artifact.analysis_file):
                 upstream_analysis_map[merged_artifact.classes_dir] = \
                   AnalysisFileSpec(merged_artifact.analysis_file, merged_artifact.classes_dir)
-
-    # Check for missing dependencies.
-    all_analysis_files = set()
-    for target in scala_targets:
-      analysis_file_spec = self._artifact_factory.analysis_file_for_targets([target])
-      if os.path.exists(analysis_file_spec.analysis_file):
-        all_analysis_files.add(analysis_file_spec)
-    deps_cache = JvmDependencyCache(self.context, scala_targets, all_analysis_files)
-    deps_cache.check_undeclared_dependencies()
+        if invalidation_check.invalid_vts:
+          # Check for missing dependencies.
+          all_analysis_files = set()
+          for target in scala_targets:
+            analysis_file_spec = self._artifact_factory.analysis_file_for_targets([target])
+            if os.path.exists(analysis_file_spec.analysis_file):
+              all_analysis_files.add(analysis_file_spec)
+          deps_cache = JvmDependencyCache(self.context, scala_targets, all_analysis_files)
+          deps_cache.check_undeclared_dependencies()
 
   def _add_globally_required_classpath_entries(self, cp):
     # Add classpath entries necessary both for our compiler calls and for downstream JVM tasks.

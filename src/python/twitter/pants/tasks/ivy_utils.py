@@ -61,7 +61,7 @@ class IvyUtils(object):
   def parse_xml_report(self, conf):
     """Returns the IvyInfo representing the info in the xml report."""
     ret = IvyInfo()
-    etree = xml.etree.ElementTree.parse(self.xml_report_path(conf))
+    etree = xml.etree.cElementTree.parse(self.xml_report_path(conf))
     doc = etree.getroot()
     for module in doc.findall('dependencies/module'):
       org = module.get('organisation')

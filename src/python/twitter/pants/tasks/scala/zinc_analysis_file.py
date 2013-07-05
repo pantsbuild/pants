@@ -25,18 +25,19 @@ class ZincAnalysisCollection(object):
   This contains the information from a collection of Zinc analysis files, merged together,
   for use in dependency analysis.
   """
-  def __init__(self,
-               stop_after=None,
-               package_prefixes=['com', 'org', 'net']):
+  # The sections in the analysis file. Do not renumber! Code below relies on this numbering.
+  PRODUCTS, BINARY, SOURCE, EXTERNAL, CLASS, DONE, UNKNOWN = range(0, 7)
+
+  def __init__(self, stop_after=None, package_prefixes=None):
     """
     Params:
-    - stop_after: a boolean flag. If true, only part of the analysis file will be parsed.
+    - stop_after: If specified, parsing will stop after this section is done.
     - package_prefixes: a list of package names that identify package roots. When translating
       class file paths to class names, these are the package names where the conversion
       will stop.
     """
     self.stop_after = stop_after
-    self.package_prefixes = set(package_prefixes)
+    self.package_prefixes = set(package_prefixes or ['com', 'org', 'net'])
 
     # The analysis files we gather information from.
     self.analysis_files = []
@@ -76,24 +77,7 @@ class ZincAnalysisCollection(object):
     For dependency analysis, we need to convert that the name of the 
     class contained in the class file, like "com.pkg.Foo".
     """
-
-    def _is_valid_package_segment(seg):
-      # The class name from a class file will be the result of stripping out anything
-      # that doesn't look like a valid packagename segment. So, for example, if there is a path 
-      # segement containing a ".", that's not a valid package segment.
-      # A package segment is valid if:
-      # - All path segments after it are valid, and
-      # - its name is a valid package identifier name in JVM code (so no "." characters,
-      #    no "-" characters), and
-      # - it is less than 30 characters long. (This is an ugly heuristic which appears
-      #    to work, but which I'm uncomfortable with.
-      # - it is not named "classes". (This is another ugly heuristic.)
-      if seg.find(".") != -1 or seg.find("-") != -1 or len(seg) > 30:
-        return False
-      else:
-        return True
-
-    if not classfile.endswith(".class"):
+    if not classfile.endswith('.class'):
       return None
     # strip '.class' from the end
     classfile = classfile[:-6]
@@ -104,74 +88,60 @@ class ZincAnalysisCollection(object):
     else:
       # Segment the path, and find the trailing segment that consists of valid
       # package elements.
-      segments = classfile.split("/")
+      segments = classfile.split('/')
       segments.reverse()
       # The root name of the class is the last segment of the pathname
       # with ".class" removed.
-      classname = segments[0]
+      classname_parts = [segments[0]]
       for seg in segments[1:]:
-        if _is_valid_package_segment(seg):
-          classname = "%s.%s" % (seg, classname)
+        # Heuristics for detecting a valid package segment.
+        if seg.find('.') == -1 and seg.find('-') == -1 and len(seg) < 30:
+          classname_parts.append(seg)
           if seg in self.package_prefixes:
-            return classname
+            return '.'.join(reversed(classname_parts))
         else:
-          return classname
+          return '.'.join(reversed(classname_parts))
     # If we reach here, none of the segments were valid, so this wasn't
     # a valid classfile path.
     return None
 
   def add_and_parse_file(self, analysis_file, classes_dir):
-    zincfile = '%s.relations' % analysis_file
+    sections = {
+      'products': ZincAnalysisCollection.PRODUCTS,
+      'binary dependencies': ZincAnalysisCollection.BINARY,
+      'source dependencies': ZincAnalysisCollection.SOURCE,
+      'external dependencies': ZincAnalysisCollection.EXTERNAL,
+      'class names': ZincAnalysisCollection.CLASS
+    }
+
+    # Note: in order of section constants above.
+    depmaps = (self.products, self.binary_deps, self.source_deps, self.external_deps, self.class_names)
+    classes_maps = (self.product_classes, self.binary_dep_classes, None, None, None)
+
     try:
-      zincfile = open(zincfile, 'r')
+      with open('%s.relations' % analysis_file, 'r') as zincfile:
+        current_section = None
+
+        for line in zincfile:
+          if line.startswith('   '):
+            (src, sep, dep) = line.partition(' -> ')
+            src = src[3:]
+            dep = dep.rstrip()
+            if sep == '' and line != '\n':
+                print('Syntax error: line is neither a section header nor a dep. "%s"' % line)
+                continue
+            depmaps[current_section][src].add(dep)
+            classes_map = classes_maps[current_section]
+            if classes_map is not None:
+              cl = self._classfile_to_classname(dep, classes_dir)
+              if cl is not None:
+                classes_map[src].add(cl)
+          elif line.endswith(':\n'):
+            current_section = ZincAnalysisCollection.DONE if current_section == self.stop_after \
+              else sections[line[0:-2]]
+          if current_section == ZincAnalysisCollection.DONE:
+            return
     except IOError:
-      print 'Warning: analysis file %s not found' % analysis_file
-      return
-    mode = None
-
-    def change_mode_to(new_mode):
-      if mode == self.stop_after:
-        return 'done'
-      else:
-        return new_mode
-
-    for line in zincfile:
-      if line.startswith('products:'):
-        mode = change_mode_to('products')
-      elif line.startswith('binary dependencies:'):
-        mode = change_mode_to('binary')
-      elif line.startswith('source dependencies:'):
-        mode = change_mode_to('source')
-      elif line.startswith('external dependencies:'):
-        mode = change_mode_to('external')
-      elif line.startswith('class names:'):
-        mode = change_mode_to('class')
-      else:
-        (src, sep, dep) = line.partition('->')
-        src = src.strip()
-        dep = dep.strip()
-        if sep == '' and line != '\n':
-            print ('Syntax error: line is neither a modeline nor a dep. "%s"'  %
-                    line)
-            continue
-        if mode == 'products':
-          self.products[src].add(dep)
-          cl = self._classfile_to_classname(dep, classes_dir)
-          if cl is not None:
-            self.product_classes[src].add(cl)
-        elif mode == 'binary':
-          self.binary_deps[src].add(dep)
-          cl = self._classfile_to_classname(dep, classes_dir)
-          if cl is not None:
-            self.binary_dep_classes[src].add(cl)
-        elif mode == 'source':
-          self.source_deps[src].add(dep)
-        elif mode == 'external':
-          self.external_deps[src].add(dep)
-        elif mode == 'class':
-          self.class_names[src].add(dep)
-        else:
-          print 'Unprocessed line, mode = %s' % mode
-      if mode == 'done':
-        return
-
+      print 'ERROR: analysis file %s not found' % analysis_file
+    except KeyError as e:
+      print 'ERROR: unrecognized section: %s' % e

@@ -1,13 +1,11 @@
 
-__author__ = 'Mark C. Chu-Carroll (markcc@foursquare.com()'
+import unittest
 
 from twitter.pants.testutils import MockTarget
-from twitter.pants.goal.group import Group
 from twitter.pants.base import Config
 from twitter.pants.goal import Context
-from twitter.pants.tasks.check_exclusives import CheckExclusives, ExclusivesMapping
+from twitter.pants.tasks.check_exclusives import CheckExclusives
 
-import unittest
 
 class ExclusivesTargetTest(unittest.TestCase):
   """Test exclusives propagation in the dependency graph"""

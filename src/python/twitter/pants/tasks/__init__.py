@@ -110,7 +110,8 @@ class Task(object):
   @contextmanager
   def invalidated(self, targets, only_buildfiles=False, invalidate_dependents=False,
                   partition_size_hint=sys.maxint):
-    """Checks targets for invalidation. Subclasses call this to figure out what to work on.
+    """Checks targets for invalidation, first checking the artifact cache.
+    Subclasses call this to figure out what to work on.
 
     targets:               The targets to check for changes.
     only_buildfiles:       If True, then only the target's BUILD files are checked for changes, not
@@ -125,57 +126,26 @@ class Task(object):
     Yields an InvalidationCheck object reflecting the (partitioned) targets.
 
     If no exceptions are thrown by work in the block, the build cache is updated for the targets.
-    Note: the artifact cache is not updated, that must be done manually.
+    Note: the artifact cache is not updated. That must be done manually.
     """
-    with self.invalidated_with_artifact_cache_check(targets,
-                                                    only_buildfiles,
-                                                    invalidate_dependents,
-                                                    partition_size_hint) as check:
-      yield check
+    with self.context.new_workunit('invalidation'):
+      extra_data = []
+      extra_data.append(self.invalidate_for())
 
+      for f in self.invalidate_for_files():
+        extra_data.append(hash_file(f))
 
-  @contextmanager
-  def invalidated_with_artifact_cache_check(self,
-                                            targets,
-                                            only_buildfiles=False,
-                                            invalidate_dependents=False,
-                                            partition_size_hint=sys.maxint):
-    """Checks targets for invalidation, first checking the artifact cache.
-    Subclasses call this to figure out what to work on.
+      cache_manager = CacheManager(self._cache_key_generator,
+                                   self._build_invalidator_dir,
+                                   invalidate_dependents,
+                                   extra_data,
+                                   only_externaldeps=only_buildfiles)
 
-    targets:               The targets to check for changes.
-    only_buildfiles:       If True, then only the target's BUILD files are checked for changes, not
-                           its sources.
-    invalidate_dependents: If True then any targets depending on changed targets are invalidated.
-    partition_size_hint:   Each VersionedTargetSet in the yielded list will represent targets
-                           containing roughly this number of source files, if possible. Set to
-                           sys.maxint for a single VersionedTargetSet. Set to 0 for one
-                           VersionedTargetSet per target. It is up to the caller to do the right
-                           thing with whatever partitioning it asks for.
-
-    Yields a pair of (invalidation_check, cached_vts) where invalidation_check is an
-    InvalidationCheck object reflecting the (partitioned) targets, and cached_vts is a list of
-    VersionedTargets that were satisfied from the artifact cache.
-
-    If no exceptions are thrown by work in the block, the build cache is updated for the targets.
-    Note: the artifact cache is not updated, that must be done manually.
-    """
-    extra_data = []
-    extra_data.append(self.invalidate_for())
-
-    for f in self.invalidate_for_files():
-      extra_data.append(hash_file(f))
-
-    cache_manager = CacheManager(self._cache_key_generator,
-                                 self._build_invalidator_dir,
-                                 invalidate_dependents,
-                                 extra_data,
-                                 only_externaldeps=only_buildfiles)
-
-    invalidation_check = cache_manager.check(targets, partition_size_hint)
+      invalidation_check = cache_manager.check(targets, partition_size_hint)
 
     # See if we have entire partitions cached.
-    if self._artifact_cache and self.context.options.read_from_artifact_cache:
+    if invalidation_check.invalid_vts and self._artifact_cache and \
+        self.context.options.read_from_artifact_cache:
       with self.context.new_workunit('cache'):
         all_cached_targets = []
         partitions_to_check = \

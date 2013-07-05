@@ -236,16 +236,16 @@ class CacheManager(object):
           if isinstance(dep, ExternalDependency):
             dependency_keys.add(dep.cache_key())
           elif isinstance(dep, Target):
-            hash = id_to_hash.get(dep.id, None)
-            if hash is None:
-              # It may have been processed in a prior round, and therefore the hash should
+            fprint = id_to_hash.get(dep.id, None)
+            if fprint is None:
+              # It may have been processed in a prior round, and therefore the fprint should
               # have been written out by the invalidator.
-              hash = self._invalidator.existing_hash(dep.id)
-              # Note that hash may be None here, indicating that the dependency will not be
+              fprint = self._invalidator.existing_hash(dep.id)
+              # Note that fprint may be None here, indicating that the dependency will not be
               # processed until a later phase. For example, if a codegen target depends on a
               # library target (because the generated code needs that library).
-            if hash is not None:
-              dependency_keys.add(hash)
+            if fprint is not None:
+              dependency_keys.add(fprint)
           else:
             raise ValueError('Cannot calculate a cache_key for a dependency: %s' % dep)
       cache_key = self._key_for(target, dependency_keys)
