@@ -30,7 +30,6 @@ class InternalTarget(Target):
 
   class CycleException(TargetDefinitionException):
     """Thrown when a circular dependency is detected."""
-
     def __init__(self, cycle):
       Exception.__init__(self, 'Cycle detected:\n\t%s' % (
           ' ->\n\t'.join(str(target.address) for target in cycle)
@@ -38,10 +37,7 @@ class InternalTarget(Target):
 
   @classmethod
   def sort_targets(cls, internal_targets):
-    """Returns a list of targets that internal_targets depend on sorted from most dependent to
-    least.
-    """
-
+    """Returns the targets that internal_targets depend on sorted from most dependent to least."""
     roots = OrderedSet()
     inverted_deps = collections.defaultdict(OrderedSet)  # target -> dependent targets
     visited = set()
@@ -136,18 +132,6 @@ class InternalTarget(Target):
           current_type = discriminator(current_target)
 
     return sorted_targets
-
-  def sort(self):
-    """Returns a list of targets this target depends on sorted from most dependent to least."""
-
-    return InternalTarget.sort_targets([self])
-
-  def coalesce(self, discriminator):
-    """Returns a list of targets this target depends on sorted from most dependent to least and
-    grouped where possible by target type as categorized by the given discriminator.
-    """
-
-    return InternalTarget.coalesce_targets([self], discriminator)
 
   def __init__(self, name, dependencies, exclusives=None):
     Target.__init__(self, name, exclusives=exclusives)
