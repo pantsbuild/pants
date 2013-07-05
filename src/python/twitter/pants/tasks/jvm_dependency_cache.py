@@ -29,7 +29,7 @@ from twitter.pants.tasks.scala.zinc_analysis_file import ZincAnalysisCollection
 
 def _default_error_filter(target):
   """ Default filter used to exclude error messages about missing deps for synthetic targets"""
-  return not target.has_label("synthetic")
+  return not target.has_label('synthetic')
 
 class JvmDependencyCache(object):
   """ Class which computes compilation dependencies of targets for jvm-based languages.

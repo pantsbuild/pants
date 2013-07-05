@@ -251,7 +251,7 @@ class ScroogeGen(NailgunTask):
     tgt = create_target(files, deps, outdir, target_type)
     tgt.id = target.id
     tgt.derived_from = target
-    tgt.add_labels('codegen', 'synthetic')
+    tgt.add_labels('synthetic')
     for dependee in dependees:
       dependee.update_dependencies([tgt])
     return tgt

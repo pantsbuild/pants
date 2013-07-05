@@ -121,7 +121,7 @@ class CodeGen(Task):
             target,
             dependees_by_gentarget.get(target, [])
           )
-          langtarget_by_gentarget[target].add_labels("synthetic")
+          langtarget_by_gentarget[target].add_labels('synthetic')
         genmap = self.context.products.get(lang)
         # synmap is a reverse map
         # such as a map of java library target generated from java thrift target
