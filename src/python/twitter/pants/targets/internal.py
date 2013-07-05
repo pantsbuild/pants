@@ -195,12 +195,6 @@ class InternalTarget(Target):
     """Subclasses can over-ride to reject invalid dependencies."""
     return True
 
-  def replace_dependency(self, dependency, replacement):
-    self.dependencies.discard(dependency)
-    self.internal_dependencies.discard(dependency)
-    self.jar_dependencies.discard(dependency)
-    self.update_dependencies([replacement])
-
   def _walk(self, walked, work, predicate = None):
     Target._walk(self, walked, work, predicate)
     for dep in self.dependencies:
@@ -229,5 +223,3 @@ class InternalTarget(Target):
         self.add_to_exclusives(t.exclusives)
       elif hasattr(t, "declared_exclusives"):
         self.add_to_exclusives(t.declared_exclusives)
-
-
