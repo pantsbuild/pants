@@ -65,14 +65,14 @@ class Target(object):
     ids = list(ids)  # We can't len a generator.
     return ids[0] if len(ids) == 1 else Target.combine_ids(ids)
 
-  @classmethod
-  def get_all_addresses(cls, buildfile):
+  @staticmethod
+  def get_all_addresses(buildfile):
     """Returns all of the target addresses in the specified buildfile if already parsed; otherwise,
     parses the buildfile to find all the addresses it contains and then returns them."""
 
     def lookup():
-      if buildfile in cls._addresses_by_buildfile:
-        return cls._addresses_by_buildfile[buildfile]
+      if buildfile in Target._addresses_by_buildfile:
+        return Target._addresses_by_buildfile[buildfile]
       else:
         return OrderedSet()
 
@@ -83,18 +83,18 @@ class Target(object):
       ParseContext(buildfile).parse()
       return lookup()
 
-  @classmethod
-  def _clear_all_addresses(cls):
-    cls._targets_by_address = {}
-    cls._addresses_by_buildfile = collections.defaultdict(OrderedSet)
+  @staticmethod
+  def _clear_all_addresses():
+    Target._targets_by_address = {}
+    Target._addresses_by_buildfile = collections.defaultdict(OrderedSet)
 
-  @classmethod
-  def get(cls, address):
+  @staticmethod
+  def get(address):
     """Returns the specified module target if already parsed; otherwise, parses the buildfile in the
     context of its parent directory and returns the parsed target."""
 
     def lookup():
-      return cls._targets_by_address[address] if address in cls._targets_by_address else None
+      return Target._targets_by_address.get(address, None)
 
     target = lookup()
     if target:
@@ -103,8 +103,8 @@ class Target(object):
       ParseContext(address.buildfile).parse()
       return lookup()
 
-  @classmethod
-  def resolve_all(cls, targets, *expected_types):
+  @staticmethod
+  def resolve_all(targets, *expected_types):
     """Yield the resolved concrete targets checking each is a subclass of one of the expected types
     if specified.
     """
@@ -112,7 +112,7 @@ class Target(object):
       for target in maybe_list(targets, expected_type=Target):
         for resolved in filter(is_concrete, target.resolve()):
           if expected_types and not isinstance(resolved, expected_types):
-            raise TypeError('%s requires types: %s and found %s' % (cls, expected_types, resolved))
+            raise TypeError('Target requires types: %s and found %s' % (expected_types, resolved))
           yield resolved
 
   def __init__(self, name, reinit_check=True, exclusives=None):
@@ -200,7 +200,7 @@ class Target(object):
     return Address(parse_context.buildfile, self.name)
 
   def register(self):
-    existing = self._targets_by_address.get(self.address)
+    existing = Target._targets_by_address.get(self.address)
     if existing and existing.address.buildfile != self.address.buildfile:
       raise KeyError("%s defined in %s already defined in a sibling BUILD file: %s" % (
         self.address,
@@ -208,8 +208,8 @@ class Target(object):
         existing.address.buildfile.full_path,
       ))
 
-    self._targets_by_address[self.address] = self
-    self._addresses_by_buildfile[self.address.buildfile].add(self.address)
+    Target._targets_by_address[self.address] = self
+    Target._addresses_by_buildfile[self.address.buildfile].add(self.address)
 
   def resolve(self):
     yield self
