@@ -126,6 +126,8 @@ class ScalaCompile(NailgunTask):
                             partition_size_hint=self._partition_size_hint) as invalidation_check:
         # Process partitions one by one.
         for vts in invalidation_check.all_vts_partitioned:
+          # Refresh the classpath, to pick up any changes from update_compatible_classpaths.
+          exclusives_classpath = egroups.get_classpath_for_group(exclusives_key)
           if not self.dry_run:
             merged_artifact = self._process_target_partition(vts, exclusives_classpath,
                                                              upstream_analysis_map)
