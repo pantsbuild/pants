@@ -32,7 +32,7 @@ class JvmTask(Task):
     return egroups.get_classpath_for_group(group_key)
 
   def classpath(self, cp=None, confs=None, exclusives_classpath=None):
-    classpath = cp or []
+    classpath = list(cp) or []
     exclusives_classpath = exclusives_classpath or []
 
     classpath.extend(path for conf, path in exclusives_classpath if not confs or conf in confs)
