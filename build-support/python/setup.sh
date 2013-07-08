@@ -33,7 +33,7 @@ pushd $CACHE >& /dev/null
   if ! test -f virtualenv-1.7.1.2.tar.gz; then
     echo 'Installing virtualenv' 1>&2
     for url in \
-      https://pypi.python.org/packages/source/v/virtualenv/virtualenv-1.7.1.2.tar.gz \
+      http://pypi.python.org/packages/source/v/virtualenv/virtualenv-1.7.1.2.tar.gz \
       https://svn.twitter.biz/science-binaries/home/third_party/python/virtualenv-1.7.1.2.tar.gz; do
       if curl --connect-timeout 10 -O $url; then
         break
@@ -49,7 +49,7 @@ if $PYTHON $CACHE/virtualenv-1.7.1.2/virtualenv.py -p $PY --distribute $BOOTSTRA
     pip install \
       --download-cache=$CACHE \
       -f https://svn.twitter.biz/science-binaries/home/third_party/python \
-      -f https://pypi.python.org/simple \
+      -f http://pypi.python.org/simple \
       -U --no-index $pkg
   done
   deactivate

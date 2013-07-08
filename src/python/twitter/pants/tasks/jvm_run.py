@@ -93,7 +93,7 @@ class JvmRun(JvmTask):
 
         result = runjava_indivisible(
           jvmargs=self.jvm_args,
-          classpath=(self.classpath(confs=self.confs)),
+          classpath=(self.classpath(confs=self.confs, exclusives_classpath=group_classpath)),
           main=main,
           args=self.args,
           dryrun=dryrun,
