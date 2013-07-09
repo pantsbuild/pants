@@ -1,6 +1,10 @@
+import httplib
+import json
 import os
 import sys
 import time
+import urllib
+from urlparse import urlparse
 
 from contextlib import contextmanager
 
@@ -37,6 +41,7 @@ class RunTracker(object):
     self.run_info = RunInfo(os.path.join(self.info_dir, 'info'))
     self.run_info.add_basic_info(run_id, self.run_timestamp)
     self.run_info.add_info('cmd_line', cmd_line)
+    self.stats_url = config.getdefault('stats_upload_url', default=None)
 
     # Create a 'latest' symlink, after we add_infos, so we're guaranteed that the file exists.
     link_to_latest = os.path.join(os.path.dirname(self.info_dir), 'latest')
@@ -121,6 +126,28 @@ class RunTracker(object):
     """Log a message against the current workunit."""
     self.report.log(self._current_workunit, level, *msg_elements)
 
+  def upload_stats(self):
+    if self.stats_url:
+      params = {
+        'run_info': json.dumps(self.run_info.get_as_dict()),
+        'cumulative_timings': json.dumps(self.cumulative_timings.get_all()),
+        'self_timings': json.dumps(self.self_timings.get_all()),
+        'artifact_cache_stats': json.dumps(self.artifact_cache_stats.get_all())
+        }
+
+      headers = {"Content-type": "application/x-www-form-urlencoded", "Accept": "text/plain"}
+      url = urlparse(self.stats_url)
+      if url.scheme == 'https':
+        http_conn = httplib.HTTPSConnection(url.netloc)
+      else:
+        http_conn = httplib.HTTPConnection(url.netloc)
+      http_conn.request('POST', url.path, urllib.urlencode(params), headers)
+      resp = http_conn.getresponse()
+      if resp.status != 200:
+        print resp
+        # TODO: Figure out how to report error
+        pass
+
   def end(self):
     """This pants run is over, so stop tracking it.
 
@@ -130,6 +157,9 @@ class RunTracker(object):
       self._current_workunit.end()
       self._current_workunit = self._current_workunit.parent
     self.report.close()
+
+    self.upload_stats()
+
     try:
       if self.run_info.get_info('outcome') is None:
         self.run_info.add_info('outcome', self.root_workunit.outcome_string())
