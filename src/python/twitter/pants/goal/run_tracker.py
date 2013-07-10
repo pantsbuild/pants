@@ -147,8 +147,10 @@ class RunTracker(object):
         http_conn.request('POST', url.path, urllib.urlencode(params), headers)
         resp = http_conn.getresponse()
         if resp.status != 200:
+          # Report aleady closed, so just print error
           print "WARNING: Failed to upload stats. HTTP error code: %d" % resp.status
-      except socket.error, (value, message):
+      except socket.error as (value, message):
+          # Report aleady closed, so just print error
           print "WARNING: Failed to upload stats. Socket error: %s" % message
 
   def end(self):
