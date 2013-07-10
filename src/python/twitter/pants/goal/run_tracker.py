@@ -1,6 +1,7 @@
 import httplib
 import json
 import os
+import socket
 import sys
 import time
 import urllib
@@ -127,6 +128,7 @@ class RunTracker(object):
     self.report.log(self._current_workunit, level, *msg_elements)
 
   def upload_stats(self):
+    """Send timing results to URL specified in pants.ini"""
     if self.stats_url:
       params = {
         'run_info': json.dumps(self.run_info.get_as_dict()),
@@ -141,12 +143,13 @@ class RunTracker(object):
         http_conn = httplib.HTTPSConnection(url.netloc)
       else:
         http_conn = httplib.HTTPConnection(url.netloc)
-      http_conn.request('POST', url.path, urllib.urlencode(params), headers)
-      resp = http_conn.getresponse()
-      if resp.status != 200:
-        print resp
-        # TODO: Figure out how to report error
-        pass
+      try:
+        http_conn.request('POST', url.path, urllib.urlencode(params), headers)
+        resp = http_conn.getresponse()
+        if resp.status != 200:
+          print "WARNING: Failed to upload stats. HTTP error code: %d" % resp.status
+      except socket.error, (value, message):
+          print "WARNING: Failed to upload stats. Socket error: %s" % message
 
   def end(self):
     """This pants run is over, so stop tracking it.
@@ -158,10 +161,10 @@ class RunTracker(object):
       self._current_workunit = self._current_workunit.parent
     self.report.close()
 
-    self.upload_stats()
-
     try:
       if self.run_info.get_info('outcome') is None:
         self.run_info.add_info('outcome', self.root_workunit.outcome_string())
     except IOError:
       pass  # If the goal is clean-all then the run info dir no longer exists...
+
+    self.upload_stats()
