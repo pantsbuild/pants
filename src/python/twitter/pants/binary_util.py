@@ -349,7 +349,7 @@ def profile_classpath(profile, java_runner=None, config=None, ivy_jar=None, ivy_
                          workunit_factory=workunit_factory,
                          workunit_name='%s:bootstrap' % profile, opts=ivy_opts)
     if result != 0:
-      raise TaskError('Failed to load profile %s, ivy exit code %s % (profile, str(result)))
+      raise TaskError('Failed to load profile %s, ivy exit code %s' % (profile, str(result)))
     touch(profile_check)
 
   return [os.path.join(profile_libdir, jar) for jar in os.listdir(profile_libdir)]
