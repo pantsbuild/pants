@@ -62,7 +62,8 @@ class PantsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
       self._send_content('Invalid GET request %s' % self.path, 'text/html')
     except (IOError, ValueError):
-      sys.stderr.write('Invalid GET request %s' % self.path)
+      pass  # Printing these errors gets annoying, and there's nothing to do about them anyway.
+      #sys.stderr.write('Invalid GET request %s' % self.path)
 
   def _handle_runs(self, relpath, params):
     """Show a listing of all pants runs since the last clean-all."""
