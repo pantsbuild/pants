@@ -15,7 +15,7 @@ def select_best_url(spec, pinger, log):
             ', '.join(['%s: %3f secs' % p for p in pingtimes]))
   argmin = min(xrange(len(pingtimes)), key=lambda i: pingtimes[i][1])
   best_url = urls[argmin]
-  if pingtimes[argmin] == Pinger.UNREACHABLE:
+  if pingtimes[argmin][1] == Pinger.UNREACHABLE:
     return None  # No reachable artifact caches.
   log.debug('Best artifact cache is %s' % best_url)
   return best_url
@@ -45,10 +45,10 @@ def create_artifact_cache(log, artifact_root, spec, task_name):
         log.info('%s using remote artifact cache at %s' % (task_name, best_url))
         return RESTfulArtifactCache(log, artifact_root, best_url)
       else:
-        log.warn('No reachable artifact cache in %s.' % spec)
+        log.warn('%s has no reachable artifact cache in %s.' % (task_name, spec))
         return None
     else:
       raise ValueError('Invalid artifact cache spec: %s' % spec)
   elif isinstance(spec, (list, tuple)):
-    caches = [ create_artifact_cache(log, artifact_root, x, task_name) for x in spec ]
-    return CombinedArtifactCache(caches)
+    caches = filter(None, [ create_artifact_cache(log, artifact_root, x, task_name) for x in spec ])
+    return CombinedArtifactCache(caches) if caches else None
