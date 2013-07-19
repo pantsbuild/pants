@@ -129,6 +129,10 @@ class RunTracker(object):
 
   def upload_stats(self):
     """Send timing results to URL specified in pants.ini"""
+    def error(msg):
+      # Report aleady closed, so just print error.
+      print("WARNING: Failed to upload stats. %s" % msg)
+
     if self.stats_url:
       params = {
         'run_info': json.dumps(self.run_info.get_as_dict()),
@@ -139,19 +143,17 @@ class RunTracker(object):
 
       headers = {"Content-type": "application/x-www-form-urlencoded", "Accept": "text/plain"}
       url = urlparse(self.stats_url)
-      if url.scheme == 'https':
-        http_conn = httplib.HTTPSConnection(url.netloc)
-      else:
-        http_conn = httplib.HTTPConnection(url.netloc)
       try:
+        if url.scheme == 'https':
+          http_conn = httplib.HTTPSConnection(url.netloc)
+        else:
+          http_conn = httplib.HTTPConnection(url.netloc)
         http_conn.request('POST', url.path, urllib.urlencode(params), headers)
         resp = http_conn.getresponse()
         if resp.status != 200:
-          # Report aleady closed, so just print error
-          print "WARNING: Failed to upload stats. HTTP error code: %d" % resp.status
-      except socket.error as (value, message):
-          # Report aleady closed, so just print error
-          print "WARNING: Failed to upload stats. Socket error: %s" % message
+          error("HTTP error code: %d" % resp.status)
+      except Exception as e:
+        error("Error: %s" % e)
 
   def end(self):
     """This pants run is over, so stop tracking it.

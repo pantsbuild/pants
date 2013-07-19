@@ -35,7 +35,7 @@ class Pinger(object):
           conn.request('HEAD', '/')   # Doesn't actually matter if this exists.
           conn.getresponse()
         new_rt_secs = timer.elapsed
-      except IOError:
+      except Exception:
         new_rt_secs = Pinger.UNREACHABLE
       rt_secs = min(rt_secs, new_rt_secs)
     _global_pinger_memo[netloc] = rt_secs
