@@ -31,8 +31,8 @@ class WithLegacyResources(TargetWithSources):
   """Collects resources whether they are specified using globs against an assumed parallel
   'resources' directory or they are Resources targets
   """
-  def __init__(self, name, sources=None, resources=None):
-    TargetWithSources.__init__(self, name, sources=sources)
+  def __init__(self, name, sources=None, resources=None, exclusives=None):
+    TargetWithSources.__init__(self, name, sources=sources, exclusives=exclusives)
 
     if resources is not None:
       def is_resources(item):
