@@ -21,7 +21,7 @@ def make_dep(name, dependency_name=None):
 make_dep('antlr-3.1.3', 'antlr_python_runtime==3.1.3')
 make_dep('beautifulsoup', 'BeautifulSoup==3.2.0')
 make_dep('boto', 'boto==2.0')
-make_dep('bottle')
+make_dep('bottle', 'bottle==0.11.6')
 make_dep('cherrypy')
 make_dep('coverage')
 make_dep('dateutil', 'python-dateutil==1.5')
