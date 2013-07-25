@@ -19,6 +19,7 @@ def make_dep(name, dependency_name=None):
   python_requirement(dependency_name, name=name)
 
 make_dep('antlr-3.1.3', 'antlr_python_runtime==3.1.3')
+make_dep('argparse', 'argparse==1.2.1')
 make_dep('beautifulsoup', 'BeautifulSoup==3.2.0')
 make_dep('boto', 'boto==2.0')
 make_dep('bottle', 'bottle==0.11.6')
