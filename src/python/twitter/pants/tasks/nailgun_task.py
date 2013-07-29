@@ -89,7 +89,7 @@ class NailgunTask(Task):
     self._ng_err = os.path.join(workdir, 'stderr')
 
     # Prevent concurrency issues when starting up a nailgun.
-    self._startup_lock = threading.Lock()
+    self._spawn_lock = threading.Lock()
 
   def _runjava_common(self, runjava, main, classpath=None, opts=None, args=None, jvmargs=None,
                       workunit_name=None, workunit_labels=None):
@@ -201,11 +201,12 @@ class NailgunTask(Task):
     return pid_port
 
   def _get_nailgun_client(self, workunit):
-    endpoint = self._get_nailgun_endpoint()
-    if endpoint:
-      return self._create_ngclient(port=endpoint[1], workunit=workunit)
-    else:
-      return self._spawn_nailgun_server(workunit)
+    with self._spawn_lock:
+      endpoint = self._get_nailgun_endpoint()
+      if endpoint:
+        return self._create_ngclient(port=endpoint[1], workunit=workunit)
+      else:
+        return self._spawn_nailgun_server(workunit)
 
   # 'NGServer started on 127.0.0.1, port 53785.'
   _PARSE_NG_PORT = re.compile('.*\s+port\s+(\d+)\.$')
