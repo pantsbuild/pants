@@ -451,16 +451,14 @@ class Goal(Command):
     if self.options.cleanup_nailguns or self.config.get('nailgun', 'autokill', default = False):
       if log:
         log.debug('auto-killing nailguns')
-      if NailgunTask.killall:
-        NailgunTask.killall(log)
+      NailgunTask.killall(log)
 
     return ret
 
   def cleanup(self):
     # TODO: Make this more selective? Only kill nailguns that affect state? E.g., checkstyle
     # may not need to be killed.
-    if NailgunTask.killall:
-      NailgunTask.killall(log)
+    NailgunTask.killall(log)
     sys.exit(1)
 
 
@@ -533,23 +531,21 @@ except ImportError:
   pass
 
 
-if NailgunTask.killall:
-  class NailgunKillall(Task):
-    @classmethod
-    def setup_parser(cls, option_group, args, mkflag):
-      option_group.add_option(mkflag("everywhere"), dest="ng_killall_everywhere",
-                              default=False, action="store_true",
-                              help="[%default] Kill all nailguns servers launched by pants for "
-                                   "all workspaces on the system.")
+class NailgunKillall(Task):
+  @classmethod
+  def setup_parser(cls, option_group, args, mkflag):
+    option_group.add_option(mkflag("everywhere"), dest="ng_killall_everywhere",
+                            default=False, action="store_true",
+                            help="[%default] Kill all nailguns servers launched by pants for "
+                                 "all workspaces on the system.")
 
-    def execute(self, targets):
-      if NailgunTask.killall:
-        NailgunTask.killall(self.context.log, everywhere=self.context.options.ng_killall_everywhere)
+  def execute(self, targets):
+    NailgunTask.killall(self.context.log, everywhere=self.context.options.ng_killall_everywhere)
 
-  ng_killall = goal(name='ng-killall', action=NailgunKillall)
-  ng_killall.install().with_description('Kill any running nailgun servers spawned by pants.')
+ng_killall = goal(name='ng-killall', action=NailgunKillall)
+ng_killall.install().with_description('Kill any running nailgun servers spawned by pants.')
 
-  ng_killall.install('clean-all', first=True)
+ng_killall.install('clean-all', first=True)
 
 
 def get_port_and_pidfile(context):
