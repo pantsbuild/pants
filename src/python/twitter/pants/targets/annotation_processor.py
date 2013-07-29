@@ -41,7 +41,6 @@ class AnnotationProcessor(ExportableJvmLibrary, WithLegacyResources):
 
     ExportableJvmLibrary.__init__(self, name, sources, provides, dependencies, excludes,
                                   exclusives=exclusives)
-    WithLegacyResources.__init__(self, name, sources=sources, resources=resources,
-                                 exclusives=exclusives)
+    WithLegacyResources.__init__(self, name, sources=sources, resources=resources)
     self.add_labels('java', 'apt')
     self.processors = processors
