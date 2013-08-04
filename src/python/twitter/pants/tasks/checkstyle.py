@@ -17,7 +17,7 @@
 import os
 
 from twitter.common.dirutil import safe_open
-from twitter.pants import is_codegen, is_java
+from twitter.pants import is_java, is_synthetic
 from twitter.pants.tasks import TaskError
 from twitter.pants.tasks.nailgun_task import NailgunTask
 
@@ -28,7 +28,7 @@ CHECKSTYLE_MAIN = 'com.puppycrawl.tools.checkstyle.Main'
 class Checkstyle(NailgunTask):
   @staticmethod
   def _is_checked(target):
-    return is_java(target) and not is_codegen(target)
+    return is_java(target) and not is_synthetic(target)
 
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
