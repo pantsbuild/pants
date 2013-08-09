@@ -14,8 +14,6 @@
 # limitations under the License.
 # ==================================================================================================
 
-__author__ = 'John Sirois'
-
 import os
 import shutil
 
@@ -62,9 +60,9 @@ class PrepareResources(Task):
     genmap = self.context.products.get('resources')
     egroups = self.context.products.get_data('exclusives_groups')
     group_key = egroups.get_group_key_for_target(targets[0])
-    cp = egroups.get_classpath_for_group(group_key)
+
     for resources in all_resources:
       resources_dir = target_dir(resources)
       genmap.add(resources, resources_dir, resources.sources)
       for conf in self.confs:
-        cp.insert(0, (conf, resources_dir))
+        egroups.update_compatible_classpaths(group_key, [(conf, resources_dir)])
