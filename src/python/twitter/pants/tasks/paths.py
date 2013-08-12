@@ -1,5 +1,7 @@
+from __future__ import print_function
 __author__ = 'ryan'
 
+from collections import defaultdict
 import copy
 
 from twitter.common.lang import Compatibility
@@ -44,12 +46,12 @@ class PathFinder(Task):
     log.debug('Looking for all paths from %s to %s' % (from_target.address.reference(), to_target.address.reference()))
 
     paths = cls._find_paths_rec(from_target, to_target)
-    print 'Found %d paths' % len(paths)
-    print ''
+    print('Found %d paths' % len(paths))
+    print('')
     for path in paths:
       log.debug('\t[%s]' % ', '.join([target.address.reference() for target in path]))
 
-  all_paths = {}
+  all_paths = defaultdict()
   @classmethod
   def _find_paths_rec(cls, from_target, to_target):
     if from_target == to_target:
@@ -82,7 +84,7 @@ class PathFinder(Task):
     queue = [([from_target], 0)]
     while True:
       if not queue:
-        print 'no path found from %s to %s!' % (from_target.address.reference(), to_target.address.reference())
+        print('no path found from %s to %s!' % (from_target.address.reference(), to_target.address.reference()))
         break
 
       path, indent = queue.pop(0)
@@ -94,9 +96,9 @@ class PathFinder(Task):
       log.debug('%sexamining %s' % ('  ' * indent, next_target))
 
       if next_target == to_target:
-        print ''
+        print('')
         for target in path:
-          print '%s' % target.address.reference()
+          print('%s' % target.address.reference())
         break
 
       if hasattr(next_target, 'dependency_addresses'):
