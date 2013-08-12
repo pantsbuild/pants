@@ -51,7 +51,7 @@ class PathFinder(Task):
     for path in paths:
       log.debug('\t[%s]' % ', '.join([target.address.reference() for target in path]))
 
-  all_paths = defaultdict()
+  all_paths = defaultdict(lambda: defaultdict(list))
   @classmethod
   def _find_paths_rec(cls, from_target, to_target):
     if from_target == to_target:
@@ -67,8 +67,6 @@ class PathFinder(Task):
             new_path.insert(0, from_target)
             paths.append(new_path)
 
-      if from_target not in cls.all_paths:
-        cls.all_paths[from_target] = {}
       cls.all_paths[from_target][to_target] = paths
 
     return cls.all_paths[from_target][to_target]
