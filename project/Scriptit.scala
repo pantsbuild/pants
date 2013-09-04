@@ -22,7 +22,7 @@ object Scriptit {
     scriptitTestName := "test",
     scriptitCommands := Commands.defaultCommands,
     scriptitCommands <+= (Dist.create in ZincBuild.dist) map Commands.zincCommand,
-    scriptitScalaVersions := Seq("2.9.2", "2.10.0"),
+    scriptitScalaVersions := Seq("2.9.3", "2.10.2"),
     scriptitProperties <<= (appConfiguration, scriptitScalaVersions) map scalaProperties,
     scriptitProperties ++= javaProperties,
     scriptit <<= scriptitTask
