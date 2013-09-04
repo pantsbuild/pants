@@ -68,8 +68,9 @@ object Scriptit {
 
   def scalaProperties(config: xsbti.AppConfiguration, versions: Seq[String]): Map[String, String] = {
     (versions flatMap { version =>
+      val binaryVersion = CrossVersion.binaryVersion(version, "")
       val provider = config.provider.scalaProvider.launcher.getScala(version)
-      def property(name: String) = "scala.%s.%s" format (version, name)
+      def property(name: String) = "scala.%s.%s" format (binaryVersion, name)
       Seq(
         property("library") -> provider.libraryJar.getAbsolutePath,
         property("compiler") -> provider.compilerJar.getAbsolutePath,

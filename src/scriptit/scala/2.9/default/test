@@ -1,4 +1,4 @@
-# default to scala 2.9.2
+# default to scala 2.9
 
 zinc -debug A.scala
 
