@@ -19,6 +19,7 @@ case class Setup(
   sbtInterface: File,
   compilerInterfaceSrc: File,
   javaHome: Option[File],
+  forkJava: Boolean,
   cacheDir: File)
 
 /**
@@ -60,7 +61,7 @@ object Setup {
   def apply(settings: Settings): Setup = {
     val scalaJars = selectScalaJars(settings.scala)
     val (sbtInterface, compilerInterfaceSrc) = selectSbtJars(settings.sbt)
-    setup(scalaJars.compiler, scalaJars.library, scalaJars.extra, sbtInterface, compilerInterfaceSrc, settings.javaHome)
+    setup(scalaJars.compiler, scalaJars.library, scalaJars.extra, sbtInterface, compilerInterfaceSrc, settings.javaHome, settings.forkJava)
   }
 
   /**
@@ -72,7 +73,8 @@ object Setup {
     scalaExtra: Seq[File],
     sbtInterface: File,
     compilerInterfaceSrc: File,
-    javaHomeDir: Option[File]): Setup =
+    javaHomeDir: Option[File],
+    forkJava: Boolean): Setup =
   {
     val normalise: File => File = { _.getCanonicalFile }
     val compilerJar          = normalise(scalaCompiler)
@@ -82,7 +84,7 @@ object Setup {
     val compilerInterfaceJar = normalise(compilerInterfaceSrc)
     val javaHome             = javaHomeDir map normalise
     val cacheDir             = zincCacheDir
-    Setup(compilerJar, libraryJar, extraJars, sbtInterfaceJar, compilerInterfaceJar, javaHome, cacheDir)
+    Setup(compilerJar, libraryJar, extraJars, sbtInterfaceJar, compilerInterfaceJar, javaHome, forkJava, cacheDir)
   }
 
   /**
@@ -94,14 +96,16 @@ object Setup {
     scalaExtra: JList[File],
     sbtInterface: File,
     compilerInterfaceSrc: File,
-    javaHome: File): Setup =
+    javaHome: File,
+    forkJava: Boolean): Setup =
   setup(
     scalaCompiler,
     scalaLibrary,
     scalaExtra.asScala,
     sbtInterface,
     compilerInterfaceSrc,
-    Option(javaHome)
+    Option(javaHome),
+    forkJava
   )
 
   /**
@@ -110,7 +114,8 @@ object Setup {
   def create(
     scalaLocation: ScalaLocation,
     sbtJars: SbtJars,
-    javaHome: File): Setup =
+    javaHome: File,
+    forkJava: Boolean): Setup =
   {
     val scalaJars = selectScalaJars(scalaLocation)
     val (sbtInterface, compilerInterfaceSrc) = selectSbtJars(sbtJars)
@@ -120,7 +125,8 @@ object Setup {
       scalaJars.extra,
       sbtInterface,
       compilerInterfaceSrc,
-      Option(javaHome)
+      Option(javaHome),
+      forkJava
     )
   }
 
@@ -284,6 +290,7 @@ object Setup {
       "sbt interface"              -> sbtInterface,
       "compiler interface sources" -> compilerInterfaceSrc,
       "java home"                  -> javaHome,
+      "fork java"                  -> forkJava,
       "cache directory"            -> cacheDir)
     Util.show(("Setup", values), output)
   }

@@ -50,9 +50,27 @@ object Compiler {
   def create(setup: Setup, log: Logger): Compiler = {
     val instance     = scalaInstance(setup)
     val interfaceJar = compilerInterface(setup, instance, log)
-    val scalac       = IC.newScalaCompiler(instance, interfaceJar, ClasspathOptions.boot, log)
-    val javac        = AggressiveCompile.directOrFork(instance, ClasspathOptions.javac(false), setup.javaHome)
+    val scalac       = newScalaCompiler(instance, interfaceJar, log)
+    val javac        = newJavaCompiler(instance, setup.javaHome, setup.forkJava)
     new Compiler(scalac, javac)
+  }
+
+  /**
+   * Create a new scala compiler.
+   */
+  def newScalaCompiler(instance: ScalaInstance, interfaceJar: File, log: Logger): AnalyzingCompiler = {
+    IC.newScalaCompiler(instance, interfaceJar, ClasspathOptions.boot, log)
+  }
+
+  /**
+   * Create a new java compiler.
+   */
+  def newJavaCompiler(instance: ScalaInstance, javaHome: Option[File], fork: Boolean): JavaCompiler = {
+    val options = ClasspathOptions.javac(false)
+    if (fork || javaHome.isDefined)
+      sbt.compiler.JavaCompiler.fork(options, instance)(AggressiveCompile.forkJavac(javaHome))
+    else
+      sbt.compiler.JavaCompiler.directOrFork(options, instance)(AggressiveCompile.forkJavac(None))
   }
 
   /**
