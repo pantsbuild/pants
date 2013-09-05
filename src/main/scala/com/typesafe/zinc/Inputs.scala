@@ -7,7 +7,7 @@ package com.typesafe.zinc
 import java.io.File
 import java.util.{ List => JList, Map => JMap }
 import sbt.compiler.IC
-import sbt.inc.{ Analysis, IncOptions, Locate }
+import sbt.inc.{ Analysis, Locate }
 import sbt.Path._
 import scala.collection.JavaConverters._
 import xsbti.compile.CompileOrder
@@ -81,10 +81,13 @@ object Inputs {
     val cacheFile        = normalise(analysisCache.getOrElse(defaultCacheLocation(classesDirectory)))
     val upstreamAnalysis = analysisCacheMap map { case (k, v) => (normalise(k), normalise(v)) }
     val analysisMap      = (cp map { file => (file, analysisFor(file, classes, upstreamAnalysis)) }).toMap
-    val incOpts          = incOptions.copy(apiDumpDirectory = incOptions.apiDumpDirectory map normalise)
+    val incOpts          = updateIncOptions(incOptions, classesDirectory, normalise)
     val printRelations   = outputRelations map normalise
     val printProducts    = outputProducts map normalise
-    new Inputs(cp, srcs, classes, scalacOptions, javacOptions, cacheFile, analysisMap, forceClean, Locate.definesClass, javaOnly, compileOrder, incOpts, printRelations, printProducts, mirrorAnalysis)
+    new Inputs(
+      cp, srcs, classes, scalacOptions, javacOptions, cacheFile, analysisMap, forceClean, Locate.definesClass,
+      javaOnly, compileOrder, incOpts, printRelations, printProducts, mirrorAnalysis
+    )
   }
 
   /**
@@ -144,6 +147,33 @@ object Inputs {
   }
 
   /**
+   * Normalise files and default the backup directory.
+   */
+  def updateIncOptions(incOptions: IncOptions, classesDir: File, normalise: File => File): IncOptions = {
+    incOptions.copy(
+      apiDumpDirectory = incOptions.apiDumpDirectory map normalise,
+      backup = getBackupDirectory(incOptions, classesDir, normalise)
+    )
+  }
+
+  /**
+   * Get normalised, default if not specified, backup directory. If transactional.
+   */
+  def getBackupDirectory(incOptions: IncOptions, classesDir: File, normalise: File => File): Option[File] = {
+    if (incOptions.transactional)
+      Some(normalise(incOptions.backup.getOrElse(defaultBackupLocation(classesDir))))
+    else
+      None
+  }
+
+  /**
+   * By default the backup location is relative to the classes directory (for example, target/classes/../backup/classes).
+   */
+  def defaultBackupLocation(classesDir: File) = {
+    classesDir.getParentFile / "backup" / classesDir.getName
+  }
+
+  /**
    * Verify inputs and update if necessary.
    * Currently checks that the cache file is writable.
    */
@@ -179,7 +209,10 @@ object Inputs {
       "recompile all fraction" -> incOptions.recompileAllFraction,
       "debug relations"        -> incOptions.relationsDebug,
       "debug api"              -> incOptions.apiDebug,
-      "api dump"               -> incOptions.apiDumpDirectory
+      "api dump"               -> incOptions.apiDumpDirectory,
+      "api diff context size"  -> incOptions.apiDiffContextSize,
+      "transactional"          -> incOptions.transactional,
+      "backup directory"       -> incOptions.backup
     )
 
     val values = Seq(

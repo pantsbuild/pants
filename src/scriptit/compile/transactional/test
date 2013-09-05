@@ -1,0 +1,33 @@
+# transactional compile test
+
+! zinc -status
+
+zinc -nailed -debug src/A.scala
+
+exists A.class
+
+copy changes/AX.scala src/A.scala
+
+! zinc -nailed -debug src/A.scala
+
+! exists A.class
+
+copy changes/A0.scala src/A.scala
+
+zinc -nailed -debug src/A.scala
+
+exists A.class
+
+copy changes/AX.scala src/A.scala
+
+! zinc -nailed -debug -transactional src/A.scala
+
+exists A.class
+
+copy changes/A0.scala src/A.scala
+
+zinc -nailed -debug src/A.scala
+
+exists A.class
+
+zinc -shutdown

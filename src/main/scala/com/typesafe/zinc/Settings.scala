@@ -6,7 +6,8 @@ package com.typesafe.zinc
 
 import java.io.File
 import java.util.{ List => JList }
-import sbt.inc.IncOptions
+import sbt.inc.ClassfileManager
+import sbt.inc.IncOptions.{ Default => DefaultIncOptions }
 import sbt.Level
 import sbt.Path._
 import scala.collection.JavaConverters._
@@ -32,10 +33,11 @@ case class Settings(
   javacOptions: Seq[String]  = Seq.empty,
   compileOrder: CompileOrder = CompileOrder.Mixed,
   sbt: SbtJars               = SbtJars(),
-  incOptions: IncOptions     = IncOptions.Default,
+  incOptions: IncOptions     = IncOptions(),
   analysis: AnalysisOptions  = AnalysisOptions(),
   analysisUtil: AnalysisUtil = AnalysisUtil(),
-  properties: Seq[String]    = Seq.empty)
+  properties: Seq[String]    = Seq.empty
+)
 
 /**
  * Alternative ways to locate the scala jars.
@@ -45,7 +47,8 @@ case class ScalaLocation(
   path: Seq[File]        = Seq.empty,
   compiler: Option[File] = None,
   library: Option[File]  = None,
-  extra: Seq[File]       = Seq.empty)
+  extra: Seq[File]       = Seq.empty
+)
 
 object ScalaLocation {
   /**
@@ -81,7 +84,8 @@ object ScalaLocation {
  */
 case class SbtJars(
   sbtInterface: Option[File]         = None,
-  compilerInterfaceSrc: Option[File] = None)
+  compilerInterfaceSrc: Option[File] = None
+)
 
 object SbtJars {
   /**
@@ -100,6 +104,39 @@ object SbtJars {
 }
 
 /**
+ * Wrapper around incremental compiler options.
+ */
+case class IncOptions(
+  transitiveStep: Int            = DefaultIncOptions.transitiveStep,
+  recompileAllFraction: Double   = DefaultIncOptions.recompileAllFraction,
+  relationsDebug: Boolean        = DefaultIncOptions.relationsDebug,
+  apiDebug: Boolean              = DefaultIncOptions.apiDebug,
+  apiDiffContextSize: Int        = DefaultIncOptions.apiDiffContextSize,
+  apiDumpDirectory: Option[File] = DefaultIncOptions.apiDumpDirectory,
+  transactional: Boolean         = false,
+  backup: Option[File]           = None
+) {
+  def options: sbt.inc.IncOptions = {
+    sbt.inc.IncOptions(
+      transitiveStep,
+      recompileAllFraction,
+      relationsDebug,
+      apiDebug,
+      apiDiffContextSize,
+      apiDumpDirectory,
+      classfileManager
+    )
+  }
+
+  def classfileManager: () => ClassfileManager = {
+    if (transactional && backup.isDefined)
+      ClassfileManager.transactional(backup.get)
+    else
+      DefaultIncOptions.newClassfileManager
+  }
+}
+
+/**
  * Configuration for sbt analysis and analysis output options.
  */
 case class AnalysisOptions(
@@ -108,19 +145,19 @@ case class AnalysisOptions(
   forceClean: Boolean           = false,
   outputRelations: Option[File] = None,
   outputProducts: Option[File]  = None,
-  mirrorAnalysis: Boolean = false
+  mirrorAnalysis: Boolean       = false
 )
 
 /**
  * Configuration for analysis manipulation utilities.
  */
 case class AnalysisUtil(
-  run: Boolean                 = false,
-  cache: Option[File]          = None,
-  merge: Seq[File]             = Seq.empty,
-  rebase: Map[File, File]      = Map.empty,
-  split: Map[Seq[File], File]  = Map.empty,
-  reload: Seq[File]            = Seq.empty
+  run: Boolean                = false,
+  cache: Option[File]         = None,
+  merge: Seq[File]            = Seq.empty,
+  rebase: Map[File, File]     = Map.empty,
+  split: Map[Seq[File], File] = Map.empty,
+  reload: Seq[File]           = Seq.empty
 )
 
 object Settings {
@@ -166,6 +203,8 @@ object Settings {
     boolean(   "-debug-api",                   "Enable analysis API debugging",              (s: Settings) => s.copy(incOptions = s.incOptions.copy(apiDebug = true))),
     file(      "-api-dump", "directory",       "Destination for analysis API dump",          (s: Settings, f: File) => s.copy(incOptions = s.incOptions.copy(apiDumpDirectory = Some(f)))),
     int(       "-api-diff-context-size", "n",  "Diff context size (in lines) for API debug", (s: Settings, i: Int) => s.copy(incOptions = s.incOptions.copy(apiDiffContextSize = i))),
+    boolean(   "-transactional",               "Restore previous class files on failure",    (s: Settings) => s.copy(incOptions = s.incOptions.copy(transactional = true))),
+    file(      "-backup", "directory",         "Backup location (if transactional)",         (s: Settings, f: File) => s.copy(incOptions = s.incOptions.copy(backup = Some(f)))),
 
     header("Analysis options:"),
     file(      "-analysis-cache", "file",      "Cache file for compile analysis",            (s: Settings, f: File) => s.copy(analysis = s.analysis.copy(cache = Some(f)))),
@@ -260,7 +299,8 @@ object Settings {
           compilerInterfaceSrc = Util.normaliseOpt(cwd)(sbt.compilerInterfaceSrc)
         ),
         incOptions = incOptions.copy(
-          apiDumpDirectory = Util.normaliseOpt(cwd)(incOptions.apiDumpDirectory)
+          apiDumpDirectory = Util.normaliseOpt(cwd)(incOptions.apiDumpDirectory),
+          backup = Util.normaliseOpt(cwd)(incOptions.backup)
         ),
         analysis = analysis.copy(
           cache = Util.normaliseOpt(cwd)(analysis.cache),
