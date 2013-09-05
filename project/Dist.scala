@@ -5,6 +5,7 @@
 import sbt._
 import sbt.Keys._
 import sbt.Project.Initialize
+import com.typesafe.sbt.S3Plugin.{ S3, s3Settings }
 
 object Dist {
   val distBase = SettingKey[File]("dist-base")
@@ -13,7 +14,9 @@ object Dist {
   val create = TaskKey[File]("create", "Create a distribution.")
   val packageTgz = TaskKey[File]("package-tgz", "Create a gzipped tar of the dist.")
 
-  lazy val settings: Seq[Setting[_]] = Seq(
+  lazy val settings: Seq[Setting[_]] = distSettings ++ s3PublishSettings
+
+  lazy val distSettings: Seq[Setting[_]] = Seq(
     distBase <<= sourceDirectory / "dist",
     distLibs <<= projectLibs(zincProject),
     distTarget <<= (crossTarget, version) { (dir, v) => dir / ("zinc-" + v) },
@@ -27,6 +30,17 @@ object Dist {
     publishTo := Some("zinc repo" at "http://typesafe.artifactoryonline.com/typesafe/zinc"),
     credentials += Credentials(Path.userHome / ".ivy2" / "artifactory-credentials")
   ) ++ addArtifact(artifact in packageTgz, packageTgz)
+
+  lazy val s3PublishSettings: Seq[Setting[_]] = s3Settings ++ Seq(
+    mappings in S3.upload <<= (packageTgz, version) map { (pkg, version) =>
+      val name = "zinc"
+      val file = "%s-%s.tgz" format (name, version)
+      val path = Seq(name, version, file) mkString "/"
+      Seq(pkg -> path)
+    },
+    S3.host in S3.upload := "downloads.typesafe.com.s3.amazonaws.com",
+    S3.progress in S3.upload := true
+  )
 
   def zincProject: ProjectReference = LocalProject(ZincBuild.zinc.id)
 
