@@ -74,7 +74,7 @@ object Inputs {
     outputProducts: Option[File],
     mirrorAnalysis: Boolean): Inputs =
   {
-    val normalise: File => File = { _.getCanonicalFile }
+    val normalise: File => File = { _.getAbsoluteFile }
     val cp               = classpath map normalise
     val srcs             = sources map normalise
     val classes          = normalise(classesDirectory)

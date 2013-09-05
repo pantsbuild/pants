@@ -76,7 +76,7 @@ object Setup {
     javaHomeDir: Option[File],
     forkJava: Boolean): Setup =
   {
-    val normalise: File => File = { _.getCanonicalFile }
+    val normalise: File => File = { _.getAbsoluteFile }
     val compilerJar          = normalise(scalaCompiler)
     val libraryJar           = normalise(scalaLibrary)
     val extraJars            = scalaExtra map normalise
