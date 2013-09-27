@@ -56,6 +56,7 @@ make_dep('poster', 'poster==0.8.2') # Twitter's monkeypatched poster
 make_dep('protobuf')
 make_dep('psutil', 'psutil==0.5.0')
 make_dep('pycrypto', 'pycrypto==2.6')
+make_dep('pyfakefs', 'pyfakefs==2.3')
 make_dep('pygments', 'Pygments==1.4')
 make_dep('pylint')
 make_dep('pystache', 'pystache==0.3.1')
