@@ -451,28 +451,38 @@ class Goal(Command):
     if self.options.cleanup_nailguns or self.config.get('nailgun', 'autokill', default = False):
       if log:
         log.debug('auto-killing nailguns')
-      NailgunTask.killall(log)
+      if NailgunTask.killall:
+        NailgunTask.killall(log)
 
     return ret
 
   def cleanup(self):
     # TODO: Make this more selective? Only kill nailguns that affect state? E.g., checkstyle
     # may not need to be killed.
-    NailgunTask.killall(log)
+    if NailgunTask.killall:
+      NailgunTask.killall(log)
     sys.exit(1)
 
 
 # Install all default pants provided goals
 from twitter.pants import junit_tests
-from twitter.pants.targets import Benchmark, JvmBinary
+from twitter.pants.targets import (
+  Benchmark,
+  JavaLibrary,
+  JvmBinary,
+  ScalaLibrary,
+  ScalaTests,
+  ScalacPlugin)
 from twitter.pants.tasks.antlr_gen import AntlrGen
 from twitter.pants.tasks.benchmark_run import BenchmarkRun
 from twitter.pants.tasks.binary_create import BinaryCreate
 from twitter.pants.tasks.build_lint import BuildLint
 from twitter.pants.tasks.bundle_create import BundleCreate
 from twitter.pants.tasks.checkstyle import Checkstyle
+from twitter.pants.tasks.extract import Extract
 from twitter.pants.tasks.check_exclusives import CheckExclusives
 from twitter.pants.tasks.filedeps import FileDeps
+from twitter.pants.tasks.idl_resolve import IdlResolve
 from twitter.pants.tasks.ivy_resolve import IvyResolve
 from twitter.pants.tasks.jar_create import JarCreate
 from twitter.pants.tasks.java_compile import JavaCompile
@@ -531,21 +541,23 @@ except ImportError:
   pass
 
 
-class NailgunKillall(Task):
-  @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    option_group.add_option(mkflag("everywhere"), dest="ng_killall_everywhere",
-                            default=False, action="store_true",
-                            help="[%default] Kill all nailguns servers launched by pants for "
-                                 "all workspaces on the system.")
+if NailgunTask.killall:
+  class NailgunKillall(Task):
+    @classmethod
+    def setup_parser(cls, option_group, args, mkflag):
+      option_group.add_option(mkflag("everywhere"), dest="ng_killall_everywhere",
+                              default=False, action="store_true",
+                              help="[%default] Kill all nailguns servers launched by pants for "
+                                   "all workspaces on the system.")
 
-  def execute(self, targets):
-    NailgunTask.killall(self.context.log, everywhere=self.context.options.ng_killall_everywhere)
+    def execute(self, targets):
+      if NailgunTask.killall:
+        NailgunTask.killall(self.context.log, everywhere=self.context.options.ng_killall_everywhere)
 
-ng_killall = goal(name='ng-killall', action=NailgunKillall)
-ng_killall.install().with_description('Kill any running nailgun servers spawned by pants.')
+  ng_killall = goal(name='ng-killall', action=NailgunKillall)
+  ng_killall.install().with_description('Kill any running nailgun servers spawned by pants.')
 
-ng_killall.install('clean-all', first=True)
+  ng_killall.install('clean-all', first=True)
 
 
 def get_port_and_pidfile(context):
@@ -674,12 +686,27 @@ goal(name='check-exclusives',
   action=CheckExclusives).install('check-exclusives').with_description(
   'Check exclusives declarations to verify that dependencies are consistent.')
 
+
+goal(
+  name='idl',
+  action=IdlResolve,
+).install('resolve-idl').with_description('Resolves idl jar dependencies.')
+
+goal(
+  name='extract',
+  action=Extract,
+).install('resolve-idl')
+
 # TODO(John Sirois): gen attempted as the sole Goal should gen for all known gen types but
 # recognize flags to narrow the gen set
-goal(name='thrift', action=ThriftGen).install('gen').with_description('Generate code.')
-goal(name='scrooge', action=ScroogeGen).install('gen')
-goal(name='protoc', action=ProtobufGen).install('gen')
-goal(name='antlr', action=AntlrGen).install('gen')
+goal(name='thrift', action=ThriftGen,
+  dependencies=['resolve-idl']).install('gen').with_description('Generate code.')
+goal(name='scrooge', action=ScroogeGen,
+  dependencies=['resolve-idl']).install('gen')
+goal(name='protoc', action=ProtobufGen,
+  dependencies=['resolve-idl']).install('gen')
+goal(name='antlr', action=AntlrGen,
+  dependencies=['resolve-idl']).install('gen')
 
 goal(
   name='checkstyle',

@@ -24,8 +24,9 @@ from twitter.pants.tasks import Task
 
 class JvmTask(Task):
   def get_base_classpath_for_target(self, target):
-    """Note: to use this method, the exclusives_groups data product must be available. This should
-    have been set by the prerequisite java/scala compile."""
+    """Note: to use this method, the exclusives_groups data product
+    must be available. This should have been set by the prerequisite
+    java/scala compile."""
     egroups = self.context.products.get_data('exclusives_groups')
     group_key = egroups.get_group_key_for_target(target)
     return egroups.get_classpath_for_group(group_key)

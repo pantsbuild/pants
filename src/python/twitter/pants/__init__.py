@@ -196,11 +196,6 @@ def is_codegen(target):
   return target.has_label('codegen')
 
 
-def is_synthetic(target):
-  """Returns True if the target is a synthetic target injected by the runtime."""
-  return target.has_label('synthetic')
-
-
 def is_jar_library(target):
   """Returns True if the target is an external jar library."""
   return target.has_label('jars')
@@ -321,7 +316,6 @@ __all__ = (
   'is_jvm',
   'is_python',
   'is_scala',
-  'is_synthetic',
   'is_test',
   'jar',
   'jar_library',

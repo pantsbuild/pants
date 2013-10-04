@@ -5,10 +5,12 @@ __author__ = 'Mark Chu-Carroll (markcc@foursquare.com)'
 
 from collections import defaultdict
 from copy import copy
+from itertools import chain
+import string
+import sys
 from twitter.pants.base import Target
 from twitter.pants.tasks import Task, TaskError
 from twitter.pants.targets import InternalTarget
-
 
 class CheckExclusives(Task):
   """Task for computing transitive exclusive maps.
@@ -50,6 +52,7 @@ class CheckExclusives(Task):
   If the build data product 'exclusives_groups' is required, then an
   ExclusivesMapping object will be created.
   """
+
 
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
@@ -149,14 +152,15 @@ class ExclusivesMapping(object):
     return self.target_to_key[target]
 
   def get_group_keys(self):
-    """Get the set of keys for all exclusives groups in the current build."""
+    """Get the set of keys for all exclusives groups in the current build.
+    """
     if len(self.conflicting_exclusives) == 0:
       return ["<none>"]
     else:
       return self.key_to_targets.keys()
 
   def get_ordered_group_keys(self):
-    """Compute the correct order in which to compile exclusives groups.
+    """ Compute the correct order in which to compile exclusives groups.
 
     In group, we already do group-based ordering. But that ordering is done separately on
     each exclusives group. If we have a grouping:
@@ -171,7 +175,7 @@ class ExclusivesMapping(object):
     def number_of_emptys(key):
       if key == "<none>":
         return len(self.conflicting_keys)
-      return key.count("<none>")
+      return string.count(key, "<none>")
 
     if self.ordering is not None:
       return self.ordering
@@ -212,7 +216,7 @@ class ExclusivesMapping(object):
       return ','.join(target_key)
 
   def _populate_target_maps(self, targets):
-    """Populates maps of exclusive keys to targets, and vice versa."""
+    """ Populates maps of exclusive keys to targets, and vice versa."""
     all_targets = set()
     workqueue = copy(targets)
     while len(workqueue) > 0:
@@ -232,7 +236,7 @@ class ExclusivesMapping(object):
       self.target_to_key[t] = key
 
   def get_classpath_for_group(self, group_key):
-    """Get the classpath to use for jvm compilations of a group.
+    """ Get the classpath to use for jvm compilations of a group.
 
     Each exclusives group requires a distinct classpath. We maintain
     them here as a map from the exclusives key to a classpath. The
@@ -271,9 +275,7 @@ class ExclusivesMapping(object):
     return True
 
   def update_compatible_classpaths(self, group_key, path_additions):
-    """Update the classpath of all groups compatible with group_key, adding path_additions to their
-    classpath.
-    """
+    """ Update the classpath of all groups compatible with group_key, adding path_additions to their classpath."""
     for key in self._group_classpaths:
       if group_key is None or self._is_compatible(group_key, key):
         group_classpath = self._group_classpaths[key]

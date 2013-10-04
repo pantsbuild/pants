@@ -18,7 +18,6 @@ import os
 import re
 import signal
 import subprocess
-import threading
 import time
 
 from twitter.common import log
@@ -31,11 +30,20 @@ from twitter.pants.java import NailgunClient, NailgunError
 from twitter.pants.tasks import Task
 
 
+def _check_pid(pid):
+  try:
+    os.kill(pid, 0)
+    return True
+  except OSError:
+    return False
+
+
 class _safe_open(object):
   def __init__(self, path, *args, **kwargs):
     self._path = path
     self._args = args
     self._kwargs = kwargs
+
 
   def __enter__(self):
     self._file = safe_open(self._path, *self._args, **self._kwargs)
@@ -47,18 +55,15 @@ class _safe_open(object):
 
 
 class NailgunTask(Task):
-  # Args to nailgun processes so we can identify them. Not actually used by the nailgun.
-
-  # All nailguns will have this arg prefix.
-  PANTS_NG_ARG_PREFIX = '-Dpants.ng.buildroot'
-
-  # Our nailguns will have this arg.
-  # Trailing slash prevents grep matching on buildroots whose name contains ours.
-  PANTS_NG_ARG = '%s=%s/' % (PANTS_NG_ARG_PREFIX, get_buildroot())
-
-  # We differentiate among our nailguns using self._identifier_arg.
+  # Used to identify we own a given java nailgun server
+  PANTS_NG_ARG_PREFIX = '-Dtwitter.pants.buildroot'
+  PANTS_NG_ARG = '%s=%s' % (PANTS_NG_ARG_PREFIX, get_buildroot())
 
   _DAEMON_OPTION_PRESENT = False
+
+  @staticmethod
+  def create_pidfile_arg(pidfile):
+    return '-Dpidfile=%s' % os.path.relpath(pidfile, get_buildroot())
 
   @staticmethod
   def _log_kill(log, pid, port=None):
@@ -81,15 +86,9 @@ class NailgunTask(Task):
     self._daemon = context.options.nailgun_daemon
 
     workdir = workdir or context.config.get('nailgun', 'workdir')
-
-    # Allows us to identify the nailgun process by its cmd-line.
-    self._identifier_arg = '-Dpants.ng.identifier=%s' % os.path.relpath(workdir, get_buildroot())
-
+    self._pidfile = os.path.join(workdir, 'pid')
     self._ng_out = os.path.join(workdir, 'stdout')
     self._ng_err = os.path.join(workdir, 'stderr')
-
-    # Prevent concurrency issues when starting up a nailgun.
-    self._spawn_lock = threading.Lock()
 
   def _runjava_common(self, runjava, main, classpath=None, opts=None, args=None, jvmargs=None,
                       workunit_name=None, workunit_labels=None):
@@ -180,10 +179,6 @@ class NailgunTask(Task):
                                          java_runner=java_runner,
                                          config=self.context.config)
 
-  @staticmethod
-  def killall(log, everywhere=False):
-    NailgunProcessManager.killall(log, everywhere)
-
   def _ng_shutdown(self):
     endpoint = self._get_nailgun_endpoint()
     if endpoint:
@@ -193,20 +188,39 @@ class NailgunTask(Task):
         os.kill(pid, 9)
       except OSError:
         pass
+      finally:
+        os.remove(self._pidfile)
 
   def _get_nailgun_endpoint(self):
-    pid_port = NailgunTask._find(self._identifier_arg)
-    if pid_port:
-      self.context.log.debug('found ng server @ pid:%d port:%d' % pid_port)
-    return pid_port
+    if os.path.exists(self._pidfile):
+      with _safe_open(self._pidfile, 'r') as pidfile:
+        contents = pidfile.read()
+        def invalid_pidfile():
+          log.warn('Invalid ng pidfile %s contained: %s' % (self._pidfile, contents))
+          return None
+        endpoint = contents.split(':')
+        if len(endpoint) != 2:
+          return invalid_pidfile()
+        pid, port = endpoint
+        try:
+          return int(pid.strip()), int(port.strip())
+        except ValueError:
+          return invalid_pidfile()
+    elif NailgunTask._find:
+      pid_port = NailgunTask._find(self._pidfile)
+      if pid_port:
+        self.context.log.info('found ng server @ pid:%d port:%d' % pid_port)
+        with safe_open(self._pidfile, 'w') as pidfile:
+          pidfile.write('%d:%d\n' % pid_port)
+      return pid_port
+    return None
 
   def _get_nailgun_client(self, workunit):
-    with self._spawn_lock:
-      endpoint = self._get_nailgun_endpoint()
-      if endpoint:
-        return self._create_ngclient(port=endpoint[1], workunit=workunit)
-      else:
-        return self._spawn_nailgun_server(workunit)
+    endpoint = self._get_nailgun_endpoint()
+    if endpoint and _check_pid(endpoint[0]):
+      return self._create_ngclient(port=endpoint[1], workunit=workunit)
+    else:
+      return self._spawn_nailgun_server(workunit)
 
   # 'NGServer started on 127.0.0.1, port 53785.'
   _PARSE_NG_PORT = re.compile('.*\s+port\s+(\d+)\.$')
@@ -220,31 +234,33 @@ class NailgunTask(Task):
   def _await_nailgun_server(self, workunit):
     nailgun_timeout_seconds = 5
     max_socket_connect_attempts = 10
-    start = time.time()
-
-    endpoint = self._get_nailgun_endpoint()
-    while endpoint is None:
-      if time.time() - start > nailgun_timeout_seconds:
-        raise NailgunError('Failed to read ng output after %s seconds' % nailgun_timeout_seconds)
-      time.sleep(0.1)
-      endpoint = self._get_nailgun_endpoint()
-
-    port = endpoint[1]
-    nailgun = self._create_ngclient(port, workunit)
-    log.debug('Detected ng server up on port %d' % port)
+    nailgun = None
+    port_parse_start = time.time()
+    with _safe_open(self._ng_out, 'r') as ng_out:
+      while not nailgun:
+        started = ng_out.readline()
+        if started:
+          port = self._parse_nailgun_port(started)
+          with open(self._pidfile, 'a') as pidfile:
+            pidfile.write(':%d\n' % port)
+          nailgun = self._create_ngclient(port, workunit)
+          log.debug('Detected ng server up on port %d' % port)
+        elif time.time() - port_parse_start > nailgun_timeout_seconds:
+          raise NailgunError('Failed to read ng output after %s seconds' % nailgun_timeout_seconds)
 
     attempt = 0
-    while attempt < max_socket_connect_attempts:
+    while nailgun:
       sock = nailgun.try_connect()
       if sock:
         sock.close()
-        log.info('Connected to ng server pid: %d @ port: %d' % endpoint)
+        log.info('Connected to ng server pid: %d @ port: %d' % self._get_nailgun_endpoint())
         return nailgun
+      elif attempt > max_socket_connect_attempts:
+        raise NailgunError('Failed to connect to ng output after %d connect attempts'
+                            % max_socket_connect_attempts)
       attempt += 1
       log.debug('Failed to connect on attempt %d' % attempt)
       time.sleep(0.1)
-    raise NailgunError('Failed to connect to ng after %d connect attempts'
-                       % max_socket_connect_attempts)
 
   def _create_ngclient(self, port, workunit):
     return NailgunClient(port=port, work_dir=get_buildroot(), ins=None,
@@ -254,8 +270,10 @@ class NailgunTask(Task):
     log.info('No ng server found, spawning...')
 
     with _safe_open(self._ng_out, 'w'):
-      pass  # truncate
+      pass # truncate
 
+    if os.path.exists(self._pidfile):
+      os.remove(self._pidfile)  # So we know when the child has written it.
     pid = os.fork()
     if pid != 0:
       # In the parent tine - block on ng being up for connections
@@ -270,7 +288,7 @@ class NailgunTask(Task):
     if self._ng_server_args:
       args.extend(self._ng_server_args)
     args.append(NailgunTask.PANTS_NG_ARG)
-    args.append(self._identifier_arg)
+    args.append(NailgunTask.create_pidfile_arg(self._pidfile))
     ng_classpath = os.pathsep.join(binary_util.profile_classpath(self._nailgun_profile,
       workunit_factory=self.context.new_workunit))
     args.extend(['-cp', ng_classpath, 'com.martiansoftware.nailgun.NGServer', ':0'])
@@ -285,33 +303,31 @@ class NailgunTask(Task):
         close_fds=True,
         cwd=get_buildroot()
       )
+      with _safe_open(self._pidfile, 'w') as pidfile:
+        pidfile.write('%d' % process.pid)
       log.debug('Spawned ng server @ %d' % process.pid)
       # Prevents finally blocks being executed, unlike sys.exit(). We don't want to execute finally
       # blocks because we might, e.g., clean up tempfiles that the parent still needs.
       os._exit(0)
 
-  @staticmethod
-  def _find(identifier_arg):
-    return NailgunProcessManager.find(identifier_arg)
 
+# Pick implementations for killall and _find. We don't use psutil, as it uses
+# native code and so is not portable, leading to packaging and deployment headaches.
+# TODO: Extract this to a class and add a paired test guarded by
+# http://pytest.org/latest/skipping.html#skipping.
+plat = Platform.current()
+if plat.startswith('linux') or plat.startswith('macosx'):
+  # TODO: add other platforms as needed, after checking that these cmds work there as expected.
 
-class NailgunProcessManager(object):
-  """A container for some gnarly process id munging logic."""
-  # Verify that the gnarly logic works on this platform.
-  plat = Platform.current()
-  if not (plat.startswith('linux') or plat.startswith('macosx')):
-    raise NotImplementedError('Platform %s not supported by pants.' % plat)
-
-  @staticmethod
+  # Returns the cmd's output, as a list of lines, including the newline characters.
   def _run_cmd(cmd):
-    # Returns the cmd's output, as a list of lines, including the newline characters.
-    runcmd = cmd + ' && echo "${PIPESTATUS[*]}"'
+    runcmd = cmd + ' && echo "\n${PIPESTATUS[*]}"'
     popen = subprocess.Popen(runcmd, shell=True, executable='/bin/bash', bufsize=-1, close_fds=True,
                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     (stdout_data, _) = popen.communicate()
     stdout_data_lines = [line for line in stdout_data.strip().split('\n') if line]
     if not stdout_data_lines:
-      return None #raise NailgunError('No output for command (%s)' % runcmd)
+      raise NailgunError('No output for command (%s)' % runcmd)
     try:
       # Get the return codes of each piped cmd.
       piped_return_codes = [int(x) for x in stdout_data_lines[-1].split(' ') if x]
@@ -325,42 +341,51 @@ class NailgunProcessManager(object):
                          (cmd, piped_return_codes, ''.join(stdout_data_lines)))
     return stdout_data_lines
 
-  @staticmethod
   def _find_matching_pids(strs):
     # Grep all processes whose cmd-lines contain all the strs, except for the grep process itself.
     filters = ' | '.join(["grep -F -e '%s'" % s for s in strs])
-    data = NailgunProcessManager._run_cmd(
-      "ps axwww | %s | (grep -v grep || true) | cut -b 1-5" % filters)
+    data = _run_cmd("ps axwww | %s | (grep -v grep || true) | cut -b 1-5" % filters)
     pids = [int(x.strip()) for x in data if x]
     return pids
 
-  @staticmethod
   def _find_ngs(everywhere=False):
     arg = NailgunTask.PANTS_NG_ARG_PREFIX if everywhere else NailgunTask.PANTS_NG_ARG
-    return NailgunProcessManager._find_matching_pids([arg])
+    return _find_matching_pids([arg])
 
-  @staticmethod
   def killall(log, everywhere=False):
-    for pid in NailgunProcessManager._find_ngs(everywhere=everywhere):
+    for pid in _find_ngs(everywhere=everywhere):
       try:
         NailgunTask._log_kill(log, pid)
         os.kill(pid, signal.SIGKILL)
       except OSError:
         pass
 
+  NailgunTask.killall = staticmethod(killall)
+
   DIGITS_RE = re.compile('^\d+$')
-  @staticmethod
-  def find(identifier_arg):
-    pids = NailgunProcessManager._find_matching_pids([NailgunTask.PANTS_NG_ARG, identifier_arg])
+  def _find(pidfile):
+    pidfile_arg = NailgunTask.create_pidfile_arg(pidfile)
+    pids = _find_matching_pids([NailgunTask.PANTS_NG_ARG, pidfile_arg])
     if len(pids) != 1:
       return None
     pid = pids[0]
 
     # Expected output of the lsof cmd: pPID\nn[::127.0.0.1]:PORT
-    lines = NailgunProcessManager._run_cmd('lsof -a -p %s -i TCP -s TCP:LISTEN -Fn' % pid)
-    if lines is None or len(lines) != 2 or lines[0] != 'p%s' % pid:
+    lines = _run_cmd('lsof -a -p %s -i TCP -s TCP:LISTEN -Fn' % pid)
+    if len(lines) != 2 or lines[0] != 'p%s' % pid:
       return None
     port = lines[1][lines[1].rfind(':') + 1:].strip()
-    if not NailgunProcessManager.DIGITS_RE.match(port):
+    if not DIGITS_RE.match(port):
       return None
     return pid, int(port)
+
+  NailgunTask._find = staticmethod(_find)
+
+else:
+  # This is some other platform. In practice, it's likely that the cmds above will work
+  # on this platform (pants assumes a UNIX variant), so test that out and modify the
+  # condition above appropriately. Note: This is unlikely to be your biggest headache
+  # in porting pants to this other platform, since many pants tasks spawn subprocesses
+  # for various commands, and none of them have been tested on unsupported platforms.
+  NailgunTask.killall = None
+  NailgunTask._find = None
