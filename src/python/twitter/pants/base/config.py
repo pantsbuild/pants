@@ -72,6 +72,18 @@ class Config(object):
     self.file = configpath
 
     # Overrides
+    # 
+    # This feature allows a second configuration file which will override 
+    # pants.ini to be specified.  The file is currently specified via an env
+    # variable because the cmd line flags are parsed after config is loaded.
+    # 
+    # The main use of the extra file is to have different settings based on
+    # the environment.  For example, the setting used to compile or locations
+    # of caches might be different between a developer's local environment
+    # and the environment used to build and publish artifacts (e.g. Jenkins)
+    # 
+    # The files cannot reference each other's values, so make sure each one is 
+    # internally consistent
     self.overrides_path = os.environ.get('PANTS_CONFIG_OVERRIDE')
     self.overrides_parser = None
     if self.overrides_path is not None:
