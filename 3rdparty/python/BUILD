@@ -19,13 +19,13 @@
 def make_dep(name, version, dependency_name=None):
   """Build a target from a specified dependency tuple.
 
-  name is the target name, specified in other BUILD files.
-  version is a hardcoded version string
-  dependency_name is used to identify the specific binary to resolve
+    name is the target name, specified in other BUILD files.
+    version is a hardcoded version string
+    dependency_name is used to identify the specific binary to resolve
   """
   dependency_name = dependency_name or name
-  versioned_name = "%s==%s" % (name, version)
-  python_requirement(dependency_name, name=name)
+  versioned_name = "%s==%s" % (dependency_name, version)
+  python_requirement(requirement=versioned_name, name=name)
 
 
 make_dep('ansicolors', '1.0.2')
@@ -50,4 +50,4 @@ make_dep('pytest', '2.3.5')
 make_dep('pytest-cov', '1.6')
 make_dep('socksipy-branch', '1.03', 'SocksiPy-Branch')
 make_dep('thrift', '0.9.0')
-make_dep('zookeeper', '', 'zc-zookeeper-static')
+make_dep('zc-zookeeper-static', '3.4.4')
