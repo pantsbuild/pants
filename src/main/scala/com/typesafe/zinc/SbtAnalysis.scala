@@ -225,8 +225,9 @@ object SbtAnalysis {
    * Run an analysis reload. The in-memory cache is updated from the specified file.
    */
   def runReload(cacheFiles: Seq[File]): Unit = {
+    // TODO: Do we still need reload functionality now that we cache by fingerprint?
     for (cacheFile <- cacheFiles) {
-      Compiler.analysisCache.put(cacheFile, Compiler.createAnalysisStore(cacheFile))
+      Compiler.analysisStore(cacheFile).get()
     }
   }
 
