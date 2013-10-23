@@ -28,9 +28,10 @@ object Compiler {
   val residentCache: GlobalsCache = createResidentCache(Setup.Defaults.residentCacheLimit)
 
   /**
-   * Static cache for compile analyses.
+   * Static cache for compile analyses.  Values must be Options because in get() we don't yet know if, on
+   * a cache miss, the underlying file will yield a valid Analysis.
    */
-  val analysisCache = Cache[File, AnalysisStore](Setup.Defaults.analysisCacheLimit)
+  val analysisCache = Cache[FileFPrint, Option[(Analysis, CompileSetup)]](Setup.Defaults.analysisCacheLimit)
 
   /**
    * Get or create a zinc compiler based on compiler setup.
@@ -81,19 +82,25 @@ object Compiler {
   }
 
   /**
-   * Get or create an analysis store.
+   * Create an analysis store backed by analysisCache.
    */
   def analysisStore(cacheFile: File): AnalysisStore = {
-    analysisCache.get(cacheFile)(createAnalysisStore(cacheFile))
-  }
-
-  /**
-   * Create a new analysis store based on a cache file.
-   */
-  def createAnalysisStore(cacheFile: File): AnalysisStore = {
     import sbinary.DefaultProtocol.{immutableMapFormat, immutableSetFormat, StringFormat, tuple2Format}
     import sbt.inc.AnalysisFormats._
-    AnalysisStore.sync(AnalysisStore.cached(FileBasedStore(cacheFile)))
+
+    val fileStore = AnalysisStore.cached(FileBasedStore(cacheFile))
+
+    val fprintStore = new AnalysisStore {
+      def set(analysis: Analysis, setup: CompileSetup) {
+        fileStore.set(analysis, setup)
+        FileFPrint.fprint(cacheFile) foreach { analysisCache.put(_, Some((analysis, setup))) }
+      }
+      def get(): Option[(Analysis, CompileSetup)] = {
+        FileFPrint.fprint(cacheFile) flatMap { fprint => analysisCache.get(fprint)(fileStore.get) }
+      }
+    }
+
+    AnalysisStore.sync(AnalysisStore.cached(fprintStore))
   }
 
   /**
