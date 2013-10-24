@@ -133,8 +133,8 @@ object Inputs {
    * for the cache location, otherwise uses the default location for output directories.
    */
   def cacheFor(file: File, exclude: File, mapped: Map[File, File]): Option[File] = {
-    if (file == exclude) None else mapped.get(file) orElse {
-      if (file.isDirectory) Some(defaultCacheLocation(file)) else None
+    mapped.get(file) orElse {
+      if (file.isDirectory && file != exclude) Some(defaultCacheLocation(file)) else None
     }
   }
 
