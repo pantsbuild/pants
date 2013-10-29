@@ -8,7 +8,6 @@ import java.io.File
 import sbt.compiler.CompileOutput
 import sbt.inc.{ APIs, Analysis, Relations, SourceInfos, Stamps }
 import sbt.{ CompileSetup, IO, Logger, Relation }
-import scala.annotation.tailrec
 import xsbti.compile.SingleOutput
 
 object SbtAnalysis {
@@ -55,13 +54,9 @@ object SbtAnalysis {
    * Currently the compile setups are not actually merged, last one wins.
    */
   def mergeAnalyses(cacheFiles: Seq[File]): Option[(Analysis, CompileSetup)] = {
-    cacheFiles.foldLeft(None: Option[(Analysis, CompileSetup)]) { (merged, cacheFile) =>
-      val store = Compiler.analysisStore(cacheFile)
-      store.get match {
-        case None => merged
-        case merging @ Some((analysis, setup)) => merged map { case (a, _) => (a ++ analysis, setup) } orElse merging
-      }
-    }
+    val analysesAndSetups: Seq[(Analysis, CompileSetup)] = cacheFiles flatMap { Compiler.analysisStore(_).get() }
+    val mergedAnalysis = Analysis.merge(analysesAndSetups map {_._1})
+    analysesAndSetups.lastOption map { x: (Analysis, CompileSetup) => (mergedAnalysis, x._2) }
   }
 
   /**
@@ -186,38 +181,40 @@ object SbtAnalysis {
         (srcs, analysis) <- mapping
         src <- srcs
       } yield (src, analysis)
+      // A split with no specified source files acts as a "catch-all", for analysis
+      // belonging to source files not specified on any other split.
+      val catchAll: Option[File] = mapping.find( { _._1.isEmpty } ) map { _._2 }
+      def discriminator(f: File): Option[File] = expandedMapping.get(f) match {
+        case None => catchAll
+        case s => s
+      }
       cache match {
         case None => throw new Exception("No cache file specified")
         case Some(cacheFile) =>
-          Compiler.analysisStore(cacheFile).get match {
+          Compiler.analysisStore(cacheFile).get() match {
             case None => throw new Exception("No analysis cache found at: " + cacheFile)
-            case Some ((analysis, compileSetup)) =>
-              for ((splitCacheOpt, splitAnalysis) <- analysis.groupBy(expandedMapping.get _)) {
-                splitCacheOpt match {
-                  case None =>
-                  case Some(splitCache) =>
-                    Compiler.analysisStore(splitCache).set(splitAnalysis, compileSetup)
-                    if (mirrorAnalysis) {
-                      printRelations(splitAnalysis, Some(new File(splitCache.getPath() + ".relations")), cwd)
-                    }
+            case Some ((analysis, compileSetup)) => {
+              def writeAnalysis(cacheFile: File, analysis: Analysis) {
+                Compiler.analysisStore(cacheFile).set(analysis, compileSetup)
+                if (mirrorAnalysis) {
+                  printRelations(analysis, Some(new File(cacheFile.getPath + ".relations")), cwd)
                 }
               }
+              val grouped: Map[Option[File], Analysis] = analysis.groupBy(discriminator)
+              for ((splitCacheOpt, splitAnalysis) <- grouped) {
+                splitCacheOpt match {
+                  case Some(splitCache) => writeAnalysis(splitCache, splitAnalysis)
+                  case None =>
+                }
+              }
+              // Some groups may be empty, but we still want to write something out.
+              val emptySplits: Set[File] = mapping.values.toSet -- grouped.keySet.flatten
+              for (file <- emptySplits) {
+                writeAnalysis(file, Analysis.Empty)
+              }
+            }
           }
       }
-    }
-  }
-
-  /**
-   * Find all sources not in a specified set of sources.
-   *
-   * If set of sources is a single directory, finds all sources outside that directory.
-   */
-  def findOutsideSources(analysis: Analysis, sources: Seq[File]): Set[File] = {
-    val pathSet = Set(sources map { f => f.getAbsolutePath } : _*)
-    if (pathSet.size == 1 && sources.head.isDirectory)
-      (analysis.relations.srcProd.all map (_._1) filter { src => IO.relativize(sources.head, src).isEmpty }).toSet
-    else {
-      (analysis.relations.srcProd.all map (_._1) filter { src => !pathSet.contains(src.getAbsolutePath) }).toSet
     }
   }
 
