@@ -19,7 +19,7 @@ import shutil
 
 from twitter.common.dirutil import safe_mkdir
 
-from twitter.pants import has_resources
+from twitter.pants import has_resources, TaskError
 from twitter.pants.tasks import Task
 
 
@@ -33,6 +33,8 @@ class PrepareResources(Task):
     self.context.products.require_data('exclusives_groups')
 
   def execute(self, targets):
+    if len(targets) == 0:
+      return
     def extract_resources(target):
       return target.resources if has_resources(target) else ()
     all_resources = set()

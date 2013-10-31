@@ -31,6 +31,7 @@ from twitter.pants.commands import Command
 from twitter.pants.goal import RunTracker
 from twitter.pants.goal.initialize_reporting import initial_reporting
 from twitter.pants.reporting.report import Report
+from twitter.pants.tasks.nailgun_task import NailgunTask
 
 
 _HELP_ALIASES = set([
@@ -142,9 +143,8 @@ def _run():
   run_tracker.log(Report.INFO, 'See a report at: %s' % url)
   run_tracker.log(Report.INFO, '(To run a reporting server: ./pants server)')
 
+  command = command_class(run_tracker, root_dir, parser, command_args)
   try:
-    command = command_class(run_tracker, root_dir, parser, command_args)
-
     if command.serialized():
       def onwait(pid):
         print('Waiting on pants process %s to complete' % _process_info(pid), file=sys.stderr)
@@ -163,7 +163,11 @@ def _run():
       lock.release()
   finally:
     run_tracker.end()
-
+    # Must kill nailguns only after run_tracker.end() is called, because there may still
+    # be pending background work that needs a nailgun.
+    if (hasattr(command.options, 'cleanup_nailguns') and command.options.cleanup_nailguns) \
+        or config.get('nailgun', 'autokill', default=False):
+      NailgunTask.killall(None)
 
 def main():
   try:

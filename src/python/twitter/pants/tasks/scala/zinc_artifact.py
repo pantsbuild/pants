@@ -33,7 +33,6 @@ from twitter.pants.targets.scala_tests import ScalaTests
 from twitter.pants.tasks import TaskError
 from twitter.pants.tasks.scala.zinc_artifact_state import ZincArtifactState, ZincArtifactStateDiff
 
-AnalysisFileSpec = namedtuple('AnalysisFileSpec', ['analysis_file', 'class_basedir'])
 
 class ZincArtifactFactory(object):
   """Creates objects representing zinc artifacts."""
@@ -62,12 +61,6 @@ class ZincArtifactFactory(object):
     factory = self
     return _MergedZincArtifact(artifacts, factory, targets, sources_by_target,
                                *self._artifact_args(targets))
-
-  # Useful for when we only need access to the analysis file, and don't have an artifact object.
-  def analysis_file_for_targets(self, targets):
-    # Needs to return AnalysisFileSpec objects, not just the file path.
-    artifact_data = self._artifact_args(targets)
-    return AnalysisFileSpec(artifact_data[2], artifact_data[1])
 
   # There are two versions of the zinc analysis file: The one zinc creates on compilation, which
   # contains full paths and is therefore not portable, and the portable version, that we create by

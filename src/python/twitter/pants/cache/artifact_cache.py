@@ -16,16 +16,18 @@ class ArtifactCache(object):
 
   class CacheError(Exception):
     """Indicates a problem writing to or reading from the cache."""
+    pass
 
-  def __init__(self, log, artifact_root):
+  def __init__(self, log, artifact_root, read_only=False):
     """Create an ArtifactCache.
 
     All artifacts must be under artifact_root.
     """
     self.log = log
     self.artifact_root = artifact_root
+    self.read_only = read_only  # If true, silently skip writes.
 
-  def insert(self, cache_key, build_artifacts):
+  def insert(self, cache_key, paths):
     """Cache the output of a build.
 
     If there is an existing set of artifacts for this key they are deleted.
@@ -34,28 +36,22 @@ class ArtifactCache(object):
           outputs.
 
     cache_key: A CacheKey object.
-    build_artifacts: List of paths to generated artifacts. These must be under pants_workdir.
+    paths: List of paths to generated dirs/files. These must be under the artifact_root.
     """
-    # It's OK for artifacts not to exist- we assume that the build didn't need to create them
-    # in this case (e.g., a no-op build on an empty target).
-    build_artifacts_that_exist = filter(lambda f: os.path.exists(f), build_artifacts)
-    try:
-      self.try_insert(cache_key, build_artifacts_that_exist)
-    except Exception as e:
-      err_msg = 'Error while writing to artifact cache: %s. Deleting, just in case.' % e
-      self.log.error(err_msg)
+    if not self.read_only:
+      missing_files = filter(lambda f: not os.path.exists(f), paths)
       try:
-        self.delete(cache_key)
-      except Exception:
-        self.log.debug('Failed to delete %s on error.' % cache_key.id)
+        if missing_files:
+          raise ArtifactCache.CacheError('Tried to cache nonexistent files: %s' % missing_files)
+        self.try_insert(cache_key, paths)
+      except Exception as e:
+        self.log.error('Error while writing to artifact cache: %s. ' % e)
 
-  def try_insert(self, cache_key, build_artifacts):
+  def try_insert(self, cache_key, paths):
     """Attempt to cache the output of a build, without error-handling.
 
-    If there is an existing set of artifacts for this key they are deleted.
-
     cache_key: A CacheKey object.
-    build_artifacts: List of paths to generated artifacts. These must be under pants_workdir.
+    paths: List of paths to generated dirs/files. These must be under the artifact_root.
     """
     pass
 
@@ -63,9 +59,11 @@ class ArtifactCache(object):
     pass
 
   def use_cached_files(self, cache_key):
-    """Use the artifacts cached for the given key.
+    """Use the files cached for the given key.
 
-    Returns True if files were found and used, False otherwise.
+    Returns an appropriate Artifact instance if files were found and used, None otherwise.
+    Callers will typically only care about the truthiness of the return value. They usually
+    don't need to tinker with the returned instance.
 
     cache_key: A CacheKey object.
     """
@@ -76,6 +74,10 @@ class ArtifactCache(object):
 
     Deleting non-existent artifacts is a no-op.
     """
+    pass
+
+  def prune(self, age_hours):
+    """Clean up cache files older than age_hours, if possible."""
     pass
 
 

@@ -94,14 +94,15 @@ class JvmDependencyCache(object):
                             help="[%default] Enable warnings for declared dependencies " \
                               "that are not needed.")
 
-  def __init__(self, context, targets, all_analysis_files):
+  def __init__(self, context, targets, analysis_file, classes_dir):
     """
     Parameters:
       context: The task context instance.
       targets: The set of targets to analyze. These should all be target types that
                inherit from jvm_target, and contain source files that will be compiled into
                jvm class files.
-      all_analysis_files: The analysis files of the targets to analyze, and all their deps.
+      analysis_file: The analysis file of the targets to analyze, and all their deps.
+      classes_dir: The root dir of the classes package tree for classes in the analysis file.
     """
 
     # The package prefixes are part of a hack to make it possible to use the
@@ -114,7 +115,8 @@ class JvmDependencyCache(object):
                                                    'dep-analysis-package-prefixes')
     if self.package_prefixes is None:
       self.package_prefixes = [ 'com', 'org', 'net', 'scala' ]
-    self.all_analysis_files = all_analysis_files
+    self.analysis_file = analysis_file
+    self.classes_dir = classes_dir
     self.zinc_analysis_collection = None
     self.context = context
     self.check_missing_deps = self.context.options.scala_check_missing_deps
@@ -209,9 +211,8 @@ class JvmDependencyCache(object):
       self.zinc_analysis_collection = \
           ZincAnalysisCollection(False,
                                  package_prefixes=self.package_prefixes)
-      for af in self.all_analysis_files:
-        basedir = os.path.relpath(af.class_basedir, self.context._buildroot)
-        self.zinc_analysis_collection.add_and_parse_file(af.analysis_file, basedir)
+      basedir = os.path.relpath(self.classes_dir, self.context._buildroot)
+      self.zinc_analysis_collection.add_and_parse_file(self.analysis_file, basedir)
     return self.zinc_analysis_collection
 
   def get_targets_by_class(self):

@@ -17,11 +17,12 @@
 import os
 
 from zipfile import  ZIP_STORED, ZIP_DEFLATED
+import zipfile
 
 from twitter.common.contextutil import temporary_dir
 from twitter.common.dirutil import safe_mkdir
 
-from twitter.pants import get_buildroot, get_version, is_internal
+from twitter.pants import get_buildroot, get_version, is_internal, TaskError
 from twitter.pants.fs.archive import ZIP
 from twitter.pants.java import open_jar, Manifest
 from twitter.pants.tasks.jvm_binary_task import JvmBinaryTask
@@ -103,10 +104,13 @@ class BinaryCreate(JvmBinaryTask):
     self.context.log.debug('  dumping %s' % jarpath)
 
     with temporary_dir() as tmpdir:
-      ZIP.extract(jarpath, tmpdir)
+      try:
+        ZIP.extract(jarpath, tmpdir)
+      except zipfile.BadZipfile:
+        raise TaskError('Bad JAR file, maybe empty: %s' % jarpath)
       for root, dirs, files in os.walk(tmpdir):
-        for file in files:
-          path = os.path.join(root, file)
+        for f in files:
+          path = os.path.join(root, f)
           relpath = os.path.relpath(path, tmpdir)
           if Manifest.PATH != relpath:
             jarfile.write(path, relpath)

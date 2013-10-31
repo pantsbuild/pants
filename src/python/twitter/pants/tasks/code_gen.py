@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==================================================================================================
+import os
 
 __author__ = 'John Sirois'
 
@@ -47,7 +48,8 @@ class CodeGen(Task):
   def genlang(self, lang, targets):
     """Subclass must override and generate code in :lang for the given targets.
 
-    May return a list of dirs/files to be stored in the artifact cache.
+    May return a list of pairs (target, files) where files is a list of files
+    to be cached against the target.
     """
     raise NotImplementedError
 
@@ -101,27 +103,33 @@ class CodeGen(Task):
       ))
 
     with self.invalidated(gentargets, invalidate_dependents=True) as invalidation_check:
-      for vt in invalidation_check.invalid_vts_partitioned:
-        invalid_targets = set(vt.targets)
-        artifact_files = []
+      for vts in invalidation_check.invalid_vts_partitioned:
+        invalid_targets = set(vts.targets)
         for lang, tgts in gentargets_bylang.items():
-          lang_invalid = invalid_targets.intersection(tgts)
-          if lang_invalid:
-            artifact_files.extend(self.genlang(lang, lang_invalid) or [])
-        if self._artifact_cache and self.context.options.write_to_artifact_cache and artifact_files:
-          self.update_artifact_cache([(vt, artifact_files)])
+          invalid_lang_tgts = invalid_targets.intersection(tgts)
+          if invalid_lang_tgts:
+            self.genlang(lang, invalid_lang_tgts)
 
-    # Link synthetic targets for all in-play gen targets
+    # Link synthetic targets for all in-play gen targets.
+    invalid_vts_by_target = dict([(vt.target, vt) for vt in invalidation_check.invalid_vts])
+    vts_artifactfiles_pairs = []
+    write_to_artifact_cache = \
+      self.get_artifact_cache() and self.context.options.write_to_artifact_cache \
+        if invalid_vts_by_target else False
     for lang, tgts in gentargets_bylang.items():
       if tgts:
         langtarget_by_gentarget = {}
         for target in tgts:
-          langtarget_by_gentarget[target] = self.createtarget(
+          syn_target = self.createtarget(
             lang,
             target,
             dependees_by_gentarget.get(target, [])
           )
-          langtarget_by_gentarget[target].add_labels('synthetic')
+          syn_target.add_labels('synthetic')
+          if write_to_artifact_cache and target in invalid_vts_by_target:
+            sources = [os.path.join(syn_target.target_base, s) for s in syn_target.sources]
+            vts_artifactfiles_pairs.append((invalid_vts_by_target[target], sources))
+          langtarget_by_gentarget[target] = syn_target
         genmap = self.context.products.get(lang)
         # synmap is a reverse map
         # such as a map of java library target generated from java thrift target
@@ -135,3 +143,5 @@ class CodeGen(Task):
               self.updatedependencies(langtarget, langtarget_by_gentarget[dep])
             else:  # Depend directly on the dep.
               self.updatedependencies(langtarget, dep)
+    if write_to_artifact_cache:
+      self.update_artifact_cache(vts_artifactfiles_pairs)

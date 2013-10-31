@@ -26,6 +26,7 @@ from twitter.common.contextutil import open_zip as open_jar, temporary_dir
 from twitter.common.dirutil import  safe_open
 
 from twitter.pants import get_buildroot
+from twitter.pants.base.hash_utils import hash_file
 from twitter.pants.goal.workunit import WorkUnit
 from twitter.pants.tasks import TaskError
 from twitter.pants.binary_util import find_java_home
@@ -48,7 +49,11 @@ class ZincUtils(object):
 
     # The target scala version.
     self._compile_profile = context.config.get('scala-compile', 'compile-profile')
+
+    # The zinc version (and the scala version it needs, which may differ from the target version).
     self._zinc_profile = context.config.get('scala-compile', 'zinc-profile')
+
+    # Compiler plugins.
     self._plugins_profile = context.config.get('scala-compile', 'scalac-plugins-profile')
 
     self._main = context.config.get('scala-compile', 'main')
@@ -65,8 +70,9 @@ class ZincUtils(object):
     self._compiler_classpath = cp_for_profile(self._compile_profile)
     self._plugin_jars = cp_for_profile(self._plugins_profile) if self._plugins_profile else []
 
-    zinc_jars = ZincUtils.identify_zinc_jars(self._compiler_classpath, self._zinc_classpath)
+    zinc_jars = ZincUtils.identify_zinc_jars(self._zinc_classpath)
     self._zinc_jar_args = []
+    self._zinc_jar_args.extend(['-scala-path', ':'.join(self._compiler_classpath)])
     for (name, jarpath) in zinc_jars.items():  # The zinc jar names are also the flag names.
       self._zinc_jar_args.extend(['-%s' % name, jarpath])
 
@@ -108,19 +114,19 @@ class ZincUtils(object):
     args = ['-S' + x for x in self._scalac_args]
 
     if len(upstream_analysis_files) > 0:
-      # upstream_analysis_files is a map to pairs of (artifact_file, class_basedir).
-      # For the command-line argument here, we need to change that to map the same keys
-      # to just the artifact_file.
       args.extend(
-        ['-analysis-map', ','.join(['%s:%s' % (kv[0], kv[1].analysis_file)
-                                    for kv in upstream_analysis_files.items()])])
+        ['-analysis-map', ','.join(['%s:%s' % kv for kv in upstream_analysis_files.items()])])
 
     args.extend([
       '-analysis-cache', analysis_file,
-      '-classpath', ':'.join(self._zinc_classpath + classpath),
+      # We add compiler_classpath to ensure the scala-library jar is on the classpath.
+      # TODO: This also adds the compiler jar to the classpath, which compiled code shouldn't
+      # usually need. Be more selective?
+      '-classpath', ':'.join(self._compiler_classpath + classpath),
       '-d', output_dir
     ])
     args.extend(sources)
+    self.log_zinc_file(analysis_file)
     return self.run_zinc(args, workunit_labels=[WorkUnit.COMPILER])
 
   # Run zinc in analysis manipulation mode.
@@ -130,15 +136,18 @@ class ZincUtils(object):
       '-cache', analysis_file,
     ]
     zinc_analysis_args.extend(args)
-    return self.run_zinc(args=zinc_analysis_args, workunit_name=workunit_name)
+    return self.run_zinc(args=zinc_analysis_args, workunit_name=workunit_name, workunit_labels=[WorkUnit.COMPILER])
 
   # src_cache - split this analysis cache.
   # splits - a list of (sources, dst_cache), where sources is a list of the sources whose analysis
   #          should be split into dst_cache.
   def run_zinc_split(self, src_analysis_file, splits):
+    # Must use the abspath of the sources, because that's what Zinc uses internally.
     zinc_split_args = [
-      '-split', ','.join(['{%s}:%s' % (':'.join(x[0]), x[1]) for x in splits]),
+      '-split', ','.join(
+        ['{%s}:%s' % (':'.join([os.path.abspath(p) for p in x[0]]), x[1]) for x in splits]),
     ]
+    self.log_zinc_file(src_analysis_file)
     return self.run_zinc_analysis(src_analysis_file, zinc_split_args, workunit_name='split')
 
   # src_analysis_files - a list of analysis files to merge into dst_analysis_file.
@@ -146,6 +155,8 @@ class ZincUtils(object):
     zinc_merge_args = [
       '-merge', ':'.join(src_analysis_files),
     ]
+    for analysis_file in src_analysis_files:
+      self.log_zinc_file(analysis_file)
     return self.run_zinc_analysis(dst_analysis_file, zinc_merge_args, workunit_name='merge')
 
   # cache - the analysis cache to rebase.
@@ -173,7 +184,7 @@ class ZincUtils(object):
     # in those rare cases.
     with temporary_dir() as tmp_analysis_dir:
       tmp_analysis_file = os.path.join(tmp_analysis_dir, "analysis")
-      shutil.copy(src, tmp_analysis_file)
+      ZincUtils._copy_analysis(src, tmp_analysis_file)
       rebasings = [
         (self._java_home, ''),  # Erase java deps.
         (self._ivy_home, ZincUtils.IVY_HOME_PLACEHOLDER),
@@ -181,24 +192,20 @@ class ZincUtils(object):
       ]
       exit_code = self.run_zinc_rebase(tmp_analysis_file, rebasings)
       if not exit_code:
-        shutil.copy(tmp_analysis_file, dst)
+        ZincUtils._copy_analysis(tmp_analysis_file, dst)
       return exit_code
 
   def localize_analysis_file(self, src, dst):
     with temporary_dir() as tmp_analysis_dir:
       tmp_analysis_file = os.path.join(tmp_analysis_dir, "analysis")
-      shutil.copy(src, tmp_analysis_file)
+      ZincUtils._copy_analysis(src, tmp_analysis_file)
       rebasings = [
         (ZincUtils.IVY_HOME_PLACEHOLDER, self._ivy_home),
         (ZincUtils.PANTS_HOME_PLACEHOLDER, self._pants_home),
       ]
       exit_code = self.run_zinc_rebase(tmp_analysis_file, rebasings)
       if not exit_code:
-        shutil.copy(tmp_analysis_file, dst)
-        tmp_relations_file = tmp_analysis_file + '.relations'
-        dst_relations_file = dst + '.relations'
-        if os.path.exists(tmp_relations_file):
-          shutil.copy(tmp_relations_file, dst_relations_file)
+        ZincUtils._copy_analysis(tmp_analysis_file, dst)
       return exit_code
 
   def write_plugin_info(self, resources_dir, target):
@@ -214,18 +221,17 @@ class ZincUtils(object):
 
   # These are the names of the various jars zinc needs. They are, conveniently and
   # non-coincidentally, the names of the flags used to pass the jar locations to zinc.
-  compiler_jar_names = ['scala-library', 'scala-compiler']  # Compiler version.
-  zinc_jar_names = ['compiler-interface', 'sbt-interface']  # Other jars zinc needs pointers to.
+  compiler_jar_names = ['scala-library', 'scala-compiler', 'scala-reflect']  # Compiler version.
+  zinc_jar_names = ['compiler-interface', 'sbt-interface' ]  # Other jars zinc needs pointers to.
 
   @staticmethod
-  def identify_zinc_jars(compiler_classpath, zinc_classpath):
-    """Find the named jars in the compiler and zinc classpaths.
+  def identify_zinc_jars(zinc_classpath):
+    """Find the named jars in the zinc classpath.
 
     TODO: When profiles migrate to regular pants jar() deps instead of ivy.xml files we can
           make these mappings explicit instead of deriving them by jar name heuristics.
     """
     ret = OrderedDict()
-    ret.update(ZincUtils.identify_jars(ZincUtils.compiler_jar_names, compiler_classpath))
     ret.update(ZincUtils.identify_jars(ZincUtils.zinc_jar_names, zinc_classpath))
     return ret
 
@@ -274,3 +280,33 @@ class ZincUtils(object):
     if len(unresolved_plugins) > 0:
       raise TaskError('Could not find requested plugins: %s' % list(unresolved_plugins))
     return plugins
+
+  def log_zinc_file(self, analysis_file):
+    self.context.log.debug('Calling zinc on: %s (%s)' % (analysis_file, hash_file(analysis_file).upper() if os.path.exists(analysis_file) else 'nonexistent'))
+
+  @staticmethod
+  def is_nonempty_analysis(path):
+    """Returns true iff path exists and points to a non-empty analysis."""
+    relfile = path + '.relations'
+    if not os.path.exists(relfile):
+      return False
+    empty_prefix = 'products:\n\n'  # Empty analyses have a blank line instead of products.
+    with open(relfile, 'r') as infile:
+      prefix = infile.read(len(empty_prefix))
+    return prefix != empty_prefix
+
+  @staticmethod
+  def _move_analysis(src, dst):
+    ZincUtils.copy_or_move_analysis(shutil.move, src, dst)
+
+  @staticmethod
+  def _copy_analysis(src, dst):
+    ZincUtils.copy_or_move_analysis(shutil.copy, src, dst)
+
+  @staticmethod
+  def copy_or_move_analysis(func, src, dst):
+    if os.path.exists(src):
+      func(src, dst)
+      relations = src + '.relations'
+      if os.path.exists(relations):
+        func(relations, dst + '.relations')

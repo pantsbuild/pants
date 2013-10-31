@@ -6,15 +6,12 @@ from twitter.pants import is_internal
 from twitter.pants.goal.workunit import WorkUnit
 from twitter.pants.targets import InternalTarget
 from twitter.pants.tasks import TaskError
-from twitter.pants.tasks.check_exclusives import CheckExclusives
-
 
 
 class Group(object):
   @staticmethod
   def _get_exclusives_product(context):
     return context.products.get_data('exclusives_groups')
-
 
   @staticmethod
   def execute(phase, tasks_by_goal, context, executed):

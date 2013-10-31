@@ -193,15 +193,24 @@ class Goal(Command):
            help="Do not colorize log messages."),
     Option("-n", "--dry-run", action="store_true", dest="dry_run", default=False,
       help="Print the commands that would be run, without actually running them."),
+
     Option("--read-from-artifact-cache", "--no-read-from-artifact-cache", action="callback",
-      callback=_set_bool, dest="read_from_artifact_cache", default=False,
+      callback=_set_bool, dest="read_from_artifact_cache", default=True,
       help="Whether to read artifacts from cache instead of building them, when possible."),
     Option("--write-to-artifact-cache", "--no-write-to-artifact-cache", action="callback",
-      callback=_set_bool, dest="write_to_artifact_cache", default=False,
+      callback=_set_bool, dest="write_to_artifact_cache", default=True,
       help="Whether to write artifacts to cache ."),
     Option("--verify-artifact-cache", "--no-verify-artifact-cache", action="callback",
       callback=_set_bool, dest="verify_artifact_cache", default=False,
       help="Whether to verify that cached artifacts are identical after rebuilding them."),
+
+    Option("--local-artifact-cache-readonly", "--no-local-artifact-cache-readonly", action="callback",
+           callback=_set_bool, dest="local_artifact_cache_readonly", default=False,
+           help="If set, we don't write to local artifact caches, even when writes are enabled."),
+    Option("--remote-artifact-cache-readonly", "--no-remote-artifact-cache-readonly", action="callback",
+           callback=_set_bool, dest="remote_artifact_cache_readonly", default=False,
+           help="If set, we don't write to remote artifact caches, even when writes are enabled."),
+
     Option("--all", dest="target_directory", action="append",
            help="DEPRECATED: Use [dir]: with no flag in a normal target position on the command "
                 "line. (Adds all targets found in the given directory's BUILD file. Can be "
@@ -447,12 +456,6 @@ class Goal(Command):
       return _list_goals(context, 'Unknown goal(s): %s' % ' '.join(phase.name for phase in unknown))
 
     ret = Phase.attempt(context, self.phases)
-
-    if self.options.cleanup_nailguns or self.config.get('nailgun', 'autokill', default = False):
-      if log:
-        log.debug('auto-killing nailguns')
-      NailgunTask.killall(log)
-
     return ret
 
   def cleanup(self):
@@ -714,10 +717,14 @@ goal(name='scala',
      dependencies=['gen', 'resolve', 'check-exclusives']).install('compile').with_description(
        'Compile both generated and checked in code.'
      )
+
+class AptCompile(JavaCompile): pass  # So they're distinct in log messages etc.
+
 goal(name='apt',
-     action=JavaCompile,
+     action=AptCompile,
      group=group('jvm', is_apt),
      dependencies=['gen', 'resolve', 'check-exclusives']).install('compile')
+
 goal(name='java',
      action=JavaCompile,
      group=group('jvm', _is_java),

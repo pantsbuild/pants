@@ -40,8 +40,8 @@ class VersionedTargetSet(object):
   built together into a single artifact.
   """
 
-  @classmethod
-  def from_versioned_targets(cls, versioned_targets):
+  @staticmethod
+  def from_versioned_targets(versioned_targets):
     first_target = versioned_targets[0]
     cache_manager = first_target._cache_manager
 
@@ -54,7 +54,7 @@ class VersionedTargetSet(object):
                          " CacheManager instances: %s and %s" % (first_target, versioned_target,
                                                                  cache_manager,
                                                                  versioned_target._cache_manager))
-    return cls(cache_manager, versioned_targets)
+    return VersionedTargetSet(cache_manager, versioned_targets)
 
   def __init__(self, cache_manager, versioned_targets):
     self._cache_manager = cache_manager
@@ -64,6 +64,7 @@ class VersionedTargetSet(object):
     self.cache_key = CacheKeyGenerator.combine_cache_keys([vt.cache_key
                                                            for vt in versioned_targets])
     self.num_sources = self.cache_key.num_sources
+    self.sources = self.cache_key.sources
     self.valid = not cache_manager.needs_update(self.cache_key)
 
   def update(self):

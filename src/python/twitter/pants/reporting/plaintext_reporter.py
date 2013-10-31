@@ -19,7 +19,11 @@ except ImportError:
 
 
 class PlainTextReporter(Reporter):
-  """Plain-text reporting to stdout."""
+  """Plain-text reporting to stdout.
+
+  We only report progress for things under the default work root. It gets too
+  confusing to try and show progress for background work too.
+  """
 
   # Console reporting settings.
   #   outfile: Write to this file-like object.
@@ -60,10 +64,14 @@ class PlainTextReporter(Reporter):
 
   def start_workunit(self, workunit):
     """Implementation of Reporter callback."""
+    if not self.is_under_main_root(workunit):
+      return
+
     if workunit.parent and workunit.parent.has_label(WorkUnit.MULTITOOL):
       # For brevity, we represent each consecutive invocation of a multitool with a dot.
       self.emit('.')
-    else:
+    elif not workunit.parent or \
+        all([not x.has_label(WorkUnit.MULTITOOL) for x in workunit.parent.ancestors()]):
       self.emit('\n%s %s %s[%s]' %
                        (workunit.start_time_string(),
                         workunit.start_delta_string(),
@@ -76,6 +84,9 @@ class PlainTextReporter(Reporter):
 
   def end_workunit(self, workunit):
     """Implementation of Reporter callback."""
+    if not self.is_under_main_root(workunit):
+      return
+
     if workunit.outcome() != WorkUnit.SUCCESS and not self._show_output(workunit):
       # Emit the suppressed workunit output, if any, to aid in debugging the problem.
       for name, outbuf in workunit.outputs().items():
@@ -85,6 +96,9 @@ class PlainTextReporter(Reporter):
 
   def do_handle_log(self, workunit, level, *msg_elements):
     """Implementation of Reporter callback."""
+    if not self.is_under_main_root(workunit):
+      return
+
     # If the element is a (msg, detail) pair, we ignore the detail. There's no
     # useful way to display it on the console.
     elements = [e if isinstance(e, basestring) else e[0] for e in msg_elements]
@@ -92,14 +106,18 @@ class PlainTextReporter(Reporter):
     if self.settings.color:
       msg = _colorfunc_map.get(level, lambda x: x)(msg)
     self.emit(self._prefix(workunit, msg))
+    self.flush()
 
   def handle_output(self, workunit, label, s):
     """Implementation of Reporter callback."""
+    if not self.is_under_main_root(workunit):
+      return
+
     if self._show_output_indented(workunit):
       self.emit(self._prefix(workunit, s))
     elif self._show_output_unindented(workunit):
       self.emit(s)
-      self.flush()
+    self.flush()
 
   def emit(self, s):
     self.settings.outfile.write(s)

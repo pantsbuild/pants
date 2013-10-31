@@ -156,11 +156,11 @@ class JarCreate(Task):
         jar_name = '%s.jar' % jarname(target)
         add_genjar(target, jar_name)
         jar_path = os.path.join(self._output_dir, jar_name)
-        with self.create_jar(target, jar_path) as zip:
+        with self.create_jar(target, jar_path) as jarfile:
           if generated:
             for basedir, classfiles in generated.items():
               for classfile in classfiles:
-                zip.write(os.path.join(basedir, classfile), classfile)
+                jarfile.write(os.path.join(basedir, classfile), classfile)
 
           if has_resources(target):
             resources_genmap = self.context.products.get('resources')
@@ -170,7 +170,7 @@ class JarCreate(Task):
                 if resource_map:
                   for basedir, files in resource_map.items():
                     for resource in files:
-                      zip.write(os.path.join(basedir, resource), resource)
+                      jarfile.write(os.path.join(basedir, resource), resource)
 
   def idljar(self, jvm_targets, add_genjar):
     for target in jvm_targets:

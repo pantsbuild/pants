@@ -26,6 +26,18 @@ class WorkUnit(object):
   SUCCESS = 3
   UNKNOWN = 4
 
+  @staticmethod
+  def choose_for_outcome(outcome, aborted_val, failure_val, warning_val, success_val, unknown_val):
+    """Returns one of the 5 arguments, depending on the outcome."""
+    if outcome not in range(0, 5):
+      raise Exception('Invalid outcome: %s' % outcome)
+    return (aborted_val, failure_val, warning_val, success_val, unknown_val)[outcome]
+
+  @staticmethod
+  def outcome_string(outcome):
+    """Returns a human-readable string describing the outcome."""
+    return WorkUnit.choose_for_outcome(outcome, 'ABORTED', 'FAILURE', 'WARNING', 'SUCCESS', 'UNKNOWN')
+
   # Labels describing a workunit.  Reporting code can use this to decide how to display
   # information about this workunit.
   #
@@ -107,7 +119,7 @@ class WorkUnit(object):
     worst outcome of any of its subunits and any outcome set on it directly."""
     if outcome < self._outcome:
       self._outcome = outcome
-      self.choose(0, 0, 0, 0, 0)  # Dummy call, to validate.
+      self.choose(0, 0, 0, 0, 0)  # Dummy call, to validate outcome.
       if self.parent: self.parent.set_outcome(self._outcome)
 
   _valid_name_re = re.compile(r'\w+')
@@ -129,13 +141,8 @@ class WorkUnit(object):
 
   def choose(self, aborted_val, failure_val, warning_val, success_val, unknown_val):
     """Returns one of the 5 arguments, depending on our outcome."""
-    if self._outcome not in range(0, 5):
-      raise Exception('Invalid outcome: %s' % self._outcome)
-    return (aborted_val, failure_val, warning_val, success_val, unknown_val)[self._outcome]
-
-  def outcome_string(self):
-    """Returns a human-readable string describing our outcome."""
-    return self.choose('ABORTED', 'FAILURE', 'WARNING', 'SUCCESS', 'UNKNOWN')
+    return WorkUnit.choose_for_outcome(self._outcome,
+                            aborted_val, failure_val, warning_val, success_val, unknown_val)
 
   def duration(self):
     """Returns the time (in fractional seconds) spent in this workunit and its children."""
@@ -147,8 +154,14 @@ class WorkUnit(object):
 
   def start_delta_string(self):
     """A convenient string representation of how long after the run started we started."""
-    delta = int(self.start_time) - int(self.run_tracker.root_workunit.start_time)
+    delta = int(self.start_time) - int(self.root().start_time)
     return '%02d:%02d' % (delta / 60, delta % 60)
+
+  def root(self):
+    ret = self
+    while ret.parent is not None:
+      ret = ret.parent
+    return ret
 
   def ancestors(self):
     """Returns a list consisting of this workunit and those enclosing it, up to the root."""

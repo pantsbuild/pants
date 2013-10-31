@@ -59,9 +59,13 @@ class IvyUtils(object):
     return os.path.join(self._cachedir, '%s-%s-%s.xml' % (org, name, conf))
 
   def parse_xml_report(self, conf):
-    """Returns the IvyInfo representing the info in the xml report."""
+    """Returns the IvyInfo representing the info in the xml report, or None of no report exists."""
+    path = self.xml_report_path(conf)
+    if not os.path.exists(path):
+      return None
+
     ret = IvyInfo()
-    etree = xml.etree.cElementTree.parse(self.xml_report_path(conf))
+    etree = xml.etree.cElementTree.parse(path)
     doc = etree.getroot()
     for module in doc.findall('dependencies/module'):
       org = module.get('organisation')

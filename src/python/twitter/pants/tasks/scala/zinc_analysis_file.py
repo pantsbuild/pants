@@ -39,9 +39,6 @@ class ZincAnalysisCollection(object):
     self.stop_after = stop_after
     self.package_prefixes = set(package_prefixes or ['com', 'org', 'net'])
 
-    # The analysis files we gather information from.
-    self.analysis_files = []
-
     # Map from scala source files to the class files generated from that source
     self.products = defaultdict(set)
     # map from scala source files to the classes generated from that source.
@@ -118,8 +115,9 @@ class ZincAnalysisCollection(object):
     depmaps = (self.products, self.binary_deps, self.source_deps, self.external_deps, self.class_names)
     classes_maps = (self.product_classes, self.binary_dep_classes, None, None, None)
 
+    relations_file = '%s.relations' % analysis_file
     try:
-      with open('%s.relations' % analysis_file, 'r') as zincfile:
+      with open(relations_file, 'r') as zincfile:
         current_section = None
 
         for line in zincfile:
@@ -142,6 +140,6 @@ class ZincAnalysisCollection(object):
           if current_section == ZincAnalysisCollection.DONE:
             return
     except IOError:
-      print 'ERROR: analysis file %s not found' % analysis_file
+      print 'ERROR: relations file %s not found' % relations_file
     except KeyError as e:
       print 'ERROR: unrecognized section: %s' % e

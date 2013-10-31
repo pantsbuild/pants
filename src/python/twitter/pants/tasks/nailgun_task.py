@@ -21,7 +21,6 @@ import subprocess
 import threading
 import time
 
-from twitter.common import log
 from twitter.common.dirutil import safe_open
 from twitter.common.python.platforms import Platform
 
@@ -85,6 +84,8 @@ class NailgunTask(Task):
     # Allows us to identify the nailgun process by its cmd-line.
     self._identifier_arg = '-Dpants.ng.identifier=%s' % os.path.relpath(workdir, get_buildroot())
 
+    self._current_pidport = None
+
     self._ng_out = os.path.join(workdir, 'stdout')
     self._ng_err = os.path.join(workdir, 'stderr')
 
@@ -122,9 +123,9 @@ class NailgunTask(Task):
           ret = call_nailgun(main, *opts_args)
           workunit.set_outcome(WorkUnit.FAILURE if ret else WorkUnit.SUCCESS)
           return ret
-        except NailgunError as e:
+        except NailgunError:
           self._ng_shutdown()
-          raise e
+          raise
     else:
       def runjava_workunit_factory(name, labels=list(), cmd=''):
         return self.context.new_workunit(name=name, labels=workunit_labels + labels, cmd=cmd)
@@ -195,10 +196,11 @@ class NailgunTask(Task):
         pass
 
   def _get_nailgun_endpoint(self):
-    pid_port = NailgunTask._find(self._identifier_arg)
-    if pid_port:
-      self.context.log.debug('found ng server @ pid:%d port:%d' % pid_port)
-    return pid_port
+    if not self._current_pidport:
+      self._current_pidport = NailgunTask._find(self._identifier_arg)
+      if self._current_pidport:
+        self.context.log.debug('found ng server @ pid:%d port:%d' % self._current_pidport)
+    return self._current_pidport
 
   def _get_nailgun_client(self, workunit):
     with self._spawn_lock:
@@ -231,17 +233,17 @@ class NailgunTask(Task):
 
     port = endpoint[1]
     nailgun = self._create_ngclient(port, workunit)
-    log.debug('Detected ng server up on port %d' % port)
+    self.context.log.debug('Detected ng server up on port %d' % port)
 
     attempt = 0
     while attempt < max_socket_connect_attempts:
       sock = nailgun.try_connect()
       if sock:
         sock.close()
-        log.info('Connected to ng server pid: %d @ port: %d' % endpoint)
+        self.context.log.debug('Connected to ng server pid: %d @ port: %d' % endpoint)
         return nailgun
       attempt += 1
-      log.debug('Failed to connect on attempt %d' % attempt)
+      self.context.log.debug('Failed to connect on attempt %d' % attempt)
       time.sleep(0.1)
     raise NailgunError('Failed to connect to ng after %d connect attempts'
                        % max_socket_connect_attempts)
@@ -251,7 +253,7 @@ class NailgunTask(Task):
                          out=workunit.output('stdout'), err=workunit.output('stderr'))
 
   def _spawn_nailgun_server(self, workunit):
-    log.info('No ng server found, spawning...')
+    self.context.log.debug('No ng server found, spawning...')
 
     with _safe_open(self._ng_out, 'w'):
       pass  # truncate
@@ -261,23 +263,23 @@ class NailgunTask(Task):
       # In the parent tine - block on ng being up for connections
       return self._await_nailgun_server(workunit)
 
+    # NOTE: Don't use self.context.log or self.context.new_workunit here.
+    # They use threadlocal state, which interacts poorly with fork().
     os.setsid()
     in_fd = open('/dev/null', 'w')
     out_fd = safe_open(self._ng_out, 'w')
     err_fd = safe_open(self._ng_err, 'w')
-
     args = ['java']
     if self._ng_server_args:
       args.extend(self._ng_server_args)
     args.append(NailgunTask.PANTS_NG_ARG)
     args.append(self._identifier_arg)
-    ng_classpath = os.pathsep.join(binary_util.profile_classpath(self._nailgun_profile,
-      workunit_factory=self.context.new_workunit))
+    ng_classpath = os.pathsep.join(binary_util.profile_classpath(self._nailgun_profile))
     args.extend(['-cp', ng_classpath, 'com.martiansoftware.nailgun.NGServer', ':0'])
-    log.debug('Executing: %s' % ' '.join(args))
+    s = ' '.join(args)
 
-    with binary_util.safe_classpath(logger=log.warn):
-      process = subprocess.Popen(
+    with binary_util.safe_classpath():
+      subprocess.Popen(
         args,
         stdin=in_fd,
         stdout=out_fd,
@@ -285,7 +287,6 @@ class NailgunTask(Task):
         close_fds=True,
         cwd=get_buildroot()
       )
-      log.debug('Spawned ng server @ %d' % process.pid)
       # Prevents finally blocks being executed, unlike sys.exit(). We don't want to execute finally
       # blocks because we might, e.g., clean up tempfiles that the parent still needs.
       os._exit(0)
@@ -343,7 +344,8 @@ class NailgunProcessManager(object):
   def killall(log, everywhere=False):
     for pid in NailgunProcessManager._find_ngs(everywhere=everywhere):
       try:
-        NailgunTask._log_kill(log, pid)
+        if log:
+          NailgunTask._log_kill(log, pid)
         os.kill(pid, signal.SIGKILL)
       except OSError:
         pass
@@ -357,7 +359,7 @@ class NailgunProcessManager(object):
     pid = pids[0]
 
     # Expected output of the lsof cmd: pPID\nn[::127.0.0.1]:PORT
-    lines = NailgunProcessManager._run_cmd('lsof -a -p %s -i TCP -s TCP:LISTEN -Fn' % pid)
+    lines = NailgunProcessManager._run_cmd('lsof -a -p %s -i TCP -s TCP:LISTEN -P -Fn' % pid)
     if lines is None or len(lines) != 2 or lines[0] != 'p%s' % pid:
       return None
     port = lines[1][lines[1].rfind(':') + 1:].strip()

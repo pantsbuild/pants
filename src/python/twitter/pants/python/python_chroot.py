@@ -15,7 +15,7 @@
 # ==================================================================================================
 
 from __future__ import print_function
-from twitter.pants.cache.file_based_artifact_cache import FileBasedArtifactCache
+import shutil
 
 __author__ = 'Brian Wickman'
 
@@ -25,7 +25,7 @@ import sys
 import tempfile
 
 from twitter.common.collections import OrderedSet
-from twitter.common.dirutil import safe_rmtree
+from twitter.common.dirutil import safe_rmtree, safe_mkdir_for
 from twitter.common.python.interpreter import PythonIdentity
 from twitter.common.python.pex_builder import PEXBuilder
 from twitter.common.python.platforms import Platform
@@ -121,10 +121,9 @@ class PythonChroot(object):
     self._resolver = MultiResolver.from_target(self._config, target, conn_timeout=conn_timeout)
     self._builder = builder or PEXBuilder(tempfile.mkdtemp())
 
-    artifact_cache_root = os.path.join(self._config.get('python-setup', 'artifact_cache'),
-                                       '%s' % PythonIdentity.get())
-    self._artifact_cache = FileBasedArtifactCache(None, self._root, artifact_cache_root,
-                                                  self._builder.add_dependency_file)
+    # Note: unrelated to the general pants artifact cache.
+    self._egg_cache_root = os.path.join(self._config.get('python-setup', 'artifact_cache'),
+                                        '%s' % PythonIdentity.get())
 
   def __del__(self):
     if os.getenv('PANTS_LEAVE_CHROOT') is None:
@@ -183,9 +182,13 @@ class PythonChroot(object):
     absolute_sources = library.expand_files()
     absolute_sources.sort()
     cache_key = self._key_generator.key_for(library.id, absolute_sources)
-    if self._artifact_cache.has(cache_key):
+    cache_dir = os.path.join(self._egg_cache_root, cache_key.hash)
+    if os.path.exists(cache_dir):
       self.debug('  Generating (cached) %s...' % library)
-      self._artifact_cache.use_cached_files(cache_key)
+      # We have no idea what the egg path is, so we simply walk the directory.
+      for dir_name, _, filenames in os.walk(cache_dir):
+        for filename in filenames:
+          self._builder.add_egg(os.path.join(dir_name, filename))
     else:
       self.debug('  Generating %s...' % library)
       egg_file = builder.build_egg()
@@ -196,7 +199,14 @@ class PythonChroot(object):
           cache_key.hash + '_' + os.path.basename(egg_file))
       self.debug('       %s => %s' % (src_egg_file, dst_egg_file))
       os.rename(src_egg_file, dst_egg_file)
-      self._artifact_cache.insert(cache_key, [dst_egg_file])
+      cache_dir = os.path.join(self._egg_cache_root, cache_key.hash)
+      cached_egg_file = os.path.join(cache_dir, os.path.relpath(dst_egg_file, self._root))
+      try:
+        safe_mkdir_for(cached_egg_file)
+        shutil.copy(dst_egg_file, cached_egg_file)
+      except:
+        safe_rmtree(cache_dir)
+        raise
       self._builder.add_egg(dst_egg_file)
 
   def resolve(self, targets):

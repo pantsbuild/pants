@@ -9,7 +9,7 @@ from twitter.common.dirutil import safe_mkdir
 from twitter.pants.base.build_invalidator import CacheKey
 from twitter.pants.cache import create_artifact_cache, select_best_url
 from twitter.pants.cache.combined_artifact_cache import CombinedArtifactCache
-from twitter.pants.cache.file_based_artifact_cache import FileBasedArtifactCache
+from twitter.pants.cache.local_artifact_cache import LocalArtifactCache
 from twitter.pants.cache.restful_artifact_cache import RESTfulArtifactCache
 from twitter.pants.testutils import MockLogger
 
@@ -65,21 +65,21 @@ class TestArtifactCache(unittest.TestCase):
     artifact_root = '/bogus/artifact/root'
 
     def check(expected_type, spec):
-      cache = create_artifact_cache(MockLogger(), artifact_root, spec, 'TestTask')
+      cache = create_artifact_cache(MockLogger(), artifact_root, spec, 'TestTask', False, False)
       self.assertTrue(isinstance(cache, expected_type))
       self.assertEquals(cache.artifact_root, artifact_root)
 
-    with temporary_file() as temp:
-      path = temp.name  # Must be a real path, since we safe_mkdir it.
-      check(FileBasedArtifactCache, path)
+    with temporary_dir() as tmpdir:
+      cachedir = os.path.join(tmpdir, 'cachedir')  # Must be a real path, so we can safe_mkdir it.
+      check(LocalArtifactCache, cachedir)
       check(RESTfulArtifactCache, 'http://localhost/bar')
-      check(CombinedArtifactCache, [path, 'http://localhost/bar'])
+      check(CombinedArtifactCache, [cachedir, 'http://localhost/bar'])
 
 
   def test_local_cache(self):
     with temporary_dir() as artifact_root:
       with temporary_dir() as cache_root:
-        artifact_cache = FileBasedArtifactCache(None, artifact_root, cache_root)
+        artifact_cache = LocalArtifactCache(None, artifact_root, cache_root)
         self.do_test_artifact_cache(artifact_cache)
 
 
@@ -114,7 +114,7 @@ class TestArtifactCache(unittest.TestCase):
 
       # Cache it.
       self.assertFalse(artifact_cache.has(key))
-      self.assertFalse(artifact_cache.use_cached_files(key))
+      self.assertFalse(bool(artifact_cache.use_cached_files(key)))
       artifact_cache.insert(key, [path])
       self.assertTrue(artifact_cache.has(key))
 
@@ -123,7 +123,7 @@ class TestArtifactCache(unittest.TestCase):
         outfile.write(TEST_CONTENT2)
 
       # Recover it from the cache.
-      self.assertTrue(artifact_cache.use_cached_files(key))
+      self.assertTrue(bool(artifact_cache.use_cached_files(key)))
 
       # Check that it was recovered correctly.
       with open(path, 'r') as infile:

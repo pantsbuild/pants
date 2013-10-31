@@ -113,7 +113,7 @@ class CheckExclusives(Task):
       for key in partition_keys:
         mapping.add_conflict(key, partition_keys[key])
       mapping._populate_target_maps(targets)
-      self.context.products.add_data('exclusives_groups', mapping)
+      self.context.products.set_data('exclusives_groups', mapping)
 
 
 class ExclusivesMapping(object):
@@ -277,9 +277,7 @@ class ExclusivesMapping(object):
     for key in self._group_classpaths:
       if group_key is None or self._is_compatible(group_key, key):
         group_classpath = self._group_classpaths[key]
-        for cpel in path_additions:
-          if cpel not in group_classpath:
-            group_classpath.add(cpel)
+        group_classpath.update(path_additions)
 
   def set_base_classpath_for_group(self, group_key, classpath):
     # set the initial classpath of the elements of group_key to classpath.

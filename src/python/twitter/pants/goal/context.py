@@ -9,6 +9,7 @@ from contextlib import contextmanager
 from twitter.common.collections import OrderedSet
 from twitter.common.dirutil import Lock
 from twitter.common.process import ProcessProviderFactory
+from twitter.common.process.process_provider import ProcessProvider
 
 from twitter.pants import get_buildroot
 from twitter.pants import SourceRoot
@@ -21,11 +22,14 @@ from twitter.pants.targets import Pants
 
 # Utility definition for grabbing process info for locking.
 def _process_info(pid):
-  ps = ProcessProviderFactory.get()
-  ps.collect_set([pid])
-  handle = ps.get_handle(pid)
-  cmdline = handle.cmdline().replace('\0', ' ')
-  return '%d (%s)' % (pid, cmdline)
+  try:
+    ps = ProcessProviderFactory.get()
+    ps.collect_set([pid])
+    handle = ps.get_handle(pid)
+    cmdline = handle.cmdline().replace('\0', ' ')
+    return '%d (%s)' % (pid, cmdline)
+  except ProcessProvider.UnknownPidError:
+    return '%d' % pid
 
 
 class Context(object):
@@ -102,9 +106,22 @@ class Context(object):
   def __str__(self):
     return 'Context(id:%s, state:%s, targets:%s)' % (self.id, self.state, self.targets())
 
+  def submit_foreground_work_and_wait(self, work, workunit_parent=None):
+    """Returns the pool to which tasks can submit foreground (blocking) work."""
+    return self.run_tracker.foreground_worker_pool().submit_work_and_wait(
+      work, workunit_parent=workunit_parent)
+
+  def submit_background_work_chain(self, work_chain, workunit_parent=None):
+    self.run_tracker.background_worker_pool().submit_async_work_chain(
+      work_chain, workunit_parent=workunit_parent)
+
+  def background_worker_pool(self):
+    """Returns the pool to which tasks can submit background work."""
+    return self.run_tracker.background_worker_pool()
+
   @contextmanager
-  def new_workunit(self, name, labels=list(), cmd=''):
-    with self.run_tracker.new_workunit(name=name, labels=labels, cmd=cmd) as workunit:
+  def new_workunit(self, name, labels=list(), cmd='', parent=None):
+    with self.run_tracker.new_workunit(name=name, labels=labels, cmd=cmd, parent=parent) as workunit:
       yield workunit
 
   def acquire_lock(self):

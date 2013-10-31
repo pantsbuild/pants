@@ -32,6 +32,7 @@ from twitter.pants import binary_util, get_buildroot, is_internal, is_jar, is_jv
 from twitter.pants.base.generator import Generator, TemplateData
 from twitter.pants.base.revision import Revision
 from twitter.pants.tasks import TaskError
+from twitter.pants.tasks.cache_manager import VersionedTargetSet
 from twitter.pants.tasks.ivy_utils import IvyUtils
 from twitter.pants.tasks.nailgun_task import NailgunTask
 
@@ -103,7 +104,6 @@ class IvyResolve(NailgunTask):
     self._template_path = os.path.join('templates', 'ivy_resolve', 'ivy.mustache')
 
     self._work_dir = context.config.get('ivy-resolve', 'workdir')
-    self._classpath_file = os.path.join(self._work_dir, 'classpath')
     self._classpath_dir = os.path.join(self._work_dir, 'mapped')
 
     self._outdir = context.options.ivy_resolve_outdir or os.path.join(self._work_dir, 'reports')
@@ -111,6 +111,10 @@ class IvyResolve(NailgunTask):
     self._report = self._open or context.options.ivy_resolve_report
     self._ivy_utils = IvyUtils(context, self._cachedir)
     context.products.require_data('exclusives_groups')
+
+    # Typically this should be a local cache only, since classpaths aren't portable.
+    artifact_cache_spec = context.config.getlist('ivy-resolve', 'artifact_caches2', default=[])
+    self.setup_artifact_cache(artifact_cache_spec)
 
     def parse_override(override):
       match = re.match(r'^([^#]+)#([^=]+)=([^\s]+)$', override)
@@ -186,42 +190,33 @@ class IvyResolve(NailgunTask):
       for target in group_targets:
         classpath_targets.update(filter(is_classpath, filter(is_concrete, target.resolve())))
 
+      if len(classpath_targets) == 0:
+        continue  # Nothing to do.
+
       target_workdir = os.path.join(self._work_dir, dirname_for_requested_targets(group_targets))
       target_classpath_file = os.path.join(target_workdir, 'classpath')
       with self.invalidated(classpath_targets, only_buildfiles=True,
                             invalidate_dependents=True) as invalidation_check:
         # Note that it's possible for all targets to be valid but for no classpath file to exist at
-        # target_classpath_file, e.g., if we previously build a superset of targets.
+        # target_classpath_file, e.g., if we previously built a superset of targets.
         if invalidation_check.invalid_vts or not os.path.exists(target_classpath_file):
+          # TODO(benjy): s/targets/classpath_targets/ ??
           self._exec_ivy(target_workdir, targets, [
             '-cachepath', target_classpath_file,
             '-confs'
           ] + self._confs)
 
-      if not os.path.exists(target_classpath_file):
-        print ('Ivy failed to create classpath file at %s %s' % target_classpath_file)
+          if not os.path.exists(target_classpath_file):
+            raise TaskError('Ivy failed to create classpath file at %s %s' % target_classpath_file)
+          if self.get_artifact_cache() and self.context.options.write_to_artifact_cache:
+            global_vts = VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
+            self.update_artifact_cache([(global_vts, [target_classpath_file])])
 
-      def safe_link(src, dest):
-        if os.path.exists(dest):
-          os.unlink(dest)
-        os.symlink(src, dest)
-
-      # TODO(benjy): Is this symlinking valid in the presence of multiple exclusives groups?
-      # Should probably get rid of it and use a local artifact cache instead.
-      # Symlink to the current classpath file.
-      safe_link(target_classpath_file, self._classpath_file)
-
-      # Symlink to the current ivy.xml file (useful for IDEs that read it).
-      ivyxml_symlink = os.path.join(self._work_dir, 'ivy.xml')
-      target_ivyxml = os.path.join(target_workdir, 'ivy.xml')
-      safe_link(target_ivyxml, ivyxml_symlink)
-
-      if os.path.exists(self._classpath_file):
-        with self._cachepath(self._classpath_file) as classpath:
-          for path in classpath:
-            if self._map_jar(path):
-              for conf in self._confs:
-                groups.update_compatible_classpaths(group_key, [(conf, path.strip())])
+      with self._cachepath(target_classpath_file) as classpath:
+        for path in classpath:
+          if self._map_jar(path):
+            for conf in self._confs:
+              groups.update_compatible_classpaths(group_key, [(conf, path.strip())])
 
     if self._report:
       self._generate_ivy_report()
@@ -234,6 +229,12 @@ class IvyResolve(NailgunTask):
       genmap = self.context.products.get(self._mapfor_typename())
       for target in filter(create_jardeps_for, targets):
         self._mapjars(genmap, target)
+
+  def check_artifact_cache_for(self, invalidation_check):
+    # Ivy resolution is an output dependent on the entire target set, and is not divisible
+    # by target. So we can only cache it keyed by the entire target set.
+    global_vts = VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
+    return [global_vts]
 
   def _extract_classpathdeps(self, targets):
     """Subclasses can override to filter out a set of targets that should be resolved for classpath
@@ -282,7 +283,8 @@ class IvyResolve(NailgunTask):
       # This is sort-of an abuse of the build-products. But build products
       # are already so abused, and this really does make sense.
       ivyinfo = self._ivy_utils.parse_xml_report(conf)
-      genmap.add("ivy", conf, [ivyinfo])
+      if ivyinfo:
+        genmap.add("ivy", conf, [ivyinfo])
 
   def _generate_ivy_report(self):
     def make_empty_report(report, organisation, module, conf):
@@ -335,7 +337,7 @@ class IvyResolve(NailgunTask):
       binary_util.ui_open(*reports)
 
   def _calculate_classpath(self, targets):
-    def is_jardependant(target):
+    def is_jardependent(target):
       return is_jar(target) or is_jvm(target)
 
     jars = {}
@@ -363,7 +365,7 @@ class IvyResolve(NailgunTask):
         excludes.update(target.excludes)
 
     for target in targets:
-      target.walk(collect_jars, is_jardependant)
+      target.walk(collect_jars, is_jardependent)
 
     return jars.values(), excludes
 

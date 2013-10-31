@@ -1,8 +1,8 @@
 import httplib
-import os
 import urlparse
-from twitter.common.contextutil import temporary_file_path, open_tar, temporary_file
+from twitter.common.contextutil import temporary_file_path, temporary_file
 from twitter.common.quantity import Amount, Data
+from twitter.pants.cache.artifact import TarballArtifact
 from twitter.pants.cache.artifact_cache import ArtifactCache
 
 
@@ -11,13 +11,13 @@ class RESTfulArtifactCache(ArtifactCache):
 
   READ_SIZE = int(Amount(4, Data.MB).as_(Data.BYTES))
 
-  def __init__(self, log, artifact_root, url_base, compress=True):
+  def __init__(self, log, artifact_root, url_base, compress=True, read_only=False):
     """
     url_base: The prefix for urls on some RESTful service. We must be able to PUT and GET to any
               path under this base.
     compress: Whether to compress the artifacts before storing them.
     """
-    ArtifactCache.__init__(self, log, artifact_root)
+    ArtifactCache.__init__(self, log, artifact_root, read_only)
     parsed_url = urlparse.urlparse(url_base)
     if parsed_url.scheme == 'http':
       self._ssl = False
@@ -30,40 +30,29 @@ class RESTfulArtifactCache(ArtifactCache):
     self._path_prefix = parsed_url.path.rstrip('/')
     self.compress = compress
 
-  def try_insert(self, cache_key, build_artifacts):
+  def try_insert(self, cache_key, paths):
     with temporary_file_path() as tarfile:
-      # In our tests, gzip is slightly less compressive than bzip2 on .class files,
-      # but decompression times are much faster.
-      mode = 'w:gz' if self.compress else 'w'
-      with open_tar(tarfile, mode, dereference=True) as tarout:
-        for artifact in build_artifacts:
-          # Adds dirs recursively.
-          tarout.add(artifact, os.path.relpath(artifact, self.artifact_root))
+      artifact = TarballArtifact(self.artifact_root, tarfile, self.compress)
+      artifact.collect(paths)
 
       with open(tarfile, 'rb') as infile:
-        path = self._path_for_key(cache_key)
-        if not self._request('PUT', path, body=infile):
-          raise self.CacheError('Failed to PUT to %s. Error: 404' % self._url_string(path))
+        remote_path = self._remote_path_for_key(cache_key)
+        if not self._request('PUT', remote_path, body=infile):
+          raise self.CacheError('Failed to PUT to %s. Error: 404' % self._url_string(remote_path))
 
   def has(self, cache_key):
-    return self._request('HEAD', self._path_for_key(cache_key)) is not None
+    return self._request('HEAD', self._remote_path_for_key(cache_key)) is not None
 
   def use_cached_files(self, cache_key):
     # This implementation fetches the appropriate tarball and extracts it.
-    path = self._path_for_key(cache_key)
+    remote_path = self._remote_path_for_key(cache_key)
     try:
       # Send an HTTP request for the tarball.
-      response = self._request('GET', path)
+      response = self._request('GET', remote_path)
       if response is None:
-        return False
-      expected_size = int(response.getheader('content-length', -1))
-      if expected_size == -1:
-        raise self.CacheError('No content-length header in HTTP response')
+        return None
 
       done = False
-      self.log.info('Reading %d bytes from artifact cache at %s' %
-                    (expected_size, self._url_string(path)))
-
       with temporary_file() as outfile:
         total_bytes = 0
         # Read the data in a loop.
@@ -74,29 +63,31 @@ class RESTfulArtifactCache(ArtifactCache):
             done = True
           total_bytes += len(data)
         outfile.close()
-        self.log.debug('Read %d bytes' % total_bytes)
+        self.log.debug('Read %d bytes from artifact cache at %s' %
+                       (total_bytes,self._url_string(remote_path)))
 
-        # Check the size.
-        if total_bytes != expected_size:
-          raise self.CacheError('Read only %d bytes from %d expected' % (total_bytes,
-                                                                         expected_size))
         # Extract the tarfile.
-        with open_tar(outfile.name, 'r') as tarfile:
-          tarfile.extractall(self.artifact_root)
-      return True
+        artifact = TarballArtifact(self.artifact_root, outfile.name, self.compress)
+        artifact.extract()
+        return artifact
     except Exception as e:
-        self.log.warn('Error while reading from artifact cache: %s' % e)
-        return False
+      self.log.warn('Error while reading from remote artifact cache: %s' % e)
+      return None
 
   def delete(self, cache_key):
-    path = self._path_for_key(cache_key)
-    self._request('DELETE', path)
+    remote_path = self._remote_path_for_key(cache_key)
+    self._request('DELETE', remote_path)
 
-  def _path_for_key(self, cache_key):
+  def prune(self, age_hours):
+    # Doesn't make sense for a client to prune a remote server.
+    # Better to run tmpwatch on the server.
+    pass
+
+  def _remote_path_for_key(self, cache_key):
     # Note: it's important to use the id as well as the hash, because two different targets
     # may have the same hash if both have no sources, but we may still want to differentiate them.
-    return '%s/%s/%s.tar%s' % (self._path_prefix, cache_key.id, cache_key.hash,
-                               '.gz' if self.compress else '')
+    return '%s/%s/%s%s' % (self._path_prefix, cache_key.id, cache_key.hash,
+                               '.tar.gz' if self.compress else '.tar')
 
   def _connect(self):
     if self._ssl:

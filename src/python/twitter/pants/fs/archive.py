@@ -45,7 +45,7 @@ class TarArchiver(Archiver):
 
   @classmethod
   def extract(cls, path, outdir):
-    with open_tar(path) as tar:
+    with open_tar(path, errorlevel=1) as tar:
       tar.extractall(outdir)
 
   def __init__(self, mode, extension):
@@ -55,7 +55,7 @@ class TarArchiver(Archiver):
 
   def create(self, basedir, outdir, name, prefix=None):
     tarpath = os.path.join(outdir, '%s.%s' % (name, self.extension))
-    with open_tar(tarpath, self.mode, dereference=True) as tar:
+    with open_tar(tarpath, self.mode, dereference=True, errorlevel=1) as tar:
       tar.add(basedir, arcname=prefix or '')
     return tarpath
 

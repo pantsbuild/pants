@@ -80,6 +80,18 @@ class Dependencies(object):
     for sourcefile, classfiles in other_deps.classes_by_source.items():
       self.classes_by_source[sourcefile] = classfiles.copy()
 
+  def split(self, splits):
+    """Split dep information out of this object.
+
+    splits: a list of pairs (srcs, path) where srcs is a list of files (relative to the build root)
+            whose deps info is to be written to path.
+    """
+    for srcs, path in splits:
+      dst_deps = Dependencies(self.outputdir)
+      for src in srcs:
+        dst_deps.add(src, self.classes_by_source.get(src, set()))
+      dst_deps.save(path)
+
   def findclasses(self, targets):
     """
       Returns a mapping from a target to its source to classes mapping.

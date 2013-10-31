@@ -1,4 +1,5 @@
 from collections import namedtuple
+from twitter.pants.goal import RunTracker
 
 
 class Reporter(object):
@@ -60,3 +61,7 @@ class Reporter(object):
     s: The content captured.
     """
     pass
+
+  def is_under_main_root(self, workunit):
+    """Is the workunit running under the main thread's root."""
+    return self.run_tracker.is_under_main_root(workunit)

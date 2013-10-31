@@ -78,39 +78,25 @@ class Products(object):
                               for basedir, outputs in outputs_by_basedir.items()))
 
   def __init__(self):
-    self.products = {}
-    self.data_products = {}
+    self.products = {}  # type -> ProductMapping instance.
     self.predicates_for_type = defaultdict(list)
 
+    self.data_products = {}  # type -> arbitrary object.
+    self.required_data_products = set()
+
   def require(self, typename, predicate=None):
-    """
-      Registers a requirement that file products of the given type by mapped.  If a target predicate is
-      supplied, only targets matching the predicate are mapped.
+    """Registers a requirement that file products of the given type by mapped.
+
+    If a target predicate is supplied, only targets matching the predicate are mapped.
     """
     if predicate:
       self.predicates_for_type[typename].append(predicate)
     return self.products.setdefault(typename, Products.ProductMapping(typename))
 
-  def require_data(self, *typename):
-    for t in typename:
-      self.data_products[t] = {}
-
-  def is_required_data(self, typename):
-    return self.data_products.has_key(typename)
-
-  def get_data(self, typename):
-    if self.data_products.has_key(typename):
-      return self.data_products[typename]
-    else:
-      return None
-
-  def add_data(self, typename, data):
-    self.data_products[typename] = data
-
   def isrequired(self, typename):
-    """
-      Returns a predicate that selects targets required for the given type if mappings are
-      required.  Otherwise returns None.
+    """Returns a predicate that selects targets required for the given type if mappings are required.
+
+    Otherwise returns None.
     """
     if typename not in self.products:
       return None
@@ -122,26 +108,25 @@ class Products(object):
     """Returns a ProductMapping for the given type name."""
     return self.require(typename)
 
-  def require_data(self, *typenames):
+  def require_data(self, typename):
     """ Registers a requirement that data produced by tasks is required.
-    Params:
-      typenames a list of names of data products that are should be generated.
+
+    typename: the name of a data product that should be generated.
     """
-    for t in typenames:
-      self.data_products[t] = {}
+    self.required_data_products.add(typename)
 
   def is_required_data(self, typename):
     """ Checks if a particular data product is required by any tasks."""
-    return self.data_products.has_key(typename)
+    return typename in self.required_data_products
 
   def get_data(self, typename):
     """ Returns a data product, or None if the product isn't found."""
-    if self.data_products.has_key(typename):
-      return self.data_products[typename]
-    else:
-      return None
+    return self.data_products.get(typename)
 
   def set_data(self, typename, data):
-    """ Stores a required data product. If the product already exists, the value is replaced. """
+    """ Stores a required data product.
+
+    If the product already exists, the value is replaced.
+    """
     self.data_products[typename] = data
 

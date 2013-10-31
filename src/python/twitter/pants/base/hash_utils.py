@@ -34,6 +34,9 @@ def hash_file(path, digest=None):
   If a hashlib message digest is not supplied a new sha1 message digest is used.
   """
   digest = digest or hashlib.sha1()
-  with open(path, "rb") as fd:
-    digest.update(fd.read())
+  with open(path, 'rb') as fd:
+    s = fd.read(8192)
+    while s:
+      digest.update(s)
+      s = fd.read(8192)
   return digest.hexdigest()
