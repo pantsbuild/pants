@@ -5,10 +5,12 @@
 package com.typesafe.zinc
 
 import java.io.File
+import java.nio.charset.Charset
 import sbt.compiler.CompileOutput
 import sbt.inc.{ APIs, Analysis, Relations, SourceInfos, Stamps }
-import sbt.{ CompileSetup, IO, Logger, Relation }
+import sbt.{ CompileSetup, Logger, Relation, Using }
 import xsbti.compile.SingleOutput
+
 
 object SbtAnalysis {
 
@@ -242,24 +244,26 @@ object SbtAnalysis {
   def printRelations(analysis: Analysis, output: Option[File], cwd: Option[File]): Unit = {
     for (file <- output) {
       val userDir = (cwd getOrElse Setup.Defaults.userDir) + "/"
-      def noCwd(path: String) = path stripPrefix userDir
-      def keyValue(kv: (Any, Any)) = "   " + noCwd(kv._1.toString) + " -> " + noCwd(kv._2.toString)
-      def relation(r: Relation[_, _]) = (r.all.toSeq map keyValue).sorted.mkString("\n")
-      import analysis.relations.{ srcProd, binaryDep, internalSrcDep, externalDep, classes }
-      val relationStrings = Seq(srcProd, binaryDep, internalSrcDep, externalDep, classes) map relation
-      val output = """
-        |products:
-        |%s
-        |binary dependencies:
-        |%s
-        |source dependencies:
-        |%s
-        |external dependencies:
-        |%s
-        |class names:
-        |%s
-        """.trim.stripMargin.format(relationStrings: _*)
-      sbt.IO.write(file, output)
+      Using.fileWriter(utf8)(file) { out =>
+        def writeNoCwd(s: String) = if (s.startsWith(userDir)) out.write(s, userDir.length, s.length - userDir.length) else out.write(s)
+        def printRelation(header: String, r: Relation[File, _]) {
+          out.write(header + ":\n")
+          r._1s.toSeq.sorted foreach { k =>
+            r.forward(k).toSeq.map(_.toString).sorted foreach { v =>
+              out.write("   "); writeNoCwd(k.toString); out.write(" -> "); writeNoCwd(v); out.write("\n")
+            }
+          }
+        }
+        import analysis.relations.{ srcProd, binaryDep, internalSrcDep, externalDep, classes }
+        val sections =
+          ("products", srcProd) ::
+          ("binary dependencies", binaryDep) ::
+          ("source dependencies", internalSrcDep) ::
+          ("external dependencies", externalDep) ::
+          ("class names", classes) ::
+          Nil
+        sections foreach { x => printRelation(x._1, x._2) }
+      }
     }
   }
 
@@ -268,10 +272,17 @@ object SbtAnalysis {
    */
   def printProducts(analysis: Analysis, output: Option[File], classesDirectory: File): Unit = {
     for (file <- output) {
-      def relative(path: String) = Util.relativize(classesDirectory, new File(path))
-      def keyValue(kv: (Any, Any)) = relative(kv._1.toString) + " -> " + relative(kv._2.toString)
-      val output = (analysis.relations.srcProd.all.toSeq map keyValue).sorted.mkString("\n")
-      sbt.IO.write(file, output)
+      Using.fileWriter(utf8)(file) { out =>
+        def relative(path: File) = Util.relativize(classesDirectory, path)
+        import analysis.relations.srcProd
+        srcProd._1s.toSeq.sorted foreach {  k =>
+          srcProd.forward(k).toSeq.sorted foreach { v =>
+            out.write(relative(k)); out.write(" -> "); out.write(relative(v)); out.write("\n")
+          }
+        }
+      }
     }
   }
+
+  private[this] val utf8 =  Charset.forName("UTF-8")
 }
