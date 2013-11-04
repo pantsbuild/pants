@@ -65,7 +65,10 @@ class ScalaCompile(NailgunTask):
 
     # Set up the zinc utils.
     color = not context.options.no_color
-    self._zinc_utils = ZincUtils(context=context, nailgun_task=self, color=color)
+    self._zinc_utils = ZincUtils(context=context,
+                                 nailgun_task=self,
+                                 color=color,
+                                 bootstrap_utils=self._bootstrap_utils)
 
     # The rough number of source files to build in each compiler pass.
     self._partition_size_hint = (context.options.scala_compile_partition_size_hint
@@ -467,5 +470,5 @@ class ScalaCompile(NailgunTask):
       # TODO(John Sirois): Map target.resources in the same way
       # Create and Map scala plugin info files to the owning targets.
       if is_scalac_plugin(target) and target.classname:
-        basedir, plugin_info_file = self._zinc_utils.write_plugin_info(self._resources_dir, target)
+        basedir, plugin_info_file = ZincUtils.write_plugin_info(self._resources_dir, target)
         genmap.add(target, basedir, [plugin_info_file])
