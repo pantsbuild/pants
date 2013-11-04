@@ -40,9 +40,13 @@ class Checkstyle(NailgunTask):
                             help="[%default] Skip checkstyle.")
 
   def __init__(self, context):
-    self._profile = context.config.get('checkstyle', 'profile')
     workdir = context.config.get('checkstyle', 'nailgun_dir')
     NailgunTask.__init__(self, context, workdir=workdir)
+
+    self._bootstrap_tools = context.config.getlist('checkstyle',
+                                                   'bootstrap-tools',
+                                                   default=[':twitter-checkstyle'])
+    self._bootstrap_utils.register_all([self._bootstrap_tools])
 
     self._configuration_file = context.config.get('checkstyle', 'configuration')
 
@@ -73,7 +77,7 @@ class Checkstyle(NailgunTask):
   def checkstyle(self, sources, targets):
     egroups = self.context.products.get_data('exclusives_groups')
     etag = egroups.get_group_key_for_target(targets[0])
-    classpath = self.profile_classpath(self._profile)
+    classpath = self._bootstrap_utils.get_jvm_build_tools_classpath(self._bootstrap_tools)
     cp = egroups.get_classpath_for_group(etag)
     classpath.extend(jar for conf, jar in cp if conf in self._confs)
 
