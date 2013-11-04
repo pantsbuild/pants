@@ -138,7 +138,8 @@ class NailgunTask(Task):
       else:
         return ret
 
-  def runjava(self, main, classpath=None, opts=None, args=None, jvmargs=None, workunit_name=None):
+  def runjava(self, main, classpath=None, opts=None, args=None, jvmargs=None, workunit_name=None,
+              workunit_factory=None):
     """Runs the java main using the given classpath and args.
 
     If --no-ng-daemons is specified then the java main is run in a freshly spawned subprocess,
@@ -146,12 +147,14 @@ class NailgunTask(Task):
     amortized run times. The args list is divisable so it can be split across multiple invocations
     of the command similiar to xargs.
     """
-
+    # TODO(pl): We're accepting workunit_factory to maintain a consistent interface with
+    # binary_util.runjava, but in fact it is just thrown away and a new one will be used
+    # in NailgunTask._runjava_common
     return self._runjava_common(binary_util.runjava, main=main, classpath=classpath,
                                 opts=opts, args=args, jvmargs=jvmargs, workunit_name=workunit_name)
 
   def runjava_indivisible(self, main, classpath=None, opts=None, args=None, jvmargs=None,
-                          workunit_name=None, workunit_labels=None):
+                          workunit_name=None, workunit_labels=None, workunit_factory=None):
     """Runs the java main using the given classpath and args.
 
     If --no-ng-daemons is specified then the java main is run in a freshly spawned subprocess,
@@ -159,7 +162,7 @@ class NailgunTask(Task):
     amortized run times. The args list is indivisable so it can't be split across multiple
     invocations of the command similiar to xargs.
     """
-
+    # TODO(pl): See above comment on runjava regarding workunit_factory
     return self._runjava_common(binary_util.runjava_indivisible, main=main, classpath=classpath,
                                 opts=opts, args=args, jvmargs=jvmargs, workunit_name=workunit_name,
                                 workunit_labels=workunit_labels)
