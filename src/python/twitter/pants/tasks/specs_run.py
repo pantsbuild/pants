@@ -19,7 +19,7 @@ import os
 from twitter.common.collections import OrderedSet
 
 from twitter.pants import is_scala, is_test
-from twitter.pants.binary_util import profile_classpath, runjava_indivisible, safe_args
+from twitter.pants.binary_util import runjava_indivisible, safe_args
 from twitter.pants.goal.workunit import WorkUnit
 from twitter.pants.tasks import Task, TaskError
 from twitter.pants.tasks.jvm_task import JvmTask
@@ -51,7 +51,11 @@ class SpecsRun(JvmTask):
   def __init__(self, context):
     Task.__init__(self, context)
 
-    self.profile = context.config.get('specs-run', 'profile')
+    self._bootstrap_tools = context.config.getlist('specs-run',
+                                                   'bootstrap-tools',
+                                                   default=[':scala-specs-2.9.2'])
+    self._bootstrap_utils.register_all([self._bootstrap_tools])
+    
     self.confs = context.config.getlist('specs-run', 'confs')
 
     self.java_args = context.config.getlist('specs-run', 'args', default=[])
@@ -76,10 +80,13 @@ class SpecsRun(JvmTask):
         opts = ['--color'] if self.color else []
         opts.append('--specs=%s' % ','.join(tests))
 
+        bootstrapped_cp = self._bootstrap_utils.get_jvm_build_tools_classpath(self._bootstrap_tools)
+
         result = runjava_indivisible(
           jvmargs=self.java_args,
-          classpath=self.classpath(profile_classpath(self.profile), confs=self.confs,
-              exclusives_classpath=self.get_base_classpath_for_target(targets[0])),
+          classpath=self.classpath(bootstrapped_cp,
+                                   confs=self.confs,
+                                   exclusives_classpath=self.get_base_classpath_for_target(targets[0])),
           main='com.twitter.common.testing.ExplicitSpecsRunnerMain',
           opts=opts,
           workunit_factory=workunit_factory,
