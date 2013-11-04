@@ -75,7 +75,13 @@ class NailgunTask(Task):
     Task.__init__(self, context)
 
     self._classpath = classpath
-    self._nailgun_profile = context.config.get('nailgun', 'profile', default='nailgun')
+    self._nailgun_bootstrap_tools = context.config.getlist('nailgun',
+                                                           'bootstrap-tools',
+                                                           default=[':nailgun-server'])
+    context.products.require_data('jvm_build_tools_classpath_callbacks')
+
+    self._bootstrap_utils.register_jvm_build_tools(self._nailgun_bootstrap_tools)
+
     self._ng_server_args = context.config.getlist('nailgun', 'args')
     self._daemon = context.options.nailgun_daemon
 
@@ -96,13 +102,17 @@ class NailgunTask(Task):
                       workunit_name=None, workunit_labels=None):
     workunit_labels = workunit_labels[:] if workunit_labels else []
     cp = (self._classpath or []) + (classpath or [])
-    cmd_str = \
-      binary_util.runjava_cmd_str(jvmargs=jvmargs, classpath=cp, main=main, opts=opts, args=args)
+    cmd_str = binary_util.runjava_cmd_str(jvmargs=jvmargs,
+                                          classpath=cp,
+                                          main=main,
+                                          opts=opts,
+                                          args=args)
     workunit_name = workunit_name or main
     if self._daemon:
       workunit_labels += [WorkUnit.TOOL, WorkUnit.NAILGUN]
-      with self.context.new_workunit(name=workunit_name, labels=workunit_labels, cmd=cmd_str) \
-          as workunit:
+      with self.context.new_workunit(name=workunit_name,
+                                     labels=workunit_labels,
+                                     cmd=cmd_str) as workunit:
         nailgun = self._get_nailgun_client(workunit)
 
         def call_nailgun(main_class, *args):
@@ -261,6 +271,8 @@ class NailgunTask(Task):
     with _safe_open(self._ng_out, 'w'):
       pass  # truncate
 
+    ng_classpath = os.pathsep.join(self._bootstrap_utils.get_jvm_build_tools_classpath(self._nailgun_bootstrap_tools))
+
     pid = os.fork()
     if pid != 0:
       # In the parent tine - block on ng being up for connections
@@ -277,7 +289,6 @@ class NailgunTask(Task):
       args.extend(self._ng_server_args)
     args.append(NailgunTask.PANTS_NG_ARG)
     args.append(self._identifier_arg)
-    ng_classpath = os.pathsep.join(binary_util.profile_classpath(self._nailgun_profile))
     args.extend(['-cp', ng_classpath, 'com.martiansoftware.nailgun.NGServer', ':0'])
     s = ' '.join(args)
 
