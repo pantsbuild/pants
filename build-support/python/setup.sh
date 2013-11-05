@@ -5,7 +5,8 @@ BOOTSTRAP_BIN=$BASE_DIR/.python/bin
 BOOTSTRAP_ENVIRONMENT=$BASE_DIR/.python/bootstrap
 CACHE=$BASE_DIR/.pants.d/.pip.cache
 PY=$(which python)
-VIRTUALENV_VERSION=1.9.1
+VENV_VERSION=1.10.1
+SETUPTOOLS_VERSION=1.1.7
 
 mkdir -p $BOOTSTRAP_BIN
 mkdir -p $BOOTSTRAP_ENVIRONMENT
@@ -31,17 +32,17 @@ fi
 PYTHON=$BOOTSTRAP_BIN/bootstrap
 
 pushd $CACHE >& /dev/null
-  VIRTUALENV_TARBALL=virtualenv-$VIRTUALENV_VERSION.tar.gz
-  if ! test -f $VIRTUALENV_TARBALL; then
+  VENV_TARBALL=virtualenv-$VENV_VERSION.tar.gz
+  if ! test -f $VENV_TARBALL; then
     echo 'Installing virtualenv' 1>&2
     curl --connect-timeout 10 -O \
-        https://pypi.python.org/packages/source/v/virtualenv/$VIRTUALENV_TARBALL
+        https://pypi.python.org/packages/source/v/virtualenv/$VENV_TARBALL
   fi
-  gzip -cd $VIRTUALENV_TARBALL | tar -xf - >& /dev/null
+  gzip -cd $VENV_TARBALL | tar -xf - >& /dev/null
 popd >& /dev/null
 
 function virtualenv() {
-  $PYTHON $CACHE/virtualenv-$VIRTUALENV_VERSION/virtualenv.py "$@"
+  $PYTHON $CACHE/virtualenv-$VENV_VERSION/virtualenv.py "$@"
 }
 
 if virtualenv -p $PY --distribute $BOOTSTRAP_ENVIRONMENT; then
@@ -49,7 +50,7 @@ if virtualenv -p $PY --distribute $BOOTSTRAP_ENVIRONMENT; then
   # that will not run.
   virtualenv --relocatable $BOOTSTRAP_ENVIRONMENT
   source $BOOTSTRAP_ENVIRONMENT/bin/activate
-  for pkg in distribute pystache; do
+  for pkg in pystache setuptools==$SETUPTOOLS_VERSION; do
     pip install \
       --download-cache=$CACHE \
       -f https://pypi.python.org/simple \
