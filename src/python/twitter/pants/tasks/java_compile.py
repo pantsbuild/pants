@@ -19,7 +19,6 @@ import shlex
 
 from collections import defaultdict
 import itertools
-import shutil
 
 from twitter.common.dirutil import safe_open, safe_mkdir, safe_rmtree
 
@@ -121,7 +120,7 @@ class JavaCompile(NailgunTask):
     self._confs = context.config.getlist('java-compile', 'confs')
     self.context.products.require_data('exclusives_groups')
 
-    artifact_cache_spec = context.config.getlist('java-compile', 'artifact_caches2', default=[])
+    artifact_cache_spec = context.config.getlist('java-compile', 'artifact_caches', default=[])
     self.setup_artifact_cache(artifact_cache_spec)
 
     # A temporary, but well-known, dir to munge analysis files in before caching. It must be

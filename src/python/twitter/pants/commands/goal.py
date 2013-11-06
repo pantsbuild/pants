@@ -207,8 +207,10 @@ class Goal(Command):
     Option("--local-artifact-cache-readonly", "--no-local-artifact-cache-readonly", action="callback",
            callback=_set_bool, dest="local_artifact_cache_readonly", default=False,
            help="If set, we don't write to local artifact caches, even when writes are enabled."),
+    # Note that remote writes are disabled by default, so you have control over who's populating
+    # the shared cache.
     Option("--remote-artifact-cache-readonly", "--no-remote-artifact-cache-readonly", action="callback",
-           callback=_set_bool, dest="remote_artifact_cache_readonly", default=False,
+           callback=_set_bool, dest="remote_artifact_cache_readonly", default=True,
            help="If set, we don't write to remote artifact caches, even when writes are enabled."),
 
     Option("--all", dest="target_directory", action="append",

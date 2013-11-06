@@ -101,9 +101,9 @@ class ScalaCompile(NailgunTask):
     self.context.products.require_data('exclusives_groups')
 
     self._local_artifact_cache_spec = \
-      context.config.getlist('scala-compile', 'local_artifact_caches2', default=[])
+      context.config.getlist('scala-compile', 'local_artifact_caches', default=[])
     self._remote_artifact_cache_spec = \
-      context.config.getlist('scala-compile', 'remote_artifact_caches2', default=[])
+      context.config.getlist('scala-compile', 'remote_artifact_caches', default=[])
 
     # A temporary, but well-known, dir to munge analysis files in before caching. It must be
     # well-known so we know where to find the files when we retrieve them from the cache.
