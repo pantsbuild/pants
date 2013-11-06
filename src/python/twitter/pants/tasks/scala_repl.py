@@ -17,7 +17,7 @@
 import shlex
 import subprocess
 
-from twitter.pants.binary_util import profile_classpath, runjava_indivisible
+from twitter.pants.binary_util import runjava_indivisible
 from twitter.pants.goal.workunit import WorkUnit
 from twitter.pants.tasks import Task
 from twitter.pants.tasks.jvm_task import JvmTask
@@ -38,7 +38,8 @@ class ScalaRepl(JvmTask):
       for arg in context.options.run_jvmargs:
         self.jvm_args.extend(shlex.split(arg))
     self.confs = context.config.getlist('scala-repl', 'confs')
-    self.profile = context.config.get('scala-repl', 'profile')
+    self._bootstrap_tools = context.config.getlist('scala-repl', 'bootstrap-tools')
+    self._bootstrap_utils.register_jvm_build_tools(self._bootstrap_tools)
     self.main = context.config.get('scala-repl', 'main')
     self.args = context.config.getlist('scala-repl', 'args', default=[])
     if context.options.run_args:
@@ -54,9 +55,10 @@ class ScalaRepl(JvmTask):
     def repl_workunit_factory(name, labels=list(), cmd=''):
       return self.context.new_workunit(name=name, labels=[WorkUnit.REPL] + labels, cmd=cmd)
 
+    tools_classpath = self._bootstrap_utils.get_jvm_build_tools_classpath(self._bootstrap_tools)
     kwargs = {
       'jvmargs': self.jvm_args,
-      'classpath': self.classpath(profile_classpath(self.profile), confs=self.confs,
+      'classpath': self.classpath(tools_classpath, confs=self.confs,
             exclusives_classpath=self.get_base_classpath_for_target(targets[0])),
       'main': self.main,
       'args': self.args
