@@ -78,7 +78,6 @@ class NailgunTask(Task):
     self._nailgun_bootstrap_tools = context.config.getlist('nailgun',
                                                            'bootstrap-tools',
                                                            default=[':nailgun-server'])
-    context.products.require_data('jvm_build_tools_classpath_callbacks')
 
     self._bootstrap_utils.register_jvm_build_tools(self._nailgun_bootstrap_tools)
 

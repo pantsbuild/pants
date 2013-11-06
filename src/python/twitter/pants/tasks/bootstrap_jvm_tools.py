@@ -30,15 +30,28 @@ class BootstrapJvmTools(Task):
     if context.products.is_required_data('jvm_build_tools_classpath_callbacks'):
       deplist_map = context.products.get('jvm_build_tools').get('jvm_build_tools')
       callback_map = context.products.get('jvm_build_tools_classpath_callbacks')
+      # We leave a callback in the products map because we want these Ivy calls 
+      # to be done lazily (they might never actually get executed) and we want
+      # to hit Task.invalidated (called in Task.ivy_resolve) on the instance of 
+      # BootstrapJvmTools rather than the instance of whatever class requires
+      # the bootstrap tools.  It would be awkward and possibly incorrect to call
+      # self.invalidated twice on a Task that does meaningful invalidation on its
+      # targets. -pl
       for key, deplist in deplist_map.items():
         callback_map.add('jvm_build_tools_classpath_callbacks',
                          key,
                          [partial(self.bootstrap_classpath, tools=deplist)])
 
   def resolve_tool_targets(self, tools):
+    if not tools:
+      raise ValueError("BootstrapJvmTools.resolve_tool_targets called with no tool"
+                       " dependency addresses.  This probably means that you don't"
+                       " have an entry in your pants.ini for this tool.")
     for tool in tools:
       try:
         targets = list(self.context.resolve(tool))
+        if not targets:
+          raise KeyError
       except KeyError:
         self.context.log.error("Failed to resolve target for bootstrap tool: %s."
                                "  You probably need to add this dep to your"

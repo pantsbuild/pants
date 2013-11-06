@@ -668,6 +668,8 @@ goal(
   action=KillServer,
 ).install().with_description('Kill the pants reporting server.')
 
+
+# TODO(pl): Make the dependency of every other phase on this phase less explicit
 goal(
   name='bootstrap-jvm-tools',
   action=BootstrapJvmTools,

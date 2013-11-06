@@ -89,7 +89,7 @@ class IvyResolve(NailgunTask):
     self._open = context.options.ivy_resolve_open
     self._report = self._open or context.options.ivy_resolve_report
 
-    self._ivy_bootstrap_tools = context.config.getlist('ivy-resolve', 'bootstrap-tools')
+    self._ivy_bootstrap_tools = context.config.getlist('ivy-resolve', 'bootstrap-tools', ':xalan')
     self._bootstrap_utils.register_all([self._ivy_bootstrap_tools])
 
     self._ivy_utils = IvyUtils(config=context.config,
