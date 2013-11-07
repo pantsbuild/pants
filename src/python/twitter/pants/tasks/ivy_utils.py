@@ -26,7 +26,7 @@ import re
 from twitter.common.collections import OrderedSet
 from twitter.common.dirutil import safe_mkdir, safe_open
 
-from twitter.pants import get_buildroot, is_internal, is_jar, is_jvm, is_concrete
+from twitter.pants import binary_util, get_buildroot, is_internal, is_jar, is_jvm, is_concrete
 from twitter.pants.base.generator import Generator, TemplateData
 from twitter.pants.base.revision import Revision
 from twitter.pants.base.target import Target
@@ -285,6 +285,11 @@ class IvyUtils(object):
   def _generate_exclude_template(self, exclude):
     return TemplateData(org=exclude.org, name=exclude.name)
 
+  @staticmethod
+  def is_mappable_artifact(path):
+    """Subclasses can override to determine whether a given path represents a mappable artifact."""
+    return path.endswith('.jar') or path.endswith('.war')
+
   def mapjars(self, genmap, target):
     """
     Parameters:
@@ -311,7 +316,7 @@ class IvyUtils(object):
             for conf in os.listdir(artifactdir):
               confdir = os.path.join(artifactdir, conf)
               for file in os.listdir(confdir):
-                if self._map_jar(file):
+                if self.is_mappable_artifact(file):
                   # TODO(John Sirois): kill the org and (org, name) exclude mappings in favor of a
                   # conf whitelist
                   genmap.add(org, confdir).append(file)
@@ -330,9 +335,10 @@ class IvyUtils(object):
     """Subclasses can override to establish an isolated jar mapping directory."""
     return os.path.join(self._work_dir, 'mapped-jars')
 
-  def exec_ivy(self, target_workdir, targets, args, runjava,
+  def exec_ivy(self, target_workdir, targets, args, runjava=None,
                workunit_name='ivy', workunit_factory=None, ivy_classpath=None):
     ivy_classpath = ivy_classpath if ivy_classpath else self._config.getlist('ivy', 'classpath')
+    runjava = runjava or binary_util.runjava_indivisible
     ivyxml = os.path.join(target_workdir, 'ivy.xml')
     jars, excludes = self._calculate_classpath(targets)
     self._generate_ivy(targets, jars, excludes, ivyxml)

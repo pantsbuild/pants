@@ -299,10 +299,6 @@ class Task(object):
       items_to_report_element([t.address.reference() for t in targets], 'target'),
       suffix)
 
-  def _map_jar(self, path):
-    """Subclasses can override to determine whether a given path represents a mappable artifact."""
-    return path.endswith('.jar') or path.endswith('.war')
-
   def ivy_resolve(self, targets, java_runner=None, ivy_args=None):
     from twitter.pants.tasks.ivy_utils import IvyUtils
     from twitter.pants.binary_util import runjava_indivisible
@@ -349,4 +345,4 @@ class Task(object):
 
     with IvyUtils.cachepath(target_classpath_file) as classpath:
       stripped_classpath = [path.strip() for path in classpath]
-      return [path for path in stripped_classpath if self._map_jar(path)]
+      return [path for path in stripped_classpath if IvyUtils.is_mappable_artifact(path)]

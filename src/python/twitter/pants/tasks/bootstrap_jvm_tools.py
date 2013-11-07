@@ -44,9 +44,9 @@ class BootstrapJvmTools(Task):
 
   def resolve_tool_targets(self, tools):
     if not tools:
-      self.context.log.warn("BootstrapJvmTools.resolve_tool_targets called with no tool"
-                            " dependency addresses.  This probably means that you don't"
-                            " have an entry in your pants.ini for this tool.")
+      raise ValueError("BootstrapJvmTools.resolve_tool_targets called with no tool"
+                       " dependency addresses.  This probably means that you don't"
+                       " have an entry in your pants.ini for this tool.")
     for tool in tools:
       try:
         targets = list(self.context.resolve(tool))

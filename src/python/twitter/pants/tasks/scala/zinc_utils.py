@@ -84,7 +84,10 @@ class ZincUtils(object):
 
   @property
   def _plugin_jars(self):
-    return self._bootstrap_utils.get_jvm_build_tools_classpath(self._plugin_bootstrap_tools)
+    if self._plugin_bootstrap_tools:
+      return self._bootstrap_utils.get_jvm_build_tools_classpath(self._plugin_bootstrap_tools)
+    else:
+      return []
 
   @property
   def _zinc_jar_args(self):
