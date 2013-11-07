@@ -133,7 +133,7 @@ class IvyResolve(NailgunTask):
       # Narrow the groups target set to just the set of targets that we're supposed to build.
       # Normally, this shouldn't be different from the contents of the group.
       group_targets = groups.get_targets_for_group_key(group_key) & set(targets)
-      classpath = self.ivy_resolve(group_targets, self.runjava_indivisible)
+      classpath = self.ivy_resolve(group_targets, java_runner=self.runjava_indivisible)
       for conf in self._confs:
         for path in classpath:
           groups.update_compatible_classpaths(group_key, [(conf, path)])
@@ -148,7 +148,7 @@ class IvyResolve(NailgunTask):
     if create_jardeps_for:
       genmap = self.context.products.get(self._ivy_utils._mapfor_typename())
       for target in filter(create_jardeps_for, targets):
-        self._ivy_utils.mapjars(genmap, target)
+        self._ivy_utils.mapjars(genmap, target, java_runner=self.runjava_indivisible)
 
   def check_artifact_cache_for(self, invalidation_check):
     # Ivy resolution is an output dependent on the entire target set, and is not divisible

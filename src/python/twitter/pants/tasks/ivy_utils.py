@@ -290,7 +290,7 @@ class IvyUtils(object):
     """Subclasses can override to determine whether a given path represents a mappable artifact."""
     return path.endswith('.jar') or path.endswith('.war')
 
-  def mapjars(self, genmap, target):
+  def mapjars(self, genmap, target, java_runner):
     """
     Parameters:
       genmap: the jar_dependencies ProductMapping entry for the required products.
@@ -305,7 +305,7 @@ class IvyUtils(object):
       '-confs',
     ]
     ivyargs.extend(target.configurations or self._confs)
-    self.exec_ivy(mapdir, [target], ivyargs)
+    self.exec_ivy(mapdir, [target], ivyargs, runjava=java_runner)
 
     for org in os.listdir(mapdir):
       orgdir = os.path.join(mapdir, org)
