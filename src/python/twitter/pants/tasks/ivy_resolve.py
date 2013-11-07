@@ -29,6 +29,7 @@ from twitter.common.dirutil import safe_mkdir, safe_open
 
 from twitter.pants import binary_util, is_internal, is_jar, is_concrete
 from twitter.pants.tasks import TaskError
+from twitter.pants.tasks.cache_manager import VersionedTargetSet
 from twitter.pants.tasks.ivy_utils import IvyUtils
 from twitter.pants.tasks.nailgun_task import NailgunTask
 
