@@ -138,8 +138,8 @@ class IvyResolve(NailgunTask):
         for path in classpath:
           groups.update_compatible_classpaths(group_key, [(conf, path)])
 
-    if self._report:
-      self._generate_ivy_report()
+      if self._report:
+        self._generate_ivy_report(group_targets)
 
     if self.context.products.isrequired('ivy_jar_products'):
       self._populate_ivy_jar_products(targets)
@@ -173,20 +173,20 @@ class IvyResolve(NailgunTask):
       if ivyinfo:
         genmap.add("ivy", conf, [ivyinfo])
 
-  def _generate_ivy_report(self):
+  def _generate_ivy_report(self, targets):
     def make_empty_report(report, organisation, module, conf):
       no_deps_xml_template = """
         <?xml version="1.0" encoding="UTF-8"?>
-          <?xml-stylesheet type="text/xsl" href="ivy-report.xsl"?>
-          <ivy-report version="1.0">
-            <info
-              organisation="%(organisation)s"
-              module="%(module)s"
-              revision="latest.integration"
-              conf="%(conf)s"
-              confs="%(conf)s"
-              date="%(timestamp)s"/>
-          </ivy-report>
+        <?xml-stylesheet type="text/xsl" href="ivy-report.xsl"?>
+        <ivy-report version="1.0">
+          <info
+            organisation="%(organisation)s"
+            module="%(module)s"
+            revision="latest.integration"
+            conf="%(conf)s"
+            confs="%(conf)s"
+            date="%(timestamp)s"/>
+        </ivy-report>
       """
       no_deps_xml = no_deps_xml_template % dict(organisation=organisation,
                                                 module=module,
@@ -199,15 +199,14 @@ class IvyResolve(NailgunTask):
                                                                     self.runjava_indivisible)
 
     reports = []
-    org, name = self._ivy_utils.identify(self.context.target_roots)
+    org, name = self._ivy_utils.identify(targets)
     xsl = os.path.join(self._cachedir, 'ivy-report.xsl')
     safe_mkdir(self._outdir, clean=True)
     for conf in self._confs:
       params = dict(org=org, name=name, conf=conf)
-      xml = os.path.join(self._cachedir, '%(org)s-%(name)s-%(conf)s.xml' % params)
+      xml = self._ivy_utils.xml_report_path(targets, conf)
       if not os.path.exists(xml):
         make_empty_report(xml, org, name, conf)
-      #xml = self._ivy_utils.xml_report_path(self.context, conf)
       out = os.path.join(self._outdir, '%(org)s-%(name)s-%(conf)s.html' % params)
       opts = ['-IN', xml, '-XSL', xsl, '-OUT', out]
       if 0 != self.runjava_indivisible('org.apache.xalan.xslt.Process', classpath=classpath,

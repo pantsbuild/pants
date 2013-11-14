@@ -270,7 +270,8 @@ class NailgunTask(Task):
     with _safe_open(self._ng_out, 'w'):
       pass  # truncate
 
-    ng_classpath = os.pathsep.join(self._bootstrap_utils.get_jvm_build_tools_classpath(self._nailgun_bootstrap_tools))
+    ng_classpath = os.pathsep.join(
+      self._bootstrap_utils.get_jvm_build_tools_classpath(self._nailgun_bootstrap_tools))
 
     pid = os.fork()
     if pid != 0:
