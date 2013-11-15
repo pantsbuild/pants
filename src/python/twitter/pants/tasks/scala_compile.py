@@ -33,7 +33,7 @@ from twitter.pants.tasks import TaskError, Task
 from twitter.pants.tasks.jvm_dependency_cache import JvmDependencyCache
 from twitter.pants.tasks.nailgun_task import NailgunTask
 from twitter.pants.reporting.reporting_utils import items_to_report_element
-from twitter.pants.tasks.scala.zinc_analysis_file import ZincAnalysisCollection
+from twitter.pants.tasks.scala.zinc_analysis_collection import ZincAnalysisCollection
 from twitter.pants.tasks.scala.zinc_utils import ZincUtils
 
 

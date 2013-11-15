@@ -24,7 +24,7 @@ from collections import defaultdict
 
 from twitter.pants import get_buildroot
 from twitter.pants.tasks import TaskError
-from twitter.pants.tasks.scala.zinc_analysis_file import ZincAnalysisCollection
+from twitter.pants.tasks.scala.zinc_analysis_collection import ZincAnalysisCollection
 
 
 class ZincArtifactState(object):
