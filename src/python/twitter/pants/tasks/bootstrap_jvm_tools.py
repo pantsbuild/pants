@@ -64,7 +64,6 @@ class BootstrapJvmTools(Task):
   def cached_bootstrap_classpath_callback(self, tools):
     cache = {}
     def bootstrap_classpath(java_runner=None):
-      print("\nbootstrap_classpath tools:\n%s" % tools)
       if 'classpath' not in cache:
         targets = list(self.resolve_tool_targets(tools))
         ivy_args = [
@@ -73,7 +72,5 @@ class BootstrapJvmTools(Task):
           '-types', 'jar', 'bundle',
         ]
         cache['classpath'] = self.ivy_resolve(targets, java_runner=java_runner, ivy_args=ivy_args)
-      else:
-        print("Yay, cached!")
       return cache['classpath']
     return bootstrap_classpath
