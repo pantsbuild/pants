@@ -365,8 +365,10 @@ class ScalaCompile(NailgunTask):
         Work(split, splits_args_tuples, 'split'),
         update_artifact_cache_work
       ]
-      with self.context.new_workunit(name='cache', labels=[WorkUnit.MULTITOOL],
-          parent=self.context.run_tracker.get_background_root_workunit()) as parent:
+      background_workunit = self.context.run_tracker.get_background_root_workunit()
+      with self.context.new_workunit(name='cache',
+                                     labels=[WorkUnit.MULTITOOL],
+                                     parent=background_workunit) as parent:
         self.context.submit_background_work_chain(work_chain, workunit_parent=parent)
 
   def check_artifact_cache(self, vts):

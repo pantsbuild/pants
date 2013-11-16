@@ -22,6 +22,7 @@ import os
 import xml
 import pkgutil
 import re
+import threading
 
 from twitter.common.collections import OrderedSet
 from twitter.common.dirutil import safe_mkdir, safe_open
@@ -335,13 +336,13 @@ class IvyUtils(object):
     """Subclasses can override to establish an isolated jar mapping directory."""
     return os.path.join(self._work_dir, 'mapped-jars')
 
+  ivy_lock = threading.Lock()
   def exec_ivy(self, target_workdir, targets, args, runjava=None,
                workunit_name='ivy', workunit_factory=None, ivy_classpath=None):
     ivy_classpath = ivy_classpath if ivy_classpath else self._config.getlist('ivy', 'classpath')
     runjava = runjava or binary_util.runjava_indivisible
     ivyxml = os.path.join(target_workdir, 'ivy.xml')
     jars, excludes = self._calculate_classpath(targets)
-    self._generate_ivy(targets, jars, excludes, ivyxml)
 
     ivy_opts = [
       '-settings', self._ivy_settings,
@@ -362,7 +363,9 @@ class IvyUtils(object):
       workunit_factory=workunit_factory,
     )
 
-    result = runjava(**runjava_args)
+    with IvyUtils.ivy_lock:
+      self._generate_ivy(targets, jars, excludes, ivyxml)
+      result = runjava(**runjava_args)
 
     if result != 0:
       raise TaskError('org.apache.ivy.Main returned %d' % result)

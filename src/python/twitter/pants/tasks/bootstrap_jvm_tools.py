@@ -40,7 +40,7 @@ class BootstrapJvmTools(Task):
       for key, deplist in deplist_map.items():
         callback_map.add('jvm_build_tools_classpath_callbacks',
                          key,
-                         [partial(self.bootstrap_classpath, tools=deplist)])
+                         [self.cached_bootstrap_classpath_callback(deplist)])
 
   def resolve_tool_targets(self, tools):
     if not tools:
@@ -61,11 +61,19 @@ class BootstrapJvmTools(Task):
       for target in targets:
         yield target
 
-  def bootstrap_classpath(self, tools, java_runner=None):
-    targets = list(self.resolve_tool_targets(tools))
-    ivy_args = [
-      '-sync',
-      '-symlink',
-      '-types', 'jar', 'bundle',
-    ]
-    return self.ivy_resolve(targets, java_runner=java_runner, ivy_args=ivy_args)
+  def cached_bootstrap_classpath_callback(self, tools):
+    cache = {}
+    def bootstrap_classpath(java_runner=None):
+      print("\nbootstrap_classpath tools:\n%s" % tools)
+      if 'classpath' not in cache:
+        targets = list(self.resolve_tool_targets(tools))
+        ivy_args = [
+          '-sync',
+          '-symlink',
+          '-types', 'jar', 'bundle',
+        ]
+        cache['classpath'] = self.ivy_resolve(targets, java_runner=java_runner, ivy_args=ivy_args)
+      else:
+        print("Yay, cached!")
+      return cache['classpath']
+    return bootstrap_classpath
