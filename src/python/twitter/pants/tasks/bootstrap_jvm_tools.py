@@ -15,6 +15,7 @@
 # ===================================================================================================
 
 from functools import partial
+import threading
 
 from twitter.pants.tasks import TaskError, Task
 
@@ -63,14 +64,18 @@ class BootstrapJvmTools(Task):
 
   def cached_bootstrap_classpath_callback(self, tools):
     cache = {}
+    cache_lock = threading.Lock()
     def bootstrap_classpath(java_runner=None):
-      if 'classpath' not in cache:
-        targets = list(self.resolve_tool_targets(tools))
-        ivy_args = [
-          '-sync',
-          '-symlink',
-          '-types', 'jar', 'bundle',
-        ]
-        cache['classpath'] = self.ivy_resolve(targets, java_runner=java_runner, ivy_args=ivy_args)
-      return cache['classpath']
+      with cache_lock:
+        if 'classpath' not in cache:
+          targets = list(self.resolve_tool_targets(tools))
+          ivy_args = [
+            '-sync',
+            '-symlink',
+            '-types', 'jar', 'bundle',
+          ]
+          cache['classpath'] = self.ivy_resolve(targets,
+                                                java_runner=java_runner,
+                                                ivy_args=ivy_args)
+        return cache['classpath']
     return bootstrap_classpath
