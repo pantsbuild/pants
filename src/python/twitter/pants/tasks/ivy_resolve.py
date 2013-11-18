@@ -133,7 +133,14 @@ class IvyResolve(NailgunTask):
       # Narrow the groups target set to just the set of targets that we're supposed to build.
       # Normally, this shouldn't be different from the contents of the group.
       group_targets = groups.get_targets_for_group_key(group_key) & set(targets)
-      classpath = self.ivy_resolve(group_targets, java_runner=self.runjava_indivisible)
+
+      # NOTE(pl): The symlinked ivy.xml (for IDEs, particularly IntelliJ) in the presence of
+      # multiple exclusives groups will end up as the last exclusives group run.  I'd like to
+      # deprecate this eventually, but some people rely on it, and it's not clear to me right now
+      # whether telling them to use IdeaGen instead is feasible.
+      classpath = self.ivy_resolve(group_targets,
+                                   java_runner=self.runjava_indivisible,
+                                   symlink_ivyxml=True)
       for conf in self._confs:
         for path in classpath:
           groups.update_compatible_classpaths(group_key, [(conf, path)])

@@ -299,7 +299,7 @@ class Task(object):
       items_to_report_element([t.address.reference() for t in targets], 'target'),
       suffix)
 
-  def ivy_resolve(self, targets, java_runner=None, ivy_args=None):
+  def ivy_resolve(self, targets, java_runner=None, ivy_args=None, symlink_ivyxml=False):
     from twitter.pants.tasks.ivy_utils import IvyUtils
     from twitter.pants.binary_util import runjava_indivisible
 
@@ -337,6 +337,7 @@ class Task(object):
           args=args,
           runjava=java_runner,
           workunit_factory=self.context.new_workunit,
+          symlink_ivyxml=symlink_ivyxml,
         )
 
         if not os.path.exists(target_classpath_file):

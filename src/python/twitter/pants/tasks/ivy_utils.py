@@ -337,8 +337,15 @@ class IvyUtils(object):
     return os.path.join(self._work_dir, 'mapped-jars')
 
   ivy_lock = threading.RLock()
-  def exec_ivy(self, target_workdir, targets, args, runjava=None,
-               workunit_name='ivy', workunit_factory=None, ivy_classpath=None):
+  def exec_ivy(self,
+               target_workdir,
+               targets,
+               args,
+               runjava=None,
+               workunit_name='ivy',
+               workunit_factory=None,
+               ivy_classpath=None,
+               symlink_ivyxml=False):
     ivy_classpath = ivy_classpath if ivy_classpath else self._config.getlist('ivy', 'classpath')
     runjava = runjava or binary_util.runjava_indivisible
     ivyxml = os.path.join(target_workdir, 'ivy.xml')
@@ -363,9 +370,19 @@ class IvyUtils(object):
       workunit_factory=workunit_factory,
     )
 
+    def safe_link(src, dest):
+      if os.path.exists(dest):
+        os.unlink(dest)
+      os.symlink(src, dest)
+
     with IvyUtils.ivy_lock:
       self._generate_ivy(targets, jars, excludes, ivyxml)
       result = runjava(**runjava_args)
+
+      # Symlink to the current ivy.xml file (useful for IDEs that read it).
+      if symlink_ivyxml:
+        ivyxml_symlink = os.path.join(self._work_dir, 'ivy.xml')
+        safe_link(ivyxml, ivyxml_symlink)
 
     if result != 0:
       raise TaskError('org.apache.ivy.Main returned %d' % result)
