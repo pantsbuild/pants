@@ -303,10 +303,7 @@ class Task(object):
     from twitter.pants.tasks.ivy_utils import IvyUtils
     from twitter.pants.binary_util import runjava_indivisible
 
-    # TODO(pl): Fix the ivy resolution lock so that Ivy can be run within
-    # a nailgun server
-    # java_runner = java_runner or runjava_indivisible
-    java_runner = runjava_indivisible
+    java_runner = java_runner or runjava_indivisible
 
     ivy_args = ivy_args or []
 

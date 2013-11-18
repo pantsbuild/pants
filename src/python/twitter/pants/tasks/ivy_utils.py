@@ -336,7 +336,7 @@ class IvyUtils(object):
     """Subclasses can override to establish an isolated jar mapping directory."""
     return os.path.join(self._work_dir, 'mapped-jars')
 
-  ivy_lock = threading.Lock()
+  ivy_lock = threading.RLock()
   def exec_ivy(self, target_workdir, targets, args, runjava=None,
                workunit_name='ivy', workunit_factory=None, ivy_classpath=None):
     ivy_classpath = ivy_classpath if ivy_classpath else self._config.getlist('ivy', 'classpath')
