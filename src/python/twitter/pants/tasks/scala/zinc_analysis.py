@@ -2,9 +2,10 @@ from collections import defaultdict
 import json
 import re
 import itertools
+from twitter.pants import TaskError
 
 
-class ParseError(Exception):
+class ParseError(TaskError):
   pass
 
 # Classes to encapsulate various parts of the analysis. Note that data in these classes is still
@@ -55,14 +56,16 @@ class Analysis(object):
   @staticmethod
   def parse(infile):
     lines_iter = iter(infile.read().splitlines())
-    version = lines_iter.next()
+    version_line = lines_iter.next()
+    if version_line != 'format version: 1':
+      raise Exception('Unrecognized format line: ' + version_line)
     relations = Relations.parse(lines_iter)
     stamps = Stamps.parse(lines_iter)
     apis = APIs.parse(lines_iter)
     source_infos = SourceInfos.parse(lines_iter)
     compilations = Compilations.parse(lines_iter)
     compile_setup = CompileSetup.parse(lines_iter)
-    return Analysis(version, relations, stamps, apis, source_infos, compilations, compile_setup)
+    return Analysis(relations, stamps, apis, source_infos, compilations, compile_setup)
 
   @staticmethod
   def parse_json(infile):
@@ -74,6 +77,34 @@ class Analysis(object):
     compilations = Compilations.from_json_obj(obj['compilations'])
     compile_setup = Compilations.from_json_obj(obj['compile setup'])
     return Analysis(relations, stamps, apis, source_infos, compilations, compile_setup)
+
+  @staticmethod
+  def rebase(input_analysis_path, output_analysis_path, rebasings):
+    # TODO: Can make this more efficient if needed, e.g., we know which sections contain
+    # which path prefixes. But for now this is fine.
+    with open(input_analysis_path, 'r') as infile:
+      txt = infile.read()
+    for rebase_from, rebase_to in rebasings:
+      txt = txt.replace(rebase_from, rebase_to)
+    with open(output_analysis_path, 'w') as outfile:
+      outfile.write(txt)
+
+  @staticmethod
+  def split_to_paths(analysis_path, split_path_pairs, catchall_path=None):
+    analysis = Analysis.parse(analysis_path)
+    splits = [x[0] for x in split_path_pairs]
+    split_analyses = analysis.split(splits, catchall_path is not None)
+    output_paths = [x[1] for x in split_path_pairs]
+    if catchall_path is not None:
+      output_paths.append(catchall_path)
+    for analysis, path in zip(split_analyses, output_paths):
+      analysis.write_to_path(path)
+
+  @staticmethod
+  def merge_from_paths(analysis_paths, merged_analysis_path):
+    analyses = [Analysis.parse_from_path(path) for path in analysis_paths]
+    merged_analysis = Analysis.merge(analyses)
+    merged_analysis.write_to_path(merged_analysis_path)
 
   @staticmethod
   def merge(analyses):
@@ -137,9 +168,9 @@ class Analysis(object):
     return Analysis(relations, stamps, apis, source_infos, compilations, compile_setup)
 
 
-  def __init__(self, version, relations, stamps, apis, source_infos, compilations, compile_setup):
-    (self.version, self.relations, self.stamps, self.apis, self.source_infos, self.compilations, self.compile_setup) = \
-      (version, relations, stamps, apis, source_infos, compilations, compile_setup)
+  def __init__(self, relations, stamps, apis, source_infos, compilations, compile_setup):
+    (self.relations, self.stamps, self.apis, self.source_infos, self.compilations, self.compile_setup) = \
+      (relations, stamps, apis, source_infos, compilations, compile_setup)
 
   def write_to_path(self, outfile_path):
     with open(outfile_path, 'w') as outfile:
@@ -150,7 +181,7 @@ class Analysis(object):
       self.write_json(outfile)
 
   def write(self, outfile):
-    outfile.write(self.version + '\n')
+    outfile.write('format version: 1\n')
     self.relations.write(outfile)
     self.stamps.write(outfile)
     self.apis.write(outfile, inline_vals=False)
@@ -163,16 +194,18 @@ class Analysis(object):
                    (self.relations, self.stamps, self.apis, self.compilations)))
     json.dump(obj, outfile, cls=AnalysisJSONEncoder, sort_keys=True, indent=2)
 
-  def split(self, splits):
+  def split(self, splits, catchall=False):
     """Split the analysis according to splits, which is a list of K iterables of source files.
 
-    Returns a list of K+1 Analysis objects: One for each of the K splits, in order, and one
-    'catch-all' containing the analysis for any remainder sources not mentioned in the K splits.
+    If catchall is False, returns a list of K Analysis objects, one for each of the splits, in order.
+    If catchall is True, returns K+1 Analysis objects, the last one containing the analysis for any
+    remainder sources not mentioned in the K splits.
     """
     splits = [set(x) for x in splits]
-    # Even empty sources with no products have stamps.
-    all_sources = (set(itertools.chain(*[self.stamps.sources.iterkeys()]))).difference(*splits)
-    splits.append(all_sources)  # The catch-all
+    if catchall:
+      # Even empty sources with no products have stamps.
+      all_sources = (set(itertools.chain(*[self.stamps.sources.iterkeys()]))).difference(*splits)
+      splits.append(all_sources)  # The catch-all
 
     # Split relations.
     src_prod_splits = Util.split_dict(self.relations.src_prod, splits)

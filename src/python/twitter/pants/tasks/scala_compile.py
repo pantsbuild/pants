@@ -33,6 +33,7 @@ from twitter.pants.tasks import TaskError, Task
 from twitter.pants.tasks.jvm_dependency_cache import JvmDependencyCache
 from twitter.pants.tasks.nailgun_task import NailgunTask
 from twitter.pants.reporting.reporting_utils import items_to_report_element
+from twitter.pants.tasks.scala.zinc_analysis import Analysis
 from twitter.pants.tasks.scala.zinc_analysis_collection import ZincAnalysisCollection
 from twitter.pants.tasks.scala.zinc_utils import ZincUtils
 
@@ -136,41 +137,10 @@ class ScalaCompile(NailgunTask):
       local_cache = self.create_artifact_cache(self._local_artifact_cache_spec)
       remote_cache = self.create_artifact_cache(self._remote_artifact_cache_spec)
       if remote_cache:
-        remote_cache = TransformingArtifactCache(remote_cache,
-                                                 pre_write_func=self._relativize_artifact,
-                                                 post_read_func=self._localize_artifact)
+        remote_cache = TransformingArtifactCache(remote_cache)
       caches = filter(None, [local_cache, remote_cache])
       self._artifact_cache = CombinedArtifactCache(caches) if caches else None
     return self._artifact_cache
-
-  def _relativize_artifact(self, paths):
-    new_paths = []
-    for path in paths:
-      if path.endswith('.analysis'):
-        portable_analysis = path + '.portable'
-        if self._zinc_utils.relativize_analysis_file(path, portable_analysis):
-          self.context.log.info('Zinc failed to relativize analysis file: %s. '
-                                'Will not cache artifact. ' % path)
-          return None
-        new_paths.append(portable_analysis)
-      else:
-        new_paths.append(path)
-    return new_paths
-
-  def _localize_artifact(self, paths):
-    new_paths = []
-    for path in paths:
-      if path.endswith('.analysis.portable'):
-        analysis = path[:-9]
-        if self._zinc_utils.localize_analysis_file(path, analysis):
-          self.context.log.info('Zinc failed to localize cached analysis file: %s. '
-                                'Will not use cached artifact.' % path)
-          return None
-        os.unlink(path)
-        new_paths.append(analysis)
-      else:
-        new_paths.append(path)
-    return new_paths
 
   def _ensure_analysis_tmpdir(self):
     # Do this lazily, so we don't trigger creation of a worker pool unless we need it.
@@ -237,14 +207,11 @@ class ScalaCompile(NailgunTask):
         invalid_analysis_tmp = os.path.join(tmpdir, 'invalid_analysis')
         if ZincUtils.is_nonempty_analysis(self._analysis_file):
           with self.context.new_workunit(name='prepare-analysis'):
-            if self._zinc_utils.run_zinc_split(self._analysis_file,
-                                               ((invalid_sources + deleted_sources, newly_invalid_analysis_tmp),
-                                                ([], valid_analysis_tmp))):
-              raise TaskError('Failed to split off invalid analysis.')
+            Analysis.split_to_paths(self._analysis_file,
+                                    [(invalid_sources + deleted_sources, newly_invalid_analysis_tmp)], valid_analysis_tmp)
             if ZincUtils.is_nonempty_analysis(self._invalid_analysis_file):
-              if self._zinc_utils.run_zinc_merge([self._invalid_analysis_file, newly_invalid_analysis_tmp],
-                                                 invalid_analysis_tmp):
-                raise TaskError('Failed to merge prior and current invalid analysis.')
+              Analysis.merge_from_paths([self._invalid_analysis_file, newly_invalid_analysis_tmp],
+                                        invalid_analysis_tmp)
             else:
               invalid_analysis_tmp = newly_invalid_analysis_tmp
 
@@ -266,8 +233,7 @@ class ScalaCompile(NailgunTask):
         if ZincUtils.is_nonempty_analysis(self._invalid_analysis_file) and partitions:
           with self.context.new_workunit(name='partition-analysis'):
             splits = [(x[1], x[2]) for x in partitions]
-            if self._zinc_utils.run_zinc_split(self._invalid_analysis_file, splits):
-              raise TaskError('Failed to split invalid analysis into per-partition files.')
+            Analysis.split_to_paths(self._invalid_analysis_file, splits)
 
         # Now compile partitions one by one.
         for partition in partitions:
@@ -284,8 +250,7 @@ class ScalaCompile(NailgunTask):
             if ZincUtils.is_nonempty_analysis(self._analysis_file):
               with self.context.new_workunit(name='update-upstream-analysis'):
                 new_valid_analysis = analysis_file + '.valid.new'
-                if self._zinc_utils.run_zinc_merge([self._analysis_file, analysis_file], new_valid_analysis):
-                  raise TaskError('Failed to merge new analysis back into valid analysis file.')
+                Analysis.merge_from_paths([self._analysis_file, analysis_file], new_valid_analysis)
               ZincUtils._move_analysis(new_valid_analysis, self._analysis_file)
             else:  # We need to keep analysis_file around. Background tasks may need it.
               ZincUtils._copy_analysis(analysis_file, self._analysis_file)
@@ -295,9 +260,8 @@ class ScalaCompile(NailgunTask):
               # Trim out the newly-valid sources from our global invalid analysis.
               new_invalid_analysis = analysis_file + '.invalid.new'
               discarded_invalid_analysis = analysis_file + '.invalid.discard'
-              if self._zinc_utils.run_zinc_split(self._invalid_analysis_file,
-                  [(sources, discarded_invalid_analysis), ([], new_invalid_analysis)]):
-                raise TaskError('Failed to trim invalid analysis file.')
+              Analysis.split_to_paths(self._invalid_analysis_file,
+                                      [(sources, discarded_invalid_analysis)], new_invalid_analysis)
               ZincUtils._move_analysis(new_invalid_analysis, self._invalid_analysis_file)
 
           # Now that all the analysis accounting is complete, we can safely mark the
@@ -330,16 +294,21 @@ class ScalaCompile(NailgunTask):
   def _write_to_artifact_cache(self, analysis_file, vts, sources_by_target):
     vt_by_target = dict([(vt.target, vt) for vt in vts.versioned_targets])
 
-    # Copy the analysis file, so we can work on it without it changing under us.
-    classes_by_source = self._compute_classes_by_source(analysis_file)
+    split_analysis_files = \
+      [ScalaCompile._analysis_for_target(self._analysis_tmpdir, t) for t in vts.targets]
+    portable_split_analysis_files = \
+      [ScalaCompile._portable_analysis_for_target(self._analysis_tmpdir, t) for t in vts.targets]
 
     # Set up args for splitting the analysis into per-target files.
-    splits = [(sources_by_target.get(t, []), ScalaCompile._analysis_for_target(self._analysis_tmpdir, t))
-              for t in vts.targets]
+    splits = zip([sources_by_target.get(t, []) for t in vts.targets], split_analysis_files)
     splits_args_tuples = [(analysis_file, splits)]
+
+    # Set up args for rebasing the splits.
+    relativize_args_tuples = zip(split_analysis_files, portable_split_analysis_files)
 
     # Set up args for artifact cache updating.
     vts_artifactfiles_pairs = []
+    classes_by_source = self._compute_classes_by_source(analysis_file)
     for target, sources in sources_by_target.items():
       artifacts = []
       for source in sources:
@@ -347,22 +316,16 @@ class ScalaCompile(NailgunTask):
           artifacts.append(os.path.join(self._classes_dir, cls))
       vt = vt_by_target.get(target)
       if vt is not None:
-        analysis_file = \
-          ScalaCompile._analysis_for_target(self._analysis_tmpdir, target)
         # NOTE: analysis_file doesn't exist yet.
-        # We stick the relations file in the artifact as well, for ease of debugging.
-        # It's not needed for correctness.
-        vts_artifactfiles_pairs.append((vt, artifacts + [analysis_file, analysis_file + '.relations']))
-
-    def split(analysis_file, splits):
-      if self._zinc_utils.run_zinc_split(analysis_file, splits):
-        raise TaskError('Zinc failed to split analysis file: %s' % analysis_file)
+        vts_artifactfiles_pairs.append(
+          (vt, artifacts + [ScalaCompile._portable_analysis_for_target(self._analysis_tmpdir, target)]))
 
     update_artifact_cache_work = \
       self.get_update_artifact_cache_work(vts_artifactfiles_pairs)
     if update_artifact_cache_work:
       work_chain = [
-        Work(split, splits_args_tuples, 'split'),
+        Work(Analysis.split_to_paths, splits_args_tuples, 'split'),
+        Work(self._zinc_utils.relativize_analysis_file, relativize_args_tuples, 'relativize'),
         update_artifact_cache_work
       ]
       background_workunit = self.context.run_tracker.get_background_root_workunit()
@@ -381,6 +344,9 @@ class ScalaCompile(NailgunTask):
       for vt in cached_vts:
         for target in vt.targets:
           analysis_file = ScalaCompile._analysis_for_target(self._analysis_tmpdir, target)
+          portable_analysis_file = ScalaCompile._portable_analysis_for_target(self._analysis_tmpdir, target)
+          if os.path.exists(portable_analysis_file):
+            self._zinc_utils.localize_analysis_file(portable_analysis_file, analysis_file)
           if os.path.exists(analysis_file):
             analyses_to_merge.append(analysis_file)
 
@@ -389,9 +355,7 @@ class ScalaCompile(NailgunTask):
           analyses_to_merge.append(self._analysis_file)
         with contextutil.temporary_dir() as tmpdir:
           tmp_analysis = os.path.join(tmpdir, 'analysis')
-          if self._zinc_utils.run_zinc_merge(analyses_to_merge, tmp_analysis):
-            raise TaskError('Zinc failed to merge cached analysis files.')
-          ZincUtils._copy_analysis(tmp_analysis, self._analysis_file)
+          Analysis.merge_from_paths(analyses_to_merge, tmp_analysis)
 
     self._ensure_analysis_tmpdir()
     return Task.do_check_artifact_cache(self, vts, post_process_cached_vts=post_process_cached_vts)

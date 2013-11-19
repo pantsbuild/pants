@@ -35,6 +35,8 @@ from twitter.pants.binary_util import find_java_home
 
 
 # Well known metadata file required to register scalac plugins with nsc.
+from twitter.pants.tasks.scala.zinc_analysis import Analysis
+
 _PLUGIN_INFO_FILE = 'scalac-plugin.xml'
 
 class ZincUtils(object):
@@ -172,23 +174,23 @@ class ZincUtils(object):
   # src_cache - split this analysis cache.
   # splits - a list of (sources, dst_cache), where sources is a list of the sources whose analysis
   #          should be split into dst_cache.
-  def run_zinc_split(self, src_analysis_file, splits):
-    # Must use the abspath of the sources, because that's what Zinc uses internally.
-    zinc_split_args = [
-      '-split', ','.join(
-        ['{%s}:%s' % (':'.join([os.path.abspath(p) for p in x[0]]), x[1]) for x in splits]),
-    ]
-    self.log_zinc_file(src_analysis_file)
-    return self.run_zinc_analysis(src_analysis_file, zinc_split_args, workunit_name='split')
+  # def run_zinc_split(self, src_analysis_file, splits):
+  #   # Must use the abspath of the sources, because that's what Zinc uses internally.
+  #   zinc_split_args = [
+  #     '-split', ','.join(
+  #       ['{%s}:%s' % (':'.join([os.path.abspath(p) for p in x[0]]), x[1]) for x in splits]),
+  #   ]
+  #   self.log_zinc_file(src_analysis_file)
+  #   return self.run_zinc_analysis(src_analysis_file, zinc_split_args, workunit_name='split')
 
   # src_analysis_files - a list of analysis files to merge into dst_analysis_file.
-  def run_zinc_merge(self, src_analysis_files, dst_analysis_file):
-    zinc_merge_args = [
-      '-merge', ':'.join(src_analysis_files),
-    ]
-    for analysis_file in src_analysis_files:
-      self.log_zinc_file(analysis_file)
-    return self.run_zinc_analysis(dst_analysis_file, zinc_merge_args, workunit_name='merge')
+  # def run_zinc_merge(self, src_analysis_files, dst_analysis_file):
+  #   zinc_merge_args = [
+  #     '-merge', ':'.join(src_analysis_files),
+  #   ]
+  #   for analysis_file in src_analysis_files:
+  #     self.log_zinc_file(analysis_file)
+  #   return self.run_zinc_analysis(dst_analysis_file, zinc_merge_args, workunit_name='merge')
 
   # cache - the analysis cache to rebase.
   # rebasings - a list of pairs (rebase_from, rebase_to). Behavior is undefined if any
@@ -215,29 +217,23 @@ class ZincUtils(object):
     # in those rare cases.
     with temporary_dir() as tmp_analysis_dir:
       tmp_analysis_file = os.path.join(tmp_analysis_dir, "analysis")
-      ZincUtils._copy_analysis(src, tmp_analysis_file)
       rebasings = [
         (self._java_home, ''),  # Erase java deps.
         (self._ivy_home, ZincUtils.IVY_HOME_PLACEHOLDER),
         (self._pants_home, ZincUtils.PANTS_HOME_PLACEHOLDER),
       ]
-      exit_code = self.run_zinc_rebase(tmp_analysis_file, rebasings)
-      if not exit_code:
-        ZincUtils._copy_analysis(tmp_analysis_file, dst)
-      return exit_code
+      Analysis.rebase(src, tmp_analysis_file, rebasings)
+      ZincUtils._move_analysis(tmp_analysis_file, dst)
 
   def localize_analysis_file(self, src, dst):
     with temporary_dir() as tmp_analysis_dir:
       tmp_analysis_file = os.path.join(tmp_analysis_dir, "analysis")
-      ZincUtils._copy_analysis(src, tmp_analysis_file)
       rebasings = [
         (ZincUtils.IVY_HOME_PLACEHOLDER, self._ivy_home),
         (ZincUtils.PANTS_HOME_PLACEHOLDER, self._pants_home),
       ]
-      exit_code = self.run_zinc_rebase(tmp_analysis_file, rebasings)
-      if not exit_code:
-        ZincUtils._copy_analysis(tmp_analysis_file, dst)
-      return exit_code
+      Analysis.rebase(src, tmp_analysis_file, rebasings)
+      ZincUtils._copy_analysis(tmp_analysis_file, dst)
 
   @staticmethod
   def write_plugin_info(resources_dir, target):
