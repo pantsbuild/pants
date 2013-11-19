@@ -19,7 +19,6 @@ import shutil
 import textwrap
 
 from contextlib import closing
-from functools import wraps
 from itertools import chain
 from xml.etree import ElementTree
 
@@ -129,7 +128,6 @@ class ZincUtils(object):
   def run_zinc(self, args, workunit_name='zinc', workunit_labels=None):
     zinc_args = [
       '-log-level', self.context.options.log_level or 'info',
-      '-mirror-analysis',
     ]
     if not self._color:
       zinc_args.append('-no-color')
@@ -162,46 +160,6 @@ class ZincUtils(object):
     self.log_zinc_file(analysis_file)
     return self.run_zinc(args, workunit_labels=[WorkUnit.COMPILER])
 
-  # Run zinc in analysis manipulation mode.
-  def run_zinc_analysis(self, analysis_file, args, workunit_name='analysis'):
-    zinc_analysis_args = [
-      '-analysis',
-      '-cache', analysis_file,
-    ]
-    zinc_analysis_args.extend(args)
-    return self.run_zinc(args=zinc_analysis_args, workunit_name=workunit_name, workunit_labels=[WorkUnit.COMPILER])
-
-  # src_cache - split this analysis cache.
-  # splits - a list of (sources, dst_cache), where sources is a list of the sources whose analysis
-  #          should be split into dst_cache.
-  # def run_zinc_split(self, src_analysis_file, splits):
-  #   # Must use the abspath of the sources, because that's what Zinc uses internally.
-  #   zinc_split_args = [
-  #     '-split', ','.join(
-  #       ['{%s}:%s' % (':'.join([os.path.abspath(p) for p in x[0]]), x[1]) for x in splits]),
-  #   ]
-  #   self.log_zinc_file(src_analysis_file)
-  #   return self.run_zinc_analysis(src_analysis_file, zinc_split_args, workunit_name='split')
-
-  # src_analysis_files - a list of analysis files to merge into dst_analysis_file.
-  # def run_zinc_merge(self, src_analysis_files, dst_analysis_file):
-  #   zinc_merge_args = [
-  #     '-merge', ':'.join(src_analysis_files),
-  #   ]
-  #   for analysis_file in src_analysis_files:
-  #     self.log_zinc_file(analysis_file)
-  #   return self.run_zinc_analysis(dst_analysis_file, zinc_merge_args, workunit_name='merge')
-
-  # cache - the analysis cache to rebase.
-  # rebasings - a list of pairs (rebase_from, rebase_to). Behavior is undefined if any
-  # rebase_from is a prefix of any other, as there is no guarantee that rebasings are
-  # applied in a particular order.
-  def run_zinc_rebase(self, analysis_file, rebasings):
-    zinc_rebase_args = [
-      '-rebase', ','.join(['%s:%s' % rebasing for rebasing in rebasings]),
-    ]
-    return self.run_zinc_analysis(analysis_file, zinc_rebase_args, workunit_name='rebase')
-
   IVY_HOME_PLACEHOLDER = '/IVY_HOME_PLACEHOLDER'
   PANTS_HOME_PLACEHOLDER = '/PANTS_HOME_PLACEHOLDER'
 
@@ -223,7 +181,7 @@ class ZincUtils(object):
         (self._pants_home, ZincUtils.PANTS_HOME_PLACEHOLDER),
       ]
       Analysis.rebase(src, tmp_analysis_file, rebasings)
-      ZincUtils._move_analysis(tmp_analysis_file, dst)
+      shutil.move(tmp_analysis_file, dst)
 
   def localize_analysis_file(self, src, dst):
     with temporary_dir() as tmp_analysis_dir:
@@ -233,7 +191,7 @@ class ZincUtils(object):
         (ZincUtils.PANTS_HOME_PLACEHOLDER, self._pants_home),
       ]
       Analysis.rebase(src, tmp_analysis_file, rebasings)
-      ZincUtils._copy_analysis(tmp_analysis_file, dst)
+      shutil.move(tmp_analysis_file, dst)
 
   @staticmethod
   def write_plugin_info(resources_dir, target):
@@ -315,26 +273,9 @@ class ZincUtils(object):
   @staticmethod
   def is_nonempty_analysis(path):
     """Returns true iff path exists and points to a non-empty analysis."""
-    relfile = path + '.relations'
-    if not os.path.exists(relfile):
+    if not os.path.exists(path):
       return False
-    empty_prefix = 'products:\n\n'  # Empty analyses have a blank line instead of products.
-    with open(relfile, 'r') as infile:
+    empty_prefix = 'products:\n0 items\n'
+    with open(path, 'r') as infile:
       prefix = infile.read(len(empty_prefix))
     return prefix != empty_prefix
-
-  @staticmethod
-  def _move_analysis(src, dst):
-    ZincUtils.copy_or_move_analysis(shutil.move, src, dst)
-
-  @staticmethod
-  def _copy_analysis(src, dst):
-    ZincUtils.copy_or_move_analysis(shutil.copy, src, dst)
-
-  @staticmethod
-  def copy_or_move_analysis(func, src, dst):
-    if os.path.exists(src):
-      func(src, dst)
-      relations = src + '.relations'
-      if os.path.exists(relations):
-        func(relations, dst + '.relations')

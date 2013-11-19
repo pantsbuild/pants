@@ -16,6 +16,7 @@
 
 import itertools
 import os
+import shutil
 import uuid
 from twitter.common import contextutil
 from twitter.common.dirutil import safe_mkdir, safe_rmtree
@@ -202,8 +203,8 @@ class ScalaCompile(NailgunTask):
               invalid_analysis_tmp = newly_invalid_analysis_tmp
 
             # Now it's OK to overwrite the main analysis files with the new state.
-            ZincUtils._move_analysis(valid_analysis_tmp, self._analysis_file)
-            ZincUtils._move_analysis(invalid_analysis_tmp, self._invalid_analysis_file)
+            shutil.move(valid_analysis_tmp, self._analysis_file)
+            shutil.move(invalid_analysis_tmp, self._invalid_analysis_file)
 
         # Figure out the sources and analysis belonging to each partition.
         partitions = []  # Each element is a triple (vts, sources_by_target, analysis).
@@ -237,9 +238,9 @@ class ScalaCompile(NailgunTask):
               with self.context.new_workunit(name='update-upstream-analysis'):
                 new_valid_analysis = analysis_file + '.valid.new'
                 Analysis.merge_from_paths([self._analysis_file, analysis_file], new_valid_analysis)
-              ZincUtils._move_analysis(new_valid_analysis, self._analysis_file)
+              shutil.move(new_valid_analysis, self._analysis_file)
             else:  # We need to keep analysis_file around. Background tasks may need it.
-              ZincUtils._copy_analysis(analysis_file, self._analysis_file)
+              shutil.copy(analysis_file, self._analysis_file)
 
           if ZincUtils.is_nonempty_analysis(self._invalid_analysis_file):
             with self.context.new_workunit(name='trim-downstream-analysis'):
@@ -248,7 +249,7 @@ class ScalaCompile(NailgunTask):
               discarded_invalid_analysis = analysis_file + '.invalid.discard'
               Analysis.split_to_paths(self._invalid_analysis_file,
                                       [(sources, discarded_invalid_analysis)], new_invalid_analysis)
-              ZincUtils._move_analysis(new_invalid_analysis, self._invalid_analysis_file)
+              shutil.move(new_invalid_analysis, self._invalid_analysis_file)
 
           # Now that all the analysis accounting is complete, we can safely mark the
           # targets as valid.
