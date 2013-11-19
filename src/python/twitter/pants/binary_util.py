@@ -38,7 +38,7 @@ else:
   import urllib2 as urllib_error
 
 from twitter.pants.base import Config
-from . import TaskError
+from twitter.pants.tasks import TaskError  # TODO: Refactor. Not a good dep to have.
 
 _ID_BY_OS = {
   'linux': lambda release, machine: ('linux', machine),

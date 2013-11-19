@@ -15,6 +15,7 @@ from twitter.pants import get_buildroot
 from twitter.pants import SourceRoot
 from twitter.pants.base import ParseContext
 from twitter.pants.base.target import Target
+from twitter.pants.binary_util import find_java_home
 from twitter.pants.goal.products import Products
 from twitter.pants.reporting.report import Report
 from twitter.pants.targets import Pants
@@ -64,6 +65,7 @@ class Context(object):
     self._state = {}
     self._products = Products()
     self._buildroot = get_buildroot()
+    self._java_home = None  # Computed lazily.
     self.requested_goals = requested_goals or []
 
     self.replace_targets(target_roots)
@@ -102,6 +104,16 @@ class Context(object):
     globbed by the wildcards are considered to be target roots.
     """
     return self._target_roots
+
+  @property
+  def java_home(self):
+    if self._java_home is None:
+      self._java_home = os.path.realpath(os.path.dirname(find_java_home()))
+    return self._java_home
+
+  @property
+  def ivy_home(self):
+    return os.path.realpath(self.config.get('ivy', 'cache_dir'))
 
   def __str__(self):
     return 'Context(id:%s, state:%s, targets:%s)' % (self.id, self.state, self.targets())

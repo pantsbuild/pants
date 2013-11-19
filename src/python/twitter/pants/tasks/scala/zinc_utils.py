@@ -30,7 +30,6 @@ from twitter.pants import get_buildroot
 from twitter.pants.base.hash_utils import hash_file
 from twitter.pants.goal.workunit import WorkUnit
 from twitter.pants.tasks import TaskError
-from twitter.pants.binary_util import find_java_home
 
 
 # Well known metadata file required to register scalac plugins with nsc.
@@ -72,8 +71,8 @@ class ZincUtils(object):
     self._jvm_args = context.config.getlist('scala-compile', 'jvm_args')
 
     # For localizing/relativizing analysis files.
-    self._java_home = os.path.realpath(os.path.dirname(find_java_home()))
-    self._ivy_home = os.path.realpath(context.config.get('ivy', 'cache_dir'))
+    self._java_home = context.java_home
+    self._ivy_home = context.ivy_home
 
   @property
   def _zinc_classpath(self):
@@ -207,8 +206,7 @@ class ZincUtils(object):
 
   # These are the names of the various jars zinc needs. They are, conveniently and
   # non-coincidentally, the names of the flags used to pass the jar locations to zinc.
-  compiler_jar_names = ['scala-library', 'scala-compiler', 'scala-reflect']  # Compiler version.
-  zinc_jar_names = ['compiler-interface', 'sbt-interface' ]  # Other jars zinc needs pointers to.
+  zinc_jar_names = ['compiler-interface', 'sbt-interface' ]
 
   @staticmethod
   def identify_zinc_jars(zinc_classpath):

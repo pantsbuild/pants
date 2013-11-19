@@ -16,8 +16,10 @@
 
 import itertools
 import os
+import re
 import shutil
 import uuid
+
 from twitter.common import contextutil
 from twitter.common.dirutil import safe_mkdir, safe_rmtree
 
@@ -29,18 +31,18 @@ from twitter.pants.targets import resolve_target_sources
 from twitter.pants.targets.scala_library import ScalaLibrary
 from twitter.pants.targets.scala_tests import ScalaTests
 from twitter.pants.tasks import TaskError, Task
-from twitter.pants.tasks.jvm_dependency_cache import JvmDependencyCache
-from twitter.pants.tasks.nailgun_task import NailgunTask
+from twitter.pants.tasks.jvm_compile import JvmCompile
 from twitter.pants.reporting.reporting_utils import items_to_report_element
 from twitter.pants.tasks.scala.zinc_analysis import Analysis
-from twitter.pants.tasks.scala.zinc_analysis_collection import ZincAnalysisCollection
 from twitter.pants.tasks.scala.zinc_utils import ZincUtils
 
 
-class ScalaCompile(NailgunTask):
+class ScalaCompile(JvmCompile):
+  _language = 'scala'
+
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
-    NailgunTask.setup_parser(option_group, args, mkflag)
+    JvmCompile.setup_parser(ScalaCompile, option_group, args, mkflag)
 
     option_group.add_option(mkflag('warnings'), mkflag('warnings', negate=True),
                             dest='scala_compile_warnings', default=True,
@@ -57,11 +59,8 @@ class ScalaCompile(NailgunTask):
            'to compile all sources together. Set this to 0 to compile target-by-target. ' \
            'Default is set in pants.ini.')
 
-    JvmDependencyCache.setup_parser(option_group, args, mkflag)
-
-
   def __init__(self, context):
-    NailgunTask.__init__(self, context, workdir=context.config.get('scala-compile', 'nailgun_dir'))
+    JvmCompile.__init__(self, context, workdir=context.config.get('scala-compile', 'nailgun_dir'))
 
     # Set up the zinc utils.
     color = not context.options.no_color
@@ -75,10 +74,6 @@ class ScalaCompile(NailgunTask):
                                  if context.options.scala_compile_partition_size_hint != -1
                                  else context.config.getint('scala-compile', 'partition_size_hint',
                                                             default=1000))
-
-    # Set up dep checking if needed.
-    if context.options.scala_check_missing_deps:
-      JvmDependencyCache.init_product_requirements(self)
 
     self._opts = context.config.getlist('scala-compile', 'args')
     if context.options.scala_compile_warnings:
@@ -143,14 +138,19 @@ class ScalaCompile(NailgunTask):
     # We compute the list lazily.
     if self._deleted_sources is None:
       with self.context.new_workunit('find-deleted-sources'):
-        analysis = ZincAnalysisCollection(stop_after=ZincAnalysisCollection.PRODUCTS)
         if os.path.exists(self._analysis_file):
-          analysis.add_and_parse_file(self._analysis_file, self._classes_dir)
-        old_sources = analysis.products.keys()
-        self._deleted_sources = filter(lambda x: not os.path.exists(x), old_sources)
+          products = Analysis.parse_products_from_path(self._analysis_file)
+          buildroot = get_buildroot()
+          old_sources = [os.path.relpath(src, buildroot) for src in products.keys()]
+          self._deleted_sources = filter(lambda x: not os.path.exists(x), old_sources)
+        else:
+          self._deleted_sources = []
     return self._deleted_sources
 
   def execute(self, targets):
+    # TODO(benjy): Add a pre-execute phase for injecting deps into targets, so we
+    # can inject a dep on the scala runtime library and still have it ivy-resolve.
+
     scala_targets = filter(lambda t: has_sources(t, '.scala'), targets)
     if not scala_targets:
       return
@@ -229,18 +229,30 @@ class ScalaCompile(NailgunTask):
           # No exception was thrown, therefore the compile succeded and analysis_file is now valid.
 
           if os.path.exists(analysis_file):  # The compilation created an analysis.
+            # Merge the newly-valid analysis with our global valid analysis.
+            new_valid_analysis = analysis_file + '.valid.new'
+            if ZincUtils.is_nonempty_analysis(self._analysis_file):
+              with self.context.new_workunit(name='update-upstream-analysis'):
+                Analysis.merge_from_paths([self._analysis_file, analysis_file], new_valid_analysis)
+            else:  # We need to keep analysis_file around. Background tasks may need it.
+              shutil.copy(analysis_file, new_valid_analysis)
+
+            # Check for missing dependencies.
+            actual_deps = Analysis.parse_deps_from_path(new_valid_analysis)
+            # TODO(benjy): Temporary hack until we inject a dep on the scala runtime jar.
+            actual_deps_filtered = {}
+            scalalib_re = re.compile(r'scala-library-\d+\.\d+\.\d+\.jar$')
+            for src, deps in actual_deps.iteritems():
+              actual_deps_filtered[src] = filter(lambda x: scalalib_re.search(x) is None, deps)
+            self.check_for_missing_dependencies(sources, actual_deps_filtered)
+
+            # Move the merged valid analysis to its proper location, now that we know
+            # there are no missing deps.
+            shutil.move(new_valid_analysis, self._analysis_file)
+
             # Kick off the background artifact cache write.
             if self.get_artifact_cache() and self.context.options.write_to_artifact_cache:
               self._write_to_artifact_cache(analysis_file, vts, invalid_sources_by_target)
-
-            # Merge the newly-valid analysis into our global valid analysis.
-            if ZincUtils.is_nonempty_analysis(self._analysis_file):
-              with self.context.new_workunit(name='update-upstream-analysis'):
-                new_valid_analysis = analysis_file + '.valid.new'
-                Analysis.merge_from_paths([self._analysis_file, analysis_file], new_valid_analysis)
-              shutil.move(new_valid_analysis, self._analysis_file)
-            else:  # We need to keep analysis_file around. Background tasks may need it.
-              shutil.copy(analysis_file, self._analysis_file)
 
           if ZincUtils.is_nonempty_analysis(self._invalid_analysis_file):
             with self.context.new_workunit(name='trim-downstream-analysis'):
@@ -254,11 +266,6 @@ class ScalaCompile(NailgunTask):
           # Now that all the analysis accounting is complete, we can safely mark the
           # targets as valid.
           vts.update()
-
-        # Check for missing dependencies, if needed.
-        if invalidation_check.invalid_vts and os.path.exists(self._analysis_file):
-          deps_cache = JvmDependencyCache(self.context, scala_targets, self._analysis_file, self._classes_dir)
-          deps_cache.check_undeclared_dependencies()
 
     # Provide the target->class and source->class mappings to downstream tasks if needed.
     if self.context.products.isrequired('classes'):
@@ -402,12 +409,12 @@ class ScalaCompile(NailgunTask):
 
     if not os.path.exists(analysis_file):
       return {}
-    len_rel_classes_dir = len(self._classes_dir) - len(get_buildroot())
-    analysis = ZincAnalysisCollection(stop_after=ZincAnalysisCollection.PRODUCTS)
-    analysis.add_and_parse_file(analysis_file, self._classes_dir)
+    buildroot = get_buildroot()
+    products = Analysis.parse_products_from_path(analysis_file)
     classes_by_src = {}
-    for src, classes in analysis.products.items():
-      classes_by_src[src] = [cls[len_rel_classes_dir:] for cls in classes]
+    for src, classes in products.items():
+      relsrc = os.path.relpath(src, buildroot)
+      classes_by_src[relsrc] = [os.path.relpath(cls, self._classes_dir) for cls in classes]
     return classes_by_src
 
   def _add_all_products_to_genmap(self, sources_by_target, classes_by_source):

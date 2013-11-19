@@ -16,18 +16,13 @@
 
 from __future__ import print_function
 
-import hashlib
 import os
-import pkgutil
 import shutil
 import time
 
-from contextlib import contextmanager
+from twitter.common.dirutil import safe_mkdir
 
-from twitter.common.collections import OrderedSet
-from twitter.common.dirutil import safe_mkdir, safe_open
-
-from twitter.pants import binary_util, is_internal, is_jar, is_concrete
+from twitter.pants import binary_util
 from twitter.pants.tasks import TaskError
 from twitter.pants.tasks.cache_manager import VersionedTargetSet
 from twitter.pants.tasks.ivy_utils import IvyUtils
@@ -168,7 +163,7 @@ class IvyResolve(NailgunTask):
     Populate the build products with an IvyInfo object for each
     generated ivy report.
     For each configuration used to run ivy, a build product entry
-    is generated for the tuple ("ivy", configuration, ivyinfo)
+    is generated for the tuple ('ivy', configuration, ivyinfo)
     """
     genmap = self.context.products.get('ivy_jar_products')
     # For each of the ivy reports:
@@ -178,7 +173,7 @@ class IvyResolve(NailgunTask):
       # are already so abused, and this really does make sense.
       ivyinfo = self._ivy_utils.parse_xml_report(targets, conf)
       if ivyinfo:
-        genmap.add("ivy", conf, [ivyinfo])
+        genmap.add('ivy', conf, [ivyinfo])
 
   def _generate_ivy_report(self, targets):
     def make_empty_report(report, organisation, module, conf):

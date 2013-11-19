@@ -27,6 +27,7 @@ from twitter.pants.base.target import Target
 from twitter.pants.goal.workunit import WorkUnit
 from twitter.pants.reporting.reporting_utils import items_to_report_element
 from twitter.pants.tasks import TaskError
+from twitter.pants.tasks.jvm_compile import JvmCompile
 from twitter.pants.tasks.jvm_compiler_dependencies import Dependencies
 from twitter.pants.tasks.nailgun_task import NailgunTask
 
@@ -61,10 +62,12 @@ _JMAKE_ERROR_CODES = {
 _JMAKE_ERROR_CODES.update((256+code, msg) for code, msg in _JMAKE_ERROR_CODES.items())
 
 
-class JavaCompile(NailgunTask):
+class JavaCompile(JvmCompile):
+  _language = 'java'
+
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
-    NailgunTask.setup_parser(option_group, args, mkflag)
+    JvmCompile.setup_parser(JavaCompile, option_group, args, mkflag)
 
     option_group.add_option(mkflag("warnings"), mkflag("warnings", negate=True),
                             dest="java_compile_warnings", default=True,
@@ -82,7 +85,7 @@ class JavaCompile(NailgunTask):
                                  " to compile target-by-target. Default is set in pants.ini.")
 
   def __init__(self, context):
-    NailgunTask.__init__(self, context, workdir=context.config.get('java-compile', 'nailgun_dir'))
+    JvmCompile.__init__(self, context, workdir=context.config.get('java-compile', 'nailgun_dir'))
 
     if context.options.java_compile_partition_size_hint != -1:
       self._partition_size_hint = context.options.java_compile_partition_size_hint
@@ -168,11 +171,13 @@ class JavaCompile(NailgunTask):
         for vts in invalidation_check.invalid_vts_partitioned:
           # Compile, using partitions for efficiency.
           sources_by_target = self._process_target_partition(vts, cp)
+
+          # TODO: Check for missing dependencies.  See ScalaCompile for an example.
+          # Will require figuring out what the actual deps of a class file are.
+
           vts.update()
           if self.get_artifact_cache() and self.context.options.write_to_artifact_cache:
             self._write_to_artifact_cache(vts, sources_by_target)
-
-        # TODO: Add dependency checking.
 
         # Provide the target->class and source->class mappings to downstream tasks if needed.
         if self.context.products.isrequired('classes'):

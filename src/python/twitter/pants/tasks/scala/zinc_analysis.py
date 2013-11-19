@@ -8,30 +8,37 @@ from twitter.pants import TaskError
 class ParseError(TaskError):
   pass
 
-# Classes to encapsulate various parts of the analysis. Note that data in these classes is still
-# just text, possibly split on lines or '->'.
-
 
 class AnalysisElement(object):
+  """Encapsulates one part of the analysis.
+
+  Subclasses specify which section headers comprise this part. Note that data in these objects is
+  just text, possibly split on lines or '->'.
+  """
   headers = ()  # Override in subclasses.
 
   @classmethod
   def parse(cls, lines_iter):
-    return cls(Util.parse_multiple_repeated(lines_iter, cls.headers))
+    return cls(Util.parse_multiple_sections(lines_iter, cls.headers))
 
   @classmethod
   def from_json_obj(cls, obj):
     return cls([obj[header] for header in cls.headers])
 
   def __init__(self, args):
+    # Subclasses can alias the elements of self.args in their own __init__, for convenience.
     self.args = args
-    # Subclasses can alias the elements of self.args conveniently in their own __init__.
 
   def write(self, outfile, inline_vals=True):
-    Util.write_multiple_repeated(outfile, self.headers, self.args, inline_vals)
+    Util.write_multiple_sections(outfile, self.headers, self.args, inline_vals)
 
 
 class AnalysisJSONEncoder(json.JSONEncoder):
+  """A custom encoder for writing analysis elements as JSON.
+
+  Not currently used, but might be useful in the future, e.g., for creating javascript-y
+  analysis browsing tools.
+  """
   def default(self, obj):
     if isinstance(obj, AnalysisElement):
       ret = {}
@@ -43,22 +50,29 @@ class AnalysisJSONEncoder(json.JSONEncoder):
 
 
 class Analysis(object):
+  """Parsed representation of a zinc analysis.
+
+  Note also that all files in keys/values are full-path, just as they appear in the analysis file.
+  If you want paths relative to the build root or the classes dir or whatever, you must compute
+  those yourself.
+  """
   @staticmethod
   def parse_from_path(infile_path):
+    """Parse an Analysis instance from a text file."""
     with open(infile_path, 'r') as infile:
       return Analysis.parse(infile)
 
   @staticmethod
   def parse_json_from_path(infile_path):
+    """Parse an Analysis instance from a JSON file."""
     with open(infile_path, 'r') as infile:
-      return Analysis.parse_json(infile)
+      return Analysis.parse_from_json(infile)
 
   @staticmethod
   def parse(infile):
-    lines_iter = iter(infile.read().splitlines())
-    version_line = lines_iter.next()
-    if version_line != 'format version: 1':
-      raise Exception('Unrecognized format line: ' + version_line)
+    """Parse an Analysis instance from an open text file."""
+    lines_iter = infile
+    Analysis._verify_version(lines_iter)
     relations = Relations.parse(lines_iter)
     stamps = Stamps.parse(lines_iter)
     apis = APIs.parse(lines_iter)
@@ -68,7 +82,8 @@ class Analysis(object):
     return Analysis(relations, stamps, apis, source_infos, compilations, compile_setup)
 
   @staticmethod
-  def parse_json(infile):
+  def parse_from_json(infile):
+    """Parse an Analysis instance from an open JSON file."""
     obj = json.load(infile)
     relations = Relations.from_json_obj(obj['relations'])
     stamps = Stamps.from_json_obj(obj['stamps'])
@@ -79,7 +94,60 @@ class Analysis(object):
     return Analysis(relations, stamps, apis, source_infos, compilations, compile_setup)
 
   @staticmethod
+  def parse_products_from_path(infile_path):
+    with open(infile_path, 'r') as infile:
+      return Analysis.parse_products(infile)
+
+  @staticmethod
+  def parse_products(infile):
+    """An efficient parser of just the products section."""
+    Analysis._verify_version(infile)
+    return Analysis._find_repeated_at_header(infile, 'products')
+
+  @staticmethod
+  def parse_deps_from_path(infile_path):
+    with open(infile_path, 'r') as infile:
+      return Analysis.parse_deps(infile)
+
+  @staticmethod
+  def parse_deps(infile):
+    """An efficient parser of just the binary, source and external deps sections.
+
+    Returns a dict of src -> list of deps, where each item in deps is either a binary dep,
+    source dep or external dep, i.e., either a source file, a class file or a jar file.
+
+    All paths are absolute.
+    """
+    Analysis._verify_version(infile)
+    # Note: relies on the fact that these headers appear in this order in the file.
+    bin_deps = Analysis._find_repeated_at_header(infile, 'binary dependencies')
+    src_deps = Analysis._find_repeated_at_header(infile, 'source dependencies')
+    ext_deps = Analysis._find_repeated_at_header(infile, 'external dependencies')
+    return Util.merge_dicts([bin_deps, src_deps, ext_deps])
+
+  @staticmethod
+  def _find_repeated_at_header(lines_iter, header):
+    header_line = header + ':\n'
+    while lines_iter.next() != header_line:
+      pass
+    return Util.parse_section(lines_iter, expected_header=None)
+
+  @staticmethod
+  def _verify_version(lines_iter):
+    version_line = lines_iter.next()
+    if version_line != 'format version: 1\n':
+      raise TaskError('Unrecognized version line: ' + version_line)
+
+  @staticmethod
   def rebase(input_analysis_path, output_analysis_path, rebasings):
+    """Rebase file paths in an analysis file.
+
+    rebasings: a list of path prefix pairs [from_prefix, to_prefix] to rewrite.
+
+    Note that this is implemented using string.replace, for efficiency, so this will
+    actually just replace everywhere, not just path prefixes. However in practice this
+    makes no difference, and the performance gains are considerable.
+    """
     # TODO: Can make this more efficient if needed, e.g., we know which sections contain
     # which path prefixes. But for now this is fine.
     with open(input_analysis_path, 'r') as infile:
@@ -91,6 +159,14 @@ class Analysis(object):
 
   @staticmethod
   def split_to_paths(analysis_path, split_path_pairs, catchall_path=None):
+    """Split an analysis file.
+
+    split_path_pairs: A list of pairs (split, output_path) where split is a list of source files
+    whose analysis is to be split out into output_path.
+
+    If catchall_path is specified, the analysis for any sources not mentioned in the splits is
+    split out to that path.
+    """
     analysis = Analysis.parse(analysis_path)
     splits = [x[0] for x in split_path_pairs]
     split_analyses = analysis.split(splits, catchall_path is not None)
@@ -102,12 +178,16 @@ class Analysis(object):
 
   @staticmethod
   def merge_from_paths(analysis_paths, merged_analysis_path):
+    """Merge multiple analysis files into one."""
     analyses = [Analysis.parse_from_path(path) for path in analysis_paths]
     merged_analysis = Analysis.merge(analyses)
     merged_analysis.write_to_path(merged_analysis_path)
 
   @staticmethod
   def merge(analyses):
+    """Merge multiple Analysis instances into one."""
+    # Note: correctly handles "internalizing" external deps that must be internal post-merge.
+
     # Merge relations.
     src_prod = Util.merge_dicts([a.relations.src_prod for a in analyses])
     binary_dep = Util.merge_dicts([a.relations.binary_dep for a in analyses])
@@ -123,9 +203,9 @@ class Analysis(object):
         for v in vs:
           vfile = class_to_source[v]
           if vfile in src_prod:
-            internal[k].append(vfile)
+            internal[k].append(vfile)  # Internalized.
           else:
-            external[k].append(v)
+            external[k].append(v)  # Remains external.
       return internal, external
 
     internal, external = merge_dependencies([a.relations.internal_src_dep for a in analyses],
@@ -149,9 +229,9 @@ class Analysis(object):
     for k, vs in naive_external_apis.iteritems():
       kfile = class_to_source[k]
       if kfile in src_prod:
-        internal_apis[kfile] = vs
+        internal_apis[kfile] = vs  # Internalized.
       else:
-        external_apis[k] = vs
+        external_apis[k] = vs  # Remains external.
     apis = APIs((internal_apis, external_apis))
 
     # Merge source infos.
@@ -190,8 +270,8 @@ class Analysis(object):
     self.compile_setup.write(outfile, inline_vals=False)
 
   def write_json(self, outfile):
-    obj = dict(zip(('relations', 'stamps', 'apis', 'compilations'),
-                   (self.relations, self.stamps, self.apis, self.compilations)))
+    obj = dict(zip(('relations', 'stamps', 'apis', 'source_infos', 'compilations', 'compile_setup'),
+                   (self.relations, self.stamps, self.apis, self.source_infos, self.compilations, self.compile_setup)))
     json.dump(obj, outfile, cls=AnalysisJSONEncoder, sort_keys=True, indent=2)
 
   def split(self, splits, catchall=False):
@@ -201,6 +281,7 @@ class Analysis(object):
     If catchall is True, returns K+1 Analysis objects, the last one containing the analysis for any
     remainder sources not mentioned in the K splits.
     """
+    # Note: correctly handles "externalizing" internal deps that must be external post-split.
     splits = [set(x) for x in splits]
     if catchall:
       # Even empty sources with no products have stamps.
@@ -212,6 +293,8 @@ class Analysis(object):
     binary_dep_splits = Util.split_dict(self.relations.binary_dep, splits)
     classes_splits = Util.split_dict(self.relations.classes, splits)
 
+    # For historical reasons, external deps are specified as src->class while internal deps are
+    # specified as src->src. So we pick a representative class for each src.
     representatives = dict((k, min(vs)) for k, vs in self.relations.classes.iteritems())
 
     def split_dependencies(all_internal, all_external):
@@ -225,9 +308,9 @@ class Analysis(object):
         for k, vs in naive_internal.iteritems():
           for v in vs:
             if v in split:
-              internal[k].append(v)
+              internal[k].append(v)  # Remains internal.
             else:
-              external[k].append(representatives[v])
+              external[k].append(representatives[v])  # Externalized.
         internals.append(internal)
         externals.append(external)
       return internals, externals
@@ -262,9 +345,9 @@ class Analysis(object):
       internal_apis = defaultdict(list)
       for k, vs in naive_internal_apis.iteritems():
         if k in split:
-          internal_apis[k] = vs
+          internal_apis[k] = vs  # Remains internal.
         else:
-          external_apis[representatives[k]] = vs
+          external_apis[representatives[k]] = vs  # Externalized.
       internal_api_splits.append(internal_apis)
       external_api_splits.append(external_apis)
 
@@ -332,37 +415,49 @@ class CompileSetup(AnalysisElement):
     (self.compile_setup, ) = self.args
 
 class Util(object):
-  header_re = re.compile(r'(\d+) items')
+  num_items_re = re.compile(r'(\d+) items\n')
 
   @staticmethod
-  def parse_multiple_repeated(lines_iter, expected_headers):
-    return [Util.parse_repeated(lines_iter, header) for header in expected_headers]
-
-  @staticmethod
-  def write_multiple_repeated(outfile, headers, reps, inline_vals=True):
-    for header, rep in zip(headers, reps):
-      Util.write_repeated(outfile, header, rep, inline_vals)
-
-  @staticmethod
-  def parse_repeated(lines_iter, expected_header):
+  def parse_num_items(lines_iter):
+    """Parse a line of the form '<num> items' and returns <num> as an int."""
     line = lines_iter.next()
-    if expected_header + ':' != line:
-      raise ParseError('Expected: "%s:". Found: "%s"' % (expected_header, line))
-    line = lines_iter.next()
-    matchobj = Util.header_re.match(line)
+    matchobj = Util.num_items_re.match(line)
     if not matchobj:
       raise ParseError('Expected: "<num> items". Found: "%s"' % line)
-    n = int(matchobj.group(1))
+    return int(matchobj.group(1))
+
+  @staticmethod
+  def parse_multiple_sections(lines_iter, expected_headers):
+    """Parse multiple sections."""
+    return [Util.parse_section(lines_iter, header) for header in expected_headers]
+
+  @staticmethod
+  def write_multiple_sections(outfile, headers, reps, inline_vals=True):
+    """Write multiple sections."""
+    for header, rep in zip(headers, reps):
+      Util.write_section(outfile, header, rep, inline_vals)
+
+  @staticmethod
+  def parse_section(lines_iter, expected_header=None):
+    """Parse a single section."""
+    if expected_header:
+      line = lines_iter.next()
+      if expected_header + ':\n' != line:
+        raise ParseError('Expected: "%s:". Found: "%s"' % (expected_header, line))
+    n = Util.parse_num_items(lines_iter)
     relation = defaultdict(list)  # Values are lists, to accommodate relations.
     for i in xrange(n):
       k, _, v = lines_iter.next().partition(' -> ')
-      if len(v) == 0:  # Value on its own line.
+      if len(v) == 1:  # Value on its own line.
         v = lines_iter.next()
-      relation[k].append(v)
+      relation[k].append(v[:-1])
     return relation
 
   @staticmethod
-  def write_repeated(outfile, header, rep, inline_vals=True):
+  def write_section(outfile, header, rep, inline_vals=True):
+    """Write a single section.
+
+    Itens are sorted, for ease of testing."""
     outfile.write(header + ':\n')
     items = []
     if isinstance(rep, dict):
@@ -381,6 +476,11 @@ class Util(object):
 
   @staticmethod
   def split_dict(d, splits):
+    """Split a dict by its keys.
+
+    splits: A list of lists of keys.
+    Returns one dict per split.
+    """
     ret = []
     for split in splits:
       dict_split = defaultdict(list)
@@ -392,6 +492,10 @@ class Util(object):
 
   @staticmethod
   def merge_dicts(dicts):
+    """Merges multiple dicts into one.
+
+    Assumes keys don't overlap.
+    """
     ret = defaultdict(list)
     for (k, v) in itertools.chain(*[d.iteritems() for d in dicts]):
       ret[k] = v
