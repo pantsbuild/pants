@@ -23,8 +23,6 @@ from twitter.common.dirutil import safe_mkdir, safe_rmtree
 from twitter.pants import has_sources, is_scalac_plugin, get_buildroot
 from twitter.pants.base import Target
 from twitter.pants.base.worker_pool import Work
-from twitter.pants.cache import CombinedArtifactCache
-from twitter.pants.cache.transforming_artifact_cache import TransformingArtifactCache
 from twitter.pants.goal.workunit import WorkUnit
 from twitter.pants.targets import resolve_target_sources
 from twitter.pants.targets.scala_library import ScalaLibrary
@@ -104,10 +102,8 @@ class ScalaCompile(NailgunTask):
 
     self.context.products.require_data('exclusives_groups')
 
-    self._local_artifact_cache_spec = \
-      context.config.getlist('scala-compile', 'local_artifact_caches', default=[])
-    self._remote_artifact_cache_spec = \
-      context.config.getlist('scala-compile', 'remote_artifact_caches', default=[])
+    artifact_cache_spec = context.config.getlist('scala-compile', 'artifact_caches', default=[])
+    self.setup_artifact_cache(artifact_cache_spec)
 
     # A temporary, but well-known, dir to munge analysis files in before caching. It must be
     # well-known so we know where to find the files when we retrieve them from the cache.
@@ -131,16 +127,6 @@ class ScalaCompile(NailgunTask):
 
   def can_dry_run(self):
     return True
-
-  def get_artifact_cache(self):
-    if self._artifact_cache is None:
-      local_cache = self.create_artifact_cache(self._local_artifact_cache_spec)
-      remote_cache = self.create_artifact_cache(self._remote_artifact_cache_spec)
-      if remote_cache:
-        remote_cache = TransformingArtifactCache(remote_cache)
-      caches = filter(None, [local_cache, remote_cache])
-      self._artifact_cache = CombinedArtifactCache(caches) if caches else None
-    return self._artifact_cache
 
   def _ensure_analysis_tmpdir(self):
     # Do this lazily, so we don't trigger creation of a worker pool unless we need it.
