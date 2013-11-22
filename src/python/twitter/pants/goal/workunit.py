@@ -74,9 +74,6 @@ class WorkUnit(object):
     self.parent = parent
     self.children = []
 
-    if self.parent:
-      self.parent.children.append(self)
-
     self.name = name
     self.labels = set(labels)
     self.cmd = cmd
@@ -89,6 +86,12 @@ class WorkUnit(object):
     # A workunit may have multiple outputs, which we identify by a name.
     # E.g., a tool invocation may have 'stdout', 'stderr', 'debug_log' etc.
     self._outputs = {}  # name -> output buffer.
+
+    # Do this last, as the parent's _self_time() might get called before we're
+    # done initializing ourselves.
+    # TODO: Ensure that a parent can't be ended before all its children are.
+    if self.parent:
+      self.parent.children.append(self)
 
   def has_label(self, label):
     return label in self.labels

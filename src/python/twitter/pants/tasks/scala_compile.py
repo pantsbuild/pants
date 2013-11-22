@@ -326,6 +326,8 @@ class ScalaCompile(JvmCompile):
       with self.context.new_workunit(name='cache',
                                      labels=[WorkUnit.MULTITOOL],
                                      parent=background_workunit) as parent:
+        # TODO: We shouldn't end the workunit here, but when the work is actually complete,
+        # so we can then time it properly, change the color in the HTML report on failure etc.
         self.context.submit_background_work_chain(work_chain, workunit_parent=parent)
 
   def check_artifact_cache(self, vts):
