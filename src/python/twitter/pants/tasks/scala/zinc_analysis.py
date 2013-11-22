@@ -1,8 +1,9 @@
 from collections import defaultdict
 import json
+import os
 import re
 import itertools
-from twitter.pants import TaskError
+from twitter.pants import TaskError, get_buildroot
 
 
 class ParseError(TaskError):
@@ -162,7 +163,8 @@ class Analysis(object):
     """Split an analysis file.
 
     split_path_pairs: A list of pairs (split, output_path) where split is a list of source files
-    whose analysis is to be split out into output_path.
+    whose analysis is to be split out into output_path. The source files may either be
+    absolute paths, or relative to the build root.
 
     If catchall_path is specified, the analysis for any sources not mentioned in the splits is
     split out to that path.
@@ -282,7 +284,8 @@ class Analysis(object):
     remainder sources not mentioned in the K splits.
     """
     # Note: correctly handles "externalizing" internal deps that must be external post-split.
-    splits = [set(x) for x in splits]
+    buildroot = get_buildroot()
+    splits = [set([s if os.path.isabs(s) else os.path.join(buildroot, s) for s in x]) for x in splits]
     if catchall:
       # Even empty sources with no products have stamps.
       all_sources = (set(itertools.chain(*[self.stamps.sources.iterkeys()]))).difference(*splits)
