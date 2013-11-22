@@ -167,7 +167,7 @@ class Analysis(object):
     If catchall_path is specified, the analysis for any sources not mentioned in the splits is
     split out to that path.
     """
-    analysis = Analysis.parse(analysis_path)
+    analysis = Analysis.parse_from_path(analysis_path)
     splits = [x[0] for x in split_path_pairs]
     split_analyses = analysis.split(splits, catchall_path is not None)
     output_paths = [x[1] for x in split_path_pairs]
