@@ -14,6 +14,7 @@
 # limitations under the License.
 # =================================================================================================
 
-
-from .task import Task, TaskError
+# Must come before the import of Task, as things Task imports require it here.
+from .task_error import TaskError
+from .task import Task
 from .cache_manager import CacheManager

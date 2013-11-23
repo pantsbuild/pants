@@ -76,6 +76,7 @@ class BootstrapJvmTools(Task):
           ]
           cache['classpath'] = self.ivy_resolve(targets,
                                                 java_runner=java_runner,
-                                                ivy_args=ivy_args)
+                                                ivy_args=ivy_args,
+                                                silent=True)
         return cache['classpath']
     return bootstrap_classpath

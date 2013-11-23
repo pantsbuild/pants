@@ -29,7 +29,6 @@ from twitter.pants.reporting.reporting_utils import items_to_report_element
 from twitter.pants.tasks import TaskError
 from twitter.pants.tasks.jvm_compile import JvmCompile
 from twitter.pants.tasks.jvm_compiler_dependencies import Dependencies
-from twitter.pants.tasks.nailgun_task import NailgunTask
 
 
 # Well known metadata file to auto-register annotation processors with a java 1.6+ compiler

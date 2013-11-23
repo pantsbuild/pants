@@ -26,7 +26,6 @@ from twitter.common.dirutil import safe_mkdir, safe_rmtree
 from twitter.pants import has_sources, is_scalac_plugin, get_buildroot
 from twitter.pants.base import Target
 from twitter.pants.base.worker_pool import Work
-from twitter.pants.goal.workunit import WorkUnit
 from twitter.pants.targets import resolve_target_sources
 from twitter.pants.targets.scala_library import ScalaLibrary
 from twitter.pants.targets.scala_tests import ScalaTests

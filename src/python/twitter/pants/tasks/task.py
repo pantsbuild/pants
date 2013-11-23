@@ -20,21 +20,20 @@ import sys
 from contextlib import contextmanager
 import itertools
 
-from twitter.pants import is_internal, is_jar, is_concrete
 from twitter.common.collections.orderedset import OrderedSet
 from twitter.pants.base.worker_pool import Work
 from twitter.pants.cache import create_artifact_cache
 
 from twitter.pants.base.hash_utils import hash_file
 from twitter.pants.base.build_invalidator import CacheKeyGenerator
+from twitter.pants.binary_util import runjava_indivisible
 from twitter.pants.goal.workunit import WorkUnit
 from twitter.pants.reporting.reporting_utils import items_to_report_element
-from twitter.pants.tasks.cache_manager import CacheManager, InvalidationCheck, VersionedTargetSet
 from twitter.pants.tasks.bootstrap_utils import BootstrapUtils
+from twitter.pants.tasks.cache_manager import CacheManager, InvalidationCheck, VersionedTargetSet
+from twitter.pants.tasks.ivy_utils import IvyUtils
+from twitter.pants.tasks.task_error import TaskError
 
-
-class TaskError(Exception):
-  """Raised to indicate a task has failed."""
 
 
 class Task(object):
@@ -128,7 +127,7 @@ class Task(object):
 
   @contextmanager
   def invalidated(self, targets, only_buildfiles=False, invalidate_dependents=False,
-                  partition_size_hint=sys.maxint):
+                  partition_size_hint=sys.maxint, silent=False):
     """Checks targets for invalidation, first checking the artifact cache.
     Subclasses call this to figure out what to work on.
 
@@ -147,20 +146,19 @@ class Task(object):
     If no exceptions are thrown by work in the block, the build cache is updated for the targets.
     Note: the artifact cache is not updated. That must be done manually.
     """
-    with self.context.new_workunit('invalidation'):
-      extra_data = []
-      extra_data.append(self.invalidate_for())
+    extra_data = []
+    extra_data.append(self.invalidate_for())
 
-      for f in self.invalidate_for_files():
-        extra_data.append(hash_file(f))
+    for f in self.invalidate_for_files():
+      extra_data.append(hash_file(f))
 
-      cache_manager = CacheManager(self._cache_key_generator,
-                                   self._build_invalidator_dir,
-                                   invalidate_dependents,
-                                   extra_data,
-                                   only_externaldeps=only_buildfiles)
+    cache_manager = CacheManager(self._cache_key_generator,
+                                 self._build_invalidator_dir,
+                                 invalidate_dependents,
+                                 extra_data,
+                                 only_externaldeps=only_buildfiles)
 
-      invalidation_check = cache_manager.check(targets, partition_size_hint)
+    invalidation_check = cache_manager.check(targets, partition_size_hint)
 
     if invalidation_check.invalid_vts and self.get_artifact_cache() and \
         self.context.options.read_from_artifact_cache:
@@ -168,37 +166,38 @@ class Task(object):
         cached_vts, uncached_vts = \
           self.check_artifact_cache(self.check_artifact_cache_for(invalidation_check))
       if cached_vts:
-        # Do some reporting.
         cached_targets = [vt.target for vt in cached_vts]
         for t in cached_targets:
           self.context.run_tracker.artifact_cache_stats.add_hit('default', t)
-        self._report_targets('Using cached artifacts for ', cached_targets, '.')
+        if not silent:
+          self._report_targets('Using cached artifacts for ', cached_targets, '.')
       if uncached_vts:
         uncached_targets = [vt.target for vt in uncached_vts]
         for t in uncached_targets:
           self.context.run_tracker.artifact_cache_stats.add_miss('default', t)
-        self._report_targets('No cached artifacts for ', uncached_targets, '.')
+        if not silent:
+          self._report_targets('No cached artifacts for ', uncached_targets, '.')
       # Now that we've checked the cache, re-partition whatever is still invalid.
       invalidation_check = \
         InvalidationCheck(invalidation_check.all_vts, uncached_vts, partition_size_hint)
 
-    # Do some reporting.
-    targets = []
-    sources = []
-    num_invalid_partitions = len(invalidation_check.invalid_vts_partitioned)
-    for vt in invalidation_check.invalid_vts_partitioned:
-      targets.extend(vt.targets)
-      sources.extend(vt.cache_key.sources)
-    if len(targets):
-      msg_elements = ['Invalidated ',
-                      items_to_report_element([t.address.reference() for t in targets], 'target')]
-      if len(sources) > 0:
-        msg_elements.append(' containing ')
-        msg_elements.append(items_to_report_element(sources, 'source file'))
-      if num_invalid_partitions > 1:
-        msg_elements.append(' in %d target partitions' % num_invalid_partitions)
-      msg_elements.append('.')
-      self.context.log.info(*msg_elements)
+    if not silent:
+      targets = []
+      sources = []
+      num_invalid_partitions = len(invalidation_check.invalid_vts_partitioned)
+      for vt in invalidation_check.invalid_vts_partitioned:
+        targets.extend(vt.targets)
+        sources.extend(vt.cache_key.sources)
+      if len(targets):
+        msg_elements = ['Invalidated ',
+                        items_to_report_element([t.address.reference() for t in targets], 'target')]
+        if len(sources) > 0:
+          msg_elements.append(' containing ')
+          msg_elements.append(items_to_report_element(sources, 'source file'))
+        if num_invalid_partitions > 1:
+          msg_elements.append(' in %d target partitions' % num_invalid_partitions)
+        msg_elements.append('.')
+        self.context.log.info(*msg_elements)
 
     # Yield the result, and then mark the targets as up to date.
     yield invalidation_check
@@ -297,10 +296,7 @@ class Task(object):
       items_to_report_element([t.address.reference() for t in targets], 'target'),
       suffix)
 
-  def ivy_resolve(self, targets, java_runner=None, ivy_args=None, symlink_ivyxml=False):
-    from twitter.pants.tasks.ivy_utils import IvyUtils
-    from twitter.pants.binary_util import runjava_indivisible
-
+  def ivy_resolve(self, targets, java_runner=None, ivy_args=None, symlink_ivyxml=False, silent=False):
     java_runner = java_runner or runjava_indivisible
 
     ivy_args = ivy_args or []
@@ -315,7 +311,8 @@ class Task(object):
 
     with self.invalidated(targets,
                           only_buildfiles=True,
-                          invalidate_dependents=True) as invalidation_check:
+                          invalidate_dependents=True,
+                          silent=silent) as invalidation_check:
       global_vts = VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
       target_workdir = os.path.join(work_dir, global_vts.cache_key.hash)
       target_classpath_file = os.path.join(target_workdir, 'classpath')
@@ -334,6 +331,7 @@ class Task(object):
           targets=targets,
           args=args,
           runjava=java_runner,
+          workunit_name='ivy',
           workunit_factory=self.context.new_workunit,
           symlink_ivyxml=symlink_ivyxml,
         )
