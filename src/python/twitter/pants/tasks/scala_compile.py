@@ -318,17 +318,11 @@ class ScalaCompile(JvmCompile):
       self.get_update_artifact_cache_work(vts_artifactfiles_pairs)
     if update_artifact_cache_work:
       work_chain = [
-        Work(Analysis.split_to_paths, splits_args_tuples, 'split'),
+        Work(Analysis.split, splits_args_tuples, 'split'),
         Work(self._zinc_utils.relativize_analysis_file, relativize_args_tuples, 'relativize'),
         update_artifact_cache_work
       ]
-      background_workunit = self.context.run_tracker.get_background_root_workunit()
-      with self.context.new_workunit(name='cache',
-                                     labels=[WorkUnit.MULTITOOL],
-                                     parent=background_workunit) as parent:
-        # TODO: We shouldn't end the workunit here, but when the work is actually complete,
-        # so we can then time it properly, change the color in the HTML report on failure etc.
-        self.context.submit_background_work_chain(work_chain, workunit_parent=parent)
+      self.context.submit_background_work_chain(work_chain, parent_workunit_name='cache')
 
   def check_artifact_cache(self, vts):
     # Special handling for scala analysis files. Class files are retrieved directly into their

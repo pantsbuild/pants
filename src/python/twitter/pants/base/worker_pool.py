@@ -40,58 +40,56 @@ class WorkerPool(object):
   def add_shutdown_hook(self, hook):
     self._shutdown_hooks.append(hook)
 
-  def submit_async_work(self, work,  workunit_parent=None, callback=None):
+  def submit_async_work(self, work,  workunit_parent=None, on_success=None, on_failure=None):
     """Submit work to be executed in the background.
 
     - work: The work to execute.
     - workunit_parent: If specified, work is accounted for under this workunit.
-    - callback: If specified, a callable taking a single argument, which will be a list
-                of return values of each invocation, in order. Called only if all work succeeded.
+    - on_success: If specified, a callable taking a single argument, which will be a list
+                  of return values of each invocation, in order. Called only if all work succeeded.
+    - on_failure: If specified, a callable taking a single argument, which is an exception
+                  thrown in the work.
 
-    Don't do work in callback: not only will it block the result handling thread, but
-    that thread is not a worker and doesn't have a logging context etc. Use callback just to
+    Don't do work in on_success: not only will it block the result handling thread, but
+    that thread is not a worker and doesn't have a logging context etc. Use it just to
     submit further work to the pool.
     """
     if work is None or len(work.args_tuples) == 0:  # map_async hangs on 0-length iterables.
-      if callback:
-        callback([])
+      if on_success:
+        on_success([])
     else:
       def do_work(*args):
         self._do_work(work.func, *args, workunit_name=work.workunit_name,
-                      workunit_parent=workunit_parent)
-      self._pool.map_async(do_work, work.args_tuples, chunksize=1, callback=callback)
+                      workunit_parent=workunit_parent, on_failure=on_failure)
+      self._pool.map_async(do_work, work.args_tuples, chunksize=1, callback=on_success)
 
-  def submit_async_work_chain(self, work_chain, workunit_parent=None):
+  def submit_async_work_chain(self, work_chain, workunit_parent, done_hook=None):
     """Submit work to be executed in the background.
 
     - work_chain: An iterable of Work instances. Will be invoked serially. Each instance may
                   have a different cardinality. There is no output-input chaining: the argument
                   tuples must already be present in each work instance.  If any work throws an
                   exception no subsequent work in the chain will be attempted.
-    - workunit_parent: If specified, work is accounted for under this workunit.
+    - workunit_parent: Work is accounted for under this workunit.
+    - done_hook: If not None, invoked with no args after all work is done, or on error.
     """
     def done():
+      done_hook()
       with self._pending_workchains_cond:
         self._pending_workchains -= 1
         self._pending_workchains_cond.notify()
 
-    def wrap(work):
-      def wrapper(*args):
-        try:
-          work.func(*args)
-        except Exception as e:  # Handles errors in the work itself.
-          done()
-          self._run_tracker.log(Report.ERROR, '%s' % e)
-          raise
-      return Work(wrapper, work.args_tuples, work.workunit_name)
+    def error(e):
+      done()
+      self._run_tracker.log(Report.ERROR, '%s' % e)
 
     # We filter out Nones defensively. There shouldn't be any, but if a bug causes one,
     # Pants might hang indefinitely without this filtering.
     work_iter = iter(filter(None, work_chain))
     def submit_next():
       try:
-        self.submit_async_work(wrap(work_iter.next()), workunit_parent=workunit_parent,
-                               callback=lambda x: submit_next())
+        self.submit_async_work(work_iter.next(), workunit_parent=workunit_parent,
+                               on_success=lambda x: submit_next(), on_failure=error)
       except StopIteration:
         done()  # The success case.
 
@@ -122,12 +120,19 @@ class WorkerPool(object):
       # on a condition variable, so we won't be able to ctrl-c out.
       return self._pool.map_async(do_work, work.args_tuples, chunksize=1).get(timeout=1000000000)
 
-  def _do_work(self, func, args_tuple, workunit_name, workunit_parent):
-    if workunit_name:
-      with self._run_tracker.new_workunit(name=workunit_name, parent=workunit_parent):
+  def _do_work(self, func, args_tuple, workunit_name, workunit_parent, on_failure=None):
+    try:
+      if workunit_name:
+        with self._run_tracker.new_workunit(name=workunit_name, parent=workunit_parent):
+          return func(*args_tuple)
+      else:
         return func(*args_tuple)
-    else:
-      return func(*args_tuple)
+    except Exception as e:
+      if on_failure:
+        # Note that here the work's workunit is closed. So, e.g., it's OK to use on_failure()
+        # to close an ancestor workunit.
+        on_failure(e)
+      raise
 
   def shutdown(self):
     with self._pending_workchains_cond:

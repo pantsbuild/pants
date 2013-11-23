@@ -262,10 +262,8 @@ class Task(object):
     """
     update_artifact_cache_work = self.get_update_artifact_cache_work(vts_artifactfiles_pairs)
     if update_artifact_cache_work:
-      with self.context.new_workunit(name='cache', labels=[WorkUnit.MULTITOOL],
-          parent=self.context.run_tracker.get_background_root_workunit()) as parent:
-        self.context.submit_background_work_chain([update_artifact_cache_work],
-                                                  workunit_parent=parent)
+      self.context.submit_background_work_chain([update_artifact_cache_work],
+                                                parent_workunit_name='cache')
 
   def get_update_artifact_cache_work(self, vts_artifactfiles_pairs, cache=None):
     """Create a Work instance to update the artifact cache, if we're configured to.

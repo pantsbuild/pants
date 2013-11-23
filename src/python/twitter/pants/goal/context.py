@@ -17,6 +17,7 @@ from twitter.pants.base import ParseContext
 from twitter.pants.base.target import Target
 from twitter.pants.binary_util import find_java_home
 from twitter.pants.goal.products import Products
+from twitter.pants.goal.workunit import WorkUnit
 from twitter.pants.reporting.report import Report
 from twitter.pants.targets import Pants
 
@@ -123,9 +124,30 @@ class Context(object):
     return self.run_tracker.foreground_worker_pool().submit_work_and_wait(
       work, workunit_parent=workunit_parent)
 
-  def submit_background_work_chain(self, work_chain, workunit_parent=None):
+  def submit_background_work_chain(self, work_chain, parent_workunit_name=None):
+    background_root_workunit = self.run_tracker.get_background_root_workunit()
+    if parent_workunit_name:
+      # We have to keep this workunit alive until all its child work is done, so
+      # we manipulate the generator manually instead of using it as a contextmanager.
+      # Note that new_workunit returns a GeneratorContextManager, and .gen is its
+      # underlying generator.
+      # This is slightly funky, but the with-context usage is so pervasive and
+      # useful elsewhere that it's worth the funkiness in this one place.
+      workunit_parent_gen = self.run_tracker.new_workunit(name=parent_workunit_name,
+                                                          labels=[WorkUnit.MULTITOOL],
+                                                          parent=background_root_workunit).gen
+      workunit_parent = workunit_parent_gen.next()
+      def close_workunit():
+        try:
+          workunit_parent_gen.next()  # Continue past the yield.
+        except StopIteration:
+          pass
+      done_hook = close_workunit
+    else:
+      workunit_parent = background_root_workunit  # Run directly under the root.
+      done_hook = None
     self.run_tracker.background_worker_pool().submit_async_work_chain(
-      work_chain, workunit_parent=workunit_parent)
+      work_chain, workunit_parent=workunit_parent, done_hook=done_hook)
 
   def background_worker_pool(self):
     """Returns the pool to which tasks can submit background work."""
