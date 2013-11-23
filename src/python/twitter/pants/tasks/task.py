@@ -15,6 +15,7 @@
 # ==================================================================================================
 
 import os
+import shutil
 import sys
 
 from contextlib import contextmanager
@@ -296,7 +297,8 @@ class Task(object):
       items_to_report_element([t.address.reference() for t in targets], 'target'),
       suffix)
 
-  def ivy_resolve(self, targets, java_runner=None, ivy_args=None, symlink_ivyxml=False, silent=False):
+  def ivy_resolve(self, targets, java_runner=None, ivy_args=None, symlink_ivyxml=False, silent=False,
+                  workunit_name=None, workunit_labels=None):
     java_runner = java_runner or runjava_indivisible
 
     ivy_args = ivy_args or []
@@ -316,28 +318,37 @@ class Task(object):
       global_vts = VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
       target_workdir = os.path.join(work_dir, global_vts.cache_key.hash)
       target_classpath_file = os.path.join(target_workdir, 'classpath')
+      target_classpath_file_tmp = target_classpath_file + '.tmp'
       # Note that it's possible for all targets to be valid but for no classpath file to exist at
       # target_classpath_file, e.g., if we previously built a superset of targets.
       if invalidation_check.invalid_vts or not os.path.exists(target_classpath_file):
         ivy_utils = IvyUtils(config=self.context.config,
                              options=self.context.options,
                              log=self.context.log)
-        args = (['-cachepath', target_classpath_file] +
+        args = (['-cachepath', target_classpath_file_tmp] +
                 ['-confs'] + confs +
                 ivy_args)
 
-        ivy_utils.exec_ivy(
-          target_workdir=target_workdir,
-          targets=targets,
-          args=args,
-          runjava=java_runner,
-          workunit_name='ivy',
-          workunit_factory=self.context.new_workunit,
-          symlink_ivyxml=symlink_ivyxml,
-        )
+        def exec_ivy():
+          ivy_utils.exec_ivy(
+            target_workdir=target_workdir,
+            targets=targets,
+            args=args,
+            runjava=java_runner,
+            workunit_name='ivy',
+            workunit_factory=self.context.new_workunit,
+            symlink_ivyxml=symlink_ivyxml,
+          )
 
-        if not os.path.exists(target_classpath_file):
-          raise TaskError('Ivy failed to create classpath file at %s %s' % target_classpath_file)
+        if workunit_name:
+          with self.context.new_workunit(name=workunit_name, labels=workunit_labels or []):
+            exec_ivy()
+        else:
+          exec_ivy()
+
+        if not os.path.exists(target_classpath_file_tmp):
+          raise TaskError('Ivy failed to create classpath file at %s' % target_classpath_file_tmp)
+        shutil.move(target_classpath_file_tmp, target_classpath_file)
         if self.get_artifact_cache() and self.context.options.write_to_artifact_cache:
           self.update_artifact_cache([(global_vts, [target_classpath_file])])
 

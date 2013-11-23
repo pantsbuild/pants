@@ -75,10 +75,11 @@ class BootstrapJvmTools(Task):
             '-types', 'jar', 'bundle',
           ]
           workunit_name = 'bootstrap-%s' % str(key)
-          with self.context.new_workunit(name=workunit_name, labels=[WorkUnit.BOOTSTRAP]):
-            cache['classpath'] = self.ivy_resolve(targets,
-                                                  java_runner=java_runner,
-                                                  ivy_args=ivy_args,
-                                                  silent=True)
+          cache['classpath'] = self.ivy_resolve(targets,
+                                                java_runner=java_runner,
+                                                ivy_args=ivy_args,
+                                                silent=True,
+                                                workunit_name=workunit_name,
+                                                workunit_labels=[WorkUnit.BOOTSTRAP])
         return cache['classpath']
     return bootstrap_classpath
