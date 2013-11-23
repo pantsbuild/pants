@@ -237,18 +237,19 @@ class ScalaCompile(JvmCompile):
             else:  # We need to keep analysis_file around. Background tasks may need it.
               shutil.copy(analysis_file, new_valid_analysis)
 
+            # Move the merged valid analysis to its proper location.
+            # We do this before checking for missing dependencies, so that we can still
+            # enjoy an incremental compile after fixing missing deps.
+            shutil.move(new_valid_analysis, self._analysis_file)
+
             # Check for missing dependencies.
-            actual_deps = Analysis.parse_deps_from_path(new_valid_analysis)
+            actual_deps = Analysis.parse_deps_from_path(self._analysis_file)
             # TODO(benjy): Temporary hack until we inject a dep on the scala runtime jar.
             actual_deps_filtered = {}
             scalalib_re = re.compile(r'scala-library-\d+\.\d+\.\d+\.jar$')
             for src, deps in actual_deps.iteritems():
               actual_deps_filtered[src] = filter(lambda x: scalalib_re.search(x) is None, deps)
             self.check_for_missing_dependencies(sources, actual_deps_filtered)
-
-            # Move the merged valid analysis to its proper location, now that we know
-            # there are no missing deps.
-            shutil.move(new_valid_analysis, self._analysis_file)
 
             # Kick off the background artifact cache write.
             if self.get_artifact_cache() and self.context.options.write_to_artifact_cache:
@@ -263,8 +264,8 @@ class ScalaCompile(JvmCompile):
                                       [(sources, discarded_invalid_analysis)], new_invalid_analysis)
               shutil.move(new_invalid_analysis, self._invalid_analysis_file)
 
-          # Now that all the analysis accounting is complete, we can safely mark the
-          # targets as valid.
+          # Now that all the analysis accounting is complete, and we have no missing deps,
+          # we can safely mark the targets as valid.
           vts.update()
 
     # Provide the target->class and source->class mappings to downstream tasks if needed.
