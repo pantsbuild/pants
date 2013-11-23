@@ -2,7 +2,7 @@
 import os
 
 from collections import defaultdict
-from twitter.pants import get_buildroot, JvmTarget, TaskError, JarLibrary, InternalTarget
+from twitter.pants import get_buildroot, JvmTarget, TaskError, JarLibrary, InternalTarget, JarDependency
 
 
 class JvmDependencyAnalyzer(object):
@@ -43,7 +43,8 @@ class JvmDependencyAnalyzer(object):
           target_by_file[os.path.join(buildroot, target.target_base, src)] = target
       elif isinstance(target, JarLibrary):
         for jardep in target.dependencies:
-          jarlibs_by_id[(jardep.org, jardep.name)] = target
+          if isinstance(jardep, JarDependency):
+            jarlibs_by_id[(jardep.org, jardep.name)] = target
 
     # Compute class -> target for classes in previous compile groups.
     genmap = self._context.products.get('classes')
@@ -108,7 +109,7 @@ class JvmDependencyAnalyzer(object):
         for (tgt_pair, evidence) in missing_tgt_deps:
           evidence_str = '\n'.join(['    %s requires %s' % (shorten(e[0]), shorten(e[1])) for e in evidence])
           self._context.log.error('Missing BUILD dependency %s -> %s because:\n%s' %
-                                  (tgt_pair[0].address, tgt_pair[1].address, evidence_str))
+                                  (tgt_pair[0].address.reference(), tgt_pair[1].address.reference(), evidence_str))
         for (src, dep) in missing_file_deps:
           self._context.log.error('Missing BUILD dependency %s -> %s' % (shorten(src), shorten(dep)))
         raise TaskError('Missing deps.')
@@ -153,10 +154,11 @@ class JvmDependencyAnalyzer(object):
           actual_dep_tgt = target_by_file.get(actual_dep)
           if actual_dep_tgt is None:
             missing_file_deps.append((src, actual_dep))
-          elif actual_dep_tgt not in transitive_deps_by_target.get(src_tgt, []):
-            missing_tgt_deps_map[(src_tgt, actual_dep_tgt)].append((src, actual_dep))
-          elif actual_dep_tgt not in src_tgt.dependencies:
-            missing_direct_tgt_deps_map[(src_tgt, actual_dep_tgt)].append((src, actual_dep))
+          elif actual_dep_tgt != src_tgt:  # Obviously intra-target deps are fine.
+            if actual_dep_tgt not in transitive_deps_by_target.get(src_tgt, []):
+              missing_tgt_deps_map[(src_tgt, actual_dep_tgt)].append((src, actual_dep))
+            elif actual_dep_tgt not in src_tgt.dependencies:
+              missing_direct_tgt_deps_map[(src_tgt, actual_dep_tgt)].append((src, actual_dep))
       else:
         raise TaskError('Requested dep info for unknown source file: %s' % src)
 
