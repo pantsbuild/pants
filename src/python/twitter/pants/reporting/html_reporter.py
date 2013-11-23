@@ -66,6 +66,7 @@ class HtmlReporter(Reporter):
   def start_workunit(self, workunit):
     """Implementation of Reporter callback."""
     # We use these properties of the workunit to decide how to render information about it.
+    is_bootstrap = workunit.has_label(WorkUnit.BOOTSTRAP)
     is_tool = workunit.has_label(WorkUnit.TOOL)
     is_multitool = workunit.has_label(WorkUnit.MULTITOOL)
     is_test = workunit.has_label(WorkUnit.TEST)
@@ -80,7 +81,7 @@ class HtmlReporter(Reporter):
              'html_path_base': self._html_path_base,
              'workunit': workunit_dict,
              'header_text': workunit.name,
-             'initially_open': is_test or not (is_tool or is_multitool),
+             'initially_open': is_test or not (is_bootstrap or is_tool or is_multitool),
              'is_tool': is_tool,
              'is_multitool': is_multitool }
     args.update({ 'collapsible': lambda x: self._renderer.render_callable('collapsible', x, args) })

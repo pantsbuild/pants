@@ -14,26 +14,35 @@
 # limitations under the License.
 # ===================================================================================================
 
+from twitter.pants.tasks.task_error import TaskError
+
 
 class BootstrapUtils(object):
-
   def __init__(self, products):
     self._products = products
 
-  def get_jvm_build_tools_classpath(self, tools, java_runner=None):
-    tools_tuple = tuple(sorted(tools))
-    callbacks_map = (self._products.get('jvm_build_tools_classpath_callbacks')
-                                   .get('jvm_build_tools_classpath_callbacks'))
-    return callbacks_map.get(tools_tuple)[0](java_runner=java_runner)
+  def get_jvm_build_tools_classpath(self, key, java_runner=None):
+    """Get a callback to resolve the targets previously registered under the key."""
+    callback_product_map = self._products.get_data('jvm_build_tools_classpath_callbacks') or {}
+    callback = callback_product_map.get(key)
+    if not callback:
+      raise TaskError('No bootstrap callback registered for %s' % key)
+    return callback(java_runner=java_runner)
 
-  def register_all(self, toolsets):
-    for toolset in toolsets:
-      self.register_jvm_build_tools(toolset)
+  def register_jvm_build_tools(self, key, tools):
+    """Register a list of targets against a key.
 
-  def register_jvm_build_tools(self, tools):
-    tools_tuple = tuple(sorted(tools))
-    deplist_map = self._products.get('jvm_build_tools')
+    We can later use this key to get a callback that will resolve these targets.
+    Note: Not reentrant. We assume that all registration is done in the main thread.
+    """
     self._products.require_data('jvm_build_tools_classpath_callbacks')
-    if not deplist_map.add('jvm_build_tools', tools_tuple):
-      deplist_map.add('jvm_build_tools', tools_tuple, tools_tuple)
+    tool_product_map = self._products.get_data('jvm_build_tools') or {}
+    existing = tool_product_map.get(key)
+    # It's OK to re-register with the same value, but not to change the value.
+    if existing is not None:
+      if existing != tools:
+        raise TaskError('Attemping to change tools under %s from %s to %s.' % (key, existing, tools))
+    else:
+      tool_product_map[key] = tools
+      self._products.set_data('jvm_build_tools', tool_product_map)
 

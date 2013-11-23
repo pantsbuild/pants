@@ -16,6 +16,7 @@
 
 from functools import partial
 import threading
+from twitter.pants.goal.workunit import WorkUnit
 
 from twitter.pants.tasks import TaskError, Task
 
@@ -29,8 +30,8 @@ class BootstrapJvmTools(Task):
   def execute(self, targets):
     context = self.context
     if context.products.is_required_data('jvm_build_tools_classpath_callbacks'):
-      deplist_map = context.products.get('jvm_build_tools').get('jvm_build_tools')
-      callback_map = context.products.get('jvm_build_tools_classpath_callbacks')
+      tool_product_map = context.products.get_data('jvm_build_tools') or {}
+      callback_product_map = context.products.get_data('jvm_build_tools_classpath_callbacks') or {}
       # We leave a callback in the products map because we want these Ivy calls 
       # to be done lazily (they might never actually get executed) and we want
       # to hit Task.invalidated (called in Task.ivy_resolve) on the instance of 
@@ -38,10 +39,9 @@ class BootstrapJvmTools(Task):
       # the bootstrap tools.  It would be awkward and possibly incorrect to call
       # self.invalidated twice on a Task that does meaningful invalidation on its
       # targets. -pl
-      for key, deplist in deplist_map.items():
-        callback_map.add('jvm_build_tools_classpath_callbacks',
-                         key,
-                         [self.cached_bootstrap_classpath_callback(deplist)])
+      for key, deplist in tool_product_map.iteritems():
+        callback_product_map[key] = self.cached_bootstrap_classpath_callback(key, deplist)
+      context.products.set_data('jvm_build_tools_classpath_callbacks', callback_product_map)
 
   def resolve_tool_targets(self, tools):
     if not tools:
@@ -62,7 +62,7 @@ class BootstrapJvmTools(Task):
       for target in targets:
         yield target
 
-  def cached_bootstrap_classpath_callback(self, tools):
+  def cached_bootstrap_classpath_callback(self, key, tools):
     cache = {}
     cache_lock = threading.Lock()
     def bootstrap_classpath(java_runner=None):
@@ -74,9 +74,11 @@ class BootstrapJvmTools(Task):
             '-symlink',
             '-types', 'jar', 'bundle',
           ]
-          cache['classpath'] = self.ivy_resolve(targets,
-                                                java_runner=java_runner,
-                                                ivy_args=ivy_args,
-                                                silent=True)
+          workunit_name = 'bootstrap-%s' % str(key)
+          with self.context.new_workunit(name=workunit_name, labels=[WorkUnit.BOOTSTRAP]):
+            cache['classpath'] = self.ivy_resolve(targets,
+                                                  java_runner=java_runner,
+                                                  ivy_args=ivy_args,
+                                                  silent=True)
         return cache['classpath']
     return bootstrap_classpath

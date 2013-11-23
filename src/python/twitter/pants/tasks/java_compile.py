@@ -101,13 +101,14 @@ class JavaCompile(JvmCompile):
     safe_mkdir(self._classes_dir)
     safe_mkdir(self._depfile_dir)
 
-    self._external_tools = context.config.getlist('java-compile',
-                                                  'external-tools',
-                                                  default=[':jmake'])
-    self._compiler_bootstrap_tools = context.config.getlist('java-compile',
-                                                            'compiler-bootstrap-tools',
-                                                            default=[':java-compiler'])
-    self._bootstrap_utils.register_all([self._external_tools, self._compiler_bootstrap_tools])
+    self._jmake_bootstrap_key = 'jmake'
+    external_tools = context.config.getlist('java-compile', 'jmake-bootstrap-tools', default=[':jmake'])
+    self._bootstrap_utils.register_jvm_build_tools(self._jmake_bootstrap_key, external_tools)
+
+    self._compiler_bootstrap_key = 'java-compiler'
+    compiler_bootstrap_tools = context.config.getlist('java-compile', 'compiler-bootstrap-tools',
+                                                      default=[':java-compiler'])
+    self._bootstrap_utils.register_jvm_build_tools(self._compiler_bootstrap_key, compiler_bootstrap_tools)
 
     self._opts = context.config.getlist('java-compile', 'args')
     self._jvm_args = context.config.getlist('java-compile', 'jvm_args')
@@ -289,7 +290,7 @@ class JavaCompile(JvmCompile):
     return sources_by_target
 
   def compile(self, classpath, sources, fingerprint, depfile):
-    jmake_classpath = self._bootstrap_utils.get_jvm_build_tools_classpath(self._external_tools,
+    jmake_classpath = self._bootstrap_utils.get_jvm_build_tools_classpath(self._jmake_bootstrap_key,
                                                                           self.runjava_indivisible)
     opts = [
       '-classpath', ':'.join(classpath),
@@ -297,7 +298,7 @@ class JavaCompile(JvmCompile):
       '-pdb', os.path.join(self._classes_dir, '%s.dependencies.pdb' % fingerprint),
     ]
 
-    compiler_classpath = self._bootstrap_utils.get_jvm_build_tools_classpath(self._compiler_bootstrap_tools,
+    compiler_classpath = self._bootstrap_utils.get_jvm_build_tools_classpath(self._compiler_bootstrap_key,
                                                                              self.runjava_indivisible)
     opts.extend([
       '-jcpath', ':'.join(compiler_classpath),

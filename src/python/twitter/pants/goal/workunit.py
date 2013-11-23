@@ -47,15 +47,16 @@ class WorkUnit(object):
   GOAL = 2       # Executing a goal.
   GROUP = 3      # Executing a group.
 
-  TOOL = 4       # Single invocations of a tool.
-  MULTITOOL = 5  # Multiple consecutive invocations of the same tool.
-  COMPILER = 6   # Invocation of a compiler.
+  BOOTSTRAP = 4  # Invocation of code to fetch a tool.
+  TOOL = 5       # Single invocations of a tool.
+  MULTITOOL = 6  # Multiple consecutive invocations of the same tool.
+  COMPILER = 7   # Invocation of a compiler.
 
-  TEST = 7       # Running a test.
-  JVM = 8        # Running a tool via the JVM.
-  NAILGUN = 9    # Running a tool via nailgun.
-  RUN = 10       # Running a binary.
-  REPL = 11      # Running a repl.
+  TEST = 8       # Running a test.
+  JVM = 9        # Running a tool via the JVM.
+  NAILGUN = 10   # Running a tool via nailgun.
+  RUN = 11       # Running a binary.
+  REPL = 12      # Running a repl.
 
   def __init__(self, run_tracker, parent, name, labels=(), cmd=''):
     """

@@ -51,21 +51,24 @@ class ZincUtils(object):
     self._pants_home = get_buildroot()
 
     # The target scala version.
-    self._compile_bootstrap_tools = context.config.getlist('scala-compile',
-                                                           'compile-bootstrap-tools',
-                                                           default=[':scala-compile-2.9.2'])
-    # The zinc version (and the scala version it needs, which may differ from the target version).
-    self._zinc_bootstrap_tools = context.config.getlist('scala-compile',
-                                                        'zinc-bootstrap-tools',
-                                                        default=[':zinc'])
-    # Compiler plugins.
-    self._plugin_bootstrap_tools = context.config.getlist('scala-compile',
-                                                          'scalac-plugin-bootstrap-tools',
-                                                          default=[])
+    self._compile_bootstrap_key = 'scalac'
+    compile_bootstrap_tools = context.config.getlist('scala-compile', 'compile-bootstrap-tools',
+                                                     default=[':scala-compile-2.9.2'])
+    self._bootstrap_utils.register_jvm_build_tools(self._compile_bootstrap_key, compile_bootstrap_tools)
 
-    bootstrap_utils.register_all([self._compile_bootstrap_tools,
-                                  self._zinc_bootstrap_tools,
-                                  self._plugin_bootstrap_tools])
+    # The zinc version (and the scala version it needs, which may differ from the target version).
+    self._zinc_bootstrap_key = 'zinc'
+    zinc_bootstrap_tools = context.config.getlist('scala-compile', 'zinc-bootstrap-tools', default=[':zinc'])
+    self._bootstrap_utils.register_jvm_build_tools(self._zinc_bootstrap_key, zinc_bootstrap_tools)
+
+    # Compiler plugins.
+    plugins_bootstrap_tools = context.config.getlist('scala-compile', 'scalac-plugin-bootstrap-tools',
+                                                     default=[])
+    if plugins_bootstrap_tools:
+      self._plugins_bootstrap_key = 'plugins'
+      self._bootstrap_utils.register_jvm_build_tools(self._plugins_bootstrap_key, plugins_bootstrap_tools)
+    else:
+      self._plugins_bootstrap_key = None
 
     self._main = context.config.get('scala-compile', 'main')
     self._jvm_args = context.config.getlist('scala-compile', 'jvm_args')
@@ -76,16 +79,16 @@ class ZincUtils(object):
 
   @property
   def _zinc_classpath(self):
-    return self._bootstrap_utils.get_jvm_build_tools_classpath(self._zinc_bootstrap_tools)
+    return self._bootstrap_utils.get_jvm_build_tools_classpath(self._zinc_bootstrap_key)
 
   @property
   def _compiler_classpath(self):
-    return self._bootstrap_utils.get_jvm_build_tools_classpath(self._compile_bootstrap_tools)
+    return self._bootstrap_utils.get_jvm_build_tools_classpath(self._compile_bootstrap_key)
 
   @property
   def _plugin_jars(self):
-    if self._plugin_bootstrap_tools:
-      return self._bootstrap_utils.get_jvm_build_tools_classpath(self._plugin_bootstrap_tools)
+    if self._plugins_bootstrap_key:
+      return self._bootstrap_utils.get_jvm_build_tools_classpath(self._plugins_bootstrap_key)
     else:
       return []
 
