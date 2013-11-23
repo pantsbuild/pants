@@ -11,6 +11,7 @@ from twitter.pants import get_buildroot
 from twitter.pants.base.mustache import MustacheRenderer
 from twitter.pants.goal.workunit import WorkUnit
 from twitter.pants.reporting.linkify import linkify
+from twitter.pants.reporting.report import Report
 from twitter.pants.reporting.reporter import Reporter
 from twitter.pants.reporting.reporting_utils import items_to_report_element
 
@@ -178,9 +179,17 @@ class HtmlReporter(Reporter):
       # We must flush in the same thread as the write.
       f.flush()
 
+  _log_level_css_map = {
+    Report.FATAL: 'fatal',
+    Report.ERROR: 'error',
+    Report.WARN:  'warn',
+    Report.INFO:  'info',
+    Report.DEBUG: 'debug'
+  }
   def do_handle_log(self, workunit, level, *msg_elements):
     """Implementation of Reporter callback."""
-    content = self._render_message(*msg_elements)
+    content = '<span class="%s">%s</span>' % \
+              (HtmlReporter._log_level_css_map[level], self._render_message(*msg_elements))
 
     # Generate some javascript that appends the content to the workunit's div.
     args = {
