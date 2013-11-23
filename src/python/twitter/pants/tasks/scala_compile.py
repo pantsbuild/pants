@@ -318,7 +318,7 @@ class ScalaCompile(JvmCompile):
       self.get_update_artifact_cache_work(vts_artifactfiles_pairs)
     if update_artifact_cache_work:
       work_chain = [
-        Work(Analysis.split, splits_args_tuples, 'split'),
+        Work(Analysis.split_to_paths, splits_args_tuples, 'split'),
         Work(self._zinc_utils.relativize_analysis_file, relativize_args_tuples, 'relativize'),
         update_artifact_cache_work
       ]
