@@ -94,6 +94,10 @@ class JvmDependencyAnalyzer(object):
     return self._transitive_deps_by_target
 
   def check(self, srcs, actual_deps):
+    """Check for missing deps.
+
+    See docstring for _compute_missing_deps for details.
+    """
     if self._check_missing_deps or self._warn_missing_direct_deps or self._warn_unnecessary_deps:
       missing_file_deps, missing_tgt_deps, missing_direct_tgt_deps = \
         self._compute_missing_deps(srcs, actual_deps)
@@ -110,9 +114,11 @@ class JvmDependencyAnalyzer(object):
           evidence_str = '\n'.join(['    %s requires %s' % (shorten(e[0]), shorten(e[1])) for e in evidence])
           self._context.log.error('Missing BUILD dependency %s -> %s because:\n%s' %
                                   (tgt_pair[0].address.reference(), tgt_pair[1].address.reference(), evidence_str))
-        for (src, dep) in missing_file_deps:
-          self._context.log.error('Missing BUILD dependency %s -> %s' % (shorten(src), shorten(dep)))
-        raise TaskError('Missing deps.')
+        for (src_tgt, dep) in missing_file_deps:
+          self._context.log.error('Missing BUILD dependency %s -> %s' % (src_tgt.address.reference(), shorten(dep)))
+        # TODO(benjy): Uncomment this once people have ironed out their missing deps.
+        # Enabling this right now would likely break a lot of builds.
+        #raise TaskError('Missing deps.')
 
       if self._warn_missing_direct_deps:
         for (tgt_pair, evidence) in missing_direct_tgt_deps:
@@ -124,11 +130,29 @@ class JvmDependencyAnalyzer(object):
         raise TaskError('Unnecessary dep warnings not implemented yet.')
 
   def _compute_missing_deps(self, srcs, actual_deps):
-    """Computes deps that are used but not specified in a BUILD file.
+    """Computes deps that are used by the compiler but not specified in a BUILD file.
+
+    These deps are bugs waiting to happen: the code may happen to compile because the dep was brought
+    in some other way (e.g., by some other root target), but that is obviously fragile.
+
+    Note that in practice we're OK with reliance on indirect deps that are only brought in transitively.
+    E.g., in Scala type inference can bring in such a dep subtly. Fortunately these cases aren't as fragile
+    as a completely missing dependency. It's still a good idea to have explicit direct deps where relevant,
+    so we optionally warn about indirect deps, to make them easy to find and reason about.
 
     - actual_deps: a map src -> list of actual deps (source, class or jar file) as noted by the compiler.
 
-    Returns a map src -> list of actual deps that are not specified in the relevant BUILD file.
+    Returns a triple (missing_file_deps, missing_tgt_deps, missing_direct_tgt_deps) where:
+
+    - missing_file_deps: a list of pairs (src_tgt, dep_file) where src_tgt requires dep_file, and we're
+      unable to map to a target (because its target isn't in the total set of targets in play, and we
+      don't want to parse every BUILD file in the workspace just to find it).
+
+    - missing_tgt_deps: a list of pairs (src_tgt, dep_tgt) where src_tgt is missing a necessary
+                        transitive dependency on dep_tgt.
+
+    - missing_direct_tgt_deps: a list of pairs (src_tgt, dep_tgt) where src_tgt is missing a direct
+                               dependency on dep_tgt but has a transitive dep on it.
 
     All paths in the input and output are absolute.
     """
@@ -153,7 +177,7 @@ class JvmDependencyAnalyzer(object):
         for actual_dep in filter(must_be_explicit_dep, actual_deps.get(src, [])):
           actual_dep_tgt = target_by_file.get(actual_dep)
           if actual_dep_tgt is None:
-            missing_file_deps.append((src, actual_dep))
+            missing_file_deps.append((src_tgt, actual_dep))
           elif actual_dep_tgt != src_tgt:  # Obviously intra-target deps are fine.
             if actual_dep_tgt not in transitive_deps_by_target.get(src_tgt, []):
               missing_tgt_deps_map[(src_tgt, actual_dep_tgt)].append((src, actual_dep))
