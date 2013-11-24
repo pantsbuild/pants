@@ -248,6 +248,10 @@ class CacheManager(object):
               # Note that fprint may still be None here. E.g., a codegen target is in the list
               # of deps, but its fprint is not visible to our self._invalidator (that of the
               # target synthesized from it is visible, so invalidation will still be correct.)
+              #
+              # Another case where this can happen is a dep of a codegen target on, say,
+              # a java target that hasn't been built yet (again, the synthesized target will
+              # depend on that same java target, so invalidation will still be correct.)
               # TODO(benjy): Make this simpler and more obviously correct.
             if fprint is not None:
               dependency_keys.add(fprint)
