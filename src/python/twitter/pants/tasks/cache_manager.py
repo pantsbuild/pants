@@ -26,7 +26,7 @@ from twitter.pants.base.build_invalidator import (
     NO_SOURCES,
     TARGET_SOURCES)
 from twitter.pants.base.target import Target
-from twitter.pants.targets import TargetWithSources
+from twitter.pants.targets import TargetWithSources, JarLibrary, Pants
 from twitter.pants.targets.external_dependency import ExternalDependency
 from twitter.pants.targets.internal import InternalTarget
 
@@ -74,7 +74,8 @@ class VersionedTargetSet(object):
     self._cache_manager.force_invalidate(self)
 
   def __repr__(self):
-    return "VTS(%s. %d)" % (','.join(target.id for target in self.targets), 1 if self.valid else 0)
+    return 'VTS(%s, %s)' % (','.join(target.id for target in self.targets),
+                            'valid' if self.valid else 'invalid')
 
 
 class VersionedTarget(VersionedTargetSet):
@@ -234,19 +235,24 @@ class CacheManager(object):
         for dep in target.dependencies:
           # We rely on the fact that any deps have already been processed, either in an earlier
           # round or because they came first in ordered_targets.
+          # Note that only external deps (e.g., JarDependency) or targets with sources can
+          # affect invalidation. Other targets (JarLibrary, Pants) are just dependency scaffolding.
           if isinstance(dep, ExternalDependency):
             dependency_keys.add(dep.cache_key())
-          elif isinstance(dep, Target):
+          elif isinstance(dep, TargetWithSources):
             fprint = id_to_hash.get(dep.id, None)
             if fprint is None:
               # It may have been processed in a prior round, and therefore the fprint should
               # have been written out by the invalidator.
               fprint = self._invalidator.existing_hash(dep.id)
-              # Note that fprint may be None here, indicating that the dependency will not be
-              # processed until a later phase. For example, if a codegen target depends on a
-              # library target (because the generated code needs that library).
+              # Note that fprint may still be None here. E.g., a codegen target is in the list
+              # of deps, but its fprint is not visible to our self._invalidator (that of the
+              # target synthesized from it is visible, so invalidation will still be correct.)
+              # TODO(benjy): Make this simpler and more obviously correct.
             if fprint is not None:
               dependency_keys.add(fprint)
+          elif isinstance(dep, JarLibrary) or isinstance(dep, Pants):
+            pass
           else:
             raise ValueError('Cannot calculate a cache_key for a dependency: %s' % dep)
       cache_key = self._key_for(target, dependency_keys)
