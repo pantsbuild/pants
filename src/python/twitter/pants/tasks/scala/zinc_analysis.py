@@ -203,8 +203,8 @@ class Analysis(object):
       external = defaultdict(list)
       for k, vs in naive_external.iteritems():
         for v in vs:
-          vfile = class_to_source[v]
-          if vfile in src_prod:
+          vfile = class_to_source.get(v)
+          if vfile and vfile in src_prod:
             internal[k].append(vfile)  # Internalized.
           else:
             external[k].append(v)  # Remains external.
