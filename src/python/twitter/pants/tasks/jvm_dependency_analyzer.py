@@ -29,9 +29,12 @@ class JvmDependencyAnalyzer(object):
     Memoizes for efficiency. Should only be called after codegen, so that all synthetic targets
     and injected deps are taken into account.
     """
-    if self._target_by_file is not None:
+    if self._target_by_file is None:
+      return self._compute_target_by_file()  # Will memoize if allowed.
+    else:
       return self._target_by_file
 
+  def _compute_target_by_file(self):
     target_by_file = {}
     jarlibs_by_id = {}
     # Compute src -> target.
@@ -76,9 +79,12 @@ class JvmDependencyAnalyzer(object):
     Memoizes for efficiency. Should only be called after codegen, so that all synthetic targets
     and injected deps are taken into account.
     """
-    if self._transitive_deps_by_target is not None:
+    if self._transitive_deps_by_target is None:
+      return self._compute_transitive_deps_by_target()
+    else:
       return self._transitive_deps_by_target
 
+  def _compute_transitive_deps_by_target(self):
     # Sort from least to most dependent.
     sorted_targets = reversed(InternalTarget.sort_targets(self._context.targets()))
     transitive_deps_by_target = defaultdict(set)
@@ -90,8 +96,8 @@ class JvmDependencyAnalyzer(object):
           transitive_deps.update(transitive_deps_by_target.get(dep, []))
           transitive_deps.add(dep)
         transitive_deps_by_target[target] = transitive_deps
-    self._transitive_deps_by_target = transitive_deps_by_target
-    return self._transitive_deps_by_target
+    self._transitive_deps_by_target = transitive_deps_by_target  # Memoize.
+    return transitive_deps_by_target
 
   def check(self, srcs, actual_deps):
     """Check for missing deps.

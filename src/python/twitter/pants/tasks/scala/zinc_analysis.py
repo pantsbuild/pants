@@ -133,10 +133,11 @@ class Analysis(object):
       pass
     return Util.parse_section(lines_iter, expected_header=None)
 
+  FORMAT_VERSION_LINE = 'format version: 1\n'
   @staticmethod
   def _verify_version(lines_iter):
     version_line = lines_iter.next()
-    if version_line != 'format version: 1\n':
+    if version_line != Analysis.FORMAT_VERSION_LINE:
       raise TaskError('Unrecognized version line: ' + version_line)
 
   @staticmethod
@@ -263,7 +264,7 @@ class Analysis(object):
       self.write_json(outfile)
 
   def write(self, outfile):
-    outfile.write('format version: 1\n')
+    outfile.write(Analysis.FORMAT_VERSION_LINE)
     self.relations.write(outfile)
     self.stamps.write(outfile)
     self.apis.write(outfile, inline_vals=False)

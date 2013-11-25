@@ -14,32 +14,32 @@ class JvmCompile(NailgunTask):
                             dest=subcls._language+'_check_missing_deps',
                             action='callback', callback=mkflag.set_bool,
                             default=True,
-                            help='[%default] Error on missing dependencies in ' +
-                                 subcls._language + ' code. Reports actual dependencies A -> B ' +
-                                 'where there is no transitive BUILD file dependency path from A to B.')
+                            help='[%default] Error on missing dependencies in %s code. '
+                                 'Reports actual dependencies A -> B where there is no '
+                                 'transitive BUILD file dependency path from A to B.' % subcls._language )
 
     option_group.add_option(mkflag('warn-missing-direct-deps'),
                             mkflag('warn-missing-direct-deps', negate=True),
                             dest=subcls._language+'_warn_missing_direct_deps',
                             action='callback', callback=mkflag.set_bool,
                             default=False,
-                            help='[%default] Warn for missing direct dependencies in ' +
-                                 subcls._language + ' code. Reports actual dependencies A -> B ' +
-                                 'where there is no direct BUILD file dependency path from A to B. ' +
-                                 'This is a very strict check, as in practice it is common to rely on ' +
-                                 'transitive, non-direct dependencies, e.g., due to type inference or when ' +
-                                 'the main target in a BUILD file is modified to depend on other targets in ' +
-                                 'the same BUILD file as an implementation detail.')
+                            help='[%default] Warn for missing direct dependencies in %s code. '
+                                 'Reports actual dependencies A -> B where there is no direct '
+                                 'BUILD file dependency path from A to B. '
+                                 'This is a very strict check, as in practice it is common to rely on '
+                                 'transitive, non-direct dependencies, e.g., due to type inference or when '
+                                 'the main target in a BUILD file is modified to depend on other targets in '
+                                 'the same BUILD file as an implementation detail.' % subcls._language)
 
     option_group.add_option(mkflag('warn-unnecessary-deps'),
                             mkflag('warn-unnecessary-deps', negate=True),
                             dest=subcls._language+'_warn_unnecessary_deps',
                             action='callback', callback=mkflag.set_bool,
                             default=False,
-                            help='[%default] Warn for declared dependencies in '  + subcls._language +
-                                 ' code that are not needed. This is a very strict check. For example, ' +
-                                 'generated code will often legitimately have BUILD dependencies that ' +
-                                 'are unused in practice.')
+                            help='[%default] Warn for declared dependencies in %s code that '
+                                 'are not needed. This is a very strict check. For example, '
+                                 'generated code will often legitimately have BUILD dependencies that '
+                                 'are unused in practice.' % subcls._language)
 
   def __init__(self, context, workdir):
     NailgunTask.__init__(self, context, workdir=workdir)
@@ -61,7 +61,7 @@ class JvmCompile(NailgunTask):
       self._dep_analyzer = None
 
   def language(self):
-    return self.__class__._language
+    return self._language
 
   def check_for_missing_dependencies(self, srcs, actual_deps):
     if self._dep_analyzer:
