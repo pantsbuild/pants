@@ -65,4 +65,5 @@ class JvmCompile(NailgunTask):
 
   def check_for_missing_dependencies(self, srcs, actual_deps):
     if self._dep_analyzer:
-      self._dep_analyzer.check(srcs, actual_deps)
+      with self.context.new_workunit(name='find-missing-dependencies'):
+        self._dep_analyzer.check(srcs, actual_deps)
