@@ -128,21 +128,14 @@ class Context(object):
     background_root_workunit = self.run_tracker.get_background_root_workunit()
     if parent_workunit_name:
       # We have to keep this workunit alive until all its child work is done, so
-      # we manipulate the generator manually instead of using it as a contextmanager.
-      # Note that new_workunit returns a GeneratorContextManager, and .gen is its
-      # underlying generator.
+      # we manipulate the context manually instead of using it as a contextmanager.
       # This is slightly funky, but the with-context usage is so pervasive and
       # useful elsewhere that it's worth the funkiness in this one place.
-      workunit_parent_gen = self.run_tracker.new_workunit(name=parent_workunit_name,
+      workunit_parent_ctx = self.run_tracker.new_workunit(name=parent_workunit_name,
                                                           labels=[WorkUnit.MULTITOOL],
-                                                          parent=background_root_workunit).gen
-      workunit_parent = workunit_parent_gen.next()
-      def close_workunit():
-        try:
-          workunit_parent_gen.next()  # Continue past the yield.
-        except StopIteration:
-          pass
-      done_hook = close_workunit
+                                                          parent=background_root_workunit)
+      workunit_parent = workunit_parent_ctx.__enter__()
+      done_hook = lambda: workunit_parent_ctx.__exit__(None, None, None)
     else:
       workunit_parent = background_root_workunit  # Run directly under the root.
       done_hook = None
