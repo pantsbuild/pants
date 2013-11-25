@@ -288,7 +288,7 @@ class Analysis(object):
     splits = [set([s if os.path.isabs(s) else os.path.join(buildroot, s) for s in x]) for x in splits]
     if catchall:
       # Even empty sources with no products have stamps.
-      all_sources = (set(itertools.chain(*[self.stamps.sources.iterkeys()]))).difference(*splits)
+      all_sources = set(self.stamps.sources.keys()).difference(*splits)
       splits.append(all_sources)  # The catch-all
 
     # Split relations.
