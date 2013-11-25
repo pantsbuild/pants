@@ -139,8 +139,14 @@ class JUnitRun(JvmTask):
     context.products.require_data('exclusives_groups')
 
     self.confs = context.config.getlist('junit-run', 'confs')
-    self.junit_profile = context.config.get('junit-run', 'junit_profile')
-    self.emma_profile = context.config.get('junit-run', 'emma_profile')
+
+    self._bootstrap_tools = context.config.getlist('junit-run',
+                                                   'bootstrap-tools',
+                                                   default=[':junit'])
+    self._emma_bootstrap_tools = context.config.getlist('junit-run',
+                                                        'emma-bootstrap-tools',
+                                                        default=[':emma'])
+    self._bootstrap_utils.register_all([self._bootstrap_tools, self._emma_bootstrap_tools])
 
     self.java_args = context.config.getlist('junit-run', 'args', default=[])
     if context.options.junit_run_jvmargs:
@@ -207,9 +213,10 @@ class JUnitRun(JvmTask):
       tests = list(self.normalize_test_classes() if self.test_classes
                                                  else self.calculate_tests(targets))
       if tests:
-        junit_classpath = self.classpath(binary_util.profile_classpath(self.junit_profile,
-                            workunit_factory=self.context.new_workunit), confs=self.confs,
-                            exclusives_classpath=self.get_base_classpath_for_target(targets[0]))
+        bootstrapped_cp = self._bootstrap_utils.get_jvm_build_tools_classpath(self._bootstrap_tools)
+        junit_classpath = self.classpath(bootstrapped_cp,
+                                         confs=self.confs,
+                                         exclusives_classpath=self.get_base_classpath_for_target(targets[0]))
 
         def run_tests(classpath, main, jvmargs=None):
           def test_workunit_factory(name, labels=list(), cmd=''):
@@ -236,7 +243,7 @@ class JUnitRun(JvmTask):
             raise TaskError()
 
         if self.coverage:
-          emma_classpath = binary_util.profile_classpath(self.emma_profile)
+          emma_classpath = self._bootstrap_utils.get_jvm_build_tools_classpath(self._emma_bootstrap_tools)
 
           def instrument_code():
             safe_mkdir(self.coverage_instrument_dir, clean=True)

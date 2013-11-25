@@ -19,6 +19,8 @@ import shutil
 import textwrap
 
 from contextlib import closing
+from functools import wraps
+from itertools import chain
 from xml.etree import ElementTree
 
 from twitter.common.collections import OrderedDict
@@ -40,57 +42,83 @@ class ZincUtils(object):
 
   Instances are immutable, and all methods are reentrant (assuming that the java_runner is).
   """
-  def __init__(self, context, nailgun_task, color):
+  def __init__(self, context, nailgun_task, color, bootstrap_utils):
     self.context = context
     self._nailgun_task = nailgun_task  # We run zinc on this task's behalf.
     self._color = color
+    self._bootstrap_utils = bootstrap_utils
 
     self._pants_home = get_buildroot()
 
     # The target scala version.
-    self._compile_profile = context.config.get('scala-compile', 'compile-profile')
-
+    self._compile_bootstrap_tools = context.config.getlist('scala-compile',
+                                                           'compile-bootstrap-tools',
+                                                           default=[':scala-compile-2.9.2'])
     # The zinc version (and the scala version it needs, which may differ from the target version).
-    self._zinc_profile = context.config.get('scala-compile', 'zinc-profile')
-
+    self._zinc_bootstrap_tools = context.config.getlist('scala-compile',
+                                                        'zinc-bootstrap-tools',
+                                                        default=[':zinc'])
     # Compiler plugins.
-    self._plugins_profile = context.config.get('scala-compile', 'scalac-plugins-profile')
+    self._plugin_bootstrap_tools = context.config.getlist('scala-compile',
+                                                          'scalac-plugin-bootstrap-tools',
+                                                          default=[])
+
+    bootstrap_utils.register_all([self._compile_bootstrap_tools,
+                                  self._zinc_bootstrap_tools,
+                                  self._plugin_bootstrap_tools])
 
     self._main = context.config.get('scala-compile', 'main')
-    self._scalac_args = context.config.getlist('scala-compile', 'args')
     self._jvm_args = context.config.getlist('scala-compile', 'jvm_args')
-
-    if context.options.scala_compile_warnings:
-      self._scalac_args.extend(context.config.getlist('scala-compile', 'warning_args'))
-    else:
-      self._scalac_args.extend(context.config.getlist('scala-compile', 'no_warning_args'))
-
-    cp_for_profile = self._nailgun_task.profile_classpath
-    self._zinc_classpath = cp_for_profile(self._zinc_profile)
-    self._compiler_classpath = cp_for_profile(self._compile_profile)
-    self._plugin_jars = cp_for_profile(self._plugins_profile) if self._plugins_profile else []
-
-    zinc_jars = ZincUtils.identify_zinc_jars(self._zinc_classpath)
-    self._zinc_jar_args = []
-    self._zinc_jar_args.extend(['-scala-path', ':'.join(self._compiler_classpath)])
-    for (name, jarpath) in zinc_jars.items():  # The zinc jar names are also the flag names.
-      self._zinc_jar_args.extend(['-%s' % name, jarpath])
-
-    # Allow multiple flags and also comma-separated values in a single flag.
-    plugin_names = [p for val in context.options.plugins for p in val.split(',')] \
-      if context.options.plugins is not None \
-      else context.config.getlist('scala-compile', 'scalac-plugins', default=[])
-    plugin_args = context.config.getdict('scala-compile', 'scalac-plugin-args', default={})
-    active_plugins = self.find_plugins(plugin_names)
-
-    for name, jar in active_plugins.items():
-      self._scalac_args.append('-Xplugin:%s' % jar)
-      for arg in plugin_args.get(name, []):
-        self._scalac_args.append('-P:%s:%s' % (name, arg))
 
     # For localizing/relativizing analysis files.
     self._java_home = os.path.realpath(os.path.dirname(find_java_home()))
     self._ivy_home = os.path.realpath(context.config.get('ivy', 'cache_dir'))
+
+  @property
+  def _zinc_classpath(self):
+    return self._bootstrap_utils.get_jvm_build_tools_classpath(self._zinc_bootstrap_tools)
+
+  @property
+  def _compiler_classpath(self):
+    return self._bootstrap_utils.get_jvm_build_tools_classpath(self._compile_bootstrap_tools)
+
+  @property
+  def _plugin_jars(self):
+    if self._plugin_bootstrap_tools:
+      return self._bootstrap_utils.get_jvm_build_tools_classpath(self._plugin_bootstrap_tools)
+    else:
+      return []
+
+  @property
+  def _zinc_jar_args(self):
+    zinc_jars = ZincUtils.identify_zinc_jars(self._zinc_classpath)
+    # The zinc jar names are also the flag names.
+    return (list(chain.from_iterable([['-%s' % name, jarpath]
+                                     for (name, jarpath) in zinc_jars.items()])) +
+            ['-scala-path', ':'.join(self._compiler_classpath)])
+
+  @property
+  def _scalac_args(self):
+    # Allow multiple flags and also comma-separated values in a single flag.
+    if self.context.options.plugins is not None:
+      plugin_names = [p for val in self.context.options.plugins for p in val.split(',')]
+    else:
+      plugin_names = self.context.config.getlist('scala-compile', 'scalac-plugins', default=[])
+
+    plugin_args = self.context.config.getdict('scala-compile', 'scalac-plugin-args', default={})
+    active_plugins = self.find_plugins(plugin_names)
+
+    scalac_args = self.context.config.getlist('scala-compile', 'args')
+    for name, jar in active_plugins.items():
+      scalac_args.append('-Xplugin:%s' % jar)
+      for arg in plugin_args.get(name, []):
+        scalac_args.append('-P:%s:%s' % (name, arg))
+
+    if self.context.options.scala_compile_warnings:
+      scalac_args.extend(self.context.config.getlist('scala-compile', 'warning_args'))
+    else:
+      scalac_args.extend(self.context.config.getlist('scala-compile', 'no_warning_args'))
+    return scalac_args
 
   def plugin_jars(self):
     """The jars containing code for enabled plugins."""
@@ -105,15 +133,18 @@ class ZincUtils(object):
       zinc_args.append('-no-color')
     zinc_args.extend(self._zinc_jar_args)
     zinc_args.extend(args)
-    return self._nailgun_task.runjava_indivisible(self._main, classpath=self._zinc_classpath,
-                             args=zinc_args, jvmargs=self._jvm_args, workunit_name=workunit_name,
-                             workunit_labels=workunit_labels)
+    return self._nailgun_task.runjava_indivisible(self._main,
+                                                  classpath=self._zinc_classpath,
+                                                  args=zinc_args,
+                                                  jvmargs=self._jvm_args,
+                                                  workunit_name=workunit_name,
+                                                  workunit_labels=workunit_labels)
 
   def compile(self, classpath, sources, output_dir, analysis_file, upstream_analysis_files):
     # To pass options to scalac simply prefix with -S.
     args = ['-S' + x for x in self._scalac_args]
 
-    if len(upstream_analysis_files) > 0:
+    if len(upstream_analysis_files):
       args.extend(
         ['-analysis-map', ','.join(['%s:%s' % kv for kv in upstream_analysis_files.items()])])
 
@@ -208,7 +239,8 @@ class ZincUtils(object):
         ZincUtils._copy_analysis(tmp_analysis_file, dst)
       return exit_code
 
-  def write_plugin_info(self, resources_dir, target):
+  @staticmethod
+  def write_plugin_info(resources_dir, target):
     basedir = os.path.join(resources_dir, target.id)
     with safe_open(os.path.join(basedir, _PLUGIN_INFO_FILE), 'w') as f:
       f.write(textwrap.dedent('''
@@ -258,7 +290,7 @@ class ZincUtils(object):
     plugins = {}
     # plugin_jars is the universe of all possible plugins and their transitive deps.
     # Here we select the ones to actually use.
-    for jar in self._plugin_jars:
+    for jar in self.plugin_jars():
       with open_jar(jar, 'r') as jarfile:
         try:
           with closing(jarfile.open(_PLUGIN_INFO_FILE, 'r')) as plugin_info_file:

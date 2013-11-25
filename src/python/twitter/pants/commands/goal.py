@@ -207,8 +207,10 @@ class Goal(Command):
     Option("--local-artifact-cache-readonly", "--no-local-artifact-cache-readonly", action="callback",
            callback=_set_bool, dest="local_artifact_cache_readonly", default=False,
            help="If set, we don't write to local artifact caches, even when writes are enabled."),
+    # Note that remote writes are disabled by default, so you have control over who's populating
+    # the shared cache.
     Option("--remote-artifact-cache-readonly", "--no-remote-artifact-cache-readonly", action="callback",
-           callback=_set_bool, dest="remote_artifact_cache_readonly", default=False,
+           callback=_set_bool, dest="remote_artifact_cache_readonly", default=True,
            help="If set, we don't write to remote artifact caches, even when writes are enabled."),
 
     Option("--all", dest="target_directory", action="append",
@@ -471,6 +473,7 @@ from twitter.pants.targets import Benchmark, JvmBinary
 from twitter.pants.tasks.antlr_gen import AntlrGen
 from twitter.pants.tasks.benchmark_run import BenchmarkRun
 from twitter.pants.tasks.binary_create import BinaryCreate
+from twitter.pants.tasks.bootstrap_jvm_tools import BootstrapJvmTools
 from twitter.pants.tasks.build_lint import BuildLint
 from twitter.pants.tasks.bundle_create import BundleCreate
 from twitter.pants.tasks.checkstyle import Checkstyle
@@ -665,11 +668,18 @@ goal(
   action=KillServer,
 ).install().with_description('Kill the pants reporting server.')
 
+
+# TODO(pl): Make the dependency of every other phase on this phase less explicit
+goal(
+  name='bootstrap-jvm-tools',
+  action=BootstrapJvmTools,
+).install('bootstrap').with_description('Bootstrap tools needed for building')
+
 # TODO(John Sirois): Resolve eggs
 goal(
   name='ivy',
   action=IvyResolve,
-  dependencies=['gen', 'check-exclusives']
+  dependencies=['gen', 'check-exclusives', 'bootstrap']
 ).install('resolve').with_description('Resolves jar dependencies and produces dependency reports.')
 
 goal(name='check-exclusives',
@@ -714,7 +724,7 @@ def _is_scala(target):
 goal(name='scala',
      action=ScalaCompile,
      group=group('jvm', _is_scala),
-     dependencies=['gen', 'resolve', 'check-exclusives']).install('compile').with_description(
+     dependencies=['gen', 'resolve', 'check-exclusives', 'bootstrap']).install('compile').with_description(
        'Compile both generated and checked in code.'
      )
 
@@ -723,22 +733,22 @@ class AptCompile(JavaCompile): pass  # So they're distinct in log messages etc.
 goal(name='apt',
      action=AptCompile,
      group=group('jvm', is_apt),
-     dependencies=['gen', 'resolve', 'check-exclusives']).install('compile')
+     dependencies=['gen', 'resolve', 'check-exclusives', 'bootstrap']).install('compile')
 
 goal(name='java',
      action=JavaCompile,
      group=group('jvm', _is_java),
-     dependencies=['gen', 'resolve', 'check-exclusives']).install('compile')
+     dependencies=['gen', 'resolve', 'check-exclusives', 'bootstrap']).install('compile')
 
 goal(name='prepare', action=PrepareResources).install('resources')
 
 # TODO(John Sirois): pydoc also
 goal(name='javadoc',
      action=JavadocGen,
-     dependencies=['compile']).install('doc').with_description('Create documentation.')
+     dependencies=['compile', 'bootstrap']).install('doc').with_description('Create documentation.')
 goal(name='scaladoc',
      action=ScaladocGen,
-     dependencies=['compile']).install('doc')
+     dependencies=['compile', 'bootstrap']).install('doc')
 
 
 if MarkdownToHtml.AVAILABLE:
@@ -749,30 +759,31 @@ if MarkdownToHtml.AVAILABLE:
 
 goal(name='jar',
      action=JarCreate,
-     dependencies=['compile', 'resources']).install('jar').with_description('Create one or more jars.')
+     dependencies=['compile', 'resources', 'bootstrap']).install('jar').with_description('Create one or more jars.')
 
 
 goal(name='junit',
      action=JUnitRun,
-     dependencies=['compile', 'resources']).install('test').with_description('Test compiled code.')
+     dependencies=['compile', 'resources', 'bootstrap']).install('test').with_description('Test compiled code.')
+
 goal(name='specs',
      action=SpecsRun,
-     dependencies=['compile', 'resources']).install('test')
+     dependencies=['compile', 'resources', 'bootstrap']).install('test')
 
 goal(name='bench',
      action=BenchmarkRun,
-     dependencies=['compile', 'resources']).install('bench')
+     dependencies=['compile', 'resources', 'bootstrap']).install('bench')
 
 # TODO(John Sirois): Create pex's in binary phase
 goal(
   name='binary',
   action=BinaryCreate,
-  dependencies=['jar']
+  dependencies=['jar', 'bootstrap']
 ).install().with_description('Create a jvm binary jar.')
 goal(
   name='bundle',
   action=BundleCreate,
-  dependencies=['binary']
+  dependencies=['binary', 'bootstrap']
 ).install().with_description('Create an application bundle from binary targets.')
 
 # run doesn't need the serialization lock. It's reasonable to run some code
@@ -780,7 +791,7 @@ goal(
 goal(
   name='jvm-run',
   action=JvmRun,
-  dependencies=['compile', 'resources'],
+  dependencies=['compile', 'resources', 'bootstrap'],
   serialize=False,
 ).install('run').with_description('Run a (currently JVM only) binary target.')
 
@@ -796,7 +807,7 @@ goal(
 goal(
   name='scala-repl',
   action=ScalaRepl,
-  dependencies=['compile', 'resources'],
+  dependencies=['compile', 'resources', 'bootstrap'],
   serialize=False,
 ).install('repl').with_description(
   'Run a (currently Scala only) REPL with the classpath set according to the targets.')
@@ -837,7 +848,7 @@ from twitter.pants.tasks.idea_gen import IdeaGen
 goal(
   name='idea',
   action=IdeaGen,
-  dependencies=['jar']
+  dependencies=['jar', 'bootstrap']
 ).install().with_description('Create an IntelliJ IDEA project from the given targets.')
 
 
@@ -846,7 +857,7 @@ from twitter.pants.tasks.eclipse_gen import EclipseGen
 goal(
   name='eclipse',
   action=EclipseGen,
-  dependencies=['jar']
+  dependencies=['jar', 'bootstrap']
 ).install().with_description('Create an Eclipse project from the given targets.')
 
 
@@ -855,7 +866,7 @@ from twitter.pants.tasks.provides import Provides
 goal(
   name='provides',
   action=Provides,
-  dependencies=['jar']
+  dependencies=['jar', 'bootstrap']
 ).install().with_description('Emit the list of symbols provided by the given targets.')
 
 
