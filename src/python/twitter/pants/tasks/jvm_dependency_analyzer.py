@@ -131,7 +131,7 @@ class JvmDependencyAnalyzer(object):
 
       if self._check_missing_deps and (missing_file_deps or missing_tgt_deps):
         for (tgt_pair, evidence) in missing_tgt_deps:
-          evidence_str = '\n'.join(['    %s requires %s' % (shorten(e[0]), shorten(e[1])) for e in evidence])
+          evidence_str = '\n'.join(['    %s uses %s' % (shorten(e[0]), shorten(e[1])) for e in evidence])
           self._context.log.error('Missing BUILD dependency %s -> %s because:\n%s' %
                                   (tgt_pair[0].address.reference(), tgt_pair[1].address.reference(), evidence_str))
         for (src_tgt, dep) in missing_file_deps:
@@ -141,7 +141,7 @@ class JvmDependencyAnalyzer(object):
 
       if self._check_missing_direct_deps:
         for (tgt_pair, evidence) in missing_direct_tgt_deps:
-          evidence_str = '\n'.join(['    %s requires %s' % (shorten(e[0]), shorten(e[1])) for e in evidence])
+          evidence_str = '\n'.join(['    %s uses %s' % (shorten(e[0]), shorten(e[1])) for e in evidence])
           self._context.log.warn('Missing direct BUILD dependency %s -> %s because:\n%s' %
                                   (tgt_pair[0].address, tgt_pair[1].address, evidence_str))
         if self._check_missing_direct_deps == 'fatal':
