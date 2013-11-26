@@ -160,21 +160,13 @@ class IvyResolve(NailgunTask):
     return [global_vts]
 
   def _populate_ivy_jar_products(self, targets):
-    """
-    Populate the build products with an IvyInfo object for each
-    generated ivy report.
-    For each configuration used to run ivy, a build product entry
-    is generated for the tuple ('ivy', configuration, ivyinfo)
-    """
-    genmap = self.context.products.get('ivy_jar_products')
-    # For each of the ivy reports:
+    """Populate the build products with an IvyInfo object for each generated ivy report."""
+    ivy_products = {}
     for conf in self._confs:
-      # parse the report file, and put it into the build products.
-      # This is sort-of an abuse of the build-products. But build products
-      # are already so abused, and this really does make sense.
       ivyinfo = self._ivy_utils.parse_xml_report(targets, conf)
       if ivyinfo:
-        genmap.add('ivy', conf, [ivyinfo])
+        ivy_products[conf] = ivyinfo
+    self.context.products.set_data('ivy_jar_products', ivy_products)
 
   def _generate_ivy_report(self, targets):
     def make_empty_report(report, organisation, module, conf):

@@ -2,52 +2,59 @@
 import os
 
 from collections import defaultdict
+from twitter.common.collections import OrderedSet
 from twitter.pants import get_buildroot, JvmTarget, TaskError, JarLibrary, InternalTarget, JarDependency
 
 
 class JvmDependencyAnalyzer(object):
-  def __init__(self, context, check_missing_deps, warn_missing_direct_deps, warn_unnecessary_deps):
+  def __init__(self, context, check_missing_deps, check_missing_direct_deps, check_unnecessary_deps):
     self._context = context
     self._context.products.require('classes')
     self._context.products.require('ivy_jar_products')
 
     self._check_missing_deps = check_missing_deps
-    self._warn_missing_direct_deps = warn_missing_direct_deps
-    self._warn_unnecessary_deps = warn_unnecessary_deps
+    self._check_missing_direct_deps = check_missing_direct_deps
+    self._check_unnecessary_deps = check_unnecessary_deps
 
-    # Memoized map from absolute path of source, class or jar file to target.
-    # Don't access directly. Call self.get_target_by_file() instead.
-    self._target_by_file = None
+    # Memoized map from absolute path of source, class or jar file to an OrderedSet of targets.
+    #
+    # The value is usually a singleton, because a source or class file belongs to a single target.
+    # However a single jar may be provided (transitively or intransitively) by multiple JarLibrary targets.
+    # But if there is a JarLibrary target that depends on a jar directly, then that "canonical" target
+    # will be the first one in the list of targets.
+    #
+    # Don't access directly. Call self.get_targets_by_file() instead.
+    self._targets_by_file = None
 
     # Memoized map from target to all its transitive dep targets.
     # Don't access directly. Call self.get_transitive_deps_by_target() instead.
     self._transitive_deps_by_target = None
 
-  def get_target_by_file(self):
-    """Compute the target_by_file mapping for all targets in-play for this pants run.
+  def get_targets_by_file(self):
+    """Compute the targets_by_file mapping for all targets in-play for this pants run.
 
     Memoizes for efficiency. Should only be called after codegen, so that all synthetic targets
     and injected deps are taken into account.
     """
-    if self._target_by_file is None:
-      return self._compute_target_by_file()  # Will memoize if allowed.
+    if self._targets_by_file is None:
+      return self._compute_targets_by_file()  # Will memoize if allowed.
     else:
-      return self._target_by_file
+      return self._targets_by_file
 
-  def _compute_target_by_file(self):
-    target_by_file = {}
-    jarlibs_by_id = {}
+  def _compute_targets_by_file(self):
+    targets_by_file = defaultdict(OrderedSet)
+    jarlibs_by_id = defaultdict(set)  # Multiple JarLibrary targets can provide the same (org, name).
     # Compute src -> target.
     buildroot = get_buildroot()
     # Look at all targets in-play for this pants run. Does not include synthetic targets,
     for target in self._context.targets():
       if isinstance(target, JvmTarget):
         for src in target.sources:
-          target_by_file[os.path.join(buildroot, target.target_base, src)] = target
+          targets_by_file[os.path.join(buildroot, target.target_base, src)].add(target)
       elif isinstance(target, JarLibrary):
         for jardep in target.dependencies:
           if isinstance(jardep, JarDependency):
-            jarlibs_by_id[(jardep.org, jardep.name)] = target
+            jarlibs_by_id[(jardep.org, jardep.name)].add(target)
 
     # Compute class -> target for classes in previous compile groups.
     genmap = self._context.products.get('classes')
@@ -56,22 +63,29 @@ class JvmDependencyAnalyzer(object):
       if isinstance(tgt, JvmTarget):
         for basedir, classes in products.items():
           for cls in classes:
-            target_by_file[os.path.join(basedir, cls)] = tgt
+            targets_by_file[os.path.join(basedir, cls)].add(tgt)
 
     # Compute jar -> target.
-    ivy_products = self._context.products.get('ivy_jar_products').get('ivy')
+    ivy_products = self._context.products.get_data('ivy_jar_products')
     if ivy_products:
-      for ivy_report_list in ivy_products.values():
-        for report in ivy_report_list:
-          for ref in report.modules_by_ref:
-            target_key = (ref.org, ref.name)
-            if target_key in jarlibs_by_id:
-              jarlib_target = jarlibs_by_id[target_key]
-              for jar in report.modules_by_ref[ref].artifacts:
-                target_by_file[jar.path] = jarlib_target
+      for ivyinfo in ivy_products.values():
+        for ref in ivyinfo.modules_by_ref:
+          target_key = (ref.org, ref.name)
+          if target_key in jarlibs_by_id:
+            jarlib_targets = jarlibs_by_id[target_key]
+            for jar in ivyinfo.modules_by_ref[ref].artifacts:
+              for jarlib_target in jarlib_targets:
+                targets_by_file[jar.path].add(jarlib_target)
+            # Map all indirect, transitive deps of the jar to this target as well, since we allow deps on them.
+            for dep in ivyinfo.deps_by_caller.get(ref, []):
+              depmodule = ivyinfo.modules_by_ref.get(dep, None)
+              if depmodule:
+                for depjar in depmodule.artifacts:
+                  for jarlib_target in jarlib_targets:
+                    targets_by_file[depjar.path].add(jarlib_target)
       # Only memoize once ivy_jar_products are available.
-      self._target_by_file = target_by_file
-    return target_by_file
+      self._targets_by_file = targets_by_file
+    return targets_by_file
 
   def get_transitive_deps_by_target(self):
     """Compute the transitive_deps_by_target mapping from all targets in-play for this pants run.
@@ -104,7 +118,7 @@ class JvmDependencyAnalyzer(object):
 
     See docstring for _compute_missing_deps for details.
     """
-    if self._check_missing_deps or self._warn_missing_direct_deps or self._warn_unnecessary_deps:
+    if self._check_missing_deps or self._check_missing_direct_deps or self._check_unnecessary_deps:
       missing_file_deps, missing_tgt_deps, missing_direct_tgt_deps = \
         self._compute_missing_deps(srcs, actual_deps)
 
@@ -122,17 +136,18 @@ class JvmDependencyAnalyzer(object):
                                   (tgt_pair[0].address.reference(), tgt_pair[1].address.reference(), evidence_str))
         for (src_tgt, dep) in missing_file_deps:
           self._context.log.error('Missing BUILD dependency %s -> %s' % (src_tgt.address.reference(), shorten(dep)))
-        # TODO(benjy): Uncomment this once people have ironed out their missing deps.
-        # Enabling this right now would likely break a lot of builds.
-        #raise TaskError('Missing deps.')
+        if self._check_missing_deps == 'fatal':
+          raise TaskError('Missing deps.')
 
-      if self._warn_missing_direct_deps:
+      if self._check_missing_direct_deps:
         for (tgt_pair, evidence) in missing_direct_tgt_deps:
           evidence_str = '\n'.join(['    %s requires %s' % (shorten(e[0]), shorten(e[1])) for e in evidence])
           self._context.log.warn('Missing direct BUILD dependency %s -> %s because:\n%s' %
                                   (tgt_pair[0].address, tgt_pair[1].address, evidence_str))
+        if self._check_missing_direct_deps == 'fatal':
+          raise TaskError('Missing direct deps.')
 
-      if self._warn_unnecessary_deps:
+      if self._check_unnecessary_deps:
         raise TaskError('Unnecessary dep warnings not implemented yet.')
 
   def _compute_missing_deps(self, srcs, actual_deps):
@@ -167,7 +182,7 @@ class JvmDependencyAnalyzer(object):
       # a missing dep.
       return not dep.startswith(self._context.java_home)
 
-    target_by_file = self.get_target_by_file()
+    targets_by_file = self.get_targets_by_file()
     transitive_deps_by_target = self.get_transitive_deps_by_target()
 
     # Find deps that are actual but not specified.
@@ -178,17 +193,21 @@ class JvmDependencyAnalyzer(object):
     buildroot = get_buildroot()
     abs_srcs = [os.path.join(buildroot, src) for src in srcs]
     for src in abs_srcs:
-      src_tgt = target_by_file.get(src)
+      src_tgt = next(iter(targets_by_file.get(src)))
       if src_tgt is not None:
         for actual_dep in filter(must_be_explicit_dep, actual_deps.get(src, [])):
-          actual_dep_tgt = target_by_file.get(actual_dep)
-          if actual_dep_tgt is None:
+          actual_dep_tgts = targets_by_file.get(actual_dep)
+          canonical_actual_dep_tgt = next(iter(actual_dep_tgts))
+          # actual_dep_tgts is usually a singleton. If it's not, we only need one of these
+          # to be in our declared deps to be OK.
+          if actual_dep_tgts is None:
             missing_file_deps.append((src_tgt, actual_dep))
-          elif actual_dep_tgt != src_tgt:  # Obviously intra-target deps are fine.
-            if actual_dep_tgt not in transitive_deps_by_target.get(src_tgt, []):
-              missing_tgt_deps_map[(src_tgt, actual_dep_tgt)].append((src, actual_dep))
-            elif actual_dep_tgt not in src_tgt.dependencies:
-              missing_direct_tgt_deps_map[(src_tgt, actual_dep_tgt)].append((src, actual_dep))
+          elif src_tgt not in actual_dep_tgts:  # Obviously intra-target deps are fine.
+            if actual_dep_tgts.isdisjoint(transitive_deps_by_target.get(src_tgt, [])):
+              missing_tgt_deps_map[(src_tgt, canonical_actual_dep_tgt)].append((src, actual_dep))
+            elif canonical_actual_dep_tgt not in src_tgt.dependencies:
+              # The canonical dep is the only one a direct dependency makes sense on.
+              missing_direct_tgt_deps_map[(src_tgt, canonical_actual_dep_tgt)].append((src, actual_dep))
       else:
         raise TaskError('Requested dep info for unknown source file: %s' % src)
 
