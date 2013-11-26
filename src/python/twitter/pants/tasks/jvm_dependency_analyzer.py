@@ -197,12 +197,12 @@ class JvmDependencyAnalyzer(object):
       if src_tgt is not None:
         for actual_dep in filter(must_be_explicit_dep, actual_deps.get(src, [])):
           actual_dep_tgts = targets_by_file.get(actual_dep)
-          canonical_actual_dep_tgt = next(iter(actual_dep_tgts))
           # actual_dep_tgts is usually a singleton. If it's not, we only need one of these
           # to be in our declared deps to be OK.
           if actual_dep_tgts is None:
             missing_file_deps.append((src_tgt, actual_dep))
           elif src_tgt not in actual_dep_tgts:  # Obviously intra-target deps are fine.
+            canonical_actual_dep_tgt = next(iter(actual_dep_tgts))
             if actual_dep_tgts.isdisjoint(transitive_deps_by_target.get(src_tgt, [])):
               missing_tgt_deps_map[(src_tgt, canonical_actual_dep_tgt)].append((src, actual_dep))
             elif canonical_actual_dep_tgt not in src_tgt.dependencies:
