@@ -18,7 +18,6 @@ import os
 
 from collections import defaultdict
 
-from twitter.common.contextutil import pushd
 from twitter.common.lang import Compatibility
 from twitter.pants import get_buildroot
 from twitter.pants.base import Target
@@ -121,6 +120,4 @@ class TargetWithSources(Target):
     src_relpath = os.path.relpath(self.address.buildfile.parent_path,
                                   os.path.join(get_buildroot(), self.target_base))
 
-    resolve_basepath = os.path.join(get_buildroot(), rel_base, src_relpath)
-    with pushd(resolve_basepath):
-      return [os.path.normpath(os.path.join(src_relpath, path)) for path in flatten_paths(paths)]
+    return [os.path.normpath(os.path.join(src_relpath, path)) for path in flatten_paths(paths)]

@@ -15,6 +15,7 @@
 # ==================================================================================================
 
 import fnmatch
+from functools import partial
 import glob
 import os
 import re
@@ -83,7 +84,6 @@ class Fileset(object):
        iterate over both files and directories.  If follow_links=True symlinked
        directories will be traversed.
     """
-    path = path or os.curdir
     for root, dirs, files in os.walk(path, followlinks=follow_links):
       if allow_dirs:
         for dirname in dirs:
@@ -94,7 +94,11 @@ class Fileset(object):
         yield os.path.relpath(os.path.normpath(os.path.join(root, filename)), path)
 
   @classmethod
-  def globs(cls, *globspecs, **kw):
+  def lazy_rel_globs(cls, glob_root):
+    return partial(cls.globs, root=glob_root)
+
+  @classmethod
+  def globs(cls, *globspecs, **kwargs):
     """Returns a Fileset that combines the lists of files returned by
        glob.glob for each globspec.  rcfiles starting with '.' are not
        returned unless explicitly globbed.  For example, ".*" matches
@@ -104,7 +108,7 @@ class Fileset(object):
        Walks the current working directory by default, can be overrided with
        the 'root' keyword argument.
     """
-    root = kw.pop('root', os.curdir)
+    root = kwargs.pop('root')
     def relative_glob(globspec):
       for fn in glob.glob(os.path.join(root, globspec)):
         yield os.path.relpath(fn, root)
@@ -113,34 +117,42 @@ class Fileset(object):
     return cls(lambda: reduce(combine, globspecs, set()))
 
   @classmethod
-  def _do_rglob(cls, matcher, root, **kw):
-    for path in cls.walk(root, **kw):
+  def _do_rglob(cls, matcher, root, **kwargs):
+    for path in cls.walk(root, **kwargs):
       if matcher(path):
         yield path
 
   @classmethod
-  def rglobs(cls, *globspecs, **kw):
+  def lazy_rel_rglobs(cls, glob_root):
+    return partial(cls.rglobs, root=glob_root)
+
+  @classmethod
+  def rglobs(cls, *globspecs, **kwargs):
     """Returns a Fileset that containing the union of all files matched by the
        globspecs applied at each directory beneath the root.  By default the
        root is the current working directory, but can be overridden with the
        'root' keyword argument.  Unlike Fileset.globs, rcfiles are matched
        by '*' (e.g.  ".bashrc"), matching the semantics of 'ls -a'.
     """
-    root = kw.pop('root', os.curdir)
+    root = kwargs.pop('root')
     def matcher(path):
       for globspec in globspecs:
         if fnmatch.fnmatch(path, globspec):
           return True
-    return cls(lambda: set(cls._do_rglob(matcher, allow_dirs=False, root=root, **kw)))
+    return cls(lambda: set(cls._do_rglob(matcher, allow_dirs=False, root=root, **kwargs)))
 
   @classmethod
-  def zglobs(cls, *globspecs, **kw):
+  def lazy_rel_zglobs(cls, glob_root):
+    return partial(cls.zglobs, root=glob_root)
+
+  @classmethod
+  def zglobs(cls, *globspecs, **kwargs):
     """Returns a Fileset that matches zsh-style globs, including '**/' for recursive globbing.
 
        By default searches from the current working directory.  Can be overridden with the
        'root' keyword argument.
     """
-    root = kw.pop('root', os.curdir)
+    root = kwargs.pop('root')
     patterns = [re.compile(fnmatch_translate_extended(spec)) for spec in globspecs]
     def matcher(path):
       for pattern in patterns:

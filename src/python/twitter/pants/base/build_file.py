@@ -137,8 +137,8 @@ class BuildFile(object):
 
   def code(self):
     """Returns the code object for this BUILD file."""
-    if (os.path.exists(self._bytecode_path)
-        and os.path.getmtime(self.full_path) <= os.path.getmtime(self._bytecode_path)):
+    if (os.path.exists(self._bytecode_path) and
+        os.path.getmtime(self.full_path) <= os.path.getmtime(self._bytecode_path)):
       with open(self._bytecode_path, 'rb') as bytecode:
         return marshal.load(bytecode)
     else:
