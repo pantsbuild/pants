@@ -85,9 +85,6 @@ object Compiler {
    * Create an analysis store backed by analysisCache.
    */
   def analysisStore(cacheFile: File): AnalysisStore = {
-    import sbinary.DefaultProtocol.{immutableMapFormat, immutableSetFormat, StringFormat, tuple2Format}
-    import sbt.inc.AnalysisFormats._
-
     val fileStore = AnalysisStore.cached(FileBasedStore(cacheFile))
 
     val fprintStore = new AnalysisStore {
