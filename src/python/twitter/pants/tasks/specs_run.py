@@ -18,9 +18,8 @@ import os
 
 from twitter.common.collections import OrderedSet
 
-from twitter.pants import is_scala, is_test
 from twitter.pants.binary_util import runjava_indivisible, safe_args
-from twitter.pants.goal.workunit import WorkUnit
+from twitter.pants.base.workunit import WorkUnit
 from twitter.pants.tasks import Task, TaskError
 from twitter.pants.tasks.jvm_task import JvmTask
 
@@ -105,6 +104,6 @@ class SpecsRun(JvmTask):
   def calculate_tests(self, targets):
     tests = OrderedSet()
     for target in targets:
-      if is_scala(target) and is_test(target):
+      if target.is_scala and target.is_test:
         tests.update(os.path.join(target.target_base, test) for test in target.sources)
     return tests

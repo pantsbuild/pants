@@ -19,7 +19,6 @@ from __future__ import print_function
 from twitter.pants.tasks.console_task import ConsoleTask
 from twitter.pants.tasks import TaskError
 
-from twitter.pants import is_jvm, is_jvm_app, is_python, is_concrete
 from twitter.pants.targets.jar_dependency import JarDependency
 
 
@@ -30,7 +29,7 @@ class Depmap(ConsoleTask):
 
   @staticmethod
   def _is_jvm(dep):
-    return is_jvm(dep) or is_jvm_app(dep)
+    return dep.is_jvm or dep.is_jvm_app
 
   @classmethod
   def setup_parser(cls, option_group, args, mkflags):
@@ -89,12 +88,12 @@ class Depmap(ConsoleTask):
       raise TaskError("One or more target addresses are required.")
 
     for target in self.context.target_roots:
-      if all(self._is_jvm(t) for t in target.resolve() if is_concrete(t)):
+      if all(self._is_jvm(t) for t in target.resolve() if t.is_concrete):
         if self.is_graph:
           return self._output_digraph(target)
         else:
           return self._output_dependency_tree(target)
-      elif is_python(target):
+      elif target.is_python:
         raise TaskError('Unsupported for Python targets')
       else:
         raise TaskError('Unsupported for target %s' % target)

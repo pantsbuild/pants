@@ -33,12 +33,13 @@ from twitter.common import log
 from twitter.common.collections import OrderedSet
 from twitter.common.dirutil import safe_mkdir, safe_rmtree
 from twitter.common.lang import Compatibility
-from twitter.pants import get_buildroot, goal, group, has_sources, is_apt, is_java, is_scala
+from twitter.pants.base.build_environment import get_buildroot
+from twitter.pants.goal import Goal as goal, Group as group
 from twitter.pants.base import Address, BuildFile, Config, ParseContext, Target
 from twitter.pants.base.rcfile import RcFile
 from twitter.pants.commands import Command
 from twitter.pants.goal.initialize_reporting import update_reporting
-from twitter.pants.goal.workunit import WorkUnit
+from twitter.pants.base.workunit import WorkUnit
 from twitter.pants.reporting.reporting_server import ReportingServer
 from twitter.pants.tasks import Task, TaskError
 from twitter.pants.tasks.console_task import ConsoleTask
@@ -67,7 +68,10 @@ def _list_goals(context, message):
 class List(Task):
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
-    option_group.add_option(mkflag("all"), dest="goal_list_all", default=False, action="store_true",
+    option_group.add_option(mkflag("all"),
+                            dest="goal_list_all",
+                            default=False,
+                            action="store_true",
                             help="[%default] List all goals even if no description is available.")
 
   def execute(self, targets):
@@ -471,7 +475,7 @@ class Goal(Command):
 
 
 # Install all default pants provided goals
-from twitter.pants import junit_tests
+from twitter.pants.targets import JavaTests as junit_tests
 from twitter.pants.targets import Benchmark, JvmBinary
 from twitter.pants.tasks.antlr_gen import AntlrGen
 from twitter.pants.tasks.benchmark_run import BenchmarkRun
@@ -706,7 +710,7 @@ goal(
 # When chunking a group, we don't need a new chunk for targets with no sources at all
 # (which do sometimes exist, e.g., when creating a BUILD file ahead of its code).
 def _has_sources(target, extension):
-  return has_sources(target, extension) or target.has_label('sources') and not target.sources
+  return target.has_sources(extension) or target.has_label('sources') and not target.sources
 
 # Note: codegen targets shouldn't really be 'is_java' or 'is_scala', but right now they
 # are so they don't cause a lot of islands while chunking. The jvm group doesn't act on them
@@ -714,14 +718,14 @@ def _has_sources(target, extension):
 # TODO: Make chunking only take into account the targets actually acted on? This would require
 # task types to declare formally the targets they act on.
 def _is_java(target):
-  return (is_java(target)
-          or (isinstance(target, (JvmBinary, junit_tests, Benchmark))
-              and _has_sources(target, '.java')))
+  return (target.is_java or 
+          (isinstance(target, (JvmBinary, junit_tests, Benchmark))
+           and _has_sources(target, '.java')))
 
 def _is_scala(target):
-  return (is_scala(target)
-          or (isinstance(target, (JvmBinary, junit_tests, Benchmark))
-              and _has_sources(target, '.scala')))
+  return (target.is_scala or 
+          (isinstance(target, (JvmBinary, junit_tests, Benchmark))
+           and _has_sources(target, '.scala')))
 
 
 goal(name='scala',
@@ -735,7 +739,7 @@ class AptCompile(JavaCompile): pass  # So they're distinct in log messages etc.
 
 goal(name='apt',
      action=AptCompile,
-     group=group('jvm', is_apt),
+     group=group('jvm', lambda t: t.is_apt),
      dependencies=['gen', 'resolve', 'check-exclusives', 'bootstrap']).install('compile')
 
 goal(name='java',

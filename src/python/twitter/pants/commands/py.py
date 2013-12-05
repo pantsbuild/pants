@@ -25,7 +25,6 @@ from . import Command
 
 from twitter.common.python.pex import PEX
 
-from twitter.pants import is_concrete
 from twitter.pants.base import Address, Config, Target
 from twitter.pants.targets import PythonBinary
 from twitter.pants.python.python_chroot import PythonChroot
@@ -85,7 +84,8 @@ class Py(Command):
         break
 
       binaries = []
-      for resolved in filter(is_concrete, target.resolve()):
+      concrete_targets = [t for t in target.resolve() if t.is_concrete]
+      for resolved in concrete_targets:
         if isinstance(resolved, PythonBinary):
           binaries.append(resolved)
         else:

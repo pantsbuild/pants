@@ -19,7 +19,6 @@ import copy
 
 from twitter.common.collections import OrderedSet
 
-from twitter.pants import is_concrete
 from twitter.pants.base import Target, TargetDefinitionException
 
 from .util import resolve
@@ -166,7 +165,7 @@ class InternalTarget(Target):
         if hasattr(dependency, 'address'):
           self.dependency_addresses.add(dependency.address)
         for resolved_dependency in dependency.resolve():
-          if is_concrete(resolved_dependency) and not self.valid_dependency(resolved_dependency):
+          if resolved_dependency.is_concrete and not self.valid_dependency(resolved_dependency):
             raise TargetDefinitionException(self, 'Cannot add %s as a dependency of %s'
                                                   % (resolved_dependency, self))
           self.dependencies.add(resolved_dependency)

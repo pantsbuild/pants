@@ -14,7 +14,7 @@
 # limitations under the License.
 # =============================================================================
 
-from twitter.pants import is_exported, get_buildroot
+from twitter.pants.base.build_environment import get_buildroot
 from twitter.pants.base import BuildFile, Target
 from twitter.pants.tasks import TaskError
 from twitter.pants.tasks.console_task import ConsoleTask
@@ -81,7 +81,7 @@ class ListTargets(ConsoleTask):
 
       def print_provides(column_extractors, address):
         target = Target.get(address)
-        if is_exported(target):
+        if target.is_exported:
           return " ".join(extractor(target) for extractor in column_extractors)
 
       try:

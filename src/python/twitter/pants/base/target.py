@@ -14,13 +14,14 @@
 # limitations under the License.
 # ==================================================================================================
 
+from __future__ import print_function
+
 import collections
 import os
 
 from twitter.common.collections import OrderedSet, maybe_list
 from twitter.common.decorators import deprecated_with_warning
 
-from twitter.pants import is_concrete
 from twitter.pants.base.address import Address
 from twitter.pants.base.hash_utils import hash_all
 from twitter.pants.base.parse_context import ParseContext
@@ -31,8 +32,97 @@ class TargetDefinitionException(Exception):
   def __init__(self, target, msg):
     Exception.__init__(self, 'Error in target %s: %s' % (target.address, msg))
 
+class AbstractTarget(object):
 
-class Target(object):
+  @property
+  def is_concrete(self):
+    """Returns true if a target resolves to itself."""
+    targets = list(self.resolve())
+    return len(targets) == 1 and targets[0] == self
+
+  @property
+  def has_resources(self):
+    """Returns True if the target has an associated set of Resources."""
+    return hasattr(self, 'resources') and self.resources
+
+  @property
+  def is_exported(self):
+    """Returns True if the target provides an artifact exportable from the repo."""
+    # TODO(John Sirois): fixup predicate dipping down into details here.
+    return self.has_label('exportable') and self.provides
+
+  @property
+  def is_internal(self):
+    """Returns True if the target is internal to the repo (ie: it might have dependencies)."""
+    return self.has_label('internal')
+
+  @property
+  def is_jar(self):
+    """Returns True if the target is a jar."""
+    return False
+
+  @property
+  def is_jvm_app(self):
+    """Returns True if the target produces a java application with bundled auxiliary files."""
+    return False
+
+  @property
+  def is_thrift(self):
+    """Returns True if the target has thrift IDL sources."""
+    return False
+
+  @property
+  def is_jvm(self):
+    """Returns True if the target produces jvm bytecode."""
+    return self.has_label('jvm')
+
+  @property
+  def is_codegen(self):
+    """Returns True if the target is a codegen target."""
+    return self.has_label('codegen')
+
+  @property
+  def is_synthetic(self):
+    """Returns True if the target is a synthetic target injected by the runtime."""
+    return self.has_label('synthetic')
+
+  @property
+  def is_jar_library(self):
+    """Returns True if the target is an external jar library."""
+    return self.has_label('jars')
+
+  @property
+  def is_java(self):
+    """Returns True if the target has or generates java sources."""
+    return self.has_label('java')
+
+  @property
+  def is_apt(self):
+    """Returns True if the target exports an annotation processor."""
+    return self.has_label('apt')
+
+  @property
+  def is_python(self):
+    """Returns True if the target has python sources."""
+    return self.has_label('python')
+
+  @property
+  def is_scala(self):
+    """Returns True if the target has scala sources."""
+    return self.has_label('scala')
+
+  @property
+  def is_scalac_plugin(self):
+    """Returns True if the target builds a scalac plugin."""
+    return self.has_label('scalac_plugin')
+
+  @property
+  def is_test(self):
+    """Returns True if the target is comprised of tests."""
+    return self.has_label('tests')
+
+
+class Target(AbstractTarget):
   """The baseclass for all pants targets.
 
   Handles registration of a target amongst all parsed targets as well as location of the target
@@ -68,7 +158,8 @@ class Target(object):
   @staticmethod
   def get_all_addresses(buildfile):
     """Returns all of the target addresses in the specified buildfile if already parsed; otherwise,
-    parses the buildfile to find all the addresses it contains and then returns them."""
+    parses the buildfile to find all the addresses it contains and then returns them.
+    """
 
     def lookup():
       if buildfile in Target._addresses_by_buildfile:
@@ -91,7 +182,8 @@ class Target(object):
   @staticmethod
   def get(address):
     """Returns the specified module target if already parsed; otherwise, parses the buildfile in the
-    context of its parent directory and returns the parsed target."""
+    context of its parent directory and returns the parsed target.
+    """
 
     def lookup():
       return Target._targets_by_address.get(address, None)
@@ -110,7 +202,8 @@ class Target(object):
     """
     if targets:
       for target in maybe_list(targets, expected_type=Target):
-        for resolved in filter(is_concrete, target.resolve()):
+        concrete_targets = [t for t in target.resolve() if t.is_concrete]
+        for resolved in concrete_targets:
           if expected_types and not isinstance(resolved, expected_types):
             raise TypeError('Target requires types: %s and found %s' % (expected_types, resolved))
           yield resolved
@@ -187,7 +280,8 @@ class Target(object):
 
   def _create_id(self):
     """Generates a unique identifer for the BUILD target.  The generated id is safe for use as a
-    a path name on unix systems."""
+    a path name on unix systems.
+    """
 
     buildfile_relpath = os.path.dirname(self.address.buildfile.relpath)
     if buildfile_relpath in ('.', ''):
@@ -218,7 +312,8 @@ class Target(object):
     """Performs a walk of this target's dependency graph visiting each node exactly once.  If a
     predicate is supplied it will be used to test each target before handing the target to work and
     descending.  Work can return targets in which case these will be added to the walk candidate set
-    if not already walked."""
+    if not already walked.
+    """
 
     self._walk(set(), work, predicate)
 
@@ -267,5 +362,40 @@ class Target(object):
 
   def __repr__(self):
     return "%s(%s)" % (type(self).__name__, self.address)
+
+  @staticmethod
+  def has_jvm_targets(targets):
+    """Returns true if the given sequence of targets contains at least one jvm target as determined
+    by is_jvm(...)
+    """
+
+    return len(list(Target.extract_jvm_targets(targets))) > 0
+
+  @staticmethod
+  def extract_jvm_targets(targets):
+    """Returns an iterator over the jvm targets the given sequence of targets resolve to.  The
+    given targets can be a mix of types and only valid jvm targets (as determined by is_jvm(...) 
+    will be returned by the iterator.
+    """
+
+    for target in targets:
+      if target is None:
+        print('Warning! Null target!', file=sys.stderr)
+        continue
+      for real_target in target.resolve():
+        if real_target.is_jvm:
+          yield real_target
+
+  def has_sources(self, extension=None):
+    """Returns True if the target has sources.
+
+    If an extension is supplied the target is further checked for at least 1 source with the given
+    extension.
+    """
+    return (self.has_label('sources') and 
+            (not extension or
+             (hasattr(self, 'sources') and
+              any(source.endswith(extension) for source in self.sources))))
+
 
 Target._clear_all_addresses()

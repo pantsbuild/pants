@@ -21,7 +21,6 @@ import sys
 
 from twitter.common.collections import OrderedSet
 from twitter.common.contextutil import open_zip as open_jar
-from twitter.pants import is_jar_dependency, is_jar_library, is_jvm
 from twitter.pants.tasks import Task
 from twitter.pants.tasks.ivy_utils import IvyModuleRef, IvyUtils
 from twitter.pants.targets.jvm_binary import JvmBinary
@@ -86,15 +85,15 @@ class Provides(Task):
 
   def get_jar_paths(self, ivyinfo, target, conf):
     jar_paths = OrderedSet()
-    if is_jar_library(target):
+    if target.is_jar_library:
       # Jar library proxies jar dependencies or jvm targets, so the jars are just those of the
       # dependencies.
       for paths in [ self.get_jar_paths(ivyinfo, dep, conf) for dep in target.dependencies ]:
         jar_paths.update(paths)
-    elif is_jar_dependency(target):
+    elif target.is_jar_dependency:
       ref = IvyModuleRef(target.org, target.name, target.rev, conf)
       jar_paths.update(self.get_jar_paths_for_ivy_module(ivyinfo, ref))
-    elif is_jvm(target):
+    elif target.is_jvm:
       for basedir, jars in self.context.products.get('jars').get(target).items():
         jar_paths.update([os.path.join(basedir, jar) for jar in jars])
       if self.transitive:

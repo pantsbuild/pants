@@ -23,7 +23,7 @@ from twitter.common.collections import OrderedSet
 from twitter.common.contextutil import open_zip
 from twitter.common.dirutil import safe_mkdir
 
-from twitter.pants import get_buildroot
+from twitter.pants.base.build_environment import get_buildroot
 from twitter.pants.fs import archive
 from twitter.pants.java import Manifest
 from twitter.pants.targets import JvmApp

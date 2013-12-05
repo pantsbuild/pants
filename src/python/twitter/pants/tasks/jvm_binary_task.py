@@ -21,7 +21,6 @@ import os
 from twitter.common.collections.ordereddict import OrderedDict
 from twitter.common.collections.orderedset import OrderedSet
 
-from twitter.pants import is_internal
 from twitter.pants.targets.jvm_binary import JvmBinary
 from twitter.pants.tasks import Task
 
@@ -103,5 +102,5 @@ class JvmBinaryTask(Task):
             else:
               self.context.log.debug('Excluding %s from binary' % externaljar)
 
-    binary.walk(add_jars, is_internal)
+    binary.walk(add_jars, lambda t: t.is_internal)
     return externaljars

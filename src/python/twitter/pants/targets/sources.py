@@ -20,7 +20,7 @@ import os
 from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
-from twitter.pants import get_buildroot
+from twitter.pants.base.build_environment import get_buildroot
 from twitter.pants.base import ParseContext
 
 class SourceRoot(object):

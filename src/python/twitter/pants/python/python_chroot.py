@@ -30,7 +30,6 @@ from twitter.common.python.interpreter import PythonIdentity
 from twitter.common.python.pex_builder import PEXBuilder
 from twitter.common.python.platforms import Platform
 
-from twitter.pants import is_concrete
 from twitter.pants.base import Config
 from twitter.pants.base.build_invalidator import CacheKeyGenerator
 from twitter.pants.targets import (
@@ -212,7 +211,7 @@ class PythonChroot(object):
   def resolve(self, targets):
     children = defaultdict(OrderedSet)
     def add_dep(trg):
-      if is_concrete(trg):
+      if trg.is_concrete:
         for target_type, target_key in self._VALID_DEPENDENCIES.items():
           if isinstance(trg, target_type):
             children[target_key].add(trg)

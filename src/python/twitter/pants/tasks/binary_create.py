@@ -22,7 +22,8 @@ import zipfile
 from twitter.common.contextutil import temporary_dir
 from twitter.common.dirutil import safe_mkdir
 
-from twitter.pants import get_buildroot, get_version, is_internal, TaskError
+from twitter.pants.base.build_environment import get_buildroot, get_version
+from twitter.pants.tasks import TaskError
 from twitter.pants.fs.archive import ZIP
 from twitter.pants.java import open_jar, Manifest
 from twitter.pants.tasks.jvm_binary_task import JvmBinaryTask
@@ -82,7 +83,7 @@ class BinaryCreate(JvmBinaryTask):
             for internaljar in jars:
               self.dump(os.path.join(basedir, internaljar), jar)
 
-      binary.walk(add_jars, is_internal)
+      binary.walk(add_jars, lambda t: t.is_internal)
 
       if self.deployjar:
         for basedir, externaljar in self.list_jar_dependencies(binary):

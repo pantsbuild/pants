@@ -19,7 +19,7 @@ import shutil
 
 from twitter.common.dirutil import safe_mkdir
 
-from twitter.pants import has_resources, TaskError
+from twitter.pants import TaskError
 from twitter.pants.tasks import Task
 
 
@@ -36,7 +36,7 @@ class PrepareResources(Task):
     if len(targets) == 0:
       return
     def extract_resources(target):
-      return target.resources if has_resources(target) else ()
+      return target.resources if target.has_resources else ()
     all_resources = set()
     for resources in map(extract_resources, targets):
       all_resources.update(resources)

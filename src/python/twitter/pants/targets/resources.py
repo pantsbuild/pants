@@ -18,7 +18,6 @@ import os
 
 from collections import Sequence
 
-from twitter.pants import is_concrete
 from twitter.pants.base import ParseContext, Target
 from twitter.pants.targets.with_sources import TargetWithSources
 
@@ -36,9 +35,10 @@ class WithLegacyResources(TargetWithSources):
 
     if resources is not None:
       def is_resources(item):
-        return (isinstance(item, Target)
-                and all(map(lambda tgt: isinstance(tgt, Resources),
-                            filter(lambda tgt: is_concrete(tgt), item.resolve()))))
+        if not isinstance(item, Target):
+          return False
+        concrete_targets = [t for t in item.resolve() if t.is_concrete]
+        return all(isinstance(t, Resources) for t in concrete_targets)
 
       if is_resources(resources):
         self.resources = list(self.resolve_all(resources, Resources))

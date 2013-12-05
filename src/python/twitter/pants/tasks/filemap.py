@@ -21,7 +21,7 @@ __author__ = 'John Sirois'
 from twitter.pants.tasks import Task
 
 from twitter.pants.base import BuildFile, Target
-from twitter.pants import get_buildroot
+from twitter.pants.base.build_environment import get_buildroot
 
 import os
 

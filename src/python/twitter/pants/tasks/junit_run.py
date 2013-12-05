@@ -20,8 +20,9 @@ import sys
 
 from twitter.common.dirutil import safe_mkdir, safe_open
 
-from twitter.pants import binary_util, is_codegen, is_java, is_scala, is_test, junit_tests
-from twitter.pants.goal.workunit import WorkUnit
+from twitter.pants import binary_util
+from twitter.pants.targets import JavaTests as junit_tests
+from twitter.pants.base.workunit import WorkUnit
 from twitter.pants.tasks import Task, TaskError
 from twitter.pants.tasks.jvm_task import JvmTask
 
@@ -321,7 +322,7 @@ class JUnitRun(JvmTask):
           run_tests(junit_classpath, 'com.twitter.common.testing.runner.JUnitConsoleRunner')
 
   def is_coverage_target(self, tgt):
-    return (is_java(tgt) or is_scala(tgt)) and not is_test(tgt) and not is_codegen(tgt)
+    return (tgt.is_java or tgt.is_scala) and not tgt.is_test and not tgt.is_codegen
 
   def get_coverage_patterns(self, targets):
     if self.coverage_filters:

@@ -22,7 +22,7 @@ import os.path
 from contextlib import contextmanager
 
 from twitter.common.lang import Compatibility
-from twitter.pants import get_buildroot
+from twitter.pants.base.build_environment import get_buildroot
 from twitter.pants.base import BuildFile
 from twitter.pants.base.fileset import Fileset
 
@@ -39,7 +39,7 @@ class ParseContext(object):
   _parsed = set()
 
   _strs_to_exec = [
-    "from twitter.pants import *",
+    "from twitter.pants.base.build_file_context import *",
     "from twitter.common.quantity import Amount, Time",
   ]
 
@@ -100,6 +100,8 @@ class ParseContext(object):
     stack to find these globals and thus locate themselves for the purposes of finding files
     (see locate() and bind())."""
 
+    from twitter.pants.targets.sources import SourceRoot
+
     if self.buildfile not in ParseContext._parsed:
       buildfile_family = tuple(self.buildfile.family())
 
@@ -122,7 +124,7 @@ class ParseContext(object):
               '__file__': buildfile.full_path,
               'globs': Fileset.lazy_rel_globs(buildfile_dir),
               'rglobs': Fileset.lazy_rel_rglobs(buildfile_dir),
-              'source_root': eval_globals['source_root'].lazy_rel_source_root(buildfile_dir),
+              'source_root': SourceRoot.lazy_rel_source_root(buildfile_dir),
             })
             eval_globals.update(global_args)
             Compatibility.exec_function(buildfile.code(), eval_globals)

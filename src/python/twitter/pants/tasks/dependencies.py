@@ -16,10 +16,8 @@
 
 from __future__ import print_function
 
-from twitter.pants import is_concrete, is_jvm, is_jvm_app, is_python, PythonRequirement
-from twitter.pants.targets.jar_dependency import JarDependency
-
-from . import TaskError
+from twitter.pants.targets import JarDependency, PythonRequirement
+from twitter.pants.tasks import TaskError
 from .console_task import ConsoleTask
 
 
@@ -28,7 +26,7 @@ class Dependencies(ConsoleTask):
 
   @staticmethod
   def _is_jvm(target):
-    return is_jvm(target) or is_jvm_app(target)
+    return target.is_jvm or target.is_jvm_app
 
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
@@ -65,11 +63,11 @@ class Dependencies(ConsoleTask):
 
   def console_output(self, unused_method_argument):
     for target in self.context.target_roots:
-      if all(self._is_jvm(t) for t in target.resolve() if is_concrete(t)):
+      if all(self._is_jvm(t) for t in target.resolve() if t.is_concrete):
         for line in self._dependencies_list(target):
           yield line
 
-      elif is_python(target):
+      elif target.is_python:
         if self.is_internal_only:
           raise TaskError('Unsupported option for Python target: is_internal_only: %s' %
                           self.is_internal_only)

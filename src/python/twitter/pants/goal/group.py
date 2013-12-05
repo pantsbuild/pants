@@ -2,8 +2,7 @@
 from collections import defaultdict
 
 from twitter.common.collections import OrderedDict, OrderedSet
-from twitter.pants import is_internal
-from twitter.pants.goal.workunit import WorkUnit
+from twitter.pants.base.workunit import WorkUnit
 from twitter.pants.targets import InternalTarget
 from twitter.pants.tasks import TaskError
 
@@ -141,11 +140,12 @@ class Group(object):
       ## TODO(markcc): right here, we're using "context.targets", which doesn't respect any of the
       ## exclusives rubbish going on around here.
       #coalesced = InternalTarget.coalesce_targets(context.targets(is_internal), discriminator)
-      coalesced = InternalTarget.coalesce_targets(filter(is_internal, chunk_targets), discriminator)
+      internal_targets = [t for t in chunk_targets if t.is_internal]
+      coalesced = InternalTarget.coalesce_targets(internal_targets, discriminator)
       coalesced = list(reversed(coalesced))
 
       def not_internal(target):
-        return not is_internal(target)
+        return not target.is_internal
       # got targets that aren't internal.
       #rest = OrderedSet(context.targets(not_internal))
       rest = OrderedSet(filter(not_internal, chunk_targets))

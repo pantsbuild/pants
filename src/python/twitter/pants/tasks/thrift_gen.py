@@ -24,7 +24,7 @@ from twitter.common import log
 from twitter.common.collections import OrderedSet
 from twitter.common.dirutil import safe_mkdir
 
-from twitter.pants import get_buildroot, is_jvm, is_python
+from twitter.pants.base.build_environment import get_buildroot
 from twitter.pants.targets import (
     InternalTarget,
     JavaLibrary,
@@ -124,7 +124,7 @@ class ThriftGen(CodeGen):
     return lang in self.gen_langs
 
   def genlangs(self):
-    return dict(java=is_jvm, python=is_python)
+    return dict(java=lambda t: t.is_jvm, python=lambda t: t.is_python)
 
   def genlang(self, lang, targets):
     bases, sources = calculate_compile_roots(targets, self.is_gentarget)

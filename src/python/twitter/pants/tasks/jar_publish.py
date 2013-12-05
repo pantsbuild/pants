@@ -33,11 +33,7 @@ from twitter.common.dirutil import safe_open, safe_rmtree
 from twitter.pants import (
   binary_util,
   get_buildroot,
-  get_scm,
-  is_exported as provides,
-  is_internal,
-  is_java,
-  is_codegen)
+  get_scm)
 from twitter.pants.base import Address, Target
 from twitter.pants.base.generator import Generator, TemplateData
 from twitter.pants.targets import (
@@ -190,7 +186,7 @@ class DependencyWriter(object):
     for dep in target.internal_dependencies:
       jar = as_jar(dep)
       dependencies[(jar.org, jar.name)] = self.internaldep(jar, dep, synth)
-      if is_codegen(dep):
+      if dep.is_codegen:
         internal_codegen[jar.name] = jar.name
     for jar in target.jar_dependencies:
       if jar.rev:
@@ -244,7 +240,7 @@ class PomWriter(DependencyWriter):
     )
 
   def internaldep(self, jar_dependency, dep=None, synth=False):
-    classifier = 'idl' if dep and is_codegen(dep) and synth else None
+    classifier = 'idl' if dep and dep.is_codegen and synth else None
     return self.jardep(jar_dependency, classifier=classifier)
 
 
@@ -279,16 +275,13 @@ class IvyWriter(DependencyWriter):
     )
 
   def internaldep(self, jar_dependency, dep=None, synth=False):
-    classifier = 'idl' if dep and is_codegen(dep) and synth else None
+    classifier = 'idl' if dep and dep.is_codegen and synth else None
     return self._jardep(jar_dependency, classifier=classifier)
 
 
 def is_exported(target):
-  return provides(target) and (
-    isinstance(target, AnnotationProcessor)
-    or isinstance(target, JavaLibrary)
-    or isinstance(target, ScalaLibrary)
-  )
+  return (target.is_exported and 
+          isinstance(target, (AnnotationProcessor, JavaLibrary, ScalaLibrary)))
 
 
 def coordinate(org, name, rev=None):
@@ -477,7 +470,7 @@ class JarPublish(Task):
       return result
 
     def fingerprint_internal(target):
-      if not is_internal(target):
+      if not target.is_internal:
         raise ValueError('Expected an internal target for fingerprinting, got %s' % target)
       pushdb, _, _ = get_db(target)
       _, _, _, fingerprint = pushdb.as_jar_with_version(target)
@@ -541,7 +534,7 @@ class JarPublish(Task):
       if (synth_target):
         copy(synth_target, typename='idl_jars', suffix='-idl', artifact_ext='-only')
 
-      if is_java(target):
+      if target.is_java:
         copy(target, typename='javadoc_jars', suffix='-javadoc')
 
 
@@ -699,7 +692,7 @@ class JarPublish(Task):
   def exported_targets(self):
     candidates = set(self.context.targets() if self.transitive else self.context.target_roots)
     def exportable(target):
-      return target in candidates and is_exported(target) and is_internal(target)
+      return target in candidates and is_exported(target) and target.is_internal
     return OrderedSet(filter(exportable,
                              reversed(InternalTarget.sort_targets(filter(exportable, candidates)))))
 

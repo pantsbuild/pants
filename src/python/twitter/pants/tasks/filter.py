@@ -20,7 +20,7 @@ import sys
 
 import twitter.pants
 
-from twitter.pants import get_buildroot
+from twitter.pants.base.build_environment import get_buildroot
 from twitter.pants.base.address import Address
 from twitter.pants.base.target import Target
 

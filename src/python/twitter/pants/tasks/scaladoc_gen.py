@@ -16,7 +16,6 @@
 
 import os
 
-from twitter.pants import is_scala
 from twitter.pants.tasks.jvmdoc_gen import Jvmdoc, JvmdocGen
 
 scaladoc = Jvmdoc(tool_name='scaladoc')
@@ -31,7 +30,7 @@ class ScaladocGen(JvmdocGen):
     super(ScaladocGen, self).__init__(context, scaladoc, output_dir, confs)
 
   def execute(self, targets):
-    self.generate_execute(targets, is_scala, create_scaladoc_command)
+    self.generate_execute(targets, lambda t: t.is_scala, create_scaladoc_command)
 
 
 def create_scaladoc_command(classpath, gendir, *targets):

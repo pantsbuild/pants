@@ -22,7 +22,7 @@ from collections import defaultdict
 from twitter.common.collections import OrderedSet, OrderedDict
 from twitter.common.dirutil import safe_delete, safe_mkdir, safe_open
 
-from twitter.pants import get_buildroot
+from twitter.pants.base.build_environment import get_buildroot
 from twitter.pants.base.generator import TemplateData, Generator
 from twitter.pants.tasks.ide_gen import IdeGen
 

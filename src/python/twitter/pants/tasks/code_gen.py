@@ -19,7 +19,7 @@ __author__ = 'John Sirois'
 
 from collections import defaultdict
 
-from twitter.pants import get_buildroot
+from twitter.pants.base.build_environment import get_buildroot
 from twitter.pants.tasks import Task
 
 class CodeGen(Task):

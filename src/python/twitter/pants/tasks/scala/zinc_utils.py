@@ -26,9 +26,9 @@ from twitter.common.collections import OrderedDict
 from twitter.common.contextutil import open_zip as open_jar, temporary_dir
 from twitter.common.dirutil import  safe_open
 
-from twitter.pants import get_buildroot
+from twitter.pants.base.build_environment import get_buildroot
 from twitter.pants.base.hash_utils import hash_file
-from twitter.pants.goal.workunit import WorkUnit
+from twitter.pants.base.workunit import WorkUnit
 from twitter.pants.tasks import TaskError
 
 

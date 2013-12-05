@@ -22,27 +22,23 @@ from zipfile import ZIP_STORED, ZIP_DEFLATED
 
 from twitter.common.dirutil import safe_mkdir
 
-from twitter.pants import (
-    get_buildroot,
-    has_resources,
-    has_sources,
-    is_exported)
+from twitter.pants.base.build_environment import get_buildroot
 from twitter.pants.java import open_jar
 from twitter.pants.tasks import Task, TaskError
 
 
 def is_java(target):
-  return has_sources(target, '.java')
+  return target.has_sources('.java')
 
 
 def is_jvm(target):
-  return is_java(target) or has_sources(target, '.scala')
+  return is_java(target) or target.has_sources('.scala')
 
 
 def is_idl(target):
   # TODO(Phil Hom): can be changed to is_codegen when previous hackweek thrift download hacks are
   # removed
-  return is_exported(target) and has_sources(target, '.thrift')
+  return target.is_exported and target.has_sources('.thrift')
 
 
 def jarname(target):
@@ -152,7 +148,7 @@ class JarCreate(Task):
   def jar(self, jvm_targets, genmap, add_genjar):
     for target in jvm_targets:
       generated = genmap.get(target)
-      if generated or has_resources(target):
+      if generated or target.has_resources:
         jar_name = '%s.jar' % jarname(target)
         add_genjar(target, jar_name)
         jar_path = os.path.join(self._output_dir, jar_name)
@@ -162,7 +158,7 @@ class JarCreate(Task):
               for classfile in classfiles:
                 jarfile.write(os.path.join(basedir, classfile), classfile)
 
-          if has_resources(target):
+          if target.has_resources:
             resources_genmap = self.context.products.get('resources')
             if resources_genmap:
               for resources in target.resources:
@@ -190,7 +186,7 @@ class JarCreate(Task):
         for source in target.sources:
           zip.write(os.path.join(target.target_base, source), source)
 
-        if has_resources(target):
+        if target.has_resources:
           for resources in target.resources:
             for resource in resources.sources:
               zip.write(os.path.join(get_buildroot(), resources.target_base, resource), resource)

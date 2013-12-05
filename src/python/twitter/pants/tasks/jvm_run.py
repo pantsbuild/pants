@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==================================================================================================
-from twitter.pants.goal.workunit import WorkUnit
+from twitter.pants.base.workunit import WorkUnit
 
 __author__ = 'Benjy Weinberger'
 

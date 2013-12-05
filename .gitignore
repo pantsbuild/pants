@@ -24,12 +24,14 @@
 .pydevproject
 bin/
 build/
+build-support/phab/
 codegen/classes/
 dist/
 htmlcov/
 ivy/
 lib/
 out/
+arc.sh
 pants.pex
 target
 ivy

@@ -19,7 +19,6 @@ try:
 except ImportError:
   import pickle
 
-from twitter.pants import has_sources
 from twitter.pants.base.build_invalidator import (
     BuildInvalidator,
     CacheKeyGenerator,

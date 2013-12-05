@@ -14,7 +14,6 @@
 # limitations under the License.
 # ==================================================================================================
 
-from twitter.pants import is_concrete
 from twitter.pants.base import ParseContext, Target, Address
 
 
@@ -60,7 +59,7 @@ class Pants(Target):
 
     If the pointer aliases more than one target a LookupError is raised.
     """
-    resolved = list(filter(is_concrete, self.resolve()))
+    resolved = [t for t in self.resolve() if t.is_concrete]
     if len(resolved) > 1:
       raise LookupError('%s points to more than one target: %s' % (self, resolved))
     return resolved.pop()

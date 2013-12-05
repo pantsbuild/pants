@@ -24,7 +24,7 @@ from twitter.common import dirutil, log
 from twitter.common.process import spawn_daemon
 from twitter.common.quantity import Amount, Time
 from twitter.common.quantity.parse_simple import parse_time, InvalidTime
-from twitter.pants import get_buildroot
+from twitter.pants.base.build_environment import get_buildroot
 from twitter.pants.buildtimestats import StatsUploader
 
 STATS_COLLECTION_URL = "devprod_stats.production.devprod.service.smf1.twitter.com"

@@ -11,13 +11,13 @@ from twitter.common.dirutil import Lock
 from twitter.common.process import ProcessProviderFactory
 from twitter.common.process.process_provider import ProcessProvider
 
-from twitter.pants import get_buildroot
-from twitter.pants import SourceRoot
+from twitter.pants.base.build_environment import get_buildroot
+from twitter.pants.targets.sources import SourceRoot
 from twitter.pants.base import ParseContext
 from twitter.pants.base.target import Target
 from twitter.pants.binary_util import find_java_home
 from twitter.pants.goal.products import Products
-from twitter.pants.goal.workunit import WorkUnit
+from twitter.pants.base.workunit import WorkUnit
 from twitter.pants.reporting.report import Report
 from twitter.pants.targets import Pants
 

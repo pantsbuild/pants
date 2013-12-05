@@ -16,7 +16,6 @@
 
 __author__ = 'John Sirois'
 
-from twitter.pants import is_python
 from twitter.pants.base.builder import Builder
 from twitter.pants.targets import PythonBinary, PythonTests, PythonTestSuite
 
@@ -33,7 +32,7 @@ class PythonBuilder(Builder):
     binary_targets = []
 
     for target in targets:
-      assert is_python(target), "PythonBuilder can only build PythonTargets, given %s" % str(target)
+      assert target.is_python, "PythonBuilder can only build PythonTargets, given %s" % str(target)
 
     if 'pylint' in args:
       real_args = list(args)

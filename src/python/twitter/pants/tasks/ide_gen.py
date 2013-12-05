@@ -25,15 +25,7 @@ from twitter.pants.targets.jvm_target import JvmTarget
 
 from twitter.pants import (
   binary_util,
-  extract_jvm_targets,
-  get_buildroot,
-  has_resources,
-  has_sources,
-  is_codegen,
-  is_java as _is_java,
-  is_scala as _is_scala,
-  is_test,
-  is_apt)
+  get_buildroot)
 from twitter.pants.base.target import Target
 from twitter.pants.goal.phase import Phase
 from twitter.pants.targets.jvm_binary import JvmBinary
@@ -50,11 +42,11 @@ from twitter.pants.tasks.jvm_binary_task import JvmBinaryTask
 #     point there are no source files yet - and the developer intents to add them using the ide.
 
 def is_scala(target):
-  return has_sources(target, '.scala') or _is_scala(target)
+  return target.has_sources('.scala') or target.is_scala
 
 
 def is_java(target):
-  return has_sources(target, '.java') or _is_java(target)
+  return target.has_sources('.java') or target.is_java
 
 
 class IdeGen(JvmBinaryTask):
@@ -165,7 +157,7 @@ class IdeGen(JvmBinaryTask):
   def configure_project(self, targets, checkstyle_suppression_files, debug_port,
                         scala_compiler_profile):
 
-    jvm_targets = extract_jvm_targets(targets)
+    jvm_targets = Target.extract_jvm_targets(targets)
     if self.intransitive:
       jvm_targets = set(self.context.target_roots).intersection(jvm_targets)
     project = Project(self.project_name,
@@ -202,15 +194,15 @@ class IdeGen(JvmBinaryTask):
     """
     def is_cp(target):
       return (
-        is_codegen(target)
+        target.is_codegen or
 
         # Some IDEs need annotation processors pre-compiled, others are smart enough to detect and
         # proceed in 2 compile rounds
-        or is_apt(target)
+        target.is_apt or 
 
-        or (self.skip_java and is_java(target))
-        or (self.skip_scala and is_scala(target))
-        or (self.intransitive and target not in self.context.target_roots)
+        (self.skip_java and is_java(target)) or
+        (self.skip_scala and is_scala(target)) or
+        (self.intransitive and target not in self.context.target_roots)
       )
 
     jars = OrderedSet()
@@ -404,10 +396,11 @@ class Project(object):
     targeted = set()
 
     def source_target(target):
-      return (self.transitive or target in self.targets) and has_sources(target) \
-          and (not is_codegen(target)
-               and not (self.skip_java and is_java(target))
-               and not (self.skip_scala and is_scala(target)))
+      return ((self.transitive or target in self.targets) and
+              target.has_sources() and 
+              (not target.is_codegen and
+               not (self.skip_java and is_java(target)) and
+               not (self.skip_scala and is_scala(target))))
 
     def configure_source_sets(relative_base, sources, is_test):
       absolute_base = os.path.join(self.root_dir, relative_base)
@@ -432,7 +425,7 @@ class Project(object):
 
         self.has_scala = not self.skip_scala and (self.has_scala or is_scala(target))
 
-        if has_resources(target):
+        if target.has_resources:
           resources_by_basedir = defaultdict(set)
           for resources in target.resources:
             resources_by_basedir[resources.target_base].update(resources.sources)
@@ -441,7 +434,7 @@ class Project(object):
             configure_source_sets(basedir, resources, is_test=False)
 
         if target.sources:
-          test = is_test(target)
+          test = target.is_test
           self.has_tests = self.has_tests or test
           configure_source_sets(target.target_base, target.sources, is_test = test)
 

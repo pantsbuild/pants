@@ -16,7 +16,7 @@
 
 from collections import defaultdict
 
-from twitter.pants import get_buildroot
+from twitter.pants.base.build_environment import get_buildroot
 from twitter.pants.base.target import Target
 from twitter.pants.base.build_file import BuildFile
 from twitter.pants.tasks.console_task import ConsoleTask

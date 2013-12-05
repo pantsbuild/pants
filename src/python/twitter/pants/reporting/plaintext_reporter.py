@@ -1,6 +1,6 @@
 from collections import namedtuple
 
-from twitter.pants.goal.workunit import WorkUnit
+from twitter.pants.base.workunit import WorkUnit
 from twitter.pants.reporting.report import Report
 from twitter.pants.reporting.reporter import Reporter
 

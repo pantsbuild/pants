@@ -22,9 +22,9 @@ import itertools
 
 from twitter.common.dirutil import safe_open, safe_mkdir, safe_rmtree
 
-from twitter.pants import has_sources, is_apt, Task
+from twitter.pants import Task
 from twitter.pants.base.target import Target
-from twitter.pants.goal.workunit import WorkUnit
+from twitter.pants.base.workunit import WorkUnit
 from twitter.pants.reporting.reporting_utils import items_to_report_element
 from twitter.pants.tasks import TaskError
 from twitter.pants.tasks.jvm_compile import JvmCompile
@@ -147,7 +147,8 @@ class JavaCompile(JvmCompile):
       self.context.background_worker_pool().add_shutdown_hook(lambda: safe_rmtree(self._depfile_tmpdir))
 
   def execute(self, targets):
-    java_targets = filter(lambda t: has_sources(t, '.java'), targets)
+    java_targets = [t for t in targets if t.has_sources('.java')]
+    
     if not java_targets:
       return
 
@@ -190,7 +191,7 @@ class JavaCompile(JvmCompile):
         # and the unit test classpath.
         all_processors = set()
         for target in java_targets:
-          if is_apt(target) and target.processors:
+          if target.is_apt and target.processors:
             all_processors.update(target.processors)
         processor_info_file = os.path.join(self._classes_dir, _PROCESSOR_INFO_FILE)
         if os.path.exists(processor_info_file):
@@ -343,7 +344,7 @@ class JavaCompile(JvmCompile):
 
       # TODO(John Sirois): Map target.resources in the same way
       # 'Map' (rewrite) annotation processor service info files to the owning targets.
-      if is_apt(target) and target.processors:
+      if target.is_apt and target.processors:
         basedir = os.path.join(self._resources_dir, Target.maybe_readable_identify([target]))
         processor_info_file = os.path.join(basedir, _PROCESSOR_INFO_FILE)
         self.write_processor_info(processor_info_file, target.processors)

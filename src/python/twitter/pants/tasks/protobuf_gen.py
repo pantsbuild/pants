@@ -24,13 +24,12 @@ from twitter.common import log
 from twitter.common.collections import OrderedSet
 from twitter.common.dirutil import safe_mkdir
 
-from twitter.pants import is_jvm, is_python
 from twitter.pants.binary_util import select_binary
 from twitter.pants.targets import JavaLibrary, JavaProtobufLibrary, PythonLibrary
 
 from .code_gen import CodeGen
 
-from . import TaskError
+from twitter.pants.tasks import TaskError
 
 
 class ProtobufGen(CodeGen):
@@ -89,7 +88,7 @@ class ProtobufGen(CodeGen):
     return lang in self.gen_langs
 
   def genlangs(self):
-    return dict(java=is_jvm, python=is_python)
+    return dict(java=lambda t: t.is_jvm, python=lambda t: t.is_python)
 
   def genlang(self, lang, targets):
     bases, sources = self._calculate_sources(targets)

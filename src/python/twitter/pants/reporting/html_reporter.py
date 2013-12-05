@@ -7,9 +7,9 @@ from collections import namedtuple, defaultdict
 from pystache.renderer import Renderer
 
 from twitter.common.dirutil import safe_mkdir
-from twitter.pants import get_buildroot
+from twitter.pants.base.build_environment import get_buildroot
 from twitter.pants.base.mustache import MustacheRenderer
-from twitter.pants.goal.workunit import WorkUnit
+from twitter.pants.base.workunit import WorkUnit
 from twitter.pants.reporting.linkify import linkify
 from twitter.pants.reporting.report import Report
 from twitter.pants.reporting.reporter import Reporter

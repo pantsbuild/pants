@@ -24,7 +24,7 @@ import traceback
 from twitter.common.dirutil import Lock
 
 from twitter.common.process import ProcessProviderFactory
-from twitter.pants import get_buildroot, get_version
+from twitter.pants.base.build_environment import get_buildroot, get_version
 from twitter.pants.base import Address, Config
 from twitter.pants.base.rcfile import RcFile
 from twitter.pants.commands import Command

@@ -16,7 +16,7 @@
 
 import os
 
-from twitter.pants import is_jvm, JavaLibrary, JavaTests
+from twitter.pants.targets import JavaLibrary, JavaTests
 from twitter.pants.tasks.jvmdoc_gen import Jvmdoc, JvmdocGen
 
 
@@ -65,7 +65,7 @@ def create_javadoc_command(classpath, gendir, *targets):
       if jar.apidocs:
         offlinelinks.add(jar.apidocs)
   for target in targets:
-    target.walk(link, is_jvm)
+    target.walk(link, lambda t: t.is_jvm)
 
   for link in offlinelinks:
     command.extend(['-linkoffline', link, link])

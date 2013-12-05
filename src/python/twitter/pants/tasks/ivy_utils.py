@@ -27,7 +27,7 @@ import threading
 from twitter.common.collections import OrderedSet
 from twitter.common.dirutil import safe_mkdir, safe_open, safe_delete
 
-from twitter.pants import binary_util, get_buildroot, is_internal, is_jar, is_jvm, is_concrete
+from twitter.pants import binary_util, get_buildroot
 from twitter.pants.base.generator import Generator, TemplateData
 from twitter.pants.base.revision import Revision
 from twitter.pants.base.target import Target
@@ -187,13 +187,12 @@ class IvyUtils(object):
     dependencies.
     """
     def is_classpath(target):
-      return is_jar(target) or (
-        is_internal(target) and any(jar for jar in target.jar_dependencies if jar.rev)
-      )
+      return (target.is_jar or 
+              target.is_internal and any(jar for jar in target.jar_dependencies if jar.rev))
 
     classpath_deps = OrderedSet()
     for target in targets:
-      classpath_deps.update(filter(is_classpath, filter(is_concrete, target.resolve())))
+      classpath_deps.update(t for t in target.resolve() if t.is_concrete and is_classpath(t))
     return classpath_deps
 
   def _generate_ivy(self, targets, jars, excludes, ivyxml):
@@ -217,7 +216,7 @@ class IvyUtils(object):
 
   def _calculate_classpath(self, targets):
     def is_jardependant(target):
-      return is_jar(target) or is_jvm(target)
+      return target.is_jar or target.is_jvm
 
     jars = {}
     excludes = set()
@@ -232,7 +231,7 @@ class IvyUtils(object):
       )
 
     def collect_jars(target):
-      if is_jar(target):
+      if target.is_jar:
         add_jar(target)
       elif target.jar_dependencies:
         for jar in target.jar_dependencies:
@@ -240,7 +239,7 @@ class IvyUtils(object):
             add_jar(jar)
 
       # Lift jvm target-level excludes up to the global excludes set
-      if is_jvm(target) and target.excludes:
+      if target.is_jvm and target.excludes:
         excludes.update(target.excludes)
 
     for target in targets:

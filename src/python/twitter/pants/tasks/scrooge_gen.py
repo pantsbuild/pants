@@ -25,7 +25,7 @@ from collections import defaultdict, namedtuple
 from twitter.common.collections import OrderedSet
 from twitter.common.dirutil import safe_mkdir
 
-from twitter.pants import get_buildroot
+from twitter.pants.base.build_environment import get_buildroot
 from twitter.pants.binary_util import profile_classpath, JvmCommandLine
 from twitter.pants.targets import (
     JavaLibrary,

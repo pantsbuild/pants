@@ -18,7 +18,6 @@ import os
 
 from textwrap import dedent
 
-from twitter.pants import is_concrete
 from twitter.pants.base.target import Target
 from twitter.pants.tasks.listtargets import ListTargets
 
@@ -164,7 +163,7 @@ class ListTargetsTest(BaseListTargetsTest):
     def expand(spec):
       for target in self.targets(spec):
         for tgt in target.resolve():
-          if isinstance(tgt, Target) and is_concrete(tgt):
+          if isinstance(tgt, Target) and tgt.is_concrete:
             yield tgt
 
     targets = []

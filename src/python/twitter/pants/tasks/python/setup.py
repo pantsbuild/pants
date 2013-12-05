@@ -21,7 +21,7 @@ import os
 import subprocess
 import tarfile
 
-from twitter.pants import get_buildroot
+from twitter.pants.base.build_environment import get_buildroot
 from twitter.common.dirutil import safe_mkdir, safe_rmtree
 from twitter.common.lang import Compatibility
 from twitter.common.python.interpreter import PythonInterpreter

@@ -28,7 +28,7 @@ from twitter.common import log
 from twitter.common.contextutil import environment_as, temporary_file, temporary_dir
 from twitter.common.dirutil import chmod_plus_x, safe_delete, safe_mkdir, safe_open, touch
 from twitter.common.lang import Compatibility
-from twitter.pants.goal.workunit import WorkUnit
+from twitter.pants.base.workunit import WorkUnit
 
 if Compatibility.PY3:
   import urllib.request as urllib_request

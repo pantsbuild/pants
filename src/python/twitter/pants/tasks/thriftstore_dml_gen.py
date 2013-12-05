@@ -9,7 +9,6 @@ import subprocess
 from twitter.common.collections import OrderedSet
 from twitter.common.dirutil import safe_mkdir
 
-from twitter.pants import is_jvm
 from twitter.pants.targets import JavaLibrary, JavaThriftstoreDMLLibrary, JavaThriftLibrary
 from twitter.pants.tasks import TaskError
 from twitter.pants.tasks.code_gen import CodeGen
@@ -84,7 +83,7 @@ class ThriftstoreDMLGen(CodeGen):
     return True
 
   def genlangs(self):
-    return dict(java=is_jvm)
+    return dict(java=lambda t: t.is_jvm)
 
   def genlang(self, lang, targets):
     bases, sources = self._calculate_sources(targets)

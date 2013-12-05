@@ -18,7 +18,7 @@ __author__ = 'John Sirois'
 
 import os
 
-from twitter.pants import get_buildroot, is_jvm, is_test
+from twitter.pants.base.build_environment import get_buildroot
 from twitter.pants.tasks import Task
 
 
@@ -46,9 +46,9 @@ class JvmTask(Task):
             bases.add(target.target_base)
 
     if self.context.config.getbool('jvm', 'parallel_src_paths', default=False):
-      add_resource_paths(lambda t: is_jvm(t) and not is_test(t))
+      add_resource_paths(lambda t: t.is_jvm and not t.is_test)
 
     if self.context.config.getbool('jvm', 'parallel_test_paths', default=False):
-      add_resource_paths(lambda t: is_jvm(t) and is_test(t))
+      add_resource_paths(lambda t: t.is_jvm and not t.is_test)
 
     return classpath

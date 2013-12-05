@@ -2,7 +2,7 @@ import os
 
 from twitter.common.dirutil import safe_mkdir
 
-from twitter.pants import get_buildroot, is_java
+from twitter.pants.base.build_environment import get_buildroot
 from twitter.pants.fs.archive import TGZ
 from twitter.pants.targets.oink_query import OinkQuery
 from twitter.pants.tasks import Task
@@ -16,7 +16,7 @@ class OinkBundleCreate(Task):
   def __init__(self, context):
     Task.__init__(self, context)
     self.outdir = context.config.getdefault('outdir')
-    self.context.products.require('jars', predicate=is_java)
+    self.context.products.require('jars', predicate=lambda t: t.is_java)
     self.context.products.require('jar_dependencies', predicate=self.is_oink_query)
 
   def execute(self, targets):
@@ -27,7 +27,7 @@ class OinkBundleCreate(Task):
         all_jars.append(jar_products)
 
     for oink_query in filter(self.is_oink_query, targets):
-      oink_query.walk(_visitor, is_java)
+      oink_query.walk(_visitor, lambda t: t.is_java)
 
       all_jars.append(self.context.products.get('jar_dependencies').get(oink_query))
 

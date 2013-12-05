@@ -23,7 +23,7 @@ import uuid
 from twitter.common import contextutil
 from twitter.common.dirutil import safe_mkdir, safe_rmtree
 
-from twitter.pants import has_sources, is_scalac_plugin, get_buildroot
+from twitter.pants.base.build_environment import get_buildroot
 from twitter.pants.base import Target
 from twitter.pants.base.worker_pool import Work
 from twitter.pants.targets import resolve_target_sources
@@ -149,7 +149,8 @@ class ScalaCompile(JvmCompile):
     # TODO(benjy): Add a pre-execute phase for injecting deps into targets, so we
     # can inject a dep on the scala runtime library and still have it ivy-resolve.
 
-    scala_targets = filter(lambda t: has_sources(t, '.scala'), targets)
+    scala_targets = [t for t in targets if t.has_sources('.scala')]
+    
     if not scala_targets:
       return
 
@@ -425,6 +426,6 @@ class ScalaCompile(JvmCompile):
 
       # TODO(John Sirois): Map target.resources in the same way
       # Create and Map scala plugin info files to the owning targets.
-      if is_scalac_plugin(target) and target.classname:
+      if target.is_scalac_plugin and target.classname:
         basedir, plugin_info_file = ZincUtils.write_plugin_info(self._resources_dir, target)
         genmap.add(target, basedir, [plugin_info_file])

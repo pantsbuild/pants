@@ -21,7 +21,6 @@ import os
 from twitter.common.collections import OrderedSet
 from twitter.common.dirutil import safe_mkdir
 
-from twitter.pants import is_jvm
 from twitter.pants.targets import JavaLibrary, JavaAntlrLibrary
 from twitter.pants.tasks import TaskError
 from twitter.pants.tasks.code_gen import CodeGen
@@ -49,7 +48,7 @@ class AntlrGen(CodeGen, NailgunTask):
     return True
 
   def genlangs(self):
-    return dict(java=is_jvm)
+    return dict(java=lambda t: t.is_jvm)
 
   def genlang(self, lang, targets):
     if lang != 'java':

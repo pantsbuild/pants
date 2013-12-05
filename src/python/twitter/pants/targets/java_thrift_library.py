@@ -82,3 +82,7 @@ class JavaThriftLibrary(ExportableJvmLibrary):
 
   def _as_jar_dependency(self):
     return ExportableJvmLibrary._as_jar_dependency(self).with_sources()
+
+  @property
+  def is_thrift(self):
+    return True

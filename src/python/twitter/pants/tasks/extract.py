@@ -24,8 +24,7 @@ from collections import defaultdict
 from twitter.common.contextutil import open_zip
 from twitter.common.dirutil import safe_mkdir
 
-from twitter.pants import is_concrete, Config
-from twitter.pants.base import ParseContext
+from twitter.pants.base import Config, ParseContext
 from twitter.pants.fs.archive import ZIP
 from twitter.pants.targets import JarDependency, JavaThriftLibrary, SourceRoot
 from twitter.pants.tasks import Task, TaskError
@@ -48,7 +47,7 @@ class Extract(Task):
     namespace_map:  A mapping from IDL declared namespaces to custom namespaces - supported by some
                     compilers.
     """
-    deps = list(filter(is_concrete, idl_dep.resolve()))
+    deps = [t for t in idl_dep.resolve() if t.is_concrete]
     if not len(deps) == 1:
       raise TaskError('Can only arrange for compiled idl for a single dependency at a time, '
                       'given:\n\t%s' % '\n\t'.join(map(str, deps)))

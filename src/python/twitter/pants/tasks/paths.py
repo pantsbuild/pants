@@ -5,7 +5,7 @@ from collections import defaultdict
 import copy
 
 from twitter.common.lang import Compatibility
-from twitter.pants import get_buildroot
+from twitter.pants.base.build_environment import get_buildroot
 from twitter.pants.base import Address, Target
 from twitter.pants.tasks import Task, TaskError
 

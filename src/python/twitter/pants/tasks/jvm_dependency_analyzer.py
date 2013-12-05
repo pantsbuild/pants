@@ -1,10 +1,12 @@
 
 import os
-
 from collections import defaultdict
+
 from twitter.common.collections import OrderedSet
-from twitter.pants import get_buildroot, JvmTarget, TaskError, JarLibrary, InternalTarget, JarDependency
-from twitter.pants.tasks.task import Task
+
+from twitter.pants.targets import JvmTarget, JarLibrary, InternalTarget, JarDependency
+from twitter.pants.tasks import TaskError, Task
+from twitter.pants import get_buildroot
 
 
 class JvmDependencyAnalyzer(object):

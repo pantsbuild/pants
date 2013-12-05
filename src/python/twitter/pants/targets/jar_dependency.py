@@ -19,6 +19,7 @@ from twitter.pants.targets.exclude import Exclude
 from collections import defaultdict
 
 from .external_dependency import ExternalDependency
+from twitter.pants.base.target import AbstractTarget
 
 
 class Artifact(object):
@@ -61,7 +62,7 @@ class Artifact(object):
     return ''.join(str(getattr(self, key)) for key in self._HASH_KEYS)
 
 
-class JarDependency(ExternalDependency):
+class JarDependency(ExternalDependency, AbstractTarget):
   """Represents a binary jar dependency ala maven or ivy.  For the ivy dependency defined by:
     <dependency org="com.google.guava" name="guava" rev="r07"/>
 
@@ -135,6 +136,9 @@ class JarDependency(ExternalDependency):
       for k in exclusives:
         self.declared_exclusives[k] |= exclusives[k]
 
+  @property
+  def is_jar(self):
+    return True
 
   def exclude(self, org, name=None):
     """Adds a transitive dependency of this jar to the exclude list."""

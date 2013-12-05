@@ -13,7 +13,7 @@ from twitter.pants.base.worker_pool import WorkerPool
 from twitter.pants.goal.artifact_cache_stats import ArtifactCacheStats
 from twitter.pants.base.run_info import RunInfo
 from twitter.pants.goal.aggregated_timings import AggregatedTimings
-from twitter.pants.goal.workunit import WorkUnit
+from twitter.pants.base.workunit import WorkUnit
 from twitter.pants.reporting.report import Report
 
 

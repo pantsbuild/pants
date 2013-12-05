@@ -22,7 +22,8 @@ from collections import defaultdict
 
 from twitter.common.lang import AbstractClass
 
-from twitter.pants import get_buildroot, has_sources, TaskError, get_scm
+from twitter.pants import TaskError
+from twitter.pants.base.build_environment import get_buildroot, get_scm
 from twitter.pants.base.build_file import BuildFile
 from twitter.pants.base.target import Target
 from twitter.pants.scm import Scm
@@ -83,7 +84,7 @@ class WhatChanged(ConsoleTask):
       is_build_file = (build_file.full_path == os.path.join(get_buildroot(), file))
       for address in Target.get_all_addresses(build_file):
         target = Target.get(address)
-        if target and (is_build_file or (has_sources(target) and self._owns(target, file))):
+        if target and (is_build_file or (target.has_sources() and self._owns(target, file))):
           yield target
 
   def _candidate_owners(self, file):

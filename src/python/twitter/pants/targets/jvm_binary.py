@@ -18,7 +18,6 @@ import os
 
 from twitter.common.dirutil import Fileset
 from twitter.common.lang import Compatibility
-from twitter.pants import is_concrete
 from twitter.pants.base import TargetDefinitionException
 from twitter.pants.targets import util
 
@@ -126,7 +125,8 @@ class JvmApp(InternalTarget):
     if not binary:
       raise TargetDefinitionException(self, 'binary is required')
 
-    binaries = list(filter(is_concrete, util.resolve(binary).resolve()))
+    binaries = [t for t in util.resolve(binary).resolve() if t.is_concrete]
+
     if len(binaries) != 1 or not isinstance(binaries[0], JvmBinary):
       raise TargetDefinitionException(self, 'must supply exactly 1 JvmBinary, got %s' % binary)
     self.binary = binaries[0]
@@ -160,3 +160,7 @@ class JvmApp(InternalTarget):
                                             'got %s' % bundles)
 
     self.basename = basename or name
+
+  @property
+  def is_jvm_app(self):
+    return True

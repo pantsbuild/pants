@@ -25,7 +25,7 @@ from twitter.common.dirutil import safe_open
 from twitter.common.python.platforms import Platform
 
 from twitter.pants import binary_util, get_buildroot
-from twitter.pants.goal.workunit import WorkUnit
+from twitter.pants.base.workunit import WorkUnit
 from twitter.pants.java import NailgunClient, NailgunError
 from twitter.pants.tasks import Task
 

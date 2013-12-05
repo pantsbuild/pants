@@ -22,6 +22,7 @@ import re
 
 from twitter.common.lang import Compatibility
 
+from twitter.pants.base.build_environment import get_buildroot
 
 def fnmatch_translate_extended(pat):
   """
@@ -108,7 +109,7 @@ class Fileset(object):
        Walks the current working directory by default, can be overrided with
        the 'root' keyword argument.
     """
-    root = kwargs.pop('root')
+    root = kwargs.pop('root', get_buildroot())
     def relative_glob(globspec):
       for fn in glob.glob(os.path.join(root, globspec)):
         yield os.path.relpath(fn, root)
@@ -134,7 +135,7 @@ class Fileset(object):
        'root' keyword argument.  Unlike Fileset.globs, rcfiles are matched
        by '*' (e.g.  ".bashrc"), matching the semantics of 'ls -a'.
     """
-    root = kwargs.pop('root')
+    root = kwargs.pop('root', get_buildroot())
     def matcher(path):
       for globspec in globspecs:
         if fnmatch.fnmatch(path, globspec):
@@ -152,7 +153,7 @@ class Fileset(object):
        By default searches from the current working directory.  Can be overridden with the
        'root' keyword argument.
     """
-    root = kwargs.pop('root')
+    root = kwargs.pop('root', get_buildroot())
     patterns = [re.compile(fnmatch_translate_extended(spec)) for spec in globspecs]
     def matcher(path):
       for pattern in patterns:
