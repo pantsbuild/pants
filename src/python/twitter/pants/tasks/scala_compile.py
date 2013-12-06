@@ -97,8 +97,7 @@ class ScalaCompile(JvmCompile):
 
     self.context.products.require_data('exclusives_groups')
 
-    artifact_cache_spec = context.config.getlist('scala-compile', 'artifact_caches', default=[])
-    self.setup_artifact_cache(artifact_cache_spec)
+    self.setup_artifact_cache_from_config(config_section='scala-compile')
 
     # A temporary, but well-known, dir to munge analysis files in before caching. It must be
     # well-known so we know where to find the files when we retrieve them from the cache.
@@ -251,7 +250,7 @@ class ScalaCompile(JvmCompile):
             self.check_for_missing_dependencies(sources, actual_deps_filtered)
 
             # Kick off the background artifact cache write.
-            if self.get_artifact_cache() and self.context.options.write_to_artifact_cache:
+            if self.artifact_cache_writes_enabled():
               self._write_to_artifact_cache(analysis_file, vts, invalid_sources_by_target)
 
           if ZincUtils.is_nonempty_analysis(self._invalid_analysis_file):

@@ -113,9 +113,7 @@ class CodeGen(Task):
     # Link synthetic targets for all in-play gen targets.
     invalid_vts_by_target = dict([(vt.target, vt) for vt in invalidation_check.invalid_vts])
     vts_artifactfiles_pairs = []
-    write_to_artifact_cache = \
-      self.get_artifact_cache() and self.context.options.write_to_artifact_cache \
-        if invalid_vts_by_target else False
+    write_to_artifact_cache = self.artifact_cache_writes_enabled() if invalid_vts_by_target else False
     for lang, tgts in gentargets_bylang.items():
       if tgts:
         langtarget_by_gentarget = {}

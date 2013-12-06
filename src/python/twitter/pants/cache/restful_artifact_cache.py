@@ -11,13 +11,13 @@ class RESTfulArtifactCache(ArtifactCache):
 
   READ_SIZE = int(Amount(4, Data.MB).as_(Data.BYTES))
 
-  def __init__(self, log, artifact_root, url_base, compress=True, read_only=False):
+  def __init__(self, log, artifact_root, url_base, compress=True):
     """
     url_base: The prefix for urls on some RESTful service. We must be able to PUT and GET to any
               path under this base.
     compress: Whether to compress the artifacts before storing them.
     """
-    ArtifactCache.__init__(self, log, artifact_root, read_only)
+    ArtifactCache.__init__(self, log, artifact_root)
     parsed_url = urlparse.urlparse(url_base)
     if parsed_url.scheme == 'http':
       self._ssl = False

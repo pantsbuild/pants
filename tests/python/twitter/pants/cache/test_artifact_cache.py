@@ -65,7 +65,7 @@ class TestArtifactCache(unittest.TestCase):
     artifact_root = '/bogus/artifact/root'
 
     def check(expected_type, spec):
-      cache = create_artifact_cache(MockLogger(), artifact_root, spec, 'TestTask', False, False)
+      cache = create_artifact_cache(MockLogger(), artifact_root, spec, 'TestTask', 'testing')
       self.assertTrue(isinstance(cache, expected_type))
       self.assertEquals(cache.artifact_root, artifact_root)
 

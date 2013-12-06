@@ -95,8 +95,7 @@ class IvyResolve(NailgunTask):
     context.products.require_data('exclusives_groups')
 
     # Typically this should be a local cache only, since classpaths aren't portable.
-    artifact_cache_spec = context.config.getlist('ivy-resolve', 'artifact_caches', default=[])
-    self.setup_artifact_cache(artifact_cache_spec)
+    self.setup_artifact_cache_from_config(config_section='ivy-resolve')
 
   def invalidate_for(self):
     return self.context.options.ivy_resolve_overrides

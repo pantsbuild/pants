@@ -194,6 +194,8 @@ class Goal(Command):
     Option("-n", "--dry-run", action="store_true", dest="dry_run", default=False,
       help="Print the commands that would be run, without actually running them."),
 
+    # NONE OF THE ARTIFACT CACHE FLAGS DO ANYTHING ANY MORE.
+    # TODO: Remove them once all uses of them are killed.
     Option("--read-from-artifact-cache", "--no-read-from-artifact-cache", action="callback",
       callback=_set_bool, dest="read_from_artifact_cache", default=True,
       help="Whether to read artifacts from cache instead of building them, when possible."),

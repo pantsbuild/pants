@@ -18,14 +18,13 @@ class ArtifactCache(object):
     """Indicates a problem writing to or reading from the cache."""
     pass
 
-  def __init__(self, log, artifact_root, read_only=False):
+  def __init__(self, log, artifact_root):
     """Create an ArtifactCache.
 
     All artifacts must be under artifact_root.
     """
     self.log = log
     self.artifact_root = artifact_root
-    self.read_only = read_only  # If true, silently skip writes.
 
   def insert(self, cache_key, paths):
     """Cache the output of a build.
@@ -38,14 +37,13 @@ class ArtifactCache(object):
     cache_key: A CacheKey object.
     paths: List of paths to generated dirs/files. These must be under the artifact_root.
     """
-    if not self.read_only:
-      missing_files = filter(lambda f: not os.path.exists(f), paths)
-      try:
-        if missing_files:
-          raise ArtifactCache.CacheError('Tried to cache nonexistent files: %s' % missing_files)
-        self.try_insert(cache_key, paths)
-      except Exception as e:
-        self.log.error('Error while writing to artifact cache: %s. ' % e)
+    missing_files = filter(lambda f: not os.path.exists(f), paths)
+    try:
+      if missing_files:
+        raise ArtifactCache.CacheError('Tried to cache nonexistent files: %s' % missing_files)
+      self.try_insert(cache_key, paths)
+    except Exception as e:
+      self.log.error('Error while writing to artifact cache: %s. ' % e)
 
   def try_insert(self, cache_key, paths):
     """Attempt to cache the output of a build, without error-handling.
