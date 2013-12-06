@@ -194,14 +194,15 @@ class Goal(Command):
     Option("-n", "--dry-run", action="store_true", dest="dry_run", default=False,
       help="Print the commands that would be run, without actually running them."),
 
-    # NONE OF THE ARTIFACT CACHE FLAGS DO ANYTHING ANY MORE.
-    # TODO: Remove them once all uses of them are killed.
     Option("--read-from-artifact-cache", "--no-read-from-artifact-cache", action="callback",
       callback=_set_bool, dest="read_from_artifact_cache", default=True,
-      help="Whether to read artifacts from cache instead of building them, when possible."),
+      help="Whether to read artifacts from cache instead of building them, if configured to do so."),
     Option("--write-to-artifact-cache", "--no-write-to-artifact-cache", action="callback",
       callback=_set_bool, dest="write_to_artifact_cache", default=True,
-      help="Whether to write artifacts to cache ."),
+      help="Whether to write artifacts to cache if configured to do so."),
+
+    # NONE OF THE ARTIFACT CACHE FLAGS BELOW DO ANYTHING ANY MORE.
+    # TODO: Remove them once all uses of them are killed.
     Option("--verify-artifact-cache", "--no-verify-artifact-cache", action="callback",
       callback=_set_bool, dest="verify_artifact_cache", default=False,
       help="Whether to verify that cached artifacts are identical after rebuilding them."),

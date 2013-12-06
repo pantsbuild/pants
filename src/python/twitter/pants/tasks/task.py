@@ -101,10 +101,10 @@ class Task(object):
       return self._artifact_cache
 
   def artifact_cache_reads_enabled(self):
-    return bool(self._read_artifact_cache_spec)
+    return bool(self._read_artifact_cache_spec) and self.context.options.read_from_artifact_cache
 
   def artifact_cache_writes_enabled(self):
-    return bool(self._write_artifact_cache_spec)
+    return bool(self._write_artifact_cache_spec) and self.context.options.write_to_artifact_cache
 
   def product_type(self):
     """Set the product type for this task.
