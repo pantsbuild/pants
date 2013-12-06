@@ -176,21 +176,14 @@ class ZincUtils(object):
     # In practice the JVM changes rarely, and it should be fine to require a full rebuild
     # in those rare cases.
     with temporary_dir() as tmp_analysis_dir:
-      stripped_src = os.path.join(tmp_analysis_dir, 'analysis.nojava')
       tmp_analysis_file = os.path.join(tmp_analysis_dir, 'analysis.relativized')
 
-      # Strip all lines containing self._java_home.
-      with open(src, 'r') as infile:
-        with open (stripped_src, 'w') as outfile:
-          for line in infile:
-            if not self._java_home in line:
-              outfile.write(line)
-
       rebasings = [
+        (self._java_home, None),
         (self._ivy_home, ZincUtils.IVY_HOME_PLACEHOLDER),
         (self._pants_home, ZincUtils.PANTS_HOME_PLACEHOLDER),
       ]
-      Analysis.rebase(stripped_src, tmp_analysis_file, rebasings)
+      Analysis.rebase(src, tmp_analysis_file, rebasings)
       shutil.move(tmp_analysis_file, dst)
 
   def localize_analysis_file(self, src, dst):

@@ -345,6 +345,7 @@ class ScalaCompile(JvmCompile):
         with contextutil.temporary_dir() as tmpdir:
           tmp_analysis = os.path.join(tmpdir, 'analysis')
           Analysis.merge_from_paths(analyses_to_merge, tmp_analysis)
+          shutil.move(tmp_analysis, self._analysis_file)
 
     self._ensure_analysis_tmpdir()
     return Task.do_check_artifact_cache(self, vts, post_process_cached_vts=post_process_cached_vts)

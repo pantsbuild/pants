@@ -30,8 +30,8 @@ class AnalysisElement(object):
     # Subclasses can alias the elements of self.args in their own __init__, for convenience.
     self.args = args
 
-  def write(self, outfile, inline_vals=True):
-    Util.write_multiple_sections(outfile, self.headers, self.args, inline_vals)
+  def write(self, outfile, inline_vals=True, rebasings=None):
+    Util.write_multiple_sections(outfile, self.headers, self.args, inline_vals, rebasings)
 
 
 class AnalysisJSONEncoder(json.JSONEncoder):
@@ -144,20 +144,11 @@ class Analysis(object):
   def rebase(input_analysis_path, output_analysis_path, rebasings):
     """Rebase file paths in an analysis file.
 
-    rebasings: a list of path prefix pairs [from_prefix, to_prefix] to rewrite.
-
-    Note that this is implemented using string.replace, for efficiency, so this will
-    actually just replace everywhere, not just path prefixes. However in practice this
-    makes no difference, and the performance gains are considerable.
+    rebasings: A list of path prefix pairs [from_prefix, to_prefix] to rewrite.
+               to_prefix may be None, in which case matching paths are removed entirely.
     """
-    # TODO: Can make this more efficient if needed, e.g., we know which sections contain
-    # which path prefixes. But for now this is fine.
-    with open(input_analysis_path, 'r') as infile:
-      txt = infile.read()
-    for rebase_from, rebase_to in rebasings:
-      txt = txt.replace(rebase_from, rebase_to)
-    with open(output_analysis_path, 'w') as outfile:
-      outfile.write(txt)
+    analysis = Analysis.parse_from_path(input_analysis_path)
+    analysis.write_to_path(output_analysis_path, rebasings=rebasings)
 
   @staticmethod
   def split_to_paths(analysis_path, split_path_pairs, catchall_path=None):
@@ -255,22 +246,27 @@ class Analysis(object):
     (self.relations, self.stamps, self.apis, self.source_infos, self.compilations, self.compile_setup) = \
       (relations, stamps, apis, source_infos, compilations, compile_setup)
 
-  def write_to_path(self, outfile_path):
+  def write_to_path(self, outfile_path, rebasings=None):
     with open(outfile_path, 'w') as outfile:
-      self.write(outfile)
+      self.write(outfile, rebasings)
 
   def write_json_to_path(self, outfile_path):
     with open(outfile_path, 'w') as outfile:
       self.write_json(outfile)
 
-  def write(self, outfile):
+  def write(self, outfile, rebasings=None):
+    """Write this Analysis to outfile.
+
+    rebasings: A list of path prefix pairs [from_prefix, to_prefix] to rewrite.
+               to_prefix may be None, in which case matching paths are removed entirely.
+    """
     outfile.write(Analysis.FORMAT_VERSION_LINE)
-    self.relations.write(outfile)
-    self.stamps.write(outfile)
-    self.apis.write(outfile, inline_vals=False)
-    self.source_infos.write(outfile, inline_vals=False)
-    self.compilations.write(outfile, inline_vals=False)
-    self.compile_setup.write(outfile, inline_vals=False)
+    self.relations.write(outfile, rebasings=rebasings)
+    self.stamps.write(outfile, rebasings=rebasings)
+    self.apis.write(outfile, inline_vals=False, rebasings=rebasings)
+    self.source_infos.write(outfile, inline_vals=False, rebasings=rebasings)
+    self.compilations.write(outfile, inline_vals=False, rebasings=rebasings)
+    self.compile_setup.write(outfile, inline_vals=False, rebasings=rebasings)
 
   def write_json(self, outfile):
     obj = dict(zip(('relations', 'stamps', 'apis', 'source_infos', 'compilations', 'compile_setup'),
@@ -436,10 +432,10 @@ class Util(object):
     return [Util.parse_section(lines_iter, header) for header in expected_headers]
 
   @staticmethod
-  def write_multiple_sections(outfile, headers, reps, inline_vals=True):
+  def write_multiple_sections(outfile, headers, reps, inline_vals=True, rebasings=None):
     """Write multiple sections."""
     for header, rep in zip(headers, reps):
-      Util.write_section(outfile, header, rep, inline_vals)
+      Util.write_section(outfile, header, rep, inline_vals, rebasings)
 
   @staticmethod
   def parse_section(lines_iter, expected_header=None):
@@ -458,19 +454,34 @@ class Util(object):
     return relation
 
   @staticmethod
-  def write_section(outfile, header, rep, inline_vals=True):
+  def write_section(outfile, header, rep, inline_vals=True, rebasings=None):
     """Write a single section.
 
-    Itens are sorted, for ease of testing."""
+    Itens are sorted, for ease of testing.
+    """
+    def rebase(txt):
+      for rebase_from, rebase_to in rebasings:
+        if rebase_to is None:
+          if rebase_from in txt:
+            return None
+        else:
+          txt = txt.replace(rebase_from, rebase_to)
+      return txt
+
+    rebasings = rebasings or []
     outfile.write(header + ':\n')
     items = []
     if isinstance(rep, dict):
       for k, vals in rep.iteritems():
         for v in vals:
-          items.append('%s -> %s%s' % (k, '' if inline_vals else '\n', v))
+          item = rebase('%s -> %s%s' % (k, '' if inline_vals else '\n', v))
+          if item:
+            items.append(item)
     else:
       for x in rep:
-        items.append(x)
+        item = rebase(x)
+        if item:
+          items.append(item)
 
     items.sort()
     outfile.write('%d items\n' % len(items))
