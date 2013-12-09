@@ -53,7 +53,7 @@ class SpecsRun(JvmTask):
 
     self._specs_bootstrap_key = 'specs'
     bootstrap_tools = context.config.getlist('specs-run', 'bootstrap-tools',
-                                             default=[':scala-specs-2.9.2'])
+                                             default=[':scala-specs-2.9.3'])
     self._bootstrap_utils.register_jvm_build_tools(self._specs_bootstrap_key, bootstrap_tools)
     
     self.confs = context.config.getlist('specs-run', 'confs')

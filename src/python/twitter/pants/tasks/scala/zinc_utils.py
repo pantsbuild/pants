@@ -53,7 +53,7 @@ class ZincUtils(object):
     # The target scala version.
     self._compile_bootstrap_key = 'scalac'
     compile_bootstrap_tools = context.config.getlist('scala-compile', 'compile-bootstrap-tools',
-                                                     default=[':scala-compile-2.9.2'])
+                                                     default=[':scala-compile-2.9.3'])
     self._bootstrap_utils.register_jvm_build_tools(self._compile_bootstrap_key, compile_bootstrap_tools)
 
     # The zinc version (and the scala version it needs, which may differ from the target version).
