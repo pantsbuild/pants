@@ -122,8 +122,8 @@ class Analysis(object):
     Analysis._verify_version(infile)
     # Note: relies on the fact that these headers appear in this order in the file.
     bin_deps = Analysis._find_repeated_at_header(infile, 'binary dependencies')
-    src_deps = Analysis._find_repeated_at_header(infile, 'source dependencies')
-    ext_deps = Analysis._find_repeated_at_header(infile, 'external dependencies')
+    src_deps = Analysis._find_repeated_at_header(infile, 'direct source dependencies')
+    ext_deps = Analysis._find_repeated_at_header(infile, 'direct external dependencies')
     return Util.merge_dicts([bin_deps, src_deps, ext_deps])
 
   @staticmethod
@@ -133,7 +133,7 @@ class Analysis(object):
       pass
     return Util.parse_section(lines_iter, expected_header=None)
 
-  FORMAT_VERSION_LINE = 'format version: 1\n'
+  FORMAT_VERSION_LINE = 'format version: 3\n'
   @staticmethod
   def _verify_version(lines_iter):
     version_line = lines_iter.next()
@@ -366,8 +366,14 @@ class Analysis(object):
 
 
 class Relations(AnalysisElement):
-  headers = ('products', 'binary dependencies', 'source dependencies', 'external dependencies',
-             'public inherited source dependencies', 'public inherited external dependencies', 'class names')
+  headers = ('products', 'binary dependencies',
+             # TODO: The following 4 headers will go away after SBT completes the
+             # transition to the new headers (the 4 after that).
+             'direct source dependencies', 'direct external dependencies',
+             'public inherited source dependencies', 'public inherited external dependencies',
+             'member reference internal dependencies', 'member reference external dependencies',
+             'inheritance internal dependencies', 'inheritance external dependencies',
+             'class names', 'used names')
 
   def __init__(self, args):
     super(Relations, self).__init__(args)
@@ -408,7 +414,7 @@ class Compilations(AnalysisElement):
 
 
 class CompileSetup(AnalysisElement):
-  headers = ('compile setup', )
+  headers = ('output directories','compile options','javac options','compiler version', 'compile order')
 
   def __init__(self, args):
     super(CompileSetup, self).__init__(args)
@@ -471,18 +477,11 @@ class Util(object):
     rebasings = rebasings or []
     outfile.write(header + ':\n')
     items = []
-    if isinstance(rep, dict):
-      for k, vals in rep.iteritems():
-        for v in vals:
-          item = rebase('%s -> %s%s' % (k, '' if inline_vals else '\n', v))
-          if item:
-            items.append(item)
-    else:
-      for x in rep:
-        item = rebase(x)
+    for k, vals in rep.iteritems():
+      for v in vals:
+        item = rebase('%s -> %s%s' % (k, '' if inline_vals else '\n', v))
         if item:
           items.append(item)
-
     items.sort()
     outfile.write('%d items\n' % len(items))
     for item in items:
