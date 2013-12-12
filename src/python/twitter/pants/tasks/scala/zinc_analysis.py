@@ -186,6 +186,7 @@ class Analysis(object):
     src_prod = Util.merge_dicts([a.relations.src_prod for a in analyses])
     binary_dep = Util.merge_dicts([a.relations.binary_dep for a in analyses])
     classes = Util.merge_dicts([a.relations.classes for a in analyses])
+    used = Util.merge_dicts([a.relations.used for a in analyses])
 
     class_to_source = dict((v, k) for k, vs in classes.iteritems() for v in vs)
 
@@ -202,12 +203,28 @@ class Analysis(object):
             external[k].append(v)  # Remains external.
       return internal, external
 
-    internal, external = merge_dependencies([a.relations.internal_src_dep for a in analyses],
-                                            [a.relations.external_dep for a in analyses])
+    internal, external = merge_dependencies(
+      [a.relations.internal_src_dep for a in analyses],
+      [a.relations.external_dep for a in analyses])
 
-    internal_pi, external_pi = merge_dependencies([a.relations.internal_src_dep_pi for a in analyses],
-                                                  [a.relations.external_dep_pi for a in analyses])
-    relations = Relations((src_prod, binary_dep, internal, external, internal_pi, external_pi, classes))
+    internal_pi, external_pi = merge_dependencies(
+      [a.relations.internal_src_dep_pi for a in analyses],
+      [a.relations.external_dep_pi for a in analyses])
+
+    member_ref_internal, member_ref_external = merge_dependencies(
+      [a.relations.member_ref_internal_dep for a in analyses],
+      [a.relations.member_ref_external_dep for a in analyses])
+
+    inheritance_internal, inheritance_external = merge_dependencies(
+      [a.relations.inheritance_internal_dep for a in analyses],
+      [a.relations.inheritance_external_dep for a in analyses])
+
+    relations = Relations((src_prod, binary_dep,
+                           internal, external,
+                           internal_pi, external_pi,
+                           member_ref_internal, member_ref_external,
+                           inheritance_internal, inheritance_external,
+                           classes, used))
 
     # Merge stamps.
     products = Util.merge_dicts([a.stamps.products for a in analyses])
@@ -265,8 +282,8 @@ class Analysis(object):
     self.stamps.write(outfile, rebasings=rebasings)
     self.apis.write(outfile, inline_vals=False, rebasings=rebasings)
     self.source_infos.write(outfile, inline_vals=False, rebasings=rebasings)
-    self.compilations.write(outfile, inline_vals=False, rebasings=rebasings)
-    self.compile_setup.write(outfile, inline_vals=False, rebasings=rebasings)
+    self.compilations.write(outfile, inline_vals=True, rebasings=rebasings)
+    self.compile_setup.write(outfile, inline_vals=True, rebasings=rebasings)
 
   def write_json(self, outfile):
     obj = dict(zip(('relations', 'stamps', 'apis', 'source_infos', 'compilations', 'compile_setup'),
@@ -318,9 +335,19 @@ class Analysis(object):
     internal_splits, external_splits = split_dependencies(self.relations.internal_src_dep, self.relations.external_dep)
     internal_pi_splits, external_pi_splits = split_dependencies(self.relations.internal_src_dep_pi, self.relations.external_dep_pi)
 
+    member_ref_internal_splits, member_ref_external_splits = \
+      split_dependencies(self.relations.member_ref_internal_dep, self.relations.member_ref_external_dep)
+    inheritance_internal_splits, inheritance_external_splits = \
+      split_dependencies(self.relations.inheritance_internal_dep, self.relations.inheritance_external_dep)
+    used_splits = Util.split_dict(self.relations.used, splits)
+
     relations_splits = []
-    for args in zip(src_prod_splits, binary_dep_splits, internal_splits, external_splits,
-                    internal_pi_splits, external_pi_splits, classes_splits):
+    for args in zip(src_prod_splits, binary_dep_splits,
+                    internal_splits, external_splits,
+                    internal_pi_splits, external_pi_splits,
+                    member_ref_internal_splits, member_ref_external_splits,
+                    inheritance_internal_splits, inheritance_external_splits,
+                    classes_splits, used_splits):
       relations_splits.append(Relations(args))
 
     # Split stamps.
@@ -377,8 +404,12 @@ class Relations(AnalysisElement):
 
   def __init__(self, args):
     super(Relations, self).__init__(args)
-    (self.src_prod, self.binary_dep, self.internal_src_dep, self.external_dep,
-     self.internal_src_dep_pi, self.external_dep_pi, self.classes) = self.args
+    (self.src_prod, self.binary_dep,
+     self.internal_src_dep, self.external_dep,
+     self.internal_src_dep_pi, self.external_dep_pi,
+     self.member_ref_internal_dep, self.member_ref_external_dep,
+     self.inheritance_internal_dep, self.inheritance_external_dep,
+     self.classes, self.used) = self.args
 
 
 class Stamps(AnalysisElement):
@@ -418,7 +449,8 @@ class CompileSetup(AnalysisElement):
 
   def __init__(self, args):
     super(CompileSetup, self).__init__(args)
-    (self.compile_setup, ) = self.args
+    (self.output_dirs, self.compile_options, self.javac_options,
+     self.compiler_version, self.compile_order) = self.args
 
 class Util(object):
   num_items_re = re.compile(r'(\d+) items\n')
