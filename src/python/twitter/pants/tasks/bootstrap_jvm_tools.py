@@ -14,7 +14,6 @@
 # limitations under the License.
 # ===================================================================================================
 
-from functools import partial
 import threading
 from twitter.pants.goal.workunit import WorkUnit
 
@@ -54,9 +53,9 @@ class BootstrapJvmTools(Task):
         if not targets:
           raise KeyError
       except KeyError:
-        self.context.log.error("Failed to resolve target for bootstrap tool: %s."
-                               "  You probably need to add this dep to your"
-                               " tools build file(s), usually located in the root of the build." % 
+        self.context.log.error("Failed to resolve target for bootstrap tool: %s. "
+                               "You probably need to add this dep to your tools "
+                               "BUILD file(s), usually located in the root of the build." %
                                tool)
         raise
       for target in targets:
@@ -69,15 +68,9 @@ class BootstrapJvmTools(Task):
       with cache_lock:
         if 'classpath' not in cache:
           targets = list(self.resolve_tool_targets(tools))
-          ivy_args = [
-            '-sync',
-            '-symlink',
-            '-types', 'jar', 'bundle',
-          ]
           workunit_name = 'bootstrap-%s' % str(key)
           cache['classpath'] = self.ivy_resolve(targets,
                                                 java_runner=java_runner,
-                                                ivy_args=ivy_args,
                                                 silent=True,
                                                 workunit_name=workunit_name,
                                                 workunit_labels=[WorkUnit.BOOTSTRAP])

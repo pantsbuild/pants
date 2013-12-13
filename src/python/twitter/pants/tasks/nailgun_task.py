@@ -71,10 +71,9 @@ class NailgunTask(Task):
                                      help="[%default] Use nailgun daemons to execute java tasks.")
       NailgunTask._DAEMON_OPTION_PRESENT = True
 
-  def __init__(self, context, classpath=None, workdir=None):
+  def __init__(self, context, workdir=None):
     Task.__init__(self, context)
 
-    self._classpath = classpath
     self._nailgun_bootstrap_key = 'nailgun'
     nailgun_bootstrap_tools = context.config.getlist('nailgun', 'bootstrap-tools',
                                                      default=[':nailgun-server'])
@@ -100,7 +99,7 @@ class NailgunTask(Task):
   def _runjava_common(self, runjava, main, classpath=None, opts=None, args=None, jvmargs=None,
                       workunit_name=None, workunit_labels=None):
     workunit_labels = workunit_labels[:] if workunit_labels else []
-    cp = (self._classpath or []) + (classpath or [])
+    cp = classpath or []
     cmd_str = binary_util.runjava_cmd_str(jvmargs=jvmargs,
                                           classpath=cp,
                                           main=main,

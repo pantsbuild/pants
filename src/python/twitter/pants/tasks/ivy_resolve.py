@@ -37,13 +37,13 @@ class IvyResolve(NailgunTask):
 
     flag = mkflag('override')
     option_group.add_option(flag, action='append', dest='ivy_resolve_overrides',
-                            help='''Specifies a jar dependency override in the form:
+                            help="""Specifies a jar dependency override in the form:
                             [org]#[name]=(revision|url)
 
                             For example, to specify 2 overrides:
                             %(flag)s=com.foo#bar=0.1.2 \\
                             %(flag)s=com.baz#spam=file:///tmp/spam.jar
-                            ''' % dict(flag=flag))
+                            """ % dict(flag=flag))
 
     report = mkflag("report")
     option_group.add_option(report, mkflag("report", negate=True), dest = "ivy_resolve_report",
@@ -63,18 +63,14 @@ class IvyResolve(NailgunTask):
                             help="Use this directory as the ivy cache, instead of the "
                                  "default specified in pants.ini.")
 
-    option_group.add_option(mkflag("args"), dest="ivy_args", action="append", default=[],
-                            help = "Pass these extra args to ivy.")
-
     option_group.add_option(mkflag("mutable-pattern"), dest="ivy_mutable_pattern",
                             help="If specified, all artifact revisions matching this pattern will "
                                  "be treated as mutable unless a matching artifact explicitly "
                                  "marks mutable as False.")
 
   def __init__(self, context, confs=None):
-    classpath = context.config.getlist('ivy', 'classpath')
     nailgun_dir = context.config.get('ivy-resolve', 'nailgun_dir')
-    NailgunTask.__init__(self, context, classpath=classpath, workdir=nailgun_dir)
+    NailgunTask.__init__(self, context, workdir=nailgun_dir)
 
     self._cachedir = context.options.ivy_resolve_cache or context.config.get('ivy', 'cache_dir')
     self._confs = confs or context.config.getlist('ivy-resolve', 'confs')
@@ -104,7 +100,6 @@ class IvyResolve(NailgunTask):
     """Resolves the specified confs for the configured targets and returns an iterator over
     tuples of (conf, jar path).
     """
-
     groups = self.context.products.get_data('exclusives_groups')
 
 
