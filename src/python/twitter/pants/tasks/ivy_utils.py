@@ -74,8 +74,6 @@ class IvyUtils(object):
     self._work_dir = config.get('ivy-resolve', 'workdir')
     self._template_path = os.path.join('templates', 'ivy_resolve', 'ivy.mustache')
     self._confs = config.getlist('ivy-resolve', 'confs')
-    self._classpath_file = os.path.join(self._work_dir, 'classpath')
-    self._classpath_dir = os.path.join(self._work_dir, 'mapped')
 
     if self._mutable_pattern:
       try:
