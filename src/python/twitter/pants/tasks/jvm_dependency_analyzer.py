@@ -4,6 +4,7 @@ import os
 from collections import defaultdict
 from twitter.common.collections import OrderedSet
 from twitter.pants import get_buildroot, JvmTarget, TaskError, JarLibrary, InternalTarget, JarDependency
+from twitter.pants.tasks.task import Task
 
 
 class JvmDependencyAnalyzer(object):
@@ -66,23 +67,32 @@ class JvmDependencyAnalyzer(object):
             targets_by_file[os.path.join(basedir, cls)].add(tgt)
 
     # Compute jar -> target.
+    with Task.symlink_map_lock:
+      all_symlinks_map = self._context.products.get_data('symlink_map').copy()
+      # We make a copy, so it's safe to use outside the lock.
+
     ivy_products = self._context.products.get_data('ivy_jar_products')
     if ivy_products:
-      for ivyinfo in ivy_products.values():
-        for ref in ivyinfo.modules_by_ref:
-          target_key = (ref.org, ref.name)
-          if target_key in jarlibs_by_id:
-            jarlib_targets = jarlibs_by_id[target_key]
-            for jar in ivyinfo.modules_by_ref[ref].artifacts:
-              for jarlib_target in jarlib_targets:
-                targets_by_file[jar.path].add(jarlib_target)
-            # Map all indirect, transitive deps of the jar to this target as well, since we allow deps on them.
-            for dep in ivyinfo.deps_by_caller.get(ref, []):
-              depmodule = ivyinfo.modules_by_ref.get(dep, None)
-              if depmodule:
-                for depjar in depmodule.artifacts:
-                  for jarlib_target in jarlib_targets:
-                    targets_by_file[depjar.path].add(jarlib_target)
+      for ivyinfos in ivy_products.values():
+        for ivyinfo in ivyinfos:
+          for ref in ivyinfo.modules_by_ref:
+            target_key = (ref.org, ref.name)
+            if target_key in jarlibs_by_id:
+              jarlib_targets = jarlibs_by_id[target_key]
+              for jar in ivyinfo.modules_by_ref[ref].artifacts:
+                for jarlib_target in jarlib_targets:
+                  symlinks = all_symlinks_map.get(jar.path, [])
+                  for symlink in symlinks:
+                    targets_by_file[symlink].add(jarlib_target)
+              # Map all indirect, transitive deps of the jar to this target as well, since we allow deps on them.
+              for dep in ivyinfo.deps_by_caller.get(ref, []):
+                depmodule = ivyinfo.modules_by_ref.get(dep, None)
+                if depmodule:
+                  for depjar in depmodule.artifacts:
+                    symlinks = all_symlinks_map.get(depjar.path, [])
+                    for symlink in symlinks:
+                      for jarlib_target in jarlib_targets:
+                        targets_by_file[symlink].add(jarlib_target)
       # Only memoize once ivy_jar_products are available.
       self._targets_by_file = targets_by_file
     return targets_by_file

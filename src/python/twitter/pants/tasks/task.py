@@ -13,10 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==================================================================================================
+from collections import defaultdict
 
 import itertools
 import os
-import shutil
 import sys
 import threading
 
@@ -41,6 +41,9 @@ from twitter.pants.tasks.task_error import TaskError
 
 
 class Task(object):
+  # Protect writes to the global map of jar path -> symlinks to that jar.
+  symlink_map_lock = threading.Lock()
+
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
     """Set up the cmd-line parser.
@@ -372,8 +375,13 @@ class Task(object):
           raise TaskError('Ivy failed to create classpath file at %s' % target_classpath_file_tmp)
 
         # Make our actual classpath be symlinks, so that the paths are uniform across systems.
-        IvyUtils.symlink_cachepath(target_classpath_file_tmp, symlink_dir, target_classpath_file)
-        os.unlink(target_classpath_file_tmp)
+        symlink_map = IvyUtils.symlink_cachepath(target_classpath_file_tmp, symlink_dir, target_classpath_file)
+        with Task.symlink_map_lock:
+          all_symlinks_map = self.context.products.get_data('symlink_map') or defaultdict(list)
+          for path, symlink in symlink_map.items():
+            all_symlinks_map[path].append(symlink)
+          self.context.products.set_data('symlink_map', all_symlinks_map)
+          os.unlink(target_classpath_file_tmp)
 
         if self.artifact_cache_writes_enabled():
           self.update_artifact_cache([(global_vts, [target_classpath_file])])

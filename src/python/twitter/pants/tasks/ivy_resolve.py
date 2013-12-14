@@ -15,6 +15,7 @@
 # ==================================================================================================
 
 from __future__ import print_function
+from collections import defaultdict
 
 import os
 import shutil
@@ -102,7 +103,6 @@ class IvyResolve(NailgunTask):
     """
     groups = self.context.products.get_data('exclusives_groups')
 
-
     # Below, need to take the code that actually execs ivy, and invoke it once for each
     # group. Then after running ivy, we need to take the resulting classpath, and load it into
     # the build products.
@@ -131,15 +131,14 @@ class IvyResolve(NailgunTask):
       classpath = self.ivy_resolve(group_targets,
                                    java_runner=self.runjava_indivisible,
                                    symlink_ivyxml=True)
+      if self.context.products.isrequired('ivy_jar_products'):
+        self._populate_ivy_jar_products(group_targets)
       for conf in self._confs:
         for path in classpath:
           groups.update_compatible_classpaths(group_key, [(conf, path)])
 
       if self._report:
         self._generate_ivy_report(group_targets)
-
-    if self.context.products.isrequired('ivy_jar_products'):
-      self._populate_ivy_jar_products(targets)
 
     create_jardeps_for = self.context.products.isrequired(self._ivy_utils._mapfor_typename())
     if create_jardeps_for:
@@ -155,11 +154,11 @@ class IvyResolve(NailgunTask):
 
   def _populate_ivy_jar_products(self, targets):
     """Populate the build products with an IvyInfo object for each generated ivy report."""
-    ivy_products = {}
+    ivy_products = self.context.products.get_data('ivy_jar_products') or defaultdict(list)
     for conf in self._confs:
       ivyinfo = self._ivy_utils.parse_xml_report(targets, conf)
       if ivyinfo:
-        ivy_products[conf] = ivyinfo
+        ivy_products[conf].append(ivyinfo)  # Value is a list, to accommodate multiple exclusives groups.
     self.context.products.set_data('ivy_jar_products', ivy_products)
 
   def _generate_ivy_report(self, targets):

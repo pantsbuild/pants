@@ -123,6 +123,11 @@ class IvyUtils(object):
 
   @staticmethod
   def symlink_cachepath(inpath, symlink_dir, outpath):
+    """Symlinks all paths listed in inpath into symlink_dir.
+
+    Writes the resulting paths to outpath.
+    Returns a map of path -> symlink to that path.
+    """
     safe_mkdir(symlink_dir)
     with safe_open(inpath, 'r') as infile:
       paths = filter(None, infile.read().strip().split(os.pathsep))
@@ -134,6 +139,8 @@ class IvyUtils(object):
       symlinks.append(symlink)
     with safe_open(outpath, 'w') as outfile:
       outfile.write(':'.join(symlinks))
+    symlink_map = dict(zip(paths, symlinks))
+    return symlink_map
 
   def identify(self, targets):
     targets = list(targets)
