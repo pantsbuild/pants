@@ -370,11 +370,13 @@ class Task(object):
 
         if not os.path.exists(target_classpath_file_tmp):
           raise TaskError('Ivy failed to create classpath file at %s' % target_classpath_file_tmp)
-        if self.artifact_cache_writes_enabled():
-          self.update_artifact_cache([(global_vts, [target_classpath_file])])
+
         # Make our actual classpath be symlinks, so that the paths are uniform across systems.
         IvyUtils.symlink_cachepath(target_classpath_file_tmp, symlink_dir, target_classpath_file)
         os.unlink(target_classpath_file_tmp)
+
+        if self.artifact_cache_writes_enabled():
+          self.update_artifact_cache([(global_vts, [target_classpath_file])])
 
     with IvyUtils.cachepath(target_classpath_file) as classpath:
       stripped_classpath = [path.strip() for path in classpath]

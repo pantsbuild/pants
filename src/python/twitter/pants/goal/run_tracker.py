@@ -82,7 +82,7 @@ class RunTracker(object):
     # We report to this Report.
     self.report = None
 
-    # self._threadlocal.current_workunit containts the current workunit for the calling thread.
+    # self._threadlocal.current_workunit contains the current workunit for the calling thread.
     # Note that multiple threads may share a name (e.g., all the threads in a pool).
     self._threadlocal = threading.local()
 
@@ -124,7 +124,7 @@ class RunTracker(object):
     self.report.start_workunit(self._main_root_workunit)
 
   @contextmanager
-  def new_workunit(self, name, labels=list(), cmd='', parent=None):
+  def new_workunit(self, name, labels=list(), cmd=''):
     """Creates a (hierarchical) subunit of work for the purpose of timing and reporting.
 
     - name: A short name for this work. E.g., 'resolve', 'compile', 'scala', 'zinc'.
@@ -132,14 +132,10 @@ class RunTracker(object):
               display information about this work.
     - cmd: An optional longer string representing this work.
            E.g., the cmd line of a compiler invocation.
-    - parent: If specified, the new workunit is created under this parent. Otherwise it's created
-              under the current workunit for this thread. This allows threadpool work to nest
-              under the workunit that submitted it, instead of under the thread's root workunit,
-              which is fixed when the thread was created.
 
     Use like this:
 
-    with context.new_workunit(name='compile', labels=[WorkUnit.GOAL]) as workunit:
+    with run_tracker.new_workunit(name='compile', labels=[WorkUnit.GOAL]) as workunit:
       <do scoped work here>
       <set the outcome on workunit if necessary>
 
@@ -147,28 +143,44 @@ class RunTracker(object):
     in a workunit, and to success otherwise, so usually you only need to set the
     outcome explicitly if you want to set it to warning.
     """
-    enclosing_workunit = self._threadlocal.current_workunit
-    current_workunit = WorkUnit(run_tracker=self,
-                                parent=parent or enclosing_workunit,
-                                name=name, labels=labels, cmd=cmd)
-    self._threadlocal.current_workunit = current_workunit
-    current_workunit.start()
+    parent = self._threadlocal.current_workunit
+    with self.new_workunit_under_parent(name, parent=parent, labels=labels, cmd=cmd) as workunit:
+      self._threadlocal.current_workunit = workunit
+      try:
+        yield workunit
+      finally:
+        self._threadlocal.current_workunit = parent
+
+  @contextmanager
+  def new_workunit_under_parent(self, name, parent, labels=list(), cmd=''):
+    """Creates a (hierarchical) subunit of work for the purpose of timing and reporting.
+
+    - name: A short name for this work. E.g., 'resolve', 'compile', 'scala', 'zinc'.
+    - parent: The new workunit is created under this parent.
+    - labels: An optional iterable of labels. The reporters can use this to decide how to
+              display information about this work.
+    - cmd: An optional longer string representing this work.
+           E.g., the cmd line of a compiler invocation.
+
+    Task code should not typically call this directly.
+    """
+    workunit = WorkUnit(run_tracker=self, parent=parent, name=name, labels=labels, cmd=cmd)
+    workunit.start()
     try:
-      self.report.start_workunit(current_workunit)
-      yield current_workunit
+      self.report.start_workunit(workunit)
+      yield workunit
     except KeyboardInterrupt:
-      current_workunit.set_outcome(WorkUnit.ABORTED)
+      workunit.set_outcome(WorkUnit.ABORTED)
       self._aborted = True
       raise
     except:
-      current_workunit.set_outcome(WorkUnit.FAILURE)
+      workunit.set_outcome(WorkUnit.FAILURE)
       raise
     else:
-      current_workunit.set_outcome(WorkUnit.SUCCESS)
+      workunit.set_outcome(WorkUnit.SUCCESS)
     finally:
-      self.report.end_workunit(current_workunit)
-      current_workunit.end()
-      self._threadlocal.current_workunit = enclosing_workunit
+      self.report.end_workunit(workunit)
+      workunit.end()
 
   def log(self, level, *msg_elements):
     """Log a message against the current workunit."""

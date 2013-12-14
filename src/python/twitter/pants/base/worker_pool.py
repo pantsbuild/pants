@@ -74,7 +74,8 @@ class WorkerPool(object):
     - done_hook: If not None, invoked with no args after all work is done, or on error.
     """
     def done():
-      done_hook()
+      if done_hook:
+        done_hook()
       with self._pending_workchains_cond:
         self._pending_workchains -= 1
         self._pending_workchains_cond.notify()
@@ -123,7 +124,7 @@ class WorkerPool(object):
   def _do_work(self, func, args_tuple, workunit_name, workunit_parent, on_failure=None):
     try:
       if workunit_name:
-        with self._run_tracker.new_workunit(name=workunit_name, parent=workunit_parent):
+        with self._run_tracker.new_workunit_under_parent(name=workunit_name, parent=workunit_parent):
           return func(*args_tuple)
       else:
         return func(*args_tuple)
