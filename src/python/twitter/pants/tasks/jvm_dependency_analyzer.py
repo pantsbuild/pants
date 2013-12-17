@@ -80,9 +80,9 @@ class JvmDependencyAnalyzer(object):
             if target_key in jarlibs_by_id:
               jarlib_targets = jarlibs_by_id[target_key]
               for jar in ivyinfo.modules_by_ref[ref].artifacts:
-                for jarlib_target in jarlib_targets:
-                  symlinks = all_symlinks_map.get(jar.path, [])
-                  for symlink in symlinks:
+                symlinks = all_symlinks_map.get(os.path.realpath(jar.path), [])
+                for symlink in symlinks:
+                  for jarlib_target in jarlib_targets:
                     targets_by_file[symlink].add(jarlib_target)
               # Map all indirect, transitive deps of the jar to this target as well, since we allow deps on them.
               for dep in ivyinfo.deps_by_caller.get(ref, []):

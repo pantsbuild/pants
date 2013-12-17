@@ -387,7 +387,7 @@ class Task(object):
     with Task.symlink_map_lock:
       all_symlinks_map = self.context.products.get_data('symlink_map') or defaultdict(list)
       for path, symlink in symlink_map.items():
-        all_symlinks_map[path].append(symlink)
+        all_symlinks_map[os.path.realpath(path)].append(symlink)
       self.context.products.set_data('symlink_map', all_symlinks_map)
 
     with IvyUtils.cachepath(target_classpath_file) as classpath:
