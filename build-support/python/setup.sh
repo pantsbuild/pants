@@ -4,8 +4,9 @@ BASE_DIR=$(dirname $0)/../..
 BOOTSTRAP_BIN=$BASE_DIR/.python/bin
 BOOTSTRAP_ENVIRONMENT=$BASE_DIR/.python/bootstrap
 CACHE=$BASE_DIR/.pants.d/.pip.cache
-PY=$(which python)
 VENV_VERSION=1.10.1
+PYSTACHE_VERSION=0.5.3
+REQUESTS_VERSION=1.2.3
 SETUPTOOLS_VERSION=1.1.7
 
 mkdir -p $BOOTSTRAP_BIN
@@ -50,7 +51,7 @@ if virtualenv -p $PY --distribute $BOOTSTRAP_ENVIRONMENT; then
   # that will not run.
   virtualenv --relocatable $BOOTSTRAP_ENVIRONMENT
   source $BOOTSTRAP_ENVIRONMENT/bin/activate
-  for pkg in pystache setuptools==$SETUPTOOLS_VERSION; do
+  for pkg in pystache==$PYSTACHE_VERSION requests==$REQUESTS_VERSION setuptools==$SETUPTOOLS_VERSION; do
     pip install \
       --download-cache=$CACHE \
       -f https://pypi.python.org/simple \
