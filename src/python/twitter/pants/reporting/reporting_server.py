@@ -4,7 +4,6 @@ import mimetypes
 import os
 import pystache
 import re
-import sys
 import urllib
 import urlparse
 
@@ -328,8 +327,9 @@ class ReportingServer(object):
     self._httpd = BaseHTTPServer.HTTPServer(('', port), MyHandler)
     self._httpd.timeout = 0.1  # Not the network timeout, but how often handle_request yields.
 
-  def start(self, run_before_blocking=list()):
-    for f in run_before_blocking:
-      f()
+  def server_port(self):
+    return self._httpd.server_port
+
+  def start(self):
     self._httpd.serve_forever()
 

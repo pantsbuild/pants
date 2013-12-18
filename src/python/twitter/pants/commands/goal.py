@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==================================================================================================
+import re
 
 import daemon
 
@@ -560,20 +561,25 @@ ng_killall.install().with_description('Kill any running nailgun servers spawned 
 
 ng_killall.install('clean-all', first=True)
 
-
-def get_port_and_pidfile(context):
-  port = context.options.port or context.config.getint('reporting', 'reporting_port')
-  # We don't put the pidfile in .pants.d, because we want to find it even after a clean.
-  # TODO: Fold pants.run and other pidfiles into here. Generalize the pidfile idiom into
-  # some central library.
-  pidfile = os.path.join(get_buildroot(), '.pids', 'port_%d.pid' % port)
-  return port, pidfile
+def _get_pidfiles_and_ports():
+  """Returns a list of pairs (pidfile, port) of all found pidfiles."""
+  pidfile_dir = os.path.join(get_buildroot(), '.pids')
+  # There should only be one pidfile, but there may be errors/race conditions where
+  # there are multiple of them.
+  pidfile_names = os.listdir(pidfile_dir)
+  ret = []
+  for pidfile_name in pidfile_names:
+    m = re.match(r'port_(\d+)\.pid', pidfile_name)
+    if m is not None:
+      ret.append((os.path.join(pidfile_dir, pidfile_name), int(m.group(1))))
+  return ret
 
 class RunServer(Task):
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
     option_group.add_option(mkflag("port"), dest="port", action="store", type="int", default=0,
-      help="Serve on this port.")
+      help="Serve on this port. Leave unset to choose a free port automatically (recommended if "
+           "using pants concurrently in multiple workspaces on the same host).")
     option_group.add_option(mkflag("allowed-clients"), dest="allowed_clients",
       default=["127.0.0.1"], action="append",
       help="Only requests from these IPs may access this server. Useful for temporarily showing " \
@@ -583,20 +589,33 @@ class RunServer(Task):
   def execute(self, targets):
     DONE = '__done_reporting'
 
+    pidfiles_and_ports = _get_pidfiles_and_ports()
+    if len(pidfiles_and_ports) > 0:
+      # There should only be one pidfile, but in case there are many due to error,
+      # pick the first one.
+      _, port = pidfiles_and_ports[0]
+      self.context.log.info('Server already running at http://localhost:%d' % port)
+      return
+
     def run_server(reporting_queue):
-      (port, pidfile) = get_port_and_pidfile(self.context)
-      def write_pidfile():
-        safe_mkdir(os.path.dirname(pidfile))
+      def write_pidfile(actual_port):
+        # We don't put the pidfile in .pants.d, because we want to find it even after a clean.
+        # NOTE: If changing this dir/file name, also change get_pidfiles_and_ports appropriately.
+        # TODO: Fold pants.run and other pidfiles into here. Generalize the pidfile idiom into
+        # some central library.
+        pidfile_dir = os.path.join(get_buildroot(), '.pids')
+        safe_mkdir(pidfile_dir)
+        pidfile = os.path.join(pidfile_dir, 'port_%d.pid' % actual_port)
         with open(pidfile, 'w') as outfile:
           outfile.write(str(os.getpid()))
 
-      def report_launch():
+      def report_launch(actual_port):
         reporting_queue.put(
-          'Launching server with pid %d at http://localhost:%d' % (os.getpid(), port))
+          'Launching server with pid %d at http://localhost:%d' % (os.getpid(), actual_port))
         show_latest_run_msg()
 
       def show_latest_run_msg():
-        url = 'http://localhost:%d/run/latest' % port
+        url = 'http://localhost:%d/run/latest' % actual_port
         try:
           from colors import magenta
           url = magenta(url)
@@ -619,18 +638,17 @@ class RunServer(Task):
           settings = ReportingServer.Settings(info_dir=info_dir, template_dir=template_dir,
                                               assets_dir=assets_dir, root=get_buildroot(),
                                               allowed_clients=self.context.options.allowed_clients)
-          server = ReportingServer(port, settings)
+          server = ReportingServer(self.context.options.port, settings)
+          actual_port = server.server_port()
+          write_pidfile(actual_port)
+          report_launch(actual_port)
+          done_reporting()
           # Block forever here.
-          server.start(run_before_blocking=[write_pidfile, report_launch, done_reporting])
-      except socket.error, e:
-        if e.errno == errno.EADDRINUSE:
-          reporting_queue.put('Server already running at http://localhost:%d' % port)
-          show_latest_run_msg()
-          done_reporting()
-          return
-        else:
-          done_reporting()
-          raise
+          server.start()
+      except socket.error:
+        done_reporting()
+        raise
+
     # We do reporting on behalf of the child process (necessary, since reporting is buffered in a
     # background thread). We use multiprocessing.Process() to spawn the child so we can use that
     # module's inter-process Queue implementation.
@@ -655,9 +673,14 @@ class KillServer(Task):
     option_group.add_option(mkflag("port"), dest="port", action="store", type="int", default=0,
       help="Serve on this port.")
 
+  pidfile_re = re.compile(r'port_(\d+)\.pid')
   def execute(self, targets):
-    (port, pidfile) = get_port_and_pidfile(self.context)
-    if os.path.exists(pidfile):
+    pidfiles_and_ports = _get_pidfiles_and_ports()
+    if len(pidfiles_and_ports) == 0:
+      self.context.log.info('No server found.')
+      return
+    # There should only be one pidfile, but in case there are many, we kill them all here.
+    for pidfile, port in pidfiles_and_ports:
       with open(pidfile, 'r') as infile:
         pidstr = infile.read()
       try:
@@ -667,8 +690,6 @@ class KillServer(Task):
         self.context.log.info('Killed server with pid %d at http://localhost:%d\n' % (pid, port))
       except (ValueError, OSError):
         pass
-    else:
-      self.context.log.info('No server found.')
 
 goal(
   name='killserver',
