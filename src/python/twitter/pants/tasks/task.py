@@ -100,8 +100,8 @@ class Task(object):
       if self._artifact_cache is None and \
         (self._read_artifact_cache_spec or self._write_artifact_cache_spec):
         self._artifact_cache = \
-          ReadWriteArtifactCache(self._create_artifact_cache(self._read_artifact_cache_spec, 'reading from'),
-                                 self._create_artifact_cache(self._write_artifact_cache_spec, 'writing to'))
+          ReadWriteArtifactCache(self._create_artifact_cache(self._read_artifact_cache_spec, 'will read from'),
+                                 self._create_artifact_cache(self._write_artifact_cache_spec, 'will write to'))
       return self._artifact_cache
 
   def artifact_cache_reads_enabled(self):
