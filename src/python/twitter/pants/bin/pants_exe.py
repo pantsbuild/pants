@@ -140,8 +140,10 @@ def _run():
   run_tracker.start(report)
 
   url = run_tracker.run_info.get_info('report_url')
-  run_tracker.log(Report.INFO, 'See a report at: %s' % url)
-  run_tracker.log(Report.INFO, '(To run a reporting server: ./pants server)')
+  if url:
+    run_tracker.log(Report.INFO, 'See a report at: %s' % url)
+  else:
+    run_tracker.log(Report.INFO, '(To run a reporting server: ./pants server)')
 
   command = command_class(run_tracker, root_dir, parser, command_args)
   try:

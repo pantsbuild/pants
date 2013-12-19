@@ -33,6 +33,7 @@ from twitter.common import log
 from twitter.common.collections import OrderedSet
 from twitter.common.dirutil import safe_mkdir, safe_rmtree
 from twitter.common.lang import Compatibility
+from twitter.pants import binary_util
 from twitter.pants.base.build_environment import get_buildroot
 from twitter.pants.goal import Goal as goal, Group as group
 from twitter.pants.base import Address, BuildFile, Config, ParseContext, Target
@@ -40,7 +41,7 @@ from twitter.pants.base.rcfile import RcFile
 from twitter.pants.commands import Command
 from twitter.pants.goal.initialize_reporting import update_reporting
 from twitter.pants.base.workunit import WorkUnit
-from twitter.pants.reporting.reporting_server import ReportingServer
+from twitter.pants.reporting.reporting_server import ReportingServer, ReportingServerManager
 from twitter.pants.tasks import Task, TaskError
 from twitter.pants.tasks.console_task import ConsoleTask
 from twitter.pants.tasks.nailgun_task import NailgunTask
@@ -570,19 +571,6 @@ ng_killall.install().with_description('Kill any running nailgun servers spawned 
 
 ng_killall.install('clean-all', first=True)
 
-def _get_pidfiles_and_ports():
-  """Returns a list of pairs (pidfile, port) of all found pidfiles."""
-  pidfile_dir = os.path.join(get_buildroot(), '.pids')
-  # There should only be one pidfile, but there may be errors/race conditions where
-  # there are multiple of them.
-  pidfile_names = os.listdir(pidfile_dir) if os.path.exists(pidfile_dir) else []
-  ret = []
-  for pidfile_name in pidfile_names:
-    m = re.match(r'port_(\d+)\.pid', pidfile_name)
-    if m is not None:
-      ret.append((os.path.join(pidfile_dir, pidfile_name), int(m.group(1))))
-  return ret
-
 class RunServer(ConsoleTask):
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
@@ -599,25 +587,11 @@ class RunServer(ConsoleTask):
   def console_output(self, targets):
     DONE = '__done_reporting'
 
-    pidfiles_and_ports = _get_pidfiles_and_ports()
-    if len(pidfiles_and_ports) > 0:
-      # There should only be one pidfile, but in case there are many due to error,
-      # pick the first one.
-      _, port = pidfiles_and_ports[0]
+    port = ReportingServerManager.get_current_server_port()
+    if port:
       return ['Server already running at http://localhost:%d' % port]
 
     def run_server(reporting_queue):
-      def write_pidfile(actual_port):
-        # We don't put the pidfile in .pants.d, because we want to find it even after a clean.
-        # NOTE: If changing this dir/file name, also change get_pidfiles_and_ports appropriately.
-        # TODO: Fold pants.run and other pidfiles into here. Generalize the pidfile idiom into
-        # some central library.
-        pidfile_dir = os.path.join(get_buildroot(), '.pids')
-        safe_mkdir(pidfile_dir)
-        pidfile = os.path.join(pidfile_dir, 'port_%d.pid' % actual_port)
-        with open(pidfile, 'w') as outfile:
-          outfile.write(str(os.getpid()))
-
       def report_launch(actual_port):
         reporting_queue.put(
           'Launching server with pid %d at http://localhost:%d' % (os.getpid(), actual_port))
@@ -639,7 +613,7 @@ class RunServer(ConsoleTask):
                                               allowed_clients=self.context.options.allowed_clients)
           server = ReportingServer(self.context.options.port, settings)
           actual_port = server.server_port()
-          write_pidfile(actual_port)
+          ReportingServerManager.save_current_server_port(actual_port)
           report_launch(actual_port)
           done_reporting()
           # Block forever here.
@@ -661,6 +635,9 @@ class RunServer(ConsoleTask):
       ret.append(s)
       s = reporting_queue.get()
     # The child process is done reporting, and is now in the server loop, so we can proceed.
+    server_port = ReportingServerManager.get_current_server_port()
+    if server_port:
+      binary_util.ui_open('http://localhost:%d/run/latest' % server_port)
     return ret
 
 goal(
@@ -671,8 +648,8 @@ goal(
 class KillServer(ConsoleTask):
   pidfile_re = re.compile(r'port_(\d+)\.pid')
   def console_output(self, targets):
-    pidfiles_and_ports = _get_pidfiles_and_ports()
-    if len(pidfiles_and_ports) == 0:
+    pidfiles_and_ports = ReportingServerManager.get_current_server_pidfiles_and_ports()
+    if not pidfiles_and_ports:
       return ['No server found.']
     # There should only be one pidfile, but in case there are many, we kill them all here.
     for pidfile, port in pidfiles_and_ports:
