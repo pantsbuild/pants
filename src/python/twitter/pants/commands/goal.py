@@ -17,7 +17,6 @@ import re
 
 import daemon
 
-import errno
 import inspect
 import multiprocessing
 import os
@@ -506,48 +505,58 @@ from twitter.pants.tasks.thrift_gen import ThriftGen
 from twitter.pants.tasks.scrooge_gen import ScroogeGen
 
 
-class Invalidator(Task):
-  def execute(self, targets):
-    build_invalidator_dir = self.context.config.get('tasks', 'build_invalidator')
-    safe_rmtree(build_invalidator_dir)
-goal(name='invalidate', action=Invalidator).install().with_description('Invalidate all targets')
-
-class ArtifactCacheWiper(Task):
-  def execute(self, targets):
-    artifact_cache_dir = self.context.config.get('tasks', 'artifact_cache')
-    safe_rmtree(artifact_cache_dir)
-goal(name='wipe-local-artifact-cache', action=ArtifactCacheWiper
-).install().with_description('Delete all cached artifacts')
-
-goal(
-  name='clean-all',
-  action=lambda ctx: safe_rmtree(ctx.config.getdefault('pants_workdir')),
-  dependencies=['invalidate']
-).install().with_description('Cleans all intermediate build output')
-
+def _cautious_rmtree(root):
+  real_buildroot = os.path.realpath(os.path.abspath(get_buildroot()))
+  real_root = os.path.realpath(os.path.abspath(root))
+  if not real_root.startswith(real_buildroot):
+    raise TaskError('DANGER: Attempting to delete %s, which is not under the build root!')
+  safe_rmtree(real_root)
 
 try:
   import daemon
-
-  def async_safe_rmtree(root):
+  def _async_cautious_rmtree(root):
     if os.path.exists(root):
       new_path = root + '.deletable.%f' % time.time()
       os.rename(root, new_path)
       with daemon.DaemonContext():
-        safe_rmtree(new_path)
-
-  goal(
-    name='clean-all-async',
-    action=lambda ctx: async_safe_rmtree(ctx.config.getdefault('pants_workdir')),
-    dependencies=['invalidate']
-  ).install().with_description('Cleans all intermediate build output in a background process')
+        _cautious_rmtree(new_path)
 except ImportError:
   pass
 
+class Invalidator(ConsoleTask):
+  def execute(self, targets):
+    build_invalidator_dir = self.context.config.get('tasks', 'build_invalidator')
+    _cautious_rmtree(build_invalidator_dir)
+goal(
+  name='invalidate',
+  action=Invalidator
+).install().with_description('Invalidate all targets')
 
-class NailgunKillall(Task):
+
+class Cleaner(ConsoleTask):
+  def execute(self, targets):
+    _cautious_rmtree(self.context.config.getdefault('pants_workdir'))
+goal(
+  name='clean-all',
+  action=Cleaner,
+  dependencies=['invalidate']
+).install().with_description('Cleans all build output')
+
+
+class AsyncCleaner(ConsoleTask):
+  def execute(self, targets):
+    _async_cautious_rmtree(self.context.config.getdefault('pants_workdir'))
+goal(
+  name='clean-all-async',
+  action=AsyncCleaner,
+  dependencies=['invalidate']
+).install().with_description('Cleans all build output in a background process')
+
+
+class NailgunKillall(ConsoleTask):
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
+    super(NailgunKillall, cls).setup_parser(option_group, args, mkflag)
     option_group.add_option(mkflag("everywhere"), dest="ng_killall_everywhere",
                             default=False, action="store_true",
                             help="[%default] Kill all nailguns servers launched by pants for "

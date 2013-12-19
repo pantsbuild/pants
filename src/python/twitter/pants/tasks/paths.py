@@ -1,5 +1,4 @@
 from __future__ import print_function
-__author__ = 'ryan'
 
 from collections import defaultdict
 import copy
@@ -7,12 +6,13 @@ import copy
 from twitter.common.lang import Compatibility
 from twitter.pants.base.build_environment import get_buildroot
 from twitter.pants.base import Address, Target
-from twitter.pants.tasks import Task, TaskError
+from twitter.pants.tasks import TaskError
+from twitter.pants.tasks.console_task import ConsoleTask
 
-class PathFinder(Task):
 
+class PathFinder(ConsoleTask):
   def __init__(self, context):
-    Task.__init__(self, context)
+    ConsoleTask.__init__(self, context)
     self.log = context.log
     self.target_roots = context.target_roots
 
@@ -106,7 +106,6 @@ class PathFinder(Task):
 
 
 class Path(PathFinder):
-
   def execute(self, targets):
     if len(self.target_roots) != 2:
       raise TaskError('Specify two targets please (found %d)' % len(self.target_roots))
@@ -114,7 +113,6 @@ class Path(PathFinder):
     self._find_path(self.target_roots[0], self.target_roots[1], self.log)
 
 class Paths(PathFinder):
-
   def execute(self, targets):
     if len(self.target_roots) != 2:
       raise TaskError('Specify two targets please (found %d)' % len(self.target_roots))
