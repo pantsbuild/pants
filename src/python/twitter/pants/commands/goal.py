@@ -575,7 +575,7 @@ def _get_pidfiles_and_ports():
   pidfile_dir = os.path.join(get_buildroot(), '.pids')
   # There should only be one pidfile, but there may be errors/race conditions where
   # there are multiple of them.
-  pidfile_names = os.listdir(pidfile_dir)
+  pidfile_names = os.listdir(pidfile_dir) if os.path.exists(pidfile_dir) else []
   ret = []
   for pidfile_name in pidfile_names:
     m = re.match(r'port_(\d+)\.pid', pidfile_name)
@@ -583,9 +583,10 @@ def _get_pidfiles_and_ports():
       ret.append((os.path.join(pidfile_dir, pidfile_name), int(m.group(1))))
   return ret
 
-class RunServer(Task):
+class RunServer(ConsoleTask):
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
+    super(RunServer, cls).setup_parser(option_group, args, mkflag)
     option_group.add_option(mkflag("port"), dest="port", action="store", type="int", default=0,
       help="Serve on this port. Leave unset to choose a free port automatically (recommended if "
            "using pants concurrently in multiple workspaces on the same host).")
@@ -595,7 +596,7 @@ class RunServer(Task):
            "build results to a colleague. The special value ALL means any client may connect. " \
            "Use with caution, as your source code is exposed to all allowed clients!")
 
-  def execute(self, targets):
+  def console_output(self, targets):
     DONE = '__done_reporting'
 
     pidfiles_and_ports = _get_pidfiles_and_ports()
@@ -603,8 +604,7 @@ class RunServer(Task):
       # There should only be one pidfile, but in case there are many due to error,
       # pick the first one.
       _, port = pidfiles_and_ports[0]
-      self.context.log.info('Server already running at http://localhost:%d' % port)
-      return
+      return ['Server already running at http://localhost:%d' % port]
 
     def run_server(reporting_queue):
       def write_pidfile(actual_port):
@@ -621,16 +621,6 @@ class RunServer(Task):
       def report_launch(actual_port):
         reporting_queue.put(
           'Launching server with pid %d at http://localhost:%d' % (os.getpid(), actual_port))
-        show_latest_run_msg()
-
-      def show_latest_run_msg():
-        url = 'http://localhost:%d/run/latest' % actual_port
-        try:
-          from colors import magenta
-          url = magenta(url)
-        except ImportError:
-          pass
-        reporting_queue.put('Automatically see latest run at %s' % url)
 
       def done_reporting():
         reporting_queue.put(DONE)
@@ -658,7 +648,7 @@ class RunServer(Task):
         done_reporting()
         raise
 
-    # We do reporting on behalf of the child process (necessary, since reporting is buffered in a
+    # We do reporting on behalf of the child process (necessary, since reporting may be buffered in a
     # background thread). We use multiprocessing.Process() to spawn the child so we can use that
     # module's inter-process Queue implementation.
     reporting_queue = multiprocessing.Queue()
@@ -666,28 +656,24 @@ class RunServer(Task):
     proc.daemon = True
     proc.start()
     s = reporting_queue.get()
+    ret = []
     while s != DONE:
-      self.context.log.info(s)
+      ret.append(s)
       s = reporting_queue.get()
     # The child process is done reporting, and is now in the server loop, so we can proceed.
+    return ret
 
 goal(
   name='server',
   action=RunServer,
 ).install().with_description('Run the pants reporting server.')
 
-class KillServer(Task):
-  @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    option_group.add_option(mkflag("port"), dest="port", action="store", type="int", default=0,
-      help="Serve on this port.")
-
+class KillServer(ConsoleTask):
   pidfile_re = re.compile(r'port_(\d+)\.pid')
-  def execute(self, targets):
+  def console_output(self, targets):
     pidfiles_and_ports = _get_pidfiles_and_ports()
     if len(pidfiles_and_ports) == 0:
-      self.context.log.info('No server found.')
-      return
+      return ['No server found.']
     # There should only be one pidfile, but in case there are many, we kill them all here.
     for pidfile, port in pidfiles_and_ports:
       with open(pidfile, 'r') as infile:
@@ -696,9 +682,9 @@ class KillServer(Task):
         os.unlink(pidfile)
         pid = int(pidstr)
         os.kill(pid, signal.SIGKILL)
-        self.context.log.info('Killed server with pid %d at http://localhost:%d\n' % (pid, port))
+        return ['Killed server with pid %d at http://localhost:%d' % (pid, port)]
       except (ValueError, OSError):
-        pass
+        return []
 
 goal(
   name='killserver',

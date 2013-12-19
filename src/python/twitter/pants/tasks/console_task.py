@@ -34,7 +34,8 @@ class ConsoleTask(Task):
 
   def execute(self, targets):
     try:
-      for value in self.console_output(targets):
+      outputs = self.console_output(targets) or []
+      for value in outputs:
         self._outstream.write(str(value))
         self._outstream.write(self._console_separator)
     finally:
