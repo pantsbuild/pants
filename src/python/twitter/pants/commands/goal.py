@@ -530,7 +530,8 @@ class Invalidator(ConsoleTask):
     _cautious_rmtree(build_invalidator_dir)
 goal(
   name='invalidate',
-  action=Invalidator
+  action=Invalidator,
+  dependencies=['ng-killall']
 ).install().with_description('Invalidate all targets')
 
 
@@ -566,10 +567,11 @@ class NailgunKillall(ConsoleTask):
   def execute(self, targets):
     NailgunTask.killall(self.context.log, everywhere=self.context.options.ng_killall_everywhere)
 
-ng_killall = goal(name='ng-killall', action=NailgunKillall)
-ng_killall.install().with_description('Kill any running nailgun servers spawned by pants.')
+goal(
+  name='ng-killall',
+  action=NailgunKillall
+).install().with_description('Kill any running nailgun servers spawned by pants.')
 
-ng_killall.install('clean-all', first=True)
 
 class RunServer(ConsoleTask):
   @classmethod
