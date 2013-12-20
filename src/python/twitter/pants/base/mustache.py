@@ -41,6 +41,7 @@ class MustacheRenderer(object):
     self._pystache_renderer = pystache.Renderer(search_dirs=template_dir)
 
   def render_name(self, template_name, args):
+    # TODO: Precompile and cache the templates? 
     if self._template_dir:
       # Let pystache find the template by name.
       return self._pystache_renderer.render_name(template_name, MustacheRenderer.expand(args))
