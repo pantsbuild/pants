@@ -47,7 +47,8 @@ def initial_reporting(config, run_tracker):
   # Set up HTML reporting. We always want that.
   template_dir = config.get('reporting', 'reports_template_dir')
   html_reporter_settings = HtmlReporter.Settings(log_level=Report.INFO,
-                                                 html_dir=html_dir, template_dir=template_dir)
+                                                 html_dir=html_dir,
+                                                 template_dir=template_dir)
   html_reporter = HtmlReporter(run_tracker, html_reporter_settings)
   report.add_reporter('html', html_reporter)
 

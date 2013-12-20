@@ -1,0 +1,63 @@
+{{! A report for a single pants run. }}
+<div class="run">
+{{#no_such_run}}
+<p>
+{{#is_latest}}<div class="no-runs">No runs found since last clean-all.<p>Latest run will display here automatically.</div>{{/is_latest}}
+{{^is_latest}}<div class="no-such-run">No run found with id {{.}}</div>{{/is_latest}}
+</p>
+{{/no_such_run}}
+{{^no_such_run}}
+<div class="run-info">
+{{#run_info}}
+<div class="timestamp-text">Pants run at {{timestamp_text}}</div>
+<p>
+<div class="cmd-line-label">Command line:</div>
+<div class="cmd-line monospace">{{cmd_line}}</div>
+</p>
+<div>
+<div id="cumulative-timings">{{#collapsible}}id=cumulative-timings-collapsible&title=Cumulative%20timings&class_prefix=aggregated-timings{{/collapsible}}</div>
+<div id="self-timings">{{#collapsible}}id=self-timings-collapsible&title=Self%20timings&class_prefix=aggregated-timings{{/collapsible}}</div>
+<div id="artifact-cache-stats">{{#collapsible}}id=artifact-cache-stats-collapsible&title=Artifact%20cache%20stats&class_prefix=artifact-cache-stats{{/collapsible}}</div>
+</div>
+</div>
+<p>
+<div id="report-{{id}}"></div>
+</p>
+<script>
+  $(function() {
+    pants.poller.startTailing('run_{{id}}_root', '{{report_path}}', '#report-{{id}}');
+  });
+  $(function() {
+    pants.poller.startPolling('run_{{id}}_cumulative_timings', '{{cumulative_timings_path}}', '#cumulative-timings-collapsible-content', function() { pants.collapsible.hasContent('cumulative-timings-collapsible'); });
+  });
+  $(function() {
+    pants.poller.startPolling('run_{{id}}_self_timings', '{{self_timings_path}}', '#self-timings-collapsible-content', function() { pants.collapsible.hasContent('self-timings-collapsible'); });
+  });
+  $(function() {
+    var initFunc = function() { pants.collapsible.hasContent('artifact-cache-stats-collapsible'); };
+    // Only update if the hit and miss details are both closed. Otherwise the update will lose that state and force them
+    // closed, which will be annoying to the user.
+    var predicate = function() { return !($('#cache-hit-details').is(':visible') || $('#cache-miss-details').is(':visible')); };
+    pants.poller.startPolling('run_{{id}}_artifact_cache_stats', '{{artifact_cache_stats_path}}', '#artifact-cache-stats-collapsible-content', initFunc, predicate);
+  });
+</script>
+{{/run_info}}
+{{/no_such_run}}
+{{#is_latest}}
+<script>
+  $(function() {
+    // We want to view whatever the latest run is, so reload the page if that changes.
+    window.setInterval(function() {
+      $.ajax({
+        url: '/latestrunid',
+        success: function(data, textStatus, jqXHR) {
+          if (data != '{{.}}') {
+            document.location.reload();
+          }
+        }
+      });
+    }, 500);
+  });
+</script>
+{{/is_latest}}
+</div>

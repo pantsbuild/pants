@@ -2,6 +2,7 @@ import itertools
 import json
 import mimetypes
 import os
+import pkgutil
 import pystache
 import re
 import urllib
@@ -131,8 +132,12 @@ class PantsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
       prettify_extra_langs = []
     else:
       prettify = True
-      prettify_extra_dir = os.path.join(self._settings.assets_dir, 'js', 'prettify_extra_langs')
-      prettify_extra_langs = [ {'name': x} for x in os.listdir(prettify_extra_dir) ]
+      if self._settings.assets_dir:
+        prettify_extra_dir = os.path.join(self._settings.assets_dir, 'js', 'prettify_extra_langs')
+        prettify_extra_langs = [ {'name': x} for x in os.listdir(prettify_extra_dir) ]
+      else:
+        # TODO: Find these from our package, somehow.
+        prettify_extra_langs = []
     linenums = True
     args = { 'prettify_extra_langs': prettify_extra_langs, 'content': content,
              'prettify': prettify, 'linenums': linenums }
@@ -140,10 +145,13 @@ class PantsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
   def _handle_assets(self, relpath, params):
     """Statically serve assets: js, css etc."""
-    abspath = os.path.normpath(os.path.join(self._settings.assets_dir, relpath))
-    content_type = mimetypes.guess_type(abspath)[0] or 'text/plain'
-    with open(abspath, 'r') as infile:
-      content = infile.read()
+    if self._settings.assets_dir:
+      abspath = os.path.normpath(os.path.join(self._settings.assets_dir, relpath))
+      with open(abspath, 'r') as infile:
+        content = infile.read()
+    else:
+      content = pkgutil.get_data(__name__, os.path.join('assets', relpath))
+    content_type = mimetypes.guess_type(relpath)[0] or 'text/plain'
     self._send_content(content, content_type)
 
   def _handle_poll(self, relpath, params):
@@ -312,15 +320,17 @@ class PantsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 class ReportingServer(object):
   # Reporting server settings.
   #   info_dir: path to dir containing RunInfo files.
-  #   template_dir: location of mustache template files.
-  #   assets_dir: location of assets (js, css etc.)
+  #   template_dir: location of mustache template files. If None, the templates
+  #                 embedded in our package are used.
+  #   assets_dir: location of assets (js, css etc.) If None, the assets
+  #               embedded in our package are used.
   #   root: build root.
   #   allowed_clients: list of ips or ['ALL'].
   Settings = namedtuple('Settings',
     ['info_dir', 'template_dir', 'assets_dir', 'root', 'allowed_clients'])
 
   def __init__(self, port, settings):
-    renderer = MustacheRenderer(Renderer(search_dirs=settings.template_dir))
+    renderer = MustacheRenderer(settings.template_dir, __name__)
 
     class MyHandler(PantsHandler):
       def __init__(self, request, client_address, server):

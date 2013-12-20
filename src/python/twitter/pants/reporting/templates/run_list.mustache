@@ -1,0 +1,17 @@
+{{! The list of all known pants runs. }}
+<div class="run-list">
+<div class="header">Pants runs since last clean-all</div>
+<div class="latest">
+<a href="/run/latest"><span class="time-of-day-text">Latest</span></a></span>
+</div>
+<div>
+{{#runs_by_day}}
+<div class="date-text">{{date_text}}</div>
+<ul>
+{{#run_infos}}
+<li><a href="/run/{{id}}" class="{{outcome}}{{^outcome}}unknown{{/outcome}}"><span class="time-of-day-text">{{time_of_day_text}}</span></a>: <span class="monospace">{{cmd_line}}</span></li>
+{{/run_infos}}
+</ul>
+{{/runs_by_day}}
+</div>
+</div>

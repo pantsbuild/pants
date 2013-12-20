@@ -606,6 +606,8 @@ class RunServer(ConsoleTask):
         if not os.fork():
           # Child process.
           info_dir = self.context.config.getdefault('info_dir')
+          # If these are specified explicitly in the config, use those. Otherwise
+          # they will be None, and we'll use the ones baked into this package.
           template_dir = self.context.config.get('reporting', 'reports_template_dir')
           assets_dir = self.context.config.get('reporting', 'reports_assets_dir')
           settings = ReportingServer.Settings(info_dir=info_dir, template_dir=template_dir,

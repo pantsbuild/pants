@@ -1,0 +1,14 @@
+<html>
+<head>
+  <link rel="stylesheet" type="text/css" href="/assets/css/prettify.css">
+  <script type="text/javascript" src="/assets/js/prettify.js"></script>
+  {{#prettify_extra_langs}}
+  <script type="text/javascript" src="/assets/js/prettify_extra_langs/{{name}}"></script>
+  {{/prettify_extra_langs}}
+</head>
+<body onload="prettyPrint()">
+<pre class="{{#prettify}}prettyprint{{/prettify}} {{#linenums}}linenums{{/linenums}}">
+{{content}}
+</pre>
+</body>
+</html>

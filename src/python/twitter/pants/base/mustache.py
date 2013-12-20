@@ -1,3 +1,6 @@
+import os
+import pkgutil
+import pystache
 import urlparse
 
 
@@ -25,11 +28,27 @@ class MustacheRenderer(object):
     ret.update(dict(items))
     return ret
 
-  def __init__(self, pystache_renderer):
-    self._pystache_renderer = pystache_renderer
+  def __init__(self, template_dir=None, package_name=None):
+    """Create a renderer that finds templates by name in one of two ways.
+       - If template_dir is specified, finds template foo in the file foo.mustache in that dir.
+       - Otherwise, if package_name is specified, finds template foo embedded in that
+         package under templates/foo.mustache.
+       - Otherwise will not find templates by name, so can only be used with an existing
+         template string.
+    """
+    self._template_dir = template_dir
+    self._package_name = package_name
+    self._pystache_renderer = pystache.Renderer(search_dirs=template_dir)
 
   def render_name(self, template_name, args):
-    return self._pystache_renderer.render_name(template_name, MustacheRenderer.expand(args))
+    if self._template_dir:
+      # Let pystache find the template by name.
+      return self._pystache_renderer.render_name(template_name, MustacheRenderer.expand(args))
+    else:
+      # Load the named template embedded in our package.
+      template = pkgutil.get_data(self._package_name,
+                                  os.path.join('templates', template_name + '.mustache'))
+      return self.render(template, args)
 
   def render(self, template, args):
     return self._pystache_renderer.render(template, MustacheRenderer.expand(args))

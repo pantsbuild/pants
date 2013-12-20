@@ -1,0 +1,7 @@
+{{! Display the contents of a file. }}
+<div class="codebase-browse file monospace">
+<div class="breadcrumbs">
+  <span class="crumb">{{root_parent}}</span>{{#breadcrumbs}}/<span class="crumb"><a href="/browse/{{link_path}}">{{name}}</a></span>{{/breadcrumbs}}
+</div>
+<iframe class="file-content-frame" src="/content/{{link_path}}" frameborder="0" seamless='seamless'></iframe>
+</div>

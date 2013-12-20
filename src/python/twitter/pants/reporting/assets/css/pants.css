@@ -1,0 +1,362 @@
+html {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  height: 100%;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 13px;
+}
+
+a:link {
+  color:inherit;
+}
+
+a:visited {
+  color: inherit;
+}
+
+.monospace {
+  font-family: "Courier New", Courier, monospace;
+}
+
+#container {
+  background-color: #fff;
+  color: #333;
+  min-height: 100%;
+  margin-bottom: -2em;  /* Height of sticky-footer. */
+  position: relative;
+}
+
+#top {
+  height: 4em;
+  line-height: 4em;
+  background-color: #ddd;
+  border-bottom: 1px solid gray;
+  padding-left: 2em;
+}
+
+#top h1 {
+  padding: 0;
+  margin: 0;
+}
+
+#menu {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 15px;
+  float: left;
+  width: 160px;
+  height: 200px;
+  margin: 0;
+  border-right: 1px solid gray;
+  border-bottom: 1px solid gray;
+}
+
+#nav {
+  list-style-type: none;
+  margin: 0;
+  padding: 0;
+}
+
+#nav li a {
+  display: block;
+  width: 100%;
+  color: black;
+}
+
+#nav li {
+  margin: 0.5em;
+  padding: 0.5em;
+}
+
+#nav li:hover {
+  background-color: #ddd;
+}
+
+#main-content {
+  margin-left: 300px;
+  padding: 1em;
+}
+
+#bottom {
+  clear: both;
+  height: 2em;  /* Height of sticky-footer. */
+}
+
+#sticky-footer {
+  margin: 0;
+  width: 100%;
+  height: 2em;
+  position: relative;
+  color: #333;
+  background-color: #ddd;
+}
+
+#sticky-footer-content {
+  border-top: 1px solid gray;
+}
+
+.bigtext {
+  font-size: 16pt;
+  font-weight: bold;
+}
+
+.timeprefix {
+  position: absolute;
+  left: 200px;
+}
+
+.timestamp {
+  color: grey;
+}
+
+.timedelta {
+  margin-left: 6px;
+  color: black;
+}
+
+/* Outcome colors. */
+
+.aborted {
+  color: purple;
+}
+
+.failure {
+  color: red;
+}
+
+.warning {
+  color: orange;
+}
+
+.success {
+  color: green;
+}
+
+.unknown {
+  color: black;
+}
+
+
+/* Log level colors. */
+
+.fatal {
+  color: red;
+}
+
+.error {
+  color: red;
+}
+
+.warn {
+  color: orange;
+}
+
+.info {
+  color: green;
+}
+
+.debug {
+  color: cyan;
+}
+
+
+/* Header toggling. */
+
+.toggle-header {
+  font-weight: bold;
+  overflow: hidden;
+}
+.toggle-header-icon {
+  float: left;
+  width: 16px;
+}
+.toggle-header-text {
+  float: left;
+}
+
+.toggle-content {
+  margin-left: 20px;
+}
+
+.timer {
+  margin-left: 4px;
+  color: brown;
+}
+
+.unaccounted-time {
+  margin-left: 4px;
+  color: red;
+}
+
+.cmd-content {
+  color: purple;
+}
+
+.greyed-header-text {
+  color: grey;
+}
+
+.codebase-browse .breadcrumbs {
+  font-size: 16px;
+  font-weight: bold;
+  color: black;
+  padding-bottom: 1em;
+}
+
+.codebase-browse .breadcrumbs .crumb {
+  margin: 0;
+  padding: 0;
+}
+
+.dir-listing .dir-entries {
+
+}
+
+.file-content-frame {
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  width: 100%;
+  height: 80%;
+}
+
+.run-list .header {
+  font-size: 16px;
+  font-weight: bold;
+  margin-bottom: 1em;
+}
+
+.run-list .latest {
+  font-weight: bold;
+  margin-bottom: 1em;
+}
+
+.run-list .date-text {
+  font-weight: bold;
+}
+
+.run-list .time-of-day-text {
+  font-size: 14px;
+}
+
+.run .no-runs {
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.run .no-such-run {
+  font-size: 14px;
+  font-weight: bold;
+  color: red;
+}
+
+.run .run-info {
+  margin-bottom: 1em;
+}
+
+.run .run-info .timestamp-text {
+  font-size: 14px;
+  font-weight: bold;
+  margin-bottom: 0.5em;
+}
+
+.run .run-info .cmd-line-label {
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.aggregated-timings table tr td {
+  font-size: 14px;
+  font-weight: bold;
+  margin: 0;
+  padding: 0;
+}
+
+.aggregated-timings table tr .timing-string {
+  text-align: right;
+  color: brown;
+  padding-right: 1px;
+}
+
+.aggregated-timings table tr td i {
+  padding-left: 2px;
+}
+
+.artifact-cache-stats table {
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.nodisplay {
+  display: none;
+}
+
+.hidden {
+  visibility: hidden;
+}
+
+.ansi-30, .ansi-30 a {
+  color: black;
+}
+
+.ansi-31, .ansi-31 a {
+  color: red;
+}
+
+.ansi-32, .ansi-32 a {
+  color: green;
+}
+
+.ansi-33, .ansi-33 a {
+  color: orange;
+}
+
+.ansi-34, .ansi-34 a {
+  color: blue;
+}
+
+.ansi-35, .ansi-35 a {
+  color: magenta;
+}
+
+.ansi-36, .ansi-36 a {
+  color: cyan;
+}
+
+.ansi-37, .ansi-37 a {
+  color: white;
+}
+
+.ansi-40 {
+  background-color: black;
+}
+
+.ansi-41 {
+  background-color: red;
+}
+
+.ansi-42 {
+  background-color: green;
+}
+
+.ansi-43 {
+  background-color: orange;
+}
+
+.ansi-44 {
+  background-color: blue;
+}
+
+.ansi-45 {
+  background-color: magenta;
+}
+
+.ansi-46 {
+  background-color: cyan;
+}
+
+.ansi-47 {
+  background-color: white;
+}

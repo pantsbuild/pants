@@ -34,7 +34,7 @@ class HtmlReporter(Reporter):
     self._html_dir = settings.html_dir
 
     # We render HTML from mustache templates.
-    self._renderer = MustacheRenderer(Renderer(search_dirs=settings.template_dir))
+    self._renderer = MustacheRenderer(settings.template_dir, __name__)
 
     # We serve files relative to the build root.
     self._buildroot = get_buildroot()
