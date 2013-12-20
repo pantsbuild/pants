@@ -385,4 +385,3 @@ class ReportingServerManager(object):
       if m is not None:
         ret.append((os.path.join(pidfile_dir, pidfile_name), int(m.group(1))))
     return ret
-  
