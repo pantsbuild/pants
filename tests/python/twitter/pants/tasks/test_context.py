@@ -29,7 +29,7 @@ class ContextTest(unittest.TestCase):
 
   @classmethod
   def create_context(cls, **kwargs):
-    return Context(cls.config, run_tracker=None, target_base=MockTarget, **kwargs)
+    return Context(cls.config, run_tracker=None, **kwargs)
 
   def test_dependents_empty(self):
     context = self.create_context(options={}, target_roots=[])
