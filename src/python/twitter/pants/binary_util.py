@@ -318,48 +318,6 @@ def _subprocess_call_with_args(cmd, args, call=subprocess.call,
       raise e
 
 
-def profile_classpath(profile, java_runner=None, config=None, ivy_jar=None, ivy_settings=None,
-                      workunit_factory=None):
-  # TODO(John Sirois): consider rework when ant backend is gone and there is no more need to share
-  # path structure
-
-  java_runner = java_runner or runjava_indivisible
-
-  config = config or Config.load()
-
-  profile_dir = config.get('ivy-profiles', 'workdir')
-  profile_libdir = os.path.join(profile_dir, '%s.libs' % profile)
-  profile_check = '%s.checked' % profile_libdir
-  if not os.path.exists(profile_check):
-    # TODO(John Sirois): refactor IvyResolve to share ivy invocation command line bits
-    ivy_classpath = [ivy_jar] if ivy_jar else config.getlist('ivy', 'classpath')
-
-    safe_mkdir(profile_libdir)
-    ivy_settings = ivy_settings or config.get('ivy', 'ivy_settings')
-    ivy_xml = os.path.join(profile_dir, '%s.ivy.xml' % profile)
-    ivy_opts = [
-      '-settings', ivy_settings,
-      '-ivy', ivy_xml,
-
-      # TODO(John Sirois): this pattern omits an [organisation]- prefix to satisfy IDEA jar naming
-      # needs for scala - isolate this hack to idea.py where it belongs
-      '-retrieve', '%s/[artifact]-[revision](-[classifier]).[ext]' % profile_libdir,
-
-      '-sync',
-      '-symlink',
-      '-types', 'jar', 'bundle',
-      '-confs', 'default'
-    ]
-    result = java_runner(classpath=ivy_classpath, main='org.apache.ivy.Main',
-                         workunit_factory=workunit_factory,
-                         workunit_name='%s:bootstrap' % profile, opts=ivy_opts)
-    if result != 0:
-      raise TaskError('Failed to load profile %s, ivy exit code %s' % (profile, str(result)))
-    touch(profile_check)
-
-  return [os.path.join(profile_libdir, jar) for jar in os.listdir(profile_libdir)]
-
-
 def _mac_open(files):
   subprocess.call(['open'] + list(files))
 

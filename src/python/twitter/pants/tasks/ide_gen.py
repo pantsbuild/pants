@@ -123,26 +123,25 @@ class IdeGen(JvmBinaryTask):
 
     self.intransitive = context.options.ide_gen_intransitive
 
-    checkstyle_suppression_files = context.config.getdefault(
+    self.checkstyle_suppression_files = context.config.getdefault(
       'checkstyle_suppression_files', type=list, default=[]
     )
-    debug_port = context.config.getint('ide', 'debug_port')
+    self.debug_port = context.config.getint('ide', 'debug_port')
 
     self.classes_conf = context.config.get('ide', 'classes_conf')
     self.sources_conf = context.config.get('ide', 'sources_conf')
 
-    scala_compiler_profile = None
+    self.checkstyle_bootstrap_key = 'checkstyle'
+    checkstyle = context.config.getlist('checkstyle', 'bootstrap-tools',
+                                        default=[':twitter-checkstyle'])
+    self._bootstrap_utils.register_jvm_build_tools(self.checkstyle_bootstrap_key, checkstyle)
+
+    self.scalac_bootstrap_key = None
     if not self.skip_scala:
-      scala_compiler_profile = context.config.getdefault('scala_compile_profile')
-
-    targets, self._project = self.configure_project(
-      context.targets(),
-      checkstyle_suppression_files,
-      debug_port,
-      scala_compiler_profile
-    )
-
-    self.configure_compile_context(targets)
+      self.scalac_bootstrap_key = 'scalac'
+      scalac = context.config.getlist('scala-compile', 'compile-bootstrap-tools',
+                                                      default=[':scala-compile-2.9.3'])
+      self._bootstrap_utils.register_jvm_build_tools(self.scalac_bootstrap_key, scalac)
 
     if self.python:
       self.context.products.require('python')
@@ -154,8 +153,7 @@ class IdeGen(JvmBinaryTask):
     self.context.products.require('jars')
     self.context.products.require('source_jars')
 
-  def configure_project(self, targets, checkstyle_suppression_files, debug_port,
-                        scala_compiler_profile):
+  def configure_project(self, targets, checkstyle_suppression_files, debug_port):
 
     jvm_targets = Target.extract_jvm_targets(targets)
     if self.intransitive:
@@ -180,7 +178,6 @@ class IdeGen(JvmBinaryTask):
     extra_source_paths = self.context.config.getlist('ide', 'extra_jvm_source_paths', default=[])
     extra_test_paths = self.context.config.getlist('ide', 'extra_jvm_test_paths', default=[])
     all_targets = project.configure_jvm(
-      scala_compiler_profile,
       extra_source_paths,
       extra_test_paths
     )
@@ -207,19 +204,19 @@ class IdeGen(JvmBinaryTask):
 
     jars = OrderedSet()
     excludes = OrderedSet()
-    compile = OrderedSet()
+    compiles = OrderedSet()
     def prune(target):
       if isinstance(target, JvmTarget):
         if target.excludes:
           excludes.update(target.excludes)
         jars.update(jar for jar in target.jar_dependencies if jar.rev)
         if is_cp(target):
-          target.walk(compile.add)
+          target.walk(compiles.add)
 
     for target in targets:
       target.walk(prune)
 
-    self.context.replace_targets(compile)
+    self.context.replace_targets(compiles)
 
     self.binary = self.context.add_new_target(self.work_dir,
                                               JvmBinary,
@@ -291,6 +288,22 @@ class IdeGen(JvmBinaryTask):
 
   def execute(self, targets):
     """Stages IDE project artifacts to a project directory and generates IDE configuration files."""
+    checkstyle_enabled = len(Phase.goals_of_type(Checkstyle)) > 0
+    checkstyle_classpath = \
+      self._bootstrap_utils.get_jvm_build_tools_classpath(self.checkstyle_bootstrap_key) \
+      if checkstyle_enabled else []
+    scalac_classpath = \
+      self._bootstrap_utils.get_jvm_build_tools_classpath(self.scalac_bootstrap_key) \
+      if self.scalac_bootstrap_key else []
+
+    targets, self._project = self.configure_project(
+      targets,
+      self.checkstyle_suppression_files,
+      self.debug_port)
+
+    self._project.set_tool_classpaths(checkstyle_classpath, scalac_classpath)
+
+    self.configure_compile_context(targets)
 
     self.map_internal_jars(targets)
     self.map_external_jars()
@@ -382,7 +395,7 @@ class Project(object):
         if os.path.isdir(os.path.join(get_buildroot(), root, path)) or path.endswith('.egg'):
           self.py_libs.append(SourceSet(get_buildroot(), root, path, False))
 
-  def configure_jvm(self, scala_compiler_profile, extra_source_paths, extra_test_paths):
+  def configure_jvm(self, extra_source_paths, extra_test_paths):
     """
       Configures this project's source sets returning the full set of targets the project is
       comprised of.  The full set can be larger than the initial set of targets when any of the
@@ -459,8 +472,6 @@ class Project(object):
     for target in self.targets:
       target.walk(configure_target, predicate = source_target)
 
-    self.configure_profiles(scala_compiler_profile)
-
     # We need to figure out excludes, in doing so there are 2 cases we should not exclude:
     # 1.) targets depend on A only should lead to an exclude of B
     # A/BUILD
@@ -479,7 +490,7 @@ class Project(object):
       parent = os.path.join(self.root_dir, source_set.source_base, source_set.path)
       while True:
         unexcludable_paths.add(parent)
-        parent, dir = os.path.split(parent)
+        parent, _ = os.path.split(parent)
         # no need to add the repo root or above, all source paths and extra paths are children
         if parent == self.root_dir:
           break
@@ -489,7 +500,7 @@ class Project(object):
       source_base = os.path.join(self.root_dir, source_set.source_base)
       for root, dirs, _ in os.walk(os.path.join(source_base, source_set.path)):
         if dirs:
-          paths.update([ os.path.join(root, dir) for dir in dirs ])
+          paths.update([ os.path.join(root, directory) for directory in dirs ])
       unused_children = paths - targeted
       if unused_children:
         for child in unused_children:
@@ -506,13 +517,6 @@ class Project(object):
 
     return targets
 
-  def configure_profiles(self, scala_compiler_profile):
-    checkstyle_enabled = len(Phase.goals_of_type(Checkstyle)) > 0
-    self.checkstyle_classpath = \
-      (binary_util.profile_classpath('checkstyle', workunit_factory=self.workunit_factory)
-       if checkstyle_enabled else [])
-    self.scala_compiler_classpath = []
-    if self.has_scala:
-      self.scala_compiler_classpath.extend(binary_util.profile_classpath(scala_compiler_profile,
-        workunit_factory=self.workunit_factory))
-
+  def set_tool_classpaths(self, checkstyle_classpath, scalac_classpath):
+    self.checkstyle_classpath = checkstyle_classpath
+    self.scala_compiler_classpath = scalac_classpath

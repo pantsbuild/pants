@@ -175,23 +175,6 @@ class NailgunTask(Task):
                                 opts=opts, args=args, jvmargs=jvmargs, workunit_name=workunit_name,
                                 workunit_labels=workunit_labels)
 
-  def profile_classpath(self, profile):
-    """Ensures the classpath for the given profile ivy.xml is available and returns it as a list of
-    paths.
-
-    profile: The name of the tool profile classpath to ensure.
-    """
-    # binary_util.profile_classpath wants to pass the workunit_factory into the runner,
-    # so we give it a wrapper method that accepts that argument.
-    def java_runner(main, classpath=None, opts=None, args=None, jvmargs=None,
-                    workunit_factory=None, workunit_name=None):
-      assert workunit_factory is None
-      return self.runjava_indivisible(main, classpath=classpath, opts=opts, args=args,
-                                      jvmargs=jvmargs, workunit_name=workunit_name)
-    return binary_util.profile_classpath(profile,
-                                         java_runner=java_runner,
-                                         config=self.context.config)
-
   @staticmethod
   def killall(log, everywhere=False):
     NailgunProcessManager.killall(log, everywhere)

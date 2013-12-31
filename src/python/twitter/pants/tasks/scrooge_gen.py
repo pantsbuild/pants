@@ -26,7 +26,7 @@ from twitter.common.collections import OrderedSet
 from twitter.common.dirutil import safe_mkdir
 
 from twitter.pants.base.build_environment import get_buildroot
-from twitter.pants.binary_util import profile_classpath, JvmCommandLine
+from twitter.pants.binary_util import JvmCommandLine
 from twitter.pants.targets import (
     JavaLibrary,
     JavaThriftLibrary,
@@ -86,6 +86,12 @@ class ScroogeGen(NailgunTask):
     self.strict = strict
     self.verbose = verbose
 
+    for info in INFO_FOR_COMPILER.values():
+      config = info['config']
+      bootstrap_tools = context.config.getlist(config, 'bootstrap-tools',
+                                               default=[':%s' % config])
+      self._bootstrap_utils.register_jvm_build_tools(config, bootstrap_tools)
+
   def _outdir(self, target):
     compiler_config = INFO_FOR_COMPILER[target.compiler]['config']
     fallback = os.path.join(self.context.config.getdefault('pants_workdir'), target.compiler)
@@ -104,8 +110,8 @@ class ScroogeGen(NailgunTask):
     return self.context.config.getbool(compiler_config, 'strict', default=self.strict)
 
   def _classpth(self, target):
-    compiler_config = INFO_FOR_COMPILER[target.compiler]['config']
-    return profile_classpath(compiler_config)
+    key = INFO_FOR_COMPILER[target.compiler]['config']
+    return self._bootstrap_utils.get_jvm_build_tools_classpath(key)
 
   def execute(self, targets):
     gentargets_by_dependee = self.context.dependents(
