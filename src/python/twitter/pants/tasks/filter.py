@@ -18,7 +18,7 @@ import operator
 import re
 import sys
 
-import twitter.pants
+import twitter.pants.base.build_file_aliases
 
 from twitter.pants.base.build_environment import get_buildroot
 from twitter.pants.base.address import Address
@@ -111,9 +111,9 @@ class Filter(ConsoleTask):
         target_type = getattr(module, type_name)
       except (ImportError, ValueError):
         # Fall back on pants provided target types.
-        if not hasattr(twitter.pants, name):
+        if not hasattr(twitter.pants.base.build_file_aliases, name):
           raise TaskError('Invalid type name: %s' % name)
-        target_type = getattr(twitter.pants, name)
+        target_type = getattr(twitter.pants.base.build_file_aliases, name)
       if not issubclass(target_type, Target):
         raise TaskError('Not a Target type: %s' % name)
       return lambda target: isinstance(target, target_type)

@@ -21,8 +21,8 @@ from tempfile import mkdtemp
 
 from twitter.common.dirutil import safe_open, safe_rmtree, safe_mkdir
 
-from twitter.pants import set_buildroot
 from twitter.pants.base import Address, Target
+from twitter.pants.base.build_environment import set_buildroot
 
 
 class BuildRootTest(unittest.TestCase):

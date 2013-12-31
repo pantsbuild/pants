@@ -53,10 +53,10 @@ class ParseContextTest(unittest.TestCase):
   def test_parse(self):
     with temporary_dir() as root_dir:
       buildfile = create_buildfile(root_dir, 'a',
-        content=dedent('''
-          with open('b', 'w') as b:
+        content=dedent("""
+          with open('%s/a/b', 'w') as b:
             b.write('jack spratt')
-        ''').strip()
+        """ % root_dir).strip()
       )
       b_file = os.path.join(root_dir, 'a', 'b')
       self.assertFalse(os.path.exists(b_file))
@@ -72,7 +72,7 @@ class ParseContextTest(unittest.TestCase):
 
     with temporary_dir() as root_dir:
       buildfile = create_buildfile(root_dir, 'a',
-        content=dedent('''
+        content=dedent("""
           import os
           from twitter.pants.base import ParseContext
           def leave_a_trail(file, contents=''):
@@ -81,7 +81,7 @@ class ParseContextTest(unittest.TestCase):
           b_file = os.path.join(os.path.dirname(__file__), 'b')
           ParseContext.locate().on_context_exit(leave_a_trail, b_file, contents='42')
           assert not os.path.exists(b_file), 'Expected context exit action to be delayed.'
-        ''').strip()
+        """).strip()
       )
       b_file = os.path.join(root_dir, 'a', 'b')
       self.assertFalse(os.path.exists(b_file))
@@ -92,23 +92,23 @@ class ParseContextTest(unittest.TestCase):
   def test_sibling_references(self):
     with temporary_dir() as root_dir:
       buildfile = create_buildfile(root_dir, 'a', name='BUILD',
-        content=dedent('''
+        content=dedent("""
           dependencies(name='util',
             dependencies=[
               jar(org='com.twitter', name='util', rev='0.0.1')
             ]
           )
-        ''').strip()
+        """).strip()
       )
       sibling = create_buildfile(root_dir, 'a', name='BUILD.sibling',
-        content=dedent('''
+        content=dedent("""
           dependencies(name='util-ex',
             dependencies=[
               pants(':util'),
               jar(org='com.twitter', name='util-ex', rev='0.0.1')
             ]
           )
-        ''').strip()
+        """).strip()
       )
       ParseContext(buildfile).parse()
 

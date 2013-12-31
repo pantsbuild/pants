@@ -17,65 +17,6 @@
 
 from __future__ import print_function
 
-import os
-import sys
-
-from twitter.pants.version import VERSION as _VERSION
-
-
-def get_version():
-  return _VERSION
-
-
-_BUILDROOT = None
-
-
-def get_buildroot():
-  """Returns the pants ROOT_DIR, calculating it if needed."""
-
-  global _BUILDROOT
-  if not _BUILDROOT:
-    if 'PANTS_BUILD_ROOT' in os.environ:
-      set_buildroot(os.environ['PANTS_BUILD_ROOT'])
-    else:
-      buildroot = os.path.abspath(os.getcwd())
-      while not os.path.exists(os.path.join(buildroot, 'pants.ini')):
-        if buildroot != os.path.dirname(buildroot):
-          buildroot = os.path.dirname(buildroot)
-        else:
-          print('Could not find pants.ini!', file=sys.stderr)
-          sys.exit(1)
-      set_buildroot(buildroot)
-  return _BUILDROOT
-
-
-def set_buildroot(path):
-  """Sets the pants ROOT_DIR.
-
-  Generally only useful for tests.
-  """
-  if not os.path.exists(path):
-    raise ValueError('Build root does not exist: %s' % path)
-  global _BUILDROOT
-  _BUILDROOT = os.path.realpath(path)
-
-
-from twitter.pants.scm import Scm
-
-_SCM = None
-def get_scm():
-  """Returns the pants Scm if any."""
-  return _SCM
-
-
-def set_scm(scm):
-  """Sets the pants Scm."""
-  if scm is not None:
-    if not isinstance(scm, Scm):
-      raise ValueError('The scm must be an instance of Scm, given %s' % scm)
-    global _SCM
-    _SCM = scm
-
 
 def maven_layout():
   """Sets up typical maven project source roots for all built-in pants target types."""
