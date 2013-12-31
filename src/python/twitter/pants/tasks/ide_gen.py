@@ -140,7 +140,7 @@ class IdeGen(JvmBinaryTask):
     if not self.skip_scala:
       self.scalac_bootstrap_key = 'scalac'
       scalac = context.config.getlist('scala-compile', 'compile-bootstrap-tools',
-                                                      default=[':scala-compile-2.9.3'])
+                                      default=[':scala-compile-2.9.3'])
       self._bootstrap_utils.register_jvm_build_tools(self.scalac_bootstrap_key, scalac)
 
     if self.python:
