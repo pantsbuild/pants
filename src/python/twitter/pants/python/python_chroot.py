@@ -127,6 +127,8 @@ class PythonChroot(object):
   def __del__(self):
     if os.getenv('PANTS_LEAVE_CHROOT') is None:
       safe_rmtree(self.path())
+    else:
+      print('Left chroot at %s' % self.path())
 
   @property
   def builder(self):
@@ -148,6 +150,7 @@ class PythonChroot(object):
     def copy_to_chroot(base, path, relative_to, add_function):
       src = os.path.join(self._root, base, path)
       dst = os.path.join(translate_module(relative_to), path)
+      self.debug('    Copying %s -> %s' % (src, dst))
       add_function(src, dst)
 
     self.debug('  Dumping library: %s [relative module: %s]' % (library, library.module))
