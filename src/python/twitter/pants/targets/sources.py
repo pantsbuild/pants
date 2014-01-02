@@ -88,7 +88,7 @@ class SourceRoot(object):
 
   @staticmethod
   def _register_relative_to_build_file(build_file_dir, rel_source_root_dir, *allowed_target_types):
-    source_root_dir = os.path.join(build_file_dir, rel_source_root_dir)
+    source_root_dir = os.path.relpath(os.path.join(build_file_dir, rel_source_root_dir), get_buildroot())
     SourceRoot._register(source_root_dir, *allowed_target_types)
 
   @staticmethod
