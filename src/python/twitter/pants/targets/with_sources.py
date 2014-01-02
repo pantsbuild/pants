@@ -25,7 +25,6 @@ from twitter.pants.targets.sources import SourceRoot
 
 
 class TargetWithSources(Target):
-
   _source_to_targets = defaultdict(set)
 
   @classmethod
@@ -37,8 +36,8 @@ class TargetWithSources(Target):
 
     self.add_labels('sources')
     self.target_base = SourceRoot.find(self)
-    self.sources = None
-    self._sources = sources or []
+    self._unresolved_sources = sources or []
+    self._resolved_sources = None
 
   def expand_files(self, recursive=True, include_buildfile=True):
     """Expand files used to build this target to absolute paths.  By default this expansion is done
@@ -66,24 +65,18 @@ class TargetWithSources(Target):
   @property
   def sources(self):
     if self._resolved_sources is None:
-      self.sources = self._resolve_paths(self.target_base, self._sources or [])
+      self._resolved_sources = self._resolve_paths(self._unresolved_sources or [])
     return self._resolved_sources
 
-  @sources.setter
-  def sources(self, sources):
+  def set_resolved_sources(self, sources):
+    """Set resolved sources directly, skipping the resolution.
+
+    Useful when synthesizing targets.
+    """
     self._resolved_sources = sources
 
-  def _resolve_paths(self, rel_base, paths):
-    """Resolves paths relative to the given rel_base from the build root.
-
-    For example:
-      target: ~/workspace/src/java/com/twitter/common/base/BUILD
-      rel_base: src/resources
-
-    Resolves paths from:
-      ~/workspace/src/resources/com/twitter/common/base
-    """
-
+  def _resolve_paths(self, paths):
+    """Resolves paths."""
     if not paths:
       return []
 

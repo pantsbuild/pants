@@ -28,7 +28,7 @@ class PythonTarget(TargetWithSources):
     processed_dependencies = resolve(dependencies)
 
     self.add_labels('python')
-    self.resources = self._resolve_paths(self.target_base, resources) if resources else OrderedSet()
+    self.resources = self._resolve_paths(resources) if resources else OrderedSet()
     self.dependencies = OrderedSet(processed_dependencies or ())
     self.provides = provides
     if self.provides:

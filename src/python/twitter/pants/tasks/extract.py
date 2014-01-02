@@ -117,7 +117,7 @@ class Extract(Task):
           for jar in jars:
             sources.update(self._extract(os.path.join(basedir, jar)))
       for placeholder in placeholders:
-        placeholder.sources = sources
+        placeholder.set_resolved_sources(sources)
 
   def _extract(self, jarpath):
     self.context.log.debug('Extracting idl jar to: %s' % self._EXTRACT_BASE)
