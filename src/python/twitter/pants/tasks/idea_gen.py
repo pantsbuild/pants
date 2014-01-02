@@ -26,7 +26,7 @@ from twitter.common.dirutil import safe_mkdir
 from twitter.pants.targets import JavaTests, ScalaTests, SourceRoot
 from twitter.pants.base.build_environment import get_buildroot
 from twitter.pants.base.generator import TemplateData, Generator
-from twitter.pants.tasks.ide_gen import IdeGen, Project
+from twitter.pants.tasks.ide_gen import IdeGen, Project, SourceSet
 
 
 _TEMPLATE_BASEDIR = 'templates/idea'
@@ -125,27 +125,11 @@ class IdeaGen(IdeGen):
     self.module_filename = os.path.join(self.work_dir, '%s.iml' % self.project_name)
 
   def generate_project(self, project):
-    def is_test_target_type(ttype):
-      return issubclass(ttype, (JavaTests, ScalaTests))
-
-    is_test_by_base = {}
-
     def is_test(source_set):
-      if source_set.is_test:
-        return True
-
       # Non test targets that otherwise live in test target roots (say a java_library), must
       # be marked as test for IDEA to correctly link the targets with the test code that uses
-      # them.
-      base = source_set.source_base
-      if base not in is_test_by_base:
-        is_test_by_base[base] = any(map(is_test_target_type, SourceRoot.types(base)))
-      istest = is_test_by_base[base]
-      if istest:
-        self.context.log.debug('Marked non-test source set as test (%s, %s)' % (
-          source_set.source_base, source_set.path
-        ))
-      return istest
+      # them. Therefore we check the base instead of the is_test flag.
+      return source_set.source_base in SourceSet.TEST_BASES
 
     def create_content_root(source_set):
       root_relative_path = os.path.join(source_set.source_base, source_set.path) \

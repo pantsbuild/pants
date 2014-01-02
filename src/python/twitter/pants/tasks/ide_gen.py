@@ -326,6 +326,8 @@ class ClasspathEntry(object):
 class SourceSet(object):
   """Models a set of source files."""
 
+  TEST_BASES = set()
+
   def __init__(self, root_dir, source_base, path, is_test):
     """
       root_dir: the full path to the root directory of the project containing this source set
@@ -339,6 +341,8 @@ class SourceSet(object):
     self.path = path
     self.is_test = is_test
     self._excludes = []
+    if is_test:
+      SourceSet.TEST_BASES.add(self.source_base)
 
   @property
   def excludes(self):

@@ -19,12 +19,14 @@ If your top-level `BUILD` file is `foo/BUILD` and your main Java code is in
 then your top-level `BUILD` file might look like
 
     # foo/BUILD
+    source_root('src/java')
+    source_root('src/javatest')
+
+Pants can optionally enforce that only allowed target types are in each source root:
+
+    # foo/BUILD
     source_root('src/java', annotation_processor, doc, jvm_binary, java_library, page)
     source_root('src/javatest', doc, java_library, java_tests, page)
-
-With this layout, if you build a `jvm_binary` target, it uses `src/java` as
-a base when figuring out whence to import `com.foo.amazing.service`; if you
-build a `java_library`, it uses `src/java` and `src/javatest` as bases.
 
 If your source tree is laid out for Maven, there's a shortcut function
 `maven_layout` that configures source roots for Maven's expected
