@@ -35,13 +35,6 @@ class SourceRoot(object):
   _SEARCHED = set()
 
   @staticmethod
-  def _register(sourceroot):
-    SourceRoot._ROOTS.add(sourceroot._basedir)
-    if sourceroot._allowed_target_types is not None:
-      SourceRoot._ALLOWED_TARGET_TYPES[sourceroot._basedir] = sourceroot._allowed_target_types
-
-
-  @staticmethod
   def find(target):
     """Finds the source root for the given target.
 
@@ -80,30 +73,40 @@ class SourceRoot(object):
     return target_path
 
   @staticmethod
-  def register(basedir):
-    """Registers the given basedir as a source root for the given target types."""
-    return SourceRoot(basedir)
+  def register(basedir, *allowed_target_types):
+    """Registers the given basedir (relative to the buildroot) as a source root.
 
-  @classmethod
-  def lazy_rel_source_root(cls, reldir):
-    return partial(cls, reldir=reldir)
-
-  def __init__(self, basedir, *allowed_target_types, **kwargs):
-    """Initializes a source root at basedir for the given target types.
-
-    :basedir The base directory to resolve sources relative to
     :allowed_target_types Optional list of target types. If specified, we enforce that
                           only targets of those types appear under this source root.
     """
-    buildroot = get_buildroot()
-    reldir = kwargs.pop('reldir', buildroot)  # TODO: Is this needed?
-    basepath = os.path.abspath(os.path.join(reldir, basedir))
-    if buildroot != os.path.commonprefix((basepath, buildroot)):
-      raise ValueError('The supplied basedir %s is not a sub-path of the project root %s' % (
-        basepath,
-        buildroot
-      ))
+    SourceRoot._register(basedir, *allowed_target_types)
 
-    self._basedir = os.path.relpath(basepath, buildroot)
-    self._allowed_target_types = allowed_target_types or None
-    SourceRoot._register(self)
+  @staticmethod
+  def lazy_rel_source_root(build_file_dir):
+    """Captures the directory of the BUILD file that calls it."""
+    return partial(SourceRoot._register_relative_to_build_file, build_file_dir)
+
+  @staticmethod
+  def _register_relative_to_build_file(build_file_dir, rel_source_root_dir, *allowed_target_types):
+    source_root_dir = os.path.join(build_file_dir, rel_source_root_dir)
+    SourceRoot._register(source_root_dir, *allowed_target_types)
+
+  @staticmethod
+  def _register(source_root_dir, *allowed_target_types):
+    """Registers a source root.
+
+    :source_root_dir The source root directory against which we resolve source paths,
+                     relative to the build root.
+    :allowed_target_types Optional list of target types. If specified, we enforce that
+                          only targets of those types appear under this source root.
+    """
+    # Verify that source_root_dir doesn't reach outside buildroot.
+    buildroot = get_buildroot()
+    normpath = os.path.normpath(os.path.join(buildroot, source_root_dir))
+    if not normpath.startswith(buildroot):
+      raise ValueError('Source root %s is not under the build root %s' % (normpath, buildroot))
+
+    SourceRoot._ROOTS.add(source_root_dir)
+    if allowed_target_types:
+      SourceRoot._ALLOWED_TARGET_TYPES[source_root_dir] = allowed_target_types
+
