@@ -133,7 +133,7 @@ class Analysis(object):
       pass
     return Util.parse_section(lines_iter, expected_header=None)
 
-  FORMAT_VERSION_LINE = 'format version: 3\n'
+  FORMAT_VERSION_LINE = 'format version: 4\n'
   @staticmethod
   def _verify_version(lines_iter):
     version_line = lines_iter.next()
@@ -445,12 +445,14 @@ class Compilations(AnalysisElement):
 
 
 class CompileSetup(AnalysisElement):
-  headers = ('output directories','compile options','javac options','compiler version', 'compile order')
+  headers = ('output mode', 'output directories','compile options','javac options',
+             'compiler version', 'compile order')
 
   def __init__(self, args):
     super(CompileSetup, self).__init__(args)
-    (self.output_dirs, self.compile_options, self.javac_options,
+    (self.output_mode, self.output_dirs, self.compile_options, self.javac_options,
      self.compiler_version, self.compile_order) = self.args
+
 
 class Util(object):
   num_items_re = re.compile(r'(\d+) items\n')
