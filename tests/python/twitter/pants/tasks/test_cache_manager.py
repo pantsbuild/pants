@@ -30,19 +30,17 @@ class AppendingCacheKeyGenerator(CacheKeyGenerator):
     return CacheKey(tid, tid, len(sources), [])
 
 
-class TestCacheManager(CacheManager):
-  def __init__(self, tmpdir):
-    CacheManager.__init__(self, AppendingCacheKeyGenerator(), tmpdir, True, None, False)
-
-
 def print_vt(vt):
   print '%d (%s) %s: [ %s ]' % (len(vt.targets), vt.cache_key, vt.valid, ', '.join(['%s(%s)' % (v.id, v.cache_key) for v in vt.versioned_targets]))
 
 class CacheManagerTest(unittest.TestCase):
+  class TestCacheManager(CacheManager):
+    def __init__(self, tmpdir):
+      CacheManager.__init__(self, AppendingCacheKeyGenerator(), tmpdir, True, None, False)
 
   def setUp(self):
     self._dir = tempfile.mkdtemp()
-    self.cache_manager = TestCacheManager(self._dir)
+    self.cache_manager = CacheManagerTest.TestCacheManager(self._dir)
 
   def tearDown(self):
     shutil.rmtree(self._dir, ignore_errors=True)
