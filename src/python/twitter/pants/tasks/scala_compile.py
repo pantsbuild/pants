@@ -38,25 +38,14 @@ from twitter.pants.tasks.scala.zinc_utils import ZincUtils
 
 class ScalaCompile(JvmCompile):
   _language = 'scala'
+  _config_section = 'scala-compile'
 
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
     JvmCompile.setup_parser(ScalaCompile, option_group, args, mkflag)
 
-    option_group.add_option(mkflag('warnings'), mkflag('warnings', negate=True),
-                            dest='scala_compile_warnings', default=True,
-                            action='callback', callback=mkflag.set_bool,
-                            help='[%default] Compile scala code with all configured warnings '
-                                 'enabled.')
-
     option_group.add_option(mkflag('plugins'), dest='plugins', default=None,
       action='append', help='Use these scalac plugins. Default is set in pants.ini.')
-
-    option_group.add_option(mkflag('partition-size-hint'), dest='scala_compile_partition_size_hint',
-      action='store', type='int', default=-1,
-      help='Roughly how many source files to attempt to compile together. Set to a large number ' \
-           'to compile all sources together. Set this to 0 to compile target-by-target. ' \
-           'Default is set in pants.ini.')
 
   def __init__(self, context):
     JvmCompile.__init__(self, context, workdir=context.config.get('scala-compile', 'nailgun_dir'))
@@ -65,43 +54,12 @@ class ScalaCompile(JvmCompile):
     color = not context.options.no_color
     self._zinc_utils = ZincUtils(context=context,
                                  nailgun_task=self,
+                                 jvm_args = self._jvm_args,
                                  color=color,
                                  bootstrap_utils=self._bootstrap_utils)
 
-    # The rough number of source files to build in each compiler pass.
-    self._partition_size_hint = (context.options.scala_compile_partition_size_hint
-                                 if context.options.scala_compile_partition_size_hint != -1
-                                 else context.config.getint('scala-compile', 'partition_size_hint',
-                                                            default=1000))
-
-    self._opts = context.config.getlist('scala-compile', 'args')
-    if context.options.scala_compile_warnings:
-      self._opts.extend(context.config.getlist('scala-compile', 'warning_args'))
-    else:
-      self._opts.extend(context.config.getlist('scala-compile', 'no_warning_args'))
-
-    # Various output directories.
-    workdir = context.config.get('scala-compile', 'workdir')
-    self._classes_dir = os.path.join(workdir, 'classes')
-    self._analysis_dir = os.path.join(workdir, 'analysis')
-
-    safe_mkdir(self._classes_dir)
-    safe_mkdir(self._analysis_dir)
-
     self._analysis_file = os.path.join(self._analysis_dir, 'global_analysis.valid')
     self._invalid_analysis_file = os.path.join(self._analysis_dir, 'global_analysis.invalid')
-    self._resources_dir = os.path.join(workdir, 'resources')
-
-    # The ivy confs for which we're building.
-    self._confs = context.config.getlist('scala-compile', 'confs')
-
-    self.context.products.require_data('exclusives_groups')
-
-    self.setup_artifact_cache_from_config(config_section='scala-compile')
-
-    # A temporary, but well-known, dir to munge analysis files in before caching. It must be
-    # well-known so we know where to find the files when we retrieve them from the cache.
-    self._analysis_tmpdir = os.path.join(self._analysis_dir, 'artifact_cache_tmpdir')
 
     # If we are compiling scala libraries with circular deps on java libraries we need to make sure
     # those cycle deps are present.
@@ -115,18 +73,6 @@ class ScalaCompile(JvmCompile):
     for scala_target in self.context.targets(lambda t: isinstance(t, ScalaLibrary)):
       for java_target in scala_target.java_sources:
         self.context.add_target(java_target)
-
-  def product_type(self):
-    return 'classes'
-
-  def can_dry_run(self):
-    return True
-
-  def _ensure_analysis_tmpdir(self):
-    # Do this lazily, so we don't trigger creation of a worker pool unless we need it.
-    if not os.path.exists(self._analysis_tmpdir):
-      os.makedirs(self._analysis_tmpdir)
-      self.context.background_worker_pool().add_shutdown_hook(lambda: safe_rmtree(self._analysis_tmpdir))
 
   def _get_deleted_sources(self):
     """Returns the list of sources present in the last analysis that have since been deleted.
@@ -385,7 +331,7 @@ class ScalaCompile(JvmCompile):
         # analysis for previous partitions.
         classpath.append(self._classes_dir)
         upstream = { self._classes_dir: self._analysis_file }
-        if self._zinc_utils.compile(classpath, sources, self._classes_dir, analysis_file, upstream):
+        if self._zinc_utils.compile(self._opts, classpath, sources, self._classes_dir, analysis_file, upstream):
           raise TaskError('Compile failed.')
 
   def _compute_sources_by_target(self, targets):

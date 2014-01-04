@@ -42,9 +42,10 @@ class ZincUtils(object):
 
   Instances are immutable, and all methods are reentrant (assuming that the java_runner is).
   """
-  def __init__(self, context, nailgun_task, color, bootstrap_utils):
+  def __init__(self, context, nailgun_task, jvm_args, color, bootstrap_utils):
     self.context = context
     self._nailgun_task = nailgun_task  # We run zinc on this task's behalf.
+    self._jvm_args = jvm_args
     self._color = color
     self._bootstrap_utils = bootstrap_utils
 
@@ -71,7 +72,6 @@ class ZincUtils(object):
       self._plugins_bootstrap_key = None
 
     self._main = context.config.get('scala-compile', 'main')
-    self._jvm_args = context.config.getlist('scala-compile', 'jvm_args')
 
     # For localizing/relativizing analysis files.
     self._java_home = context.java_home
@@ -100,8 +100,7 @@ class ZincUtils(object):
                                      for (name, jarpath) in zinc_jars.items()])) +
             ['-scala-path', ':'.join(self._compiler_classpath)])
 
-  @property
-  def _scalac_args(self):
+  def _plugin_args(self):
     # Allow multiple flags and also comma-separated values in a single flag.
     if self.context.options.plugins is not None:
       plugin_names = [p for val in self.context.options.plugins for p in val.split(',')]
@@ -111,17 +110,12 @@ class ZincUtils(object):
     plugin_args = self.context.config.getdict('scala-compile', 'scalac-plugin-args', default={})
     active_plugins = self.find_plugins(plugin_names)
 
-    scalac_args = self.context.config.getlist('scala-compile', 'args')
+    ret = []
     for name, jar in active_plugins.items():
-      scalac_args.append('-Xplugin:%s' % jar)
+      ret.append('-S-Xplugin:%s' % jar)
       for arg in plugin_args.get(name, []):
-        scalac_args.append('-P:%s:%s' % (name, arg))
-
-    if self.context.options.scala_compile_warnings:
-      scalac_args.extend(self.context.config.getlist('scala-compile', 'warning_args'))
-    else:
-      scalac_args.extend(self.context.config.getlist('scala-compile', 'no_warning_args'))
-    return scalac_args
+        ret.append('-S-P:%s:%s' % (name, arg))
+    return ret
 
   def plugin_jars(self):
     """The jars containing code for enabled plugins."""
@@ -142,9 +136,10 @@ class ZincUtils(object):
                                                   workunit_name=workunit_name,
                                                   workunit_labels=workunit_labels)
 
-  def compile(self, classpath, sources, output_dir, analysis_file, upstream_analysis_files):
-    # To pass options to scalac simply prefix with -S.
-    args = ['-S' + x for x in self._scalac_args]
+  def compile(self, opts, classpath, sources, output_dir, analysis_file, upstream_analysis_files):
+    args = list(opts)  # Make a copy
+
+    args.extend(self._plugin_args())
 
     if len(upstream_analysis_files):
       args.extend(

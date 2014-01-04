@@ -20,7 +20,7 @@ import shlex
 from collections import defaultdict
 import itertools
 
-from twitter.common.dirutil import safe_open, safe_mkdir, safe_rmtree
+from twitter.common.dirutil import safe_open, safe_mkdir
 
 from twitter.pants import Task
 from twitter.pants.base.target import Target
@@ -63,43 +63,19 @@ _JMAKE_ERROR_CODES.update((256+code, msg) for code, msg in _JMAKE_ERROR_CODES.it
 
 class JavaCompile(JvmCompile):
   _language = 'java'
+  _config_section = 'java-compile'
 
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
     JvmCompile.setup_parser(JavaCompile, option_group, args, mkflag)
 
-    option_group.add_option(mkflag("warnings"), mkflag("warnings", negate=True),
-                            dest="java_compile_warnings", default=True,
-                            action="callback", callback=mkflag.set_bool,
-                            help="[%default] Compile java code with all configured warnings "
-                                 "enabled.")
-
     option_group.add_option(mkflag("args"), dest="java_compile_args", action="append",
                             help="Pass these extra args to javac.")
-
-    option_group.add_option(mkflag("partition-size-hint"), dest="java_compile_partition_size_hint",
-                            action="store", type="int", default=-1,
-                            help="Roughly how many source files to attempt to compile together. Set"
-                                 " to a large number to compile all sources together. Set this to 0"
-                                 " to compile target-by-target. Default is set in pants.ini.")
 
   def __init__(self, context):
     JvmCompile.__init__(self, context, workdir=context.config.get('java-compile', 'nailgun_dir'))
 
-    if context.options.java_compile_partition_size_hint != -1:
-      self._partition_size_hint = context.options.java_compile_partition_size_hint
-    else:
-      self._partition_size_hint = context.config.getint('java-compile', 'partition_size_hint',
-                                                        default=1000)
-
-    workdir = context.config.get('java-compile', 'workdir')
-    self._classes_dir = os.path.join(workdir, 'classes')
-    self._resources_dir = os.path.join(workdir, 'resources')
-    self._depfile_dir = os.path.join(workdir, 'depfiles')
-    self._depfile = os.path.join(self._depfile_dir, 'global_depfile')
-
-    safe_mkdir(self._classes_dir)
-    safe_mkdir(self._depfile_dir)
+    self._depfile = os.path.join(self._analysis_dir, 'global_depfile')
 
     self._jmake_bootstrap_key = 'jmake'
     external_tools = context.config.getlist('java-compile', 'jmake-bootstrap-tools', default=[':jmake'])
@@ -110,41 +86,12 @@ class JavaCompile(JvmCompile):
                                                       default=[':java-compiler'])
     self._bootstrap_utils.register_jvm_build_tools(self._compiler_bootstrap_key, compiler_bootstrap_tools)
 
-    self._opts = context.config.getlist('java-compile', 'args')
-    self._jvm_args = context.config.getlist('java-compile', 'jvm_args')
-
     self._javac_opts = []
     if context.options.java_compile_args:
       for arg in context.options.java_compile_args:
         self._javac_opts.extend(shlex.split(arg))
     else:
       self._javac_opts.extend(context.config.getlist('java-compile', 'javac_args', default=[]))
-
-    if context.options.java_compile_warnings:
-      self._opts.extend(context.config.getlist('java-compile', 'warning_args'))
-    else:
-      self._opts.extend(context.config.getlist('java-compile', 'no_warning_args'))
-
-    self._confs = context.config.getlist('java-compile', 'confs')
-    self.context.products.require_data('exclusives_groups')
-
-    self.setup_artifact_cache_from_config(config_section='java-compile')
-
-    # A temporary, but well-known, dir to munge analysis files in before caching. It must be
-    # well-known so we know where to find the files when we retrieve them from the cache.
-    self._depfile_tmpdir = os.path.join(self._depfile_dir, 'depfile_tmpdir')
-
-  def product_type(self):
-    return 'classes'
-
-  def can_dry_run(self):
-    return True
-
-  def _ensure_depfile_tmpdir(self):
-    # Do this lazily, so we don't trigger creation of a worker pool unless we need it.
-    if not os.path.exists(self._depfile_tmpdir):
-      os.makedirs(self._depfile_tmpdir)
-      self.context.background_worker_pool().add_shutdown_hook(lambda: safe_rmtree(self._depfile_tmpdir))
 
   def execute(self, targets):
     java_targets = [t for t in targets if t.has_sources('.java')]
@@ -222,13 +169,13 @@ class JavaCompile(JvmCompile):
     return sources_by_target
 
   def _write_to_artifact_cache(self, vts, sources_by_target):
-    self._ensure_depfile_tmpdir()
+    self._ensure_analysis_tmpdir()
     vt_by_target = dict([(vt.target, vt) for vt in vts.versioned_targets])
 
     # This work can happen in the background, if there's a measurable benefit to that.
 
     # Split the depfile into per-target files.
-    splits = [(sources, JavaCompile.create_depfile_path(self._depfile_tmpdir, [target]))
+    splits = [(sources, JavaCompile.create_depfile_path(self._analysis_tmpdir, [target]))
               for target, sources in sources_by_target.items()]
     deps = Dependencies(self._classes_dir)
     if os.path.exists(self._depfile):
@@ -238,7 +185,7 @@ class JavaCompile(JvmCompile):
     # Gather up the artifacts.
     vts_artifactfiles_pairs = []
     for target, sources in sources_by_target.items():
-      artifacts = [JavaCompile.create_depfile_path(self._depfile_tmpdir, [target])]
+      artifacts = [JavaCompile.create_depfile_path(self._analysis_tmpdir, [target])]
       for source in sources:
         for cls in deps.classes_by_source.get(source, []):
           artifacts.append(os.path.join(self._classes_dir, cls))
@@ -262,14 +209,14 @@ class JavaCompile(JvmCompile):
             global_deps.load(self._depfile)
           for vt in cached_vts:
             for target in vt.targets:
-              depfile = JavaCompile.create_depfile_path(self._depfile_tmpdir, [target])
+              depfile = JavaCompile.create_depfile_path(self._analysis_tmpdir, [target])
               if os.path.exists(depfile):
                 deps = Dependencies(self._classes_dir)
                 deps.load(depfile)
                 global_deps.merge(deps)
           global_deps.save(self._depfile)
 
-    self._ensure_depfile_tmpdir()
+    self._ensure_analysis_tmpdir()
     return Task.do_check_artifact_cache(self, vts, post_process_cached_vts=post_process_cached_vts)
 
   @staticmethod
