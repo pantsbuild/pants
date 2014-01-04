@@ -50,36 +50,36 @@ def jarname(target):
 class JarCreate(Task):
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
-    option_group.add_option(mkflag("outdir"), dest="jar_create_outdir",
-                            help="Emit jars in to this directory.")
+    option_group.add_option(mkflag('outdir'), dest='jar_create_outdir',
+                            help='Emit jars in to this directory.')
 
-    option_group.add_option(mkflag("compressed"), mkflag("compressed", negate=True),
-                            dest="jar_create_compressed", default=True,
-                            action="callback", callback=mkflag.set_bool,
-                            help="[%default] Create compressed jars.")
+    option_group.add_option(mkflag('compressed'), mkflag('compressed', negate=True),
+                            dest='jar_create_compressed', default=True,
+                            action='callback', callback=mkflag.set_bool,
+                            help='[%default] Create compressed jars.')
 
-    option_group.add_option(mkflag("transitive"), mkflag("transitive", negate=True),
-                            dest="jar_create_transitive", default=True,
-                            action="callback", callback=mkflag.set_bool,
-                            help="[%default] Create jars for the transitive closure of internal "
-                                 "targets reachable from the roots specified on the command line.")
+    option_group.add_option(mkflag('transitive'), mkflag('transitive', negate=True),
+                            dest='jar_create_transitive', default=True,
+                            action='callback', callback=mkflag.set_bool,
+                            help='[%default] Create jars for the transitive closure of internal '
+                                 'targets reachable from the roots specified on the command line.')
 
-    option_group.add_option(mkflag("classes"), mkflag("classes", negate=True),
-                            dest="jar_create_classes", default=True,
-                            action="callback", callback=mkflag.set_bool,
-                            help="[%default] Create class jars.")
-    option_group.add_option(mkflag("sources"), mkflag("sources", negate=True),
-                            dest="jar_create_sources", default=False,
-                            action="callback", callback=mkflag.set_bool,
-                            help="[%default] Create source jars.")
-    option_group.add_option(mkflag("javadoc"), mkflag("javadoc", negate=True),
-                            dest="jar_create_javadoc", default=False,
-                            action="callback", callback=mkflag.set_bool,
-                            help="[%default] Create javadoc jars.")
-    option_group.add_option(mkflag("idl"), mkflag("idl", negate=True),
-                            dest="jar_create_idl", default=False,
-                            action="callback", callback=mkflag.set_bool,
-                            help="[%default] Create Thrift jars.")
+    option_group.add_option(mkflag('classes'), mkflag('classes', negate=True),
+                            dest='jar_create_classes', default=True,
+                            action='callback', callback=mkflag.set_bool,
+                            help='[%default] Create class jars.')
+    option_group.add_option(mkflag('sources'), mkflag('sources', negate=True),
+                            dest='jar_create_sources', default=False,
+                            action='callback', callback=mkflag.set_bool,
+                            help='[%default] Create source jars.')
+    option_group.add_option(mkflag('javadoc'), mkflag('javadoc', negate=True),
+                            dest='jar_create_javadoc', default=False,
+                            action='callback', callback=mkflag.set_bool,
+                            help='[%default] Create javadoc jars.')
+    option_group.add_option(mkflag('idl'), mkflag('idl', negate=True),
+                            dest='jar_create_idl', default=False,
+                            action='callback', callback=mkflag.set_bool,
+                            help='[%default] Create Thrift jars.')
 
   def __init__(self, context):
     Task.__init__(self, context)
