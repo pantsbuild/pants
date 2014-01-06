@@ -56,11 +56,11 @@ class Context(object):
     def fatal(self, *msg_elements): self._run_tracker.log(Report.FATAL, *msg_elements)
 
   def __init__(self, config, options, run_tracker, target_roots, requested_goals=None,
-               lock=Lock.unlocked(), log=None):
+               lock=None, log=None):
     self._config = config
     self._options = options
     self.run_tracker = run_tracker
-    self._lock = lock
+    self._lock = lock or Lock.unlocked()
     self._log = log or Context.Log(run_tracker)
     self._state = {}
     self._products = Products()
