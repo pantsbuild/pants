@@ -157,12 +157,12 @@ def safe_classpath(logger=None):
 
 
 class JvmCommandLine(object):
-  def __init__(self, jvmargs=None, classpath=None, main=None, opts=None, args=None):
+  def __init__(self, jvm_options=None, classpath=None, main=None, opts=None, args=None):
     object.__init__(self)
 
     tuplize = lambda x: tuple(x) if x else None
 
-    self.jvmargs = tuplize(jvmargs)
+    self.jvm_options = tuplize(jvm_options)
     self.classpath = tuplize(classpath)
     self.main = main
     self.opts = tuplize(opts)
@@ -191,8 +191,8 @@ class JvmCommandLine(object):
     args= is a list of paths"""
 
     cmd = ['java']
-    if self.jvmargs:
-      cmd.extend(self.jvmargs)
+    if self.jvm_options:
+      cmd.extend(self.jvm_options)
     if self.classpath:
       cmd.extend(('-cp' if self.main else '-jar', os.pathsep.join(self.classpath)))
     if self.main:
@@ -209,10 +209,10 @@ class JvmCommandLine(object):
     return cmd
 
 
-def _runjava_cmd(jvmargs=None, classpath=None, main=None, opts=None, args=None):
+def _runjava_cmd(jvm_options=None, classpath=None, main=None, opts=None, args=None):
   cmd = ['java']
-  if jvmargs:
-    cmd.extend(jvmargs)
+  if jvm_options:
+    cmd.extend(jvm_options)
   if classpath:
     cmd.extend(('-cp' if main else '-jar', os.pathsep.join(classpath)))
   if main:
@@ -228,19 +228,19 @@ def _runjava_cmd_to_str(cmd):
   return ' '.join(cmd)
 
 
-def runjava_cmd_str(jvmargs=None, classpath=None, main=None, opts=None, args=None):
-  cmd = _runjava_cmd(jvmargs=jvmargs, classpath=classpath, main=main, opts=opts, args=args)
+def runjava_cmd_str(jvm_options=None, classpath=None, main=None, opts=None, args=None):
+  cmd = _runjava_cmd(jvm_options=jvm_options, classpath=classpath, main=main, opts=opts, args=args)
   return _runjava_cmd_to_str(cmd)
 
 
-def runjava_indivisible(jvmargs=None, classpath=None, main=None, opts=None, args=None, dryrun=False,
+def runjava_indivisible(jvm_options=None, classpath=None, main=None, opts=None, args=None, dryrun=False,
                         workunit_factory=None, workunit_name=None, **kwargs):
   """Spawns a java process with the supplied configuration and returns its exit code.
   The args list is indivisible so it can't be split across multiple invocations of the command
   similiar to xargs.
   Passes kwargs through to subproccess.call.
   """
-  cmd_with_args = _runjava_cmd(jvmargs=jvmargs, classpath=classpath, main=main, opts=opts,
+  cmd_with_args = _runjava_cmd(jvm_options=jvm_options, classpath=classpath, main=main, opts=opts,
                                args=args)
   if dryrun:
     return _runjava_cmd_to_str(cmd_with_args)
@@ -250,14 +250,14 @@ def runjava_indivisible(jvmargs=None, classpath=None, main=None, opts=None, args
                               workunit_name=workunit_name or main, **kwargs)
 
 
-def runjava(jvmargs=None, classpath=None, main=None, opts=None, args=None, dryrun=False,
+def runjava(jvm_options=None, classpath=None, main=None, opts=None, args=None, dryrun=False,
             workunit_factory=None, workunit_name=None, **kwargs):
   """Spawns a java process with the supplied configuration and returns its exit code.
   The args list is divisable so it can be split across multiple invocations of the command
   similiar to xargs.
   Passes kwargs through to subproccess.call.
   """
-  cmd = _runjava_cmd(jvmargs=jvmargs, classpath=classpath, main=main, opts=opts)
+  cmd = _runjava_cmd(jvm_options=jvm_options, classpath=classpath, main=main, opts=opts)
   if dryrun:
     return _runjava_cmd_to_str(cmd)
   else:

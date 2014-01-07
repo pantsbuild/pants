@@ -30,108 +30,109 @@ from twitter.pants.tasks.jvm_task import JvmTask
 class JUnitRun(JvmTask):
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
-    option_group.add_option(mkflag("skip"), mkflag("skip", negate=True), dest = "junit_run_skip",
-                            action="callback", callback=mkflag.set_bool, default=False,
-                            help = "[%default] Skip running tests")
+    option_group.add_option(mkflag('skip'), mkflag('skip', negate=True), dest = 'junit_run_skip',
+                            action='callback', callback=mkflag.set_bool, default=False,
+                            help = '[%default] Skip running tests')
 
-    option_group.add_option(mkflag("debug"), mkflag("debug", negate=True), dest = "junit_run_debug",
-                            action="callback", callback=mkflag.set_bool, default=False,
-                            help = "[%default] Run junit tests with a debugger")
+    option_group.add_option(mkflag('debug'), mkflag('debug', negate=True), dest = 'junit_run_debug',
+                            action='callback', callback=mkflag.set_bool, default=False,
+                            help = '[%default] Run junit tests with a debugger')
 
-    option_group.add_option(mkflag("fail-fast"), mkflag("fail-fast", negate=True),
-                            dest = "junit_run_fail_fast",
-                            action="callback", callback=mkflag.set_bool, default=False,
-                            help = "[%default] Fail fast on the first test failure in a suite")
+    option_group.add_option(mkflag('fail-fast'), mkflag('fail-fast', negate=True),
+                            dest = 'junit_run_fail_fast',
+                            action='callback', callback=mkflag.set_bool, default=False,
+                            help = '[%default] Fail fast on the first test failure in a suite')
 
-    option_group.add_option(mkflag("batch-size"), type = "int", default=sys.maxint,
-                            dest = "junit_run_batch_size",
-                            help = "[ALL] Runs at most this many tests in a single test process.")
+    option_group.add_option(mkflag('batch-size'), type = 'int', default=sys.maxint,
+                            dest = 'junit_run_batch_size',
+                            help = '[ALL] Runs at most this many tests in a single test process.')
 
-    option_group.add_option(mkflag("jvmargs"), dest = "junit_run_jvmargs", action="append",
-                            help = "Runs junit tests in a jvm with these extra jvm args.")
+    # TODO: Rename flag to jvm-options.
+    option_group.add_option(mkflag('jvmargs'), dest = 'junit_run_jvm_options', action='append',
+                            help = 'Runs junit tests in a jvm with these extra jvm options.')
 
-    option_group.add_option(mkflag("test"), dest = "junit_run_tests", action="append",
-                            help = "[%default] Force running of just these tests.  Tests can be "
-                                   "specified using any of: [classname], [classname]#[methodname], "
-                                   "[filename] or [filename]#[methodname]")
+    option_group.add_option(mkflag('test'), dest = 'junit_run_tests', action='append',
+                            help = '[%default] Force running of just these tests.  Tests can be '
+                                   'specified using any of: [classname], [classname]#[methodname], '
+                                   '[filename] or [filename]#[methodname]')
 
-    outdir = mkflag("outdir")
-    option_group.add_option(outdir, dest="junit_run_outdir",
-                            help="Emit output in to this directory.")
+    outdir = mkflag('outdir')
+    option_group.add_option(outdir, dest='junit_run_outdir',
+                            help='Emit output in to this directory.')
 
-    xmlreport = mkflag("xmlreport")
-    option_group.add_option(xmlreport, mkflag("xmlreport", negate=True),
-                            dest = "junit_run_xmlreport",
-                            action="callback", callback=mkflag.set_bool, default=False,
-                            help = "[%default] Causes an xml report to be output for each test "
-                                   "class that is run.")
+    xmlreport = mkflag('xmlreport')
+    option_group.add_option(xmlreport, mkflag('xmlreport', negate=True),
+                            dest = 'junit_run_xmlreport',
+                            action='callback', callback=mkflag.set_bool, default=False,
+                            help = '[%default] Causes an xml report to be output for each test '
+                                   'class that is run.')
 
-    option_group.add_option(mkflag("per-test-timer"), mkflag("per-test-timer", negate=True),
-                            dest = "junit_run_per_test_timer",
-                            action="callback", callback=mkflag.set_bool, default=False,
-                            help = "[%default] Shows progress and timer for each test "
-                                   "class that is run.")
+    option_group.add_option(mkflag('per-test-timer'), mkflag('per-test-timer', negate=True),
+                            dest = 'junit_run_per_test_timer',
+                            action='callback', callback=mkflag.set_bool, default=False,
+                            help = '[%default] Shows progress and timer for each test '
+                                   'class that is run.')
 
-    option_group.add_option(mkflag("default-parallel"), mkflag("default-parallel", negate=True),
-                            dest = "junit_run_default_parallel",
-                            action="callback", callback=mkflag.set_bool, default=False,
-                            help = "[%default] Whether to run classes without @TestParallel or "
-                                   "@TestSerial annotations in parallel.")
+    option_group.add_option(mkflag('default-parallel'), mkflag('default-parallel', negate=True),
+                            dest = 'junit_run_default_parallel',
+                            action='callback', callback=mkflag.set_bool, default=False,
+                            help = '[%default] Whether to run classes without @TestParallel or '
+                                   '@TestSerial annotations in parallel.')
 
-    option_group.add_option(mkflag("parallel-threads"), type = "int", default=0,
-                            dest = "junit_run_parallel_threads",
-                            help = "Number of threads to run tests in parallel. 0 for autoset.")
+    option_group.add_option(mkflag('parallel-threads'), type = 'int', default=0,
+                            dest = 'junit_run_parallel_threads',
+                            help = 'Number of threads to run tests in parallel. 0 for autoset.')
 
-    option_group.add_option(mkflag("coverage"), mkflag("coverage", negate=True),
-                            dest = "junit_run_coverage",
-                            action="callback", callback=mkflag.set_bool, default=False,
-                            help = "[%default] Collects code coverage data")
+    option_group.add_option(mkflag('coverage'), mkflag('coverage', negate=True),
+                            dest = 'junit_run_coverage',
+                            action='callback', callback=mkflag.set_bool, default=False,
+                            help = '[%default] Collects code coverage data')
 
-    coverage_patterns = mkflag("coverage-patterns")
-    option_group.add_option(coverage_patterns, dest="junit_run_coverage_patterns",
-                            action="append",
-                            help="By default all non-test code depended on by the selected tests "
-                                 "is measured for coverage during the test run.  By specifying "
-                                 "coverage patterns you can select which classes and packages "
-                                 "should be counted.  Values should be class name prefixes in "
-                                 "dotted form with ? and * wildcard support. If preceded with a - "
-                                 "the pattern is excluded. "
-                                 "For example, to include all code in com.twitter.raven except "
-                                 "claws and the eye you would use: "
-                                 "%(flag)s=com.twitter.raven.* "
-                                 "%(flag)s=-com.twitter.raven.claw "
-                                 "%(flag)s=-com.twitter.raven.Eye"
-                                 "This option can be specified multiple times. " % dict(
+    coverage_patterns = mkflag('coverage-patterns')
+    option_group.add_option(coverage_patterns, dest='junit_run_coverage_patterns',
+                            action='append',
+                            help='By default all non-test code depended on by the selected tests '
+                                 'is measured for coverage during the test run.  By specifying '
+                                 'coverage patterns you can select which classes and packages '
+                                 'should be counted.  Values should be class name prefixes in '
+                                 'dotted form with ? and * wildcard support. If preceded with a - '
+                                 'the pattern is excluded. '
+                                 'For example, to include all code in com.twitter.raven except '
+                                 'claws and the eye you would use: '
+                                 '%(flag)s=com.twitter.raven.* '
+                                 '%(flag)s=-com.twitter.raven.claw '
+                                 '%(flag)s=-com.twitter.raven.Eye'
+                                 'This option can be specified multiple times. ' % dict(
                                     flag=coverage_patterns
                                  ))
 
-    option_group.add_option(mkflag("coverage-console"), mkflag("coverage-console", negate=True),
-                            dest = "junit_run_coverage_console",
-                            action="callback", callback=mkflag.set_bool, default=True,
-                            help = "[%default] Outputs a simple coverage report to the console.")
+    option_group.add_option(mkflag('coverage-console'), mkflag('coverage-console', negate=True),
+                            dest = 'junit_run_coverage_console',
+                            action='callback', callback=mkflag.set_bool, default=True,
+                            help = '[%default] Outputs a simple coverage report to the console.')
 
-    option_group.add_option(mkflag("coverage-xml"), mkflag("coverage-xml", negate=True),
-                            dest = "junit_run_coverage_xml",
-                            action="callback", callback=mkflag.set_bool, default=False,
-                            help = "[%%default] Produces an xml coverage report in %s." % outdir)
+    option_group.add_option(mkflag('coverage-xml'), mkflag('coverage-xml', negate=True),
+                            dest = 'junit_run_coverage_xml',
+                            action='callback', callback=mkflag.set_bool, default=False,
+                            help = '[%%default] Produces an xml coverage report in %s.' % outdir)
 
-    coverage_html_flag = mkflag("coverage-html")
-    option_group.add_option(coverage_html_flag, mkflag("coverage-html", negate=True),
-                            dest = "junit_run_coverage_html",
-                            action="callback", callback=mkflag.set_bool, default=False,
-                            help = "[%%default] Produces an html coverage report in %s." % outdir)
+    coverage_html_flag = mkflag('coverage-html')
+    option_group.add_option(coverage_html_flag, mkflag('coverage-html', negate=True),
+                            dest = 'junit_run_coverage_html',
+                            action='callback', callback=mkflag.set_bool, default=False,
+                            help = '[%%default] Produces an html coverage report in %s.' % outdir)
 
-    option_group.add_option(mkflag("coverage-html-open"), mkflag("coverage-html-open", negate=True),
-                            dest = "junit_run_coverage_html_open",
-                            action="callback", callback=mkflag.set_bool, default=False,
-                            help = "[%%default] Tries to open the generated html coverage report, "
-                                   "implies %s." % coverage_html_flag)
+    option_group.add_option(mkflag('coverage-html-open'), mkflag('coverage-html-open', negate=True),
+                            dest = 'junit_run_coverage_html_open',
+                            action='callback', callback=mkflag.set_bool, default=False,
+                            help = '[%%default] Tries to open the generated html coverage report, '
+                                   'implies %s.' % coverage_html_flag)
 
-    option_group.add_option(mkflag("suppress-output"), mkflag("suppress-output", negate=True),
-                            dest = "junit_run_suppress_output",
-                            action="callback", callback=mkflag.set_bool, default=True,
-                            help = "[%%default] Redirects test output to files in %s.  "
-                                   "Implied by %s" % (outdir, xmlreport))
+    option_group.add_option(mkflag('suppress-output'), mkflag('suppress-output', negate=True),
+                            dest = 'junit_run_suppress_output',
+                            action='callback', callback=mkflag.set_bool, default=True,
+                            help = '[%%default] Redirects test output to files in %s.  '
+                                   'Implied by %s' % (outdir, xmlreport))
 
 
   def __init__(self, context):
@@ -149,11 +150,11 @@ class JUnitRun(JvmTask):
     emma_bootstrap_tools = context.config.getlist('junit-run', 'emma-bootstrap-tools', default=[':emma'])
     self._bootstrap_utils.register_jvm_build_tools(self._emma_bootstrap_key, emma_bootstrap_tools)
 
-    self.java_args = context.config.getlist('junit-run', 'args', default=[])
-    if context.options.junit_run_jvmargs:
-      self.java_args.extend(context.options.junit_run_jvmargs)
+    self.jvm_options = context.config.getlist('junit-run', 'args', default=[])
+    if context.options.junit_run_jvm_options:
+      self.jvm_options.extend(context.options.junit_run_jvm_options)
     if context.options.junit_run_debug:
-      self.java_args.extend(context.config.getlist('jvm', 'debug_args'))
+      self.jvm_options.extend(context.config.getlist('jvm', 'debug_args'))
 
     self.test_classes = context.options.junit_run_tests
     self.context.products.require('classes')
@@ -219,7 +220,7 @@ class JUnitRun(JvmTask):
                                          confs=self.confs,
                                          exclusives_classpath=self.get_base_classpath_for_target(targets[0]))
 
-        def run_tests(classpath, main, jvmargs=None):
+        def run_tests(classpath, main, jvm_options=None):
           def test_workunit_factory(name, labels=list(), cmd=''):
             return self.context.new_workunit(name=name, labels=[WorkUnit.TEST] + labels, cmd=cmd)
 
@@ -230,7 +231,7 @@ class JUnitRun(JvmTask):
           for batch in self._partition(tests):
             with binary_util.safe_args(batch) as batch_tests:
               result += abs(binary_util.runjava_indivisible(
-                jvmargs=(jvmargs or []) + self.java_args,
+                jvm_options=(jvm_options or []) + self.jvm_options,
                 classpath=classpath,
                 main=main,
                 opts=self.opts,
@@ -313,7 +314,7 @@ class JUnitRun(JvmTask):
             run_tests(
               [self.coverage_instrument_dir] + junit_classpath + emma_classpath,
               'com.twitter.common.testing.runner.JUnitConsoleRunner',
-              jvmargs=['-Demma.coverage.out.file=%s' % self.coverage_file]
+              jvm_options=['-Demma.coverage.out.file=%s' % self.coverage_file]
             )
           finally:
             generate_reports()

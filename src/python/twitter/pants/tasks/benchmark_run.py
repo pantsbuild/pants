@@ -40,8 +40,8 @@ class BenchmarkRun(JvmTask):
     Task.__init__(self, context)
     config = context.config
     self.confs = config.getlist('benchmark-run', 'confs')
-    self.java_args = config.getlist('benchmark-run', 'args',
-                                    default=['-Xmx1g', '-XX:MaxPermSize=256m'])
+    self.jvm_options = config.getlist('benchmark-run', 'args',
+                                      default=['-Xmx1g', '-XX:MaxPermSize=256m'])
 
     self._benchmark_bootstrap_key = 'benchmark-tool'
     benchmark_bootstrap_tools = config.getlist('benchmark-run', 'bootstrap-tools',
@@ -61,7 +61,7 @@ class BenchmarkRun(JvmTask):
       self.caliper_args += ['--measureMemory']
 
     if context.options.debug:
-      self.java_args.extend(context.config.getlist('jvm', 'debug_args'))
+      self.jvm_options.extend(context.config.getlist('jvm', 'debug_args'))
       self.caliper_args += ['--debug']
 
   def execute(self, targets):
@@ -80,7 +80,7 @@ class BenchmarkRun(JvmTask):
     benchmark_tools_classpath = self._bootstrap_utils.get_jvm_build_tools_classpath(self._benchmark_bootstrap_key)
 
     exit_code = runjava_indivisible(
-      jvmargs=self.java_args,
+      jvm_options=self.jvm_options,
       classpath=self.classpath(benchmark_tools_classpath),
       main='com.google.caliper.Runner',
       opts=self.caliper_args,

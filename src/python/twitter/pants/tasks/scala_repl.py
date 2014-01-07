@@ -26,17 +26,17 @@ from twitter.pants.tasks.jvm_task import JvmTask
 class ScalaRepl(JvmTask):
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
-    option_group.add_option(mkflag("jvmargs"), dest = "run_jvmargs", action="append",
-      help = "Run the repl in a jvm with these extra jvm args.")
-    option_group.add_option(mkflag("args"), dest = "run_args", action="append",
-                            help = "run the repl in a jvm with extra args.")
+    option_group.add_option(mkflag('jvmargs'), dest = 'run_jvm_options', action='append',
+      help = 'Run the repl in a jvm with these extra jvm options.')
+    option_group.add_option(mkflag('args'), dest = 'run_args', action='append',
+                            help = 'run the repl in a jvm with extra args.')
 
   def __init__(self, context):
     Task.__init__(self, context)
-    self.jvm_args = context.config.getlist('scala-repl', 'jvm_args', default=[])
-    if context.options.run_jvmargs:
-      for arg in context.options.run_jvmargs:
-        self.jvm_args.extend(shlex.split(arg))
+    self._jvm_options = context.config.getlist('scala-repl', 'jvm_args', default=[])
+    if context.options.run_jvm_options:
+      for arg in context.options.run_jvm_options:
+        self._jvm_options.extend(shlex.split(arg))
     self.confs = context.config.getlist('scala-repl', 'confs')
     self._bootstrap_key = 'scala-repl'
     bootstrap_tools = context.config.getlist('scala-repl', 'bootstrap-tools')
@@ -58,7 +58,7 @@ class ScalaRepl(JvmTask):
 
     tools_classpath = self._bootstrap_utils.get_jvm_build_tools_classpath(self._bootstrap_key)
     kwargs = {
-      'jvmargs': self.jvm_args,
+      'jvm_options': self._jvm_options,
       'classpath': self.classpath(tools_classpath, confs=self.confs,
             exclusives_classpath=self.get_base_classpath_for_target(targets[0])),
       'main': self.main,
@@ -84,10 +84,10 @@ class ScalaRepl(JvmTask):
     execution, so if you have a terminal with non-default stty options, you end
     up to a broken terminal (need to do a 'reset').
     """
-    self.stty_options = self.run_cmd("stty -g 2>/dev/null")
+    self.stty_options = self.run_cmd('stty -g 2>/dev/null')
 
   def restore_ssty_options(self):
-    self.run_cmd("stty " + self.stty_options)
+    self.run_cmd('stty ' + self.stty_options)
 
   def run_cmd(self, cmd):
     po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)

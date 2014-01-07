@@ -620,12 +620,12 @@ class JarPublish(Task):
           path = repo.get('path')
 
           # Get authentication for the publish repo if needed
-          jvmargs = []
+          jvm_options = []
           auth = repo['auth']
           if auth:
             user, password = auth
-            jvmargs.append('-Dlogin=%s' % user)
-            jvmargs.append('-Dpassword=%s' % password)
+            jvm_options.append('-Dlogin=%s' % user)
+            jvm_options.append('-Dpassword=%s' % password)
 
           # Do the publish
           ivysettings = self.generate_ivysettings(published, publish_local=path)
@@ -642,7 +642,7 @@ class JarPublish(Task):
           if self.snapshot:
             opts.append('-overwrite')
 
-          result = binary_util.runjava_indivisible(jvmargs=jvmargs, classpath=self.ivycp,
+          result = binary_util.runjava_indivisible(jvm_options=jvm_options, classpath=self.ivycp,
                                                    opts=opts, workunit_name='ivy')
           if result != 0:
             raise TaskError('Failed to push %s - ivy failed with %d' % (
@@ -663,7 +663,7 @@ class JarPublish(Task):
             if self.snapshot:
               opts.append('-overwrite')
 
-            result = binary_util.runjava_indivisible(jvmargs=jvmargs, classpath=self.ivycp,
+            result = binary_util.runjava_indivisible(jvm_options=jvm_options, classpath=self.ivycp,
                                                      opts=opts, workunit_name='ivy')
             if result != 0:
               raise TaskError('Failed to push %s - ivy failed with %d' % (

@@ -42,10 +42,10 @@ class ZincUtils(object):
 
   Instances are immutable, and all methods are reentrant (assuming that the java_runner is).
   """
-  def __init__(self, context, nailgun_task, jvm_args, color, bootstrap_utils):
+  def __init__(self, context, nailgun_task, jvm_options, color, bootstrap_utils):
     self.context = context
     self._nailgun_task = nailgun_task  # We run zinc on this task's behalf.
-    self._jvm_args = jvm_args
+    self._jvm_options = jvm_options
     self._color = color
     self._bootstrap_utils = bootstrap_utils
 
@@ -132,7 +132,7 @@ class ZincUtils(object):
     return self._nailgun_task.runjava_indivisible(self._main,
                                                   classpath=self._zinc_classpath,
                                                   args=zinc_args,
-                                                  jvmargs=self._jvm_args,
+                                                  jvm_options=self._jvm_options,
                                                   workunit_name=workunit_name,
                                                   workunit_labels=workunit_labels)
 

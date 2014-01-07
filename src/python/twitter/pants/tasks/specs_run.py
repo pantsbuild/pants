@@ -27,25 +27,25 @@ from twitter.pants.tasks.jvm_task import JvmTask
 class SpecsRun(JvmTask):
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
-    option_group.add_option(mkflag("skip"), mkflag("skip", negate=True), dest = "specs_run_skip",
-                            action="callback", callback=mkflag.set_bool, default=False,
-                            help = "[%default] Skip running specs")
+    option_group.add_option(mkflag('skip'), mkflag('skip', negate=True), dest = 'specs_run_skip',
+                            action='callback', callback=mkflag.set_bool, default=False,
+                            help = '[%default] Skip running specs')
 
-    option_group.add_option(mkflag("debug"), mkflag("debug", negate=True), dest = "specs_run_debug",
-                            action="callback", callback=mkflag.set_bool, default=False,
-                            help = "[%default] Run specs with a debugger")
+    option_group.add_option(mkflag('debug'), mkflag('debug', negate=True), dest = 'specs_run_debug',
+                            action='callback', callback=mkflag.set_bool, default=False,
+                            help = '[%default] Run specs with a debugger')
 
-    option_group.add_option(mkflag("jvmargs"), dest = "specs_run_jvmargs", action="append",
-                            help = "Runs specs in a jvm with these extra jvm args.")
+    option_group.add_option(mkflag('jvmargs'), dest = 'specs_run_jvm_options', action='append',
+                            help = 'Runs specs in a jvm with these extra jvm options.')
 
-    option_group.add_option(mkflag("test"), dest = "specs_run_tests", action="append",
-                            help = "[%default] Force running of just these specs.  Tests can be "
-                                   "specified either by classname or filename.")
+    option_group.add_option(mkflag('test'), dest = 'specs_run_tests', action='append',
+                            help = '[%default] Force running of just these specs.  Tests can be '
+                                   'specified either by classname or filename.')
 
-    option_group.add_option(mkflag("color"), mkflag("color", negate=True),
-                            dest="specs_run_color", default=True,
-                            action="callback", callback=mkflag.set_bool,
-                            help="[%default] Emit test result with ANSI terminal color codes.")
+    option_group.add_option(mkflag('color'), mkflag('color', negate=True),
+                            dest='specs_run_color', default=True,
+                            action='callback', callback=mkflag.set_bool,
+                            help='[%default] Emit test result with ANSI terminal color codes.')
 
   def __init__(self, context):
     Task.__init__(self, context)
@@ -57,11 +57,11 @@ class SpecsRun(JvmTask):
     
     self.confs = context.config.getlist('specs-run', 'confs')
 
-    self.java_args = context.config.getlist('specs-run', 'args', default=[])
-    if context.options.specs_run_jvmargs:
-      self.java_args.extend(context.options.specs_run_jvmargs)
+    self._jvm_options = context.config.getlist('specs-run', 'args', default=[])
+    if context.options.specs_run_jvm_options:
+      self._jvm_options.extend(context.options.specs_run_jvm_options)
     if context.options.specs_run_debug:
-      self.java_args.extend(context.config.getlist('jvm', 'debug_args'))
+      self._jvm_options.extend(context.config.getlist('jvm', 'debug_args'))
 
     self.skip = context.options.specs_run_skip
     self.color = context.options.specs_run_color
@@ -82,7 +82,7 @@ class SpecsRun(JvmTask):
         bootstrapped_cp = self._bootstrap_utils.get_jvm_build_tools_classpath(self._specs_bootstrap_key)
 
         result = runjava_indivisible(
-          jvmargs=self.java_args,
+          jvm_options=self._jvm_options,
           classpath=self.classpath(bootstrapped_cp,
                                    confs=self.confs,
                                    exclusives_classpath=self.get_base_classpath_for_target(targets[0])),

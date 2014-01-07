@@ -95,8 +95,8 @@ class JvmCompile(NailgunTask):
       self._partition_size_hint = \
         context.config.getint(config_section, 'partition_size_hint', default=1000)
 
-    # JVM args for running the compiler.
-    self._jvm_args = context.config.getlist(config_section, 'jvm_args')
+    # JVM options for running the compiler.
+    self._jvm_options = context.config.getlist(config_section, 'jvm_args')
 
     # The ivy confs for which we're building.
     self._confs = context.config.getlist(config_section, 'confs')

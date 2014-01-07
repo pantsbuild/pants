@@ -54,7 +54,7 @@ class ScalaCompile(JvmCompile):
     color = not context.options.no_color
     self._zinc_utils = ZincUtils(context=context,
                                  nailgun_task=self,
-                                 jvm_args = self._jvm_args,
+                                 jvm_options = self._jvm_options,
                                  color=color,
                                  bootstrap_utils=self._bootstrap_utils)
 

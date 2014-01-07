@@ -34,32 +34,33 @@ def is_binary(target):
 class JvmRun(JvmTask):
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
-    option_group.add_option(mkflag("jvmargs"), dest = "run_jvmargs", action="append",
-      help = "Run binary in a jvm with these extra jvm args.")
+    # TODO: Change flag name to jvm-options.
+    option_group.add_option(mkflag('jvmargs'), dest = 'run_jvm_options', action='append',
+      help = 'Run binary in a jvm with these extra jvm options.')
 
-    option_group.add_option(mkflag("args"), dest = "run_args", action="append",
-      help = "Run binary with these main() args.")
+    option_group.add_option(mkflag('args'), dest = 'run_args', action='append',
+      help = 'Run binary with these main() args.')
 
-    option_group.add_option(mkflag("debug"), mkflag("debug", negate=True), dest = "run_debug",
-      action="callback", callback=mkflag.set_bool, default=False,
-      help = "[%default] Run binary with a debugger")
+    option_group.add_option(mkflag('debug'), mkflag('debug', negate=True), dest = 'run_debug',
+      action='callback', callback=mkflag.set_bool, default=False,
+      help = '[%default] Run binary with a debugger')
 
-    option_group.add_option(mkflag("only-write-cmd-line"), dest = "only_write_cmd_line",
-      action="store", default=None,
-      help = "[%default] Instead of running, just write the cmd line to this file")
+    option_group.add_option(mkflag('only-write-cmd-line'), dest = 'only_write_cmd_line',
+      action='store', default=None,
+      help = '[%default] Instead of running, just write the cmd line to this file')
 
   def __init__(self, context):
     Task.__init__(self, context)
-    self.jvm_args = context.config.getlist('jvm-run', 'jvm_args', default=[])
-    if context.options.run_jvmargs:
-      for arg in context.options.run_jvmargs:
-        self.jvm_args.extend(shlex.split(arg))
+    self.jvm_options = context.config.getlist('jvm-run', 'jvm_args', default=[])
+    if context.options.run_jvm_options:
+      for arg in context.options.run_jvm_options:
+        self.jvm_options.extend(shlex.split(arg))
     self.args = []
     if context.options.run_args:
       for arg in context.options.run_args:
         self.args.extend(shlex.split(arg))
     if context.options.run_debug:
-      self.jvm_args.extend(context.config.getlist('jvm', 'debug_args'))
+      self.jvm_options.extend(context.config.getlist('jvm', 'debug_args'))
     self.confs = context.config.getlist('jvm-run', 'confs')
     self.only_write_cmd_line = context.options.only_write_cmd_line
     context.products.require_data('exclusives_groups')
@@ -92,7 +93,7 @@ class JvmRun(JvmTask):
           return self.context.new_workunit(name=name, labels=[WorkUnit.RUN] + labels, cmd=cmd)
 
         result = runjava_indivisible(
-          jvmargs=self.jvm_args,
+          jvm_options=self.jvm_options,
           classpath=(self.classpath(confs=self.confs, exclusives_classpath=group_classpath)),
           main=main,
           args=self.args,

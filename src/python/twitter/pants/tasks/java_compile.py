@@ -259,7 +259,7 @@ class JavaCompile(JvmCompile):
                                     classpath=jmake_classpath,
                                     opts=opts,
                                     args=sources,
-                                    jvmargs=self._jvm_args,
+                                    jvm_options=self._jvm_options,
                                     workunit_name='jmake',
                                     workunit_labels=[WorkUnit.COMPILER])
 
