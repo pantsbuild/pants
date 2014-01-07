@@ -70,7 +70,7 @@ class IvyUtils(object):
 
     self._ivy_settings = config.get('ivy', 'ivy_settings')
     self._transitive = config.getbool('ivy-resolve', 'transitive')
-    self._opts = config.getlist('ivy-resolve', 'args')
+    self._args = config.getlist('ivy-resolve', 'args')
     self._work_dir = config.get('ivy-resolve', 'workdir')
     self._template_path = os.path.join('templates', 'ivy_resolve', 'ivy.mustache')
     self._confs = config.getlist('ivy-resolve', 'confs')
@@ -375,7 +375,7 @@ class IvyUtils(object):
     ivy_args.extend(args)
     if not self._transitive:
       ivy_args.append('-notransitive')
-    ivy_args.extend(self._opts)
+    ivy_args.extend(self._args)
 
     runjava_args = dict(
       main='org.apache.ivy.Main',

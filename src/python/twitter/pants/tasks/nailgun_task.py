@@ -96,14 +96,13 @@ class NailgunTask(Task):
     # Prevent concurrency issues when starting up a nailgun.
     self._spawn_lock = threading.Lock()
 
-  def _runjava_common(self, runjava, main, classpath=None, opts=None, args=None, jvm_options=None,
+  def _runjava_common(self, runjava, main, classpath=None, args=None, jvm_options=None,
                       workunit_name=None, workunit_labels=None):
     workunit_labels = workunit_labels[:] if workunit_labels else []
     cp = classpath or []
     cmd_str = binary_util.runjava_cmd_str(jvm_options=jvm_options,
                                           classpath=cp,
                                           main=main,
-                                          opts=opts,
                                           args=args)
     workunit_name = workunit_name or main
     if self._daemon:
@@ -123,12 +122,7 @@ class NailgunTask(Task):
         try:
           if cp:
             call_nailgun('ng-cp', *[os.path.relpath(jar, get_buildroot()) for jar in cp])
-          opts_args = []
-          if opts:
-            opts_args.extend(opts)
-          if args:
-            opts_args.extend(args)
-          ret = call_nailgun(main, *opts_args)
+          ret = call_nailgun(main, *args)
           workunit.set_outcome(WorkUnit.FAILURE if ret else WorkUnit.SUCCESS)
           return ret
         except NailgunError:
@@ -137,7 +131,7 @@ class NailgunTask(Task):
     else:
       def runjava_workunit_factory(name, labels=list(), cmd=''):
         return self.context.new_workunit(name=name, labels=workunit_labels + labels, cmd=cmd)
-      ret = runjava(main=main, classpath=cp, opts=opts, args=args, jvm_options=jvm_options,
+      ret = runjava(main=main, classpath=cp, args=args, jvm_options=jvm_options,
                     workunit_factory=runjava_workunit_factory, workunit_name=workunit_name,
                     dryrun=self.dry_run)
       if self.dry_run:
@@ -146,7 +140,7 @@ class NailgunTask(Task):
       else:
         return ret
 
-  def runjava(self, main, classpath=None, opts=None, args=None, jvm_options=None, workunit_name=None,
+  def runjava(self, main, classpath=None, args=None, jvm_options=None, workunit_name=None,
               workunit_factory=None):
     """Runs the java main using the given classpath and args.
 
@@ -159,9 +153,9 @@ class NailgunTask(Task):
     # binary_util.runjava, but in fact it is just thrown away and a new one will be used
     # in NailgunTask._runjava_common
     return self._runjava_common(binary_util.runjava, main=main, classpath=classpath,
-                                opts=opts, args=args, jvm_options=jvm_options, workunit_name=workunit_name)
+                                args=args, jvm_options=jvm_options, workunit_name=workunit_name)
 
-  def runjava_indivisible(self, main, classpath=None, opts=None, args=None, jvm_options=None,
+  def runjava_indivisible(self, main, classpath=None, args=None, jvm_options=None,
                           workunit_name=None, workunit_labels=None, workunit_factory=None):
     """Runs the java main using the given classpath and args.
 
@@ -172,7 +166,7 @@ class NailgunTask(Task):
     """
     # TODO(pl): See above comment on runjava regarding workunit_factory
     return self._runjava_common(binary_util.runjava_indivisible, main=main, classpath=classpath,
-                                opts=opts, args=args, jvm_options=jvm_options, workunit_name=workunit_name,
+                                args=args, jvm_options=jvm_options, workunit_name=workunit_name,
                                 workunit_labels=workunit_labels)
 
   @staticmethod
