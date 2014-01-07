@@ -76,8 +76,8 @@ class SpecsRun(JvmTask):
         def workunit_factory(name, labels=list(), cmd=''):
             return self.context.new_workunit(name=name, labels=[WorkUnit.TEST] + labels, cmd=cmd)
 
-        opts = ['--color'] if self.color else []
-        opts.append('--specs=%s' % ','.join(tests))
+        args = ['--color'] if self.color else []
+        args.append('--specs=%s' % ','.join(tests))
 
         bootstrapped_cp = self._bootstrap_utils.get_jvm_build_tools_classpath(self._specs_bootstrap_key)
 
@@ -87,7 +87,7 @@ class SpecsRun(JvmTask):
                                    confs=self.confs,
                                    exclusives_classpath=self.get_base_classpath_for_target(targets[0])),
           main='com.twitter.common.testing.ExplicitSpecsRunnerMain',
-          opts=opts,
+          args=args,
           workunit_factory=workunit_factory,
           workunit_name='specs'
         )

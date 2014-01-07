@@ -188,22 +188,22 @@ class JUnitRun(JvmTask):
     self.coverage = self.coverage or self.coverage_report_html_open
     self.coverage_html_file = os.path.join(self.coverage_dir, 'html', 'index.html')
 
-    self.opts = []
+    self._args = []
     if context.options.junit_run_xmlreport or context.options.junit_run_suppress_output:
       if self.fail_fast:
-        self.opts.append('-fail-fast')
+        self._args.append('-fail-fast')
       if context.options.junit_run_xmlreport:
-        self.opts.append('-xmlreport')
-      self.opts.append('-suppress-output')
-      self.opts.append('-outdir')
-      self.opts.append(self.outdir)
+        self._args.append('-xmlreport')
+      self._args.append('-suppress-output')
+      self._args.append('-outdir')
+      self._args.append(self.outdir)
 
     if context.options.junit_run_per_test_timer:
-      self.opts.append('-per-test-timer')
+      self._args.append('-per-test-timer')
     if context.options.junit_run_default_parallel:
-      self.opts.append('-default-parallel')
-    self.opts.append('-parallel-threads')
-    self.opts.append(str(context.options.junit_run_parallel_threads))
+      self._args.append('-default-parallel')
+    self._args.append('-parallel-threads')
+    self._args.append(str(context.options.junit_run_parallel_threads))
 
   def _partition(self, tests):
     stride = min(self.batch_size, len(tests))
@@ -230,12 +230,12 @@ class JUnitRun(JvmTask):
           result = 0
           for batch in self._partition(tests):
             with binary_util.safe_args(batch) as batch_tests:
+              args = self._args + batch_tests
               result += abs(binary_util.runjava_indivisible(
                 jvm_options=(jvm_options or []) + self.jvm_options,
                 classpath=classpath,
                 main=main,
-                opts=self.opts,
-                args=batch_tests,
+                args=args,
                 workunit_factory=test_workunit_factory,
                 workunit_name='run'
               ))
@@ -250,7 +250,7 @@ class JUnitRun(JvmTask):
           def instrument_code():
             safe_mkdir(self.coverage_instrument_dir, clean=True)
             with binary_util.safe_args(self.get_coverage_patterns(targets)) as patterns:
-              opts = [
+              args = [
                 'instr',
                 '-out', self.coverage_metadata_file,
                 '-d', self.coverage_instrument_dir,
@@ -258,14 +258,14 @@ class JUnitRun(JvmTask):
                 '-exit'
               ]
               for pattern in patterns:
-                opts.extend(['-filter', pattern])
+                args.extend(['-filter', pattern])
               result = binary_util.runjava_indivisible(classpath=emma_classpath, main='emma',
-                                                       opts=opts, workunit_name='emma')
+                                                       args=args, workunit_name='emma')
               if result != 0:
                 raise TaskError('Emma instrumentation failed with: %d' % result)
 
           def generate_reports():
-            opts = [
+            args = [
               'report',
               '-in', self.coverage_metadata_file,
               '-in', self.coverage_file,
@@ -278,23 +278,23 @@ class JUnitRun(JvmTask):
             for target in self.test_target_candidates(targets):
               target.walk(collect_source_base)
             for source_base in source_bases:
-              opts.extend(['-sp', source_base])
+              args.extend(['-sp', source_base])
 
             sorting = ['-Dreport.sort', '+name,+class,+method,+block']
             if self.coverage_report_console:
-              opts.extend(['-r', 'txt',
+              args.extend(['-r', 'txt',
                            '-Dreport.txt.out.file=%s' % self.coverage_console_file] + sorting)
             if self.coverage_report_xml:
-              opts.extend(['-r', 'xml','-Dreport.xml.out.file=%s' % self.coverage_xml_file])
+              args.extend(['-r', 'xml','-Dreport.xml.out.file=%s' % self.coverage_xml_file])
             if self.coverage_report_html:
-              opts.extend(['-r', 'html',
+              args.extend(['-r', 'html',
                            '-Dreport.html.out.file=%s' % self.coverage_html_file,
                            '-Dreport.out.encoding=UTF-8'] + sorting)
 
             result = binary_util.runjava_indivisible(
               classpath=emma_classpath,
               main='emma',
-              opts=opts,
+              args=args,
               workunit_name='emma'
             )
             if result != 0:

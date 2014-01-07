@@ -367,19 +367,19 @@ class IvyUtils(object):
     ivyxml = os.path.join(target_workdir, 'ivy.xml')
     jars, excludes = self._calculate_classpath(targets)
 
-    ivy_opts = [
+    ivy_args = [
       '-settings', self._ivy_settings,
       '-cache', self._cachedir,
       '-ivy', ivyxml,
     ]
-    ivy_opts.extend(args)
+    ivy_args.extend(args)
     if not self._transitive:
-      ivy_opts.append('-notransitive')
-    ivy_opts.extend(self._opts)
+      ivy_args.append('-notransitive')
+    ivy_args.extend(self._opts)
 
     runjava_args = dict(
       main='org.apache.ivy.Main',
-      opts=ivy_opts,
+      args=ivy_args,
       workunit_name=workunit_name,
       classpath=ivy_classpath,
       workunit_factory=workunit_factory,

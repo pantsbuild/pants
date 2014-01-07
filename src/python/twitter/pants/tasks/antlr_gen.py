@@ -63,21 +63,20 @@ class AntlrGen(CodeGen, NailgunTask):
 
       antlr_classpath = self._bootstrap_utils.get_jvm_build_tools_classpath(target.compiler,
                                                                             self.runjava_indivisible)
-      antlr_opts = ["-o", java_out]
-
-      java_main = None
+      args = ["-o", java_out]
 
       if target.compiler == 'antlr3':
         java_main = 'org.antlr.Tool'
       elif target.compiler == 'antlr4':
-        antlr_opts.append("-visitor") # Generate Parse Tree Vistor As Well
+        args.append("-visitor") # Generate Parse Tree Vistor As Well
         java_main = 'org.antlr.v4.Tool'
       else:
         raise TaskError("Unknown ANTLR compiler: {}".format(target.compiler))
 
       sources = self._calculate_sources([target])
-      result = self.runjava_indivisible(java_main, classpath=antlr_classpath,
-                                        opts=antlr_opts, args=sources, workunit_name='antlr')
+      args.extend(sources)
+      result = self.runjava_indivisible(java_main, classpath=antlr_classpath, args=args,
+                                        workunit_name='antlr')
       if result != 0:
         raise TaskError
 

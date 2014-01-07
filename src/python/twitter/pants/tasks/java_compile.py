@@ -239,7 +239,7 @@ class JavaCompile(JvmCompile):
   def compile(self, classpath, sources, fingerprint, depfile):
     jmake_classpath = self._bootstrap_utils.get_jvm_build_tools_classpath(self._jmake_bootstrap_key,
                                                                           self.runjava_indivisible)
-    opts = [
+    args = [
       '-classpath', ':'.join(classpath),
       '-d', self._classes_dir,
       '-pdb', os.path.join(self._classes_dir, '%s.dependencies.pdb' % fingerprint),
@@ -247,19 +247,19 @@ class JavaCompile(JvmCompile):
 
     compiler_classpath = self._bootstrap_utils.get_jvm_build_tools_classpath(self._compiler_bootstrap_key,
                                                                              self.runjava_indivisible)
-    opts.extend([
+    args.extend([
       '-jcpath', ':'.join(compiler_classpath),
       '-jcmainclass', 'com.twitter.common.tools.Compiler',
       '-C-Tdependencyfile', '-C%s' % depfile,
     ])
-    opts.extend(map(lambda arg: '-C%s' % arg, self._javac_opts))
+    args.extend(map(lambda arg: '-C%s' % arg, self._javac_opts))
 
-    opts.extend(self._opts)
+    args.extend(self._args)
+    args.extend(sources)
     return self.runjava_indivisible(_JMAKE_MAIN,
                                     classpath=jmake_classpath,
-                                    opts=opts,
-                                    args=sources,
                                     jvm_options=self._jvm_options,
+                                    args=args,
                                     workunit_name='jmake',
                                     workunit_labels=[WorkUnit.COMPILER])
 

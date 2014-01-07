@@ -629,7 +629,7 @@ class JarPublish(Task):
 
           # Do the publish
           ivysettings = self.generate_ivysettings(published, publish_local=path)
-          opts = [
+          args = [
             '-settings', ivysettings,
             '-ivy', ivyxml,
             '-deliverto', '%s/[organisation]/[module]/ivy-[revision].xml' % self.outdir,
@@ -640,17 +640,17 @@ class JarPublish(Task):
             '-m2compatible',
           ]
           if self.snapshot:
-            opts.append('-overwrite')
+            args.append('-overwrite')
 
           result = binary_util.runjava_indivisible(jvm_options=jvm_options, classpath=self.ivycp,
-                                                   opts=opts, workunit_name='ivy')
+                                                   args=args, workunit_name='ivy')
           if result != 0:
             raise TaskError('Failed to push %s - ivy failed with %d' % (
               jar_coordinate(jar, newver.version()), result)
             )
 
           if (synth_target):
-            opts = [
+            args = [
               '-settings', ivysettings,
               '-ivy', idl_ivyxml,
               '-deliverto', '%s/[organisation]/[module]/ivy-[revision].xml' % self.outdir,
@@ -661,10 +661,10 @@ class JarPublish(Task):
               '-m2compatible',
             ]
             if self.snapshot:
-              opts.append('-overwrite')
+              args.append('-overwrite')
 
             result = binary_util.runjava_indivisible(jvm_options=jvm_options, classpath=self.ivycp,
-                                                     opts=opts, workunit_name='ivy')
+                                                     args=args, workunit_name='ivy')
             if result != 0:
               raise TaskError('Failed to push %s - ivy failed with %d' % (
                 jar_coordinate(jar, newver.version()), result)

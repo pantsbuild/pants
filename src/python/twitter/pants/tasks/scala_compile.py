@@ -331,7 +331,7 @@ class ScalaCompile(JvmCompile):
         # analysis for previous partitions.
         classpath.append(self._classes_dir)
         upstream = { self._classes_dir: self._analysis_file }
-        if self._zinc_utils.compile(self._opts, classpath, sources, self._classes_dir, analysis_file, upstream):
+        if self._zinc_utils.compile(self._args, classpath, sources, self._classes_dir, analysis_file, upstream):
           raise TaskError('Compile failed.')
 
   def _compute_sources_by_target(self, targets):

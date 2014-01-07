@@ -129,68 +129,68 @@ class ScroogeGen(NailgunTask):
     # actually doing the work of generating)
     # AWESOME-1563
 
-    PartialCmd = namedtuple('PartialCmd', ['classpath', 'main', 'opts'])
+    PartialCmd = namedtuple('PartialCmd', ['classpath', 'main', 'args'])
 
     partial_cmds = defaultdict(set)
     gentargets = filter(is_gentarget, targets)
 
     for target in gentargets:
-      opts = []
+      args = []
 
       language = target.language
-      opts.append(('--language', language))
+      args.append(('--language', language))
 
       if target.rpc_style == 'ostrich':
-        opts.append(('--finagle',))
-        opts.append(('--ostrich',))
+        args.append(('--finagle',))
+        args.append(('--ostrich',))
       elif target.rpc_style == 'finagle':
-        opts.append(('--finagle',))
+        args.append(('--finagle',))
 
       if target.namespace_map:
         for lhs, rhs in namespace_map([target]).items():
-          opts.append(('--namespace-map', '%s=%s' % (lhs, rhs)))
+          args.append(('--namespace-map', '%s=%s' % (lhs, rhs)))
 
       outdir = self._outdir(target)
-      opts.append(('--dest', '%s' % outdir))
+      args.append(('--dest', '%s' % outdir))
       safe_mkdir(outdir)
 
       if not self._strict(target):
-        opts.append(('--disable-strict',))
+        args.append(('--disable-strict',))
 
       if self._verbose(target):
-        opts.append(('--verbose',))
+        args.append(('--verbose',))
 
       classpath = self._classpth(target)
       main = INFO_FOR_COMPILER[target.compiler]['main']
 
-      partial_cmd = PartialCmd(tuple(classpath), main, tuple(opts))
+      partial_cmd = PartialCmd(tuple(classpath), main, tuple(args))
       partial_cmds[partial_cmd].add(target)
 
     for partial_cmd, targets in partial_cmds.items():
       classpath = partial_cmd.classpath
       main =      partial_cmd.main
-      opts = list(partial_cmd.opts)
+      args = list(partial_cmd.args)
 
       compiler = list(targets)[0].compiler # any target will do (they all have the same compiler)
       calculate_compile_sources = INFO_FOR_COMPILER[compiler]['calculate_compile_sources']
       import_paths, sources = calculate_compile_sources(targets, is_gentarget)
 
       for import_path in import_paths:
-        opts.append(('--import-path', import_path))
+        args.append(('--import-path', import_path))
 
       gen_file_map_fd, gen_file_map_path = tempfile.mkstemp()
       os.close(gen_file_map_fd)
-      opts.append(('--gen-file-map', gen_file_map_path))
+      args.append(('--gen-file-map', gen_file_map_path))
+      args.extend(sources)
 
       cmdline = JvmCommandLine(classpath=classpath,
                                main=main,
-                               opts=opts,
-                               args=sources)
+                               args=args)
 
       returncode = cmdline.call()
 
       if 0 == returncode:
-        outdir = value_from_seq_of_seq(opts, '--dest')
+        outdir = value_from_seq_of_seq(args, '--dest')
         gen_files_for_source = self.parse_gen_file_map(gen_file_map_path, outdir)
       os.remove(gen_file_map_path)
 

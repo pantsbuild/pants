@@ -83,11 +83,11 @@ class JvmCompile(NailgunTask):
     self._analysis_tmpdir = os.path.join(self._analysis_dir, 'artifact_cache_tmpdir')
 
     # Compiler options.
-    self._opts = context.config.getlist(config_section, 'args')
+    self._args = context.config.getlist(config_section, 'args')
     if get_lang_specific_option('compile_warnings'):
-      self._opts.extend(context.config.getlist(config_section, 'warning_args'))
+      self._args.extend(context.config.getlist(config_section, 'warning_args'))
     else:
-      self._opts.extend(context.config.getlist(config_section, 'no_warning_args'))
+      self._args.extend(context.config.getlist(config_section, 'no_warning_args'))
 
     # The rough number of source files to build in each compiler pass.
     self._partition_size_hint = get_lang_specific_option('partition_size_hint')

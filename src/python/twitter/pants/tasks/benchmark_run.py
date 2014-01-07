@@ -83,7 +83,7 @@ class BenchmarkRun(JvmTask):
       jvm_options=self.jvm_options,
       classpath=self.classpath(benchmark_tools_classpath),
       main='com.google.caliper.Runner',
-      opts=self.caliper_args,
+      args=self.caliper_args,
       workunit_name='caliper'
     )
     if exit_code != 0:
