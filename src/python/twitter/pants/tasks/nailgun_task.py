@@ -96,6 +96,9 @@ class NailgunTask(Task):
     # Prevent concurrency issues when starting up a nailgun.
     self._spawn_lock = threading.Lock()
 
+  def tool_classpath(self, key, java_runner=None):
+    return Task.tool_classpath(self, key, java_runner or self.runjava_indivisible)
+
   def _runjava_common(self, runjava, main, classpath=None, args=None, jvm_options=None,
                       workunit_name=None, workunit_labels=None):
     workunit_labels = workunit_labels[:] if workunit_labels else []
