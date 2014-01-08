@@ -22,12 +22,22 @@ class JvmToolBootstrapper(object):
     self._products = products
 
   def get_jvm_tool_classpath(self, key, java_runner=None):
-    """Get a callback to resolve the targets previously registered under the key."""
+    """Get a classpath for the tool previously registered under the key.
+
+    Returns a list of paths.
+    """
+    return self.get_lazy_jvm_tool_classpath(key, java_runner)()
+
+  def get_lazy_jvm_tool_classpath(self, key, java_runner=None):
+    """Get a lazy classpath for the tool previously registered under the key.
+
+    Returns a no-arg callable. Invoking it returns a list of paths.
+    """
     callback_product_map = self._products.get_data('jvm_build_tools_classpath_callbacks') or {}
     callback = callback_product_map.get(key)
     if not callback:
       raise TaskError('No bootstrap callback registered for %s' % key)
-    return callback(java_runner=java_runner)
+    return lambda: callback(java_runner=java_runner)
 
   def register_jvm_tool(self, key, tools):
     """Register a list of targets against a key.

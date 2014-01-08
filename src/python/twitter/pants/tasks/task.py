@@ -72,6 +72,9 @@ class Task(object):
   def tool_classpath(self, key, java_runner=None):
     return self._jvm_tool_bootstrapper.get_jvm_tool_classpath(key, java_runner)
 
+  def lazy_tool_classpath(self, key, java_runner=None):
+    return self.tool_classpath(key, java_runner)
+
   def setup_artifact_cache_from_config(self, config_section=None):
     """Subclasses can call this in their __init__() to set up artifact caching for that task type.
 
