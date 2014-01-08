@@ -134,14 +134,14 @@ class IdeGen(JvmBinaryTask):
     self.checkstyle_bootstrap_key = 'checkstyle'
     checkstyle = context.config.getlist('checkstyle', 'bootstrap-tools',
                                         default=[':twitter-checkstyle'])
-    self._bootstrap_utils.register_jvm_build_tools(self.checkstyle_bootstrap_key, checkstyle)
+    self._jvm_tool_bootstrapper.register_jvm_tool(self.checkstyle_bootstrap_key, checkstyle)
 
     self.scalac_bootstrap_key = None
     if not self.skip_scala:
       self.scalac_bootstrap_key = 'scalac'
       scalac = context.config.getlist('scala-compile', 'compile-bootstrap-tools',
                                       default=[':scala-compile-2.9.3'])
-      self._bootstrap_utils.register_jvm_build_tools(self.scalac_bootstrap_key, scalac)
+      self._jvm_tool_bootstrapper.register_jvm_tool(self.scalac_bootstrap_key, scalac)
 
     if self.python:
       self.context.products.require('python')
@@ -290,10 +290,10 @@ class IdeGen(JvmBinaryTask):
     """Stages IDE project artifacts to a project directory and generates IDE configuration files."""
     checkstyle_enabled = len(Phase.goals_of_type(Checkstyle)) > 0
     checkstyle_classpath = \
-      self._bootstrap_utils.get_jvm_build_tools_classpath(self.checkstyle_bootstrap_key) \
+      self._jvm_tool_bootstrapper.get_jvm_tool_classpath(self.checkstyle_bootstrap_key) \
       if checkstyle_enabled else []
     scalac_classpath = \
-      self._bootstrap_utils.get_jvm_build_tools_classpath(self.scalac_bootstrap_key) \
+      self._jvm_tool_bootstrapper.get_jvm_tool_classpath(self.scalac_bootstrap_key) \
       if self.scalac_bootstrap_key else []
 
     targets, self._project = self.configure_project(

@@ -34,7 +34,7 @@ from twitter.pants.binary_util import runjava_indivisible
 from twitter.pants.cache.read_write_artifact_cache import ReadWriteArtifactCache
 from twitter.pants.base.workunit import WorkUnit
 from twitter.pants.reporting.reporting_utils import items_to_report_element
-from twitter.pants.tasks.bootstrap_utils import BootstrapUtils
+from twitter.pants.tasks.bootstrap_utils import JvmToolBootstrapper
 from twitter.pants.tasks.cache_manager import CacheManager, InvalidationCheck, VersionedTargetSet
 from twitter.pants.tasks.ivy_utils import IvyUtils
 from twitter.pants.tasks.task_error import TaskError
@@ -64,7 +64,7 @@ class Task(object):
     self._artifact_cache_setup_lock = threading.Lock()
     self._build_invalidator_dir = os.path.join(context.config.get('tasks', 'build_invalidator'),
                                                self.product_type())
-    self._bootstrap_utils = BootstrapUtils(self.context.products)
+    self._jvm_tool_bootstrapper = JvmToolBootstrapper(self.context.products)
 
   def setup_artifact_cache_from_config(self, config_section=None):
     """Subclasses can call this in their __init__() to set up artifact caching for that task type.

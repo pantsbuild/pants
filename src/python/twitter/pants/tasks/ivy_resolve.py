@@ -84,7 +84,7 @@ class IvyResolve(NailgunTask):
 
     self._ivy_bootstrap_key = 'ivy'
     ivy_bootstrap_tools = context.config.getlist('ivy-resolve', 'bootstrap-tools', ':xalan')
-    self._bootstrap_utils.register_jvm_build_tools(self._ivy_bootstrap_key, ivy_bootstrap_tools)
+    self._jvm_tool_bootstrapper.register_jvm_tool(self._ivy_bootstrap_key, ivy_bootstrap_tools)
 
     self._ivy_utils = IvyUtils(config=context.config,
                                options=context.options,
@@ -183,8 +183,8 @@ class IvyResolve(NailgunTask):
       with open(report, 'w') as report_handle:
         print(no_deps_xml, file=report_handle)
 
-    classpath = self._bootstrap_utils.get_jvm_build_tools_classpath(self._ivy_bootstrap_key,
-                                                                    self.runjava_indivisible)
+    classpath = self._jvm_tool_bootstrapper.get_jvm_tool_classpath(self._ivy_bootstrap_key,
+                                                                   self.runjava_indivisible)
 
     reports = []
     org, name = self._ivy_utils.identify(targets)

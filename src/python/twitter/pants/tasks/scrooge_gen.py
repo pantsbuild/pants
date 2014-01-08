@@ -90,7 +90,7 @@ class ScroogeGen(NailgunTask):
       config = info['config']
       bootstrap_tools = context.config.getlist(config, 'bootstrap-tools',
                                                default=[':%s' % config])
-      self._bootstrap_utils.register_jvm_build_tools(config, bootstrap_tools)
+      self._jvm_tool_bootstrapper.register_jvm_tool(config, bootstrap_tools)
 
   def _outdir(self, target):
     compiler_config = INFO_FOR_COMPILER[target.compiler]['config']
@@ -111,7 +111,7 @@ class ScroogeGen(NailgunTask):
 
   def _classpth(self, target):
     key = INFO_FOR_COMPILER[target.compiler]['config']
-    return self._bootstrap_utils.get_jvm_build_tools_classpath(key)
+    return self._jvm_tool_bootstrapper.get_jvm_tool_classpath(key)
 
   def execute(self, targets):
     gentargets_by_dependee = self.context.dependents(

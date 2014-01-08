@@ -56,7 +56,7 @@ class ScalaCompile(JvmCompile):
                                  nailgun_task=self,
                                  jvm_options = self._jvm_options,
                                  color=color,
-                                 bootstrap_utils=self._bootstrap_utils)
+                                 jvm_tool_bootstrapper=self._jvm_tool_bootstrapper)
 
     self._analysis_file = os.path.join(self._analysis_dir, 'global_analysis.valid')
     self._invalid_analysis_file = os.path.join(self._analysis_dir, 'global_analysis.invalid')

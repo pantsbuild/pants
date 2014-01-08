@@ -79,12 +79,12 @@ class JavaCompile(JvmCompile):
 
     self._jmake_bootstrap_key = 'jmake'
     external_tools = context.config.getlist('java-compile', 'jmake-bootstrap-tools', default=[':jmake'])
-    self._bootstrap_utils.register_jvm_build_tools(self._jmake_bootstrap_key, external_tools)
+    self._jvm_tool_bootstrapper.register_jvm_tool(self._jmake_bootstrap_key, external_tools)
 
     self._compiler_bootstrap_key = 'java-compiler'
     compiler_bootstrap_tools = context.config.getlist('java-compile', 'compiler-bootstrap-tools',
                                                       default=[':java-compiler'])
-    self._bootstrap_utils.register_jvm_build_tools(self._compiler_bootstrap_key, compiler_bootstrap_tools)
+    self._jvm_tool_bootstrapper.register_jvm_tool(self._compiler_bootstrap_key, compiler_bootstrap_tools)
 
     self._javac_opts = []
     if context.options.java_compile_args:
@@ -237,16 +237,16 @@ class JavaCompile(JvmCompile):
     return sources_by_target
 
   def compile(self, classpath, sources, fingerprint, depfile):
-    jmake_classpath = self._bootstrap_utils.get_jvm_build_tools_classpath(self._jmake_bootstrap_key,
-                                                                          self.runjava_indivisible)
+    jmake_classpath = self._jvm_tool_bootstrapper.get_jvm_tool_classpath(self._jmake_bootstrap_key,
+                                                                         self.runjava_indivisible)
     args = [
       '-classpath', ':'.join(classpath),
       '-d', self._classes_dir,
       '-pdb', os.path.join(self._classes_dir, '%s.dependencies.pdb' % fingerprint),
     ]
 
-    compiler_classpath = self._bootstrap_utils.get_jvm_build_tools_classpath(self._compiler_bootstrap_key,
-                                                                             self.runjava_indivisible)
+    compiler_classpath = self._jvm_tool_bootstrapper.get_jvm_tool_classpath(self._compiler_bootstrap_key,
+                                                                            self.runjava_indivisible)
     args.extend([
       '-jcpath', ':'.join(compiler_classpath),
       '-jcmainclass', 'com.twitter.common.tools.Compiler',

@@ -144,11 +144,11 @@ class JUnitRun(JvmTask):
 
     self._junit_bootstrap_key = 'junit'
     junit_bootstrap_tools = context.config.getlist('junit-run', 'junit-bootstrap-tools', default=[':junit'])
-    self._bootstrap_utils.register_jvm_build_tools(self._junit_bootstrap_key, junit_bootstrap_tools)
+    self._jvm_tool_bootstrapper.register_jvm_tool(self._junit_bootstrap_key, junit_bootstrap_tools)
 
     self._emma_bootstrap_key = 'emma'
     emma_bootstrap_tools = context.config.getlist('junit-run', 'emma-bootstrap-tools', default=[':emma'])
-    self._bootstrap_utils.register_jvm_build_tools(self._emma_bootstrap_key, emma_bootstrap_tools)
+    self._jvm_tool_bootstrapper.register_jvm_tool(self._emma_bootstrap_key, emma_bootstrap_tools)
 
     self.jvm_options = context.config.getlist('junit-run', 'args', default=[])
     if context.options.junit_run_jvm_options:
@@ -215,7 +215,7 @@ class JUnitRun(JvmTask):
       tests = list(self.normalize_test_classes() if self.test_classes
                                                  else self.calculate_tests(targets))
       if tests:
-        bootstrapped_cp = self._bootstrap_utils.get_jvm_build_tools_classpath(self._junit_bootstrap_key)
+        bootstrapped_cp = self._jvm_tool_bootstrapper.get_jvm_tool_classpath(self._junit_bootstrap_key)
         junit_classpath = self.classpath(bootstrapped_cp,
                                          confs=self.confs,
                                          exclusives_classpath=self.get_base_classpath_for_target(targets[0]))
@@ -245,7 +245,7 @@ class JUnitRun(JvmTask):
             raise TaskError()
 
         if self.coverage:
-          emma_classpath = self._bootstrap_utils.get_jvm_build_tools_classpath(self._emma_bootstrap_key)
+          emma_classpath = self._jvm_tool_bootstrapper.get_jvm_tool_classpath(self._emma_bootstrap_key)
 
           def instrument_code():
             safe_mkdir(self.coverage_instrument_dir, clean=True)

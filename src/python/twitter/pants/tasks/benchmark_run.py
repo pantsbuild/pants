@@ -46,11 +46,11 @@ class BenchmarkRun(JvmTask):
     self._benchmark_bootstrap_key = 'benchmark-tool'
     benchmark_bootstrap_tools = config.getlist('benchmark-run', 'bootstrap-tools',
                                                default=[':benchmark-caliper-0.5'])
-    self._bootstrap_utils.register_jvm_build_tools(self._benchmark_bootstrap_key, benchmark_bootstrap_tools)
+    self._jvm_tool_bootstrapper.register_jvm_tool(self._benchmark_bootstrap_key, benchmark_bootstrap_tools)
     self._agent_bootstrap_key = 'benchmark-agent'
     agent_bootstrap_tools = config.getlist('benchmark-run', 'agent_profile',
                                            default=[':benchmark-java-allocation-instrumenter-2.1'])
-    self._bootstrap_utils.register_jvm_build_tools(self._agent_bootstrap_key, agent_bootstrap_tools)
+    self._jvm_tool_bootstrapper.register_jvm_tool(self._agent_bootstrap_key, agent_bootstrap_tools)
 
     # TODO(Steve Gury):
     # Find all the target classes from the Benchmark target itself
@@ -68,7 +68,7 @@ class BenchmarkRun(JvmTask):
     # For rewriting JDK classes to work, the JAR file has to be listed specifically in
     # the JAR manifest as something that goes in the bootclasspath.
     # The MANIFEST list a jar 'allocation.jar' this is why we have to rename it
-    agent_tools_classpath = self._bootstrap_utils.get_jvm_build_tools_classpath(self._agent_bootstrap_key)
+    agent_tools_classpath = self._jvm_tool_bootstrapper.get_jvm_tool_classpath(self._agent_bootstrap_key)
     agent_jar = agent_tools_classpath[0]
     allocation_jar = os.path.join(os.path.dirname(agent_jar), "allocation.jar")
 
@@ -77,7 +77,7 @@ class BenchmarkRun(JvmTask):
     shutil.copyfile(agent_jar, allocation_jar)
     os.environ['ALLOCATION_JAR'] = str(allocation_jar)
 
-    benchmark_tools_classpath = self._bootstrap_utils.get_jvm_build_tools_classpath(self._benchmark_bootstrap_key)
+    benchmark_tools_classpath = self._jvm_tool_bootstrapper.get_jvm_tool_classpath(self._benchmark_bootstrap_key)
 
     exit_code = runjava_indivisible(
       jvm_options=self.jvm_options,

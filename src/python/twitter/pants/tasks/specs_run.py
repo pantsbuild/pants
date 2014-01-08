@@ -53,7 +53,7 @@ class SpecsRun(JvmTask):
     self._specs_bootstrap_key = 'specs'
     bootstrap_tools = context.config.getlist('specs-run', 'bootstrap-tools',
                                              default=[':scala-specs-2.9.3'])
-    self._bootstrap_utils.register_jvm_build_tools(self._specs_bootstrap_key, bootstrap_tools)
+    self._jvm_tool_bootstrapper.register_jvm_tool(self._specs_bootstrap_key, bootstrap_tools)
     
     self.confs = context.config.getlist('specs-run', 'confs')
 
@@ -79,7 +79,7 @@ class SpecsRun(JvmTask):
         args = ['--color'] if self.color else []
         args.append('--specs=%s' % ','.join(tests))
 
-        bootstrapped_cp = self._bootstrap_utils.get_jvm_build_tools_classpath(self._specs_bootstrap_key)
+        bootstrapped_cp = self._jvm_tool_bootstrapper.get_jvm_tool_classpath(self._specs_bootstrap_key)
 
         result = runjava_indivisible(
           jvm_options=self._jvm_options,

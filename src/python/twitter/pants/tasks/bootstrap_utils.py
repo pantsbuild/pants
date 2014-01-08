@@ -17,11 +17,11 @@
 from twitter.pants.tasks.task_error import TaskError
 
 
-class BootstrapUtils(object):
+class JvmToolBootstrapper(object):
   def __init__(self, products):
     self._products = products
 
-  def get_jvm_build_tools_classpath(self, key, java_runner=None):
+  def get_jvm_tool_classpath(self, key, java_runner=None):
     """Get a callback to resolve the targets previously registered under the key."""
     callback_product_map = self._products.get_data('jvm_build_tools_classpath_callbacks') or {}
     callback = callback_product_map.get(key)
@@ -29,7 +29,7 @@ class BootstrapUtils(object):
       raise TaskError('No bootstrap callback registered for %s' % key)
     return callback(java_runner=java_runner)
 
-  def register_jvm_build_tools(self, key, tools):
+  def register_jvm_tool(self, key, tools):
     """Register a list of targets against a key.
 
     We can later use this key to get a callback that will resolve these targets.

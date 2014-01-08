@@ -40,7 +40,7 @@ class ScalaRepl(JvmTask):
     self.confs = context.config.getlist('scala-repl', 'confs')
     self._bootstrap_key = 'scala-repl'
     bootstrap_tools = context.config.getlist('scala-repl', 'bootstrap-tools')
-    self._bootstrap_utils.register_jvm_build_tools(self._bootstrap_key, bootstrap_tools)
+    self._jvm_tool_bootstrapper.register_jvm_tool(self._bootstrap_key, bootstrap_tools)
     self.main = context.config.get('scala-repl', 'main')
     self.args = context.config.getlist('scala-repl', 'args', default=[])
     if context.options.run_args:
@@ -56,7 +56,7 @@ class ScalaRepl(JvmTask):
     def repl_workunit_factory(name, labels=list(), cmd=''):
       return self.context.new_workunit(name=name, labels=[WorkUnit.REPL] + labels, cmd=cmd)
 
-    tools_classpath = self._bootstrap_utils.get_jvm_build_tools_classpath(self._bootstrap_key)
+    tools_classpath = self._jvm_tool_bootstrapper.get_jvm_tool_classpath(self._bootstrap_key)
     kwargs = {
       'jvm_options': self._jvm_options,
       'classpath': self.classpath(tools_classpath, confs=self.confs,

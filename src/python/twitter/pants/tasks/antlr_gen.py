@@ -39,7 +39,7 @@ class AntlrGen(CodeGen, NailgunTask):
     NailgunTask.__init__(self, context)
 
     for compiler, tools in self._all_possible_antlr_bootstrap_tools():
-      self._bootstrap_utils.register_jvm_build_tools(compiler, tools)
+      self._jvm_tool_bootstrapper.register_jvm_tool(compiler, tools)
 
   def is_gentarget(self, target):
     return isinstance(target, JavaAntlrLibrary)
@@ -61,8 +61,8 @@ class AntlrGen(CodeGen, NailgunTask):
       java_out = self._java_out(target)
       safe_mkdir(java_out)
 
-      antlr_classpath = self._bootstrap_utils.get_jvm_build_tools_classpath(target.compiler,
-                                                                            self.runjava_indivisible)
+      antlr_classpath = self._jvm_tool_bootstrapper.get_jvm_tool_classpath(target.compiler,
+                                                                           self.runjava_indivisible)
       args = ["-o", java_out]
 
       if target.compiler == 'antlr3':

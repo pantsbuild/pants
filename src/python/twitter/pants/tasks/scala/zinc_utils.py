@@ -42,12 +42,12 @@ class ZincUtils(object):
 
   Instances are immutable, and all methods are reentrant (assuming that the java_runner is).
   """
-  def __init__(self, context, nailgun_task, jvm_options, color, bootstrap_utils):
+  def __init__(self, context, nailgun_task, jvm_options, color, jvm_tool_bootstrapper):
     self.context = context
     self._nailgun_task = nailgun_task  # We run zinc on this task's behalf.
     self._jvm_options = jvm_options
     self._color = color
-    self._bootstrap_utils = bootstrap_utils
+    self._jvm_tool_bootstrapper = jvm_tool_bootstrapper
 
     self._pants_home = get_buildroot()
 
@@ -55,19 +55,19 @@ class ZincUtils(object):
     self._compile_bootstrap_key = 'scalac'
     compile_bootstrap_tools = context.config.getlist('scala-compile', 'compile-bootstrap-tools',
                                                      default=[':scala-compile-2.9.3'])
-    self._bootstrap_utils.register_jvm_build_tools(self._compile_bootstrap_key, compile_bootstrap_tools)
+    self._jvm_tool_bootstrapper.register_jvm_tool(self._compile_bootstrap_key, compile_bootstrap_tools)
 
     # The zinc version (and the scala version it needs, which may differ from the target version).
     self._zinc_bootstrap_key = 'zinc'
     zinc_bootstrap_tools = context.config.getlist('scala-compile', 'zinc-bootstrap-tools', default=[':zinc'])
-    self._bootstrap_utils.register_jvm_build_tools(self._zinc_bootstrap_key, zinc_bootstrap_tools)
+    self._jvm_tool_bootstrapper.register_jvm_tool(self._zinc_bootstrap_key, zinc_bootstrap_tools)
 
     # Compiler plugins.
     plugins_bootstrap_tools = context.config.getlist('scala-compile', 'scalac-plugin-bootstrap-tools',
                                                      default=[])
     if plugins_bootstrap_tools:
       self._plugins_bootstrap_key = 'plugins'
-      self._bootstrap_utils.register_jvm_build_tools(self._plugins_bootstrap_key, plugins_bootstrap_tools)
+      self._jvm_tool_bootstrapper.register_jvm_tool(self._plugins_bootstrap_key, plugins_bootstrap_tools)
     else:
       self._plugins_bootstrap_key = None
 
@@ -79,16 +79,16 @@ class ZincUtils(object):
 
   @property
   def _zinc_classpath(self):
-    return self._bootstrap_utils.get_jvm_build_tools_classpath(self._zinc_bootstrap_key)
+    return self._jvm_tool_bootstrapper.get_jvm_tool_classpath(self._zinc_bootstrap_key)
 
   @property
   def _compiler_classpath(self):
-    return self._bootstrap_utils.get_jvm_build_tools_classpath(self._compile_bootstrap_key)
+    return self._jvm_tool_bootstrapper.get_jvm_tool_classpath(self._compile_bootstrap_key)
 
   @property
   def _plugin_jars(self):
     if self._plugins_bootstrap_key:
-      return self._bootstrap_utils.get_jvm_build_tools_classpath(self._plugins_bootstrap_key)
+      return self._jvm_tool_bootstrapper.get_jvm_tool_classpath(self._plugins_bootstrap_key)
     else:
       return []
 

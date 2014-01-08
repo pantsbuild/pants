@@ -78,7 +78,7 @@ class NailgunTask(Task):
     nailgun_bootstrap_tools = context.config.getlist('nailgun', 'bootstrap-tools',
                                                      default=[':nailgun-server'])
 
-    self._bootstrap_utils.register_jvm_build_tools(self._nailgun_bootstrap_key, nailgun_bootstrap_tools)
+    self._jvm_tool_bootstrapper.register_jvm_tool(self._nailgun_bootstrap_key, nailgun_bootstrap_tools)
 
     self._ng_server_args = context.config.getlist('nailgun', 'args')
     self._daemon = context.options.nailgun_daemon
@@ -247,7 +247,7 @@ class NailgunTask(Task):
       pass  # truncate
 
     ng_classpath = os.pathsep.join(
-      self._bootstrap_utils.get_jvm_build_tools_classpath(self._nailgun_bootstrap_key))
+      self._jvm_tool_bootstrapper.get_jvm_tool_classpath(self._nailgun_bootstrap_key))
 
     pid = os.fork()
     if pid != 0:
