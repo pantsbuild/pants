@@ -34,7 +34,7 @@ from twitter.pants.binary_util import runjava_indivisible
 from twitter.pants.cache.read_write_artifact_cache import ReadWriteArtifactCache
 from twitter.pants.base.workunit import WorkUnit
 from twitter.pants.reporting.reporting_utils import items_to_report_element
-from twitter.pants.tasks.bootstrap_utils import JvmToolBootstrapper
+from twitter.pants.tasks.jvm_tool_bootstrapper import JvmToolBootstrapper
 from twitter.pants.tasks.cache_manager import CacheManager, InvalidationCheck, VersionedTargetSet
 from twitter.pants.tasks.ivy_utils import IvyUtils
 from twitter.pants.tasks.task_error import TaskError
