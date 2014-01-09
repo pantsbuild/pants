@@ -40,10 +40,16 @@ object Scriptit {
       }
       val failed = results count (r => !r.success)
       if (failed > 0) {
-        val counted = sbt.Util.counted("test", "", "s", failed).getOrElse("test")
+        val counted = this.counted("test", "", "s", failed).getOrElse("test")
         sys.error(counted + " failed")
       }
     }
+  }
+
+  private def counted(prefix: String, single: String, plural: String, count: Int): Option[String] = count match {
+    case 0 => None
+    case 1 => Some("1 " + prefix + single)
+    case x => Some(x.toString + " " + prefix + plural)
   }
 
   def scriptitParser(scriptitBase: File, script: String): Parser[Seq[String]] =
