@@ -114,7 +114,9 @@ case class IncOptions(
   apiDiffContextSize: Int        = DefaultIncOptions.apiDiffContextSize,
   apiDumpDirectory: Option[File] = DefaultIncOptions.apiDumpDirectory,
   transactional: Boolean         = false,
-  backup: Option[File]           = None
+  backup: Option[File]           = None,
+  recompileOnMacroDef: Boolean   = DefaultIncOptions.recompileOnMacroDef,
+  nameHashing: Boolean           = DefaultIncOptions.nameHashing
 ) {
   def options: sbt.inc.IncOptions = {
     sbt.inc.IncOptions(
@@ -124,7 +126,9 @@ case class IncOptions(
       apiDebug,
       apiDiffContextSize,
       apiDumpDirectory,
-      classfileManager
+      classfileManager,
+      recompileOnMacroDef,
+      nameHashing
     )
   }
 
@@ -205,6 +209,10 @@ object Settings {
     int(       "-api-diff-context-size", "n",  "Diff context size (in lines) for API debug", (s: Settings, i: Int) => s.copy(incOptions = s.incOptions.copy(apiDiffContextSize = i))),
     boolean(   "-transactional",               "Restore previous class files on failure",    (s: Settings) => s.copy(incOptions = s.incOptions.copy(transactional = true))),
     file(      "-backup", "directory",         "Backup location (if transactional)",         (s: Settings, f: File) => s.copy(incOptions = s.incOptions.copy(backup = Some(f)))),
+    boolean(   "-recompileOnMacroDefDisabled", "Disable recompilation of all dependencies of a macro def",
+      (s: Settings) => s.copy(incOptions = s.incOptions.copy(recompileOnMacroDef = false))),
+    boolean(   "-nameHashing",                 "Enable improved (experimental) incremental compilation algorithm",
+      (s: Settings) => s.copy(incOptions = s.incOptions.copy(nameHashing = true))),
 
     header("Analysis options:"),
     file(      "-analysis-cache", "file",      "Cache file for compile analysis",            (s: Settings, f: File) => s.copy(analysis = s.analysis.copy(cache = Some(f)))),
