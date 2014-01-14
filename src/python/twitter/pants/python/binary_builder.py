@@ -26,6 +26,7 @@ from twitter.pants.base import Config
 from twitter.pants.targets import PythonBinary
 from twitter.pants.python.python_chroot import PythonChroot
 
+
 class PythonBinaryBuilder(object):
   class NotABinaryTargetException(Exception): pass
 
@@ -37,19 +38,7 @@ class PythonBinaryBuilder(object):
     config = Config.load()
     self.distdir = config.getdefault('pants_distdir')
     distpath = tempfile.mktemp(dir=self.distdir, prefix=target.name)
-    self.builder = PEXBuilder(distpath)
-
-    # configure builder PexInfo options
-    for repo in target._repositories:
-      self.builder.info().add_repository(repo)
-    for index in target._indices:
-      self.builder.info().add_index(index)
-    self.builder.info().allow_pypi = target._allow_pypi
-    self.builder.info().zip_safe = target._zip_safe
-    self.builder.info().inherit_path = target._inherit_path
-    self.builder.info().entry_point = target._entry_point
-    self.builder.info().ignore_errors = target._ignore_errors
-
+    self.builder = PEXBuilder(distpath, pex_info=target.pexinfo)
     self.chroot = PythonChroot(target, root_dir, builder=self.builder, conn_timeout=conn_timeout)
 
   def run(self):

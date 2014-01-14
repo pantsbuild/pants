@@ -17,16 +17,26 @@
 __author__ = 'Brian Wickman'
 
 import os
-import glob
+
+from glob import glob as fsglob
+from pkg_resources import Distribution, EggMetadata, PathMetadata
 from zipimport import zipimporter
 
-from pkg_resources import Distribution, EggMetadata, PathMetadata
-
-from twitter.pants.targets.python_requirement import PythonRequirement
+from .python_requirement import PythonRequirement
 
 
-def PythonEgg(egg_glob):
-  eggs = glob.glob(egg_glob)
+def PythonEgg(glob, name=None):
+  """Refers to pre-built Python eggs in the file system. (To instead fetch
+  eggs in a ``pip``/``easy_install`` way, use ``python_requirement``)
+
+  E.g., ``egg(name='foo', glob='foo-0.1-py2.6.egg')`` would pick up the
+  file ``foo-0.1-py2.6.egg`` from the ``BUILD`` file's directory; targets
+  could depend on it by name ``foo``.
+
+  :param string glob: File glob pattern.
+  :param string name: Target name; by default uses the egg's project name.
+  """
+  eggs = fsglob(glob)
 
   requirements = set()
   for egg in eggs:
@@ -40,4 +50,4 @@ def PythonEgg(egg_glob):
   if len(requirements) > 1:
     raise ValueError('Got multiple egg versions! => %s' % requirements)
 
-  return PythonRequirement(str(requirements.pop()))
+  return PythonRequirement(str(requirements.pop()), name=name)

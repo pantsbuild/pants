@@ -18,10 +18,10 @@ PANTS_SOURCES   = rglobs('*.py')
 PANTS_GARBAGE   = rglobs('*.pyc') + rglobs('*~')
 PANTS_RESOURCES = rglobs('*') - PANTS_SOURCES - PANTS_GARBAGE
 
-# Only build pylint on py 2.x
-def pylint_build_filter():
-  import sys
-  return sys.version_info[0] == 2
+
+def pylint_build_filter(python, platform):
+  return python.startswith('2')
+
 
 python_library(
   name = 'pants-deps',
@@ -30,7 +30,7 @@ python_library(
     python_requirement('elementtree'),
     python_requirement('Markdown'),
     python_requirement('pygments'),
-    python_requirement('pylint', version_filter=pylint_build_filter),
+    python_requirement('pylint==0.25.1', version_filter=pylint_build_filter),
     python_requirement('pystache'),
     python_requirement('pytest'),
     python_requirement('pytest-cov'),
@@ -39,43 +39,38 @@ python_library(
 )
 
 python_library(
-  name = 'pants-lib',
-  dependencies = [
-    pants('src/python/twitter/common'),
-    pants('src/python/twitter/common/app'),
+  name='pants-lib',
+  dependencies=[
+    pants(':pants-deps'),
+    pants('src/python/twitter/common/collections'),
+    pants('src/python/twitter/common/config'),
     pants('src/python/twitter/common/confluence'),
     pants('src/python/twitter/common/contextutil'),
+    pants('src/python/twitter/common/decorators'),
     pants('src/python/twitter/common/dirutil'),
     pants('src/python/twitter/common/java'),
     pants('src/python/twitter/common/lang'),
+    pants('src/python/twitter/common/log'),
     pants('src/python/twitter/common/process'),
     pants('src/python/twitter/common/python'),
+    pants('src/python/twitter/common/quantity'),
     pants('src/python/twitter/common/rwbuf'),
     pants('src/python/twitter/thrift/text'),
     pants('src/python/twitter/common/threading'),
     pants('src/python/twitter/common/util'),
-    pants(':pants-deps')
+    pants('src/python/twitter/thrift/text'),
   ],
-  sources = PANTS_SOURCES,
-  resources = PANTS_RESOURCES,
-  provides = setup_py(
-    name = 'twitter.pants',
-    version = '0.0.3',
-    description = 'the pants build tool',
-    namespace_packages = [
-      'twitter',
-      'twitter.common',
-    ]
-  )
+  sources=PANTS_SOURCES,
+  resources=PANTS_RESOURCES,
 )
 
 python_binary(
-  name = 'pants',
-  entry_point = 'twitter.pants.bin.pants_exe',
-  dependencies = [
+  name='pants',
+  entry_point='twitter.pants.bin.pants_exe:main',
+  dependencies=[
     pants(':pants-lib')
   ],
-  platforms = [
+  platforms=[
     'current',
     'macosx-10.4-x86_64',
     'linux-x86_64'

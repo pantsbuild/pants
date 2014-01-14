@@ -4,6 +4,9 @@ BASE_DIR=$(dirname $0)/../..
 BOOTSTRAP_BIN=$BASE_DIR/.python/bin
 BOOTSTRAP_ENVIRONMENT=$BASE_DIR/.python/bootstrap
 CACHE=$BASE_DIR/.pants.d/.pip.cache
+
+PY=${PY:-$(which python)}
+
 VENV_VERSION=1.10.1
 PYSTACHE_VERSION=0.5.3
 REQUESTS_VERSION=1.2.3
@@ -25,6 +28,8 @@ if [ "${py_version}" -lt 26 ]; then
   echo 'Python interpreter needs to be version 2.6+.'
   exit 2
 fi
+
+echo "Using $PY" 1>&2
 
 if ! test -f $BOOTSTRAP_BIN/bootstrap; then
   ln -s $PY $BOOTSTRAP_BIN/bootstrap

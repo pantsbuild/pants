@@ -14,25 +14,29 @@
 # limitations under the License.
 # ==================================================================================================
 
+from twitter.common.collections import OrderedSet
+
+from .python_requirement import PythonRequirement
 from .python_target import PythonTarget
 
 
 class PythonThriftLibrary(PythonTarget):
+  """Generates a stub Python library from thrift IDL files."""
+
   def __init__(self, name,
-               sources = None,
-               resources = None,
-               dependencies = None,
-               thrift_version = None,
-               provides=None,
-               exclusives=None):
+               sources=None,
+               resources=None,
+               dependencies=None,
+               provides=None):
     """
-      name = Name of library
-      source = thrift source file
-      resources = non-Python resources, e.g. templates, keys, other data (it is
-        recommended that your application uses the pkgutil package to access these
-        resources in a .zip-module friendly way.)
-      dependencies = other PythonLibraries, Eggs or internal Pants targets
-      exclusives:   An optional map of exclusives tags. See CheckExclusives for details.
+    :param name: Name of library
+    :param sources: thrift source files (If more than one tries to use the same
+      namespace, beware https://issues.apache.org/jira/browse/THRIFT-515)
+    :param resources: non-Python resources, e.g. templates, keys, other data (it is
+      recommended that your application uses the pkgutil package to access these
+      resources in a .zip-module friendly way.)
+    :param dependencies: List of :class:`twitter.pants.base.target.Target` instances
+      this target depends on.
+    :type dependencies: list of targets
     """
-    self.thrift_version = thrift_version
-    PythonTarget.__init__(self, name, sources, resources, dependencies, provides, exclusives=exclusives)
+    PythonTarget.__init__(self, name, sources, resources, dependencies, provides)
