@@ -8,9 +8,12 @@ CACHE=$BASE_DIR/.pants.d/.pip.cache
 PY=${PY:-$(which python)}
 
 VENV_VERSION=1.10.1
-PYSTACHE_VERSION=0.5.3
-REQUESTS_VERSION=1.2.3
-SETUPTOOLS_VERSION=1.1.7
+
+BOOTSTRAP_REQS=(
+  pystache==0.5.3
+  setuptools==2.1
+  python_daemon==1.5.5
+)
 
 mkdir -p $BOOTSTRAP_BIN
 mkdir -p $BOOTSTRAP_ENVIRONMENT
@@ -56,11 +59,8 @@ if virtualenv -p $PY --distribute $BOOTSTRAP_ENVIRONMENT; then
   # that will not run.
   virtualenv --relocatable $BOOTSTRAP_ENVIRONMENT
   source $BOOTSTRAP_ENVIRONMENT/bin/activate
-  for pkg in pystache==$PYSTACHE_VERSION requests==$REQUESTS_VERSION setuptools==$SETUPTOOLS_VERSION; do
-    pip install \
-      --download-cache=$CACHE \
-      -f https://pypi.python.org/simple \
-      -U --no-index $pkg
+  for pkg in ${BOOTSTRAP_REQS[@]}; do
+    pip install --download-cache=$CACHE -U $pkg
   done
   deactivate
 fi

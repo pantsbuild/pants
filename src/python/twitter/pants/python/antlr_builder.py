@@ -42,7 +42,7 @@ class PythonAntlrBuilder(CodeGenerator):
       abs_path = os.path.abspath(os.path.join(self.root, self.target.target_base, source))
       args.append(abs_path)
 
-    print('PythonAntlrBuilder executing: %s' % ' '.join(args))
+    print('PythonAntlrBuilder executing: %s' % ' '.join(map(str, args)))
     po = subprocess.Popen(args)
     rv = po.wait()
     if rv != 0:

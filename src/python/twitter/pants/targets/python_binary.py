@@ -22,7 +22,7 @@ from twitter.common.lang import Compatibility
 from twitter.common.python.pex_info import PexInfo
 from twitter.common.python.platforms import Platform
 
-from twitter.pants.base import TargetDefinitionException
+from twitter.pants.base import Target, TargetDefinitionException
 from twitter.pants.base.build_info import get_build_info
 
 from .python_target import PythonTarget
@@ -51,7 +51,8 @@ class PythonBinary(PythonTarget):
                ignore_errors=False,       # pex option
                allow_pypi=False,          # pex option
                platforms=(),
-               compatibility=None):
+               compatibility=None,
+               exclusives=None):
     """
     :param name: target name
     :param source: the python source file that becomes this binary's __main__.
@@ -71,7 +72,13 @@ class PythonBinary(PythonTarget):
     :param compatibility: either a string or list of strings that represents
       interpreter compatibility for this target, using the Requirement-style format,
       e.g. ``'CPython>=3', or just ['>=2.7','<3']`` for requirements agnostic to interpreter class.
+    :param dict exclusives: An optional dict of exclusives tags. See CheckExclusives for details.
     """
+
+    # TODO(John Sirois): Fixup TargetDefinitionException - it has awkward Target base-class
+    # initialization requirements right now requiring this Target.__init__.
+    Target.__init__(self, name, exclusives=exclusives)
+
     if source is None and entry_point is None:
       raise TargetDefinitionException(self,
           'A python binary target must specify either source or entry_point.')
@@ -81,6 +88,7 @@ class PythonBinary(PythonTarget):
         [] if source is None else [source],
         compatibility=compatibility,
         dependencies=dependencies,
+        exclusives=exclusives,
     )
 
     if not isinstance(platforms, (list, tuple)) and not isinstance(platforms, Compatibility.string):

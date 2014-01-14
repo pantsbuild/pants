@@ -29,7 +29,7 @@ def make_dep(name, version, dependency_name=None):
 
 
 make_dep('ansicolors', '1.0.2')
-make_dep('antlr-python-runtime', '3.1.3', 'antlr_python_runtime')
+make_dep('antlr-3.1.3', '3.1.3', 'antlr_python_runtime')
 make_dep('bottle', '0.11.6')
 make_dep('distribute', '0.6.28')
 make_dep('elementtree', '1.2.7_20070827_preview')
@@ -47,10 +47,14 @@ make_dep('pure-sasl', '0.1.4')
 make_dep('pyfakefs', '2.3')
 make_dep('pygments', '1.4', 'Pygments')
 make_dep('pylint', '0.25.1')
+make_dep('pystache', '0.5.3'),
 make_dep('pytest', '2.3.5')
 make_dep('pytest-cov', '1.6')
+make_dep('python_daemon', '1.5.5'),
 make_dep('requests', '1.2.3')
-make_dep('setuptools', '1.1.7')
-make_dep('socksipy-branch', '1.03', 'SocksiPy-Branch')
+make_dep('setuptools', '2.1')
+make_dep('socksipy-branch', '1.01', 'SocksiPy-Branch')
 make_dep('thrift', '0.9.1')
 make_dep('zc-zookeeper-static', '3.4.4')
+
+dependencies(name='antlr-python-runtime', dependencies=[':antlr-3.1.3'])

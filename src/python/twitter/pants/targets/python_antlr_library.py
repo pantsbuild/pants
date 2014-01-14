@@ -40,7 +40,7 @@ class PythonAntlrLibrary(PythonTarget):
     :param dependencies: List of :class:`twitter.pants.base.target.Target` instances
       this target depends on.
     :type dependencies: list of targets
-    :param exclusives: An optional map of exclusives tags. See CheckExclusives for details.
+    :param dict exclusives: An optional dict of exclusives tags. See CheckExclusives for details.
     """
 
     def get_all_deps():
@@ -50,8 +50,7 @@ class PythonAntlrLibrary(PythonTarget):
         all_deps.update(dependencies)
       return all_deps
 
-    PythonTarget.__init__(self, name, sources, resources, get_all_deps(),
-                          exclusives=exclusives or {})
+    PythonTarget.__init__(self, name, sources, resources, get_all_deps(), exclusives=exclusives)
 
     self.module = module
     self.antlr_version = antlr_version

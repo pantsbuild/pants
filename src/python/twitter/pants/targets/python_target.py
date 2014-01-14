@@ -30,9 +30,10 @@ class PythonTarget(TargetWithDependencies, TargetWithSources):
                resources=None,
                dependencies=None,
                provides=None,
-               compatibility=None):
-    TargetWithSources.__init__(self, name, sources=sources)
-    TargetWithDependencies.__init__(self, name, dependencies=dependencies)
+               compatibility=None,
+               exclusives=None):
+    TargetWithSources.__init__(self, name, sources=sources, exclusives=exclusives)
+    TargetWithDependencies.__init__(self, name, dependencies=dependencies, exclusives=exclusives)
 
     self.add_labels('python')
     self.resources = self._resolve_paths(resources) if resources else OrderedSet()

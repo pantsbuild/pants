@@ -17,11 +17,13 @@
 from twitter.common.collections import OrderedSet
 from twitter.pants.base import Target
 
+from .util import resolve
+
 
 class TargetWithDependencies(Target):
-  def __init__(self, name, dependencies=None):
-    Target.__init__(self, name)
-    self.dependencies = OrderedSet(dependencies) if dependencies else OrderedSet()
+  def __init__(self, name, dependencies=None, exclusives=None):
+    Target.__init__(self, name, exclusives=exclusives)
+    self.dependencies = OrderedSet(resolve(dependencies)) if dependencies else OrderedSet()
 
   def _walk(self, walked, work, predicate=None):
     Target._walk(self, walked, work, predicate)

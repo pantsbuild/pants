@@ -33,16 +33,18 @@ class DepmapTest(BaseDepmapTest):
   def setUpClass(cls):
     super(DepmapTest, cls).setUpClass()
 
-    def create_target(path, name, type, deps=()):
+    def create_target(path, name, type, deps=(), **kwargs):
       cls.create_target(path, dedent('''
           %(type)s(name='%(name)s',
-            dependencies=[%(deps)s]
+            dependencies=[%(deps)s],
+            %(extra)s
           )
           ''' % dict(
         type=type,
         name=name,
-        deps=','.join("pants('%s')" % dep for dep in list(deps)))
-      ))
+        deps=','.join("pants('%s')" % dep for dep in list(deps)),
+        extra=('' if not kwargs else ', '.join('%s=%r' % (k, v) for k, v in kwargs.items()))
+      )))
 
     def create_jvm_app(path, name, type, binary, deps=()):
       cls.create_target(path, dedent('''
@@ -61,7 +63,7 @@ class DepmapTest(BaseDepmapTest):
     create_target('common/b', 'b', 'jar_library')
     create_target('common/c', 'c', 'scala_library')
     create_target('common/d', 'd', 'python_library')
-    create_target('common/e', 'e', 'python_binary')
+    create_target('common/e', 'e', 'python_binary', entry_point='foo:main')
     create_target('common/f', 'f', 'jvm_binary')
     create_target('common/g', 'g', 'jvm_binary', deps=['common/f:f'])
     create_jvm_app('common/h', 'h', 'jvm_app', 'common/f:f', "bundle().add('common.f')")

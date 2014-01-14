@@ -26,7 +26,8 @@ class PythonLibrary(PythonTarget):
                resources=(),
                dependencies=(),
                provides=None,
-               compatibility=None):
+               compatibility=None,
+               exclusives=None):
     """
     :param name: Name of library
     :param sources: A list of filenames representing the source code
@@ -41,6 +42,7 @@ class PythonLibrary(PythonTarget):
     :param Artifact provides:
       The :class:`twitter.pants.targets.artifact.Artifact`
       to publish that represents this target outside the repo.
+    :param dict exclusives: An optional dict of exclusives tags. See CheckExclusives for details.
     """
     PythonTarget.__init__(self,
         name,
@@ -49,4 +51,5 @@ class PythonLibrary(PythonTarget):
         dependencies=dependencies,
         provides=provides,
         compatibility=compatibility,
+        exclusives=exclusives,
     )

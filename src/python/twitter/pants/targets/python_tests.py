@@ -30,7 +30,8 @@ class PythonTests(PythonTarget):
                timeout=Amount(2, Time.MINUTES),
                coverage=None,
                soft_dependencies=False,
-               entry_point='pytest'):
+               entry_point='pytest',
+               exclusives=None):
     """
     :param name: See PythonLibrary target
     :param sources: A list of filenames representing the source code
@@ -46,12 +47,13 @@ class PythonTests(PythonTarget):
     :param soft_dependencies: Whether or not we should ignore dependency resolution
       errors for this test.
     :param entry_point: The entry point to use to run the tests.
+    :param dict exclusives: An optional dict of exclusives tags. See CheckExclusives for details.
     """
     self._timeout = timeout
     self._soft_dependencies = bool(soft_dependencies)
     self._coverage = maybe_list(coverage) if coverage is not None else []
     self._entry_point = entry_point
-    PythonTarget.__init__(self, name, sources, resources, dependencies)
+    PythonTarget.__init__(self, name, sources, resources, dependencies, exclusives=exclusives)
     self.add_labels('python', 'tests')
 
   @property

@@ -19,6 +19,7 @@ from __future__ import print_function
 from collections import defaultdict
 import os
 import random
+import shutil
 import sys
 import tempfile
 
@@ -120,16 +121,14 @@ class PythonChroot(object):
     builder = builder_cls(library, self._root, self._config, '-' + library_key.hash[:8])
 
     cache_dir = os.path.join(self._egg_cache_root, library_key.id)
-    cached_dist = os.path.join(cache_dir, library_key.hash)
     if self._build_invalidator.needs_update(library_key):
-      # XXX An sdist is a tarball ?
       sdist = builder.build(interpreter=self._interpreter)
       safe_mkdir(cache_dir)
-      shutil.copy(sdist, cached_dist)
+      shutil.copy(sdist, os.path.join(cache_dir, os.path.basename(sdist)))
       self._build_invalidator.update(library_key)
 
     with ParseContext.temp():
-      return PythonRequirement(builder.requirement_string(), repository=cached_dist, use_2to3=True)
+      return PythonRequirement(builder.requirement_string(), repository=cache_dir, use_2to3=True)
 
   def _generate_thrift_requirement(self, library):
     return self._generate_requirement(library, PythonThriftBuilder)

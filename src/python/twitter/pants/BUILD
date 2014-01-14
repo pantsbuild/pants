@@ -24,17 +24,19 @@ def pylint_build_filter(python, platform):
 
 
 python_library(
-  name = 'pants-deps',
-  dependencies = [
-    python_requirement('ansicolors'),
-    python_requirement('elementtree'),
-    python_requirement('Markdown'),
-    python_requirement('pygments'),
+  name='pants-deps',
+  dependencies=[
+    pants('3rdparty/python:ansicolors'),
+    pants('3rdparty/python:elementtree'),
+    pants('3rdparty/python:markdown'),
+    pants('3rdparty/python:psutil'),
+    pants('3rdparty/python:pygments'),
+    pants('3rdparty/python:pystache'),
+    pants('3rdparty/python:pytest'),
+    pants('3rdparty/python:pytest-cov'),
+    pants('3rdparty/python:python_daemon'),
+    pants('3rdparty/python:requests'),
     python_requirement('pylint==0.25.1', version_filter=pylint_build_filter),
-    python_requirement('pystache'),
-    python_requirement('pytest'),
-    python_requirement('pytest-cov'),
-    python_requirement('python_daemon'),
   ]
 )
 
@@ -42,6 +44,7 @@ python_library(
   name='pants-lib',
   dependencies=[
     pants(':pants-deps'),
+    pants('src/python/twitter/common/app'),
     pants('src/python/twitter/common/collections'),
     pants('src/python/twitter/common/config'),
     pants('src/python/twitter/common/confluence'),

@@ -27,7 +27,8 @@ class PythonThriftLibrary(PythonTarget):
                sources=None,
                resources=None,
                dependencies=None,
-               provides=None):
+               provides=None,
+               exclusives=None):
     """
     :param name: Name of library
     :param sources: thrift source files (If more than one tries to use the same
@@ -38,5 +39,7 @@ class PythonThriftLibrary(PythonTarget):
     :param dependencies: List of :class:`twitter.pants.base.target.Target` instances
       this target depends on.
     :type dependencies: list of targets
+    :param dict exclusives: An optional dict of exclusives tags. See CheckExclusives for details.
     """
-    PythonTarget.__init__(self, name, sources, resources, dependencies, provides)
+    PythonTarget.__init__(self, name, sources, resources, dependencies, provides,
+                          exclusives=exclusives)

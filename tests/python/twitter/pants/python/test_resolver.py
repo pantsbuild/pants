@@ -20,9 +20,10 @@ from twitter.common.contextutil import temporary_file
 from twitter.common.python.platforms import Platform
 
 from twitter.pants.base import Config
-from twitter.pants.python.python_chroot import get_platforms
+from twitter.pants.python.resolver import get_platforms
 
-class PythonChrootTest(unittest.TestCase):
+
+class ResolverTest(unittest.TestCase):
   def setUp(self):
     with temporary_file() as ini:
       ini.write(
