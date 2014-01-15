@@ -15,15 +15,12 @@
 # ==================================================================================================
 
 import os
-import sys
 
 from twitter.common.collections import maybe_list
 from twitter.common.lang import Compatibility
 from twitter.common.python.pex_info import PexInfo
-from twitter.common.python.platforms import Platform
 
 from twitter.pants.base import Target, TargetDefinitionException
-from twitter.pants.base.build_info import get_build_info
 
 from .python_target import PythonTarget
 
@@ -143,7 +140,6 @@ class PythonBinary(PythonTarget):
   @property
   def pexinfo(self):
     info = PexInfo.default()
-    info.build_properties = get_build_info()._asdict()
     for repo in self._repositories:
       info.add_repository(repo)
     for index in self._indices:

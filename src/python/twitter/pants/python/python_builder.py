@@ -14,18 +14,17 @@
 # limitations under the License.
 # ==================================================================================================
 
-__author__ = 'John Sirois'
-
-from twitter.pants.base.builder import Builder
 from twitter.pants.targets import PythonBinary, PythonTests, PythonTestSuite
 
-from twitter.pants.python.binary_builder import PythonBinaryBuilder
-from twitter.pants.python.test_builder import PythonTestBuilder
-from twitter.pants.python.lint_builder import PythonLintBuilder
+from .binary_builder import PythonBinaryBuilder
+from .lint_builder import PythonLintBuilder
+from .test_builder import PythonTestBuilder
 
-class PythonBuilder(Builder):
-  def __init__(self, ferror, root_dir):
-    Builder.__init__(self, ferror, root_dir)
+
+class PythonBuilder(object):
+  def __init__(self, run_tracker, root_dir):
+    self._root_dir = root_dir
+    self._run_tracker = run_tracker
 
   def build(self, targets, args, conn_timeout=None):
     test_targets = []
@@ -39,7 +38,7 @@ class PythonBuilder(Builder):
       real_args.remove('pylint')
       for target in targets:
         try:
-          PythonLintBuilder([target], real_args, self.root_dir, conn_timeout=conn_timeout).run()
+          PythonLintBuilder([target], real_args, self._root_dir, conn_timeout=conn_timeout).run()
         except Exception as e:
           print('Failed to run lint for %s: %s' % (target, e))
       return 0
@@ -51,11 +50,14 @@ class PythonBuilder(Builder):
       elif isinstance(target, PythonBinary):
         binary_targets.append(target)
 
-    rv = PythonTestBuilder(test_targets, args, self.root_dir, conn_timeout=conn_timeout).run()
-    if rv != 0: return rv
+    rv = PythonTestBuilder(test_targets, args, self._root_dir, conn_timeout=conn_timeout).run()
+    if rv != 0:
+      return rv
 
     for binary_target in binary_targets:
-      rv = PythonBinaryBuilder(binary_target, args, self.root_dir, conn_timeout=conn_timeout).run()
-      if rv != 0: return rv
+      rv = PythonBinaryBuilder(binary_target, self._root_dir, self._run_tracker,
+                               conn_timeout=conn_timeout).run()
+      if rv != 0:
+        return rv
 
     return 0
