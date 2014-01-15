@@ -1,0 +1,84 @@
+#!/bin/bash
+# ==================================================================================================
+# Copyright 2011 Twitter, Inc.
+# --------------------------------------------------------------------------------------------------
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this work except in compliance with the License.
+# You may obtain a copy of the License in the LICENSE file, or at:
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ==================================================================================================
+
+MY_DIR=$(dirname $0)
+VIRTUAL_PYTHON=$MY_DIR/.python/bootstrap
+
+PANTS_EXE=$MY_DIR/src/python/twitter/pants/bin/pants_exe.py
+PANTS_BOOTSTRAP_ARGS=${PANTS_BOOTSTRAP_ARGS:-''}
+
+MARKDOWN_EGG=$MY_DIR/3rdparty/python/Markdown-2.1.1-py2.6.egg
+PYGMENTS_EGG=$MY_DIR/3rdparty/python/Pygments-1.4-py2.6.egg
+PYSTACHE_EGG=$MY_DIR/3rdparty/python/pystache-0.5.3-py2.6.egg
+PYTHON_DAEMON_EGG=$MY_DIR/3rdparty/python/python_daemon-1.5.5-py2.6.egg
+
+function with_virtualenv() {
+  source $VIRTUAL_PYTHON/bin/activate
+  PYTHONPATH=$MARKDOWN_EGG:$PYGMENTS_EGG:$PYSTACHE_EGG:$PYTHON_DAEMON_EGG:$MY_DIR/src/python "$@"
+  result=$?
+  deactivate
+  return $((result))
+}
+
+function build_pants() {
+  with_virtualenv python $PYTHON_ARGS $PANTS_EXE build $PANTS_BOOTSTRAP_ARGS \
+    src/python/twitter/pants:pants
+}
+
+function run_pants_bare() {
+  with_virtualenv python $PYTHON_ARGS $PANTS_EXE "$@"
+}
+
+if [ ! -e $VIRTUAL_PYTHON/bin/python ]; then
+  $MY_DIR/build-support/python/setup.sh
+  rc=$?
+  if [[ $rc != 0 ]]; then
+    echo "Unable to bootstrap a sane Python virtual environment for pants!"
+    rm -rf $VIRTUAL_PYTHON
+    exit $rc
+  fi
+  source $VIRTUAL_PYTHON/bin/activate
+  deactivate
+fi
+
+if [ -z "${PANTS_DEV}" -a ! -e $MY_DIR/pants.pex ]; then
+  build_pants
+  if [ ! -e $MY_DIR/dist/pants.pex ]; then
+    echo "Unable to build pants!  Cannot continue!"
+    exit 1
+  else
+    mv $MY_DIR/dist/pants.pex $MY_DIR/pants.pex
+    cp $MY_DIR/pants.pex $VIRTUAL_PYTHON/pants.pex
+  fi
+fi
+
+if [ ! -z "${PANTS_DEV}" ]; then
+  # TODO(John Sirois): ideally this would just use pants.pex to run the pants target in py mode:
+  # ./pants.pex py src/python/twitter/pants "$@"
+  echo "*** running pants in dev mode from $PANTS_EXE ***" 1>&2
+  run_pants_bare "$@"
+else
+  ${MY_DIR}/pants.pex "$@"
+  return_code=$?
+  if [[ $return_code != 0 ]]; then
+    pants_version=$(unzip -q -c pants.pex PEX-INFO | \
+                    with_virtualenv python -c 'import json,sys; \
+                    print json.loads(sys.stdin.read()).get("build_properties", {"sha": None})["sha"]')
+    echo "pants.pex version $pants_version"
+    exit $return_code
+  fi
+fi

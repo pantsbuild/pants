@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env python
 # ==================================================================================================
 # Copyright 2011 Twitter, Inc.
 # --------------------------------------------------------------------------------------------------
@@ -15,56 +15,224 @@
 # limitations under the License.
 # ==================================================================================================
 
-MY_DIR=$(dirname $0)
-VIRTUAL_PYTHON=$MY_DIR/.python/bootstrap
+"""Pants build system bootstrap script.
 
-PANTS_EXE=$MY_DIR/src/python/twitter/pants/bin/pants_exe.py
+This script downloads then exec's a pre-built pants pex. Its intended for
+users of the pants build system. If 'pants.pex' exists in the current
+directory that version is used instead of fetching a pex.
 
-PANTS_BOOTSTRAP_ARGS=${PANTS_BOOTSTRAP_ARGS:-''}
+The following pants.ini configuration options are used from the DEFAULT section.
 
-MARKDOWN_EGG=$MY_DIR/3rdparty/python/Markdown-2.1.1-py2.6.egg
-PYGMENTS_EGG=$MY_DIR/3rdparty/python/Pygments-1.4-py2.6.egg
-PYSTACHE_EGG=$MY_DIR/3rdparty/python/pystache-0.5.3-py2.6.egg
-PYTHON_DAEMON_EGG=$MY_DIR/3rdparty/python/python_daemon-1.5.5-py2.6.egg
+* pants_version - version number, such as '0.0.7'
+* pants_pex_baseurl - URL of the pants pex repository to fetch from.
+* pants_pex_filename_pattern - Pants PEX filename pattern if different from the
+                               default value. This option is not typically used.
+* ivysvnresolver_url - URL of the ivysvnresolver bin release to use.
+"""
 
-function run_pants_bare() {
-  source $VIRTUAL_PYTHON/bin/activate
-  PYTHONPATH=$MARKDOWN_EGG:$PYGMENTS_EGG:$PYSTACHE_EGG:$PYTHON_DAEMON_EGG:$MY_DIR/src/python \
-    python $PANTS_BOOTSTRAP_ARGS $PANTS_EXE "$@"
-  result=$?
-  deactivate
-  return $((result))
-}
+# NB: gyrations are made to support python2.4 bootstrapping into python newer so some constructs
+# are non-idiomatic for more modern pythons
 
-if [ ! -e $VIRTUAL_PYTHON/bin/python ]; then
-  $MY_DIR/build-support/python/setup.sh
-  rc=$?
-  if [[ $rc != 0 ]]; then
-    echo "Unable to bootstrap a sane Python virtual environment for pants!"
-    rm -rf $VIRTUAL_PYTHON
-    exit $rc
-  fi
-  source $VIRTUAL_PYTHON/bin/activate
-  deactivate
-fi
+import errno
+import logging
+import os
+import sys
+import tarfile
+import tempfile
+import time
 
-if [ -z "${PANTS_DEV}" -a ! -e $MY_DIR/pants.pex ]; then
-  run_pants_bare src/python/twitter/pants:pants
-  if [ ! -e $MY_DIR/dist/pants.pex ]; then
-    echo "Unable to build pants!  Cannot continue!"
-    exit 1
-  else
-    mv $MY_DIR/dist/pants.pex $MY_DIR/pants.pex
-    cp $MY_DIR/pants.pex $VIRTUAL_PYTHON/pants.pex
-  fi
-fi
 
-if [ ! -z "${PANTS_DEV}" ]; then
-  # TODO(John Sirois): ideally this would just use pants.pex to run the pants target in py mode:
-  # ./pants.pex py src/python/twitter/pants "$@"
-  echo "*** running pants in dev mode from $PANTS_EXE ***" 1>&2
-  run_pants_bare "$@"
-  exit $ret
-else
-  ${MY_DIR}/pants.pex "$@"
-fi
+DEBUG = 'PANTS_DEV' in os.environ
+
+logger = logging.getLogger()
+if DEBUG:
+  logger.setLevel(logging.DEBUG)
+else:
+  logger.setLevel(logging.INFO)
+formatter = logging.Formatter("%(asctime)s %(filename)s:%(lineno)d - %(message)s")
+stream_handler = logging.StreamHandler(sys.stderr)
+stream_handler.setFormatter(formatter)
+logger.addHandler(stream_handler)
+
+# Use pants.pex if in the repo - primarily for development
+LOCAL_PEX = os.path.exists('pants.pex')
+
+
+def error(msg, code=1):
+  logger.error(msg)
+  sys.exit(code)
+
+
+major, minor = sys.version_info[0:2]
+
+
+# TODO(John Sirois): publish pants.pex for python3 and remove these gymnastics
+def is_exe(path):
+  return os.path.isfile(path) and os.access(path, os.X_OK)
+
+
+def get_python(ver):
+    for path in os.environ['PATH'].split(os.pathsep):
+      exe = os.path.join(path, ver)
+      if is_exe(exe):
+        return exe
+    return None
+
+
+def has_python(ver):
+  return get_python(ver) is not None
+
+
+start = time.time()
+def restart(exe):
+  logger.debug('selected %s in %fs bootstrapping from python%d.%d' % (
+    exe, time.time() - start, major, minor))
+  os.execv(exe, [exe] + sys.argv)
+
+# Check to see if user exported python version manually
+exported_py_ver = os.environ.get('PY')
+if exported_py_ver:
+  try:
+    exported_major, exported_minor = map(int, exported_py_ver.split('.'))
+  except ValueError:
+    error('Exported PY variable is not of the form #.# (e.g. 2.7)')
+
+if exported_py_ver:
+  if not (exported_major, exported_minor) == (major, minor):
+    exe = get_python('python%d.%d' % (exported_major, exported_minor))
+    if not exe:
+      error('Cannot execute the python you specified via PY=%s' % exported_py_ver)
+    restart(exe)
+elif major == 2:
+  if has_python('python2.6'):
+    if minor != 6:
+      restart(get_python('python2.6'))
+  elif has_python('python2.7'):
+    if minor != 7:
+      restart(get_python('python2.7'))
+
+if (major, minor) != (2, 6) and (major, minor) != (2, 7):
+  error('Pants requires a valid python2.6 or python2.7')
+
+if major == 3:
+  from configparser import ConfigParser
+  import urllib.error as urllib_error
+  import urllib.request as urllib_request
+elif major == 2:
+  if minor < 6:
+    error('Pants requires python >= 2.6, using %d.%d' % (major, minor))
+  from ConfigParser import SafeConfigParser as ConfigParser
+  import urllib2 as urllib_error
+  import urllib2 as urllib_request
+
+
+PANTS_CACHE = os.path.expanduser('~/.pants.d')
+PANTS_PEX_CACHE = '%s/bin/pants.pex' % PANTS_CACHE
+
+CHUNK_SIZE = 102400
+
+config = ConfigParser({
+  'pants_pex_filename_pattern': 'pants-%s-py%s%s.pex',
+  'ivysvnresolver_url': 'https://ivysvn.googlecode.com/files/ivysvnresolver-2.2.0-bin.tgz',
+})
+config.read('pants.ini')
+ivysvnresolver_url = config.get('DEFAULT', 'ivysvnresolver_url')
+
+if not LOCAL_PEX:
+  pants_pex_baseurl = config.get('DEFAULT', 'pants_pex_baseurl')
+  pants_pex_filename_pattern = config.get('DEFAULT', 'pants_pex_filename_pattern', raw=True)
+  pants_version = config.get('DEFAULT', 'pants_version')
+
+
+def fetch(url, dest, mode=None):
+  """returns true if url was fetched, false if already cached"""
+  if os.path.exists(dest):
+    logger.debug('already cached %s at %s' % (url, dest))
+    return False
+
+  try:
+    os.makedirs(os.path.dirname(dest))
+  except OSError:
+    _, e, _ = sys.exc_info()
+    if e.errno != errno.EEXIST:
+      raise e
+
+  tmp_fh, tmp_path = tempfile.mkstemp(dir=os.path.dirname(dest))
+  try:
+    try:
+      logger.debug('fetching %s to %s' % (url, tmp_path))
+      u = urllib_request.urlopen(url)
+      try:
+        size = int(u.info().getheader('Content-Length').strip())
+        sys.stderr.write('Reading %.2fKB from %s\n' % (size / 1024.0, url))
+        size = 0
+        while True:
+          sys.stderr.write('.')
+          chunk = u.read(CHUNK_SIZE)
+          if not chunk:
+            sys.stderr.write('. (%.2fKB)\n' % (size / 1024.0))
+            break
+          else:
+            size += len(chunk)
+            os.write(tmp_fh, chunk)
+      finally:
+        u.close()
+      os.close(tmp_fh)
+
+      # TODO(John Sirois): We need a checksum protocol
+      info = os.stat(tmp_path)
+      if size != info.st_size:
+        error('Failed to fetch %s : expected %d bytes, got %d' % (url, size, info.st_size))
+
+      os.rename(tmp_path, dest)
+    except urllib_error.HTTPError:
+      _, e, _ = sys.exc_info()
+      error('Failed to fetch %s : %s' % (url, e))
+  finally:
+    if os.path.exists(tmp_path):
+      os.unlink(tmp_path)
+
+  if mode:
+    os.chmod(dest, mode)
+  logger.debug('deposited %s at %s' % (url, dest))
+  return True
+
+
+# TODO(travis, jsirois): remove when pants does this itself
+def fetch_ivy():
+  dest = os.path.join(PANTS_CACHE, 'ivysvnresolver', os.path.basename(ivysvnresolver_url))
+  if not fetch(ivysvnresolver_url, dest):
+    return  # no need to extract/symlink
+
+  tar = tarfile.open(dest)
+  try:
+    tar.extractall(path=os.path.dirname(dest))
+  finally:
+    tar.close()
+
+
+def fetch_pants():
+  if LOCAL_PEX:
+    return 'pants.pex'
+
+  pants_pex_filename = pants_pex_filename_pattern % (pants_version, sys.version_info[0], sys.version_info[1])
+  pants_pex_cached_filename = '%s/%s' % (PANTS_PEX_CACHE, pants_pex_filename)
+
+  if os.path.exists(pants_pex_cached_filename):
+    return pants_pex_cached_filename
+
+  url = os.path.join(pants_pex_baseurl, pants_version, pants_pex_filename)
+  execute_perms = 493  # 0o755
+  fetch(url, pants_pex_cached_filename, execute_perms)
+  return pants_pex_cached_filename
+
+
+def main():
+  logger.debug('Running with python version: %s.%s' % (major, minor))
+  fetch_ivy()
+  logger.debug('launching %s' % fetch_pants())
+  os.execv(fetch_pants(), sys.argv)
+
+
+if __name__ == '__main__':
+  main()
