@@ -14,9 +14,11 @@
 # limitations under the License.
 # ==================================================================================================
 
-PANTS_SOURCES   = rglobs('*.py')
+NG_CLIENT = ['java/bin/ng.py']
+
+PANTS_SOURCES   = rglobs('*.py') - NG_CLIENT
 PANTS_GARBAGE   = rglobs('*.pyc') + rglobs('*~')
-PANTS_RESOURCES = rglobs('*') - PANTS_SOURCES - PANTS_GARBAGE
+PANTS_RESOURCES = rglobs('*') - PANTS_SOURCES - NG_CLIENT - PANTS_GARBAGE
 
 
 def pylint_build_filter(python, platform):
@@ -44,7 +46,6 @@ python_library(
   name='pants-lib',
   dependencies=[
     pants(':pants-deps'),
-    pants('src/python/twitter/common/app'),
     pants('src/python/twitter/common/collections'),
     pants('src/python/twitter/common/config'),
     pants('src/python/twitter/common/confluence'),
@@ -58,11 +59,19 @@ python_library(
     pants('src/python/twitter/common/python'),
     pants('src/python/twitter/common/quantity'),
     pants('src/python/twitter/common/rwbuf'),
-    pants('src/python/twitter/thrift/text'),
     pants('src/python/twitter/common/threading'),
     pants('src/python/twitter/common/util'),
     pants('src/python/twitter/thrift/text'),
   ],
+  provides = setup_py(
+    name = 'twitter.pants',
+    version = '0.0.3',
+    description = 'the pants build tool',
+    namespace_packages = [
+      'twitter',
+      'twitter.common',
+    ]
+  ),
   sources=PANTS_SOURCES,
   resources=PANTS_RESOURCES,
 )
@@ -85,8 +94,12 @@ python_binary(
   dependencies = [
     'src/python/twitter/common/app',
     'src/python/twitter/common/log',
+
+    # TODO(John Sirois): Break up pants src/ into proper libs - the ng client should not need all
+    # of pants
+    ':pants-lib'
   ],
-  source = 'java/nailgun_client.py',
+  source = NG_CLIENT,
 )
 
 # TODO(John Sirois): add a BUILD.commons github wiki goal to the 'publish' phase and publish these

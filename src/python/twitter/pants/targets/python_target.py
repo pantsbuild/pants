@@ -14,11 +14,15 @@
 # limitations under the License.
 # ==================================================================================================
 
+from collections import defaultdict
+
 from twitter.common.collections import OrderedSet
 from twitter.common.python.interpreter import PythonIdentity
-from twitter.pants.base.target import TargetDefinitionException
-from twitter.pants.targets.with_dependencies import TargetWithDependencies
-from twitter.pants.targets.with_sources import TargetWithSources
+
+from twitter.pants.base.target import Target, TargetDefinitionException
+
+from .with_dependencies import TargetWithDependencies
+from .with_sources import TargetWithSources
 
 
 class PythonTarget(TargetWithDependencies, TargetWithSources):
