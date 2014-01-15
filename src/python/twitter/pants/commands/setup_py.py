@@ -351,20 +351,12 @@ class SetupPy(Command):
     safe_rmtree(setup_dir)
     os.rename(chroot.path(), setup_dir)
 
-    stderr, stdout = [], []
-    def read_output(po):
-      stdout.append(po.stdout.read())
-      stderr.append(po.stderr.read())
-
     with pushd(setup_dir):
       cmd = '%s setup.py %s' % (sys.executable, self.options.run or 'sdist')
       print('Running "%s" in %s' % (cmd, setup_dir))
       extra_args = {} if self.options.run else dict(stdout=subprocess.PIPE, stderr=subprocess.PIPE)
       po = subprocess.Popen(cmd, shell=True, **extra_args)
-      while po.poll() is None:
-        read_output(po)
-        time.sleep(0.1)
-      read_output(po)
+      stdout, stderr = po.communicate()
 
     if self.options.run:
       print('Ran %s' % cmd)
@@ -377,13 +369,13 @@ class SetupPy(Command):
       for line in ''.join(stderr).splitlines():
         print('stderr: %s' % line)
       return po.returncode
+    else:
+      if not os.path.exists(expected_target):
+        print('Could not find expected target %s!' % expected_target)
+        sys.exit(1)
 
-    if not os.path.exists(expected_target):
-      print('Could not find expected target %s!' % expected_target)
-      sys.exit(1)
+      safe_delete(dist_tgz)
+      os.rename(expected_target, dist_tgz)
+      safe_rmtree(setup_dir)
 
-    safe_delete(dist_tgz)
-    os.rename(expected_target, dist_tgz)
-    safe_rmtree(setup_dir)
-
-    print('Wrote %s' % dist_tgz)
+      print('Wrote %s' % dist_tgz)
