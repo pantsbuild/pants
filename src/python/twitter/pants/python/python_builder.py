@@ -14,6 +14,8 @@
 # limitations under the License.
 # ==================================================================================================
 
+from twitter.common.python.interpreter import PythonInterpreter
+
 from twitter.pants.targets import PythonBinary, PythonTests, PythonTestSuite
 
 from .binary_builder import PythonBinaryBuilder
@@ -26,9 +28,10 @@ class PythonBuilder(object):
     self._root_dir = root_dir
     self._run_tracker = run_tracker
 
-  def build(self, targets, args, conn_timeout=None):
+  def build(self, targets, args, interpreter=None, conn_timeout=None):
     test_targets = []
     binary_targets = []
+    interpreter = interpreter or PythonInterpreter.get()
 
     for target in targets:
       assert target.is_python, "PythonBuilder can only build PythonTargets, given %s" % str(target)
@@ -50,13 +53,22 @@ class PythonBuilder(object):
       elif isinstance(target, PythonBinary):
         binary_targets.append(target)
 
-    rv = PythonTestBuilder(test_targets, args, self._root_dir, conn_timeout=conn_timeout).run()
+    rv = PythonTestBuilder(
+        test_targets,
+        args,
+        self._root_dir,
+        interpreter=interpreter,
+        conn_timeout=conn_timeout).run()
     if rv != 0:
       return rv
 
     for binary_target in binary_targets:
-      rv = PythonBinaryBuilder(binary_target, self._root_dir, self._run_tracker,
-                               conn_timeout=conn_timeout).run()
+      rv = PythonBinaryBuilder(
+          binary_target,
+          self._root_dir,
+          self._run_tracker,
+          interpreter=interpreter,
+          conn_timeout=conn_timeout).run()
       if rv != 0:
         return rv
 

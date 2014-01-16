@@ -20,6 +20,7 @@ import os
 import tempfile
 import time
 
+from twitter.common.python.interpreter import PythonInterpreter
 from twitter.common.python.pex_builder import PEXBuilder
 
 from twitter.pants.base import Config
@@ -32,8 +33,9 @@ class PythonBinaryBuilder(object):
   class NotABinaryTargetException(Exception):
     pass
 
-  def __init__(self, target, root_dir, run_tracker, conn_timeout=None):
+  def __init__(self, target, root_dir, run_tracker, interpreter=None, conn_timeout=None):
     self.target = target
+    self.interpreter = interpreter or PythonInterpreter.get()
     if not isinstance(target, PythonBinary):
       raise PythonBinaryBuilder.NotABinaryTargetException(
           "Target %s is not a PythonBinary!" % target)
@@ -49,9 +51,14 @@ class PythonBinaryBuilder(object):
 
     pexinfo = target.pexinfo.copy()
     pexinfo.build_properties = build_properties
-    builder = PEXBuilder(distpath, pex_info=pexinfo)
+    builder = PEXBuilder(distpath, pex_info=pexinfo, interpreter=self.interpreter)
 
-    self.chroot = PythonChroot(target, root_dir, builder=builder, conn_timeout=conn_timeout)
+    self.chroot = PythonChroot(
+        target,
+        root_dir,
+        builder=builder,
+        interpreter=self.interpreter,
+        conn_timeout=conn_timeout)
 
   def run(self):
     print('Building PythonBinary %s:' % self.target)

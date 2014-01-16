@@ -16,12 +16,14 @@
 
 from __future__ import print_function
 
+import sys
 import traceback
 
 from twitter.common.collections import OrderedSet
 
 from twitter.pants.base import Address, Config, Target
 from twitter.pants.python import PythonBuilder
+from twitter.pants.python.interpreter_cache import PythonInterpreterCache
 
 from . import Command
 
@@ -38,6 +40,10 @@ class Build(Command):
     parser.add_option("-t", "--timeout", dest="conn_timeout", type="int",
                       default=Config.load().getdefault('connection_timeout'),
                       help="Number of seconds to wait for http connections.")
+    parser.add_option('-i', '--interpreter', dest='interpreter', default=None,
+                      help='The interpreter requirement for this chroot.')
+    parser.add_option('-v', '--verbose', dest='verbose', default=False, action='store_true',
+                      help='Show verbose output.')
     parser.disable_interspersed_args()
     parser.epilog = ('Builds the specified Python target(s). Use ./pants goal for JVM and other '
                      'targets.')
@@ -47,6 +53,18 @@ class Build(Command):
 
     if not self.args:
       self.error("A spec argument is required")
+
+    self.config = Config.load()
+    self.interpreter_cache = PythonInterpreterCache(self.config, logger=self.debug)
+    self.interpreter_cache.setup()
+    interpreters = self.interpreter_cache.select_interpreter(
+        list(self.interpreter_cache.matches([self.options.interpreter]
+            if self.options.interpreter else [''])))
+    if len(interpreters) != 1:
+      self.error('Unable to detect suitable interpreter.')
+    else:
+      self.debug('Selected %s' % interpreters[0])
+    self.interpreter = interpreters[0]
 
     try:
       specs_end = self.args.index('--')
@@ -74,6 +92,10 @@ class Build(Command):
         self.error("Target %s does not exist" % address)
       self.targets.update(tgt for tgt in target.resolve() if tgt.is_concrete)
 
+  def debug(self, message):
+    if self.options.verbose:
+      print(message, file=sys.stderr)
+
   def execute(self):
     print("Build operating on targets: %s" % self.targets)
 
@@ -94,7 +116,11 @@ class Build(Command):
   def _python_build(self, targets):
     try:
       executor = PythonBuilder(self.run_tracker, self.root_dir)
-      return executor.build(targets, self.build_args, conn_timeout=self.options.conn_timeout)
+      return executor.build(
+        targets,
+        self.build_args,
+        interpreter=self.interpreter,
+        conn_timeout=self.options.conn_timeout)
     except:
       self.error("Problem executing PythonBuilder for targets %s: %s" % (targets,
                                                                          traceback.format_exc()))

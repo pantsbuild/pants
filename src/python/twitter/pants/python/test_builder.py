@@ -33,6 +33,7 @@ from twitter.common.contextutil import temporary_file
 from twitter.common.dirutil import safe_mkdir
 from twitter.common.lang import Compatibility
 from twitter.common.quantity import Amount, Time
+from twitter.common.python.interpreter import PythonInterpreter
 from twitter.common.python.pex import PEX
 from twitter.common.python.pex_builder import PEXBuilder
 
@@ -98,16 +99,18 @@ def generate_coverage_config(target):
 class PythonTestBuilder(object):
   class InvalidDependencyException(Exception): pass
   class ChrootBuildingException(Exception): pass
+
   TESTING_TARGETS = None
 
   # TODO(wickman) Expose these as configuratable parameters
   TEST_TIMEOUT = Amount(2, Time.MINUTES)
   TEST_POLL_PERIOD = Amount(100, Time.MILLISECONDS)
 
-  def __init__(self, targets, args, root_dir, conn_timeout=None):
+  def __init__(self, targets, args, root_dir, interpreter=None, conn_timeout=None):
     self.targets = targets
     self.args = args
     self.root_dir = root_dir
+    self.interpreter = interpreter or PythonInterpreter.get()
     self.successes = {}
     self._conn_timeout = conn_timeout
 
@@ -158,7 +161,7 @@ class PythonTestBuilder(object):
       source = target.coverage
     else:
       # This technically makes the assumption that tests/python/<target> will be testing
-      # src/python/<target>.  To change to honest measurements, do target.walk() here insead,
+      # src/python/<target>.  To change to honest measurements, do target.walk() here instead,
       # however this results in very useless and noisy coverage reports.
       source = set(os.path.dirname(source).replace(os.sep, '.') for source in target.sources)
     args = ['-p', 'pytest_cov',
@@ -188,11 +191,16 @@ class PythonTestBuilder(object):
     coverage_enabled = 'PANTS_PY_COVERAGE' in os.environ
 
     try:
-      builder = PEXBuilder()
+      builder = PEXBuilder(interpreter=self.interpreter)
       builder.info.entry_point = target.entry_point
       builder.info.ignore_errors = target._soft_dependencies
-      chroot = PythonChroot(target, self.root_dir, extra_targets=self.generate_test_targets(),
-                            builder=builder, conn_timeout=self._conn_timeout)
+      chroot = PythonChroot(
+          target,
+          self.root_dir,
+          extra_targets=self.generate_test_targets(),
+          builder=builder,
+          interpreter=self.interpreter,
+          conn_timeout=self._conn_timeout)
       builder = chroot.dump()
       builder.freeze()
       test_args = PythonTestBuilder.generate_junit_args(target)
@@ -201,7 +209,8 @@ class PythonTestBuilder(object):
         coverage_rc, args = self.cov_setup(target, builder.chroot())
         test_args.extend(args)
       sources = [os.path.join(target.target_base, source) for source in target.sources]
-      po = PEX(builder.path()).run(args=test_args + sources, blocking=False, setsid=True)
+      po = PEX(builder.path(), interpreter=self.interpreter).run(
+          args=test_args + sources, blocking=False, setsid=True)
       # TODO(wickman)  If coverage is enabled, write an intermediate .html that points to
       # each of the coverage reports generated and webbrowser.open to that page.
       rv = PythonTestBuilder.wait_on(po, timeout=target.timeout)
