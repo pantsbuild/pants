@@ -18,13 +18,12 @@ from __future__ import print_function
 
 import traceback
 
-from twitter.common.collections import OrderedSet
-
-from twitter.pants.base import Address, Config, Target
-from twitter.pants.python import PythonBuilder
-
 from . import Command
 
+from twitter.common.collections import OrderedSet
+from twitter.pants.base import Address, Config, Target
+from twitter.pants.targets import InternalTarget
+from twitter.pants.python import PythonBuilder
 
 class Build(Command):
   """Builds a specified target."""
@@ -39,8 +38,7 @@ class Build(Command):
                       default=Config.load().getdefault('connection_timeout'),
                       help="Number of seconds to wait for http connections.")
     parser.disable_interspersed_args()
-    parser.epilog = ('Builds the specified Python target(s). Use ./pants goal for JVM and other '
-                     'targets.')
+    parser.epilog = """Builds the specified Python target(s). Use ./pants goal for JVM and other targets."""
 
   def __init__(self, run_tracker, root_dir, parser, argv):
     Command.__init__(self, run_tracker, root_dir, parser, argv)
@@ -93,7 +91,7 @@ class Build(Command):
 
   def _python_build(self, targets):
     try:
-      executor = PythonBuilder(self.run_tracker, self.root_dir)
+      executor = PythonBuilder(self.error, self.root_dir)
       return executor.build(targets, self.build_args, conn_timeout=self.options.conn_timeout)
     except:
       self.error("Problem executing PythonBuilder for targets %s: %s" % (targets,

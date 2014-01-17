@@ -48,9 +48,9 @@ class PythonLintBuilder(object):
     chroot = PythonChroot(target, self.root_dir, extra_targets=[
       Target.get(Address.parse(self.root_dir, '3rdparty/python:pylint'))],
       conn_timeout=self._conn_timeout)
-    chroot.builder.info.ignore_errors = True
+    chroot.builder.info().ignore_errors = True
     builder = chroot.dump()
-    builder.info.entry_point = 'pylint.lint'
+    builder.info().entry_point = 'pylint.lint'
     builder.freeze()
 
     interpreter_args = [

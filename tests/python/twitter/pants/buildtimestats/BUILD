@@ -20,7 +20,7 @@ python_tests(name = 'buildtimestats',
     pants("src/python/twitter/pants:pants-lib"),
     pants("src/python/twitter/pants:pants-deps"),
     pants('src/python/twitter/common/util'),
-    pants('3rdparty/python:mox'),
-    pants('3rdparty/python:psutil')
+    python_requirement('mox'),
+    python_requirement('psutil')
   ]
 )

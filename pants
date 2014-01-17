@@ -43,6 +43,7 @@ import time
 
 
 DEBUG = 'PANTS_DEV' in os.environ
+CONFIG_FILE = 'pants.ini'
 
 logger = logging.getLogger()
 if DEBUG:
@@ -131,17 +132,38 @@ PANTS_PEX_CACHE = '%s/bin/pants.pex' % PANTS_CACHE
 
 CHUNK_SIZE = 102400
 
+def get_required(config, key, raw=False):
+  """Get options from the DEFAULT config file section.
+
+  :param config: ``ConfigParser`` instance to get the option from.
+  :param string: Name of the option to get.
+  :param boolean raw: Suppress variable interpolation when getting the option.
+  :returns: The value for ``key``.
+  """
+  if not config.has_option('DEFAULT', key):
+    error('Required %s key DEFAULT.%s is not present. Please add the option and try again.' % (
+      CONFIG_FILE, key))
+  return config.get('DEFAULT', key, raw=raw)
+
 config = ConfigParser({
   'pants_pex_filename_pattern': 'pants-%s-py%s%s.pex',
   'ivysvnresolver_url': 'https://ivysvn.googlecode.com/files/ivysvnresolver-2.2.0-bin.tgz',
 })
-config.read('pants.ini')
-ivysvnresolver_url = config.get('DEFAULT', 'ivysvnresolver_url')
+
+if not os.path.exists(CONFIG_FILE):
+  error(''.join([
+    '%s does not exist in the current directory. ' % CONFIG_FILE,
+    'Please run %s from the directory that contains ' % os.path.basename(__file__),
+    'the pants.ini you wish to use.',
+  ]))
+
+config.read(CONFIG_FILE)
+ivysvnresolver_url = get_required(config, 'ivysvnresolver_url')
 
 if not LOCAL_PEX:
-  pants_pex_baseurl = config.get('DEFAULT', 'pants_pex_baseurl')
-  pants_pex_filename_pattern = config.get('DEFAULT', 'pants_pex_filename_pattern', raw=True)
-  pants_version = config.get('DEFAULT', 'pants_version')
+  pants_pex_baseurl = get_required(config, 'pants_pex_baseurl')
+  pants_pex_filename_pattern = get_required(config, 'pants_pex_filename_pattern', raw=True)
+  pants_version = get_required(config, 'pants_version')
 
 
 def fetch(url, dest, mode=None):

@@ -51,6 +51,10 @@ class PythonTestResult(object):
     return PythonTestResult('TIMEOUT')
 
   @staticmethod
+  def cancelled():
+    return PythonTestResult('CANCELLED')
+
+  @staticmethod
   def exception():
     return PythonTestResult('EXCEPTION')
 
@@ -118,18 +122,18 @@ class PythonTestBuilder(object):
       print('%-80s.....%10s' % (target, self.successes[target]))
     return 0 if rv.success else 1
 
-  @classmethod
-  def generate_test_targets(cls):
-    if cls.TESTING_TARGETS is None:
+  @staticmethod
+  def generate_test_targets():
+    if PythonTestBuilder.TESTING_TARGETS is None:
       with ParseContext.temp():
-        cls.TESTING_TARGETS = [
+        PythonTestBuilder.TESTING_TARGETS = [
           PythonRequirement('pytest'),
           PythonRequirement('pytest-cov'),
-          PythonRequirement('coverage==3.6b1'),
-          PythonRequirement('unittest2', version_filter=lambda py, pl: py.startswith('2')),
-          PythonRequirement('unittest2py3k', version_filter=lambda py, pl: py.startswith('3'))
+          PythonRequirement('coverage'),
+          PythonRequirement('unittest2', version_filter=lambda:sys.version_info[0]==2),
+          PythonRequirement('unittest2py3k', version_filter=lambda:sys.version_info[0]==3)
         ]
-    return cls.TESTING_TARGETS
+    return PythonTestBuilder.TESTING_TARGETS
 
   @staticmethod
   def generate_junit_args(target):
@@ -189,8 +193,8 @@ class PythonTestBuilder(object):
 
     try:
       builder = PEXBuilder()
-      builder.info.entry_point = target.entry_point
-      builder.info.ignore_errors = target._soft_dependencies
+      builder.info().entry_point = 'pytest'
+      builder.info().ignore_errors = target._soft_dependencies
       chroot = PythonChroot(target, self.root_dir, extra_targets=self.generate_test_targets(),
                             builder=builder, conn_timeout=self._conn_timeout)
       builder = chroot.dump()
@@ -205,6 +209,9 @@ class PythonTestBuilder(object):
       # TODO(wickman)  If coverage is enabled, write an intermediate .html that points to
       # each of the coverage reports generated and webbrowser.open to that page.
       rv = PythonTestBuilder.wait_on(po, timeout=target.timeout)
+    except KeyboardInterrupt:
+      print('Test interrupted by user')
+      rv = PythonTestResult.cancelled()
     except Exception as e:
       import traceback
       print('Failed to run test!', file=sys.stderr)

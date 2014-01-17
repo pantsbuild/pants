@@ -16,22 +16,48 @@
 
 from __future__ import print_function
 
+__author__ = 'Brian Wickman'
+
 import os
-import subprocess
 import sys
+import tempfile
+import subprocess
 
 from twitter.common.dirutil import safe_rmtree
-from twitter.pants.base.build_environment import get_buildroot
-from twitter.pants.python.code_generator import CodeGenerator
+from twitter.common.dirutil.chroot import RelativeChroot
+
+from twitter.pants.python.egg_builder import EggBuilder
 from twitter.pants.targets.python_thrift_library import PythonThriftLibrary
 from twitter.pants.thrift_util import calculate_compile_roots, select_thrift_binary
 
-
-class PythonThriftBuilder(CodeGenerator):
-  class UnknownPlatformException(CodeGenerator.Error):
+class PythonThriftBuilder(object):
+  """
+    Thrift builder.
+  """
+  class UnknownPlatformException(Exception):
     def __init__(self, platform):
-      super(PythonThriftBuilder.UnknownPlatformException, self).__init__(
-          "Unknown platform: %s!" % str(platform))
+      Exception.__init__(self, "Unknown platform: %s!" % str(platform))
+  class CodeGenerationException(Exception): pass
+
+  def __init__(self, target, root_dir, config):
+    self.target = target
+    self.root = root_dir
+    self.config = config
+    distdir = os.path.join(self.root, 'dist')
+    self.chroot = RelativeChroot(root_dir, distdir, target.name)
+    codegen_root = tempfile.mkdtemp(dir=self.chroot.path(), prefix='codegen.')
+    self.codegen_root = os.path.relpath(codegen_root, self.chroot.path())
+    self.detected_packages = set()
+    self.detected_namespace_packages = set()
+
+  def __del__(self):
+    self.cleanup()
+
+  def packages(self):
+    return self.detected_packages
+
+  def cleanup(self):
+    safe_rmtree(self.chroot.path())
 
   def run_thrifts(self):
     def is_py_thrift(target):
@@ -45,7 +71,8 @@ class PythonThriftBuilder(CodeGenerator):
 
   def _run_thrift(self, source, bases):
     thrift_file = source
-    thrift_abs_path = os.path.abspath(os.path.join(self.root, thrift_file))
+    thrift_abs_path = os.path.join(self.root, thrift_file)
+    thrift_abs_path = os.path.abspath(thrift_abs_path)
 
     args = [
       select_thrift_binary(self.config),
@@ -53,16 +80,13 @@ class PythonThriftBuilder(CodeGenerator):
       'py:new_style',
       '-recurse',
       '-o',
-      self.codegen_root
+      os.path.join(self.chroot.path(), self.codegen_root)
     ]
-
-    # Add bases as include paths to try.  Note that include paths and compile targets
-    # should be uniformly relative, or uniformly absolute (in this case the latter).
     for base in bases:
-      args.extend(('-I', os.path.join(get_buildroot(), base)))
+      args.extend(('-I', base))
     args.append(thrift_abs_path)
 
-    po = subprocess.Popen(args, cwd=self.chroot.path())
+    po = subprocess.Popen(args)
     rv = po.wait()
     if rv != 0:
       comm = po.communicate()
@@ -73,34 +97,60 @@ class PythonThriftBuilder(CodeGenerator):
       print(comm[1], file=sys.stderr)
     return rv == 0
 
-  @property
-  def package_dir(self):
-    return "gen-py"
+  @staticmethod
+  def path_to_module(path):
+    return path.replace(os.path.sep, '.')
 
-  def generate(self):
+  def build_egg(self):
     # autogenerate the python files that we bundle up
     self.run_thrifts()
 
-    # Thrift generates code with all parent namespaces with empty __init__.py's. Generally
-    # speaking we want to drop anything w/o an __init__.py, and for anything with an __init__.py,
-    # we want to explicitly make it a namespace package, hence the hoops here.
-    for root, _, files in os.walk(os.path.normpath(self.package_root)):
-      reldir = os.path.relpath(root, self.package_root)
-      if reldir == '.':  # skip root
-        continue
-      if '__init__.py' not in files:  # skip non-packages
-        continue
-      init_py_abspath = os.path.join(root, '__init__.py')
+    genpy_root = os.path.join(self.chroot.path(), self.codegen_root, 'gen-py')
+    for dir, _, files in os.walk(os.path.normpath(genpy_root)):
+      reldir = os.path.relpath(dir, genpy_root)
+      if reldir == '.': continue
+      if '__init__.py' not in files: continue
+      init_py_abspath = os.path.join(dir, '__init__.py')
       module_path = self.path_to_module(reldir)
-      self.created_packages.add(module_path)
-      if os.path.getsize(init_py_abspath) == 0:  # empty __init__, translate to namespace package
+      self.detected_packages.add(module_path)
+      # A namespace package is one that is just a container for other
+      # modules and subpackages. Setting their __init__.py files as follows
+      # allows them to be distributed across multiple eggs. Without this you
+      # couldn't have this egg share any package prefix with any other module
+      # in any other egg or in the source tree.
+      #
+      # Note that the thrift compiler should always generate empty __init__.py
+      # files, but we test for this anyway, just in case that changes.
+      if len(files) == 1 and os.path.getsize(init_py_abspath) == 0:
         with open(init_py_abspath, 'wb') as f:
           f.write(b"__import__('pkg_resources').declare_namespace(__name__)")
-        self.created_namespace_packages.add(module_path)
-      else:
-        # non-empty __init__, this is a leaf package, usually with ttypes and constants, leave as-is
-        pass
+        self.detected_namespace_packages.add(module_path)
 
-    if not self.created_packages:
-      raise self.CodeGenerationException(
+    if not self.detected_packages:
+      raise PythonThriftBuilder.CodeGenerationException(
         'No Thrift structures declared in %s!' % self.target)
+
+    def dump_setup_py(packages, namespace_packages):
+      boilerplate = """
+from setuptools import setup
+
+setup(name        = "%(target_name)s",
+      version     = "dev",
+      description = "autogenerated thrift bindings for %(target_name)s",
+      package_dir = { "": "gen-py" },
+      packages    = %(packages)s,
+      namespace_packages = %(namespace_packages)s)
+"""
+      boilerplate = boilerplate % {
+        'target_name': self.target._create_id(),
+        'genpy_root': genpy_root,
+        'packages': repr(list(packages)),
+        'namespace_packages': repr(list(namespace_packages))
+      }
+
+      self.chroot.write(boilerplate.encode('utf-8'), os.path.join(self.codegen_root, 'setup.py'))
+    dump_setup_py(self.detected_packages, self.detected_namespace_packages)
+
+    egg_root = os.path.join(self.chroot.path(), self.codegen_root)
+    egg_path = EggBuilder().build_egg(egg_root, self.target)
+    return egg_path

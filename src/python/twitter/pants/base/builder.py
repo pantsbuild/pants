@@ -1,5 +1,5 @@
 # ==================================================================================================
-# Copyright 2012 Twitter, Inc.
+# Copyright 2011 Twitter, Inc.
 # --------------------------------------------------------------------------------------------------
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this work except in compliance with the License.
@@ -14,30 +14,18 @@
 # limitations under the License.
 # ==================================================================================================
 
-import unittest
+class Builder(object):
+  """Abstract base class for builder implementations that can execute a parsed BUILD target."""
 
-from twitter.common.contextutil import temporary_file
-from twitter.common.python.platforms import Platform
+  def __init__(self, ferror, root_dir):
+    self.ferror = ferror
+    self.root_dir = root_dir
 
-from twitter.pants.base import Config
-from twitter.pants.python.resolver import get_platforms
+  def build(self, target, args):
+    """Subclasses must implement a BUILD target executor.  The value returned should be an int,
+    0 indicating success and any other value indicating failure.
 
+    target: the parsed target to build
+    args: additional arguments to the builder backend"""
 
-class ResolverTest(unittest.TestCase):
-  def setUp(self):
-    with temporary_file() as ini:
-      ini.write(
-'''
-[python-setup]
-platforms: [
-  'current',
-  'linux-x86_64']
-''')
-      ini.close()
-      self.config = Config.load(configpath=ini.name)
-
-  def test_get_current_platform(self):
-    expected_platforms = [Platform.current(), 'linux-x86_64']
-    self.assertEqual(expected_platforms,
-                     list(get_platforms(self.config.getlist('python-setup', 'platforms'))))
-
+    pass
