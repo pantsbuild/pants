@@ -19,6 +19,8 @@ from twitter.pants.targets.python_target import PythonTarget
 from twitter.pants.targets.pants_target import Pants
 
 class PythonAntlrLibrary(PythonTarget):
+  """Generates a stub Python library from Antlr grammar files."""
+
   def __init__(self, name, module,
                antlr_version = '3.1.3',
                sources = None,
@@ -26,14 +28,19 @@ class PythonAntlrLibrary(PythonTarget):
                dependencies = None,
                exclusives=None):
     """
-      name = Name of library
-      package = Python package to generate the parser in (there is no directive for this in ANTLR)
-      sources = antlr source files
-      resources = non-Python resources, e.g. templates, keys, other data (it is
+    :param name: Name of library
+    :param module: everything beneath module is relative to this module name, None if root namespace
+    :param antlr_version:
+    :param sources: A list of filenames representing the source code
+      this library is compiled from.
+    :type sources: list of strings
+    :param resources: non-Python resources, e.g. templates, keys, other data (it is
         recommended that your application uses the pkgutil package to access these
         resources in a .zip-module friendly way.)
-      dependencies = other PythonLibraries, Eggs or internal Pants targets
-      exclusives:   An optional map of exclusives tags. See CheckExclusives for details.
+    :param dependencies: List of :class:`twitter.pants.base.target.Target` instances
+      this target depends on.
+    :type dependencies: list of targets
+    :param dict exclusives: An optional dict of exclusives tags. See CheckExclusives for details.
     """
 
     def get_all_deps():
@@ -43,8 +50,7 @@ class PythonAntlrLibrary(PythonTarget):
         all_deps.update(dependencies)
       return all_deps
 
-    PythonTarget.__init__(self, name, sources, resources, get_all_deps(),
-                          exclusives=exclusives or {})
+    PythonTarget.__init__(self, name, sources, resources, get_all_deps(), exclusives=exclusives)
 
     self.module = module
     self.antlr_version = antlr_version

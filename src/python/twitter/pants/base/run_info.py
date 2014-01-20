@@ -38,29 +38,33 @@ class RunInfo(object):
     return self._info.copy()
 
   def add_info(self, key, val):
-    self.add_infos((key, val))
+    """Adds the given info and returns a dict composed of just this added info."""
+    return self.add_infos((key, val))
 
   def add_infos(self, *keyvals):
+    """Adds the given info and returns a dict composed of just this added info."""
+    infos = dict(keyvals)
     with open(self._info_file, 'a') as outfile:
-      for key, val in keyvals:
+      for key, val in infos.items():
         key = key.strip()
         val = str(val).strip()
         if ':' in key:
           raise Exception, 'info key must not contain a colon'
         outfile.write('%s: %s\n' % (key, val))
         self._info[key] = val
+    return infos
 
   def add_basic_info(self, run_id, timestamp):
-    """A helper function to add basic build info."""
+    """Adds basic build info and returns a dict composed of just this added info."""
     datetime = time.strftime('%A %b %d, %Y %H:%M:%S', time.localtime(timestamp))
     user = getpass.getuser()
     machine = socket.gethostname()
     path = get_buildroot()
-    self.add_infos(('id', run_id), ('timestamp', timestamp), ('datetime', datetime),
-                   ('user', user), ('machine', machine), ('path', path))
+    return self.add_infos(('id', run_id), ('timestamp', timestamp), ('datetime', datetime),
+                          ('user', user), ('machine', machine), ('path', path))
 
   def add_scm_info(self):
-    """A helper function to add SCM-related info."""
+    """Adds SCM-related info and returns a dict composed of just this added info."""
     scm = get_scm()
     if scm:
       revision = scm.commit_id
@@ -68,4 +72,4 @@ class RunInfo(object):
       branch = scm.branch_name or revision
     else:
       revision, tag, branch = 'none', 'none', 'none'
-    self.add_infos(('revision', revision), ('tag', tag), ('branch', branch))
+    return self.add_infos(('revision', revision), ('tag', tag), ('branch', branch))

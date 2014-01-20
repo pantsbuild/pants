@@ -77,7 +77,8 @@ else
   if [[ $return_code != 0 ]]; then
     pants_version=$(unzip -q -c pants.pex PEX-INFO | \
                     with_virtualenv python -c 'import json,sys; \
-                    print json.loads(sys.stdin.read()).get("build_properties", {"sha": None})["sha"]')
+                    print json.loads(sys.stdin.read()).get("build_properties", \
+                                                           {"revision": None})["revision"]')
     echo "pants.pex version $pants_version"
     exit $return_code
   fi

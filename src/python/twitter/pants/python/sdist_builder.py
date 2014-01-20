@@ -1,5 +1,5 @@
 # ==================================================================================================
-# Copyright 2012 Twitter, Inc.
+# Copyright 2013 Twitter, Inc.
 # --------------------------------------------------------------------------------------------------
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this work except in compliance with the License.
@@ -14,29 +14,28 @@
 # limitations under the License.
 # ==================================================================================================
 
-import unittest
+from __future__ import print_function
 
-from twitter.common.contextutil import temporary_file
-from twitter.common.python.platforms import Platform
+import glob
+import os
+import subprocess
+import sys
 
-from twitter.pants.base import Config
-from twitter.pants.python.python_chroot import get_platforms
+from twitter.common.contextutil import pushd
+from twitter.common.python.installer import Packager
 
-class PythonChrootTest(unittest.TestCase):
-  def setUp(self):
-    with temporary_file() as ini:
-      ini.write(
-'''
-[python-setup]
-platforms: [
-  'current',
-  'linux-x86_64']
-''')
-      ini.close()
-      self.config = Config.load(configpath=ini.name)
 
-  def test_get_current_platform(self):
-    expected_platforms = [Platform.current(), 'linux-x86_64']
-    self.assertEqual(expected_platforms,
-                     list(get_platforms(self.config.getlist('python-setup', 'platforms'))))
+class SdistBuilder(object):
+  """A helper class to run setup.py projects."""
 
+  class Error(Exception): pass
+  class SetupError(Error): pass
+
+  @classmethod
+  def build(cls, setup_root, target, interpreter=None):
+    packager = Packager(setup_root, interpreter=interpreter,
+        install_dir=os.path.join(setup_root, 'dist'))
+    try:
+      return packager.sdist()
+    except Packager.InstallFailure as e:
+      raise cls.SetupError(str(e))

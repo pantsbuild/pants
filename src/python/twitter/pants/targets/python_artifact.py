@@ -31,7 +31,7 @@ class PythonArtifact(object):
 
   def __init__(self, **kwargs):
     self._kw = kwargs
-    self._library = None
+    self._binaries = {}
 
     def has(name):
       value = self._kw.get(name)
@@ -49,14 +49,45 @@ class PythonArtifact(object):
       misses(arg)
 
   @property
-  def library(self):
-    return self._library
+  def name(self):
+    return self._name
 
-  @library.setter
-  def library(self, value):
-    assert isinstance(value, PythonTarget)
-    self._library = value
+  @property
+  def version(self):
+    return self._version
 
   @property
   def key(self):
     return '%s==%s' % (self._name, self._version)
+
+  @property
+  def setup_py_keywords(self):
+    return self._kw
+
+  @property
+  def binaries(self):
+    return self._binaries
+
+  def with_binaries(self, *args, **kw):
+    """
+      Add binaries tagged to this artifact, e.g.
+
+      provides = setup_py(
+        name = 'my_library',
+        zip_safe = True
+      ).with_binaries(
+        my_command = pants(':my_library_bin')
+      )
+
+      This adds a console_script entry_point for the python_binary target
+      pointed at by :my_library_bin.  Currently only supports
+      python_binaries that specify entry_point explicitly instead of source.
+
+      Also can take a dictionary, e.g.
+      with_binaries({'my-command': pants(...)})
+    """
+    for arg in args:
+      if isinstance(arg, dict):
+        self._binaries.update(arg)
+    self._binaries.update(kw)
+    return self

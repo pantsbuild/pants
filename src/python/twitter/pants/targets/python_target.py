@@ -13,26 +13,41 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==================================================================================================
-from collections import defaultdict
-from twitter.common.collections import OrderedSet
-from twitter.pants.base import Target
 
-from .util import resolve
+from collections import defaultdict
+
+from twitter.common.collections import OrderedSet
+from twitter.common.python.interpreter import PythonIdentity
+
+from twitter.pants.base.target import Target, TargetDefinitionException
+
+from .with_dependencies import TargetWithDependencies
 from .with_sources import TargetWithSources
 
 
-class PythonTarget(TargetWithSources):
-  def __init__(self, name, sources, resources=None, dependencies=None, provides=None,
+class PythonTarget(TargetWithDependencies, TargetWithSources):
+  """Base class for all Python targets."""
+
+  def __init__(self,
+               name,
+               sources,
+               resources=None,
+               dependencies=None,
+               provides=None,
+               compatibility=None,
                exclusives=None):
-    TargetWithSources.__init__(self, name, sources, exclusives=exclusives)
-    processed_dependencies = resolve(dependencies)
+    TargetWithSources.__init__(self, name, sources=sources, exclusives=exclusives)
+    TargetWithDependencies.__init__(self, name, dependencies=dependencies, exclusives=exclusives)
 
     self.add_labels('python')
     self.resources = self._resolve_paths(resources) if resources else OrderedSet()
-    self.dependencies = OrderedSet(processed_dependencies or ())
     self.provides = provides
-    if self.provides:
-      self.provides.library = self
+    self.compatibility = compatibility or ['']
+    for req in self.compatibility:
+      try:
+        PythonIdentity.parse_requirement(req)
+      except ValueError as e:
+        raise TargetDefinitionException(str(e))
 
   def _propagate_exclusives(self):
     self.exclusives = defaultdict(set)
@@ -44,17 +59,3 @@ class PythonTarget(TargetWithSources):
         self.add_to_exclusives(t.exclusives)
       elif hasattr(t, "declared_exclusives"):
         self.add_to_exclusives(t.declared_exclusives)
-
-  def _walk(self, walked, work, predicate = None):
-    Target._walk(self, walked, work, predicate)
-    for dependency in self.dependencies:
-      for dep in dependency.resolve():
-        if isinstance(dep, Target) and not dep in walked:
-          walked.add(dep)
-          if not predicate or predicate(dep):
-            additional_targets = work(dep)
-            dep._walk(walked, work, predicate)
-            if additional_targets:
-              for additional_target in additional_targets:
-                if hasattr(additional_target, '_walk'):
-                  additional_target._walk(walked, work, predicate)

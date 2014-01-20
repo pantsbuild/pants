@@ -18,7 +18,7 @@
 python_test_suite(name = 'all',
   dependencies = [
     pants(':test_antlr_builder'),
-    pants(':test_python_chroot'),
+    pants(':test_resolver'),
     pants(':test_thrift_namespace_packages'),
     pants(':test_subprocess_call_with_args')
   ]
@@ -39,8 +39,8 @@ python_tests(name = 'test_thrift_namespace_packages',
                    pants('src/thrift/com/twitter/pants/testing:goose-py') ]
 )
 
-python_tests(name = 'test_python_chroot',
-  sources = ['test_python_chroot.py'],
+python_tests(name = 'test_resolver',
+  sources = ['test_resolver.py'],
   dependencies = [
     pants('src/python/twitter/common/config'),
     pants('src/python/twitter/common/python'),

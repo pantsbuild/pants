@@ -14,50 +14,55 @@
 # limitations under the License.
 # ==================================================================================================
 
-PANTS_SOURCES   = rglobs('*.py')
-PANTS_GARBAGE   = rglobs('*.pyc') + rglobs('*~')
-PANTS_RESOURCES = rglobs('*') - PANTS_SOURCES - PANTS_GARBAGE
+NG_CLIENT = ['java/bin/ng.py']
 
-# Only build pylint on py 2.x
-def pylint_build_filter():
-  import sys
-  return sys.version_info[0] == 2
+PANTS_SOURCES   = rglobs('*.py') - NG_CLIENT
+PANTS_GARBAGE   = rglobs('*.pyc') + rglobs('*~')
+PANTS_RESOURCES = rglobs('*') - PANTS_SOURCES - NG_CLIENT - PANTS_GARBAGE
+
+
+def pylint_build_filter(python, platform):
+  return python.startswith('2')
+
 
 python_library(
-  name = 'pants-deps',
-  dependencies = [
-    python_requirement('ansicolors'),
-    python_requirement('elementtree'),
-    python_requirement('Markdown'),
-    python_requirement('pygments'),
-    python_requirement('pylint', version_filter=pylint_build_filter),
-    python_requirement('pystache'),
-    python_requirement('pytest'),
-    python_requirement('pytest-cov'),
-    python_requirement('python_daemon'),
+  name='pants-deps',
+  dependencies=[
+    pants('3rdparty/python:ansicolors'),
+    pants('3rdparty/python:elementtree'),
+    pants('3rdparty/python:markdown'),
+    pants('3rdparty/python:psutil'),
+    pants('3rdparty/python:pygments'),
+    pants('3rdparty/python:pystache'),
+    pants('3rdparty/python:pytest'),
+    pants('3rdparty/python:pytest-cov'),
+    pants('3rdparty/python:python_daemon'),
+    pants('3rdparty/python:requests'),
+    python_requirement('pylint==0.25.1', version_filter=pylint_build_filter),
   ]
 )
 
 python_library(
-  name = 'pants-lib',
-  dependencies = [
-    pants('src/python/twitter/common'),
-    pants('src/python/twitter/common/app'),
+  name='pants-lib',
+  dependencies=[
+    pants(':pants-deps'),
+    pants('src/python/twitter/common/collections'),
+    pants('src/python/twitter/common/config'),
     pants('src/python/twitter/common/confluence'),
     pants('src/python/twitter/common/contextutil'),
+    pants('src/python/twitter/common/decorators'),
     pants('src/python/twitter/common/dirutil'),
     pants('src/python/twitter/common/java'),
     pants('src/python/twitter/common/lang'),
+    pants('src/python/twitter/common/log'),
     pants('src/python/twitter/common/process'),
     pants('src/python/twitter/common/python'),
+    pants('src/python/twitter/common/quantity'),
     pants('src/python/twitter/common/rwbuf'),
-    pants('src/python/twitter/thrift/text'),
     pants('src/python/twitter/common/threading'),
     pants('src/python/twitter/common/util'),
-    pants(':pants-deps')
+    pants('src/python/twitter/thrift/text'),
   ],
-  sources = PANTS_SOURCES,
-  resources = PANTS_RESOURCES,
   provides = setup_py(
     name = 'twitter.pants',
     version = '0.0.3',
@@ -66,16 +71,18 @@ python_library(
       'twitter',
       'twitter.common',
     ]
-  )
+  ),
+  sources=PANTS_SOURCES,
+  resources=PANTS_RESOURCES,
 )
 
 python_binary(
-  name = 'pants',
-  entry_point = 'twitter.pants.bin.pants_exe',
-  dependencies = [
+  name='pants',
+  entry_point='twitter.pants.bin.pants_exe:main',
+  dependencies=[
     pants(':pants-lib')
   ],
-  platforms = [
+  platforms=[
     'current',
     'macosx-10.4-x86_64',
     'linux-x86_64'
@@ -87,8 +94,12 @@ python_binary(
   dependencies = [
     'src/python/twitter/common/app',
     'src/python/twitter/common/log',
+
+    # TODO(John Sirois): Break up pants src/ into proper libs - the ng client should not need all
+    # of pants
+    ':pants-lib'
   ],
-  source = 'java/nailgun_client.py',
+  source = NG_CLIENT,
 )
 
 # TODO(John Sirois): add a BUILD.commons github wiki goal to the 'publish' phase and publish these

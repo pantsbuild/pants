@@ -17,7 +17,7 @@
 python_tests(name = 'base',
   sources = globs('*.py'),
   dependencies = [
-    python_requirement('mox'),
+    pants('3rdparty/python:mox'),
     pants("src/python/twitter/common/collections"),
     pants("src/python/twitter/common/dirutil"),
     pants("src/python/twitter/pants:pants-lib"),

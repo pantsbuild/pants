@@ -16,41 +16,42 @@
 
 from __future__ import print_function
 
-__author__ = 'Brian Wickman'
-
 import os
 import tempfile
+import time
 
 from twitter.common.python.pex_builder import PEXBuilder
+
 from twitter.pants.base import Config
 from twitter.pants.targets import PythonBinary
-from twitter.pants.python.python_chroot import PythonChroot
+
+from .python_chroot import PythonChroot
+
 
 class PythonBinaryBuilder(object):
-  class NotABinaryTargetException(Exception): pass
+  class NotABinaryTargetException(Exception):
+    pass
 
-  def __init__(self, target, args, root_dir, conn_timeout=None):
+  def __init__(self, target, root_dir, run_tracker, conn_timeout=None):
     self.target = target
     if not isinstance(target, PythonBinary):
       raise PythonBinaryBuilder.NotABinaryTargetException(
-        "Target %s is not a PythonBinary!" % target)
+          "Target %s is not a PythonBinary!" % target)
+
     config = Config.load()
     self.distdir = config.getdefault('pants_distdir')
     distpath = tempfile.mktemp(dir=self.distdir, prefix=target.name)
-    self.builder = PEXBuilder(distpath)
 
-    # configure builder PexInfo options
-    for repo in target._repositories:
-      self.builder.info().add_repository(repo)
-    for index in target._indices:
-      self.builder.info().add_index(index)
-    self.builder.info().allow_pypi = target._allow_pypi
-    self.builder.info().zip_safe = target._zip_safe
-    self.builder.info().inherit_path = target._inherit_path
-    self.builder.info().entry_point = target._entry_point
-    self.builder.info().ignore_errors = target._ignore_errors
+    run_info = run_tracker.run_info
+    build_properties = {}
+    build_properties.update(run_info.add_basic_info(run_id=None, timestamp=time.time()))
+    build_properties.update(run_info.add_scm_info())
 
-    self.chroot = PythonChroot(target, root_dir, builder=self.builder, conn_timeout=conn_timeout)
+    pexinfo = target.pexinfo.copy()
+    pexinfo.build_properties = build_properties
+    builder = PEXBuilder(distpath, pex_info=pexinfo)
+
+    self.chroot = PythonChroot(target, root_dir, builder=builder, conn_timeout=conn_timeout)
 
   def run(self):
     print('Building PythonBinary %s:' % self.target)

@@ -18,20 +18,38 @@ from twitter.pants.targets.python_target import PythonTarget
 
 
 class PythonLibrary(PythonTarget):
-  def __init__(self, name, sources=(), resources=(), dependencies=(), provides=None, module="",
+  """Produces a Python library."""
+
+  def __init__(self,
+               name,
+               sources=(),
+               resources=(),
+               dependencies=(),
+               provides=None,
+               compatibility=None,
                exclusives=None):
     """
-      name = Name of library
-      sources = Python source files
-      resources = non-Python resources, e.g. templates, keys, other data (it is
-        recommended that your application uses the pkgutil package to access these
-        resources in a .zip-module friendly way.)
-      dependencies = other PythonLibraries, Eggs or internal Pants targets
-      module = everything beneath module is relative to this module name, None if root namespace
-      provides = A Python artifact that this library provides
-      exclusives:   An optional map of exclusives tags. See CheckExclusives for details.
+    :param name: Name of library
+    :param sources: A list of filenames representing the source code
+      this library is compiled from.
+    :type sources: list of strings
+    :param resources: non-Python resources, e.g. templates, keys, other data (it is
+      recommended that your application uses the pkgutil package to access these
+      resources in a .zip-module friendly way.)
+    :param dependencies: List of :class:`twitter.pants.base.target.Target` instances
+      this target depends on.
+    :type dependencies: list of targets
+    :param Artifact provides:
+      The :class:`twitter.pants.targets.artifact.Artifact`
+      to publish that represents this target outside the repo.
+    :param dict exclusives: An optional dict of exclusives tags. See CheckExclusives for details.
     """
-    PythonTarget.__init__(self, name, sources, resources, dependencies, provides,
-                          exclusives=exclusives)
-    self.module = module
-
+    PythonTarget.__init__(self,
+        name,
+        sources=sources,
+        resources=resources,
+        dependencies=dependencies,
+        provides=provides,
+        compatibility=compatibility,
+        exclusives=exclusives,
+    )
