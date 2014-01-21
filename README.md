@@ -12,7 +12,7 @@ Download the [latest stable version][download].
 Build
 -----
 
-Zinc is built using sbt 0.12. To create the full distribution:
+Zinc is built using sbt 0.13. To create the full distribution:
 
     sbt dist/create
 
