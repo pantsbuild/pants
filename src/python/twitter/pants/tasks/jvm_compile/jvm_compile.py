@@ -492,7 +492,7 @@ class JvmCompile(NailgunTask):
 
   def _compute_sources_by_target(self, targets):
     def calculate_sources(target):
-      sources = filter(lambda s: s.endswith(self._file_suffix), target.sources_relative_to_buildroot())
+      sources = [s for s in target.sources_relative_to_buildroot() if s.endswith(self._file_suffix)]
       # TODO: Make this less hacky. Ideally target.java_sources will point to sources, not targets.
       if hasattr(target, 'java_sources') and target.java_sources:
         sources.extend(resolve_target_sources(target.java_sources, '.java'))
