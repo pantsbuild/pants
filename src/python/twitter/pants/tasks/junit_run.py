@@ -214,7 +214,7 @@ class JUnitRun(JvmTask):
   def execute(self, targets):
     if not self.context.options.junit_run_skip:
       tests = list(self.get_tests_to_run() if self.tests_to_run
-              else self.calculate_tests_from_targets(targets))
+                   else self.calculate_tests_from_targets(targets))
       if tests:
         bootstrapped_cp = self._jvm_tool_bootstrapper.get_jvm_tool_classpath(self._junit_bootstrap_key)
         junit_classpath = self.classpath(bootstrapped_cp,
@@ -369,7 +369,7 @@ class JUnitRun(JvmTask):
     relpath = os.path.relpath(path, basedir)
     class_mappings_for_src = self.context.products.get('classes').get(relpath)
     if not class_mappings_for_src:
-      # Its valid - if questionable - to have a source file with no classes when, for
+      # It's valid - if questionable - to have a source file with no classes when, for
       # example, the source file has all its code commented out.
       self.context.log.warn('File %s contains no classes' % path)
     else:
