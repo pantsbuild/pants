@@ -110,7 +110,7 @@ class ThriftstoreDMLGen(CodeGen):
     def collect_sources(target):
       if self.is_gentarget(target):
         bases.add(target.target_base)
-        sources.update(os.path.join(target.target_base, source) for source in target.sources)
+        sources.update(target.sources_relative_to_buildroot())
     for target in thrift_targets:
       target.walk(collect_sources)
     return bases, sources
@@ -136,6 +136,5 @@ class ThriftstoreDMLGen(CodeGen):
     return thriftstore_classes
 
   def _create_java_target(self, target):
-    source_files = [os.path.join(target.target_base, source) for source in target.sources]
-    self.gen_dml_jls[target].sources = self._calculate_genfiles(source_files)
+    self.gen_dml_jls[target].sources = self._calculate_genfiles(target.sources_relative_to_buildroot())
     return self.gen_dml_jls[target]

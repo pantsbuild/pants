@@ -105,5 +105,5 @@ class SpecsRun(JvmTask):
     tests = OrderedSet()
     for target in targets:
       if target.is_scala and target.is_test:
-        tests.update(os.path.join(target.target_base, test) for test in target.sources)
+        tests.update(target.sources_relative_to_buildroot())
     return tests

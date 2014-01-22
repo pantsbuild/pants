@@ -63,8 +63,8 @@ class JvmDependencyAnalyzer(object):
     # Look at all targets in-play for this pants run. Does not include synthetic targets,
     for target in self._context.targets():
       if isinstance(target, JvmTarget):
-        for src in target.sources:
-          targets_by_file[os.path.join(buildroot, target.target_base, src)].add(target)
+        for src in target.sources_relative_to_buildroot():
+          targets_by_file[os.path.join(buildroot, src)].add(target)
       elif isinstance(target, JarLibrary):
         for jardep in target.dependencies:
           if isinstance(jardep, JarDependency):

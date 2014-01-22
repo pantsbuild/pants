@@ -124,7 +124,7 @@ class ProtobufGen(CodeGen):
     def collect_sources(target):
       if self.is_gentarget(target):
         bases.add(target.target_base)
-        sources.update(os.path.join(target.target_base, source) for source in target.sources)
+        sources.update(target.sources_relative_to_buildroot())
 
     for target in targets:
       target.walk(collect_sources)

@@ -125,8 +125,8 @@ class CodeGen(Task):
           )
           syn_target.add_labels('synthetic')
           if write_to_artifact_cache and target in invalid_vts_by_target:
-            sources = [os.path.join(syn_target.target_base, s) for s in syn_target.sources]
-            vts_artifactfiles_pairs.append((invalid_vts_by_target[target], sources))
+            vts_artifactfiles_pairs.append((invalid_vts_by_target[target],
+                                            syn_target.sources_relative_to_buildroot()))
           langtarget_by_gentarget[target] = syn_target
         genmap = self.context.products.get(lang)
         # synmap is a reverse map

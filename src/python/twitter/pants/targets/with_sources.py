@@ -68,6 +68,10 @@ class TargetWithSources(Target):
       self._resolved_sources = self._resolve_paths(self._unresolved_sources or [])
     return self._resolved_sources
 
+  def sources_relative_to_buildroot(self):
+    for src in self.sources:
+      yield os.path.join(self.target_base, src)
+
   def set_resolved_sources(self, sources):
     """Set resolved sources directly, skipping the resolution.
 

@@ -110,10 +110,10 @@ class Dependencies(object):
     sources = set()
     target_by_source = dict()
     for target in targets:
-      for source in target.sources:
-        src = os.path.normpath(os.path.join(target.target_base, source))
-        target_by_source[src] = target
-        sources.add(src)
+      for src in target.sources_relative_to_buildroot():
+        normsrc = os.path.normpath(src)
+        target_by_source[normsrc] = target
+        sources.add(normsrc)
 
     classes_by_target_by_source = defaultdict(lambda: defaultdict(set))
     for sourcefile, classfiles in self.classes_by_source.items():

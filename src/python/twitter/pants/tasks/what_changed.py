@@ -63,12 +63,12 @@ class WhatChanged(ConsoleTask):
   def console_output(self, _):
     touched_files = self._get_touched_files()
     if self._show_files:
-      for file in touched_files:
-        yield file
+      for path in touched_files:
+        yield path
     else:
       touched_targets = set()
-      for file in touched_files:
-        for touched_target in self._owning_targets(file):
+      for path in touched_files:
+        for touched_target in self._owning_targets(path):
           if touched_target not in touched_targets:
             touched_targets.add(touched_target)
             yield str(touched_target.address)
@@ -79,16 +79,16 @@ class WhatChanged(ConsoleTask):
     except Workspace.WorkspaceError as e:
       raise TaskError(e)
 
-  def _owning_targets(self, file):
-    for build_file in self._candidate_owners(file):
-      is_build_file = (build_file.full_path == os.path.join(get_buildroot(), file))
+  def _owning_targets(self, path):
+    for build_file in self._candidate_owners(path):
+      is_build_file = (build_file.full_path == os.path.join(get_buildroot(), path))
       for address in Target.get_all_addresses(build_file):
         target = Target.get(address)
-        if target and (is_build_file or (target.has_sources() and self._owns(target, file))):
+        if target and (is_build_file or (target.has_sources() and self._owns(target, path))):
           yield target
 
-  def _candidate_owners(self, file):
-    build_file = BuildFile(get_buildroot(), relpath=os.path.dirname(file), must_exist=False)
+  def _candidate_owners(self, path):
+    build_file = BuildFile(get_buildroot(), relpath=os.path.dirname(path), must_exist=False)
     if build_file.exists():
       yield build_file
     for sibling in build_file.siblings():
@@ -96,13 +96,10 @@ class WhatChanged(ConsoleTask):
     for ancestor in build_file.ancestors():
       yield ancestor
 
-  def _owns(self, target, file):
+  def _owns(self, target, path):
     if target not in self._filemap:
-      files = self._filemap[target]
-      for owned_file in target.sources:
-        owned_path = os.path.join(target.target_base, owned_file)
-        files.add(owned_path)
-    return file in self._filemap[target]
+      self._filemap[target].update(target.sources_relative_to_buildroot())
+    return path in self._filemap[target]
 
 
 class Workspace(AbstractClass):

@@ -86,7 +86,7 @@ class AntlrGen(CodeGen, NailgunTask):
 
     def collect_sources(target):
       if self.is_gentarget(target):
-        sources.update(os.path.join(target.target_base, source) for source in target.sources)
+        sources.update(target.sources_relative_to_buildroot())
     for target in targets:
       target.walk(collect_sources)
     return sources

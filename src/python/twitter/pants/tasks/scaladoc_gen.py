@@ -36,7 +36,7 @@ class ScaladocGen(JvmdocGen):
 def create_scaladoc_command(classpath, gendir, *targets):
   sources = []
   for target in targets:
-    sources.extend(os.path.join(target.target_base, source) for source in target.sources)
+    sources.extend(target.sources_relative_to_buildroot())
 
   if not sources:
     return None

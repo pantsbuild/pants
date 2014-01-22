@@ -244,8 +244,7 @@ class ScroogeGen(NailgunTask):
   def _inject_target(self, target, dependees, geninfo, gen_files_for_source, create_target):
     files = []
     has_service = False
-    for source_file in target.sources:
-      source = os.path.join(target.target_base, source_file)
+    for source in target.sources_relative_to_buildroot():
       services = calculate_services(source)
       genfiles = gen_files_for_source[source]
       has_service = has_service or services

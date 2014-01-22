@@ -209,8 +209,8 @@ class ThriftGen(CodeGen):
   def _inject_target(self, target, dependees, geninfo, namespace, create_target):
     files = []
     has_service = False
-    for source in target.sources:
-      services, genfiles = calculate_gen(os.path.join(target.target_base, source))
+    for src in target.sources_relative_to_buildroot():
+      services, genfiles = calculate_gen(src)
       has_service = has_service or services
       files.extend(genfiles.get(namespace, []))
     deps = geninfo.deps['service' if has_service else 'structs']

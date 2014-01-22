@@ -19,7 +19,6 @@ import shutil
 
 from twitter.common.dirutil import safe_mkdir
 
-from twitter.pants import TaskError
 from twitter.pants.tasks import Task
 
 
