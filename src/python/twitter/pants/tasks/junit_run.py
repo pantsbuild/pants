@@ -156,7 +156,8 @@ class JUnitRun(JvmTask):
     if context.options.junit_run_debug:
       self.jvm_options.extend(context.config.getlist('jvm', 'debug_args'))
 
-    self.test_classes = context.options.junit_run_tests
+    # List of FQCN, FQCN#method, sourcefile or sourcefile#method.
+    self.tests_to_run = context.options.junit_run_tests
     self.context.products.require('classes')
 
     self.outdir = (
@@ -212,8 +213,8 @@ class JUnitRun(JvmTask):
 
   def execute(self, targets):
     if not self.context.options.junit_run_skip:
-      tests = list(self.normalize_test_classes() if self.test_classes
-                                                 else self.calculate_tests(targets))
+      tests = list(self.get_tests_to_run() if self.tests_to_run
+              else self.calculate_tests_from_targets(targets))
       if tests:
         bootstrapped_cp = self._jvm_tool_bootstrapper.get_jvm_tool_classpath(self._junit_bootstrap_key)
         junit_classpath = self.classpath(bootstrapped_cp,
@@ -345,9 +346,9 @@ class JUnitRun(JvmTask):
         target.walk(add_sources_under_test)
       return classes_under_test
 
-  def normalize_test_classes(self):
-    for cls in self.test_classes:
-      for c in self.normalize(cls):
+  def get_tests_to_run(self):
+    for test_spec in self.tests_to_run:
+      for c in self.interpret_test_spec(test_spec):
         yield c
 
   def test_target_candidates(self, targets):
@@ -355,42 +356,46 @@ class JUnitRun(JvmTask):
       if isinstance(target, junit_tests):
         yield target
 
-  def calculate_tests(self, targets):
+  def calculate_tests_from_targets(self, targets):
+    targets_to_classes = self.context.products.get('classes')
     for target in self.test_target_candidates(targets):
-      for test in target.sources:
-        for cls in self.normalize(test, target.target_base):
-          yield cls
+      for classes in targets_to_classes.get(target).values():
+        for cls in classes:
+          yield JUnitRun.classfile_to_classname(cls)
+
+  def classnames_from_source_file(self, path):
+    # TODO: This is awful. The products should simply store the full path from the buildroot.
+    basedir = calculate_basedir(path)
+    relpath = os.path.relpath(path, basedir)
+    class_mappings_for_src = self.context.products.get('classes').get(relpath)
+    if not class_mappings_for_src:
+      # Its valid - if questionable - to have a source file with no classes when, for
+      # example, the source file has all its code commented out.
+      self.context.log.warn('File %s contains no classes' % path)
+    else:
+      for classes in class_mappings_for_src.values():
+        for cls in classes:
+          yield JUnitRun.classfile_to_classname(cls)
 
   @staticmethod
   def classfile_to_classname(cls):
     clsname, _ = os.path.splitext(cls.replace('/', '.'))
     return clsname
 
-  def normalize(self, classname_or_file, basedir=None):
-    components = classname_or_file.split('#', 2)
-    classname = components[0]
+  def interpret_test_spec(self, test_spec):
+    components = test_spec.split('#', 2)
+    classname_or_srcfile = components[0]
     methodname = '#' + components[1] if len(components) == 2 else ''
 
     classes_by_source = self.context.products.get('classes')
-    def relpath_toclassname(path):
-      classes = classes_by_source.get(path)
-      if not classes:
-        # Its perfectly valid - if questionable - to have a source file with no classes when, for
-        # example, the source file has all its code commented out.
-        self.context.log.warn('File %s contains no classes' % os.path.join(basedir, path))
-      else:
-        for base, classes in classes.items():
-          for cls in classes:
-            yield JUnitRun.classfile_to_classname(cls)
-
-    if basedir:
-      for classname in relpath_toclassname(classname):
-        yield classname + methodname
-    elif os.path.exists(classname):
-      basedir = calculate_basedir(classname)
-      for classname in relpath_toclassname(os.path.relpath(classname, basedir)):
-        yield classname + methodname
-    else:
+    if os.path.exists(classname_or_srcfile):  # It's a source file.
+      srcfile = classname_or_srcfile
+      for cls in self.classnames_from_source_file(srcfile):
+        # Tack the methodname onto all classes in the source file, as we
+        # can't know which method the user intended.
+        yield cls + methodname
+    else:  # It's a classname.
+      classname = classname_or_srcfile
       yield classname + methodname
 
 PACKAGE_PARSER = re.compile(r'^\s*package\s+([\w.]+)\s*;?\s*')
