@@ -182,14 +182,14 @@ class JarCreate(Task):
       jar_name = '%s-sources.jar' % jarname(target)
       add_genjar(target, jar_name)
       jar_path = os.path.join(self._output_dir, jar_name)
-      with self.create_jar(target, jar_path) as zip:
+      with self.create_jar(target, jar_path) as zipfile:
         for source in target.sources:
-          zip.write(os.path.join(target.target_base, source), source)
+          zipfile.write(os.path.join(target.target_base, source), source)
 
         if target.has_resources:
           for resources in target.resources:
             for resource in resources.sources:
-              zip.write(os.path.join(get_buildroot(), resources.target_base, resource), resource)
+              zipfile.write(os.path.join(get_buildroot(), resources.target_base, resource), resource)
 
   def javadocjar(self, java_targets, genmap, add_genjar):
     for target in java_targets:
@@ -198,7 +198,7 @@ class JarCreate(Task):
         jar_name = '%s-javadoc.jar' % jarname(target)
         add_genjar(target, jar_name)
         jar_path = os.path.join(self._output_dir, jar_name)
-        with self.create_jar(target, jar_path) as zip:
+        with self.create_jar(target, jar_path) as zipfile:
           for basedir, javadocfiles in generated.items():
             for javadocfile in javadocfiles:
-              zip.write(os.path.join(basedir, javadocfile), javadocfile)
+              zipfile.write(os.path.join(basedir, javadocfile), javadocfile)
