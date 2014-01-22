@@ -3,6 +3,7 @@ import os
 import itertools
 import shutil
 import uuid
+
 from twitter.common import contextutil
 from twitter.common.contextutil import open_zip
 from twitter.common.dirutil import safe_rmtree, safe_mkdir
@@ -27,21 +28,24 @@ class JvmCompile(NailgunTask):
     NailgunTask.setup_parser(option_group, args, mkflag)
 
     option_group.add_option(mkflag('warnings'), mkflag('warnings', negate=True),
-                            dest=subcls._language+'_compile_warnings', default=True,
-                            action='callback', callback=mkflag.set_bool,
+                            dest=subcls._language+'_compile_warnings',
+                            default=True,
+                            action='callback',
+                            callback=mkflag.set_bool,
                             help='[%default] Compile with all configured warnings enabled.')
 
     option_group.add_option(mkflag('partition-size-hint'),
                             dest=subcls._language+'_partition_size_hint',
-                            action='store', type='int', default=-1,
-                            help='Roughly how many source files to attempt to compile together. Set to a large number ' \
-                                 'to compile all sources together. Set this to 0 to compile target-by-target. ' \
+                            action='store',
+                            type='int',
+                            default=-1,
+                            help='Roughly how many source files to attempt to compile together. Set to a large number '
+                                 'to compile all sources together. Set this to 0 to compile target-by-target. '
                                  'Default is set in pants.ini.')
 
     option_group.add_option(mkflag('missing-deps'),
                             dest=subcls._language+'_missing_deps',
                             choices=['off', 'warn', 'fatal'],
-                            # TODO(Benjy): Change to fatal after we iron out all outstanding missing deps.
                             default='fatal',
                             help='[%default] One of off, warn, fatal. '
                                  'Check for missing dependencies in ' +  subcls._language + 'code. '
@@ -133,7 +137,7 @@ class JvmCompile(NailgunTask):
 
   def __init__(self, context, workdir):
     NailgunTask.__init__(self, context, workdir=workdir)
-    concrete_class = self.__class__
+    concrete_class = type(self)
     config_section = concrete_class._config_section
 
     def get_lang_specific_option(opt):
@@ -244,7 +248,8 @@ class JvmCompile(NailgunTask):
 
     # Invalidation check. Everything inside the with block must succeed for the
     # invalid targets to become valid.
-    with self.invalidated(relevant_targets, invalidate_dependents=True,
+    with self.invalidated(relevant_targets,
+                          invalidate_dependents=True,
                           partition_size_hint=self._partition_size_hint) as invalidation_check:
       if invalidation_check.invalid_vts and not self.dry_run:
         # The analysis for invalid and deleted sources is no longer valid.

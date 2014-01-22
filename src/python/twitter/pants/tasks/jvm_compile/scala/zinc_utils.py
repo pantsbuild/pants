@@ -132,7 +132,7 @@ class ZincUtils(object):
 
     args.extend(self._plugin_args())
 
-    if len(upstream_analysis_files):
+    if upstream_analysis_files:
       args.extend(
         ['-analysis-map', ','.join(['%s:%s' % kv for kv in upstream_analysis_files.items()])])
 
@@ -219,7 +219,7 @@ class ZincUtils(object):
           pass
 
     unresolved_plugins = plugin_names - set(plugins.keys())
-    if len(unresolved_plugins) > 0:
+    if unresolved_plugins:
       raise TaskError('Could not find requested plugins: %s' % list(unresolved_plugins))
     return plugins
 

@@ -34,7 +34,7 @@ class ZincAnalysisElement(object):
   def _write_section(self, outfile, header, rep, inline_vals=True, rebasings=None):
     """Write a single section.
 
-    Itens are sorted, for ease of testing.
+    Items are sorted, for ease of testing.
     """
     def rebase(txt):
       for rebase_from, rebase_to in rebasings:
@@ -46,7 +46,6 @@ class ZincAnalysisElement(object):
       return txt
 
     rebasings = rebasings or []
-    outfile.write(header + ':\n')
     items = []
     for k, vals in rep.iteritems():
       for v in vals:
@@ -54,6 +53,7 @@ class ZincAnalysisElement(object):
         if item:
           items.append(item)
     items.sort()
+    outfile.write(header + ':\n')
     outfile.write('%d items\n' % len(items))
     for item in items:
       outfile.write(item)
@@ -374,7 +374,7 @@ class ZincAnalysisJSONEncoder(json.JSONEncoder):
   def default(self, obj):
     if isinstance(obj, ZincAnalysisElement):
       ret = {}
-      for h, a in zip(obj.__class__.headers, obj.args):
+      for h, a in zip(type(obj).headers, obj.args):
         ret[h] = a
       return ret
     else:

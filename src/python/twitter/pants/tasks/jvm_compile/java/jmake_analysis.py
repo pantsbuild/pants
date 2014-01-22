@@ -1,4 +1,5 @@
 import os
+
 from collections import defaultdict
 from twitter.pants import get_buildroot
 from twitter.pants.tasks.jvm_compile.analysis import Analysis

@@ -27,9 +27,8 @@ class AnalysisTools(object):
     split out to that path.
     """
     analysis = self.parser.parse_from_path(analysis_path)
-    splits = [x[0] for x in split_path_pairs]
+    splits, output_paths = zip(*split_path_pairs)
     split_analyses = analysis.split(splits, catchall_path is not None)
-    output_paths = [x[1] for x in split_path_pairs]
     if catchall_path is not None:
       output_paths.append(catchall_path)
     for analysis, path in zip(split_analyses, output_paths):

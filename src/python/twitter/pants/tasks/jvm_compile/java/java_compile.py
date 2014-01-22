@@ -115,7 +115,7 @@ class JavaCompile(JvmCompile):
                                       args=args,
                                       workunit_name='jmake',
                                       workunit_labels=[WorkUnit.COMPILER])
-    if result != 0:
+    if result:
       default_message = 'Unexpected error - JMake returned %d' % result
       raise TaskError(_JMAKE_ERROR_CODES.get(result, default_message))
 

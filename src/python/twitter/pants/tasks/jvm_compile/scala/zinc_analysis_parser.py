@@ -1,6 +1,7 @@
 from collections import defaultdict
 import json
 import re
+
 from twitter.pants.tasks.jvm_compile.analysis_parser import AnalysisParser, ParseError
 from twitter.pants.tasks.jvm_compile.scala.zinc_analysis import ZincAnalysis, \
   Compilations, CompileSetup, SourceInfos, APIs, Relations, Stamps
