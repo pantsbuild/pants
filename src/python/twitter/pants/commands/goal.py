@@ -14,9 +14,6 @@
 # limitations under the License.
 # ==================================================================================================
 import re
-
-import daemon
-
 import inspect
 import multiprocessing
 import os
@@ -25,13 +22,14 @@ import signal
 import socket
 import time
 import traceback
-
 from contextlib import contextmanager
 from optparse import Option, OptionParser
 
+import daemon
+
 from twitter.common import log
 from twitter.common.collections import OrderedSet
-from twitter.common.dirutil import safe_mkdir, safe_rmtree
+from twitter.common.dirutil import safe_rmtree
 from twitter.common.lang import Compatibility
 from twitter.pants import binary_util
 from twitter.pants.base.build_environment import get_buildroot
@@ -45,7 +43,6 @@ from twitter.pants.reporting.reporting_server import ReportingServer, ReportingS
 from twitter.pants.tasks import Task, TaskError
 from twitter.pants.tasks.console_task import ConsoleTask
 from twitter.pants.tasks.nailgun_task import NailgunTask
-
 from twitter.pants.goal import Context, GoalError, Phase
 
 
@@ -489,7 +486,7 @@ from twitter.pants.tasks.check_exclusives import CheckExclusives
 from twitter.pants.tasks.filedeps import FileDeps
 from twitter.pants.tasks.ivy_resolve import IvyResolve
 from twitter.pants.tasks.jar_create import JarCreate
-from twitter.pants.tasks.java_compile import JavaCompile
+from twitter.pants.tasks.jvm_compile.java.java_compile import JavaCompile
 from twitter.pants.tasks.javadoc_gen import JavadocGen
 from twitter.pants.tasks.scaladoc_gen import ScaladocGen
 from twitter.pants.tasks.junit_run import JUnitRun
@@ -499,7 +496,7 @@ from twitter.pants.tasks.listtargets import ListTargets
 from twitter.pants.tasks.pathdeps import PathDeps
 from twitter.pants.tasks.prepare_resources import PrepareResources
 from twitter.pants.tasks.protobuf_gen import ProtobufGen
-from twitter.pants.tasks.scala_compile import ScalaCompile
+from twitter.pants.tasks.jvm_compile.scala.scala_compile import ScalaCompile
 from twitter.pants.tasks.scala_repl import ScalaRepl
 from twitter.pants.tasks.specs_run import SpecsRun
 from twitter.pants.tasks.thrift_gen import ThriftGen
