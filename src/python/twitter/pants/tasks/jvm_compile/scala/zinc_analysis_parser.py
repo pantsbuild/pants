@@ -42,12 +42,12 @@ class ZincAnalysisParser(AnalysisParser):
 
     # TODO(benjy): Temporary hack until we inject a dep on the scala runtime jar.
     scalalib_re = re.compile(r'scala-library-\d+\.\d+\.\d+\.jar$')
-    filtered_ext_deps = defaultdict(list)
-    for src, deps in ext_deps.iteritems():
-      filtered_ext_deps[src] = filter(lambda x: scalalib_re.search(x) is None, deps)
+    filtered_bin_deps = defaultdict(list)
+    for src, deps in bin_deps.iteritems():
+      filtered_bin_deps[src] = filter(lambda x: scalalib_re.search(x) is None, deps)
 
     ret = defaultdict(list)
-    for d in [bin_deps, src_deps, filtered_ext_deps]:
+    for d in [filtered_bin_deps, src_deps, ext_deps]:
       ret.update(d)
     return ret
 
