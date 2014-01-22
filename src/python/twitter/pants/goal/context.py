@@ -15,7 +15,7 @@ from twitter.pants.base.build_environment import get_buildroot
 from twitter.pants.targets.sources import SourceRoot
 from twitter.pants.base import ParseContext
 from twitter.pants.base.target import Target
-from twitter.pants.binary_util import find_all_java_sysprops
+from twitter.pants.binary_util import find_java_home
 from twitter.pants.goal.products import Products
 from twitter.pants.base.workunit import WorkUnit
 from twitter.pants.reporting.report import Report
@@ -65,7 +65,7 @@ class Context(object):
     self._state = {}
     self._products = Products()
     self._buildroot = get_buildroot()
-    self._java_sysprops = None  # Computed lazily.
+    self._java_home = None  # Computed lazily.
     self.requested_goals = requested_goals or []
 
     self.replace_targets(target_roots)
@@ -106,25 +106,10 @@ class Context(object):
     return self._target_roots
 
   @property
-  def java_sysprops(self):
-    """The system properties of the JVM we use."""
-    # TODO: In the future we can use these to hermeticize the Java enivronment rather than relying
-    # on whatever's on the shell's PATH. E.g., you either specify a path to the Java home via a
-    # cmd-line flag or .pantsrc, or we infer one from java.home but verify that the java.version
-    # is a supported version.
-    if self._java_sysprops is None:
-      self._java_sysprops = find_all_java_sysprops()
-    return self._java_sysprops
-
-  @property
   def java_home(self):
-    """Find the java home for the JVM we use."""
-    # Implementation is a kind-of-insane hack: we run the jvm to get it to emit its
-    # system properties. On some platforms there are so many hard and symbolic links into
-    # the JRE dirs that it's actually quite hard to establish what path to use as the java home,
-    # e.g., for the purpose of rebasing. In practice, this seems to work fine.
-    # Note that for our purposes we take the parent of java.home.
-    return os.path.realpath(os.path.dirname(self.java_sysprops['java.home']))
+    if self._java_home is None:
+      self._java_home = os.path.realpath(os.path.dirname(find_java_home()))
+    return self._java_home
 
   @property
   def ivy_home(self):

@@ -15,6 +15,7 @@
 # ==================================================================================================
 
 import os
+import shutil
 import textwrap
 
 from contextlib import closing
@@ -22,7 +23,7 @@ from itertools import chain
 from xml.etree import ElementTree
 
 from twitter.common.collections import OrderedDict
-from twitter.common.contextutil import open_zip as open_jar
+from twitter.common.contextutil import open_zip as open_jar, temporary_dir
 from twitter.common.dirutil import  safe_open
 
 from twitter.pants.base.build_environment import get_buildroot
@@ -32,6 +33,8 @@ from twitter.pants.tasks import TaskError
 
 
 # Well known metadata file required to register scalac plugins with nsc.
+from twitter.pants.tasks.scala.zinc_analysis import Analysis
+
 _PLUGIN_INFO_FILE = 'scalac-plugin.xml'
 
 class ZincUtils(object):
@@ -39,14 +42,14 @@ class ZincUtils(object):
 
   Instances are immutable, and all methods are reentrant (assuming that the java_runner is).
   """
-  _ZINC_MAIN = 'com.typesafe.zinc.Main'
-
   def __init__(self, context, nailgun_task, jvm_options, color, jvm_tool_bootstrapper):
     self.context = context
     self._nailgun_task = nailgun_task  # We run zinc on this task's behalf.
     self._jvm_options = jvm_options
     self._color = color
     self._jvm_tool_bootstrapper = jvm_tool_bootstrapper
+
+    self._pants_home = get_buildroot()
 
     # The target scala version.
     self._compile_bootstrap_key = 'scalac'
@@ -67,6 +70,12 @@ class ZincUtils(object):
       self._jvm_tool_bootstrapper.register_jvm_tool(self._plugins_bootstrap_key, plugins_bootstrap_tools)
     else:
       self._plugins_bootstrap_key = None
+
+    self._main = context.config.get('scala-compile', 'main')
+
+    # For localizing/relativizing analysis files.
+    self._java_home = context.java_home
+    self._ivy_home = context.ivy_home
 
   @property
   def _zinc_classpath(self):
@@ -112,7 +121,7 @@ class ZincUtils(object):
     """The jars containing code for enabled plugins."""
     return self._plugin_jars
 
-  def _run_zinc(self, args, workunit_name='zinc', workunit_labels=None):
+  def run_zinc(self, args, workunit_name='zinc', workunit_labels=None):
     zinc_args = [
       '-log-level', self.context.options.log_level or 'info',
     ]
@@ -120,7 +129,7 @@ class ZincUtils(object):
       zinc_args.append('-no-color')
     zinc_args.extend(self._zinc_jar_args)
     zinc_args.extend(args)
-    return self._nailgun_task.runjava_indivisible(ZincUtils._ZINC_MAIN,
+    return self._nailgun_task.runjava_indivisible(self._main,
                                                   classpath=self._zinc_classpath,
                                                   args=zinc_args,
                                                   jvm_options=self._jvm_options,
@@ -132,7 +141,7 @@ class ZincUtils(object):
 
     args.extend(self._plugin_args())
 
-    if upstream_analysis_files:
+    if len(upstream_analysis_files):
       args.extend(
         ['-analysis-map', ','.join(['%s:%s' % kv for kv in upstream_analysis_files.items()])])
 
@@ -146,8 +155,41 @@ class ZincUtils(object):
     ])
     args.extend(sources)
     self.log_zinc_file(analysis_file)
-    if self._run_zinc(args, workunit_labels=[WorkUnit.COMPILER]):
-      raise TaskError('Zinc compile failed.')
+    return self.run_zinc(args, workunit_labels=[WorkUnit.COMPILER])
+
+  IVY_HOME_PLACEHOLDER = '/IVY_HOME_PLACEHOLDER'
+  PANTS_HOME_PLACEHOLDER = '/PANTS_HOME_PLACEHOLDER'
+
+  def relativize_analysis_file(self, src, dst):
+    # Make an analysis cache portable. Work on a tmpfile, for safety.
+    #
+    # NOTE: We can't port references to deps on the Java home. This is because different JVM
+    # implementations on different systems have different structures, and there's not
+    # necessarily a 1-1 mapping between Java jars on different systems. Instead we simply
+    # drop those references from the analysis file.
+    #
+    # In practice the JVM changes rarely, and it should be fine to require a full rebuild
+    # in those rare cases.
+    with temporary_dir() as tmp_analysis_dir:
+      tmp_analysis_file = os.path.join(tmp_analysis_dir, 'analysis.relativized')
+
+      rebasings = [
+        (self._java_home, None),
+        (self._ivy_home, ZincUtils.IVY_HOME_PLACEHOLDER),
+        (self._pants_home, ZincUtils.PANTS_HOME_PLACEHOLDER),
+      ]
+      Analysis.rebase(src, tmp_analysis_file, rebasings)
+      shutil.move(tmp_analysis_file, dst)
+
+  def localize_analysis_file(self, src, dst):
+    with temporary_dir() as tmp_analysis_dir:
+      tmp_analysis_file = os.path.join(tmp_analysis_dir, 'analysis')
+      rebasings = [
+        (ZincUtils.IVY_HOME_PLACEHOLDER, self._ivy_home),
+        (ZincUtils.PANTS_HOME_PLACEHOLDER, self._pants_home),
+      ]
+      Analysis.rebase(src, tmp_analysis_file, rebasings)
+      shutil.move(tmp_analysis_file, dst)
 
   @staticmethod
   def write_plugin_info(resources_dir, target):
@@ -197,7 +239,6 @@ class ZincUtils(object):
     """Returns a map from plugin name to plugin jar."""
     plugin_names = set(plugin_names)
     plugins = {}
-    buildroot = get_buildroot()
     # plugin_jars is the universe of all possible plugins and their transitive deps.
     # Here we select the ones to actually use.
     for jar in self.plugin_jars():
@@ -214,14 +255,24 @@ class ZincUtils(object):
               raise TaskError('Plugin %s defined in %s and in %s' % (name, plugins[name], jar))
             # It's important to use relative paths, as the compiler flags get embedded in the zinc
             # analysis file, and we port those between systems via the artifact cache.
-            plugins[name] = os.path.relpath(jar, buildroot)
+            plugins[name] = os.path.relpath(jar, self._pants_home)
         except KeyError:
           pass
 
     unresolved_plugins = plugin_names - set(plugins.keys())
-    if unresolved_plugins:
+    if len(unresolved_plugins) > 0:
       raise TaskError('Could not find requested plugins: %s' % list(unresolved_plugins))
     return plugins
 
   def log_zinc_file(self, analysis_file):
     self.context.log.debug('Calling zinc on: %s (%s)' % (analysis_file, hash_file(analysis_file).upper() if os.path.exists(analysis_file) else 'nonexistent'))
+
+  @staticmethod
+  def is_nonempty_analysis(path):
+    """Returns true iff path exists and points to a non-empty analysis."""
+    if not os.path.exists(path):
+      return False
+    empty_prefix = 'products:\n0 items\n'
+    with open(path, 'r') as infile:
+      prefix = infile.read(len(empty_prefix))
+    return prefix != empty_prefix
