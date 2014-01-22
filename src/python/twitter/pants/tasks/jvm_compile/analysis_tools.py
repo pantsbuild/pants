@@ -30,7 +30,7 @@ class AnalysisTools(object):
     splits, output_paths = zip(*split_path_pairs)
     split_analyses = analysis.split(splits, catchall_path is not None)
     if catchall_path is not None:
-      output_paths.append(catchall_path)
+      output_paths = output_paths + (catchall_path, )
     for analysis, path in zip(split_analyses, output_paths):
       analysis.write_to_path(path)
 
