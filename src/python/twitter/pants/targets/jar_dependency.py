@@ -110,7 +110,6 @@ class JarDependency(ExternalDependency, AbstractTarget):
     self.transitive = True
     self.apidocs = apidocs
     self.mutable = mutable
-    self.classifier = classifier
 
     self.artifacts = []
     if ext or url or type_ or classifier:

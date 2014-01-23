@@ -359,9 +359,11 @@ class JUnitRun(JvmTask):
   def calculate_tests_from_targets(self, targets):
     targets_to_classes = self.context.products.get('classes')
     for target in self.test_target_candidates(targets):
-      for classes in targets_to_classes.get(target).values():
-        for cls in classes:
-          yield JUnitRun.classfile_to_classname(cls)
+      classes_for_target = targets_to_classes.get(target)  # Map of basedir->classes.
+      if classes_for_target:
+        for classes in classes_for_target.values():
+          for cls in classes:
+            yield JUnitRun.classfile_to_classname(cls)
 
   def classnames_from_source_file(self, path):
     # TODO: This is awful. The products should simply store the full path from the buildroot.
