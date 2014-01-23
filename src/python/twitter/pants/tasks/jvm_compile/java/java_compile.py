@@ -57,8 +57,6 @@ class JavaCompile(JvmCompile):
   def __init__(self, context):
     JvmCompile.__init__(self, context, workdir=context.config.get('java-compile', 'nailgun_dir'))
 
-    self._depfile = os.path.join(self._analysis_dir, 'global_depfile')
-
     self._jmake_bootstrap_key = 'jmake'
     external_tools = context.config.getlist('java-compile', 'jmake-bootstrap-tools', default=[':jmake'])
     self.register_jvm_tool(self._jmake_bootstrap_key, external_tools)
