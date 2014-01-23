@@ -46,7 +46,7 @@ class JvmCompile(NailgunTask):
     option_group.add_option(mkflag('missing-deps'),
                             dest=subcls._language+'_missing_deps',
                             choices=['off', 'warn', 'fatal'],
-                            default='fatal',
+                            default='warn',
                             help='[%default] One of off, warn, fatal. '
                                  'Check for missing dependencies in ' +  subcls._language + 'code. '
                                  'Reports actual dependencies A -> B where there is no '
