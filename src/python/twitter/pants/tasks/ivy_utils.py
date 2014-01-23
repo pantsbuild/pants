@@ -153,7 +153,7 @@ class IvyUtils(object):
     return os.path.join(self._cachedir, '%s-%s-%s.xml' % (org, name, conf))
 
   def parse_xml_report(self, targets, conf):
-    """Returns the IvyInfo representing the info in the xml report, or None of no report exists."""
+    """Returns the IvyInfo representing the info in the xml report, or None if no report exists."""
     path = self.xml_report_path(targets, conf)
     if not os.path.exists(path):
       return None

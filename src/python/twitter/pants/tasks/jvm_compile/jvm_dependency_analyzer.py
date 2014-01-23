@@ -86,33 +86,43 @@ class JvmDependencyAnalyzer(object):
       # We make a copy, so it's safe to use outside the lock.
 
     ivy_products = self._context.products.get_data('ivy_jar_products')
+
     if ivy_products:
-      def handle_ref(ref):
+      def register_transitive_jars_for_ref(ivyinfo, ref):
+
+        deps_by_ref_memo = {}
+        def get_transitive_jars_by_ref(ref1, visited=None):
+          if ref1 in deps_by_ref_memo:
+            return deps_by_ref_memo[ref1]
+          else:
+            visited = visited or set()
+            if ref1 in visited:
+              return set()  # Ivy allows circular deps.
+            visited.add(ref1)
+            jars = set()
+            jars.update(ivyinfo.modules_by_ref[ref1].artifacts)
+            for dep in ivyinfo.deps_by_caller.get(ref1, []):
+              jars.update(get_transitive_jars_by_ref(dep, visited))
+            deps_by_ref_memo[ref1] = jars
+            return jars
+
         target_key = (ref.org, ref.name)
         if target_key in jarlibs_by_id:
+          # These targets provide all the jars in ref, and all the jars ref transitively depends on.
           jarlib_targets = jarlibs_by_id[target_key]
 
-          def map_symlinks(jar):
+          for jar in get_transitive_jars_by_ref(ref):
+            # Register that each jarlib_target provides jar (via all its symlinks).
             symlinks = all_symlinks_map.get(os.path.realpath(jar.path), [])
             for symlink in symlinks:
               for jarlib_target in jarlib_targets:
                 targets_by_file[symlink].add(jarlib_target)
 
-          # Map the current jar.
-          for jar in ivyinfo.modules_by_ref[ref].artifacts:
-            map_symlinks(jar)
-
-          # Map all indirect, transitive deps of the jar to this target as well, since we allow deps on them.
-          for dep in ivyinfo.deps_by_caller.get(ref, []):
-            depmodule = ivyinfo.modules_by_ref.get(dep, None)
-            if depmodule:
-              for depjar in depmodule.artifacts:
-                map_symlinks(depjar)
-
       for ivyinfos in ivy_products.values():
         for ivyinfo in ivyinfos:
           for ref in ivyinfo.modules_by_ref:
-            handle_ref(ref)
+            register_transitive_jars_for_ref(ivyinfo, ref)
+
       # Only memoize once ivy_jar_products are available.
       self._lazy_targets_by_file = targets_by_file
     return targets_by_file
