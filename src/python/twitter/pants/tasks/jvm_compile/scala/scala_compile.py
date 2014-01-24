@@ -45,11 +45,9 @@ class ScalaCompile(JvmCompile):
 
   def extra_products(self, target):
       ret = []
-      # TODO(John Sirois): Map target.resources in the same way
       if target.is_scalac_plugin and target.classname:
-        # Create and Map scala plugin info files to the owning targets.
-        basedir, info_file = ZincUtils.write_plugin_info(self._resources_dir, target)
-        ret.append((basedir, [info_file]))
+        root, plugin_info_file = ZincUtils.write_plugin_info(self._resources_dir, target)
+        ret.append((root, [plugin_info_file]))
       return ret
 
   def compile(self, args, classpath, sources, classes_output_dir, analysis_file):

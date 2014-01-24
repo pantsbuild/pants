@@ -1,4 +1,63 @@
+import os
 from collections import defaultdict
+
+from twitter.common.collections import OrderedSet
+
+
+class RootedProducts(object):
+  """Products of a build that have a concept of a 'root' directory.
+
+  E.g., classfiles, under a root package directory."""
+  def __init__(self, root):
+    self._root = root
+    self._rel_paths = OrderedSet()
+
+  def add_abs_paths(self, abs_paths):
+    for abs_path in abs_paths:
+      if not abs_path.startswith(self._root):
+        raise Exception('%s is not under %s' % (abs_path, self._root))
+      self._rel_paths.add(os.path.relpath(abs_path, self._root))
+
+  def add_rel_paths(self, rel_paths):
+    self._rel_paths.update(rel_paths)
+
+  def root(self):
+    return self._root
+
+  def rel_paths(self):
+    return self._rel_paths
+
+  def abs_paths(self):
+    for relpath in self._rel_paths:
+      yield os.path.join(self._root, relpath)
+
+
+class MultipleRootedProducts(object):
+  def __init__(self):
+    self._rooted_products_by_root = {}
+
+  def add_rel_paths(self, root, rel_paths):
+    self._get_products_for_root(root).add_rel_paths(rel_paths)
+
+  def add_abs_paths(self, root, abs_paths):
+    self._get_products_for_root(root).add_abs_paths(abs_paths)
+
+  def rel_paths(self):
+    for root, products in self._rooted_products_by_root.items():
+      yield root, products.rel_paths()
+
+  def abs_paths(self):
+    for root, products in self._rooted_products_by_root.items():
+      yield root, products.abs_paths()
+
+  def _get_products_for_root(self, root):
+    if root in self._rooted_products_by_root:
+      ret = self._rooted_products_by_root[root]
+    else:
+      ret = RootedProducts(root)
+      self._rooted_products_by_root[root] = ret
+    return ret
+
 
 class Products(object):
   class ProductMapping(object):
@@ -119,8 +178,15 @@ class Products(object):
     """ Checks if a particular data product is required by any tasks."""
     return typename in self.required_data_products
 
-  def get_data(self, typename):
-    """ Returns a data product, or None if the product isn't found."""
+  def get_data(self, typename, init_func=None):
+    """ Returns a data product.
+
+    If the product isn't found, returns None, unless init_func is set, in which case the product's
+    value is set to the return value of init_func(), and returned."""
+    if typename not in self.data_products:
+      if not init_func:
+        return None
+      self.data_products[typename] = init_func()
     return self.data_products.get(typename)
 
   def set_data(self, typename, data):

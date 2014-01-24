@@ -415,4 +415,3 @@ class IvyUtils(object):
 
     if result != 0:
       raise TaskError('org.apache.ivy.Main returned %d' % result)
-

@@ -131,7 +131,7 @@ class IvyResolve(NailgunTask):
       classpath = self.ivy_resolve(group_targets,
                                    java_runner=self.runjava_indivisible,
                                    symlink_ivyxml=True)
-      if self.context.products.isrequired('ivy_jar_products'):
+      if self.context.products.is_required_data('ivy_jar_products'):
         self._populate_ivy_jar_products(group_targets)
       for conf in self._confs:
         for path in classpath:
