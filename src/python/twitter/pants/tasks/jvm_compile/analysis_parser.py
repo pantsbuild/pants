@@ -8,6 +8,8 @@ class ParseError(TaskError):
 
 class AnalysisParser(object):
   """Parse a file containing representation of an analysis for some JVM language."""
+  def __init__(self, classes_dir):
+    self.classes_dir = classes_dir  # The output dir for classes in this analysis.
 
   def is_nonempty_analysis(self, path):
     """Returns whether an analysis at a specified path is nontrivial."""

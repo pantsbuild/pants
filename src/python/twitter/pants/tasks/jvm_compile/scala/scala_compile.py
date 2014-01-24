@@ -1,4 +1,4 @@
-
+import os
 from twitter.pants.targets.scala_library import ScalaLibrary
 from twitter.pants.tasks.jvm_compile.analysis_tools import AnalysisTools
 from twitter.pants.tasks.jvm_compile.jvm_compile import JvmCompile
@@ -37,7 +37,7 @@ class ScalaCompile(JvmCompile):
         self.context.add_target(java_target)
 
   def create_analysis_tools(self):
-    return AnalysisTools(self.context, ZincAnalysisParser(), ZincAnalysis)
+    return AnalysisTools(self.context, ZincAnalysisParser(self._classes_dir), ZincAnalysis)
 
   def extra_classpath_elements(self):
     # Classpath entries necessary for our compiler plugins.
@@ -54,6 +54,7 @@ class ScalaCompile(JvmCompile):
 
   def compile(self, args, classpath, sources, classes_output_dir, analysis_file):
     # We have to treat our output dir as an upstream element, so zinc can find valid
-    # analysis for previous partitions.
-    upstream = { classes_output_dir: self._analysis_file }  # Use the global valid analysis for the upstream.
-    return self._zinc_utils.compile(args, classpath, sources, classes_output_dir, analysis_file, upstream)
+    # analysis for previous partitions. We use the global valid analysis for the upstream.
+    upstream = { classes_output_dir: self._analysis_file } if os.path.exists(self._analysis_file) else {}
+    return self._zinc_utils.compile(args, classpath + [self._classes_dir], sources,
+                                    classes_output_dir, analysis_file, upstream)

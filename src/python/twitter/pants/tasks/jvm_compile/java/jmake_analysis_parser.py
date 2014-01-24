@@ -10,9 +10,6 @@ from twitter.pants.tasks.jvm_compile.java.jmake_analysis import JMakeAnalysis
 class JMakeAnalysisParser(AnalysisParser):
   """Parse a file containing representation of an analysis for some JVM language."""
 
-  def __init__(self, classes_dir):
-    self._classes_dir = classes_dir
-
   def empty_prefix(self):
     return 'pcd entries:\n0 items\n'
 
@@ -38,7 +35,7 @@ class JMakeAnalysisParser(AnalysisParser):
     for _ in xrange(0, num_pcd_entries):
       line = infile.readline()
       p1 = line.find('\t')
-      clsfile = os.path.join(self._classes_dir, line[0:p1] + '.class')
+      clsfile = os.path.join(self.classes_dir, line[0:p1] + '.class')
       p2 = line.find('\t', p1 + 1)
       src = line[p1+1:p2]
       ret[src].append(clsfile)
@@ -60,7 +57,7 @@ class JMakeAnalysisParser(AnalysisParser):
         if classpath_element:  # Dep is on an external jar/classes dir.
           ret[src].add(classpath_element)
         else:  # Dep is on an internal class.
-          classfile = os.path.join(buildroot, self._classes_dir, rel_classfile)
+          classfile = os.path.join(buildroot, self.classes_dir, rel_classfile)
           ret[src].add(classfile)
     return ret
 
