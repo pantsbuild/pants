@@ -69,6 +69,10 @@ class TargetWithSources(Target):
     return self._resolved_sources
 
   def sources_relative_to_buildroot(self):
+    """Returns this target's sources, relative to the buildroot.
+
+    Prefer this over .sources unless you need to know about the target_base. 
+    """
     for src in self.sources:
       yield os.path.join(self.target_base, src)
 
