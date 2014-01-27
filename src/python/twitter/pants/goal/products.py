@@ -33,6 +33,7 @@ class RootedProducts(object):
 
 
 class MultipleRootedProducts(object):
+  """A product consisting of multiple roots, with associated products."""
   def __init__(self):
     self._rooted_products_by_root = {}
 
@@ -60,6 +61,29 @@ class MultipleRootedProducts(object):
 
 
 class Products(object):
+  """An out-of-band 'dropbox' where tasks can place build product information for later tasks to use.
+
+  Historically, the only type of product was a ProductMapping. However this had some issues, as not
+  all products fit into the (basedir, [files-under-basedir]) paradigm. Also, ProductMapping docs
+  and varnames refer to targets, and implicitly expect the mappings to be keyed by a target, however
+  we sometimes also need to map sources to products.
+
+  So in practice we ended up abusing this in several ways:
+    1) Using fake basedirs when we didn't have a basedir concept.
+    2) Using objects other than strings as 'product paths' when we had a need to.
+    3) Using things other than targets as keys.
+
+  Right now this class is in an intermediate stage, as we transition to a more robust Products concept.
+  The abuses have been switched to use 'data_products' (see below) which is just a dictionary
+  of product type (e.g., 'classes_by_target') to arbitrary payload. That payload can be anything,
+  but the MultipleRootedProducts class is useful for products that do happen to fit into the
+  (basedir, [files-under-basedir]) paradigm.
+
+  The long-term future of Products is TBD. But we do want to make it easier to reason about
+  which tasks produce which products and which tasks consume them. Currently it's quite difficult
+  to match up 'requires' calls to the producers of those requirements, especially when the 'typename'
+  is in a variable, not a literal.
+  """
   class ProductMapping(object):
     """Maps products of a given type by target. Each product is a map from basedir to a list of
     files in that dir.
