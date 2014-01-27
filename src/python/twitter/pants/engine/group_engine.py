@@ -271,7 +271,7 @@ class GroupEngine(Engine):
     execution_phases = ' -> '.join(map(str, map(lambda e: e.phase.name, phase_executors)))
     context.log.debug('Executing goals in phases %s' % execution_phases)
 
-    explain = context.options.explain
+    explain = getattr(context.options, 'explain', None)
     if explain:
       print("Phase Execution Order:\n\n%s\n" % execution_phases)
       print("Phase [Goal->Task] Order:\n")
