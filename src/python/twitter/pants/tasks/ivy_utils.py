@@ -26,7 +26,7 @@ import threading
 import errno
 
 from twitter.common.collections import OrderedSet
-from twitter.common.dirutil import safe_mkdir, safe_open, safe_delete
+from twitter.common.dirutil import safe_mkdir, safe_open
 
 from twitter.pants import binary_util, get_buildroot
 from twitter.pants.base.generator import Generator, TemplateData

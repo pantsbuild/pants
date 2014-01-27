@@ -98,6 +98,8 @@ class JarCreate(Task):
       products.require_data('resources_by_target')
 
     self.jar_idl = products.isrequired('idl_jars') or options.jar_create_idl
+    if self.jar_idl:
+      products.require('idl')
 
     self.jar_javadoc = products.isrequired('javadoc_jars') or options.jar_create_javadoc
     if self.jar_javadoc:
