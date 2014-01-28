@@ -76,6 +76,15 @@ class TargetWithSources(Target):
     for src in self.sources:
       yield os.path.join(self.target_base, src)
 
+  def sources_absolute_paths(self):
+    """Returns the absolute paths of this target's sources.
+
+    Prefer this over .sources unless you need to know about the target_base.
+    """
+    abs_target_base = os.path.join(get_buildroot(), self.target_base)
+    for src in self.sources:
+      yield os.path.join(abs_target_base, src)
+
   def set_resolved_sources(self, sources):
     """Set resolved sources directly, skipping the resolution.
 

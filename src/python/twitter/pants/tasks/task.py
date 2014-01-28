@@ -295,7 +295,7 @@ class Task(object):
 
     vts_artifactfiles_pairs - a list of pairs (vts, artifactfiles) where
       - vts is single VersionedTargetSet.
-      - artifactfiles is a list of paths to artifacts for the VersionedTargetSet.
+      - artifactfiles is a list of absolute paths to artifacts for the VersionedTargetSet.
     """
     update_artifact_cache_work = self.get_update_artifact_cache_work(vts_artifactfiles_pairs)
     if update_artifact_cache_work:
