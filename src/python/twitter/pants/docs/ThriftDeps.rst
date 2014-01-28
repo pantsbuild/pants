@@ -65,50 +65,25 @@ artifact to generate and compile the IDL themselves.
 For example, you could consume the ``mybird`` artifact published above
 in a different repo.
 
-.. TODO link to 3rdparty doc when it exists
+As with other code from elsewhere, you want to use :doc:`3rdparty`.
+For Thrift, there are targets to use to pull in published IDL jars
+and generate code from them, e.g., :ref:`bdict_idl_jar_thrift_library`
+for Java and Scala::
 
-Define the IDL jar version that will be used in your repo.
-Use a ``thrift_jar`` dependencies for this; this target should live in
-the ``3rdparty`` part of the source tree.
-This ensures all users in your repo use a consistent version number. ::
+  idl_jar_thrift_library(name='servo-exception-thrift-scala',
+    thrift_jar=thrift_jar('org.archimedes', 'mybird-thrift-scala-only', '2.7.0'),
+    language='scala',
+    rpc_style='finagle',
+  )
 
-    # Target defined in 3rdparty/jvm/com/twitter/BUILD
-    # In jvm tree as jar dependency sharing mechanism is used.
-    dependencies(name='mybird-thrift',
-      dependencies=[
-        thrift_jar(org='com.twitter', name='mybird-thrift', rev='1.0.0')
-      ]
-    )
+  idl_jar_thrift_library(name='servo-exception-thrift-java',
+    thrift_jar=thrift_jar('org.archimedes', 'mybird-thrift-java-only', '2.7.0'),
+    language='java',
+  )
 
-Other targets can depend on
-`pants('3rdparty/jvm/com/twitter:mybird-thrift')` without worrying
-where the IDL-only jar comes from. For example::
-
-    # Target defined in src/java/com/twitter/otherbird/BUILD
-    java_library(name='otherbird'
-      dependencies=[
-        compiled_idl(
-          # List of one or more IDL-only jar_library targets to compile.
-          idl_deps=[
-            pants('3rdparty/jvm/com/twitter:mybird-thrift'),
-          ],
-          # Use defaults unless you have a good reason not to.
-          # compiler='thrift',
-          # language='java',
-          # rpc_style='finagle',
-        ),
-      ],
-      sources=globs('*.java'),
-    )
-
-In the library where we want to use compiled classes defined in thrift IDL we
-specify a ``compiled_idl`` dependency. This happens on the dependee side of the
-relationship because dependees need full control over how they choose to
-generate the code (e.g.: language, namespace mappings).
-
-You can't *publish* an IDL jar via a ``compiled_idl``; it's for consuming
-IDL jars that were published elsewhere.
-
+(So far, there is no Python or Ruby way to consume IDL jars. If all Ruby 
+thrift lives in the same repo, you can publish the
+:ref:`bdict_ruby_thrift_library` targets.)
 
 ******************************
 Thrift Client & Server Example
