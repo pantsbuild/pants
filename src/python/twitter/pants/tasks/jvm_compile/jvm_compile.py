@@ -326,11 +326,11 @@ class JvmCompile(NailgunTask):
             # enjoy an incremental compile after fixing missing deps.
             shutil.move(new_valid_analysis, self._analysis_file)
 
-            # Update the products with the latest classes.
+            # Update the products with the latest classes. Must happen before the
+            # missing dependencies check.
             self._register_products(vts.targets, sources_by_target, analysis_file)
             if self._dep_analyzer:
               # Check for missing dependencies.
-              self._dep_analyzer.update(vts.targets)  # Make sure it knows about the latest classes.
               actual_deps = self._analysis_parser.parse_deps_from_path(analysis_file,
                   lambda: self._compute_classpath_elements_by_class(cp_entries))
               with self.context.new_workunit(name='find-missing-dependencies'):
