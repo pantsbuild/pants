@@ -27,7 +27,7 @@ import time
 
 from twitter.common.collections import OrderedDict
 from twitter.common.dirutil import safe_mkdir, safe_open
-from twitter.common.log import LogOptions
+from twitter.common.log.options import LogOptions
 
 from twitter.pants import binary_util
 from twitter.pants.base.generator import TemplateData
