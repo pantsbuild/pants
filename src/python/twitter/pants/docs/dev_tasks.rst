@@ -176,56 +176,44 @@ Command-line flag values are also available during task instantiation. ::
    self.context.options.myflag
 
 
-Profiles
-========
+JVM Tool Bootstrapping
+======================
 
-If you want to integrate an existing JVM-based tool with a pants task, ``profiles``
-are exactly what you're looking for. A profile is a JVM ``classpath``; combined with
-the name of a ``main`` and command-line args you can make use of JVM-based tools
-from within you tasks. Pants makes working with profiles easy.
+If you want to integrate an existing JVM-based tool with a pants task, you need
+to be able to bootstrap it, i.e., fetch it and create a classpath with which to run it.
 
 Your job as a task
-developer is to setup the arguments passed to your profile (e.g.: source file names
-to compile) and do something useful after the profile has run. For example, a code
-generation profile would identify targets that own IDL sources, pass those sources
+developer is to set up the arguments passed to your tool (e.g.: source file names
+to compile) and do something useful after the tool has run. For example, a code
+generation tool would identify targets that own IDL sources, pass those sources
 as arguments to the code generator, create targets of the correct type to own
 generated sources, and mutate the targets graph rewriting dependencies on targets
 owning IDL sources to point at targets that own the generated code.
 
-Let's create a profile! We simply need to create a specially named
-`Ivy file <http://ant.apache.org/ivy/history/latest-milestone/ivyfile.html>`_
-in the configured ``ivy-profiles.workdir`` directory.
+Tools are specified by targets in a special BUILD.tools file in the root of
+your workspace. To bootstrap it you register that target under some key
+in the task's __init__ method. Then, a special bootstrapping task will use Ivy
+to resolve those targets. Then, in your execute() method you can get the
+classpath for the tool using its registration key.
 
 `Scalastyle <http://www.scalastyle.org/>`_ is a tool that enforces style policies
-for scala code. To use as a profile we put the following in
-``${ivy-profiles.workdir}/scalastyle.ivy.xml``; see ``pants.ini`` for the
-directory used as the profiles workdir in your repo. The ``scalastyle``
-of ``scalastyle.ivy.xml`` is the profile name, which we'll use shortly. ::
-
-   <?xml version="1.0"?>
-   <ivy-module version="2.0"
-               xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-               xsi:noNamespaceSchemaLocation="http://ant.apache.org/ivy/schemas/ivy.xsd">
-     <info organisation="com.twitter" module="pants-libs"/>=
-     <dependencies>
-       <dependency org="org.scalastyle" name="scalastyle_2.9.3" rev="0.3.2"/>
-     </dependencies>
-   </ivy-module>
-
-Now let's examine a simplified task that uses our profile. This example has been condensed
-from the Scalastyle task provided by pants; please see its sources for a real-world
-profiles example, including exemplary configuration and error handling (which your task
-will have too, right :)  ::
+for scala code. Let's examine a simplified task that uses this tool. This example has been
+condensed from the Scalastyle task provided by pants; please see its sources for a real-world
+example, including exemplary configuration and error handling (which your task will have too,
+right :)  ::
 
    class Scalastyle(NailgunTask):
      def __init__(self, context):
        NailgunTask.__init__(self, context)
        self._scalastyle_config = self.context.config.get_required('scalastyle, 'config')
+       self._scalastyle_bootstrap_key = 'scalastyle'
+       self.register_jvm_tool(self._scalastyle_bootstrap_key, [':scalastyle'])
 
      def execute(self, targets):
        srcs = get_scala_sources(targets)
+       cp = self._jvm_tool_bootstrapper.get_jvm_tool_classpath(self._scalastyle_bootstrap_key)
        result = self.runjava(main='org.scalastyle.Main',
-                             classpath=self.profile_classpath('scalastyle'),
+                             classpath=cp,
                              args=['-c', self._scalastyle_config] + srcs)
        if result != 0:
          raise TaskError('java %s ... exited non-zero (%i)' % ('org.scalastyle.Main', result))
@@ -233,15 +221,16 @@ will have too, right :)  ::
 Notice how we subclass ``NailgunTask``. This takes advantage of
 `Nailgun <http://www.martiansoftware.com/nailgun/>`_ to speed up any tool with
 a fixed classpath.
-Our constructor is straightforward, simply identifying the configuration file.
+Our constructor is straightforward, simply identifying the configuration file and
+registering the tool.
 Our ``execute`` magically finds all the scala sources to check (we're focusing on
-profiles here). Pay attention to the ``runjava`` line - that's where the
-profile is used. We simply way what main to execute, with what classpath, and what
-program args to use. As Scalastyle is a barrier in our build, we fail the build
-if files do not conform to the configured policy.
+bootstrapping here), and fetches the classpath to use. Pay attention to the ``runjava`` line -
+that's where the tool classpath is used. We simply say what main to execute, with what
+classpath, and what program args to use. As Scalastyle is a barrier in our build, we fail
+the build if files do not conform to the configured policy.
 
-Profiles are regularly used by tasks, and fortunately simple to use. Create
-the Ivy file defining the classpath, and using the convenience methods of
-``NailgunTask`` specify what class to run in the profile and the program args.
-Pants takes care of resolving the classpath, starting the subprocess, and logging
-what its doing along the way.
+Note that the above description was a slight simplification. The bootstrapping task doesn't
+actually invoke Ivy. Instead it creates a callback that invokes Ivy in just the right
+way. This callback is called lazily on demand, the first time you call get_jvm_tool_classpath()
+with a given key. This lazy invocation improves performance - we only invoke Ivy when we know
+we really do need to use the tool.

@@ -68,6 +68,9 @@ class Scalastyle(NailgunTask):
         for pattern in fh.readlines():
           self._excludes.add(re.compile(pattern.strip()))
 
+    self._scalastyle_bootstrap_key = 'scalastyle'
+    self.register_jvm_tool(self._scalastyle_bootstrap_key, [':scalastyle'])
+
   def execute(self, targets):
     if self.context.options.scalastyle_skip:
       self.context.log.debug('Skipping checkstyle.')
@@ -95,8 +98,9 @@ class Scalastyle(NailgunTask):
 
     if scala_sources:
       def call(srcs):
+        cp = self._jvm_tool_bootstrapper.get_jvm_tool_classpath(self._scalastyle_bootstrap_key)
         return self.runjava(main=Scalastyle._MAIN,
-                            classpath=self.profile_classpath('scalastyle'),
+                            classpath=cp,
                             args=['-c', self._scalastyle_config] + srcs)
       result = Xargs(call).execute(scala_sources)
       if result != 0:

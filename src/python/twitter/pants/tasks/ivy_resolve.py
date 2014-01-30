@@ -427,7 +427,7 @@ class IvyResolve(NailgunTask):
     ivy_args.extend(self._ivy_args)
 
     try:
-      ivy = self._ivy_bootstrapper.ivy(self.java_executor)
+      ivy = self._ivy_bootstrapper.ivy(self.create_java_executor())
       ivy.execute(ivy_args, jvm_args=self._jvm_args)
     except (Bootstrapper.Error, Ivy.Error) as e:
       raise TaskError('Failed to execute ivy call! %s' % e)

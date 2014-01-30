@@ -385,7 +385,7 @@ class Task(object):
             target_workdir=target_workdir,
             targets=targets,
             args=args,
-            runjava=java_runner,
+            ivy=ivy,
             workunit_name='ivy',
             workunit_factory=self.context.new_workunit,
             symlink_ivyxml=symlink_ivyxml,

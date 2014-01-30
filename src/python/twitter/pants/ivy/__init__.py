@@ -15,10 +15,8 @@
 # ==================================================================================================
 
 from .ivy import Bootstrapper, Ivy
-from .profile import profile_classpath
 
 __all__ = (
-    'profile_classpath',
     'Bootstrapper',
     'Ivy'
 )

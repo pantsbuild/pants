@@ -169,8 +169,7 @@ class ZincUtils(object):
   def identify_zinc_jars(zinc_classpath):
     """Find the named jars in the zinc classpath.
 
-    TODO: When profiles migrate to regular pants jar() deps instead of ivy.xml files we can
-          make these mappings explicit instead of deriving them by jar name heuristics.
+    TODO: Make these mappings explicit instead of deriving them by jar name heuristics.
     """
     ret = OrderedDict()
     ret.update(ZincUtils.identify_jars(ZincUtils.zinc_jar_names, zinc_classpath))

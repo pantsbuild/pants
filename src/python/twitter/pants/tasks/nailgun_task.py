@@ -17,8 +17,6 @@
 import os
 import time
 
-from twitter.pants.base.workunit import WorkUnit
-from twitter.pants.ivy import profile_classpath as profile_cp
 from twitter.pants.java import Distribution, SubprocessExecutor, NailgunExecutor
 
 from . import Task, TaskError
@@ -55,7 +53,9 @@ class NailgunTask(Task):
   def __init__(self, context, minimum_version=None, jdk=False):
     super(NailgunTask, self).__init__(context)
 
-    workdir = os.path.join(context.config.get('nailgun', 'workdir'), self.__class__.__name__)
+    self._workdir = os.path.join(context.config.get('nailgun', 'workdir'), self.__class__.__name__)
+    self._nailgun_bootstrap_key = 'nailgun'
+    self._jvm_tool_bootstrapper.register_jvm_tool(self._nailgun_bootstrap_key, [':nailgun-server'])
 
     start = time.time()
     try:
@@ -65,17 +65,18 @@ class NailgunTask(Task):
     except Distribution.Error as e:
       raise TaskError(e)
 
-    if context.options.nailgun_daemon:
-      nailgun_profile = context.config.get('nailgun', 'profile', default='nailgun')
-      classpath = self.profile_classpath(nailgun_profile)
-      self._java = NailgunExecutor(workdir, classpath, distribution=self._dist)
-    else:
-      self._java = SubprocessExecutor(self._dist)
+  def create_java_executor(self):
+    """Create java executor that uses this task's ng daemon, if allowed.
 
-  @property
-  def java_executor(self):
-    """Returns the active java executor in use by this task."""
-    return self._java
+    Call only in execute() or later. TODO: Enforce this.
+    """
+    if self.context.options.nailgun_daemon:
+      classpath = os.pathsep.join(
+        self._jvm_tool_bootstrapper.get_jvm_tool_classpath(self._nailgun_bootstrap_key))
+      client = NailgunExecutor(self._workdir, classpath, distribution=self._dist)
+    else:
+      client = SubprocessExecutor(self._dist)
+    return client
 
   @property
   def jvm_args(self):
@@ -94,33 +95,15 @@ class NailgunTask(Task):
     otherwise a persistent nailgun server dedicated to this Task subclass is used to speed up
     amortized run times.
     """
+    executor = self.create_java_executor()
     try:
       return util.execute_java(classpath,
                                main,
                                args=args,
                                jvm_args=jvm_args,
-                               executor=self.java_executor,
+                               executor=executor,
                                workunit_factory=self.context.new_workunit,
                                workunit_name=workunit_name,
                                workunit_labels=workunit_labels)
-    except self._java.Error as e:
+    except executor.Error as e:
       raise TaskError(e)
-
-  def profile_classpath(self, profile):
-    # TODO(John Sirois): XXX use new jvm tool work
-    """Ensures the classpath for the given profile ivy.xml is available and returns it as a list of
-    paths.
-
-    If the classpath has changed since the last check for this profile this Task's build cache is
-    invalidated.
-
-    profile: The name of the tool profile classpath to ensure.
-    """
-    updated, classpath = profile_cp(profile,
-                                    java_executor=SubprocessExecutor(self._dist),
-                                    config=self.context.config)
-    if updated:
-      # This is probably overly conservative - its unlikely nailgun upgrades affect cached work
-      # from subclasses.
-      self.invalidate()
-    return classpath

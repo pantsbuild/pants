@@ -157,14 +157,6 @@ class ScroogeGen(NailgunTask):
         namespace_map=tuple(target.namespace_map.items()) if target.namespace_map else ())
       partial_cmds[partial_cmd].add(target)
 
-    # TODO(John Sirois): This invalidates scrooge and scrooge-legacy targets even if only one
-    # profile has changed as a side-effect of invoking self.profile_classpath(...).  Split up
-    # ScroogeGen into 2 concrete Tasks with a thin subclassing so that each compiler gets its own
-    # cache.
-    for partial_cmd in partial_cmds:
-      # TODO(John Sirois): XXX use bootstrap!
-      self.profile_classpath(partial_cmd.compiler.profile)
-
     for partial_cmd, tgts in partial_cmds.items():
       gen_files_for_source = self.gen(partial_cmd, tgts)
 
@@ -183,7 +175,7 @@ class ScroogeGen(NailgunTask):
             langtarget.update_dependencies([langtarget_by_gentarget[dep]])
 
   def gen(self, partial_cmd, targets):
-    with self.invalidated(targets, invalidate_dependants=True) as invalidation_check:
+    with self.invalidated(targets, invalidate_dependents=True) as invalidation_check:
       invalid_targets = []
       for vt in invalidation_check.invalid_vts:
         invalid_targets.extend(vt.targets)

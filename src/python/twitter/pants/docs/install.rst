@@ -66,28 +66,6 @@ Solution::
     $ rm -f pants.pex
     $ ./pants
 
-`OSError: [Errno 2] No such file or directory: '/path/to/science/build-support/profiles/foobar.libs'`
-`````````````````````````````````````````````````````````````````````````````````````````````````````
-
-You've somehow lost or removed required libraries (e.g. jars for `nailgun`, `jmake`) which support
-various pants goals.
-
-Solution (where ``*-support`` is your source tree's Pants support dir; probably
-``build-support``, but perhaps :ref:`configured <setup-pants-ini>` to something
-else, e.g., ``pants-support``)::
-
-    $ git clean -fdx *-support/profiles
-    $ ./pants goal clean-all
-
-`Failed to read ng output after 5 seconds`
-``````````````````````````````````````````
-
-You've somehow lost or removed `nailgun` libraries.
-
-Solution::
-
-    $ git clean -fdx build-support/profiles
-    $ ./pants
 
 `DistributionNotFound: pytest-cov`
 ``````````````````````````````````
