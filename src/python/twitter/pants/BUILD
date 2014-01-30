@@ -117,7 +117,3 @@ python_binary(
   ],
   source=NG_CLIENT,
 )
-
-page(name='readme',
-  source='README.md',
-)

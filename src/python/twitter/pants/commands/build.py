@@ -91,11 +91,6 @@ class Build(Command):
       except:
         self.error("Problem parsing BUILD target %s: %s" % (address, traceback.format_exc()))
 
-      try:
-        InternalTarget.check_cycles(target)
-      except InternalTarget.CycleException as e:
-        self.error("Target contains an internal dependency cycle: %s" % e)
-
       if not target:
         self.error("Target %s does not exist" % address)
       self.targets.update(tgt for tgt in target.resolve() if tgt.is_concrete)

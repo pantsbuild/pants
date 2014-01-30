@@ -58,7 +58,7 @@ class Pants(Target):
 
     Target.__init__(self, self.address.target_name, reinit_check=False, exclusives=exclusives)
 
-  def register(self):
+  def _register(self):
     # A pants target is a pointer, do not register it as an actual target (see resolve).
     pass
 
