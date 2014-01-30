@@ -52,7 +52,6 @@ class JvmTarget(InternalTarget, TargetWithSources, Jarable):
     InternalTarget.__init__(self, name, dependencies, exclusives=exclusives)
     TargetWithSources.__init__(self, name, sources)
 
-    self.declared_dependencies = set(dependencies or [])
     self.add_labels('jvm')
     for source in self.sources:
       rel_path = os.path.join(self.target_base, source)
