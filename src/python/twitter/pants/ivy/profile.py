@@ -20,7 +20,8 @@ import os
 
 from twitter.common.dirutil import safe_mkdir, safe_delete
 
-from twitter.pants import Config, TaskError
+from twitter.pants.base.config import Config
+from twitter.pants.tasks import TaskError
 from twitter.pants.java import SubprocessExecutor
 
 from .ivy import Bootstrapper, Ivy

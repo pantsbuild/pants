@@ -21,9 +21,11 @@ from tempfile import mkdtemp
 
 from twitter.common.dirutil import safe_open, safe_rmtree, safe_mkdir
 
-from twitter.pants import BuildRoot
-from twitter.pants.base import Address, Target
+from twitter.pants.base.build_root import BuildRoot
+from twitter.pants.base.address import Address
+from twitter.pants.base.target import Target
 from twitter.pants.targets.sources import SourceRoot
+
 
 class BaseBuildRootTest(unittest.TestCase):
   """A baseclass useful for tests requiring a temporary buildroot."""

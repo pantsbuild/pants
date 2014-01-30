@@ -18,7 +18,7 @@ import pytest
 
 from textwrap import dedent
 
-from twitter.pants.base import TargetDefinitionException
+from twitter.pants.base.target import TargetDefinitionException
 from twitter.pants.base_build_root_test import BaseBuildRootTest
 from twitter.pants.targets.thrift_library import ThriftJar
 

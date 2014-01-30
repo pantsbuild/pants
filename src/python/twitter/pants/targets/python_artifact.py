@@ -14,7 +14,7 @@
 # limitations under the License.
 # ==================================================================================================
 
-from twitter.pants.base import manual
+from twitter.pants.base.build_manual import manual
 
 from .python_target import PythonTarget
 

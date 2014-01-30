@@ -14,8 +14,7 @@
 # limitations under the License.
 # ==================================================================================================
 
-from twitter.pants.base import manua
-l
+from twitter.pants.base import manual
 from .jvm_target import JvmTarget
 from .resources import Resources
 

@@ -12,10 +12,10 @@ from twitter.common.process import ProcessProviderFactory
 from twitter.common.process.process_provider import ProcessProvider
 
 from twitter.pants.base.build_environment import get_buildroot
+from twitter.pants.java.distribution.distribution import Distribution
 from twitter.pants.targets.sources import SourceRoot
 from twitter.pants.base import ParseContext
 from twitter.pants.base.target import Target
-from twitter.pants.binary_util import find_all_java_sysprops
 from twitter.pants.goal.products import Products
 from twitter.pants.base.workunit import WorkUnit
 from twitter.pants.reporting.report import Report
@@ -115,7 +115,8 @@ class Context(object):
     # cmd-line flag or .pantsrc, or we infer one from java.home but verify that the java.version
     # is a supported version.
     if self._java_sysprops is None:
-      self._java_sysprops = find_all_java_sysprops()
+      # TODO(John Sirois): Plumb a sane default distribution through 1 point of control
+      self._java_sysprops = Distribution.cached().system_properties
     return self._java_sysprops
 
   @property

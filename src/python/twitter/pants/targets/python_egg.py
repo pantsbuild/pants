@@ -22,7 +22,7 @@ from glob import glob as fsglob
 from pkg_resources import Distribution, EggMetadata, PathMetadata
 from zipimport import zipimporter
 
-from twitter.pants.base import manual
+from twitter.pants.base.build_manual import manual
 
 from .python_requirement import PythonRequirement
 

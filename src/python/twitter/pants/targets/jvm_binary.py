@@ -21,7 +21,9 @@ from functools import partial
 from twitter.common.collections import maybe_list
 from twitter.common.dirutil import Fileset
 from twitter.common.lang import Compatibility
-from twitter.pants.base import TargetDefinitionException
+
+from twitter.pants.base import manual
+from twitter.pants.base.target import TargetDefinitionException
 from twitter.pants.targets import util
 
 from .internal import InternalTarget

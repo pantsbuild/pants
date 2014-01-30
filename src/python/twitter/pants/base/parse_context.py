@@ -22,12 +22,10 @@ from contextlib import contextmanager
 
 from twitter.common.lang import Compatibility
 
-from twitter.pants.targets import SourceRoot
-
 from .build_environment import get_buildroot
+from .build_file import BuildFile
 from .fileset import Fileset
-
-from . import BuildFile, Config
+from .config import Config
 
 
 class ParseContext(object):
@@ -146,6 +144,9 @@ class ParseContext(object):
 
             # TODO(John Sirois): This is not build-dictionary friendly - rework SourceRoot to allow
             # allow for doc of both register (as source_root) and source_root.here(*types).
+            # TODO(John Sirois): XXX this import is done here to prevent a cycle
+            from twitter.pants.targets.sources import SourceRoot
+
             class RelativeSourceRoot(object):
               @staticmethod
               def here(*allowed_target_types):

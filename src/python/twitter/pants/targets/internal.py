@@ -21,7 +21,7 @@ from functools import partial
 
 from twitter.common.collections import maybe_list, OrderedSet
 
-from twitter.pants.base import Target, TargetDefinitionException
+from twitter.pants.base.target import Target, TargetDefinitionException
 
 from .anonymous import AnonymousDeps
 from .external_dependency import ExternalDependency

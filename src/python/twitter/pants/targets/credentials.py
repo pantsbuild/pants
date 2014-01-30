@@ -14,7 +14,7 @@
 # limitations under the License.
 # ==================================================================================================
 
-from twitter.pants.base import Target
+from twitter.pants.base.target import Target
 
 class Credentials(Target):
   """Supplies credentials for a maven repository on demand.

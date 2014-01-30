@@ -21,7 +21,9 @@ import traceback
 
 from twitter.common.collections import OrderedSet
 
-from twitter.pants.base import Address, Config, Target
+from twitter.pants.base.address import Address
+from twitter.pants.base.config import Config
+from twitter.pants.base.target import Target
 from twitter.pants.targets import InternalTarget
 from twitter.pants.python import PythonBuilder
 from twitter.pants.python.interpreter_cache import PythonInterpreterCache

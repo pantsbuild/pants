@@ -16,7 +16,7 @@
 
 from collections import defaultdict
 
-from twitter.pants.base import manual
+from twitter.pants.base.build_manual import manual
 from twitter.pants.base.target import AbstractTarget
 
 from .exclude import Exclude

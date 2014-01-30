@@ -14,27 +14,6 @@
 # limitations under the License.
 # ==================================================================================================
 
-import os
-
-from twitter.pants.base.target import Target
-
-
-def resolve_target_sources(target_sources, extension=None, relative_to_target_base=False):
-  """Given a list of pants targets, extract their sources as a list.
-
-  Filters against the extension if given and optionally returns the paths relative to the target
-  base.
-  """
-  resolved_sources = []
-  for resolved in Target.resolve_all(target_sources):
-    if hasattr(resolved, 'sources'):
-      resolved_sources.extend(
-        source if relative_to_target_base else os.path.join(resolved.target_base, source)
-        for source in resolved.sources if not extension or source.endswith(extension)
-      )
-  return resolved_sources
-
-
 from .annotation_processor import AnnotationProcessor
 from .anonymous import AnonymousDeps
 from .artifact import Artifact

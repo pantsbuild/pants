@@ -73,9 +73,11 @@ import textwrap
 from twitter.common.dirutil import safe_mkdir, safe_open
 
 from twitter.pants import binary_util, get_buildroot
-from twitter.pants.base import Address, Target
-from twitter.pants.targets import Page
+from twitter.pants.base.address import Address
+from twitter.pants.base.target import Target
+from twitter.pants.targets.doc import Page
 from twitter.pants.tasks import Task, TaskError
+
 
 class MarkdownToHtml(Task):
   AVAILABLE = HAS_MARKDOWN

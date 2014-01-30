@@ -36,7 +36,8 @@ from twitter.common.log.options import LogOptions
 from twitter.common.collections import OrderedSet
 from twitter.common.dirutil import safe_mkdir, safe_rmtree
 from twitter.common.lang import Compatibility
-from twitter.pants import get_buildroot, goal, group, has_sources, is_apt
+from twitter.pants.base.build_environment import get_buildroot
+from twitter.pants.goal import Goal as goal, Group as group
 from twitter.pants.base import (
     Address,
     BuildFile,
@@ -470,7 +471,7 @@ class Goal(Command):
     update_reporting(self.options, is_console_task(), self.run_tracker)
 
     if self.options.dry_run:
-      print '****** Dry Run ******'
+      print('****** Dry Run ******')
 
     context = Context(
       self.config,
@@ -739,14 +740,16 @@ goal(name='check-exclusives',
   dependencies=['gen'],
   action=CheckExclusives).install('check-exclusives').with_description(
   'Check exclusives declarations to verify that dependencies are consistent.')
-extract',
+
+goal(
+  name='extract',
   action=Extract,
-  ).install('resolve-idl')
+).install('resolve-idl')
 
 goal(
   name='idl-extract',
   action=IdlExtract,
-  ).install('resolve-idl')
+).install('resolve-idl')
 
 # TODO(John Sirois): gen attempted as the sole Goal should gen for all known gen types but
 # recognize flags to narrow the gen set

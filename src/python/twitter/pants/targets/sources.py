@@ -17,8 +17,11 @@
 import os
 
 from twitter.common.collections import OrderedSet
-from twitter.pants.base import manual, ParseContext, TargetDefinitionException
+
 from twitter.pants.base.build_environment import get_buildroot
+from twitter.pants.base.build_manual import manual
+from twitter.pants.base.parse_context import ParseContext
+from twitter.pants.base.target import TargetDefinitionException
 
 
 @manual.builddict()

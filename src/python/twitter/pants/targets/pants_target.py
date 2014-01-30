@@ -14,7 +14,10 @@
 # limitations under the License.
 # ==================================================================================================
 
-from twitter.pants.base import Address, manual, ParseContext, Target, TargetDefinitionException
+from twitter.pants.base.address import Address
+from twitter.pants.base.build_manual import manual
+from twitter.pants.base.parse_context import ParseContext
+from twitter.pants.base.target import Target, TargetDefinitionException
 
 
 @manual.builddict(tags=["anylang"])

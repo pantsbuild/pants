@@ -25,7 +25,7 @@ from twitter.common.dirutil import safe_open, touch
 from twitter.common.lang import Compatibility
 
 from twitter.pants import get_buildroot, is_concrete, Config
-from twitter.pants.base import manual, ParseContext
+from twitter.pants.base.build_manual import manual, ParseContext
 from twitter.pants.targets import (
     AnonymousDeps,
     JarLibrary,

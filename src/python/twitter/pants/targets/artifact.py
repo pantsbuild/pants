@@ -16,7 +16,7 @@
 
 from twitter.common.lang import Compatibility
 
-from twitter.pants.base import manual
+from twitter.pants.base.build_manual import manual
 
 from .pants_target import Pants
 from .repository import Repository

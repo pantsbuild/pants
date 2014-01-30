@@ -15,7 +15,7 @@
 # ==================================================================================================
 
 from twitter.common.collections import OrderedSet
-from twitter.pants.base import manual
+from twitter.pants.base.build_manual import manual
 from .ruby_target import RubyTarget
 
 

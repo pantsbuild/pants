@@ -19,7 +19,7 @@ __author__ = 'John Sirois'
 import inspect
 from optparse import OptionGroup
 
-from twitter.pants.base import manual
+from twitter.pants.base.build_manual import manual
 from twitter.pants.tasks import Task
 
 

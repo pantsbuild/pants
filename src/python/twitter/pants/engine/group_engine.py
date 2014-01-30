@@ -19,9 +19,9 @@ from collections import defaultdict, namedtuple
 from twitter.common import log
 from twitter.common.collections import OrderedDict, OrderedSet
 
-from twitter.pants import is_concrete, TaskError
 from twitter.pants.goal import Goal
 from twitter.pants.targets.internal import InternalTarget
+from twitter.pants.tasks import TaskError
 
 from .engine import Engine
 
@@ -160,7 +160,8 @@ class GroupEngine(Engine):
           execute_task(goal, self._tasks_by_goal[goal], self._context.targets())
         else:
           goals_by_group_member = OrderedDict((GroupMember.from_goal(g), g) for g in goals)
-          chunks = GroupIterator(self._context.targets(is_concrete), goals_by_group_member.keys())
+          chunks = GroupIterator(self._context.targets(lambda t: t.is_concrete),
+                                 goals_by_group_member.keys())
           for group_member, goal_chunk in chunks:
             goal = goals_by_group_member[group_member]
             self._context.log.info('[%s:%s:%s]' % (self._phase, group_name, goal.name))

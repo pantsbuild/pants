@@ -16,7 +16,7 @@
 
 from twitter.common.collections import maybe_list
 from twitter.common.quantity import Amount, Time
-from twitter.pants.base import manual
+from twitter.pants.base.build_manual import manual
 from twitter.pants.targets.python_target import PythonTarget
 
 

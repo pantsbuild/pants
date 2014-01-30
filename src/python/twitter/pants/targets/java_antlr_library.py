@@ -16,7 +16,7 @@
 
 __author__ = 'Brian Larson'
 
-from twitter.pants.base import manual
+from twitter.pants.base.build_manual import manual
 
 from .exportable_jvm_library import ExportableJvmLibrary
 
