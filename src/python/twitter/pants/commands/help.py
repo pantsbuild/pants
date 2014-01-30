@@ -20,6 +20,7 @@ from . import Command
 
 from copy import copy
 
+
 class Help(Command):
   """Provides help for available commands or a single specified command."""
 
@@ -42,5 +43,5 @@ class Help(Command):
   def execute(self):
     subcommand_class = Command.get_command(self.subcommand)
 
-    command = subcommand_class(self.root_dir, self.parser, [ '--help' ])
+    command = subcommand_class(self.run_tracker, self.root_dir, self.parser, [ '--help' ])
     return command.execute()
