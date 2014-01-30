@@ -126,14 +126,13 @@ class SourceRoot(object):
     """
     # Verify that source_root_dir doesn't reach outside buildroot.
     buildroot = get_buildroot()
-
     if source_root_dir.startswith(buildroot):
       abspath = os.path.normpath(source_root_dir)
     else:
       abspath = os.path.normpath(os.path.join(buildroot, source_root_dir))
-
     if not abspath.startswith(buildroot):
       raise ValueError('Source root %s is not under the build root %s' % (abspath, buildroot))
+    source_root_dir = os.path.relpath(abspath, buildroot)
 
     types = cls._TYPES_BY_ROOT.get(source_root_dir)
     if types is None:
