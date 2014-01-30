@@ -22,6 +22,7 @@ import twitter.pants
 import twitter.pants.base
 
 from twitter.common.dirutil import Fileset, safe_open
+from twitter.pants.base.build_file_helpers import maven_layout
 from twitter.pants.base.generator import Generator, TemplateData
 from twitter.pants.goal.phase import Phase
 from twitter.pants.tasks import Task, TaskError
@@ -140,8 +141,7 @@ PREDEFS = {  # some hardwired entries
                   """Old name for `junit_tests`_""")},
   "JavaLibrary": {"suppress": True},
   "JavaTests": {"suppress": True},
-  "maven_layout": {"defn": entry_for_one("maven_layout",
-                                          twitter.pants.maven_layout)},
+  "maven_layout": {"defn": entry_for_one("maven_layout", maven_layout)},
   "oink_query": {"suppress": True},
   "python_artifact": {"suppress": True},
   "rglobs": {"defn": entry_for_one("rglobs", Fileset.rglobs)},

@@ -19,6 +19,7 @@ import os
 from twitter.common.lang import Compatibility
 from twitter.pants.base.build_file import BuildFile
 
+
 class Address(object):
   """A target address.
 
@@ -45,8 +46,8 @@ class Address(object):
     An address spec can be one of:
     1.) the (relative) path of a BUILD file
     2.) the (relative) path of a directory containing a BUILD file child
-    3.) either of 1 or 2 with a ':[module name]' suffix
-    4.) a bare ':[module name]' indicating the BUILD file to use is the one in the current directory
+    3.) either of 1 or 2 with a ':[target name]' suffix
+    4.) a bare ':[target name]' indicating the BUILD file to use is the one in the current directory
 
     If the spec does not have a target name suffix the target name is taken to be the same name
     as the BUILD file's parent directory.  In this way the containing directory name

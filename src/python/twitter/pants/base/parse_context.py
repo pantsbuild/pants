@@ -136,6 +136,7 @@ class ParseContext(object):
 
       with ParseContext.activate(self):
         for buildfile in buildfile_family:
+          self._active_buildfile = buildfile
           # We may have traversed a sibling already, guard against re-parsing it.
           if buildfile not in ParseContext._parsed:
             ParseContext._parsed.add(buildfile)
@@ -192,3 +193,10 @@ class ParseContext(object):
 
   def __repr__(self):
     return '%s(%s)' % (type(self).__name__, self.buildfile)
+
+  @property
+  def current_buildfile(self):
+    """ This property return the current build file being parsed from all BUILD files co-located
+    with this BUILD file within the family.
+    """
+    return self._active_buildfile

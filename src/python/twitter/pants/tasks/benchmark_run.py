@@ -16,16 +16,10 @@
 
 import os
 import shutil
-from twitter.pants.binary_util import profile_classpath, runjava_indivisible
-from twitter.pants.tasks import Task, TaskError
-from twitter.pants.tasks.jvm_task import JvmTask
 
-from twitter.pants.ivy import profile_classpath
-from twitter.pants.java import runjava
-
+from .java.util import execute_java
 from .jvm_task import JvmTask
-
-from . import Task, TaskError
+from . import TaskError
 
 
 class BenchmarkRun(JvmTask):
@@ -100,10 +94,10 @@ class BenchmarkRun(JvmTask):
         self._benchmark_bootstrap_key)
 
     caliper_main = 'com.google.caliper.Runner'
-    exit_code = runjava(self.classpath(benchmark_tools_classpath),
-                        caliper_main,
-                        args=self.caliper_args,
-                        jvm_args=self.jvm_args,
-                        workunit_name='caliper')
+    exit_code = execute_java(self.classpath(benchmark_tools_classpath),
+                             caliper_main,
+                             args=self.caliper_args,
+                             jvm_args=self.jvm_args,
+                             workunit_name='caliper')
     if exit_code != 0:
       raise TaskError('java %s ... exited non-zero (%i)' % (caliper_main, exit_code))

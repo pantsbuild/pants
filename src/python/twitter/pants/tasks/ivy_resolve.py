@@ -15,17 +15,24 @@
 # ==================================================================================================
 
 from __future__ import print_function
-from collections import defaultdict
 
+from collections import defaultdict
+from contextlib import contextmanager
+
+import logging
 import os
+import re
 import shutil
 import time
 
-from twitter.common.dirutil import safe_mkdir
+from twitter.common.collections import OrderedDict
+from twitter.common.dirutil import safe_mkdir, safe_open
+from twitter.common.log import LogOptions
 
 from twitter.pants import binary_util
+from twitter.pants.base.generator import TemplateData
 from twitter.pants.base.revision import Revision
-from twitter.pants.ivy import Bootstrapper
+from twitter.pants.ivy import Bootstrapper, Ivy
 
 from .cache_manager import VersionedTargetSet
 from .ivy_utils import IvyUtils
@@ -265,7 +272,7 @@ class IvyResolve(NailgunTask):
 
   def _calculate_classpath(self, targets):
     def is_jardependant(target):
-      return is_jar(target) or is_jvm(target)
+      return target.is_jar or target.is_jvm
 
     jars = OrderedDict()
     excludes = set()
@@ -280,7 +287,7 @@ class IvyResolve(NailgunTask):
       )
 
     def collect_jars(target):
-      if is_jar(target):
+      if target.is_jar:
         add_jar(target)
       elif target.jar_dependencies:
         for jar in target.jar_dependencies:
@@ -288,7 +295,7 @@ class IvyResolve(NailgunTask):
             add_jar(jar)
 
       # Lift jvm target-level excludes up to the global excludes set
-      if is_jvm(target) and target.excludes:
+      if target.is_jvm and target.excludes:
         excludes.update(target.excludes)
 
     for target in targets:

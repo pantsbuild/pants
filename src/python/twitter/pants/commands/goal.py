@@ -513,7 +513,6 @@ class Goal(Command):
 # Install all default pants provided goals
 from twitter.pants.targets import JavaTests as junit_tests
 from twitter.pants.targets import Benchmark, JvmBinary
-from twitter.pants import junit_tests
 from twitter.pants.targets import (
   Benchmark,
   JavaLibrary,

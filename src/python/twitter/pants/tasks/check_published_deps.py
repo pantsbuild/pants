@@ -14,7 +14,7 @@
 # limitations under the License.
 # ==================================================================================================
 
-from twitter.pants import get_buildroot, is_exported
+from twitter.pants.base.build_environment import get_buildroot
 from twitter.pants.base import BuildFile, Target
 from twitter.pants.targets import JarDependency
 from twitter.pants.tasks.console_task import ConsoleTask
@@ -42,7 +42,7 @@ class CheckPublishedDeps(ConsoleTask):
                      for address in Target.get_all_addresses(buildfile))
     for address in all_addresses:
       target = Target.get(address)
-      if is_exported(target):
+      if target.is_exported:
         provided_jar, _, _ = target.get_artifact_info()
         artifact = (provided_jar.org, provided_jar.name)
         if not artifact in self._artifacts_to_targets:

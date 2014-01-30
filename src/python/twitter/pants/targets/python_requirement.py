@@ -36,7 +36,7 @@ class PythonRequirement(Target, ExternalDependency):
     self._version_filter = version_filter or (lambda py, pl: True)
     # TODO(wickman) Unify this with PythonTarget .compatibility
     self.compatibility = compatibility or ['']
-    super(Target, self).__init__(self._name, exclusives=exclusives)
+    Target.__init__(self, self._name, exclusives=exclusives)
 
   def should_build(self, python, platform):
     return self._version_filter(python, platform)

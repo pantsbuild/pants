@@ -24,8 +24,10 @@ from twitter.common.contextutil import open_zip
 from twitter.common.dirutil import safe_open, touch
 from twitter.common.lang import Compatibility
 
-from twitter.pants import get_buildroot, is_concrete, Config
-from twitter.pants.base.build_manual import manual, ParseContext
+from twitter.pants.base.build_environment import get_buildroot
+from twitter.pants.base.config import Config
+from twitter.pants.base.parse_context import ParseContext
+from twitter.pants.base.build_manual import manual
 from twitter.pants.targets import (
     AnonymousDeps,
     JarLibrary,
@@ -284,7 +286,7 @@ class Extract(Task):
       for idl_dep in maybe_list(idl_deps,
                                 expected_type=(JarLibrary, Pants, ThriftJar, ThriftLibrary),
                                 raise_type=TaskError):
-        idl_dep.walk(accumulate, predicate=is_concrete)
+        idl_dep.walk(accumulate, predicate=lambda t: t.is_concrete)
 
       if invalid:
         raise TaskError('Can only arrange for compiled idl from thrift jars and thrift libraries, '
@@ -306,7 +308,7 @@ class Extract(Task):
         synthetic_deps = OrderedSet()
         for dependency in thrift_library.dependencies:
           for dep in dependency.resolve():
-            if is_concrete(dep):
+            if dep.is_concrete:
               synthetic_deps.add(synthetic_by_idl[dep])
         synthetic_by_idl[thrift_library].update_dependencies(synthetic_deps)
       synthetic_jarlib.dependencies.update(synthetic_by_idl.values())

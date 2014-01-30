@@ -26,8 +26,6 @@ from twitter.pants.base.build_environment import get_buildroot
 from twitter.pants.fs import safe_filename
 from twitter.pants.java.jar import open_jar
 from twitter.pants.targets import JvmBinary, JavaThriftLibrary, ThriftLibrary
-from twitter.pants.base.build_environment import get_buildroot
-from twitter.pants.java import open_jar
 
 from .javadoc_gen import javadoc
 from .scaladoc_gen import scaladoc
