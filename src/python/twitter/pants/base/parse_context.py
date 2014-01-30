@@ -18,13 +18,15 @@ import collections
 import copy
 import os
 
+from functools import partial
+
 from contextlib import contextmanager
 
+from twitter.common.dirutil.fileset import Fileset
 from twitter.common.lang import Compatibility
 
 from .build_environment import get_buildroot
 from .build_file import BuildFile
-from .fileset import Fileset
 from .config import Config
 
 
@@ -161,8 +163,9 @@ class ParseContext(object):
             eval_globals.update({
               'ROOT_DIR': buildfile.root_dir,
               '__file__': buildfile.full_path,
-              'globs': Fileset.lazy_rel_globs(buildfile_dir),
-              'rglobs': Fileset.lazy_rel_rglobs(buildfile_dir),
+              'globs': partial(Fileset.globs, root=buildfile_dir),
+              'rglobs': partial(Fileset.rglobs, root=buildfile_dir),
+              'zglobs': partial(Fileset.zglobs, root=buildfile_dir),
               'source_root': RelativeSourceRoot,
             })
             eval_globals.update(globalargs)

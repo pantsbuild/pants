@@ -38,7 +38,7 @@ python_library(
     pants('3rdparty/python:pytest-cov'),
     pants('3rdparty/python:python_daemon'),
     pants('3rdparty/python:requests'),
-    python_requirement('pylint==1.1.0', version_filter=pylint_build_filter),
+    python_requirement('pylint==1.1.0', version_filter=pylint_build_filter)
   ]
 )
 
@@ -116,4 +116,8 @@ python_binary(
     pants(':pants-lib')
   ],
   source=NG_CLIENT,
+)
+
+page(name='readme',
+  source='README.md',
 )

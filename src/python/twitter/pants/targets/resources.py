@@ -39,7 +39,7 @@ class Resources(InternalTarget, TargetWithSources):
   In the ``jar`` goal, the resource files are placed in the resulting `.jar`.
   """
 
-  def __init__(self, name, sources):
+  def __init__(self, name, sources, exclusives=None):
     """
     :param string name: The name of this target, which combined with this
       build file defines the target :class:`twitter.pants.base.address.Address`.
@@ -47,7 +47,7 @@ class Resources(InternalTarget, TargetWithSources):
       this library provides.
     """
     # TODO(John Sirois): XXX Review why this is an InternalTarget
-    InternalTarget.__init__(self, name)
+    InternalTarget.__init__(self, name, dependencies=None, exclusives=exclusives)
     TargetWithSources.__init__(self, name, sources=sources)
 
 
@@ -104,8 +104,8 @@ class WithLegacyResources(TargetWithSources):
       resources_seq = resources if isinstance(resources, Sequence) else [resources]
       if all(map(is_resources, resources_seq)):
         self.resources = list(self.resolve_all(resources_seq, Resources))
-      elif (all(map(lambda resource: isinstance(resource, Fileset)
-            or isinstance(resource, Compatibility.string), resources_seq))):
+      elif (all(map(lambda resource: isinstance(resource, (Fileset, Compatibility.string)),
+                    resources_seq))):
         # Handle parallel resource dir globs.
         # For example, for a java_library target base of src/main/java:
         #   src/main/java/com/twitter/base/BUILD

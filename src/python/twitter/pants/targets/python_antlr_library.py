@@ -24,7 +24,9 @@ from twitter.pants.targets.pants_target import Pants
 class PythonAntlrLibrary(PythonTarget):
   """Generates a stub Python library from Antlr grammar files."""
 
-  def __init__(self, name, module,
+  def __init__(self,
+               name,
+               module,
                antlr_version='3.1.3',
                sources=None,
                resources=None,
@@ -53,8 +55,8 @@ class PythonAntlrLibrary(PythonTarget):
         all_deps.update(dependencies)
       return all_deps
 
-    super(PythonTarget, self).__init__(name, sources, resources, get_all_deps(),
-                                       exclusives=exclusives)
+    super(PythonAntlrLibrary, self).__init__(name, sources, resources, get_all_deps(),
+                                             exclusives=exclusives)
 
     self.module = module
     self.antlr_version = antlr_version

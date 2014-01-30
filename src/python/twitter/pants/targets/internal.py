@@ -166,9 +166,9 @@ class InternalTarget(Target):
     self._internal_dependencies = OrderedSet()
     self._jar_dependencies = OrderedSet()
 
-    self._deps = dependencies
+    self._deps = self.processed_dependencies
     if dependencies:
-      maybe_list(dependencies,
+      maybe_list(self.processed_dependencies,
                  expected_type=(ExternalDependency, AnonymousDeps, Target),
                  raise_type=partial(TargetDefinitionException, self))
 
