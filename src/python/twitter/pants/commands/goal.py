@@ -623,7 +623,7 @@ class NailgunKillall(ConsoleTask):
                                  "all workspaces on the system.")
 
   def execute(self, targets):
-    NailgunTask.killall(self.context.log, everywhere=self.context.options.ng_killall_everywhere)
+    NailgunTask.killall(everywhere=self.context.options.ng_killall_everywhere)
 
 goal(
   name='ng-killall',
