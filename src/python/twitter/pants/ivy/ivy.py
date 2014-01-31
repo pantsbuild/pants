@@ -142,7 +142,8 @@ class Bootstrapper(object):
   def _bootstrap_ivy_classpath(self, executor, workunit_factory, retry=True):
     # TODO(John Sirois): Extract a ToolCache class to control the path structure:
     # https://jira.twitter.biz/browse/DPB-283
-    ivy_cache = os.path.join(self._config.getdefault('pants_cachedir'), 'tools', 'jvm', 'ivy')
+    ivy_bootstrap_dir = \
+      os.path.join(self._config.getdefault('pants_bootstrapdir'), 'tools', 'jvm', 'ivy')
 
     digest = hashlib.sha1()
     if os.path.isfile(self._version_or_ivyxml):
@@ -150,10 +151,10 @@ class Bootstrapper(object):
         digest.update(fp.read())
     else:
       digest.update(self._version_or_ivyxml)
-    classpath = os.path.join(ivy_cache, '%s.classpath' % digest.hexdigest())
+    classpath = os.path.join(ivy_bootstrap_dir, '%s.classpath' % digest.hexdigest())
 
     if not os.path.exists(classpath):
-      ivy = self._bootstrap_ivy(os.path.join(ivy_cache, 'bootstrap.jar'))
+      ivy = self._bootstrap_ivy(os.path.join(ivy_bootstrap_dir, 'bootstrap.jar'))
       args = ['-confs', 'default', '-cachepath', classpath]
       if os.path.isfile(self._version_or_ivyxml):
         args.extend(['-ivy', self._version_or_ivyxml])
@@ -176,8 +177,8 @@ class Bootstrapper(object):
         raise self.Error('Ivy bootstrapping failed - invalid classpath: %s' % ':'.join(cp))
       return cp
 
-  def _bootstrap_ivy(self, bootstrap_jar_cache_path):
-    if not os.path.exists(bootstrap_jar_cache_path):
+  def _bootstrap_ivy(self, bootstrap_jar_path):
+    if not os.path.exists(bootstrap_jar_path):
       with temporary_file() as bootstrap_jar:
         fetcher = Fetcher()
         checksummer = fetcher.ChecksumListener(digest=hashlib.sha1())
@@ -191,12 +192,12 @@ class Bootstrapper(object):
                            timeout=self._timeout)
           log.info('sha1: %s' % checksummer.checksum)
           bootstrap_jar.close()
-          touch(bootstrap_jar_cache_path)
-          shutil.move(bootstrap_jar.name, bootstrap_jar_cache_path)
+          touch(bootstrap_jar_path)
+          shutil.move(bootstrap_jar.name, bootstrap_jar_path)
         except fetcher.Error as e:
           raise self.Error('Problem fetching the ivy bootstrap jar! %s' % e)
 
-    return Ivy(bootstrap_jar_cache_path,
+    return Ivy(bootstrap_jar_path,
                ivy_settings=self._ivy_settings,
                ivy_cache_dir=self.ivy_cache_dir)
 
