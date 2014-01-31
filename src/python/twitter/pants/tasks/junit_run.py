@@ -236,10 +236,12 @@ class JUnitRun(JvmTask):
       tests = list(self.get_tests_to_run() if self.tests_to_run
                    else self.calculate_tests_from_targets(targets))
       if tests:
-        bootstrapped_cp = self._jvm_tool_bootstrapper.get_jvm_tool_classpath(self._junit_bootstrap_key)
-        junit_classpath = self.classpath(bootstrapped_cp,
-                                         confs=self.confs,
-                                         exclusives_classpath=self.get_base_classpath_for_target(targets[0]))
+        bootstrapped_cp = self._jvm_tool_bootstrapper.get_jvm_tool_classpath(
+            self._junit_bootstrap_key)
+        junit_classpath = self.classpath(
+            bootstrapped_cp,
+            confs=self.confs,
+            exclusives_classpath=self.get_base_classpath_for_target(targets[0]))
 
         def run_tests(classpath, main, jvm_args=None):
           # TODO(John Sirois): Integrated batching with the test runner.  As things stand we get
@@ -349,6 +351,7 @@ class JUnitRun(JvmTask):
     else:
       classes_under_test = set()
       classes_by_source = self.context.products.get('classes')
+
       def add_sources_under_test(tgt):
         if self.is_coverage_target(tgt):
           for source in tgt.sources:
