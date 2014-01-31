@@ -56,7 +56,7 @@ class Pants(Target):
     # We must disable the re-init check, because our funky __getattr__ breaks it.
     # We're not involved in any multiple inheritance, so it's OK to disable it here.
 
-    Target.__init__(self, self.address.target_name, reinit_check=False, exclusives=exclusives)
+    Target.__init__(self, self.address.target_name, exclusives=exclusives)
 
   def _register(self):
     # A pants target is a pointer, do not register it as an actual target (see resolve).
@@ -82,12 +82,3 @@ class Pants(Target):
     if len(resolved) > 1:
       raise LookupError('%s points to more than one target: %s' % (self, resolved))
     return resolved.pop()
-
-  def __getattr__(self, name):
-    try:
-      return Target.__getattribute__(self, name)
-    except AttributeError as e:
-      try:
-        return getattr(self.get(), name)
-      except (AttributeError, LookupError):
-        raise e
