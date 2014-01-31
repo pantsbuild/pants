@@ -93,7 +93,7 @@ class WhatChanged(ConsoleTask):
           continue
 
         if target and (is_build_file or ((target.has_sources() or target.has_resources)
-                                         and self._owns(target, file_))):
+                                         and self._owns(target, path))):
           yield target
 
   def _candidate_owners(self, path):
