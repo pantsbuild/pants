@@ -31,6 +31,8 @@ from . import TaskError
 
 
 class JUnitRun(JvmTask):
+  _MAIN = 'com.twitter.common.junit.runner.ConsoleRunner'
+
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
     option_group.add_option(mkflag('skip'), mkflag('skip', negate=True), dest = 'junit_run_skip',
@@ -330,13 +332,13 @@ class JUnitRun(JvmTask):
             # the classpath followed by the normal classpath.  The instrumentation also adds a
             # dependency on emma libs that must be satisfied on the classpath.
             run_tests([self.coverage_instrument_dir] + junit_classpath + emma_classpath,
-                      'com.twitter.common.junit.runner.ConsoleRunner',
+                      JUnitRun._MAIN,
                       jvm_args=['-Demma.coverage.out.file=%s' % self.coverage_file])
           finally:
             generate_reports()
         else:
           self.context.lock.release()
-          run_tests(junit_classpath, 'com.twitter.common.testing.runner.JUnitConsoleRunner')
+          run_tests(junit_classpath, JUnitRun._MAIN)
 
   def is_coverage_target(self, tgt):
     return (tgt.is_java or tgt.is_scala) and not tgt.is_test and not tgt.is_codegen
