@@ -85,7 +85,9 @@ class JarCreateMiscTest(JarCreateTestBase):
 
   def test_resources_with_scala_java_files(self):
     for ftype in ('java', 'scala'):
-      target = self.resources('project', 'target_%s' % ftype, 'hello.%s' % ftype)
+      target = self.resources(os.path.join('project', ftype),
+                              'target_%s' % ftype,
+                              'hello.%s' % ftype)
       self.assertFalse(is_jvm_library(target))
 
 

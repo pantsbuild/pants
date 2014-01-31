@@ -50,6 +50,13 @@ class Resources(InternalTarget, TargetWithSources):
     InternalTarget.__init__(self, name, dependencies=None, exclusives=exclusives)
     TargetWithSources.__init__(self, name, sources=sources)
 
+  def has_sources(self, extension=None):
+    """``Resources`` never own sources of any particular native type, like for example
+    ``JavaLibrary``.
+    """
+    # TODO(John Sirois): track down the reason for this hack and kill or explain better.
+    return extension is None
+
 
 class WithLegacyResources(TargetWithSources):
   """Collects resources whether they are specified using globs against an assumed parallel

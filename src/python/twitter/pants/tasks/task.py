@@ -59,6 +59,7 @@ class Task(object):
   def __init__(self, context):
     self.context = context
     self.dry_run = self.can_dry_run() and context.options.dry_run
+    self._pants_workdir = self.context.config.getdefault('pants_workdir')
     self._cache_key_generator = CacheKeyGenerator(
         context.config.getdefault('cache_key_gen_version', default=None))
     self._read_artifact_cache_spec = None
@@ -418,3 +419,9 @@ class Task(object):
     with IvyUtils.cachepath(target_classpath_file) as classpath:
       stripped_classpath = [path.strip() for path in classpath]
       return [path for path in stripped_classpath if IvyUtils.is_mappable_artifact(path)]
+
+  def get_workdir(self, section="default", key="workdir", workdir=None):
+    return self.context.config.get(section,
+                                   key,
+                                   default=os.path.join(self._pants_workdir,
+                                                        workdir or self.__class__.__name__.lower()))
