@@ -48,9 +48,8 @@ code from the Thrift IDL files. Users can
 depend on this target like any other internal target. In this case, users would
 add a dependency on ``pants('src/thrift/com/twitter/mybird')``.
 
-To make this thrift available to other source trees, you might publish it.
-
-.. TODO when we have a doc about publishing it, link to it
+To make this thrift available to other source trees, you might
+:doc:`publish it <publish>`.
 
 *******************************
 Consuming Thrift from Elsewhere
@@ -70,16 +69,32 @@ For Thrift, there are targets to use to pull in published IDL jars
 and generate code from them, e.g., :ref:`bdict_idl_jar_thrift_library`
 for Java and Scala::
 
-  idl_jar_thrift_library(name='servo-exception-thrift-scala',
+  idl_jar_thrift_library(name='mybird-thrift-scala',
     thrift_jar=thrift_jar('org.archimedes', 'mybird-thrift-scala-only', '2.7.0'),
     language='scala',
     rpc_style='finagle',
   )
 
-  idl_jar_thrift_library(name='servo-exception-thrift-java',
+  idl_jar_thrift_library(name='mybird-thrift-java',
     thrift_jar=thrift_jar('org.archimedes', 'mybird-thrift-java-only', '2.7.0'),
     language='java',
   )
+
+Notice something subtle here: these two ``idl_jar_thrift_library`` targets
+use different ``thrift_jar`` values, one for Scala and one for Java. That
+might seem strange: They consume Thrift IDL code, which is language agnostic.
+Why have different ``thrift_jar``\s?
+
+When you _publish_ an artifact that depends on an ``idl_jar_thrift_library``,
+Pants needs an artifact with the JVM classes generated from the IDL.
+It expects those to have been published by the IDL's "home" repo, the place
+it was published from.
+Pants uses the ``idl_jar_thrift_library``\'s ``thrift_jar``
+parameter to figure out
+the Jar with the generated code. (This works if Pants published those artifacts,
+since it can assume the "-only" suffix naming convention; if the artifacts
+were published some other way, you can specify the generated-code artifact
+address via the ``idl_jar_thrift_library``\'s ``provided_by`` parameter.)
 
 (So far, there is no Python or Ruby way to consume IDL jars. If all Ruby 
 thrift lives in the same repo, you can publish the
