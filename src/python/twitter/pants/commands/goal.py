@@ -32,8 +32,9 @@ from optparse import Option, OptionParser
 
 from twitter.common import log
 from twitter.common.collections import OrderedSet
-from twitter.common.dirutil import safe_rmtree
+from twitter.common.dirutil import safe_rmtree, safe_mkdir
 from twitter.common.lang import Compatibility
+from twitter.common.log.options import LogOptions
 from twitter.pants import binary_util
 from twitter.pants.base.build_environment import get_buildroot
 from twitter.pants.goal import Goal as goal, Group as group
@@ -53,7 +54,6 @@ from twitter.pants.base.workunit import WorkUnit
 from twitter.pants.reporting.reporting_server import ReportingServer, ReportingServerManager
 from twitter.pants.tasks import Task, TaskError
 from twitter.pants.tasks.console_task import ConsoleTask
-from twitter.pants.tasks.nailgun_task import NailgunTask
 from twitter.pants.goal import Context, GoalError, Phase
 from twitter.pants.tasks.targets_help import TargetsHelp
 
@@ -198,8 +198,6 @@ class Goal(Command):
            help="Explain the execution of goals."),
     Option("--force-stats-upload", dest="force_upload", action="store_true", default=False,
            help="[%default] Forces pants runtime stats upload after every pants runs"),
-    Option("-v", "--log", action="store_true", dest="log", default=False,
-           help="[%default] Logs extra build output."),
     Option("-k", "--kill-nailguns", action="store_true", dest="cleanup_nailguns", default=False,
            help="Kill nailguns before exiting"),
     Option("-d", "--logdir", dest="logdir",
@@ -458,6 +456,20 @@ class Goal(Command):
       Phase.setup_parser(parser, args, self.phases)
 
   def run(self, lock):
+    # TODO(John Sirois): Consider moving to straight python logging.  The divide between the
+    # context/work-unit logging and standard python logging doesn't buy us anything.
+
+    # Enable standard python logging for code with no handle to a context/work-unit.
+    if self.options.log_level:
+      LogOptions.set_stderr_log_level((self.options.log_level or 'info').upper())
+      logdir = self.options.logdir or self.config.get('goals', 'logdir', default=None)
+      if logdir:
+        safe_mkdir(logdir)
+        LogOptions.set_log_dir(logdir)
+        log.init('goals')
+      else:
+        log.init()
+
     # Update the reporting settings, now that we have flags etc.
     def is_console_task():
       for phase in self.phases:
