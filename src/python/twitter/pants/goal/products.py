@@ -1,5 +1,6 @@
 from collections import defaultdict
 
+
 class Products(object):
   class ProductMapping(object):
     """Maps products of a given type by target. Each product is a map from basedir to a list of
@@ -10,6 +11,8 @@ class Products(object):
       self.typename = typename
       self.by_target = defaultdict(lambda: defaultdict(list))
 
+    def empty(self):
+      return len(self.by_target) == 0
 
     def add(self, target, basedir, product_paths=None):
       """
@@ -31,8 +34,8 @@ class Products(object):
 
     def get(self, target):
       """
-        Returns the product mapping for the given target as a map of <basedir> -> <products list>,
-        or None if no such product exists.
+        Returns the product mapping for the given target as a tuple of (basedir, products list).
+        Can return None if there is no mapping for the given target.
       """
       return self.by_target.get(target)
 
