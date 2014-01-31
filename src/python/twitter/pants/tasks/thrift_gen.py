@@ -217,7 +217,6 @@ class ThriftGen(CodeGen):
     deps = geninfo.deps['service' if has_service else 'structs']
     tgt = create_target(files, deps)
     tgt.id = target.id + '.thrift_gen'
-    tgt.add_labels('synthetic')
     tgt.add_labels('codegen')
     for dependee in dependees:
       if isinstance(dependee, InternalTarget):

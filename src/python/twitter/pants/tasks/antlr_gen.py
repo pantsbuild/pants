@@ -128,7 +128,7 @@ class AntlrGen(CodeGen, NailgunTask):
                                       provides=target.provides,
                                       sources=generated_sources,
                                       dependencies=deps)
-    target.add_labels('codegen')
+    tgt.add_labels('codegen')
     for dependee in dependees:
       dependee.update_dependencies([tgt])
     return tgt

@@ -67,8 +67,8 @@ class IvyUtils(object):
     self._mutable_pattern = (getattr(options, 'ivy_mutable_pattern', None) or
                              config.get('ivy-resolve', 'mutable_pattern', default=None))
 
-    self._transitive = config.getbool('ivy-resolve', 'transitive')
-    self._args = config.getlist('ivy-resolve', 'args')
+    self._transitive = config.getbool('ivy-resolve', 'transitive', default=True)
+    self._args = config.getlist('ivy-resolve', 'args', default=[])
     self._jvm_options = config.getlist('ivy-resolve', 'jvm_args', default=[])
     # Disable cache in File.getCanonicalPath(), makes Ivy work with -symlink option properly on ng.
     self._jvm_options.append('-Dsun.io.useCanonCaches=false')

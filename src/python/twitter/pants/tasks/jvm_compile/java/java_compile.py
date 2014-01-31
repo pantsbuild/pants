@@ -84,7 +84,7 @@ class JavaCompile(JvmCompile):
       basedir = os.path.join(self._resources_dir, Target.maybe_readable_identify([target]))
       processor_info_file = os.path.join(basedir, JavaCompile._PROCESSOR_INFO_FILE)
       self._write_processor_info(processor_info_file, target.processors)
-      ret.append((basedir, [processor_info_file]))
+      ret.append((basedir, [JavaCompile._PROCESSOR_INFO_FILE]))
     return ret
 
   def compile(self, args, classpath, sources, classes_output_dir, analysis_file):

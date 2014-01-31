@@ -404,7 +404,6 @@ class JUnitRun(JvmTask):
     classname_or_srcfile = components[0]
     methodname = '#' + components[1] if len(components) == 2 else ''
 
-    classes_by_source = self.context.products.get('classes')
     if os.path.exists(classname_or_srcfile):  # It's a source file.
       srcfile = classname_or_srcfile
       for cls in self.classnames_from_source_file(srcfile):
