@@ -34,7 +34,7 @@ from twitter.pants.base.workunit import WorkUnit
 from twitter.pants.cache import create_artifact_cache
 from twitter.pants.cache.read_write_artifact_cache import ReadWriteArtifactCache
 from twitter.pants.ivy import Bootstrapper
-from twitter.pants.java import Executor, SubprocessExecutor
+from twitter.pants.java import Executor
 from twitter.pants.reporting.reporting_utils import items_to_report_element
 
 from .jvm_tool_bootstrapper import JvmToolBootstrapper
@@ -195,8 +195,7 @@ class Task(object):
     If no exceptions are thrown by work in the block, the build cache is updated for the targets.
     Note: the artifact cache is not updated. That must be done manually.
     """
-    extra_data = []
-    extra_data.append(self.invalidate_for())
+    extra_data = [self.invalidate_for()]
 
     for f in self.invalidate_for_files():
       extra_data.append(hash_file(f))

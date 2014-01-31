@@ -84,12 +84,9 @@ class Bootstrapper(object):
     """
     return cls.instance().ivy(java_executor=java_executor)
 
-  def __init__(self, config=None):
-    """Creates an ivy bootstrapper.
-
-    :param config: the pants repo config to obtain ivy settings values from
-    """
-    self._config = config or Config.load()
+  def __init__(self):
+    """Creates an ivy bootstrapper."""
+    self._config = Config.load()
     self._bootstrap_jar_url = self._config.get('ivy', 'bootstrap_jar_url',
                                                default=self._DEFAULT_URL)
     self._timeout = Amount(self._config.getint('ivy', 'bootstrap_fetch_timeout_secs', default=1),

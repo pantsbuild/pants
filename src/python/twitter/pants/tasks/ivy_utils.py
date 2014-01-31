@@ -69,6 +69,9 @@ class IvyUtils(object):
 
     self._transitive = config.getbool('ivy-resolve', 'transitive')
     self._args = config.getlist('ivy-resolve', 'args')
+    self._jvm_args = config.getlist('ivy-resolve', 'jvm_args', default=[])
+    # Disable cache in File.getCanonicalPath(), makes Ivy work with -symlink option properly on ng.
+    self._jvm_args.append('-Dsun.io.useCanonCaches=false')
     self._work_dir = config.get('ivy-resolve', 'workdir')
     self._template_path = os.path.join('templates', 'ivy_resolve', 'ivy.mustache')
     self._confs = config.getlist('ivy-resolve', 'confs')
@@ -148,7 +151,8 @@ class IvyUtils(object):
   def xml_report_path(self, targets, conf):
     """The path to the xml report ivy creates after a retrieve."""
     org, name = self.identify(targets)
-    return os.path.join(self._cachedir, '%s-%s-%s.xml' % (org, name, conf))
+    cachedir = Bootstrapper.instance().ivy_cache_dir
+    return os.path.join(cachedir, '%s-%s-%s.xml' % (org, name, conf))
 
   def parse_xml_report(self, targets, conf):
     """Returns the IvyInfo representing the info in the xml report, or None if no report exists."""
@@ -305,7 +309,7 @@ class IvyUtils(object):
     """Subclasses can override to determine whether a given path represents a mappable artifact."""
     return path.endswith('.jar') or path.endswith('.war')
 
-  def mapjars(self, genmap, target, java_runner):
+  def mapjars(self, genmap, target, executor):
     """
     Parameters:
       genmap: the jar_dependencies ProductMapping entry for the required products.
@@ -320,7 +324,7 @@ class IvyUtils(object):
       '-confs',
     ]
     ivyargs.extend(target.configurations or self._confs)
-    self.exec_ivy(mapdir, [target], ivyargs, runjava=java_runner)
+    self.exec_ivy(mapdir, [target], ivyargs, ivy=Bootstrapper.default_ivy(executor))
 
     for org in os.listdir(mapdir):
       orgdir = os.path.join(mapdir, org)
@@ -330,16 +334,16 @@ class IvyUtils(object):
           if os.path.isdir(artifactdir):
             for conf in os.listdir(artifactdir):
               confdir = os.path.join(artifactdir, conf)
-              for file in os.listdir(confdir):
-                if self.is_mappable_artifact(file):
+              for f in os.listdir(confdir):
+                if self.is_mappable_artifact(f):
                   # TODO(John Sirois): kill the org and (org, name) exclude mappings in favor of a
                   # conf whitelist
-                  genmap.add(org, confdir).append(file)
-                  genmap.add((org, name), confdir).append(file)
+                  genmap.add(org, confdir).append(f)
+                  genmap.add((org, name), confdir).append(f)
 
-                  genmap.add(target, confdir).append(file)
-                  genmap.add((target, conf), confdir).append(file)
-                  genmap.add((org, name, conf), confdir).append(file)
+                  genmap.add(target, confdir).append(f)
+                  genmap.add((target, conf), confdir).append(f)
+                  genmap.add((org, name, conf), confdir).append(f)
 
   def _mapfor_typename(self):
     """Subclasses can override to identify the product map typename that should trigger jar mapping.
@@ -382,7 +386,7 @@ class IvyUtils(object):
 
     with IvyUtils.ivy_lock:
       self._generate_ivy(targets, jars, excludes, ivyxml)
-      runner = ivy.runner(args=ivy_args)
+      runner = ivy.runner(args=ivy_args, jvm_args=self._jvm_args)
       try:
         result = util.execute_runner(runner,
                                      workunit_factory=workunit_factory,
