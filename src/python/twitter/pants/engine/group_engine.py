@@ -16,13 +16,13 @@
 
 from collections import defaultdict, namedtuple
 
-from twitter.common import log
 from twitter.common.collections import OrderedDict, OrderedSet
 from twitter.pants.base.workunit import WorkUnit
 
 from twitter.pants.goal import Goal
 from twitter.pants.targets.internal import InternalTarget
 from twitter.pants.tasks import TaskError
+from twitter.pants.tasks.check_exclusives import ExclusivesMapping
 
 from .engine import Engine
 
@@ -87,18 +87,39 @@ class GroupIterator(object):
     for chunk_num, target in enumerate(coalesced):
       target_flavor = discriminator(target)
       if target_flavor != flavor and chunk_num > chunk_start:
-        chunks.append((flavor, OrderedSet(coalesced[chunk_start:chunk_num])))
+        chunks.append(OrderedSet(coalesced[chunk_start:chunk_num]))
         chunk_start = chunk_num
       flavor = target_flavor
     if chunk_start < len(coalesced):
-      chunks.append((flavor, OrderedSet(coalesced[chunk_start:])))
+      chunks.append(OrderedSet(coalesced[chunk_start:]))
+    return chunks
 
-    log.debug('::: created chunks(%d)' % len(chunks))
-    for i, (flavor, chunk) in enumerate(chunks):
-      log.debug('  chunk(%d:%s):\n\t%s'
-                % (i, flavor, '\n\t'.join(sorted(map(str, chunk)))))
 
-    return map(lambda (flavor, chunk): chunk, chunks)
+class ExclusivesIterator(object):
+  """Iterates over groups of compatible targets."""
+
+  @classmethod
+  def from_context(cls, context):
+    exclusives = context.products.get_data('exclusives_groups')
+    return cls(exclusives)
+
+  def __init__(self, exclusives_mapping):
+    """Creates an iterator that yields lists of compatible targets.``.
+
+    Chunks will be returned in least exclusive to most exclusive order.
+
+    :param exclusives_mapping: An ``ExclusivesMapping`` that contains the exclusive chunked targets
+      to iterate.
+    """
+    if not isinstance(exclusives_mapping, ExclusivesMapping):
+      raise ValueError('An ExclusivesMapping is required, given %s of type %s'
+                       % (exclusives_mapping, type(exclusives_mapping)))
+    self._exclusives_mapping = exclusives_mapping
+
+  def __iter__(self):
+    sorted_excl_group_keys = self._exclusives_mapping.get_ordered_group_keys()
+    for excl_group_key in sorted_excl_group_keys:
+      yield self._exclusives_mapping.get_targets_for_group_key(excl_group_key)
 
 
 class GroupEngine(Engine):
@@ -150,7 +171,6 @@ class GroupEngine(Engine):
         else:
           run_queue.append((None, [goal]))
 
-
       with self._context.new_workunit(name=self._phase.name, labels=[WorkUnit.PHASE]):
         # OrderedSet takes care of not repeating chunked task execution mentions
         execution_phases = defaultdict(OrderedSet)
@@ -164,9 +184,30 @@ class GroupEngine(Engine):
           else:
             with self._context.new_workunit(name=group_name, labels=[WorkUnit.GROUP]):
               goals_by_group_member = OrderedDict((GroupMember.from_goal(g), g) for g in goals)
-              chunks = GroupIterator(self._context.targets(lambda t: t.is_concrete),
-                                     goals_by_group_member.keys())
-              for group_member, goal_chunk in chunks:
+
+              # First, divide the set of all targets to be built into compatible chunks, based
+              # on their declared exclusives. Then, for each chunk of compatible exclusives, do
+              # further sub-chunking. At the end, we'll have a list of chunks to be built,
+              # which will go through the chunks of each exclusives-compatible group separately.
+
+              # TODO(markcc); chunks with incompatible exclusives require separate ivy resolves.
+              # Either interleave the ivy task in this group so that it runs once for each batch of
+              # chunks with compatible exclusives, or make the compilation tasks do their own ivy
+              # resolves for each batch of targets they're asked to compile.
+
+              goal_chunks = []
+              exclusive_chunks = ExclusivesIterator.from_context(self._context)
+              for exclusive_chunk in exclusive_chunks:
+                group_chunks = GroupIterator(filter(lambda t: t.is_concrete, exclusive_chunk),
+                                             goals_by_group_member.keys())
+                goal_chunks.extend(group_chunks)
+
+              self._context.log.debug('::: created chunks(%d)' % len(goal_chunks))
+              for i, (group_member, goal_chunk) in enumerate(goal_chunks):
+                self._context.log.debug('  chunk(%d) [flavor=%s]:\n\t%s' % (
+                    i, group_member.name, '\n\t'.join(sorted(map(str, goal_chunk)))))
+
+              for group_member, goal_chunk in goal_chunks:
                 goal = goals_by_group_member[group_member]
                 execution_phases[self._phase].add((group_name, goal.name))
                 with self._context.new_workunit(name=goal.name, labels=[WorkUnit.GOAL]):
