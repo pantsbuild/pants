@@ -1,14 +1,12 @@
-
-import unittest
-
 from twitter.pants.base import Config
 from twitter.pants.goal import Context
 from twitter.pants.testutils import MockTarget
 from twitter.pants.tasks import TaskError
 from twitter.pants.tasks.check_exclusives import CheckExclusives
+from twitter.pants.testutils.base_mock_target_test import BaseMockTargetTest
 
 
-class CheckExclusivesTest(unittest.TestCase):
+class CheckExclusivesTest(BaseMockTargetTest):
   """Test of the CheckExclusives task."""
 
   @classmethod

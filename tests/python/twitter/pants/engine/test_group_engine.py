@@ -19,7 +19,6 @@ import unittest
 
 from textwrap import dedent
 
-from twitter.pants import is_java, is_scala
 from twitter.pants.engine import GroupEngine
 from twitter.pants.engine.group_engine import GroupIterator, GroupMember
 from twitter.pants.goal import Goal, Group
@@ -194,11 +193,11 @@ class GroupEngineTest(EngineTestBase, JvmTargetTest):
   def test_groups(self):
     self.install_goal('resolve')
     self.install_goal('javac',
-                      group=Group('jvm', is_java),
+                      group=Group('jvm', lambda t: t.is_java),
                       dependencies=['resolve'],
                       phase='compile')
     self.install_goal('scalac',
-                      group=Group('jvm', is_scala),
+                      group=Group('jvm', lambda t: t.is_scala),
                       dependencies=['resolve'],
                       phase='compile')
     self.install_goal('checkstyle', phase='compile')

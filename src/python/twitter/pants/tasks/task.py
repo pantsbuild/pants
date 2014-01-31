@@ -59,14 +59,18 @@ class Task(object):
   def __init__(self, context):
     self.context = context
     self.dry_run = self.can_dry_run() and context.options.dry_run
-    self._cache_key_generator = CacheKeyGenerator(context.config.getdefault('cache_key_gen_version',
-                                                                            default=None))
+    self._cache_key_generator = CacheKeyGenerator(
+        context.config.getdefault('cache_key_gen_version', default=None))
     self._read_artifact_cache_spec = None
     self._write_artifact_cache_spec = None
     self._artifact_cache = None
     self._artifact_cache_setup_lock = threading.Lock()
-    self._build_invalidator_dir = os.path.join(context.config.get('tasks', 'build_invalidator'),
-                                               self.product_type())
+
+    default_invalidator_root = os.path.join(self.context.config.getdefault('pants_workdir'),
+                                            'build_invalidator')
+    self._build_invalidator_dir = os.path.join(
+        context.config.get('tasks', 'build_invalidator', default=default_invalidator_root),
+        self.product_type())
     self._jvm_tool_bootstrapper = JvmToolBootstrapper(self.context.products)
 
   def register_jvm_tool(self, key, target_addrs):

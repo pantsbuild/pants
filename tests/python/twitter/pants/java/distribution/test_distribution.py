@@ -44,7 +44,7 @@ class MockDistributionTest(unittest.TestCase):
           echo "Expected 3 arguments, got $#: $@" >&2
           exit 1
         fi
-        echo "%s"
+        echo "java.version=%s"
       ''' % version).strip()
     return cls.EXE(name, contents=contents)
 

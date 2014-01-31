@@ -8,6 +8,7 @@ import urllib
 from urlparse import urlparse
 
 from contextlib import contextmanager
+from twitter.pants import Config
 from twitter.pants.base.worker_pool import WorkerPool
 
 from twitter.pants.goal.artifact_cache_stats import ArtifactCacheStats
@@ -42,7 +43,24 @@ class RunTracker(object):
   # The name of the tracking root for the background worker threads.
   BACKGROUND_ROOT_NAME = 'background'
 
-  def __init__(self, config):
+  @classmethod
+  def from_config(cls, config):
+    if not isinstance(config, Config):
+      raise ValueError('Expected a Config object, given %s of type %s' % (config, type(config)))
+    info_dir = config.getdefault('info_dir')
+    stats_upload_url = config.getdefault('stats_upload_url', default=None)
+    num_foreground_workers = config.getdefault('num_foreground_workers', default=8)
+    num_background_workers = config.getdefault('num_background_workers', default=8)
+    return cls(info_dir,
+               stats_upload_url=stats_upload_url,
+               num_foreground_workers=num_foreground_workers,
+               num_background_workers=num_background_workers)
+
+  def __init__(self,
+               info_dir,
+               stats_upload_url=None,
+               num_foreground_workers=8,
+               num_background_workers=8):
     self.run_timestamp = time.time()  # A double, so we get subsecond precision for ids.
     cmd_line = ' '.join(['./pants'] + sys.argv[1:])
 
@@ -51,11 +69,11 @@ class RunTracker(object):
     run_id = 'pants_run_%s_%d' % \
              (time.strftime('%Y_%m_%d_%H_%M_%S', time.localtime(self.run_timestamp)), millis)
 
-    self.info_dir = os.path.join(config.getdefault('info_dir'), run_id)
+    self.info_dir = os.path.join(info_dir, run_id)
     self.run_info = RunInfo(os.path.join(self.info_dir, 'info'))
     self.run_info.add_basic_info(run_id, self.run_timestamp)
     self.run_info.add_info('cmd_line', cmd_line)
-    self.stats_url = config.getdefault('stats_upload_url', default=None)
+    self.stats_url = stats_upload_url
 
     # Create a 'latest' symlink, after we add_infos, so we're guaranteed that the file exists.
     link_to_latest = os.path.join(os.path.dirname(self.info_dir), 'latest')
@@ -74,10 +92,10 @@ class RunTracker(object):
       ArtifactCacheStats(os.path.join(self.info_dir, 'artifact_cache_stats'))
 
     # Number of threads for foreground work.
-    self._num_foreground_workers = config.getdefault('num_foreground_workers', default=8)
+    self._num_foreground_workers = num_foreground_workers
 
     # Number of threads for background work.
-    self._num_background_workers = config.getdefault('num_background_workers', default=8)
+    self._num_background_workers = num_background_workers
 
     # We report to this Report.
     self.report = None

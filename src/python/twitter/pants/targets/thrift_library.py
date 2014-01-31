@@ -54,7 +54,7 @@ class ThriftLibrary(InternalTarget, TargetWithSources, Jarable):
                                        raise_type=partial(TargetDefinitionException, self)))
 
     self._provides = provides
-    self.is_codegen = True
+    self.add_labels('codegen')
 
   @property
   def provides(self):

@@ -14,15 +14,14 @@
 # limitations under the License.
 # ==================================================================================================
 
-import unittest
-
 from twitter.pants.base import ParseContext
 from twitter.pants.base.target import Target, TargetDefinitionException
 from twitter.pants.targets import InternalTarget
 from twitter.pants.testutils import MockTarget
+from twitter.pants.testutils.base_mock_target_test import BaseMockTargetTest
 
 
-class InternalTargetTest(unittest.TestCase):
+class InternalTargetTest(BaseMockTargetTest):
 
   def test_validation(self):
     with ParseContext.temp('InternalTargetTest/test_validation'):

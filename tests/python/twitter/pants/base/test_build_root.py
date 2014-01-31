@@ -13,25 +13,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==================================================================================================
+
 import os
 
 import unittest
 
 from twitter.common.contextutil import environment_as, pushd, temporary_dir
-from twitter.common.dirutil import safe_mkdir, touch
+from twitter.common.dirutil import safe_mkdir, safe_mkdtemp, safe_rmtree, touch
 
-from twitter.pants.build_root import BuildRoot
+from twitter.pants.base.build_environment import BuildRoot
 
 
 class BuildRootTest(unittest.TestCase):
 
   def setUp(self):
     self.original_root = BuildRoot().path
-    self.new_root = BuildRoot().path + 'not_original'
+    self.new_root = safe_mkdtemp()
     BuildRoot().reset()
 
   def tearDown(self):
     BuildRoot().reset()
+    safe_rmtree(self.new_root)
 
   def test_via_env(self):
     with environment_as(PANTS_BUILD_ROOT=self.new_root):

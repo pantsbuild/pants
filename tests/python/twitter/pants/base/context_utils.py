@@ -17,11 +17,13 @@
 import io
 
 from twitter.common.collections import maybe_list
+from twitter.common.dirutil import safe_mkdtemp
 from twitter.common.lang import Compatibility
 
-from twitter.pants.base import Config
-from twitter.pants.goal import Context
-from twitter.pants.targets import Target
+from twitter.pants.base.config import Config
+from twitter.pants.base.target import Target
+from twitter.pants.goal import Context, RunTracker
+from twitter.pants.reporting.report import Report
 
 
 def create_options(options_hash=None):
@@ -64,5 +66,13 @@ def create_context(config='', options=None, target_roots=None, **kwargs):
   :param ``**kwargs``: Any additional keyword arguments to pass through to the Context constructor.
   """
   config = config if isinstance(config, Config) else create_config(config)
+
+  # TODO(John Sirois): Rework uses around a context manager for cleanup of the info_dir in a more
+  # disciplined manner
+  info_dir = safe_mkdtemp()
+  run_tracker = RunTracker(info_dir)
+  report = Report()
+  run_tracker.start(report)
+
   target_roots = maybe_list(target_roots, Target) if target_roots else []
-  return Context(config, create_options(options or {}), target_roots, **kwargs)
+  return Context(config, create_options(options or {}), run_tracker, target_roots, **kwargs)

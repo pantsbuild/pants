@@ -15,7 +15,7 @@
 # ==================================================================================================
 
 python_library(name='base-test',
-  sources=['build_root_test.py'],
+  sources=['base_build_root_test.py'],
   dependencies=[
     pants('src/python/twitter/pants:pants-lib'),
     pants('src/python/twitter/pants:pants-deps'),

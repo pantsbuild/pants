@@ -150,7 +150,7 @@ def _run():
   roots = config.getlist('parse', 'roots', default=[])
   sys.path.extend(roots)
 
-  run_tracker = RunTracker(config)
+  run_tracker = RunTracker.from_config(config)
   report = initial_reporting(config, run_tracker)
   run_tracker.start(report)
 
