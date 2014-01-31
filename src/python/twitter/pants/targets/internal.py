@@ -157,7 +157,7 @@ class InternalTarget(Target):
     """
     Target.__init__(self, name, exclusives=exclusives)
     self._injected_deps = []
-    self.processed_dependencies = resolve(dependencies)
+    self._processed_dependencies = resolve(dependencies)
 
     self.add_labels('internal')
     self.dependency_addresses = OrderedSet()
@@ -166,20 +166,10 @@ class InternalTarget(Target):
     self._internal_dependencies = OrderedSet()
     self._jar_dependencies = OrderedSet()
 
-    self._deps = self.processed_dependencies
     if dependencies:
-      maybe_list(self.processed_dependencies,
+      maybe_list(self._processed_dependencies,
                  expected_type=(ExternalDependency, AnonymousDeps, Target),
                  raise_type=partial(TargetDefinitionException, self))
-
-    # TODO(John Sirois): XXX reconcile _post_constructs below with @property style delayed
-    # resolution,
-
-    # Defer dependency resolution after parsing the current BUILD file to allow for forward
-    # references
-    self._post_construct(self.update_dependencies, self.processed_dependencies)
-
-    self._post_construct(self.inject_dependencies)
 
   def add_injected_dependency(self, spec):
     self._injected_deps.append(spec)
@@ -203,9 +193,12 @@ class InternalTarget(Target):
     return self._jar_dependencies
 
   def _maybe_apply_deps(self):
-    if self._deps is not None:
-      self.update_dependencies(self._deps)
-      self._deps = None
+    if self._processed_dependencies is not None:
+      self.update_dependencies(self._processed_dependencies)
+      self._processed_dependencies = None
+    if self._injected_deps:
+      self.update_dependencies(resolve(self._injected_deps))
+      self._injected_deps = []
 
   def update_dependencies(self, dependencies):
     if dependencies:
