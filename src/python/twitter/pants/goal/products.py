@@ -48,15 +48,6 @@ class Products(object):
       """
       return self.by_target[target]
 
-    def __getitem__(self, target):
-      """
-        Support for subscripting into this mapping. Returns the product mapping for the given target
-        as a map of <basedir> -> <products list>.
-        If no mapping exists, returns an empty map whose values default to empty lists. So you
-        can use the result without checking for None.
-      """
-      return self.by_target[target]
-
     def itermappings(self):
       """
         Returns an iterable over all pairs (target, product) in this mapping.
