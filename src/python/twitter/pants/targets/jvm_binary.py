@@ -217,6 +217,9 @@ class JvmApp(InternalTarget):
     self._resolved_binary = None
     self._resolved_bundles = []
 
+  def is_jvm_app(self):
+    return True
+
   @property
   def binary(self):
     self._maybe_resolve_binary()
