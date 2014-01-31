@@ -38,7 +38,7 @@ class InternalTargetTest(BaseMockTargetTest):
 
     # no cycles yet
     InternalTarget.sort_targets([a])
-    a.internal_dependencies = [a]
+    a.update_dependencies([a])
     try:
       InternalTarget.sort_targets([a])
       self.fail("Expected a cycle to be detected")
@@ -54,7 +54,7 @@ class InternalTargetTest(BaseMockTargetTest):
     # no cycles yet
     InternalTarget.sort_targets([a])
 
-    c.internal_dependencies = [a]
+    c.update_dependencies([a])
     try:
       InternalTarget.sort_targets([a])
       self.fail("Expected a cycle to be detected")

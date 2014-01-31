@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==================================================================================================
+from twitter.common.collections import maybe_list
 
 from twitter.common.lang import Compatibility
 
@@ -45,17 +46,16 @@ class Artifact(object):
 
     if repo is None:
       raise ValueError("repo must be supplied")
-    repos = list(resolve(repo).resolve())
+    repos = []
+    for tgt in maybe_list(resolve(repo), expected_type=(Pants, Repository)):
+      repos.append(tgt.resolve())
     if len(repos) != 1:
-      raise Exception("An artifact must have exactly 1 repo, given: %s" % repos)
+      raise ValueError("An artifact must have exactly 1 repo, given: %s" % repos)
     repo = repos[0]
-    if not isinstance(repo, (Pants, Repository)):
-      raise ValueError("repo must be %s or %s but was %s" % (
-        Repository.__name__, Pants.__name__, repo))
 
     if description is not None and not isinstance(description, Compatibility.string):
-      raise ValueError(
-        "description must be None or %s but was %s" % (Compatibility.string, description))
+      raise ValueError("description must be None or %s but was %s"
+                       % (Compatibility.string, description))
 
     self.org = org
     self.name = name
