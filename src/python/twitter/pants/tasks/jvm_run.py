@@ -18,8 +18,8 @@ import shlex
 
 from twitter.pants.base.workunit import WorkUnit
 from twitter.pants.targets import JvmBinary
+from twitter.pants.java.util import execute_java
 
-from .java.util import execute_java
 from .jvm_task import JvmTask
 
 from . import Task, TaskError

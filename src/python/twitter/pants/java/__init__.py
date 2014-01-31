@@ -18,6 +18,7 @@ from .distribution import Distribution
 from .executor import Executor, SubprocessExecutor
 from .nailgun_client import NailgunClient
 from .nailgun_executor import NailgunExecutor
+from . import util
 
 
 __all__ = (
@@ -26,4 +27,5 @@ __all__ = (
     'NailgunClient',
     'NailgunExecutor',
     'SubprocessExecutor',
+    'util'
 )

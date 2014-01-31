@@ -18,8 +18,7 @@ from twitter.common.collections import OrderedSet
 
 from twitter.pants.base.workunit import WorkUnit
 from twitter.pants.binary_util import safe_args
-
-from .java.util import execute_java
+from twitter.pants.java.util import execute_java
 from .jvm_task import JvmTask
 
 from . import TaskError

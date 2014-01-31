@@ -350,7 +350,8 @@ class Task(object):
     if executor and not isinstance(executor, Executor):
       raise ValueError('The executor must be an Executor instance, given %s of type %s'
                        % (executor, type(executor)))
-    ivy = Bootstrapper.default_ivy(java_executor=executor)
+    ivy = Bootstrapper.default_ivy(java_executor=executor,
+                                   bootstrap_workunit_factory=self.context.new_workunit)
 
     targets = set(targets)
 

@@ -17,7 +17,7 @@
 import os
 import shutil
 
-from .java.util import execute_java
+from twitter.pants.java.util import execute_java
 from .jvm_task import JvmTask
 from . import TaskError
 

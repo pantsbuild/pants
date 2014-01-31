@@ -31,10 +31,10 @@ from twitter.pants.base.generator import Generator, TemplateData
 from twitter.pants.base.revision import Revision
 from twitter.pants.base.target import Target
 from twitter.pants.ivy import Bootstrapper, Ivy
+from twitter.pants.java import util
 
 from . import TaskError
 
-from .java import util
 
 IvyModuleRef = namedtuple('IvyModuleRef', ['org', 'name', 'rev', 'conf'])
 IvyArtifact = namedtuple('IvyArtifact', ['path'])

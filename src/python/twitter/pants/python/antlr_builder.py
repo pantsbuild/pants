@@ -43,7 +43,7 @@ class PythonAntlrBuilder(CodeGenerator):
 
     try:
       ivy = Bootstrapper.default_ivy()
-      ivy.execute(args)
+      ivy.execute(args=args)  # TODO: Needs a workunit, when we have a context here.
       return True
     except (Bootstrapper.Error, Ivy.Error) as e:
       print('ANTLR generation failed! %s' % e, file=sys.stderr)

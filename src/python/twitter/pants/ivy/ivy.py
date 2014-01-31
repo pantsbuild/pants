@@ -18,6 +18,7 @@ import hashlib
 import os
 import shutil
 
+from twitter.common import log
 from twitter.common.collections import maybe_list
 from twitter.common.contextutil import temporary_file
 from twitter.common.dirutil import safe_delete, touch
@@ -25,7 +26,7 @@ from twitter.common.lang import Compatibility
 from twitter.common.quantity import Amount, Time
 
 from twitter.pants.base.config import Config
-from twitter.pants.java import Executor, SubprocessExecutor
+from twitter.pants.java import Executor, SubprocessExecutor, util
 from twitter.pants.net.http.fetcher import Fetcher
 
 
@@ -73,16 +74,18 @@ class Bootstrapper(object):
     return cls._INSTANCE
 
   @classmethod
-  def default_ivy(cls, java_executor=None):
+  def default_ivy(cls, java_executor=None, bootstrap_workunit_factory=None):
     """Returns an Ivy instance using the default global bootstrapper.
 
     By default runs ivy via a subprocess java executor.
 
     :param java_executor: the optional java executor to use
+    :param bootstrap_workunit_factory: the optional workunit to bootstrap under.
     :returns: an Ivy instance.
     :raises: Bootstrapper.Error if the default ivy instance could not be bootstrapped
     """
-    return cls.instance().ivy(java_executor=java_executor)
+    return cls.instance().ivy(java_executor=java_executor,
+                              bootstrap_workunit_factory=bootstrap_workunit_factory)
 
   def __init__(self):
     """Creates an ivy bootstrapper."""
@@ -94,28 +97,29 @@ class Bootstrapper(object):
     self._version_or_ivyxml = self._config.get('ivy', 'ivy_profile', default=self._DEFAULT_VERSION)
     self._classpath = None
 
-  def ivy(self, java_executor=None):
+  def ivy(self, java_executor=None, bootstrap_workunit_factory=None):
     """Returns an ivy instance bootstrapped by this bootstrapper.
 
+    :param java_executor: the optional java executor to use
+    :param bootstrap_workunit_factory: the optional workunit to bootstrap under.
     :raises: Bootstrapper.Error if ivy could not be bootstrapped
     """
-    return Ivy(self.classpath,
+    return Ivy(self._get_classpath(java_executor, bootstrap_workunit_factory),
                java_executor=java_executor,
-               ivy_settings=self.ivy_settings,
+               ivy_settings=self._ivy_settings,
                ivy_cache_dir=self.ivy_cache_dir)
 
-  @property
-  def classpath(self):
+  def _get_classpath(self, executor, workunit_factory):
     """Returns the bootstrapped ivy classpath as a list of jar paths.
 
     :raises: Bootstrapper.Error if the classpath could not be bootstrapped
     """
     if not self._classpath:
-      self._classpath = self._bootstrap_ivy_classpath()
+      self._classpath = self._bootstrap_ivy_classpath(executor, workunit_factory)
     return self._classpath
 
   @property
-  def ivy_settings(self):
+  def _ivy_settings(self):
     """Returns the bootstrapped ivysettings.xml path.
 
     By default the ivy.ivy_settings value found in pants.ini but can be overridden by via the
@@ -135,7 +139,7 @@ class Bootstrapper(object):
     return (os.getenv('PANTS_IVY_CACHE_DIR')
             or self._config.get('ivy', 'cache_dir', default=os.path.expanduser('~/.ivy2/cache')))
 
-  def _bootstrap_ivy_classpath(self, retry=True):
+  def _bootstrap_ivy_classpath(self, executor, workunit_factory, retry=True):
     # TODO(John Sirois): Extract a ToolCache class to control the path structure:
     # https://jira.twitter.biz/browse/DPB-283
     ivy_cache = os.path.join(self._config.getdefault('pants_cachedir'), 'tools', 'jvm', 'ivy')
@@ -157,7 +161,8 @@ class Bootstrapper(object):
         args.extend(['-dependency', 'org.apache.ivy', 'ivy', self._version_or_ivyxml])
 
       try:
-        ivy.execute(args)
+        ivy.execute(args=args, executor=executor,
+                    workunit_factory=workunit_factory, workunit_name='ivy-bootstrap')
       except ivy.Error as e:
         safe_delete(classpath)
         raise self.Error('Failed to bootstrap an ivy classpath! %s' % e)
@@ -167,7 +172,7 @@ class Bootstrapper(object):
       if not all(map(os.path.exists, cp)):
         safe_delete(classpath)
         if retry:
-          return self._bootstrap_ivy_classpath(retry=False)
+          return self._bootstrap_ivy_classpath(executor, workunit_factory, retry=False)
         raise self.Error('Ivy bootstrapping failed - invalid classpath: %s' % ':'.join(cp))
       return cp
 
@@ -177,12 +182,14 @@ class Bootstrapper(object):
         fetcher = Fetcher()
         checksummer = fetcher.ChecksumListener(digest=hashlib.sha1())
         try:
-          print('Downloading %s' % self._bootstrap_jar_url)
+          log.info('\nDownloading %s' % self._bootstrap_jar_url)
+          # TODO: Capture the stdout of the fetcher, instead of letting it output
+          # to the console directly.
           fetcher.download(self._bootstrap_jar_url,
                            listener=fetcher.ProgressListener().wrap(checksummer),
                            path_or_fd=bootstrap_jar,
                            timeout=self._timeout)
-          print('sha1: %s' % checksummer.checksum)
+          log.info('sha1: %s' % checksummer.checksum)
           bootstrap_jar.close()
           touch(bootstrap_jar_cache_path)
           shutil.move(bootstrap_jar.name, bootstrap_jar_cache_path)
@@ -190,7 +197,7 @@ class Bootstrapper(object):
           raise self.Error('Problem fetching the ivy bootstrap jar! %s' % e)
 
     return Ivy(bootstrap_jar_cache_path,
-               ivy_settings=self.ivy_settings,
+               ivy_settings=self._ivy_settings,
                ivy_cache_dir=self.ivy_cache_dir)
 
 
@@ -232,14 +239,15 @@ class Ivy(object):
     """Returns the ivy cache dir used by this `Ivy` instance."""
     return self._ivy_cache_dir
 
-  def execute(self, jvm_options=None, args=None, stdout=None, stderr=None, executor=None):
+  def execute(self, jvm_options=None, args=None, executor=None,
+              workunit_factory=None, workunit_name=None, workunit_labels=None):
     """Executes the ivy commandline client with the given args.
 
     Raises Ivy.Error if the command fails for any reason.
     """
     runner = self.runner(jvm_options=jvm_options, args=args, executor=executor)
     try:
-      result = runner.run(stdout=stdout, stderr=stderr)
+      result = util.execute_runner(runner, workunit_factory, workunit_name, workunit_labels)
       if result != 0:
         raise self.Error('Ivy command failed with exit code %d%s'
                          % (result, ': ' + ' '.join(args) if args else ''))
@@ -248,6 +256,7 @@ class Ivy(object):
 
   def runner(self, jvm_options=None, args=None, executor=None):
     """Creates an ivy commandline client runner for the given args."""
+    args = args or []
     executor = executor or self._java
     if not isinstance(executor, Executor):
       raise ValueError('The executor argument must be an Executor instance, given %s of type %s'
@@ -263,5 +272,5 @@ class Ivy(object):
     if self._ivy_settings and '-settings' not in args:
       args = ['-settings', self._ivy_settings] + args
 
-    return executor.runner(self._classpath, 'org.apache.ivy.Main',
+    return executor.runner(classpath=self._classpath, main='org.apache.ivy.Main',
                            jvm_options=jvm_options, args=args)

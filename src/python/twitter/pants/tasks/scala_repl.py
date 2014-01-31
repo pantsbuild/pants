@@ -18,8 +18,7 @@ import shlex
 import subprocess
 
 from twitter.pants.base.workunit import WorkUnit
-
-from .java.util import execute_java
+from twitter.pants.java.util import execute_java
 from .jvm_task import JvmTask
 
 from . import Task

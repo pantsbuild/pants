@@ -670,7 +670,8 @@ class JarPublish(ScmPublish, Task):
 
             try:
               ivy = Bootstrapper.default_ivy()
-              ivy.execute(args, jvm_args=jvm_args)
+              ivy.execute(jvm_options=jvm_args, args=args,
+                          workunit_factory=self.context.new_workunit, workunit_name = 'jar-publish')
             except (Bootstrapper.Error, Ivy.Error) as e:
               raise TaskError('Failed to push %s! %s' % (jar_coordinate(jar, newver.version()), e))
 
