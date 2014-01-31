@@ -67,8 +67,9 @@ class ScalaRepl(JvmTask):
                    main=self.main,
                    jvm_options=self.jvm_args,
                    args=self.args,
-                   workunit_labels=[WorkUnit.REPL, WorkUnit.JVM],
-                   workunit_name='repl')
+                   workunit_factory=self.context.new_workunit,
+                   workunit_name='repl',
+                   workunit_labels=[WorkUnit.REPL, WorkUnit.JVM])
     except KeyboardInterrupt:
       # TODO(John Sirois): Confirm with Steve Gury that finally does not work on mac and an
       # explicit catch of KeyboardInterrupt is required.

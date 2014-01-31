@@ -22,7 +22,7 @@ from twitter.pants.binary_util import safe_args
 from .java.util import execute_java
 from .jvm_task import JvmTask
 
-from . import Task, TaskError
+from . import TaskError
 
 
 class SpecsRun(JvmTask):
@@ -59,11 +59,11 @@ class SpecsRun(JvmTask):
 
     self.confs = context.config.getlist('specs-run', 'confs')
 
-    self.jvm_args = context.config.getlist('specs-run', 'jvm_args', default=[])
-    if context.options.specs_run_jvmargs:
-      self.jvm_args.extend(context.options.specs_run_jvmargs)
+    self._jvm_options = context.config.getlist('specs-run', 'jvm_args', default=[])
+    if context.options.specs_run_jvm_options:
+      self._jvm_options.extend(context.options.specs_run_jvm_options)
     if context.options.specs_run_debug:
-      self.jvm_args.extend(context.config.getlist('jvm', 'debug_args'))
+      self._jvm_options.extend(context.config.getlist('jvm', 'debug_args'))
 
     self.skip = context.options.specs_run_skip
     self.color = context.options.specs_run_color
@@ -84,10 +84,11 @@ class SpecsRun(JvmTask):
         result = execute_java(
           classpath=self.classpath(bootstrapped_cp, confs=self.confs),
           main=specs_runner_main,
-          jvm_options=self.jvm_args,
+          jvm_options=self._jvm_options,
           args=args,
-          workunit_labels=[WorkUnit.TEST],
-          workunit_name='specs'
+          workunit_factory=self.context.new_workunit,
+          workunit_name='specs',
+          workunit_labels=[WorkUnit.TEST]
         )
         if result != 0:
           raise TaskError('java %s ... exited non-zero (%i)' % (specs_runner_main, result))

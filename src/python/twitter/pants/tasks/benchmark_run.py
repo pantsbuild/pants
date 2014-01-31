@@ -98,6 +98,7 @@ class BenchmarkRun(JvmTask):
                              main=caliper_main,
                              jvm_options=self.jvm_args,
                              args=self.caliper_args,
+                             workunit_factory=self.context.new_workunit,
                              workunit_name='caliper')
     if exit_code != 0:
       raise TaskError('java %s ... exited non-zero (%i)' % (caliper_main, exit_code))

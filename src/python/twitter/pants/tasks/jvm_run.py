@@ -83,8 +83,9 @@ class JvmRun(JvmTask):
         main=main,
         jvm_options=self.jvm_args,
         args=self.args,
-        workunit_labels=[WorkUnit.RUN],
-        workunit_name='run'
+        workunit_factory=self.context.new_workunit,
+        workunit_name='run',
+        workunit_labels=[WorkUnit.RUN]
       )
       if result != 0:
         raise TaskError('java %s ... exited non-zero (%i)' % (main, result), exit_code=result)

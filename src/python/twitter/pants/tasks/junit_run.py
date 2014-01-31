@@ -251,8 +251,9 @@ class JUnitRun(JvmTask):
                 main=main,
                 jvm_options=(jvm_args or []) + self.jvm_args,
                 args=self.opts + batch_tests,
-                workunit_labels=[WorkUnit.TEST],
-                workunit_name='run'
+                workunit_factory=self.context.new_workunit,
+                workunit_name='run',
+                workunit_labels=[WorkUnit.TEST]
               ))
               if result != 0 and self.fail_fast:
                 break
@@ -275,8 +276,9 @@ class JUnitRun(JvmTask):
               for pattern in patterns:
                 args.extend(['-filter', pattern])
               main = 'emma'
-              result = execute_java(classpath=emma_classpath, main=main,
-                                    args=args, workunit_name='emma')
+              result = execute_java(classpath=emma_classpath, main=main, args=args,
+                                    workunit_factory=self.context.new_workunit,
+                                    workunit_name='emma-instrument')
               if result != 0:
                 raise TaskError("java %s ... exited non-zero (%i)"
                                 " 'failed to instrument'" % (main, result))
@@ -309,8 +311,9 @@ class JUnitRun(JvmTask):
                            '-Dreport.out.encoding=UTF-8'] + sorting)
 
             main = 'emma'
-            result = execute_java(classpath=emma_classpath, main=main,
-                                  args=args, workunit_name='emma')
+            result = execute_java(classpath=emma_classpath, main=main, args=args,
+                                  workunit_factory=self.context.new_workunit,
+                                  workunit_name='emma-report')
             if result != 0:
               raise TaskError("java %s ... exited non-zero (%i)"
                               " 'failed to generate code coverage reports'" % (main, result))
