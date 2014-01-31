@@ -41,7 +41,7 @@ class ListRootsTest(ConsoleTaskTest):
   def test_no_source_root(self):
     with register_sourceroot() as sourceroot:
       sourceroot(os.path.join(get_buildroot(), "fakeroot"))
-      self.assert_console_output()
+      self.assert_console_output('fakeroot: *')
 
   def test_single_source_root(self):
     with register_sourceroot() as sourceroot:
