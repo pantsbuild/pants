@@ -20,10 +20,11 @@ from twitter.common.collections import maybe_list
 
 from .exclude import Exclude
 from .internal import InternalTarget
+from .jarable import Jarable
 from .with_sources import TargetWithSources
 
 
-class JvmTarget(InternalTarget, TargetWithSources):
+class JvmTarget(InternalTarget, TargetWithSources, Jarable):
   """A base class for all java module targets that provides path and dependency translation."""
 
   def __init__(self,

@@ -48,7 +48,7 @@ class Artifact(object):
       raise ValueError("repo must be supplied")
     repos = []
     for tgt in maybe_list(resolve(repo), expected_type=(Pants, Repository)):
-      repos.append(tgt.resolve())
+      repos.extend(tgt.resolve())
     if len(repos) != 1:
       raise ValueError("An artifact must have exactly 1 repo, given: %s" % repos)
     repo = repos[0]

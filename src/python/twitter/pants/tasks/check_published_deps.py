@@ -50,6 +50,7 @@ class CheckPublishedDeps(ConsoleTask):
 
   def console_output(self, targets):
     push_dbs = {}
+
     def get_jar_with_version(target):
       db = target.provides.repo.push_db
       if db not in push_dbs:
