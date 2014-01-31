@@ -34,6 +34,7 @@ from twitter.common import log
 from twitter.common.collections import OrderedSet
 from twitter.common.dirutil import safe_rmtree
 from twitter.common.lang import Compatibility
+from twitter.pants import binary_util
 from twitter.pants.base.build_environment import get_buildroot
 from twitter.pants.goal import Goal as goal, Group as group
 from twitter.pants.base import (
@@ -739,9 +740,13 @@ goal(name='check-exclusives',
 # TODO(John Sirois): gen attempted as the sole Goal should gen for all known gen types but
 # recognize flags to narrow the gen set
 goal(name='thrift', action=ThriftGen).install('gen').with_description('Generate code.')
-goal(name='scrooge', action=ScroogeGen).install('gen')
+goal(name='scrooge',
+     dependencies=['bootstrap'],
+     action=ScroogeGen).install('gen')
 goal(name='protoc', action=ProtobufGen).install('gen')
-goal(name='antlr', action=AntlrGen).install('gen')
+goal(name='antlr',
+     dependencies=['bootstrap'],
+     action=AntlrGen).install('gen')
 
 goal(
   name='checkstyle',
