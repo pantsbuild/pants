@@ -120,7 +120,7 @@ class ScroogeGen(NailgunTask):
     self.compiler_for_name = dict((name, Compiler.fromConfig(context, config))
                                   for name, config in _CONFIG_FOR_COMPILER.items())
 
-    for name, compiler in self.compiler_for_name:
+    for name, compiler in self.compiler_for_name.items():
       bootstrap_tools = context.config.getlist(compiler.config_section, 'bootstrap-tools',
                                                default=[':%s' % compiler.profile])
       self._jvm_tool_bootstrapper.register_jvm_tool(compiler.name, bootstrap_tools)
@@ -137,7 +137,7 @@ class ScroogeGen(NailgunTask):
     return path
 
   def execute(self, targets):
-    gentargets_by_dependee = self.context.dependants(
+    gentargets_by_dependee = self.context.dependents(
       on_predicate=self.is_gentarget,
       from_predicate=lambda t: not self.is_gentarget(t))
 
@@ -215,10 +215,10 @@ class ScroogeGen(NailgunTask):
         args.extend(changed_srcs)
 
         classpath = self._jvm_tool_bootstrapper.get_jvm_tool_classpath(compiler.name)
-        returncode = self.runjava(classpath,
-                                  compiler.main,
+        returncode = self.runjava(classpath=classpath,
+                                  main=compiler.main,
+                                  jvm_options=compiler.jvm_args,
                                   args=args,
-                                  jvm_args=compiler.jvm_args,
                                   workunit_name=compiler.name)
         try:
           if 0 == returncode:

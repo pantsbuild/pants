@@ -94,10 +94,10 @@ class BenchmarkRun(JvmTask):
         self._benchmark_bootstrap_key)
 
     caliper_main = 'com.google.caliper.Runner'
-    exit_code = execute_java(self.classpath(benchmark_tools_classpath),
-                             caliper_main,
+    exit_code = execute_java(classpath=self.classpath(benchmark_tools_classpath),
+                             main=caliper_main,
+                             jvm_options=self.jvm_args,
                              args=self.caliper_args,
-                             jvm_args=self.jvm_args,
                              workunit_name='caliper')
     if exit_code != 0:
       raise TaskError('java %s ... exited non-zero (%i)' % (caliper_main, exit_code))

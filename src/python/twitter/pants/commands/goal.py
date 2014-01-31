@@ -28,13 +28,11 @@ import time
 import traceback
 
 from contextlib import contextmanager
-from functools import wraps
 from optparse import Option, OptionParser
 
 from twitter.common import log
-from twitter.common.log.options import LogOptions
 from twitter.common.collections import OrderedSet
-from twitter.common.dirutil import safe_mkdir, safe_rmtree
+from twitter.common.dirutil import safe_rmtree
 from twitter.common.lang import Compatibility
 from twitter.pants.base.build_environment import get_buildroot
 from twitter.pants.goal import Goal as goal, Group as group
@@ -56,7 +54,6 @@ from twitter.pants.tasks import Task, TaskError
 from twitter.pants.tasks.console_task import ConsoleTask
 from twitter.pants.tasks.nailgun_task import NailgunTask
 from twitter.pants.goal import Context, GoalError, Phase
-from twitter.pants.tasks import Task, TaskError
 from twitter.pants.tasks.targets_help import TargetsHelp
 
 
@@ -468,7 +465,8 @@ class Goal(Command):
             return True
       return False
 
-    update_reporting(self.options, is_console_task(), self.run_tracker)
+    is_explain = self.options.explain
+    update_reporting(self.options, is_console_task() or is_explain, self.run_tracker)
 
     if self.options.dry_run:
       print('****** Dry Run ******')
@@ -534,7 +532,6 @@ from twitter.pants.tasks.extract import Extract
 from twitter.pants.tasks.check_exclusives import CheckExclusives
 from twitter.pants.tasks.filedeps import FileDeps
 from twitter.pants.tasks.idl_extract import IdlExtract
-from twitter.pants.tasks.idl_resolve import IdlResolve
 from twitter.pants.tasks.ivy_resolve import IvyResolve
 from twitter.pants.tasks.jar_create import JarCreate
 from twitter.pants.tasks.jvm_compile.java.java_compile import JavaCompile
@@ -740,26 +737,12 @@ goal(name='check-exclusives',
   action=CheckExclusives).install('check-exclusives').with_description(
   'Check exclusives declarations to verify that dependencies are consistent.')
 
-goal(
-  name='extract',
-  action=Extract,
-).install('resolve-idl')
-
-goal(
-  name='idl-extract',
-  action=IdlExtract,
-).install('resolve-idl')
-
 # TODO(John Sirois): gen attempted as the sole Goal should gen for all known gen types but
 # recognize flags to narrow the gen set
-goal(name='thrift', action=ThriftGen,
-  dependencies=['resolve-idl']).install('gen').with_description('Generate code.')
-goal(name='scrooge', action=ScroogeGen,
-  dependencies=['resolve-idl']).install('gen')
-goal(name='protoc', action=ProtobufGen,
-  dependencies=['resolve-idl']).install('gen')
-goal(name='antlr', action=AntlrGen,
-  dependencies=['resolve-idl']).install('gen')
+goal(name='thrift', action=ThriftGen).install('gen').with_description('Generate code.')
+goal(name='scrooge', action=ScroogeGen).install('gen')
+goal(name='protoc', action=ProtobufGen).install('gen')
+goal(name='antlr', action=AntlrGen).install('gen')
 
 goal(
   name='checkstyle',

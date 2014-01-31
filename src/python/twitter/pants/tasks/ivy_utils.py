@@ -69,9 +69,9 @@ class IvyUtils(object):
 
     self._transitive = config.getbool('ivy-resolve', 'transitive')
     self._args = config.getlist('ivy-resolve', 'args')
-    self._jvm_args = config.getlist('ivy-resolve', 'jvm_args', default=[])
+    self._jvm_options = config.getlist('ivy-resolve', 'jvm_args', default=[])
     # Disable cache in File.getCanonicalPath(), makes Ivy work with -symlink option properly on ng.
-    self._jvm_args.append('-Dsun.io.useCanonCaches=false')
+    self._jvm_options.append('-Dsun.io.useCanonCaches=false')
     self._work_dir = config.get('ivy-resolve', 'workdir')
     self._template_path = os.path.join('templates', 'ivy_resolve', 'ivy.mustache')
     self._confs = config.getlist('ivy-resolve', 'confs')
@@ -386,7 +386,7 @@ class IvyUtils(object):
 
     with IvyUtils.ivy_lock:
       self._generate_ivy(targets, jars, excludes, ivyxml)
-      runner = ivy.runner(args=ivy_args, jvm_args=self._jvm_args)
+      runner = ivy.runner(jvm_options=self._jvm_options, args=ivy_args)
       try:
         result = util.execute_runner(runner,
                                      workunit_factory=workunit_factory,

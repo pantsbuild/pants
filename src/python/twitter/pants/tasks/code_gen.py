@@ -118,33 +118,33 @@ class CodeGen(Task):
             if invalid_lang_tgts:
               self.genlang(lang, invalid_lang_tgts)
 
-    # Link synthetic targets for all in-play gen targets.
-    invalid_vts_by_target = dict([(vt.target, vt) for vt in invalidation_check.invalid_vts])
-    vts_artifactfiles_pairs = []
-    write_to_artifact_cache = self.artifact_cache_writes_enabled() if invalid_vts_by_target else False
-    for lang, tgts in gentargets_bylang.items():
-      if tgts:
-        langtarget_by_gentarget = {}
-        for target in tgts:
-          syn_target = self.createtarget(
-            lang,
-            target,
-            dependees_by_gentarget.get(target, [])
-          )
-          syn_target.derived_from = target
-          syn_target.add_labels('synthetic')
-          if write_to_artifact_cache and target in invalid_vts_by_target:
-            vts_artifactfiles_pairs.append((invalid_vts_by_target[target],
-                                            syn_target.sources_relative_to_buildroot()))
-          langtarget_by_gentarget[target] = syn_target
-        genmap = self.context.products.get(lang)
-        for gentarget, langtarget in langtarget_by_gentarget.items():
-          genmap.add(gentarget, get_buildroot(), [langtarget])
-          # Transfer dependencies from gentarget to its synthetic counterpart.
-          for dep in self.getdependencies(gentarget):
-            if self.is_gentarget(dep):  # Translate the dep to its synthetic counterpart.
-              self.updatedependencies(langtarget, langtarget_by_gentarget[dep])
-            else:  # Depend directly on the dep.
-              self.updatedependencies(langtarget, dep)
-    if write_to_artifact_cache:
-      self.update_artifact_cache(vts_artifactfiles_pairs)
+      # Link synthetic targets for all in-play gen targets.
+      invalid_vts_by_target = dict([(vt.target, vt) for vt in invalidation_check.invalid_vts])
+      vts_artifactfiles_pairs = []
+      write_to_artifact_cache = self.artifact_cache_writes_enabled() if invalid_vts_by_target else False
+      for lang, tgts in gentargets_bylang.items():
+        if tgts:
+          langtarget_by_gentarget = {}
+          for target in tgts:
+            syn_target = self.createtarget(
+              lang,
+              target,
+              dependees_by_gentarget.get(target, [])
+            )
+            syn_target.derived_from = target
+            syn_target.add_labels('synthetic')
+            if write_to_artifact_cache and target in invalid_vts_by_target:
+              vts_artifactfiles_pairs.append((invalid_vts_by_target[target],
+                                              syn_target.sources_relative_to_buildroot()))
+            langtarget_by_gentarget[target] = syn_target
+          genmap = self.context.products.get(lang)
+          for gentarget, langtarget in langtarget_by_gentarget.items():
+            genmap.add(gentarget, get_buildroot(), [langtarget])
+            # Transfer dependencies from gentarget to its synthetic counterpart.
+            for dep in self.getdependencies(gentarget):
+              if self.is_gentarget(dep):  # Translate the dep to its synthetic counterpart.
+                self.updatedependencies(langtarget, langtarget_by_gentarget[dep])
+              else:  # Depend directly on the dep.
+                self.updatedependencies(langtarget, dep)
+      if write_to_artifact_cache:
+        self.update_artifact_cache(vts_artifactfiles_pairs)

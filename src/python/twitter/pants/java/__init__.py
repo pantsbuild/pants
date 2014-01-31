@@ -20,23 +20,7 @@ from .nailgun_client import NailgunClient
 from .nailgun_executor import NailgunExecutor
 
 
-def runjava(classpath, main, args=None, jvm_args=None, **subprocess_kwargs):
-  """Spawns a java process with the supplied configuration and returns its exit code.
-
-  Any extra kwargs are passed through to ``subprocess.Popen`` to control the spawned process
-  environment further,
-
-  :param list classpath: the classpath for the java program
-  :param string main: the fully qualified class name of the java program's entry point
-  :param list args: an optional sequence of args to pass to the java program
-  :param list jvm_args: an optional sequence of args for the underlying jvm
-  """
-  java = SubprocessExecutor()
-  return java.spawn(classpath, main, args=args, jvm_args=jvm_args, **subprocess_kwargs).wait()
-
-
 __all__ = (
-    'runjava',
     'Distribution',
     'Executor',
     'NailgunClient',

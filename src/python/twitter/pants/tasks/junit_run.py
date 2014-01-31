@@ -249,8 +249,8 @@ class JUnitRun(JvmTask):
               result += abs(execute_java(
                 classpath=classpath,
                 main=main,
+                jvm_options=(jvm_args or []) + self.jvm_args,
                 args=self.opts + batch_tests,
-                jvmargs=(jvm_args or []) + self.java_args,
                 workunit_labels=[WorkUnit.TEST],
                 workunit_name='run'
               ))
@@ -275,7 +275,8 @@ class JUnitRun(JvmTask):
               for pattern in patterns:
                 args.extend(['-filter', pattern])
               main = 'emma'
-              result = execute_java(emma_classpath, main, args=args, workunit_name='emma')
+              result = execute_java(classpath=emma_classpath, main=main,
+                                    args=args, workunit_name='emma')
               if result != 0:
                 raise TaskError("java %s ... exited non-zero (%i)"
                                 " 'failed to instrument'" % (main, result))
@@ -308,7 +309,8 @@ class JUnitRun(JvmTask):
                            '-Dreport.out.encoding=UTF-8'] + sorting)
 
             main = 'emma'
-            result = execute_java(emma_classpath, main, args=args, workunit_name='emma')
+            result = execute_java(classpath=emma_classpath, main=main,
+                                  args=args, workunit_name='emma')
             if result != 0:
               raise TaskError("java %s ... exited non-zero (%i)"
                               " 'failed to generate code coverage reports'" % (main, result))

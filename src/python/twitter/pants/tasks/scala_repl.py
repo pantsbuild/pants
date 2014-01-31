@@ -63,10 +63,10 @@ class ScalaRepl(JvmTask):
 
     print('')  # Start REPL output on a new line.
     try:
-      execute_java(classpath,
-                   self.main,
-                   self.args,
-                   self.jvm_args,
+      execute_java(classpath=classpath,
+                   main=self.main,
+                   jvm_options=self.jvm_args,
+                   args=self.args,
                    workunit_labels=[WorkUnit.REPL, WorkUnit.JVM],
                    workunit_name='repl')
     except KeyboardInterrupt:

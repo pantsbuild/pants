@@ -18,7 +18,7 @@ from twitter.pants.base.workunit import WorkUnit
 from twitter.pants.java import Executor, NailgunExecutor, SubprocessExecutor
 
 
-def execute_java(classpath, main, args=None, jvm_args=None, executor=None,
+def execute_java(classpath, main, jvm_options=None, args=None, executor=None,
                  workunit_factory=None, workunit_name=None, workunit_labels=None):
   """Executes the java program defined by the classpath and main.
 
@@ -26,8 +26,8 @@ def execute_java(classpath, main, args=None, jvm_args=None, executor=None,
 
   :param list classpath: the classpath for the java program
   :param string main: the fully qualified class name of the java program's entry point
+  :param list jvm_options: an optional sequence of options for the underlying jvm
   :param list args: an optional sequence of args to pass to the java program
-  :param list jvm_args: an optional sequence of args for the underlying jvm
   :param executor: an optional java executor to use to launch the program; defaults to a subprocess
     spawn of the default java distribution
   :param workunit_factory: an optional callable that can produce a workunit context
@@ -42,7 +42,7 @@ def execute_java(classpath, main, args=None, jvm_args=None, executor=None,
     raise ValueError('The executor argument must be a java Executor instance, give %s of type %s'
                      % (executor, type(executor)))
 
-  runner = executor.runner(classpath, main, args=args, jvm_args=jvm_args)
+  runner = executor.runner(classpath, main, args=args, jvm_options=jvm_options)
   workunit_name = workunit_name or main
   return execute_runner(runner,
                         workunit_factory=workunit_factory,

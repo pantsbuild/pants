@@ -32,13 +32,13 @@ class Executor(AbstractClass):
   """Executes java programs."""
 
   @staticmethod
-  def _scrub_args(jvm_args, classpath, main, args):
-    jvm_args = maybe_list(jvm_args or ())
+  def _scrub_args(classpath, main, jvm_options, args):
     classpath = maybe_list(classpath)
     if not isinstance(main, Compatibility.string) or not main:
       raise ValueError('A non-empty main classname is required, given: %s' % main)
+    jvm_options = maybe_list(jvm_options or ())
     args = maybe_list(args or ())
-    return jvm_args, classpath, main, args
+    return classpath, main, jvm_options, args
 
   class Error(Exception):
     """Indicates an error launching a java program."""
@@ -80,31 +80,31 @@ class Executor(AbstractClass):
 
     self._distribution = distribution
 
-  def runner(self, classpath, main, args=None, jvm_args=None):
+  def runner(self, classpath, main, jvm_options=None, args=None):
     """Returns an `Executor.Runner` for the given java command."""
-    return self._runner(*self._scrub_args(jvm_args, classpath, main, args))
+    return self._runner(*self._scrub_args(classpath, main, jvm_options, args))
 
-  def execute(self, classpath, main, args=None, jvm_args=None, stdout=None, stderr=None):
+  def execute(self, classpath, main, jvm_options=None, args=None, stdout=None, stderr=None):
     """Launches the java program defined by the classpath and main.
 
     :param list classpath: the classpath for the java program
     :param string main: the fully qualified class name of the java program's entry point
+    :param list jvm_options: an optional sequence of options for the underlying jvm
     :param list args: an optional sequence of args to pass to the java program
-    :param list jvm_args: an optional sequence of args for the underlying jvm
 
     Returns the exit code of the java program.
     Raises Executor.Error if there was a problem launching java itself.
     """
-    executor = self.runner(classpath, main, args=args, jvm_args=jvm_args)
+    executor = self.runner(classpath=classpath, main=main, jvm_options=jvm_options, args=args)
     return executor.run(stdout=stdout, stderr=stderr)
 
   @abstractmethod
-  def _runner(self, jvm_args, classpath, main, args):
+  def _runner(self, classpath, main, jvm_options, args):
     """Subclasses should return a `Runner` that can execute the given java main."""
 
-  def _create_command(self, jvm_args, classpath, main, args):
+  def _create_command(self, classpath, main, jvm_options, args):
     cmd = [self._distribution.java]
-    cmd.extend(jvm_args)
+    cmd.extend(jvm_options)
     cmd.extend(['-cp', os.pathsep.join(classpath), main])
     cmd.extend(args)
     return cmd
@@ -117,8 +117,8 @@ class SubprocessExecutor(Executor):
     super(SubprocessExecutor, self).__init__(distribution=distribution)
     self._scrub_classpath = scrub_classpath
 
-  def _runner(self, jvm_args, classpath, main, args):
-    command = self._create_command(jvm_args, classpath, main, args)
+  def _runner(self, classpath, main, jvm_options, args):
+    command = self._create_command(classpath, main, jvm_options, args)
 
     class Runner(self.Runner):
       @property
@@ -134,12 +134,12 @@ class SubprocessExecutor(Executor):
 
     return Runner()
 
-  def spawn(self, classpath, main, args=None, jvm_args=None, **subprocess_args):
+  def spawn(self, classpath, main, jvm_options=None, args=None, **subprocess_args):
     """Spawns the java program passing any extra subprocess kwargs on to subprocess.Popen.
 
     Returns the Popen process object handle to the spawned java program subprocess.
     """
-    cmd = self._create_command(*self._scrub_args(jvm_args, classpath, main, args))
+    cmd = self._create_command(*self._scrub_args(classpath, main, jvm_options, args))
     return self._spawn(cmd, **subprocess_args)
 
   def _spawn(self, cmd, **subprocess_args):

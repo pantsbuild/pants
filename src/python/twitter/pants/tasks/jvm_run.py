@@ -15,7 +15,6 @@
 # ==================================================================================================
 
 import shlex
-import sys
 
 from twitter.pants.base.workunit import WorkUnit
 from twitter.pants.targets import JvmBinary
@@ -82,11 +81,10 @@ class JvmRun(JvmTask):
       result = execute_java(
         classpath=(self.classpath(confs=self.confs, exclusives_classpath=group_classpath)),
         main=main,
+        jvm_options=self.jvm_args,
         args=self.args,
-        jvm_args=self.jvm_args,
         workunit_labels=[WorkUnit.RUN],
-        workunit_name='run',
-        stdin=sys.stdin
+        workunit_name='run'
       )
       if result != 0:
         raise TaskError('java %s ... exited non-zero (%i)' % (main, result), exit_code=result)

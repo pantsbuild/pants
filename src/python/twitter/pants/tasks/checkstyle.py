@@ -83,7 +83,7 @@ class Checkstyle(NailgunTask):
     cp = egroups.get_classpath_for_group(etag)
     classpath.extend(jar for conf, jar in cp if conf in self._confs)
 
-    opts = [
+    args = [
       '-c', self._configuration_file,
       '-f', 'plain'
     ]
@@ -93,12 +93,13 @@ class Checkstyle(NailgunTask):
       with safe_open(properties_file, 'w') as pf:
         for k, v in self._properties.items():
           pf.write('%s=%s\n' % (k, v))
-      opts.extend(['-p', properties_file])
+      args.extend(['-p', properties_file])
 
     # We've hit known cases of checkstyle command lines being too long for the system so we guard
     # with Xargs since checkstyle does not accept, for example, @argfile style arguments.
-    def call(args):
-      return self.runjava(classpath, CHECKSTYLE_MAIN, args=opts + args, workunit_name='checkstyle')
+    def call(xargs):
+      return self.runjava(classpath=classpath, main=CHECKSTYLE_MAIN,
+                          args=args + xargs, workunit_name='checkstyle')
     checks = Xargs(call)
 
     return checks.execute(sources)

@@ -88,7 +88,7 @@ class NailgunTask(Task):
     """
     return self.context.config.getlist('nailgun', 'jvm_args', default=[])
 
-  def runjava(self, classpath, main, args=None, jvm_args=None, workunit_name=None,
+  def runjava(self, classpath, main, jvm_options=None, args=None, workunit_name=None,
               workunit_labels=None):
     """Runs the java main using the given classpath and args.
 
@@ -98,10 +98,10 @@ class NailgunTask(Task):
     """
     executor = self.create_java_executor()
     try:
-      return util.execute_java(classpath,
-                               main,
+      return util.execute_java(classpath=classpath,
+                               main=main,
+                               jvm_options=jvm_options,
                                args=args,
-                               jvm_args=jvm_args,
                                executor=executor,
                                workunit_factory=self.context.new_workunit,
                                workunit_name=workunit_name,

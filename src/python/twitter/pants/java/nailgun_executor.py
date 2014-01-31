@@ -109,8 +109,8 @@ class NailgunExecutor(Executor):
 
     self._ins = ins
 
-  def _runner(self, jvm_args, classpath, main, args):
-    command = self._create_command(jvm_args, classpath, main, args)
+  def _runner(self, classpath, main, jvm_options, args):
+    command = self._create_command(classpath, main, jvm_options, args)
 
     class Runner(self.Runner):
       @property
@@ -122,7 +122,7 @@ class NailgunExecutor(Executor):
         return ' '.join(command)
 
       def run(this, stdout=sys.stdout, stderr=sys.stderr):
-        nailgun = self._get_nailgun_client(jvm_args, classpath, stdout, stderr)
+        nailgun = self._get_nailgun_client(jvm_options, classpath, stdout, stderr)
         try:
           log.debug('Executing via %s: %s' % (nailgun, this.cmd))
           return nailgun(main, *args)
@@ -246,9 +246,9 @@ class NailgunExecutor(Executor):
                            self.create_pidfile_arg(self._pidfile),
                            self._create_fingerprint_arg(fingerprint)]
 
-    process = java.spawn(jvm_args=jvm_args,
-                         classpath=classpath,
+    process = java.spawn(classpath=classpath,
                          main='com.martiansoftware.nailgun.NGServer',
+                         jvm_options=jvm_args,
                          args=[':0'],
                          stdin=in_fd,
                          stdout=out_fd,

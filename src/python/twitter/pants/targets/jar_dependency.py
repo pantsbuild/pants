@@ -211,7 +211,7 @@ class  JarDependency(ExternalDependency, AbstractTarget):
     return self.id
 
   def cache_key(self):
-    key = ''.join(str(getattr(self, key)) for key in self._HASH_KEYS)
+    key = ''.join(str(getattr(self, key)) for key in self._JAR_HASH_KEYS)
     key += ''.join(sorted(self._configurations))
     key += ''.join(a.cache_key() for a in sorted(self.artifacts, key=lambda a: a.name + a.type_))
     return key

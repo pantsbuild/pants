@@ -84,8 +84,8 @@ class SpecsRun(JvmTask):
         result = execute_java(
           classpath=self.classpath(bootstrapped_cp, confs=self.confs),
           main=specs_runner_main,
+          jvm_options=self.jvm_args,
           args=args,
-          jvm_args=self.jvm_args,
           workunit_labels=[WorkUnit.TEST],
           workunit_name='specs'
         )

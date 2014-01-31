@@ -106,12 +106,12 @@ class JavaCompile(JvmCompile):
 
     args.extend(self._args)
     args.extend(sources)
-    result = self.runjava_indivisible(JavaCompile._JMAKE_MAIN,
-                                      classpath=jmake_classpath,
-                                      jvm_options=self._jvm_options,
-                                      args=args,
-                                      workunit_name='jmake',
-                                      workunit_labels=[WorkUnit.COMPILER])
+    result = self.runjava(classpath=jmake_classpath,
+                          main=JavaCompile._JMAKE_MAIN,
+                          jvm_options=self._jvm_options,
+                          args=args,
+                          workunit_name='jmake',
+                          workunit_labels=[WorkUnit.COMPILER])
     if result:
       default_message = 'Unexpected error - JMake returned %d' % result
       raise TaskError(_JMAKE_ERROR_CODES.get(result, default_message))

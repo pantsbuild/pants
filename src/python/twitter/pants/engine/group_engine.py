@@ -18,6 +18,7 @@ from collections import defaultdict, namedtuple
 
 from twitter.common import log
 from twitter.common.collections import OrderedDict, OrderedSet
+from twitter.pants.base.workunit import WorkUnit
 
 from twitter.pants.goal import Goal
 from twitter.pants.targets.internal import InternalTarget
@@ -149,41 +150,44 @@ class GroupEngine(Engine):
         else:
           run_queue.append((None, [goal]))
 
-      # OrderedSet takes care of not repeating chunked task execution mentions
-      execution_phases = defaultdict(OrderedSet)
 
-      for group_name, goals in run_queue:
-        if not group_name:
-          goal = goals[0]
-          self._context.log.info('[%s:%s]' % (self._phase, goal.name))
-          execution_phases[self._phase].add(goal.name)
-          execute_task(goal, self._tasks_by_goal[goal], self._context.targets())
-        else:
-          goals_by_group_member = OrderedDict((GroupMember.from_goal(g), g) for g in goals)
-          chunks = GroupIterator(self._context.targets(lambda t: t.is_concrete),
-                                 goals_by_group_member.keys())
-          for group_member, goal_chunk in chunks:
-            goal = goals_by_group_member[group_member]
-            self._context.log.info('[%s:%s:%s]' % (self._phase, group_name, goal.name))
-            execution_phases[self._phase].add((group_name, goal.name))
-            execute_task(goal, self._tasks_by_goal[goal], goal_chunk)
+      with self._context.new_workunit(name=self._phase.name, labels=[WorkUnit.PHASE]):
+        # OrderedSet takes care of not repeating chunked task execution mentions
+        execution_phases = defaultdict(OrderedSet)
 
-      if explain:
-        tasks_by_goalname = dict((goal.name, task.__class__.__name__)
-                                 for goal, task in self._tasks_by_goal.items())
-
-        def expand_goal(goal):
-          if len(goal) == 2:  # goal is (group, goal)
-            group_name, goal_name = goal
-            task_name = tasks_by_goalname[goal_name]
-            return "%s:%s->%s" % (group_name, goal_name, task_name)
+        for group_name, goals in run_queue:
+          if not group_name:
+            goal = goals[0]
+            execution_phases[self._phase].add(goal.name)
+            with self._context.new_workunit(name=goal.name, labels=[WorkUnit.GOAL]):
+              execute_task(goal, self._tasks_by_goal[goal], self._context.targets())
           else:
-            task_name = tasks_by_goalname[goal]
-            return "%s->%s" % (goal, task_name)
+            with self._context.new_workunit(name=group_name, labels=[WorkUnit.GROUP]):
+              goals_by_group_member = OrderedDict((GroupMember.from_goal(g), g) for g in goals)
+              chunks = GroupIterator(self._context.targets(lambda t: t.is_concrete),
+                                     goals_by_group_member.keys())
+              for group_member, goal_chunk in chunks:
+                goal = goals_by_group_member[group_member]
+                execution_phases[self._phase].add((group_name, goal.name))
+                with self._context.new_workunit(name=goal.name, labels=[WorkUnit.GOAL]):
+                  execute_task(goal, self._tasks_by_goal[goal], goal_chunk)
 
-        for phase, goals in execution_phases.items():
-          goal_to_task = ", ".join(expand_goal(goal) for goal in goals)
-          print("%s [%s]" % (phase, goal_to_task))
+        if explain:
+          tasks_by_goalname = dict((goal.name, task.__class__.__name__)
+                                   for goal, task in self._tasks_by_goal.items())
+
+          def expand_goal(goal):
+            if len(goal) == 2:  # goal is (group, goal)
+              group_name, goal_name = goal
+              task_name = tasks_by_goalname[goal_name]
+              return "%s:%s->%s" % (group_name, goal_name, task_name)
+            else:
+              task_name = tasks_by_goalname[goal]
+              return "%s->%s" % (goal, task_name)
+
+          for phase, goals in execution_phases.items():
+            goal_to_task = ", ".join(expand_goal(goal) for goal in goals)
+            print("%s [%s]" % (phase, goal_to_task))
 
   @classmethod
   def _prepare(cls, context, phases):

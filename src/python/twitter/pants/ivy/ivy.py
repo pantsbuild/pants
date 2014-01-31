@@ -232,12 +232,12 @@ class Ivy(object):
     """Returns the ivy cache dir used by this `Ivy` instance."""
     return self._ivy_cache_dir
 
-  def execute(self, args=None, jvm_args=None, stdout=None, stderr=None, executor=None):
+  def execute(self, jvm_options=None, args=None, stdout=None, stderr=None, executor=None):
     """Executes the ivy commandline client with the given args.
 
     Raises Ivy.Error if the command fails for any reason.
     """
-    runner = self.runner(args=args, jvm_args=jvm_args, executor=executor)
+    runner = self.runner(jvm_options=jvm_options, args=args, executor=executor)
     try:
       result = runner.run(stdout=stdout, stderr=stderr)
       if result != 0:
@@ -246,7 +246,7 @@ class Ivy(object):
     except self._java.Error as e:
       raise self.Error('Problem executing ivy: %s' % e)
 
-  def runner(self, args=None, jvm_args=None, executor=None):
+  def runner(self, jvm_options=None, args=None, executor=None):
     """Creates an ivy commandline client runner for the given args."""
     executor = executor or self._java
     if not isinstance(executor, Executor):
@@ -258,9 +258,10 @@ class Ivy(object):
       # ivysettings.xml.  Ideally we'd support either simple -caches or these hand-crafted cases
       # instead of just hand-crafted.  Clean this up by taking over ivysettings.xml and generating
       # it from BUILD constructs.
-      jvm_args = ['-Divy.cache.dir=%s' % self._ivy_cache_dir] + (jvm_args or [])
+      jvm_options = ['-Divy.cache.dir=%s' % self._ivy_cache_dir] + (jvm_options or [])
 
     if self._ivy_settings and '-settings' not in args:
       args = ['-settings', self._ivy_settings] + args
 
-    return executor.runner(self._classpath, 'org.apache.ivy.Main', args=args, jvm_args=jvm_args)
+    return executor.runner(self._classpath, 'org.apache.ivy.Main',
+                           jvm_options=jvm_options, args=args)
