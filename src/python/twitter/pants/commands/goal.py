@@ -531,7 +531,6 @@ from twitter.pants.tasks.detect_duplicates import DuplicateDetector
 from twitter.pants.tasks.extract import Extract
 from twitter.pants.tasks.check_exclusives import CheckExclusives
 from twitter.pants.tasks.filedeps import FileDeps
-from twitter.pants.tasks.idl_extract import IdlExtract
 from twitter.pants.tasks.ivy_resolve import IvyResolve
 from twitter.pants.tasks.jar_create import JarCreate
 from twitter.pants.tasks.jvm_compile.java.java_compile import JavaCompile
