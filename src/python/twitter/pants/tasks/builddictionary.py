@@ -245,16 +245,15 @@ class BuildBuildDictionary(Task):
   """Generate documentation for the Sphinx site."""
 
   def __init__(self, context):
-    Task.__init__(self, context)
+    super(BuildBuildDictionary, self).__init__(context)
     self._templates_dir = os.path.join('templates', 'builddictionary')
     self._outdir = os.path.join(self.context.config.getdefault("pants_distdir"), "builddict")
-
 
   def execute(self, targets):
     self._gen_goals_reference()
 
     d = assemble()
-    template = resource_string(__name__, os.path.join(self._templates_dir, 'page.mk'))
+    template = resource_string(__name__, os.path.join(self._templates_dir, 'page.mustache'))
     tocs = [tocl(d),
             tags_tocl(d, ["java", "scala", "jvm", "anylang"], "JVM"),
             tags_tocl(d, ["python", "anylang"], "Python")]
@@ -273,7 +272,8 @@ class BuildBuildDictionary(Task):
     for phase, goals in Phase.all():
       phases[phase] = goals
 
-    template = resource_string(__name__, os.path.join(self._templates_dir, 'goals_reference.mk'))
+    template = resource_string(__name__,
+                               os.path.join(self._templates_dir, 'goals_reference.mustache'))
     filename = os.path.join(self._outdir, 'goals_reference.rst')
     self.context.log.info('Generating %s' % filename)
     with safe_open(filename, 'w') as outfile:

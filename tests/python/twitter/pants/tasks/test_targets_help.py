@@ -16,12 +16,13 @@
 
 import os.path
 
-from twitter.pants import get_buildroot
-from twitter.pants.targets import Target
+from twitter.pants.base.build_environment import get_buildroot
+from twitter.pants.base.target import Target
 from twitter.pants.targets.sources import SourceRoot
 from twitter.pants.tasks.targets_help import TargetsHelp
 
 from . import ConsoleTaskTest
+
 
 class TargetsHelpTest(ConsoleTaskTest):
 

@@ -23,7 +23,7 @@ from textwrap import dedent
 from twitter.common.contextutil import temporary_dir
 from twitter.common.dirutil import safe_open, safe_rmtree
 
-from twitter.pants import SourceRoot
+from twitter.pants.targets.sources import SourceRoot
 from twitter.pants.base.context_utils import create_context
 from twitter.pants.base_build_root_test import BaseBuildRootTest
 from twitter.pants.java.jar import open_jar

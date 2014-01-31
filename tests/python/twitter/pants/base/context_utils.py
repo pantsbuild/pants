@@ -56,6 +56,21 @@ def create_config(sample_ini='', defaults=None):
   return Config(parser)
 
 
+def create_run_tracker(info_dir=None):
+  """Creates a ``RunTracker`` and starts it.
+
+  :param string info_dir: An optional director for the run tracker to store state; defaults to a
+    new temp dir that will be be cleaned up on interpreter exit.
+  """
+  # TODO(John Sirois): Rework uses around a context manager for cleanup of the info_dir in a more
+  # disciplined manner
+  info_dir = info_dir or safe_mkdtemp()
+  run_tracker = RunTracker(info_dir)
+  report = Report()
+  run_tracker.start(report)
+  return run_tracker
+
+
 def create_context(config='', options=None, target_roots=None, **kwargs):
   """Creates a ``Context`` with no config values, options, or targets by default.
 
@@ -66,13 +81,6 @@ def create_context(config='', options=None, target_roots=None, **kwargs):
   :param ``**kwargs``: Any additional keyword arguments to pass through to the Context constructor.
   """
   config = config if isinstance(config, Config) else create_config(config)
-
-  # TODO(John Sirois): Rework uses around a context manager for cleanup of the info_dir in a more
-  # disciplined manner
-  info_dir = safe_mkdtemp()
-  run_tracker = RunTracker(info_dir)
-  report = Report()
-  run_tracker.start(report)
-
+  run_tracker = create_run_tracker()
   target_roots = maybe_list(target_roots, Target) if target_roots else []
   return Context(config, create_options(options or {}), run_tracker, target_roots, **kwargs)

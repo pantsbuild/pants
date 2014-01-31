@@ -18,6 +18,8 @@ from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
 
+import twitter.pants.base.build_file_context
+
 from twitter.pants.base.build_environment import get_buildroot
 from twitter.pants.base.target import Target
 from twitter.pants.base.build_file import BuildFile
@@ -69,8 +71,8 @@ class ReverseDepmap(ConsoleTask):
           __import__('%s.%s' % (from_list, module), fromlist=[from_list])
         except (ImportError, ValueError):
           # Fall back on pants provided target types.
-          if hasattr(twitter.pants, dependees_type):
-            type_name = getattr(twitter.pants, dependees_type)
+          if hasattr(twitter.pants.base.build_file_context, dependees_type):
+            type_name = getattr(twitter.pants.base.build_file_context, dependees_type)
           else:
             raise TaskError('Invalid type name: %s' % dependees_type)
         # Find the SourceRoot for the given input type
