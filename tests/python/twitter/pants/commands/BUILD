@@ -14,34 +14,7 @@
 # limitations under the License.
 # ==================================================================================================
 
-python_test_suite(
-  name = 'all',
-  dependencies = [
-    pants(':commands'),
-  ]
-)
-
-python_test_suite(
-  name = 'commands',
-  dependencies = [
-    pants(':test_goal'),
-    pants(':test_setup_py'),
-  ]
-)
-
-python_tests(
-  name = 'test_goal',
-  sources = [ 'test_goal.py' ],
-  dependencies = [
-    pants("src/python/twitter/pants:pants-lib")
-  ]
-)
-
-python_tests(
-  name = 'test_setup_py',
-  sources = [ 'test_setup_py.py' ],
-  dependencies = [
-    pants('3rdparty/python:mock'),
-    pants("src/python/twitter/pants:pants-lib")
-  ]
+python_tests(name = 'commands',
+  sources = globs('*.py'),
+  dependencies = ['src/python/twitter/pants:pants-lib']
 )

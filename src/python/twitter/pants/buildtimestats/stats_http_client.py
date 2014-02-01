@@ -128,7 +128,7 @@ class StatsUploader():
       #Get the System info
       import psutil
       stats["cpu_time"] = psutil.cpu_percent(interval=1)
-      stats["network_counter"] = psutil.net_io_counters()
+      stats["network_counter"] = psutil.network_io_counters()
       stats["no_of_cpus"] = psutil.NUM_CPUS
     except Exception as e:
       log.debug("Exception %s. Cannot collect psutil stats" % e)

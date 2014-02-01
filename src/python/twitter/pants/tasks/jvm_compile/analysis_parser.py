@@ -8,6 +8,8 @@ class ParseError(TaskError):
 
 class AnalysisParser(object):
   """Parse a file containing representation of an analysis for some JVM language."""
+  def __init__(self, classes_dir):
+    self.classes_dir = classes_dir  # The output dir for classes in this analysis.
 
   def is_nonempty_analysis(self, path):
     """Returns whether an analysis at a specified path is nontrivial."""
@@ -35,14 +37,17 @@ class AnalysisParser(object):
     raise NotImplementedError()
 
   def parse_products_from_path(self, infile_path):
-    """An efficient parser of just the src->class mappings."""
+    """An efficient parser of just the src->class mappings.
+
+    Returns a map of src -> list of classfiles. All paths are absolute.
+    """
     with open(infile_path, 'r') as infile:
       return self.parse_products(infile)
 
   def parse_products(self, infile):
     """An efficient parser of just the src->class mappings.
 
-    Returns a dict of src -> list of classfiles.
+    Returns a map of src -> list of classfiles. All paths are absolute.
     """
     raise NotImplementedError()
 

@@ -1,4 +1,4 @@
-
+import os
 from twitter.pants.targets.scala_library import ScalaLibrary
 from twitter.pants.tasks.jvm_compile.analysis_tools import AnalysisTools
 from twitter.pants.tasks.jvm_compile.jvm_compile import JvmCompile
@@ -20,7 +20,7 @@ class ScalaCompile(JvmCompile):
       action='append', help='Use these scalac plugins. Default is set in pants.ini.')
 
   def __init__(self, context):
-    JvmCompile.__init__(self, context, jdk=False)
+    JvmCompile.__init__(self, context, workdir=context.config.get('scala-compile', 'nailgun_dir'))
 
     # Set up the zinc utils.
     color = not context.options.no_color
@@ -37,7 +37,7 @@ class ScalaCompile(JvmCompile):
         self.context.add_target(java_target)
 
   def create_analysis_tools(self):
-    return AnalysisTools(self.context, ZincAnalysisParser(), ZincAnalysis)
+    return AnalysisTools(self.context, ZincAnalysisParser(self._classes_dir), ZincAnalysis)
 
   def extra_classpath_elements(self):
     # Classpath entries necessary for our compiler plugins.
@@ -45,15 +45,14 @@ class ScalaCompile(JvmCompile):
 
   def extra_products(self, target):
       ret = []
-      # TODO(John Sirois): Map target.resources in the same way
       if target.is_scalac_plugin and target.classname:
-        # Create and Map scala plugin info files to the owning targets.
-        basedir, info_file = ZincUtils.write_plugin_info(self._resources_dir, target)
-        ret.append((basedir, [info_file]))
+        root, plugin_info_file = ZincUtils.write_plugin_info(self._resources_dir, target)
+        ret.append((root, [plugin_info_file]))
       return ret
 
   def compile(self, args, classpath, sources, classes_output_dir, analysis_file):
     # We have to treat our output dir as an upstream element, so zinc can find valid
-    # analysis for previous partitions.
-    upstream = { classes_output_dir: self._analysis_file }  # Use the global valid analysis for the upstream.
-    return self._zinc_utils.compile(args, classpath, sources, classes_output_dir, analysis_file, upstream)
+    # analysis for previous partitions. We use the global valid analysis for the upstream.
+    upstream = { classes_output_dir: self._analysis_file } if os.path.exists(self._analysis_file) else {}
+    return self._zinc_utils.compile(args, classpath + [self._classes_dir], sources,
+                                    classes_output_dir, analysis_file, upstream)

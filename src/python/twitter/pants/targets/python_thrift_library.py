@@ -16,13 +16,10 @@
 
 from twitter.common.collections import OrderedSet
 
-from twitter.pants.base.build_manual import manual
-
 from .python_requirement import PythonRequirement
 from .python_target import PythonTarget
 
 
-@manual.builddict(tags=["python"])
 class PythonThriftLibrary(PythonTarget):
   """Generates a stub Python library from thrift IDL files."""
 
@@ -44,5 +41,5 @@ class PythonThriftLibrary(PythonTarget):
     :type dependencies: list of targets
     :param dict exclusives: An optional dict of exclusives tags. See CheckExclusives for details.
     """
-    super(PythonThriftLibrary, self).__init__(name, sources, resources, dependencies, provides,
-                                              exclusives=exclusives)
+    PythonTarget.__init__(self, name, sources, resources, dependencies, provides,
+                          exclusives=exclusives)

@@ -26,10 +26,7 @@ from . import Command
 from twitter.common.python.pex import PEX
 from twitter.common.python.pex_builder import PEXBuilder
 
-from twitter.pants.base.address import Address
-from twitter.pants.base.config import Config
-from twitter.pants.base.parse_context import ParseContext
-from twitter.pants.base.target import Target
+from twitter.pants.base import Address, Config, ParseContext, Target
 from twitter.pants.python.interpreter_cache import PythonInterpreterCache
 from twitter.pants.python.python_chroot import PythonChroot
 from twitter.pants.targets import PythonBinary, PythonRequirement

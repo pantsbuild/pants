@@ -18,6 +18,7 @@ import os
 import shutil
 
 from twitter.common.dirutil import safe_mkdir
+from twitter.pants.goal.products import MultipleRootedProducts
 
 from twitter.pants.tasks import Task
 
@@ -36,34 +37,37 @@ class PrepareResources(Task):
       return
     def extract_resources(target):
       return target.resources if target.has_resources else ()
-    all_resources = set()
-    for resources in map(extract_resources, targets):
-      all_resources.update(resources)
+    all_resources_tgts = set()
+    for resources_tgts in map(extract_resources, targets):
+      all_resources_tgts.update(resources_tgts)
 
-    def target_dir(resources):
-      return os.path.join(self.workdir, resources.id)
+    def target_dir(resources_tgt):
+      return os.path.join(self.workdir, resources_tgt.id)
 
-    with self.invalidated(all_resources) as invalidation_check:
+    with self.invalidated(all_resources_tgts) as invalidation_check:
       invalid_targets = set()
       for vt in invalidation_check.invalid_vts:
         invalid_targets.update(vt.targets)
 
-      for resources in invalid_targets:
-        resources_dir = target_dir(resources)
+      for resources_tgt in invalid_targets:
+        resources_dir = target_dir(resources_tgt)
         safe_mkdir(resources_dir, clean=True)
-        for resource in resources.sources:
-          basedir = os.path.dirname(resource)
+        for resource_path in resources_tgt.sources:
+          basedir = os.path.dirname(resource_path)
           destdir = os.path.join(resources_dir, basedir)
           safe_mkdir(destdir)
-          shutil.copy(os.path.join(resources.target_base, resource),
-                      os.path.join(resources_dir, resource))
+          # TODO: Symlink instead?
+          shutil.copy(os.path.join(resources_tgt.target_base, resource_path),
+                      os.path.join(resources_dir, resource_path))
 
-    genmap = self.context.products.get('resources')
+    resources_by_target = \
+      self.context.products.get_data('resources_by_target', MultipleRootedProducts)
     egroups = self.context.products.get_data('exclusives_groups')
     group_key = egroups.get_group_key_for_target(targets[0])
 
-    for resources in all_resources:
-      resources_dir = target_dir(resources)
-      genmap.add(resources, resources_dir, resources.sources)
+    for resources_tgt in all_resources_tgts:
+      resources_dir = target_dir(resources_tgt)
+      target_resources = resources_by_target[resources_tgt]
+      target_resources.add_rel_paths(resources_dir, resources_tgt.sources)
       for conf in self.confs:
         egroups.update_compatible_classpaths(group_key, [(conf, resources_dir)])

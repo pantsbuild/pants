@@ -15,22 +15,17 @@
 # ==================================================================================================
 
 from twitter.common.collections import OrderedSet
-from twitter.pants.base.build_manual import manual
 from twitter.pants.targets.python_target import PythonTarget
 from twitter.pants.targets.pants_target import Pants
 
-
-@manual.builddict(tags=["python"])
 class PythonAntlrLibrary(PythonTarget):
   """Generates a stub Python library from Antlr grammar files."""
 
-  def __init__(self,
-               name,
-               module,
-               antlr_version='3.1.3',
-               sources=None,
-               resources=None,
-               dependencies=None,
+  def __init__(self, name, module,
+               antlr_version = '3.1.3',
+               sources = None,
+               resources = None,
+               dependencies = None,
                exclusives=None):
     """
     :param name: Name of library
@@ -55,8 +50,7 @@ class PythonAntlrLibrary(PythonTarget):
         all_deps.update(dependencies)
       return all_deps
 
-    super(PythonAntlrLibrary, self).__init__(name, sources, resources, get_all_deps(),
-                                             exclusives=exclusives)
+    PythonTarget.__init__(self, name, sources, resources, get_all_deps(), exclusives=exclusives)
 
     self.module = module
     self.antlr_version = antlr_version

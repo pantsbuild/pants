@@ -16,10 +16,11 @@
 
 from twitter.pants.base.build_environment import get_buildroot
 from twitter.pants.base import BuildFile, Target
+from twitter.pants.tasks import TaskError
+from twitter.pants.tasks.console_task import ConsoleTask
 
-from .console_task import ConsoleTask
 
-from . import TaskError
+__author__ = 'Senthil Kumaran'
 
 
 class ListTargets(ConsoleTask):
@@ -67,7 +68,7 @@ class ListTargets(ConsoleTask):
   def console_output(self, targets):
     if self._provides:
       def extract_artifact_id(target):
-        provided_jar, _, _ = target.get_artifact_info()
+        provided_jar = target._as_jar_dependency()
         return "%s%s%s" % (provided_jar.org, '#', provided_jar.name)
 
       extractors = dict(

@@ -21,11 +21,14 @@ from collections import defaultdict
 import itertools
 import os
 import pprint
+import subprocess
+import sys
+import time
 
 from twitter.common.collections import OrderedSet
-from twitter.common.dirutil import safe_rmtree
+from twitter.common.contextutil import pushd
+from twitter.common.dirutil import safe_delete, safe_rmtree
 from twitter.common.dirutil.chroot import Chroot
-from twitter.common.python.installer import InstallerBase, Packager
 from twitter.pants.base import (
     Address,
     Config,
@@ -57,15 +60,6 @@ setup(**
 """
 
 
-class SetupPyRunner(InstallerBase):
-  def __init__(self, source_dir, setup_command, **kw):
-    self.__setup_command = setup_command.split()
-    super(SetupPyRunner, self).__init__(source_dir, **kw)
-
-  def _setup_command(self):
-    return self.__setup_command
-
-
 class SetupPy(Command):
   """Generate setup.py-based Python projects from python_library targets."""
 
@@ -78,34 +72,8 @@ class SetupPy(Command):
   __command__ = 'setup_py'
 
   @classmethod
-  def _combined_dependencies(cls, target):
-    dependencies = getattr(target, 'dependencies', OrderedSet())
-    if isinstance(target, PythonTarget) and target.provides:
-      return dependencies | OrderedSet(target.provides.binaries.values())
-    else:
-      return dependencies
-
-  @classmethod
-  def _construct_provider_map(cls, root_target, descendant, parents, providers, depmap):
-    if isinstance(descendant, PythonTarget) and descendant.provides:
-      providers.append(descendant)
-    for dependency in cls._combined_dependencies(descendant):
-      for prv in providers:
-        for dep in dependency.resolve():
-          depmap[prv].add(dep)
-          if dep in parents:
-            raise TargetDefinitionException(root_target,
-               '%s and %s combined have a cycle!' % (root_target, dep))
-          parents.add(dep)
-          cls._construct_provider_map(root_target, dep, parents, providers, depmap)
-          parents.remove(dep)
-    if isinstance(descendant, PythonTarget) and descendant.provides:
-      assert providers[-1] == descendant
-      providers.pop()
-
-  @classmethod
-  def construct_provider_map(cls, root_target):
-    """Construct a mapping of provider => minimal target set within :root_target.
+  def minified_dependencies(cls, root_target):
+    """Minify the dependencies of a PythonTarget.
 
        The algorithm works in the following fashion:
 
@@ -133,15 +101,35 @@ class SetupPy(Command):
           directly reference twitter.common.dirutil, which could be considered a leak.
     """
     depmap = defaultdict(OrderedSet)
-    cls._construct_provider_map(root_target, root_target, parents=set(), providers=[],
-                                depmap=depmap)
-    return depmap
+    providers = []
 
-  @classmethod
-  def minified_dependencies(cls, root_target):
-    """Minify the dependencies of a PythonTarget."""
-    depmap = cls.construct_provider_map(root_target)
-    root_deps = depmap.pop(root_target, OrderedSet())
+    def combined_dependencies(target):
+      dependencies = getattr(target, 'dependencies', OrderedSet())
+      if isinstance(target, PythonTarget) and target.provides:
+        return dependencies | OrderedSet(target.provides.binaries.values())
+      else:
+        return dependencies
+
+    def resolve(target, parents=None):
+      parents = parents or set()
+      if isinstance(target, PythonTarget) and target.provides:
+        providers.append(target.provides.key)
+      for dependency in combined_dependencies(target):
+        for prv in providers:
+          for dep in dependency.resolve():
+            depmap[prv].add(dep)
+            if dep in parents:
+              raise TargetDefinitionException(root_target,
+                 '%s and %s combined have a cycle!' % (root_target, dep))
+            parents.add(dep)
+            resolve(dep, parents)
+            parents.remove(dep)
+      if isinstance(target, PythonTarget) and target.provides:
+        assert providers[-1] == target.provides.key
+        providers.pop()
+
+    resolve(root_target)
+    root_deps = depmap.pop(root_target.provides.key, {})
 
     def elide(target):
       if any(target in depset for depset in depmap.values()):
@@ -262,8 +250,6 @@ class SetupPy(Command):
                       help="The command to run against setup.py.  Don't forget to quote "
                            "any additional parameters.  If no run command is specified, "
                            "pants will by default generate and dump the source distribution.")
-    parser.add_option("--recursive", dest="recursive", default=False, action="store_true",
-                      help="Transitively run setup_py on all provided downstream targets.")
 
   def __init__(self, run_tracker, root_dir, parser, argv):
     Command.__init__(self, run_tracker, root_dir, parser, argv)
@@ -282,7 +268,7 @@ class SetupPy(Command):
     if not self.target.provides:
       self.error('Target must provide an artifact.')
 
-  def write_contents(self, root_target, chroot):
+  def write_contents(self, chroot):
     """Write contents of the target."""
     def write_target_source(target, src):
       chroot.link(os.path.join(target.target_base, src), os.path.join(self.SOURCE_ROOT, src))
@@ -308,14 +294,14 @@ class SetupPy(Command):
         for source in list(target.sources) + list(target.resources):
           write_target_source(target, source)
 
-    write_target(root_target)
-    for dependency in self.minified_dependencies(root_target):
+    write_target(self.target)
+    for dependency in self.minified_dependencies(self.target):
       if isinstance(dependency, PythonTarget) and not dependency.provides:
         write_target(dependency)
 
-  def write_setup(self, root_target, chroot):
+  def write_setup(self, chroot):
     """Write the setup.py of a target.  Must be run after writing the contents to the chroot."""
-    setup_keywords = root_target.provides.setup_py_keywords
+    setup_keywords = self.target.provides.setup_py_keywords
 
     package_dir = {'': self.SOURCE_ROOT}
     packages, namespace_packages, resources = self.find_packages(chroot)
@@ -330,14 +316,14 @@ class SetupPy(Command):
           package_data=dict((package, list(rs)) for (package, rs) in resources.items()))
 
     install_requires = set()
-    for dep in self.minified_dependencies(root_target):
+    for dep in self.minified_dependencies(self.target):
       if isinstance(dep, PythonRequirement):
         install_requires.add(str(dep.requirement))
       elif isinstance(dep, PythonTarget) and dep.provides:
         install_requires.add(dep.provides.key)
     setup_keywords['install_requires'] = list(install_requires)
 
-    for binary_name, entry_point in self.iter_entry_points(root_target):
+    for binary_name, entry_point in self.iter_entry_points(self.target):
       if 'entry_points' not in setup_keywords:
         setup_keywords['entry_points'] = {}
       if 'console_scripts' not in setup_keywords['entry_points']:
@@ -347,45 +333,49 @@ class SetupPy(Command):
 
     chroot.write(SETUP_BOILERPLATE % {
       'setup_dict': pprint.pformat(setup_keywords, indent=4),
-      'setup_target': repr(root_target)
+      'setup_target': repr(self.target)
     }, 'setup.py')
 
-    # make sure that setup.py is included
-    chroot.write('include *.py'.encode('utf8'), 'MANIFEST.in')
-
-  def run_one(self, target):
+  def execute(self):
     dist_dir = self._config.getdefault('pants_distdir')
-    chroot = Chroot(dist_dir, name=target.provides.name)
-    self.write_contents(target, chroot)
-    self.write_setup(target, chroot)
-    target_base = '%s-%s' % (target.provides.name, target.provides.version)
+    target_base = '%s-%s' % (
+        self.target.provides.name, self.target.provides.version)
     setup_dir = os.path.join(dist_dir, target_base)
+    expected_tgz = '%s.tar.gz' % target_base
+    expected_target = os.path.join(setup_dir, 'dist', expected_tgz)
+    dist_tgz = os.path.join(dist_dir, expected_tgz)
+
+    chroot = Chroot(dist_dir, name=self.target.provides.name)
+    self.write_contents(chroot)
+    self.write_setup(chroot)
     safe_rmtree(setup_dir)
     os.rename(chroot.path(), setup_dir)
 
-    if not self.options.run:
-      print('Running packager against %s' % setup_dir)
-      setup_runner = Packager(setup_dir)
-      tgz_name = os.path.basename(setup_runner.sdist())
-      print('Writing %s' % os.path.join(dist_dir, tgz_name))
-      os.rename(setup_runner.sdist(), os.path.join(dist_dir, tgz_name))
+    with pushd(setup_dir):
+      cmd = '%s setup.py %s' % (sys.executable, self.options.run or 'sdist')
+      print('Running "%s" in %s' % (cmd, setup_dir))
+      extra_args = {} if self.options.run else dict(stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+      po = subprocess.Popen(cmd, shell=True, **extra_args)
+      stdout, stderr = po.communicate()
+
+    if self.options.run:
+      print('Ran %s' % cmd)
+      print('Output in %s' % setup_dir)
+      return po.returncode
+    elif po.returncode != 0:
+      print('Failed to run %s!' % cmd)
+      for line in ''.join(stdout).splitlines():
+        print('stdout: %s' % line)
+      for line in ''.join(stderr).splitlines():
+        print('stderr: %s' % line)
+      return po.returncode
+    else:
+      if not os.path.exists(expected_target):
+        print('Could not find expected target %s!' % expected_target)
+        sys.exit(1)
+
+      safe_delete(dist_tgz)
+      os.rename(expected_target, dist_tgz)
       safe_rmtree(setup_dir)
-    else:
-      print('Running %s against %s' % (self.options.run, setup_dir))
-      setup_runner = SetupPyRunner(setup_dir, self.options.run)
-      setup_runner.run()
 
-  def execute(self):
-    if self.options.recursive:
-      setup_targets = OrderedSet()
-      def add_providing_target(target):
-        if isinstance(target, PythonTarget) and getattr(target, 'provides', None):
-          setup_targets.add(target)
-          return OrderedSet(target.provides.binaries.values())
-      self.target.walk(add_providing_target)
-    else:
-      setup_targets = [self.target]
-
-    for target in setup_targets:
-      if isinstance(target, PythonTarget) and target.provides:
-        self.run_one(target)
+      print('Wrote %s' % dist_tgz)

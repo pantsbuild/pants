@@ -16,11 +16,9 @@
 
 from twitter.common.collections import maybe_list
 from twitter.common.quantity import Amount, Time
-from twitter.pants.base.build_manual import manual
 from twitter.pants.targets.python_target import PythonTarget
 
 
-@manual.builddict(tags=["python"])
 class PythonTests(PythonTarget):
   """Tests a Python library."""
 
@@ -55,7 +53,7 @@ class PythonTests(PythonTarget):
     self._soft_dependencies = bool(soft_dependencies)
     self._coverage = maybe_list(coverage) if coverage is not None else []
     self._entry_point = entry_point
-    super(PythonTests, self).__init__(name, sources, resources, dependencies, exclusives=exclusives)
+    PythonTarget.__init__(self, name, sources, resources, dependencies, exclusives=exclusives)
     self.add_labels('python', 'tests')
 
   @property
@@ -75,4 +73,4 @@ class PythonTestSuite(PythonTarget):
   """Tests one or more python test targets."""
 
   def __init__(self, name, dependencies=None):
-    super(PythonTestSuite, self).__init__(name, (), (), dependencies)
+    PythonTarget.__init__(self, name, (), (), dependencies)

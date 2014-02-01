@@ -14,6 +14,8 @@
 # limitations under the License.
 # ==================================================================================================
 
+__author__ = 'John Sirois'
+
 import os
 import pytest
 import unittest
@@ -22,11 +24,7 @@ from textwrap import dedent
 
 from twitter.common.contextutil import temporary_dir
 from twitter.common.dirutil import safe_mkdir
-
-from twitter.pants.base.address import Address
-from twitter.pants.base.build_file import BuildFile
-from twitter.pants.base.parse_context import ParseContext
-from twitter.pants.base.target import Target
+from twitter.pants.base import Address, BuildFile, ContextError, ParseContext, Target
 
 def create_buildfile(root_dir, relpath, name='BUILD', content=''):
   path = os.path.join(root_dir, relpath)
@@ -39,7 +37,7 @@ def create_buildfile(root_dir, relpath, name='BUILD', content=''):
 
 class ParseContextTest(unittest.TestCase):
   def test_locate(self):
-    with pytest.raises(ParseContext.ContextError):
+    with pytest.raises(ContextError):
       ParseContext.locate()
 
     with temporary_dir() as root_dir:
@@ -69,7 +67,7 @@ class ParseContextTest(unittest.TestCase):
   def test_on_context_exit(self):
     with temporary_dir() as root_dir:
       parse_context = ParseContext(create_buildfile(root_dir, 'a'))
-      with pytest.raises(parse_context.ContextError):
+      with pytest.raises(ContextError):
         parse_context.on_context_exit(lambda: 37)
 
     with temporary_dir() as root_dir:

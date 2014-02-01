@@ -1,11 +1,13 @@
+
+import unittest
+
 from twitter.pants.testutils import MockTarget
 from twitter.pants.base import Config
 from twitter.pants.goal import Context
 from twitter.pants.tasks.check_exclusives import CheckExclusives
-from twitter.pants.testutils.base_mock_target_test import BaseMockTargetTest
 
 
-class ExclusivesTargetTest(BaseMockTargetTest):
+class ExclusivesTargetTest(unittest.TestCase):
   """Test exclusives propagation in the dependency graph"""
 
   @classmethod
