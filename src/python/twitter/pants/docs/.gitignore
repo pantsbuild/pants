@@ -1,0 +1,7 @@
+# Ignore Sphinx output directory and generated reference docs.
+_build
+base.rst
+targets.rst
+tasks.rst
+build_dictionary.rst
+goals_reference.rst

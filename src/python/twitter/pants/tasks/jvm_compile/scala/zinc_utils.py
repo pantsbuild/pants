@@ -120,12 +120,12 @@ class ZincUtils(object):
       zinc_args.append('-no-color')
     zinc_args.extend(self._zinc_jar_args)
     zinc_args.extend(args)
-    return self._nailgun_task.runjava_indivisible(ZincUtils._ZINC_MAIN,
-                                                  classpath=self._zinc_classpath,
-                                                  args=zinc_args,
-                                                  jvm_options=self._jvm_options,
-                                                  workunit_name=workunit_name,
-                                                  workunit_labels=workunit_labels)
+    return self._nailgun_task.runjava(classpath=self._zinc_classpath,
+                                      main=ZincUtils._ZINC_MAIN,
+                                      jvm_options=self._jvm_options,
+                                      args=zinc_args,
+                                      workunit_name=workunit_name,
+                                      workunit_labels=workunit_labels)
 
   def compile(self, opts, classpath, sources, output_dir, analysis_file, upstream_analysis_files):
     args = list(opts)  # Make a copy
@@ -151,16 +151,15 @@ class ZincUtils(object):
 
   @staticmethod
   def write_plugin_info(resources_dir, target):
-    root = os.path.join(resources_dir, target.id)
-    plugin_info_file = os.path.join(root, _PLUGIN_INFO_FILE)
-    with safe_open(plugin_info_file, 'w') as f:
+    basedir = os.path.join(resources_dir, target.id)
+    with safe_open(os.path.join(basedir, _PLUGIN_INFO_FILE), 'w') as f:
       f.write(textwrap.dedent('''
         <plugin>
           <name>%s</name>
           <classname>%s</classname>
         </plugin>
       ''' % (target.plugin, target.classname)).strip())
-    return root, plugin_info_file
+    return basedir, _PLUGIN_INFO_FILE
 
   # These are the names of the various jars zinc needs. They are, conveniently and
   # non-coincidentally, the names of the flags used to pass the jar locations to zinc.
@@ -170,8 +169,7 @@ class ZincUtils(object):
   def identify_zinc_jars(zinc_classpath):
     """Find the named jars in the zinc classpath.
 
-    TODO: When profiles migrate to regular pants jar() deps instead of ivy.xml files we can
-          make these mappings explicit instead of deriving them by jar name heuristics.
+    TODO: Make these mappings explicit instead of deriving them by jar name heuristics.
     """
     ret = OrderedDict()
     ret.update(ZincUtils.identify_jars(ZincUtils.zinc_jar_names, zinc_classpath))

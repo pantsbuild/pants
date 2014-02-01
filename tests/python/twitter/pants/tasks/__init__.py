@@ -14,17 +14,19 @@
 # limitations under the License.
 # ==================================================================================================
 
+import pytest
+
 from contextlib import closing
 from optparse import OptionGroup, OptionParser
 from StringIO import StringIO
-import pytest
 
-from twitter.common.contextutil import temporary_file
+from twitter.common.collections import maybe_list
 
-from twitter.pants.base import Config
-from twitter.pants.build_root_test import BuildRootTest
+from twitter.pants.base.context_utils import create_context, create_config, create_run_tracker
+from twitter.pants.base.target import Target
+from twitter.pants.base_build_root_test import BaseBuildRootTest
 from twitter.pants.commands.goal import SpecParser
-from twitter.pants.goal import Context, Mkflag
+from twitter.pants.goal import Mkflag, Context
 from twitter.pants.tasks import Task
 from twitter.pants.tasks.console_task import ConsoleTask
 
@@ -43,23 +45,21 @@ def prepare_task(task_type, config=None, args=None, targets=None, **kwargs):
 
   assert issubclass(task_type, Task), 'task_type must be a Task subclass, got %s' % task_type
 
+  config = create_config(config or '')
+
   parser = OptionParser()
   option_group = OptionGroup(parser, 'test')
   mkflag = Mkflag('test')
   task_type.setup_parser(option_group, args, mkflag)
   options, _ = parser.parse_args(args or [])
 
-  def load_config():
-    with temporary_file() as ini:
-      ini.write(config or '')
-      ini.close()
-      return Config.load()
+  run_tracker = create_run_tracker()
 
-  context = Context(load_config(), options, None, targets or [])
+  context = Context(config, options, run_tracker, targets or [])
   return task_type(context, **kwargs)
 
 
-class TaskTest(BuildRootTest):
+class TaskTest(BaseBuildRootTest):
   """A baseclass useful for testing Tasks."""
 
   @classmethod
@@ -72,6 +72,17 @@ class TaskTest(BuildRootTest):
     Returns the set of all Targets found.
     """
     return set(target for target, _ in SpecParser(cls.build_root).parse(spec) if target)
+
+  def assertDeps(self, target, expected_deps=None):
+    """Check that actual and expected dependencies of the given target match.
+
+    :param target: :class:`twitter.pants.base.target.Target` to check
+      dependencies of.
+    :param expected_deps: :class:`twitter.pants.base.target.Target` or list of
+      ``Target`` instances that are expected dependencies of ``target``.
+    """
+    expected_deps_list = maybe_list(expected_deps or [], expected_type=Target)
+    self.assertEquals(set(expected_deps_list), set(target.dependencies))
 
 
 class ConsoleTaskTest(TaskTest):

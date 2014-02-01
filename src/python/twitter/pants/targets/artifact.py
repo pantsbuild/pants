@@ -13,27 +13,54 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==================================================================================================
+from twitter.common.collections import maybe_list
 
-from twitter.pants.targets.util import resolve
+from twitter.common.lang import Compatibility
 
+from twitter.pants.base.build_manual import manual
+
+from .pants_target import Pants
+from .repository import Repository
+from .util import resolve
+
+
+@manual.builddict(tags=["jvm"])
 class Artifact(object):
-  """Represents a jvm artifact ala maven or ivy."""
+  """Represents a jvm artifact ala maven or ivy.
+
+  Used in the ``provides`` parameter to *jvm*\_library targets.
+  """
 
   def __init__(self, org, name, repo, description=None):
     """
-      :org the originization of this artifact, the group id in maven parlance
-      :name the name of the artifact
-      :repo the repository this artifact is published to
-      :description a description of this artifact
+    :param string org: Organization of this artifact, or groupId in maven parlance.
+    :param string name: Name of the artifact, or artifactId in maven parlance.
+    :param repo: :class:`twitter.pants.targets.repository.Repository`
+      this artifact is published to.
+    :param string description: Description of this artifact.
     """
+    if not isinstance(org, Compatibility.string):
+      raise ValueError("org must be %s but was %s" % (Compatibility.string, org))
+    if not isinstance(name, Compatibility.string):
+      raise ValueError("name must be %s but was %s" % (Compatibility.string, name))
+
+    if repo is None:
+      raise ValueError("repo must be supplied")
+    repos = []
+    for tgt in maybe_list(resolve(repo), expected_type=(Pants, Repository)):
+      repos.extend(tgt.resolve())
+    if len(repos) != 1:
+      raise ValueError("An artifact must have exactly 1 repo, given: %s" % repos)
+    repo = repos[0]
+
+    if description is not None and not isinstance(description, Compatibility.string):
+      raise ValueError("description must be None or %s but was %s"
+                       % (Compatibility.string, description))
 
     self.org = org
     self.name = name
     self.rev = None
-    repos = list(resolve(repo).resolve())
-    if len(repos) != 1:
-      raise Exception("An artifact must have exactly 1 repo, given: %s" % repos)
-    self.repo = repos[0]
+    self.repo = repo
     self.description = description
 
   def __eq__(self, other):
@@ -44,10 +71,7 @@ class Artifact(object):
     return result
 
   def __hash__(self):
-    value = 17
-    value *= 37 + hash(self.org)
-    value *= 37 + hash(self.name)
-    return value
+    return hash((self.org, self.name))
 
   def __ne__(self, other):
     return not self.__eq__(other)

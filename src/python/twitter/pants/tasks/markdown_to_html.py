@@ -65,16 +65,19 @@ except ImportError:
   def emit_codehighlight_css(path, style): pass
 
 
+import codecs
 import os
 import re
 import textwrap
 
-from twitter.common.dirutil import safe_open
+from twitter.common.dirutil import safe_mkdir, safe_open
 
 from twitter.pants import binary_util, get_buildroot
-from twitter.pants.base import Address, Target
-from twitter.pants.targets import Page
+from twitter.pants.base.address import Address
+from twitter.pants.base.target import Target
+from twitter.pants.targets.doc import Page
 from twitter.pants.tasks import Task, TaskError
+
 
 class MarkdownToHtml(Task):
   AVAILABLE = HAS_MARKDOWN
@@ -88,10 +91,10 @@ class MarkdownToHtml(Task):
                             action="callback", callback=mkflag.set_bool, default=False,
                             help = "[%default] Open the generated documents in a browser.")
 
-    option_group.add_option(mkflag("standalone"), mkflag("standalone", negate=True),
-                            dest = "markdown_to_html_standalone",
+    option_group.add_option(mkflag("fragment"), mkflag("fragment", negate=True),
+                            dest = "markdown_to_html_fragment",
                             action="callback", callback=mkflag.set_bool, default=False,
-                            help = "[%default] Generate a well-formed standalone html document.")
+                            help = "[%default] Generate a fragment of html to embed in a page.")
 
     option_group.add_option(mkflag("outdir"), dest="markdown_to_html_outdir",
                             help="Emit generated html in to this directory.")
@@ -119,7 +122,7 @@ class MarkdownToHtml(Task):
       or context.config.getlist('markdown-to-html', 'extensions', default=['.md', '.markdown'])
     )
 
-    self.standalone = context.options.markdown_to_html_standalone
+    self.fragment = context.options.markdown_to_html_fragment
 
     self.code_style = context.config.get('markdown-to-html', 'code-style', default='friendly')
     if hasattr(context.options, 'markdown_to_html_code_style'):
@@ -153,34 +156,35 @@ class MarkdownToHtml(Task):
         if not page.dependencies and page not in interior_nodes:
           roots.add(page)
 
-    genmap = self.context.products.get('markdown_html')
+    plaingenmap = self.context.products.get('markdown_html')
+    wikigenmap = self.context.products.get('wiki_html')
     show = []
     for page in filter(is_page, targets):
       _, ext = os.path.splitext(page.source)
       if ext in self.extensions:
-        def process_page(key, outdir, url_builder, config):
-          outputs = list()
-          if css and self.standalone:
-            outputs.append(css_relpath)
+        def process_page(key, outdir, url_builder, config, genmap, fragment=False):
           html_path = self.process(
             outdir,
             page.target_base,
             page.source,
-            self.standalone,
+            self.fragment or fragment,
             url_builder,
             config,
             css=css
           )
           self.context.log.info('Processed %s to %s' % (page.source, html_path))
-          outputs.append(os.path.relpath(html_path, outdir))
-          genmap.add(key, outdir, outputs)
+          relpath = os.path.relpath(html_path, outdir)
+          genmap.add(key, outdir, [relpath])
           return html_path
 
         def url_builder(linked_page, config=None):
           path, ext = os.path.splitext(linked_page.source)
           return linked_page.name, os.path.relpath(path + '.html', os.path.dirname(page.source))
 
-        html = process_page(page, os.path.join(self.outdir, 'html'), url_builder, lambda p: None)
+        page_path = os.path.join(self.outdir, 'html')
+        html = process_page(page, page_path, url_builder, lambda p: None, plaingenmap)
+        if css and not self.fragment:
+          plaingenmap.add(page, self.outdir, list(css_relpath))
         if self.open and page in roots:
           show.append(html)
 
@@ -188,22 +192,24 @@ class MarkdownToHtml(Task):
           def get_config(page):
             return page.wiki_config(wiki)
           basedir = os.path.join(self.outdir, wiki.id)
-          process_page((wiki, page), basedir, wiki.url_builder, get_config)
+          process_page((wiki, page), basedir, wiki.url_builder, get_config,
+                       wikigenmap, fragment=True)
 
     if show:
       binary_util.ui_open(*show)
 
-  PANTS_LINK = re.compile(r'''pants\(['"]([^)]+)['"]\)''')
+  PANTS_LINK = re.compile(r'''pants\(['"]([^)]+)['"]\)(#.*)?''')
 
-  def process(self, outdir, base, source, standalone, url_builder, get_config, css=None):
+  def process(self, outdir, base, source, fragmented, url_builder, get_config, css=None):
     def parse_url(spec):
       match = MarkdownToHtml.PANTS_LINK.match(spec)
       if match:
         page = Target.get(Address.parse(get_buildroot(), match.group(1)))
+        anchor = match.group(2) or ''
         if not page:
           raise TaskError('Invalid link %s' % match.group(1))
         alias, url = url_builder(page, config=get_config(page))
-        return alias, url
+        return alias, url + anchor
       else:
         return spec, spec
 
@@ -219,31 +225,15 @@ class MarkdownToHtml(Task):
     wikilinks = WikilinksExtension(build_url)
 
     path, ext = os.path.splitext(source)
-    with safe_open(os.path.join(outdir, path + '.html'), 'w') as output:
-      with open(os.path.join(get_buildroot(), base, source), 'r') as input:
+    output_path = os.path.join(outdir, path + '.html')
+    safe_mkdir(os.path.dirname(output_path))
+    with codecs.open(output_path, 'w', 'utf-8') as output:
+      with codecs.open(os.path.join(get_buildroot(), base, source), 'r', 'utf-8') as input:
         md_html = markdown.markdown(
           input.read(),
           extensions=['codehilite(guess_lang=False)', 'extra', 'tables', 'toc', wikilinks],
         )
-        if standalone:
-          if css:
-            css_relpath = os.path.relpath(css, outdir)
-            out_relpath = os.path.dirname(source)
-            link_relpath = os.path.relpath(css_relpath, out_relpath)
-            css = '<link rel="stylesheet" type="text/css" href="%s"/>' % link_relpath
-          html = textwrap.dedent('''
-          <html>
-            <head>
-              %s
-            </head>
-            <body>
-          <!-- generated by pants! -->
-          %s
-            </body>
-          </html>
-          ''').strip() % (css or '', md_html)
-          output.write(html)
-        else:
+        if fragmented:
           if css:
             with safe_open(css) as fd:
               output.write(textwrap.dedent('''
@@ -253,4 +243,23 @@ class MarkdownToHtml(Task):
               ''').strip() % fd.read())
               output.write('\n')
           output.write(md_html)
+        else:
+          if css:
+            css_relpath = os.path.relpath(css, outdir)
+            out_relpath = os.path.dirname(source)
+            link_relpath = os.path.relpath(css_relpath, out_relpath)
+            css = '<link rel="stylesheet" type="text/css" href="%s"/>' % link_relpath
+          html = textwrap.dedent('''
+          <html>
+            <head>
+              <meta charset="utf-8">
+              %s
+            </head>
+            <body>
+          <!-- generated by pants! -->
+          %s
+            </body>
+          </html>
+          ''').strip() % (css or '', md_html)
+          output.write(html)
         return output.name

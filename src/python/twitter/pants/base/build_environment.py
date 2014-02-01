@@ -16,34 +16,24 @@
 
 from __future__ import print_function
 
-import os
 import sys
 
 from twitter.pants.version import VERSION as _VERSION
+
+from .build_root import BuildRoot
 
 
 def get_version():
   return _VERSION
 
 
-_BUILDROOT = None
 def get_buildroot():
   """Returns the pants ROOT_DIR, calculating it if needed."""
-
-  global _BUILDROOT
-  if not _BUILDROOT:
-    if 'PANTS_BUILD_ROOT' in os.environ:
-      set_buildroot(os.environ['PANTS_BUILD_ROOT'])
-    else:
-      buildroot = os.path.abspath(os.getcwd())
-      while not os.path.exists(os.path.join(buildroot, 'pants.ini')):
-        if buildroot != os.path.dirname(buildroot):
-          buildroot = os.path.dirname(buildroot)
-        else:
-          print('Could not find pants.ini!', file=sys.stderr)
-          sys.exit(1)
-      set_buildroot(buildroot)
-  return _BUILDROOT
+  try:
+    return BuildRoot().path
+  except BuildRoot.NotFoundError as e:
+    print(e.message, file=sys.stderr)
+    sys.exit(1)
 
 
 def set_buildroot(path):
@@ -51,15 +41,15 @@ def set_buildroot(path):
 
   Generally only useful for tests.
   """
-  if not os.path.exists(path):
-    raise ValueError('Build root does not exist: %s' % path)
-  global _BUILDROOT
-  _BUILDROOT = os.path.realpath(path)
+  BuildRoot().path = path
 
 
 from twitter.pants.scm import Scm
 
+
 _SCM = None
+
+
 def get_scm():
   """Returns the pants Scm if any."""
   return _SCM

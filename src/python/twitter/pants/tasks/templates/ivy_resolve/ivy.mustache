@@ -95,6 +95,11 @@ limitations under the License.
     {{#name}}<exclude matcher="exactOrRegexp" org="{{org}}" module="{{name}}"/>{{/name}}
     {{^name}}<exclude matcher="exactOrRegexp" org="{{org}}"/>{{/name}}
     {{/lib.excludes}}
+    {{#lib.overrides?}}
+      {{#lib.overrides}}
+    <override org="{{org}}" module="{{module}}" rev="{{version}}"/>
+      {{/lib.overrides}}
+    {{/lib.overrides?}}
   </dependencies>
   {{/lib.dependencies?}}
 </ivy-module>

@@ -1,13 +1,12 @@
-__author__ = 'Ryan Williams'
-
-import unittest
-
 import shutil
 import tempfile
+
 from twitter.pants.base.build_invalidator import CacheKey, CacheKeyGenerator
 from twitter.pants.tasks import CacheManager
 from twitter.pants.tasks.cache_manager import InvalidationCheck, VersionedTarget
 from twitter.pants.testutils import MockTarget
+from twitter.pants.testutils.base_mock_target_test import BaseMockTargetTest
+
 
 class AppendingCacheKeyGenerator(CacheKeyGenerator):
   """Generates cache keys for versions of target sets."""
@@ -33,7 +32,8 @@ class AppendingCacheKeyGenerator(CacheKeyGenerator):
 def print_vt(vt):
   print '%d (%s) %s: [ %s ]' % (len(vt.targets), vt.cache_key, vt.valid, ', '.join(['%s(%s)' % (v.id, v.cache_key) for v in vt.versioned_targets]))
 
-class CacheManagerTest(unittest.TestCase):
+
+class CacheManagerTest(BaseMockTargetTest):
   class TestCacheManager(CacheManager):
     def __init__(self, tmpdir):
       CacheManager.__init__(self, AppendingCacheKeyGenerator(), tmpdir, True, None, False)

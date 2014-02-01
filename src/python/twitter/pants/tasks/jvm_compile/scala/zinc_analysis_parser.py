@@ -1,6 +1,5 @@
 from collections import defaultdict
 import json
-import os
 import re
 
 from twitter.pants.tasks.jvm_compile.analysis_parser import AnalysisParser, ParseError
@@ -47,14 +46,8 @@ class ZincAnalysisParser(AnalysisParser):
     for src, deps in bin_deps.iteritems():
       filtered_bin_deps[src] = filter(lambda x: scalalib_re.search(x) is None, deps)
 
-    transformed_ext_deps = {}
-    def fqcn_to_path(fqcn):
-      return os.path.join(self.classes_dir, fqcn.replace('.', os.sep) + '.class')
-    for src, fqcns in ext_deps.items():
-      transformed_ext_deps[src] = [fqcn_to_path(fqcn) for fqcn in fqcns]
-
     ret = defaultdict(list)
-    for d in [filtered_bin_deps, src_deps, transformed_ext_deps]:
+    for d in [filtered_bin_deps, src_deps, ext_deps]:
       ret.update(d)
     return ret
 

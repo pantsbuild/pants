@@ -1,6 +1,5 @@
-from collections import defaultdict
-import os
 import itertools
+import os
 import shutil
 import uuid
 
@@ -8,11 +7,9 @@ from twitter.common import contextutil
 from twitter.common.contextutil import open_zip
 from twitter.common.dirutil import safe_rmtree, safe_mkdir
 from twitter.pants import get_buildroot, Task
-from twitter.pants.base import Target
+from twitter.pants.base.target import Target
 from twitter.pants.base.worker_pool import Work
-from twitter.pants.goal.products import RootedProducts, MultipleRootedProducts
 from twitter.pants.reporting.reporting_utils import items_to_report_element
-from twitter.pants.targets import resolve_target_sources
 from twitter.pants.tasks.jvm_compile.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from twitter.pants.tasks.nailgun_task import NailgunTask
 
@@ -116,7 +113,7 @@ class JvmCompile(NailgunTask):
     """Any extra, out-of-band products created for a target.
 
     E.g., targets that produce scala compiler plugins produce an info file.
-    Returns a list of pairs (root, [absolute paths of files under root]).
+    Returns list of (basedir, prods), where prods is a list of files under basedir.
     """
     return []
 
@@ -136,8 +133,9 @@ class JvmCompile(NailgunTask):
   def _portable_analysis_for_target(analysis_dir, target):
     return JvmCompile._analysis_for_target(analysis_dir, target) + '.portable'
 
-  def __init__(self, context, workdir):
-    NailgunTask.__init__(self, context, workdir=workdir)
+  def __init__(self, context, minimum_version=None, jdk=False):
+    # TODO(John Sirois): XXX plumb minimum_version via config or flags
+    super(JvmCompile, self).__init__(context, minimum_version=minimum_version, jdk=jdk)
     concrete_class = type(self)
     config_section = concrete_class._config_section
 
@@ -207,9 +205,9 @@ class JvmCompile(NailgunTask):
     self.context.products.require_data('exclusives_groups')
     self.setup_artifact_cache_from_config(config_section=config_section)
 
-    # Sources (relative to buildroot) present in the last analysis that have since been deleted.
+    # Sources present in the last analysis that have since been deleted.
     # Generated lazily, so do not access directly. Call self._get_deleted_sources().
-    self._lazy_deleted_sources = None
+    self._deleted_sources = None
 
   def product_type(self):
     return 'classes'
@@ -245,7 +243,6 @@ class JvmCompile(NailgunTask):
       for jar in self.extra_classpath_elements():
         classpath.insert(0, (conf, jar))
 
-    # Target -> sources (relative to buildroot).
     sources_by_target = self._compute_sources_by_target(relevant_targets)
 
     # Invalidation check. Everything inside the with block must succeed for the
@@ -260,7 +257,7 @@ class JvmCompile(NailgunTask):
         for tgt in invalid_targets:
           invalid_sources_by_target[tgt] = sources_by_target[tgt]
         invalid_sources = list(itertools.chain.from_iterable(invalid_sources_by_target.values()))
-        deleted_sources = self._deleted_sources()
+        deleted_sources = self._get_deleted_sources()
 
         # Work in a tmpdir so we don't stomp the main analysis files on error.
         # The tmpdir is cleaned up in a shutdown hook, because background work
@@ -285,10 +282,11 @@ class JvmCompile(NailgunTask):
             shutil.move(valid_analysis_tmp, self._analysis_file)
             shutil.move(invalid_analysis_tmp, self._invalid_analysis_file)
 
-        # Register products for all the valid targets.
-        # We register as we go, so dependency checking code can use this data.
-        valid_targets = list(set(relevant_targets) - set(invalid_targets))
-        self._register_products(valid_targets, sources_by_target, self._analysis_file)
+        if self.context.products.isrequired('classes'):
+          # Register products for all the valid targets.
+          # We register as we go, so dependency checking code can use this data.
+          valid_targets = list(set(relevant_targets) - set(invalid_targets))
+          self._add_products_to_genmap(valid_targets, sources_by_target, self._analysis_file)
 
         # Figure out the sources and analysis belonging to each partition.
         partitions = []  # Each element is a triple (vts, sources_by_target, analysis).
@@ -326,11 +324,12 @@ class JvmCompile(NailgunTask):
             # enjoy an incremental compile after fixing missing deps.
             shutil.move(new_valid_analysis, self._analysis_file)
 
-            # Update the products with the latest classes. Must happen before the
-            # missing dependencies check.
-            self._register_products(vts.targets, sources_by_target, analysis_file)
+            if self.context.products.isrequired('classes'):
+              # Update the products with the latest classes.
+              self._add_products_to_genmap(vts.targets, sources_by_target, analysis_file)
             if self._dep_analyzer:
               # Check for missing dependencies.
+              self._dep_analyzer.update(vts.targets)  # Make sure it knows about the latest classes.
               actual_deps = self._analysis_parser.parse_deps_from_path(analysis_file,
                   lambda: self._compute_classpath_elements_by_class(cp_entries))
               with self.context.new_workunit(name='find-missing-dependencies'):
@@ -352,9 +351,9 @@ class JvmCompile(NailgunTask):
           # Now that all the analysis accounting is complete, and we have no missing deps,
           # we can safely mark the targets as valid.
           vts.update()
-      else:
+      elif self.context.products.isrequired('classes'):
         # Nothing to build. Register products for all the targets in one go.
-        self._register_products(relevant_targets, sources_by_target, self._analysis_file)
+        self._add_products_to_genmap(relevant_targets, sources_by_target, self._analysis_file)
 
     # Update the classpath for downstream tasks.
     for conf in self._confs:
@@ -440,7 +439,8 @@ class JvmCompile(NailgunTask):
     for target, sources in sources_by_target.items():
       artifacts = []
       for source in sources:
-        artifacts.extend(classes_by_source.get(source, []))
+        for cls in classes_by_source.get(source, []):
+          artifacts.append(os.path.join(self._classes_dir, cls))
       vt = vt_by_target.get(target)
       if vt is not None:
         # NOTE: analysis_file doesn't exist yet.
@@ -458,10 +458,7 @@ class JvmCompile(NailgunTask):
       self.context.submit_background_work_chain(work_chain, parent_workunit_name='cache')
 
   def _compute_classes_by_source(self, analysis_file=None):
-    """Compute src->classes.
-
-    Srcs are relative to buildroot. Classes are absolute paths.
-    """
+    """Compute src->classes."""
     if analysis_file is None:
       analysis_file = self._analysis_file
 
@@ -472,37 +469,49 @@ class JvmCompile(NailgunTask):
     classes_by_src = {}
     for src, classes in products.items():
       relsrc = os.path.relpath(src, buildroot)
-      classes_by_src[relsrc] = classes
+      classes_by_src[relsrc] = [os.path.relpath(cls, self._classes_dir) for cls in classes]
     return classes_by_src
 
-  def _deleted_sources(self):
+  def _get_deleted_sources(self):
     """Returns the list of sources present in the last analysis that have since been deleted.
 
     This is a global list. We have no way of associating them to individual targets.
-    Paths are relative to buildroot.
     """
     # We compute the list lazily.
-    if self._lazy_deleted_sources is None:
+    if self._deleted_sources is None:
       with self.context.new_workunit('find-deleted-sources'):
         if os.path.exists(self._analysis_file):
           products = self._analysis_parser.parse_products_from_path(self._analysis_file)
           buildroot = get_buildroot()
-          old_sources = products.keys()  # Absolute paths.
-          self._lazy_deleted_sources = \
-            [os.path.relpath(src, buildroot) for src in old_sources if not os.path.exists(src)]
+          old_sources = [os.path.relpath(src, buildroot) for src in products.keys()]
+          self._deleted_sources = filter(lambda x: not os.path.exists(x), old_sources)
         else:
-          self._lazy_deleted_sources = []
-    return self._lazy_deleted_sources
+          self._deleted_sources = []
+    return self._deleted_sources
 
   def _compute_sources_by_target(self, targets):
-    """Returns map target -> list of sources (relative to buildroot)."""
     def calculate_sources(target):
       sources = [s for s in target.sources_relative_to_buildroot() if s.endswith(self._file_suffix)]
       # TODO: Make this less hacky. Ideally target.java_sources will point to sources, not targets.
       if hasattr(target, 'java_sources') and target.java_sources:
-        sources.extend(resolve_target_sources(target.java_sources, '.java'))
+        sources.extend(self._resolve_target_sources(target.java_sources, '.java'))
       return sources
     return dict([(t, calculate_sources(t)) for t in targets])
+
+  def _resolve_target_sources(self, target_sources, extension=None, relative_to_target_base=False):
+    """Given a list of pants targets, extract their sources as a list.
+
+    Filters against the extension if given and optionally returns the paths relative to the target
+    base.
+    """
+    resolved_sources = []
+    for resolved in Target.resolve_all(target_sources):
+      if hasattr(resolved, 'sources'):
+        resolved_sources.extend(
+          source if relative_to_target_base else os.path.join(resolved.target_base, source)
+          for source in resolved.sources if not extension or source.endswith(extension)
+        )
+    return resolved_sources
 
   def _compute_classpath_elements_by_class(self, classpath):
     # Don't consider loose classes dirs in our classpath. Those will be considered
@@ -569,26 +578,15 @@ class JvmCompile(NailgunTask):
       os.makedirs(self._analysis_tmpdir)
       self.context.background_worker_pool().add_shutdown_hook(lambda: safe_rmtree(self._analysis_tmpdir))
 
-  def _register_products(self, targets, sources_by_target, analysis_file):
-    # If no products actually needed, return quickly.
-    required_data = ['classes_by_source', 'classes_by_target', 'resources_by_target']
-    if not any(self.context.products.is_required_data(x) for x in required_data):
-      return
-
-    # TODO: Only compute what is actually needed?
-    make_products = lambda: defaultdict(MultipleRootedProducts)
-    computed_classes_by_source = self._compute_classes_by_source(analysis_file)
-    classes_by_source = self.context.products.get_data('classes_by_source', make_products)
-    classes_by_target = self.context.products.get_data('classes_by_target', make_products)
-    resources_by_target = self.context.products.get_data('resources_by_target', make_products)
-
+  def _add_products_to_genmap(self, targets, sources_by_target, analysis_file):
+    # Map generated classes to the owning targets and sources.
+    classes_by_source = self._compute_classes_by_source(analysis_file)
+    genmap = self.context.products.get('classes')
     for target in targets:
-      target_products = classes_by_target[target]
-      for source in sources_by_target[target]:  # Source is relative to buildroot.
-        classes = computed_classes_by_source.get(source, [])  # Classes are absolute paths.
-        target_products.add_abs_paths(self._classes_dir, classes)
-        classes_by_source[source].add_abs_paths(self._classes_dir, classes)
-      if self.context.products.is_required_data('resources_by_target'):
-        target_resources = resources_by_target[target]
-        for root, abs_paths in self.extra_products(target):
-          target_resources.add_abs_paths(root, abs_paths)
+      for source in sources_by_target[target]:
+        classes = classes_by_source.get(source, [])
+        relsrc = os.path.relpath(source, target.target_base)
+        genmap.add(relsrc, self._classes_dir, classes)
+        genmap.add(target, self._classes_dir, classes)
+      for basedir, prod in self.extra_products(target):
+        genmap.add(target, basedir, prod)

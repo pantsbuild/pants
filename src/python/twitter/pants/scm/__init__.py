@@ -18,6 +18,7 @@ from abc import abstractmethod, abstractproperty
 
 from twitter.common.lang import AbstractClass
 
+
 class Scm(AbstractClass):
   """Abstracts high-level scm operations needed by pants core and pants tasks."""
 

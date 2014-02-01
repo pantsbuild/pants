@@ -1,20 +1,34 @@
 import os
 
+from collections import defaultdict
+
 from twitter.common.dirutil import safe_mkdir
 
 from twitter.pants.base.build_environment import get_buildroot
 from twitter.pants.fs.archive import TGZ
 from twitter.pants.targets.oink_query import OinkQuery
-from twitter.pants.tasks import Task
 
-class OinkBundleCreate(Task):
+from .jvm_binary_task import  JvmBinaryTask
+
+from . import Task
+
+
+class OinkBundleCreate(JvmBinaryTask):
+  """Produces a deployable tar.gz bundle for an Oink Query.
+
+  This is invoked as a bundle goal against OinkQuery Target.
+
+  Example usage::
+
+    ./pants goal bundle /path/to/oink_query_target
+  """
 
   @staticmethod
   def is_oink_query(target):
     return isinstance(target, OinkQuery)
 
   def __init__(self, context):
-    Task.__init__(self, context)
+    super(OinkBundleCreate, self).__init__(context)
     self.outdir = context.config.getdefault('outdir')
     self.context.products.require('jars', predicate=lambda t: t.is_java)
     self.context.products.require('jar_dependencies', predicate=self.is_oink_query)
@@ -29,7 +43,12 @@ class OinkBundleCreate(Task):
     for oink_query in filter(self.is_oink_query, targets):
       oink_query.walk(_visitor, lambda t: t.is_java)
 
-      all_jars.append(self.context.products.get('jar_dependencies').get(oink_query))
+      dependencies_with_excludes = defaultdict(list)
+      # list_jar_dependencies below expects a JvmBinary but we can safely pass an OinkQuery
+      # since it has the deploy_excludes property and walk method list_jar_dependencies expects
+      for basedir, externaljar in self.list_jar_dependencies(oink_query):
+        dependencies_with_excludes[basedir].append(externaljar)
+      all_jars.append(dependencies_with_excludes)
 
       self.context.log.debug("all jar dependencies: %s" % all_jars)
 

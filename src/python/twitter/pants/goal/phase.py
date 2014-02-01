@@ -16,45 +16,10 @@
 
 from __future__ import print_function
 
-import sys
-import time
-
 from collections import defaultdict
-from optparse import OptionParser
 
-from twitter.common.collections import OrderedDict, OrderedSet
-
-from twitter.pants.base import TargetDefinitionException
-from twitter.pants.tasks import TaskError
-
-from .context import Context
-from .group import Group
-
-from . import GoalError
-
-
-#Set this value to True if you want to upload pants runtime stats to a HTTP server.
-STATS_COLLECTION = True
-
-
-class Timer(object):
-  """Provides timing support for goal execution."""
-
-  def __init__(self, timer=time.time, log=None):
-    """
-      timer:  A callable that returns the current time in fractional seconds.
-      log:    A callable that can log timing messages, prints to stdout by default.
-    """
-    self._now = timer
-    self._log = log or (lambda message: print(message, file=sys.stdout))
-
-  def now(self):
-    """Returns the current time in fractional seconds."""
-    return self._now()
-
-  def log(self, message):
-    """Logs timing results."""
-    self._log(message)
+from twitter.pants.base.build_manual import manual
+from twitter.pants.goal import GoalError
 
 
 class SingletonPhases(type):
@@ -80,6 +45,8 @@ class SingletonPhases(type):
 # Python 2.x + 3.x wankery
 PhaseBase = SingletonPhases('PhaseBase', (object,), {})
 
+
+@manual.builddict()
 class Phase(PhaseBase):
   _goals_by_phase = defaultdict(list)
   _phase_by_goal = dict()
@@ -106,93 +73,6 @@ class Phase(PhaseBase):
     setup = set()
     for phase in phases:
       do_setup_parser(phase, setup)
-
-  @staticmethod
-  def execution_order(phases):
-    """
-      Yields goals in execution order for the given phases.  Does not account for goals run
-      multiple times due to grouping.
-    """
-    dependencies_by_goal = OrderedDict()
-    def populate_dependencies(phases):
-      for phase in phases:
-        for goal in phase.goals():
-          if goal not in dependencies_by_goal:
-            populate_dependencies(goal.dependencies)
-            deps = OrderedSet()
-            for phasedep in goal.dependencies:
-              deps.update(phasedep.goals())
-            dependencies_by_goal[goal] = deps
-    populate_dependencies(phases)
-
-    while dependencies_by_goal:
-      for goal, deps in dependencies_by_goal.items():
-        if not deps:
-          dependencies_by_goal.pop(goal)
-          for _, deps in dependencies_by_goal.items():
-            if goal in deps:
-              deps.discard(goal)
-          yield goal
-
-  @staticmethod
-  def attempt(context, phases):
-    """Attempts to reach the goals for the supplied phases."""
-    executed = OrderedDict()
-
-    try:
-      # Prepare tasks roots to leaves and allow for goals introducing new goals in existing phases.
-      tasks_by_goal = {}
-      expanded = OrderedSet()
-      prepared = set()
-      round_ = 0
-      while True:
-        goals = list(Phase.execution_order(phases))
-        if set(goals) == prepared:
-          break
-        else:
-          round_ += 1
-          context.log.debug('Preparing goals in round %d' % round_)
-          for goal in reversed(goals):
-            if goal not in prepared:
-              phase = Phase.of(goal)
-              expanded.add(phase)
-              context.log.debug('preparing: %s:%s' % (phase, goal.name))
-              prepared.add(goal)
-              task = goal.prepare(context)
-              tasks_by_goal[goal] = task
-
-      # Execute phases leaves to roots
-      execution_phases = ' -> '.join(map(str, reversed(expanded)))
-
-      context.log.debug('Executing goals in phases %s' % execution_phases)
-
-      if getattr(context.options, 'explain', None):
-        print("Phase Execution Order:\n\n%s\n" % execution_phases)
-        print("Phase [Goal->Task] Order:\n")
-
-      for phase in phases:
-        Group.execute(phase, tasks_by_goal, context, executed)
-
-      ret = 0
-    except (TargetDefinitionException, TaskError, GoalError) as e:
-
-      message = '%s' % e
-      if message:
-        print('\nFAILURE: %s\n' % e)
-      else:
-        print('\nFAILURE\n')
-      ret = 1
-    return ret
-
-  @staticmethod
-  def execute(context, *names):
-    """Run pants as if the named goals were specified on the command line by a user."""
-    parser = OptionParser()
-    phases = [Phase(name) for name in names]
-    Phase.setup_parser(parser, [], phases)
-    options, _ = parser.parse_args([])
-    context = Context(context.config, options, context.run_tracker, context.target_roots, log=context.log)
-    return Phase.attempt(context, phases)
 
   @staticmethod
   def all():
@@ -233,7 +113,7 @@ class Phase(PhaseBase):
     elif before in g_names:
       g.insert(g_names.index(before), goal)
     elif after in g_names:
-      g.insert(g_names.index(after)+1, goal)
+      g.insert(g_names.index(after) + 1, goal)
     else:
       g.append(goal)
     return self

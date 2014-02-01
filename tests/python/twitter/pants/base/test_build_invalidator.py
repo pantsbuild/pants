@@ -14,12 +14,14 @@
 # limitations under the License.
 # ==================================================================================================
 
-from twitter.pants.base.build_invalidator import BuildInvalidator, CacheKeyGenerator
-from twitter.common.contextutil import temporary_dir
-from contextlib import contextmanager
 import os
 import hashlib
 import tempfile
+
+from contextlib import contextmanager
+
+from twitter.common.contextutil import temporary_dir
+from twitter.pants.base.build_invalidator import BuildInvalidator, CacheKeyGenerator
 
 
 TEST_CONTENT = 'muppet'

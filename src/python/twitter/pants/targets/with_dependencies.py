@@ -15,7 +15,7 @@
 # ==================================================================================================
 
 from twitter.common.collections import OrderedSet
-from twitter.pants.base import Target
+from twitter.pants.base.target import Target
 
 from .util import resolve
 

@@ -35,7 +35,7 @@ class ArtifactCache(object):
           outputs.
 
     cache_key: A CacheKey object.
-    paths: List of absolute paths to generated dirs/files. These must be under the artifact_root.
+    paths: List of paths to generated dirs/files. These must be under the artifact_root.
     """
     missing_files = filter(lambda f: not os.path.exists(f), paths)
     try:
@@ -49,7 +49,7 @@ class ArtifactCache(object):
     """Attempt to cache the output of a build, without error-handling.
 
     cache_key: A CacheKey object.
-    paths: List of absolute paths to generated dirs/files. These must be under the artifact_root.
+    paths: List of paths to generated dirs/files. These must be under the artifact_root.
     """
     pass
 

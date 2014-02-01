@@ -27,8 +27,6 @@ The following pants.ini configuration options are used from the DEFAULT section.
 * pants_pex_baseurl - URL of the pants pex repository to fetch from.
 * pants_pex_filename_pattern - Pants PEX filename pattern if different from the
                                default value. This option is not typically used.
-* pants_pex_verify_md5: A boolean flag which instructs to md5sum
-                        verification after fetching the pex.
 * ivysvnresolver_url - URL of the ivysvnresolver bin release to use.
 """
 
@@ -36,79 +34,38 @@ The following pants.ini configuration options are used from the DEFAULT section.
 # are non-idiomatic for more modern pythons
 
 import errno
-import hashlib
 import logging
 import os
 import sys
 import tarfile
 import tempfile
 import time
-import urllib2
 
-from ConfigParser import SafeConfigParser as ConfigParser
 
-major, minor = sys.version_info[0:2]
-
+DEBUG = 'PANTS_DEV' in os.environ
 CONFIG_FILE = 'pants.ini'
 
-if not os.path.exists(CONFIG_FILE):
-  sys.exit(''.join([
-    '%s does not exist in the current directory. ' % CONFIG_FILE,
-    'Please run %s from the directory that contains ' % os.path.basename(__file__),
-    'the pants.ini you wish to use.',
-  ]))
-
-config = ConfigParser({
-  'pants_pex_filename_pattern': 'pants-%s-py%s%s.pex',
-  'ivysvnresolver_url': 'https://ivysvn.googlecode.com/files/ivysvnresolver-2.2.0-bin.tgz',
-  'pants_pex_verify_md5': False
-})
-
-config.read(CONFIG_FILE)
-
-
-def get_required(config, key, raw=False):
-  """Get options from the DEFAULT config file section.
-
-  :param config: ``ConfigParser`` instance to get the option from.
-  :param string: Name of the option to get.
-  :param boolean raw: Suppress variable interpolation when getting the option.
-  :returns: The value for ``key``.
-  """
-  if not config.has_option('DEFAULT', key):
-    error('Required %s key DEFAULT.%s is not present. Please add the option and try again.' % (
-      CONFIG_FILE, key))
-  return config.get('DEFAULT', key, raw=raw)
-
-
-# Use pants.pex if in the repo - primarily for development
-IVYSVNRESOLVER_URL = get_required(config, 'ivysvnresolver_url')
-LOCAL_PEX = os.path.exists('pants.pex')
-PANTS_CACHE = os.path.expanduser('~/.pants.d')
-
-if not LOCAL_PEX:
-  PANTS_VERSION = get_required(config, 'pants_version')
-  PANTS_PEX_BASEURL = get_required(config, 'pants_pex_baseurl')
-  PANTS_PEX_FILENAME_PATTERN = get_required(config, 'pants_pex_filename_pattern', raw=True)
-  PANTS_PEX_FILENAME = PANTS_PEX_FILENAME_PATTERN % (PANTS_VERSION, major, minor)
-  PANTS_PEX_VERIFY_MD5 = config.getboolean('DEFAULT', 'pants_pex_verify_md5')
-
 logger = logging.getLogger()
+if DEBUG:
+  logger.setLevel(logging.DEBUG)
+else:
+  logger.setLevel(logging.INFO)
 formatter = logging.Formatter("%(asctime)s %(filename)s:%(lineno)d - %(message)s")
 stream_handler = logging.StreamHandler(sys.stderr)
 stream_handler.setFormatter(formatter)
 logger.addHandler(stream_handler)
 
-DEBUG = 'PANTS_DEV' in os.environ
+# Use pants.pex if in the repo - primarily for development
+LOCAL_PEX = os.path.exists('pants.pex')
 
-if DEBUG:
-  logger.setLevel(logging.DEBUG)
-else:
-  logger.setLevel(logging.INFO)
 
 def error(msg, code=1):
   logger.error(msg)
   sys.exit(code)
+
+
+major, minor = sys.version_info[0:2]
+
 
 # TODO(John Sirois): publish pants.pex for python3 and remove these gymnastics
 def is_exe(path):
@@ -133,7 +90,6 @@ def restart(exe):
     exe, time.time() - start, major, minor))
   os.execv(exe, [exe] + sys.argv)
 
-
 # Check to see if user exported python version manually
 exported_py_ver = os.environ.get('PY')
 if exported_py_ver:
@@ -141,6 +97,8 @@ if exported_py_ver:
     exported_major, exported_minor = map(int, exported_py_ver.split('.'))
   except ValueError:
     error('Exported PY variable is not of the form #.# (e.g. 2.7)')
+
+if exported_py_ver:
   if not (exported_major, exported_minor) == (major, minor):
     exe = get_python('python%d.%d' % (exported_major, exported_minor))
     if not exe:
@@ -154,46 +112,62 @@ elif major == 2:
     if minor != 7:
       restart(get_python('python2.7'))
 
-
 if (major, minor) != (2, 6) and (major, minor) != (2, 7):
-  error("Pants requires a valid python2.6 or python2.7. Found python%s.%s" % (major, minor))
+  error('Pants requires a valid python2.6 or python2.7')
 
-def get_md5sum(path):
-  """Calculate the md5sum of the path"""
-  md5 = hashlib.md5()
-  MD5_CHUNK_READ_SIZE = 128 * md5.block_size
-  fd = open(path, 'rb')
-  for chunk in iter(lambda: fd.read(MD5_CHUNK_READ_SIZE), ''):
-    md5.update(chunk)
-  fd.close()
-  return md5.hexdigest()
+if major == 3:
+  from configparser import ConfigParser
+  import urllib.error as urllib_error
+  import urllib.request as urllib_request
+elif major == 2:
+  if minor < 6:
+    error('Pants requires python >= 2.6, using %d.%d' % (major, minor))
+  from ConfigParser import SafeConfigParser as ConfigParser
+  import urllib2 as urllib_error
+  import urllib2 as urllib_request
 
 
-def get_published_md5sum():
-  """Get the md5sum published at pants_pex_baseurl"""
-  md5sum_url = os.path.join(PANTS_PEX_BASEURL, PANTS_VERSION, 'MD5SUM')
-  try:
-    req = urllib2.urlopen(md5sum_url)
-    contents = req.read()
-    req.close()
-  except (urllib2.URLError, urllib2.HTTPError):
-    error("Failed to download MD5SUM for verification")
+PANTS_CACHE = os.path.expanduser('~/.pants.d')
+PANTS_PEX_CACHE = '%s/bin/pants.pex' % PANTS_CACHE
 
-  content_dict = dict()
-  for line in filter(None, contents.splitlines()):
-    pex_name, md5_hash = map(lambda value: value.strip(), line.split())
-    content_dict[pex_name] = md5_hash
-  return content_dict[PANTS_PEX_FILENAME]
+CHUNK_SIZE = 102400
 
-def verify_md5sum(local_path):
-  return get_md5sum(local_path) == get_published_md5sum()
+def get_required(config, key, raw=False):
+  """Get options from the DEFAULT config file section.
+
+  :param config: ``ConfigParser`` instance to get the option from.
+  :param string: Name of the option to get.
+  :param boolean raw: Suppress variable interpolation when getting the option.
+  :returns: The value for ``key``.
+  """
+  if not config.has_option('DEFAULT', key):
+    error('Required %s key DEFAULT.%s is not present. Please add the option and try again.' % (
+      CONFIG_FILE, key))
+  return config.get('DEFAULT', key, raw=raw)
+
+config = ConfigParser({
+  'pants_pex_filename_pattern': 'pants-%s-py%s%s.pex',
+  'ivysvnresolver_url': 'https://ivysvn.googlecode.com/files/ivysvnresolver-2.2.0-bin.tgz',
+})
+
+if not os.path.exists(CONFIG_FILE):
+  error(''.join([
+    '%s does not exist in the current directory. ' % CONFIG_FILE,
+    'Please run %s from the directory that contains ' % os.path.basename(__file__),
+    'the pants.ini you wish to use.',
+  ]))
+
+config.read(CONFIG_FILE)
+ivysvnresolver_url = get_required(config, 'ivysvnresolver_url')
+
+if not LOCAL_PEX:
+  pants_pex_baseurl = get_required(config, 'pants_pex_baseurl')
+  pants_pex_filename_pattern = get_required(config, 'pants_pex_filename_pattern', raw=True)
+  pants_version = get_required(config, 'pants_version')
+
 
 def fetch(url, dest, mode=None):
   """returns true if url was fetched, false if already cached"""
-
-  chunk_size = 102400
-  md5_verification_error = -1
-
   if os.path.exists(dest):
     logger.debug('already cached %s at %s' % (url, dest))
     return False
@@ -209,14 +183,14 @@ def fetch(url, dest, mode=None):
   try:
     try:
       logger.debug('fetching %s to %s' % (url, tmp_path))
-      u = urllib2.urlopen(url)
+      u = urllib_request.urlopen(url)
       try:
         size = int(u.info().getheader('Content-Length').strip())
         sys.stderr.write('Reading %.2fKB from %s\n' % (size / 1024.0, url))
         size = 0
         while True:
           sys.stderr.write('.')
-          chunk = u.read(chunk_size)
+          chunk = u.read(CHUNK_SIZE)
           if not chunk:
             sys.stderr.write('. (%.2fKB)\n' % (size / 1024.0))
             break
@@ -227,16 +201,13 @@ def fetch(url, dest, mode=None):
         u.close()
       os.close(tmp_fh)
 
+      # TODO(John Sirois): We need a checksum protocol
       info = os.stat(tmp_path)
       if size != info.st_size:
         error('Failed to fetch %s : expected %d bytes, got %d' % (url, size, info.st_size))
 
-      if PANTS_PEX_VERIFY_MD5 and verify_md5sum(tmp_path) == False:
-        error("Failed md5sum verification of the download. Please run this script again to retry.",
-              md5_verification_error)
-
       os.rename(tmp_path, dest)
-    except urllib2.HTTPError:
+    except urllib_error.HTTPError:
       _, e, _ = sys.exc_info()
       error('Failed to fetch %s : %s' % (url, e))
   finally:
@@ -248,10 +219,11 @@ def fetch(url, dest, mode=None):
   logger.debug('deposited %s at %s' % (url, dest))
   return True
 
+
 # TODO(travis, jsirois): remove when pants does this itself
 def fetch_ivy():
-  dest = os.path.join(PANTS_CACHE, 'ivysvnresolver', os.path.basename(IVYSVNRESOLVER_URL))
-  if not fetch(IVYSVNRESOLVER_URL, dest):
+  dest = os.path.join(PANTS_CACHE, 'ivysvnresolver', os.path.basename(ivysvnresolver_url))
+  if not fetch(ivysvnresolver_url, dest):
     return  # no need to extract/symlink
 
   tar = tarfile.open(dest)
@@ -260,15 +232,18 @@ def fetch_ivy():
   finally:
     tar.close()
 
+
 def fetch_pants():
   if LOCAL_PEX:
     return 'pants.pex'
 
-  pants_pex_cached_filename = '%s/bin/pants.pex/%s' % (PANTS_CACHE, PANTS_PEX_FILENAME)
+  pants_pex_filename = pants_pex_filename_pattern % (pants_version, sys.version_info[0], sys.version_info[1])
+  pants_pex_cached_filename = '%s/%s' % (PANTS_PEX_CACHE, pants_pex_filename)
+
   if os.path.exists(pants_pex_cached_filename):
     return pants_pex_cached_filename
 
-  url = os.path.join(PANTS_PEX_BASEURL, PANTS_VERSION, PANTS_PEX_FILENAME)
+  url = os.path.join(pants_pex_baseurl, pants_version, pants_pex_filename)
   execute_perms = 493  # 0o755
   fetch(url, pants_pex_cached_filename, execute_perms)
   return pants_pex_cached_filename
@@ -279,6 +254,7 @@ def main():
   fetch_ivy()
   logger.debug('launching %s' % fetch_pants())
   os.execv(fetch_pants(), sys.argv)
+
 
 if __name__ == '__main__':
   main()
