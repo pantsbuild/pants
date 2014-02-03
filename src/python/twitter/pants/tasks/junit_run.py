@@ -20,7 +20,7 @@ import sys
 
 from twitter.common.dirutil import safe_mkdir, safe_open
 
-from twitter.pants import binary_util
+from twitter.pants import binary_util, get_buildroot
 from twitter.pants.targets import JavaTests as junit_tests
 from twitter.pants.base.workunit import WorkUnit
 from twitter.pants.java.util import execute_java
@@ -170,7 +170,8 @@ class JUnitRun(JvmTask):
 
     # List of FQCN, FQCN#method, sourcefile or sourcefile#method.
     self.tests_to_run = context.options.junit_run_tests
-    self.context.products.require('classes')
+    self.context.products.require_data('classes_by_target')
+    self.context.products.require_data('classes_by_source')
 
     self.outdir = (
       context.options.junit_run_outdir
@@ -349,17 +350,14 @@ class JUnitRun(JvmTask):
       return self.coverage_filters
     else:
       classes_under_test = set()
-      classes_by_source = self.context.products.get('classes')
-
+      classes_by_source = self.context.products.get_data('classes_by_source')
       def add_sources_under_test(tgt):
         if self.is_coverage_target(tgt):
-          for source in tgt.sources:
-            classes = classes_by_source.get(source)
-            if classes:
-              for base, classes in classes.items():
-                classes_under_test.update(
-                  JUnitRun.classfile_to_classname(cls) for cls in classes
-                )
+          for source in tgt.sources_relative_to_buildroot():
+            source_products = classes_by_source.get(source)
+            if source_products:
+              for _, classes in source_products.rel_paths():
+                classes_under_test.update(JUnitRun.classfile_to_classname(cls) for cls in classes)
 
       for target in targets:
         target.walk(add_sources_under_test)
@@ -376,23 +374,23 @@ class JUnitRun(JvmTask):
         yield target
 
   def calculate_tests_from_targets(self, targets):
-    targets_to_classes = self.context.products.get('classes')
+    targets_to_classes = self.context.products.get_data('classes_by_target')
     for target in self.test_target_candidates(targets):
-      for classes in targets_to_classes.get(target).values():
-        for cls in classes:
-          yield JUnitRun.classfile_to_classname(cls)
+      target_products = targets_to_classes.get(target)
+      if target_products:
+        for _, classes in target_products.rel_paths():
+          for cls in classes:
+            yield JUnitRun.classfile_to_classname(cls)
 
-  def classnames_from_source_file(self, path):
-    # TODO: This is awful. The products should simply store the full path from the buildroot.
-    basedir = calculate_basedir(path)
-    relpath = os.path.relpath(path, basedir)
-    class_mappings_for_src = self.context.products.get('classes').get(relpath)
-    if not class_mappings_for_src:
+  def classnames_from_source_file(self, srcfile):
+    relsrc = os.path.relpath(srcfile, get_buildroot()) if os.path.isabs(srcfile) else srcfile
+    source_products = self.context.products.get_data('classes_by_source').get(relsrc)
+    if not source_products:
       # It's valid - if questionable - to have a source file with no classes when, for
       # example, the source file has all its code commented out.
-      self.context.log.warn('File %s contains no classes' % path)
+      self.context.log.warn('Source file %s generated no classes' % srcfile)
     else:
-      for classes in class_mappings_for_src.values():
+      for _, classes in source_products.rel_paths():
         for cls in classes:
           yield JUnitRun.classfile_to_classname(cls)
 
@@ -407,7 +405,7 @@ class JUnitRun(JvmTask):
     methodname = '#' + components[1] if len(components) == 2 else ''
 
     if os.path.exists(classname_or_srcfile):  # It's a source file.
-      srcfile = classname_or_srcfile
+      srcfile = classname_or_srcfile  # Alias for clarity.
       for cls in self.classnames_from_source_file(srcfile):
         # Tack the methodname onto all classes in the source file, as we
         # can't know which method the user intended.

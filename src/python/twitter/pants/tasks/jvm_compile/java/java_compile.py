@@ -57,6 +57,8 @@ class JavaCompile(JvmCompile):
   def __init__(self, context):
     super(JavaCompile, self).__init__(context, jdk=True)
 
+    self._depfile = os.path.join(self._analysis_dir, 'global_depfile')
+
     self._jmake_bootstrap_key = 'jmake'
     external_tools = context.config.getlist('java-compile', 'jmake-bootstrap-tools', default=[':jmake'])
     self.register_jvm_tool(self._jmake_bootstrap_key, external_tools)
@@ -78,13 +80,11 @@ class JavaCompile(JvmCompile):
 
   def extra_products(self, target):
     ret = []
-    # TODO(John Sirois): Map target.resources in the same way.
-    # 'Map' (rewrite) annotation processor service info files to the owning targets.
     if target.is_apt and target.processors:
-      basedir = os.path.join(self._resources_dir, Target.maybe_readable_identify([target]))
-      processor_info_file = os.path.join(basedir, JavaCompile._PROCESSOR_INFO_FILE)
+      root = os.path.join(self._resources_dir, Target.maybe_readable_identify([target]))
+      processor_info_file = os.path.join(root, JavaCompile._PROCESSOR_INFO_FILE)
       self._write_processor_info(processor_info_file, target.processors)
-      ret.append((basedir, [JavaCompile._PROCESSOR_INFO_FILE]))
+      ret.append((root, [processor_info_file]))
     return ret
 
   def compile(self, args, classpath, sources, classes_output_dir, analysis_file):

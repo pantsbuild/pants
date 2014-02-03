@@ -182,9 +182,9 @@ class JarCreateExecuteTest(JarCreateTestBase):
               self.assertEqual(os.path.basename(content), fp.read())
 
   def assert_classfile_jar_contents(self, context, empty=False):
-    with self.add_products(context, 'classes', self.jl, 'a.class', 'b.class'):
-      with self.add_products(context, 'classes', self.sl, 'c.class'):
-        with self.add_products(context, 'resources', self.res, 'r.txt.transformed'):
+    with self.add_products(context, 'classes_by_target', self.jl, 'a.class', 'b.class'):
+      with self.add_products(context, 'classes_by_target', self.sl, 'c.class'):
+        with self.add_products(context, 'resources_by_target', self.res, 'r.txt.transformed'):
           JarCreate(context).execute(context.targets())
           if empty:
             self.assertTrue(context.products.get('jars').empty())

@@ -151,15 +151,16 @@ class ZincUtils(object):
 
   @staticmethod
   def write_plugin_info(resources_dir, target):
-    basedir = os.path.join(resources_dir, target.id)
-    with safe_open(os.path.join(basedir, _PLUGIN_INFO_FILE), 'w') as f:
+    root = os.path.join(resources_dir, target.id)
+    plugin_info_file = os.path.join(root, _PLUGIN_INFO_FILE)
+    with safe_open(plugin_info_file, 'w') as f:
       f.write(textwrap.dedent('''
         <plugin>
           <name>%s</name>
           <classname>%s</classname>
         </plugin>
       ''' % (target.plugin, target.classname)).strip())
-    return basedir, _PLUGIN_INFO_FILE
+    return root, plugin_info_file
 
   # These are the names of the various jars zinc needs. They are, conveniently and
   # non-coincidentally, the names of the flags used to pass the jar locations to zinc.

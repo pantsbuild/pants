@@ -305,7 +305,7 @@ class Task(object):
 
     vts_artifactfiles_pairs - a list of pairs (vts, artifactfiles) where
       - vts is single VersionedTargetSet.
-      - artifactfiles is a list of paths to artifacts for the VersionedTargetSet.
+      - artifactfiles is a list of absolute paths to artifacts for the VersionedTargetSet.
     """
     update_artifact_cache_work = self.get_update_artifact_cache_work(vts_artifactfiles_pairs)
     if update_artifact_cache_work:
@@ -370,7 +370,11 @@ class Task(object):
       target_classpath_file = os.path.join(target_workdir, 'classpath')
       raw_target_classpath_file = target_classpath_file + '.raw'
       raw_target_classpath_file_tmp = raw_target_classpath_file + '.tmp'
-      symlink_dir = os.path.join(target_workdir, 'jars')
+      # A common dir for symlinks into the ivy2 cache. This ensures that paths to jars
+      # in artifact-cached analysis files are consistent across systems.
+      # Note that we have one global, well-known symlink dir, again so that paths are
+      # consistent across builds.
+      symlink_dir = os.path.join(work_dir, 'jars')
 
       # Note that it's possible for all targets to be valid but for no classpath file to exist at
       # target_classpath_file, e.g., if we previously built a superset of targets.
@@ -409,8 +413,8 @@ class Task(object):
     # Make our actual classpath be symlinks, so that the paths are uniform across systems.
     # Note that we must do this even if we read the raw_target_classpath_file from the artifact
     # cache. If we cache the target_classpath_file we won't know how to create the symlinks.
-    symlink_map = IvyUtils.symlink_cachepath(raw_target_classpath_file, symlink_dir,
-                                             target_classpath_file)
+    symlink_map = IvyUtils.symlink_cachepath(self.context.ivy_home, raw_target_classpath_file,
+                                             symlink_dir, target_classpath_file)
     with Task.symlink_map_lock:
       all_symlinks_map = self.context.products.get_data('symlink_map') or defaultdict(list)
       for path, symlink in symlink_map.items():

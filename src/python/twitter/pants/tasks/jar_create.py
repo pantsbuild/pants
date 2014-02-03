@@ -115,7 +115,8 @@ class JarCreate(Task):
 
     self.jar_classes = options.jar_create_classes or products.isrequired('jars')
     if self.jar_classes:
-      products.require('classes')
+      products.require_data('classes_by_target')
+      products.require_data('resources_by_target')
 
     self.jar_idl = products.isrequired('idl_jars') or options.jar_create_idl
     if self.jar_idl:
@@ -148,9 +149,7 @@ class JarCreate(Task):
       self.context.products.get(typename).add(target, self._output_dir).append(name)
 
     if self.jar_classes:
-      self.jar(jar_targets(is_jvm_library),
-               self.context.products.get('classes'),
-               functools.partial(add_genjar, 'jars'))
+      self._jar(jar_targets(is_jvm_library), functools.partial(add_genjar, 'jars'))
 
     if self.jar_idl:
       self.idljar(jar_targets(is_idl_library), functools.partial(add_genjar, 'idl_jars'))
@@ -178,28 +177,25 @@ class JarCreate(Task):
     with open_jar(path, 'w', compression=self.compression) as jar:
       yield jar
 
-  def jar(self, jvm_targets, genmap, add_genjar):
+  def _jar(self, jvm_targets, add_genjar):
+    classes_by_target = self.context.products.get_data('classes_by_target')
+    resources_by_target = self.context.products.get_data('resources_by_target')
+
     for target in jvm_targets:
-      generated = genmap.get(target)
-      if generated or target.has_resources:
-        jar_name = jarname(target)
+      target_classes = classes_by_target.get(target)
+      target_resources = resources_by_target.get(target)
+      if target_classes or target_resources or target.has_resources:
+        jar_name = '%s.jar' % jarname(target)
         add_genjar(target, jar_name)
         jar_path = os.path.join(self._output_dir, jar_name)
-        with self.create_jar(target, jar_path) as jar:
-          if generated:
-            for basedir, classfiles in generated.items():
-              for classfile in classfiles:
-                jar.write(os.path.join(basedir, classfile), classfile)
-
-          if target.has_resources:
-            resources_genmap = self.context.products.get('resources')
-            if resources_genmap:
-              for resources in target.resources:
-                resource_map = resources_genmap.get(resources)
-                if resource_map:
-                  for basedir, files in resource_map.items():
-                    for resource in files:
-                      jar.write(os.path.join(basedir, resource), resource)
+        with self.create_jar(target, jar_path) as jarfile:
+          def add_to_jar(target_products):
+            if target_products:
+              for root, products in target_products.rel_paths():
+                for prod in products:
+                  jarfile.write(os.path.join(root, prod), prod)
+          add_to_jar(target_classes)
+          add_to_jar(target_resources)
 
   def idljar(self, idl_targets, add_genjar):
     for target in idl_targets:

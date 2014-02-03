@@ -75,7 +75,7 @@ class TarballArtifact(Artifact):
     # but decompression times are much faster.
     mode = 'w:gz' if self._compress else 'w'
     with open_tar(self._tarfile, mode, dereference=True, errorlevel=2) as tarout:
-      for path in paths:
+      for path in paths or ():
         # Adds dirs recursively.
         relpath = os.path.relpath(path, self._artifact_root)
         tarout.add(path, relpath)
