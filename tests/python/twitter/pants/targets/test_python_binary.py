@@ -14,15 +14,14 @@
 # limitations under the License.
 # ==================================================================================================
 
-import unittest
-
-from twitter.pants.base import ParseContext, Target, TargetDefinitionException
-from twitter.pants.targets import PythonBinary
-
 import pytest
 
+from twitter.pants.base import ParseContext, Target, TargetDefinitionException
+from twitter.pants.base_build_root_test import BaseBuildRootTest
+from twitter.pants.targets import PythonBinary
 
-class TestPythonBinary(unittest.TestCase):
+
+class TestPythonBinary(BaseBuildRootTest):
   def tearDown(self):
     Target._clear_all_addresses()
 
