@@ -17,10 +17,11 @@
 from __future__ import print_function
 
 import os
-import subprocess
 import sys
 
 from twitter.common.dirutil import safe_mkdir
+
+from twitter.pants.ivy import Bootstrapper, Ivy
 
 from .code_generator import CodeGenerator
 
@@ -31,8 +32,6 @@ class PythonAntlrBuilder(CodeGenerator):
   """
   def run_antlrs(self, output_dir):
     args = [
-      'java', '-jar', os.path.join(self.root, 'build-support/ivy/lib/ivy-2.2.0.jar'),
-      '-settings', os.path.join(self.root, 'build-support/ivy/ivysettings.xml'),
       '-dependency', 'org.antlr', 'antlr', self.target.antlr_version,
       '-types', 'jar',
       '-main', 'org.antlr.Tool',
@@ -42,17 +41,13 @@ class PythonAntlrBuilder(CodeGenerator):
       abs_path = os.path.abspath(os.path.join(self.root, self.target.target_base, source))
       args.append(abs_path)
 
-    print('PythonAntlrBuilder executing: %s' % ' '.join(map(str, args)))
-    po = subprocess.Popen(args)
-    rv = po.wait()
-    if rv != 0:
-      comm = po.communicate()
-      print('ANTLR generation failed!', file=sys.stderr)
-      print('STDOUT', file=sys.stderr)
-      print(comm[0], file=sys.stderr)
-      print('STDERR', file=sys.stderr)
-      print(comm[1], file=sys.stderr)
-    return rv == 0
+    try:
+      ivy = Bootstrapper.default_ivy()
+      ivy.execute(args=args)  # TODO: Needs a workunit, when we have a context here.
+      return True
+    except (Bootstrapper.Error, Ivy.Error) as e:
+      print('ANTLR generation failed! %s' % e, file=sys.stderr)
+      return False
 
   def generate(self):
     # Create the package structure.

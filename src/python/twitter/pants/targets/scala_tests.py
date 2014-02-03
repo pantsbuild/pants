@@ -14,29 +14,47 @@
 # limitations under the License.
 # ==================================================================================================
 
+from twitter.pants.base.build_manual import manual
+
 from .jvm_target import JvmTarget
 from .resources import Resources
 
 
+@manual.builddict(tags=["scala"])
 class ScalaTests(JvmTarget):
-  """Defines a target that tests a scala library."""
+  """Tests a Scala library."""
 
-  def __init__(self, name, sources=None, java_sources=None, dependencies=None, excludes=None,
-               resources=None, buildflags=None, exclusives=None):
-    """name: The name of this module target, addressable via pants via the portion of the spec
-        following the colon
-    sources: A list of paths containing the scala source files this modules tests are compiled from.
-    java_sources: An optional JavaLibrary target or list of targets containing the java libraries
-        this library has a circular dependency on.  Prefer using dependencies to express
-        non-circular dependencies.
-    dependencies: An optional list of Dependency objects specifying the binary (jar) dependencies of
-        this module.
-    excludes: An optional list of dependency exclude patterns to filter all of this module's
-        transitive dependencies against.
-    resources: An optional list of Resources that should be in this target's classpath.
-    buildflags: DEPRECATED - A list of additional command line arguments to pass to the underlying
-        build system for this target - now ignored.
-    exclusives:   An optional map of exclusives tags. See CheckExclusives for details.
+  def __init__(self,
+               name,
+               sources=None,
+               java_sources=None,
+               dependencies=None,
+               excludes=None,
+               resources=None,
+               buildflags=None,
+               exclusives=None):
+
+    """
+    :param name: The name of this module target, addressable via pants via the portion of the spec
+      following the colon
+    :param sources: A list of filenames representing the source code
+      this library is compiled from.
+    :type sources: list of strings
+    :param java_sources:
+      :class:`twitter.pants.targets.java_library.JavaLibrary` or list of
+      JavaLibrary targets this library has a circular dependency on.
+      Prefer using dependencies to express non-circular dependencies.
+    :param Artifact provides:
+      The :class:`twitter.pants.targets.artifact.Artifact`
+      to publish that represents this target outside the repo.
+    :param dependencies: List of :class:`twitter.pants.base.target.Target` instances
+      this target depends on.
+    :type dependencies: list of targets
+    :param excludes: List of :class:`twitter.pants.targets.exclude.Exclude` instances
+      to filter this target's transitive dependencies against.
+    :param resources: An optional list of Resources that should be in this target's classpath.
+    :param buildflags: Unused, and will be removed in a future release.
+    :param exclusives: An optional map of exclusives tags. See CheckExclusives for details.
     """
 
     JvmTarget.__init__(self, name, sources, dependencies, excludes, exclusives=exclusives)

@@ -18,13 +18,11 @@ from __future__ import print_function
 
 import os
 import sys
-import time
 
 from twitter.common import dirutil, log
 from twitter.common.process import spawn_daemon
-from twitter.common.quantity import Amount, Time
-from twitter.common.quantity.parse_simple import parse_time, InvalidTime
-from twitter.pants.base.build_environment import get_buildroot
+from twitter.common.quantity.parse_simple import parse_time
+from twitter.pants import get_buildroot
 from twitter.pants.buildtimestats import StatsUploader
 
 STATS_COLLECTION_URL = "devprod_stats.production.devprod.service.smf1.twitter.com"
@@ -37,10 +35,16 @@ CMD_TOTAL = "cmd_total"
 
 __author__ = 'Tejal Desai'
 
+
 class BuildTimeStats(object):
 
-  def __init__(self, user):
+  def __init__(self, user, force_upload):
+    """
+    :param user: The user to be used for uploading stats. Its the current user.
+    :param force_upload: [False] Uploads Stats at the end of pants run.
+    """
     self._user = user
+    self._force_upload = force_upload
     self._max_delay = parse_time(MAX_UPLOAD_DELAY)
 
   def _get_default_stats_file(self):
@@ -54,7 +58,7 @@ class BuildTimeStats(object):
         #Create a new structure
         timing = dict()
         timing['phase'] = str(phase)
-        timing['goal']  = goal
+        timing['goal'] = goal
         timing['total'] = sum(times)
         if not phase_time:
           phase_time = 0
@@ -65,13 +69,13 @@ class BuildTimeStats(object):
         #Add the phase total
         timing = dict()
         timing['phase'] = str(phase)
-        timing['goal']  = PHASE_TOTAL
+        timing['goal'] = PHASE_TOTAL
         timing['total'] = phase_time
         timings_array.append(timing)
     #end of Loop through PHASES
     timing = {}
     timing['phase'] = CMD_TOTAL
-    timing['goal']  = CMD_TOTAL
+    timing['goal'] = CMD_TOTAL
     timing['total'] = elapsed
     timings_array.append(timing)
     return timings_array
@@ -87,14 +91,11 @@ class BuildTimeStats(object):
     if not os.path.exists(stats_pid):
       log.debug("Starting the daemon")
       stats_log_file = os.path.join("/tmp", self._user, "buildtime_uploader")
-      log.debug("The logs are writen to %s" % stats_log_file)
+      log.debug("The logs are written to %s" % stats_log_file)
       if spawn_daemon(pidfile=stats_pid, quiet=True):
-        force_stats_upload = False
-        if "--force_stats_upload" in sys.argv:
-          force_stats_upload = True
         su = StatsUploader(STATS_COLLECTION_URL, STATS_COLLECTION_PORT, STATS_COLLECTION_ENDPOINT,
                            self._max_delay, self._get_default_stats_file(), self._user,
-                           force_stats_upload)
+                           self._force_upload)
         su.upload_sync(stats)
 
   def record_stats(self, timings, elapsed):

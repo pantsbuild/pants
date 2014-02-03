@@ -14,13 +14,24 @@
 # limitations under the License.
 # ==================================================================================================
 
-from twitter.pants.base import Target, TargetDefinitionException
+from functools import partial
 
+
+from twitter.common.collections import maybe_list, OrderedSet
+
+from twitter.pants.base import manual, Target, TargetDefinitionException
+from twitter.pants.base.target import TargetDefinitionException
+
+from .anonymous import AnonymousDeps
+from .external_dependency import ExternalDependency
 from .util import resolve
 
 
+@manual.builddict(tags=["anylang"])
 class JarLibrary(Target):
-  """Serves as a proxy for one or more JarDependencies or JavaTargets."""
+  """A set of dependencies that may be depended upon,
+  as if depending upon the set of dependencies directly.
+  """
 
   def __init__(self, name, dependencies, exclusives=None):
     """name: The name of this module target, addressable via pants via the portion of the spec
@@ -34,7 +45,11 @@ class JarLibrary(Target):
     if dependencies is None:
       raise TargetDefinitionException(self, "A dependencies list must be supplied even if empty.")
     self.add_labels('jars')
-    self.dependencies = resolve(dependencies)
+
+    self.dependencies = OrderedSet(maybe_list(resolve(dependencies),
+        expected_type=(ExternalDependency, AnonymousDeps, Target),
+        raise_type=partial(TargetDefinitionException, self)))
+
     self.dependency_addresses = set()
     for dependency in self.dependencies:
       if hasattr(dependency, 'address'):

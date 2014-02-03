@@ -16,6 +16,7 @@
 
 from __future__ import print_function
 
+import hashlib
 import os
 import re
 import tempfile
@@ -23,200 +24,218 @@ import tempfile
 from collections import defaultdict, namedtuple
 
 from twitter.common.collections import OrderedSet
-from twitter.common.dirutil import safe_mkdir
+from twitter.common.dirutil import safe_mkdir, safe_open
 
 from twitter.pants.base.build_environment import get_buildroot
-from twitter.pants.binary_util import JvmCommandLine
-from twitter.pants.targets import (
-    JavaLibrary,
-    JavaThriftLibrary,
-    ScalaLibrary)
+from twitter.pants.targets import InternalTarget, JavaLibrary, JavaThriftLibrary, ScalaLibrary
 from twitter.pants.tasks import TaskError
 from twitter.pants.tasks.nailgun_task import NailgunTask
 from twitter.pants.thrift_util import (
     calculate_compile_sources,
     calculate_compile_sources_HACK_FOR_SCROOGE_LEGACY)
 
-INFO_FOR_COMPILER = { 'scrooge':        { 'config': 'scrooge-gen',
-                                          'main':   'com.twitter.scrooge.Main',
-                                          'calculate_compile_sources': calculate_compile_sources,
-                                          'langs':  frozenset(['scala', 'java']) },
-
-                      'scrooge-legacy': { 'config': 'scrooge-legacy-gen',
-                                          'main':   'com.twitter.scrooge.Main',
-                                          'calculate_compile_sources':
-                                            calculate_compile_sources_HACK_FOR_SCROOGE_LEGACY,
-                                          'langs':  frozenset(['scala']) } }
-
-INFO_FOR_LANG = { 'scala':  { 'target_type': ScalaLibrary },
-                  'java':   { 'target_type': JavaLibrary  } }
+CompilerConfig = namedtuple('CompilerConfig', ['name', 'config_section', 'profile',
+                                               'main', 'calc_srcs', 'langs'])
 
 
-# like an associate array, but sub-sequences may have only one element (uses default)
-def value_from_seq_of_seq(seq_of_seq, key, default=None):
-  result = default
-  for seq in seq_of_seq:
-    if len(seq) == 1 and key == seq[0]:
-      break
-    elif len(seq) == 2 and key == seq[0]:
-      result = seq[1]
-      break
-    elif len(seq) == 0:
-      raise ValueError('A sequence of sequences may not have less than one element'
-                       ' in a sub-sequence.')
-    elif len(seq) > 2:
-      raise ValueError('A sequence of sequences may not have more than two elements'
-                       ' in a sub-sequence.')
-  return result
+class Compiler(namedtuple('CompilerConfigWithContext', ('context',) + CompilerConfig._fields)):
+  @classmethod
+  def fromConfig(cls, context, config):
+    return cls(context, **config._asdict())
+
+  @property
+  def jvm_args(self):
+    args = self.context.config.getlist(self.config_section, 'jvm_args', default=[])
+    args.append('-Dfile.encoding=UTF-8')
+    return args
+
+  @property
+  def outdir(self):
+    pants_workdir_fallback = os.path.join(get_buildroot(), '.pants.d')
+    workdir_fallback = os.path.join(self.context.config.getdefault('pants_workdir',
+                                                                   default=pants_workdir_fallback),
+                                    self.name)
+    outdir = (self.context.options.scrooge_gen_create_outdir
+              or self.context.config.get(self.config_section, 'workdir', default=workdir_fallback))
+    return os.path.relpath(outdir)
+
+  @property
+  def verbose(self):
+    if self.context.options.scrooge_gen_quiet is not None:
+      return not self.context.options.scrooge_gen_quiet
+    else:
+      return self.context.config.getbool(self.config_section, 'verbose', default=False)
+
+  @property
+  def strict(self):
+    return self.context.config.getbool(self.config_section, 'strict', default=False)
+
+
+_COMPILERS = [
+    CompilerConfig(name='scrooge',
+                   config_section='scrooge-gen',
+                   profile='scrooge-gen',
+                   main='com.twitter.scrooge.Main',
+                   calc_srcs=calculate_compile_sources,
+                   langs=frozenset(['scala', 'java'])),
+    CompilerConfig(name='scrooge-legacy',
+                   config_section='scrooge-legacy-gen',
+                   profile='scrooge-legacy-gen',
+                   main='com.twitter.scrooge.Main',
+                   calc_srcs=calculate_compile_sources_HACK_FOR_SCROOGE_LEGACY,
+                   langs=frozenset(['scala']))
+]
+
+_CONFIG_FOR_COMPILER = dict((compiler.name, compiler) for compiler in _COMPILERS)
+
+_TARGET_TYPE_FOR_LANG = dict(scala=ScalaLibrary, java=JavaLibrary)
 
 
 class ScroogeGen(NailgunTask):
-  class GenInfo(object):
-    def __init__(self, gen, deps):
-      self.gen = gen
-      self.deps = deps
+  GenInfo = namedtuple('GenInfo', ['gen', 'deps'])
+
+  class PartialCmd(namedtuple('PC', ['compiler', 'language', 'rpc_style', 'namespace_map'])):
+    @property
+    def outdir(self):
+      namespace_sig = None
+      if self.namespace_map:
+        sha = hashlib.sha1()
+        for ns_from, ns_to in sorted(self.namespace_map):
+          sha.update(ns_from)
+          sha.update(ns_to)
+        namespace_sig = sha.hexdigest()
+      output_style = '-'.join(filter(None, (self.language, self.rpc_style, namespace_sig)))
+      return os.path.join(self.compiler.outdir, output_style)
 
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
     option_group.add_option(mkflag("outdir"), dest="scrooge_gen_create_outdir",
                             help="Emit generated code in to this directory.")
+    option_group.add_option(mkflag("quiet"), dest="scrooge_gen_quiet",
+                            action="callback", callback=mkflag.set_bool, default=None,
+                            help="[%default] Suppress output, overrides verbose flag in pants.ini.")
 
-  def __init__(self, context, strict=False, verbose=True):
-    NailgunTask.__init__(self, context)
-    self.strict = strict
-    self.verbose = verbose
+  def __init__(self, context):
+    super(ScroogeGen, self).__init__(context)
+    self.compiler_for_name = dict((name, Compiler.fromConfig(context, config))
+                                  for name, config in _CONFIG_FOR_COMPILER.items())
 
-    for info in INFO_FOR_COMPILER.values():
-      config = info['config']
-      bootstrap_tools = context.config.getlist(config, 'bootstrap-tools',
-                                               default=[':%s' % config])
-      self._jvm_tool_bootstrapper.register_jvm_tool(config, bootstrap_tools)
+    for name, compiler in self.compiler_for_name.items():
+      bootstrap_tools = context.config.getlist(compiler.config_section, 'bootstrap-tools',
+                                               default=[':%s' % compiler.profile])
+      self._jvm_tool_bootstrapper.register_jvm_tool(compiler.name, bootstrap_tools)
 
-  def _outdir(self, target):
-    compiler_config = INFO_FOR_COMPILER[target.compiler]['config']
-    fallback = os.path.join(self.context.config.getdefault('pants_workdir'), target.compiler)
-    outdir = (self.context.options.scrooge_gen_create_outdir
-              or self.context.config.get(compiler_config, 'workdir', default=fallback))
-
-    outdir = os.path.relpath(outdir)
-    return outdir
-
-  def _verbose(self, target):
-    compiler_config = INFO_FOR_COMPILER[target.compiler]['config']
-    return self.context.config.getbool(compiler_config, 'verbose', default=self.verbose)
-
-  def _strict(self, target):
-    compiler_config = INFO_FOR_COMPILER[target.compiler]['config']
-    return self.context.config.getbool(compiler_config, 'strict', default=self.strict)
-
-  def _classpth(self, target):
-    key = INFO_FOR_COMPILER[target.compiler]['config']
-    return self._jvm_tool_bootstrapper.get_jvm_tool_classpath(key)
+  def _tempname(self):
+    # don't assume the user's cwd is buildroot
+    buildroot = get_buildroot()
+    fallback = os.path.join(get_buildroot(), '.pants.d')
+    pants_workdir = self.context.config.getdefault('pants_workdir', default=fallback)
+    tmp_dir = os.path.join(pants_workdir, 'tmp')
+    safe_mkdir(tmp_dir)
+    fd, path = tempfile.mkstemp(dir=tmp_dir, prefix='')
+    os.close(fd)
+    return path
 
   def execute(self, targets):
     gentargets_by_dependee = self.context.dependents(
-      on_predicate=is_gentarget,
-      from_predicate=lambda t: not is_gentarget(t)
-    )
+      on_predicate=self.is_gentarget,
+      from_predicate=lambda t: not self.is_gentarget(t))
+
     dependees_by_gentarget = defaultdict(set)
     for dependee, tgts in gentargets_by_dependee.items():
       for gentarget in tgts:
         dependees_by_gentarget[gentarget].add(dependee)
 
-    # TODO(Robert Nielsen): Add optimization to only regenerate the files that have changed
-    # initially we could just cache the generated file names and make subsequent invocations faster
-    # but a feature like --dry-run will likely be added to scrooge to get these file names (without
-    # actually doing the work of generating)
-    # AWESOME-1563
-
-    PartialCmd = namedtuple('PartialCmd', ['classpath', 'main', 'args'])
-
     partial_cmds = defaultdict(set)
-    gentargets = filter(is_gentarget, targets)
+    gentargets = filter(self.is_gentarget, targets)
 
     for target in gentargets:
-      args = []
-
-      language = target.language
-      args.append(('--language', language))
-
-      if target.rpc_style == 'ostrich':
-        args.append(('--finagle',))
-        args.append(('--ostrich',))
-      elif target.rpc_style == 'finagle':
-        args.append(('--finagle',))
-
-      if target.namespace_map:
-        for lhs, rhs in namespace_map([target]).items():
-          args.append(('--namespace-map', '%s=%s' % (lhs, rhs)))
-
-      outdir = self._outdir(target)
-      args.append(('--dest', '%s' % outdir))
-      safe_mkdir(outdir)
-
-      if not self._strict(target):
-        args.append(('--disable-strict',))
-
-      if self._verbose(target):
-        args.append(('--verbose',))
-
-      classpath = self._classpth(target)
-      main = INFO_FOR_COMPILER[target.compiler]['main']
-
-      partial_cmd = PartialCmd(tuple(classpath), main, tuple(args))
+      partial_cmd = self.PartialCmd(
+        compiler=self.compiler_for_name[target.compiler],
+        language=target.language,
+        rpc_style=target.rpc_style,
+        namespace_map=tuple(target.namespace_map.items()) if target.namespace_map else ())
       partial_cmds[partial_cmd].add(target)
 
-    for partial_cmd, targets in partial_cmds.items():
-      classpath = partial_cmd.classpath
-      main =      partial_cmd.main
-      args = list(partial_cmd.args)
+    for partial_cmd, tgts in partial_cmds.items():
+      gen_files_for_source = self.gen(partial_cmd, tgts)
 
-      compiler = list(targets)[0].compiler # any target will do (they all have the same compiler)
-      calculate_compile_sources = INFO_FOR_COMPILER[compiler]['calculate_compile_sources']
-      import_paths, sources = calculate_compile_sources(targets, is_gentarget)
-
-      for import_path in import_paths:
-        args.append(('--import-path', import_path))
-
-      gen_file_map_fd, gen_file_map_path = tempfile.mkstemp()
-      os.close(gen_file_map_fd)
-      args.append(('--gen-file-map', gen_file_map_path))
-      args.extend(sources)
-
-      cmdline = JvmCommandLine(classpath=classpath,
-                               main=main,
-                               args=args)
-
-      returncode = cmdline.call()
-
-      if 0 == returncode:
-        outdir = value_from_seq_of_seq(args, '--dest')
-        gen_files_for_source = self.parse_gen_file_map(gen_file_map_path, outdir)
-      os.remove(gen_file_map_path)
-
-      if 0 != returncode:
-        raise TaskError("java %s ... exited non-zero (%i)" % (main, returncode))
-
+      outdir = partial_cmd.outdir
       langtarget_by_gentarget = {}
-      for target in targets:
+      for target in tgts:
         dependees = dependees_by_gentarget.get(target, [])
-        langtarget_by_gentarget[target] = self.createtarget(target, dependees, gen_files_for_source)
+        langtarget_by_gentarget[target] = self.createtarget(target, dependees, outdir,
+                                                            gen_files_for_source)
 
-      genmap = self.context.products.get(language)
-      # synmap is a reverse map
-      # such as a map of java library target generated from java thrift target
-      synmap = self.context.products.get(language + ':rev')
+      genmap = self.context.products.get(partial_cmd.language)
       for gentarget, langtarget in langtarget_by_gentarget.items():
-        synmap.add(langtarget, get_buildroot(), [gentarget])
         genmap.add(gentarget, get_buildroot(), [langtarget])
         for dep in gentarget.internal_dependencies:
-          if is_gentarget(dep):
+          if self.is_gentarget(dep):
             langtarget.update_dependencies([langtarget_by_gentarget[dep]])
 
-  def createtarget(self, gentarget, dependees, gen_files_for_source):
-    assert is_gentarget(gentarget)
+  def gen(self, partial_cmd, targets):
+    with self.invalidated(targets, invalidate_dependents=True) as invalidation_check:
+      invalid_targets = []
+      for vt in invalidation_check.invalid_vts:
+        invalid_targets.extend(vt.targets)
 
-    def create_target(files, deps, outdir, target_type):
+      compiler = partial_cmd.compiler
+      import_paths, changed_srcs = compiler.calc_srcs(invalid_targets, self.is_gentarget)
+      outdir = partial_cmd.outdir
+      if changed_srcs:
+        args = []
+
+        for import_path in import_paths:
+          args.extend(['--import-path', import_path])
+
+        args.extend(['--language', partial_cmd.language])
+
+        for lhs, rhs in partial_cmd.namespace_map:
+          args.extend(['--namespace-map', '%s=%s' % (lhs, rhs)])
+
+        if partial_cmd.rpc_style == 'ostrich':
+          args.append('--finagle')
+          args.append('--ostrich')
+        elif partial_cmd.rpc_style == 'finagle':
+          args.append('--finagle')
+
+        args.extend(['--dest', outdir])
+        safe_mkdir(outdir)
+
+        if not compiler.strict:
+          args.append('--disable-strict')
+
+        if compiler.verbose:
+          args.append('--verbose')
+
+        gen_file_map_path = os.path.relpath(self._tempname())
+        args.extend(['--gen-file-map', gen_file_map_path])
+
+        args.extend(changed_srcs)
+
+        classpath = self._jvm_tool_bootstrapper.get_jvm_tool_classpath(compiler.name)
+        returncode = self.runjava(classpath=classpath,
+                                  main=compiler.main,
+                                  jvm_options=compiler.jvm_args,
+                                  args=args,
+                                  workunit_name=compiler.name)
+        try:
+          if 0 == returncode:
+            gen_files_for_source = self.parse_gen_file_map(gen_file_map_path, outdir)
+        finally:
+          os.remove(gen_file_map_path)
+
+        if 0 != returncode:
+          raise TaskError('java %s ... exited non-zero (%i)' % (compiler.main, returncode))
+        self.write_gen_file_map(gen_files_for_source, invalid_targets, outdir)
+
+    return self.gen_file_map(targets, outdir)
+
+  def createtarget(self, gentarget, dependees, outdir, gen_files_for_source):
+    assert self.is_gentarget(gentarget)
+
+    def create_target(files, deps, target_type):
       return self.context.add_new_target(outdir,
                                          target_type,
                                          name=gentarget.id,
@@ -225,8 +244,10 @@ class ScroogeGen(NailgunTask):
                                          dependencies=deps)
 
     def create_geninfo(key):
-      compiler_config = INFO_FOR_COMPILER[gentarget.compiler]['config']
-      gen_info = self.context.config.getdict(compiler_config, key)
+      compiler = self.compiler_for_name[gentarget.compiler]
+      gen_info = self.context.config.getdict(compiler.config_section, key,
+                                             default={'gen': key,
+                                                      'deps': {'service': [], 'structs': []}})
       gen = gen_info['gen']
       deps = dict()
       for category, depspecs in gen_info['deps'].items():
@@ -251,25 +272,95 @@ class ScroogeGen(NailgunTask):
       files.extend(genfiles)
     deps = OrderedSet(geninfo.deps['service' if has_service else 'structs'])
     deps.update(target.dependencies)
-    outdir = self._outdir(target)
-    target_type = INFO_FOR_LANG[target.language]['target_type']
-    tgt = create_target(files, deps, outdir, target_type)
-    tgt.id = target.id
+    target_type = _TARGET_TYPE_FOR_LANG[target.language]
+    tgt = create_target(files, deps, target_type)
     tgt.derived_from = target
-    tgt.add_labels('synthetic')
+    tgt.add_labels('codegen', 'synthetic')
     for dependee in dependees:
-      dependee.update_dependencies([tgt])
+      if isinstance(dependee, InternalTarget):
+        dependee.update_dependencies((tgt,))
+      else:
+        # TODO(John Sirois): rationalize targets with dependencies.
+        # JarLibrary or PythonTarget dependee on the thrift target
+        dependee.dependencies.add(tgt)
     return tgt
 
-  def parse_gen_file_map(self, gen_file_map, outdir):
+  def parse_gen_file_map(self, gen_file_map_path, outdir):
     d = defaultdict(set)
-    with open(gen_file_map, 'r') as deps:
+    with open(gen_file_map_path, 'r') as deps:
       for dep in deps:
         src, cls = dep.strip().split('->')
-        src = os.path.relpath(src.strip(), os.path.curdir)
+        src = os.path.relpath(src.strip())
         cls = os.path.relpath(cls.strip(), outdir)
         d[src].add(cls)
     return d
+
+  def gen_file_map_path_for_target(self, target, outdir):
+    return os.path.join(outdir, 'gen-file-map-by-target', target.id)
+
+  def gen_file_map_for_target(self, target, outdir):
+    gen_file_map = self.gen_file_map_path_for_target(target, outdir)
+    return self.parse_gen_file_map(gen_file_map, outdir)
+
+  def gen_file_map(self, targets, outdir):
+    gen_file_map = defaultdict(set)
+    for target in targets:
+      target_gen_file_map = self.gen_file_map_for_target(target, outdir)
+      gen_file_map.update(target_gen_file_map)
+    return gen_file_map
+
+  def write_gen_file_map_for_target(self, gen_file_map, target, outdir):
+    def calc_srcs(target):
+      _, srcs = calculate_compile_sources([target], self.is_gentarget)
+      return srcs
+    with safe_open(self.gen_file_map_path_for_target(target, outdir), 'w') as f:
+      for src in sorted(calc_srcs(target)):
+        clss = gen_file_map[src]
+        for cls in sorted(clss):
+          print('%s -> %s' % (src, os.path.join(outdir, cls)), file=f)
+
+  def write_gen_file_map(self, gen_file_map, targets, outdir):
+    for target in targets:
+      self.write_gen_file_map_for_target(gen_file_map, target, outdir)
+
+  def is_gentarget(self, target):
+    result = (isinstance(target, JavaThriftLibrary)
+              and target.compiler in self.compiler_for_name.keys())
+
+    if result and target.language not in self.compiler_for_name[target.compiler].langs:
+      raise TaskError("%s can not generate %s" % (target.compiler, target.language))
+    return result
+
+  @staticmethod
+  def _validate(targets):
+    ValidateCompilerConfig = namedtuple('ValidateCompilerConfig', ['language', 'rpc_style'])
+
+    def compiler_config(tgt):
+      # Note compiler is not present in this signature. At this time
+      # Scrooge and the Apache thrift generators produce identical
+      # java sources, and the Apache generator does not produce scala
+      # sources. As there's no permutation allowing the creation of
+      # incompatible sources with the same language+rpc_style we omit
+      # the compiler from the signature at this time.
+      return ValidateCompilerConfig(language=tgt.language, rpc_style=tgt.rpc_style)
+
+    mismatched_compiler_configs = defaultdict(set)
+
+    for target in filter(lambda t: isinstance(t, JavaThriftLibrary), targets):
+      mycompilerconfig = compiler_config(target)
+      def collect(dep):
+        if mycompilerconfig != compiler_config(dep):
+          mismatched_compiler_configs[target].add(dep)
+      target.walk(collect, predicate=lambda t: isinstance(t, JavaThriftLibrary))
+
+    if mismatched_compiler_configs:
+      msg = ['Thrift dependency trees must be generated with a uniform compiler configuration.\n\n']
+      for tgt in sorted(mismatched_compiler_configs.keys()):
+        msg.append('%s - %s\n' % (tgt, compiler_config(tgt)))
+        for dep in mismatched_compiler_configs[tgt]:
+          msg.append('    %s - %s\n' % (dep, compiler_config(dep)))
+      raise TaskError(''.join(msg))
+
 
 NAMESPACE_PARSER = re.compile(r'^\s*namespace\s+([^\s]+)\s+([^\s]+)\s*$')
 TYPE_PARSER = re.compile(r'^\s*(const|enum|exception|service|struct|union)\s+([^\s{]+).*')
@@ -298,30 +389,3 @@ def calculate_services(source):
           types[typename].add(name)
 
     return types['service']
-
-
-def is_gentarget(target):
-  result = (isinstance(target, JavaThriftLibrary)
-            and hasattr(target, 'compiler')
-            and hasattr(target, 'language')
-            and target.compiler in INFO_FOR_COMPILER)
-
-  if result and target.language not in INFO_FOR_COMPILER[target.compiler]['langs']:
-    raise TaskError("%s can not generate %s" % (target.compiler, target.language))
-  return result
-
-
-def namespace_map(targets):
-  result = dict()
-  target_for_lhs = dict()
-  for target in targets:
-    if target.namespace_map:
-      for lhs, rhs in target.namespace_map.items():
-        current_rhs = result.get(lhs)
-        if None == current_rhs:
-          result[lhs] = rhs
-          target_for_lhs[lhs] = target
-        elif current_rhs != rhs:
-          raise TaskError("Conflicting namespace_map values:\n\t%s {'%s': '%s'}\n\t%s {'%s': '%s'}"
-                          % (target_for_lhs[lhs], lhs, current_rhs, target, lhs, rhs))
-  return result

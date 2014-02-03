@@ -58,7 +58,7 @@ class WorkUnit(object):
   RUN = 11       # Running a binary.
   REPL = 12      # Running a repl.
 
-  def __init__(self, run_tracker, parent, name, labels=(), cmd=''):
+  def __init__(self, run_tracker, parent, name, labels=None, cmd=''):
     """
     - run_tracker: The RunTracker that tracks this WorkUnit.
     - parent: The containing workunit, if any. E.g., 'compile' might contain 'java', 'scala' etc.,
@@ -76,7 +76,7 @@ class WorkUnit(object):
     self.children = []
 
     self.name = name
-    self.labels = set(labels)
+    self.labels = set(labels or ())
     self.cmd = cmd
     self.id = uuid.uuid4()
 

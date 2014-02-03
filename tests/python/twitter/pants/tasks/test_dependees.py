@@ -16,9 +16,16 @@
 
 from textwrap import dedent
 
+from twitter.pants import get_buildroot
+from twitter.pants.targets.python_tests import PythonTests, PythonTestSuite
+from twitter.pants.targets.sources import SourceRoot
+from twitter.pants.tasks import TaskError
 from twitter.pants.tasks.dependees import ReverseDepmap
 
 from . import ConsoleTaskTest
+
+
+import mox
 
 
 class BaseReverseDepmapTest(ConsoleTaskTest):
@@ -32,7 +39,7 @@ class ReverseDepmapEmptyTest(BaseReverseDepmapTest):
     self.assert_console_output(targets=[])
 
 
-class ReverseDepmapTest(BaseReverseDepmapTest):
+class ReverseDepmapTest(BaseReverseDepmapTest, mox.MoxTestBase):
   @classmethod
   def setUpClass(cls):
     super(ReverseDepmapTest, cls).setUpClass()
@@ -48,15 +55,52 @@ class ReverseDepmapTest(BaseReverseDepmapTest):
         deps=','.join("pants('%s')" % dep for dep in list(deps)))
       ))
 
-    create_target('common/a', 'a')
+    create_target('common/a', 'a', deps=['common/d'])
     create_target('common/b', 'b')
     create_target('common/c', 'c')
     create_target('common/d', 'd')
+    create_target('tests/d', 'd', deps=['common/d'])
     create_target('overlaps', 'one', deps=['common/a', 'common/b'])
     create_target('overlaps', 'two', deps=['common/a', 'common/c'])
     create_target('overlaps', 'three', deps=['common/a', 'overlaps:one'])
     create_target('overlaps', 'four', alias=True, deps=['common/b'])
     create_target('overlaps', 'five', deps=['overlaps:four'])
+    cls.create_target('resources/a', dedent('''
+      resources(
+        name='a_resources',
+        sources=['a.resource']
+      )
+    '''))
+
+    cls.create_target('src/java/a', dedent('''
+      java_library(
+        name='a_java',
+        resources=[pants('resources/a:a_resources')]
+      )
+    '''))
+
+    #Compile idl tests
+    cls.create_target('src/thrift/example', dedent('''
+      thrift_library(name='mybird', sources=None)
+      '''))
+
+    cls.create_target('src/thrift/example', dedent('''
+      compiled_idl(name='compiled_scala', idl_deps=[pants(':mybird')])
+      '''))
+
+    create_target('src/thrift/dependent', 'my-example', deps=['src/thrift/example:mybird'])
+
+    #External Dependency tests
+    cls.create_target('src/java/example', dedent('''
+      java_library(name='mybird', sources=['1.java'],
+                   dependencies=[jar(org='com', name='twitter')])
+      '''))
+
+    cls.create_target('src/java/example', dedent('''
+      java_library(name='example2', 
+                   dependencies=[pants(':mybird')],
+                   sources=['2.java'])
+      '''))
 
   def test_roots(self):
     self.assert_console_output(
@@ -114,3 +158,45 @@ class ReverseDepmapTest(BaseReverseDepmapTest):
       'overlaps/BUILD:five',
       targets=[self.target('overlaps:four')]
     )
+
+  def test_depeendees_type(self):
+    self._set_up_mocks(PythonTests, ["%s/tests" % get_buildroot()])
+    self.assert_console_output(
+      'tests/d/BUILD:d',
+      args=['--test-type=python_tests'],
+      targets=[self.target('common/d')]
+    )
+
+  def test_empty_depeendees_type(self):
+    self._set_up_mocks(PythonTestSuite, [])
+    self.assert_console_raises(
+      TaskError,
+      args=['--test-type=python_test_suite'],
+      targets=[self.target('common/d')]
+    )
+
+  def test_compile_idls(self):
+    self.assert_console_output(
+      'src/thrift/dependent/BUILD:my-example',
+      'src/thrift/example/BUILD:compiled_scala',
+      targets=[
+        self.target('src/thrift/example:mybird'),
+      ],
+    )
+
+  def test_external_dependency(self):
+    self.assert_console_output(
+      'src/java/example/BUILD:example2',
+       targets=[self.target('src/java/example/BUILD:mybird')]
+    )
+ 
+  def test_resources_dependees(self):
+    self.assert_console_output(
+      'src/java/a/BUILD:a_java',
+       targets=[self.target('resources/a:a_resources')]
+    )
+
+  def _set_up_mocks(self, class_type, src_roots):
+    self.mox.StubOutWithMock(SourceRoot, 'roots')
+    SourceRoot.roots(class_type).AndReturn(src_roots)
+    self.mox.ReplayAll()

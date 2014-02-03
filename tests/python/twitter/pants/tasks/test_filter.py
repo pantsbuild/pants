@@ -45,8 +45,13 @@ class FilterTest(BaseFilterTest):
   def setUpClass(cls):
     super(FilterTest, cls).setUpClass()
 
+    requirement_injected = set()
+
     def create_target(path, name, *deps):
-      all_deps = ["pants('%s')" % dep for dep in list(deps)] + ["python_requirement('foo')"]
+      if path not in requirement_injected:
+        cls.create_target(path, "python_requirement('foo')")
+        requirement_injected.add(path)
+      all_deps = ["pants('%s')" % dep for dep in deps] + ["pants(':foo')"]
       cls.create_target(path, dedent('''
           python_library(name='%s',
             dependencies=[%s]

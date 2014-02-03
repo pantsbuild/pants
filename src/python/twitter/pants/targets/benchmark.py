@@ -16,10 +16,15 @@
 
 from .jvm_target import JvmTarget
 from .resources import Resources
+from twitter.pants.base.build_manual import manual
 
 
+@manual.builddict(tags=["jvm"])
 class Benchmark(JvmTarget):
-  """Defines a target that run a caliper benchmark."""
+  """A caliper benchmark.
+
+  Run it with the ``bench`` goal.
+  """
 
   def __init__(self,
                name,
@@ -28,6 +33,24 @@ class Benchmark(JvmTarget):
                dependencies = None,
                excludes = None,
                resources = None):
+    """
+    :param string name: The name of this target, which combined with this
+      build file defines the target :class:`twitter.pants.base.address.Address`.
+    :param sources: A list of filenames representing the source code
+      this library is compiled from.
+    :type sources: list of strings
+    :param java_sources:
+      :class:`twitter.pants.targets.java_library.JavaLibrary` or list of
+      JavaLibrary targets this library has a circular dependency on.
+      Prefer using dependencies to express non-circular dependencies.
+    :param dependencies: List of :class:`twitter.pants.base.target.Target` instances
+      this target depends on.
+    :type dependencies: list of targets
+    :param excludes: List of :class:`twitter.pants.targets.exclude.Exclude` instances
+      to filter this target's transitive dependencies against.
+    :param resources: An optional list of ``resources`` targets containing text
+      file resources to place in this module's jar.
+    """
 
     JvmTarget.__init__(self,
                        name,

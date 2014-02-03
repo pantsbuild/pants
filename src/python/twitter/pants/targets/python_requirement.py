@@ -14,13 +14,14 @@
 # limitations under the License.
 # ==================================================================================================
 
-from twitter.pants.base import Target
+from twitter.pants.base import manual, Target
 
 from .external_dependency import ExternalDependency
 
 from pkg_resources import Requirement
 
 
+@manual.builddict(tags=["python"])
 class PythonRequirement(Target, ExternalDependency):
   """Pants wrapper around pkg_resources.Requirement"""
 
