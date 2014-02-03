@@ -15,54 +15,37 @@ from twitter.common.quantity import Amount, Time
 
 from twitter.pants.buildtimestats import BuildTimeStats as RealBuildTimeStats
 from twitter.pants.buildtimestats import StatsUploader as RealStatsUploader
-from twitter.pants.buildtimestats import StatsHttpClient as RealStatsHttpClient
 
-
-class StatsHttpClient(RealStatsHttpClient):
-  def __init__(self, host=None, port=None, http_endpoint=None, stats_dir=None):
-    self.called = False
-    RealStatsHttpClient.__init__(self, host, port, http_endpoint, stats_dir)
-
-  def process_stats_file(self):
-    self.called = True
 
 class StatsUploader(RealStatsUploader):
-  def __init__(self, host, port, endpoint, max_delay, stats_file, user, force_upload):
+  def __init__(self, host, port, endpoint, max_delay, stats_file, user):
     self._calls = []
-    RealStatsUploader.__init__(self, host, port, endpoint, max_delay, stats_file, user, force_upload)
-    self._stats_http_client = StatsHttpClient(host, port, endpoint, self._stats_dir)
+    RealStatsUploader.__init__(self,host, port, endpoint, max_delay, stats_file, user)
 
   def _append_to_file(self, src, target):
     if not self._calls:
       self._calls = []
     self._calls.append({src :target})
-
   def get_calls(self):
     return self._calls
-
-  def get_uploaded_stats(self):
-    return self._stats_http_client.called
 
 
 
 class BuildTimeStats(RealBuildTimeStats):
-  def __init__(self, file_nm, force_upload):
+  def __init__(self, file_nm):
     self._file = file_nm
-    self._force_upload = force_upload
 
   def stats_uploader_daemon(self, stats):
     """
     This method calls uploader in sync
     """
-    self._su = StatsUploader("locahost", "80", "buildtime.json", Amount(6, Time.HOURS),
-                              self._file, "dummy", self._force_upload)
+    self._su = StatsUploader("localhost", "80", "buildtime.json", Amount(6, Time.HOURS),
+                              self._file, "dummy")
     self._su.upload_sync(stats)
 
   def get_log_append_calls(self):
     return self._su.get_calls()
 
-  def get_uploaded_stats(self):
-    return self._su.get_uploaded_stats()
 
 class BuildTimeStatsTest(unittest.TestCase):
   def setUp(self):
@@ -85,7 +68,7 @@ class BuildTimeStatsTest(unittest.TestCase):
                       "test": {'junit': [9.1075897216796875e-05], 'specs': [0.0015749931335449219]}
                     }
     with temporary_file() as temp_fd:
-      bs = BuildTimeStats(temp_fd.name, False)
+      bs = BuildTimeStats(temp_fd.name)
       actual_timings = bs.compute_stats(executed_goals, 100)
       expected_timings =[{'phase': 'resolve', 'total': 0.00097703933715820312, 'goal': 'ivy'},
                        {'phase': 'resolve-idl', 'total': 0.00072813034057617188, 'goal': 'idl'},
@@ -112,7 +95,7 @@ class BuildTimeStatsTest(unittest.TestCase):
     self.set_up_mocks()
     with temporary_file() as temp_fd:
       temp_filename = temp_fd.name
-      bs = BuildTimeStats(temp_filename, False)
+      bs = BuildTimeStats(temp_filename)
       bs.record_stats(timings, 100)
       with open(temp_filename, 'r') as stats_file:
         stats = json.load(temp_fd)
@@ -131,13 +114,12 @@ class BuildTimeStatsTest(unittest.TestCase):
                  {"/tmp/test/current_run.ERROR": "/tmp/dummy/buildtime_uploader.global.ERROR"},
                  {"/tmp/test/current_run.WARNING": "/tmp/dummy/buildtime_uploader.global.WARNING"}]
     self.assertEqual(bs.get_log_append_calls(), exp_calls)
-    self.assertEqual(bs.get_uploaded_stats(), False)
 
   def test_record_stats_written(self):
     timings =  {"compile": {'checkstyle': [0.00057005882263183594]}}
     with temporary_file() as temp_fd:
       temp_filename = temp_fd.name
-      bs = BuildTimeStats(temp_filename, False)
+      bs = BuildTimeStats(temp_filename)
       self.set_up_mocks()
 
       bs.record_stats(timings, 100)
@@ -157,17 +139,6 @@ class BuildTimeStatsTest(unittest.TestCase):
                  {"/tmp/test/current_run.ERROR": "/tmp/dummy/buildtime_uploader.global.ERROR"},
                  {"/tmp/test/current_run.WARNING": "/tmp/dummy/buildtime_uploader.global.WARNING"}]
     self.assertEqual(bs.get_log_append_calls(), exp_calls)
-    self.assertEqual(bs.get_uploaded_stats(), False)
-
-  def test_force_upload(self):
-    timings =  {"compile": {'checkstyle': [0.00057005882263183594]}}
-    self.set_up_mocks()
-    with temporary_file() as temp_fd:
-      temp_filename = temp_fd.name
-      bs = BuildTimeStats(temp_filename, True)
-      bs.record_stats(timings, 100)
-    self.assertEqual(bs.get_uploaded_stats(), True)
-    self.mox.VerifyAll()
 
   def set_up_mocks(self, su=None):
     self.mox.StubOutWithMock(dirutil, 'safe_mkdtemp')
@@ -184,8 +155,8 @@ class BuildTimeStatsTest(unittest.TestCase):
 
     self.mox.StubOutWithMock(psutil, 'cpu_percent')
     psutil.cpu_percent(interval=1).AndReturn(1.0)
-    self.mox.StubOutWithMock(psutil, 'net_io_counters')
-    psutil.net_io_counters().AndReturn("1000,10000,1000")
+    self.mox.StubOutWithMock(psutil, 'network_io_counters')
+    psutil.network_io_counters().AndReturn("1000,10000,1000")
     self.mox.StubOutWithMock(psutil, 'NUM_CPUS')
     psutil.NUM_CPUS = 5
 

@@ -14,54 +14,22 @@
 # limitations under the License.
 # =================================================================================================
 
-import os
 
-from twitter.pants.targets.annotation_processor import AnnotationProcessor
-from twitter.pants.targets.doc import Page
-from twitter.pants.targets.java_antlr_library import JavaAntlrLibrary
-from twitter.pants.targets.java_library import JavaLibrary
-from twitter.pants.targets.java_protobuf_library import JavaProtobufLibrary
-from twitter.pants.targets.java_tests import JavaTests
-from twitter.pants.targets.java_thrift_library import JavaThriftLibrary
-from twitter.pants.targets.jvm_binary import JvmBinary
-from twitter.pants.targets.python_antlr_library import PythonAntlrLibrary
-from twitter.pants.targets.python_binary import PythonBinary
-from twitter.pants.targets.python_library import PythonLibrary
-from twitter.pants.targets.python_tests import PythonTests, PythonTestSuite
-from twitter.pants.targets.python_thrift_library import PythonThriftLibrary
-from twitter.pants.targets.resources import Resources
-from twitter.pants.targets.ruby_thrift_library import RubyThriftLibrary
-from twitter.pants.targets.scala_library import ScalaLibrary
-from twitter.pants.targets.scala_tests import ScalaTests
-from twitter.pants.targets.sources import SourceRoot
-from twitter.pants.targets.thrift_library import ThriftLibrary
+from __future__ import print_function
 
 
-def maven_layout(basedir=None):
-  """Sets up typical maven project source roots for all built-in pants target types.
+def maven_layout():
+  """Sets up typical maven project source roots for all built-in pants target types."""
 
-  Shortcut for ``source_root('src/main/java', *java targets*)``,
-  ``source_root('src/main/python', *python targets*)``, ...
+  source_root('src/main/antlr', java_antlr_library, page, python_antlr_library)
+  source_root('src/main/java', annotation_processor, java_library, jvm_binary, page)
+  source_root('src/main/protobuf', java_protobuf_library, page)
+  source_root('src/main/python', page, python_binary, python_library)
+  source_root('src/main/resources', page, resources)
+  source_root('src/main/scala', jvm_binary, page, scala_library)
+  source_root('src/main/thrift', java_thrift_library, page, python_thrift_library)
 
-  :param string basedir: Instead of using this BUILD file's directory as
-    the base of the source tree, use a subdirectory. E.g., instead of
-    expecting to find java files in ``src/main/java``, expect them in
-    ``**basedir**/src/main/java``.
-  """
-
-  def root(path, *types):
-    SourceRoot.register(os.path.join(basedir, path) if basedir else path, *types)
-
-  root('src/main/antlr', JavaAntlrLibrary, Page, PythonAntlrLibrary)
-  root('src/main/java', AnnotationProcessor, JavaLibrary, JvmBinary, Page)
-  root('src/main/protobuf', JavaProtobufLibrary, Page)
-  root('src/main/python', Page, PythonBinary, PythonLibrary)
-  root('src/main/resources', Page, Resources)
-  root('src/main/scala', JvmBinary, Page, ScalaLibrary)
-  root('src/main/thrift', JavaThriftLibrary, Page, PythonThriftLibrary, RubyThriftLibrary,
-       ThriftLibrary)
-
-  root('src/test/java', JavaLibrary, JavaTests, Page)
-  root('src/test/python', Page, PythonLibrary, PythonTests, PythonTestSuite)
-  root('src/test/resources', Page, Resources)
-  root('src/test/scala', JavaTests, Page, ScalaLibrary, ScalaTests)
+  source_root('src/test/java', java_library, junit_tests, page)
+  source_root('src/test/python', page, python_library, python_tests, python_test_suite)
+  source_root('src/test/resources', page, resources)
+  source_root('src/test/scala', junit_tests, page, scala_library, scala_specs)

@@ -15,10 +15,9 @@
 # ==================================================================================================
 
 from .address import Address
-from .build_manual import get_builddict_info, manual
 from .build_file import BuildFile
 from .config import Config
-from .parse_context import ParseContext
+from .parse_context import ContextError, ParseContext
 from .target import Target, TargetDefinitionException
 from .timer import Timer
 
@@ -27,8 +26,7 @@ __all__ = (
   'Address',
   'BuildFile',
   'Config',
-  'get_builddict_info',
-  'manual',
+  'ContextError',
   'ParseContext',
   'Target',
   'TargetDefinitionException',

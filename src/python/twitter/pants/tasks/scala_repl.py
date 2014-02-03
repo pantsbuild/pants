@@ -17,27 +17,26 @@
 import shlex
 import subprocess
 
+from twitter.pants.binary_util import runjava_indivisible
 from twitter.pants.base.workunit import WorkUnit
-from twitter.pants.java.util import execute_java
-from .jvm_task import JvmTask
-
-from . import Task
+from twitter.pants.tasks import Task
+from twitter.pants.tasks.jvm_task import JvmTask
 
 
 class ScalaRepl(JvmTask):
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
-    option_group.add_option(mkflag("jvmargs"), dest = "run_jvmargs", action="append",
-      help = "Run the repl in a jvm with these extra jvm args.")
+    option_group.add_option(mkflag('jvmargs'), dest = 'run_jvm_options', action='append',
+      help = 'Run the repl in a jvm with these extra jvm options.')
     option_group.add_option(mkflag('args'), dest = 'run_args', action='append',
                             help = 'run the repl in a jvm with extra args.')
 
   def __init__(self, context):
     Task.__init__(self, context)
-    self.jvm_args = context.config.getlist('scala-repl', 'jvm_args', default=[])
-    if context.options.run_jvmargs:
-      for arg in context.options.run_jvmargs:
-        self.jvm_args.extend(shlex.split(arg))
+    self._jvm_options = context.config.getlist('scala-repl', 'jvm_args', default=[])
+    if context.options.run_jvm_options:
+      for arg in context.options.run_jvm_options:
+        self._jvm_options.extend(shlex.split(arg))
     self.confs = context.config.getlist('scala-repl', 'confs')
     self._bootstrap_key = 'scala-repl'
     bootstrap_tools = context.config.getlist('scala-repl', 'bootstrap-tools')
@@ -51,29 +50,33 @@ class ScalaRepl(JvmTask):
   def execute(self, targets):
     # The repl session may last a while, allow concurrent pants activity during this pants idle
     # period.
-    tools_classpath = self._jvm_tool_bootstrapper.get_jvm_tool_classpath(self._bootstrap_key)
-
     self.context.lock.release()
     self.save_stty_options()
 
-    classpath = self.classpath(tools_classpath,
-                               confs=self.confs,
-                               exclusives_classpath=self.get_base_classpath_for_target(targets[0]))
+    def repl_workunit_factory(name, labels=list(), cmd=''):
+      return self.context.new_workunit(name=name, labels=[WorkUnit.REPL] + labels, cmd=cmd)
 
-    print('')  # Start REPL output on a new line.
-    try:
-      execute_java(classpath=classpath,
-                   main=self.main,
-                   jvm_options=self.jvm_args,
-                   args=self.args,
-                   workunit_factory=self.context.new_workunit,
-                   workunit_name='repl',
-                   workunit_labels=[WorkUnit.REPL, WorkUnit.JVM])
-    except KeyboardInterrupt:
-      # TODO(John Sirois): Confirm with Steve Gury that finally does not work on mac and an
-      # explicit catch of KeyboardInterrupt is required.
-      pass
-    self.restore_ssty_options()
+    tools_classpath = self._jvm_tool_bootstrapper.get_jvm_tool_classpath(self._bootstrap_key)
+    kwargs = {
+      'jvm_options': self._jvm_options,
+      'classpath': self.classpath(tools_classpath, confs=self.confs,
+            exclusives_classpath=self.get_base_classpath_for_target(targets[0])),
+      'main': self.main,
+      'args': self.args
+    }
+    # Capture the cmd_line.
+    cmd = runjava_indivisible(dryrun=True, **kwargs)
+    with self.context.new_workunit(name='repl', labels=[WorkUnit.REPL, WorkUnit.JVM], cmd=cmd):
+      # Now actually run the REPL. We don't let runjava_indivisible create a workunit because we
+      # want the REPL's output to go straight to stdout and not get buffered by the report.
+      print('')  # Start REPL output on a new line.
+      try:
+        runjava_indivisible(dryrun=False, **kwargs)
+      except KeyboardInterrupt:
+        # TODO(John Sirois): Confirm with Steve Gury that finally does not work on mac and an
+        # explicit catch of KeyboardInterrupt is required.
+        pass
+      self.restore_ssty_options()
 
   def save_stty_options(self):
     """

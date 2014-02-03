@@ -59,6 +59,7 @@ class MultipleRootedProducts(object):
       self._rooted_products_by_root[root] = ret
     return ret
 
+
 class Products(object):
   """An out-of-band 'dropbox' where tasks can place build product information for later tasks to use.
 
@@ -92,8 +93,6 @@ class Products(object):
       self.typename = typename
       self.by_target = defaultdict(lambda: defaultdict(list))
 
-    def empty(self):
-      return len(self.by_target) == 0
 
     def add(self, target, basedir, product_paths=None):
       """
@@ -115,10 +114,19 @@ class Products(object):
 
     def get(self, target):
       """
-        Returns the product mapping for the given target as a tuple of (basedir, products list).
-        Can return None if there is no mapping for the given target.
+        Returns the product mapping for the given target as a map of <basedir> -> <products list>,
+        or None if no such product exists.
       """
       return self.by_target.get(target)
+
+    def __getitem__(self, target):
+      """
+        Support for subscripting into this mapping. Returns the product mapping for the given target
+        as a map of <basedir> -> <products list>.
+        If no mapping exists, returns an empty map whose values default to empty lists. So you
+        can use the result without checking for None.
+      """
+      return self.by_target[target]
 
     def __getitem__(self, target):
       """
@@ -136,12 +144,12 @@ class Products(object):
       """
       return self.by_target.iteritems()
 
-    def keys_for(self, basedir, product):
+    def keys_for(self, basedir, file):
       """Returns the set of keys the given mapped product is registered under."""
       keys = set()
       for key, mappings in self.by_target.items():
         for mapped in mappings.get(basedir, []):
-          if product == mapped:
+          if file == mapped:
             keys.add(key)
             break
       return keys

@@ -15,10 +15,9 @@
 # ===================================================================================================
 
 import threading
-
 from twitter.pants.base.workunit import WorkUnit
 
-from . import Task, TaskError
+from twitter.pants.tasks import TaskError, Task
 
 
 class BootstrapJvmTools(Task):
@@ -32,9 +31,9 @@ class BootstrapJvmTools(Task):
     if context.products.is_required_data('jvm_build_tools_classpath_callbacks'):
       tool_product_map = context.products.get_data('jvm_build_tools') or {}
       callback_product_map = context.products.get_data('jvm_build_tools_classpath_callbacks') or {}
-      # We leave a callback in the products map because we want these Ivy calls
+      # We leave a callback in the products map because we want these Ivy calls 
       # to be done lazily (they might never actually get executed) and we want
-      # to hit Task.invalidated (called in Task.ivy_resolve) on the instance of
+      # to hit Task.invalidated (called in Task.ivy_resolve) on the instance of 
       # BootstrapJvmTools rather than the instance of whatever class requires
       # the bootstrap tools.  It would be awkward and possibly incorrect to call
       # self.invalidated twice on a Task that does meaningful invalidation on its
@@ -65,14 +64,13 @@ class BootstrapJvmTools(Task):
   def cached_bootstrap_classpath_callback(self, key, tools):
     cache = {}
     cache_lock = threading.Lock()
-
-    def bootstrap_classpath(executor=None):
+    def bootstrap_classpath(java_runner=None):
       with cache_lock:
         if 'classpath' not in cache:
           targets = list(self.resolve_tool_targets(tools))
           workunit_name = 'bootstrap-%s' % str(key)
           cache['classpath'] = self.ivy_resolve(targets,
-                                                executor=executor,
+                                                java_runner=java_runner,
                                                 silent=True,
                                                 workunit_name=workunit_name,
                                                 workunit_labels=[WorkUnit.BOOTSTRAP])

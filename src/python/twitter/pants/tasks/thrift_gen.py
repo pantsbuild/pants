@@ -10,10 +10,9 @@
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
+# See the License for the
 # limitations under the License.
 # ==================================================================================================
-
 import errno
 import os
 import re
@@ -178,7 +177,7 @@ class ThriftGen(CodeGen):
         else:
           _copytree(session.outdir, self.combined_dir)
     if result != 0:
-      raise TaskError('%s ... exited non-zero (%i)' % (self.thrift_binary, result))
+      raise TaskError('thrift compile failed with exit code %d' % result)
 
   def createtarget(self, lang, gentarget, dependees):
     if lang == 'java':
@@ -217,7 +216,7 @@ class ThriftGen(CodeGen):
     deps = geninfo.deps['service' if has_service else 'structs']
     tgt = create_target(files, deps)
     tgt.id = target.id + '.thrift_gen'
-    tgt.add_labels('codegen')
+    tgt.add_labels('synthetic')
     for dependee in dependees:
       if isinstance(dependee, InternalTarget):
         dependee.update_dependencies((tgt,))

@@ -14,14 +14,14 @@
 # limitations under the License.
 # ==================================================================================================
 
+import os
+
 from twitter.common.collections import OrderedSet
 
+from twitter.pants.binary_util import runjava_indivisible, safe_args
 from twitter.pants.base.workunit import WorkUnit
-from twitter.pants.binary_util import safe_args
-from twitter.pants.java.util import execute_java
-from .jvm_task import JvmTask
-
-from . import TaskError
+from twitter.pants.tasks import Task, TaskError
+from twitter.pants.tasks.jvm_task import JvmTask
 
 
 class SpecsRun(JvmTask):
@@ -29,19 +29,18 @@ class SpecsRun(JvmTask):
   def setup_parser(cls, option_group, args, mkflag):
     option_group.add_option(mkflag('skip'), mkflag('skip', negate=True), dest = 'specs_run_skip',
                             action='callback', callback=mkflag.set_bool, default=False,
-                            help='[%default] Skip running specs')
+                            help = '[%default] Skip running specs')
 
     option_group.add_option(mkflag('debug'), mkflag('debug', negate=True), dest = 'specs_run_debug',
                             action='callback', callback=mkflag.set_bool, default=False,
-                            help='[%default] Run specs with a debugger')
+                            help = '[%default] Run specs with a debugger')
 
-    option_group.add_option(mkflag('jvmargs'), dest='specs_run_jvm_options', action='append',
-                            help='Runs specs in a jvm with these extra jvm options.')
+    option_group.add_option(mkflag('jvmargs'), dest = 'specs_run_jvm_options', action='append',
+                            help = 'Runs specs in a jvm with these extra jvm options.')
 
-    option_group.add_option(mkflag('test'), dest='specs_run_tests', action='append',
-                            help='[%default] Force running of just these specs.  Tests can be '
-                                 'specified either by fully qualified classname or '
-                                 'full file path.')
+    option_group.add_option(mkflag('test'), dest = 'specs_run_tests', action='append',
+                            help = '[%default] Force running of just these specs.  Tests can be '
+                                   'specified either by classname or filename.')
 
     option_group.add_option(mkflag('color'), mkflag('color', negate=True),
                             dest='specs_run_color', default=True,
@@ -49,16 +48,16 @@ class SpecsRun(JvmTask):
                             help='[%default] Emit test result with ANSI terminal color codes.')
 
   def __init__(self, context):
-    super(SpecsRun, self).__init__(context)
+    Task.__init__(self, context)
 
     self._specs_bootstrap_key = 'specs'
     bootstrap_tools = context.config.getlist('specs-run', 'bootstrap-tools',
                                              default=[':scala-specs-2.9.3'])
     self._jvm_tool_bootstrapper.register_jvm_tool(self._specs_bootstrap_key, bootstrap_tools)
-
+    
     self.confs = context.config.getlist('specs-run', 'confs')
 
-    self._jvm_options = context.config.getlist('specs-run', 'jvm_args', default=[])
+    self._jvm_options = context.config.getlist('specs-run', 'args', default=[])
     if context.options.specs_run_jvm_options:
       self._jvm_options.extend(context.options.specs_run_jvm_options)
     if context.options.specs_run_debug:
@@ -74,28 +73,26 @@ class SpecsRun(JvmTask):
   def execute(self, targets):
     if not self.skip:
       def run_tests(tests):
+        def workunit_factory(name, labels=list(), cmd=''):
+            return self.context.new_workunit(name=name, labels=[WorkUnit.TEST] + labels, cmd=cmd)
+
         args = ['--color'] if self.color else []
         args.append('--specs=%s' % ','.join(tests))
-        specs_runner_main = 'com.twitter.common.testing.ExplicitSpecsRunnerMain'
 
-        bootstrapped_cp = self._jvm_tool_bootstrapper.get_jvm_tool_classpath(
-            self._specs_bootstrap_key)
-        classpath = self.classpath(
-            bootstrapped_cp,
-            confs=self.confs,
-            exclusives_classpath=self.get_base_classpath_for_target(targets[0]))
+        bootstrapped_cp = self._jvm_tool_bootstrapper.get_jvm_tool_classpath(self._specs_bootstrap_key)
 
-        result = execute_java(
-          classpath=classpath,
-          main=specs_runner_main,
+        result = runjava_indivisible(
           jvm_options=self._jvm_options,
+          classpath=self.classpath(bootstrapped_cp,
+                                   confs=self.confs,
+                                   exclusives_classpath=self.get_base_classpath_for_target(targets[0])),
+          main='com.twitter.common.testing.ExplicitSpecsRunnerMain',
           args=args,
-          workunit_factory=self.context.new_workunit,
-          workunit_name='specs',
-          workunit_labels=[WorkUnit.TEST]
+          workunit_factory=workunit_factory,
+          workunit_name='specs'
         )
         if result != 0:
-          raise TaskError('java %s ... exited non-zero (%i)' % (specs_runner_main, result))
+          raise TaskError()
 
       if self.tests:
         run_tests(self.tests)

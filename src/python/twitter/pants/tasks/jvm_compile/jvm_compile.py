@@ -1,19 +1,18 @@
-
+from collections import defaultdict
 import os
 import itertools
 import shutil
 import uuid
 
-from collections import defaultdict
-
 from twitter.common import contextutil
 from twitter.common.contextutil import open_zip
 from twitter.common.dirutil import safe_rmtree, safe_mkdir
 from twitter.pants import get_buildroot, Task
-from twitter.pants.base.target import Target
+from twitter.pants.base import Target
 from twitter.pants.base.worker_pool import Work
-from twitter.pants.goal.products import MultipleRootedProducts
+from twitter.pants.goal.products import RootedProducts, MultipleRootedProducts
 from twitter.pants.reporting.reporting_utils import items_to_report_element
+from twitter.pants.targets import resolve_target_sources
 from twitter.pants.tasks.jvm_compile.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from twitter.pants.tasks.nailgun_task import NailgunTask
 
@@ -137,9 +136,8 @@ class JvmCompile(NailgunTask):
   def _portable_analysis_for_target(analysis_dir, target):
     return JvmCompile._analysis_for_target(analysis_dir, target) + '.portable'
 
-  def __init__(self, context, minimum_version=None, jdk=False):
-    # TODO(John Sirois): XXX plumb minimum_version via config or flags
-    super(JvmCompile, self).__init__(context, minimum_version=minimum_version, jdk=jdk)
+  def __init__(self, context, workdir):
+    NailgunTask.__init__(self, context, workdir=workdir)
     concrete_class = type(self)
     config_section = concrete_class._config_section
 
@@ -502,24 +500,9 @@ class JvmCompile(NailgunTask):
       sources = [s for s in target.sources_relative_to_buildroot() if s.endswith(self._file_suffix)]
       # TODO: Make this less hacky. Ideally target.java_sources will point to sources, not targets.
       if hasattr(target, 'java_sources') and target.java_sources:
-        sources.extend(self._resolve_target_sources(target.java_sources, '.java'))
+        sources.extend(resolve_target_sources(target.java_sources, '.java'))
       return sources
     return dict([(t, calculate_sources(t)) for t in targets])
-
-  def _resolve_target_sources(self, target_sources, extension=None, relative_to_target_base=False):
-    """Given a list of pants targets, extract their sources as a list.
-
-    Filters against the extension if given and optionally returns the paths relative to the target
-    base.
-    """
-    resolved_sources = []
-    for resolved in Target.resolve_all(target_sources):
-      if hasattr(resolved, 'sources'):
-        resolved_sources.extend(
-          source if relative_to_target_base else os.path.join(resolved.target_base, source)
-          for source in resolved.sources if not extension or source.endswith(extension)
-        )
-    return resolved_sources
 
   def _compute_classpath_elements_by_class(self, classpath):
     # Don't consider loose classes dirs in our classpath. Those will be considered

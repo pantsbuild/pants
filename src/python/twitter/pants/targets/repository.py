@@ -14,21 +14,17 @@
 # limitations under the License.
 # ==================================================================================================
 
-from twitter.pants.base import manual, Target
+from twitter.pants.base import Target
 
-
-@manual.builddict(tags=["jvm"])
 class Repository(Target):
-  """An artifact repository, such as a maven repo."""
+  """Represents an artifact repository.  Typically this is a maven-style artifact repo."""
 
   def __init__(self, name, url, push_db, exclusives=None):
-    """
-    :param string name: Name of the repository.
-    :param string url: Optional URL of the repository.
-    :param string push_db: Path of the push history file.
-    """
+    """name: an identifier for the repo
+    url: the url used to access the repo and retrieve artifacts or artifact metadata
+    push_db: the data file associated with this repo that records artifact push history"""
 
-    super(Repository, self).__init__(name, exclusives=exclusives)
+    Target.__init__(self, name, exclusives=exclusives)
 
     self.name = name
     self.url = url

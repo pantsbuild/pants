@@ -38,7 +38,7 @@ python_library(
     pants('3rdparty/python:pytest-cov'),
     pants('3rdparty/python:python_daemon'),
     pants('3rdparty/python:requests'),
-    python_requirement('pylint==1.1.0', version_filter=pylint_build_filter)
+    python_requirement('pylint==1.1.0', version_filter=pylint_build_filter),
   ]
 )
 
@@ -63,6 +63,15 @@ python_library(
     pants('src/python/twitter/common/util'),
     pants('src/python/twitter/thrift/text'),
   ],
+  provides = setup_py(
+    name = 'twitter.pants',
+    version = '0.0.3',
+    description = 'the pants build tool',
+    namespace_packages = [
+      'twitter',
+      'twitter.common',
+    ]
+  ),
   sources=PANTS_SOURCES,
   resources=PANTS_RESOURCES,
 )
@@ -80,44 +89,31 @@ python_binary(
   ]
 )
 
-python_library(
-  name='pants-packaged',
-  dependencies=[
-    pants(':pants-lib'),
-  ],
-  # TODO(wickman) This version should be automatically pulled in from twitter.pants.version
-  provides=setup_py(
-    name='twitter.pants',
-    version='0.0.12',
-    description="Twitter's pants build tool.",
-    url='https://github.com/twitter/commons',
-    license='Apache License, Version 2.0',
-    zip_safe=True,
-    namespace_packages=['twitter'],
-    classifiers=[
-      'Intended Audience :: Developers',
-      'License :: OSI Approved :: Apache Software License',
-      'Operating System :: OS Independent',
-      'Programming Language :: Python',
-    ]
-  ).with_binaries(
-    pants=pants(':pants'),
-  )
-)
-
 python_binary(
-  name='ng',
-  dependencies=[
-    pants('src/python/twitter/common/app'),
-    pants('src/python/twitter/common/log'),
+  name = 'ng',
+  dependencies = [
+    'src/python/twitter/common/app',
+    'src/python/twitter/common/log',
 
     # TODO(John Sirois): Break up pants src/ into proper libs - the ng client should not need all
     # of pants
-    pants(':pants-lib')
+    ':pants-lib'
   ],
-  source=NG_CLIENT,
+  source = NG_CLIENT,
 )
 
-page(name='readme',
-  source='README.md',
+# TODO(John Sirois): add a BUILD.commons github wiki goal to the 'publish' phase and publish these
+
+page(name = 'readme',
+  source = 'README.md',
+  dependencies = [
+    pants('src/python/twitter/pants/docs:migration'),
+    pants('src/python/twitter/pants/docs:internals'),
+    pants('src/python/twitter/pants/docs:setuprepo'),
+    pants(':install'),
+  ]
+)
+
+page(name = 'install',
+  source = 'INSTALL.md',
 )

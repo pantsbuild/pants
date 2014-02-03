@@ -16,40 +16,30 @@
 
 __author__ = 'Brian Larson'
 
-from twitter.pants.base.build_manual import manual
-
-from .exportable_jvm_library import ExportableJvmLibrary
+from twitter.pants.targets.exportable_jvm_library import ExportableJvmLibrary
 
 
-@manual.builddict(tags=["jvm"])
 class JavaAntlrLibrary(ExportableJvmLibrary):
-  """Generates a stub Java library from Antlr grammar files."""
+  """Defines a target that builds java stubs from an Antlr grammar file."""
 
   def __init__(self,
                name,
                sources,
-               provides=None,
-               dependencies=None,
-               excludes=None,
-               compiler='antlr3'):
+               provides = None,
+               dependencies = None,
+               excludes = None,
+               compiler = 'antlr3'):
 
-    """
-    :param string name: The name of this target, which combined with this
-      build file defines the target :class:`twitter.pants.base.address.Address`.
-    :param sources: A list of filenames representing the source code
-      this library is compiled from.
-    :type sources: list of strings
-    :param Artifact provides:
-      The :class:`twitter.pants.targets.artifact.Artifact`
-      to publish that represents this target outside the repo.
-    :param dependencies: List of :class:`twitter.pants.base.target.Target` instances
-      this target depends on.
-    :type dependencies: list of targets
-    :param excludes: List of :class:`twitter.pants.targets.exclude.Exclude` instances
-      to filter this target's transitive dependencies against.
-    :param compiler: The name of the compiler used to compile the ANTLR files.
-        Currently only supports 'antlr3' and 'antlr4'
-    """
+    """name: The name of this module target, addressable via pants via the portion of the spec
+        following the colon
+    sources: A list of paths containing the Antlr source files this module's jar is compiled from
+    provides: An optional Dependency object indicating the The ivy artifact to export
+    dependencies: An optional list of Dependency objects specifying the binary (jar) dependencies of
+        this module.
+    excludes: An optional list of dependency exclude patterns to filter all of this module's
+        transitive dependencies against.
+    compiler: The name of the compiler used to compile the ANTLR files.
+        Currently only supports 'antlr3' and 'antlr4'"""
 
     ExportableJvmLibrary.__init__(self,
                                   name,
@@ -59,6 +49,9 @@ class JavaAntlrLibrary(ExportableJvmLibrary):
                                   excludes)
     self.add_labels('codegen')
 
-    if compiler not in ('antlr3', 'antlr4'):
+    if compiler not in ['antlr3', 'antlr4']:
         raise ValueError("Illegal value for 'compiler': {}".format(compiler))
     self.compiler = compiler
+
+  def _as_jar_dependency(self):
+    return ExportableJvmLibrary._as_jar_dependency(self).with_sources()
