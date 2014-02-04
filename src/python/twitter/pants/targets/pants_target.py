@@ -82,3 +82,12 @@ class Pants(Target):
     if len(resolved) > 1:
       raise LookupError('%s points to more than one target: %s' % (self, resolved))
     return resolved.pop()
+
+  def __getattr__(self, name):
+    try:
+      return Target.__getattribute__(self, name)
+    except AttributeError as e:
+      try:
+        return getattr(self.get(), name)
+      except (AttributeError, LookupError):
+         raise e
