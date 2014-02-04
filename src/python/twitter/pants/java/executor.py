@@ -110,6 +110,32 @@ class Executor(AbstractClass):
     return cmd
 
 
+class CommandLineGrabber(Executor):
+  """Doesn't actually execute anything, just captures the cmd line."""
+  def __init__(self):
+    super(Executor, self).__init__(self)
+    self._command = None  # Initialized when we run something.
+
+  def _runner(self, classpath, main, jvm_options, args):
+    self._command = self._create_command(classpath, main, jvm_options, args)
+    class Runner(self.Runner):
+      @property
+      def executor(_):
+        return self
+
+      @property
+      def cmd(_):
+        return ' '.join(self._command)
+
+      def run(_, stdout=None, stderr=None):
+        return 0
+    return Runner()
+
+  @property
+  def cmd(self):
+    return self._command
+
+
 class SubprocessExecutor(Executor):
   """Executes java programs by launching a jvm in a subprocess."""
 

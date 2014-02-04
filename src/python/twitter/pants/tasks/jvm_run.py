@@ -16,7 +16,9 @@
 
 import shlex
 
+from twitter.common.dirutil import safe_open
 from twitter.pants.base.workunit import WorkUnit
+from twitter.pants.java.executor import CommandLineGrabber
 from twitter.pants.targets import JvmBinary
 from twitter.pants.java.util import execute_java
 
@@ -42,6 +44,10 @@ class JvmRun(JvmTask):
       action="callback", callback=mkflag.set_bool, default=False,
       help = "[%default] Run binary with a debugger")
 
+    option_group.add_option(mkflag('only-write-cmd-line'), dest = 'only_write_cmd_line',
+                            action='store', default=None,
+                            help = '[%default] Instead of running, just write the cmd line to this file')
+
   def __init__(self, context):
     Task.__init__(self, context)
     self.jvm_args = context.config.getlist('jvm-run', 'jvm_args', default=[])
@@ -55,6 +61,7 @@ class JvmRun(JvmTask):
     if context.options.run_debug:
       self.jvm_args.extend(context.config.getlist('jvm', 'debug_args'))
     self.confs = context.config.getlist('jvm-run', 'confs')
+    self.only_write_cmd_line = context.options.only_write_cmd_line
     context.products.require_data('exclusives_groups')
 
   def execute(self, targets):
@@ -78,14 +85,20 @@ class JvmRun(JvmTask):
       group_key = egroups.get_group_key_for_target(binaries[0])
       group_classpath = egroups.get_classpath_for_group(group_key)
 
+      executor = CommandLineGrabber() if self.only_write_cmd_line else None
       result = execute_java(
         classpath=(self.classpath(confs=self.confs, exclusives_classpath=group_classpath)),
         main=main,
+        executor=executor,
         jvm_options=self.jvm_args,
         args=self.args,
         workunit_factory=self.context.new_workunit,
         workunit_name='run',
         workunit_labels=[WorkUnit.RUN]
       )
-      if result != 0:
+
+      if self.only_write_cmd_line:
+        with safe_open(self.only_write_cmd_line, 'w') as outfile:
+          outfile.write(executor.cmd)
+      elif result != 0:
         raise TaskError('java %s ... exited non-zero (%i)' % (main, result), exit_code=result)
