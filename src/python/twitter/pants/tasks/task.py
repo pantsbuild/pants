@@ -26,7 +26,6 @@ from contextlib import contextmanager
 
 from twitter.common.collections.orderedset import OrderedSet
 
-from twitter.common.dirutil import safe_mkdir
 from twitter.pants import Config
 from twitter.pants.base.build_invalidator import BuildInvalidator, CacheKeyGenerator
 from twitter.pants.base.hash_utils import hash_file

@@ -11,7 +11,7 @@ from twitter.common.dirutil import safe_rmtree, safe_mkdir
 from twitter.pants import get_buildroot, Task
 from twitter.pants.base.target import Target
 from twitter.pants.base.worker_pool import Work
-from twitter.pants.goal.products import RootedProducts, MultipleRootedProducts
+from twitter.pants.goal.products import MultipleRootedProducts
 from twitter.pants.reporting.reporting_utils import items_to_report_element
 from twitter.pants.tasks.jvm_compile.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from twitter.pants.tasks.nailgun_task import NailgunTask

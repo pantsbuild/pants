@@ -138,12 +138,12 @@ class Products(object):
       """
       return self.by_target.iteritems()
 
-    def keys_for(self, basedir, file):
+    def keys_for(self, basedir, product):
       """Returns the set of keys the given mapped product is registered under."""
       keys = set()
       for key, mappings in self.by_target.items():
         for mapped in mappings.get(basedir, []):
-          if file == mapped:
+          if product == mapped:
             keys.add(key)
             break
       return keys

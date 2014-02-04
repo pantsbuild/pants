@@ -136,8 +136,7 @@ class CodeGen(Task):
             syn_target.add_labels('synthetic')
             if write_to_artifact_cache and target in invalid_vts_by_target:
               generated_sources = list(syn_target.sources_absolute_paths())
-              vts_artifactfiles_pairs.append((invalid_vts_by_target[target],
-                                              generated_sources))
+              vts_artifactfiles_pairs.append((invalid_vts_by_target[target], generated_sources))
             langtarget_by_gentarget[target] = syn_target
           genmap = self.context.products.get(lang)
           for gentarget, langtarget in langtarget_by_gentarget.items():

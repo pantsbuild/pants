@@ -208,13 +208,11 @@ class JarCreateExecuteTest(JarCreateTestBase):
                                      'a.class', 'b.class', 'r.txt.transformed')
             self.assert_jar_contents(context, 'jars', self.sl, 'c.class')
 
-  # TODO(John Sirois): XXX
   def test_classfile_jar_required(self):
     context = self.context()
     context.products.require('jars')
     self.assert_classfile_jar_contents(context)
 
-  # TODO(John Sirois): XXX
   def test_classfile_jar_flagged(self):
     self.assert_classfile_jar_contents(self.context(jar_create_classes=True))
 
