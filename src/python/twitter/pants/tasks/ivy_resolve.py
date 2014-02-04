@@ -130,7 +130,8 @@ class IvyResolve(NailgunTask):
       # whether telling them to use IdeaGen instead is feasible.
       classpath = self.ivy_resolve(group_targets,
                                    executor=executor,
-                                   symlink_ivyxml=True)
+                                   symlink_ivyxml=True,
+                                   workunit_name='ivy-resolve')
       if self.context.products.is_required_data('ivy_jar_products'):
         self._populate_ivy_jar_products(group_targets)
       for conf in self._confs:
@@ -144,7 +145,8 @@ class IvyResolve(NailgunTask):
     if create_jardeps_for:
       genmap = self.context.products.get(self._ivy_utils._mapfor_typename())
       for target in filter(create_jardeps_for, targets):
-        self._ivy_utils.mapjars(genmap, target, executor=executor)
+        self._ivy_utils.mapjars(genmap, target, executor=executor,
+                                workunit_factory=self.context.new_workunit)
 
   def check_artifact_cache_for(self, invalidation_check):
     # Ivy resolution is an output dependent on the entire target set, and is not divisible

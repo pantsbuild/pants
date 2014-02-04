@@ -204,9 +204,9 @@ class JvmApp(InternalTarget):
       binary_list.extend(b.resolve())
     if len(binary_list) != 1:
       raise TargetDefinitionException(
-          self, 'binary must resolve to a JvmBinary target, found %s' % binary)
+          self, 'binary must resolve to a single JvmBinary target, found %s' % binary)
+    self._resolved_binary = binary_list[0]
 
-    self._binary = binary
     self._bundles = maybe_list(bundles, expected_type=(Bundle),
                                raise_type=partial(TargetDefinitionException, self))
 
@@ -214,7 +214,6 @@ class JvmApp(InternalTarget):
       raise TargetDefinitionException(self, 'basename must not equal name.')
     self.basename = basename or name
 
-    self._resolved_binary = None
     self._resolved_bundles = []
 
   def is_jvm_app(self):
@@ -222,17 +221,7 @@ class JvmApp(InternalTarget):
 
   @property
   def binary(self):
-    self._maybe_resolve_binary()
     return self._resolved_binary
-
-  def _maybe_resolve_binary(self):
-    if self._binary is not None:
-      binaries = [t for t in util.resolve(self._binary).resolve() if t.is_concrete]
-      if len(binaries) != 1 or not isinstance(binaries[0], JvmBinary):
-        raise TargetDefinitionException(self,
-                                        'must supply exactly 1 JvmBinary, got %s' % self._binary)
-      self._resolved_binary = binaries[0]
-      self._binary = None
 
   @property
   def bundles(self):
