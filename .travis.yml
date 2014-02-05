@@ -13,8 +13,7 @@ script: |
   && PANTS_VERBOSE=1 PEX_VERBOSE=1 PYTHON_VERBOSE=1 ./pants.bootstrap \
   ; java -version \
   && ./pants goal clean-all \
-  && PANTS_CONFIG_OVERRIDE=travis-ci.pants.ini \
-  ./pants goal test tests/{java,scala}/com/twitter/common:: --no-ng-daemons -x \
+  && ./pants goal test tests/{java,scala}/com/twitter/common:: --no-ng-daemons -x \
   && ./pants tests/python/twitter/common:all \
   && ./pants tests/python/twitter/pants:all
 
