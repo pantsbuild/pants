@@ -132,8 +132,9 @@ class ThriftGemerator(ScmPublish, Task):
         publish=' --publish %s' % target.provides.repo.url if not self._dryrun else ''
       )
 
-      cmd = 'thrift_gemerator --no-interactive --compiler-args="%(include)s" --gem=%(name)s --output=%(outdir)s ' \
-            '--gem-version %(version)s%(publish)s %(thrift_files)s' % args
+      cmd = 'thrift_gemerator --no-interactive --compiler-args="%(include)s" --gem=%(name)s' \
+            ' --output=%(outdir)s --gem-version %(version)s%(publish)s' \
+            ' --no-git-repo %(thrift_files)s' % args
       log = self.context.log
       log.debug("Executing: %s" % cmd)
       result = subprocess.call(cmd, shell=True)
