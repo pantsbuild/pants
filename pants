@@ -27,7 +27,6 @@ The following pants.ini configuration options are used from the DEFAULT section.
 * pants_pex_baseurl - URL of the pants pex repository to fetch from.
 * pants_pex_filename_pattern - Pants PEX filename pattern if different from the
                                default value. This option is not typically used.
-* ivysvnresolver_url - URL of the ivysvnresolver bin release to use.
 """
 
 # NB: gyrations are made to support python2.4 bootstrapping into python newer so some constructs
@@ -147,7 +146,6 @@ def get_required(config, key, raw=False):
 
 config = ConfigParser({
   'pants_pex_filename_pattern': 'pants-%s-py%s%s.pex',
-  'ivysvnresolver_url': 'https://ivysvn.googlecode.com/files/ivysvnresolver-2.2.0-bin.tgz',
 })
 
 if not os.path.exists(CONFIG_FILE):
@@ -158,7 +156,6 @@ if not os.path.exists(CONFIG_FILE):
   ]))
 
 config.read(CONFIG_FILE)
-ivysvnresolver_url = get_required(config, 'ivysvnresolver_url')
 
 if not LOCAL_PEX:
   pants_pex_baseurl = get_required(config, 'pants_pex_baseurl')
@@ -220,19 +217,6 @@ def fetch(url, dest, mode=None):
   return True
 
 
-# TODO(travis, jsirois): remove when pants does this itself
-def fetch_ivy():
-  dest = os.path.join(PANTS_CACHE, 'ivysvnresolver', os.path.basename(ivysvnresolver_url))
-  if not fetch(ivysvnresolver_url, dest):
-    return  # no need to extract/symlink
-
-  tar = tarfile.open(dest)
-  try:
-    tar.extractall(path=os.path.dirname(dest))
-  finally:
-    tar.close()
-
-
 def fetch_pants():
   if LOCAL_PEX:
     return 'pants.pex'
@@ -251,7 +235,6 @@ def fetch_pants():
 
 def main():
   logger.debug('Running with python version: %s.%s' % (major, minor))
-  fetch_ivy()
   logger.debug('launching %s' % fetch_pants())
   os.execv(fetch_pants(), sys.argv)
 
