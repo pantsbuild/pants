@@ -22,6 +22,8 @@ import re
 import sys
 import time
 
+# TODO: Once we integrate standard logging into our reporting framework, we  can consider making
+#  some of the log.debug() below into log.info(). Right now it just looks wrong on the console.
 from twitter.common import log
 from twitter.common.collections import maybe_list
 from twitter.common.dirutil import safe_open
@@ -54,10 +56,10 @@ class NailgunExecutor(Executor):
       return cls(fingerprint, int(pid), int(port))
 
   # Used to identify we own a given java nailgun server
-  PANTS_NG_ARG_PREFIX = '-Dtwitter.pants.buildroot'
-  PANTS_NG_ARG = '%s=%s' % (PANTS_NG_ARG_PREFIX, get_buildroot())
+  _PANTS_NG_ARG_PREFIX = '-Dpants.buildroot'
+  _PANTS_NG_ARG = '%s=%s' % (_PANTS_NG_ARG_PREFIX, get_buildroot())
 
-  _PANTS_FINGERPRINT_ARG_PREFIX = '-Dfingerprint='
+  _PANTS_FINGERPRINT_ARG_PREFIX = '-Dpants.nailgun.fingerprint='
 
   @staticmethod
   def _check_pid(pid):
@@ -68,8 +70,9 @@ class NailgunExecutor(Executor):
       return False
 
   @staticmethod
-  def create_pidfile_arg(pidfile):
-    return '-Dpidfile=%s' % os.path.relpath(pidfile, get_buildroot())
+  def create_owner_arg(workdir):
+    # Currently the owner is identified via the full path to the workdir.
+    return '-Dpants.nailgun.owner=%s' % workdir
 
   @classmethod
   def _create_fingerprint_arg(cls, fingerprint):
@@ -103,7 +106,8 @@ class NailgunExecutor(Executor):
     if not isinstance(workdir, Compatibility.string):
       raise ValueError('Workdir must be a path string, given %s' % workdir)
 
-    self._pidfile = os.path.join(workdir, 'pid')
+    self._workdir = workdir
+
     self._ng_out = os.path.join(workdir, 'stdout')
     self._ng_err = os.path.join(workdir, 'stderr')
 
@@ -143,26 +147,16 @@ class NailgunExecutor(Executor):
         os.kill(endpoint.pid, 9)
       except OSError:
         pass
-      finally:
-        os.remove(self._pidfile)
 
   def _get_nailgun_endpoint(self):
-    if os.path.exists(self._pidfile):
-      with safe_open(self._pidfile, 'r') as pidfile:
-        contents = pidfile.read().strip()
-        try:
-          return self.Endpoint.parse(contents)
-        except ValueError:
-          log.warn('Invalid ng pidfile %s contained: %s' % (self._pidfile, contents))
-          return None
-    elif self._find:
-      endpoint = self._find(self._pidfile)
+    if self._find:
+      endpoint = self._find(self._workdir)
       if endpoint:
-        log.info('found ng server with fingerprint %s @ pid:%d port:%d' % endpoint)
-        with safe_open(self._pidfile, 'w') as pidfile:
-          pidfile.write('%s:%d:%d\n' % endpoint)
+        log.debug('Found ng server with fingerprint %s @ pid:%d port:%d' % endpoint)
       return endpoint
-    return None
+    else:
+      log.warn('Nailguns disabled in dev mode.')
+      return None
 
   def _get_nailgun_client(self, jvm_args, classpath, stdout, stderr):
     classpath = self._nailgun_classpath + classpath
@@ -175,6 +169,7 @@ class NailgunExecutor(Executor):
       return self._create_ngclient(endpoint.port, stdout, stderr)
     else:
       if running and updated:
+        log.debug('Killing ng server with fingerprint %s @ pid:%d port:%d' % endpoint)
         self.kill()
       return self._spawn_nailgun_server(new_fingerprint, jvm_args, classpath, stdout, stderr)
 
@@ -198,8 +193,6 @@ class NailgunExecutor(Executor):
         started = ng_out.readline()
         if started:
           port = self._parse_nailgun_port(started)
-          with open(self._pidfile, 'a') as pidfile:
-            pidfile.write(':%d\n' % port)
           nailgun = self._create_ngclient(port, stdout, stderr)
           log.debug('Detected ng server up on port %d' % port)
         elif time.time() - port_parse_start > nailgun_timeout_seconds:
@@ -211,8 +204,11 @@ class NailgunExecutor(Executor):
       sock = nailgun.try_connect()
       if sock:
         sock.close()
-        log.info('Connected to ng server with fingerprint'
-                 ' %s pid: %d @ port: %d' % self._get_nailgun_endpoint())
+        endpoint = self._get_nailgun_endpoint()
+        if endpoint:
+          log.debug('Connected to ng server with fingerprint %s pid: %d @ port: %d' % endpoint)
+        else:
+          raise NailgunClient.NailgunError('Failed to connect to ng server.')
         return nailgun
       elif attempt > max_socket_connect_attempts:
         raise nailgun.NailgunError('Failed to connect to ng output after %d connect attempts'
@@ -225,7 +221,7 @@ class NailgunExecutor(Executor):
     return NailgunClient(port=port, ins=self._ins, out=stdout, err=stderr, work_dir=get_buildroot())
 
   def _spawn_nailgun_server(self, fingerprint, jvm_args, classpath, stdout, stderr):
-    log.info('No ng server found with fingerprint %s, spawning...' % fingerprint)
+    log.debug('No ng server found with fingerprint %s, spawning...' % fingerprint)
 
     with safe_open(self._ng_out, 'w'):
       pass  # truncate
@@ -242,8 +238,8 @@ class NailgunExecutor(Executor):
 
     java = SubprocessExecutor(self._distribution)
 
-    jvm_args = jvm_args + [self.PANTS_NG_ARG,
-                           self.create_pidfile_arg(self._pidfile),
+    jvm_args = jvm_args + [self._PANTS_NG_ARG,
+                           self.create_owner_arg(self._workdir),
                            self._create_fingerprint_arg(fingerprint)]
 
     process = java.spawn(classpath=classpath,
@@ -256,8 +252,6 @@ class NailgunExecutor(Executor):
                          close_fds=True,
                          cwd=get_buildroot())
 
-    with safe_open(self._pidfile, 'w') as pidfile:
-      pidfile.write('%s:%d' % (fingerprint, process.pid))
     log.debug('Spawned ng server with fingerprint %s @ %d' % (fingerprint, process.pid))
     # Prevents finally blocks and atexit handlers from being executed, unlike sys.exit(). We
     # don't want to execute finally blocks because we might, e.g., clean up tempfiles that the
@@ -268,15 +262,16 @@ class NailgunExecutor(Executor):
     return 'NailgunExecutor(%s, server=%s)' % (self._distribution, self._get_nailgun_endpoint())
 
 
+# TODO(jsirois): Make psutil and other deps available in dev mode, so we don't need such tricks.
 try:
   import psutil
 
   def _find_ngs(everywhere=False):
     def cmdline_matches(cmdline):
       if everywhere:
-        return any(filter(lambda arg: arg.startswith(NailgunExecutor.PANTS_NG_ARG_PREFIX), cmdline))
+        return any(filter(lambda arg: arg.startswith(NailgunExecutor._PANTS_NG_ARG_PREFIX), cmdline))
       else:
-        return NailgunExecutor.PANTS_NG_ARG in cmdline
+        return NailgunExecutor._PANTS_NG_ARG in cmdline
 
     for proc in psutil.process_iter():
       try:
@@ -304,11 +299,11 @@ try:
         return port
     return None
 
-  def _find(pidfile):
-    pidfile_arg = NailgunExecutor.create_pidfile_arg(pidfile)
+  def _find(workdir):
+    owner_arg = NailgunExecutor.create_owner_arg(workdir)
     for proc in _find_ngs(everywhere=False):
       try:
-        if pidfile_arg in proc.cmdline:
+        if owner_arg in proc.cmdline:
           fingerprint = NailgunExecutor.parse_fingerprint_arg(proc.cmdline)
           port = _find_ng_listen_port(proc)
           if fingerprint and port:

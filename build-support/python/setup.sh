@@ -14,6 +14,7 @@ BOOTSTRAP_REQS=(
   python_daemon==1.5.5
   requests==2.0.0
   setuptools==2.1
+  psutil==1.1.2
 )
 
 mkdir -p $BOOTSTRAP_BIN
