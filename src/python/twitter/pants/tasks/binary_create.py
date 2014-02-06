@@ -79,15 +79,16 @@ class BinaryCreate(JvmBinaryTask):
     self.context.log.info('creating %s' % os.path.relpath(binaryjarpath, get_buildroot()))
 
     with open_jar(binaryjarpath, 'w', compression=self.compression, allowZip64=self.zip64) as jar:
-      if self.deployjar:
-        def add_jars(target):
-          generated = jarmap.get(target)
-          if generated:
-            for basedir, jars in generated.items():
-              for internaljar in jars:
-                self.dump(os.path.join(basedir, internaljar), jar)
-        binary.walk(add_jars, lambda t: t.is_internal)
+      def add_jars(target):
+        generated = jarmap.get(target)
+        if generated:
+          for basedir, jars in generated.items():
+            for internaljar in jars:
+              self.dump(os.path.join(basedir, internaljar), jar)
 
+      binary.walk(add_jars, lambda t: t.is_internal)
+
+      if self.deployjar:
         for basedir, externaljar in self.list_jar_dependencies(binary):
           self.dump(os.path.join(basedir, externaljar), jar)
 
