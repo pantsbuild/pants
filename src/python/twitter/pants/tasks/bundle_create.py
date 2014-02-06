@@ -149,13 +149,13 @@ class BundleCreate(JvmBinaryTask):
         with open_zip(binary_jar, 'r') as src:
           with open_zip(bundle_jar, 'w', compression=ZIP_DEFLATED) as dest:
             for item in src.infolist():
-              buffer = src.read(item.filename)
+              buf = src.read(item.filename)
               if Manifest.PATH == item.filename:
-                manifest = Manifest(buffer)
+                manifest = Manifest(buf)
                 manifest.addentry(Manifest.CLASS_PATH,
                                   ' '.join(os.path.join('libs', jar) for jar in classpath))
-                buffer = manifest.contents()
-              dest.writestr(item, buffer)
+                buf = manifest.contents()
+              dest.writestr(item, buf)
 
     for bundle in app.bundles:
       for path, relpath in bundle.filemap.items():
