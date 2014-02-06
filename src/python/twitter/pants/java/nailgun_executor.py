@@ -155,7 +155,6 @@ class NailgunExecutor(Executor):
         log.debug('Found ng server with fingerprint %s @ pid:%d port:%d' % endpoint)
       return endpoint
     else:
-      log.warn('Nailguns disabled in dev mode.')
       return None
 
   def _get_nailgun_client(self, jvm_args, classpath, stdout, stderr):
