@@ -41,7 +41,7 @@ function build_pants() {
 
 function run_pants_bare() {
   # TODO(John Sirois): Remove the --no-ng-daemons flag once we can run nailguns in dev mode.
-  with_virtualenv python $PYTHON_ARGS $PANTS_EXE "$@" --no-ng-daemons
+  with_virtualenv python $PYTHON_ARGS $PANTS_EXE "$@"
 }
 
 if [ ! -e $VIRTUAL_PYTHON/bin/python ]; then
