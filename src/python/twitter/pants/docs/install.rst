@@ -1,32 +1,30 @@
 Installing
 ==========
 
-As of October 2013, the way to install Pants build is to install a repo
-already set up with Pants (and then invoke ``./pants`` in its root dir
-to use it).
+**As of January 2014, alas, Pants is not an install-able thing.**
+You can use it in a repo in which some Pants expert has set it up;
+you can use it to build things *in* that repo, but nothing else.
+
+We hope to fix this situation soon, but we're not there yet.
+If you're reading this in open-source-land and want to try out Pants,
+https://github.com/twitter/commons uses it. If you're reading this in
+an organization that already uses Pants, ask your neighbor where
+your source code is.
+
 
 Requirements
 ------------
 
-Most of the commons python environment has been developed against CPython 2.6.
+Most of Pants was developed against CPython 2.6.
 Things mostly work with CPython 2.7 and recent efforts have been made to improve
 CPython 3.x and PyPy compatibility.  We've explicitly ignored anything prior to
-CPython 2.6 and in fact generally discourage use against anything less than
+CPython 2.6 and generally discourage use against anything less than
 CPython 2.6.5 as there are known bugs that we're unwilling to fix.  We've never
 even tried running against Jython or IronPython so if that's your environment,
 you're on your own.
 
 If none of this made any sense to you, run `python -V`.  If it says `Python
 2.6.x` or `Python 2.7.x` you're probably fine.
-
-TL;DR
------
-
-Nowadays, you use Pants by working in a repo for which it's already
-installed. If that's not true and you're thinking "Is there some
-open-source repo in which I can try pants?" then
-``git clone git://github.com/twitter/commons && cd commons`` and then
-``./pants``
 
 .. _tshoot:
 
