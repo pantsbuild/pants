@@ -14,7 +14,7 @@
 # limitations under the License.
 # ==================================================================================================
 
-import os.path
+import os
 import re
 
 from twitter.pants.base.config import Config
