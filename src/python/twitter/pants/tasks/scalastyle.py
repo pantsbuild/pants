@@ -18,6 +18,7 @@ import os
 import re
 
 from twitter.pants.base.config import Config
+from twitter.pants.base.target import Target
 from twitter.pants.process.xargs import Xargs
 from twitter.pants.tasks import TaskError
 from twitter.pants.tasks.nailgun_task import NailgunTask
@@ -77,7 +78,7 @@ class Scalastyle(NailgunTask):
     check_targets = list()
     for target in targets:
       for tgt in target.resolve():
-        if tgt.has_sources('.scala'):
+        if isinstance(tgt, Target) and tgt.has_sources('.scala'):
           check_targets.append(tgt)
 
     def filter_excludes(filename):
