@@ -18,7 +18,6 @@ from __future__ import print_function
 
 import os
 
-from twitter.pants import is_internal
 from twitter.pants.java.jar import open_jar
 from twitter.pants.targets import JavaLibrary, ScalaLibrary
 
@@ -59,11 +58,9 @@ class ArgsResourceMapper(Task):
     self.resource_index = 0 if main else 1
 
     context.products.require('jars', self.select_targets)
-    context.products.require('classes')
+    context.products.require_data('classes_by_target')
     default_args_resource_mapper = [
-      os.path.join(self.get_workdir(key='java_workdir',
-                                    workdir='javac'),
-                   'classes')
+      os.path.join(self.get_workdir(key='java_workdir', workdir='javac'), 'classes')
     ]
     self.classdirs = context.config.getlist('args-resource-mapper', 'classdirs',
                                             default=default_args_resource_mapper)
@@ -92,22 +89,24 @@ class ArgsResourceMapper(Task):
 
     if lines:
       class Args(object):
-        def __init__(self, context, transitive, class_genmap):
+        def __init__(self, context, transitive, classes_by_target):
           self.context = context
           self.classnames = set()
-          def add_clasnames(target):
+
+          def add_classnames(target):
             if isinstance(target, JavaLibrary) or isinstance(target, ScalaLibrary):
-              if class_genmap.get(target):
-                for base, classes in class_genmap.get(target).items():
+              target_products = classes_by_target.get(target)
+              if target_products:
+                for _, classes in target_products.rel_paths():
                   for cls in classes:
                     self.classnames.add(cls.replace('.class', '').replace('/', '.'))
               else:
                 self.context.log.debug('No mapping for %s' % target)
 
           if transitive:
-            target.walk(add_clasnames, is_internal)
+            target.walk(add_classnames, lambda t: t.is_internal)
           else:
-            add_clasnames(target)
+            add_classnames(target)
 
         def matches(self, line):
           line = line.strip()
@@ -129,9 +128,10 @@ class ArgsResourceMapper(Task):
             return True
 
       self._addargs(lines if self.include_all
-                    else filter(Args(self.context,
-                                     self.transitive,
-                                     self.context.products.get('classes')).matches, lines),
+                          else filter(Args(self.context,
+                                           self.transitive,
+                                           self.context.products.get_data('classes_by_target')).matches,
+                                      lines),
                     jar,
                     target)
 
