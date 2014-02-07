@@ -52,7 +52,6 @@ python_library(
     pants('src/python/twitter/common/contextutil'),
     pants('src/python/twitter/common/decorators'),
     pants('src/python/twitter/common/dirutil'),
-    pants('src/python/twitter/common/java'),
     pants('src/python/twitter/common/lang'),
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/common/process'),
@@ -61,7 +60,6 @@ python_library(
     pants('src/python/twitter/common/rwbuf'),
     pants('src/python/twitter/common/threading'),
     pants('src/python/twitter/common/util'),
-    pants('src/python/twitter/thrift/text'),
   ],
   sources=PANTS_SOURCES,
   resources=PANTS_RESOURCES,
@@ -88,7 +86,7 @@ python_library(
   # TODO(wickman) This version should be automatically pulled in from twitter.pants.version
   provides=setup_py(
     name='twitter.pants',
-    version='0.0.12',
+    version='0.0.14',
     description="Twitter's pants build tool.",
     url='https://github.com/twitter/commons',
     license='Apache License, Version 2.0',

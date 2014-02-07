@@ -13,7 +13,7 @@ BOOTSTRAP_REQS=(
   pystache==0.5.3
   python_daemon==1.5.5
   requests==2.0.0
-  setuptools==2.1
+  setuptools==2.1.2
   psutil==1.1.2
 )
 
