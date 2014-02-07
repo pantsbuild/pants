@@ -69,7 +69,6 @@ class SetupPyRunner(InstallerBase):
 class SetupPy(Command):
   """Generate setup.py-based Python projects from python_library targets."""
 
-  DECLARE_NAMESPACE = '__import__("pkg_resources").declare_namespace(__name__)'
   GENERATED_TARGETS = {
       PythonAntlrLibrary: PythonAntlrBuilder,
       PythonThriftLibrary: PythonThriftBuilder,
