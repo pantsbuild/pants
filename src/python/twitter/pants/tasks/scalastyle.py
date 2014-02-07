@@ -17,7 +17,6 @@
 import os.path
 import re
 
-from twitter.pants import has_sources
 from twitter.pants.base.config import Config
 from twitter.pants.process.xargs import Xargs
 from twitter.pants.tasks import TaskError
@@ -55,14 +54,13 @@ class Scalastyle(NailgunTask):
       Scalastyle._CONFIG_SECTION, 'config')
     if not os.path.exists(self._scalastyle_config):
       raise Config.ConfigError(
-        'Scalastyle config file does not exist: %s' % self._scalastyle_config)
+          'Scalastyle config file does not exist: %s' % self._scalastyle_config)
 
     excludes_file = self.context.config.get(Scalastyle._CONFIG_SECTION, 'excludes')
     self._excludes = set()
     if excludes_file:
       if not os.path.exists(excludes_file):
-        raise Config.ConfigError(
-          'Scalastyle excludes file does not exist: %s' % excludes_file)
+        raise Config.ConfigError('Scalastyle excludes file does not exist: %s' % excludes_file)
       self.context.log.debug('Using scalastyle excludes file %s' % excludes_file)
       with open(excludes_file) as fh:
         for pattern in fh.readlines():
@@ -79,7 +77,7 @@ class Scalastyle(NailgunTask):
     check_targets = list()
     for target in targets:
       for tgt in target.resolve():
-        if has_sources(tgt, '.scala'):
+        if tgt.has_sources('.scala'):
           check_targets.append(tgt)
 
     def filter_excludes(filename):

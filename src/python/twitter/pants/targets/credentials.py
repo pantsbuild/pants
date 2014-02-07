@@ -16,6 +16,7 @@
 
 from twitter.pants.base.target import Target
 
+
 class Credentials(Target):
   """Supplies credentials for a maven repository on demand.
 
