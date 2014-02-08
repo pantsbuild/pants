@@ -265,5 +265,6 @@ def main():
   logger.debug('launching %s' % fetch_pants())
   os.execv(fetch_pants(), sys.argv)
 
+
 if __name__ == '__main__':
   main()

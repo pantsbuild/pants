@@ -14,13 +14,23 @@
 # limitations under the License.
 # ==================================================================================================
 
-from twitter.pants.base import TargetDefinitionException
+from collections import Iterable
+from functools import partial
+
+from twitter.common.collections import maybe_list
+
+from twitter.pants.base import manual, TargetDefinitionException
 
 from .exportable_jvm_library import ExportableJvmLibrary
+from .jar_dependency import JarDependency
+from .pants_target import Pants
+from .thrift_library import ThriftJar
 
 
+@manual.builddict(tags=["java"])
 class JavaThriftLibrary(ExportableJvmLibrary):
-  """Defines a target that builds java or scala stubs from a thrift IDL file."""
+  """Generates a stub Java or Scala library from thrift IDL files."""
+
 
   _COMPILERS = frozenset(['thrift', 'scrooge', 'scrooge-legacy'])
   _COMPILER_DEFAULT = 'thrift'
@@ -31,34 +41,52 @@ class JavaThriftLibrary(ExportableJvmLibrary):
   _RPC_STYLES = frozenset(['sync', 'finagle', 'ostrich'])
   _RPC_STYLE_DEFAULT = 'sync'
 
-  def __init__(self, name, sources, provides=None, dependencies=None, excludes=None,
-               compiler=_COMPILER_DEFAULT, language=_LANGUAGE_DEFAULT, rpc_style=_RPC_STYLE_DEFAULT,
-               namespace_map=None, buildflags=None, exclusives=None):
-    """name: The name of this module target, addressable via pants via the portion of the spec
-        following the colon
-    sources: A list of paths containing the thrift source files this module's jar is compiled from
-    provides: An optional Dependency object indicating the The ivy artifact to export
-    dependencies: An optional list of Dependency objects specifying the binary (jar) dependencies of
-        this module.
-    excludes: An optional list of dependency exclude patterns to filter all of this module's
-        transitive dependencies against.
-    compiler: An optional compiler used to compile the thrift files {'thrift', 'scrooge',
-                                                                               'scrooge-legacy'}.
-        Defaults to 'thrift'.
-    language: An optional language used to generate the output files {'java', 'scala'}.
-        Defaults to 'java'.
-    rpc_style: An optional rpc style in code generation {'sync', 'finagle', 'ostrich'}.
-        Defaults to 'sync'.
-    namespace_map: A dictionary of namespaces to remap (old: new)
-    buildflags: DEPRECATED - A list of additional command line arguments to pass to the underlying
-        build system for this target - now ignored.
-    exclusives:   An optional map of exclusives tags. See CheckExclusives for details.
+  def __init__(self,
+               name,
+               sources,
+               provides=None,
+               dependencies=None,
+               excludes=None,
+               compiler=_COMPILER_DEFAULT,
+               language=_LANGUAGE_DEFAULT,
+               rpc_style=_RPC_STYLE_DEFAULT,
+               namespace_map=None,
+               exclusives=None):
+    """
+    :param string name: The name of this target, which combined with this
+      build file defines the target :class:`twitter.pants.base.address.Address`.
+    :param sources: A list of filenames representing the source code
+      this library is compiled from.
+    :type sources: list of strings
+    :param Artifact provides:
+      The :class:`twitter.pants.targets.artifact.Artifact`
+      to publish that represents this target outside the repo.
+    :param dependencies: List of :class:`twitter.pants.base.target.Target` instances
+      this target depends on.
+    :type dependencies: list of targets
+    :param excludes: List of :class:`twitter.pants.targets.exclude.Exclude` instances
+      to filter this target's transitive dependencies against.
+    :param compiler: An optional compiler used to compile the thrift files.
+    :param language: The language used to generate the output files.
+      One of 'java' or 'scala' with a default of 'java'.
+    :param rpc_style: An optional rpc style to generate service stubs with.
+      One of 'sync', 'finagle' or 'ostrich' with a default of 'sync'.
+    :param namespace_map: A dictionary of namespaces to remap (old: new)
+    :param exclusives: An optional map of exclusives tags. See CheckExclusives for details.
     """
     ExportableJvmLibrary.__init__(self, name, sources, provides, dependencies, excludes,
                                   exclusives=exclusives)
+
     # 'java' shouldn't be here, but is currently required to prevent lots of chunking islands.
     # See comment in goal.py for details.
     self.add_labels('codegen', 'java')
+
+    if dependencies:
+      if not isinstance(dependencies, Iterable):
+        raise TargetDefinitionException(self,
+                                        "dependencies must be Iterable but was: %s" % dependencies)
+      maybe_list(dependencies, expected_type=(JarDependency, JavaThriftLibrary, Pants, ThriftJar),
+                 raise_type=partial(TargetDefinitionException, self))
 
     def check_value_for_arg(arg, value, values):
       if value not in values:
@@ -80,9 +108,6 @@ class JavaThriftLibrary(ExportableJvmLibrary):
 
     self.namespace_map = namespace_map
 
-  def _as_jar_dependency(self):
-    return ExportableJvmLibrary._as_jar_dependency(self).with_sources()
-
-  @property
-  def is_thrift(self):
-    return True
+    @property
+    def is_thrift(self):
+      return True

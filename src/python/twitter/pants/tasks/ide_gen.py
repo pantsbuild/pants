@@ -21,17 +21,18 @@ from collections import defaultdict
 
 from twitter.common.collections.orderedset import OrderedSet
 from twitter.common.dirutil import safe_mkdir
-from twitter.pants.targets.jvm_target import JvmTarget
 
 from twitter.pants import (
-  binary_util,
-  get_buildroot)
+    binary_util,
+    get_buildroot)
 from twitter.pants.base.target import Target
 from twitter.pants.goal.phase import Phase
 from twitter.pants.targets.jvm_binary import JvmBinary
-from twitter.pants.tasks import TaskError
 from twitter.pants.tasks.checkstyle import Checkstyle
-from twitter.pants.tasks.jvm_binary_task import JvmBinaryTask
+
+from .jvm_binary_task import JvmBinaryTask
+
+from . import TaskError
 
 
 # We use custom checks for scala and java targets here for 2 reasons:
@@ -97,7 +98,7 @@ class IdeGen(JvmBinaryTask):
                                  "compiles them and adds them to the project classpath.")
 
   def __init__(self, context):
-    JvmBinaryTask.__init__(self, context)
+    super(IdeGen, self).__init__(context)
 
     self.project_name = context.options.ide_gen_project_name
     self.python = context.options.ide_gen_python
@@ -143,6 +144,13 @@ class IdeGen(JvmBinaryTask):
                                       default=[':scala-compile-2.9.3'])
       self._jvm_tool_bootstrapper.register_jvm_tool(self.scalac_bootstrap_key, scalac)
 
+    targets, self._project = self.configure_project(
+        context.targets(),
+        self.checkstyle_suppression_files,
+        self.debug_port)
+
+    self.configure_compile_context(targets)
+
     if self.python:
       self.context.products.require('python')
     if not self.skip_java:
@@ -177,10 +185,7 @@ class IdeGen(JvmBinaryTask):
 
     extra_source_paths = self.context.config.getlist('ide', 'extra_jvm_source_paths', default=[])
     extra_test_paths = self.context.config.getlist('ide', 'extra_jvm_test_paths', default=[])
-    all_targets = project.configure_jvm(
-      extra_source_paths,
-      extra_test_paths
-    )
+    all_targets = project.configure_jvm(extra_source_paths, extra_test_paths)
     return all_targets, project
 
   def configure_compile_context(self, targets):
@@ -195,7 +200,7 @@ class IdeGen(JvmBinaryTask):
 
         # Some IDEs need annotation processors pre-compiled, others are smart enough to detect and
         # proceed in 2 compile rounds
-        target.is_apt or 
+        target.is_apt or
 
         (self.skip_java and is_java(target)) or
         (self.skip_scala and is_scala(target)) or
@@ -206,7 +211,7 @@ class IdeGen(JvmBinaryTask):
     excludes = OrderedSet()
     compiles = OrderedSet()
     def prune(target):
-      if isinstance(target, JvmTarget):
+      if target.is_jvm:
         if target.excludes:
           excludes.update(target.excludes)
         jars.update(jar for jar in target.jar_dependencies if jar.rev)
@@ -289,21 +294,19 @@ class IdeGen(JvmBinaryTask):
   def execute(self, targets):
     """Stages IDE project artifacts to a project directory and generates IDE configuration files."""
     checkstyle_enabled = len(Phase.goals_of_type(Checkstyle)) > 0
-    checkstyle_classpath = \
-      self._jvm_tool_bootstrapper.get_jvm_tool_classpath(self.checkstyle_bootstrap_key) \
-      if checkstyle_enabled else []
-    scalac_classpath = \
-      self._jvm_tool_bootstrapper.get_jvm_tool_classpath(self.scalac_bootstrap_key) \
-      if self.scalac_bootstrap_key else []
+    if checkstyle_enabled:
+      checkstyle_classpath = self._jvm_tool_bootstrapper.get_jvm_tool_classpath(
+          self.checkstyle_bootstrap_key)
+    else:
+      checkstyle_classpath = []
 
-    targets, self._project = self.configure_project(
-      targets,
-      self.checkstyle_suppression_files,
-      self.debug_port)
+    if self.scalac_bootstrap_key:
+      scalac_classpath = self._jvm_tool_bootstrapper.get_jvm_tool_classpath(
+          self.scalac_bootstrap_key)
+    else:
+      scalac_classpath = []
 
     self._project.set_tool_classpaths(checkstyle_classpath, scalac_classpath)
-
-    self.configure_compile_context(targets)
 
     self.map_internal_jars(targets)
     self.map_external_jars()
@@ -414,7 +417,7 @@ class Project(object):
 
     def source_target(target):
       return ((self.transitive or target in self.targets) and
-              target.has_sources() and 
+              target.has_sources() and
               (not target.is_codegen and
                not (self.skip_java and is_java(target)) and
                not (self.skip_scala and is_scala(target))))
@@ -504,7 +507,7 @@ class Project(object):
       source_base = os.path.join(self.root_dir, source_set.source_base)
       for root, dirs, _ in os.walk(os.path.join(source_base, source_set.path)):
         if dirs:
-          paths.update([ os.path.join(root, directory) for directory in dirs ])
+          paths.update([os.path.join(root, directory) for directory in dirs])
       unused_children = paths - targeted
       if unused_children:
         for child in unused_children:

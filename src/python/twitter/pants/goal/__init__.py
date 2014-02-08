@@ -19,6 +19,7 @@ __author__ = 'John Sirois'
 import inspect
 from optparse import OptionGroup
 
+from twitter.pants.base.build_manual import manual
 from twitter.pants.tasks import Task
 
 
@@ -53,6 +54,7 @@ class Mkflag(object):
     setattr(parser.values, option.dest, not opt_str.startswith("--no"))
 
 
+@manual.builddict()
 class Goal(object):
   def __init__(self, name, action, group=None, dependencies=None, serialize=True):
     """Parameters:
@@ -111,9 +113,14 @@ class Goal(object):
     mkflag = Mkflag(namespace)
 
     group = OptionGroup(parser, title = namespace(':'))
-    self._task.setup_parser(group, args, mkflag)
+    self.task_setup_parser(group, args, mkflag)
     if group.option_list:
       parser.add_option_group(group)
+
+  def task_setup_parser(self, group, args, mkflag):
+    """Allows a task to setup a parser.
+    Override this method if you want to initialize the task with more goal data."""
+    self._task.setup_parser(group, args, mkflag)
 
   def prepare(self, context):
     """Prepares a Task that can be executed to achieve this goal."""

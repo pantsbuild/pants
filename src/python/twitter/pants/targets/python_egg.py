@@ -22,9 +22,12 @@ from glob import glob as fsglob
 from pkg_resources import Distribution, EggMetadata, PathMetadata
 from zipimport import zipimporter
 
+from twitter.pants.base.build_manual import manual
+
 from .python_requirement import PythonRequirement
 
 
+@manual.builddict(tags=["python"])
 def PythonEgg(glob, name=None):
   """Refers to pre-built Python eggs in the file system. (To instead fetch
   eggs in a ``pip``/``easy_install`` way, use ``python_requirement``)

@@ -15,24 +15,40 @@
 # ==================================================================================================
 
 
-from twitter.pants.base import Target, TargetDefinitionException
+from twitter.pants.base import manual, Target
+
 from .internal import InternalTarget
 from .pants_target import Pants
 from .with_sources import TargetWithSources
 
+
 class Wiki(Target):
-  """A target that identifies a wiki where pages can be published"""
+  """Target that identifies a wiki where pages can be published."""
 
   def __init__(self, name, url_builder, exclusives=None):
-    """:url_builder a function that accepts a page target and an optional wiki :config dict and
-    returns a tuple of (alias, fully qualified url)."""
+    """
+    :param string name: The name of this target, which combined with this
+      build file defines the target :class:`twitter.pants.base.address.Address`.
+    :param url_builder: Function that accepts a page target and an optional wiki config dict.
+    :returns: A tuple of (alias, fully qualified url).
+    """
     Target.__init__(self, name, exclusives=exclusives)
     self.url_builder = url_builder
 
 
 class Page(InternalTarget, TargetWithSources):
-  """A target that identifies a single documentation page."""
+  """Describes a single documentation page."""
+
   def __init__(self, name, source, dependencies=None, resources=None, exclusives=None):
+    """
+    :param string name: The name of this target, which combined with this
+      build file defines the target :class:`twitter.pants.base.address.Address`.
+    :param source: Source of the page in markdown format.
+    :param dependencies: List of :class:`twitter.pants.base.target.Target` instances
+      this target depends on.
+    :type dependencies: list of targets
+    :param resources: An optional list of Resources objects.
+    """
     InternalTarget.__init__(self, name, dependencies, exclusives=exclusives)
     TargetWithSources.__init__(self, name, sources=[source], exclusives=exclusives)
 
@@ -43,6 +59,7 @@ class Page(InternalTarget, TargetWithSources):
   def source(self):
     return self.sources[0]
 
+  @manual.builddict()
   def register_wiki(self, wiki, **kwargs):
     """Adds this page to the given wiki for publishing.  Wiki-specific configuration is passed as
     kwargs.

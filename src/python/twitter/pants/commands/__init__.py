@@ -22,6 +22,7 @@ import sys
 from twitter.common.collections import OrderedSet
 from twitter.pants.base import BuildFile, Target
 
+
 class Command(object):
   """Baseclass for all pants subcommands."""
 
@@ -37,6 +38,7 @@ class Command(object):
 
   @staticmethod
   def _register_modules():
+    """Register all 'Command's from all modules in the current directory."""
     import pkgutil
     for _, mod, ispkg in pkgutil.iter_modules(__path__):
       if ispkg: continue
@@ -77,7 +79,7 @@ class Command(object):
         print(message + '\n')
       if show_help:
         parser.print_help()
-      parser.exit(status = 1)
+      parser.exit(status=1)
     parser.error = error
     self.error = error
 

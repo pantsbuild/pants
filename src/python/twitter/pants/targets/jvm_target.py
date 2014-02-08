@@ -16,49 +16,48 @@
 
 import os
 
+from twitter.common.collections import maybe_list
+
+from .exclude import Exclude
 from .internal import InternalTarget
-from .jar_dependency import JarDependency
+from .jarable import Jarable
 from .with_sources import TargetWithSources
 
 
-class JvmTarget(InternalTarget, TargetWithSources):
+class JvmTarget(InternalTarget, TargetWithSources, Jarable):
   """A base class for all java module targets that provides path and dependency translation."""
 
-  def __init__(self, name, sources, dependencies, excludes=None, configurations=None,
+  def __init__(self,
+               name,
+               sources,
+               dependencies,
+               excludes=None,
+               configurations=None,
                exclusives=None):
+    """
+    :param string name: The name of this target, which combined with this
+      build file defines the target :class:`twitter.pants.base.address.Address`.
+    :param sources: A list of filenames representing the source code
+      this library is compiled from.
+    :type sources: list of strings
+    :param dependencies: List of :class:`twitter.pants.base.target.Target` instances
+      this target depends on.
+    :type dependencies: list of targets
+    :param excludes: One or more :class:`twitter.pants.targets.exclude.Exclude` instances
+      to filter this target's transitive dependencies against.
+    :param configurations: One or more ivy configurations to resolve for this target.
+      This parameter is not intended for general use.
+    :type configurations: tuple of strings
+    """
     InternalTarget.__init__(self, name, dependencies, exclusives=exclusives)
     TargetWithSources.__init__(self, name, sources)
 
-    self.declared_dependencies = set(dependencies or [])
     self.add_labels('jvm')
     for source in self.sources:
       rel_path = os.path.join(self.target_base, source)
       TargetWithSources.register_source(rel_path, self)
-    self.excludes = excludes or []
-    self.configurations = configurations
-
-  def _as_jar_dependency(self):
-    jar_dependency, _, _ = self._get_artifact_info()
-    jar = JarDependency(org=jar_dependency.org, name=jar_dependency.name, rev=None,
-                              exclusives=self.declared_exclusives)
-    jar.id = self.id
-    return jar
-
-  def _as_jar_dependencies(self):
-    yield self._as_jar_dependency()
-
-
-  def _get_artifact_info(self):
-    provides = self._provides()
-    exported = bool(provides)
-
-    org = provides.org if exported else 'internal'
-    module = provides.name if exported else self.id
-    version = provides.rev if exported else None
-
-    id = "%s-%s" % (provides.org, provides.name) if exported else self.id
-
-    return JarDependency(org=org, name=module, rev=version), id, exported
+    self.excludes = maybe_list(excludes or [], Exclude)
+    self.configurations = maybe_list(configurations or [])
 
   def _provides(self):
     return None

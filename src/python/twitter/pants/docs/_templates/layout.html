@@ -1,0 +1,42 @@
+{% extends "!layout.html" %}
+
+{% block extrahead %}
+{{ super() }}
+<script type="text/javascript">
+  var _gaq = _gaq || [];
+  _gaq.push(['_setAccount', 'UA-39101739-2']);
+  _gaq.push(['_trackPageview']);
+</script>
+<script type="text/javascript">
+  // In a plain template, we'd put this in the footer block.
+  // In the read-the-docs template, there is no footer. So use jQuery ready:
+  $(document).ready(function() {
+    var ga = document.createElement('script');
+    ga.type = 'text/javascript'; ga.async = true;
+    ga.src = ('https:' == document.location.protocol ?
+              'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+    ga.setAttribute('async', 'true');
+    $(document).append(ga);
+  });
+</script>
+<style type="text/css">
+/* Shoehorn in pants logo */
+body .icon-home:before {
+   content: "";
+}
+{% set logo = pathto("./_static/" + favicon, 1) %}
+body .icon-home{
+  background: transparent url({{ logo }}) center left no-repeat;
+  background-position-x: 5px;
+  padding-left: 40px;
+  padding-right: 35px;
+  line-height: 40px;
+}
+
+body a.icon-home:hover{
+  background: #3d8cbf url({{ logo }}) center left no-repeat;
+  background-position-x: 5px;
+}
+
+</style>
+{% endblock %}
