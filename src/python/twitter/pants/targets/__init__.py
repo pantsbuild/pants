@@ -14,17 +14,29 @@
 # limitations under the License.
 # ==================================================================================================
 
+import os
+
+
+def resolve_target_sources(target_sources, extension):
+  """given a list of pants targets, extract their sources as a list"""
+  resolved_sources = []
+
+  if target_sources:
+    for target in target_sources:
+      for resolved in target.resolve():
+        if hasattr(resolved, 'sources'):
+          resolved_sources.extend(os.path.join(resolved.target_base, source)
+            for source in resolved.sources if source.endswith(extension))
+  return resolved_sources
+
+
 from .annotation_processor import AnnotationProcessor
-from .anonymous import AnonymousDeps
 from .artifact import Artifact
 from .benchmark import Benchmark
 from .credentials import Credentials
 from .doc import Page, Wiki
 from .exclude import Exclude
 from .exportable_jvm_library import ExportableJvmLibrary
-from .gem import Gem
-from .hadoop_binary import TwitterHadoopBinary
-from .idl_jar_thrift_library import IdlJvmThriftLibrary
 from .internal import InternalTarget
 from .jar_dependency import JarDependency
 from .jar_library import JarLibrary
@@ -48,28 +60,22 @@ from .python_requirement import PythonRequirement
 from .python_target import PythonTarget
 from .python_tests import PythonTests, PythonTestSuite
 from .repository import Repository
-from .ruby_thrift_library import RubyThriftLibrary
-from .ruby_target import RubyTarget
 from .resources import Resources
 from .scala_library import ScalaLibrary
 from .scala_tests import ScalaTests
 from .scalac_plugin import ScalacPlugin
 from .sources import SourceRoot
-from .thrift_library import ThriftJar, ThriftLibrary
 from .with_sources import TargetWithSources
 
 
 __all__ = (
   'AnnotationProcessor',
-  'AnonymousDeps',
   'Artifact',
   'Benchmark',
   'Bundle',
   'Credentials',
   'Exclude',
   'ExportableJvmLibrary',
-  'Gem',
-  'IdlJvmThriftLibrary',
   'InternalTarget',
   'JarDependency',
   'JarLibrary',
@@ -99,15 +105,10 @@ __all__ = (
   'PythonTestSuite',
   'Repository',
   'Resources',
-  'RubyTarget',
-  'RubyThriftLibrary',
   'ScalaLibrary',
   'ScalaTests',
   'ScalacPlugin',
   'SourceRoot',
   'TargetWithSources',
-  'ThriftJar',
-  'ThriftLibrary',
-  'TwitterHadoopBinary',
   'Wiki'
 )

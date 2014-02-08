@@ -23,51 +23,31 @@ from zipfile import ZIP_STORED, ZIP_DEFLATED
 from twitter.common.dirutil import safe_mkdir
 
 from twitter.pants.base.build_environment import get_buildroot
-from twitter.pants.fs import safe_filename
-from twitter.pants.java.jar import open_jar
-from twitter.pants.targets import JvmBinary, JavaThriftLibrary, ThriftLibrary
-
-from .javadoc_gen import javadoc
-from .scaladoc_gen import scaladoc
-
-from . import Task, TaskError
+from twitter.pants.java import open_jar
+from twitter.pants.tasks import Task, TaskError
 
 
-DEFAULT_CONFS = ['default']
+def is_java(target):
+  return target.has_sources('.java')
 
 
-def is_binary(target):
-  return isinstance(target, JvmBinary)
+def is_jvm(target):
+  return is_java(target) or target.has_sources('.scala')
 
 
-def is_java_library(target):
-  return target.has_sources('.java') and not is_binary(target)
+def is_idl(target):
+  # TODO(Phil Hom): can be changed to is_codegen when previous hackweek thrift download hacks are
+  # removed
+  return target.is_exported and target.has_sources('.thrift')
 
 
-def is_scala_library(target):
-  return target.has_sources('.scala') and not is_binary(target)
-
-
-def is_jvm_library(target):
-  return is_java_library(target) or is_scala_library(target)
-
-
-def is_idl_library(target):
-  return target.has_sources('.thrift') and isinstance(target, (ThriftLibrary, JavaThriftLibrary))
-
-
-def jarname(target, extension='.jar'):
+def jarname(target):
   # TODO(John Sirois): incorporate version
-  _, id_, _ = target.get_artifact_info()
-  # Cap jar names quite a bit lower than the standard fs limit of 255 characters since these
-  # artifacts will often be used outside pants and those uses may manipulate (expand) the jar
-  # filenames blindly.
-  return safe_filename(id_, extension, max_length=200)
+  _, id, _ = target._get_artifact_info()
+  return id
 
 
 class JarCreate(Task):
-  """Jars jvm libraries and optionally their sources and their docs."""
-
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
     option_group.add_option(mkflag('outdir'), dest='jar_create_outdir',
@@ -101,19 +81,18 @@ class JarCreate(Task):
                             action='callback', callback=mkflag.set_bool,
                             help='[%default] Create Thrift jars.')
 
-  def __init__(self, context, jar_javadoc=False):
+  def __init__(self, context):
     Task.__init__(self, context)
 
     options = context.options
     products = context.products
 
-    self._output_dir = (options.jar_create_outdir or
-                        self.get_workdir(section='jar-create', workdir='jars'))
+    self._output_dir = options.jar_create_outdir or context.config.get('jar-create', 'workdir')
     self.transitive = options.jar_create_transitive
-    self.confs = context.config.getlist('jar-create', 'confs', default=DEFAULT_CONFS)
+    self.confs = context.config.getlist('jar-create', 'confs')
     self.compression = ZIP_DEFLATED if options.jar_create_compressed else ZIP_STORED
 
-    self.jar_classes = options.jar_create_classes or products.isrequired('jars')
+    self.jar_classes = products.isrequired('jars') or options.jar_create_classes
     if self.jar_classes:
       products.require_data('classes_by_target')
       products.require_data('resources_by_target')
@@ -122,18 +101,9 @@ class JarCreate(Task):
     if self.jar_idl:
       products.require('idl')
 
-    definitely_create_javadoc = options.jar_create_javadoc or products.isrequired('javadoc_jars')
-    definitely_dont_create_javadoc = options.jar_create_javadoc is False
-    create_javadoc = jar_javadoc and options.jar_create_javadoc is None
-    if definitely_create_javadoc and definitely_dont_create_javadoc:
-      self.context.log.warn('javadoc jars are required but you have requested they not be created, '
-                            'creating anyway')
-    self.jar_javadoc = (True  if definitely_create_javadoc      else
-                        False if definitely_dont_create_javadoc else
-                        create_javadoc)
+    self.jar_javadoc = products.isrequired('javadoc_jars') or options.jar_create_javadoc
     if self.jar_javadoc:
-      products.require(javadoc.product_type)
-      products.require(scaladoc.product_type)
+      products.require('javadoc')
 
     self.jar_sources = products.isrequired('source_jars') or options.jar_create_sources
 
@@ -146,25 +116,22 @@ class JarCreate(Task):
       return filter(predicate, (targets if self.transitive else self.context.target_roots))
 
     def add_genjar(typename, target, name):
-      self.context.products.get(typename).add(target, self._output_dir).append(name)
+      if self.context.products.isrequired(typename):
+        self.context.products.get(typename).add(target, self._output_dir).append(name)
 
     if self.jar_classes:
-      self._jar(jar_targets(is_jvm_library), functools.partial(add_genjar, 'jars'))
+      self._jar(jar_targets(is_jvm), functools.partial(add_genjar, 'jars'))
 
     if self.jar_idl:
-      self.idljar(jar_targets(is_idl_library), functools.partial(add_genjar, 'idl_jars'))
+      self.idljar(jar_targets(is_idl), functools.partial(add_genjar, 'idl_jars'))
 
     if self.jar_sources:
-      self.sourcejar(jar_targets(is_jvm_library), functools.partial(add_genjar, 'source_jars'))
+      self.sourcejar(jar_targets(is_jvm), functools.partial(add_genjar, 'source_jars'))
 
     if self.jar_javadoc:
-      javadoc_add_genjar = functools.partial(add_genjar, 'javadoc_jars')
-      self.javadocjar(jar_targets(is_java_library),
-                      self.context.products.get(javadoc.product_type),
-                      javadoc_add_genjar)
-      self.javadocjar(jar_targets(is_scala_library),
-                      self.context.products.get(scaladoc.product_type),
-                      javadoc_add_genjar)
+      self.javadocjar(jar_targets(is_java),
+                      self.context.products.get('javadoc'),
+                      functools.partial(add_genjar, 'javadoc_jars'))
 
   @contextmanager
   def create_jar(self, target, path):
@@ -183,13 +150,9 @@ class JarCreate(Task):
 
     for target in jvm_targets:
       target_classes = classes_by_target.get(target)
-
-      target_resources = []
-      if target.has_resources:
-        target_resources.extend(resources_by_target.get(r) for r in target.resources)
-
-      if target_classes or target_resources:
-        jar_name = jarname(target)
+      target_resources = resources_by_target.get(target)
+      if target_classes or target_resources or target.has_resources:
+        jar_name = '%s.jar' % jarname(target)
         add_genjar(target, jar_name)
         jar_path = os.path.join(self._output_dir, jar_name)
         with self.create_jar(target, jar_path) as jarfile:
@@ -199,40 +162,39 @@ class JarCreate(Task):
                 for prod in products:
                   jarfile.write(os.path.join(root, prod), prod)
           add_to_jar(target_classes)
-          for resources_target in target_resources:
-            add_to_jar(resources_target)
+          add_to_jar(target_resources)
 
-  def idljar(self, idl_targets, add_genjar):
-    for target in idl_targets:
-      jar_name = jarname(target, '-idl.jar')
+  def idljar(self, jvm_targets, add_genjar):
+    for target in jvm_targets:
+      jar_name = '%s-idl.jar' % jarname(target)
       add_genjar(target, jar_name)
       jar_path = os.path.join(self._output_dir, jar_name)
-      with self.create_jar(target, jar_path) as jar:
+      with self.create_jar(target, jar_path) as zh:
         for source in target.sources:
-          jar.write(os.path.join(get_buildroot(), target.target_base, source), source)
+          zh.write(os.path.join(target.target_base, source), source)
 
   def sourcejar(self, jvm_targets, add_genjar):
     for target in jvm_targets:
-      jar_name = jarname(target, '-sources.jar')
+      jar_name = '%s-sources.jar' % jarname(target)
       add_genjar(target, jar_name)
       jar_path = os.path.join(self._output_dir, jar_name)
-      with self.create_jar(target, jar_path) as jar:
+      with self.create_jar(target, jar_path) as zipfile:
         for source in target.sources:
-          jar.write(os.path.join(get_buildroot(), target.target_base, source), source)
+          zipfile.write(os.path.join(target.target_base, source), source)
 
         if target.has_resources:
           for resources in target.resources:
             for resource in resources.sources:
-              jar.write(os.path.join(get_buildroot(), resources.target_base, resource), resource)
+              zipfile.write(os.path.join(get_buildroot(), resources.target_base, resource), resource)
 
   def javadocjar(self, java_targets, genmap, add_genjar):
     for target in java_targets:
       generated = genmap.get(target)
       if generated:
-        jar_name = jarname(target, '-javadoc.jar')
+        jar_name = '%s-javadoc.jar' % jarname(target)
         add_genjar(target, jar_name)
         jar_path = os.path.join(self._output_dir, jar_name)
-        with self.create_jar(target, jar_path) as jar:
+        with self.create_jar(target, jar_path) as zipfile:
           for basedir, javadocfiles in generated.items():
             for javadocfile in javadocfiles:
-              jar.write(os.path.join(basedir, javadocfile), javadocfile)
+              zipfile.write(os.path.join(basedir, javadocfile), javadocfile)

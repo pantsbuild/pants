@@ -14,13 +14,15 @@
 # limitations under the License.
 # ==================================================================================================
 
+__author__ = 'jsirois'
+
+import unittest
+
 from twitter.pants.base import Config
 from twitter.pants.goal import Context
 from twitter.pants.testutils import MockTarget
-from twitter.pants.testutils.base_mock_target_test import BaseMockTargetTest
 
-
-class ContextTest(BaseMockTargetTest):
+class ContextTest(unittest.TestCase):
   @classmethod
   def setUpClass(cls):
     cls.config = Config.load()

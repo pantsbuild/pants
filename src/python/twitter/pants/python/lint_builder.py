@@ -22,8 +22,7 @@ import sys
 from twitter.common.collections import OrderedSet
 from twitter.common.python.pex import PEX
 
-from twitter.pants.base.address import Address
-from twitter.pants.base.target import Target
+from twitter.pants.base import Target, Address
 from twitter.pants.python.python_chroot import PythonChroot
 
 try:

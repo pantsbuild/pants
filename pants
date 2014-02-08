@@ -117,7 +117,6 @@ if not os.path.exists(CONFIG_FILE):
 
 config = ConfigParser({
   'pants_pex_filename_pattern': 'pants-%s-py%s%s.pex',
-  'ivysvnresolver_url': 'https://ivysvn.googlecode.com/files/ivysvnresolver-2.2.0-bin.tgz',
   'pants_pex_verify_md5': False
 })
 
@@ -139,7 +138,6 @@ def get_required(config, key, raw=False):
 
 
 # Use pants.pex if in the repo - primarily for development
-IVYSVNRESOLVER_URL = get_required(config, 'ivysvnresolver_url')
 LOCAL_PEX = os.path.exists('pants.pex')
 PANTS_CACHE = os.path.expanduser('~/.pants.d')
 
@@ -264,9 +262,9 @@ def fetch_pants():
 
 def main():
   logger.debug('Running with python version: %s.%s' % (major, minor))
+  fetch_ivy()
   logger.debug('launching %s' % fetch_pants())
   os.execv(fetch_pants(), sys.argv)
-
 
 if __name__ == '__main__':
   main()

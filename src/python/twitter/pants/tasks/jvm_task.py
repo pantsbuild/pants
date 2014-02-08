@@ -14,6 +14,8 @@
 # limitations under the License.
 # ==================================================================================================
 
+__author__ = 'John Sirois'
+
 import os
 
 from twitter.pants.base.build_environment import get_buildroot

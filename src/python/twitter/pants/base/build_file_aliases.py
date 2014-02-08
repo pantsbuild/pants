@@ -16,54 +16,21 @@
 
 from __future__ import print_function
 
-from twitter.pants.targets import (
-    AnnotationProcessor,
-    Artifact,
-    Benchmark,
-    Bundle,
-    Credentials,
-    JarLibrary,
-    PythonEgg,
-    Exclude,
-    JarDependency,
-    JavaLibrary,
-    JavaAntlrLibrary,
-    JavaProtobufLibrary,
-    JavaTests,
-    JavaThriftLibrary,
-    JavaThriftstoreDMLLibrary,
-    JvmApp,
-    JvmBinary,
-    OinkQuery,
-    Page,
-    Pants,
-    PythonArtifact,
-    PythonBinary,
-    PythonLibrary,
-    PythonAntlrLibrary,
-    PythonRequirement,
-    PythonThriftLibrary,
-    PythonTests,
-    PythonTestSuite,
-    Repository,
-    Resources,
-    RubyThriftLibrary,
-    ScalaLibrary,
-    ScalaTests,
-    ScalacPlugin,
-    SourceRoot,
-    ThriftJar,
-    ThriftLibrary,
-    Wiki)
-
-from twitter.pants.tasks.extract import Extract
+from twitter.pants.targets import (AnnotationProcessor, Artifact, Benchmark, Bundle, Credentials,
+                                   JarLibrary, PythonEgg, Exclude, Pants, JarDependency,
+                                   JavaLibrary, JavaAntlrLibrary, JavaProtobufLibrary, JavaTests,
+                                   JavaThriftLibrary, JavaThriftstoreDMLLibrary, JvmApp,
+                                   JvmBinary, OinkQuery, Page, PythonArtifact, PythonBinary,
+                                   PythonLibrary, PythonAntlrLibrary, PythonRequirement,
+                                   PythonThriftLibrary, PythonTests, PythonTestSuite, Repository,
+                                   Resources, ScalaLibrary, ScalaTests, ScalacPlugin, SourceRoot,
+                                   Wiki)
 
 # aliases
 annotation_processor = AnnotationProcessor
 artifact = Artifact
 benchmark = Benchmark
 bundle = Bundle
-compiled_idl = Extract.compiled_idl
 credentials = Credentials
 dependencies = jar_library = JarLibrary
 egg = PythonEgg
@@ -92,11 +59,8 @@ python_tests = PythonTests
 python_test_suite = PythonTestSuite
 repo = Repository
 resources = Resources
-ruby_thrift_library = RubyThriftLibrary
 scala_library = ScalaLibrary
 scala_specs = scala_tests = ScalaTests
 scalac_plugin = ScalacPlugin
 source_root = SourceRoot
-thrift_jar = ThriftJar
-thrift_library = ThriftLibrary
 wiki = Wiki

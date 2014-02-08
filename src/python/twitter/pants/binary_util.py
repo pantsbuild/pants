@@ -14,18 +14,20 @@
 # limitations under the License.
 # ==================================================================================================
 
-from __future__ import print_function
+from __future__ import division, print_function
 
 import os
+import errno
 import posixpath
 import subprocess
 
 from contextlib import closing, contextmanager
 
 from twitter.common import log
-from twitter.common.contextutil import temporary_file
+from twitter.common.contextutil import environment_as, temporary_file, temporary_dir
 from twitter.common.dirutil import chmod_plus_x, safe_delete, safe_open
 from twitter.common.lang import Compatibility
+from twitter.pants.base.workunit import WorkUnit
 
 if Compatibility.PY3:
   import urllib.request as urllib_request
@@ -34,8 +36,8 @@ else:
   import urllib2 as urllib_request
   import urllib2 as urllib_error
 
-from .base import Config
-from .tasks import TaskError
+from twitter.pants.base import Config
+from twitter.pants.tasks import TaskError
 
 
 _ID_BY_OS = {
@@ -63,7 +65,7 @@ def select_binary(base_path, version, name, config=None):
   """
   # TODO(John Sirois): finish doc of the path structure expexcted under base_path
   config = config or Config.load()
-  bootstrap_dir = config.getdefault('pants_bootstrapdir', default=os.path.expanduser('~/.pants.d'))
+  cachedir = config.getdefault('pants_cachedir', default=os.path.expanduser('~/.pants.d'))
   baseurl = config.getdefault('pants_support_baseurl')
   timeout_secs = config.getdefault('pants_support_fetch_timeout_secs', type=int, default=30)
 
@@ -73,24 +75,24 @@ def select_binary(base_path, version, name, config=None):
     middle_path = _PATH_BY_ID[os_id(release, machine)]
     if middle_path:
       binary_path = os.path.join(base_path, *(middle_path + [version, name]))
-      bootstrapped_binary_path = os.path.join(bootstrap_dir, binary_path)
-      if not os.path.exists(bootstrapped_binary_path):
+      cached_binary_path = os.path.join(cachedir, binary_path)
+      if not os.path.exists(cached_binary_path):
         url = posixpath.join(baseurl, binary_path)
         log.info('Fetching %s binary from: %s' % (name, url))
-        downloadpath = bootstrapped_binary_path + '~'
+        downloadpath = cached_binary_path + '~'
         try:
           with closing(urllib_request.urlopen(url, timeout=timeout_secs)) as binary:
-            with safe_open(downloadpath, 'wb') as bootstrapped_binary:
-              bootstrapped_binary.write(binary.read())
+            with safe_open(downloadpath, 'wb') as cached_binary:
+              cached_binary.write(binary.read())
 
-          os.rename(downloadpath, bootstrapped_binary_path)
-          chmod_plus_x(bootstrapped_binary_path)
+          os.rename(downloadpath, cached_binary_path)
+          chmod_plus_x(cached_binary_path)
         except (IOError, urllib_error.HTTPError, urllib_error.URLError) as e:
           raise TaskError('Failed to fetch binary from %s: %s' % (url, e))
         finally:
           safe_delete(downloadpath)
-      log.debug('Selected %s binary bootstrapped to: %s' % (name, bootstrapped_binary_path))
-      return bootstrapped_binary_path
+      log.debug('Selected %s binary cached at: %s' % (name, cached_binary_path))
+      return cached_binary_path
   raise TaskError('No %s binary found for: %s' % (name, (sysname, release, machine)))
 
 
@@ -139,23 +141,178 @@ def safe_args(args,
     yield args
 
 
+@contextmanager
+def safe_classpath(logger=None):
+  """
+    Yields to a block in an environment with no CLASSPATH.  This is useful to ensure hermetic java
+    invocations.
+  """
+  classpath = os.getenv('CLASSPATH')
+  if classpath:
+    logger = logger or log.warn
+    logger('Scrubbing CLASSPATH=%s' % classpath)
+  with environment_as(CLASSPATH=None):
+    yield
+
+
+class JvmCommandLine(object):
+  def __init__(self, jvm_options=None, classpath=None, main=None, args=None):
+    object.__init__(self)
+
+    tuplize = lambda x: tuple(x) if x else None
+
+    self.jvm_options = tuplize(jvm_options)
+    self.classpath = tuplize(classpath)
+    self.main = main
+    self.args = tuplize(args)
+
+  def __str__(self):
+    cmd = self.callable_cmd()
+    ret = ' '.join(cmd)
+    del cmd
+    return ret
+
+  def call(self, indivisible=True, **kwargs):
+    if indivisible:
+      cmd_with_args = self.callable_cmd()
+      with safe_classpath():
+        returncode = _subprocess_call(cmd_with_args, **kwargs)
+    else:
+      cmd = self.callable_cmd(use_args=False)
+      with safe_classpath():
+        returncode = _subprocess_call_with_args(cmd, self.args, **kwargs)
+    return returncode
+
+  def callable_cmd(self, use_args=True):
+    """Returns a list ready to be used by subprocess.call() or subprocess.Popen()"""
+
+    cmd = ['java']
+    if self.jvm_options:
+      cmd.extend(self.jvm_options)
+    if self.classpath:
+      cmd.extend(('-cp' if self.main else '-jar', os.pathsep.join(self.classpath)))
+    if self.main:
+      cmd.append(self.main)
+    if self.args and use_args:
+      cmd.extend(self.args)
+    return cmd
+
+
+def _runjava_cmd(jvm_options=None, classpath=None, main=None, args=None):
+  cmd = ['java']
+  if jvm_options:
+    cmd.extend(jvm_options)
+  if classpath:
+    cmd.extend(('-cp' if main else '-jar', os.pathsep.join(classpath)))
+  if main:
+    cmd.append(main)
+  if args:
+    cmd.extend(args)
+  return cmd
+
+
+def _runjava_cmd_to_str(cmd):
+  return ' '.join(cmd)
+
+
+def runjava_cmd_str(jvm_options=None, classpath=None, main=None, args=None):
+  cmd = _runjava_cmd(jvm_options=jvm_options, classpath=classpath, main=main, args=args)
+  return _runjava_cmd_to_str(cmd)
+
+
+def runjava_indivisible(jvm_options=None, classpath=None, main=None, args=None, dryrun=False,
+                        workunit_factory=None, workunit_name=None, **kwargs):
+  """Spawns a java process with the supplied configuration and returns its exit code.
+  The args list is indivisible so it can't be split across multiple invocations of the command
+  similiar to xargs.
+  Passes kwargs through to subproccess.call.
+  """
+  cmd_with_args = _runjava_cmd(jvm_options=jvm_options, classpath=classpath, main=main,
+                               args=args)
+  if dryrun:
+    return _runjava_cmd_to_str(cmd_with_args)
+  else:
+    with safe_classpath():
+      return _subprocess_call(cmd_with_args, workunit_factory=workunit_factory,
+                              workunit_name=workunit_name or main, **kwargs)
+
+
+def runjava(jvm_options=None, classpath=None, main=None, args=None, dryrun=False,
+            workunit_factory=None, workunit_name=None, **kwargs):
+  """Spawns a java process with the supplied configuration and returns its exit code.
+  The args list is divisable so it can be split across multiple invocations of the command
+  similiar to xargs.
+  Passes kwargs through to subproccess.call.
+  """
+  cmd = _runjava_cmd(jvm_options=jvm_options, classpath=classpath, main=main)
+  if dryrun:
+    return _runjava_cmd_to_str(cmd)
+  else:
+    with safe_classpath():
+      return _subprocess_call_with_args(cmd, args, workunit_factory=workunit_factory,
+                                        workunit_name=workunit_name or main, **kwargs)
+
+
+def _split_args(i):
+  l = list(i)
+  half = len(l)//2
+  return l[:half], l[half:]
+
+
+def _subprocess_call(cmd_with_args, call=subprocess.call, workunit_factory=None,
+                     workunit_name=None, **kwargs):
+  cmd_str = ' '.join(cmd_with_args)
+  log.debug('Executing: %s' % cmd_str)
+  if workunit_factory:
+    workunit_labels = [WorkUnit.TOOL, WorkUnit.JVM]
+    with workunit_factory(name=workunit_name, labels=workunit_labels, cmd=cmd_str) as workunit:
+      try:
+        ret = call(cmd_with_args,
+                   stdout=workunit.output('stdout'),
+                   stderr=workunit.output('stderr'),
+                   **kwargs)
+        workunit.set_outcome(WorkUnit.FAILURE if ret else WorkUnit.SUCCESS)
+        return ret
+      except OSError as e:
+        if errno.E2BIG == e.errno:
+          # _subprocess_call_with_args will split and retry,
+          # so we want this to appear to have succeeded.
+          workunit.set_outcome(WorkUnit.SUCCESS)
+  else:
+    return call(cmd_with_args, **kwargs)
+
+
+def _subprocess_call_with_args(cmd, args, call=subprocess.call,
+                               workunit_factory=None, workunit_name=None, **kwargs):
+  cmd_with_args = cmd[:]
+  if args:
+    cmd_with_args.extend(args)
+  try:
+    with safe_classpath():
+      return _subprocess_call(cmd_with_args, call=call, workunit_factory=workunit_factory,
+                              workunit_name=workunit_name, **kwargs)
+  except OSError as e:
+    if errno.E2BIG == e.errno and args and len(args) > 1:
+      args1, args2 = _split_args(args)
+      result1 = _subprocess_call_with_args(cmd, args1, call=call, **kwargs)
+      result2 = _subprocess_call_with_args(cmd, args2, call=call, **kwargs)
+      # we are making one command into two so if either fails we return fail
+      result = 0
+      if 0 != result1 or 0 != result2:
+        result = 1
+      return result
+    else:
+      raise e
+
+
 def _mac_open(files):
   subprocess.call(['open'] + list(files))
 
 
 def _linux_open(files):
-  cmd = "xdg-open"
-  if not _cmd_exists(cmd):
-    raise TaskError("The program '%s' isn't in your PATH. Please install and re-run this "
-                    "goal." % cmd)
   for f in list(files):
-    subprocess.call([cmd, f])
+    subprocess.call(['xdg-open', f])
 
-
-# From: http://stackoverflow.com/questions/377017/test-if-executable-exists-in-python
-def _cmd_exists(cmd):
-  return subprocess.call(["/usr/bin/which", cmd], shell=False, stdout=subprocess.PIPE,
-                         stderr=subprocess.PIPE) == 0
 
 _OPENER_BY_OS = {
   'darwin': _mac_open,
@@ -171,3 +328,27 @@ def ui_open(*files):
       print('Sorry, open currently not supported for ' + osname)
     else:
       _OPENER_BY_OS[osname](files)
+
+def find_all_java_sysprops():
+  """Runs a JVM to get at its standard system properties."""
+  with temporary_dir() as tmpdir:
+    with open(os.path.join(tmpdir, 'X.java'), 'w') as srcfile:
+      srcfile.write("""
+        class X {
+          public static void main(String[] argv) {
+            java.util.Properties props = System.getProperties();
+            // We don't use Properties.list() because it truncates long values.
+            for (String key : props.stringPropertyNames())
+              System.out.println(key + "=" + props.getProperty(key));
+          }
+        }""")
+    subprocess.Popen(['javac', '-d', tmpdir, srcfile.name],
+                     stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()
+    output = subprocess.Popen(['java', '-cp', tmpdir, 'X'],
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()[0]
+    lines = output.split('\n')
+    ret = {}
+    for line in lines:
+      key, _, val = line.partition('=')
+      ret[key] = val
+    return ret
