@@ -262,7 +262,6 @@ def fetch_pants():
 
 def main():
   logger.debug('Running with python version: %s.%s' % (major, minor))
-  fetch_ivy()
   logger.debug('launching %s' % fetch_pants())
   os.execv(fetch_pants(), sys.argv)
 
