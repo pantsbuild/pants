@@ -46,7 +46,6 @@ from twitter.pants.base import (
     Target,
     TargetDefinitionException)
 from twitter.pants.base.rcfile import RcFile
-from twitter.pants.buildtimestats import BuildTimeStats
 from twitter.pants.commands import Command
 from twitter.pants.engine import Engine, GroupEngine
 from twitter.pants.goal.initialize_reporting import update_reporting
@@ -293,8 +292,7 @@ class Goal(Command):
     build_stats = None
     if context.config.getdefault('stats_collection', bool, default=False):
       user = context.config.getdefault('user')
-      build_stats = BuildTimeStats(user, force_stats_upload)
-    engine = GroupEngine(print_timing=print_timing, build_stats=build_stats)
+    engine = GroupEngine(print_timing=print_timing)
     return engine.execute(context, phases)
 
   # TODO(John Sirois): revisit wholesale locking when we move py support into pants new

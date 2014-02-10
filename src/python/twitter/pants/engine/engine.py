@@ -175,14 +175,12 @@ class Engine(AbstractClass):
     for ordered in order(phases):
       yield ordered
 
-  def __init__(self, print_timing=False, build_stats=None):
-    """Creates an engine that prints no timings and records no build stats by default.
+  def __init__(self, print_timing=False):
+    """Creates an engine that prints no timings by default.
 
     :param print_timing: ``True`` to print detailed timings at the end of the run.
-    :param build_stats:  A ``BuildTimeStats`` object for recording run timings.
     """
     self._print_timing = print_timing
-    self._build_stats = build_stats
 
   def execute(self, context, phases):
     """Executes the supplied phases and their dependencies against the given context.
@@ -205,8 +203,6 @@ class Engine(AbstractClass):
         return e.exit_code if isinstance(e, TaskError) else 1
       finally:
         timer.finish()
-        if self._build_stats:
-          self._build_stats.record_stats(timer.timings, timer.elapsed)
         if self._print_timing:
           print(timer.render_timing_report())
 
