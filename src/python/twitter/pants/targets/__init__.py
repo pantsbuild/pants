@@ -22,17 +22,21 @@ from .credentials import Credentials
 from .doc import Page, Wiki
 from .exclude import Exclude
 from .exportable_jvm_library import ExportableJvmLibrary
+from .gem import Gem
+from .hadoop_binary import TwitterHadoopBinary
+from .idl_jar_thrift_library import IdlJvmThriftLibrary
 from .internal import InternalTarget
-from .jarable import Jarable
 from .jar_dependency import JarDependency
 from .jar_library import JarLibrary
 from .java_antlr_library import JavaAntlrLibrary
 from .java_library import JavaLibrary
 from .java_thrift_library import JavaThriftLibrary
+from .java_thriftstore_dml_library import JavaThriftstoreDMLLibrary
 from .java_protobuf_library import JavaProtobufLibrary
 from .java_tests import JavaTests
 from .jvm_binary import Bundle, JvmApp, JvmBinary
 from .jvm_target import JvmTarget
+from .oink_query import OinkQuery
 from .pants_target import Pants
 from .python_artifact import PythonArtifact
 from .python_binary import PythonBinary
@@ -44,12 +48,14 @@ from .python_requirement import PythonRequirement
 from .python_target import PythonTarget
 from .python_tests import PythonTests, PythonTestSuite
 from .repository import Repository
+from .ruby_thrift_library import RubyThriftLibrary
+from .ruby_target import RubyTarget
 from .resources import Resources
 from .scala_library import ScalaLibrary
 from .scala_tests import ScalaTests
 from .scalac_plugin import ScalacPlugin
 from .sources import SourceRoot
-from .with_dependencies import TargetWithDependencies
+from .thrift_library import ThriftJar, ThriftLibrary
 from .with_sources import TargetWithSources
 
 
@@ -62,18 +68,23 @@ __all__ = (
   'Credentials',
   'Exclude',
   'ExportableJvmLibrary',
+  'Gem',
+  'IdlJvmThriftLibrary',
   'InternalTarget',
   'JarDependency',
-  'Jarable',
   'JarLibrary',
   'JavaAntlrLibrary',
   'JavaLibrary',
   'JavaThriftLibrary',
+  # TODO(Anand) Remove this from pants proper when a code adjoinment mechanism exists
+  # or ok if/when thriftstore is open sourced as well..
+  'JavaThriftstoreDMLLibrary',
   'JavaProtobufLibrary',
   'JavaTests',
   'JvmApp',
   'JvmBinary',
   'JvmTarget',
+  'OinkQuery',
   'Page',
   'Pants',
   'PythonArtifact',
@@ -88,11 +99,15 @@ __all__ = (
   'PythonTestSuite',
   'Repository',
   'Resources',
+  'RubyTarget',
+  'RubyThriftLibrary',
   'ScalaLibrary',
   'ScalaTests',
   'ScalacPlugin',
   'SourceRoot',
-  'TargetWithDependencies',
   'TargetWithSources',
+  'ThriftJar',
+  'ThriftLibrary',
+  'TwitterHadoopBinary',
   'Wiki'
 )

@@ -1,0 +1,56 @@
+# ==================================================================================================
+# Copyright 2011 Twitter, Inc.
+# --------------------------------------------------------------------------------------------------
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this work except in compliance with the License.
+# You may obtain a copy of the License in the LICENSE file, or at:
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ==================================================================================================
+
+from twitter.pants.base.build_manual import manual
+
+from .java_thrift_library import JavaThriftLibrary
+
+
+# TODO(Anand): Remove this from pants proper when a code adjoinment mechanism exists
+# or ok if/when thriftstore is open sourced as well..
+@manual.builddict(tags=["java"])
+class JavaThriftstoreDMLLibrary(JavaThriftLibrary):
+  """Defines a target that builds java stubs from a thriftstore DDL file."""
+
+  def __init__(self,
+               name,
+               sources,
+               provides=None,
+               dependencies=None,
+               exclusives=None):
+    """
+    :param string name: The name of this target, which combined with this
+      build file defines the target :class:`twitter.pants.base.address.Address`.
+    :param sources: A list of filenames representing the source code
+      this library is compiled from.
+    :type sources: list of strings
+    :param Artifact provides:
+      The :class:`twitter.pants.targets.artifact.Artifact`
+      to publish that represents this target outside the repo.
+    :param dependencies: List of :class:`twitter.pants.base.target.Target` instances
+      this target depends on.
+    :type dependencies: list of targets
+    """
+
+    JavaThriftLibrary.__init__(self,
+                               name,
+                               sources,
+                               provides=provides,
+                               compiler='scrooge',
+                               language='java',
+                               dependencies=dependencies,
+                               exclusives=exclusives)
+    self.add_labels('codegen', 'java')

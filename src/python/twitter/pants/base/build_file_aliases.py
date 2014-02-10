@@ -14,6 +14,8 @@
 # limitations under the License.
 # =================================================================================================
 
+from __future__ import print_function
+
 from twitter.pants.targets import (
     AnnotationProcessor,
     Artifact,
@@ -29,8 +31,10 @@ from twitter.pants.targets import (
     JavaProtobufLibrary,
     JavaTests,
     JavaThriftLibrary,
+    JavaThriftstoreDMLLibrary,
     JvmApp,
     JvmBinary,
+    OinkQuery,
     Page,
     Pants,
     PythonArtifact,
@@ -43,18 +47,23 @@ from twitter.pants.targets import (
     PythonTestSuite,
     Repository,
     Resources,
+    RubyThriftLibrary,
     ScalaLibrary,
     ScalaTests,
     ScalacPlugin,
     SourceRoot,
+    ThriftJar,
+    ThriftLibrary,
     Wiki)
 
+from twitter.pants.tasks.extract import Extract
 
 # aliases
 annotation_processor = AnnotationProcessor
 artifact = Artifact
 benchmark = Benchmark
 bundle = Bundle
+compiled_idl = Extract.compiled_idl
 credentials = Credentials
 dependencies = jar_library = JarLibrary
 egg = PythonEgg
@@ -66,8 +75,12 @@ java_antlr_library = JavaAntlrLibrary
 java_protobuf_library = JavaProtobufLibrary
 junit_tests = java_tests = JavaTests
 java_thrift_library = JavaThriftLibrary
+# TODO(Anand) Remove this from pants proper when a code adjoinment mechanism exists
+# or ok if/when thriftstore is open sourced as well
+java_thriftstore_dml_library = JavaThriftstoreDMLLibrary
 jvm_binary = JvmBinary
 jvm_app = JvmApp
+oink_query = OinkQuery
 page = Page
 python_artifact = setup_py = PythonArtifact
 python_binary = PythonBinary
@@ -79,8 +92,11 @@ python_tests = PythonTests
 python_test_suite = PythonTestSuite
 repo = Repository
 resources = Resources
+ruby_thrift_library = RubyThriftLibrary
 scala_library = ScalaLibrary
 scala_specs = scala_tests = ScalaTests
 scalac_plugin = ScalacPlugin
 source_root = SourceRoot
+thrift_jar = ThriftJar
+thrift_library = ThriftLibrary
 wiki = Wiki
