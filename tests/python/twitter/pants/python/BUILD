@@ -19,6 +19,7 @@ python_test_suite(name = 'all',
   dependencies = [
     pants(':test_antlr_builder'),
     pants(':test_resolver'),
+    pants(':test_thrift_builder'),
     pants(':test_thrift_namespace_packages'),
   ]
 )
@@ -47,3 +48,14 @@ python_tests(name = 'test_resolver',
   ]
 )
 
+python_tests(name = 'test_thrift_builder',
+  sources = ['test_thrift_builder.py', 'test_file_copier.py'],
+  dependencies = [
+    pants('3rdparty/python:mock'),
+    pants('src/python/twitter/common/config'),
+    pants('src/python/twitter/common/python'),
+    pants('src/python/twitter/pants:pants-lib'),
+    pants('tests/python/twitter/pants:base-test'),
+    pants('tests/python/twitter/pants/base:base-test')
+  ]
+)
