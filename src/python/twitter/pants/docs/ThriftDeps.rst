@@ -49,15 +49,16 @@ depend on this target like any other internal target. In this case, users would
 add a dependency on ``pants('src/thrift/com/twitter/mybird')``.
 
 To make this thrift available to other source trees, you might
-:doc:`publish it <publish>`.
+:ref:`publish it <thriftdeps_publish>`.
+
+.. _thriftdeps_consume:
 
 *******************************
 Consuming Thrift from Elsewhere
 *******************************
 
 Not all Thrift IDL files live in your repo. Pants supports cross-repo IDL
-sharing
-through IDL-only jars. An IDL-only jar is simply a Java ``jar``
+sharing through IDL-only jars. An IDL-only jar is simply a Java ``jar``
 containing raw thrift IDL files. This allows users to depend on a versioned
 artifact to generate and compile the IDL themselves.
 
@@ -134,8 +135,8 @@ control over how code is generated we control that through arguments provided
 by :ref:`bdict_java_thrift_library`.
 
 .. NOTE::
-   While ``java_thrift_library`` implies Java as the generated code language,
-   in reality it can generate code into a number of target languages via
+   While the name ``java_thrift_library`` might make you think it generates
+   Java, it can also generate other target languages via
    the ``language`` parameter (scala for example). For Python code, however,
    use :ref:`bdict_python_thrift_library`.
 
@@ -191,3 +192,71 @@ defines dependencies, and a :ref:`bdict_jvm_binary` to simplify running the
 client. We can run the client locally with: ::
 
     ./pants goal run src/java/com/twitter/common/examples/pingpong_thrift/client:client-bin
+
+.. _thriftdeps_publish:
+
+*******************************
+Publishing Thrift for Elsewhere
+*******************************
+
+Earlier, you learned how to
+:ref:`consume Thrift artifacts published by other repos <thriftdeps_consume>`.
+This raises the question: how can you use Pants to publish such artifacts?
+
+Publishing Thrift artifacts is like :doc:`publishing other artifacts <publish>`,
+but with some trickiness. Remember the subtle point in *consuming*
+Thrift from other repos: although the Thrift IDL is language-agnostic, a
+*lang*\_``library`` that is itself published and consumes a Thrift artifact
+must know about an artifact with *lang* code generated from that Thrift.
+Thus, if you publish Thrift artifacts, you probably want to publish generated
+code artifacts in a few languages even though your code does not use those
+languages.
+
+It might look something like::
+
+  java_thrift_library(name='eureka-java',
+    sources=['eureka.thrift'],
+    dependencies=[
+      pants('src/thrift/org/archimedes/volume:volume-java'),
+    ],
+    language='java',
+    provides=artifact(
+      org='org.archimedes',
+      name='eureka-java',
+      repo=pants('BUILD.archimedes:jar-public'),
+  ))
+
+  java_thrift_library(name='eureka-scala',
+    sources=['eureka.thrift'],
+    dependencies=[
+      pants('src/thrift/org/archimedes/volume:volume-scala'),
+    ],
+    language='scala',
+    provides=artifact(
+      org='org.archimedes',
+      name='eureka-scala',
+      repo=pants('BUILD.archimedes:jar-public'),
+    ))
+
+  ruby_thrift_library(
+    name='eureka-ruby',
+    sources=['eureka.thrift'],
+    dependencies=[
+      pants('src/thrift/org/archimedes/volume:volume-ruby'),
+    ],
+    provides=gem(
+      name='eureka-ruby',
+      repo=pants('BUILD.archimedes:gem-public'),
+    ))
+
+Publishing a ``java_thrift_library`` target actually publishes *two*
+artifacts:
+
+* One jar with generated code (generated Java (or Scala) classes)
+* One jar with Thrift IDL; the jar name has ``-only`` appended
+
+For example, publishing the ``eureka-java`` example target presented above
+yields two artifacts, one named ``eureka-java`` with the generated Java
+(the ``provides``-specified name) and ``eureka-java-only``. A Pants target
+in another repo can depend on ``eureka-java-only``; if Pants needs a
+generated-Java artifact, it "knows" to use the ``eureka-java`` name.
