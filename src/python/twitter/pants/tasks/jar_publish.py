@@ -16,7 +16,6 @@
 
 from __future__ import print_function
 
-import copy
 import functools
 import getpass
 import hashlib
@@ -38,15 +37,7 @@ from twitter.pants.base.address import Address
 from twitter.pants.base.target import Target
 from twitter.pants.base.generator import Generator, TemplateData
 from twitter.pants.ivy import Bootstrapper, Ivy
-from twitter.pants.targets import (
-    AnnotationProcessor,
-    InternalTarget,
-    JavaLibrary,
-    JavaThriftLibrary,
-    Resources,
-    ScalaLibrary,
-    ThriftJar,
-    ThriftLibrary)
+from twitter.pants.targets import InternalTarget, Resources
 from twitter.pants.tasks.scm_publish import ScmPublish, Semver
 
 from . import Task, TaskError
@@ -117,15 +108,17 @@ class DependencyWriter(object):
     dependency descriptor.
   """
 
+  @staticmethod
+  def create_exclude(exclude):
+    return TemplateData(org=exclude.org, name=exclude.name)
+
   def __init__(self, get_db, template_relpath):
     self.get_db = get_db
     self.template_relpath = template_relpath
 
-  def write(self, target, path, confs=None, synth=False):
-    def as_jar(internal_target, is_tgt=False):
+  def write(self, target, path, confs=None):
+    def as_jar(internal_target):
       jar, _, _, _ = self.get_db(internal_target).as_jar_with_version(internal_target)
-      if synth and is_tgt:
-        jar.name += '-only'
       return jar
 
     # TODO(John Sirois): a dict is used here to de-dup codegen targets which have both the original
@@ -136,109 +129,89 @@ class DependencyWriter(object):
     internal_codegen = {}
     for dep in target_internal_dependencies(target):
       jar = as_jar(dep)
-      dependencies[(jar.org, jar.name)] = self.internaldep(jar, dep, synth)
+      dependencies[(jar.org, jar.name)] = self.internaldep(jar, dep)
       if dep.is_codegen:
         internal_codegen[jar.name] = jar.name
     for jar in target.jar_dependencies:
       if jar.rev:
-        classifier = jar.classifier if isinstance(jar, ThriftJar) else None
-        dependencies[(jar.org, jar.name)] = self.jardep(jar, classifier=classifier)
-    target_jar = self.internaldep(as_jar(target, is_tgt=True)).extend(
-      dependencies=dependencies.values()
-    )
+        dependencies[(jar.org, jar.name)] = self.jardep(jar)
+    target_jar = self.internaldep(as_jar(target)).extend(dependencies=dependencies.values())
 
-    template_kwargs = self.templateargs(target_jar, confs, synth)
+    template_kwargs = self.templateargs(target_jar, confs)
     with safe_open(path, 'w') as output:
       template = pkgutil.get_data(__name__, self.template_relpath)
       Generator(template, **template_kwargs).write(output)
 
-  def templateargs(self, target_jar, confs=None, synth=False):
+  def templateargs(self, target_jar, confs=None):
     """
       Subclasses must return a dict for use by their template given the target jar template data
       and optional specific ivy configurations.
     """
     raise NotImplementedError()
 
-  def internaldep(self, jar_dependency, dep=None, synth=False):
+  def internaldep(self, jar_dependency, dep=None):
     """
       Subclasses must return a template data for the given internal target (provided in jar
       dependency form).
     """
     raise NotImplementedError()
 
-  def jardep(self, jar_dependency, classifier=None):
+  def jardep(self, jar_dependency):
     """Subclasses must return a template data for the given external jar dependency."""
     raise NotImplementedError()
-
-  def create_exclude(self, exclude):
-    return TemplateData(org=exclude.org, name=exclude.name)
 
 
 class PomWriter(DependencyWriter):
   def __init__(self, get_db):
-    super(PomWriter, self).__init__(get_db, os.path.join('templates', 'jar_publish', 'pom.mustache'))
+    super(PomWriter, self).__init__(
+        get_db,
+        os.path.join('templates', 'jar_publish', 'pom.mustache'))
 
-  def templateargs(self, target_jar, confs=None, synth=False):
+  def templateargs(self, target_jar, confs=None):
     return dict(artifact=target_jar)
 
-  def jardep(self, jar, classifier=None, synth=False):
+  def jardep(self, jar):
     return TemplateData(
-      org=jar.org,
-      name=jar.name + ('-only' if synth else ''),
-      rev=jar.rev,
-      scope='compile',
-      classifier=(classifier if classifier is not None else jar.classifier),
-      excludes=[self.create_exclude(exclude) for exclude in jar.excludes if exclude.name]
-    )
+        org=jar.org,
+        name=jar.name,
+        rev=jar.rev,
+        scope='compile',
+        excludes=[self.create_exclude(exclude) for exclude in jar.excludes if exclude.name])
 
-  def internaldep(self, jar_dependency, dep=None, synth=False):
-    classifier = 'idl' if (dep.is_codegen and synth) or isinstance(dep, ThriftLibrary) else None
-    return self.jardep(jar_dependency, classifier=classifier, synth=synth)
+  def internaldep(self, jar_dependency, dep=None):
+    return self.jardep(jar_dependency)
 
 
 class IvyWriter(DependencyWriter):
   def __init__(self, get_db):
-    super(IvyWriter, self).__init__(get_db, os.path.join('templates', 'ivy_resolve', 'ivy.mustache'))
+    super(IvyWriter, self).__init__(
+        get_db,
+        os.path.join('templates', 'ivy_resolve', 'ivy.mustache'))
 
-  def templateargs(self, target_jar, confs=None, synth=False):
+  def templateargs(self, target_jar, confs=None):
     return dict(lib=target_jar.extend(
-      is_idl=synth,
-      publications=set(confs) if confs else set(),
-      overrides=None
-    ))
+        publications=set(confs) if confs else set(),
+        overrides=None))
 
-  def _jardep(self, jar, transitive=True, configurations='default', classifier=None, synth=False):
+  def _jardep(self, jar, transitive=True, configurations='default'):
     return TemplateData(
-      org=jar.org,
-      module=jar.name + ('-only' if synth else ''),
-      version=jar.rev,
-      mutable=False,
-      force=jar.force,
-      excludes=[self.create_exclude(exclude) for exclude in jar.excludes],
-      transitive=transitive,
-      artifacts=jar.artifacts,
-      is_idl=(classifier == 'idl'),
-      configurations=configurations,
-    )
+        org=jar.org,
+        module=jar.name,
+        version=jar.rev,
+        mutable=False,
+        force=jar.force,
+        excludes=[self.create_exclude(exclude) for exclude in jar.excludes],
+        transitive=transitive,
+        artifacts=jar.artifacts,
+        configurations=configurations)
 
-  def jardep(self, jar, classifier=None):
+  def jardep(self, jar):
     return self._jardep(jar,
-      transitive=jar.transitive,
-      configurations=';'.join(jar._configurations),
-      classifier=classifier
-    )
+        transitive=jar.transitive,
+        configurations=';'.join(jar._configurations))
 
-  def internaldep(self, jar_dependency, dep=None, synth=False):
-    classifier = 'idl' if dep.is_codegen and synth else None
-    return self._jardep(jar_dependency, classifier=classifier)
-
-
-def is_exported(target):
-  return target.is_exported and (
-    isinstance(target, AnnotationProcessor)
-    or isinstance(target, JavaLibrary)
-    or isinstance(target, ScalaLibrary)
-  )
+  def internaldep(self, jar_dependency, dep=None):
+    return self._jardep(jar_dependency)
 
 
 def coordinate(org, name, rev=None):
@@ -436,7 +409,7 @@ class JarPublish(ScmPublish, Task):
               prompt = 'did you mean' if len(siblings) == 1 else 'maybe you meant one of these'
               raise TaskError('%s => %s?:\n    %s' % (address, prompt,
                                                       '\n    '.join(str(a) for a in siblings)))
-            if not is_exported(target):
+            if not target.is_exported:
               raise TaskError('%s is not an exported target' % coordinate)
             return target.provides.org, target.provides.name
           except (ImportError, SyntaxError, TypeError):
@@ -465,7 +438,6 @@ class JarPublish(ScmPublish, Task):
 
     context.products.require('jars')
     context.products.require('source_jars')
-    context.products.require('idl_jars')
 
   def execute(self, targets):
     self.check_clean_master(commit=(not self.dryrun and self.commit))
@@ -498,10 +470,6 @@ class JarPublish(ScmPublish, Task):
       _, _, _, fingerprint = pushdb.as_jar_with_version(tgt)
       return fingerprint or '0.0.0'
 
-    def lookup_synthetic_target(tgt):
-      # TODO(phom) this only works for Thrift Library, not Protobuf
-      return tgt.derived_from if isinstance(tgt.derived_from, JavaThriftLibrary) else None
-
     def artifact_path(jar, version, name=None, suffix='', extension='jar', artifact_ext=''):
       return os.path.join(self.outdir, jar.org, jar.name + artifact_ext,
                           '%s%s-%s%s.%s' % ((name or jar.name),
@@ -510,7 +478,7 @@ class JarPublish(ScmPublish, Task):
                                             suffix,
                                             extension))
 
-    def stage_artifact(tgt, jar, version, changelog, confs=None, artifact_ext='', synth=False):
+    def stage_artifact(tgt, jar, version, changelog, confs=None, artifact_ext=''):
       def path(name=None, suffix='', extension='jar'):
         return artifact_path(jar, version, name=name, suffix=suffix, extension=extension,
                              artifact_ext=artifact_ext)
@@ -519,8 +487,8 @@ class JarPublish(ScmPublish, Task):
         changelog_file.write(changelog)
       ivyxml = path(name='ivy', extension='xml')
 
-      IvyWriter(get_pushdb).write(tgt, ivyxml, confs=confs, synth=synth)
-      PomWriter(get_pushdb).write(tgt, path(extension='pom'), synth=synth)
+      IvyWriter(get_pushdb).write(tgt, ivyxml, confs=confs)
+      PomWriter(get_pushdb).write(tgt, path(extension='pom'))
 
       return ivyxml
 
@@ -531,30 +499,16 @@ class JarPublish(ScmPublish, Task):
           path = artifact_path(jar, version, suffix=suffix, artifact_ext=artifact_ext)
           shutil.copy(os.path.join(basedir, artifact), path)
 
-    def stage_artifacts(tgt, jar, version, changelog, confs=None, synth_target=None):
-      is_idl = isinstance(tgt, ThriftLibrary)
-      class_target = None if is_idl else tgt
-      idl_target = synth_target or (tgt if is_idl else None)
+    def stage_artifacts(tgt, jar, version, changelog, confs=None):
+      ivyxml_path = stage_artifact(tgt, jar, version, changelog, confs)
+      copy_artifact(tgt, version, typename='jars')
+      copy_artifact(tgt, version, typename='source_jars', suffix='-sources')
 
-      class_ivyxml_path = idl_ivyxml_path = None
-      if class_target:
-        class_ivyxml_path = stage_artifact(tgt, jar, version, changelog, confs)
-        copy_artifact(tgt, version, typename='jars')
-        copy_artifact(tgt, version, typename='source_jars', suffix='-sources')
+      jarmap = self.context.products.get('javadoc_jars')
+      if not jarmap.empty() and (tgt.is_java or tgt.is_scala):
+        copy_artifact(tgt, version, typename='javadoc_jars', suffix='-javadoc')
 
-        jarmap = self.context.products.get('javadoc_jars')
-        if not jarmap.empty() and (tgt.is_java or tgt.is_scala):
-          copy_artifact(tgt, version, typename='javadoc_jars', suffix='-javadoc')
-
-      if idl_target:
-        synth = bool(synth_target)
-        artifact_ext = '-only' if synth else ''
-        idl_ivyxml_path = stage_artifact(idl_target, jar, version, changelog, confs=['idl'],
-                                         artifact_ext=artifact_ext, synth=synth)
-        copy_artifact(idl_target, version, typename='idl_jars', suffix='-idl',
-                      artifact_ext=artifact_ext)
-
-      return class_ivyxml_path, idl_ivyxml_path
+      return ivyxml_path
 
     if self.overrides:
       print('Publishing with revision overrides:\n  %s' % '\n  '.join(
@@ -567,15 +521,9 @@ class JarPublish(ScmPublish, Task):
     published = []
     skip = (self.restart_at is not None)
     for target in exported_targets:
-      synth_target = lookup_synthetic_target(target)
       pushdb, dbfile, repo = get_db(target)
       jar, semver, sha, fingerprint = pushdb.as_jar_with_version(target)
 
-      if synth_target:
-        # add idl artifact to the published cache
-        tmp_jar = copy.copy(jar)
-        tmp_jar.name += '-only'
-        published.append(tmp_jar)
       published.append(jar)
 
       if skip and (jar.org, jar.name) == self.restart_at:
@@ -600,14 +548,13 @@ class JarPublish(ScmPublish, Task):
 
       if no_changes and not self.force:
         print('No changes for %s' % jar_coordinate(jar, semver.version()))
-        stage_artifacts(target, jar, (newver if self.force else semver).version(), changelog,
-                        synth_target=synth_target)
+        stage_artifacts(target, jar, (newver if self.force else semver).version(), changelog)
       elif skip:
         print('Skipping %s to resume at %s' % (
           jar_coordinate(jar, (newver if self.force else semver).version()),
           coordinate(self.restart_at[0], self.restart_at[1])
         ))
-        stage_artifacts(target, jar, semver.version(), changelog, synth_target=synth_target)
+        stage_artifacts(target, jar, semver.version(), changelog)
       else:
         if not self.dryrun:
           # Confirm push looks good
@@ -627,8 +574,7 @@ class JarPublish(ScmPublish, Task):
 
         pushdb.set_version(target, newver, head_sha, newfingerprint)
 
-        ivyxml, idl_ivyxml = stage_artifacts(target, jar, newver.version(), changelog,
-                                             confs=repo['confs'], synth_target=synth_target)
+        ivyxml = stage_artifacts(target, jar, newver.version(), changelog, confs=repo['confs'])
 
         if self.dryrun:
           print('Skipping publish of %s in test mode.' % jar_coordinate(jar, newver.version()))
@@ -675,10 +621,7 @@ class JarPublish(ScmPublish, Task):
             except (Bootstrapper.Error, Ivy.Error) as e:
               raise TaskError('Failed to push %s! %s' % (jar_coordinate(jar, newver.version()), e))
 
-          if ivyxml:
-            publish(ivyxml)
-          if idl_ivyxml:
-            publish(idl_ivyxml)
+          publish(ivyxml)
 
           if self.commit:
             org = jar.org
@@ -700,23 +643,44 @@ class JarPublish(ScmPublish, Task):
                          message='Publish of %(coordinate)s initiated by %(user)s %(cause)s' % args)
 
   def check_targets(self, targets):
-    invalid = defaultdict(set)
+    invalid = defaultdict(lambda: defaultdict(set))
+    derived_by_target = dict()
 
     def collect(publish_target, walked_target):
-      if hasattr(walked_target, "sources") and not walked_target.sources:
-        invalid[publish_target].add((walked_target, 'No sources.'))
-      if hasattr(walked_target, "provides") and not walked_target.provides:
-        invalid[publish_target].add((walked_target, 'Does not provide an artifact.'))
+      derived_by_target[walked_target.derived_from] = walked_target
+      if not walked_target.has_sources() or not walked_target.sources:
+        invalid[publish_target][walked_target].add('No sources.')
+      if not walked_target.is_exported:
+        invalid[publish_target][walked_target].add('Does not provide an artifact.')
 
     for target in targets:
-      target.walk(functools.partial(collect, target))
+      target.walk(functools.partial(collect, target), predicate=lambda t: t.is_concrete)
+
+    # When walking the graph of a publishable target, we may encounter families of sibling targets
+    # that form a derivation chain.  As long as one of these siblings is publishable, we can
+    # proceed and publish a valid graph.
+    # TODO(John Sirois): This does not actually handle derivation chains longer than 2 with the
+    # exported item in the most derived position - fix this.
+    for publish_target, invalid_targets in list(invalid.items()):
+      for invalid_target, reasons in list(invalid_targets.items()):
+        derived_target = derived_by_target[invalid_target]
+        if derived_target not in invalid_targets:
+          invalid_targets.pop(invalid_target)
+      if not invalid_targets:
+        invalid.pop(publish_target)
 
     if invalid:
       msg = list()
-      for target, reasons in sorted(invalid.items(), reverse=True):
-        msg.append('\n  Cannot publish %s due to:' % target.address)
-        for invalid_target, reason in sorted(reasons, reverse=True):
-          msg.append('\n    %s - %s' % (invalid_target.address, reason))
+
+      def first_address(pair):
+        first, _ = pair
+        return str(first.address)
+
+      for publish_target, invalid_targets in sorted(invalid.items(), key=first_address):
+        msg.append('\n  Cannot publish %s due to:' % publish_target.address)
+        for invalid_target, reasons in sorted(invalid_targets.items(), key=first_address):
+          for reason in sorted(reasons):
+            msg.append('\n    %s - %s' % (invalid_target.address, reason))
 
       raise TaskError('The following errors must be resolved to publish.%s' % ''.join(msg))
 
@@ -741,7 +705,7 @@ class JarPublish(ScmPublish, Task):
         candidates.update(get_synthetic('scala', candidate))
 
     def exportable(tgt):
-      return tgt in candidates and is_exported(tgt)
+      return tgt in candidates and tgt.is_exported
 
     return OrderedSet(filter(exportable,
                              reversed(InternalTarget.sort_targets(filter(exportable, candidates)))))

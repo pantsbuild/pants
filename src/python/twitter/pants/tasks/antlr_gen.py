@@ -14,8 +14,6 @@
 # limitations under the License.
 # ==================================================================================================
 
-__author__ = 'Brian Larson'
-
 import os
 
 from twitter.common.collections import OrderedSet
@@ -125,10 +123,10 @@ class AntlrGen(CodeGen, NailgunTask):
     tgt = self.context.add_new_target(os.path.join(self._java_out(target), target.target_base),
                                       JavaLibrary,
                                       name=target.id,
-                                      provides=target.provides,
                                       sources=generated_sources,
-                                      dependencies=deps)
-    tgt.add_labels('codegen')
+                                      provides=target.provides,
+                                      dependencies=deps,
+                                      excludes=target.excludes)
     for dependee in dependees:
       dependee.update_dependencies([tgt])
     return tgt

@@ -14,12 +14,18 @@
 # limitations under the License.
 # ==================================================================================================
 
-from twitter.pants.targets.scala_library import ScalaLibrary
+from twitter.pants.base import manual
 
+from .scala_library import ScalaLibrary
+
+
+@manual.builddict(tags=['scala'])
 class ScalacPlugin(ScalaLibrary):
   """Defines a target that produces a scalac_plugin."""
 
-  def __init__(self, name, classname,
+  def __init__(self,
+               name,
+               classname,
                plugin=None,
                sources=None,
                java_sources=None,
@@ -54,8 +60,16 @@ class ScalacPlugin(ScalaLibrary):
     :param exclusives: An optional map of exclusives tags. See CheckExclusives for details.
     """
 
-    ScalaLibrary.__init__(self, name, sources, java_sources, provides, dependencies, excludes,
-                          resources, exclusives=exclusives)
-    self.add_labels('scalac_plugin')
+    super(ScalacPlugin, self).__init__(
+        name,
+        sources,
+        java_sources,
+        provides,
+        dependencies,
+        excludes,
+        resources,
+        exclusives=exclusives)
+
     self.plugin = plugin or name
     self.classname = classname
+    self.add_labels('scalac_plugin')

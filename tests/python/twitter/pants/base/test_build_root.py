@@ -28,7 +28,7 @@ class BuildRootTest(unittest.TestCase):
 
   def setUp(self):
     self.original_root = BuildRoot().path
-    self.new_root = os.path.realpath(safe_mkdtemp())
+    self.new_root = safe_mkdtemp()
     BuildRoot().reset()
 
   def tearDown(self):

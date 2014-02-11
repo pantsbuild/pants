@@ -193,9 +193,10 @@ class ThriftGen(CodeGen):
        return self.context.add_new_target(os.path.join(self.combined_dir, 'gen-java'),
                                           JavaLibrary,
                                           name=target.id,
-                                          provides=target.provides,
                                           sources=files,
-                                          dependencies=deps)
+                                          provides=target.provides,
+                                          dependencies=deps,
+                                          excludes=target.excludes)
     return self._inject_target(target, dependees, self.gen_java, 'java', create_target)
 
   def _create_python_target(self, target, dependees):
@@ -217,7 +218,6 @@ class ThriftGen(CodeGen):
     deps = geninfo.deps['service' if has_service else 'structs']
     tgt = create_target(files, deps)
     tgt.id = target.id + '.thrift_gen'
-    tgt.add_labels('codegen')
     for dependee in dependees:
       if isinstance(dependee, InternalTarget):
         dependee.update_dependencies((tgt,))

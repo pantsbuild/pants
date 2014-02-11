@@ -14,9 +14,8 @@
 # limitations under the License.
 # ==================================================================================================
 
-__author__ = 'John Sirois'
-
 import inspect
+
 from optparse import OptionGroup
 
 from twitter.pants.base.build_manual import manual
@@ -112,10 +111,10 @@ class Goal(object):
       return self.name if phase_leader else '%s%s%s' % (phase.name, sep, self.name)
     mkflag = Mkflag(namespace)
 
-    group = OptionGroup(parser, title = namespace(':'))
-    self.task_setup_parser(group, args, mkflag)
-    if group.option_list:
-      parser.add_option_group(group)
+    option_group = OptionGroup(parser, title=namespace(':'))
+    self.task_setup_parser(option_group, args, mkflag)
+    if option_group.option_list:
+      parser.add_option_group(option_group)
 
   def task_setup_parser(self, group, args, mkflag):
     """Allows a task to setup a parser.

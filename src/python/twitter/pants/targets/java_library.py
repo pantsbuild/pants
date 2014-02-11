@@ -17,11 +17,11 @@
 from twitter.pants.base import manual, TargetDefinitionException
 
 from .exportable_jvm_library import ExportableJvmLibrary
-from .resources import WithLegacyResources
+from .resources import Resources
 
 
-@manual.builddict(tags=["java"])
-class JavaLibrary(ExportableJvmLibrary, WithLegacyResources):
+@manual.builddict(tags=['java'])
+class JavaLibrary(ExportableJvmLibrary):
   """A collection of Java code.
 
   Normally has conceptually-related sources; invoking the ``compile`` goal
@@ -38,8 +38,6 @@ class JavaLibrary(ExportableJvmLibrary, WithLegacyResources):
                dependencies=None,
                excludes=None,
                resources=None,
-               deployjar=False,
-               buildflags=None,
                exclusives=None):
 
     """
@@ -59,21 +57,18 @@ class JavaLibrary(ExportableJvmLibrary, WithLegacyResources):
     :param resources: An optional list of file paths (DEPRECATED) or
       ``resources`` targets (which in turn point to file paths). The paths
       indicate text file resources to place in this module's jar.
-    :param deployjar: Unused, and will be removed in a future release.
-    :param buildflags: Unused, and will be removed in a future release.
     :param exclusives: An optional map of exclusives tags. See CheckExclusives for details.
     """
-    ExportableJvmLibrary.__init__(self,
-                                  name,
-                                  sources,
-                                  provides,
-                                  dependencies,
-                                  excludes,
-                                  exclusives=exclusives)
-    WithLegacyResources.__init__(self, name, sources=sources, resources=resources)
+    super(JavaLibrary, self).__init__(
+        name,
+        sources,
+        provides,
+        dependencies,
+        excludes,
+        exclusives=exclusives)
 
     if (sources is None) and (resources is None):
       raise TargetDefinitionException(self, 'Must specify sources and/or resources.')
 
-    self.deployjar = deployjar
+    self.resources = list(self.resolve_all(resources, Resources))
     self.add_labels('java')

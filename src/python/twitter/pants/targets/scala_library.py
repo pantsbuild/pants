@@ -19,13 +19,13 @@ from twitter.common.collections import maybe_list
 from twitter.pants.base import manual, Target, TargetDefinitionException
 
 from .exportable_jvm_library import ExportableJvmLibrary
-from .resources import WithLegacyResources
+from .resources import Resources
 
 from . import JavaLibrary
 
 
-@manual.builddict(tags=["scala"])
-class ScalaLibrary(ExportableJvmLibrary, WithLegacyResources):
+@manual.builddict(tags=['scala'])
+class ScalaLibrary(ExportableJvmLibrary):
   """A collection of Scala code.
 
   Normally has conceptually-related sources; invoking the ``compile`` goal
@@ -43,8 +43,6 @@ class ScalaLibrary(ExportableJvmLibrary, WithLegacyResources):
                dependencies=None,
                excludes=None,
                resources=None,
-               deployjar=False,
-               buildflags=None,
                exclusives=None):
     """
     :param string name: The name of this target, which combined with this
@@ -66,28 +64,32 @@ class ScalaLibrary(ExportableJvmLibrary, WithLegacyResources):
       to filter this target's transitive dependencies against.
     :param resources: An optional list of paths (DEPRECATED) or ``resources``
       targets containing resources that belong on this library's classpath.
-    :param deployjar: Unused, and will be removed in a future release.
-    :param buildflags: Unused, and will be removed in a future release.
     :param exclusives: An optional list of exclusives tags.
     """
 
-    ExportableJvmLibrary.__init__(self, name, sources, provides, dependencies, excludes, exclusives=exclusives)
-    WithLegacyResources.__init__(self, name, sources=sources, resources=resources)
+    super(ScalaLibrary, self).__init__(
+        name,
+        sources,
+        provides,
+        dependencies,
+        excludes,
+        exclusives=exclusives)
 
     if (sources is None) and (resources is None):
       raise TargetDefinitionException(self, 'Must specify sources and/or resources.')
 
-    self.add_labels('scala')
+    self.resources = list(self.resolve_all(resources, Resources))
 
     # Defer resolves until done parsing the current BUILD file, certain source_root arrangements
     # might allow java and scala sources to co-mingle and so have targets in the same BUILD.
+    self.java_sources = []
     self._post_construct(self._link_java_cycles, java_sources)
+
+    self.add_labels('scala')
 
   def _link_java_cycles(self, java_sources):
     if java_sources:
       self.java_sources = list(Target.resolve_all(maybe_list(java_sources, Target), JavaLibrary))
-    else:
-      self.java_sources = []
 
     # We have circular java/scala dep, add an inbound dependency edge from java to scala in this
     # case to force scala compilation to precede java - since scalac supports generating java stubs

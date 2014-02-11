@@ -14,8 +14,6 @@
 # limitations under the License.
 # ==================================================================================================
 
-__author__ = 'John Sirois'
-
 from . import Command
 
 from copy import copy
@@ -42,6 +40,7 @@ class Help(Command):
 
   def execute(self):
     subcommand_class = Command.get_command(self.subcommand)
-
-    command = subcommand_class(self.run_tracker, self.root_dir, self.parser, [ '--help' ])
+    if not subcommand_class:
+      self.error("'%s' is not a recognized subcommand." % self.subcommand)
+    command = subcommand_class(self.run_tracker, self.root_dir, self.parser, ['--help'])
     return command.execute()

@@ -30,11 +30,9 @@ from twitter.pants.targets.python_library import PythonLibrary
 from twitter.pants.targets.python_tests import PythonTests, PythonTestSuite
 from twitter.pants.targets.python_thrift_library import PythonThriftLibrary
 from twitter.pants.targets.resources import Resources
-from twitter.pants.targets.ruby_thrift_library import RubyThriftLibrary
 from twitter.pants.targets.scala_library import ScalaLibrary
 from twitter.pants.targets.scala_tests import ScalaTests
 from twitter.pants.targets.sources import SourceRoot
-from twitter.pants.targets.thrift_library import ThriftLibrary
 
 
 def maven_layout(basedir=None):
@@ -58,8 +56,7 @@ def maven_layout(basedir=None):
   root('src/main/python', Page, PythonBinary, PythonLibrary)
   root('src/main/resources', Page, Resources)
   root('src/main/scala', JvmBinary, Page, ScalaLibrary)
-  root('src/main/thrift', JavaThriftLibrary, Page, PythonThriftLibrary, RubyThriftLibrary,
-       ThriftLibrary)
+  root('src/main/thrift', JavaThriftLibrary, Page, PythonThriftLibrary)
 
   root('src/test/java', JavaLibrary, JavaTests, Page)
   root('src/test/python', Page, PythonLibrary, PythonTests, PythonTestSuite)

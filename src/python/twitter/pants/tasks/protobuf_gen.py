@@ -150,12 +150,11 @@ class ProtobufGen(CodeGen):
     tgt = self.context.add_new_target(self.java_out,
                                       JavaLibrary,
                                       name=target.id,
-                                      provides=target.provides,
                                       sources=genfiles,
+                                      provides=target.provides,
                                       dependencies=self.javadeps,
-                                      derived_from=target)
+                                      excludes=target.excludes)
     tgt.id = target.id + '.protobuf_gen'
-    tgt.add_labels('codegen')
     for dependee in dependees:
       dependee.update_dependencies([tgt])
     return tgt

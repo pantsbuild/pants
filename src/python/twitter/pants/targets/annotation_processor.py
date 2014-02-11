@@ -17,11 +17,11 @@
 from twitter.pants.base.build_manual import manual
 
 from .exportable_jvm_library import ExportableJvmLibrary
-from .resources import WithLegacyResources
+from .resources import Resources
 
 
-@manual.builddict(tags=["java"])
-class AnnotationProcessor(ExportableJvmLibrary, WithLegacyResources):
+@manual.builddict(tags=['java'])
+class AnnotationProcessor(ExportableJvmLibrary):
   """Produces a Java library containing one or more annotation processors."""
 
   def __init__(self,
@@ -55,17 +55,14 @@ class AnnotationProcessor(ExportableJvmLibrary, WithLegacyResources):
       annotation processors this library exports.
     :param exclusives: An optional map of exclusives tags. See CheckExclusives for details.
     """
-    ExportableJvmLibrary.__init__(self,
-                                  name,
-                                  sources,
-                                  provides,
-                                  dependencies,
-                                  excludes,
-                                  exclusives=exclusives)
-    WithLegacyResources.__init__(self,
-                                 name,
-                                 sources=sources,
-                                 resources=resources,
-                                 exclusives=exclusives)
-    self.add_labels('java', 'apt')
+    super(AnnotationProcessor, self).__init__(
+        name,
+        sources,
+        provides,
+        dependencies,
+        excludes,
+        exclusives=exclusives)
+
+    self.resources = list(self.resolve_all(resources, Resources))
     self.processors = processors
+    self.add_labels('java', 'apt')

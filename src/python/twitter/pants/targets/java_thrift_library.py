@@ -21,14 +21,13 @@ from twitter.common.collections import maybe_list
 
 from twitter.pants.base import manual, TargetDefinitionException
 
-from .exportable_jvm_library import ExportableJvmLibrary
 from .jar_dependency import JarDependency
+from .jvm_target import JvmTarget
 from .pants_target import Pants
-from .thrift_library import ThriftJar
 
 
-@manual.builddict(tags=["java"])
-class JavaThriftLibrary(ExportableJvmLibrary):
+@manual.builddict(tags=['java'])
+class JavaThriftLibrary(JvmTarget):
   """Generates a stub Java or Scala library from thrift IDL files."""
 
 
@@ -74,18 +73,29 @@ class JavaThriftLibrary(ExportableJvmLibrary):
     :param namespace_map: A dictionary of namespaces to remap (old: new)
     :param exclusives: An optional map of exclusives tags. See CheckExclusives for details.
     """
-    ExportableJvmLibrary.__init__(self, name, sources, provides, dependencies, excludes,
-                                  exclusives=exclusives)
+
+    # It's critical that provides is set 1st since _provides() is called elsewhere in the
+    # constructor flow.
+    self._provides = provides
+
+    super(JavaThriftLibrary, self).__init__(
+        name,
+        sources,
+        dependencies,
+        excludes,
+        exclusives=exclusives)
+
+    self.add_labels('codegen')
 
     # 'java' shouldn't be here, but is currently required to prevent lots of chunking islands.
     # See comment in goal.py for details.
-    self.add_labels('codegen', 'java')
+    self.add_labels('java')
 
     if dependencies:
       if not isinstance(dependencies, Iterable):
         raise TargetDefinitionException(self,
-                                        "dependencies must be Iterable but was: %s" % dependencies)
-      maybe_list(dependencies, expected_type=(JarDependency, JavaThriftLibrary, Pants, ThriftJar),
+                                        'dependencies must be Iterable but was: %s' % dependencies)
+      maybe_list(dependencies, expected_type=(JarDependency, JavaThriftLibrary, Pants),
                  raise_type=partial(TargetDefinitionException, self))
 
     def check_value_for_arg(arg, value, values):
@@ -108,6 +118,10 @@ class JavaThriftLibrary(ExportableJvmLibrary):
 
     self.namespace_map = namespace_map
 
-    @property
-    def is_thrift(self):
-      return True
+  @property
+  def is_thrift(self):
+    return True
+
+  @property
+  def provides(self):
+    return self._provides

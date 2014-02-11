@@ -16,7 +16,6 @@
 
 from __future__ import print_function
 
-import daemon
 import inspect
 import multiprocessing
 import os
@@ -46,7 +45,6 @@ from twitter.pants.base import (
     Target,
     TargetDefinitionException)
 from twitter.pants.base.rcfile import RcFile
-from twitter.pants.buildtimestats import BuildTimeStats
 from twitter.pants.commands import Command
 from twitter.pants.engine import Engine, GroupEngine
 from twitter.pants.goal.initialize_reporting import update_reporting
@@ -72,20 +70,21 @@ def _list_goals(context, message):
   """Show all installed goals."""
   context.log.error(message)
   # Execute as if the user had run "./pants goals".
-  return Phase.execute(context, 'goals')
+  return Goal.execute(context, 'goals')
 
 
-class List(Task):
+class ListGoals(ConsoleTask):
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
+    super(ListGoals, cls).setup_parser(option_group, args, mkflag)
     option_group.add_option(mkflag("all"),
                             dest="goal_list_all",
                             default=False,
                             action="store_true",
                             help="[%default] List all goals even if no description is available.")
 
-  def execute(self, targets):
-    print('Installed goals:')
+  def console_output(self, targets):
+    yield 'Installed goals:'
     documented_rows = []
     undocumented = []
     max_width = 0
@@ -96,12 +95,14 @@ class List(Task):
       elif self.context.options.goal_list_all:
         undocumented.append(phase.name)
     for name, description in documented_rows:
-      print('  %s: %s' % (name.rjust(max_width), description))
+      yield '  %s: %s' % (name.rjust(max_width), description)
     if undocumented:
-      print('\nUndocumented goals:\n  %s' % ' '.join(undocumented))
+      yield ''
+      yield 'Undocumented goals:'
+      yield '  %s' % ' '.join(undocumented)
 
 
-goal(name='goals', action=List).install().with_description('List all documented goals.')
+goal(name='goals', action=ListGoals).install().with_description('List all documented goals.')
 
 
 goal(name='targets', action=TargetsHelp).install().with_description('List all target types.')
@@ -196,8 +197,6 @@ class Goal(Command):
            help="Times goal phases and outputs a report."),
     Option("-e", "--explain", action="store_true", dest="explain", default=False,
            help="Explain the execution of goals."),
-    Option("--force-stats-upload", dest="force_upload", action="store_true", default=False,
-           help="[%default] Forces pants runtime stats upload after every pants runs"),
     Option("-k", "--kill-nailguns", action="store_true", dest="cleanup_nailguns", default=False,
            help="Kill nailguns before exiting"),
     Option("-d", "--logdir", dest="logdir",
@@ -279,22 +278,20 @@ class Goal(Command):
 
     return goals, specs
 
-  @staticmethod
-  def execute(context, *names):
+  @classmethod
+  def execute(cls, context, *names):
     parser = OptionParser()
+    cls.add_global_options(parser)
     phases = [Phase(name) for name in names]
     Phase.setup_parser(parser, [], phases)
     options, _ = parser.parse_args([])
-    context = Context(context.config, options, context.target_roots, log=context.log)
-    return Goal._execute(context, phases, print_timing=False, force_stats_upload=False)
+    context = Context(context.config, options, context.run_tracker, context.target_roots,
+                      requested_goals=list(names))
+    return cls._execute(context, phases, print_timing=False)
 
   @staticmethod
-  def _execute(context, phases, print_timing, force_stats_upload):
-    build_stats = None
-    if context.config.getdefault('stats_collection', bool, default=False):
-      user = context.config.getdefault('user')
-      build_stats = BuildTimeStats(user, force_stats_upload)
-    engine = GroupEngine(print_timing=print_timing, build_stats=build_stats)
+  def _execute(context, phases, print_timing):
+    engine = GroupEngine(print_timing=print_timing)
     return engine.execute(context, phases)
 
   # TODO(John Sirois): revisit wholesale locking when we move py support into pants new
@@ -511,8 +508,7 @@ class Goal(Command):
     if unknown:
       return _list_goals(context, 'Unknown goal(s): %s' % ' '.join(phase.name for phase in unknown))
 
-    return Goal._execute(context, self.phases, print_timing=self.options.time,
-                         force_stats_upload=self.options.force_upload)
+    return Goal._execute(context, self.phases, print_timing=self.options.time)
 
   def cleanup(self):
     # TODO: Make this more selective? Only kill nailguns that affect state? E.g., checkstyle
@@ -541,7 +537,6 @@ from twitter.pants.tasks.bundle_create import BundleCreate
 from twitter.pants.tasks.checkstyle import Checkstyle
 from twitter.pants.tasks.check_published_deps import CheckPublishedDeps
 from twitter.pants.tasks.detect_duplicates import DuplicateDetector
-from twitter.pants.tasks.extract import Extract
 from twitter.pants.tasks.check_exclusives import CheckExclusives
 from twitter.pants.tasks.filedeps import FileDeps
 from twitter.pants.tasks.ivy_resolve import IvyResolve

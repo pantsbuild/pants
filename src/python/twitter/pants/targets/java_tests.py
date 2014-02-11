@@ -15,11 +15,12 @@
 # ==================================================================================================
 
 from twitter.pants.base import manual
+
 from .jvm_target import JvmTarget
 from .resources import Resources
 
 
-@manual.builddict(tags=["java"])
+@manual.builddict(tags=['jvm'])
 class JavaTests(JvmTarget):
   """Tests JVM sources with JUnit."""
 
@@ -29,7 +30,6 @@ class JavaTests(JvmTarget):
                dependencies=None,
                excludes=None,
                resources=None,
-               buildflags=None,
                exclusives=None):
     """
    :param string name: The name of this target, which combined with this
@@ -47,10 +47,13 @@ class JavaTests(JvmTarget):
      to filter this target's transitive dependencies against.
    :param resources: An optional list of ``resources`` targets containing text
      file resources to place in this module's jar.
-   :param buildflags: Unused, and will be removed in a future release.
    :param exclusives: An optional map of exclusives tags. See CheckExclusives for details.
    """
 
-    JvmTarget.__init__(self, name, sources, dependencies, excludes, exclusives=exclusives)
-    self.add_labels('java', 'tests')
+    super(JavaTests, self).__init__(name, sources, dependencies, excludes, exclusives=exclusives)
+
     self.resources = list(self.resolve_all(resources, Resources))
+
+    # TODO(John Sirois): These could be scala, clojure, etc.  'jvm' and 'tests' are the only truly
+    # applicable labels - fixup the 'java' misnomer.
+    self.add_labels('java', 'tests')

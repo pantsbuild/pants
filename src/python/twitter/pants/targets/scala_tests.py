@@ -14,13 +14,13 @@
 # limitations under the License.
 # ==================================================================================================
 
-from twitter.pants.base.build_manual import manual
+from twitter.pants.base import manual
 
 from .jvm_target import JvmTarget
 from .resources import Resources
 
 
-@manual.builddict(tags=["scala"])
+@manual.builddict(tags=['scala'])
 class ScalaTests(JvmTarget):
   """Tests a Scala library."""
 
@@ -31,7 +31,6 @@ class ScalaTests(JvmTarget):
                dependencies=None,
                excludes=None,
                resources=None,
-               buildflags=None,
                exclusives=None):
 
     """
@@ -53,12 +52,14 @@ class ScalaTests(JvmTarget):
     :param excludes: List of :class:`twitter.pants.targets.exclude.Exclude` instances
       to filter this target's transitive dependencies against.
     :param resources: An optional list of Resources that should be in this target's classpath.
-    :param buildflags: Unused, and will be removed in a future release.
     :param exclusives: An optional map of exclusives tags. See CheckExclusives for details.
     """
 
-    JvmTarget.__init__(self, name, sources, dependencies, excludes, exclusives=exclusives)
+    super(ScalaTests, self).__init__(name, sources, dependencies, excludes, exclusives=exclusives)
 
-    self.add_labels('scala', 'tests')
+    # TODO(John Sirois): Merge handling with ScalaLibrary.java_sources - which is different and
+    # likely more correct.
     self.java_sources = java_sources
+
     self.resources = list(self.resolve_all(resources, Resources))
+    self.add_labels('scala', 'tests')

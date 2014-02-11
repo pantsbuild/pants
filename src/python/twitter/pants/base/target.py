@@ -258,7 +258,28 @@ class Target(AbstractTarget):
 
       # For synthetic codegen targets this will be the original target from which
       # the target was synthesized.
-      self.derived_from = self
+      self._derived_from = self
+
+  @property
+  def derived_from(self):
+    """Returns the target this target was derived from.
+
+    If this target was not derived from another, returns itself.
+    """
+    return self._derived_from
+
+  @derived_from.setter
+  def derived_from(self, value):
+    """Sets the target this target was derived from.
+
+    Various tasks may create targets not written down in any BUILD file.  Often these targets are
+    derived from targets written down in BUILD files though in which case the derivation chain
+    should be maintained.
+    """
+    if value and not isinstance(value, Target):
+      raise ValueError('Expected derived_from to be a Target, given %s of type %s'
+                       % (value, type(value)))
+    self._derived_from = value
 
   def get_declared_exclusives(self):
     return self.declared_exclusives

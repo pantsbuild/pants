@@ -47,7 +47,13 @@ class ExportableJvmLibrary(JvmTarget):
     # constructor flow.
     self._provides = provides
 
-    JvmTarget.__init__(self, name, sources, dependencies, excludes, exclusives=exclusives)
+    super(ExportableJvmLibrary, self).__init__(
+        name,
+        sources,
+        dependencies,
+        excludes,
+        exclusives=exclusives)
+
     self.add_labels('exportable')
 
   @property

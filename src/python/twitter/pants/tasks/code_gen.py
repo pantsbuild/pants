@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==================================================================================================
-import os
 
 from collections import defaultdict
 
@@ -133,7 +132,7 @@ class CodeGen(Task):
               dependees_by_gentarget.get(target, [])
             )
             syn_target.derived_from = target
-            syn_target.add_labels('synthetic')
+            syn_target.add_labels('codegen', 'synthetic')
             if write_to_artifact_cache and target in invalid_vts_by_target:
               generated_sources = list(syn_target.sources_absolute_paths())
               vts_artifactfiles_pairs.append((invalid_vts_by_target[target], generated_sources))

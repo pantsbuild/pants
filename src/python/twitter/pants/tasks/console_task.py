@@ -29,7 +29,7 @@ class ConsoleTask(Task):
                             default='\\n', help="String to use to separate results.")
 
   def __init__(self, context, outstream=sys.stdout):
-    Task.__init__(self, context)
+    super(ConsoleTask, self).__init__(context)
     separator_option = "console_%s_separator" % self.__class__.__name__
     self._console_separator = getattr(context.options, separator_option).decode('string-escape')
     self._outstream = outstream

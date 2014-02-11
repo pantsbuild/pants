@@ -25,7 +25,7 @@ from twitter.common.dirutil import safe_mkdir
 from twitter.pants.base.build_environment import get_buildroot
 from twitter.pants.fs import safe_filename
 from twitter.pants.java.jar import open_jar
-from twitter.pants.targets import JvmBinary, JavaThriftLibrary, ThriftLibrary
+from twitter.pants.targets import JvmBinary
 
 from .javadoc_gen import javadoc
 from .scaladoc_gen import scaladoc
@@ -50,10 +50,6 @@ def is_scala_library(target):
 
 def is_jvm_library(target):
   return is_java_library(target) or is_scala_library(target)
-
-
-def is_idl_library(target):
-  return target.has_sources('.thrift') and isinstance(target, (ThriftLibrary, JavaThriftLibrary))
 
 
 def jarname(target, extension='.jar'):
@@ -96,10 +92,6 @@ class JarCreate(Task):
                             dest='jar_create_javadoc', default=False,
                             action='callback', callback=mkflag.set_bool,
                             help='[%default] Create javadoc jars.')
-    option_group.add_option(mkflag('idl'), mkflag('idl', negate=True),
-                            dest='jar_create_idl', default=False,
-                            action='callback', callback=mkflag.set_bool,
-                            help='[%default] Create Thrift jars.')
 
   def __init__(self, context, jar_javadoc=False):
     Task.__init__(self, context)
@@ -117,10 +109,6 @@ class JarCreate(Task):
     if self.jar_classes:
       products.require_data('classes_by_target')
       products.require_data('resources_by_target')
-
-    self.jar_idl = products.isrequired('idl_jars') or options.jar_create_idl
-    if self.jar_idl:
-      products.require('idl')
 
     definitely_create_javadoc = options.jar_create_javadoc or products.isrequired('javadoc_jars')
     definitely_dont_create_javadoc = options.jar_create_javadoc is False
@@ -150,9 +138,6 @@ class JarCreate(Task):
 
     if self.jar_classes:
       self._jar(jar_targets(is_jvm_library), functools.partial(add_genjar, 'jars'))
-
-    if self.jar_idl:
-      self.idljar(jar_targets(is_idl_library), functools.partial(add_genjar, 'idl_jars'))
 
     if self.jar_sources:
       self.sourcejar(jar_targets(is_jvm_library), functools.partial(add_genjar, 'source_jars'))
@@ -201,15 +186,6 @@ class JarCreate(Task):
           add_to_jar(target_classes)
           for resources_target in target_resources:
             add_to_jar(resources_target)
-
-  def idljar(self, idl_targets, add_genjar):
-    for target in idl_targets:
-      jar_name = jarname(target, '-idl.jar')
-      add_genjar(target, jar_name)
-      jar_path = os.path.join(self._output_dir, jar_name)
-      with self.create_jar(target, jar_path) as jar:
-        for source in target.sources:
-          jar.write(os.path.join(get_buildroot(), target.target_base, source), source)
 
   def sourcejar(self, jvm_targets, add_genjar):
     for target in jvm_targets:

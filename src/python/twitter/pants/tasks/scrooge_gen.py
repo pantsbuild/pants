@@ -239,9 +239,10 @@ class ScroogeGen(NailgunTask):
       return self.context.add_new_target(outdir,
                                          target_type,
                                          name=gentarget.id,
-                                         provides=gentarget.provides,
                                          sources=files,
-                                         dependencies=deps)
+                                         provides=gentarget.provides,
+                                         dependencies=deps,
+                                         excludes=gentarget.excludes)
 
     def create_geninfo(key):
       compiler = self.compiler_for_name[gentarget.compiler]
