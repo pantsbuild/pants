@@ -14,41 +14,17 @@
 # limitations under the License.
 # =================================================================================================
 
-from twitter.pants.targets import (
-    AnnotationProcessor,
-    Artifact,
-    Benchmark,
-    Bundle,
-    Credentials,
-    JarLibrary,
-    PythonEgg,
-    Exclude,
-    JarDependency,
-    JavaLibrary,
-    JavaAntlrLibrary,
-    JavaProtobufLibrary,
-    JavaTests,
-    JavaThriftLibrary,
-    JvmApp,
-    JvmBinary,
-    Page,
-    Pants,
-    PythonArtifact,
-    PythonBinary,
-    PythonLibrary,
-    PythonAntlrLibrary,
-    PythonRequirement,
-    PythonThriftLibrary,
-    PythonTests,
-    PythonTestSuite,
-    Repository,
-    Resources,
-    ScalaLibrary,
-    ScalaTests,
-    ScalacPlugin,
-    SourceRoot,
-    Wiki)
+from __future__ import print_function
 
+from twitter.pants.targets import (AnnotationProcessor, Artifact, Benchmark, Bundle, Credentials,
+                                   JarLibrary, PythonEgg, Exclude, Pants, JarDependency,
+                                   JavaLibrary, JavaAntlrLibrary, JavaProtobufLibrary, JavaTests,
+                                   JavaThriftLibrary, JavaThriftstoreDMLLibrary, JvmApp,
+                                   JvmBinary, OinkQuery, Page, PythonArtifact, PythonBinary,
+                                   PythonLibrary, PythonAntlrLibrary, PythonRequirement,
+                                   PythonThriftLibrary, PythonTests, PythonTestSuite, Repository,
+                                   Resources, ScalaLibrary, ScalaTests, ScalacPlugin, SourceRoot,
+                                   Wiki)
 
 # aliases
 annotation_processor = AnnotationProcessor
@@ -66,8 +42,12 @@ java_antlr_library = JavaAntlrLibrary
 java_protobuf_library = JavaProtobufLibrary
 junit_tests = java_tests = JavaTests
 java_thrift_library = JavaThriftLibrary
+# TODO(Anand) Remove this from pants proper when a code adjoinment mechanism exists
+# or ok if/when thriftstore is open sourced as well
+java_thriftstore_dml_library = JavaThriftstoreDMLLibrary
 jvm_binary = JvmBinary
 jvm_app = JvmApp
+oink_query = OinkQuery
 page = Page
 python_artifact = setup_py = PythonArtifact
 python_binary = PythonBinary

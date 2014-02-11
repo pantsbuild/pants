@@ -14,6 +14,8 @@
 # limitations under the License.
 # ==================================================================================================
 
+__author__ = 'jsirois'
+
 try:
   import ConfigParser
 except ImportError:
@@ -24,7 +26,6 @@ import getpass
 
 from twitter.pants.base.build_environment import get_buildroot
 
-
 class Config(object):
   """
     Encapsulates ini-style config file loading and access additionally supporting recursive variable
@@ -34,8 +35,7 @@ class Config(object):
 
   DEFAULT_SECTION = ConfigParser.DEFAULTSECT
 
-  class ConfigError(Exception):
-    pass
+  class ConfigError(Exception): pass
 
   @staticmethod
   def load(configpath=os.path.join(get_buildroot(), 'pants.ini'), defaults=None):
@@ -45,10 +45,7 @@ class Config(object):
       file's DEFAULT section.  The 'buildroot', invoking 'user' and invoking user's 'homedir' are
       automatically defaulted.
     """
-    parser = Config.create_parser(defaults)
-    with open(configpath) as ini:
-      parser.readfp(ini)
-    return Config(parser)
+    return Config(Config.create_parser(defaults), configpath)
 
   @staticmethod
   def create_parser(defaults=None):
@@ -61,30 +58,31 @@ class Config(object):
     standard_defaults = dict(
       buildroot=get_buildroot(),
       homedir=os.path.expanduser('~'),
-      user=getpass.getuser(),
-      pants_workdir=os.path.join(get_buildroot(), '.pants.d'),
-      pants_supportdir=os.path.join(get_buildroot(), 'build-support'),
-      pants_distdir=os.path.join(get_buildroot(), 'dist')
+      user=getpass.getuser()
     )
     if defaults:
       standard_defaults.update(defaults)
     return ConfigParser.SafeConfigParser(standard_defaults)
 
-  def __init__(self, configparser):
+  def __init__(self, configparser, configpath):
+    # Base Config
     self.configparser = configparser
+    with open(configpath) as ini:
+      self.configparser.readfp(ini, filename=configpath)
+    self.file = configpath
 
     # Overrides
-    #
-    # This feature allows a second configuration file which will override
+    # 
+    # This feature allows a second configuration file which will override 
     # pants.ini to be specified.  The file is currently specified via an env
     # variable because the cmd line flags are parsed after config is loaded.
-    #
+    # 
     # The main use of the extra file is to have different settings based on
     # the environment.  For example, the setting used to compile or locations
     # of caches might be different between a developer's local environment
     # and the environment used to build and publish artifacts (e.g. Jenkins)
-    #
-    # The files cannot reference each other's values, so make sure each one is
+    # 
+    # The files cannot reference each other's values, so make sure each one is 
     # internally consistent
     self.overrides_path = os.environ.get('PANTS_CONFIG_OVERRIDE')
     self.overrides_parser = None
@@ -129,27 +127,6 @@ class Config(object):
       returned.
     """
     return self._getinstance(section, option, type, default=default)
-
-  def get_required(self, section, option, type=str):
-    """Retrieves option from the specified section and attempts to parse it as type.
-    If the specified section is missing a definition for the option, the value is
-    looked up in the DEFAULT section. If there is still no definition found,
-    a `ConfigError` is raised.
-
-    :param string section: Section to lookup the option in, before looking in DEFAULT.
-    :param string option: Option to retrieve.
-    :param type: Type to retrieve the option as.
-    :returns: The option as the specified type.
-    :raises: :class:`twitter.pants.base.config.Config.ConfigError` if option is not found.
-    """
-    val = self.get(section, option, type=type)
-    if val is None:
-      raise Config.ConfigError('Required option %s.%s is not defined.' % (section, option))
-    return val
-
-  def has_section(self, section):
-    """Return whether or not this config has the section."""
-    return self.configparser.has_section(section)
 
   def _has_option(self, section, option):
     if self.overrides_parser and self.overrides_parser.has_option(section, option):

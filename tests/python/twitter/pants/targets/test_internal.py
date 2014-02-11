@@ -14,31 +14,19 @@
 # limitations under the License.
 # ==================================================================================================
 
-from twitter.pants.base import ParseContext
-from twitter.pants.base.target import Target, TargetDefinitionException
+import unittest
+
 from twitter.pants.targets import InternalTarget
 from twitter.pants.testutils import MockTarget
-from twitter.pants.testutils.base_mock_target_test import BaseMockTargetTest
 
 
-class InternalTargetTest(BaseMockTargetTest):
-
-  def test_validation(self):
-    with ParseContext.temp('InternalTargetTest/test_validation'):
-      InternalTarget(name="valid", dependencies=None)
-      self.assertRaises(TargetDefinitionException, InternalTarget,
-                        name=1, dependencies=None)
-
-      InternalTarget(name="valid2", dependencies=Target(name='mybird'))
-      self.assertRaises(TargetDefinitionException, InternalTarget,
-                        name='valid3', dependencies=1)
-
+class InternalTargetTest(unittest.TestCase):
   def test_detect_cycle_direct(self):
     a = MockTarget('a')
 
     # no cycles yet
     InternalTarget.sort_targets([a])
-    a.update_dependencies([a])
+    a.internal_dependencies = [a]
     try:
       InternalTarget.sort_targets([a])
       self.fail("Expected a cycle to be detected")
@@ -54,7 +42,7 @@ class InternalTargetTest(BaseMockTargetTest):
     # no cycles yet
     InternalTarget.sort_targets([a])
 
-    c.update_dependencies([a])
+    c.internal_dependencies = [a]
     try:
       InternalTarget.sort_targets([a])
       self.fail("Expected a cycle to be detected")

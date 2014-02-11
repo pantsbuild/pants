@@ -16,6 +16,7 @@
 
 import os
 
+import errno
 from zipfile import ZIP_DEFLATED
 
 from twitter.common.collections import OrderedSet
@@ -24,8 +25,8 @@ from twitter.common.dirutil import safe_mkdir
 
 from twitter.pants.base.build_environment import get_buildroot
 from twitter.pants.fs import archive
-from twitter.pants.java.jar import Manifest
-from twitter.pants.targets import JvmApp, JvmBinary
+from twitter.pants.java import Manifest
+from twitter.pants.targets import JvmApp
 from twitter.pants.tasks import TaskError
 from twitter.pants.tasks.jvm_binary_task import JvmBinaryTask
 
@@ -52,9 +53,8 @@ class BundleCreate(JvmBinaryTask):
     JvmBinaryTask.__init__(self, context)
 
     self.outdir = (
-      context.options.jvm_binary_create_outdir or
-      context.config.get('bundle-create', 'outdir',
-                         default=context.config.getdefault('pants_distdir'))
+      context.options.jvm_binary_create_outdir
+      or context.config.get('bundle-create', 'outdir')
     )
 
     self.prefix = context.options.bundle_create_prefix
@@ -73,42 +73,25 @@ class BundleCreate(JvmBinaryTask):
       self.context.products.require('jars', predicate=self.is_binary)
     self.require_jar_dependencies()
 
-  class App(object):
-    """A uniform interface to an app."""
-
-    @staticmethod
+  def execute(self, targets):
     def is_app(target):
-      return isinstance(target, (JvmApp, JvmBinary))
+      return isinstance(target, JvmApp)
 
-    def __init__(self, target):
-      assert self.is_app(target), "%s is not a valid app target" % target
-
-      self.binary = target if isinstance(target, JvmBinary) else target.binary
-      self.bundles = [] if isinstance(target, JvmBinary) else target.bundles
-      self.basename = target.basename
-
-  def execute(self, _):
     archiver = archive.archiver(self.archiver_type) if self.archiver_type else None
-    for target in self.context.target_roots:
-      for app in map(self.App, filter(self.App.is_app, target.resolve())):
-        basedir = self.bundle(app)
-        if archiver:
-          archivemap = self.context.products.get(self.archiver_type)
-          archivepath = archiver.create(
-            basedir,
-            self.outdir,
-            app.basename,
-            prefix=app.basename if self.prefix else None
-          )
-          archivemap.add(app, self.outdir, [archivepath])
-          self.context.log.info('created %s' % os.path.relpath(archivepath, get_buildroot()))
+    for app in filter(is_app, targets):
+      basedir = self.bundle(app)
+      if archiver:
+        archivemap = self.context.products.get(self.archiver_type)
+        archivepath = archiver.create(
+          basedir,
+          self.outdir,
+          app.basename,
+          prefix=app.basename if self.prefix else None
+        )
+        archivemap.add(app, self.outdir, [archivepath])
+        self.context.log.info('created %s' % os.path.relpath(archivepath, get_buildroot()))
 
   def bundle(self, app):
-    """Create a self-contained application bundle containing the target
-    classes, dependencies and resources.
-    """
-    assert(isinstance(app, BundleCreate.App))
-
     bundledir = os.path.join(self.outdir, '%s-bundle' % app.basename)
     self.context.log.info('creating %s' % os.path.relpath(bundledir, get_buildroot()))
 
@@ -119,28 +102,25 @@ class BundleCreate(JvmBinaryTask):
       libdir = os.path.join(bundledir, 'libs')
       os.mkdir(libdir)
 
-      # Add internal dependencies to the bundle.
-      def add_jars(target):
-        target_jars = self.context.products.get('jars').get(target)
-        if target_jars is not None:
-          for basedir, jars in target_jars.items():
-            for internaljar in jars:
-              os.symlink(os.path.join(basedir, internaljar),
-                         os.path.join(libdir, internaljar))
-              classpath.add(internaljar)
-      app.binary.walk(add_jars, lambda t: t.is_internal)
-
-      # Add external dependencies to the bundle.
       for basedir, externaljar in self.list_jar_dependencies(app.binary):
-        path = os.path.join(basedir, externaljar)
-        os.symlink(path, os.path.join(libdir, externaljar))
+        src = os.path.join(basedir, externaljar)
+        link_name = os.path.join(libdir, externaljar)
+        try:
+          os.symlink(src, link_name)
+        except OSError as e:
+          if e.errno == errno.EEXIST:
+            raise TaskError('Trying to symlink %s to %s, but it is already symlinked to %s. ' %
+                            (link_name, src, os.readlink(link_name)) +
+                            'Does the bundled target depend on multiple jvm_binary targets?')
+          else:
+            raise
         classpath.add(externaljar)
 
     for basedir, jars in self.context.products.get('jars').get(app.binary).items():
       if len(jars) != 1:
-        raise TaskError('Expected 1 mapped binary for %s but found: %s' % (app.binary, jars))
+        raise TaskError('Expected 1 mapped binary but found: %s' % jars)
 
-      binary = jars[0]
+      binary = jars.pop()
       binary_jar = os.path.join(basedir, binary)
       bundle_jar = os.path.join(bundledir, binary)
       if not classpath:
@@ -149,13 +129,13 @@ class BundleCreate(JvmBinaryTask):
         with open_zip(binary_jar, 'r') as src:
           with open_zip(bundle_jar, 'w', compression=ZIP_DEFLATED) as dest:
             for item in src.infolist():
-              buf = src.read(item.filename)
+              buffer = src.read(item.filename)
               if Manifest.PATH == item.filename:
-                manifest = Manifest(buf)
+                manifest = Manifest(buffer)
                 manifest.addentry(Manifest.CLASS_PATH,
                                   ' '.join(os.path.join('libs', jar) for jar in classpath))
-                buf = manifest.contents()
-              dest.writestr(item, buf)
+                buffer = manifest.contents()
+              dest.writestr(item, buffer)
 
     for bundle in app.bundles:
       for path, relpath in bundle.filemap.items():

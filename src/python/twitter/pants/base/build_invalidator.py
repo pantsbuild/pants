@@ -82,7 +82,7 @@ TARGET_SOURCES = DefaultSourceScope(recursive=False, include_buildfile=False)
 TRANSITIVE_SOURCES = DefaultSourceScope(recursive=True, include_buildfile=False)
 
 # Bump this to invalidate all existing keys in artifact caches across all pants deployments in the world.
-# Do this if you've made a change that invalidates existing artifacts, e.g.,  fixed a bug that
+# Do this if you've made a change that invalidates existing artifacts, e.g.,  fixed a bug that 
 # caused bad artifacts to be cached.
 GLOBAL_CACHE_KEY_GEN_VERSION = '6'
 
@@ -202,10 +202,6 @@ class BuildInvalidator(object):
     :param cache_key: A CacheKey object (typically returned by BuildInvalidator.key_for()).
     """
     self._write_sha(cache_key)
-
-  def force_invalidate_all(self):
-    """Force-invalidates all cached items."""
-    safe_mkdir(self._root, clean=True)
 
   def force_invalidate(self, cache_key):
     """Force-invalidate the cached item."""

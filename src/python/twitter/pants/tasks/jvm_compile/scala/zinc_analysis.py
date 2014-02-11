@@ -237,23 +237,21 @@ class ZincAnalysis(Analysis):
       stamps_splits.append(Stamps((products, sources, binaries, classnames)))
 
     # Split apis.
+    naive_internal_api_splits = self._split_dict(self.apis.internal, splits)
+    naive_external_api_splits = self._split_dict(self.apis.external, splits)
 
-    # The splits, but expressed via class representatives of the sources (see above).
-    representative_splits = [filter(None, [representatives.get(s) for s in srcs]) for srcs in splits]
-    representative_to_internal_api = {}
-    for src, rep in representatives.items():
-      representative_to_internal_api[rep] = self.apis.internal.get(src)
-
-    # Note that the keys in self.apis.external are classes, not sources.
-    internal_api_splits = self._split_dict(self.apis.internal, splits)
-    external_api_splits = self._split_dict(self.apis.external, representative_splits)
-
-    # All externalized deps require a copy of the relevant api.
-    for external, external_api in zip(external_splits, external_api_splits):
-      for vs in external.values():
-        for v in vs:
-          if v in representative_to_internal_api:
-            external_api[v] = representative_to_internal_api[v]
+    internal_api_splits = []
+    external_api_splits = []
+    for naive_internal_apis, external_apis, split in \
+      zip(naive_internal_api_splits, naive_external_api_splits, splits):
+      internal_apis = defaultdict(list)
+      for k, vs in naive_internal_apis.iteritems():
+        if k in split:
+          internal_apis[k] = vs  # Remains internal.
+        else:
+          external_apis[representatives[k]] = vs  # Externalized.
+      internal_api_splits.append(internal_apis)
+      external_api_splits.append(external_apis)
 
     apis_splits = []
     for args in zip(internal_api_splits, external_api_splits):

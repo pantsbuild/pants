@@ -14,6 +14,9 @@
 # limitations under the License.
 # ==================================================================================================
 
+from __future__ import print_function
+
+
 from .version import VERSION as _VERSION
 from twitter.pants.base.build_environment import get_version, get_buildroot, get_scm, set_scm
 from twitter.pants.base.config import Config

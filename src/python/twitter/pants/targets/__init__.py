@@ -14,8 +14,23 @@
 # limitations under the License.
 # ==================================================================================================
 
+import os
+
+
+def resolve_target_sources(target_sources, extension):
+  """given a list of pants targets, extract their sources as a list"""
+  resolved_sources = []
+
+  if target_sources:
+    for target in target_sources:
+      for resolved in target.resolve():
+        if hasattr(resolved, 'sources'):
+          resolved_sources.extend(os.path.join(resolved.target_base, source)
+            for source in resolved.sources if source.endswith(extension))
+  return resolved_sources
+
+
 from .annotation_processor import AnnotationProcessor
-from .anonymous import AnonymousDeps
 from .artifact import Artifact
 from .benchmark import Benchmark
 from .credentials import Credentials
@@ -23,16 +38,17 @@ from .doc import Page, Wiki
 from .exclude import Exclude
 from .exportable_jvm_library import ExportableJvmLibrary
 from .internal import InternalTarget
-from .jarable import Jarable
 from .jar_dependency import JarDependency
 from .jar_library import JarLibrary
 from .java_antlr_library import JavaAntlrLibrary
 from .java_library import JavaLibrary
 from .java_thrift_library import JavaThriftLibrary
+from .java_thriftstore_dml_library import JavaThriftstoreDMLLibrary
 from .java_protobuf_library import JavaProtobufLibrary
 from .java_tests import JavaTests
 from .jvm_binary import Bundle, JvmApp, JvmBinary
 from .jvm_target import JvmTarget
+from .oink_query import OinkQuery
 from .pants_target import Pants
 from .python_artifact import PythonArtifact
 from .python_binary import PythonBinary
@@ -49,13 +65,11 @@ from .scala_library import ScalaLibrary
 from .scala_tests import ScalaTests
 from .scalac_plugin import ScalacPlugin
 from .sources import SourceRoot
-from .with_dependencies import TargetWithDependencies
 from .with_sources import TargetWithSources
 
 
 __all__ = (
   'AnnotationProcessor',
-  'AnonymousDeps',
   'Artifact',
   'Benchmark',
   'Bundle',
@@ -64,16 +78,19 @@ __all__ = (
   'ExportableJvmLibrary',
   'InternalTarget',
   'JarDependency',
-  'Jarable',
   'JarLibrary',
   'JavaAntlrLibrary',
   'JavaLibrary',
   'JavaThriftLibrary',
+  # TODO(Anand) Remove this from pants proper when a code adjoinment mechanism exists
+  # or ok if/when thriftstore is open sourced as well..
+  'JavaThriftstoreDMLLibrary',
   'JavaProtobufLibrary',
   'JavaTests',
   'JvmApp',
   'JvmBinary',
   'JvmTarget',
+  'OinkQuery',
   'Page',
   'Pants',
   'PythonArtifact',
@@ -92,7 +109,6 @@ __all__ = (
   'ScalaTests',
   'ScalacPlugin',
   'SourceRoot',
-  'TargetWithDependencies',
   'TargetWithSources',
   'Wiki'
 )

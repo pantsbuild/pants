@@ -90,11 +90,9 @@ class Depmap(ConsoleTask):
     for target in self.context.target_roots:
       if all(self._is_jvm(t) for t in target.resolve() if t.is_concrete):
         if self.is_graph:
-          for line in self._output_digraph(target):
-            yield line
+          return self._output_digraph(target)
         else:
-          for line in self._output_dependency_tree(target):
-            yield line
+          return self._output_dependency_tree(target)
       elif target.is_python:
         raise TaskError('Unsupported for Python targets')
       else:
@@ -147,8 +145,6 @@ class Depmap(ConsoleTask):
     return [dependency for t in target.resolve() for dependency in output_deps(t)]
 
   def _output_digraph(self, target):
-    color_by_type = {}
-
     def output_candidate(internal):
       return ((self.is_internal_only and internal)
               or (self.is_external_only and not internal)
@@ -156,27 +152,27 @@ class Depmap(ConsoleTask):
 
     def output_dep(dep):
       dep_id, internal = self._dep_id(dep)
-      if internal:
-        fmt = '  "%(id)s" [style=filled, fillcolor="%(color)d"];'
-      else:
-        fmt = '  "%(id)s" [style=filled, fillcolor="%(color)d", shape=ellipse];'
-      if not color_by_type.has_key(type(dep)):
-        color_by_type[type(dep)] = len(color_by_type.keys()) + 1
-      return fmt % {'id': dep_id, 'color': color_by_type[type(dep)]}
+      science_styled = internal and not self.is_internal_only
+      twitter_styled = not internal and dep.org.startswith('com.twitter')
 
-    def output_deps(outputted, dep, parent=None):
+      if science_styled:
+        fmt = '  "%(id)s" [label="%(id)s", style="filled", fillcolor="#0084b4", fontcolor="white"];'
+        return fmt % {'id': dep_id}
+      elif twitter_styled:
+        return '  "%s" [style="filled", fillcolor="#c0deed"];' % dep_id
+      else:
+        return '  "%s";' % dep_id
+
+    def output_deps(outputted, dep):
       output = []
 
       if dep not in outputted:
         outputted.add(dep)
-        output.append(output_dep(dep))
-        if parent:
-          output.append('  "%s" -> "%s";' % (self._dep_id(parent)[0], self._dep_id(dep)[0]))
 
         for dependency in dep.resolve():
           if self._is_jvm(dependency):
             for internal_dependency in dependency.internal_dependencies:
-              output += output_deps(outputted, internal_dependency, dependency)
+              output += output_deps(outputted, internal_dependency)
 
           for jar in (dependency.jar_dependencies if self._is_jvm(dependency) else [dependency]):
             jar_id, internal = self._dep_id(jar)
@@ -194,6 +190,5 @@ class Depmap(ConsoleTask):
                                                   ' [style="dashed"]' if styled else '')]
                 outputted.add((left_id, jar_id))
       return output
-    header = ['digraph "%s" {' % target.id]
-    graph_attr = ['  node [shape=rectangle, colorscheme=set312;];', '  rankdir=LR;']
-    return header + graph_attr + output_deps(set(), target) + ['}']
+
+    return ['digraph "%s" {' % target.id, output_dep(target)] + output_deps(set(), target) + ['}']

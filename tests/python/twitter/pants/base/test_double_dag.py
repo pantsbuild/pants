@@ -1,14 +1,15 @@
+import unittest
+
 from twitter.pants.base.double_dag import DoubleDag
 from twitter.pants.reporting.report import Report
 from twitter.pants.testutils import MockLogger, MockTarget
-from twitter.pants.testutils.base_mock_target_test import BaseMockTargetTest
 
 
 def make_dag(nodes):
   return DoubleDag(nodes, lambda t: t.dependencies, MockLogger(Report.INFO))
 
 
-class DoubleDagTest(BaseMockTargetTest):
+class DoubleDagTest(unittest.TestCase):
 
   def check_dag_node(self, dag, data, children, parents):
     node = dag.lookup(data)
