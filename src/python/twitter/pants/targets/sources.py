@@ -65,7 +65,7 @@ class SourceRoot(object):
             # TODO: Find a way to use the BUILD file aliases in the error message, instead
             # of target.__class__.__name__. E.g., java_tests instead of JavaTests.
             raise TargetDefinitionException(target,
-                'Target type %s not allowed under %s' % (target.__class__.__name__, root))
+                'Target type %s not allowed under %s' % (target.__class__.__name__, root_dir))
           return root_dir
       return None
 
