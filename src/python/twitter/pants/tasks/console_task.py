@@ -14,11 +14,13 @@
 # limitations under the License.
 # ==================================================================================================
 
+import errno
 import sys
 
-from twitter.pants.tasks import Task
+from contextlib import contextmanager
 
-__author__ = 'Dave Buchfuhrer'
+from . import Task
+
 
 class ConsoleTask(Task):
   @classmethod
@@ -27,19 +29,29 @@ class ConsoleTask(Task):
                             default='\\n', help="String to use to separate results.")
 
   def __init__(self, context, outstream=sys.stdout):
-    Task.__init__(self, context)
+    super(ConsoleTask, self).__init__(context)
     separator_option = "console_%s_separator" % self.__class__.__name__
     self._console_separator = getattr(context.options, separator_option).decode('string-escape')
     self._outstream = outstream
 
-  def execute(self, targets):
+  @contextmanager
+  def _guard_sigpipe(self):
     try:
-      outputs = self.console_output(targets) or []
-      for value in outputs:
-        self._outstream.write(str(value))
-        self._outstream.write(self._console_separator)
-    finally:
-      self._outstream.flush()
+      yield
+    except IOError as e:
+      # If the pipeline only wants to read so much, that's fine; otherwise, this error is probably
+      # legitimate.
+      if e.errno != errno.EPIPE:
+        raise e
+
+  def execute(self, targets):
+    with self._guard_sigpipe():
+      try:
+        for value in self.console_output(targets):
+          self._outstream.write(str(value))
+          self._outstream.write(self._console_separator)
+      finally:
+        self._outstream.flush()
 
   def console_output(self, targets):
     raise NotImplementedError('console_output must be implemented by subclasses of ConsoleTask')

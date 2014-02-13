@@ -16,52 +16,80 @@
 
 from twitter.common.collections import maybe_list
 
-from twitter.pants.base import Target
+from twitter.pants.base import manual, Target, TargetDefinitionException
 
 from .exportable_jvm_library import ExportableJvmLibrary
-from .resources import WithLegacyResources
+from .resources import Resources
+
 from . import JavaLibrary
 
-class ScalaLibrary(ExportableJvmLibrary, WithLegacyResources):
-  """Defines the source code and dependencies of a scala library."""
 
-  def __init__(self, name, sources=None, java_sources=None, provides=None, dependencies=None,
-               excludes=None, resources=None, deployjar=False, buildflags=None,
+@manual.builddict(tags=['scala'])
+class ScalaLibrary(ExportableJvmLibrary):
+  """A collection of Scala code.
+
+  Normally has conceptually-related sources; invoking the ``compile`` goal
+  on this target compiles scala and generates classes. Invoking the ``bundle``
+  goal on this target creates a ``.jar``; but that's an unusual thing to do.
+  Instead, a ``jvm_binary`` might depend on this library; that binary is a
+  more sensible thing to bundle.
+  """
+
+  def __init__(self,
+               name,
+               sources=None,
+               java_sources=None,
+               provides=None,
+               dependencies=None,
+               excludes=None,
+               resources=None,
                exclusives=None):
-    """name:      The name of this target, addressable via pants via the portion of the address spec
-                  following the colon.
-    sources:      A list of paths containing the scala source files this scala library is composed
-                  of.
-    java_sources: An optional JavaLibrary target or list of targets containing the java libraries
-                  this library has a circular dependency on.  Prefer using dependencies to express
-                  non-circular dependencies.
-    provides:     An optional Dependency object indicating the The ivy artifact to export
-    dependencies: An optional list of local and remote dependencies of this library.
-    excludes:     An optional list of dependency Exclude objects to filter all of this module's
-                  transitive dependencies against.
-    resources:    An optional list of paths (DEPRECATED) or Resource targets containing resources
-                  that belong on this library's classpath.
-    deployjar:    DEPRECATED - An optional boolean that turns on generation of a monolithic deploy
-                  jar - now ignored.
-    buildflags:   DEPRECATED - A list of additional command line arguments to pass to the underlying
-                  build system for this target - now ignored.
-    exclusives:   An optional list of exclusives tags.
+    """
+    :param string name: The name of this target, which combined with this
+      build file defines the target :class:`twitter.pants.base.address.Address`.
+    :param sources: A list of filenames representing the source code
+      this library is compiled from.
+    :type sources: list of strings
+    :param java_sources:
+      :class:`twitter.pants.targets.java_library.JavaLibrary` or list of
+      JavaLibrary targets this library has a circular dependency on.
+      Prefer using dependencies to express non-circular dependencies.
+    :param Artifact provides:
+      The :class:`twitter.pants.targets.artifact.Artifact`
+      to publish that represents this target outside the repo.
+    :param dependencies: List of :class:`twitter.pants.base.target.Target` instances
+      this target depends on.
+    :type dependencies: list of targets
+    :param excludes: List of :class:`twitter.pants.targets.exclude.Exclude` instances
+      to filter this target's transitive dependencies against.
+    :param resources: An optional list of paths (DEPRECATED) or ``resources``
+      targets containing resources that belong on this library's classpath.
+    :param exclusives: An optional list of exclusives tags.
     """
 
-    ExportableJvmLibrary.__init__(self, name, sources, provides, dependencies, excludes, exclusives=exclusives)
-    WithLegacyResources.__init__(self, name, sources=sources, resources=resources)
+    super(ScalaLibrary, self).__init__(
+        name,
+        sources,
+        provides,
+        dependencies,
+        excludes,
+        exclusives=exclusives)
 
-    self.add_labels('scala')
+    if (sources is None) and (resources is None):
+      raise TargetDefinitionException(self, 'Must specify sources and/or resources.')
+
+    self.resources = list(self.resolve_all(resources, Resources))
 
     # Defer resolves until done parsing the current BUILD file, certain source_root arrangements
     # might allow java and scala sources to co-mingle and so have targets in the same BUILD.
+    self.java_sources = []
     self._post_construct(self._link_java_cycles, java_sources)
+
+    self.add_labels('scala')
 
   def _link_java_cycles(self, java_sources):
     if java_sources:
       self.java_sources = list(Target.resolve_all(maybe_list(java_sources, Target), JavaLibrary))
-    else:
-      self.java_sources = []
 
     # We have circular java/scala dep, add an inbound dependency edge from java to scala in this
     # case to force scala compilation to precede java - since scalac supports generating java stubs

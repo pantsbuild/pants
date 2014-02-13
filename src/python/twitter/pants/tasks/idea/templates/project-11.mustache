@@ -33,6 +33,7 @@ limitations under the License.
 
   <component name="JavacSettings">
     <option name="ADDITIONAL_OPTIONS_STRING" value="-encoding {{project.java_encoding}}" />
+    <option name="MAXIMUM_HEAP_SIZE" value="{{project.java.maximum_heap_size}}" />
   </component>
 
   <component name="ProjectModuleManager">
@@ -97,6 +98,10 @@ limitations under the License.
         <entry key="thirdparty-classpath" value="{{project.checkstyle_classpath}}" />
       </map>
     </option>
+  </component>
+
+  <component name="ScalaProjectSettings">
+    <option name="sortImports" value="true" />
   </component>
 
 {{#project.extra_components}}

@@ -14,8 +14,6 @@
 # limitations under the License.
 # ==================================================================================================
 
-__author__ = 'Brian Larson'
-
 import os
 
 from twitter.common.collections import OrderedSet
@@ -25,6 +23,7 @@ from twitter.pants.targets import JavaLibrary, JavaAntlrLibrary
 from twitter.pants.tasks import TaskError
 from twitter.pants.tasks.code_gen import CodeGen
 from twitter.pants.tasks.nailgun_task import NailgunTask
+
 
 class AntlrGen(CodeGen, NailgunTask):
 
@@ -38,8 +37,13 @@ class AntlrGen(CodeGen, NailgunTask):
     CodeGen.__init__(self, context)
     NailgunTask.__init__(self, context)
 
+    # TODO(John Sirois): kill if not needed by prepare_gen
+    self._classpath_by_compiler = {}
+
+    active_compilers = set(map(lambda t: t.compiler, context.targets(predicate=self.is_gentarget)))
     for compiler, tools in self._all_possible_antlr_bootstrap_tools():
-      self._jvm_tool_bootstrapper.register_jvm_tool(compiler, tools)
+      if compiler in active_compilers:
+        self._jvm_tool_bootstrapper.register_jvm_tool(compiler, tools)
 
   def is_gentarget(self, target):
     return isinstance(target, JavaAntlrLibrary)
@@ -49,6 +53,12 @@ class AntlrGen(CodeGen, NailgunTask):
 
   def genlangs(self):
     return dict(java=lambda t: t.is_jvm)
+
+  def prepare_gen(self, targets):
+    compilers = set(map(lambda t: t.compiler, targets))
+    for compiler in compilers:
+      classpath = self._jvm_tool_bootstrapper.get_jvm_tool_classpath(compiler)
+      self._classpath_by_compiler[compiler] = classpath
 
   def genlang(self, lang, targets):
     if lang != 'java':
@@ -61,25 +71,23 @@ class AntlrGen(CodeGen, NailgunTask):
       java_out = self._java_out(target)
       safe_mkdir(java_out)
 
-      antlr_classpath = self._jvm_tool_bootstrapper.get_jvm_tool_classpath(target.compiler,
-                                                                           self.runjava_indivisible)
+      antlr_classpath = self._classpath_by_compiler[target.compiler]
       args = ["-o", java_out]
 
       if target.compiler == 'antlr3':
         java_main = 'org.antlr.Tool'
       elif target.compiler == 'antlr4':
-        args.append("-visitor") # Generate Parse Tree Vistor As Well
+        args.append("-visitor")  # Generate Parse Tree Vistor As Well
         java_main = 'org.antlr.v4.Tool'
       else:
         raise TaskError("Unknown ANTLR compiler: {}".format(target.compiler))
 
       sources = self._calculate_sources([target])
       args.extend(sources)
-      result = self.runjava_indivisible(java_main, classpath=antlr_classpath, args=args,
-                                        workunit_name='antlr')
+      result = self.runjava(classpath=antlr_classpath, main=java_main,
+                            args=args, workunit_name='antlr')
       if result != 0:
-        raise TaskError
-
+        raise TaskError('java %s ... exited non-zero (%i)' % (java_main, result))
 
   def _calculate_sources(self, targets):
     sources = set()
@@ -115,9 +123,10 @@ class AntlrGen(CodeGen, NailgunTask):
     tgt = self.context.add_new_target(os.path.join(self._java_out(target), target.target_base),
                                       JavaLibrary,
                                       name=target.id,
-                                      provides=target.provides,
                                       sources=generated_sources,
-                                      dependencies=deps)
+                                      provides=target.provides,
+                                      dependencies=deps,
+                                      excludes=target.excludes)
     for dependee in dependees:
       dependee.update_dependencies([tgt])
     return tgt

@@ -14,36 +14,33 @@
 # limitations under the License.
 # ==================================================================================================
 
-from __future__ import print_function
-
-__author__ = 'John Sirois'
-
-from twitter.pants.tasks import Task
+import os
 
 from twitter.pants.base import BuildFile, Target
 from twitter.pants.base.build_environment import get_buildroot
 
-import os
+from .console_task import ConsoleTask
 
-class Filemap(Task):
+
+class Filemap(ConsoleTask):
   """Outputs a mapping from source file to the target that owns the source file."""
 
-  def __init__(self, context):
-    Task.__init__(self, context)
+  def console_output(self, _):
+    visited = set()
+    for target in self._find_targets():
+      if target not in visited:
+        visited.add(target)
+        if hasattr(target, 'sources') and target.sources is not None:
+          for sourcefile in target.sources:
+            path = os.path.join(target.target_base, sourcefile)
+            yield '%s %s' % (path, target.address)
 
-  def execute(self, expanded_target_addresses):
-    buildroot = get_buildroot()
+  def _find_targets(self):
     if len(self.context.target_roots) > 0:
       for target in self.context.target_roots:
-        self._execute_target(target, buildroot)
+        yield target
     else:
-      for buildfile in BuildFile.scan_buildfiles(buildroot):
+      for buildfile in BuildFile.scan_buildfiles(get_buildroot()):
         target_addresses = Target.get_all_addresses(buildfile)
         for target_address in target_addresses:
-          target = Target.get(target_address)
-          self._execute_target(target, buildroot)
-
-  def _execute_target(self, target, buildroot):
-    if hasattr(target, 'sources') and target.sources is not None:
-      for sourcefile in target.sources:
-        print(os.path.relpath(sourcefile, buildroot), target.address)
+          yield Target.get(target_address)

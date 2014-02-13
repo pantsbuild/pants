@@ -14,16 +14,14 @@
 # limitations under the License.
 # ==================================================================================================
 
-import os
-
-from twitter.pants.targets import JavaLibrary, JavaTests
 from twitter.pants.tasks.jvmdoc_gen import Jvmdoc, JvmdocGen
 
 
-def is_java(target):
-  return isinstance(target, JavaLibrary) or isinstance(target, JavaTests)
+javadoc = Jvmdoc(tool_name='javadoc', product_type='javadoc')
 
-javadoc = Jvmdoc(tool_name='javadoc')
+
+def is_java(target):
+  return target.has_sources('.java')
 
 
 class JavadocGen(JvmdocGen):
@@ -31,8 +29,8 @@ class JavadocGen(JvmdocGen):
   def setup_parser(cls, option_group, args, mkflag):
     cls.generate_setup_parser(option_group, args, mkflag, javadoc)
 
-  def __init__(self, context, output_dir=None, confs=None):
-    super(JavadocGen, self).__init__(context, javadoc, output_dir, confs)
+  def __init__(self, context, output_dir=None, confs=None, active=True):
+    super(JavadocGen, self).__init__(context, javadoc, output_dir, confs, active)
 
   def execute(self, targets):
     self.generate_execute(targets, is_java, create_javadoc_command)
