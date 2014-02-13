@@ -35,7 +35,6 @@ python_test_suite(name='all',
   dependencies=[
     pants(':utils'),
     pants('tests/python/twitter/pants/base'),
-    pants('tests/python/twitter/pants/buildtimestats'),
     pants('tests/python/twitter/pants/cache'),
     pants('tests/python/twitter/pants/commands'),
     pants('tests/python/twitter/pants/engine'),
