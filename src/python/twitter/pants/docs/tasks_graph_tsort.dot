@@ -1,0 +1,5 @@
+digraph G {
+  rankdir=RL;
+  node [shape=box];
+  specs -> junit -> checkstyle -> javac -> scalac -> ivy -> scrooge;
+}

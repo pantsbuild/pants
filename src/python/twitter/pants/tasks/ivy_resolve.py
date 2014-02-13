@@ -22,12 +22,12 @@ import shutil
 import time
 
 from twitter.common.dirutil import safe_mkdir
-
 from twitter.pants import binary_util
-from twitter.pants.tasks import TaskError
-from twitter.pants.tasks.cache_manager import VersionedTargetSet
-from twitter.pants.tasks.ivy_utils import IvyUtils
-from twitter.pants.tasks.nailgun_task import NailgunTask
+from twitter.pants.ivy import Bootstrapper
+from .cache_manager import VersionedTargetSet
+from .ivy_utils import IvyUtils
+from .nailgun_task import NailgunTask
+from . import TaskError
 
 
 class IvyResolve(NailgunTask):
@@ -60,9 +60,8 @@ class IvyResolve(NailgunTask):
     option_group.add_option(mkflag("outdir"), dest="ivy_resolve_outdir",
                             help="Emit ivy report outputs in to this directory.")
 
-    option_group.add_option(mkflag("cache"), dest="ivy_resolve_cache",
-                            help="Use this directory as the ivy cache, instead of the "
-                                 "default specified in pants.ini.")
+    option_group.add_option(mkflag("args"), dest="ivy_args", action="append", default=[],
+                            help = "Pass these extra args to ivy.")
 
     option_group.add_option(mkflag("mutable-pattern"), dest="ivy_mutable_pattern",
                             help="If specified, all artifact revisions matching this pattern will "
@@ -70,15 +69,15 @@ class IvyResolve(NailgunTask):
                                  "marks mutable as False.")
 
   def __init__(self, context, confs=None):
-    nailgun_dir = context.config.get('ivy-resolve', 'nailgun_dir')
-    NailgunTask.__init__(self, context, workdir=nailgun_dir)
+    super(IvyResolve, self).__init__(context)
+    work_dir = context.config.get('ivy-resolve', 'workdir')
 
-    self._cachedir = context.options.ivy_resolve_cache or context.config.get('ivy', 'cache_dir')
-    self._confs = confs or context.config.getlist('ivy-resolve', 'confs')
-    self._work_dir = context.config.get('ivy-resolve', 'workdir')
-    self._classpath_dir = os.path.join(self._work_dir, 'mapped')
+    self._ivy_bootstrapper = Bootstrapper.instance()
+    self._cachedir = self._ivy_bootstrapper.ivy_cache_dir
+    self._confs = confs or context.config.getlist('ivy-resolve', 'confs', default=['default'])
+    self._classpath_dir = os.path.join(work_dir, 'mapped')
 
-    self._outdir = context.options.ivy_resolve_outdir or os.path.join(self._work_dir, 'reports')
+    self._outdir = context.options.ivy_resolve_outdir or os.path.join(work_dir, 'reports')
     self._open = context.options.ivy_resolve_open
     self._report = self._open or context.options.ivy_resolve_report
 
@@ -102,6 +101,7 @@ class IvyResolve(NailgunTask):
     tuples of (conf, jar path).
     """
     groups = self.context.products.get_data('exclusives_groups')
+    executor = self.create_java_executor()
 
     # Below, need to take the code that actually execs ivy, and invoke it once for each
     # group. Then after running ivy, we need to take the resulting classpath, and load it into
@@ -115,7 +115,7 @@ class IvyResolve(NailgunTask):
     #   - the two groups that are in conflict (A and B).
     # In the latter case, we need to do the resolve twice: Once for A+X, and once for B+X,
     # because things in A and B can depend on things in X; and so they can indirectly depend
-    # on the dependencies of X. 
+    # on the dependencies of X.
     # (I think this well be covered by the computed transitive dependencies of
     # A and B. But before pushing this change, review this comment, and make sure that this is
     # working correctly.)
@@ -129,8 +129,9 @@ class IvyResolve(NailgunTask):
       # deprecate this eventually, but some people rely on it, and it's not clear to me right now
       # whether telling them to use IdeaGen instead is feasible.
       classpath = self.ivy_resolve(group_targets,
-                                   java_runner=self.runjava_indivisible,
-                                   symlink_ivyxml=True)
+                                   executor=executor,
+                                   symlink_ivyxml=True,
+                                   workunit_name='ivy-resolve')
       if self.context.products.is_required_data('ivy_jar_products'):
         self._populate_ivy_jar_products(group_targets)
       for conf in self._confs:
@@ -144,7 +145,8 @@ class IvyResolve(NailgunTask):
     if create_jardeps_for:
       genmap = self.context.products.get(self._ivy_utils._mapfor_typename())
       for target in filter(create_jardeps_for, targets):
-        self._ivy_utils.mapjars(genmap, target, java_runner=self.runjava_indivisible)
+        self._ivy_utils.mapjars(genmap, target, executor=executor,
+                                workunit_factory=self.context.new_workunit)
 
   def check_artifact_cache_for(self, invalidation_check):
     # Ivy resolution is an output dependent on the entire target set, and is not divisible
@@ -184,12 +186,16 @@ class IvyResolve(NailgunTask):
         print(no_deps_xml, file=report_handle)
 
     classpath = self._jvm_tool_bootstrapper.get_jvm_tool_classpath(self._ivy_bootstrap_key,
-                                                                   self.runjava_indivisible)
+                                                                   self.create_java_executor())
 
     reports = []
     org, name = self._ivy_utils.identify(targets)
     xsl = os.path.join(self._cachedir, 'ivy-report.xsl')
-    safe_mkdir(self._outdir, clean=True)
+
+    # Xalan needs this dir to exist - ensure that, but do no more - we have no clue where this
+    # points.
+    safe_mkdir(self._outdir, clean=False)
+
     for conf in self._confs:
       params = dict(org=org, name=name, conf=conf)
       xml = self._ivy_utils.xml_report_path(targets, conf)
@@ -197,8 +203,8 @@ class IvyResolve(NailgunTask):
         make_empty_report(xml, org, name, conf)
       out = os.path.join(self._outdir, '%(org)s-%(name)s-%(conf)s.html' % params)
       args = ['-IN', xml, '-XSL', xsl, '-OUT', out]
-      if 0 != self.runjava_indivisible('org.apache.xalan.xslt.Process', classpath=classpath,
-                                       args=args, workunit_name='report'):
+      if 0 != self.runjava(classpath=classpath, main='org.apache.xalan.xslt.Process',
+                           args=args, workunit_name='report'):
         raise TaskError
       reports.append(out)
 
@@ -209,4 +215,3 @@ class IvyResolve(NailgunTask):
 
     if self._open:
       binary_util.ui_open(*reports)
-

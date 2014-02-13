@@ -54,7 +54,7 @@ class Git(Scm):
 
   @property
   def tag_name(self):
-    tag = self._check_output(['describe', '--always'], raise_type=Scm.LocalException)
+    tag = self._check_output(['describe', '--tags', '--always'], raise_type=Scm.LocalException)
     return None if b'cannot' in tag else self._cleanse(tag)
 
   @property
@@ -95,6 +95,9 @@ class Git(Scm):
     self._check_call(['pull', '--ff-only', '--tags', remote, merge], raise_type=Scm.RemoteException)
 
   def tag(self, name, message=None):
+    # We use -a here instead of --annotate to maintain maximum git compatibility.
+    # --annotate was only introduced in 1.7.8 via:
+    #   https://github.com/git/git/commit/c97eff5a95d57a9561b7c7429e7fcc5d0e3a7f5d
     self._check_call(['tag', '-a', '--message=%s' % (message or ''), name],
                      raise_type=Scm.LocalException)
     self._push('refs/tags/%s' % name)

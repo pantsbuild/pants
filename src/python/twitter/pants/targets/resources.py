@@ -14,49 +14,39 @@
 # limitations under the License.
 # ==================================================================================================
 
-import os
+from twitter.pants.base import manual
 
-from collections import Sequence
-
-from twitter.pants.base import ParseContext, Target
-from twitter.pants.targets.with_sources import TargetWithSources
+from .internal import InternalTarget
+from .with_sources import TargetWithSources
 
 
-class Resources(TargetWithSources):
-  """Describes a set of resource files to be embedded in a library or binary."""
+@manual.builddict(tags=['jvm'])
+class Resources(InternalTarget, TargetWithSources):
+  """Describes a set of resource files to be embedded in a library or binary.
 
+  If your target compiles to the JVM (e.g., ``java_library``,
+  ``scala_library``, ``junit_tests``), you might have files
+  that you need to access as resources. Each of these targets has an optional
+  argument called ``resources`` that expects a list of target addresses that
+  resolve to targets whose type is resource.
 
-class WithLegacyResources(TargetWithSources):
-  """Collects resources whether they are specified using globs against an assumed parallel
-  'resources' directory or they are Resources targets
+  In the ``jar`` goal, the resource files are placed in the resulting `.jar`.
   """
-  def __init__(self, name, sources=None, resources=None, exclusives=None):
+
+  def __init__(self, name, sources, exclusives=None):
+    """
+    :param string name: The name of this target, which combined with this
+      build file defines the target :class:`twitter.pants.base.address.Address`.
+    :param sources: A list of filenames representing the resources
+      this library provides.
+    """
+    # TODO(John Sirois): XXX Review why this is an InternalTarget
+    InternalTarget.__init__(self, name, dependencies=None, exclusives=exclusives)
     TargetWithSources.__init__(self, name, sources=sources, exclusives=exclusives)
 
-    if resources is not None:
-      def is_resources(item):
-        if not isinstance(item, Target):
-          return False
-        concrete_targets = [t for t in item.resolve() if t.is_concrete]
-        return all(isinstance(t, Resources) for t in concrete_targets)
-
-      if is_resources(resources):
-        self.resources = list(self.resolve_all(resources, Resources))
-      elif isinstance(resources, Sequence) and all(map(is_resources, resources)):
-        self.resources = list(self.resolve_all(resources, Resources))
-      else:
-        # Handle parallel resource dir globs.
-        # For example, for a java_library target base of src/main/java:
-        #   src/main/java/com/twitter/base/BUILD
-        # We get:
-        #   sibling_resources_base = src/main/resources
-        #   base_relpath = com/twitter/base
-        #   resources_dir = src/main/resources/com/twitter/base
-        #
-        # TODO(John Sirois): migrate projects to Resources and remove support for old style assumed
-        # parallel resources dirs
-        sibling_resources_base = os.path.join(os.path.dirname(self.target_base), 'resources')
-        base_relpath = os.path.relpath(self.address.buildfile.relpath, self.target_base)
-        resources_dir = os.path.join(sibling_resources_base, base_relpath)
-        with ParseContext.temp(basedir=resources_dir):
-          self.resources = [Resources(name, resources)]
+  def has_sources(self, extension=None):
+    """``Resources`` never own sources of any particular native type, like for example
+    ``JavaLibrary``.
+    """
+    # TODO(John Sirois): track down the reason for this hack and kill or explain better.
+    return extension is None

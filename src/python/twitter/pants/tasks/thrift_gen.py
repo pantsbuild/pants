@@ -10,9 +10,10 @@
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the
+# See the License for the specific language governing permissions and
 # limitations under the License.
 # ==================================================================================================
+
 import errno
 import os
 import re
@@ -177,7 +178,7 @@ class ThriftGen(CodeGen):
         else:
           _copytree(session.outdir, self.combined_dir)
     if result != 0:
-      raise TaskError('thrift compile failed with exit code %d' % result)
+      raise TaskError('%s ... exited non-zero (%i)' % (self.thrift_binary, result))
 
   def createtarget(self, lang, gentarget, dependees):
     if lang == 'java':
@@ -192,9 +193,10 @@ class ThriftGen(CodeGen):
        return self.context.add_new_target(os.path.join(self.combined_dir, 'gen-java'),
                                           JavaLibrary,
                                           name=target.id,
-                                          provides=target.provides,
                                           sources=files,
-                                          dependencies=deps)
+                                          provides=target.provides,
+                                          dependencies=deps,
+                                          excludes=target.excludes)
     return self._inject_target(target, dependees, self.gen_java, 'java', create_target)
 
   def _create_python_target(self, target, dependees):
@@ -216,7 +218,6 @@ class ThriftGen(CodeGen):
     deps = geninfo.deps['service' if has_service else 'structs']
     tgt = create_target(files, deps)
     tgt.id = target.id + '.thrift_gen'
-    tgt.add_labels('synthetic')
     for dependee in dependees:
       if isinstance(dependee, InternalTarget):
         dependee.update_dependencies((tgt,))

@@ -14,9 +14,7 @@
 # limitations under the License.
 # =================================================================================================
 
-from __future__ import print_function
-
-from twitter.common.dirutil import Fileset
+from twitter.pants.goal import Goal, Group, Phase
 
 from twitter.pants.targets import Pants
 from twitter.pants.base import Config
@@ -28,11 +26,8 @@ goal = Goal
 group = Group
 phase = Phase
 
-# TODO(John Sirois): Update to dynamic linking when http://jira.local.twitter.com/browse/AWESOME-243
-# is avaiable.
-# bind twitter-specific idl helper
-from twitter.pants.tasks.extract import Extract
-compiled_idl = Extract.compiled_idl
-
 from twitter.pants.base.build_file_aliases import *
 from twitter.pants.base.build_file_helpers import *
+
+# TODO(John Sirois): XXX kill
+from twitter.pants.base.build_environment import *

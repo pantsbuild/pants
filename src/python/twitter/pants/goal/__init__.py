@@ -14,11 +14,11 @@
 # limitations under the License.
 # ==================================================================================================
 
-__author__ = 'John Sirois'
-
 import inspect
+
 from optparse import OptionGroup
 
+from twitter.pants.base.build_manual import manual
 from twitter.pants.tasks import Task
 
 
@@ -53,6 +53,7 @@ class Mkflag(object):
     setattr(parser.values, option.dest, not opt_str.startswith("--no"))
 
 
+@manual.builddict()
 class Goal(object):
   def __init__(self, name, action, group=None, dependencies=None, serialize=True):
     """Parameters:
@@ -110,10 +111,15 @@ class Goal(object):
       return self.name if phase_leader else '%s%s%s' % (phase.name, sep, self.name)
     mkflag = Mkflag(namespace)
 
-    group = OptionGroup(parser, title = namespace(':'))
+    option_group = OptionGroup(parser, title=namespace(':'))
+    self.task_setup_parser(option_group, args, mkflag)
+    if option_group.option_list:
+      parser.add_option_group(option_group)
+
+  def task_setup_parser(self, group, args, mkflag):
+    """Allows a task to setup a parser.
+    Override this method if you want to initialize the task with more goal data."""
     self._task.setup_parser(group, args, mkflag)
-    if group.option_list:
-      parser.add_option_group(group)
 
   def prepare(self, context):
     """Prepares a Task that can be executed to achieve this goal."""
