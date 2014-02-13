@@ -33,8 +33,7 @@ from twitter.pants.targets import (
     JavaLibrary,
     JavaThriftLibrary,
     Resources,
-    ScalaLibrary,
-    ThriftLibrary)
+    ScalaLibrary)
 from twitter.pants.tasks.jar_create import is_jvm_library, JarCreate
 
 
@@ -123,10 +122,6 @@ class JarCreateExecuteTest(JarCreateTestBase):
     return cls.library(path, 'java_thrift_library', name, sources)
 
   @classmethod
-  def thrift_library(cls, path, name, *sources):
-    return cls.library(path, 'thrift_library', name, sources)
-
-  @classmethod
   def setUpClass(cls):
     super(JarCreateExecuteTest, cls).setUpClass()
 
@@ -137,14 +132,12 @@ class JarCreateExecuteTest(JarCreateTestBase):
     SourceRoot.register(get_source_root_fs_path('src/java'), JavaLibrary)
     SourceRoot.register(get_source_root_fs_path('src/scala'), ScalaLibrary)
     SourceRoot.register(get_source_root_fs_path('src/thrift'), JavaThriftLibrary)
-    SourceRoot.register(get_source_root_fs_path('src/idl'), ThriftLibrary)
 
     cls.res = cls.resources('src/resources/com/twitter', 'spam', 'r.txt')
     cls.jl = cls.java_library('src/java/com/twitter', 'foo', ['a.java'],
                               resources='src/resources/com/twitter:spam')
     cls.sl = cls.scala_library('src/scala/com/twitter', 'bar', ['c.scala'])
     cls.jtl = cls.java_thrift_library('src/thrift/com/twitter', 'baz', 'd.thrift')
-    cls.tl = cls.thrift_library('src/idl/com/twitter', 'bip', 'e.thrift')
 
   def setUp(self):
     super(JarCreateExecuteTest, self).setUp()
@@ -158,7 +151,7 @@ class JarCreateExecuteTest(JarCreateTestBase):
     opts = dict(jar_create_outdir=self.jar_outdir)
     opts.update(**options)
     return create_context(config=config, options=self.create_options(**opts),
-                          target_roots=[self.jl, self.sl, self.jtl, self.tl])
+                          target_roots=[self.jl, self.sl, self.jtl])
 
   @contextmanager
   def add_products(self, context, product_type, target, *products):
@@ -218,28 +211,6 @@ class JarCreateExecuteTest(JarCreateTestBase):
 
   def test_classfile_jar_not_required(self):
     self.assert_classfile_jar_contents(self.context(), empty=True)
-
-  def assert_idl_jar_contents(self, context, empty=False):
-    JarCreate(context).execute(context.targets())
-
-    if empty:
-      self.assertTrue(context.products.get('idl_jars').empty())
-    else:
-      self.assert_jar_contents(context, 'idl_jars', self.jtl,
-                               'com/', 'com/twitter/', 'com/twitter/d.thrift')
-      self.assert_jar_contents(context, 'idl_jars', self.tl,
-                               'com/', 'com/twitter/', 'com/twitter/e.thrift')
-
-  def test_idl_jar_required(self):
-    context = self.context()
-    context.products.require('idl_jars')
-    self.assert_idl_jar_contents(context)
-
-  def test_idl_jar_flagged(self):
-    self.assert_idl_jar_contents(self.context(jar_create_idl=True))
-
-  def test_idl_jar_not_required(self):
-    self.assert_idl_jar_contents(self.context(), empty=True)
 
   def assert_source_jar_contents(self, context, empty=False):
     JarCreate(context).execute(context.targets())

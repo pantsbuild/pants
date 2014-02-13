@@ -19,13 +19,13 @@ from twitter.common.collections import maybe_list
 from twitter.pants.base import manual, Target, TargetDefinitionException
 
 from .exportable_jvm_library import ExportableJvmLibrary
-from .resources import Resources
+from .resources import WithResources
 
 from . import JavaLibrary
 
 
 @manual.builddict(tags=['scala'])
-class ScalaLibrary(ExportableJvmLibrary):
+class ScalaLibrary(ExportableJvmLibrary, WithResources):
   """A collection of Scala code.
 
   Normally has conceptually-related sources; invoking the ``compile`` goal
@@ -66,7 +66,6 @@ class ScalaLibrary(ExportableJvmLibrary):
       targets containing resources that belong on this library's classpath.
     :param exclusives: An optional list of exclusives tags.
     """
-
     super(ScalaLibrary, self).__init__(
         name,
         sources,
@@ -78,7 +77,7 @@ class ScalaLibrary(ExportableJvmLibrary):
     if (sources is None) and (resources is None):
       raise TargetDefinitionException(self, 'Must specify sources and/or resources.')
 
-    self.resources = list(self.resolve_all(resources, Resources))
+    self.resources = resources
 
     # Defer resolves until done parsing the current BUILD file, certain source_root arrangements
     # might allow java and scala sources to co-mingle and so have targets in the same BUILD.

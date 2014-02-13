@@ -17,11 +17,11 @@
 from twitter.pants.base import manual
 
 from .jvm_target import JvmTarget
-from .resources import Resources
+from .resources import WithResources
 
 
 @manual.builddict(tags=['jvm'])
-class JavaTests(JvmTarget):
+class JavaTests(JvmTarget, WithResources):
   """Tests JVM sources with JUnit."""
 
   def __init__(self,
@@ -49,10 +49,9 @@ class JavaTests(JvmTarget):
      file resources to place in this module's jar.
    :param exclusives: An optional map of exclusives tags. See CheckExclusives for details.
    """
-
     super(JavaTests, self).__init__(name, sources, dependencies, excludes, exclusives=exclusives)
 
-    self.resources = list(self.resolve_all(resources, Resources))
+    self.resources = resources
 
     # TODO(John Sirois): These could be scala, clojure, etc.  'jvm' and 'tests' are the only truly
     # applicable labels - fixup the 'java' misnomer.

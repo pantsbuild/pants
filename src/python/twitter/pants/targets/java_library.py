@@ -17,11 +17,11 @@
 from twitter.pants.base import manual, TargetDefinitionException
 
 from .exportable_jvm_library import ExportableJvmLibrary
-from .resources import Resources
+from .resources import WithResources
 
 
 @manual.builddict(tags=['java'])
-class JavaLibrary(ExportableJvmLibrary):
+class JavaLibrary(ExportableJvmLibrary, WithResources):
   """A collection of Java code.
 
   Normally has conceptually-related sources; invoking the ``compile`` goal
@@ -70,5 +70,5 @@ class JavaLibrary(ExportableJvmLibrary):
     if (sources is None) and (resources is None):
       raise TargetDefinitionException(self, 'Must specify sources and/or resources.')
 
-    self.resources = list(self.resolve_all(resources, Resources))
+    self.resources = resources
     self.add_labels('java')

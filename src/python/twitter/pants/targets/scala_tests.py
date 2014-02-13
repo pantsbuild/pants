@@ -17,11 +17,11 @@
 from twitter.pants.base import manual
 
 from .jvm_target import JvmTarget
-from .resources import Resources
+from .resources import WithResources
 
 
 @manual.builddict(tags=['scala'])
-class ScalaTests(JvmTarget):
+class ScalaTests(JvmTarget, WithResources):
   """Tests a Scala library."""
 
   def __init__(self,
@@ -54,12 +54,11 @@ class ScalaTests(JvmTarget):
     :param resources: An optional list of Resources that should be in this target's classpath.
     :param exclusives: An optional map of exclusives tags. See CheckExclusives for details.
     """
-
     super(ScalaTests, self).__init__(name, sources, dependencies, excludes, exclusives=exclusives)
 
     # TODO(John Sirois): Merge handling with ScalaLibrary.java_sources - which is different and
     # likely more correct.
     self.java_sources = java_sources
 
-    self.resources = list(self.resolve_all(resources, Resources))
+    self.resources = resources
     self.add_labels('scala', 'tests')

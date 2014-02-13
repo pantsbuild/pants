@@ -65,6 +65,7 @@ class ReverseDepmapTest(BaseReverseDepmapTest, mox.MoxTestBase):
     create_target('overlaps', 'three', deps=['common/a', 'overlaps:one'])
     create_target('overlaps', 'four', alias=True, deps=['common/b'])
     create_target('overlaps', 'five', deps=['overlaps:four'])
+
     cls.create_target('resources/a', dedent('''
       resources(
         name='a_resources',
@@ -81,25 +82,44 @@ class ReverseDepmapTest(BaseReverseDepmapTest, mox.MoxTestBase):
 
     #Compile idl tests
     cls.create_target('src/thrift/example', dedent('''
-      thrift_library(name='mybird', sources=None)
+      java_thrift_library(
+        name='mybird',
+        compiler='scrooge',
+        language='scala',
+        sources=['1.thrift']
+      )
       '''))
 
     cls.create_target('src/thrift/example', dedent('''
-      compiled_idl(name='compiled_scala', idl_deps=[pants(':mybird')])
+      jar_library(
+        name='compiled_scala',
+        dependencies=[
+          pants(':mybird')
+        ]
+      )
       '''))
 
     create_target('src/thrift/dependent', 'my-example', deps=['src/thrift/example:mybird'])
 
     #External Dependency tests
     cls.create_target('src/java/example', dedent('''
-      java_library(name='mybird', sources=['1.java'],
-                   dependencies=[jar(org='com', name='twitter')])
+      java_library(
+        name='mybird',
+        dependencies=[
+          jar(org='com', name='twitter')
+        ],
+        sources=['1.java'],
+      )
       '''))
 
     cls.create_target('src/java/example', dedent('''
-      java_library(name='example2', 
-                   dependencies=[pants(':mybird')],
-                   sources=['2.java'])
+      java_library(
+        name='example2',
+        dependencies=[
+          pants(':mybird')
+        ],
+        sources=['2.java']
+      )
       '''))
 
   def test_roots(self):
@@ -189,7 +209,7 @@ class ReverseDepmapTest(BaseReverseDepmapTest, mox.MoxTestBase):
       'src/java/example/BUILD:example2',
        targets=[self.target('src/java/example/BUILD:mybird')]
     )
- 
+
   def test_resources_dependees(self):
     self.assert_console_output(
       'src/java/a/BUILD:a_java',

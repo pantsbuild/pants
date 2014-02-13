@@ -50,3 +50,20 @@ class Resources(InternalTarget, TargetWithSources):
     """
     # TODO(John Sirois): track down the reason for this hack and kill or explain better.
     return extension is None
+
+
+class WithResources(InternalTarget):
+  """A mixin for internal targets that have resources."""
+
+  def __init__(self, *args, **kwargs):
+    super(WithResources, self).__init__(*args, **kwargs)
+    self._resources = []
+
+  @property
+  def resources(self):
+    return self._resources
+
+  @resources.setter
+  def resources(self, resources):
+    self._resources = list(self.resolve_all(resources, Resources))
+    self.update_dependencies(self.resources)

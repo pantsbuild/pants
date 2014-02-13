@@ -14,13 +14,14 @@
 # limitations under the License.
 # ==================================================================================================
 
-from .jvm_target import JvmTarget
-from .resources import Resources
 from twitter.pants.base.build_manual import manual
+
+from .jvm_target import JvmTarget
+from .resources import WithResources
 
 
 @manual.builddict(tags=["jvm"])
-class Benchmark(JvmTarget):
+class Benchmark(JvmTarget, WithResources):
   """A caliper benchmark.
 
   Run it with the ``bench`` goal.
@@ -28,11 +29,12 @@ class Benchmark(JvmTarget):
 
   def __init__(self,
                name,
-               sources = None,
-               java_sources = None,
-               dependencies = None,
-               excludes = None,
-               resources = None):
+               sources=None,
+               java_sources=None,
+               dependencies=None,
+               excludes=None,
+               resources=None,
+               exclusives=None):
     """
     :param string name: The name of this target, which combined with this
       build file defines the target :class:`twitter.pants.base.address.Address`.
@@ -50,13 +52,9 @@ class Benchmark(JvmTarget):
       to filter this target's transitive dependencies against.
     :param resources: An optional list of ``resources`` targets containing text
       file resources to place in this module's jar.
+    :param exclusives: An optional map of exclusives tags. See CheckExclusives for details.
     """
-
-    JvmTarget.__init__(self,
-                       name,
-                       sources,
-                       dependencies,
-                       excludes)
+    super(Benchmark, self).__init__(name, sources, dependencies, excludes, exclusives=exclusives)
 
     self.java_sources = java_sources
-    self.resources = list(self.resolve_all(resources, Resources))
+    self.resources = resources

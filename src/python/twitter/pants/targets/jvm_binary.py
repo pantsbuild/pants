@@ -29,11 +29,11 @@ from twitter.pants.targets import util
 from .internal import InternalTarget
 from .jvm_target import JvmTarget
 from .pants_target import Pants
-from .resources import Resources
+from .resources import WithResources
 
 
 @manual.builddict(tags=["jvm"])
-class JvmBinary(JvmTarget):
+class JvmBinary(JvmTarget, WithResources):
   """Produces a JVM binary optionally identifying a launcher main class.
 
   Below are a summary of how key goals affect targets of this type:
@@ -78,13 +78,12 @@ class JvmBinary(JvmTarget):
       This parameter is not intended for general use.
     :type configurations: tuple of strings
     """
-    JvmTarget.__init__(self,
-                       name=name,
-                       sources=[source] if source else None,
-                       dependencies=dependencies,
-                       excludes=excludes,
-                       configurations=configurations,
-                       exclusives=exclusives)
+    super(JvmBinary, self).__init__(name=name,
+                                    sources=[source] if source else None,
+                                    dependencies=dependencies,
+                                    excludes=excludes,
+                                    configurations=configurations,
+                                    exclusives=exclusives)
 
     if main and not isinstance(main, Compatibility.string):
       raise TargetDefinitionException(self, 'main must be a fully qualified classname')
@@ -94,7 +93,7 @@ class JvmBinary(JvmTarget):
 
     self.main = main
     self.basename = basename or name
-    self.resources = list(self.resolve_all(resources, Resources))
+    self.resources = resources
     self.deploy_excludes = deploy_excludes or []
 
 
