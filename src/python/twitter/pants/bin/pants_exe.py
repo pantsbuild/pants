@@ -23,9 +23,9 @@ import traceback
 
 from twitter.common.dirutil import Lock
 
+from twitter.common.process import ProcessProviderFactory
 from twitter.pants.base.build_environment import get_buildroot, get_version
-from twitter.pants.base.address import Address
-from twitter.pants.base.config import Config
+from twitter.pants.base import Address, Config
 from twitter.pants.base.rcfile import RcFile
 from twitter.pants.commands import Command
 from twitter.pants.goal import RunTracker
@@ -105,23 +105,14 @@ def _parse_command(root_dir, args):
   return Command.get_command(command), args
 
 
-try:
-  import psutil
-
-  def _process_info(pid):
-    process = psutil.Process(pid)
-    return '%d (%s)' % (pid, ' '.join(process.cmdline))
-except ImportError:
-  def _process_info(pid):
-    return '%d' % pid
-
+def _process_info(pid):
+  ps = ProcessProviderFactory.get()
+  ps.collect_set([pid])
+  handle = ps.get_handle(pid)
+  cmdline = handle.cmdline()
+  return '%d (%s)' % (pid, cmdline)
 
 def _run():
-  """
-  To add additional paths to sys.path, add a block to the config similar to the following:
-  [main]
-  roots: ['src/python/twitter/pants_internal/test/',]
-  """
   version = get_version()
   if len(sys.argv) == 2 and sys.argv[1] == _VERSION_OPTION:
     _do_exit(version)
@@ -144,13 +135,7 @@ def _run():
                     help = 'Log an exit message on success or failure.')
 
   config = Config.load()
-
-  # TODO: This can be replaced once extensions are enabled with
-  # https://github.com/pantsbuild/pants/issues/5
-  roots = config.getlist('parse', 'roots', default=[])
-  sys.path.extend(roots)
-
-  run_tracker = RunTracker.from_config(config)
+  run_tracker = RunTracker(config)
   report = initial_reporting(config, run_tracker)
   run_tracker.start(report)
 

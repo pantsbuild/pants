@@ -12,10 +12,10 @@ from twitter.common.process import ProcessProviderFactory
 from twitter.common.process.process_provider import ProcessProvider
 
 from twitter.pants.base.build_environment import get_buildroot
-from twitter.pants.java.distribution.distribution import Distribution
 from twitter.pants.targets.sources import SourceRoot
 from twitter.pants.base import ParseContext
 from twitter.pants.base.target import Target
+from twitter.pants.binary_util import find_all_java_sysprops
 from twitter.pants.goal.products import Products
 from twitter.pants.base.workunit import WorkUnit
 from twitter.pants.reporting.report import Report
@@ -49,30 +49,19 @@ class Context(object):
     def __init__(self, run_tracker):
       self._run_tracker = run_tracker
 
-    def debug(self, *msg_elements):
-      self._run_tracker.log(Report.DEBUG, *msg_elements)
-
-    def info(self, *msg_elements):
-      self._run_tracker.log(Report.INFO, *msg_elements)
-
-    def warn(self, *msg_elements):
-      self._run_tracker.log(Report.WARN, *msg_elements)
-
-    def error(self, *msg_elements):
-      self._run_tracker.log(Report.ERROR, *msg_elements)
-
-    def fatal(self, *msg_elements):
-      self._run_tracker.log(Report.FATAL, *msg_elements)
+    def debug(self, *msg_elements): self._run_tracker.log(Report.DEBUG, *msg_elements)
+    def info(self, *msg_elements): self._run_tracker.log(Report.INFO, *msg_elements)
+    def warn(self, *msg_elements): self._run_tracker.log(Report.WARN, *msg_elements)
+    def error(self, *msg_elements): self._run_tracker.log(Report.ERROR, *msg_elements)
+    def fatal(self, *msg_elements): self._run_tracker.log(Report.FATAL, *msg_elements)
 
   def __init__(self, config, options, run_tracker, target_roots, requested_goals=None,
-               lock=None, log=None, target_base=None):
+               lock=None, log=None):
     self._config = config
     self._options = options
     self.run_tracker = run_tracker
     self._lock = lock or Lock.unlocked()
     self._log = log or Context.Log(run_tracker)
-    self._target_base = target_base or Target
-
     self._state = {}
     self._products = Products()
     self._buildroot = get_buildroot()
@@ -124,8 +113,7 @@ class Context(object):
     # cmd-line flag or .pantsrc, or we infer one from java.home but verify that the java.version
     # is a supported version.
     if self._java_sysprops is None:
-      # TODO(John Sirois): Plumb a sane default distribution through 1 point of control
-      self._java_sysprops = Distribution.cached().system_properties
+      self._java_sysprops = find_all_java_sysprops()
     return self._java_sysprops
 
   @property
@@ -172,7 +160,7 @@ class Context(object):
     return self.run_tracker.background_worker_pool()
 
   @contextmanager
-  def new_workunit(self, name, labels=None, cmd=''):
+  def new_workunit(self, name, labels=list(), cmd=''):
     """Create a new workunit under the calling thread's current workunit."""
     with self.run_tracker.new_workunit(name=name, labels=labels, cmd=cmd) as workunit:
       yield workunit
@@ -220,7 +208,7 @@ class Context(object):
     The target is not added to the target roots.
     """
     def add_targets(tgt):
-      self._targets.update(tgt for tgt in tgt.resolve() if isinstance(tgt, self._target_base))
+      self._targets.update(tgt for tgt in tgt.resolve() if isinstance(tgt, Target))
     target.walk(add_targets)
 
   def add_new_target(self, target_base, target_type, *args, **kwargs):

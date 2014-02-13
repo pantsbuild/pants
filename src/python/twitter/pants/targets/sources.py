@@ -16,15 +16,11 @@
 
 import os
 
-from twitter.common.collections import OrderedSet
-
+from functools import partial
+from twitter.pants.base import ParseContext, TargetDefinitionException
 from twitter.pants.base.build_environment import get_buildroot
-from twitter.pants.base.build_manual import manual
-from twitter.pants.base.parse_context import ParseContext
-from twitter.pants.base.target import TargetDefinitionException
 
 
-@manual.builddict()
 class SourceRoot(object):
   """Allows registration of a source root for a set of targets.
 
@@ -32,91 +28,71 @@ class SourceRoot(object):
   Generally compilers or interpreters for the source will expect sources relative to a base path
   and a source root allows calculation of the correct relative paths.
 
-  E.g., a Java compiler probably expects to find ``.java`` files for
-  ``package com.twitter.common.net`` in ``*something*/com/twitter/common/net``.
-  The ``source_root`` command specifies that *something*.
-
   It is illegal to have nested source roots.
   """
-  _ROOTS_BY_TYPE = {}
-  _TYPES_BY_ROOT = {}
+  _ROOTS = set()  # Paths relative to buildroot.
+  _ALLOWED_TARGET_TYPES = {}  # basedir -> list of target types.
   _SEARCHED = set()
 
-  @classmethod
-  def reset(cls):
-    """Reset all source roots to empty. Only intended for testing."""
-    cls._ROOTS_BY_TYPE = {}
-    cls._TYPES_BY_ROOT = {}
-    cls._SEARCHED = set()
-
-  @classmethod
-  def find(cls, target):
+  @staticmethod
+  def find(target):
     """Finds the source root for the given target.
 
     If none is registered, returns the parent directory of the target's BUILD file.
     """
     target_path = os.path.relpath(target.address.buildfile.parent_path, get_buildroot())
-
     def _find():
-      for root_dir, types in cls._TYPES_BY_ROOT.items():
-        if target_path.startswith(root_dir):  # The only candidate root for this target.
+      for root in SourceRoot._ROOTS:
+        if target_path.startswith(root):  # The only candidate root for this target.
           # Validate the target type, if restrictions were specified.
-          if types and not isinstance(target, tuple(types)):
+          if root in SourceRoot._ALLOWED_TARGET_TYPES and not \
+             any(map(lambda t: isinstance(target, t), SourceRoot._ALLOWED_TARGET_TYPES[root])):
             # TODO: Find a way to use the BUILD file aliases in the error message, instead
             # of target.__class__.__name__. E.g., java_tests instead of JavaTests.
             raise TargetDefinitionException(target,
-                'Target type %s not allowed under %s' % (target.__class__.__name__, root))
-          return root_dir
+              'Target type %s not allowed under %s' % (target.__class__.__name__, root))
+          return root
       return None
 
-    # Try already registered roots
     root = _find()
     if root:
       return root
 
     # Fall back to searching the ancestor path for a root.
-    # TODO(John Sirois): We currently allow for organic growth of maven multi-module layout style
-    # projects (for example) and do not require a global up-front registration of all source roots
-    # and instead do lazy resolution here.  This allows for parse cycles that lead to surprising
-    # runtime errors.  Re-consider allowing lazy source roots at all.
+    # TODO(benjy): Seems like an odd way to trigger evaluation of the repo layout
+    # stanzas in the root-level BUILD file. Should that be eval'd up front?
     for buildfile in reversed(target.address.buildfile.ancestors()):
-      if buildfile not in cls._SEARCHED:
+      if buildfile not in SourceRoot._SEARCHED:
         ParseContext(buildfile).parse()
-        cls._SEARCHED.add(buildfile)
+        SourceRoot._SEARCHED.add(buildfile)
         root = _find()
         if root:
           return root
 
-    # Finally, resolve files relative to the BUILD file parent dir as the target base
+    # Fall back to the BUILD file's directory.
     return target_path
 
-  @classmethod
-  def types(cls, root):
-    """Returns the set of target types rooted at root."""
-    return cls._TYPES_BY_ROOT[root]
-
-  @classmethod
-  def roots(cls, target_type):
-    """Returns the set of roots for given target type."""
-    return cls._ROOTS_BY_TYPE[target_type]
-
-  @classmethod
-  def all_roots(cls):
-    """Returns a mapping from source roots to the associated target types."""
-    return dict(cls._TYPES_BY_ROOT)
-
-  @classmethod
-  def register(cls, basedir, *allowed_target_types):
+  @staticmethod
+  def register(basedir, *allowed_target_types):
     """Registers the given basedir (relative to the buildroot) as a source root.
 
-    :param string basedir: The base directory to resolve sources relative to.
-    :param list allowed_target_types: Optional list of target types. If specified, we enforce that
-      only targets of those types appear under this source root.
+    :allowed_target_types Optional list of target types. If specified, we enforce that
+                          only targets of those types appear under this source root.
     """
-    cls._register(basedir, *allowed_target_types)
+    SourceRoot._register(basedir, *allowed_target_types)
 
-  @classmethod
-  def _register(cls, source_root_dir, *allowed_target_types):
+  @staticmethod
+  def lazy_rel_source_root(build_file_dir):
+    """Captures the directory of the BUILD file that calls it."""
+    return partial(SourceRoot._register_relative_to_build_file, build_file_dir)
+
+  @staticmethod
+  def _register_relative_to_build_file(build_file_dir, rel_source_root_dir, *allowed_target_types):
+    source_root_dir = os.path.relpath(os.path.join(build_file_dir, rel_source_root_dir), get_buildroot())
+    SourceRoot._register(source_root_dir, *allowed_target_types)
+
+  @staticmethod
+  def _register(source_root_dir, *allowed_target_types):
     """Registers a source root.
 
     :source_root_dir The source root directory against which we resolve source paths,
@@ -126,23 +102,11 @@ class SourceRoot(object):
     """
     # Verify that source_root_dir doesn't reach outside buildroot.
     buildroot = get_buildroot()
-    if source_root_dir.startswith(buildroot):
-      abspath = os.path.normpath(source_root_dir)
-    else:
-      abspath = os.path.normpath(os.path.join(buildroot, source_root_dir))
-    if not abspath.startswith(buildroot):
-      raise ValueError('Source root %s is not under the build root %s' % (abspath, buildroot))
-    source_root_dir = os.path.relpath(abspath, buildroot)
+    normpath = os.path.normpath(os.path.join(buildroot, source_root_dir))
+    if not normpath.startswith(buildroot):
+      raise ValueError('Source root %s is not under the build root %s' % (normpath, buildroot))
 
-    types = cls._TYPES_BY_ROOT.get(source_root_dir)
-    if types is None:
-      types = OrderedSet()
-      cls._TYPES_BY_ROOT[source_root_dir] = types
+    SourceRoot._ROOTS.add(source_root_dir)
+    if allowed_target_types:
+      SourceRoot._ALLOWED_TARGET_TYPES[source_root_dir] = allowed_target_types
 
-    for allowed_target_type in allowed_target_types:
-      types.add(allowed_target_type)
-      roots = cls._ROOTS_BY_TYPE.get(allowed_target_type)
-      if roots is None:
-        roots = OrderedSet()
-        cls._ROOTS_BY_TYPE[allowed_target_type] = roots
-      roots.add(source_root_dir)

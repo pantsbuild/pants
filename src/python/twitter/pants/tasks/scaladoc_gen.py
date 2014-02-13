@@ -14,14 +14,11 @@
 # limitations under the License.
 # ==================================================================================================
 
+import os
+
 from twitter.pants.tasks.jvmdoc_gen import Jvmdoc, JvmdocGen
 
-
-scaladoc = Jvmdoc(tool_name='scaladoc', product_type='scaladoc')
-
-
-def is_scala(target):
-  return target.has_sources('.scala')
+scaladoc = Jvmdoc(tool_name='scaladoc')
 
 
 class ScaladocGen(JvmdocGen):
@@ -29,8 +26,8 @@ class ScaladocGen(JvmdocGen):
   def setup_parser(cls, option_group, args, mkflag):
     cls.generate_setup_parser(option_group, args, mkflag, scaladoc)
 
-  def __init__(self, context, output_dir=None, confs=None, active=True):
-    super(ScaladocGen, self).__init__(context, scaladoc, output_dir, confs, active)
+  def __init__(self, context, output_dir=None, confs=None):
+    super(ScaladocGen, self).__init__(context, scaladoc, output_dir, confs)
 
   def execute(self, targets):
     self.generate_execute(targets, lambda t: t.is_scala, create_scaladoc_command)

@@ -23,15 +23,11 @@ from twitter.common.dirutil import safe_mkdir, safe_open
 from twitter.pants import binary_util, get_buildroot
 from twitter.pants.targets import JavaTests as junit_tests
 from twitter.pants.base.workunit import WorkUnit
-from twitter.pants.java.util import execute_java
-from .jvm_task import JvmTask
-
-from . import TaskError
+from twitter.pants.tasks import Task, TaskError
+from twitter.pants.tasks.jvm_task import JvmTask
 
 
 class JUnitRun(JvmTask):
-  _MAIN = 'com.twitter.common.junit.runner.ConsoleRunner'
-
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
     option_group.add_option(mkflag('skip'), mkflag('skip', negate=True), dest = 'junit_run_skip',
@@ -52,8 +48,8 @@ class JUnitRun(JvmTask):
                             help = '[ALL] Runs at most this many tests in a single test process.')
 
     # TODO: Rename flag to jvm-options.
-    option_group.add_option(mkflag('jvmargs'), dest = 'junit_run_jvmargs', action='append',
-                            help = 'Runs junit tests in a jvm with these extra jvm args.')
+    option_group.add_option(mkflag('jvmargs'), dest = 'junit_run_jvm_options', action='append',
+                            help = 'Runs junit tests in a jvm with these extra jvm options.')
 
     option_group.add_option(mkflag('test'), dest = 'junit_run_tests', action='append',
                             help = '[%default] Force running of just these tests.  Tests can be '
@@ -86,10 +82,6 @@ class JUnitRun(JvmTask):
     option_group.add_option(mkflag('parallel-threads'), type = 'int', default=0,
                             dest = 'junit_run_parallel_threads',
                             help = 'Number of threads to run tests in parallel. 0 for autoset.')
-
-    option_group.add_option(mkflag("test-shard"), dest = "junit_run_test_shard",
-                            help = "Subset of tests to run, in the form M/N, 0 <= M < N."
-                                   "For example, 1/3 means run tests number 2, 5, 8, 11, ...")
 
     option_group.add_option(mkflag('coverage'), mkflag('coverage', negate=True),
                             dest = 'junit_run_coverage',
@@ -142,13 +134,9 @@ class JUnitRun(JvmTask):
                             help = '[%%default] Redirects test output to files in %s.  '
                                    'Implied by %s' % (outdir, xmlreport))
 
-    option_group.add_option(mkflag("arg"), dest="junit_run_arg",
-                            action="append",
-                            help = "An arbitrary argument to pass directly to the test runner. "
-                                   "This option can be specified multiple times.")
 
   def __init__(self, context):
-    super(JUnitRun, self).__init__(context)
+    Task.__init__(self, context)
 
     context.products.require_data('exclusives_groups')
 
@@ -162,11 +150,11 @@ class JUnitRun(JvmTask):
     emma_bootstrap_tools = context.config.getlist('junit-run', 'emma-bootstrap-tools', default=[':emma'])
     self._jvm_tool_bootstrapper.register_jvm_tool(self._emma_bootstrap_key, emma_bootstrap_tools)
 
-    self.jvm_args = context.config.getlist('junit-run', 'jvm_args', default=[])
-    if context.options.junit_run_jvmargs:
-      self.jvm_args.extend(context.options.junit_run_jvmargs)
+    self.jvm_options = context.config.getlist('junit-run', 'args', default=[])
+    if context.options.junit_run_jvm_options:
+      self.jvm_options.extend(context.options.junit_run_jvm_options)
     if context.options.junit_run_debug:
-      self.jvm_args.extend(context.config.getlist('jvm', 'debug_args'))
+      self.jvm_options.extend(context.config.getlist('jvm', 'debug_args'))
 
     # List of FQCN, FQCN#method, sourcefile or sourcefile#method.
     self.tests_to_run = context.options.junit_run_tests
@@ -202,29 +190,22 @@ class JUnitRun(JvmTask):
     self.coverage = self.coverage or self.coverage_report_html_open
     self.coverage_html_file = os.path.join(self.coverage_dir, 'html', 'index.html')
 
-    self.opts = []
+    self._args = []
     if context.options.junit_run_xmlreport or context.options.junit_run_suppress_output:
       if self.fail_fast:
-        self.opts.append('-fail-fast')
+        self._args.append('-fail-fast')
       if context.options.junit_run_xmlreport:
-        self.opts.append('-xmlreport')
-      self.opts.append('-suppress-output')
-      self.opts.append('-outdir')
-      self.opts.append(self.outdir)
+        self._args.append('-xmlreport')
+      self._args.append('-suppress-output')
+      self._args.append('-outdir')
+      self._args.append(self.outdir)
 
     if context.options.junit_run_per_test_timer:
-      self.opts.append('-per-test-timer')
+      self._args.append('-per-test-timer')
     if context.options.junit_run_default_parallel:
-      self.opts.append('-default-parallel')
-    self.opts.append('-parallel-threads')
-    self.opts.append(str(context.options.junit_run_parallel_threads))
-
-    if context.options.junit_run_test_shard:
-      self.opts.append('-test-shard')
-      self.opts.append(context.options.junit_run_test_shard)
-
-    if context.options.junit_run_arg:
-      self.opts.extend(context.options.junit_run_arg)
+      self._args.append('-default-parallel')
+    self._args.append('-parallel-threads')
+    self._args.append(str(context.options.junit_run_parallel_threads))
 
   def _partition(self, tests):
     stride = min(self.batch_size, len(tests))
@@ -236,33 +217,34 @@ class JUnitRun(JvmTask):
       tests = list(self.get_tests_to_run() if self.tests_to_run
                    else self.calculate_tests_from_targets(targets))
       if tests:
-        bootstrapped_cp = self._jvm_tool_bootstrapper.get_jvm_tool_classpath(
-            self._junit_bootstrap_key)
-        junit_classpath = self.classpath(
-            bootstrapped_cp,
-            confs=self.confs,
-            exclusives_classpath=self.get_base_classpath_for_target(targets[0]))
+        bootstrapped_cp = self._jvm_tool_bootstrapper.get_jvm_tool_classpath(self._junit_bootstrap_key)
+        junit_classpath = self.classpath(bootstrapped_cp,
+                                         confs=self.confs,
+                                         exclusives_classpath=self.get_base_classpath_for_target(targets[0]))
 
-        def run_tests(classpath, main, jvm_args=None):
+        def run_tests(classpath, main, jvm_options=None):
+          def test_workunit_factory(name, labels=list(), cmd=''):
+            return self.context.new_workunit(name=name, labels=[WorkUnit.TEST] + labels, cmd=cmd)
+
           # TODO(John Sirois): Integrated batching with the test runner.  As things stand we get
           # results summaries for example for each batch but no overall summary.
           # http://jira.local.twitter.com/browse/AWESOME-1114
           result = 0
           for batch in self._partition(tests):
             with binary_util.safe_args(batch) as batch_tests:
-              result += abs(execute_java(
+              args = self._args + batch_tests
+              result += abs(binary_util.runjava_indivisible(
+                jvm_options=(jvm_options or []) + self.jvm_options,
                 classpath=classpath,
                 main=main,
-                jvm_options=(jvm_args or []) + self.jvm_args,
-                args=self.opts + batch_tests,
-                workunit_factory=self.context.new_workunit,
-                workunit_name='run',
-                workunit_labels=[WorkUnit.TEST]
+                args=args,
+                workunit_factory=test_workunit_factory,
+                workunit_name='run'
               ))
               if result != 0 and self.fail_fast:
                 break
           if result != 0:
-            raise TaskError('java %s ... exited non-zero (%i)' % (main, result))
+            raise TaskError()
 
         if self.coverage:
           emma_classpath = self._jvm_tool_bootstrapper.get_jvm_tool_classpath(self._emma_bootstrap_key)
@@ -279,13 +261,10 @@ class JUnitRun(JvmTask):
               ]
               for pattern in patterns:
                 args.extend(['-filter', pattern])
-              main = 'emma'
-              result = execute_java(classpath=emma_classpath, main=main, args=args,
-                                    workunit_factory=self.context.new_workunit,
-                                    workunit_name='emma-instrument')
+              result = binary_util.runjava_indivisible(classpath=emma_classpath, main='emma',
+                                                       args=args, workunit_name='emma')
               if result != 0:
-                raise TaskError("java %s ... exited non-zero (%i)"
-                                " 'failed to instrument'" % (main, result))
+                raise TaskError('Emma instrumentation failed with: %d' % result)
 
           def generate_reports():
             args = [
@@ -314,13 +293,14 @@ class JUnitRun(JvmTask):
                            '-Dreport.html.out.file=%s' % self.coverage_html_file,
                            '-Dreport.out.encoding=UTF-8'] + sorting)
 
-            main = 'emma'
-            result = execute_java(classpath=emma_classpath, main=main, args=args,
-                                  workunit_factory=self.context.new_workunit,
-                                  workunit_name='emma-report')
+            result = binary_util.runjava_indivisible(
+              classpath=emma_classpath,
+              main='emma',
+              args=args,
+              workunit_name='emma'
+            )
             if result != 0:
-              raise TaskError("java %s ... exited non-zero (%i)"
-                              " 'failed to generate code coverage reports'" % (main, result))
+              raise TaskError('Failed to emma generate code coverage reports: %d' % result)
 
             if self.coverage_report_console:
               with safe_open(self.coverage_console_file) as console_report:
@@ -333,14 +313,16 @@ class JUnitRun(JvmTask):
             # Coverage runs over instrumented classes require the instrumented classes come 1st in
             # the classpath followed by the normal classpath.  The instrumentation also adds a
             # dependency on emma libs that must be satisfied on the classpath.
-            run_tests([self.coverage_instrument_dir] + junit_classpath + emma_classpath,
-                      JUnitRun._MAIN,
-                      jvm_args=['-Demma.coverage.out.file=%s' % self.coverage_file])
+            run_tests(
+              [self.coverage_instrument_dir] + junit_classpath + emma_classpath,
+              'com.twitter.common.testing.runner.JUnitConsoleRunner',
+              jvm_options=['-Demma.coverage.out.file=%s' % self.coverage_file]
+            )
           finally:
             generate_reports()
         else:
           self.context.lock.release()
-          run_tests(junit_classpath, JUnitRun._MAIN)
+          run_tests(junit_classpath, 'com.twitter.common.testing.runner.JUnitConsoleRunner')
 
   def is_coverage_target(self, tgt):
     return (tgt.is_java or tgt.is_scala) and not tgt.is_test and not tgt.is_codegen
@@ -414,9 +396,7 @@ class JUnitRun(JvmTask):
       classname = classname_or_srcfile
       yield classname + methodname
 
-
 PACKAGE_PARSER = re.compile(r'^\s*package\s+([\w.]+)\s*;?\s*')
-
 
 def calculate_basedir(filepath):
   with open(filepath, 'r') as source:

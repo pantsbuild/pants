@@ -19,43 +19,15 @@ from .jvm_target import JvmTarget
 
 class ExportableJvmLibrary(JvmTarget):
   """A baseclass for java targets that support being exported to an artifact repository."""
-
-  def __init__(self,
-               name,
-               sources,
-               provides=None,
-               dependencies=None,
-               excludes=None,
+  def __init__(self, name, sources, provides=None, dependencies=None, excludes=None,
                exclusives=None):
-    """
-    :param string name: The name of this target, which combined with this
-      build file defines the target :class:`twitter.pants.base.address.Address`.
-    :param sources: A list of filenames representing the source code
-      this library is compiled from.
-    :type sources: list of strings
-    :param provides:
-      An optional Dependency object indicating the The ivy artifact to export.
-    :param dependencies: List of :class:`twitter.pants.base.target.Target` instances
-      this target depends on.
-    :type dependencies: list of targets
-    :param excludes: List of :class:`twitter.pants.targets.exclude.Exclude` instances
-      to filter this target's transitive dependencies against.
-    :param buildflags: Unused, and will be removed in a future release.
-    """
-
     # It's critical that provides is set 1st since _provides() is called elsewhere in the
     # constructor flow.
-    self._provides = provides
+    self.provides = provides
 
-    super(ExportableJvmLibrary, self).__init__(
-        name,
-        sources,
-        dependencies,
-        excludes,
-        exclusives=exclusives)
-
+    JvmTarget.__init__(self, name, sources, dependencies, excludes, exclusives=exclusives)
     self.add_labels('exportable')
 
-  @property
-  def provides(self):
-    return self._provides
+  def _provides(self):
+    return self.provides
+

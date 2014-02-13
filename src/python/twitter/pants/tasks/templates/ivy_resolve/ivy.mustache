@@ -30,13 +30,19 @@ limitations under the License.
     {{/lib.version}}
    />
 
-  <configurations defaultconfmapping="default->default(compile),runtime();sources->sources;docs->@,javadoc;">
+  {{#lib.is_idl}}
+  <configurations defaultconfmapping="idl->runtime()">
+  {{/lib.is_idl}}
+  {{^lib.is_idl}}
+  <configurations defaultconfmapping="default->default(compile),runtime();sources->sources;docs->@,javadoc;idl->runtime();">
+  {{/lib.is_idl}}
     <conf name="default" description="normal build"/>
     <conf name="sources" description="java sources"/>
     <conf name="docs" description="javadocs"/>
     <conf name="changelog" description="changelog for artifact pushes"/>
     <conf name="test" visibility="private" description="build and run tests"/>
     <conf name="provided" description="provided by target environment"/>
+    <conf name="idl" description="thrift idl files"/>
   </configurations>
 
   {{#lib.publications?}}
@@ -52,6 +58,9 @@ limitations under the License.
     {{#lib.publications.changelog}}
     <artifact conf="changelog" type="CHANGELOG" m:classifier="CHANGELOG" ext="txt"/>
     {{/lib.publications.changelog}}
+    {{#lib.is_idl}}
+    <artifact conf="idl" type="idl" m:classifier="idl" ext="jar"/>
+    {{/lib.is_idl}}
   </publications>
   {{/lib.publications?}}
 
@@ -62,7 +71,7 @@ limitations under the License.
                 name="{{module}}"
                 rev="{{version}}"
                 {{#force}}force="true"{{/force}}
-                conf="{{configurations}}"
+                conf="{{#is_idl}}idl{{/is_idl}}{{^is_idl}}{{configurations}}{{/is_idl}}"
                 {{^transitive}}transitive="false"{{/transitive}}
                 {{#mutable}}changing="true"{{/mutable}}
     >
@@ -86,11 +95,6 @@ limitations under the License.
     {{#name}}<exclude matcher="exactOrRegexp" org="{{org}}" module="{{name}}"/>{{/name}}
     {{^name}}<exclude matcher="exactOrRegexp" org="{{org}}"/>{{/name}}
     {{/lib.excludes}}
-    {{#lib.overrides?}}
-      {{#lib.overrides}}
-    <override org="{{org}}" module="{{module}}" rev="{{version}}"/>
-      {{/lib.overrides}}
-    {{/lib.overrides?}}
   </dependencies>
   {{/lib.dependencies?}}
 </ivy-module>

@@ -25,11 +25,3 @@ python_tests(name = 'base',
     pants("tests/python/twitter/pants/testutils"),
   ]
 )
-
-python_library(name = 'base-test',
-  sources = ['context_utils.py'],
-  dependencies = [
-    pants("src/python/twitter/pants:pants-lib"),
-    pants("src/python/twitter/pants:pants-deps"),
-  ]
-)

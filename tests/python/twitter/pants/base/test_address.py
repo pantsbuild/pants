@@ -22,8 +22,7 @@ from contextlib import contextmanager
 
 from twitter.common.contextutil import temporary_dir, pushd
 from twitter.common.dirutil import touch
-
-from twitter.pants.base.address import Address
+from twitter.pants.base import Address
 from twitter.pants.base.build_environment import set_buildroot
 
 

@@ -1,18 +1,18 @@
-import itertools
+from collections import defaultdict
 import os
+import itertools
 import shutil
 import uuid
-
-from collections import defaultdict
 
 from twitter.common import contextutil
 from twitter.common.contextutil import open_zip
 from twitter.common.dirutil import safe_rmtree, safe_mkdir
 from twitter.pants import get_buildroot, Task
-from twitter.pants.base.target import Target
+from twitter.pants.base import Target
 from twitter.pants.base.worker_pool import Work
-from twitter.pants.goal.products import MultipleRootedProducts
+from twitter.pants.goal.products import RootedProducts, MultipleRootedProducts
 from twitter.pants.reporting.reporting_utils import items_to_report_element
+from twitter.pants.targets import resolve_target_sources
 from twitter.pants.tasks.jvm_compile.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from twitter.pants.tasks.nailgun_task import NailgunTask
 
@@ -78,6 +78,13 @@ class JvmCompile(NailgunTask):
                                  'generated code will often legitimately have BUILD dependencies that '
                                  'are unused in practice.')
 
+    option_group.add_option(mkflag('delete-scratch'), mkflag('delete-scratch', negate=True),
+                            dest=subcls._language+'_delete_scratch',
+                            default=True,
+                            action='callback',
+                            callback=mkflag.set_bool,
+                            help='[%default] Leave intermediate scratch files around, '
+                                 'for debugging build problems.')
 
   # Subclasses must implement.
   # --------------------------
@@ -136,9 +143,8 @@ class JvmCompile(NailgunTask):
   def _portable_analysis_for_target(analysis_dir, target):
     return JvmCompile._analysis_for_target(analysis_dir, target) + '.portable'
 
-  def __init__(self, context, minimum_version=None, jdk=False):
-    # TODO(John Sirois): XXX plumb minimum_version via config or flags
-    super(JvmCompile, self).__init__(context, minimum_version=minimum_version, jdk=jdk)
+  def __init__(self, context, workdir):
+    NailgunTask.__init__(self, context, workdir=workdir)
     concrete_class = type(self)
     config_section = concrete_class._config_section
 
@@ -154,6 +160,8 @@ class JvmCompile(NailgunTask):
     self._classes_dir = os.path.join(workdir, 'classes')
     self._resources_dir = os.path.join(workdir, 'resources')
     self._analysis_dir = os.path.join(workdir, 'analysis')
+
+    self._delete_scratch = get_lang_specific_option('delete_scratch')
 
     safe_mkdir(self._classes_dir)
     safe_mkdir(self._analysis_dir)
@@ -217,6 +225,12 @@ class JvmCompile(NailgunTask):
 
   def can_dry_run(self):
     return True
+
+  def move(self, src, dst):
+    if self._delete_scratch:
+      shutil.move(src, dst)
+    else:
+      shutil.copy(src, dst)
 
   # TODO(benjy): Break this monstrosity up? Previous attempts to do so
   #              turned out to be more trouble than it was worth.
@@ -283,8 +297,8 @@ class JvmCompile(NailgunTask):
               invalid_analysis_tmp = newly_invalid_analysis_tmp
 
             # Now it's OK to overwrite the main analysis files with the new state.
-            shutil.move(valid_analysis_tmp, self._analysis_file)
-            shutil.move(invalid_analysis_tmp, self._invalid_analysis_file)
+            self.move(valid_analysis_tmp, self._analysis_file)
+            self.move(invalid_analysis_tmp, self._invalid_analysis_file)
 
         # Register products for all the valid targets.
         # We register as we go, so dependency checking code can use this data.
@@ -325,7 +339,7 @@ class JvmCompile(NailgunTask):
             # Move the merged valid analysis to its proper location.
             # We do this before checking for missing dependencies, so that we can still
             # enjoy an incremental compile after fixing missing deps.
-            shutil.move(new_valid_analysis, self._analysis_file)
+            self.move(new_valid_analysis, self._analysis_file)
 
             # Update the products with the latest classes. Must happen before the
             # missing dependencies check.
@@ -348,7 +362,7 @@ class JvmCompile(NailgunTask):
               discarded_invalid_analysis = analysis_file + '.invalid.discard'
               self._analysis_tools.split_to_paths(self._invalid_analysis_file,
                 [(sources, discarded_invalid_analysis)], new_invalid_analysis)
-              shutil.move(new_invalid_analysis, self._invalid_analysis_file)
+              self.move(new_invalid_analysis, self._invalid_analysis_file)
 
           # Now that all the analysis accounting is complete, and we have no missing deps,
           # we can safely mark the targets as valid.
@@ -415,7 +429,7 @@ class JvmCompile(NailgunTask):
         with contextutil.temporary_dir() as tmpdir:
           tmp_analysis = os.path.join(tmpdir, 'analysis')
           self._analysis_tools.merge_from_paths(analyses_to_merge, tmp_analysis)
-          shutil.move(tmp_analysis, self._analysis_file)
+          self.move(tmp_analysis, self._analysis_file)
 
     self._ensure_analysis_tmpdir()
     return Task.do_check_artifact_cache(self, vts, post_process_cached_vts=post_process_cached_vts)
@@ -489,8 +503,8 @@ class JvmCompile(NailgunTask):
           products = self._analysis_parser.parse_products_from_path(self._analysis_file)
           buildroot = get_buildroot()
           old_sources = products.keys()  # Absolute paths.
-          self._lazy_deleted_sources = [os.path.relpath(src, buildroot) for src in old_sources
-                                        if not os.path.exists(src)]
+          self._lazy_deleted_sources = \
+            [os.path.relpath(src, buildroot) for src in old_sources if not os.path.exists(src)]
         else:
           self._lazy_deleted_sources = []
     return self._lazy_deleted_sources
@@ -501,24 +515,9 @@ class JvmCompile(NailgunTask):
       sources = [s for s in target.sources_relative_to_buildroot() if s.endswith(self._file_suffix)]
       # TODO: Make this less hacky. Ideally target.java_sources will point to sources, not targets.
       if hasattr(target, 'java_sources') and target.java_sources:
-        sources.extend(self._resolve_target_sources(target.java_sources, '.java'))
+        sources.extend(resolve_target_sources(target.java_sources, '.java'))
       return sources
     return dict([(t, calculate_sources(t)) for t in targets])
-
-  def _resolve_target_sources(self, target_sources, extension=None, relative_to_target_base=False):
-    """Given a list of pants targets, extract their sources as a list.
-
-    Filters against the extension if given and optionally returns the paths relative to the target
-    base.
-    """
-    resolved_sources = []
-    for resolved in Target.resolve_all(target_sources):
-      if hasattr(resolved, 'sources'):
-        resolved_sources.extend(
-          source if relative_to_target_base else os.path.join(resolved.target_base, source)
-          for source in resolved.sources if not extension or source.endswith(extension)
-        )
-    return resolved_sources
 
   def _compute_classpath_elements_by_class(self, classpath):
     # Don't consider loose classes dirs in our classpath. Those will be considered
@@ -583,7 +582,8 @@ class JvmCompile(NailgunTask):
     # Do this lazily, so we don't trigger creation of a worker pool unless we need it.
     if not os.path.exists(self._analysis_tmpdir):
       os.makedirs(self._analysis_tmpdir)
-      self.context.background_worker_pool().add_shutdown_hook(lambda: safe_rmtree(self._analysis_tmpdir))
+      if self._delete_scratch:
+        self.context.background_worker_pool().add_shutdown_hook(lambda: safe_rmtree(self._analysis_tmpdir))
 
   def _register_products(self, targets, sources_by_target, analysis_file):
     # If no products actually needed, return quickly.

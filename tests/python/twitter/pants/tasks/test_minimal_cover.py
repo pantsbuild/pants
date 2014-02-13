@@ -39,7 +39,7 @@ class MinimalCoverTest(BaseMinimalCovertTest):
     super(MinimalCoverTest, cls).setUpClass()
 
     def create_target(path, name, *deps):
-      all_deps = ["pants('%s')" % dep for dep in list(deps)]
+      all_deps = ["pants('%s')" % dep for dep in list(deps)] + ["python_requirement('foo')"]
       cls.create_target(path, dedent('''
           python_library(name='%s',
             dependencies=[%s]

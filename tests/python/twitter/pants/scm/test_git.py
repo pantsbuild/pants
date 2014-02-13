@@ -16,7 +16,6 @@
 
 import os
 import subprocess
-import re
 import unittest
 
 from itertools import izip_longest
@@ -65,8 +64,7 @@ def git_version():
   process = subprocess.Popen(['git', '--version'], stdout=subprocess.PIPE)
   (stdout, stderr) = process.communicate()
   assert process.returncode == 0, "Failed to determine git version."
-  matches = re.search('(.*)\s(\d+.*\d+)\s(.*)', stdout)
-  return Version(matches.group(2))
+  return Version(stdout.split(' ')[2])
 
 
 @pytest.mark.skipif("git_version() < Version('1.7.10')")
@@ -95,7 +93,7 @@ class GitTest(unittest.TestCase):
       touch(cls.readme_file)
       subprocess.check_call(['git', 'add', 'README'])
       subprocess.check_call(['git', 'commit', '-am', 'initial commit.'])
-      subprocess.check_call(['git', 'tag', 'first'])
+      subprocess.check_call(['git', 'tag', '-a', '-m', 'first tag', 'first'])
       subprocess.check_call(['git', 'push', '--tags', 'depot', 'master'])
       subprocess.check_call(['git', 'branch', '--set-upstream', 'master', 'depot/master'])
 
@@ -131,7 +129,7 @@ class GitTest(unittest.TestCase):
 
     self.assertTrue(tip_sha in self.git.changelog())
 
-    self.assertTrue(self.git.tag_name.startswith('first-'), msg='un-annotated tags should be found')
+    self.assertTrue(self.git.tag_name.startswith('first-'))
     self.assertEqual('master', self.git.branch_name)
 
     def edit_readme():
@@ -174,4 +172,4 @@ class GitTest(unittest.TestCase):
         self.assertEqual(set(['README', 'CHANGES']), git.changed_files(from_commit='first'))
 
         self.assertEqual('master', git.branch_name)
-        self.assertEqual('second', git.tag_name, msg='annotated tags should be found')
+        self.assertEqual('second', git.tag_name)

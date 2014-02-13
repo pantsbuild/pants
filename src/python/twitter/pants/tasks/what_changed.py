@@ -20,15 +20,14 @@ import sys
 from abc import abstractmethod
 from collections import defaultdict
 
-from twitter.common.lang import AbstractClass, Compatibility
+from twitter.common.lang import AbstractClass
 
 from twitter.pants import TaskError
 from twitter.pants.base.build_environment import get_buildroot, get_scm
 from twitter.pants.base.build_file import BuildFile
 from twitter.pants.base.target import Target
 from twitter.pants.scm import Scm
-
-from .console_task import ConsoleTask
+from twitter.pants.tasks.console_task import ConsoleTask
 
 
 class WhatChanged(ConsoleTask):
@@ -85,15 +84,7 @@ class WhatChanged(ConsoleTask):
       is_build_file = (build_file.full_path == os.path.join(get_buildroot(), path))
       for address in Target.get_all_addresses(build_file):
         target = Target.get(address)
-
-        # A synthesized target can never own permanent files on disk
-        if target != target.derived_from:
-          # TODO(John Sirois): tighten up the notion of targets written down in a BUILD by a user
-          # vs. targets created by pants at runtime.
-          continue
-
-        if target and (is_build_file or ((target.has_sources() or target.has_resources)
-                                         and self._owns(target, path))):
+        if target and (is_build_file or (target.has_sources() and self._owns(target, path))):
           yield target
 
   def _candidate_owners(self, path):
@@ -107,17 +98,7 @@ class WhatChanged(ConsoleTask):
 
   def _owns(self, target, path):
     if target not in self._filemap:
-      files = self._filemap[target]
-      files_owned_by_target = target.sources if target.has_sources() else []
-      # TODO (tdesai): This case to handle resources in PythonTarget.
-      # Remove this when we normalize resources handling across python and jvm targets.
-      if target.has_resources:
-        for resource in target.resources:
-          if isinstance(resource, Compatibility.string):
-            files_owned_by_target.extend(target.resources)
-      for owned_file in files_owned_by_target:
-        owned_path = os.path.join(target.target_base, owned_file)
-        files.add(owned_path)
+      self._filemap[target].update(target.sources_relative_to_buildroot())
     return path in self._filemap[target]
 
 
@@ -143,8 +124,7 @@ class ScmWorkspace(Workspace):
     self._scm = scm or get_scm()
 
     if self._scm is None:
-      raise self.WorkspaceError('Cannot figure out what changed without a configured '
-                                'source-control system.')
+      raise self.WorkspaceError('Cannot figure out what changed without a configured source-control system.')
 
   def touched_files(self, parent):
     try:

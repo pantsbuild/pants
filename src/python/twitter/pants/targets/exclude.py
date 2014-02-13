@@ -14,20 +14,10 @@
 # limitations under the License.
 # ==================================================================================================
 
-from twitter.pants.base.build_manual import manual
-
-
-@manual.builddict(tags=["jvm"])
 class Exclude(object):
   """Represents a dependency exclude pattern to filter transitive dependencies against."""
 
   def __init__(self, org, name=None):
-    """
-    :param string org: Organization of the artifact to filter,
-      known as groupId in Maven parlance.
-    :param string name: Name of the artifact to filter in the org, or filter
-      everything if unspecified.
-    """
     self.org = org
     self.name = name
 
@@ -38,7 +28,10 @@ class Exclude(object):
                 self.name == other.name])
 
   def __hash__(self):
-    return hash((self.org, self.name))
+    value = 17
+    value *= 37 + hash(self.org)
+    value *= 37 + hash(self.name)
+    return value
 
   def __ne__(self, other):
     return not self.__eq__(other)

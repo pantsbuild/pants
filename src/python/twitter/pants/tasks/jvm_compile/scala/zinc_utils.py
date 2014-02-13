@@ -120,12 +120,12 @@ class ZincUtils(object):
       zinc_args.append('-no-color')
     zinc_args.extend(self._zinc_jar_args)
     zinc_args.extend(args)
-    return self._nailgun_task.runjava(classpath=self._zinc_classpath,
-                                      main=ZincUtils._ZINC_MAIN,
-                                      jvm_options=self._jvm_options,
-                                      args=zinc_args,
-                                      workunit_name=workunit_name,
-                                      workunit_labels=workunit_labels)
+    return self._nailgun_task.runjava_indivisible(ZincUtils._ZINC_MAIN,
+                                                  classpath=self._zinc_classpath,
+                                                  args=zinc_args,
+                                                  jvm_options=self._jvm_options,
+                                                  workunit_name=workunit_name,
+                                                  workunit_labels=workunit_labels)
 
   def compile(self, opts, classpath, sources, output_dir, analysis_file, upstream_analysis_files):
     args = list(opts)  # Make a copy
@@ -170,7 +170,8 @@ class ZincUtils(object):
   def identify_zinc_jars(zinc_classpath):
     """Find the named jars in the zinc classpath.
 
-    TODO: Make these mappings explicit instead of deriving them by jar name heuristics.
+    TODO: When profiles migrate to regular pants jar() deps instead of ivy.xml files we can
+          make these mappings explicit instead of deriving them by jar name heuristics.
     """
     ret = OrderedDict()
     ret.update(ZincUtils.identify_jars(ZincUtils.zinc_jar_names, zinc_classpath))

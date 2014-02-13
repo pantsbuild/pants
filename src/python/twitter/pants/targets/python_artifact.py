@@ -14,12 +14,9 @@
 # limitations under the License.
 # ==================================================================================================
 
-from twitter.pants.base.build_manual import manual
-
 from .python_target import PythonTarget
 
 
-@manual.builddict(tags=["python"])
 class PythonArtifact(object):
   """Represents a Python setup.py-based project."""
   class MissingArgument(Exception): pass

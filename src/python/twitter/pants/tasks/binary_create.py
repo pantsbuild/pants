@@ -16,7 +16,7 @@
 
 import os
 
-from zipfile import ZIP_STORED, ZIP_DEFLATED
+from zipfile import  ZIP_STORED, ZIP_DEFLATED
 import zipfile
 
 from twitter.common.contextutil import temporary_dir
@@ -25,13 +25,11 @@ from twitter.common.dirutil import safe_mkdir
 from twitter.pants.base.build_environment import get_buildroot, get_version
 from twitter.pants.tasks import TaskError
 from twitter.pants.fs.archive import ZIP
-from twitter.pants.java.jar import open_jar, Manifest
+from twitter.pants.java import open_jar, Manifest
 from twitter.pants.tasks.jvm_binary_task import JvmBinaryTask
 
 
 class BinaryCreate(JvmBinaryTask):
-  """Creates a runnable monolithic binary deploy jar."""
-
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
     JvmBinaryTask.setup_parser(option_group, args, mkflag)
@@ -48,10 +46,9 @@ class BinaryCreate(JvmBinaryTask):
   def __init__(self, context):
     JvmBinaryTask.__init__(self, context)
 
-    self.outdir = os.path.abspath(
-      context.options.jvm_binary_create_outdir or
-      context.config.get('binary-create', 'outdir',
-                         default=context.config.getdefault('pants_distdir'))
+    self.outdir = (
+      context.options.jvm_binary_create_outdir
+      or context.config.get('binary-create', 'outdir')
     )
     self.compression = ZIP_DEFLATED if context.options.binary_create_compressed else ZIP_STORED
     self.zip64 = (

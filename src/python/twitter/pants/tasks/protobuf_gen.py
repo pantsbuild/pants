@@ -29,7 +29,7 @@ from twitter.pants.targets import JavaLibrary, JavaProtobufLibrary, PythonLibrar
 
 from .code_gen import CodeGen
 
-from . import TaskError
+from twitter.pants.tasks import TaskError
 
 
 class ProtobufGen(CodeGen):
@@ -91,13 +91,6 @@ class ProtobufGen(CodeGen):
     return dict(java=lambda t: t.is_jvm, python=lambda t: t.is_python)
 
   def genlang(self, lang, targets):
-    protobuf_binary = select_binary(
-      self.protoc_supportdir,
-      self.protoc_version,
-      'protoc',
-      self.context.config
-    )
-
     bases, sources = self._calculate_sources(targets)
 
     if lang == 'java':
@@ -109,7 +102,10 @@ class ProtobufGen(CodeGen):
     else:
       raise TaskError('Unrecognized protobuf gen lang: %s' % lang)
 
-    args = [self.protobuf_binary, gen]
+    args = [
+      self.protobuf_binary,
+      gen
+    ]
 
     for base in bases:
       args.append('--proto_path=%s' % base)
@@ -150,10 +146,10 @@ class ProtobufGen(CodeGen):
     tgt = self.context.add_new_target(self.java_out,
                                       JavaLibrary,
                                       name=target.id,
-                                      sources=genfiles,
                                       provides=target.provides,
+                                      sources=genfiles,
                                       dependencies=self.javadeps,
-                                      excludes=target.excludes)
+                                      derived_from=target)
     tgt.id = target.id + '.protobuf_gen'
     for dependee in dependees:
       dependee.update_dependencies([tgt])
