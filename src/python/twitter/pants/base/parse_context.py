@@ -67,6 +67,16 @@ class ParseContext(object):
       raise cls.ContextError('No parse context active.')
     return ParseContext._active[-1]
 
+  @classmethod
+  def path(cls, relpath=None):
+    """Returns the active parse context path or `os.getcwd()` if there is no active context.
+
+    If relpath is specified the path returned will be joined to it but in either case the returned
+    path will be absolute.
+    """
+    base = os.getcwd() if not ParseContext._active else cls.locate().current_buildfile.parent_path
+    return os.path.abspath(os.path.join(base, relpath) if relpath else base)
+
   @staticmethod
   @contextmanager
   def temp(basedir=None):

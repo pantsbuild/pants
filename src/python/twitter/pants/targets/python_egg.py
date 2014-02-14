@@ -39,14 +39,7 @@ def PythonEgg(glob, name=None):
   :param string name: Target name; by default uses the egg's project name.
   """
   # TODO(John Sirois): Rationalize with globs handling in ParseContext
-  try:
-    parse_context = ParseContext.locate()
-    glob = os.path.join(parse_context.current_buildfile.parent_path, glob)
-  except ParseContext.ContextError:
-    # We might not be in a ParseContext if exercised from tests.
-    pass
-
-  eggs = fsglob(glob)
+  eggs = fsglob(ParseContext.path(glob))
 
   requirements = set()
   for egg in eggs:

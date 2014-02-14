@@ -22,7 +22,7 @@ from twitter.common.collections import maybe_list
 from twitter.common.dirutil import Fileset
 from twitter.common.lang import Compatibility
 
-from twitter.pants.base import manual
+from twitter.pants.base import manual, ParseContext
 from twitter.pants.base.target import TargetDefinitionException
 from twitter.pants.targets import util
 
@@ -144,12 +144,12 @@ class Bundle(object):
       raise ValueError("Must specify exactly one of 'mapper' or 'relative_to'")
 
     if relative_to:
-      base = os.path.abspath(relative_to)
+      base = ParseContext.path(relative_to)
       if not os.path.isdir(base):
         raise ValueError('Could not find a directory to bundle relative to at %s' % base)
       self.mapper = RelativeToMapper(base)
     else:
-      self.mapper = mapper or RelativeToMapper(os.getcwd())
+      self.mapper = mapper or RelativeToMapper(ParseContext.path())
 
     self.filemap = {}
 
@@ -206,7 +206,7 @@ class JvmApp(InternalTarget):
           self, 'binary must resolve to a single JvmBinary target, found %s' % binary)
     self._resolved_binary = binary_list[0]
 
-    self._bundles = maybe_list(bundles, expected_type=(Bundle),
+    self._bundles = maybe_list(bundles, expected_type=Bundle,
                                raise_type=partial(TargetDefinitionException, self))
 
     if name == basename:
