@@ -276,7 +276,7 @@ class Target(AbstractTarget):
     derived from targets written down in BUILD files though in which case the derivation chain
     should be maintained.
     """
-    if value and not isinstance(value, Target):
+    if value and not isinstance(value, AbstractTarget):
       raise ValueError('Expected derived_from to be a Target, given %s of type %s'
                        % (value, type(value)))
     self._derived_from = value

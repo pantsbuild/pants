@@ -68,7 +68,7 @@ class Artifact(object):
 
 
 @manual.builddict(tags=["jvm"])
-class  JarDependency(ExternalDependency, AbstractTarget):
+class JarDependency(ExternalDependency, AbstractTarget):
   """A pre-built Maven repository dependency."""
 
   _JAR_HASH_KEYS = (
