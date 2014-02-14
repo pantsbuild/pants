@@ -143,8 +143,8 @@ class ZincAnalysis(Analysis):
     naive_external_apis = ZincAnalysis.merge_dicts([a.apis.external for a in analyses])
     external_apis = defaultdict(list)
     for k, vs in naive_external_apis.iteritems():
-      kfile = class_to_source[k]
-      if kfile in src_prod:
+      kfile = class_to_source.get(k)
+      if kfile and kfile in src_prod:
         internal_apis[kfile] = vs  # Internalized.
       else:
         external_apis[k] = vs  # Remains external.
