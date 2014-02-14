@@ -14,8 +14,6 @@
 # limitations under the License.
 # ==================================================================================================
 
-__author__ = 'Brian Wickman'
-
 import os
 
 from glob import glob as fsglob
@@ -23,6 +21,7 @@ from pkg_resources import Distribution, EggMetadata, PathMetadata
 from zipimport import zipimporter
 
 from twitter.pants.base.build_manual import manual
+from twitter.pants.base.parse_context import ParseContext
 
 from .python_requirement import PythonRequirement
 
@@ -39,6 +38,14 @@ def PythonEgg(glob, name=None):
   :param string glob: File glob pattern.
   :param string name: Target name; by default uses the egg's project name.
   """
+  # TODO(John Sirois): Rationalize with globs handling in ParseContext
+  try:
+    parse_context = ParseContext.locate()
+    glob = os.path.join(parse_context.current_buildfile.parent_path, glob)
+  except ParseContext.ContextError:
+    # We might not be in a ParseContext if exercised from tests.
+    pass
+
   eggs = fsglob(glob)
 
   requirements = set()
