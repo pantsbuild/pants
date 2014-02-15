@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==================================================================================================
+from collections import defaultdict
 
 import os
 import shutil
@@ -33,6 +34,10 @@ class PrepareResources(Task):
     self.context.products.require_data('exclusives_groups')
 
   def execute(self, targets):
+    if self.context.products.is_required_data('resources_by_target'):
+      self.context.products.safe_create_data('resources_by_target',
+                                             lambda: defaultdict(MultipleRootedProducts))
+
     if len(targets) == 0:
       return
     def extract_resources(target):
@@ -60,14 +65,14 @@ class PrepareResources(Task):
           shutil.copy(os.path.join(resources_tgt.target_base, resource_path),
                       os.path.join(resources_dir, resource_path))
 
-    resources_by_target = \
-      self.context.products.get_data('resources_by_target', MultipleRootedProducts)
-    egroups = self.context.products.get_data('exclusives_groups')
-    group_key = egroups.get_group_key_for_target(targets[0])
+      resources_by_target = self.context.products.get_data('resources_by_target')
+      egroups = self.context.products.get_data('exclusives_groups')
+      group_key = egroups.get_group_key_for_target(targets[0])
 
-    for resources_tgt in all_resources_tgts:
-      resources_dir = target_dir(resources_tgt)
-      target_resources = resources_by_target[resources_tgt]
-      target_resources.add_rel_paths(resources_dir, resources_tgt.sources)
-      for conf in self.confs:
-        egroups.update_compatible_classpaths(group_key, [(conf, resources_dir)])
+      for resources_tgt in all_resources_tgts:
+        resources_dir = target_dir(resources_tgt)
+        for conf in self.confs:
+          egroups.update_compatible_classpaths(group_key, [(conf, resources_dir)])
+        if resources_by_target is not None:
+          target_resources = resources_by_target[resources_tgt]
+          target_resources.add_abs_paths(resources_dir, resources_tgt.sources)
