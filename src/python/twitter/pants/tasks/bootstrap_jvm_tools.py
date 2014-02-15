@@ -41,7 +41,8 @@ class BootstrapJvmTools(Task):
       # targets. -pl
       for key, deplist in tool_product_map.iteritems():
         callback_product_map[key] = self.cached_bootstrap_classpath_callback(key, deplist)
-      context.products.set_data('jvm_build_tools_classpath_callbacks', callback_product_map)
+      context.products.safe_create_data('jvm_build_tools_classpath_callbacks',
+                                        lambda: callback_product_map)
 
   def resolve_tool_targets(self, tools):
     if not tools:

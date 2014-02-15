@@ -149,7 +149,7 @@ class GroupEngineTest(EngineTestBase, JvmTargetTest):
     # layer.
     exclusives_mapping = ExclusivesMapping(self.context)
     exclusives_mapping._populate_target_maps(self.context.targets())
-    self.context.products.set_data('exclusives_groups', exclusives_mapping)
+    self.context.products.safe_create_data('exclusives_groups', lambda: exclusives_mapping)
 
     self.engine = GroupEngine(print_timing=False)
     self.recorded_actions = []

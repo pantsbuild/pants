@@ -196,6 +196,11 @@ class Products(object):
     """ Checks if a particular data product is required by any tasks."""
     return typename in self.required_data_products
 
+  def safe_create_data(self, typename, init_func):
+    """Ensures that a data item is created if it doesn't already exist."""
+    # Basically just an alias for readability.
+    self.get_data(typename, init_func)
+
   def get_data(self, typename, init_func=None):
     """ Returns a data product.
 
@@ -206,11 +211,3 @@ class Products(object):
         return None
       self.data_products[typename] = init_func()
     return self.data_products.get(typename)
-
-  def set_data(self, typename, data):
-    """ Stores a required data product.
-
-    If the product already exists, the value is replaced.
-    """
-    self.data_products[typename] = data
-

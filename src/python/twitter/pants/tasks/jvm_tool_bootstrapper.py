@@ -55,5 +55,5 @@ class JvmToolBootstrapper(object):
                         % (key, existing, tools))
     else:
       tool_product_map[key] = tools
-      self._products.set_data('jvm_build_tools', tool_product_map)
+      self._products.safe_create_data('jvm_build_tools', lambda: tool_product_map)
 

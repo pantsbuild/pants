@@ -239,6 +239,9 @@ class JvmCompile(NailgunTask):
     # TODO(benjy): Add a pre-execute phase for injecting deps into targets, so e.g.,
     # we can inject a dep on the scala runtime library and still have it ivy-resolve.
 
+    # In case we have no relevant targets and return early.
+    self._create_empty_products()
+
     relevant_targets = [t for t in targets if t.has_sources(self._file_suffix)]
 
     if not relevant_targets:
@@ -601,26 +604,33 @@ class JvmCompile(NailgunTask):
       if self._delete_scratch:
         self.context.background_worker_pool().add_shutdown_hook(lambda: safe_rmtree(self._analysis_tmpdir))
 
-  def _register_products(self, targets, sources_by_target, analysis_file):
-    # If no products actually needed, return quickly.
-    required_data = ['classes_by_source', 'classes_by_target', 'resources_by_target']
-    if not any(self.context.products.is_required_data(x) for x in required_data):
-      return
-
-    # TODO: Only compute what is actually needed?
+  def _create_empty_products(self):
     make_products = lambda: defaultdict(MultipleRootedProducts)
-    computed_classes_by_source = self._compute_classes_by_source(analysis_file)
-    classes_by_source = self.context.products.get_data('classes_by_source', make_products)
-    classes_by_target = self.context.products.get_data('classes_by_target', make_products)
-    resources_by_target = self.context.products.get_data('resources_by_target', make_products)
+    if self.context.products.is_required_data('classes_by_source'):
+      self.context.products.safe_create_data('classes_by_source', make_products)
+    if self.context.products.is_required_data('classes_by_target'):
+      self.context.products.safe_create_data('classes_by_target', make_products)
+    if self.context.products.is_required_data('resources_by_target'):
+      self.context.products.safe_create_data('resources_by_target', make_products)
 
-    for target in targets:
-      target_products = classes_by_target[target]
-      for source in sources_by_target[target]:  # Source is relative to buildroot.
-        classes = computed_classes_by_source.get(source, [])  # Classes are absolute paths.
-        target_products.add_abs_paths(self._classes_dir, classes)
-        classes_by_source[source].add_abs_paths(self._classes_dir, classes)
-      if self.context.products.is_required_data('resources_by_target'):
+  def _register_products(self, targets, sources_by_target, analysis_file):
+    classes_by_source = self.context.products.get_data('classes_by_source')
+    classes_by_target = self.context.products.get_data('classes_by_target')
+    resources_by_target = self.context.products.get_data('resources_by_target')
+
+    if classes_by_source is not None or classes_by_target is not None:
+      computed_classes_by_source = self._compute_classes_by_source(analysis_file)
+      for target in targets:
+        target_products = classes_by_target[target] if classes_by_target is not None else None
+        for source in sources_by_target[target]:  # Source is relative to buildroot.
+          classes = computed_classes_by_source.get(source, [])  # Classes are absolute paths.
+          if classes_by_target is not None:
+            target_products.add_abs_paths(self._classes_dir, classes)
+          if classes_by_source is not None:
+            classes_by_source[source].add_abs_paths(self._classes_dir, classes)
+
+    if resources_by_target is not None:
+      for target in targets:
         target_resources = resources_by_target[target]
         for root, abs_paths in self.extra_products(target):
           target_resources.add_abs_paths(root, abs_paths)

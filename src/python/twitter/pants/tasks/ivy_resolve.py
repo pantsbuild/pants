@@ -161,7 +161,7 @@ class IvyResolve(NailgunTask):
       ivyinfo = self._ivy_utils.parse_xml_report(targets, conf)
       if ivyinfo:
         ivy_products[conf].append(ivyinfo)  # Value is a list, to accommodate multiple exclusives groups.
-    self.context.products.set_data('ivy_jar_products', ivy_products)
+    self.context.products.safe_create_data('ivy_jar_products', lambda: ivy_products)
 
   def _generate_ivy_report(self, targets):
     def make_empty_report(report, organisation, module, conf):
