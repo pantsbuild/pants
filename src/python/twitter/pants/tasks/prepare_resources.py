@@ -75,4 +75,4 @@ class PrepareResources(Task):
           egroups.update_compatible_classpaths(group_key, [(conf, resources_dir)])
         if resources_by_target is not None:
           target_resources = resources_by_target[resources_tgt]
-          target_resources.add_abs_paths(resources_dir, resources_tgt.sources)
+          target_resources.add_rel_paths(resources_dir, resources_tgt.sources)
