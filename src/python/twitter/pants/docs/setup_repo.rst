@@ -71,13 +71,17 @@ If your top-level ``BUILD`` file is ``top/BUILD`` and your main Java code is in
 then your top-level `BUILD` file might look like::
 
     # top/BUILD
+    source_root('src/java')
+    source_root('src/javatest')
+    ...
+
+Pants can optionally enforce that only certain target types are allowed under each source root::
+
+    # top/BUILD
     source_root('src/java', annotation_processor, doc, jvm_binary, java_library, page)
     source_root('src/javatest', doc, java_library, java_tests, page)
     ...
 
-With this layout, if you build a ``jvm_binary`` target, it uses ``top/src/java`` as
-a base when figuring out whence to import ``com.top.amazing.service``; if you
-build a ``java_library``, it uses ``top/src/java`` and ``top/src/javatest`` as bases.
 
 Organized by Project
 ====================
@@ -88,12 +92,17 @@ then your top-level `BUILD` file might not contain any ``source_root`` statement
 Instead, ``theodore/BUILD`` and ``hank/BUILD`` might look like::
 
     # top/(project)/BUILD
+    source_root('src/java')
+    source_root('src/javatest')
+    ...
+
+Or::
+
+    # top/(project)/BUILD
     source_root('src/java', annotation_processor, doc, jvm_binary, java_library, page)
     source_root('src/javatest', doc, java_library, java_tests, page)
     ...
 
-With this layout, if you build a ``jvm_binary`` target under the ``top/hank/`` directory,
-it uses ``top/hank/src/java`` as a base when figuring out whence to import ``com.top.hank``.
 
 `BUILD.*` and environment-specific config
 -----------------------------------------
