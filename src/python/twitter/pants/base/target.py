@@ -74,6 +74,11 @@ class AbstractTarget(object):
     return False
 
   @property
+  def is_java_agent(self):
+    """Returns `True` if the target is a java agent."""
+    return self.has_label('java_agent')
+
+  @property
   def is_jvm_app(self):
     """Returns True if the target produces a java application with bundled auxiliary files."""
     return False

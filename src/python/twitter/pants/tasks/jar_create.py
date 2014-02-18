@@ -24,7 +24,7 @@ from twitter.common.dirutil import safe_mkdir
 
 from twitter.pants.base.build_environment import get_buildroot
 from twitter.pants.fs import safe_filename
-from twitter.pants.java.jar import open_jar
+from twitter.pants.java.jar import open_jar, Manifest
 from twitter.pants.targets import JvmBinary
 
 from .javadoc_gen import javadoc
@@ -186,6 +186,8 @@ class JarCreate(Task):
           add_to_jar(target_classes)
           for resources_target in target_resources:
             add_to_jar(resources_target)
+          if target.is_java_agent:
+            self.write_agent_manifest(target, jarfile)
 
   def sourcejar(self, jvm_targets, add_genjar):
     for target in jvm_targets:
@@ -212,3 +214,19 @@ class JarCreate(Task):
           for basedir, javadocfiles in generated.items():
             for javadocfile in javadocfiles:
               jar.write(os.path.join(basedir, javadocfile), javadocfile)
+
+  def write_agent_manifest(self, agent, jarfile):
+    # TODO(John Sirois): refactor an agent model to suport 'Boot-Class-Path' properly.
+    manifest = Manifest()
+    manifest.addentry(Manifest.MANIFEST_VERSION, '1.0')
+    if agent.premain:
+      manifest.addentry('Premain-Class', agent.premain)
+    if agent.agent_class:
+      manifest.addentry('Agent-Class', agent.agent_class)
+    if agent.can_redefine:
+      manifest.addentry('Can-Redefine-Classes', 'true')
+    if agent.can_retransform:
+      manifest.addentry('Can-Retransform-Classes', 'true')
+    if agent.can_set_native_method_prefix:
+      manifest.addentry('Can-Set-Native-Method-Prefix', 'true')
+    jarfile.writestr(Manifest.PATH, manifest.contents())

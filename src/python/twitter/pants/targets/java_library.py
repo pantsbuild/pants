@@ -39,7 +39,6 @@ class JavaLibrary(ExportableJvmLibrary, WithResources):
                excludes=None,
                resources=None,
                exclusives=None):
-
     """
     :param string name: The name of this target, which combined with this
       build file defines the target :class:`twitter.pants.base.address.Address`.

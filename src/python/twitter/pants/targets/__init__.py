@@ -26,6 +26,7 @@ from .internal import InternalTarget
 from .jarable import Jarable
 from .jar_dependency import JarDependency
 from .jar_library import JarLibrary
+from .java_agent import JavaAgent
 from .java_antlr_library import JavaAntlrLibrary
 from .java_library import JavaLibrary
 from .java_thrift_library import JavaThriftLibrary
@@ -66,6 +67,7 @@ __all__ = (
   'JarDependency',
   'Jarable',
   'JarLibrary',
+  'JavaAgent',
   'JavaAntlrLibrary',
   'JavaLibrary',
   'JavaThriftLibrary',

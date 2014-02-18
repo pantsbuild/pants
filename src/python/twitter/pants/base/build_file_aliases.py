@@ -20,12 +20,12 @@ from twitter.pants.targets import (
     Benchmark,
     Bundle,
     Credentials,
-    JarLibrary,
-    PythonEgg,
     Exclude,
     JarDependency,
-    JavaLibrary,
+    JarLibrary,
+    JavaAgent,
     JavaAntlrLibrary,
+    JavaLibrary,
     JavaProtobufLibrary,
     JavaTests,
     JavaThriftLibrary,
@@ -35,6 +35,7 @@ from twitter.pants.targets import (
     Pants,
     PythonArtifact,
     PythonBinary,
+    PythonEgg,
     PythonLibrary,
     PythonAntlrLibrary,
     PythonRequirement,
@@ -61,6 +62,7 @@ egg = PythonEgg
 exclude = Exclude
 fancy_pants = Pants
 jar = JarDependency
+java_agent = JavaAgent
 java_library = JavaLibrary
 java_antlr_library = JavaAntlrLibrary
 java_protobuf_library = JavaProtobufLibrary
