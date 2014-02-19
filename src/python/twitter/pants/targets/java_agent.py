@@ -77,11 +77,11 @@ class JavaAgent(JavaLibrary):
     if not premain or agent_class:
       raise TargetDefinitionException(self, "Must have at least one of 'premain' or 'agent_class' "
                                             "defined.")
-    if not isinstance(premain, Compatibility.string):
+    if premain and not isinstance(premain, Compatibility.string):
       raise TargetDefinitionException(self, 'The premain must be a fully qualified class name, '
                                             'given %s of type %s' % (premain, type(premain)))
 
-    if not isinstance(agent_class, Compatibility.string):
+    if agent_class and not isinstance(agent_class, Compatibility.string):
       raise TargetDefinitionException(self,
                                       'The agent_class must be a fully qualified class name, given '
                                       '%s of type %s' % (agent_class, type(agent_class)))

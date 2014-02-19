@@ -18,6 +18,7 @@ import os
 
 from twitter.pants.targets.annotation_processor import AnnotationProcessor
 from twitter.pants.targets.doc import Page
+from twitter.pants.targets.java_agent import JavaAgent
 from twitter.pants.targets.java_antlr_library import JavaAntlrLibrary
 from twitter.pants.targets.java_library import JavaLibrary
 from twitter.pants.targets.java_protobuf_library import JavaProtobufLibrary
@@ -51,7 +52,7 @@ def maven_layout(basedir=None):
     SourceRoot.register(os.path.join(basedir, path) if basedir else path, *types)
 
   root('src/main/antlr', JavaAntlrLibrary, Page, PythonAntlrLibrary)
-  root('src/main/java', AnnotationProcessor, JavaLibrary, JvmBinary, Page)
+  root('src/main/java', AnnotationProcessor, JavaAgent, JavaLibrary, JvmBinary, Page)
   root('src/main/protobuf', JavaProtobufLibrary, Page)
   root('src/main/python', Page, PythonBinary, PythonLibrary)
   root('src/main/resources', Page, Resources)
