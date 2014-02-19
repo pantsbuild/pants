@@ -231,6 +231,7 @@ class JvmApp(InternalTarget):
         raise TargetDefinitionException(self,
                                         'must supply exactly 1 JvmBinary, got %s' % binaries_list)
       self._resolved_binary = binaries_list[0]
+      self.update_dependencies([self._resolved_binary])
       self._binaries = None
 
   @property
@@ -262,3 +263,16 @@ class JvmApp(InternalTarget):
         raise TargetDefinitionException(self, 'bundles must be one or more Bundle objects, '
                                               'got %s' % self._bundles)
       self._bundles = None
+
+  @property
+  def dependencies(self):
+    self._maybe_resolve_binary()
+    return super(JvmApp, self).dependencies
+
+  def resolve(self):
+    # TODO(John Sirois): Clean this up when BUILD parse refactoring is tackled.
+    unused_resolved_binary = self.binary
+    unused_resolved_bundles = self.bundles
+
+    for resolved in super(JvmApp, self).resolve():
+      yield resolved

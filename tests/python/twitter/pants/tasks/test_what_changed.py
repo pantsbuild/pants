@@ -16,6 +16,7 @@
 
 from textwrap import dedent
 
+from twitter.pants.base import TargetDefinitionException
 from twitter.pants.tasks.what_changed import WhatChanged, Workspace
 
 from . import ConsoleTaskTest
@@ -59,6 +60,7 @@ class WhatChangedTest(BaseWhatChangedTest):
 
     cls.create_target('root', dedent('''
       source_root('src/py', python_library)
+      source_root('resources/a1', resources)
     '''))
 
     cls.create_target('root/src/py/a', dedent('''
@@ -174,6 +176,6 @@ class WhatChangedTest(BaseWhatChangedTest):
       )
     '''))
     self.assert_console_raises(
-      ValueError,
+      TargetDefinitionException,
       workspace=self.workspace(files=['root/resources/a1/a1.test'])
     )

@@ -74,3 +74,10 @@ class WithResources(InternalTarget):
   def resources(self, resources):
     self._resources = []
     self._raw_resources = util.resolve(resources)
+
+  def resolve(self):
+    # TODO(John Sirois): Clean this up when BUILD parse refactoring is tackled.
+    unused_resolved_resources = self.resources
+
+    for resolved in super(WithResources, self).resolve():
+      yield resolved

@@ -99,3 +99,10 @@ class ScalaLibrary(ExportableJvmLibrary, WithResources):
         java_target.update_dependencies([self])
     return self._java_sources
 
+  def resolve(self):
+    # TODO(John Sirois): Clean this up when BUILD parse refactoring is tackled.
+    unused_resolved_java_sources = self.java_sources
+
+    for resolved in super(ScalaLibrary, self).resolve():
+      yield resolved
+
