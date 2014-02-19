@@ -16,6 +16,8 @@
 
 from twitter.pants.base import manual
 
+from twitter.pants.targets import util
+
 from .internal import InternalTarget
 from .with_sources import TargetWithSources
 
@@ -58,12 +60,17 @@ class WithResources(InternalTarget):
   def __init__(self, *args, **kwargs):
     super(WithResources, self).__init__(*args, **kwargs)
     self._resources = []
+    self._raw_resources = None
 
   @property
   def resources(self):
+    if self._raw_resources is not None:
+      self._resources = list(self.resolve_all(self._raw_resources, Resources))
+      self.update_dependencies(self._resources)
+      self._raw_resources = None
     return self._resources
 
   @resources.setter
   def resources(self, resources):
-    self._resources = list(self.resolve_all(resources, Resources))
-    self.update_dependencies(self.resources)
+    self._resources = []
+    self._raw_resources = util.resolve(resources)
