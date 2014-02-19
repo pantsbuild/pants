@@ -513,7 +513,7 @@ class Goal(Command):
   def cleanup(self):
     # TODO: Make this more selective? Only kill nailguns that affect state? E.g., checkstyle
     # may not need to be killed.
-    NailgunTask.killall(log)
+    NailgunTask.killall(log.info)
     sys.exit(1)
 
 
