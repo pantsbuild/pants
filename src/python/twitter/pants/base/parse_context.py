@@ -63,9 +63,9 @@ class ParseContext(object):
 
     If there is an active parse context (see do_in_context), then it is returned.
     """
-    if not ParseContext._active:
+    if not cls._active:
       raise cls.ContextError('No parse context active.')
-    return ParseContext._active[-1]
+    return next(reversed(cls._active))
 
   @classmethod
   def path(cls, relpath=None):
@@ -77,14 +77,14 @@ class ParseContext(object):
     base = os.getcwd() if not ParseContext._active else cls.locate().current_buildfile.parent_path
     return os.path.abspath(os.path.join(base, relpath) if relpath else base)
 
-  @staticmethod
+  @classmethod
   @contextmanager
-  def temp(basedir=None):
+  def temp(cls, basedir=None):
     """Activates a temporary parse context in the given basedir relative to the build root or else
     in the build root dir itself if no basedir is specified.
     """
-    context = ParseContext(BuildFile(get_buildroot(), basedir or 'BUILD.temp', must_exist=False))
-    with ParseContext.activate(context):
+    context = cls(BuildFile(get_buildroot(), basedir or 'BUILD.temp', must_exist=False))
+    with cls.activate(context):
       yield
 
   @classmethod
@@ -95,14 +95,14 @@ class ParseContext(object):
       raise cls.ContextError('Context actions registered outside this parse context arg active')
 
     try:
-      ParseContext._active.append(ctx)
+      cls._active.append(ctx)
       ctx._on_context_exit = []
       yield
     finally:
       for func, args, kwargs in ctx._on_context_exit:
         func(*args, **kwargs)
       del ctx._on_context_exit
-      ParseContext._active.pop()
+      cls._active.pop()
 
   def __init__(self, buildfile):
     self.buildfile = buildfile
@@ -155,11 +155,19 @@ class ParseContext(object):
 
             buildfile_dir = os.path.dirname(buildfile.full_path)
 
-            # TODO(John Sirois): This is not build-dictionary friendly - rework SourceRoot to allow
-            # allow for doc of both register (as source_root) and source_root.here(*types).
-            # TODO(John Sirois): XXX this import is done here to prevent a cycle
+            # TODO(John Sirois): XXX imports are done here to prevent a cycles
+            from twitter.pants.targets.jvm_binary import Bundle
             from twitter.pants.targets.sources import SourceRoot
 
+            class RelativeBundle(Bundle):
+              def __init__(self, mapper=None, relative_to=None):
+                super(RelativeBundle, self).__init__(
+                    base=buildfile_dir,
+                    mapper=mapper,
+                    relative_to=relative_to)
+
+            # TODO(John Sirois): This is not build-dictionary friendly - rework SourceRoot to allow
+            # allow for doc of both register (as source_root) and source_root.here(*types).
             class RelativeSourceRoot(object):
               @staticmethod
               def here(*allowed_target_types):
@@ -177,6 +185,7 @@ class ParseContext(object):
               'rglobs': partial(Fileset.rglobs, root=buildfile_dir),
               'zglobs': partial(Fileset.zglobs, root=buildfile_dir),
               'source_root': RelativeSourceRoot,
+              'bundle': RelativeBundle
             })
             eval_globals.update(globalargs)
             Compatibility.exec_function(buildfile.code(), eval_globals)

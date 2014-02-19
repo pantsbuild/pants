@@ -24,7 +24,7 @@ from twitter.common.lang import Compatibility
 
 from twitter.pants.base import manual, ParseContext
 from twitter.pants.base.target import TargetDefinitionException
-from twitter.pants.targets import util
+from twitter.pants.targets import JarLibrary, util
 
 from .internal import InternalTarget
 from .jvm_target import JvmTarget
@@ -133,10 +133,11 @@ class Bundle(object):
     ]
   """
 
-  def __init__(self, mapper=None, relative_to=None):
+  def __init__(self, base=None, mapper=None, relative_to=None):
     """
     :param mapper: Function that takes a path string and returns a path string. Takes a path in
-      the source tree, returns a path to use in the resulting bundle. By default, an identity mapper.
+      the source tree, returns a path to use in the resulting bundle. By default, an identity
+      mapper.
     :param string relative_to: Set up a simple mapping from source path to bundle path.
       E.g., ``relative_to='common'`` removes that prefix from all files in the application bundle.
     """
@@ -144,12 +145,12 @@ class Bundle(object):
       raise ValueError("Must specify exactly one of 'mapper' or 'relative_to'")
 
     if relative_to:
-      base = ParseContext.path(relative_to)
+      base = base or ParseContext.path(relative_to)
       if not os.path.isdir(base):
         raise ValueError('Could not find a directory to bundle relative to at %s' % base)
       self.mapper = RelativeToMapper(base)
     else:
-      self.mapper = mapper or RelativeToMapper(ParseContext.path())
+      self.mapper = mapper or RelativeToMapper(base or ParseContext.path())
 
     self.filemap = {}
 
@@ -195,16 +196,12 @@ class JvmApp(InternalTarget):
       ``name``. Pants uses this in the ``bundle`` goal to name the distribution
       artifact. In most cases this parameter is not necessary.
     """
-    InternalTarget.__init__(self, name, dependencies=[binary])
+    super(JvmApp, self).__init__(name, dependencies=[])
 
-    binary_list = list()
-    for b in maybe_list(util.resolve(binary), expected_type=(Pants, JvmBinary),
-                        raise_type=partial(TargetDefinitionException, self)):
-      binary_list.extend(b.resolve())
-    if len(binary_list) != 1:
-      raise TargetDefinitionException(
-          self, 'binary must resolve to a single JvmBinary target, found %s' % binary)
-    self._resolved_binary = binary_list[0]
+    self._binaries = maybe_list(
+        util.resolve(binary),
+        expected_type=(Pants, JarLibrary, JvmBinary),
+        raise_type=partial(TargetDefinitionException, self))
 
     self._bundles = maybe_list(bundles, expected_type=Bundle,
                                raise_type=partial(TargetDefinitionException, self))
@@ -213,6 +210,7 @@ class JvmApp(InternalTarget):
       raise TargetDefinitionException(self, 'basename must not equal name.')
     self.basename = basename or name
 
+    self._resolved_binary = None
     self._resolved_bundles = []
 
   def is_jvm_app(self):
@@ -220,7 +218,20 @@ class JvmApp(InternalTarget):
 
   @property
   def binary(self):
+    self._maybe_resolve_binary()
     return self._resolved_binary
+
+  def _maybe_resolve_binary(self):
+    if self._binaries is not None:
+      binaries_list = []
+      for binary in self._binaries:
+        binaries_list.extend(filter(lambda t: t.is_concrete, binary.resolve()))
+
+      if len(binaries_list) != 1 or not isinstance(binaries_list[0], JvmBinary):
+        raise TargetDefinitionException(self,
+                                        'must supply exactly 1 JvmBinary, got %s' % binaries_list)
+      self._resolved_binary = binaries_list[0]
+      self._binaries = None
 
   @property
   def bundles(self):
