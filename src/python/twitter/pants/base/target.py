@@ -228,7 +228,7 @@ class Target(AbstractTarget):
             raise TypeError('%s requires types: %s and found %s' % (cls, expected_types, resolved))
           yield resolved
 
-  def __init__(self, name, exclusives=None):
+  def __init__(self, name, reinit_check=True, exclusives=None):
     """
     :param string name: The target name.
     """
@@ -236,7 +236,7 @@ class Target(AbstractTarget):
     # This check prevents double-initialization in multiple-inheritance situations.
     # TODO(John Sirois): fix target inheritance - use super() to linearize or use alternatives to
     # multiple inheritance.
-    if not hasattr(self, '_initialized'):
+    if not reinit_check or not hasattr(self, '_initialized'):
       if not isinstance(name, Compatibility.string):
         self.address = '%s:%s' % (ParseContext.locate().current_buildfile, str(name))
         raise TargetDefinitionException(self, "Invalid target name: %s" % name)
