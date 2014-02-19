@@ -17,6 +17,7 @@
 from twitter.common.collections import maybe_list
 
 from twitter.pants.base import manual, Target, TargetDefinitionException
+from twitter.pants.targets import util
 
 from .exportable_jvm_library import ExportableJvmLibrary
 from .resources import WithResources
@@ -79,19 +80,22 @@ class ScalaLibrary(ExportableJvmLibrary, WithResources):
 
     self.resources = resources
 
-    # Defer resolves until done parsing the current BUILD file, certain source_root arrangements
-    # might allow java and scala sources to co-mingle and so have targets in the same BUILD.
-    self.java_sources = []
-    self._post_construct(self._link_java_cycles, java_sources)
+    self._java_sources = []
+    self._raw_java_sources = util.resolve(java_sources)
 
     self.add_labels('scala')
 
-  def _link_java_cycles(self, java_sources):
-    if java_sources:
-      self.java_sources = list(Target.resolve_all(maybe_list(java_sources, Target), JavaLibrary))
+  @property
+  def java_sources(self):
+    if self._raw_java_sources is not None:
+      self._java_sources = list(Target.resolve_all(maybe_list(self._raw_java_sources, Target),
+                                                   JavaLibrary))
 
-    # We have circular java/scala dep, add an inbound dependency edge from java to scala in this
-    # case to force scala compilation to precede java - since scalac supports generating java stubs
-    # for these cycles and javac does not this is both necessary and always correct.
-    for java_target in self.java_sources:
-      java_target.update_dependencies([self])
+      # TODO(John Sirois): reconsider doing this auto-linking.
+      # We have circular java/scala dep, add an inbound dependency edge from java to scala in this
+      # case to force scala compilation to precede java - since scalac supports generating java stubs
+      # for these cycles and javac does not this is both necessary and always correct.
+      for java_target in self._java_sources:
+        java_target.update_dependencies([self])
+    return self._java_sources
+
