@@ -4,7 +4,7 @@ import re
 from twitter.pants.binary_util import select_binary
 
 
-INCLUDE_PARSER = re.compile(r'^\s*include\s+"([^"]+)"\s*$')
+INCLUDE_PARSER = re.compile(r'^\s*include\s+"([^"]+)"\s*([\/\/|\#].*)*$')
 
 
 def find_includes(basedirs, source, log=None):
@@ -24,12 +24,17 @@ def find_includes(basedirs, source, log=None):
       match = INCLUDE_PARSER.match(line)
       if match:
         capture = match.group(1)
+        added = False
         for basedir in all_basedirs:
           include = os.path.join(basedir, capture)
           if os.path.exists(include):
             if log:
               log.debug('%s has include %s' % (source, include))
             includes.add(include)
+            added = True
+        if not added:
+          raise ValueError("%s included in %s not found in bases %s"
+                           % (include, source, all_basedirs))
   return includes
 
 
@@ -60,23 +65,13 @@ def calculate_compile_sources_HACK_FOR_SCROOGE_LEGACY(targets, is_thrift_target)
 
   dirs = set()
   sources = set()
+
   def collect_sources(target):
     for source in target.sources:
       dirs.add(os.path.normpath(os.path.join(target.target_base, os.path.dirname(source))))
       sources.add(os.path.join(target.target_base, source))
   for target in targets:
     target.walk(collect_sources, predicate=is_thrift_target)
-
-  # This chunk of code is optional, but it might help find bugs because scrooge
-  # found the wrong file and used it.
-  thrift_file_to_import_paths = defaultdict(set)
-  for import_path in dirs:
-    for thrift_file in map(lambda p: os.path.basename(p), glob.glob('%s/*.thrift' % import_path)):
-      thrift_file_to_import_paths[thrift_file].add(import_path)
-    for thrift_file, import_paths in thrift_file_to_import_paths.items():
-      if len(import_paths) > 1:
-        self.context.log.warning("'%s' found in multiple import-paths: [%s]" % (
-            thrift_file, ', '.join(import_paths)))
 
   return dirs, sources
 
