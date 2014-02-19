@@ -23,6 +23,7 @@ from glob import glob1
 from twitter.common.collections import OrderedSet
 from twitter.common.python.interpreter import PythonIdentity
 
+
 class BuildFile(object):
   _CANONICAL_NAME = 'BUILD'
   _PATTERN = re.compile('^%s(\.[a-z]+)?$' % _CANONICAL_NAME)
