@@ -91,10 +91,12 @@ class ScalaLibrary(ExportableJvmLibrary, WithResources):
       self._java_sources = list(Target.resolve_all(maybe_list(self._raw_java_sources, Target),
                                                    JavaLibrary))
 
+      self._raw_java_sources = None
+
       # TODO(John Sirois): reconsider doing this auto-linking.
       # We have circular java/scala dep, add an inbound dependency edge from java to scala in this
-      # case to force scala compilation to precede java - since scalac supports generating java stubs
-      # for these cycles and javac does not this is both necessary and always correct.
+      # case to force scala compilation to precede java - since scalac supports generating java
+      # stubs for these cycles and javac does not this is both necessary and always correct.
       for java_target in self._java_sources:
         java_target.update_dependencies([self])
     return self._java_sources
