@@ -71,11 +71,11 @@ class ListTargets(ConsoleTask):
         return "%s%s%s" % (provided_jar.org, '#', provided_jar.name)
 
       extractors = dict(
-          address = lambda target: str(target.address),
-          artifact_id = extract_artifact_id,
-          repo_name = lambda target: target.provides.repo.name,
-          repo_url = lambda target: target.provides.repo.url,
-          repo_db = lambda target: target.provides.repo.push_db,
+          address=lambda target: str(target.address),
+          artifact_id=extract_artifact_id,
+          repo_name=lambda target: target.provides.repo.name,
+          repo_url=lambda target: target.provides.repo.url,
+          repo_db=lambda target: target.provides.repo.push_db,
       )
 
       def print_provides(column_extractors, address):
@@ -97,7 +97,7 @@ class ListTargets(ConsoleTask):
           return '%s\n  %s' % (address, '\n  '.join(target.description.strip().split('\n')))
       print_fn = print_documented
     else:
-      print_fn = lambda address: str(address)
+      print_fn = lambda addr: str(addr)
 
     visited = set()
     for address in self._addresses():
@@ -108,7 +108,9 @@ class ListTargets(ConsoleTask):
 
   def _addresses(self):
     if self.context.target_roots:
-      return (target.address for target in self.context.target_roots)
+      for target in self.context.target_roots:
+        yield target.address
     else:
-      return (address for buildfile in BuildFile.scan_buildfiles(self._root_dir)
-                      for address in Target.get_all_addresses(buildfile))
+      for buildfile in BuildFile.scan_buildfiles(self._root_dir):
+        for address in Target.get_all_addresses(buildfile):
+          yield address
