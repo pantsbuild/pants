@@ -196,7 +196,13 @@ class GroupEngine(Engine):
               # resolves for each batch of targets they're asked to compile.
 
               goal_chunks = []
-              exclusive_chunks = ExclusivesIterator.from_context(self._context)
+
+              # We won't have exclusives calculated if stopping short for example during an explain.
+              if explain:
+                exclusive_chunks = [self._context.targets()]
+              else:
+                exclusive_chunks = ExclusivesIterator.from_context(self._context)
+
               for exclusive_chunk in exclusive_chunks:
                 group_chunks = GroupIterator(filter(lambda t: t.is_concrete, exclusive_chunk),
                                              goals_by_group_member.keys())
