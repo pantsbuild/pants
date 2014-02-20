@@ -73,6 +73,7 @@ How to develop Pants itself and contribute your changes.
 
    howto_develop
    howto_contribute
+   intellij
    internals
    dev_tasks
    docs
