@@ -943,6 +943,10 @@ goal(
   dependencies=['compile'],  # To pick up missing deps.
 ).install()
 
+goal(
+  name='builddict',
+  action=BuildBuildDictionary,
+).install()
 
 from twitter.pants.tasks.idea_gen import IdeaGen
 

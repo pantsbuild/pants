@@ -66,8 +66,7 @@ def main():
   pants_src_dir = os.path.dirname(docs_dir)
   tasks_dir = os.path.join(pants_src_dir, 'tasks')
 
-  # TODO: Re-enable when the BUILD dictionary templates have been updated.
-  #copy_builddict(docs_dir)
+  copy_builddict(docs_dir)
 
   with open(os.path.join(docs_dir, 'tasks.rst'), 'w') as tasks_rst:
     tasks_rst.write('\n'.join([
