@@ -16,29 +16,29 @@ goal.
 
 **Goals and Tasks summary**
 
-{{#phases}}
-  * :ref:`gref_phase_{{phase.name}}` - {{phase.description}}
-{{/phases}}
 
-{{#phases}}
+% for phase in sorted(phases.keys(), key=lambda phase: phase.name):
+  * :ref:`gref_phase_${phase.name}` - ${phase.description}
+% endfor
 
-.. _gref_phase_{{phase.name}}:
 
-{{phase.name}}
------------------------------------------------------------------------------
+% for phase in sorted(phases.keys(), key=lambda phase: phase.name):
+.. _gref_phase_${phase.name}:
 
-{{#phase.description}}
-{{phase.description}}
-{{/phase.description}}
+<% stars = '=' * len(phase.name) %>
+${phase.name}
+${stars}
 
-**Installed tasks:**
+${phase.description}
 
-{{#goals}}
-* Implemented by class ``{{name}}``
+Installed tasks:
 
-{{#doc}}
-  {{{doc}}}
-{{/doc}}
+% for goal in sorted(phases[phase], key=lambda goal: goal.task_type.__name__):
 
-{{/goals}}
-{{/phases}}
+.. py:class:: ${goal.task_type.__name__}
+
+${goal.task_type.__doc__}
+% endfor
+
+
+% endfor

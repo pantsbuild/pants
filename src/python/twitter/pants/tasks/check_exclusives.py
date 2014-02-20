@@ -242,7 +242,7 @@ class ExclusivesMapping(object):
     if group_key not in self._group_classpaths:
       self._group_classpaths[group_key] = OrderedSet()
     # get the classpath to use for compiling targets within the group specified by group_key.
-    return list(self._group_classpaths[group_key])
+    return list(reversed(self._group_classpaths[group_key]))
 
   def _key_to_map(self, key):
     result = {}
@@ -274,12 +274,13 @@ class ExclusivesMapping(object):
     """Update the classpath of all groups compatible with group_key, adding path_additions to their
     classpath.
     """
+    additions = list(reversed(path_additions))
     for key in self._group_classpaths:
       if group_key is None or self._is_compatible(group_key, key):
         group_classpath = self._group_classpaths[key]
-        group_classpath.update(path_additions)
+        group_classpath.update(additions)
 
   def set_base_classpath_for_group(self, group_key, classpath):
     # set the initial classpath of the elements of group_key to classpath.
-    self._group_classpaths[group_key] = OrderedSet(classpath)
+    self._group_classpaths[group_key] = OrderedSet(reversed(classpath))
 

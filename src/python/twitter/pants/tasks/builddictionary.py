@@ -14,6 +14,7 @@
 # limitations under the License.
 # =============================================================================
 
+import cgi
 import inspect
 import os
 
@@ -58,19 +59,19 @@ def entry(nom, classdoc=None, msg_rst=None, argspec=None, funcdoc=None, methods=
     # Determine minimum indentation (first line doesn't count):
     indent = 999
     for line in lines[1:]:
-      stripped = line.lstrip()
-      if stripped:
-        indent = min(indent, len(line) - len(stripped))
+        stripped = line.lstrip()
+        if stripped:
+            indent = min(indent, len(line) - len(stripped))
     # Remove indentation (first line is special):
     trimmed = [lines[0].strip()]
     if indent < 999:
-      for line in lines[1:]:
-        trimmed.append(line[indent:].rstrip())
+        for line in lines[1:]:
+            trimmed.append(line[indent:].rstrip())
     # Strip off trailing and leading blank lines:
     while trimmed and not trimmed[-1]:
-      trimmed.pop()
+        trimmed.pop()
     while trimmed and not trimmed[0]:
-      trimmed.pop(0)
+        trimmed.pop(0)
     # Return a single string:
     return '\n'.join([" " + t for t in trimmed])
 
@@ -80,8 +81,7 @@ def entry(nom, classdoc=None, msg_rst=None, argspec=None, funcdoc=None, methods=
     msg_rst=indent_docstring_by_1(msg_rst),
     argspec=argspec,
     funcdoc=indent_docstring_by_1(funcdoc),
-    methods=methods,
-    showmethods=(methods and len(methods) > 0))
+    methods=methods)
 
 
 def msg_entry(nom, defn):
@@ -98,7 +98,6 @@ def entry_for_one_func(nom, func):
   return entry(nom,
                argspec=argspec,
                funcdoc=func.__doc__)
-
 
 def entry_for_one_method(nom, method):
   """Generate a BUILD dictionary entry for a method
@@ -120,8 +119,8 @@ def entry_for_one(nom, sym):
     return entry_for_one_class(nom, sym)
   if inspect.ismethod(sym) or inspect.isfunction(sym):
     return entry_for_one_func(nom, sym)
-  return msg_entry(nom, "TODO! no doc gen for %s %s" % (
-        str(type(sym)), str(sym)))
+  return msg_entry(nom, cgi.escape("TODO! no doc gen for %s %s" % (
+        str(type(sym)), str(sym))))
 
 
 PREDEFS = {  # some hardwired entries
@@ -163,7 +162,6 @@ def get_syms():
   vc = twitter.pants.base.ParseContext.default_globals()
   for s in vc:
     if s in PREDEFS: continue
-    if s[0].isupper(): continue  # REMIND see both jvm_binary and JvmBinary??
     o = vc[s]
     r[s] = o
   return r
@@ -208,9 +206,7 @@ def entry_for_one_class(nom, klas):
       if inspect.ismethod(attr):
         methods.append(entry_for_one_method(attrname, attr))
         continue
-      raise TaskError('@manual.builddict on non-method %s within class %s '
-                      'but I only know what to do with methods' %
-                      (attrname, nom))
+      raise TaskError('@manual.builddict on non-method %s within class %s but I only know what to do with methods' % (attrname, nom))
 
   except TypeError:  # __init__ might not be a Python function
     argspec = None
@@ -272,18 +268,9 @@ class BuildBuildDictionary(Task):
 
   def _gen_goals_reference(self):
     """Generate the goals reference rst doc."""
-    phase_dict = {}
-    phase_names = []
-    for phase, raw_goals in Phase.all():
-      goals = []
-      for g in raw_goals:
-        # TODO(lahosken) generalize indent_docstring, use here
-        doc = (g.task_type.__doc__ or "").replace("\n", " ").strip()
-        goals.append(TemplateData(name=g.task_type.__name__, doc=doc))
-      phase_dict[phase.name] = TemplateData(phase=phase, goals=goals)
-      phase_names.append(phase.name)
-
-    phases = [phase_dict[name] for name in sorted(phase_names, key=str.lower)]
+    phases = dict()
+    for phase, goals in Phase.all():
+      phases[phase] = goals
 
     template = resource_string(__name__,
                                os.path.join(self._templates_dir, 'goals_reference.mustache'))

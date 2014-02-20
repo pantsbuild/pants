@@ -59,8 +59,6 @@ Pants Reference Documentation
 .. toctree::
    :maxdepth: 1
 
-   build_dictionary
-   goals_reference
    targets
    tasks
    base
@@ -75,7 +73,6 @@ How to develop Pants itself and contribute your changes.
 
    howto_develop
    howto_contribute
-   intellij
    internals
    dev_tasks
    docs
