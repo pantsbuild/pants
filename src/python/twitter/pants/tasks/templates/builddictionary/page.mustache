@@ -8,45 +8,46 @@ with the ant concept of a build target. This page describes the
 commands and values available. Many of these define ``BUILD``
 targets; some are handy utilities.
 
-% for toc in tocs:
-**${toc.t}** |
-  % for e in toc.e:
-`${e}`_ |
-  % endfor
+{{#tocs}}
+**{{t}}** |
+  {{#e}}
+`{{.}}`_ |
+  {{/e}}
 
-% endfor
+{{/tocs}}
 
-% for defn in defns:
-.. _bdict_${defn.nom}:
+{{#defns}}
+.. _bdict_{{nom}}:
 
-${defn.nom}
+{{nom}}
 -------------------------------------------------------------------------------
 
-%if defn.argspec:
-.. py:function:: ${defn.nom}${defn.argspec}
-%endif
+{{#argspec}}
+.. py:function:: {{nom}}{{argspec}}
+{{/argspec}}
 
-%if defn.classdoc:
-${defn.classdoc}
-%endif
+{{#classdoc}}
+{{{classdoc}}}
+{{/classdoc}}
 
-%if defn.msg_rst:
-${defn.msg_rst}
-%endif
+{{#msg_rst}}
+{{{msg_rst}}}
+{{/msg_rst}}
 
-%if defn.funcdoc:
-${defn.funcdoc}
-%endif
+{{#funcdoc}}
+{{{funcdoc}}}
+{{/funcdoc}}
 
-%if defn.methods:
+{{#showmethods}}
 **Methods:**
-% for method in defn.methods:
-  .. py:method:: ${method.nom}${method.argspec}
+{{#methods}}
 
-  ${method.funcdoc}
-% endfor
-%endif
+ .. py:method:: {{nom}}{{argspec}}
 
-% endfor
+{{{funcdoc}}}
+{{/methods}}
+{{/showmethods}}
+
+{{/defns}}
 
 
