@@ -58,7 +58,7 @@ class IvyInfo(object):
 
 class IvyUtils(object):
   """Useful methods related to interaction with ivy."""
-  def __init__(self, config, options, log, confs=None):
+  def __init__(self, config, options, log):
     self._log = log
     self._config = config
     self._options = options
@@ -78,7 +78,6 @@ class IvyUtils(object):
     self._jvm_options.append('-Dsun.io.useCanonCaches=false')
     self._work_dir = config.get('ivy-resolve', 'workdir')
     self._template_path = os.path.join('templates', 'ivy_resolve', 'ivy.mustache')
-    self._confs = maybe_list(confs) if confs else ['default']
 
     if self._mutable_pattern:
       try:
@@ -391,7 +390,7 @@ class IvyUtils(object):
 
     ivy_args = ['-ivy', ivyxml]
 
-    confs_to_resolve = confs or self._confs
+    confs_to_resolve = confs or ['default']
     ivy_args.append('-confs')
     ivy_args.extend(confs_to_resolve)
 
