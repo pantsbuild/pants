@@ -30,7 +30,7 @@ class PrepareResources(Task):
     Task.__init__(self, context)
 
     self.workdir = context.config.get('prepare-resources', 'workdir')
-    self.confs = context.config.getlist('prepare-resources', 'confs')
+    self.confs = context.config.getlist('prepare-resources', 'confs', default=['default'])
     self.context.products.require_data('exclusives_groups')
 
   def execute(self, targets):

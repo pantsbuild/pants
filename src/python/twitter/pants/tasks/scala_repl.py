@@ -38,7 +38,7 @@ class ScalaRepl(JvmTask):
     if context.options.run_jvmargs:
       for arg in context.options.run_jvmargs:
         self.jvm_args.extend(shlex.split(arg))
-    self.confs = context.config.getlist('scala-repl', 'confs')
+    self.confs = context.config.getlist('scala-repl', 'confs', default=['default'])
     self._bootstrap_key = 'scala-repl'
     bootstrap_tools = context.config.getlist('scala-repl', 'bootstrap-tools')
     self._jvm_tool_bootstrapper.register_jvm_tool(self._bootstrap_key, bootstrap_tools)

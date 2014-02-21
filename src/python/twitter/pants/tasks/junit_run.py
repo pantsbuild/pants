@@ -152,14 +152,16 @@ class JUnitRun(JvmTask):
 
     context.products.require_data('exclusives_groups')
 
-    self.confs = context.config.getlist('junit-run', 'confs')
+    self.confs = context.config.getlist('junit-run', 'confs', default=['default'])
 
     self._junit_bootstrap_key = 'junit'
-    junit_bootstrap_tools = context.config.getlist('junit-run', 'junit-bootstrap-tools', default=[':junit'])
+    junit_bootstrap_tools = context.config.getlist('junit-run', 'junit-bootstrap-tools',
+                                                   default=[':junit'])
     self._jvm_tool_bootstrapper.register_jvm_tool(self._junit_bootstrap_key, junit_bootstrap_tools)
 
     self._emma_bootstrap_key = 'emma'
-    emma_bootstrap_tools = context.config.getlist('junit-run', 'emma-bootstrap-tools', default=[':emma'])
+    emma_bootstrap_tools = context.config.getlist('junit-run', 'emma-bootstrap-tools',
+                                                  default=[':emma'])
     self._jvm_tool_bootstrapper.register_jvm_tool(self._emma_bootstrap_key, emma_bootstrap_tools)
 
     self.jvm_args = context.config.getlist('junit-run', 'jvm_args', default=[])
@@ -265,7 +267,8 @@ class JUnitRun(JvmTask):
             raise TaskError('java %s ... exited non-zero (%i)' % (main, result))
 
         if self.coverage:
-          emma_classpath = self._jvm_tool_bootstrapper.get_jvm_tool_classpath(self._emma_bootstrap_key)
+          emma_classpath = self._jvm_tool_bootstrapper.get_jvm_tool_classpath(
+              self._emma_bootstrap_key)
 
           def instrument_code():
             safe_mkdir(self.coverage_instrument_dir, clean=True)

@@ -56,7 +56,7 @@ class SpecsRun(JvmTask):
                                              default=[':scala-specs-2.9.3'])
     self._jvm_tool_bootstrapper.register_jvm_tool(self._specs_bootstrap_key, bootstrap_tools)
 
-    self.confs = context.config.getlist('specs-run', 'confs')
+    self.confs = context.config.getlist('specs-run', 'confs', default=['default'])
 
     self._jvm_options = context.config.getlist('specs-run', 'jvm_args', default=[])
     if context.options.specs_run_jvm_options:

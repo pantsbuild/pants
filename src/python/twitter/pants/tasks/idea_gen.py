@@ -171,6 +171,8 @@ class IdeaGen(IdeGen):
       internal_source_jars=[cp_entry.source_jar for cp_entry in project.internal_jars
                             if cp_entry.source_jar],
       external_jars=[cp_entry.jar for cp_entry in project.external_jars],
+      external_javadoc_jars=[cp_entry.javadoc_jar for cp_entry in project.external_jars
+                             if cp_entry.javadoc_jar],
       external_source_jars=[cp_entry.source_jar for cp_entry in project.external_jars
                             if cp_entry.source_jar],
       extra_components=[],

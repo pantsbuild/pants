@@ -95,7 +95,11 @@ limitations under the License.
           <root url="jar://{{.}}!/" />
           {{/module.external_jars}}
         </CLASSES>
-        <JAVADOC />
+        <JAVADOC>
+          {{#module.external_javadoc_jars}}
+          <root url="jar://{{.}}!/" />
+          {{/module.external_javadoc_jars}}
+        </JAVADOC>
         <SOURCES>
           {{#module.external_source_jars}}
           <root url="jar://{{.}}!/" />

@@ -19,7 +19,7 @@ import pkgutil
 
 from collections import defaultdict
 
-from twitter.common.collections import OrderedSet, OrderedDict
+from twitter.common.collections import OrderedSet
 from twitter.common.dirutil import safe_delete, safe_mkdir, safe_open
 
 from twitter.pants.base.build_environment import get_buildroot
@@ -135,14 +135,16 @@ class EclipseGen(IdeGen):
     outdir = os.path.abspath(os.path.join(self.work_dir, 'bin'))
     safe_mkdir(outdir)
 
-    source_sets = defaultdict(OrderedSet) # base_id -> source_set
+    source_sets = defaultdict(OrderedSet)  # base_id -> source_set
     for source_set in project.sources:
       source_sets[linked_folder_id(source_set)].add(source_set)
     sourcepaths = [create_sourcepath(base_id, sources) for base_id, sources in source_sets.items()]
 
     libs = []
+
     def add_jarlibs(classpath_entries):
       for classpath_entry in classpath_entries:
+        # TODO(John Sirois): Plumb javadoc jars
         libs.append((classpath_entry.jar, classpath_entry.source_jar))
     add_jarlibs(project.internal_jars)
     add_jarlibs(project.external_jars)

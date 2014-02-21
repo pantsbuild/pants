@@ -30,14 +30,13 @@ limitations under the License.
     {{/lib.version}}
    />
 
-  <configurations defaultconfmapping="default->default(compile),runtime();sources->sources;docs->@,javadoc;">
-    <conf name="default" description="normal build"/>
-    <conf name="sources" description="java sources"/>
-    <conf name="docs" description="javadocs"/>
-    <conf name="changelog" description="changelog for artifact pushes"/>
-    <conf name="test" visibility="private" description="build and run tests"/>
-    <conf name="provided" description="provided by target environment"/>
+  {{#lib.configurations?}}
+  <configurations>
+    {{#lib.configurations}}
+    <conf name="{{.}}"/>
+    {{/lib.configurations}}
   </configurations>
+  {{/lib.configurations?}}
 
   {{#lib.publications?}}
   <publications>
@@ -62,10 +61,12 @@ limitations under the License.
                 name="{{module}}"
                 rev="{{version}}"
                 {{#force}}force="true"{{/force}}
-                conf="{{configurations}}"
                 {{^transitive}}transitive="false"{{/transitive}}
                 {{#mutable}}changing="true"{{/mutable}}
     >
+      {{#configurations}}
+      <conf name="{{.}}" mapped="{{.}}"/>
+      {{/configurations}}
       {{#artifacts}}
       <artifact
         {{#name}}name="{{.}}"{{/name}}

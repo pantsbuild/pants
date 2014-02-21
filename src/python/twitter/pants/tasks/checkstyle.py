@@ -54,7 +54,7 @@ class Checkstyle(NailgunTask):
 
     self._work_dir = context.config.get('checkstyle', 'workdir')
     self._properties = context.config.getdict('checkstyle', 'properties')
-    self._confs = context.config.getlist('checkstyle', 'confs')
+    self._confs = context.config.getlist('checkstyle', 'confs', default=['default'])
     self.context.products.require_data('exclusives_groups')
 
   def execute(self, targets):

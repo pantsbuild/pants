@@ -51,7 +51,7 @@ class BenchmarkRun(JvmTask):
     super(BenchmarkRun, self).__init__(context)
 
     config = context.config
-    self.confs = config.getlist('benchmark-run', 'confs')
+    self.confs = config.getlist('benchmark-run', 'confs', default=['default'])
     self.jvm_args = config.getlist('benchmark-run', 'jvm_args',
                                    default=['-Xmx1g', '-XX:MaxPermSize=256m'])
 

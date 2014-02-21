@@ -92,6 +92,7 @@ class JvmBinaryTask(Task):
     self.context.log.debug('Calculated excludes:\n\t%s' % '\n\t'.join(str(e) for e in excludes))
 
     externaljars = OrderedSet()
+
     def add_jars(target):
       mapped = jardepmap.get(target)
       if mapped:

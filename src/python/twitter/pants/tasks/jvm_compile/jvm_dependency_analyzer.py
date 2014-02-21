@@ -10,7 +10,12 @@ from twitter.pants import get_buildroot
 
 
 class JvmDependencyAnalyzer(object):
-  def __init__(self, context, check_missing_deps, check_missing_direct_deps, check_unnecessary_deps):
+  def __init__(self,
+               context,
+               check_missing_deps,
+               check_missing_direct_deps,
+               check_unnecessary_deps):
+
     self._context = context
     self._context.products.require_data('classes_by_target')
     self._context.products.require_data('ivy_jar_products')
@@ -23,12 +28,14 @@ class JvmDependencyAnalyzer(object):
     """Returns a map from abs path of source, class or jar file to an OrderedSet of targets.
 
     The value is usually a singleton, because a source or class file belongs to a single target.
-    However a single jar may be provided (transitively or intransitively) by multiple JarLibrary targets.
-    But if there is a JarLibrary target that depends on a jar directly, then that "canonical" target
-    will be the first one in the list of targets.
+    However a single jar may be provided (transitively or intransitively) by multiple JarLibrary
+    targets. But if there is a JarLibrary target that depends on a jar directly, then that
+    "canonical" target will be the first one in the list of targets.
     """
     targets_by_file = defaultdict(OrderedSet)
-    jarlibs_by_id = defaultdict(set)  # Multiple JarLibrary targets can provide the same (org, name).
+
+    # Multiple JarLibrary targets can provide the same (org, name).
+    jarlibs_by_id = defaultdict(set)
 
     # Compute src -> target.
     buildroot = get_buildroot()
@@ -56,6 +63,7 @@ class JvmDependencyAnalyzer(object):
 
     def register_transitive_jars_for_ref(ivyinfo, ref):
       deps_by_ref_memo = {}
+
       def get_transitive_jars_by_ref(ref1, visited=None):
         if ref1 in deps_by_ref_memo:
           return deps_by_ref_memo[ref1]
@@ -125,17 +133,21 @@ class JvmDependencyAnalyzer(object):
 
       if self._check_missing_deps and (missing_file_deps or missing_tgt_deps):
         for (tgt_pair, evidence) in missing_tgt_deps:
-          evidence_str = '\n'.join(['    %s uses %s' % (shorten(e[0]), shorten(e[1])) for e in evidence])
-          self._context.log.error('Missing BUILD dependency %s -> %s because:\n%s' %
-                                  (tgt_pair[0].address.reference(), tgt_pair[1].address.reference(), evidence_str))
+          evidence_str = '\n'.join(['    %s uses %s' % (shorten(e[0]), shorten(e[1]))
+                                    for e in evidence])
+          self._context.log.error(
+              'Missing BUILD dependency %s -> %s because:\n%s'
+              % (tgt_pair[0].address.reference(), tgt_pair[1].address.reference(), evidence_str))
         for (src_tgt, dep) in missing_file_deps:
-          self._context.log.error('Missing BUILD dependency %s -> %s' % (src_tgt.address.reference(), shorten(dep)))
+          self._context.log.error('Missing BUILD dependency %s -> %s'
+                                  % (src_tgt.address.reference(), shorten(dep)))
         if self._check_missing_deps == 'fatal':
           raise TaskError('Missing deps.')
 
       if self._check_missing_direct_deps:
         for (tgt_pair, evidence) in missing_direct_tgt_deps:
-          evidence_str = '\n'.join(['    %s uses %s' % (shorten(e[0]), shorten(e[1])) for e in evidence])
+          evidence_str = '\n'.join(['    %s uses %s' % (shorten(e[0]), shorten(e[1]))
+                                    for e in evidence])
           self._context.log.warn('Missing direct BUILD dependency %s -> %s because:\n%s' %
                                   (tgt_pair[0].address, tgt_pair[1].address, evidence_str))
         if self._check_missing_direct_deps == 'fatal':
@@ -147,21 +159,23 @@ class JvmDependencyAnalyzer(object):
   def _compute_missing_deps(self, srcs, actual_deps):
     """Computes deps that are used by the compiler but not specified in a BUILD file.
 
-    These deps are bugs waiting to happen: the code may happen to compile because the dep was brought
-    in some other way (e.g., by some other root target), but that is obviously fragile.
+    These deps are bugs waiting to happen: the code may happen to compile because the dep was
+    brought in some other way (e.g., by some other root target), but that is obviously fragile.
 
-    Note that in practice we're OK with reliance on indirect deps that are only brought in transitively.
-    E.g., in Scala type inference can bring in such a dep subtly. Fortunately these cases aren't as fragile
-    as a completely missing dependency. It's still a good idea to have explicit direct deps where relevant,
-    so we optionally warn about indirect deps, to make them easy to find and reason about.
+    Note that in practice we're OK with reliance on indirect deps that are only brought in
+    transitively. E.g., in Scala type inference can bring in such a dep subtly. Fortunately these
+    cases aren't as fragile as a completely missing dependency. It's still a good idea to have
+    explicit direct deps where relevant, so we optionally warn about indirect deps, to make them
+    easy to find and reason about.
 
-    - actual_deps: a map src -> list of actual deps (source, class or jar file) as noted by the compiler.
+    - actual_deps: a map src -> list of actual deps (source, class or jar file) as noted by the
+      compiler.
 
     Returns a triple (missing_file_deps, missing_tgt_deps, missing_direct_tgt_deps) where:
 
-    - missing_file_deps: a list of pairs (src_tgt, dep_file) where src_tgt requires dep_file, and we're
-      unable to map to a target (because its target isn't in the total set of targets in play, and we
-      don't want to parse every BUILD file in the workspace just to find it).
+    - missing_file_deps: a list of pairs (src_tgt, dep_file) where src_tgt requires dep_file, and
+      we're unable to map to a target (because its target isn't in the total set of targets in play,
+      and we don't want to parse every BUILD file in the workspace just to find it).
 
     - missing_tgt_deps: a list of pairs (src_tgt, dep_tgt) where src_tgt is missing a necessary
                         transitive dependency on dep_tgt.
@@ -204,8 +218,11 @@ class JvmDependencyAnalyzer(object):
               missing_tgt_deps_map[(src_tgt, canonical_actual_dep_tgt)].append((src, actual_dep))
             elif canonical_actual_dep_tgt not in src_tgt.dependencies:
               # The canonical dep is the only one a direct dependency makes sense on.
-              missing_direct_tgt_deps_map[(src_tgt, canonical_actual_dep_tgt)].append((src, actual_dep))
+              missing_direct_tgt_deps_map[(src_tgt, canonical_actual_dep_tgt)].append(
+                  (src, actual_dep))
       else:
         raise TaskError('Requested dep info for unknown source file: %s' % src)
 
-    return list(missing_file_deps), missing_tgt_deps_map.items(), missing_direct_tgt_deps_map.items()
+    return (list(missing_file_deps),
+            missing_tgt_deps_map.items(),
+            missing_direct_tgt_deps_map.items())

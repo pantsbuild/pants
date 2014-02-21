@@ -45,8 +45,8 @@ class JvmRun(JvmTask):
       help = "[%default] Run binary with a debugger")
 
     option_group.add_option(mkflag('only-write-cmd-line'), dest = 'only_write_cmd_line',
-                            action='store', default=None,
-                            help = '[%default] Instead of running, just write the cmd line to this file')
+      action='store', default=None,
+      help = '[%default] Instead of running, just write the cmd line to this file')
 
   def __init__(self, context):
     Task.__init__(self, context)
@@ -60,7 +60,7 @@ class JvmRun(JvmTask):
         self.args.extend(shlex.split(arg))
     if context.options.run_debug:
       self.jvm_args.extend(context.config.getlist('jvm', 'debug_args'))
-    self.confs = context.config.getlist('jvm-run', 'confs')
+    self.confs = context.config.getlist('jvm-run', 'confs', default=['default'])
     self.only_write_cmd_line = context.options.only_write_cmd_line
     context.products.require_data('exclusives_groups')
 

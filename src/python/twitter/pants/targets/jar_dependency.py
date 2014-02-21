@@ -16,6 +16,8 @@
 
 from collections import defaultdict
 
+from twitter.common.collections import OrderedSet
+
 from twitter.pants.base.build_manual import manual
 from twitter.pants.base.target import AbstractTarget
 
@@ -126,7 +128,7 @@ class JarDependency(ExternalDependency, AbstractTarget):
     # Support legacy method names
     # TODO(John Sirois): introduce a deprecation cycle for these and then kill
     self.withSources = self.with_sources
-    self.withDocs = self.with_sources
+    self.withDocs = self.with_docs
 
     self.declared_exclusives = defaultdict(set)
     if exclusives is not None:
@@ -136,6 +138,12 @@ class JarDependency(ExternalDependency, AbstractTarget):
   @property
   def is_jar(self):
     return True
+
+  @property
+  def configurations(self):
+    confs = OrderedSet(self._configurations)
+    confs.update(artifact.conf for artifact in self.artifacts if artifact.conf)
+    return list(confs)
 
   @property
   def classifier(self):
@@ -177,7 +185,10 @@ class JarDependency(ExternalDependency, AbstractTarget):
     return self
 
   def with_docs(self):
-    self._configurations.append('docs')
+    """This requests the artifact have its javadoc jar fetched.
+    (This implies there *is* a javadoc jar to fetch.) Used in contexts
+    that can use source jars (as of 2014, just eclipse and idea goals)."""
+    self._configurations.append('javadoc')
     return self
 
   # TODO: This is necessary duck-typing because in some places JarDependency is treated like

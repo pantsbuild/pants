@@ -40,9 +40,9 @@ class JvmCompile(NailgunTask):
                             action='store',
                             type='int',
                             default=-1,
-                            help='Roughly how many source files to attempt to compile together. Set to a large number '
-                                 'to compile all sources together. Set this to 0 to compile target-by-target. '
-                                 'Default is set in pants.ini.')
+                            help='Roughly how many source files to attempt to compile together. '
+                                 'Set to a large number to compile all sources together. Set this '
+                                 'to 0 to compile target-by-target. Default is set in pants.ini.')
 
     option_group.add_option(mkflag('missing-deps'),
                             dest=subcls._language+'_missing_deps',
@@ -59,24 +59,25 @@ class JvmCompile(NailgunTask):
                             choices=['off', 'warn', 'fatal'],
                             default='off',
                             help='[%default] One of off, warn, fatal. '
-                                 'Check for missing direct dependencies in ' + subcls._language + ' code. '
-                                 'Reports actual dependencies A -> B where there is no direct '
-                                 'BUILD file dependency path from A to B. '
-                                 'This is a very strict check, as in practice it is common to rely on '
-                                 'transitive, non-direct dependencies, e.g., due to type inference or when '
-                                 'the main target in a BUILD file is modified to depend on other targets in '
-                                 'the same BUILD file as an implementation detail. It may still be useful '
-                                 'to set it to fatal temorarily, to detect these.')
+                                 'Check for missing direct dependencies in ' + subcls._language +
+                                 ' code. Reports actual dependencies A -> B where there is no '
+                                 'direct BUILD file dependency path from A to B. This is a very '
+                                 'strict check, as in practice it is common to rely on transitive, '
+                                 'non-direct dependencies, e.g., due to type inference or when the '
+                                 'main target in a BUILD file is modified to depend on other '
+                                 'targets in the same BUILD file as an implementation detail. It '
+                                 'may still be useful to set it to fatal temorarily, to detect '
+                                 'these.')
 
     option_group.add_option(mkflag('unnecessary-deps'),
                             dest=subcls._language+'_unnecessary_deps',
                             choices=['off', 'warn', 'fatal'],
                             default='off',
-                            help='[%default] One of off, warn, fatal. '
-                                 'Check for declared dependencies in ' +  subcls._language + ' code '
-                                 'that are not needed. This is a very strict check. For example, '
-                                 'generated code will often legitimately have BUILD dependencies that '
-                                 'are unused in practice.')
+                            help='[%default] One of off, warn, fatal. Check for declared '
+                                 'dependencies in ' +  subcls._language + ' code that are not '
+                                 'needed. This is a very strict check. For example, generated code '
+                                 'will often legitimately have BUILD dependencies that are unused '
+                                 'in practice.')
 
     option_group.add_option(mkflag('delete-scratch'), mkflag('delete-scratch', negate=True),
                             dest=subcls._language+'_delete_scratch',
@@ -170,8 +171,9 @@ class JvmCompile(NailgunTask):
     self._analysis_file = os.path.join(self._analysis_dir, 'global_analysis.valid')
     self._invalid_analysis_file = os.path.join(self._analysis_dir, 'global_analysis.invalid')
 
-    # A temporary, but well-known, dir in which to munge analysis/dependency files in before caching.
-    # It must be well-known so we know where to find the files when we retrieve them from the cache.
+    # A temporary, but well-known, dir in which to munge analysis/dependency files in before
+    # caching. It must be well-known so we know where to find the files when we retrieve them from
+    # the cache.
     self._analysis_tmpdir = os.path.join(self._analysis_dir, 'artifact_cache_tmpdir')
 
     # We can't create analysis tools until after construction.
@@ -187,14 +189,14 @@ class JvmCompile(NailgunTask):
     # The rough number of source files to build in each compiler pass.
     self._partition_size_hint = get_lang_specific_option('partition_size_hint')
     if self._partition_size_hint == -1:
-      self._partition_size_hint = \
-        context.config.getint(config_section, 'partition_size_hint', default=1000)
+      self._partition_size_hint = context.config.getint(config_section, 'partition_size_hint',
+                                                        default=1000)
 
     # JVM options for running the compiler.
     self._jvm_options = context.config.getlist(config_section, 'jvm_args')
 
     # The ivy confs for which we're building.
-    self._confs = context.config.getlist(config_section, 'confs')
+    self._confs = context.config.getlist(config_section, 'confs', default=['default'])
 
     # Set up dep checking if needed.
     def munge_flag(flag):
@@ -336,7 +338,8 @@ class JvmCompile(NailgunTask):
             new_valid_analysis = analysis_file + '.valid.new'
             if self._analysis_parser.is_nonempty_analysis(self._analysis_file):
               with self.context.new_workunit(name='update-upstream-analysis'):
-                self._analysis_tools.merge_from_paths([self._analysis_file, analysis_file], new_valid_analysis)
+                self._analysis_tools.merge_from_paths([self._analysis_file, analysis_file],
+                                                      new_valid_analysis)
             else:  # We need to keep analysis_file around. Background tasks may need it.
               shutil.copy(analysis_file, new_valid_analysis)
 
@@ -395,8 +398,8 @@ class JvmCompile(NailgunTask):
     (vts, sources, analysis_file) = partition
 
     if not sources:
-      self.context.log.warn('Skipping %s compile for targets with no sources:\n  %s' % \
-                            (self._language, vts.targets))
+      self.context.log.warn('Skipping %s compile for targets with no sources:\n  %s'
+                            % (self._language, vts.targets))
     else:
       # Do some reporting.
       self.context.log.info(
@@ -421,7 +424,8 @@ class JvmCompile(NailgunTask):
       for vt in cached_vts:
         for target in vt.targets:
           analysis_file = JvmCompile._analysis_for_target(self._analysis_tmpdir, target)
-          portable_analysis_file = JvmCompile._portable_analysis_for_target(self._analysis_tmpdir, target)
+          portable_analysis_file = JvmCompile._portable_analysis_for_target(self._analysis_tmpdir,
+                                                                            target)
           if os.path.exists(portable_analysis_file):
             self._analysis_tools.localize(portable_analysis_file, analysis_file)
           if os.path.exists(analysis_file):
@@ -441,10 +445,10 @@ class JvmCompile(NailgunTask):
   def _write_to_artifact_cache(self, analysis_file, vts, sources_by_target):
     vt_by_target = dict([(vt.target, vt) for vt in vts.versioned_targets])
 
-    split_analysis_files = \
-      [JvmCompile._analysis_for_target(self._analysis_tmpdir, t) for t in vts.targets]
-    portable_split_analysis_files = \
-      [JvmCompile._portable_analysis_for_target(self._analysis_tmpdir, t) for t in vts.targets]
+    split_analysis_files = [
+        JvmCompile._analysis_for_target(self._analysis_tmpdir, t) for t in vts.targets]
+    portable_split_analysis_files = [
+        JvmCompile._portable_analysis_for_target(self._analysis_tmpdir, t) for t in vts.targets]
 
     # Set up args for splitting the analysis into per-target files.
     splits = zip([sources_by_target.get(t, []) for t in vts.targets], split_analysis_files)
@@ -464,10 +468,10 @@ class JvmCompile(NailgunTask):
       if vt is not None:
         # NOTE: analysis_file doesn't exist yet.
         vts_artifactfiles_pairs.append(
-          (vt, artifacts + [JvmCompile._portable_analysis_for_target(self._analysis_tmpdir, target)]))
+            (vt,
+             artifacts + [JvmCompile._portable_analysis_for_target(self._analysis_tmpdir, target)]))
 
-    update_artifact_cache_work = \
-      self.get_update_artifact_cache_work(vts_artifactfiles_pairs)
+    update_artifact_cache_work = self.get_update_artifact_cache_work(vts_artifactfiles_pairs)
     if update_artifact_cache_work:
       work_chain = [
         Work(self._analysis_tools.split_to_paths, splits_args_tuples, 'split'),
@@ -602,7 +606,8 @@ class JvmCompile(NailgunTask):
     if not os.path.exists(self._analysis_tmpdir):
       os.makedirs(self._analysis_tmpdir)
       if self._delete_scratch:
-        self.context.background_worker_pool().add_shutdown_hook(lambda: safe_rmtree(self._analysis_tmpdir))
+        self.context.background_worker_pool().add_shutdown_hook(
+            lambda: safe_rmtree(self._analysis_tmpdir))
 
   def _create_empty_products(self):
     make_products = lambda: defaultdict(MultipleRootedProducts)

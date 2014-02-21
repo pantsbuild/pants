@@ -141,9 +141,9 @@ class IvyResolve(NailgunTask):
       if self._report:
         self._generate_ivy_report(group_targets)
 
-    create_jardeps_for = self.context.products.isrequired(self._ivy_utils._mapfor_typename())
+    create_jardeps_for = self.context.products.isrequired('jar_dependencies')
     if create_jardeps_for:
-      genmap = self.context.products.get(self._ivy_utils._mapfor_typename())
+      genmap = self.context.products.get('jar_dependencies')
       for target in filter(create_jardeps_for, targets):
         self._ivy_utils.mapjars(genmap, target, executor=executor,
                                 workunit_factory=self.context.new_workunit)
@@ -160,7 +160,8 @@ class IvyResolve(NailgunTask):
     for conf in self._confs:
       ivyinfo = self._ivy_utils.parse_xml_report(targets, conf)
       if ivyinfo:
-        ivy_products[conf].append(ivyinfo)  # Value is a list, to accommodate multiple exclusives groups.
+        # Value is a list, to accommodate multiple exclusives groups.
+        ivy_products[conf].append(ivyinfo)
     self.context.products.safe_create_data('ivy_jar_products', lambda: ivy_products)
 
   def _generate_ivy_report(self, targets):

@@ -43,7 +43,7 @@ class Provides(Task):
     self.ivy_utils = IvyUtils(config=context.config,
                               options=context.options,
                               log=context.log)
-    self.confs = context.config.getlist('ivy', 'confs')
+    self.confs = context.config.getlist('ivy', 'confs', default=['default'])
     self.target_roots = context.target_roots
     self.transitive = context.options.provides_transitive
     self.workdir = context.config.get('provides', 'workdir')
@@ -60,7 +60,7 @@ class Provides(Task):
 
   def execute(self, targets):
     for conf in self.confs:
-      outpath = os.path.join(self.outdir, '%s.%s.provides' % 
+      outpath = os.path.join(self.outdir, '%s.%s.provides' %
                              (self.ivy_utils.identify(targets)[1], conf))
       if self.transitive:
         outpath += '.transitive'

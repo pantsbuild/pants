@@ -129,9 +129,6 @@ class IdeGen(JvmBinaryTask):
     )
     self.debug_port = context.config.getint('ide', 'debug_port')
 
-    self.classes_conf = context.config.get('ide', 'classes_conf')
-    self.sources_conf = context.config.get('ide', 'sources_conf')
-
     self.checkstyle_bootstrap_key = 'checkstyle'
     checkstyle = context.config.getlist('checkstyle', 'bootstrap-tools',
                                         default=[':twitter-checkstyle'])
@@ -228,7 +225,7 @@ class IdeGen(JvmBinaryTask):
                                               name='%s-external-jars' % self.project_name,
                                               dependencies=jars,
                                               excludes=excludes,
-                                              configurations=(self.classes_conf, self.sources_conf))
+                                              configurations=('default', 'sources', 'javadoc'))
     self.require_jar_dependencies(predicate=lambda t: t == self.binary)
 
     self.context.log.debug('pruned to cp:\n\t%s' % '\n\t'.join(
@@ -267,7 +264,7 @@ class IdeGen(JvmBinaryTask):
               cp_source_jar = os.path.join(internal_source_jar_dir, jar)
               shutil.copy(os.path.join(base, jar), cp_source_jar)
 
-          self._project.internal_jars.add(ClasspathEntry(cp_jar, cp_source_jar))
+          self._project.internal_jars.add(ClasspathEntry(cp_jar, source_jar=cp_source_jar))
 
   def map_external_jars(self):
     external_jar_dir = os.path.join(self.work_dir, 'external-libs')
@@ -276,20 +273,31 @@ class IdeGen(JvmBinaryTask):
     external_source_jar_dir = os.path.join(self.work_dir, 'external-libsources')
     safe_mkdir(external_source_jar_dir, clean=True)
 
-    confs = [self.classes_conf, self.sources_conf]
+    external_javadoc_jar_dir = os.path.join(self.work_dir, 'external-libjavadoc')
+    safe_mkdir(external_javadoc_jar_dir, clean=True)
+
+    confs = ['default', 'sources', 'javadoc']
     for entry in self.list_jar_dependencies(self.binary, confs=confs):
-      jar = entry.get(self.classes_conf)
+      jar = entry.get('default')
       if jar:
         cp_jar = os.path.join(external_jar_dir, os.path.basename(jar))
         shutil.copy(jar, cp_jar)
 
         cp_source_jar = None
-        source_jar = entry.get(self.sources_conf)
+        source_jar = entry.get('sources')
         if source_jar:
           cp_source_jar = os.path.join(external_source_jar_dir, os.path.basename(source_jar))
           shutil.copy(source_jar, cp_source_jar)
 
-        self._project.external_jars.add(ClasspathEntry(cp_jar, cp_source_jar))
+        cp_javadoc_jar = None
+        javadoc_jar = entry.get('javadoc')
+        if javadoc_jar:
+          cp_javadoc_jar = os.path.join(external_javadoc_jar_dir, os.path.basename(javadoc_jar))
+          shutil.copy(javadoc_jar, cp_javadoc_jar)
+
+        self._project.external_jars.add(ClasspathEntry(cp_jar,
+                                                       source_jar=cp_source_jar,
+                                                       javadoc_jar=cp_javadoc_jar))
 
   def execute(self, targets):
     """Stages IDE project artifacts to a project directory and generates IDE configuration files."""
@@ -321,9 +329,10 @@ class IdeGen(JvmBinaryTask):
 
 class ClasspathEntry(object):
   """Represents a classpath entry that may have sources available."""
-  def __init__(self, jar, source_jar=None):
+  def __init__(self, jar, source_jar=None, javadoc_jar=None):
     self.jar = jar
     self.source_jar = source_jar
+    self.javadoc_jar = javadoc_jar
 
 
 class SourceSet(object):

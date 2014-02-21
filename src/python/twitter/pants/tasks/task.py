@@ -359,7 +359,9 @@ class Task(object):
       return []
 
     work_dir = self.context.config.get('ivy-resolve', 'workdir')
-    confs = self.context.config.getlist('ivy-resolve', 'confs')
+    ivy_utils = IvyUtils(config=self.context.config,
+                         options=self.context.options,
+                         log=self.context.log)
 
     with self.invalidated(targets,
                           only_buildfiles=True,
@@ -379,22 +381,17 @@ class Task(object):
       # Note that it's possible for all targets to be valid but for no classpath file to exist at
       # target_classpath_file, e.g., if we previously built a superset of targets.
       if invalidation_check.invalid_vts or not os.path.exists(raw_target_classpath_file):
-        ivy_utils = IvyUtils(config=self.context.config,
-                             options=self.context.options,
-                             log=self.context.log)
-        args = (['-cachepath', raw_target_classpath_file_tmp] +
-                ['-confs'] + confs)
+        args = ['-cachepath', raw_target_classpath_file_tmp]
 
         def exec_ivy():
           ivy_utils.exec_ivy(
-            target_workdir=target_workdir,
-            targets=targets,
-            args=args,
-            ivy=ivy,
-            workunit_name='ivy',
-            workunit_factory=self.context.new_workunit,
-            symlink_ivyxml=symlink_ivyxml,
-          )
+              target_workdir=target_workdir,
+              targets=targets,
+              args=args,
+              ivy=ivy,
+              workunit_name='ivy',
+              workunit_factory=self.context.new_workunit,
+              symlink_ivyxml=symlink_ivyxml)
 
         if workunit_name:
           with self.context.new_workunit(name=workunit_name, labels=workunit_labels or []):
@@ -423,7 +420,7 @@ class Task(object):
 
     with IvyUtils.cachepath(target_classpath_file) as classpath:
       stripped_classpath = [path.strip() for path in classpath]
-      return [path for path in stripped_classpath if IvyUtils.is_mappable_artifact(path)]
+      return [path for path in stripped_classpath if ivy_utils.is_classpath_artifact(path)]
 
   def get_workdir(self, section="default", key="workdir", workdir=None):
     return self.context.config.get(section,

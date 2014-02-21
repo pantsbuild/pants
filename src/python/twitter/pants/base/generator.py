@@ -50,6 +50,7 @@ class TemplateData(dict):
   def __str__(self):
     return 'TemplateData(%s)' % pprint.pformat(self)
 
+
 class Generator(object):
   """Generates pants intermediary output files using a configured mustache template."""
 
@@ -58,7 +59,7 @@ class Generator(object):
     # via str in python 3.x.
     if Compatibility.PY2:
       template_text = unicode(template_text)
-    self._template =  pystache.parse(template_text)
+    self._template = pystache.parse(template_text)
     self.template_data = template_data
 
   def write(self, stream):
