@@ -99,6 +99,16 @@ class ReverseDepmapTest(BaseReverseDepmapTest, mox.MoxTestBase):
       )
       '''))
 
+    cls.create_target('src/thrift/example', dedent('''
+      scala_library(
+        name='compiled_scala_user',
+        dependencies=[
+          pants(':compiled_scala')
+        ],
+        sources=['1.scala'],
+      )
+      '''))
+
     create_target('src/thrift/dependent', 'my-example', deps=['src/thrift/example:mybird'])
 
     #External Dependency tests
@@ -199,6 +209,7 @@ class ReverseDepmapTest(BaseReverseDepmapTest, mox.MoxTestBase):
     self.assert_console_output(
       'src/thrift/dependent/BUILD:my-example',
       'src/thrift/example/BUILD:compiled_scala',
+      'src/thrift/example/BUILD:compiled_scala_user',
       targets=[
         self.target('src/thrift/example:mybird'),
       ],
