@@ -17,36 +17,21 @@
 from twitter.pants.targets.jvm_binary import JvmBinary
 from twitter.pants.targets.exclude import Exclude
 
-LOGGING_EXCLUDES = [
-  Exclude(org = 'ch.qos.logback'),
-  Exclude(org = 'commons-logging', name = 'commons-logging'),
-  Exclude(org = 'log4j'),
-  Exclude(org = 'org.slf4j'),
+BLACKLIST_EXCLUDES = [
+  Exclude(org = 'log4j'), #There should only be a single logger implementation per JVM, and that's logback on storm. 
 ]
+
 # The storm cluster provides the appropriate versions of these jars.
 ON_STORM_CLUSTER_EXCLUDES = [
   Exclude(org = 'storm', name = 'storm'),
   Exclude(org = 'backtype', name = 'jzmq'),
-  Exclude(org = 'ch.qos.logback', name = 'logback-classic'),
-  Exclude(org = 'clj-time', name = 'clj-time'),
-  Exclude(org = 'com.google.guava'),
+  Exclude(org = 'com.esotericsoftware.kryo', name = 'kryo'),
   Exclude(org = 'com.googlecode.disruptor', name = 'disruptor'),
-  Exclude(org = 'com.googlecode.json-simple', name = 'json-simple'),
-  Exclude(org = 'com.netflix.curator', name = 'curator-framework'),
-  Exclude(org = 'com.twitter.storm', name = 'carbonite'),
-  Exclude(org = 'commons-io', name = 'commons-io'),
-  Exclude(org = 'compojure', name = 'compojure'),
-  Exclude(org = 'hiccup', name = 'hiccup'),
-  Exclude(org = 'org.apache.commons', name = 'commons-exec'),
-  Exclude(org = 'org.apache.httpcomponents', name = 'httpclient'),
+  Exclude(org = 'ch.qos.logback'),
+  Exclude(org = 'org.slf4j'),
   Exclude(org = 'org.clojure', name = 'clojure'),
   Exclude(org = 'org.clojure', name = 'math.numeric-tower'),
   Exclude(org = 'org.clojure', name = 'tools.logging'),
-  Exclude(org = 'org.yaml', name = 'snakeyaml'),
-  Exclude(org = 'ring', name = 'ring-jetty-adapter'),
-  Exclude(org = 'storm', name = 'jgrapht'),
-  Exclude(org = 'storm', name = 'libthrift7'),
-  Exclude(org = 'storm', name = 'tools.cli'),
 ]
 
 class TwitterStormBinary(JvmBinary):
@@ -75,6 +60,6 @@ class TwitterStormBinary(JvmBinary):
       resources=resources,
       dependencies=dependencies,
       excludes=excludes,
-      deploy_excludes=(deploy_excludes or []) + LOGGING_EXCLUDES + ON_STORM_CLUSTER_EXCLUDES,
+      deploy_excludes=(deploy_excludes or []) + BLACKLIST_EXCLUDES + ON_STORM_CLUSTER_EXCLUDES,
       configurations=None
     )
