@@ -20,22 +20,15 @@ import functools
 import keyword
 import os
 import re
+import shutil
 import subprocess
 import sys
 
-from twitter.pants.base.build_environment import get_buildroot
+from twitter.common.dirutil import safe_mkdir
+
 from twitter.pants.python.code_generator import CodeGenerator
-from twitter.pants.python.file_copier import FileCopier
 from twitter.pants.targets.python_thrift_library import PythonThriftLibrary
-from twitter.pants.thrift_util import (
-    calculate_compile_sources,
-    find_includes,
-    select_thrift_binary)
-
-
-# TODO(John Sirois): XXX
-sys.path.append(os.path.join(get_buildroot(), 'src/python/twitter'))
-from twadoop.pants.targets.remote_python_thrift_library import RemotePythonThriftLibrary
+from twitter.pants.thrift_util import select_thrift_binary
 
 
 class PythonThriftBuilder(CodeGenerator):
@@ -45,6 +38,10 @@ class PythonThriftBuilder(CodeGenerator):
       super(PythonThriftBuilder.UnknownPlatformException, self).__init__(
           "Unknown platform: %s!" % str(platform))
 
+  def __init__(self, target, root_dir, config, target_suffix=None):
+    super(PythonThriftBuilder, self).__init__(target, root_dir, config, target_suffix=target_suffix)
+    self._workdir = os.path.join(config.getdefault(option='thrift_workdir'), 'py-thrift')
+
   def run_thrifts(self):
     """
     Generate Python thrift code using thrift compiler specified in pants config.
@@ -52,49 +49,39 @@ class PythonThriftBuilder(CodeGenerator):
     Thrift fields conflicting with Python keywords are suffixed with a trailing
     underscore (e.g.: from_).
     """
-    self._workdir = os.path.join(self.config.getdefault(option='thrift_workdir'), 'py-thrift')
+
     def is_py_thrift(target):
       return isinstance(target, PythonThriftLibrary)
-    bases, target_thrifts_sources = calculate_compile_sources([self.target], is_py_thrift)
-    no_new_thrifts = False
-    thrifts = target_thrifts_sources
-    all_thrifts = target_thrifts_sources
-    while(not no_new_thrifts):
-      if not thrifts:
-        no_new_thrifts = True
-      else:
-        inc_thrifts = set()
-        for source in thrifts:
-          inc_thrifts.update(find_includes(bases, source))
-        thrifts = inc_thrifts.difference(thrifts)
-        all_thrifts.update(inc_thrifts)
 
-    copier = FileCopier(self._workdir)
+    all_thrifts = set()
+
+    def collect_sources(target):
+      for source in target.sources:
+        all_thrifts.add((target.target_base, source))
+
+    self.target.walk(collect_sources, predicate=is_py_thrift)
+
     copied_sources = set()
-    for src in all_thrifts:
-      # Find and Copy the sources to work dir.
-      thrift_roots = [RemotePythonThriftLibrary, PythonThriftLibrary]
-      copied_sources.add(self._modify_thrift(copier.find_and_copy_relative_file(src, thrift_roots)))
+    for base, relative_source in all_thrifts:
+      abs_source = os.path.join(base, relative_source)
+      copied_source = os.path.join(self._workdir, relative_source)
+
+      safe_mkdir(os.path.dirname(copied_source))
+      shutil.copyfile(abs_source, copied_source)
+      copied_sources.add(self._modify_thrift(copied_source))
 
     for src in copied_sources:
       if not self._run_thrift(src):
-        raise PythonThriftBuilder.CodeGenerationException(
-          "Could not generate .py from %s!" % src)
+        raise PythonThriftBuilder.CodeGenerationException("Could not generate .py from %s!" % src)
 
   def _run_thrift(self, source):
-    thrift_file = source
-    thrift_abs_path = os.path.abspath(thrift_file)
-
     args = [
-      select_thrift_binary(self.config),
-      '--gen',
-      'py:new_style',
-      '-o',
-      self.codegen_root
-    ]
-
-    args.extend(['-I', self._workdir])
-    args.append(thrift_abs_path)
+        select_thrift_binary(self.config),
+        '--gen',
+        'py:new_style',
+        '-o', self.codegen_root,
+        '-I', self._workdir,
+        os.path.abspath(source)]
 
     po = subprocess.Popen(args, cwd=self.chroot.path())
     rv = po.wait()
@@ -117,10 +104,13 @@ class PythonThriftBuilder(CodeGenerator):
     rewrites = []
     renames = dict((kw, '%s_' % kw) for kw in keyword.kwlist)
     token_regex = re.compile(r'(\W)(%s)(\W)' % '|'.join(renames.keys()), re.MULTILINE)
+
     def token_replace(match):
       return '%s%s%s' % (match.group(1), renames[match.group(2)], match.group(3))
+
     def replace_tokens(contents):
       return token_regex.sub(token_replace, contents)
+
     rewrites.append(replace_tokens)
     with open(source) as contents:
       modified = functools.reduce(lambda txt, rewrite: rewrite(txt), rewrites, contents.read())
@@ -134,7 +124,7 @@ class PythonThriftBuilder(CodeGenerator):
     return "gen-py"
 
   def generate(self):
-    # autogenerate the python files that we bundle up
+    # auto-generate the python files that we bundle up
     self.run_thrifts()
 
     # Thrift generates code with all parent namespaces with empty __init__.py's. Generally
@@ -158,5 +148,4 @@ class PythonThriftBuilder(CodeGenerator):
         pass
 
     if not self.created_packages:
-      raise self.CodeGenerationException(
-        'No Thrift structures declared in %s!' % self.target)
+      raise self.CodeGenerationException('No Thrift structures declared in %s!' % self.target)

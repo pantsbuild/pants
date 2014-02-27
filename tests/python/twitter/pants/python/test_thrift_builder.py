@@ -18,12 +18,14 @@ import os
 
 from textwrap import dedent
 
-from twitter.pants import PythonThriftLibrary, SourceRoot
 from twitter.pants.base_build_root_test import BaseBuildRootTest
 from twitter.pants.base.context_utils import create_config
 from twitter.pants.python.thrift_builder import PythonThriftBuilder
+from twitter.pants.targets.python_thrift_library import PythonThriftLibrary
+from twitter.pants.targets.sources import SourceRoot
 
 from mock import call, MagicMock, mock_open, patch
+
 
 sample_ini_test = """
 [DEFAULT]

@@ -49,7 +49,7 @@ python_tests(name = 'test_resolver',
 )
 
 python_tests(name = 'test_thrift_builder',
-  sources = ['test_thrift_builder.py', 'test_file_copier.py'],
+  sources = ['test_thrift_builder.py'],
   dependencies = [
     pants('3rdparty/python:mock'),
     pants('src/python/twitter/common/config'),
