@@ -29,21 +29,12 @@ import traceback
 from contextlib import contextmanager
 from optparse import Option, OptionParser
 
-try:
-  from colors import cyan, green, red, yellow
-except ImportError:
-  turn_off_colored_logging = True
-else:
-  turn_off_colored_logging = False
-
-from functools import wraps
-
 from twitter.common import log
-from twitter.common.log.options import LogOptions
 from twitter.common.collections import OrderedSet
 from twitter.common.dirutil import safe_rmtree, safe_mkdir
 from twitter.common.lang import Compatibility
 from twitter.common.log.options import LogOptions
+
 from twitter.pants import binary_util
 from twitter.pants.base.build_environment import get_buildroot
 from twitter.pants.goal import Goal as goal, Group as group
@@ -55,7 +46,6 @@ from twitter.pants.base import (
     Target,
     TargetDefinitionException)
 from twitter.pants.base.rcfile import RcFile
-from twitter.pants.buildtimestats import BuildTimeStats
 from twitter.pants.commands import Command
 from twitter.pants.engine import Engine, GroupEngine
 from twitter.pants.goal.initialize_reporting import update_reporting
@@ -64,7 +54,6 @@ from twitter.pants.reporting.reporting_server import ReportingServer, ReportingS
 from twitter.pants.tasks import Task, TaskError
 from twitter.pants.tasks.console_task import ConsoleTask
 from twitter.pants.goal import Context, GoalError, Phase
-from twitter.pants.tasks import Task, TaskError
 from twitter.pants.tasks.targets_help import TargetsHelp
 
 
