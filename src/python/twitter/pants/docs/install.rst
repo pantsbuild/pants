@@ -77,10 +77,13 @@ that your dependencies may be downloaded during the build.
 Almost any problem
 ``````````````````
 
-Almost any problem can be solved by fully clearing out all caches and rebuilding pants::
+Almost any problem can be solved by fully clearing out all caches,
+rebuilding Pants,
+and killing all lingering nailgun (JVM build implementation) processes::
 
     $ build-support/python/clean.sh
-    $ ./pants
+    $ ./pants.bootstrap
+    $ ./pants goal ng-killall --ng-killall-everywhere
 
 Did you change your `PYTHONPATH` recently? Pants is implemented in Python, so
 `PYTHONPATH` can cause spooky changes.
