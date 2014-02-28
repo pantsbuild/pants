@@ -62,6 +62,10 @@ limitations under the License.
       <excludeFolder url="file://{{module.root_dir}}/{{.}}"/>
       {{/exclude_paths}}
     {{/module.content_roots}}
+      <!-- TODO(John Sirois): Kill this exclude hack - its valid to map generated sources under
+           .pants.d as generated sources for example - which IDEA 13+ understands. -->
+      <excludeFolder url="file://${module.root_dir}/.pants.d" />
+
       <excludeFolder url="file://$MODULE_DIR$/external-libs" />
       <excludeFolder url="file://$MODULE_DIR$/external-libsources" />
       <excludeFolder url="file://$MODULE_DIR$/internal-libs" />
