@@ -69,7 +69,7 @@ python_binary(
   name='pants',
   entry_point='twitter.pants.bin.pants_exe:main',
   dependencies=[
-    pants(':pants-lib')
+    pants(':pants-lib'),
   ],
   platforms=[
     'current',

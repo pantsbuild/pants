@@ -16,9 +16,9 @@
 
 from collections import defaultdict, namedtuple
 
-from twitter.common.collections import OrderedDict, OrderedSet
-from twitter.pants.base.workunit import WorkUnit
+from twitter.common.collections import  maybe_list, OrderedDict, OrderedSet
 
+from twitter.pants.base.workunit import WorkUnit
 from twitter.pants.goal import Goal
 from twitter.pants.targets.internal import InternalTarget
 from twitter.pants.tasks import TaskError
@@ -59,7 +59,7 @@ class GroupIterator(object):
     assert len(map(lambda m: m.name, group_members)) == len(group_members), (
       'Expected group members with unique names')
 
-    self._targets = targets
+    self._targets = maybe_list(targets, expected_type=InternalTarget, raise_type=ValueError)
     self._group_members = group_members
 
   def __iter__(self):
@@ -213,7 +213,9 @@ class GroupEngine(Engine):
                 exclusive_chunks = ExclusivesIterator.from_context(self._context)
 
               for exclusive_chunk in exclusive_chunks:
-                group_chunks = GroupIterator(filter(lambda t: t.is_concrete, exclusive_chunk),
+                # TODO(Travis Crawford): Targets should be filtered by is_concrete rather than
+                # is_internal, however, at this time python targets are not internal targets.
+                group_chunks = GroupIterator(filter(lambda t: t.is_internal, exclusive_chunk),
                                              goals_by_group_member.keys())
                 goal_chunks.extend(group_chunks)
 
@@ -279,7 +281,7 @@ class GroupEngine(Engine):
     execution_phases = ' -> '.join(map(str, map(lambda e: e.phase.name, phase_executors)))
     context.log.debug('Executing goals in phases %s' % execution_phases)
 
-    explain = context.options.explain
+    explain = getattr(context.options, 'explain', None)
     if explain:
       print("Phase Execution Order:\n\n%s\n" % execution_phases)
       print("Phase [Goal->Task] Order:\n")

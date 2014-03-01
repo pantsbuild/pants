@@ -12,9 +12,9 @@ installed (such as
 
 You invoke pants with a *goal* (like ``test`` or ``bundle``) and the
 *build targets* to use (like
-``src/main/java/com/twitter/common/examples/pingpong/BUILD:pingpong``). For example, ::
+``tests/java/com/twitter/common/examples/pingpong/BUILD:pingpong``). For example, ::
 
-    pants goal test test/java/com/twitter/common/examples/BUILD:pingpong
+    ./pants goal test tests/java/com/twitter/common/examples/pingpong/BUILD:pingpong
 
 Goals (the "verbs" of Pants) produce new files from Targets (the "nouns").
 
