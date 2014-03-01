@@ -16,9 +16,9 @@
 
 from collections import defaultdict, namedtuple
 
-from twitter.common.collections import  maybe_list, OrderedDict, OrderedSet
-
+from twitter.common.collections import OrderedDict, OrderedSet
 from twitter.pants.base.workunit import WorkUnit
+
 from twitter.pants.goal import Goal
 from twitter.pants.targets.internal import InternalTarget
 from twitter.pants.tasks import TaskError
@@ -59,7 +59,7 @@ class GroupIterator(object):
     assert len(map(lambda m: m.name, group_members)) == len(group_members), (
       'Expected group members with unique names')
 
-    self._targets = maybe_list(targets, expected_type=InternalTarget, raise_type=ValueError)
+    self._targets = targets
     self._group_members = group_members
 
   def __iter__(self):
@@ -142,6 +142,14 @@ class GroupEngine(Engine):
     def attempt(self, timer, explain):
       """Executes the named phase against the current context tracking goal executions in executed.
       """
+      def acquire_lock_if_needed(goal):
+        """If the goal about to be executed requires the lock, then acquire it. If not,
+        then make sure it's released.
+        """
+        if goal.serialize:
+          self._context.acquire_lock()
+        else:
+          self._context.release_lock()
 
       def execute_task(goal, task, targets):
         """Execute and time a single goal that has had all of its dependencies satisfied."""
@@ -178,6 +186,7 @@ class GroupEngine(Engine):
         for group_name, goals in run_queue:
           if not group_name:
             goal = goals[0]
+            acquire_lock_if_needed(goal)
             execution_phases[self._phase].add(goal.name)
             with self._context.new_workunit(name=goal.name, labels=[WorkUnit.GOAL]):
               execute_task(goal, self._tasks_by_goal[goal], self._context.targets())
@@ -204,9 +213,7 @@ class GroupEngine(Engine):
                 exclusive_chunks = ExclusivesIterator.from_context(self._context)
 
               for exclusive_chunk in exclusive_chunks:
-                # TODO(Travis Crawford): Targets should be filtered by is_concrete rather than
-                # is_internal, however, at this time python targets are not internal targets.
-                group_chunks = GroupIterator(filter(lambda t: t.is_internal, exclusive_chunk),
+                group_chunks = GroupIterator(filter(lambda t: t.is_concrete, exclusive_chunk),
                                              goals_by_group_member.keys())
                 goal_chunks.extend(group_chunks)
 
@@ -217,6 +224,7 @@ class GroupEngine(Engine):
 
               for group_member, goal_chunk in goal_chunks:
                 goal = goals_by_group_member[group_member]
+                acquire_lock_if_needed(goal)
                 execution_phases[self._phase].add((group_name, goal.name))
                 with self._context.new_workunit(name=goal.name, labels=[WorkUnit.GOAL]):
                   execute_task(goal, self._tasks_by_goal[goal], goal_chunk)
@@ -271,7 +279,7 @@ class GroupEngine(Engine):
     execution_phases = ' -> '.join(map(str, map(lambda e: e.phase.name, phase_executors)))
     context.log.debug('Executing goals in phases %s' % execution_phases)
 
-    explain = getattr(context.options, 'explain', None)
+    explain = context.options.explain
     if explain:
       print("Phase Execution Order:\n\n%s\n" % execution_phases)
       print("Phase [Goal->Task] Order:\n")

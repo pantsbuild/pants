@@ -38,15 +38,14 @@ class Config(object):
     pass
 
   @staticmethod
-  def load(configpath=None, defaults=None):
+  def load(configpath=os.path.join(get_buildroot(), 'pants.ini'), defaults=None):
     """
       Loads a Config from the given path, by default the path to the pants.ini file in the current
       build root directory.  Any defaults supplied will act as if specified in the loaded config
       file's DEFAULT section.  The 'buildroot', invoking 'user' and invoking user's 'homedir' are
       automatically defaulted.
     """
-    configpath = configpath or os.path.join(get_buildroot(), 'pants.ini')
-    parser = Config.create_parser(defaults=defaults)
+    parser = Config.create_parser(defaults)
     with open(configpath) as ini:
       parser.readfp(ini)
     return Config(parser)

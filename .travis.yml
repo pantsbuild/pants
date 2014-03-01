@@ -15,8 +15,8 @@ script: |
   && ./pants goal clean-all \
   && ./pants goal test {src,tests}/java/com/twitter/common:: --no-ng-daemons -x \
   && ./pants goal test {src,tests}/scala/com/twitter/common:: --no-ng-daemons -x \
-  && PANTS_PYTHON_TEST_FAILSOFT=1 ./pants build --timeout=5 tests/python/twitter/common:all \
-  && PANTS_PYTHON_TEST_FAILSOFT=1 ./pants build --timeout=5 tests/python/twitter/pants:all
+  && PANTS_PYTHON_TEST_FAILSOFT=1 PYTHON_VERBOSE=2 ./pants build --timeout=5 tests/python/twitter/common:all \
+  && PANTS_PYTHON_TEST_FAILSOFT=1 PYTHON_VERBOSE=2 ./pants build --timeout=5 tests/python/twitter/pants:all
 
 notifications:
   email:

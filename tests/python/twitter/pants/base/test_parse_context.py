@@ -16,6 +16,7 @@
 
 import os
 import pytest
+import unittest
 
 from textwrap import dedent
 
@@ -24,10 +25,8 @@ from twitter.common.dirutil import safe_mkdir
 
 from twitter.pants.base.address import Address
 from twitter.pants.base.build_file import BuildFile
-from twitter.pants.base_build_root_test import BaseBuildRootTest
 from twitter.pants.base.parse_context import ParseContext
 from twitter.pants.base.target import Target
-
 
 def create_buildfile(root_dir, relpath, name='BUILD', content=''):
   path = os.path.join(root_dir, relpath)
@@ -38,7 +37,7 @@ def create_buildfile(root_dir, relpath, name='BUILD', content=''):
   return BuildFile(root_dir, relpath)
 
 
-class ParseContextTest(BaseBuildRootTest):
+class ParseContextTest(unittest.TestCase):
   def test_locate(self):
     with pytest.raises(ParseContext.ContextError):
       ParseContext.locate()

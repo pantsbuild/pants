@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==================================================================================================
+import os
 
 import pytest
 import unittest
@@ -23,11 +24,11 @@ from twitter.pants.engine import GroupEngine
 from twitter.pants.engine.group_engine import GroupIterator, GroupMember
 from twitter.pants.goal import Goal, Group
 from twitter.pants.tasks import Task
-from twitter.pants.tasks.check_exclusives import ExclusivesMapping
 
 from ..base.context_utils import create_context
 from ..base_build_root_test import BaseBuildRootTest
 from .base_engine_test import EngineTestBase
+from twitter.pants.tasks.check_exclusives import ExclusivesMapping
 
 
 class GroupMemberTest(unittest.TestCase):
@@ -46,18 +47,14 @@ class GroupMemberTest(unittest.TestCase):
 class JvmTargetTest(BaseBuildRootTest):
   @classmethod
   def java_library(cls, path, name, deps=None):
-    cls._library(path, 'java_library', name, deps)
-
-  @classmethod
-  def python_library(cls, path, name, deps=None):
-    cls._library(path, 'python_library', name, deps)
+    cls.jvm_library(path, 'java_library', name, deps)
 
   @classmethod
   def scala_library(cls, path, name, deps=None):
-    cls._library(path, 'scala_library', name, deps)
+    cls.jvm_library(path, 'scala_library', name, deps)
 
   @classmethod
-  def _library(cls, path, target_type, name, deps=None):
+  def jvm_library(cls, path, target_type, name, deps=None):
     cls.create_target(path, dedent('''
       %(target_type)s(name='%(name)s',
         dependencies=[%(deps)s],
@@ -130,19 +127,6 @@ class GroupIteratorMultipleTest(GroupIteratorTestBase):
     self.assertEqual(set(self.targets('root:b_red', 'root:c_red')), set(targets))
 
 
-class GroupIteratorTargetsTest(GroupIteratorTestBase):
-  """Test that GroupIterator raises an exception when given non-internal targets."""
-
-  def test_internal_targets(self):
-    self.java_library('root', 'colorless', deps=[])
-    self.iterate('root:colorless')
-
-  def test_non_internal_targets(self):
-    self.python_library('root2', 'colorless', deps=[])
-    with pytest.raises(ValueError):
-      self.iterate('root2:colorless')
-
-
 class GroupEngineTest(EngineTestBase, JvmTargetTest):
   @classmethod
   def setUpClass(cls):
@@ -153,13 +137,12 @@ class GroupEngineTest(EngineTestBase, JvmTargetTest):
     cls.java_library('src/java', 'c', deps=['src/scala:b'])
     cls.scala_library('src/scala', 'd', deps=['src/java:c'])
     cls.java_library('src/java', 'e', deps=['src/scala:d'])
-    cls.python_library('src/python', 'f')
 
   def setUp(self):
     super(GroupEngineTest, self).setUp()
 
     self.context = create_context(options=dict(explain=False),
-                                  target_roots=self.targets('src/java:e', 'src/python:f'))
+                                  target_roots=self.targets('src/java:e'))
 
     # TODO(John Sirois): disentangle GroupEngine from relying upon the CheckExclusives task being
     # run.  It should either arrange this directly or else the requirement should be in a different

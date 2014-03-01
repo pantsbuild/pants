@@ -116,9 +116,6 @@ class RelativeToMapper(object):
 class Bundle(object):
   """A set of files to include in an application bundle.
 
-  Looking for Java-style resources accessible via the ``Class.getResource`` API?
-  Those are :ref:`bdict_resources`\ .
-
   Files added to the bundle will be included when bundling an application target.
   By default relative paths are preserved. For example, to include ``config``
   and ``scripts`` directories: ::

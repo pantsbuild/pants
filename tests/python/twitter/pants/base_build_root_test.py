@@ -72,7 +72,6 @@ class BaseBuildRootTest(unittest.TestCase):
   def setUpClass(cls):
     cls.build_root = mkdtemp(suffix='_BUILD_ROOT')
     BuildRoot().path = cls.build_root
-    cls.create_file('pants.ini')
     Target._clear_all_addresses()
 
   @classmethod

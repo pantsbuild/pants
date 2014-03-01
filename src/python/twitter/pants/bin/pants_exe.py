@@ -148,7 +148,7 @@ def _run():
   # TODO: This can be replaced once extensions are enabled with
   # https://github.com/pantsbuild/pants/issues/5
   roots = config.getlist('parse', 'roots', default=[])
-  sys.path.extend(map(lambda root: os.path.join(root_dir, root), roots))
+  sys.path.extend(roots)
 
   run_tracker = RunTracker.from_config(config)
   report = initial_reporting(config, run_tracker)

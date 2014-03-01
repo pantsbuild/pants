@@ -34,7 +34,6 @@ from twitter.common.collections import OrderedSet
 from twitter.common.dirutil import safe_rmtree, safe_mkdir
 from twitter.common.lang import Compatibility
 from twitter.common.log.options import LogOptions
-
 from twitter.pants import binary_util
 from twitter.pants.base.build_environment import get_buildroot
 from twitter.pants.goal import Goal as goal, Group as group
@@ -507,8 +506,7 @@ class Goal(Command):
         unknown.append(phase)
 
     if unknown:
-      _list_goals(context, 'Unknown goal(s): %s' % ' '.join(phase.name for phase in unknown))
-      return 1
+      return _list_goals(context, 'Unknown goal(s): %s' % ' '.join(phase.name for phase in unknown))
 
     return Goal._execute(context, self.phases, print_timing=self.options.time)
 

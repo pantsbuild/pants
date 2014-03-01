@@ -61,8 +61,6 @@ class BinaryCreate(JvmBinaryTask):
     self.deployjar = context.options.jvm_binary_create_deployjar
 
     context.products.require('jars', predicate=self.is_binary)
-    context.products.require_data('classes_by_target')
-    context.products.require_data('resources_by_target')
     if self.deployjar:
       self.require_jar_dependencies()
 
@@ -93,16 +91,6 @@ class BinaryCreate(JvmBinaryTask):
       if self.deployjar:
         for basedir, externaljar in self.list_jar_dependencies(binary):
           self.dump(os.path.join(basedir, externaljar), jar)
-
-      def write_binary_data(product_type):
-        data = self.context.products.get_data(product_type).get(binary)
-        if data:
-          for root, rel_paths in data.rel_paths():
-            for rel_path in rel_paths:
-              jar.write(os.path.join(root, rel_path), arcname=rel_path)
-
-      write_binary_data('classes_by_target')
-      write_binary_data('resources_by_target')
 
       manifest = Manifest()
       manifest.addentry(Manifest.MANIFEST_VERSION, '1.0')

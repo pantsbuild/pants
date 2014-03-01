@@ -24,12 +24,15 @@ from .with_sources import TargetWithSources
 
 @manual.builddict(tags=['jvm'])
 class Resources(InternalTarget, TargetWithSources):
-  """A set of files accessible as resources from the JVM classpath.
+  """Describes a set of resource files to be embedded in a library or binary.
 
-  Looking for loose files in your application bundle? Those are :ref:`bdict_bundle`\ s.
+  If your target compiles to the JVM (e.g., ``java_library``,
+  ``scala_library``, ``junit_tests``), you might have files
+  that you need to access as resources. Each of these targets has an optional
+  argument called ``resources`` that expects a list of target addresses that
+  resolve to targets whose type is resource.
 
-  Resources are Java-style resources accessible via the ``Class.getResource``
-  and friends API. In the ``jar`` goal, the resource files are placed in the resulting `.jar`.
+  In the ``jar`` goal, the resource files are placed in the resulting `.jar`.
   """
 
   def __init__(self, name, sources, exclusives=None):

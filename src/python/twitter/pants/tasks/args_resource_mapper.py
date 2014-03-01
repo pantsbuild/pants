@@ -60,7 +60,8 @@ class ArgsResourceMapper(Task):
     context.products.require('jars', self.select_targets)
     context.products.require_data('classes_by_target')
     default_args_resource_mapper = [
-        os.path.join(self.get_workdir(key='java_workdir', workdir='javac'), 'classes')]
+      os.path.join(self.get_workdir(key='java_workdir', workdir='javac'), 'classes')
+    ]
     self.classdirs = context.config.getlist('args-resource-mapper', 'classdirs',
                                             default=default_args_resource_mapper)
     self.include_all = context.options.args_resource_mapper_include_all
@@ -81,9 +82,9 @@ class ArgsResourceMapper(Task):
     lines = set()
     for resourcedir in [os.path.join(classdir, RESOURCE_RELDIR) for classdir in self.classdirs]:
       if os.path.exists(resourcedir):
-        for path in os.listdir(resourcedir):
-          if path.startswith(RESOURCE_BASENAME):
-            with open(os.path.join(resourcedir, path)) as resource:
+        for file in os.listdir(resourcedir):
+          if file.startswith(RESOURCE_BASENAME):
+            with open(os.path.join(resourcedir, file)) as resource:
               lines.update(resource.readlines())
 
     if lines:
@@ -93,7 +94,7 @@ class ArgsResourceMapper(Task):
           self.classnames = set()
 
           def add_classnames(target):
-            if target.has_sources('.java'):
+            if isinstance(target, JavaLibrary) or isinstance(target, ScalaLibrary):
               target_products = classes_by_target.get(target)
               if target_products:
                 for _, classes in target_products.rel_paths():
@@ -126,11 +127,11 @@ class ArgsResourceMapper(Task):
             # Unknown line (comments, ws, unknown configuration types
             return True
 
-      classes_by_target = self.context.products.get_data('classes_by_target')
       self._addargs(lines if self.include_all
                           else filter(Args(self.context,
                                            self.transitive,
-                                           classes_by_target).matches, lines),
+                                           self.context.products.get_data('classes_by_target')).matches,
+                                      lines),
                     jar,
                     target)
 

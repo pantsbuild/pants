@@ -14,8 +14,11 @@
 # limitations under the License.
 # ==================================================================================================
 
+from twitter.common.collections import OrderedSet
+
 from twitter.pants.base.build_manual import manual
 
+from .python_requirement import PythonRequirement
 from .python_target import PythonTarget
 
 
