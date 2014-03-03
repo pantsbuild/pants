@@ -4,11 +4,14 @@ Pants Contributors Guide
 
 This page documents how to make contributions to Pants. If you've
 :doc:`developed a change to Pants <howto_develop>`, it passes all
-tests, and you'd like to "send it upstream", here's what to do.
+tests (current test status: |travis-bot|), and you'd like to "send
+it upstream", here's what to do:
 
 .. TODO: Document the release process.
 .. TODO: Coding Conventions section
 
+.. |travis-bot| image:: https://travis-ci.org/twitter/commons.png?branch=master
+                :target: https://travis-ci.org/twitter/commons
 
 ************
 Mailing List

@@ -69,10 +69,14 @@ Running Tests
 =============
 
 Pants has many tests. There are BUILD targets to run those tests.
+We try to keep them passing. (Their current status: |travis-bot|)
 To make sure a change passes *all* of Pants' tests, use the
-``tests/python/twitter/pants:all`` target:
+``tests/python/twitter/pants:all`` target::
 
    ./pants tests/python/twitter/pants:all
+
+.. |travis-bot| image:: https://travis-ci.org/twitter/commons.png?branch=master
+                :target: https://travis-ci.org/twitter/commons
 
 Before :doc:`contributing a change <howto_contribute>` to Pants,
 make sure it passes all tests.
