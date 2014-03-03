@@ -54,6 +54,7 @@ from twitter.pants.reporting.reporting_server import ReportingServer, ReportingS
 from twitter.pants.tasks import Task, TaskError
 from twitter.pants.tasks.console_task import ConsoleTask
 from twitter.pants.goal import Context, GoalError, Phase
+from twitter.pants.tasks.list_goals import ListGoals
 from twitter.pants.tasks.targets_help import TargetsHelp
 
 
@@ -72,35 +73,6 @@ def _list_goals(context, message):
   context.log.error(message)
   # Execute as if the user had run "./pants goals".
   return Goal.execute(context, 'goals')
-
-
-class ListGoals(ConsoleTask):
-  @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    super(ListGoals, cls).setup_parser(option_group, args, mkflag)
-    option_group.add_option(mkflag("all"),
-                            dest="goal_list_all",
-                            default=False,
-                            action="store_true",
-                            help="[%default] List all goals even if no description is available.")
-
-  def console_output(self, targets):
-    yield 'Installed goals:'
-    documented_rows = []
-    undocumented = []
-    max_width = 0
-    for phase, _ in Phase.all():
-      if phase.description:
-        documented_rows.append((phase.name, phase.description))
-        max_width = max(max_width, len(phase.name))
-      elif self.context.options.goal_list_all:
-        undocumented.append(phase.name)
-    for name, description in documented_rows:
-      yield '  %s: %s' % (name.rjust(max_width), description)
-    if undocumented:
-      yield ''
-      yield 'Undocumented goals:'
-      yield '  %s' % ' '.join(undocumented)
 
 
 goal(name='goals', action=ListGoals).install().with_description('List all documented goals.')

@@ -51,6 +51,15 @@ class Phase(PhaseBase):
   _goals_by_phase = defaultdict(list)
   _phase_by_goal = dict()
 
+  @classmethod
+  def clear(cls):
+    """Remove all phases and goals.
+
+    This method is EXCLUSIVELY for use in tests.
+    """
+    cls._goals_by_phase.clear()
+    cls._phase_by_goal.clear()
+
   @staticmethod
   def of(goal):
     return Phase._phase_by_goal[goal]
