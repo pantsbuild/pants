@@ -20,7 +20,6 @@ from twitter.pants.targets.python_binary import PythonBinary
 from twitter.pants.targets.python_tests import PythonTests, PythonTestSuite
 
 from .binary_builder import PythonBinaryBuilder
-from .lint_builder import PythonLintBuilder
 from .test_builder import PythonTestBuilder
 
 
@@ -36,16 +35,6 @@ class PythonBuilder(object):
 
     for target in targets:
       assert target.is_python, "PythonBuilder can only build PythonTargets, given %s" % str(target)
-
-    if 'pylint' in args:
-      real_args = list(args)
-      real_args.remove('pylint')
-      for target in targets:
-        try:
-          PythonLintBuilder([target], real_args, self._root_dir, conn_timeout=conn_timeout).run()
-        except Exception as e:
-          print('Failed to run lint for %s: %s' % (target, e))
-      return 0
 
     # PythonBuilder supports PythonTests and PythonBinaries
     for target in targets:

@@ -38,6 +38,6 @@ platforms: [
 
   def test_get_current_platform(self):
     expected_platforms = [Platform.current(), 'linux-x86_64']
-    self.assertEqual(expected_platforms,
-                     list(get_platforms(self.config.getlist('python-setup', 'platforms'))))
+    self.assertEqual(set(expected_platforms),
+                     set(get_platforms(self.config.getlist('python-setup', 'platforms'))))
 

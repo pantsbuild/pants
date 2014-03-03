@@ -42,7 +42,7 @@ from twitter.pants.targets.python_tests import PythonTests
 from twitter.pants.targets.python_thrift_library import PythonThriftLibrary
 
 from .antlr_builder import PythonAntlrBuilder
-from .resolver import MultiResolver
+from .resolver import resolve_multi
 from .thrift_builder import PythonThriftBuilder
 
 
@@ -62,14 +62,20 @@ class PythonChroot(object):
     def __init__(self, target):
       Exception.__init__(self, "Not a valid Python dependency! Found: %s" % target)
 
-  def __init__(self, target, root_dir, extra_targets=None, builder=None, interpreter=None,
-      conn_timeout=None):
+  def __init__(self,
+               target,
+               root_dir,
+               extra_targets=None,
+               builder=None,
+               platforms=None,
+               interpreter=None,
+               conn_timeout=None):
     self._config = Config.load()
     self._target = target
     self._root = root_dir
+    self._platforms = platforms
     self._interpreter = interpreter or PythonInterpreter.get()
     self._extra_targets = list(extra_targets) if extra_targets is not None else []
-    self._resolver = MultiResolver(self._config, target, conn_timeout=conn_timeout)
     self._builder = builder or PEXBuilder(tempfile.mkdtemp(), interpreter=self._interpreter)
 
     # Note: unrelated to the general pants artifact cache.
@@ -140,11 +146,10 @@ class PythonChroot(object):
   def resolve(self, targets):
     children = defaultdict(OrderedSet)
     def add_dep(trg):
-      if trg.is_concrete:
-        for target_type, target_key in self._VALID_DEPENDENCIES.items():
-          if isinstance(trg, target_type):
-            children[target_key].add(trg)
-            return
+      for target_type, target_key in self._VALID_DEPENDENCIES.items():
+        if isinstance(trg, target_type):
+          children[target_key].add(trg)
+          return
       raise self.InvalidDependencyException(trg)
     for target in targets:
       target.walk(add_dep)
@@ -179,16 +184,29 @@ class PythonChroot(object):
       generated_reqs.add(self._generate_antlr_requirement(antlr))
 
     targets['reqs'] |= generated_reqs
+    reqs_to_build = OrderedSet()
     for req in targets['reqs']:
       if not req.should_build(self._interpreter.python, Platform.current()):
         self.debug('Skipping %s based upon version filter' % req)
         continue
+      reqs_to_build.add(req)
       self._dump_requirement(req._requirement, False, req._repository)
 
-    reqs_to_build = (req for req in targets['reqs']
-        if req.should_build(self._interpreter.python, Platform.current()))
-    for dist in self._resolver.resolve(reqs_to_build, interpreter=self._interpreter):
-      self._dump_distribution(dist)
+    platforms = self._platforms
+    if isinstance(self._target, PythonBinary):
+      platforms = self._target.platforms
+    distributions = resolve_multi(
+         self._config,
+         reqs_to_build,
+         interpreter=self._interpreter,
+         platforms=platforms)
+
+    locations = set()
+    for platform, dist_set in distributions.items():
+      for dist in dist_set:
+        if dist.location not in locations:
+          self._dump_distribution(dist)
+        locations.add(dist.location)
 
     if len(targets['binaries']) > 1:
       print('WARNING: Target has multiple python_binary targets!', file=sys.stderr)

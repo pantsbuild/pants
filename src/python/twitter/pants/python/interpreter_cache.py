@@ -23,7 +23,7 @@ from twitter.common.python.installer import Installer
 from twitter.common.python.interpreter import PythonInterpreter, PythonIdentity
 from twitter.common.python.obtainer import Obtainer
 
-from .resolver import MultiResolver
+from .resolver import crawler_from_config, fetchers_from_config
 
 from pkg_resources import Requirement
 
@@ -46,8 +46,8 @@ class PythonInterpreterCache(object):
     except TypeError:
       self._setuptools_requirement = Requirement.parse(setuptools_req)
     safe_mkdir(self._path)
-    self._fetchers = MultiResolver.fetchers(config)
-    self._crawler = MultiResolver.crawler(config)
+    self._fetchers = fetchers_from_config(config)
+    self._crawler = crawler_from_config(config)
     self._interpreters = set()
     self._logger = logger or (lambda msg: True)
 

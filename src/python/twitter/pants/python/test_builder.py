@@ -198,6 +198,7 @@ class PythonTestBuilder(object):
           self.root_dir,
           extra_targets=self.generate_test_targets(),
           builder=builder,
+          platforms=('current',),
           interpreter=self.interpreter,
           conn_timeout=self._conn_timeout)
       builder = chroot.dump()

@@ -49,28 +49,11 @@ python_library(
   ]
 )
 
-def pylint_build_filter(python, platform):
-  return python.startswith('2')
-
-python_library(
-  name = 'lint_builder',
-  sources = ['lint_builder.py'],
-  dependencies = [
-    pants(':python_chroot'),
-    pants('src/python/twitter/common/collections'),
-    pants('src/python/twitter/common/python'),
-    pants('src/python/twitter/pants/base:address'),
-    pants('src/python/twitter/pants/base:target'),
-    python_requirement('pylint==1.1.0', version_filter=pylint_build_filter),
-  ],
-)
-
 python_library(
   name = 'python_builder',
   sources = ['python_builder.py'],
   dependencies = [
     pants(':binary_builder'),
-    pants(':lint_builder'),
     pants(':python_chroot'),
     pants(':test_builder'),
     pants('src/python/twitter/pants/targets:python'),
