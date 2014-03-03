@@ -674,6 +674,7 @@ class RunServer(ConsoleTask):
 goal(
   name='server',
   action=RunServer,
+  serialize=False,
 ).install().with_description('Run the pants reporting server.')
 
 class KillServer(ConsoleTask):
@@ -697,6 +698,7 @@ class KillServer(ConsoleTask):
 goal(
   name='killserver',
   action=KillServer,
+  serialize=False,
 ).install().with_description('Kill the pants reporting server.')
 
 
