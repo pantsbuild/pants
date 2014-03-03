@@ -24,6 +24,9 @@
 .pydevproject
 bin/
 build/
+build-support/*.pex
+build-support/*.venv
+build-support/virtualenv-*
 build-support/phab/
 codegen/classes/
 dist/

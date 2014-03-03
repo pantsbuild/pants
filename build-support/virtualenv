@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Wrapper for self-bootstrapping virtualenv
+set -ex
+VIRTUALENV_VERSION=1.10.1
+
+if which python2.7 >/dev/null; then
+  PY=`which python2.7`
+elif which python2.6 >/dev/null; then
+  PY=`which python2.6`
+else
+  echo 'No python interpreter found on the path.  Python will not work!' 1>&2
+  exit 1
+fi
+
+echo "Using $PY" >&2
+
+HERE=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
+if ! [ -f "$HERE/virtualenv-$VIRTUALENV_VERSION/BOOTSTRAPPED" ]; then
+  pushd "$HERE"
+  curl -O https://pypi.python.org/packages/source/v/virtualenv/virtualenv-$VIRTUALENV_VERSION.tar.gz
+  tar zxvf virtualenv-$VIRTUALENV_VERSION.tar.gz
+  # TODO(ksweeney): Checksum
+  touch virtualenv-$VIRTUALENV_VERSION/BOOTSTRAPPED  # 2PC
+  popd
+fi
+
+exec "$PY" "$HERE/virtualenv-$VIRTUALENV_VERSION/virtualenv.py" "$@"
