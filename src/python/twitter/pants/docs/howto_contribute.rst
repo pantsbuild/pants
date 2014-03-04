@@ -35,9 +35,30 @@ we'll do the following:
 * Get a code review.
 * Commit your change to master.
 
-Overall its quite straightforward. Please note - despite being hosted on
+Overall it's quite straightforward. Please note - despite being hosted on
 GitHub - we do not use pull requests because we prefer a linear commit history
 and doing code reviews with Review Board.
+
+
+Identify the change
+===================
+
+It's a good idea to make sure the work you'll be embarking on is generally
+agreed to be in a useful direction for the project before getting too far
+along.
+
+If there is a pre-existing github issue filed and un-assigned, feel free to
+grab it and ask any clarifying questions needed on `pants-devel
+<https://groups.google.com/forum/#!forum/pants-devel>`_. If there is an issue
+you'd like to work on that's assigned and stagnant, please ping the assignee
+and finally `pants-devel
+<https://groups.google.com/forum/#!forum/pants-devel>`_ before taking over
+ownership for the issue.
+
+If you have an idea for new work that's not yet been discussed on `pants-devel
+<https://groups.google.com/forum/#!forum/pants-devel>`_, then start a
+conversation there to vet the proposal. Once the group agrees it's worth
+a spike you can file a github issue and assign it to yourself.
 
 
 Getting Pants Source Code
@@ -73,6 +94,18 @@ need to fill in the change description, reviewers, testing done, etc. When the
 review looks good publish it. An email will be sent to `pants-devel` mailing
 list and the reviewers will take a look. If they have any feedback there might
 be a few iterations before finally getting a Ship It.
+
+Before posting a review but certainly before the branch ships you should run
+relevant tests. If you're not sure what those are you can always run the
+same test set-up that's run on `Travis CI
+<https://travis-ci.org/twitter/commons/>`_.
+
+To run the full jvm and python suite including a pants self-rebuild. ::
+
+   ./build-support/bin/ci.sh
+
+You can also skip certain steps including pants bootstrapping. Just use the
+``-h`` argument to get command line help on the options available.
 
 
 Commit Your Change
