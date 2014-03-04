@@ -31,7 +31,7 @@ mkdir -p $out
 cd $out
 git clone $repo_url
 cd `ls`
-cp -R $root/_build/html/ ./$path_within_url
+cp -R $root/_build/html/* ./$path_within_url
 git add .
 git commit -am"publish by $USER"
 git push origin master
