@@ -178,9 +178,9 @@ class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler) {
     val maxErrors     = 100
     val reporter      = new LoggerReporter(maxErrors, log, identity)
     val skip          = false
-    val compileSetup  = new CompileSetup(compileOutput, new CompileOptions(scalacOptions, javacOptions), scalac.scalaInstance.actualVersion, compileOrder)
-    val analysisStore = Compiler.analysisStore(cacheFile)
     val incOpts       = incOptions.options
+    val compileSetup  = new CompileSetup(compileOutput, new CompileOptions(scalacOptions, javacOptions), scalac.scalaInstance.actualVersion, compileOrder, incOpts.nameHashing)
+    val analysisStore = Compiler.analysisStore(cacheFile)
     val analysis      = aggressive.compile1(sources, cp, compileSetup, progress, analysisStore, getAnalysis, definesClass, scalac, javac, reporter, skip, globalsCache, incOpts)(log)
     if (mirrorAnalysis) {
       SbtAnalysis.printRelations(analysis, Some(new File(cacheFile.getPath() + ".relations")), cwd)
