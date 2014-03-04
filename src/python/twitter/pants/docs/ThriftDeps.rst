@@ -82,33 +82,56 @@ Use Apache Thrift compiler (the default)::
     )
 
 
-******************************
-Thrift Client & Server Example
-******************************
+**************
+Thrift Example
+**************
 
-Enough theoretical mumbo jumbo - let's build a thrift client & server with
-pants! While the example is written in Java these same concepts apply to
-other languages.
+Let's look at some sample code that puts all of this together.
+
+* Thrift IDL code (``.thrift`` files)
+* ``BUILD`` targets for the Thrift IDL code
+* Java code that ``import``\s code generated from Thrift
+* ``BUILD`` target dependencies that allow that ``import``
+
 
 Thrift IDL
 ==========
 
-Since we're writing a thrift service, let's start by defining the service
-interface. As pants is our build tool we'll also define a ``BUILD`` file
-with a target owning the sources. We define our thrift service in
-``src/thrift/com/twitter/common/examples/pingpong/pingpong.thrift``.
+Our example uses two Thrift files, one of which ``include``\s the other.
+They look pretty ordinary. The include-d Thrift,
+``src/thrift/com/twitter/common/examples/distance/distance.thrift``,
+is regular Thrift (albeit with a ``#namespace`` comment used for Thrift
+that will be compiled with both Apache Thrift and Scrooge):
 
-.. include:: ../../../../../src/thrift/com/twitter/common/examples/pingpong/pingpong.thrift
-  :code:
+.. include:: ../../../../../src/thrift/com/twitter/common/examples/distance/distance.thrift
+   :code:
 
-And a target owning the sources in
-``src/thrift/com/twitter/common/examples/pingpong/BUILD``.
+The include-ing Thrift,
+``src/thrift/com/twitter/common/examples/precipitation/precipitation.thrift``,
+also looks ordinary. (The include path is a little tricky: it's based on
+source roots. Thus, if your source tree has more than one root
+``foo`` and ``bar`` and has Thrift in both, code in foo can ``include``
+code from ``bar`` without mentioning ``bar`` in the include path.
+Since twitter/commons has just one source root, this trickiness doesn't
+arise in our example.):
 
-.. include:: ../../../../../src/thrift/com/twitter/common/examples/pingpong/BUILD
-  :code:
+.. include:: ../../../../../src/thrift/com/twitter/common/examples/precipitation/precipitation.thrift
+   :code:
+
+BUILD Targets
+=============
+
+In a ``BUILD`` file, we use a ``java_thrift_library`` or
+``python_thrift_library`` to generate "real" code from Thrift.
+Our example just uses Java;
+thus, the ``BUILD`` file for ``distance.thrift`` looks like
+
+.. include:: ../../../../../src/thrift/com/twitter/common/examples/distance/BUILD
+   :code: python
+   :start-after: cd ../precipitation)
 
 Notice the target type is :ref:`bdict_java_thrift_library`, and this target
-staked its claim to our pingpong thrift IDL file. JVM library targets
+staked its claim to our distance thrift IDL file. JVM library targets
 (e.g.: :ref:`bdict_java_library`, :ref:`bdict_scala_library`) that depend on
 this target will simply see generated code from the IDL. Since no additional
 options are specified we use the defaults; however, if we need more
@@ -122,57 +145,34 @@ by :ref:`bdict_java_thrift_library`.
    use :ref:`bdict_python_thrift_library`.
 
 .. TODO(travis): How to specify the repo thrift gen defaults?
-.. TODO(travis): Maybe we should show generating Java and Scala code?
 
-So we can focus on the build itself, bare-bones thrift client & server code
-are provided for this example. For details about writing thrift services,
-see the `Apache Thrift site <http://thrift.apache.org/>`_.
+As with "regular" languages, for one target's code to include another's,
+a target should have the other in its ``dependencies``. Thus, to allow
+``precipitation.thrift`` to depend on ``distance.thrift``, we set up
+``.../precipitation/BUILD`` like so:
 
-Thrift Server
-=============
+.. include:: ../../../../../src/thrift/com/twitter/common/examples/precipitation/BUILD
+   :code: python
+   :start-after: includes other thrift
 
-Let's examine ``src/java/com/twitter/common/examples/pingpong_thrift/server/BUILD``
-to understand how the server consumes thrift.
+Using in "Regular" Code
+=======================
 
-.. include:: ../../../../../src/java/com/twitter/common/examples/pingpong_thrift/server/BUILD
-  :code:
+We want to use the Thrift-generated interface from "regular" code. In this Java
+example, we want to ``import`` the generated code. In our Java, the ``import``
+statements use the names from the ``.thrift`` files' ``namespace``\s:
 
-Notice how two targets are defined for this server.
-A :ref:`bdict_java_library` has been defined to own the server source code.
-Since the server has dependencies those are defined too. Notice how the server
-depends on both java and thrift. As a consumer we simply depend on targets
-that provide things we need and pants figures out the rest.
+.. include:: ../../../../../tests/java/com/twitter/common/examples/usethrift/UseThriftTest.java
+   :code: java
+   :start-after: from Java.
 
-A :ref:`bdict_jvm_binary` has also been defined, turning our library into
-something runnable. For example, a ``server-bin`` bundle would contain a
-jar with a manifest file specifying the main class and dependency classpath.
-We can simply start the server locally with: ::
+As usual, for code in one target to use code from another, one target needs to
+depend on the other. Thus, our Java code's target has the ``*_thrift_library``
+target whose code it uses in its dependencies:
 
-    ./pants goal run src/java/com/twitter/common/examples/pingpong_thrift/server:server-bin
-
-If you find this interesting but really just care about implementing thrift
-server in Scala or Python, very little changes. For Scala, your
-:ref:`bdict_scala_library` would simply depend on the target that owns
-your thrift IDL sources. Same with Python, but using
-:ref:`bdict_python_library`. The key thing to remember is depending on thrift
-is the same as any other dependency. By the time the thrift dependency is
-used the IDL has already been converted into plain old source code.
-
-Thrift Client
-=============
-
-Now that we have the server, let's build the client. The client lives in a
-separate package with its own BUILD file
-``src/java/com/twitter/common/examples/pingpong_thrift/client/BUILD``.
-
-.. include:: ../../../../../src/java/com/twitter/common/examples/pingpong_thrift/client/BUILD
-  :code:
-
-Again we see two targets, a :ref:`bdict_java_library` that owns sources and
-defines dependencies, and a :ref:`bdict_jvm_binary` to simplify running the
-client. We can run the client locally with: ::
-
-    ./pants goal run src/java/com/twitter/common/examples/pingpong_thrift/client:client-bin
+.. include:: ../../../../../tests/java/com/twitter/common/examples/usethrift/BUILD
+   :code: python
+   :start-after: using Thrift from Java, though.
 
 .. _thriftdeps_publish:
 
