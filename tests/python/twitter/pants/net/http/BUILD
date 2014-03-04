@@ -14,14 +14,15 @@
 # limitations under the License.
 # ==================================================================================================
 
-python_tests(name='http',
-  sources=globs('*.py'),
-  dependencies=[
+python_tests(
+  name = 'http',
+  sources = globs('*.py'),
+  dependencies = [
     pants('3rdparty/python:mox'),
     pants('3rdparty/python:requests'),
     pants('src/python/twitter/common/contextutil'),
     pants('src/python/twitter/common/lang'),
     pants('src/python/twitter/common/quantity'),
-    pants('src/python/twitter/pants:pants-lib'),
+    pants('src/python/twitter/pants/net'),
   ]
 )

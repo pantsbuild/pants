@@ -14,10 +14,10 @@
 # limitations under the License.
 # ==================================================================================================
 
-python_tests(name='reporting',
-  sources=globs('*.py'),
+python_tests(
+  name = 'reporting',
+  sources = globs('*.py'),
   dependencies = [
-    pants("src/python/twitter/pants:pants-lib"),
-    pants("src/python/twitter/pants:pants-deps"),
+    pants('src/python/twitter/pants/reporting'),
   ]
 )

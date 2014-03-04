@@ -22,7 +22,7 @@ from twitter.common.confluence import Confluence, ConfluenceError
 from twitter.common.dirutil import safe_open
 
 from twitter.pants import binary_util
-from twitter.pants.targets import Page
+from twitter.pants.targets.doc import Page
 from twitter.pants.tasks import Task, TaskError
 
 """Classes to ease publishing Page targets to Confluence wikis."""

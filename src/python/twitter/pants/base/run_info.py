@@ -5,7 +5,8 @@ import socket
 import time
 
 from twitter.common.dirutil import safe_mkdir_for
-from twitter.pants import get_scm, get_buildroot
+
+from .build_environment import get_scm, get_buildroot
 
 
 class RunInfo(object):

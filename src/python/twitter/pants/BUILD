@@ -14,75 +14,16 @@
 # limitations under the License.
 # ==================================================================================================
 
-NG_CLIENT = ['java/bin/ng.py']
-
-PANTS_SOURCES   = rglobs('*.py') - NG_CLIENT
-PANTS_GARBAGE   = rglobs('*.pyc') + rglobs('*~')
-PANTS_RESOURCES = rglobs('*') - PANTS_SOURCES - NG_CLIENT - PANTS_GARBAGE
-
-
-def pylint_build_filter(python, platform):
-  return python.startswith('2')
-
+dependencies(
+  name = 'pants',
+  dependencies = [
+    pants('src/python/twitter/pants/bin:pants'),
+  ],
+).with_description('An alias for the pants binary target.')
 
 python_library(
-  name='pants-deps',
-  dependencies=[
-    pants('3rdparty/python:ansicolors'),
-    pants('3rdparty/python:elementtree'),
-    pants('3rdparty/python:markdown'),
-    pants('3rdparty/python:psutil'),
-    pants('3rdparty/python:pygments'),
-    pants('3rdparty/python:pystache'),
-    pants('3rdparty/python:pytest'),
-    pants('3rdparty/python:pytest-cov'),
-    pants('3rdparty/python:python_daemon'),
-    pants('3rdparty/python:requests'),
-    python_requirement('pylint==1.1.0', version_filter=pylint_build_filter)
-  ]
-)
+  name = 'pants-packaged',
 
-python_library(
-  name='pants-lib',
-  dependencies=[
-    pants(':pants-deps'),
-    pants('src/python/twitter/common/collections'),
-    pants('src/python/twitter/common/config'),
-    pants('src/python/twitter/common/confluence'),
-    pants('src/python/twitter/common/contextutil'),
-    pants('src/python/twitter/common/decorators'),
-    pants('src/python/twitter/common/dirutil'),
-    pants('src/python/twitter/common/lang'),
-    pants('src/python/twitter/common/log'),
-    pants('src/python/twitter/common/process'),
-    pants('src/python/twitter/common/python'),
-    pants('src/python/twitter/common/quantity'),
-    pants('src/python/twitter/common/rwbuf'),
-    pants('src/python/twitter/common/threading'),
-    pants('src/python/twitter/common/util'),
-  ],
-  sources=PANTS_SOURCES,
-  resources=PANTS_RESOURCES,
-)
-
-python_binary(
-  name='pants',
-  entry_point='twitter.pants.bin.pants_exe:main',
-  dependencies=[
-    pants(':pants-lib'),
-  ],
-  platforms=[
-    'current',
-    'macosx-10.4-x86_64',
-    'linux-x86_64'
-  ]
-)
-
-python_library(
-  name='pants-packaged',
-  dependencies=[
-    pants(':pants-lib'),
-  ],
   # TODO(wickman) This version should be automatically pulled in from twitter.pants.version
   provides=setup_py(
     name='twitter.pants',
@@ -99,23 +40,32 @@ python_library(
       'Programming Language :: Python',
     ]
   ).with_binaries(
-    pants=pants(':pants'),
+    pants = pants('src/python/twitter/pants/bin:pants'),
   )
-)
-
-python_binary(
-  name='ng',
-  dependencies=[
-    pants('src/python/twitter/common/app'),
-    pants('src/python/twitter/common/log'),
-
-    # TODO(John Sirois): Break up pants src/ into proper libs - the ng client should not need all
-    # of pants
-    pants(':pants-lib')
-  ],
-  source=NG_CLIENT,
 )
 
 page(name='readme',
   source='README.md',
+)
+
+# XXX move into base or thrift
+python_library(
+  name = 'binary_util',
+  sources = ['binary_util.py'],
+  dependencies = [
+    pants('src/python/twitter/common/contextutil'),
+    pants('src/python/twitter/common/dirutil'),
+    pants('src/python/twitter/common/lang'),
+    pants('src/python/twitter/common/log'),
+    pants('src/python/twitter/pants/base:config'),
+    pants('src/python/twitter/pants/tasks:task_error'),
+  ],
+)
+
+python_library(
+  name = 'thrift_util',
+  sources = ['thrift_util.py'],
+  dependencies = [
+    pants(':binary_util'),
+  ],
 )

@@ -77,7 +77,7 @@ class ParseContextTest(BaseBuildRootTest):
       buildfile = create_buildfile(root_dir, 'a',
         content=dedent("""
           import os
-          from twitter.pants.base import ParseContext
+          from twitter.pants.base.parse_context import ParseContext
           def leave_a_trail(file, contents=''):
             with open(file, 'w') as b:
               b.write(contents)

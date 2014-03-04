@@ -37,13 +37,12 @@ from twitter.common.python.interpreter import PythonInterpreter
 from twitter.common.python.pex import PEX
 from twitter.common.python.pex_builder import PEXBuilder
 
-from twitter.pants.base import Config, ParseContext
+from twitter.pants.base.config import Config
+from twitter.pants.base.parse_context import ParseContext
 from twitter.pants.python.python_chroot import PythonChroot
-from twitter.pants.targets import (
-    PythonRequirement,
-    PythonTarget,
-    PythonTestSuite,
-    PythonTests)
+from twitter.pants.targets.python_requirement import PythonRequirement
+from twitter.pants.targets.python_target import PythonTarget
+from twitter.pants.targets.python_tests import PythonTests, PythonTestSuite
 
 
 class PythonTestResult(object):

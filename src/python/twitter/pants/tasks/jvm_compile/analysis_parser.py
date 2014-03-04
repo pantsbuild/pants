@@ -1,5 +1,6 @@
 import os
-from twitter.pants import TaskError
+
+from twitter.pants.tasks.task_error import TaskError
 
 
 class ParseError(TaskError):

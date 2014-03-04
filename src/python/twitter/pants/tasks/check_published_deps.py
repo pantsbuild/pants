@@ -15,8 +15,9 @@
 # ==================================================================================================
 
 from twitter.pants.base.build_environment import get_buildroot
-from twitter.pants.base import BuildFile, Target
-from twitter.pants.targets import JarDependency
+from twitter.pants.base.build_file import BuildFile
+from twitter.pants.base.target import Target
+from twitter.pants.targets.jar_dependency import JarDependency
 from twitter.pants.tasks.console_task import ConsoleTask
 from twitter.pants.tasks.jar_publish import PushDb
 

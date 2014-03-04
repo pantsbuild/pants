@@ -18,9 +18,10 @@ from functools import partial
 
 from twitter.common.collections import maybe_list, OrderedSet
 
-from twitter.pants.base import manual, Target, TargetDefinitionException
-from twitter.pants.targets import util
+from twitter.pants.base.build_manual import manual
+from twitter.pants.base.target import Target, TargetDefinitionException
 
+from . import util
 from .anonymous import AnonymousDeps
 from .exclude import Exclude
 from .external_dependency import ExternalDependency

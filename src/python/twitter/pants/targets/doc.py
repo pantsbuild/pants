@@ -15,7 +15,8 @@
 # ==================================================================================================
 
 
-from twitter.pants.base import manual, Target
+from twitter.pants.base.build_manual import manual
+from twitter.pants.base.target import Target
 
 from .internal import InternalTarget
 from .pants_target import Pants

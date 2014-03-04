@@ -26,21 +26,16 @@ from twitter.common.collections import OrderedSet
 from twitter.common.dirutil import safe_rmtree
 from twitter.common.dirutil.chroot import Chroot
 from twitter.common.python.installer import InstallerBase, Packager
-from twitter.pants.base import (
-    Address,
-    Config,
-    Target,
-    TargetDefinitionException,
-)
+from twitter.pants.base.address import Address
+from twitter.pants.base.config import Config
+from twitter.pants.base.target import Target, TargetDefinitionException
 from twitter.pants.python.antlr_builder import PythonAntlrBuilder
 from twitter.pants.python.thrift_builder import PythonThriftBuilder
-from twitter.pants.targets import (
-    PythonAntlrLibrary,
-    PythonBinary,
-    PythonRequirement,
-    PythonTarget,
-    PythonThriftLibrary,
-)
+from twitter.pants.targets.python_antlr_library import PythonAntlrLibrary
+from twitter.pants.targets.python_binary import PythonBinary
+from twitter.pants.targets.python_requirement import PythonRequirement
+from twitter.pants.targets.python_target import PythonTarget
+from twitter.pants.targets.python_thrift_library import PythonThriftLibrary
 
 from . import Command
 

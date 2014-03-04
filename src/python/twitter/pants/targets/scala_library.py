@@ -16,13 +16,13 @@
 
 from twitter.common.collections import maybe_list
 
-from twitter.pants.base import manual, Target, TargetDefinitionException
-from twitter.pants.targets import util
+from twitter.pants.base.build_manual import manual
+from twitter.pants.base.target import Target, TargetDefinitionException
 
+from . import util
 from .exportable_jvm_library import ExportableJvmLibrary
+from .java_library import JavaLibrary
 from .resources import WithResources
-
-from . import JavaLibrary
 
 
 @manual.builddict(tags=['scala'])

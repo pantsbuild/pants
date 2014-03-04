@@ -17,8 +17,7 @@
 from textwrap import dedent
 
 from twitter.pants.tasks.filter import Filter
-
-from . import ConsoleTaskTest
+from twitter.pants.tasks.test_base import ConsoleTaskTest
 
 
 class BaseFilterTest(ConsoleTaskTest):
@@ -132,7 +131,7 @@ class FilterTest(BaseFilterTest):
       'overlaps/BUILD:two',
       'overlaps/BUILD:three',
       'overlaps/BUILD:foo',
-      args=['--test-type=PythonRequirement,twitter.pants.targets.PythonLibrary'],
+      args=['--test-type=PythonRequirement,twitter.pants.targets.python_library.PythonLibrary'],
       targets=self.targets('::')
     )
 

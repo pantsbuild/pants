@@ -18,7 +18,7 @@ __author__ = 'John Sirois'
 
 from twitter.common.collections import OrderedSet
 from twitter.common.dirutil import touch, safe_mkdir
-from twitter.pants.base import BuildFile
+from twitter.pants.base.build_file import BuildFile
 
 import os
 import shutil

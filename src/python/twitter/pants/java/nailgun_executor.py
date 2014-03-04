@@ -28,12 +28,10 @@ from twitter.common import log
 from twitter.common.collections import maybe_list
 from twitter.common.dirutil import safe_open
 from twitter.common.lang import Compatibility
-
-from twitter.pants import get_buildroot
+from twitter.pants.base.build_environment import get_buildroot
 
 from .executor import Executor, SubprocessExecutor
-
-from . import NailgunClient
+from .nailgun_client import NailgunClient
 
 
 class NailgunExecutor(Executor):

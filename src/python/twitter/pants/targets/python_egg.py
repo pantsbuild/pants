@@ -14,16 +14,19 @@
 # limitations under the License.
 # ==================================================================================================
 
+# XXX(wickman) This should probably die?
+
 import os
 
 from glob import glob as fsglob
-from pkg_resources import Distribution, EggMetadata, PathMetadata
 from zipimport import zipimporter
 
 from twitter.pants.base.build_manual import manual
 from twitter.pants.base.parse_context import ParseContext
 
 from .python_requirement import PythonRequirement
+
+from pkg_resources import Distribution, EggMetadata, PathMetadata
 
 
 @manual.builddict(tags=["python"])

@@ -26,20 +26,20 @@ from contextlib import contextmanager
 
 from twitter.common.collections.orderedset import OrderedSet
 
-from twitter.pants import Config
 from twitter.pants.base.build_invalidator import BuildInvalidator, CacheKeyGenerator
+from twitter.pants.base.config import Config
 from twitter.pants.base.hash_utils import hash_file
 from twitter.pants.base.worker_pool import Work
 from twitter.pants.base.workunit import WorkUnit
 from twitter.pants.cache import create_artifact_cache
 from twitter.pants.cache.read_write_artifact_cache import ReadWriteArtifactCache
-from twitter.pants.ivy import Bootstrapper
-from twitter.pants.java import Executor
+from twitter.pants.ivy import Bootstrapper  # XXX
+from twitter.pants.java.executor import Executor  # XXX
 from twitter.pants.reporting.reporting_utils import items_to_report_element
 
-from .jvm_tool_bootstrapper import JvmToolBootstrapper
+from .jvm_tool_bootstrapper import JvmToolBootstrapper  # XXX
 from .cache_manager import CacheManager, InvalidationCheck, VersionedTargetSet
-from .ivy_utils import IvyUtils
+from .ivy_utils import IvyUtils  # XXX
 from .task_error import TaskError
 
 

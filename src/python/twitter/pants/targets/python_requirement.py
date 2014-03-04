@@ -14,7 +14,8 @@
 # limitations under the License.
 # ==================================================================================================
 
-from twitter.pants.base import manual, Target
+from twitter.pants.base.build_manual import manual
+from twitter.pants.base.target import Target
 
 from .external_dependency import ExternalDependency
 

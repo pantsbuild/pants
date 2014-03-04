@@ -1,5 +1,5 @@
 # ==================================================================================================
-# Copyright 2013 Twitter, Inc.
+# Copyright 2014 Twitter, Inc.
 # --------------------------------------------------------------------------------------------------
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this work except in compliance with the License.
@@ -14,13 +14,5 @@
 # limitations under the License.
 # ==================================================================================================
 
-python_tests(name = 'goal',
-  sources = globs('*.py'),
-  dependencies = [
-    pants('3rdparty/python:mox'),
-    pants('src/python/twitter/common/util'),
-    pants('src/python/twitter/pants:pants-deps'),
-    pants('src/python/twitter/pants:pants-lib'),
-    pants('tests/python/twitter/pants/base:base-test')
-  ]
-)
+class GoalError(Exception):
+  """Raised to indicate a goal has failed."""

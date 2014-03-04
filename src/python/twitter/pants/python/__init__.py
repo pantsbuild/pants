@@ -13,13 +13,3 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==================================================================================================
-
-__author__ = 'John Sirois, Brian Wickman'
-
-from twitter.pants.python.python_builder import PythonBuilder
-from twitter.pants.python.python_chroot import PythonChroot
-
-__all__ = [
-  'PythonBuilder',
-  'PythonChroot'
-]

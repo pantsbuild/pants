@@ -7,14 +7,13 @@ from twitter.common.contextutil import temporary_file, temporary_dir
 from twitter.common.dirutil import safe_mkdir, touch
 from twitter.common.dirutil.chroot import Chroot
 from twitter.common.collections import OrderedSet
-from twitter.pants.base import ParseContext, Target, TargetDefinitionException
+from twitter.pants.base.parse_context import ParseContext
+from twitter.pants.base.target import Target, TargetDefinitionException
 from twitter.pants.commands.setup_py import SetupPy
-from twitter.pants.targets import (
-    Pants as pants,
-    PythonArtifact as setup_py,
-    PythonBinary as python_binary,
-    PythonLibrary as python_library,
-)
+from twitter.pants.targets.pants_target import Pants as pants
+from twitter.pants.targets.python_artifact import PythonArtifact as setup_py
+from twitter.pants.targets.python_binary import PythonBinary as python_binary
+from twitter.pants.targets.python_library import PythonLibrary as python_library
 
 from mock import (
     MagicMock,

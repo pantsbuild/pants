@@ -17,8 +17,7 @@
 from textwrap import dedent
 
 from twitter.pants.tasks.minimal_cover import MinimalCover
-
-from . import ConsoleTaskTest
+from twitter.pants.tasks.test_base import ConsoleTaskTest
 
 
 class BaseMinimalCovertTest(ConsoleTaskTest):

@@ -16,7 +16,7 @@
 
 import unittest
 
-from twitter.pants.base import ParseContext
+from twitter.pants.base.parse_context import ParseContext
 from twitter.pants.targets.artifact import Artifact
 from twitter.pants.targets.repository import Repository
 

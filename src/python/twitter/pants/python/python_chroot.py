@@ -30,15 +30,16 @@ from twitter.common.python.interpreter import PythonInterpreter
 from twitter.common.python.pex_builder import PEXBuilder
 from twitter.common.python.platforms import Platform
 from twitter.common.quantity import Amount, Time
-from twitter.pants.base import Config, ParseContext, TargetDefinitionException
 from twitter.pants.base.build_invalidator import BuildInvalidator, CacheKeyGenerator
-from twitter.pants.targets import (
-    PythonAntlrLibrary,
-    PythonBinary,
-    PythonLibrary,
-    PythonRequirement,
-    PythonTests,
-    PythonThriftLibrary)
+from twitter.pants.base.config import Config
+from twitter.pants.base.parse_context import ParseContext
+from twitter.pants.base.target import TargetDefinitionException
+from twitter.pants.targets.python_antlr_library import PythonAntlrLibrary
+from twitter.pants.targets.python_binary import PythonBinary
+from twitter.pants.targets.python_library import PythonLibrary
+from twitter.pants.targets.python_requirement import PythonRequirement
+from twitter.pants.targets.python_tests import PythonTests
+from twitter.pants.targets.python_thrift_library import PythonThriftLibrary
 
 from .antlr_builder import PythonAntlrBuilder
 from .resolver import MultiResolver

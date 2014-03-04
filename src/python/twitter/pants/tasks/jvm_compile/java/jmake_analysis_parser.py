@@ -2,7 +2,7 @@ from collections import defaultdict
 import os
 import re
 
-from twitter.pants import get_buildroot
+from twitter.pants.base.build_environment import get_buildroot
 from twitter.pants.tasks.jvm_compile.analysis_parser import ParseError, AnalysisParser
 from twitter.pants.tasks.jvm_compile.java.jmake_analysis import JMakeAnalysis
 

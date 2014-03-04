@@ -34,8 +34,8 @@ else:
   import urllib2 as urllib_request
   import urllib2 as urllib_error
 
-from .base import Config
-from .tasks import TaskError
+from .base.config import Config
+from .tasks.task_error import TaskError
 
 
 _ID_BY_OS = {

@@ -16,7 +16,8 @@
 
 from __future__ import print_function
 
-from twitter.pants.targets import JarDependency, PythonRequirement
+from twitter.pants.targets.jar_dependency import JarDependency
+from twitter.pants.targets.python_requirement import PythonRequirement
 from twitter.pants.tasks import TaskError
 from .console_task import ConsoleTask
 

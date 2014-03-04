@@ -16,7 +16,8 @@
 
 from twitter.common.python.interpreter import PythonInterpreter
 
-from twitter.pants.targets import PythonBinary, PythonTests, PythonTestSuite
+from twitter.pants.targets.python_binary import PythonBinary
+from twitter.pants.targets.python_tests import PythonTests, PythonTestSuite
 
 from .binary_builder import PythonBinaryBuilder
 from .lint_builder import PythonLintBuilder

@@ -20,8 +20,7 @@ from textwrap import dedent
 
 from twitter.pants.base.target import Target
 from twitter.pants.tasks.listtargets import ListTargets
-
-from . import ConsoleTaskTest
+from twitter.pants.tasks.test_base import ConsoleTaskTest
 
 
 class BaseListTargetsTest(ConsoleTaskTest):

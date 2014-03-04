@@ -15,7 +15,9 @@
 # ==================================================================================================
 
 from twitter.pants.base.workunit import WorkUnit
-from twitter.pants.java import Executor, NailgunExecutor, SubprocessExecutor
+
+from .executor import Executor, SubprocessExecutor
+from .nailgun_executor import NailgunExecutor
 
 
 def execute_java(classpath, main, jvm_options=None, args=None, executor=None,

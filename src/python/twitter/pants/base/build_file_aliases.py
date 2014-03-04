@@ -14,41 +14,36 @@
 # limitations under the License.
 # =================================================================================================
 
-from twitter.pants.targets import (
-    AnnotationProcessor,
-    Artifact,
-    Benchmark,
-    Bundle,
-    Credentials,
-    Exclude,
-    JarDependency,
-    JarLibrary,
-    JavaAgent,
-    JavaAntlrLibrary,
-    JavaLibrary,
-    JavaProtobufLibrary,
-    JavaTests,
-    JavaThriftLibrary,
-    JvmApp,
-    JvmBinary,
-    Page,
-    Pants,
-    PythonArtifact,
-    PythonBinary,
-    PythonEgg,
-    PythonLibrary,
-    PythonAntlrLibrary,
-    PythonRequirement,
-    PythonThriftLibrary,
-    PythonTests,
-    PythonTestSuite,
-    Repository,
-    Resources,
-    ScalaLibrary,
-    ScalaTests,
-    ScalacPlugin,
-    SourceRoot,
-    Wiki)
+from twitter.pants.targets.annotation_processor import AnnotationProcessor
+from twitter.pants.targets.artifact import Artifact
+from twitter.pants.targets.benchmark import Benchmark
+from twitter.pants.targets.credentials import Credentials
+from twitter.pants.targets.doc import Page, Wiki
+from twitter.pants.targets.exclude import Exclude
+from twitter.pants.targets.jar_dependency import JarDependency
+from twitter.pants.targets.jar_library import JarLibrary
+from twitter.pants.targets.java_agent import JavaAgent
+from twitter.pants.targets.java_antlr_library import JavaAntlrLibrary
+from twitter.pants.targets.java_library import JavaLibrary
+from twitter.pants.targets.java_protobuf_library import JavaProtobufLibrary
+from twitter.pants.targets.java_tests import JavaTests
+from twitter.pants.targets.java_thrift_library import JavaThriftLibrary
+from twitter.pants.targets.jvm_binary import Bundle, JvmApp, JvmBinary
+from twitter.pants.targets.pants_target import Pants
+from twitter.pants.targets.python_antlr_library import PythonAntlrLibrary
+from twitter.pants.targets.python_artifact import PythonArtifact
+from twitter.pants.targets.python_binary import PythonBinary
+from twitter.pants.targets.python_egg import PythonEgg
+from twitter.pants.targets.python_library import PythonLibrary
+from twitter.pants.targets.python_requirement import PythonRequirement
+from twitter.pants.targets.python_tests import PythonTests, PythonTestSuite
+from twitter.pants.targets.python_thrift_library import PythonThriftLibrary
+from twitter.pants.targets.repository import Repository
+from twitter.pants.targets.resources import Resources
+from twitter.pants.targets.scala_library import ScalaLibrary
+from twitter.pants.targets.scala_tests import ScalaTests
+from twitter.pants.targets.scalac_plugin import ScalacPlugin
+from twitter.pants.targets.sources import SourceRoot
 
 
 # aliases

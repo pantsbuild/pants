@@ -27,7 +27,10 @@ from twitter.common.collections import OrderedSet
 from twitter.common.dirutil import safe_mkdir, safe_open
 
 from twitter.pants.base.build_environment import get_buildroot
-from twitter.pants.targets import InternalTarget, JavaLibrary, JavaThriftLibrary, ScalaLibrary
+from twitter.pants.targets.internal import InternalTarget
+from twitter.pants.targets.java_library import JavaLibrary
+from twitter.pants.targets.java_thrift_library import JavaThriftLibrary
+from twitter.pants.targets.scala_library import ScalaLibrary
 from twitter.pants.tasks import TaskError
 from twitter.pants.tasks.nailgun_task import NailgunTask
 from twitter.pants.thrift_util import (

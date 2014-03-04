@@ -14,13 +14,14 @@
 # limitations under the License.
 # ==================================================================================================
 
-import pytest
 from textwrap import dedent
-from twitter.pants import TaskError
 
 from twitter.pants.tasks.dependencies import Dependencies
+from twitter.pants.tasks.task_error import TaskError
+from twitter.pants.tasks.test_base import ConsoleTaskTest
 
-from .import ConsoleTaskTest
+import pytest
+
 
 # some helper methods to be able to setup the state in a cleaner way
 def pants(path):

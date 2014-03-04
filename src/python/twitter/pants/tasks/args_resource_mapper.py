@@ -19,9 +19,10 @@ from __future__ import print_function
 import os
 
 from twitter.pants.java.jar import open_jar
-from twitter.pants.targets import JavaLibrary, ScalaLibrary
+from twitter.pants.targets.java_library import JavaLibrary
+from twitter.pants.targets.scala_library import ScalaLibrary
 
-from . import Task
+from .task import Task
 
 
 RESOURCE_RELDIR = 'com/twitter/common/args/apt'

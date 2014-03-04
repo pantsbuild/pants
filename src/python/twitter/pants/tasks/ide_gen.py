@@ -22,9 +22,8 @@ from collections import defaultdict
 from twitter.common.collections.orderedset import OrderedSet
 from twitter.common.dirutil import safe_mkdir
 
-from twitter.pants import (
-    binary_util,
-    get_buildroot)
+from twitter.pants import binary_util
+from twitter.pants.base.build_environment import get_buildroot
 from twitter.pants.base.target import Target
 from twitter.pants.goal.phase import Phase
 from twitter.pants.targets.jvm_binary import JvmBinary

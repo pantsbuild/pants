@@ -19,7 +19,7 @@ import unittest
 from twitter.common.contextutil import temporary_file
 from twitter.common.python.platforms import Platform
 
-from twitter.pants.base import Config
+from twitter.pants.base.config import Config
 from twitter.pants.python.resolver import get_platforms
 
 

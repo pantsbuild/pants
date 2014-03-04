@@ -15,7 +15,7 @@ from datetime import date, datetime
 
 from pystache import Renderer
 from twitter.common.dirutil import safe_mkdir
-from twitter.pants import get_buildroot
+from twitter.pants.base.build_environment import get_buildroot
 
 from twitter.pants.base.mustache import MustacheRenderer
 from twitter.pants.goal.run_tracker import RunInfo

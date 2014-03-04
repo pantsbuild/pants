@@ -72,8 +72,9 @@ import textwrap
 
 from twitter.common.dirutil import safe_mkdir, safe_open
 
-from twitter.pants import binary_util, get_buildroot
+from twitter.pants import binary_util
 from twitter.pants.base.address import Address
+from twitter.pants.base.build_environment import get_buildroot
 from twitter.pants.base.target import Target
 from twitter.pants.targets.doc import Page
 from twitter.pants.tasks import Task, TaskError

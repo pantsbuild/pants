@@ -19,7 +19,8 @@ from functools import partial
 
 from twitter.common.collections import maybe_list
 
-from twitter.pants.base import manual, TargetDefinitionException
+from twitter.pants.base.build_manual import manual
+from twitter.pants.base.target import TargetDefinitionException
 
 from .jar_dependency import JarDependency
 from .jvm_target import JvmTarget

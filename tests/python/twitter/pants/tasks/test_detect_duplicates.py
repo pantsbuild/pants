@@ -24,10 +24,9 @@ from zipfile import ZipFile
 from twitter.common.dirutil import safe_rmtree, touch
 
 from twitter.pants.base.context_utils import create_context
-from twitter.pants.tasks import TaskError
 from twitter.pants.tasks.detect_duplicates import DuplicateDetector
-
-from . import TaskTest
+from twitter.pants.tasks.task_error import TaskError
+from twitter.pants.tasks.test_base import TaskTest
 
 
 class DuplicateDetectorTest(TaskTest):

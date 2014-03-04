@@ -17,8 +17,7 @@
 from textwrap import dedent
 
 from twitter.pants.tasks.check_published_deps import CheckPublishedDeps
-
-from . import ConsoleTaskTest
+from twitter.pants.tasks.test_base import ConsoleTaskTest
 
 
 class CheckPublishedDepsTest(ConsoleTaskTest):

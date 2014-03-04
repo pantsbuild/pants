@@ -25,7 +25,9 @@ from twitter.common.collections import OrderedSet
 from twitter.common.dirutil import safe_mkdir
 
 from twitter.pants.binary_util import select_binary
-from twitter.pants.targets import JavaLibrary, JavaProtobufLibrary, PythonLibrary
+from twitter.pants.targets.java_library import JavaLibrary
+from twitter.pants.targets.java_protobuf_library import JavaProtobufLibrary
+from twitter.pants.targets.python_library import PythonLibrary
 
 from .code_gen import CodeGen
 

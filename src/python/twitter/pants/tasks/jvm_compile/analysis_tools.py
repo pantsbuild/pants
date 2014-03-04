@@ -1,7 +1,7 @@
 import os
 import shutil
 from twitter.common.contextutil import temporary_dir
-from twitter.pants import get_buildroot
+from twitter.pants.base.build_environment import get_buildroot
 
 
 class AnalysisTools(object):

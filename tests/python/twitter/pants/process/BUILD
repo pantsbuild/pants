@@ -14,10 +14,11 @@
 # limitations under the License.
 # ==================================================================================================
 
-python_tests(name='process',
-  sources=globs('*.py'),
-  dependencies=[
+python_tests(
+  name = 'process',
+  sources = globs('*.py'),
+  dependencies = [
     pants('3rdparty/python:mox'),
-    pants('src/python/twitter/pants:pants-lib'),
+    pants('src/python/twitter/pants/process'),
   ]
 )

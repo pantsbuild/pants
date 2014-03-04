@@ -17,11 +17,13 @@
 import itertools
 import os
 
-from twitter.pants.targets import TargetWithSources
 from twitter.pants.targets.jvm_binary import JvmApp
-from twitter.pants.tasks.console_task import ConsoleTask
+from twitter.pants.targets.with_sources import TargetWithSources
+
+from .console_task import ConsoleTask
 
 __author__ = 'Dave Buchfuhrer'
+
 
 class FileDeps(ConsoleTask):
   def console_output(self, targets):

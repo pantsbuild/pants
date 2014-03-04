@@ -23,11 +23,10 @@ import sys
 from twitter.common.collections import OrderedSet, maybe_list
 from twitter.common.lang import Compatibility
 
-from twitter.pants.base.parse_context import ParseContext
-
 from .address import Address
 from .build_manual import manual
 from .hash_utils import hash_all
+from .parse_context import ParseContext
 
 
 class TargetDefinitionException(Exception):

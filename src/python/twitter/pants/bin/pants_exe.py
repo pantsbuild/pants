@@ -28,8 +28,8 @@ from twitter.pants.base.address import Address
 from twitter.pants.base.config import Config
 from twitter.pants.base.rcfile import RcFile
 from twitter.pants.commands import Command
-from twitter.pants.goal import RunTracker
 from twitter.pants.goal.initialize_reporting import initial_reporting
+from twitter.pants.goal.run_tracker import RunTracker
 from twitter.pants.reporting.report import Report
 from twitter.pants.tasks.nailgun_task import NailgunTask
 
@@ -150,6 +150,7 @@ def _run():
   roots = config.getlist('parse', 'roots', default=[])
   sys.path.extend(map(lambda root: os.path.join(root_dir, root), roots))
 
+  # XXX(wickman) This should be in the command goal, not un pants_exe.py!
   run_tracker = RunTracker.from_config(config)
   report = initial_reporting(config, run_tracker)
   run_tracker.start(report)

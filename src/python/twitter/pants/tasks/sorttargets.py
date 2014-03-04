@@ -19,7 +19,7 @@ from collections import defaultdict
 from twitter.common.util import topological_sort
 
 from .console_task import ConsoleTask
-from ..base import Target
+from ..base.target import Target
 
 
 class SortTargets(ConsoleTask):

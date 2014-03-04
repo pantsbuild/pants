@@ -3,7 +3,7 @@ import json
 import os
 import re
 import itertools
-from twitter.pants import get_buildroot
+from twitter.pants.base.build_environment import get_buildroot
 from twitter.pants.tasks.jvm_compile.analysis import Analysis
 
 

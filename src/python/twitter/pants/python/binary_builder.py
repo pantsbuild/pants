@@ -23,8 +23,8 @@ import time
 from twitter.common.python.interpreter import PythonInterpreter
 from twitter.common.python.pex_builder import PEXBuilder
 
-from twitter.pants.base import Config
-from twitter.pants.targets import PythonBinary
+from twitter.pants.base.config import Config
+from twitter.pants.targets.python_binary import PythonBinary
 
 from .python_chroot import PythonChroot
 

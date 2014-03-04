@@ -1,5 +1,6 @@
+from twitter.pants.targets.sources import SourceRoot
+
 from .console_task import ConsoleTask
-from twitter.pants.targets import SourceRoot
 
 
 class ListRoots(ConsoleTask):

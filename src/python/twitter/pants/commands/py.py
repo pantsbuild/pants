@@ -32,7 +32,8 @@ from twitter.pants.base.parse_context import ParseContext
 from twitter.pants.base.target import Target
 from twitter.pants.python.interpreter_cache import PythonInterpreterCache
 from twitter.pants.python.python_chroot import PythonChroot
-from twitter.pants.targets import PythonBinary, PythonRequirement
+from twitter.pants.targets.python_binary import PythonBinary
+from twitter.pants.targets.python_requirement import PythonRequirement
 
 
 class Py(Command):

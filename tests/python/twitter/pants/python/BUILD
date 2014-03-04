@@ -14,8 +14,15 @@
 # limitations under the License.
 # ==================================================================================================
 
+python_test_suite(
+  name = 'all',
+  dependencies = [
+    pants(':python'),
+  ],
+)
 
-python_test_suite(name = 'all',
+python_test_suite(
+  name = 'python',
   dependencies = [
     pants(':test_antlr_builder'),
     pants(':test_resolver'),
@@ -24,28 +31,34 @@ python_test_suite(name = 'all',
   ]
 )
 
-python_tests(name = 'test_antlr_builder',
+# XXX this tests the code running the test, not the code under test!
+python_tests(
+  name = 'test_antlr_builder',
   sources = ['test_antlr_builder.py'],
   dependencies = [
     'src/antlr/twitter/pants/python/test:csv',
     'src/antlr/twitter/pants/python/test:eval',
-    'src/python/twitter/pants:pants-lib',
-  ]
+  ],
 )
 
-python_tests(name = 'test_thrift_namespace_packages',
+# XXX this tests the code running the test, not the code under test!
+python_tests(
+  name = 'test_thrift_namespace_packages',
   sources = ['test_thrift_namespace_packages.py'],
-  dependencies = [ pants('src/thrift/com/twitter/pants/testing:duck-py'),
-                   pants('src/thrift/com/twitter/pants/testing:goose-py') ]
+  dependencies = [
+    pants('src/thrift/com/twitter/pants/testing:duck-py'),
+    pants('src/thrift/com/twitter/pants/testing:goose-py'),
+  ],
 )
 
 python_tests(name = 'test_resolver',
   sources = ['test_resolver.py'],
   dependencies = [
-    pants('src/python/twitter/common/config'),
+    pants('src/python/twitter/common/contextutil'),
     pants('src/python/twitter/common/python'),
-    pants('src/python/twitter/pants:pants-lib')
-  ]
+    pants('src/python/twitter/pants/base:config'),
+    pants('src/python/twitter/pants/python:resolver'),
+  ],
 )
 
 python_tests(name = 'test_thrift_builder',
@@ -54,7 +67,7 @@ python_tests(name = 'test_thrift_builder',
     pants('3rdparty/python:mock'),
     pants('src/python/twitter/common/config'),
     pants('src/python/twitter/common/python'),
-    pants('src/python/twitter/pants:pants-lib'),
+    pants('src/python/twitter/pants/python:thrift_builder'),
     pants('tests/python/twitter/pants:base-test'),
     pants('tests/python/twitter/pants/base:base-test')
   ]

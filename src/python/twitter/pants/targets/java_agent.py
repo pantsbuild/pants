@@ -16,7 +16,8 @@
 
 from twitter.common.lang import Compatibility
 
-from twitter.pants.base import manual, TargetDefinitionException
+from twitter.pants.base.build_manual import manual
+from twitter.pants.base.target import TargetDefinitionException
 
 from .java_library import JavaLibrary
 

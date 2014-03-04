@@ -14,9 +14,12 @@
 # limitations under the License.
 # ==================================================================================================
 
-python_tests(name='fs',
-  sources=globs('*.py'),
-  dependencies=[
-    pants('src/python/twitter/pants:pants-lib'),
+python_tests(
+  name = 'fs',
+  sources = globs('*.py'),
+  dependencies = [
+    pants('src/python/twitter/common/contextutil'),
+    pants('src/python/twitter/common/dirutil'),
+    pants('src/python/twitter/pants/fs'),
   ]
 )

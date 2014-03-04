@@ -25,7 +25,7 @@ from twitter.common.dirutil import safe_mkdir
 from twitter.pants.base.build_environment import get_buildroot
 from twitter.pants.fs import archive
 from twitter.pants.java.jar import Manifest
-from twitter.pants.targets import JvmApp, JvmBinary
+from twitter.pants.targets.jvm_binary import JvmApp, JvmBinary
 from twitter.pants.tasks import TaskError
 from twitter.pants.tasks.jvm_binary_task import JvmBinaryTask
 

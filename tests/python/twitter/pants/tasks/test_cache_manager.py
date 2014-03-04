@@ -2,8 +2,7 @@ import shutil
 import tempfile
 
 from twitter.pants.base.build_invalidator import CacheKey, CacheKeyGenerator
-from twitter.pants.tasks import CacheManager
-from twitter.pants.tasks.cache_manager import InvalidationCheck, VersionedTarget
+from twitter.pants.tasks.cache_manager import CacheManager, InvalidationCheck, VersionedTarget
 from twitter.pants.testutils import MockTarget
 from twitter.pants.testutils.base_mock_target_test import BaseMockTargetTest
 

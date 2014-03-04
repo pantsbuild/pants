@@ -28,7 +28,8 @@ try:
 except ImportError:
   HAS_MARKDOWN = False
 
-from twitter.pants import is_doc
+
+from twitter.pants import is_doc  # XXX This no longer exists
 from twitter.pants.base.generator import Generator
 
 _TEMPLATE_BASEDIR = 'templates'

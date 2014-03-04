@@ -11,9 +11,8 @@ from twitter.common.python.translator import (
     EggTranslator,
     SourceTranslator)
 
-from twitter.pants.targets import (
-    PythonBinary,
-    PythonRequirement)
+from twitter.pants.targets.python_binary import PythonBinary
+from twitter.pants.targets.python_requirement import PythonRequirement
 
 
 def get_platforms(platform_list):

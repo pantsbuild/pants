@@ -16,9 +16,10 @@
 
 import pytest
 
-from twitter.pants.base import ParseContext, Target, TargetDefinitionException
+from twitter.pants.base.parse_context import ParseContext
+from twitter.pants.base.target import Target, TargetDefinitionException
 from twitter.pants.base_build_root_test import BaseBuildRootTest
-from twitter.pants.targets import PythonBinary
+from twitter.pants.targets.python_binary import PythonBinary
 
 
 class TestPythonBinary(BaseBuildRootTest):

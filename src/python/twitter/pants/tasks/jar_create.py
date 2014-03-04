@@ -25,7 +25,7 @@ from twitter.common.dirutil import safe_mkdir
 from twitter.pants.base.build_environment import get_buildroot
 from twitter.pants.fs import safe_filename
 from twitter.pants.java.jar import open_jar, Manifest
-from twitter.pants.targets import JvmBinary
+from twitter.pants.targets.jvm_binary import JvmBinary
 
 from .javadoc_gen import javadoc
 from .scaladoc_gen import scaladoc

@@ -17,11 +17,10 @@
 import inspect
 import os
 
-import twitter.pants
-import twitter.pants.base
-
 from twitter.common.dirutil import Fileset, safe_open
 from twitter.pants.base.build_file_helpers import maven_layout
+from twitter.pants.base.build_manual import get_builddict_info
+from twitter.pants.base.parse_context import ParseContext
 from twitter.pants.base.generator import Generator, TemplateData
 from twitter.pants.goal.phase import Phase
 from twitter.pants.tasks import Task, TaskError
@@ -151,7 +150,7 @@ PREDEFS = {  # some hardwired entries
 # Returns list of duples [(name, object), (name, object), (name, object),...]
 def get_syms():
   r = {}
-  vc = twitter.pants.base.ParseContext.default_globals()
+  vc = ParseContext.default_globals()
   for s in vc:
     if s in PREDEFS: continue
     if s[0].isupper(): continue  # REMIND see both jvm_binary and JvmBinary??
@@ -194,7 +193,7 @@ def entry_for_one_class(nom, klas):
     methods = []
     for attrname in dir(klas):
       attr = getattr(klas, attrname)
-      attr_bdi = twitter.pants.base.get_builddict_info(attr)
+      attr_bdi = get_builddict_info(attr)
       if not attr_bdi: continue
       if inspect.ismethod(attr):
         methods.append(entry_for_one_method(attrname, attr))
@@ -228,7 +227,7 @@ def assemble(predefs=PREDEFS, symbol_hash=None):
   if symbol_hash is None:
     symbol_hash = get_syms()
   for k in symbol_hash:
-    bdi = twitter.pants.base.get_builddict_info(symbol_hash[k])
+    bdi = get_builddict_info(symbol_hash[k])
     if bdi is None: continue
     d[k] = bdi.copy()
     if not "defn" in d[k]:

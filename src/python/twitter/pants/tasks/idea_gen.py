@@ -22,10 +22,11 @@ import tempfile
 from xml.dom import minidom
 
 from twitter.common.dirutil import safe_mkdir
-
-from twitter.pants.targets import JavaTests, ScalaTests, SourceRoot
 from twitter.pants.base.build_environment import get_buildroot
 from twitter.pants.base.generator import TemplateData, Generator
+from twitter.pants.targets.java_tests import JavaTests
+from twitter.pants.targets.scala_tests import ScalaTests
+from twitter.pants.targets.sources import SourceRoot
 from twitter.pants.tasks.ide_gen import IdeGen, Project, SourceSet
 
 

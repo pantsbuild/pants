@@ -23,9 +23,8 @@ import pytest
 
 from Queue import Empty, Queue
 
+from twitter.pants.tasks.test_base import prepare_task
 from twitter.pants.tasks.console_task import ConsoleTask
-
-from . import prepare_task
 
 
 class ConsoleTaskTest(unittest.TestCase):

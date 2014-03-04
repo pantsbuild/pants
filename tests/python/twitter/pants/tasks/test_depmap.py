@@ -17,9 +17,8 @@
 from textwrap import dedent
 
 from twitter.pants.tasks.depmap import Depmap
-from twitter.pants.tasks import TaskError
-
-from . import ConsoleTaskTest
+from twitter.pants.tasks.task_error import TaskError
+from twitter.pants.tasks.test_base import ConsoleTaskTest
 
 
 class BaseDepmapTest(ConsoleTaskTest):

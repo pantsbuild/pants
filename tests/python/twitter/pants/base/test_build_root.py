@@ -21,7 +21,7 @@ import unittest
 from twitter.common.contextutil import environment_as, pushd, temporary_dir
 from twitter.common.dirutil import safe_mkdir, safe_mkdtemp, safe_rmtree, touch
 
-from twitter.pants.base.build_environment import BuildRoot
+from twitter.pants.base.build_root import BuildRoot
 
 
 class BuildRootTest(unittest.TestCase):

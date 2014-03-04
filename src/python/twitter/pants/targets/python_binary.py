@@ -20,7 +20,8 @@ from twitter.common.collections import maybe_list
 from twitter.common.lang import Compatibility
 from twitter.common.python.pex_info import PexInfo
 
-from twitter.pants.base import manual, Target, TargetDefinitionException
+from twitter.pants.base.build_manual import manual
+from twitter.pants.base.target import Target, TargetDefinitionException
 
 from .python_target import PythonTarget
 

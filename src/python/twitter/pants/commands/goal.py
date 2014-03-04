@@ -36,27 +36,24 @@ from twitter.common.lang import Compatibility
 from twitter.common.log.options import LogOptions
 
 from twitter.pants import binary_util
+from twitter.pants.base.address import Address
 from twitter.pants.base.build_environment import get_buildroot
-from twitter.pants.goal import Goal as goal, Group as group
-from twitter.pants.base import (
-    Address,
-    BuildFile,
-    Config,
-    ParseContext,
-    Target,
-    TargetDefinitionException)
+from twitter.pants.base.build_file import BuildFile
+from twitter.pants.base.config import Config
+from twitter.pants.base.parse_context import ParseContext
 from twitter.pants.base.rcfile import RcFile
+from twitter.pants.base.target import Target, TargetDefinitionException
+from twitter.pants.base.workunit import WorkUnit
 from twitter.pants.commands import Command
 from twitter.pants.engine import Engine, GroupEngine
+from twitter.pants.goal import Context, GoalError, Phase
+from twitter.pants.goal import Goal as goal, Group as group
 from twitter.pants.goal.initialize_reporting import update_reporting
-from twitter.pants.base.workunit import WorkUnit
 from twitter.pants.reporting.reporting_server import ReportingServer, ReportingServerManager
 from twitter.pants.tasks import Task, TaskError
 from twitter.pants.tasks.console_task import ConsoleTask
-from twitter.pants.goal import Context, GoalError, Phase
 from twitter.pants.tasks.list_goals import ListGoals
 from twitter.pants.tasks.targets_help import TargetsHelp
-
 
 try:
   import colors
@@ -492,45 +489,43 @@ class Goal(Command):
 
 
 # Install all default pants provided goals
-from twitter.pants.targets import JavaTests as junit_tests
-from twitter.pants.targets import Benchmark, JvmBinary
-from twitter.pants.targets import (
-  Benchmark,
-  JavaLibrary,
-  JvmBinary,
-  ScalacPlugin,
-  ScalaLibrary,
-  ScalaTests)
+from twitter.pants.targets.benchmark import Benchmark
+from twitter.pants.targets.java_library import JavaLibrary
+from twitter.pants.targets.java_tests import JavaTests as junit_tests
+from twitter.pants.targets.jvm_binary import JvmBinary
+from twitter.pants.targets.scala_library import ScalaLibrary
+from twitter.pants.targets.scala_tests import ScalaTests
+from twitter.pants.targets.scalac_plugin import ScalacPlugin
 from twitter.pants.tasks.antlr_gen import AntlrGen
 from twitter.pants.tasks.benchmark_run import BenchmarkRun
 from twitter.pants.tasks.binary_create import BinaryCreate
-from twitter.pants.tasks.builddictionary import BuildBuildDictionary
 from twitter.pants.tasks.bootstrap_jvm_tools import BootstrapJvmTools
 from twitter.pants.tasks.build_lint import BuildLint
+from twitter.pants.tasks.builddictionary import BuildBuildDictionary
 from twitter.pants.tasks.bundle_create import BundleCreate
-from twitter.pants.tasks.checkstyle import Checkstyle
-from twitter.pants.tasks.check_published_deps import CheckPublishedDeps
-from twitter.pants.tasks.detect_duplicates import DuplicateDetector
 from twitter.pants.tasks.check_exclusives import CheckExclusives
+from twitter.pants.tasks.check_published_deps import CheckPublishedDeps
+from twitter.pants.tasks.checkstyle import Checkstyle
+from twitter.pants.tasks.detect_duplicates import DuplicateDetector
 from twitter.pants.tasks.filedeps import FileDeps
 from twitter.pants.tasks.ivy_resolve import IvyResolve
 from twitter.pants.tasks.jar_create import JarCreate
-from twitter.pants.tasks.jvm_compile.java.java_compile import JavaCompile
 from twitter.pants.tasks.javadoc_gen import JavadocGen
-from twitter.pants.tasks.scaladoc_gen import ScaladocGen
 from twitter.pants.tasks.junit_run import JUnitRun
+from twitter.pants.tasks.jvm_compile.java.java_compile import JavaCompile
+from twitter.pants.tasks.jvm_compile.scala.scala_compile import ScalaCompile
 from twitter.pants.tasks.jvm_run import JvmRun
+from twitter.pants.tasks.listtargets import ListTargets
 from twitter.pants.tasks.markdown_to_html import MarkdownToHtml
 from twitter.pants.tasks.nailgun_task import NailgunTask
-from twitter.pants.tasks.listtargets import ListTargets
 from twitter.pants.tasks.pathdeps import PathDeps
 from twitter.pants.tasks.prepare_resources import PrepareResources
 from twitter.pants.tasks.protobuf_gen import ProtobufGen
-from twitter.pants.tasks.jvm_compile.scala.scala_compile import ScalaCompile
 from twitter.pants.tasks.scala_repl import ScalaRepl
+from twitter.pants.tasks.scaladoc_gen import ScaladocGen
+from twitter.pants.tasks.scrooge_gen import ScroogeGen
 from twitter.pants.tasks.specs_run import SpecsRun
 from twitter.pants.tasks.thrift_gen import ThriftGen
-from twitter.pants.tasks.scrooge_gen import ScroogeGen
 
 
 def _cautious_rmtree(root):

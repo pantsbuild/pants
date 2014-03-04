@@ -19,13 +19,13 @@ import re
 import sys
 
 from twitter.common.dirutil import safe_mkdir, safe_open
-
-from twitter.pants import binary_util, get_buildroot
-from twitter.pants.targets import JavaTests as junit_tests
+from twitter.pants import binary_util
+from twitter.pants.base.build_environment import get_buildroot
 from twitter.pants.base.workunit import WorkUnit
 from twitter.pants.java.util import execute_java
-from .jvm_task import JvmTask
+from twitter.pants.targets.java_tests import JavaTests as junit_tests
 
+from .jvm_task import JvmTask
 from . import TaskError
 
 

@@ -14,11 +14,97 @@
 # limitations under the License.
 # ==================================================================================================
 
-python_tests(name = 'targets',
-  sources = globs('*.py'),
+python_test_suite(
+  name = 'targets',
   dependencies = [
-    pants("src/python/twitter/pants:pants-lib"),
-    pants('tests/python/twitter/pants:base-test'),
-    pants('tests/python/twitter/pants/testutils'),
+    pants(':artifact'),
+    pants(':exclusive'),
+    pants(':internal'),
+    pants(':jar_library'),
+    pants(':pants_target'),
+    pants(':python_binary'),
+    pants(':target'),
+    pants(':util'),
   ]
 )
+
+python_tests(
+  name = 'artifact',
+  sources = ['test_artifact.py'],
+  dependencies = [
+    pants('src/python/twitter/pants/base:parse_context'),
+    pants('src/python/twitter/pants/targets:common'),
+    pants('src/python/twitter/pants/targets:jvm'),
+  ]
+)
+
+python_tests(
+  name = 'exclusive',
+  sources = ['test_exclusive.py'],
+  dependencies = [
+    pants('tests/python/twitter/pants/testutils'),
+    pants('src/python/twitter/pants/base:config'),
+    pants('src/python/twitter/pants/goal:context'),
+    pants('src/python/twitter/pants/tasks:check_exclusives'),
+  ]
+)
+
+python_tests(
+  name = 'internal',
+  sources = ['test_internal.py'],
+  dependencies = [
+    pants('tests/python/twitter/pants/testutils'),
+    pants('src/python/twitter/pants/base:parse_context'),
+    pants('src/python/twitter/pants/base:target'),
+    pants('src/python/twitter/pants/targets:common'),
+  ]
+)
+
+python_tests(
+  name = 'jar_library',
+  sources = ['test_jar_library.py'],
+  dependencies = [
+    pants('src/python/twitter/pants/base:parse_context'),
+    pants('src/python/twitter/pants/base:target'),
+    pants('src/python/twitter/pants/targets:jvm'),
+  ]
+)
+
+python_tests(
+  name = 'pants_target',
+  sources = ['test_pants_target.py'],
+  dependencies = [
+    pants('src/python/twitter/pants/base:parse_context'),
+    pants('src/python/twitter/pants/base:target'),
+    pants('src/python/twitter/pants/targets:common'),
+  ]
+)
+
+python_tests(
+  name = 'python_binary',
+  sources = ['test_python_binary.py'],
+  dependencies = [
+    pants('tests/python/twitter/pants:base-test'),
+    pants('src/python/twitter/pants/base:parse_context'),
+    pants('src/python/twitter/pants/base:target'),
+    pants('src/python/twitter/pants/targets:python'),
+  ]
+)
+
+python_tests(
+  name = 'target',
+  sources = ['test_target.py'],
+  dependencies = [
+    pants('src/python/twitter/pants/base:parse_context'),
+    pants('src/python/twitter/pants/base:target'),
+  ]
+)
+
+python_tests(
+  name = 'util',
+  sources = ['test_util.py'],
+  dependencies = [
+    pants('src/python/twitter/pants/targets:common'),
+  ]
+)
+

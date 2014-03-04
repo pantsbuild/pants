@@ -14,11 +14,10 @@
 # limitations under the License.
 # ==================================================================================================
 
-python_tests(name = 'java',
-  sources = globs('*.py'),
+python_test_suite(
+  name = 'java',
   dependencies = [
-    pants("src/python/twitter/common/contextutil"),
-    pants("src/python/twitter/common/dirutil"),
-    pants("src/python/twitter/pants:pants-lib"),
+    pants('tests/python/twitter/pants/java/distribution'),
+    pants('tests/python/twitter/pants/java/jar'),
   ]
 )

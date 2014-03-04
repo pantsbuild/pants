@@ -25,9 +25,11 @@ from twitter.pants.base.build_invalidator import (
     NO_SOURCES,
     TARGET_SOURCES)
 from twitter.pants.base.target import Target
-from twitter.pants.targets import TargetWithSources, JarLibrary, Pants
 from twitter.pants.targets.external_dependency import ExternalDependency
 from twitter.pants.targets.internal import InternalTarget
+from twitter.pants.targets.jar_library import JarLibrary
+from twitter.pants.targets.pants_target import Pants
+from twitter.pants.targets.with_sources import TargetWithSources
 
 
 class VersionedTargetSet(object):

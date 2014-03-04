@@ -33,7 +33,7 @@ python_tests(
   name = 'test_goal',
   sources = [ 'test_goal.py' ],
   dependencies = [
-    pants("src/python/twitter/pants:pants-lib")
+    pants('src/python/twitter/pants/commands:goal'),
   ]
 )
 
@@ -42,6 +42,14 @@ python_tests(
   sources = [ 'test_setup_py.py' ],
   dependencies = [
     pants('3rdparty/python:mock'),
-    pants("src/python/twitter/pants:pants-lib")
+    pants('src/python/twitter/common/collections'),
+    pants('src/python/twitter/common/collections'),
+    pants('src/python/twitter/common/contextutil'),
+    pants('src/python/twitter/common/dirutil'),
+    pants('src/python/twitter/pants/base:parse_context'),
+    pants('src/python/twitter/pants/base:target'),
+    pants('src/python/twitter/pants/commands:setup_py'),
+    pants('src/python/twitter/pants/targets:common'),
+    pants('src/python/twitter/pants/targets:python'),
   ]
 )

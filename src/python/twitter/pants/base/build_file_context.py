@@ -14,11 +14,8 @@
 # limitations under the License.
 # =================================================================================================
 
-from twitter.pants.goal import Goal, Group, Phase
-
-from twitter.pants.targets import Pants
-from twitter.pants.base import Config
 from twitter.pants.goal import Context, Goal, Group, Phase
+from twitter.pants.targets.pants_target import Pants
 from twitter.pants.tasks import Task, TaskError
 
 pants = Pants
@@ -26,8 +23,9 @@ goal = Goal
 group = Group
 phase = Phase
 
-from twitter.pants.base.build_file_aliases import *
-from twitter.pants.base.build_file_helpers import *
+from .build_file_aliases import *
+from .build_file_helpers import *
+from .config import Config
 
 # TODO(John Sirois): XXX kill
-from twitter.pants.base.build_environment import *
+from .build_environment import *

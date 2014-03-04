@@ -17,8 +17,10 @@
 import os
 import time
 
-from twitter.pants.java import SubprocessExecutor, NailgunExecutor, util
+from twitter.pants.java import util
 from twitter.pants.java.distribution import Distribution
+from twitter.pants.java.executor import SubprocessExecutor
+from twitter.pants.java.nailgun_executor import NailgunExecutor
 
 from . import Task, TaskError
 

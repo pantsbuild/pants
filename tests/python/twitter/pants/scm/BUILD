@@ -14,10 +14,20 @@
 # limitations under the License.
 # ==================================================================================================
 
-python_tests(name='scm',
-  sources=globs('*.py'),
+python_test_suite(
+  name = 'scm',
   dependencies = [
-    pants("src/python/twitter/pants:pants-lib"),
-    pants("src/python/twitter/pants:pants-deps"),
+    pants(':test_git'),
+  ]
+)
+
+python_tests(
+  name = 'test_git',
+  sources = ['test_git.py'],
+  dependencies = [
+    pants('src/python/twitter/common/contextutil'),
+    pants('src/python/twitter/common/dirutil'),
+    pants('src/python/twitter/pants/scm'),
+    pants('src/python/twitter/pants/scm:git'),
   ]
 )

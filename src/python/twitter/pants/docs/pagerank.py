@@ -2,7 +2,7 @@ from __future__ import division
 
 from collections import defaultdict
 
-from twitter.pants import is_concrete
+from twitter.pants import is_concrete  # XXX This target doesn't exist
 from twitter.pants.tasks.console_task import ConsoleTask
 
 

@@ -14,36 +14,52 @@
 # limitations under the License.
 # ==================================================================================================
 
-python_library(name='base-test',
-  sources=['base_build_root_test.py'],
-  dependencies=[
-    pants('src/python/twitter/pants:pants-lib'),
-    pants('src/python/twitter/pants:pants-deps'),
+python_library(
+  name = 'base-test',
+  sources = ['base_build_root_test.py'],
+  dependencies = [
+    pants('src/python/twitter/common/dirutil'),
+    pants('src/python/twitter/pants/base:address'),
+    pants('src/python/twitter/pants/base:build_root'),
+    pants('src/python/twitter/pants/base:target'),
+    pants('src/python/twitter/pants/targets:common'),
   ]
 )
 
-python_tests(name='utils',
-  sources=globs('test_*.py'),
-  dependencies=[
+python_tests(
+  name = 'test_maven_layout',
+  sources = ['test_maven_layout.py'],
+  dependencies = [
     pants(':base-test'),
-    pants('src/python/twitter/pants:pants-lib'),
-    pants('src/python/twitter/pants:pants-deps'),
   ]
 )
 
-python_test_suite(name='all',
-  dependencies=[
-    pants(':utils'),
+python_tests(
+  name = 'test_thrift_util',
+  sources = ['test_thrift_util.py'],
+  dependencies = [
+    pants(':base-test'),
+    pants('src/python/twitter/common/contextutil'),
+    pants('src/python/twitter/common/dirutil'),
+    pants('src/python/twitter/common/lang'),
+    pants('src/python/twitter/pants:thrift_util'),
+  ]
+)
+
+python_test_suite(
+  name = 'all',
+  dependencies = [
+    pants(':test_maven_layout'),
+    pants(':test_thrift_util'),
     pants('tests/python/twitter/pants/base'),
     pants('tests/python/twitter/pants/cache'),
     pants('tests/python/twitter/pants/commands'),
     pants('tests/python/twitter/pants/engine'),
     pants('tests/python/twitter/pants/fs'),
     pants('tests/python/twitter/pants/java'),
-    pants('tests/python/twitter/pants/java/distribution'),
-    pants('tests/python/twitter/pants/net/http'),
+    pants('tests/python/twitter/pants/net'),
     pants('tests/python/twitter/pants/process'),
-    pants('tests/python/twitter/pants/python:all'),
+    pants('tests/python/twitter/pants/python'),
     pants('tests/python/twitter/pants/reporting'),
     pants('tests/python/twitter/pants/scm'),
     pants('tests/python/twitter/pants/targets'),

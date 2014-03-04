@@ -1,9 +1,9 @@
-from twitter.pants.base import ParseContext
-
 __author__ = 'Ryan Williams'
 
 from collections import defaultdict
-from twitter.pants.targets import InternalTarget, TargetWithSources
+from twitter.pants.base.parse_context import ParseContext
+from twitter.pants.targets.internal import InternalTarget
+from twitter.pants.targets.with_sources import TargetWithSources
 
 
 class MockTarget(InternalTarget, TargetWithSources):

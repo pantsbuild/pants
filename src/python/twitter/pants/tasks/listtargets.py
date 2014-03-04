@@ -15,11 +15,11 @@
 # =============================================================================
 
 from twitter.pants.base.build_environment import get_buildroot
-from twitter.pants.base import BuildFile, Target
+from twitter.pants.base.build_file import BuildFile
+from twitter.pants.base.target import Target
 
 from .console_task import ConsoleTask
-
-from . import TaskError
+from .task_error import TaskError
 
 
 class ListTargets(ConsoleTask):

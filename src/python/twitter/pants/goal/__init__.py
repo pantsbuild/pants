@@ -21,12 +21,11 @@ from optparse import OptionGroup
 from twitter.pants.base.build_manual import manual
 from twitter.pants.tasks import Task
 
-
-class GoalError(Exception):
-  """Raised to indicate a goal has failed."""
-
-
-from twitter.pants.goal.phase import Phase
+from .error import GoalError
+from .phase import Phase
+from .context import Context
+from .group import Group
+from .run_tracker import RunTracker
 
 
 class Mkflag(object):
@@ -141,9 +140,6 @@ class Goal(object):
     phase.install(self, first, replace, before, after)
     return phase
 
-from twitter.pants.goal.context import Context
-from twitter.pants.goal.group import Group
-from twitter.pants.goal.run_tracker import RunTracker
 
 __all__ = (
   'Context',

@@ -32,12 +32,13 @@ from twitter.common.config import Properties
 from twitter.common.dirutil import safe_open, safe_rmtree
 from twitter.common.log.options import LogOptions
 
-from twitter.pants import get_buildroot, get_scm
+from twitter.pants.base.build_environment import get_buildroot, get_scm
 from twitter.pants.base.address import Address
 from twitter.pants.base.target import Target
 from twitter.pants.base.generator import Generator, TemplateData
 from twitter.pants.ivy import Bootstrapper, Ivy
-from twitter.pants.targets import InternalTarget, Resources
+from twitter.pants.targets.internal import InternalTarget
+from twitter.pants.targets.resources import Resources
 from twitter.pants.tasks.scm_publish import ScmPublish, Semver
 
 from . import Task, TaskError

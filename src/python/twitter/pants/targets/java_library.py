@@ -14,7 +14,8 @@
 # limitations under the License.
 # =====================================
 
-from twitter.pants.base import manual, TargetDefinitionException
+from twitter.pants.base.build_manual import manual
+from twitter.pants.base.target import TargetDefinitionException
 
 from .exportable_jvm_library import ExportableJvmLibrary
 from .resources import WithResources

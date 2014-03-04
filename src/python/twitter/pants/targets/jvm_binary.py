@@ -22,11 +22,13 @@ from twitter.common.collections import maybe_list
 from twitter.common.dirutil import Fileset
 from twitter.common.lang import Compatibility
 
-from twitter.pants.base import manual, ParseContext
+from twitter.pants.base.build_manual import manual
+from twitter.pants.base.parse_context import ParseContext
 from twitter.pants.base.target import TargetDefinitionException
-from twitter.pants.targets import JarLibrary, util
 
+from . import util
 from .internal import InternalTarget
+from .jar_library import JarLibrary
 from .jvm_target import JvmTarget
 from .pants_target import Pants
 from .resources import WithResources

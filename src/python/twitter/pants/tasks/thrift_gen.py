@@ -26,15 +26,15 @@ from twitter.common.collections import OrderedSet
 from twitter.common.dirutil import safe_mkdir
 
 from twitter.pants.base.build_environment import get_buildroot
-from twitter.pants.targets import (
-    InternalTarget,
-    JavaLibrary,
-    JavaThriftLibrary,
-    PythonLibrary,
-    PythonThriftLibrary)
+from twitter.pants.targets.internal import InternalTarget
+from twitter.pants.targets.java_library import JavaLibrary
+from twitter.pants.targets.java_thrift_library import JavaThriftLibrary
+from twitter.pants.targets.python_library import PythonLibrary
+from twitter.pants.targets.python_thrift_library import PythonThriftLibrary
 from twitter.pants.tasks import TaskError
-from twitter.pants.tasks.code_gen import CodeGen
 from twitter.pants.thrift_util import calculate_compile_roots, select_thrift_binary
+
+from .code_gen import CodeGen
 
 
 def _copytree(from_base, to_base):

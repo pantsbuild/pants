@@ -17,8 +17,10 @@
 import pytest
 import unittest
 
-from twitter.pants.base import ParseContext, TargetDefinitionException
+from twitter.pants.base.parse_context import ParseContext
+from twitter.pants.base.target import TargetDefinitionException
 from twitter.pants.targets.jar_library import JarLibrary
+
 
 class JarLibraryWithEmptyDependenciesTest(unittest.TestCase):
 

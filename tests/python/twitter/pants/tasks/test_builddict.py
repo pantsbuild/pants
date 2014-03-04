@@ -18,8 +18,8 @@ from contextlib import closing
 from StringIO import StringIO
 
 from twitter.pants.tasks.builddictionary import assemble, BuildBuildDictionary
+from twitter.pants.tasks.test_base import prepare_task, TaskTest
 
-from . import prepare_task, TaskTest
 
 OUTDIR = "/tmp/dist"
 

@@ -19,7 +19,8 @@ from __future__ import print_function
 from collections import defaultdict
 
 from twitter.pants.base.build_manual import manual
-from twitter.pants.goal import GoalError
+
+from .error import GoalError
 
 
 class SingletonPhases(type):

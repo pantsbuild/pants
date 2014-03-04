@@ -18,8 +18,7 @@ import os
 from textwrap import dedent
 
 from twitter.pants.tasks.filemap import Filemap
-
-from . import ConsoleTaskTest
+from twitter.pants.tasks.test_base import ConsoleTaskTest
 
 
 class FilemapTest(ConsoleTaskTest):

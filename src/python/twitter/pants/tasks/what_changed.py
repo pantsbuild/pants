@@ -22,13 +22,13 @@ from collections import defaultdict
 
 from twitter.common.lang import AbstractClass, Compatibility
 
-from twitter.pants import TaskError
 from twitter.pants.base.build_environment import get_buildroot, get_scm
 from twitter.pants.base.build_file import BuildFile
 from twitter.pants.base.target import Target
 from twitter.pants.scm import Scm
 
 from .console_task import ConsoleTask
+from .task_error import TaskError
 
 
 class WhatChanged(ConsoleTask):

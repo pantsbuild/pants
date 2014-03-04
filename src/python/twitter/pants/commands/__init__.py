@@ -20,7 +20,8 @@ import inspect
 import sys
 
 from twitter.common.collections import OrderedSet
-from twitter.pants.base import BuildFile, Target
+from twitter.pants.base.build_file import BuildFile
+from twitter.pants.base.target import Target
 
 
 class Command(object):

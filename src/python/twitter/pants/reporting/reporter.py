@@ -1,5 +1,5 @@
 from collections import namedtuple
-from twitter.pants.goal import RunTracker
+from twitter.pants.goal.run_tracker import RunTracker
 
 
 class Reporter(object):

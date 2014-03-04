@@ -19,7 +19,8 @@ import os
 from twitter.common.collections import OrderedSet
 from twitter.common.dirutil import safe_mkdir
 
-from twitter.pants.targets import JavaLibrary, JavaAntlrLibrary
+from twitter.pants.targets.java_antlr_library import JavaAntlrLibrary
+from twitter.pants.targets.java_library import JavaLibrary
 from twitter.pants.tasks import TaskError
 from twitter.pants.tasks.code_gen import CodeGen
 from twitter.pants.tasks.nailgun_task import NailgunTask

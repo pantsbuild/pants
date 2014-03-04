@@ -7,7 +7,7 @@ from collections import defaultdict
 from copy import copy
 from twitter.pants.base.target import Target
 from twitter.pants.tasks import Task, TaskError
-from twitter.pants.targets import InternalTarget
+from twitter.pants.targets.internal import InternalTarget
 
 
 class CheckExclusives(Task):

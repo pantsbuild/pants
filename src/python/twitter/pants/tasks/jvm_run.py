@@ -19,7 +19,7 @@ import shlex
 from twitter.common.dirutil import safe_open
 from twitter.pants.base.workunit import WorkUnit
 from twitter.pants.java.executor import CommandLineGrabber
-from twitter.pants.targets import JvmBinary
+from twitter.pants.targets.jvm_binary import JvmBinary
 from twitter.pants.java.util import execute_java
 
 from .jvm_task import JvmTask
