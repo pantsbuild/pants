@@ -142,14 +142,6 @@ class GroupEngine(Engine):
     def attempt(self, timer, explain):
       """Executes the named phase against the current context tracking goal executions in executed.
       """
-      def acquire_lock_if_needed(goal):
-        """If the goal about to be executed requires the lock, then acquire it. If not,
-        then make sure it's released.
-        """
-        if goal.serialize:
-          self._context.acquire_lock()
-        else:
-          self._context.release_lock()
 
       def execute_task(goal, task, targets):
         """Execute and time a single goal that has had all of its dependencies satisfied."""
@@ -186,7 +178,6 @@ class GroupEngine(Engine):
         for group_name, goals in run_queue:
           if not group_name:
             goal = goals[0]
-            acquire_lock_if_needed(goal)
             execution_phases[self._phase].add(goal.name)
             with self._context.new_workunit(name=goal.name, labels=[WorkUnit.GOAL]):
               execute_task(goal, self._tasks_by_goal[goal], self._context.targets())
@@ -226,7 +217,6 @@ class GroupEngine(Engine):
 
               for group_member, goal_chunk in goal_chunks:
                 goal = goals_by_group_member[group_member]
-                acquire_lock_if_needed(goal)
                 execution_phases[self._phase].add((group_name, goal.name))
                 with self._context.new_workunit(name=goal.name, labels=[WorkUnit.GOAL]):
                   execute_task(goal, self._tasks_by_goal[goal], goal_chunk)
@@ -286,5 +276,23 @@ class GroupEngine(Engine):
       print("Phase Execution Order:\n\n%s\n" % execution_phases)
       print("Phase [Goal->Task] Order:\n")
 
-    for phase_executor in phase_executors:
-      phase_executor.attempt(timer, explain)
+    # We take a conservative locking strategy and lock in the widest needed scope.  If we have a
+    # linearized set of phases as such (where x -> y means x depends on y and *z means z needs to be
+    # serialized):
+    #   a -> b -> *c -> d -> *e
+    # Then we grab the lock at the beginning of e's execution and don't relinquish until the largest
+    # scope serialization requirement from c is past.
+    serialized_phase_executors = list(filter(lambda pe: pe.phase.serialize, phase_executors))
+    outer_lock_holder = serialized_phase_executors[-1] if serialized_phase_executors else None
+
+    if outer_lock_holder:
+      context.acquire_lock()
+    try:
+      for phase_executor in phase_executors:
+        phase_executor.attempt(timer, explain)
+        if phase_executor is outer_lock_holder:
+          context.release_lock()
+    finally:
+      # we may fail before we reach the outer lock holder - so make sure to clean up no matter what.
+      if outer_lock_holder:
+        context.release_lock()

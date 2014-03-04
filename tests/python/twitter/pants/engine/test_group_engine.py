@@ -160,6 +160,7 @@ class GroupEngineTest(EngineTestBase, JvmTargetTest):
 
     self.context = create_context(options=dict(explain=False),
                                   target_roots=self.targets('src/java:e', 'src/python:f'))
+    self.assertTrue(self.context.is_unlocked())
 
     # TODO(John Sirois): disentangle GroupEngine from relying upon the CheckExclusives task being
     # run.  It should either arrange this directly or else the requirement should be in a different
@@ -170,6 +171,9 @@ class GroupEngineTest(EngineTestBase, JvmTargetTest):
 
     self.engine = GroupEngine(print_timing=False)
     self.recorded_actions = []
+
+  def tearDown(self):
+    self.assertTrue(self.context.is_unlocked())
 
   def construct_action(self, tag):
     return 'construct', tag, self.context
