@@ -74,26 +74,8 @@ and make our changes. ::
 
    git checkout -b $FEATURE_BRANCH
 
-
-Code Review
-===========
-
-Now that your change is complete, we'll post it for review. The first time
-posting a review you'll need to:
-
-* Create an account at https://rbcommons.com
-* Install `RBTools <http://www.reviewboard.org/docs/rbtools/dev/>`_ to
-  simplify interacting with Review Board.
-
-Post your change for review. ::
-
-   rbt post
-
-This will create a new review, but not yet publish it. At the provided URL you
-need to fill in the change description, reviewers, testing done, etc. When the
-review looks good publish it. An email will be sent to `pants-devel` mailing
-list and the reviewers will take a look. If they have any feedback there might
-be a few iterations before finally getting a Ship It.
+Run the CI Tests
+================
 
 Before posting a review but certainly before the branch ships you should run
 relevant tests. If you're not sure what those are you can always run the
@@ -108,17 +90,74 @@ You can also skip certain steps including pants bootstrapping. Just use the
 ``-h`` argument to get command line help on the options available.
 
 
+Code Review
+===========
+
+Now that your change is complete, we'll post it for review.
+We use https://rbcommons.com to host code reviews and
+`rbt <http://www.reviewboard.org/docs/rbtools/dev/>`_ (RBTools)
+
+Posting the First Draft
+-----------------------
+
+**Before posting your first review,** you must create an
+account at https://rbcommons.com .
+To set up local tools, run `./rbt status`.
+(``./rbt`` is a wrapper around the usual RBTools ``rbt`` script.)
+The first time this runs it will bootstrap and you will be asked to log in.
+Subsequent runs use your cached login credentials.
+
+Post your change for review::
+
+   ./rbt post -o -g
+
+This will create a new review, but not yet publish it.
+
+At the provided URL, there's a web form. To get your change reviewed,
+you must fill in the change description, reviewers, testing done, etc.
+To make sure it gets seen, add ``pants-devel`` to the Groups field.
+When the review looks good, publish it.
+An email will be sent to ``pants-devel`` mailing list and the reviewers
+will take a look. (For your first review, double-check that the mail got sent;
+rbcommons tries to "spoof" mail from you and it doesn't work for everybody's
+email address.)
+
+Iterating
+---------
+
+If reviewers have feedback, there might
+be a few iterations before finally getting a Ship It.
+As reviewers enter feedback, the rbcommons page updates; it should also
+send you mail (but sometimes its "spoof" fails).
+
+If those reviews inspire you to change some code, great. Change some code,
+commit locally. To update the code review with the new diff where
+<RB_ID> is a review number like 123::
+
+    ./rbt post -o -r <RB_ID>
+
+Look over the fields in the web form; perhaps some could use updating.
+Press the web form's Publish button.
+
 Commit Your Change
 ==================
 
 At this point you've made a change, had it reviewed and are ready to
-complete things by getting your change in master. If you're not a committer
-please ask one do do this section for you. ::
+complete things by getting your change in master. (If you're not a committer,
+please ask one do do this section for you.) ::
 
    cd /path/to/pants/repo
+   ./build-support/bin/ci.sh
    git checkout master
    git pull
    git merge --squash $FEATURE_BRANCH
+   git commit -a
    git push origin master
 
 The very last step is closing the review. The change is now complete. Huzzah!
+
+**If you're a committer committing someone else's review,** a handy way to
+patch a local branch with a diff from rbcommons where
+<RB_ID> is a review number like 123::
+
+   ./rbt patch -c <RB_ID>
