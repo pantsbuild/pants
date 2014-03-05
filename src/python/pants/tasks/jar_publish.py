@@ -714,7 +714,16 @@ class JarPublish(ScmPublish, Task):
         sha.update(source)
         sha.update(fd.read())
 
-    # TODO(John Sirois): handle resources and circular dep scala_library java_sources
+    # Todo(Tejal Desai): Add tests for handling java sources changes.
+    if isinstance(target, ScalaLibrary):
+      for java_target in target.java_sources:
+        for java_source in java_target.sources:
+          path = os.path.join(java_source.target_base, java_source)
+          with open(path) as fd:
+            sha.update(java_source)
+            sha.update(fd.read())
+
+    # TODO(John Sirois): handle resources
 
     for jarsig in sorted([jar_coordinate(j) for j in target.jar_dependencies if j.rev]):
       sha.update(jarsig)
