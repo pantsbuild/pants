@@ -49,13 +49,11 @@ class PythonTarget(TargetWithDependencies, TargetWithSources):
       except ValueError as e:
         raise TargetDefinitionException(str(e))
 
-  def resolve(self):
-    for dep in super(PythonTarget, self).resolve():
-      yield dep
-    if self.provides:
+  def _walk(self, walked, work, predicate=None):
+    super(PythonTarget, self)._walk(walked, work, predicate)
+    if self.provides and self.provides.binaries:
       for binary in self.provides.binaries.values():
-        for dep in binary.resolve():
-          yield dep
+        binary._walk(walked, work, predicate)
 
   def _propagate_exclusives(self):
     self.exclusives = defaultdict(set)
