@@ -10,6 +10,12 @@ It assumes you're working in a source tree that already has ``pants``
 installed (such as
 `twitter/commons <https://github.com/twitter/commons>`_).
 
+**Before you use Pants proper the first time,** you must bootstrap it::
+
+    ./pants.bootstrap
+
+(Someday soon, we hope that Pants will be self-bootstrapping.)
+
 You invoke pants with a *goal* (like ``test`` or ``bundle``) and the
 *build targets* to use (like
 ``tests/java/com/twitter/common/examples/pingpong/BUILD:pingpong``). For example, ::
