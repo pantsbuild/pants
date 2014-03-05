@@ -78,6 +78,12 @@ To make sure a change passes *all* of Pants' tests, use the
 .. |travis-bot| image:: https://travis-ci.org/twitter/commons.png?branch=master
                 :target: https://travis-ci.org/twitter/commons
 
+To try all the tests in a few configurations, you can run the same script
+that our Travis CI does. This can take a while, but it's a good idea to
+run it before you contribute a change or merge it to master::
+
+   ./build-support/bin/ci.sh
+
 Before :doc:`contributing a change <howto_contribute>` to Pants,
 make sure it passes all tests.
 
