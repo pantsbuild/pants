@@ -195,9 +195,9 @@ class JarCreate(Task):
 
         if isinstance(target, ScalaLibrary):
           for java_source in target.java_sources:
-            for java_source in java_source.sources:
-              jar.write(os.path.join(get_buildroot(), java_source.target_base, java_source),
-                        java_source)
+            for source in java_source.sources:
+              jar.write(os.path.join(get_buildroot(), java_source.target_base, source),
+                        source)
 
         if target.has_resources:
           for resources in target.resources:
