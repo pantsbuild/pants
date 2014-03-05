@@ -14,13 +14,19 @@
 # limitations under the License.
 # ==================================================================================================
 
+from __future__ import print_function
+
 import os
 
 from twitter.common.dirutil import safe_mkdir
-from twitter.common.python.distiller import Distiller
 from twitter.common.python.http.link import SourceLink
-from twitter.common.python.installer import Installer
-from twitter.common.python.interpreter import PythonInterpreter, PythonIdentity
+from twitter.common.python.http.link import EggLink
+from twitter.common.python.installer import EggInstaller
+from twitter.common.python.interpreter import (
+    PythonCapability,
+    PythonIdentity,
+    PythonInterpreter,
+)
 from twitter.common.python.obtainer import Obtainer
 
 from .resolver import crawler_from_config, fetchers_from_config
@@ -37,17 +43,82 @@ def safe_link(src, dst):
   os.symlink(src, dst)
 
 
+def resolve_interpreter(config, interpreter, requirement, logger=print):
+  """Given a :class:`PythonInterpreter` and :class:`Config`, and a requirement,
+     return an interpreter with the capability of resolving that requirement or
+     None if it's not possible to install a suitable requirement."""
+  interpreter_cache = config.get('python-setup', 'interpreter_cache')
+  interpreter_dir = os.path.join(interpreter_cache, str(interpreter.identity))
+  if interpreter.satisfies(PythonCapability([requirement])):
+    return interpreter
+  def installer_provider(sdist):
+    return EggInstaller(sdist, strict=requirement.key != 'setuptools', interpreter=interpreter)
+  egg = resolve_and_link(
+      config,
+      requirement,
+      os.path.join(interpreter_dir, requirement.key),
+      installer_provider,
+      logger=logger)
+  if egg:
+    return interpreter.with_extra(egg.name, egg.raw_version, egg.url)
+  else:
+    logger('Failed to resolve requirement %s for %s' % (requirement, interpreter))
+
+
+def resolve_and_link(config, requirement, target_link, installer_provider, logger=print):
+  if os.path.exists(target_link) and os.path.exists(os.path.realpath(target_link)):
+    egg = EggLink(os.path.realpath(target_link))
+    if egg.satisfies(requirement):
+      return egg
+  fetchers = fetchers_from_config(config)
+  crawler = crawler_from_config(config)
+  obtainer = Obtainer(crawler, fetchers, [])
+  obtainer_iterator = obtainer.iter(requirement)
+  links = [link for link in obtainer_iterator if isinstance(link, SourceLink)]
+  for link in links:
+    logger('    fetching %s' % link.url)
+    sdist = link.fetch()
+    logger('    installing %s' % sdist)
+    installer = installer_provider(sdist)
+    dist_location = installer.bdist()
+    target_location = os.path.join(os.path.dirname(target_link), os.path.basename(dist_location))
+    os.rename(dist_location, target_location)
+    safe_link(target_location, target_link)
+    logger('    installed %s' % target_location)
+    return EggLink(target_location)
+
+
+# This is a setuptools <1 and >1 compatible version of Requirement.parse.
+# For setuptools <1, if you did Requirement.parse('setuptools'), it would
+# return 'distribute' which of course is not desirable for us.  So they
+# added a replacement=False keyword arg.  Sadly, they removed this keyword
+# arg in setuptools >= 1 so we have to simply failover using TypeError as a
+# catch for 'Invalid Keyword Argument'.
+def failsafe_parse(requirement):
+  try:
+    return Requirement.parse(requirement, replacement=False)
+  except TypeError:
+    return Requirement.parse(requirement)
+
+
+def resolve(config, interpreter, logger=print):
+  """Resolve and cache an interpreter with a setuptools and wheel capability."""
+
+  setuptools_requirement = failsafe_parse(
+      'setuptools==%s' % config.getdefault('python-setup', 'setuptools_version', '2.2'))
+  wheel_requirement = failsafe_parse(
+      'wheel==%s' % config.getdefault('python-setup', 'wheel_version', '0.22.0'))
+
+  interpreter = resolve_interpreter(config, interpreter, setuptools_requirement, logger=logger)
+  if interpreter:
+    return resolve_interpreter(config, interpreter, wheel_requirement, logger=logger)
+
+
 class PythonInterpreterCache(object):
   def __init__(self, config, logger=None):
     self._path = config.get('python-setup', 'interpreter_cache')
-    setuptools_req = 'setuptools==%s' % config.get('python-setup', 'setuptools_version')
-    try:
-      self._setuptools_requirement = Requirement.parse(setuptools_req, replacement=False)
-    except TypeError:
-      self._setuptools_requirement = Requirement.parse(setuptools_req)
+    self._config = config
     safe_mkdir(self._path)
-    self._fetchers = fetchers_from_config(config)
-    self._crawler = crawler_from_config(config)
     self._interpreters = set()
     self._logger = logger or (lambda msg: True)
 
@@ -55,50 +126,28 @@ class PythonInterpreterCache(object):
   def interpreters(self):
     return self._interpreters
 
-  @classmethod
-  def interpreter_from_path(cls, path):
+  def interpreter_from_path(self, path):
     interpreter_dir = os.path.basename(path)
     identity = PythonIdentity.from_path(interpreter_dir)
     try:
       executable = os.readlink(os.path.join(path, 'python'))
     except OSError:
       return None
-    try:
-      distribute_path = os.readlink(os.path.join(path, 'distribute'))
-    except OSError:
-      distribute_path = None
-    return PythonInterpreter(executable, identity, distribute_path)
-
-  def setup_distribute(self, interpreter, dest):
-    obtainer = Obtainer(self._crawler, self._fetchers, [])
-    obtainer_iterator = obtainer.iter(self._setuptools_requirement)
-    links = [link for link in obtainer_iterator if isinstance(link, SourceLink)]
-    for link in links:
-      self._logger('Fetching %s' % link)
-      sdist = link.fetch()
-      self._logger('Installing %s' % sdist)
-      installer = Installer(sdist, strict=False, interpreter=interpreter)
-      dist = installer.distribution()
-      self._logger('Distilling %s' % dist)
-      egg = Distiller(dist).distill(into=dest)
-      safe_link(egg, os.path.join(dest, 'distribute'))
-      break
+    interpreter = PythonInterpreter(executable, identity)
+    return resolve(self._config, interpreter, logger=self._logger)
 
   def setup_interpreter(self, interpreter):
     interpreter_dir = os.path.join(self._path, str(interpreter.identity))
     safe_mkdir(interpreter_dir)
     safe_link(interpreter.binary, os.path.join(interpreter_dir, 'python'))
-    if interpreter.distribute:
-      safe_link(interpreter.distribute, os.path.join(interpreter_dir, 'distribute'))
-    else:
-      self.setup_distribute(interpreter, interpreter_dir)
+    return resolve(self._config, interpreter)
 
   def setup_cached(self):
     for interpreter_dir in os.listdir(self._path):
       path = os.path.join(self._path, interpreter_dir)
       pi = self.interpreter_from_path(path)
       if pi:
-        self._logger('Found interpreter %s: %s (cached)' % (pi.binary, str(pi.identity)))
+        self._logger('Detected interpreter %s: %s' % (pi.binary, str(pi.identity)))
         self._interpreters.add(pi)
 
   def setup_paths(self, paths):
@@ -106,14 +155,10 @@ class PythonInterpreterCache(object):
       identity_str = str(interpreter.identity)
       path = os.path.join(self._path, identity_str)
       pi = self.interpreter_from_path(path)
-      if pi is None or pi.distribute is None:
-        self._logger('Found interpreter %s: %s (%s)' % (
-            interpreter.binary,
-            str(interpreter.identity),
-            'uncached' if pi is None else 'incomplete'))
+      if pi is None:
         self.setup_interpreter(interpreter)
         pi = self.interpreter_from_path(path)
-        if pi is None or pi.distribute is None:
+        if pi is None:
           continue
       self._interpreters.add(pi)
 
