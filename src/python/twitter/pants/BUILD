@@ -40,7 +40,9 @@ python_library(
       'Programming Language :: Python',
     ]
   ).with_binaries(
-    pants = pants('src/python/twitter/pants/bin:pants'),
+    # TODO(John Sirois): Switch back when target cycles have been sorted out.
+    # pants=pants('src/python/twitter/pants/bin:pants'),
+    pants=pants(':_pants_transitional_publishable_binary_'),
   )
 )
 

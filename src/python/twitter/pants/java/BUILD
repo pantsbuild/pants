@@ -1,7 +1,7 @@
 python_library(
   name = 'distribution',
   sources = globs('distribution/*.py'),
-  resources = globs('distribution/*.class') + globs('distribution/*.java'),
+  resources = globs('distribution/*.class'),
   dependencies = [
     pants('src/python/twitter/common/contextutil'),
     pants('src/python/twitter/common/lang'),
