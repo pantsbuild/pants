@@ -152,6 +152,11 @@ please ask one do do this section for you.) ::
    git pull
    git merge --squash $FEATURE_BRANCH
    git commit -a
+
+Here, fix up the commit message: replace ``git``'s default message
+("Squashed commit of the following... <long list>") with a summary.
+Finally, ::
+
    git push origin master
 
 The very last step is closing the review. The change is now complete. Huzzah!
