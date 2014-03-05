@@ -239,7 +239,7 @@ class JarPublish(ScmPublish, Task):
   Ivy ``resolvers`` used to publish them.
 
   The following target types are publishable: :ref:`bdict_java_library`,
-  :ref:`bdict_scala_library`, :ref:`bdict_thrift_library`,
+  :ref:`bdict_scala_library`, :ref:`bdict_java_thrift_library`,
   :ref:`bdict_annotation_processor`.
   Targets to publish and their dependencies must be publishable target
   types and specify the ``provides`` argument. One exception is
