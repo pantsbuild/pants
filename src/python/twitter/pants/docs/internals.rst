@@ -166,7 +166,12 @@ Code Layout
   **`*.md`** Docs too important for `docs/`.
 
 `base <https://github.com/twitter/commons/tree/master/src/python/twitter/pants/base/>`_
-  Defines `Target` and TODO
+  Defines `Target` and other fundamental pieces/base classes.
+  As a rule of thumb, code in ``base`` shouldn't ``import`` anything in
+  non-base Pants; but many things in non-base Pants ``import`` from ``base``.
+  If you're editing code in ``base`` and find yourself referring to
+  the JVM (or other target-language-specific things), you're probably editing
+  the wrong thing and want to look further up the inheritance tree.
 
 `bin <https://github.com/twitter/commons/tree/master/src/python/twitter/pants/bin/>`_
   The "main" of Pants itself lives here.
