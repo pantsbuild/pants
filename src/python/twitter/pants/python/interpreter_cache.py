@@ -29,6 +29,7 @@ from twitter.common.python.interpreter import (
 )
 from twitter.common.python.obtainer import Obtainer
 
+from .python_setup import PythonSetup
 from .resolver import crawler_from_config, fetchers_from_config
 
 from pkg_resources import Requirement
@@ -47,7 +48,7 @@ def resolve_interpreter(config, interpreter, requirement, logger=print):
   """Given a :class:`PythonInterpreter` and :class:`Config`, and a requirement,
      return an interpreter with the capability of resolving that requirement or
      None if it's not possible to install a suitable requirement."""
-  interpreter_cache = config.get('python-setup', 'interpreter_cache')
+  interpreter_cache = PythonInterpreterCache.cache_dir(config)
   interpreter_dir = os.path.join(interpreter_cache, str(interpreter.identity))
   if interpreter.satisfies(PythonCapability([requirement])):
     return interpreter
@@ -115,8 +116,12 @@ def resolve(config, interpreter, logger=print):
 
 
 class PythonInterpreterCache(object):
+  @staticmethod
+  def cache_dir(config):
+    return PythonSetup(config).scratch_dir('interpreter_cache', default_name='interpreters')
+
   def __init__(self, config, logger=None):
-    self._path = config.get('python-setup', 'interpreter_cache')
+    self._path = self.cache_dir(config)
     self._config = config
     safe_mkdir(self._path)
     self._interpreters = set()

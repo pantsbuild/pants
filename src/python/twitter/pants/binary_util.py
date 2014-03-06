@@ -63,7 +63,7 @@ def select_binary(base_path, version, name, config=None):
   """
   # TODO(John Sirois): finish doc of the path structure expexcted under base_path
   config = config or Config.load()
-  bootstrap_dir = config.getdefault('pants_bootstrapdir', default=os.path.expanduser('~/.pants.d'))
+  bootstrap_dir = config.getdefault('pants_bootstrapdir')
   baseurl = config.getdefault('pants_support_baseurl')
   timeout_secs = config.getdefault('pants_support_fetch_timeout_secs', type=int, default=30)
 

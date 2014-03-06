@@ -75,7 +75,7 @@ section named for the subcommand in ini style format, ie:
 
 
 def _add_default_options(command, args):
-  expanded_options = RcFile(paths=['~/.pantsrc']).apply_defaults([command], args)
+  expanded_options = RcFile(paths=['/etc/pantsrc', '~/.pants.rc']).apply_defaults([command], args)
   if expanded_options != args:
     print("(using ~/.pantsrc expansion: pants %s %s)" % (command, ' '.join(expanded_options)),
           file=sys.stderr)

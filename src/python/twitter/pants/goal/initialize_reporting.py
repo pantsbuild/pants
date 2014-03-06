@@ -18,7 +18,8 @@ def initial_reporting(config, run_tracker):
 
   Will be changed after we parse cmd-line flags.
   """
-  reports_dir = config.get('reporting', 'reports_dir')
+  reports_dir = config.get('reporting', 'reports_dir',
+                           default=os.path.join(config.getdefault('pants_workdir'), 'reports'))
   link_to_latest = os.path.join(reports_dir, 'latest')
   if os.path.exists(link_to_latest):
     os.unlink(link_to_latest)

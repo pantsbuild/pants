@@ -15,6 +15,8 @@ from twitter.common.python.translator import (
     EggTranslator,
     SourceTranslator)
 
+from .python_setup import PythonSetup
+
 from pkg_resources import (
     Environment,
     WorkingSet,
@@ -35,7 +37,8 @@ def fetchers_from_config(config):
 
 
 def crawler_from_config(config, conn_timeout=None):
-  return Crawler(cache=config.get('python-setup', 'download_cache'), conn_timeout=conn_timeout)
+  download_cache = PythonSetup(config).scratch_dir('download_cache', default_name='downloads')
+  return Crawler(cache=download_cache, conn_timeout=conn_timeout)
 
 
 class PantsEnvironment(Environment):
@@ -75,7 +78,7 @@ def resolve_multi(config,
   if not isinstance(interpreter, PythonInterpreter):
     raise TypeError('Expected interpreter to be a PythonInterpreter, got %s' % type(interpreter))
 
-  install_cache = config.get('python-setup', 'install_cache')
+  install_cache = PythonSetup(config).scratch_dir('install_cache', default_name='eggs')
   platforms = get_platforms(platforms or config.getlist('python-setup', 'platforms', ['current']))
   crawler = crawler_from_config(config, conn_timeout=conn_timeout)
   fetchers = fetchers_from_config(config)

@@ -98,6 +98,7 @@ python_library(
     pants('src/python/twitter/pants/base:config'),
     pants('src/python/twitter/pants/base:parse_context'),
     pants('src/python/twitter/pants/base:rcfile'),
+    pants('src/python/twitter/pants/base:run_info'),
     pants('src/python/twitter/pants/base:target'),
     pants('src/python/twitter/pants/base:workunit'),
     pants('src/python/twitter/pants/engine'),

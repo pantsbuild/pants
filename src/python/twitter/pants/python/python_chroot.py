@@ -24,16 +24,13 @@ import sys
 import tempfile
 
 from twitter.common.collections import OrderedSet
-from twitter.common.decorators import lru_cache
 from twitter.common.dirutil import safe_mkdir, safe_rmtree
 from twitter.common.python.interpreter import PythonInterpreter
 from twitter.common.python.pex_builder import PEXBuilder
 from twitter.common.python.platforms import Platform
-from twitter.common.quantity import Amount, Time
 from twitter.pants.base.build_invalidator import BuildInvalidator, CacheKeyGenerator
 from twitter.pants.base.config import Config
 from twitter.pants.base.parse_context import ParseContext
-from twitter.pants.base.target import TargetDefinitionException
 from twitter.pants.targets.python_antlr_library import PythonAntlrLibrary
 from twitter.pants.targets.python_binary import PythonBinary
 from twitter.pants.targets.python_library import PythonLibrary
@@ -42,6 +39,7 @@ from twitter.pants.targets.python_tests import PythonTests
 from twitter.pants.targets.python_thrift_library import PythonThriftLibrary
 
 from .antlr_builder import PythonAntlrBuilder
+from .python_setup import PythonSetup
 from .resolver import resolve_multi
 from .thrift_builder import PythonThriftBuilder
 
@@ -79,8 +77,9 @@ class PythonChroot(object):
     self._builder = builder or PEXBuilder(tempfile.mkdtemp(), interpreter=self._interpreter)
 
     # Note: unrelated to the general pants artifact cache.
-    self._egg_cache_root = os.path.join(self._config.get('python-setup', 'artifact_cache'),
-                                        str(self._interpreter.identity))
+    self._egg_cache_root = os.path.join(
+        PythonSetup(self._config).scratch_dir('artifact_cache', default_name='artifacts'),
+        str(self._interpreter.identity))
 
     self._key_generator = CacheKeyGenerator()
     self._build_invalidator = BuildInvalidator( self._egg_cache_root)

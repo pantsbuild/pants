@@ -53,16 +53,25 @@ class Config(object):
 
   @staticmethod
   def create_parser(defaults=None):
-    """
-      Creates a config parser that supports %([key-name])s value substitution.  Any defaults
-      supplied will act as if specified in the loaded config file's DEFAULT section and be available
-      for substitutions.  The 'buildroot', invoking 'user' and invoking user's 'homedir' are
-      automatically defaulted.
+    """Creates a config parser that supports %([key-name])s value substitution.
+
+    Any defaults supplied will act as if specified in the loaded config file's DEFAULT section and
+    be available for substitutions.
+
+    All of the following are seeded with defaults in the config
+      user: the current user
+      homedir: the current user's home directory
+      buildroot: the root of this repo
+      pants_bootstrapdir: the global pants scratch space primarily used for caches
+      pants_supportdir: pants support files for this repo go here; for example: ivysettings.xml
+      pants_distdir: user visible artifacts for this repo go here
+      pants_workdir: the scratch space used to for live builds in this repo
     """
     standard_defaults = dict(
       buildroot=get_buildroot(),
       homedir=os.path.expanduser('~'),
       user=getpass.getuser(),
+      pants_bootstrapdir=os.path.expanduser('~/.pants.d'),
       pants_workdir=os.path.join(get_buildroot(), '.pants.d'),
       pants_supportdir=os.path.join(get_buildroot(), 'build-support'),
       pants_distdir=os.path.join(get_buildroot(), 'dist')

@@ -12,7 +12,18 @@ from .build_environment import get_scm, get_buildroot
 class RunInfo(object):
   """A little plaintext file containing very basic info about a pants run.
 
-  Can only be appended to, never edited."""
+  Can only be appended to, never edited.
+  """
+
+  @classmethod
+  def dir(cls, config):
+    """Returns the configured base directory run info files are stored under."""
+    # TODO(John Sirois): This is centralized, but in an awkward location.  Isolate RunInfo reading
+    # and writing in 1 package or class that could naturally know this location and synthesize
+    # info_file names.
+    return config.getdefault('info_dir',
+                             default=os.path.join(config.getdefault('pants_workdir'), 'runs'))
+
   def __init__(self, info_file):
     self._info_file = info_file
     safe_mkdir_for(self._info_file)

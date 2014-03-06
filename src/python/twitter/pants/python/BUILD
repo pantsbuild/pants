@@ -7,6 +7,14 @@ page(
 )
 
 python_library(
+  name = 'python_setup',
+  sources = ['python_setup.py'],
+  dependencies = [
+    pants('src/python/twitter/pants/base:config'),
+  ]
+)
+
+python_library(
   name = 'antlr_builder',
   sources = ['antlr_builder.py'],
   dependencies = [
@@ -43,6 +51,7 @@ python_library(
   sources = ['interpreter_cache.py'],
   dependencies = [
     pants('3rdparty/python:setuptools'),
+    pants(':python_setup'),
     pants(':resolver'),
     pants('src/python/twitter/common/dirutil'),
     pants('src/python/twitter/common/python'),
@@ -65,6 +74,7 @@ python_library(
   sources = ['python_chroot.py'],
   dependencies = [
     pants(':antlr_builder'),
+    pants(':python_setup'),
     pants(':resolver'),
     pants(':thrift_builder'),
     pants('src/python/twitter/common/collections'),
@@ -84,6 +94,7 @@ python_library(
   name = 'resolver',
   sources = ['resolver.py'],
   dependencies = [
+    pants(':python_setup'),
     pants('src/python/twitter/common/collections'),
     pants('src/python/twitter/common/python'),
     pants('src/python/twitter/pants/targets:python'),

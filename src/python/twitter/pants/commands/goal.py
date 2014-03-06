@@ -42,6 +42,7 @@ from twitter.pants.base.build_file import BuildFile
 from twitter.pants.base.config import Config
 from twitter.pants.base.parse_context import ParseContext
 from twitter.pants.base.rcfile import RcFile
+from twitter.pants.base.run_info import RunInfo
 from twitter.pants.base.target import Target, TargetDefinitionException
 from twitter.pants.base.workunit import WorkUnit
 from twitter.pants.commands import Command
@@ -396,7 +397,8 @@ class Goal(Command):
 
       self.phases = [Phase(goal) for goal in goals]
 
-      rcfiles = self.config.getdefault('rcfiles', type=list, default=[])
+      rcfiles = self.config.getdefault('rcfiles', type=list,
+                                       default=['/etc/pantsrc', '~/.pants.rc'])
       if rcfiles:
         rcfile = RcFile(rcfiles, default_prepend=False, process_default=True)
 
@@ -629,7 +631,7 @@ class RunServer(ConsoleTask):
         # but is allowed to block indefinitely on the server loop.
         if not os.fork():
           # Child process.
-          info_dir = self.context.config.getdefault('info_dir')
+          info_dir = RunInfo.dir(self.context.config)
           # If these are specified explicitly in the config, use those. Otherwise
           # they will be None, and we'll use the ones baked into this package.
           template_dir = self.context.config.get('reporting', 'reports_template_dir')

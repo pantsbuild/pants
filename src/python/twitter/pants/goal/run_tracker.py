@@ -47,7 +47,7 @@ class RunTracker(object):
   def from_config(cls, config):
     if not isinstance(config, Config):
       raise ValueError('Expected a Config object, given %s of type %s' % (config, type(config)))
-    info_dir = config.getdefault('info_dir')
+    info_dir = RunInfo.dir(config)
     stats_upload_url = config.getdefault('stats_upload_url', default=None)
     num_foreground_workers = config.getdefault('num_foreground_workers', default=8)
     num_background_workers = config.getdefault('num_background_workers', default=8)
