@@ -96,6 +96,12 @@ class JarCreateExecuteTest(JarCreateTestBase):
   @classmethod
   def setUpClass(cls):
     super(JarCreateExecuteTest, cls).setUpClass()
+    cls.create_target('build-support/ivy',
+                      dedent('''
+                         repo(name = 'ivy',
+                              url = 'https://art.twitter.biz/',
+                              push_db = 'dummy.pushdb')
+                       '''))
 
     def get_source_root_fs_path(path):
         return os.path.realpath(os.path.join(cls.BUILD_ROOT, path))
