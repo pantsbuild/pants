@@ -17,28 +17,34 @@
 __author__ = 'Ryan Williams'
 
 def abbreviate_target_ids(arr):
-  """This method takes a list of strings (e.g. target IDs) and maps them to shortened versions of
+  """Map a list of target IDs to shortened versions.
+
+  This method takes a list of strings (e.g. target IDs) and maps them to shortened versions of
   themselves.
 
   The original strings should consist of '.'-delimited segments, and the abbreviated versions are
   subsequences of these segments such that each string's subsequence is unique from others in @arr.
 
-  For example:
+  For example: ::
 
-  input: [
-    'com.twitter.pants.a.b',
-    'com.twitter.pants.a.c',
-    'com.twitter.pants.d'
-  ]
+     input: [
+       'com.twitter.pants.a.b',
+       'com.twitter.pants.a.c',
+       'com.twitter.pants.d'
+     ]
 
-  might return: {
-    'com.twitter.pants.a.b': 'b',
-    'com.twitter.pants.a.c': 'c',
-    'com.twitter.pants.d': 'd'
-  }
+  might return: ::
+
+     {
+       'com.twitter.pants.a.b': 'b',
+       'com.twitter.pants.a.c': 'c',
+       'com.twitter.pants.d': 'd'
+     }
 
   This can be useful for debugging purposes, removing a lot of boilerplate from printed lists of
   target IDs.
+
+  :param arr: List of strings representing target IDs.
   """
   split_keys = [tuple(a.split('.')) for a in arr]
 

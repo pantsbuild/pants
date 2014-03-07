@@ -31,11 +31,12 @@ class MustacheRenderer(object):
 
   def __init__(self, template_dir=None, package_name=None):
     """Create a renderer that finds templates by name in one of two ways.
-       - If template_dir is specified, finds template foo in the file foo.mustache in that dir.
-       - Otherwise, if package_name is specified, finds template foo embedded in that
-         package under templates/foo.mustache.
-       - Otherwise will not find templates by name, so can only be used with an existing
-         template string.
+
+    * If template_dir is specified, finds template foo in the file foo.mustache in that dir.
+    * Otherwise, if package_name is specified, finds template foo embedded in that
+      package under templates/foo.mustache.
+    * Otherwise will not find templates by name, so can only be used with an existing
+      template string.
     """
     self._template_dir = template_dir
     self._package_name = package_name
@@ -58,17 +59,19 @@ class MustacheRenderer(object):
   def render_callable(self, inner_template_name, arg_string, outer_args):
     """Handle a mustache callable.
 
-    In a mustache template, when foo is callable, {{#foo}}arg_string{{/foo}} is replaced with the
-    result of calling foo(arg_string). The callable must interpret arg_string.
+    In a mustache template, when foo is callable, ``{{#foo}}arg_string{{/foo}}`` is replaced
+    with the result of calling ``foo(arg_string)``. The callable must interpret ``arg_string``.
 
     This method provides an implementation of such a callable that does the following:
-      A) Parses the arg_string as CGI args.
-      B) Adds them to the original args that the enclosing template was rendered with.
-      C) Renders some other template against those args.
-      D) Returns the resulting text.
 
-    Use by adding { 'foo': lambda x: self._renderer.render_callable('foo_template', x, args) }
-    to the args of the outer template, which can then contain {{#foo}}arg_string{{/foo}}.
+    #. Parses the arg_string as CGI args.
+    #. Adds them to the original args that the enclosing template was rendered with.
+    #. Renders some other template against those args.
+    #. Returns the resulting text.
+
+    Use by adding
+    ``{ 'foo': lambda x: self._renderer.render_callable('foo_template', x, args) }``
+    to the args of the outer template, which can then contain ``{{#foo}}arg_string{{/foo}}``.
     """
     # First render the arg_string (mustache doesn't do this for you, and it may itself
     # contain mustache constructs).

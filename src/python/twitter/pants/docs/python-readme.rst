@@ -56,9 +56,9 @@ mechanism that unifies both your development and your deployment.
 Getting started
 ---------------
 
-First it is necessary to install Pants.  See :doc:`install`.
+First it is necessary to install Pants. See :doc:`install`.
 
-It is also helpful to read the main Pants Introduction :doc:`Getting Started with Pants <README>`
+It is also helpful to read the :doc:`first_concepts`.
 
 
 TL;DR - 'Hello world!' with Pants Python

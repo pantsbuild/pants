@@ -7,7 +7,7 @@ concentrating on how to tailor Pants to your needs, such as integrating it with
 other tools.
 
 If you want to run Pants or to write BUILD files, you probably want
-the :doc:`README` instead.  But if you want to support a new tool or a
+the :doc:`first_concepts` instead.  But if you want to support a new tool or a
 new language, read on.
 
 *********************************

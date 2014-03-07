@@ -55,14 +55,12 @@ class Mkflag(object):
 @manual.builddict()
 class Goal(object):
   def __init__(self, name, action, group=None, dependencies=None, serialize=True):
-    """Parameters:
-       name: the name of the goal.
-       action: the goal action object to invoke this goal.
-       dependencies: the names of other goals which must be achieved
-          before invoking this goal.
-       serialize: a flag indicating whether or not the action to achieve
-          this goal requires the global lock. If true, the action will
-          block until it can acquire the lock.
+    """
+    :param name: the name of the goal.
+    :param action: the goal action object to invoke this goal.
+    :param dependencies: the names of other goals which must be achieved before invoking this goal.
+    :param serialize: a flag indicating whether or not the action to achieve this goal requires
+      the global lock. If true, the action will block until it can acquire the lock.
     """
     self.serialize = serialize
     self.name = name
@@ -125,16 +123,15 @@ class Goal(object):
     return self._task(context)
 
   def install(self, phase=None, first=False, replace=False, before=None, after=None):
-    """
-      Installs this goal in the specified phase (or a new phase with the same name as this Goal).
+    """Install this goal in the specified phase (or a new phase with the same name as this Goal).
 
-      The placement of the goal in the execution list of the phase defaults to the end but can be
-      influence by specifying exactly one of the following arguments:
+    The placement of the goal in the execution list of the phase defaults to the end but can be
+    influence by specifying exactly one of the following arguments:
 
-      first: Places this goal 1st in the phase's execution list
-      replace: Replaces any existing goals in the phase with this goal
-      before: Places this goal before the named goal in the phase's execution list
-      after: Places this goal after the named goal in the phase's execution list
+    :param first: Places this goal 1st in the phase's execution list
+    :param replace: Replaces any existing goals in the phase with this goal
+    :param before: Places this goal before the named goal in the phase's execution list
+    :param after: Places this goal after the named goal in the phase's execution list
     """
     phase = Phase(phase or self.name)
     phase.install(self, first, replace, before, after)

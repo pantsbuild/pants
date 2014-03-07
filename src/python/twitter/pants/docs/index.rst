@@ -49,7 +49,6 @@ Advanced Documentation
 
    setup_repo
    install
-   README
    migration
 
 

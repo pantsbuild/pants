@@ -4,7 +4,7 @@ Set up Your Source Tree for Pants
 
 If you're setting up the Pants build tool to work in your source tree, you
 probably want to configure Pants' behavior.  (Once it's set up, most
-folks should be able to use the :doc:`normal Pants build workflow <README>`
+folks should be able to use the :doc:`first_concepts`
 and not worry about these things.)
 
 .. _setup-pants-ini:

@@ -72,8 +72,9 @@ class PythonArtifact(object):
     return self._binaries
 
   def with_binaries(self, *args, **kw):
-    """
-      Add binaries tagged to this artifact, e.g.
+    """Add binaries tagged to this artifact.
+
+    For example: ::
 
       provides = setup_py(
         name = 'my_library',
@@ -82,12 +83,12 @@ class PythonArtifact(object):
         my_command = pants(':my_library_bin')
       )
 
-      This adds a console_script entry_point for the python_binary target
-      pointed at by :my_library_bin.  Currently only supports
-      python_binaries that specify entry_point explicitly instead of source.
+    This adds a console_script entry_point for the python_binary target
+    pointed at by :my_library_bin.  Currently only supports
+    python_binaries that specify entry_point explicitly instead of source.
 
-      Also can take a dictionary, e.g.
-      with_binaries({'my-command': pants(...)})
+    Also can take a dictionary, e.g.
+    with_binaries({'my-command': pants(...)})
     """
     for arg in args:
       if isinstance(arg, dict):

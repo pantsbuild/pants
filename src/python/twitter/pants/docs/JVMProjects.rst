@@ -124,7 +124,7 @@ The ``BUILD`` files in ``3rdparty/jvm/``, e.g.,
 ``3rdparty/jvm/com/sun/jersey/BUILD``, have targets like:
 
 .. literalinclude:: ../../../../../3rdparty/jvm/com/sun/jersey/BUILD
-   :end-before: jersey-client
+   :lines: 3-4
 
 Those :ref:`jar() things <bdict_jar>` are references to public jars.
 

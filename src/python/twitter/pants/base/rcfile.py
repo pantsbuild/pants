@@ -25,7 +25,11 @@ log = logger(name='rcfile')
 
 
 class RcFile(object):
-  """Encapsulates pants rcfile handling."""
+  """Handles rcfile-style configuration files.
+
+  Precedence is given to rcfiles that come last in the given sequence of paths.
+  The effect is as if each rcfile in paths overlays the next in a walk from left to right.
+  """
 
   # TODO(John Sirois): localize handling of this flag value back into pants_exe.py once the new old
   # split is healed.
@@ -38,15 +42,11 @@ class RcFile(object):
 
   def __init__(self, paths, default_prepend=True, process_default=False):
     """
-      Creates an RcFile object that gives precedence to rcfiles that come last in the given
-      sequence of paths.  The effect is as if each rcfile in paths overlays the next in a walk from
-      left to right.
-
-      :paths The rcfiles to apply default subcommand options from.
-      :default_prepend Whether to prepend (the default) or append if default options are specified
-                       with the 'options' key.
-      :process_default True to process options in the [DEFAULT] section and apply regardless of
-                       goal.
+    :param paths: The rcfiles to apply default subcommand options from.
+    :param default_prepend: Whether to prepend (the default) or append if default options
+      are specified with the ``options`` key.
+    :param process_default: True to process options in the [DEFAULT] section and apply
+      regardless of goal.
     """
 
     self.default_prepend = default_prepend
@@ -60,17 +60,18 @@ class RcFile(object):
     self.paths = [os.path.expanduser(path) for path in paths]
 
   def apply_defaults(self, commands, args):
-    """
-      Augments the given list of arguments with any default options found for the given commands.
-      The returned argments will be a new copy of the given args with possibly extra augmented
-      arguments.
+    """Augment arguments with defaults found for the given commands.
 
-      Default options are applied from the following keys under a section with the name of the
-      subcommand the default options apply to:
-      'options': These options are either prepended or appended to the command line args as
-                 specified in the constructor with default_prepend.
-      'prepend-options': These options are prepended to the command line args.
-      'append-options': These options are appended to the command line args.
+    The returned arguments will be a new copy of the given args with possibly extra augmented
+    arguments.
+
+    Default options are applied from the following keys under a section with the name of the
+    sub-command the default options apply to:
+
+    * `options` - These options are either prepended or appended to the command line args as
+      specified in the constructor with default_prepend.
+    * `prepend-options` - These options are prepended to the command line args.
+    * `append-options` - These options are appended to the command line args.
     """
 
     args = args[:]

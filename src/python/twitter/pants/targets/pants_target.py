@@ -33,8 +33,7 @@ class Pants(Target):
 
   def __init__(self, spec, exclusives=None):
     """
-    :param string spec: target address. E.g.,
-      src/main/java/com/twitter/common/util/BUILD:util
+    :param string spec: target address. E.g., `src/java/com/twitter/common/util/BUILD\:util`
     """
     # it's critical the spec is parsed 1st, the results are needed elsewhere in constructor flow
     parse_context = ParseContext.locate()
