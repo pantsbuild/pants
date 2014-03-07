@@ -184,17 +184,16 @@ class JarCreateExecuteTest(JarCreateTestBase):
             self.assert_jar_contents(context, 'jars', self.jl,
                                      'a.class', 'b.class', 'r.txt.transformed')
             self.assert_jar_contents(context, 'jars', self.sl, 'c.class')
-          with self.add_data(context, 'classes_by_target', self.scala_lib, 'scala_foo.class'):
-            with self.add_data(context, 'classes_by_target', self.java_lib_foo, 'java_foo.class'):
-              JarCreate(context).execute(context.targets())
-              if empty:
-                self.assertTrue(context.products.get('jars').empty())
-              else:
-                self.assert_jar_contents(context, 'jars', self.jl,
-                                        'a.class', 'b.class', 'r.txt.transformed')
-                self.assert_jar_contents(context, 'jars', self.sl, 'c.class')
-                self.assert_jar_contents(context, 'jars', self.scala_lib, 'scala_foo.class',
-                                         'java_foo.class')
+          with self.add_data(context, 'classes_by_target', self.scala_lib, 'scala_foo.class', 'java_foo.class'):
+            JarCreate(context).execute(context.targets())
+            if empty:
+              self.assertTrue(context.products.get('jars').empty())
+            else:
+              self.assert_jar_contents(context, 'jars', self.jl,
+                                      'a.class', 'b.class', 'r.txt.transformed')
+              self.assert_jar_contents(context, 'jars', self.sl, 'c.class')
+              self.assert_jar_contents(context, 'jars', self.scala_lib, 'scala_foo.class',
+                                       'java_foo.class')
 
   def test_classfile_jar_required(self):
     context = self.context()

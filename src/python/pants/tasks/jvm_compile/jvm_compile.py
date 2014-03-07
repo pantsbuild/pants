@@ -262,7 +262,7 @@ class JvmCompile(NailgunTask):
     self._create_empty_products()
 
     relevant_targets = [t for t in targets if t.has_sources(self._file_suffix)]
-
+    print("\n relevant targets %s" %relevant_targets)
     if not relevant_targets:
       return
 

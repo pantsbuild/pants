@@ -159,10 +159,6 @@ class JarCreate(Task):
 
     for target in jvm_targets:
       target_classes = classes_by_target.get(target)
-      if isinstance(target, ScalaLibrary):
-        target_classes = [target_classes]
-        for java_source in target.java_sources:
-          target_classes.append(classes_by_target.get(java_source))
 
       target_resources = []
       if target.has_resources:
