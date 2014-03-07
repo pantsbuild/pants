@@ -49,7 +49,6 @@ Advanced Documentation
 
    setup_repo
    install
-   migration
 
 
 Pants Reference Documentation
