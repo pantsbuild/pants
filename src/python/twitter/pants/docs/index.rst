@@ -61,9 +61,7 @@ Pants Reference Documentation
 
    build_dictionary
    goals_reference
-   targets
-   tasks
-   base
+
 
 Contributing to Pants
 ---------------------
@@ -73,13 +71,7 @@ How to develop Pants itself and contribute your changes.
 .. toctree::
    :maxdepth: 1
 
-   howto_develop
-   howto_contribute
-   intellij
-   internals
-   dev_tasks
-   docs
-   credits
+   dev
 
 
 Indices and tables
