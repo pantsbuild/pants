@@ -326,6 +326,10 @@ class JvmCompile(NailgunTask):
         if self._analysis_parser.is_nonempty_analysis(self._invalid_analysis_file) and partitions:
           with self.context.new_workunit(name='partition-analysis'):
             splits = [(x[1], x[2]) for x in partitions]
+            # We have to pass the analysis for any deleted files through zinc, to give it
+            # a chance to delete the relevant class files.
+            if splits:
+              splits[0] = (splits[0][0] + deleted_sources, splits[0][1])
             self._analysis_tools.split_to_paths(self._invalid_analysis_file, splits)
 
         # Now compile partitions one by one.
