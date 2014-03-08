@@ -17,6 +17,7 @@
 from __future__ import print_function
 
 import os
+import shutil
 
 from twitter.common.dirutil import safe_mkdir
 from twitter.common.python.http.link import SourceLink
@@ -83,7 +84,7 @@ def resolve_and_link(config, requirement, target_link, installer_provider, logge
     installer = installer_provider(sdist)
     dist_location = installer.bdist()
     target_location = os.path.join(os.path.dirname(target_link), os.path.basename(dist_location))
-    os.rename(dist_location, target_location)
+    shutil.move(dist_location, target_location)
     safe_link(target_location, target_link)
     logger('    installed %s' % target_location)
     return EggLink(target_location)
@@ -145,7 +146,7 @@ class PythonInterpreterCache(object):
     interpreter_dir = os.path.join(self._path, str(interpreter.identity))
     safe_mkdir(interpreter_dir)
     safe_link(interpreter.binary, os.path.join(interpreter_dir, 'python'))
-    return resolve(self._config, interpreter)
+    return resolve(self._config, interpreter, logger=self._logger)
 
   def setup_cached(self):
     for interpreter_dir in os.listdir(self._path):
