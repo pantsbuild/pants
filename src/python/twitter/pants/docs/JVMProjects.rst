@@ -219,7 +219,12 @@ You can enjoy your web service on your development machine's ``localhost``,
 but to let other people enjoy it, you probably want to copy it to a server
 machine. With Pants, the easiest way to do this is to create a *bundle*: a
 directory tree of ``.jar`` and helper files. If your ``jvm_app`` has
-a ``bundles`` paramater, it can specify trees of files to include in the tree.
+a ``bundles`` parameter, it can specify trees of files to include in the tree.
+
+If you want to set up a tree of static files but don't need it to be runnable,
+you can define a ``jvm_app`` target with bundles (and/or resources) but whose
+``jvm_binary`` has no source or main; the resulting bundle will have
+the files you want (along with a couple of not-so-useful stub ``.jar`` files).
 
 **Generating a Bundle**
 
