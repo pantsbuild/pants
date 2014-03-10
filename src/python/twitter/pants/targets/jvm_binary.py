@@ -140,6 +140,8 @@ class Bundle(object):
 
   def __init__(self, base=None, mapper=None, relative_to=None):
     """
+    :param base: Base path of the "source" file paths. By default, path of the
+      BUILD file. Useful for assets that don't live in the source code repo.
     :param mapper: Function that takes a path string and returns a path string. Takes a path in
       the source tree, returns a path to use in the resulting bundle. By default, an identity
       mapper.
@@ -149,13 +151,15 @@ class Bundle(object):
     if mapper and relative_to:
       raise ValueError("Must specify exactly one of 'mapper' or 'relative_to'")
 
+    self._base = base or ParseContext.path()
+
     if relative_to:
-      base = base or ParseContext.path(relative_to)
+      base = os.path.join(self._base, relative_to)
       if not os.path.isdir(base):
         raise ValueError('Could not find a directory to bundle relative to at %s' % base)
       self.mapper = RelativeToMapper(base)
     else:
-      self.mapper = mapper or RelativeToMapper(base or ParseContext.path())
+      self.mapper = mapper or RelativeToMapper(self._base)
 
     self.filemap = {}
 
@@ -168,7 +172,14 @@ class Bundle(object):
       paths = fileset() if isinstance(fileset, Fileset) \
                         else fileset if hasattr(fileset, '__iter__') \
                         else [fileset]
-      self.filemap.update(((os.path.abspath(path), self.mapper(path)) for path in paths))
+      for path in paths:
+        abspath = path
+        if not os.path.isabs(abspath):
+          abspath = os.path.join(self._base, path)
+        if not os.path.exists(abspath):
+          raise ValueError('Given path: %s with absolute path: %s which does not exist'
+                           % (path, abspath))
+        self.filemap[abspath] = self.mapper(abspath)
     return self
 
   def resolve(self):

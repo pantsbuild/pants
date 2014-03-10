@@ -82,7 +82,11 @@ class DepmapTest(BaseDepmapTest):
     create_python_binary_target('common/e', 'e', 'common.e.entry', 'python_binary')
     create_target('common/f', 'f', 'jvm_binary')
     create_target('common/g', 'g', 'jvm_binary', deps=['common/f:f'])
+    cls.create_dir('common/h')
+    cls.create_file('common/h/common.f')
     create_jvm_app('common/h', 'h', 'jvm_app', 'common/f:f', "bundle().add('common.f')")
+    cls.create_dir('common/i')
+    cls.create_file('common/i/common.g')
     create_jvm_app('common/i', 'i', 'jvm_app', 'common/g:g', "bundle().add('common.g')")
     create_target('overlaps', 'one', 'jvm_binary', deps=['common/h', 'common/i'])
     cls.create_target('overlaps', dedent('''

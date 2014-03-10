@@ -18,6 +18,7 @@ python_test_suite(
   name = 'targets',
   dependencies = [
     pants(':artifact'),
+    pants(':bundle'),
     pants(':exclusive'),
     pants(':internal'),
     pants(':jar_library'),
@@ -34,6 +35,16 @@ python_tests(
   dependencies = [
     pants('src/python/twitter/pants/base:parse_context'),
     pants('src/python/twitter/pants/targets:common'),
+    pants('src/python/twitter/pants/targets:jvm'),
+  ]
+)
+
+python_tests(
+  name = 'bundle',
+  sources = ['test_bundle.py'],
+  dependencies = [
+    pants('tests/python/twitter/pants:base-test'),
+    pants('src/python/twitter/pants/base:parse_context'),
     pants('src/python/twitter/pants/targets:jvm'),
   ]
 )
