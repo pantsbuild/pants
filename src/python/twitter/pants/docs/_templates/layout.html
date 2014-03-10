@@ -11,12 +11,20 @@
   // In a plain template, we'd put this in the footer block.
   // In the read-the-docs template, there is no footer. So use jQuery ready:
   $(document).ready(function() {
+    // Ping Google analytics
     var ga = document.createElement('script');
     ga.type = 'text/javascript'; ga.async = true;
     ga.src = ('https:' == document.location.protocol ?
               'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
     ga.setAttribute('async', 'true');
     $(document).append(ga);
+
+    // Show the travis-ci status graphic
+    $('.wy-breadcrumbs').append(
+      '<div style="float: right;">' +
+      '<a href="https://travis-ci.org/twitter/commons">' +
+      '<img src="https://travis-ci.org/twitter/commons.png?branch=master">' +
+      '</a></div>');
   });
 </script>
 <style type="text/css">
