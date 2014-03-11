@@ -18,5 +18,6 @@ how to build & test pants, and finally how to get your change committed.
    targets
    tasks
    base
+   release
    docs
    credits
