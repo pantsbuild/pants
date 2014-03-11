@@ -27,7 +27,7 @@ In the appropriate ``BUILD`` file, you want to find a
 :ref:`bdict_dependencies` with a :ref:`bdict_jar` dependency:
 
 .. literalinclude:: ../../../../../3rdparty/jvm/com/sun/jersey/BUILD
-   :end-before: jersey-client
+   :end-before: jersey-server
 
 
 Here, the
