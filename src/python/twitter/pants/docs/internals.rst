@@ -205,6 +205,12 @@ Code Layout
   Source of the Task classes. E.g., `junit_run`, the code that
   invokes JUnit if someone tests a `java_tests` target.
 
+`tests/.../pants <https://github.com/twitter/commons/tree/master/tests/python/twitter/pants/>`_
+  Tests for Pants. These tend to be ``python_tests`` exercising Pants functions.
+  ``twitter.pants.base_build_root_test.BaseBuildRootTest`` is a very handy
+  class; it has methods to set up and tear down little source trees with
+  ``BUILD`` files.
+
 .. *********
    .pants.d/
    *********
