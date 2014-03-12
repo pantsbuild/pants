@@ -35,12 +35,10 @@ generate a list of libraries requiring publishing with: ::
    src/python/twitter/common/confluence/BUILD:confluence
    <SNIP>
 
-After updating the checked-in version numbers, generate the libraries to publish. ::
+After updating the checked-in version numbers, publish. ::
 
-   ./pants.bootstrap setup_py --recursive \
-     src/python/twitter/pants:_pants_transitional_publishable_library_
+   ./pants.bootstrap setup_py --recursive --run='sdist upload' \
+     src/python/twitter/pants:pants-packaged
 
-`sdist publish` each generated library. You will need credentials to publish.
-If you don't already have them, please ask on `pants-devel` for what to do.
-
-Finally, check PyPi to ensure everything looks good.
+Check PyPi to ensure everything looks good. Finally, announce the release to
+`pants-users` and `pants-devel`.

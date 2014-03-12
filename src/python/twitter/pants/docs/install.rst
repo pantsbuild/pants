@@ -1,95 +1,52 @@
-Installing
-==========
+################
+Installing Pants
+################
 
-**As of January 2014, alas, Pants is not an install-able thing.**
-You can use it in a repo in which some Pants expert has set it up;
-you can use it to build things *in* that repo, but nothing else.
+This page documents how to install pants. Three installation methods are
+described, each with different tradeoffs, allowing you can choose the
+right method for your particular needs.
 
-We hope to fix this situation soon, but we're not there yet.
-If you're reading this in open-source-land and want to try out Pants,
-https://github.com/twitter/commons uses it. If you're reading this in
-an organization that already uses Pants, ask your neighbor where
-your source code is.
+************************
+System-wide Installation
+************************
 
+The simplest installation method is installing for all users on your system. ::
 
-Requirements
-------------
+   pip install twitter.pants
 
-Most of Pants was developed against CPython 2.6.
-Things mostly work with CPython 2.7 and recent efforts have been made to improve
-CPython 3.x and PyPy compatibility.  We've explicitly ignored anything prior to
-CPython 2.6 and generally discourage use against anything less than
-CPython 2.6.5 as there are known bugs that we're unwilling to fix.  We've never
-even tried running against Jython or IronPython so if that's your environment,
-you're on your own.
-
-If none of this made any sense to you, run `python -V`.  If it says `Python
-2.6.x` or `Python 2.7.x` you're probably fine.
-
-.. _tshoot:
-
-Troubleshooting
----------------
-
-`TypeError: unpack_http_url() takes exactly 4 arguments (3 given)`
-``````````````````````````````````````````````````````````````````
-
-If you see this error, it means that your installation is attempting to use a cached
-version of pip 1.0.2 instead of pip 1.1.
-
-Solution::
-
-    $ rm -rf .python
-    $ rm -f pants.pex
-    $ ./pants
-
-`TypeError: __init__() got an unexpected keyword argument 'platforms'`
-``````````````````````````````````````````````````````````````````````
-
-If you see this error, you're running an old pants.pex against a new BUILD file.
-
-Solution::
-
-    $ rm -f pants.pex
-    $ ./pants
+This installs pants (and its dependencies) into your Python distribution
+site-packages, making it available to all users on your system. This
+installation method requires root access and may cause dependency conflicts
+with other pip-installed applications.
 
 
-`AttributeError: 'NoneType' object has no attribute 'rfind'`
-````````````````````````````````````````````````````````````
+*****************************
+Virtualenv-based Installation
+*****************************
 
-If you see this error, you're running an old pants.pex against a new BUILD file.
+`Virtualenv <http://www.virtualenv.org/>`_ is a tool for creating isolated
+Python environments. This is the recommended way of installing pants locally
+as it does not modify the system Python libraries. ::
 
-Solution::
+   $ virtualenv /tmp/pants
+   $ source /tmp/pants/bin/activate
+   $ pip install twitter.pants \
+     --allow-external elementtree \
+     --allow-unverified elementtree
+   $ pants
 
-    $ rm -f pants.pex
-    $ ./pants
-
-
-`DistributionNotFound: pytest-cov`
-``````````````````````````````````
-
-If you encounter this error after building pants, it means that some dependent
-libraries like pytest-cov which are downloaded from Internal Twitter network
-has not been downloaded yet.  Make sure you are on VPN or Twitter Network so
-that your dependencies may be downloaded during the build.
+To simplify a virtualenv-based installation, consider adding a wrapper script
+to your repo. See https://github.com/twitter/commons/blob/master/pants for an
+example.
 
 
-Almost any problem
-``````````````````
+**********************
+PEX-based Installation
+**********************
 
-Almost any problem can be solved by fully clearing out all caches,
-rebuilding Pants,
-and killing all lingering nailgun (JVM build implementation) processes::
+To support hermetic builds and not depend on a local pants installation
+(e.g.: CI machines may prohibit software installation), some sites fetch
+a pre-build `pants.pex` whose version is checked-into `pants.ini`. If your site
+uses such an installation, please ask around for details.
 
-    $ build-support/python/clean.sh
-    $ ./pants.bootstrap
-    $ ./pants goal ng-killall --ng-killall-everywhere
-
-Did you change your `PYTHONPATH` recently? Pants is implemented in Python, so
-`PYTHONPATH` can cause spooky changes.
-
-Prefix your pants command with some verbosity-setting environment vars::
-
-    PEX_VERBOSE=1 PANTS_VERBOSE=1 PYTHON_VERBOSE=1 ./pants ...
-
-It won't fix the problem, but it might clarify the problem.
+.. TODO(travis): Should we provide an example fetcher script?
