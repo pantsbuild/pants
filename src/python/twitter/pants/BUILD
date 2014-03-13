@@ -27,7 +27,7 @@ python_library(
   # TODO(wickman) This version should be automatically pulled in from twitter.pants.version
   provides=setup_py(
     name='twitter.pants',
-    version='0.0.15',
+    version='0.0.17',
     description="Twitter's pants build tool.",
     url='https://github.com/twitter/commons',
     license='Apache License, Version 2.0',

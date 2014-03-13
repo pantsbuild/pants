@@ -35,9 +35,20 @@ generate a list of libraries requiring publishing with: ::
    src/python/twitter/common/confluence/BUILD:confluence
    <SNIP>
 
-After updating the checked-in version numbers, publish. ::
+After updating the checked-in version numbers, publish locally and verify the release. ::
 
-   ./pants.bootstrap setup_py --recursive --run='sdist upload' \
+   PANTS_DEV=1 ./pants.bootstrap setup_py --recursive src/python/twitter/pants:pants-packaged
+   VENV_DIR=$(mktemp -d -t pants.XXXXX)
+   virtualenv $VENV_DIR
+   source $VENV_DIR/bin/activate
+   pip install --allow-external elementtree --allow-unverified elementtree \
+     --find-links=file://$(pwd)/dist twitter.pants==0.0.17
+   pants goal list ::
+   deactivate
+
+Now that we've smoke-tested this release, publish to PyPi. ::
+
+   PANTS_DEV=1 ./pants.bootstrap setup_py --recursive --run='sdist upload' \
      src/python/twitter/pants:pants-packaged
 
 Check PyPi to ensure everything looks good. Finally, announce the release to

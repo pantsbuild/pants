@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
 source build-support/python/libvirtualenv.sh
-setup_virtualenv 'pants' 'twitter.pants==0.0.15' \
+setup_virtualenv 'pants' 'twitter.pants==0.0.17' \
   '--allow-external elementtree --allow-unverified elementtree'
 exec pants "$@"
