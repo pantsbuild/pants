@@ -106,9 +106,9 @@ def resolve(config, interpreter, logger=print):
   """Resolve and cache an interpreter with a setuptools and wheel capability."""
 
   setuptools_requirement = failsafe_parse(
-      'setuptools==%s' % config.getdefault('python-setup', 'setuptools_version', '2.2'))
+      'setuptools==%s' % config.get('python-setup', 'setuptools_version', default='2.2'))
   wheel_requirement = failsafe_parse(
-      'wheel==%s' % config.getdefault('python-setup', 'wheel_version', '0.22.0'))
+      'wheel==%s' % config.get('python-setup', 'wheel_version', default='0.22.0'))
 
   interpreter = resolve_interpreter(config, interpreter, setuptools_requirement, logger=logger)
   if interpreter:
