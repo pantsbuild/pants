@@ -8,6 +8,12 @@ folks elsewhere can fetch and import. In the JVM world, these are jars
 on a server that Maven (or Ivy) looks for. (In the Python world, these are
 eggs; but as of late 2013, Pants doesn't help publish these.)
 
+.. WARNING::
+   This page describes ``pants goal publish``. Alas, this goal is not, in fact,
+   built into Pants *yet*. If you work in an organization with a Pants guru,
+   you might have a ``publish`` goal. Otherwise, please consider this a sneak
+   preview of an upcoming feature.
+
 This page talks about publishing artifacts. We assume you already know enough
 about Pants to *build* the library that underlies an artifact.
 To *use* an artifact that has already been published from some other
