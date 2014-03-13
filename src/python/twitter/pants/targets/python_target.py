@@ -24,6 +24,7 @@ from twitter.pants.base.target import Target, TargetDefinitionException
 from .with_dependencies import TargetWithDependencies
 from .with_sources import TargetWithSources
 
+from twitter.pants.targets.python_artifact import PythonArtifact
 
 class PythonTarget(TargetWithDependencies, TargetWithSources):
   """Base class for all Python targets."""
@@ -41,7 +42,13 @@ class PythonTarget(TargetWithDependencies, TargetWithSources):
 
     self.add_labels('python')
     self.resources = self._resolve_paths(resources) if resources else OrderedSet()
+
+    if provides and not isinstance(provides, PythonArtifact):
+      raise TargetDefinitionException(self,
+        "Target must provide a valid pants setup_py object. Received a '%s' object instead." %
+          provides.__class__.__name__)
     self.provides = provides
+
     self.compatibility = compatibility or ['']
     for req in self.compatibility:
       try:

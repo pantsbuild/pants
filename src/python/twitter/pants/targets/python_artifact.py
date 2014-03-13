@@ -16,8 +16,6 @@
 
 from twitter.pants.base.build_manual import manual
 
-from .python_target import PythonTarget
-
 
 @manual.builddict(tags=["python"])
 class PythonArtifact(object):

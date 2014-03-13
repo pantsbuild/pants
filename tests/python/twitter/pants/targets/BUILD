@@ -24,6 +24,7 @@ python_test_suite(
     pants(':jar_library'),
     pants(':pants_target'),
     pants(':python_binary'),
+    pants(':python_target'),
     pants(':target'),
     pants(':util'),
   ]
@@ -108,6 +109,17 @@ python_tests(
   dependencies = [
     pants('src/python/twitter/pants/base:parse_context'),
     pants('src/python/twitter/pants/base:target'),
+  ]
+)
+
+python_tests(
+  name = 'python_target',
+  sources = ['test_python_target.py'],
+  dependencies = [
+    pants('tests/python/twitter/pants:base-test'),
+    pants('src/python/twitter/pants/base:parse_context'),
+    pants('src/python/twitter/pants/base:target'),
+    pants('src/python/twitter/pants/targets:python'),
   ]
 )
 
