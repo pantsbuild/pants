@@ -21,11 +21,12 @@ How to configure build-able things in BUILD files.
    python-readme
    build_files
    invoking
+   tshoot
 
 Troubleshooting
 ---------------
 
-* Something that usually works just failed? See :ref:`tshoot`.
+* Something that usually works just failed? See :doc:`tshoot`.
 
 * Publishing can fail in more ways. See :doc:`publish`.
 
