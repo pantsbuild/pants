@@ -121,6 +121,12 @@ class PythonInterpreterCache(object):
   def cache_dir(config):
     return PythonSetup(config).scratch_dir('interpreter_cache', default_name='interpreters')
 
+  @classmethod
+  def select_interpreter(cls, compatibilities, allow_multiple=False):
+    if allow_multiple:
+      return compatibilities
+    return [min(compatibilities)] if compatibilities else []
+
   def __init__(self, config, logger=None):
     self._path = self.cache_dir(config)
     self._config = config
@@ -187,11 +193,3 @@ class PythonInterpreterCache(object):
     if len(matches) == 0:
       self._logger('Found no valid interpreters!')
     return matches
-
-  def select_interpreter(self, compatibilities, allow_multiple=False):
-    if allow_multiple:
-      return compatibilities
-    me = PythonInterpreter.get()
-    if me in compatibilities:
-      return [me]
-    return [min(compatibilities)] if compatibilities else []
