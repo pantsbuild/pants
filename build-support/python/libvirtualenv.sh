@@ -2,7 +2,7 @@ function setup_virtualenv() {
   script="$1"            # 'rbt'
   requirements="$2"      # 'RBTools==0.5.5'
   pip_install_opts="$3"  # '--allow-external RBTools --allow-unverified RBTools'
-  fingerprint=$(echo $script $requirements | openssl md5)
+  fingerprint=$(echo $script $requirements | openssl md5 | cut -d' ' -f2)
 
   HERE=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
   VENV_DIR="$HERE/../${script}.venv"
