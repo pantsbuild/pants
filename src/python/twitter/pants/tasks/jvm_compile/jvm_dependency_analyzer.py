@@ -41,65 +41,68 @@ class JvmDependencyAnalyzer(object):
     jarlibs_by_id = defaultdict(set)
 
     # Compute src -> target.
-    buildroot = get_buildroot()
-    # Look at all targets in-play for this pants run. Does not include synthetic targets,
-    for target in self._context.targets():
-      if isinstance(target, JvmTarget):
-        for src in target.sources_relative_to_buildroot():
-          targets_by_file[os.path.join(buildroot, src)].add(target)
-      elif isinstance(target, JarLibrary):
-        for jardep in target.dependencies:
-          if isinstance(jardep, JarDependency):
-            jarlibs_by_id[(jardep.org, jardep.name)].add(target)
+    with self._context.new_workunit(name='map_sources'):
+      buildroot = get_buildroot()
+      # Look at all targets in-play for this pants run. Does not include synthetic targets,
+      for target in self._context.targets():
+        if isinstance(target, JvmTarget):
+          for src in target.sources_relative_to_buildroot():
+            targets_by_file[os.path.join(buildroot, src)].add(target)
+        elif isinstance(target, JarLibrary):
+          for jardep in target.dependencies:
+            if isinstance(jardep, JarDependency):
+              jarlibs_by_id[(jardep.org, jardep.name)].add(target)
 
     # Compute class -> target.
-    classes_by_target = self._context.products.get_data('classes_by_target')
-    for tgt, target_products in classes_by_target.items():
-      for _, classes in target_products.abs_paths():
-        for cls in classes:
-          targets_by_file[cls].add(tgt)
+    with self._context.new_workunit(name='map_classes'):
+      classes_by_target = self._context.products.get_data('classes_by_target')
+      for tgt, target_products in classes_by_target.items():
+        for _, classes in target_products.abs_paths():
+          for cls in classes:
+            targets_by_file[cls].add(tgt)
 
     # Compute jar -> target.
-    with Task.symlink_map_lock:
-      all_symlinks_map = self._context.products.get_data('symlink_map').copy()
-      # We make a copy, so it's safe to use outside the lock.
+    with self._context.new_workunit(name='map_jars'):
+      with Task.symlink_map_lock:
+        all_symlinks_map = self._context.products.get_data('symlink_map').copy()
+        # We make a copy, so it's safe to use outside the lock.
 
-    def register_transitive_jars_for_ref(ivyinfo, ref):
-      deps_by_ref_memo = {}
+      def register_transitive_jars_for_ref(ivyinfo, ref):
+        deps_by_ref_memo = {}
 
-      def get_transitive_jars_by_ref(ref1, visited=None):
-        if ref1 in deps_by_ref_memo:
-          return deps_by_ref_memo[ref1]
-        else:
-          visited = visited or set()
-          if ref1 in visited:
-            return set()  # Ivy allows circular deps.
-          visited.add(ref1)
-          jars = set()
-          jars.update(ivyinfo.modules_by_ref[ref1].artifacts)
-          for dep in ivyinfo.deps_by_caller.get(ref1, []):
-            jars.update(get_transitive_jars_by_ref(dep, visited))
-          deps_by_ref_memo[ref1] = jars
-          return jars
+        def get_transitive_jars_by_ref(ref1, visited=None):
+          if ref1 in deps_by_ref_memo:
+            return deps_by_ref_memo[ref1]
+          else:
+            visited = visited or set()
+            if ref1 in visited:
+              return set()  # Ivy allows circular deps.
+            visited.add(ref1)
+            jars = set()
+            jars.update(ivyinfo.modules_by_ref[ref1].artifacts)
+            for dep in ivyinfo.deps_by_caller.get(ref1, []):
+              jars.update(get_transitive_jars_by_ref(dep, visited))
+            deps_by_ref_memo[ref1] = jars
+            return jars
 
-      target_key = (ref.org, ref.name)
-      if target_key in jarlibs_by_id:
-        # These targets provide all the jars in ref, and all the jars ref transitively depends on.
-        jarlib_targets = jarlibs_by_id[target_key]
+        target_key = (ref.org, ref.name)
+        if target_key in jarlibs_by_id:
+          # These targets provide all the jars in ref, and all the jars ref transitively depends on.
+          jarlib_targets = jarlibs_by_id[target_key]
 
-        for jar in get_transitive_jars_by_ref(ref):
-          # Register that each jarlib_target provides jar (via all its symlinks).
-          symlinks = all_symlinks_map.get(os.path.realpath(jar.path), [])
-          for symlink in symlinks:
-            for jarlib_target in jarlib_targets:
-              targets_by_file[symlink].add(jarlib_target)
+          for jar in get_transitive_jars_by_ref(ref):
+            # Register that each jarlib_target provides jar (via all its symlinks).
+            symlinks = all_symlinks_map.get(os.path.realpath(jar.path), [])
+            for symlink in symlinks:
+              for jarlib_target in jarlib_targets:
+                targets_by_file[symlink].add(jarlib_target)
 
-    ivy_products = self._context.products.get_data('ivy_jar_products')
-    if ivy_products:
-      for ivyinfos in ivy_products.values():
-        for ivyinfo in ivyinfos:
-          for ref in ivyinfo.modules_by_ref:
-            register_transitive_jars_for_ref(ivyinfo, ref)
+      ivy_products = self._context.products.get_data('ivy_jar_products')
+      if ivy_products:
+        for ivyinfos in ivy_products.values():
+          for ivyinfo in ivyinfos:
+            for ref in ivyinfo.modules_by_ref:
+              register_transitive_jars_for_ref(ivyinfo, ref)
 
     return targets_by_file
 
@@ -200,31 +203,32 @@ class JvmDependencyAnalyzer(object):
     transitive_deps_by_target = self._compute_transitive_deps_by_target()
 
     # Find deps that are actual but not specified.
-    missing_file_deps = OrderedSet()  # (src, src).
-    missing_tgt_deps_map = defaultdict(list)  # (tgt, tgt) -> a list of (src, src) as evidence.
-    missing_direct_tgt_deps_map = defaultdict(list)  # The same, but for direct deps.
+    with self._context.new_workunit(name='scan_deps'):
+      missing_file_deps = OrderedSet()  # (src, src).
+      missing_tgt_deps_map = defaultdict(list)  # (tgt, tgt) -> a list of (src, src) as evidence.
+      missing_direct_tgt_deps_map = defaultdict(list)  # The same, but for direct deps.
 
-    buildroot = get_buildroot()
-    abs_srcs = [os.path.join(buildroot, src) for src in srcs]
-    for src in abs_srcs:
-      src_tgt = next(iter(targets_by_file.get(src)))
-      if src_tgt is not None:
-        for actual_dep in filter(must_be_explicit_dep, actual_deps.get(src, [])):
-          actual_dep_tgts = targets_by_file.get(actual_dep)
-          # actual_dep_tgts is usually a singleton. If it's not, we only need one of these
-          # to be in our declared deps to be OK.
-          if actual_dep_tgts is None:
-            missing_file_deps.add((src_tgt, actual_dep))
-          elif src_tgt not in actual_dep_tgts:  # Obviously intra-target deps are fine.
-            canonical_actual_dep_tgt = next(iter(actual_dep_tgts))
-            if actual_dep_tgts.isdisjoint(transitive_deps_by_target.get(src_tgt, [])):
-              missing_tgt_deps_map[(src_tgt, canonical_actual_dep_tgt)].append((src, actual_dep))
-            elif canonical_actual_dep_tgt not in src_tgt.dependencies:
-              # The canonical dep is the only one a direct dependency makes sense on.
-              missing_direct_tgt_deps_map[(src_tgt, canonical_actual_dep_tgt)].append(
-                  (src, actual_dep))
-      else:
-        raise TaskError('Requested dep info for unknown source file: %s' % src)
+      buildroot = get_buildroot()
+      abs_srcs = [os.path.join(buildroot, src) for src in srcs]
+      for src in abs_srcs:
+        src_tgt = next(iter(targets_by_file.get(src)))
+        if src_tgt is not None:
+          for actual_dep in filter(must_be_explicit_dep, actual_deps.get(src, [])):
+            actual_dep_tgts = targets_by_file.get(actual_dep)
+            # actual_dep_tgts is usually a singleton. If it's not, we only need one of these
+            # to be in our declared deps to be OK.
+            if actual_dep_tgts is None:
+              missing_file_deps.add((src_tgt, actual_dep))
+            elif src_tgt not in actual_dep_tgts:  # Obviously intra-target deps are fine.
+              canonical_actual_dep_tgt = next(iter(actual_dep_tgts))
+              if actual_dep_tgts.isdisjoint(transitive_deps_by_target.get(src_tgt, [])):
+                missing_tgt_deps_map[(src_tgt, canonical_actual_dep_tgt)].append((src, actual_dep))
+              elif canonical_actual_dep_tgt not in src_tgt.dependencies:
+                # The canonical dep is the only one a direct dependency makes sense on.
+                missing_direct_tgt_deps_map[(src_tgt, canonical_actual_dep_tgt)].append(
+                    (src, actual_dep))
+        else:
+          raise TaskError('Requested dep info for unknown source file: %s' % src)
 
     return (list(missing_file_deps),
             missing_tgt_deps_map.items(),

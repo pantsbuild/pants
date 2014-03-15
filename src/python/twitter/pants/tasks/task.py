@@ -284,7 +284,7 @@ class Task(object):
     with self.context.new_workunit(name='check', labels=[WorkUnit.MULTITOOL]) as parent:
       res = self.context.submit_foreground_work_and_wait(
         Work(lambda vt: bool(self.get_artifact_cache().use_cached_files(vt.cache_key)),
-             [(vt, ) for vt in vts], 'check'), workunit_parent=parent)
+             [(vt, ) for vt in vts], 'fetch'), workunit_parent=parent)
     for vt, was_in_cache in zip(vts, res):
       if was_in_cache:
         cached_vts.append(vt)

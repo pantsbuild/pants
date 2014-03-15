@@ -441,7 +441,8 @@ class JvmCompile(NailgunTask):
           analyses_to_merge.append(self._analysis_file)
         with contextutil.temporary_dir() as tmpdir:
           tmp_analysis = os.path.join(tmpdir, 'analysis')
-          self._analysis_tools.merge_from_paths(analyses_to_merge, tmp_analysis)
+          with self.context.new_workunit(name='merge_analysis'):
+            self._analysis_tools.merge_from_paths(analyses_to_merge, tmp_analysis)
           self.move(tmp_analysis, self._analysis_file)
 
     self._ensure_analysis_tmpdir()
