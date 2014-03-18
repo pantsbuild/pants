@@ -34,6 +34,11 @@ python_library(
 python_binary(
   name = 'pants',
   entry_point = 'twitter.pants.bin.pants_exe:main',
+  platforms=[
+    'current',
+    'linux-x86_64',
+    'macosx-10.4-x86_64',
+  ],
   dependencies = [
     pants(':pants_exe'),
     pants('src/python/twitter/pants/commands:pants_old'),

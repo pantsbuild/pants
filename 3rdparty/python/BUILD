@@ -31,7 +31,7 @@ def make_dep(name, version, dependency_name=None):
 make_dep('ansicolors', '1.0.2')
 make_dep('antlr-3.1.3', '3.1.3', 'antlr_python_runtime')
 make_dep('bottle', '0.11.6')
-make_dep('coverage', '3.6b1')
+make_dep('coverage', '3.7.1')
 make_dep('elementtree', '1.2.7_20070827_preview')
 make_dep('futures', '2.1.2')
 make_dep('git-python', '0.3.2.RC1', 'GitPython')
