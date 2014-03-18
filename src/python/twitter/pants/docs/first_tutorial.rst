@@ -10,13 +10,14 @@ It assumes you're working in a source tree that already has ``pants``
 installed (such as
 `twitter/commons <https://github.com/twitter/commons>`_).
 
-**Before you use Pants proper the first time,** you must bootstrap it::
+The first time you run ``pants``, try it without arguments. This makes
+Pants "bootstrap" itself, downloading and compiling things it needs::
 
-    ./pants.bootstrap
+    ./pants
 
-(Someday soon, we hope that Pants will be self-bootstrapping.)
+Now you're ready to invoke pants for more useful things.
 
-You invoke pants with a *goal* (like ``test`` or ``bundle``) and the
+You invoke pants with *goals* (like ``test`` or ``bundle``) and the
 *build targets* to use (like
 ``tests/java/com/twitter/common/examples/pingpong/BUILD:pingpong``). For example, ::
 
