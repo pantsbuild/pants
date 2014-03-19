@@ -7,14 +7,27 @@ CACHE=$BASE_DIR/.pants.d/.pip.cache
 
 PY=${PY:-$(which python)}
 
-VENV_VERSION=1.10.1
+VENV_VERSION=1.11.4
 
+# This is a list manually updated by running `pants goal dependencies` against the pants target
+# plus some post munging (note elementtree flags).
+# TODO(John Sirois): rework dev mode to get its list of requirements from a shared source with
+# pants itself ... somehow?
 BOOTSTRAP_REQS=(
-  pystache==0.5.3
-  python_daemon==1.5.5
-  requests==2.0.0
-  setuptools==2.1.2
+  ansicolors==1.0.2
+  coverage==3.7.1
+  elementtree==1.2.7-20070827-preview \
+    --allow-external elementtree \
+    --allow-unverified elementtree
+  Markdown==2.1.1
   psutil==1.1.2
+  Pygments==1.4
+  pystache==0.5.3
+  pytest==2.5.2
+  pytest-cov==1.6
+  python-daemon==1.5.5
+  requests==2.0.0
+  setuptools==2.2
 )
 
 mkdir -p $BOOTSTRAP_BIN
@@ -61,8 +74,6 @@ if virtualenv -p $PY --distribute $BOOTSTRAP_ENVIRONMENT; then
   # that will not run.
   virtualenv --relocatable $BOOTSTRAP_ENVIRONMENT
   source $BOOTSTRAP_ENVIRONMENT/bin/activate
-  for pkg in ${BOOTSTRAP_REQS[@]}; do
-    pip install --download-cache=$CACHE -U $pkg
-  done
+  pip install --download-cache=$CACHE -U ${BOOTSTRAP_REQS[@]}
   deactivate
 fi

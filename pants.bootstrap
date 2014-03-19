@@ -21,14 +21,9 @@ VIRTUAL_PYTHON=$MY_DIR/.python/bootstrap
 PANTS_EXE=$MY_DIR/src/python/twitter/pants/bin/pants_exe.py
 PANTS_BOOTSTRAP_ARGS=${PANTS_BOOTSTRAP_ARGS:-''}
 
-MARKDOWN_EGG=$MY_DIR/3rdparty/python/Markdown-2.1.1-py2.6.egg
-PYGMENTS_EGG=$MY_DIR/3rdparty/python/Pygments-1.4-py2.6.egg
-PYSTACHE_EGG=$MY_DIR/3rdparty/python/pystache-0.5.3-py2.6.egg
-PYTHON_DAEMON_EGG=$MY_DIR/3rdparty/python/python_daemon-1.5.5-py2.6.egg
-
 function with_virtualenv() {
   source $VIRTUAL_PYTHON/bin/activate
-  PYTHONPATH=$MARKDOWN_EGG:$PYGMENTS_EGG:$PYSTACHE_EGG:$PYTHON_DAEMON_EGG:$MY_DIR/src/python "$@"
+  PYTHONPATH=$MY_DIR/src/python "$@"
   result=$?
   deactivate
   return $((result))
@@ -40,7 +35,6 @@ function build_pants() {
 }
 
 function run_pants_bare() {
-  # TODO(John Sirois): Remove the --no-ng-daemons flag once we can run nailguns in dev mode.
   with_virtualenv python $PYTHON_ARGS $PANTS_EXE "$@"
 }
 
