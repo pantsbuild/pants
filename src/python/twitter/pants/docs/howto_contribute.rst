@@ -100,6 +100,10 @@ Posting the First Draft
 **Before posting your first review,** you must create an
 account at https://rbcommons.com . To create one, visit
 https://rbcommons.com/account/login/ and click "Create one now."
+Once your account exists, mail the
+`pants-devel Google Group
+<https://groups.google.com/forum/#!forum/pants-devel>`_
+and ask for your account to be added to the group.
 
 To set up local tools, run `./rbt status`.
 (``./rbt`` is a wrapper around the usual RBTools ``rbt`` script.)
