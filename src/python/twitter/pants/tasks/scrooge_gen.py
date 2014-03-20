@@ -130,9 +130,7 @@ class ScroogeGen(NailgunTask):
 
   def _tempname(self):
     # don't assume the user's cwd is buildroot
-    buildroot = get_buildroot()
-    fallback = os.path.join(get_buildroot(), '.pants.d')
-    pants_workdir = self.context.config.getdefault('pants_workdir', default=fallback)
+    pants_workdir = self.context.config.getdefault('pants_workdir')
     tmp_dir = os.path.join(pants_workdir, 'tmp')
     safe_mkdir(tmp_dir)
     fd, path = tempfile.mkstemp(dir=tmp_dir, prefix='')
@@ -141,8 +139,8 @@ class ScroogeGen(NailgunTask):
 
   def execute(self, targets):
     gentargets_by_dependee = self.context.dependents(
-      on_predicate=self.is_gentarget,
-      from_predicate=lambda t: not self.is_gentarget(t))
+        on_predicate=self.is_gentarget,
+        from_predicate=lambda t: not self.is_gentarget(t))
 
     dependees_by_gentarget = defaultdict(set)
     for dependee, tgts in gentargets_by_dependee.items():
@@ -154,10 +152,10 @@ class ScroogeGen(NailgunTask):
 
     for target in gentargets:
       partial_cmd = self.PartialCmd(
-        compiler=self.compiler_for_name[target.compiler],
-        language=target.language,
-        rpc_style=target.rpc_style,
-        namespace_map=tuple(target.namespace_map.items()) if target.namespace_map else ())
+          compiler=self.compiler_for_name[target.compiler],
+          language=target.language,
+          rpc_style=target.rpc_style,
+          namespace_map=tuple(sorted(target.namespace_map.items()) if target.namespace_map else ()))
       partial_cmds[partial_cmd].add(target)
 
     for partial_cmd, tgts in partial_cmds.items():
