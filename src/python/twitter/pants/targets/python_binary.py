@@ -26,6 +26,7 @@ from twitter.pants.base.target import Target, TargetDefinitionException
 from .python_target import PythonTarget
 
 
+@manual.builddict(tags=['python'])
 class PythonBinary(PythonTarget):
   """Produces a Python binary.
 

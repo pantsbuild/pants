@@ -41,8 +41,9 @@ class PythonLibrary(PythonTarget):
     :param dependencies: List of :class:`twitter.pants.base.target.Target` instances
       this target depends on.
     :type dependencies: list of targets
-    :param Artifact provides:
-      The :class:`twitter.pants.targets.artifact.Artifact`
+    :param provides:
+      The :ref:`setup_py <bdict_setup_py>` (implemented by
+      :class:`twitter.pants.targets.artifact.PythonArtifact`)
       to publish that represents this target outside the repo.
     :param dict exclusives: An optional dict of exclusives tags. See CheckExclusives for details.
     """
