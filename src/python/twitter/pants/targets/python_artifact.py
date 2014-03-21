@@ -70,6 +70,7 @@ class PythonArtifact(object):
   def binaries(self):
     return self._binaries
 
+  @manual.builddict()
   def with_binaries(self, *args, **kw):
     """Add binaries tagged to this artifact.
 
