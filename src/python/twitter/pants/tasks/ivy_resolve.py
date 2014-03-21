@@ -135,8 +135,10 @@ class IvyResolve(NailgunTask):
       if self.context.products.is_required_data('ivy_jar_products'):
         self._populate_ivy_jar_products(group_targets)
       for conf in self._confs:
-        for path in classpath:
-          groups.update_compatible_classpaths(group_key, [(conf, path)])
+        # Its important we add the full classpath as an (ordered) unit for code that is classpath
+        # order sensitive
+        classpath_entries = map(lambda entry: (conf, entry), classpath)
+        groups.update_compatible_classpaths(group_key, classpath_entries)
 
       if self._report:
         self._generate_ivy_report(group_targets)
