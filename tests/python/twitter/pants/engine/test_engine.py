@@ -16,7 +16,7 @@
 
 import mox
 
-from twitter.pants.engine.engine import Engine, Timer
+from twitter.pants.engine import Engine, Timer
 from twitter.pants.tasks import TaskError
 
 from ..base.context_utils import create_context
