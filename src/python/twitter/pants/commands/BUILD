@@ -1,6 +1,6 @@
 python_library(
   name = 'command',
-  sources = ['command.py'],
+  sources = ['__init__.py'],
   dependencies = [
     pants('src/python/twitter/common/collections'),
     pants('src/python/twitter/pants/base:build_file'),
