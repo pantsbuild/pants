@@ -54,7 +54,11 @@ class NailgunTask(Task):
   def __init__(self, context, minimum_version=None, jdk=False):
     super(NailgunTask, self).__init__(context)
 
-    self._workdir = os.path.join(context.config.get('nailgun', 'workdir'), self.__class__.__name__)
+    default_workdir_root = os.path.join(context.config.getdefault('pants_workdir'), 'ng')
+    self._workdir = os.path.join(
+        context.config.get('nailgun', 'workdir', default=default_workdir_root),
+        self.__class__.__name__)
+
     self._nailgun_bootstrap_key = 'nailgun'
     self._jvm_tool_bootstrapper.register_jvm_tool(self._nailgun_bootstrap_key, [':nailgun-server'])
 
