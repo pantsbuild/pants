@@ -31,13 +31,11 @@ build-support/phab/
 codegen/classes/
 dist/
 htmlcov/
-ivy/
 lib/
 out/
 arc.sh
 pants.pex
 target
-ivy
 *.class
 *.iml
 *.ipr

@@ -26,14 +26,15 @@ import errno
 from collections import namedtuple, defaultdict
 from contextlib import contextmanager
 
-from twitter.common.collections import OrderedSet, maybe_list
+from twitter.common.collections import OrderedSet
 from twitter.common.dirutil import safe_mkdir, safe_open
 
 from twitter.pants.base.build_environment import get_buildroot
 from twitter.pants.base.generator import Generator, TemplateData
 from twitter.pants.base.revision import Revision
 from twitter.pants.base.target import Target
-from twitter.pants.ivy import Bootstrapper, Ivy
+from twitter.pants.ivy.bootstrapper import Bootstrapper
+from twitter.pants.ivy.ivy import Ivy
 from twitter.pants.java import util
 
 from . import TaskError

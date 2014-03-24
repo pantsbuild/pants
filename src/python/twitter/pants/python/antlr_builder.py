@@ -21,7 +21,8 @@ import sys
 
 from twitter.common.dirutil import safe_mkdir
 
-from twitter.pants.ivy import Bootstrapper, Ivy
+from twitter.pants.ivy.bootstrapper import Bootstrapper
+from twitter.pants.ivy.ivy import Ivy
 
 from .code_generator import CodeGenerator
 

@@ -33,7 +33,7 @@ from twitter.pants.base.worker_pool import Work
 from twitter.pants.base.workunit import WorkUnit
 from twitter.pants.cache import create_artifact_cache
 from twitter.pants.cache.read_write_artifact_cache import ReadWriteArtifactCache
-from twitter.pants.ivy import Bootstrapper  # XXX
+from twitter.pants.ivy.bootstrapper import Bootstrapper  # XXX
 from twitter.pants.java.executor import Executor  # XXX
 from twitter.pants.reporting.reporting_utils import items_to_report_element
 

@@ -23,7 +23,7 @@ import time
 
 from twitter.common.dirutil import safe_mkdir
 from twitter.pants import binary_util
-from twitter.pants.ivy import Bootstrapper
+from twitter.pants.ivy.bootstrapper import Bootstrapper
 from .cache_manager import VersionedTargetSet
 from .ivy_utils import IvyUtils
 from .nailgun_task import NailgunTask
