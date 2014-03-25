@@ -70,6 +70,7 @@ python_library(
     pants(':target'),
     pants('src/python/twitter/common/dirutil'),
     pants('src/python/twitter/common/lang'),
+    pants('src/python/twitter/pants/fs'),
   ]
 )
 

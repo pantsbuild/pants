@@ -26,6 +26,7 @@ from twitter.common.dirutil import safe_mkdir
 from twitter.common.lang import Compatibility, Interface
 
 from twitter.pants.base.hash_utils import hash_all
+from twitter.pants.fs.fs import safe_filename
 from twitter.pants.base.target import Target
 
 
@@ -226,7 +227,7 @@ class BuildInvalidator(object):
     return self._sha_file_by_id(cache_key.id)
 
   def _sha_file_by_id(self, id):
-    return os.path.join(self._root, id) + '.hash'
+    return os.path.join(self._root, safe_filename(id, extension='.hash'))
 
   def _write_sha(self, cache_key):
     with open(self._sha_file(cache_key), 'w') as fd:
