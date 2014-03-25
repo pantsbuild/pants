@@ -58,6 +58,4 @@ class JavaProtobufLibrary(ExportableJvmLibrary):
                                   excludes,
                                   exclusives=exclusives)
 
-    # 'java' shouldn't be here, but is currently required to prevent lots of chunking islands.
-    # See comment in goal.py for details.
-    self.add_labels('codegen', 'java')
+    self.add_labels('codegen')

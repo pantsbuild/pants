@@ -88,10 +88,6 @@ class JavaThriftLibrary(JvmTarget):
 
     self.add_labels('codegen')
 
-    # 'java' shouldn't be here, but is currently required to prevent lots of chunking islands.
-    # See comment in goal.py for details.
-    self.add_labels('java')
-
     if dependencies:
       if not isinstance(dependencies, Iterable):
         raise TargetDefinitionException(self,
