@@ -7,7 +7,7 @@ import unittest
 from twitter.common.contextutil import pushd, temporary_dir, temporary_file
 from twitter.common.dirutil import safe_mkdir
 from twitter.pants.base.build_invalidator import CacheKey
-from twitter.pants.cache import create_artifact_cache, select_best_url
+from twitter.pants.cache.cache_setup import create_artifact_cache, select_best_url
 from twitter.pants.cache.combined_artifact_cache import CombinedArtifactCache
 from twitter.pants.cache.local_artifact_cache import LocalArtifactCache
 from twitter.pants.cache.restful_artifact_cache import RESTfulArtifactCache
