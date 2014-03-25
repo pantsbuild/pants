@@ -42,6 +42,10 @@ class PythonThriftBuilder(CodeGenerator):
     super(PythonThriftBuilder, self).__init__(target, root_dir, config, target_suffix=target_suffix)
     self._workdir = os.path.join(config.getdefault(option='thrift_workdir'), 'py-thrift')
 
+  @property
+  def install_requires(self):
+    return ['thrift']
+
   def run_thrifts(self):
     """
     Generate Python thrift code using thrift compiler specified in pants config.
