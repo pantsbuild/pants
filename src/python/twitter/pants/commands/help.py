@@ -14,9 +14,9 @@
 # limitations under the License.
 # ==================================================================================================
 
-from . import Command
-
 from copy import copy
+
+from twitter.pants.commands.command import Command
 
 
 class Help(Command):

@@ -29,6 +29,7 @@ from twitter.common.python.installer import InstallerBase, Packager
 from twitter.pants.base.address import Address
 from twitter.pants.base.config import Config
 from twitter.pants.base.target import Target, TargetDefinitionException
+from twitter.pants.commands.command import Command
 from twitter.pants.python.antlr_builder import PythonAntlrBuilder
 from twitter.pants.python.thrift_builder import PythonThriftBuilder
 from twitter.pants.targets.python_antlr_library import PythonAntlrLibrary
@@ -36,8 +37,6 @@ from twitter.pants.targets.python_binary import PythonBinary
 from twitter.pants.targets.python_requirement import PythonRequirement
 from twitter.pants.targets.python_target import PythonTarget
 from twitter.pants.targets.python_thrift_library import PythonThriftLibrary
-
-from . import Command
 
 
 SETUP_BOILERPLATE = """

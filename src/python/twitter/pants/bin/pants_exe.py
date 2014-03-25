@@ -27,7 +27,8 @@ from twitter.pants.base.build_environment import get_buildroot, get_version
 from twitter.pants.base.address import Address
 from twitter.pants.base.config import Config
 from twitter.pants.base.rcfile import RcFile
-from twitter.pants.commands import Command
+from twitter.pants.commands.command import Command
+from twitter.pants.commands.register import register_commands
 from twitter.pants.goal.initialize_reporting import initial_reporting
 from twitter.pants.goal.run_tracker import RunTracker
 from twitter.pants.reporting.report import Report
@@ -83,6 +84,7 @@ def _add_default_options(command, args):
 
 
 def _synthesize_command(root_dir, args):
+  register_commands()
   command = args[0]
 
   if command in Command.all_commands():
