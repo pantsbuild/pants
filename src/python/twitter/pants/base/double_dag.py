@@ -1,6 +1,6 @@
 __author__ = 'Ryan Williams'
 
-from abbreviate_target_ids import abbreviate_target_ids
+from twitter.pants.base.abbreviate_target_ids import abbreviate_target_ids
 
 # This file contains the implementation for a doubly-linked DAG data structure that is useful for dependency analysis.
 

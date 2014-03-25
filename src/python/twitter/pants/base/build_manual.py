@@ -19,7 +19,7 @@ class manual(object):
   """Annotate things that should appear in generated documents"""
 
   @staticmethod
-  def builddict(tags=[]):
+  def builddict(tags=None):
     """Decorator to mark something that belongs in the BUILD Dictionary doc.
 
     Use it on a function to mention the function. Use it on a class to
@@ -31,6 +31,7 @@ class manual(object):
     tags: E.g., tags=["python"] means This thingy should appear in the
           Python section"
     """
+    tags = tags or []
     def builddictdecorator(funcorclass):
       funcorclass.builddictdict = {"tags": tags}
       return funcorclass
