@@ -87,7 +87,7 @@ def resolve_multi(config,
 
     def has_expired_ttl(self, dist):
       now = time.time()
-      return now - os.path.getmtime(dist.location) < ttl
+      return now - os.path.getmtime(dist.location) >= ttl
 
     def __call__(self, requirement):
       cached_dist = self._egg_cache_obtainer.obtain(requirement)
