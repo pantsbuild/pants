@@ -18,7 +18,7 @@ import os
 import pytest
 import unittest
 
-from twitter.pants.fs import safe_filename
+from twitter.pants.fs.fs import safe_filename
 
 
 class SafeFilenameTest(unittest.TestCase):
