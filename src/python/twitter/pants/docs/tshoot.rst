@@ -30,10 +30,17 @@ Scrub the Environment
 *********************
 
 If you suspect that Pants has cached some corrupt data somewhere, but don't
-want to track down exactly what, you can reset your state::
+want to track down exactly what, you can reset your state:
 
-    $ build-support/python/clean.sh # clean cached files
-    $ ./pants goal ng-killall --ng-killall-everywhere # stop background procs
+* **Clean many cached files:** ``./build-support/python/clean.sh``
+* **Clean more cached files:** If your source tree lives under source control,
+  use your source control tool to clean up more files.
+  For example with ``git``, you might do something like::
+    $ git status  # look for untracked files
+    $ git add path/to/file1 path/to/file2  # preserve untracked files you don't want deleted
+    $ git clean -fdx  # delete all untracked files
+* **Stop background processes:**
+  ``./pants goal ng-killall --ng-killall-everywhere``
 
 *****************
 Nailgun 5 seconds
