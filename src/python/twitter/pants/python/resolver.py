@@ -4,13 +4,14 @@ import os
 import time
 
 from twitter.common.dirutil import touch
+from twitter.common.python.base import requirement_is_exact
 from twitter.common.python.fetcher import Fetcher, PyPIFetcher
 from twitter.common.python.http import Crawler
-from twitter.common.python.obtainer import Obtainer, ObtainerFactory
+from twitter.common.python.obtainer import Obtainer, CachingObtainer
 from twitter.common.python.interpreter import PythonInterpreter
 from twitter.common.python.package import distribution_compatible
 from twitter.common.python.platforms import Platform
-from twitter.common.python.resolver import resolve, requirement_is_exact
+from twitter.common.python.resolver import resolve
 from twitter.common.python.translator import (
     ChainedTranslator,
     EggTranslator,
@@ -44,6 +45,20 @@ def crawler_from_config(config, conn_timeout=None):
   return Crawler(cache=download_cache, conn_timeout=conn_timeout)
 
 
+class PantsObtainer(CachingObtainer):
+  def iter(self, requirement):
+    if hasattr(requirement, 'repository') and requirement.repository:
+      obtainer = Obtainer(
+          crawler=self._crawler,
+          fetchers=[Fetcher([requirement.repository])],
+          translators=self._translator)
+      for package in obtainer.iter(requirement):
+        yield package
+    else:
+      for package in super(PantsObtainer, self).iter(requirement):
+        yield package
+
+
 def resolve_multi(config,
                   requirements,
                   interpreter=None,
@@ -67,41 +82,6 @@ def resolve_multi(config,
                  "flask>=0.2" if a matching distribution is available on disk.  Defaults
                  to 3600.
   """
-  class PantsObtainerFactory(ObtainerFactory):
-    def __init__(self, platform, interpreter, install_cache):
-      self.translator = Translator.default(install_cache=install_cache,
-                                           interpreter=interpreter,
-                                           platform=platform,
-                                           conn_timeout=conn_timeout)
-      self._crawler = crawler_from_config(config, conn_timeout=conn_timeout)
-      self._default_obtainer = Obtainer(self._crawler,
-                                        fetchers_from_config(config) or [PyPIFetcher()],
-                                        self.translator)
-      self._egg_cache_obtainer = Obtainer(crawler=Crawler(cache=install_cache),
-                                          fetchers=[Fetcher([install_cache])],
-                                          translators=EggTranslator(
-                                            install_cache=install_cache,
-                                            interpreter=interpreter,
-                                            platform=platform,
-                                            conn_timeout=conn_timeout))
-
-    def has_expired_ttl(self, dist):
-      now = time.time()
-      return now - os.path.getmtime(dist.location) >= ttl
-
-    def __call__(self, requirement):
-      cached_dist = self._egg_cache_obtainer.obtain(requirement)
-      if cached_dist:
-        if requirement_is_exact(requirement) or not self.has_expired_ttl(cached_dist):
-          if distribution_compatible(cached_dist, interpreter, platform):
-            return self._egg_cache_obtainer
-      if hasattr(requirement, 'repository') and requirement.repository:
-        return Obtainer(crawler=self._crawler,
-                        fetchers=[Fetcher([requirement.repository])],
-                        translators=self.translator)
-      else:
-        return self._default_obtainer
-
   distributions = dict()
   interpreter = interpreter or PythonInterpreter.get()
   if not isinstance(interpreter, PythonInterpreter):
@@ -109,14 +89,23 @@ def resolve_multi(config,
 
   install_cache = PythonSetup(config).scratch_dir('install_cache', default_name='eggs')
   platforms = get_platforms(platforms or config.getlist('python-setup', 'platforms', ['current']))
+
   for platform in platforms:
-    obtainer_factory = PantsObtainerFactory(
-        platform=platform,
-        interpreter=interpreter,
+    translator = Translator.default(
         install_cache=install_cache,
-    )
+        interpreter=interpreter,
+        platform=platform,
+        conn_timeout=conn_timeout)
+
+    obtainer = PantsObtainer(
+        install_cache=install_cache,
+        crawler=crawler_from_config(config, conn_timeout=conn_timeout),
+        fetchers=fetchers_from_config(config) or [PyPIFetcher()],
+        translators=translator)
+
     distributions[platform] = resolve(requirements=requirements,
-                                      obtainer_factory=obtainer_factory,
+                                      obtainer=obtainer,
                                       interpreter=interpreter,
                                       platform=platform)
+
   return distributions
