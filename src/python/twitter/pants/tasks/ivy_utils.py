@@ -26,7 +26,7 @@ import errno
 from collections import namedtuple, defaultdict
 from contextlib import contextmanager
 
-from twitter.common.collections import OrderedSet
+from twitter.common.collections import OrderedDict, OrderedSet
 from twitter.common.dirutil import safe_mkdir, safe_open
 
 from twitter.pants.base.build_environment import get_buildroot
@@ -232,7 +232,7 @@ class IvyUtils(object):
     def is_jardependant(target):
       return target.is_jar or target.is_jvm
 
-    jars = {}
+    jars = OrderedDict()
     excludes = set()
 
     # Support the ivy force concept when we sanely can for internal dep conflicts.
