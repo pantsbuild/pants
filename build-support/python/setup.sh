@@ -70,10 +70,11 @@ function virtualenv() {
 }
 
 if virtualenv -p $PY --distribute $BOOTSTRAP_ENVIRONMENT; then
-  # Fixup pip script - in some environments the shebang line is too long leading to a  pip script
+  # Fixup pip script - in some environments the shebang line is too long leading to a pip script
   # that will not run.
   virtualenv --relocatable $BOOTSTRAP_ENVIRONMENT
   source $BOOTSTRAP_ENVIRONMENT/bin/activate
-  pip install --download-cache=$CACHE -U ${BOOTSTRAP_REQS[@]}
+  ARCHFLAGS=-Wno-error=unused-command-line-argument-hard-error-in-future pip install \
+    --download-cache=$CACHE -U ${BOOTSTRAP_REQS[@]}
   deactivate
 fi

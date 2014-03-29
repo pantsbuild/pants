@@ -23,7 +23,7 @@ PANTS_BOOTSTRAP_ARGS=${PANTS_BOOTSTRAP_ARGS:-''}
 
 function with_virtualenv() {
   source $VIRTUAL_PYTHON/bin/activate
-  PYTHONPATH=$MY_DIR/src/python "$@"
+  ARCHFLAGS=-Wno-error=unused-command-line-argument-hard-error-in-future PYTHONPATH=$MY_DIR/src/python "$@"
   result=$?
   deactivate
   return $((result))
