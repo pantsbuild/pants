@@ -1,0 +1,23 @@
+SHA = '1b9c6e43ffe066eb69ff4fc72dcbf6f0d23ac756'
+
+REPO = ('https://raw.githubusercontent.com/pantsbuild/cheeseshop/master/'
+        'third_party/twitter-commons/%s/index.html' % SHA)
+
+def commons_dep(name):
+  return python_requirement(requirement='twitter.common.%s' % name, repository=REPO)
+
+commons_dep('collections')
+commons_dep('config')
+commons_dep('confluence')
+commons_dep('contextutil')
+commons_dep('decorators')
+commons_dep('dirutil')
+commons_dep('lang')
+commons_dep('log')
+commons_dep('process')
+commons_dep('python')
+commons_dep('quantity')
+commons_dep('rwbuf') # XXX(fixme)
+commons_dep('threading')
+commons_dep('util')
+
