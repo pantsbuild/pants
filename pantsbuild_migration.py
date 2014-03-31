@@ -10,8 +10,8 @@ import sys
 
 
 PANTS_ROOT = os.path.dirname(os.path.realpath(__file__))
-SRC_ROOT = os.path.dirname(PANTS_ROOT)
-TESTS_ROOT = os.path.join(os.path.dirname(os.path.dirname(SRC_ROOT)), 'tests', 'python')
+SRC_ROOT = os.path.join(PANTS_ROOT, 'src', 'python')
+TESTS_ROOT = os.path.join(PANTS_ROOT, 'tests', 'python')
 
 
 KNOWN_STD_LIBS = set(["abc", "anydbm", "argparse", "array", "asynchat", "asyncore", "atexit", "base64",
@@ -109,7 +109,7 @@ class BuildFile(object):
     except StopIteration:
       return  # File is empty (possibly except for a comment).
     def _translate(line):
-      return line.replace('src/python/twitter/pants', 'src/python/pants')
+      return line.replace('twitter/pants', 'pants')
     self._body = map(_translate, self._old_lines[p:])
     # Remove any trailing empty lines.
     while not self._body[-1]:
@@ -249,7 +249,7 @@ class PantsSourceFile(object):
 
 def handle_path(path):
   if os.path.isfile(path):
-    if path.endswith('.py'):
+    if path.endswith('.py') and not path.endswith('pantsbuild_migration.py'):
       print('PROCESSING: %s' % path)
       srcfile = PantsSourceFile(path)
       srcfile.process()
