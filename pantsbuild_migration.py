@@ -257,7 +257,7 @@ def handle_path(path):
       print('PROCESSING: %s' % path)
       srcfile = BuildFile(path)
       srcfile.process()
-    elif path.endswith('.rst') or path.endswith('.sh') or path.endswith('pants.bootstrap') or path.endswith('taskdev.asc'):
+    elif path.endswith('.rst') or path.endswith('.sh') or path.endswith('pants.bootstrap'):
       print('PROCESSING: %s' % path)
       with open(path, 'r') as infile:
         content = infile.read()
