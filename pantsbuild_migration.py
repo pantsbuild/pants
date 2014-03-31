@@ -76,7 +76,7 @@ class FromImport(object):
     self._from = frm.strip()
     if self._from.startswith(OLD_PANTS_PACKAGE):
       self._from = NEW_PANTS_PACKAGE + self._from[len(OLD_PANTS_PACKAGE):]
-    self._symbols = [s.strip() for s in symbols]
+    self._symbols = filter(None, [filter(lambda c: c not in '()', s.strip()).strip() for s in symbols])
 
   def package(self):
     return self._from
@@ -108,9 +108,9 @@ class BuildFile(object):
       p = next(i for i, line in enumerate(self._old_lines) if line and not line.startswith('#'))
     except StopIteration:
       return  # File is empty (possibly except for a comment).
-    def translate(line):
+    def _translate(line):
       return line.replace('src/python/twitter/pants', 'src/python/pants')
-    self._body = map(translate, self._old_lines[p:])
+    self._body = map(_translate, self._old_lines[p:])
     # Remove any trailing empty lines.
     while not self._body[-1]:
       self._body = self._body[0:-1]
@@ -211,12 +211,19 @@ class PantsSourceFile(object):
         while has_continuation(line_parts[-1]):
           line_parts.append(lines_iter.next())
         line = ' '.join([x[:-1].strip() for x in line_parts[:-1]] + [line_parts[-1].strip()])
+        if line.startswith('from ') and '(' in line:
+          line_parts = [line]
+          next_line = ''
+          while not ')' in next_line:
+            next_line = lines_iter.next().strip()
+            line_parts.append(next_line)
+          line = ' '.join(line_parts)
     except StopIteration:
       line_parts = []
 
-    def translate(line):
+    def _translate(line):
       return line.replace('twitter/pants', 'pants').replace('twitter.pants', 'pants')
-    self._body = map(translate, [''] + line_parts + list(lines_iter))
+    self._body = map(_translate, [''] + line_parts + list(lines_iter))
 
     # Remove any trailing empty lines.
     while self._body and not self._body[-1]:
