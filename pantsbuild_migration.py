@@ -109,7 +109,7 @@ class BuildFile(object):
     except StopIteration:
       return  # File is empty (possibly except for a comment).
     def _translate(line):
-      return line.replace('twitter/pants', 'pants')
+      return line.replace('twitter/pants', 'pants').replace('twitter.pants', 'pants')
     self._body = map(_translate, self._old_lines[p:])
     # Remove any trailing empty lines.
     while not self._body[-1]:
@@ -257,6 +257,13 @@ def handle_path(path):
       print('PROCESSING: %s' % path)
       srcfile = BuildFile(path)
       srcfile.process()
+    elif path.endswith('.rst') or path.endswith('.sh') or path.endswith('pants.bootstrap') or path.endswith('taskdev.asc'):
+      print('PROCESSING: %s' % path)
+      with open(path, 'r') as infile:
+        content = infile.read()
+      new_content = content.replace('twitter.pants', 'pants').replace('twitter/pants', 'pants')
+      with open(path, 'w') as outfile:
+        outfile.write(new_content)
   elif os.path.isdir(path):
     for p in os.listdir(path):
       handle_path(os.path.join(path, p))
