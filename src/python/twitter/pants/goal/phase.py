@@ -44,7 +44,7 @@ class SingletonPhases(type):
     return cls.phases[name]
 
 # Python 2.x + 3.x wankery
-PhaseBase = SingletonPhases('PhaseBase', (object,), {})
+PhaseBase = SingletonPhases(str('PhaseBase'), (object,), {})
 
 
 @manual.builddict()

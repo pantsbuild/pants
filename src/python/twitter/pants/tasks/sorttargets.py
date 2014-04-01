@@ -18,8 +18,8 @@ from collections import defaultdict
 
 from twitter.common.util import topological_sort
 
-from .console_task import ConsoleTask
-from ..base.target import Target
+from twitter.pants.base.target import Target
+from twitter.pants.tasks.console_task import ConsoleTask
 
 
 class SortTargets(ConsoleTask):

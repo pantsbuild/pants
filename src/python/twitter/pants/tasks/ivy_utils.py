@@ -36,8 +36,7 @@ from twitter.pants.base.target import Target
 from twitter.pants.ivy.bootstrapper import Bootstrapper
 from twitter.pants.ivy.ivy import Ivy
 from twitter.pants.java import util
-
-from . import TaskError
+from twitter.pants.tasks.task_error import TaskError
 
 
 IvyModuleRef = namedtuple('IvyModuleRef', ['org', 'name', 'rev'])
