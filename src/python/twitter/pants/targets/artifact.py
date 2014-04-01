@@ -1,27 +1,16 @@
-# ==================================================================================================
-# Copyright 2011 Twitter, Inc.
-# --------------------------------------------------------------------------------------------------
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this work except in compliance with the License.
-# You may obtain a copy of the License in the LICENSE file, or at:
-#
-#  http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ==================================================================================================
-from twitter.common.collections import maybe_list
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
+
+from twitter.common.collections import maybe_list
 from twitter.common.lang import Compatibility
 
-from twitter.pants.base.build_manual import manual
-
-from .pants_target import Pants
-from .repository import Repository
-from .util import resolve
+from pants.base.build_manual import manual
+from pants.targets.pants_target import Pants
+from pants.targets.repository import Repository
+from pants.targets.util import resolve
 
 
 @manual.builddict(tags=["jvm"])
@@ -35,7 +24,7 @@ class Artifact(object):
     """
     :param string org: Organization of this artifact, or groupId in maven parlance.
     :param string name: Name of the artifact, or artifactId in maven parlance.
-    :param repo: :class:`twitter.pants.targets.repository.Repository`
+    :param repo: :class:`pants.targets.repository.Repository`
       this artifact is published to.
     :param string description: Description of this artifact.
     """

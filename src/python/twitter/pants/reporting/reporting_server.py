@@ -1,24 +1,28 @@
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
+
+import BaseHTTPServer
 import itertools
 import json
-import mimetypes
 import os
 import pkgutil
-import pystache
 import re
 import urllib
 import urlparse
-
-import BaseHTTPServer
-
 from collections import namedtuple
 from datetime import date, datetime
 
+import mimetypes
+import pystache
 from pystache import Renderer
 from twitter.common.dirutil import safe_mkdir
-from twitter.pants.base.build_environment import get_buildroot
 
-from twitter.pants.base.mustache import MustacheRenderer
-from twitter.pants.goal.run_tracker import RunInfo
+from pants.base.build_environment import get_buildroot
+from pants.base.mustache import MustacheRenderer
+from pants.goal.run_tracker import RunInfo
 
 
 # Google Prettyprint plugin files.

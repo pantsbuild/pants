@@ -1,15 +1,22 @@
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
+
 import os
 
 from twitter.common.contextutil import temporary_dir
 from twitter.common.dirutil import safe_open
 from twitter.common.lang import Compatibility
 
+
 if Compatibility.PY3:
   import unittest
 else:
   import unittest2 as unittest
 
-from twitter.pants.thrift_util import find_includes, find_root_thrifts
+from pants.thrift_util import find_includes, find_root_thrifts
 
 
 class ThriftUtilTest(unittest.TestCase):

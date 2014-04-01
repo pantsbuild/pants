@@ -1,6 +1,11 @@
-__author__ = 'Ryan Williams'
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from twitter.pants.base.abbreviate_target_ids import abbreviate_target_ids
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
+
+from pants.base.abbreviate_target_ids import abbreviate_target_ids
+
 
 # This file contains the implementation for a doubly-linked DAG data structure that is useful for dependency analysis.
 

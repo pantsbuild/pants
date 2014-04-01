@@ -1,20 +1,8 @@
-# ==================================================================================================
-# Copyright 2011 Twitter, Inc.
-# --------------------------------------------------------------------------------------------------
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this work except in compliance with the License.
-# You may obtain a copy of the License in the LICENSE file, or at:
-#
-#  http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ==================================================================================================
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import print_function
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
 
 import optparse
 import os
@@ -23,16 +11,16 @@ import traceback
 
 from twitter.common.dirutil import Lock
 
-from twitter.pants.base.build_environment import get_buildroot, get_version
-from twitter.pants.base.address import Address
-from twitter.pants.base.config import Config
-from twitter.pants.base.rcfile import RcFile
-from twitter.pants.commands.command import Command
-from twitter.pants.commands.register import register_commands
-from twitter.pants.goal.initialize_reporting import initial_reporting
-from twitter.pants.goal.run_tracker import RunTracker
-from twitter.pants.reporting.report import Report
-from twitter.pants.tasks.nailgun_task import NailgunTask
+from pants.base.address import Address
+from pants.base.build_environment import get_buildroot, get_version
+from pants.base.config import Config
+from pants.base.rcfile import RcFile
+from pants.commands.command import Command
+from pants.commands.register import register_commands
+from pants.goal.initialize_reporting import initial_reporting
+from pants.goal.run_tracker import RunTracker
+from pants.reporting.report import Report
+from pants.tasks.nailgun_task import NailgunTask
 
 
 _HELP_ALIASES = set([
@@ -122,7 +110,7 @@ def _run():
   """
   To add additional paths to sys.path, add a block to the config similar to the following:
   [main]
-  roots: ['src/python/twitter/pants_internal/test/',]
+  roots: ['src/python/pants_internal/test/',]
   """
   version = get_version()
   if len(sys.argv) == 2 and sys.argv[1] == _VERSION_OPTION:

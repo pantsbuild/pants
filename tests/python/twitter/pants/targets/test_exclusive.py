@@ -1,8 +1,14 @@
-from twitter.pants.testutils import MockTarget
-from twitter.pants.base.config import Config
-from twitter.pants.goal import Context
-from twitter.pants.tasks.check_exclusives import CheckExclusives
-from twitter.pants.testutils.base_mock_target_test import BaseMockTargetTest
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
+
+from pants.base.config import Config
+from pants.goal import Context
+from pants.tasks.check_exclusives import CheckExclusives
+from pants.testutils import MockTarget
+from pants.testutils.base_mock_target_test import BaseMockTargetTest
 
 
 class ExclusivesTargetTest(BaseMockTargetTest):
@@ -38,7 +44,3 @@ class ExclusivesTargetTest(BaseMockTargetTest):
     egroups = context.products.get_data('exclusives_groups')
     self.assertEquals(egroups.get_targets_for_group_key("a=1"), set([a, b, d]))
     self.assertEquals(egroups.get_targets_for_group_key("a=2"), set([c]))
-
-
-
-

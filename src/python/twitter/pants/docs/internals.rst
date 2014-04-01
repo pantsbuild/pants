@@ -157,7 +157,7 @@ a time.
 Code Layout
 ***********
 
-`./ <https://github.com/twitter/commons/tree/master/src/python/twitter/pants/base/>`_
+`./ <https://github.com/twitter/commons/tree/master/src/python/pants/base/>`_
   Top-level directory  
   **`__init__.py`** Among other things, defines the symbols
   visible in `BUILD` files. If you add a
@@ -165,7 +165,7 @@ Code Layout
   **`BUILD`** Dogfood and/or recursion.  
   **`*.md`** Docs too important for `docs/`.
 
-`base <https://github.com/twitter/commons/tree/master/src/python/twitter/pants/base/>`_
+`base <https://github.com/twitter/commons/tree/master/src/python/pants/base/>`_
   Defines `Target` and other fundamental pieces/base classes.
   As a rule of thumb, code in ``base`` shouldn't ``import`` anything in
   non-base Pants; but many things in non-base Pants ``import`` from ``base``.
@@ -173,41 +173,41 @@ Code Layout
   the JVM (or other target-language-specific things), you're probably editing
   the wrong thing and want to look further up the inheritance tree.
 
-`bin <https://github.com/twitter/commons/tree/master/src/python/twitter/pants/bin/>`_
+`bin <https://github.com/twitter/commons/tree/master/src/python/pants/bin/>`_
   The "main" of Pants itself lives here.
 
-`commands <https://github.com/twitter/commons/tree/master/src/python/twitter/pants/commands/>`_
+`commands <https://github.com/twitter/commons/tree/master/src/python/pants/commands/>`_
   Before we had goals we had commands, and they lived here.  
   **goal.py** Many Goals and Phases are defined here.
 
-`docs <https://github.com/twitter/commons/tree/master/src/python/twitter/pants/docs/>`_
+`docs <https://github.com/twitter/commons/tree/master/src/python/pants/docs/>`_
   Documentation. The source of this very document you're reading now lives here.
 
-`goal <https://github.com/twitter/commons/tree/master/src/python/twitter/pants/goal/>`_
+`goal <https://github.com/twitter/commons/tree/master/src/python/pants/goal/>`_
   The source of `Context`, `Goal`, and `Phase` (some
   important classes) lives here. If you extend pants to work with other
   tools/languages, hopefully you won't need to edit these; but you'll
   probably look at them to see the flow of control.
 
-`java <https://github.com/twitter/commons/tree/master/src/python/twitter/pants/java/>`_
+`java <https://github.com/twitter/commons/tree/master/src/python/pants/java/>`_
   (TODO OMG bluffing) Utility classes useful to many things that work
   with Java code.
 
-`python <https://github.com/twitter/commons/tree/master/src/python/twitter/pants/python/>`_
+`python <https://github.com/twitter/commons/tree/master/src/python/pants/python/>`_
   (TODO OMG bluffing) Utility classes useful to many things that work
   with Python code.
 
-`targets <https://github.com/twitter/commons/tree/master/src/python/twitter/pants/targets/>`_
+`targets <https://github.com/twitter/commons/tree/master/src/python/pants/targets/>`_
   Source of the Target classes; e.g., the code behind `jvm_binary`
   lives here. If you define a new Target type, add its code here.
 
-`tasks <https://github.com/twitter/commons/tree/master/src/python/twitter/pants/tasks/>`_
+`tasks <https://github.com/twitter/commons/tree/master/src/python/pants/tasks/>`_
   Source of the Task classes. E.g., `junit_run`, the code that
   invokes JUnit if someone tests a `java_tests` target.
 
-`tests/.../pants <https://github.com/twitter/commons/tree/master/tests/python/twitter/pants/>`_
+`tests/.../pants <https://github.com/twitter/commons/tree/master/tests/python/pants/>`_
   Tests for Pants. These tend to be ``python_tests`` exercising Pants functions.
-  ``twitter.pants.base_build_root_test.BaseBuildRootTest`` is a very handy
+  ``pants.base_build_root_test.BaseBuildRootTest`` is a very handy
   class; it has methods to set up and tear down little source trees with
   ``BUILD`` files.
 

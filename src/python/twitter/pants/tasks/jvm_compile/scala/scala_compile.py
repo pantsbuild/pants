@@ -1,10 +1,17 @@
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
+
 import os
-from twitter.pants.targets.scala_library import ScalaLibrary
-from twitter.pants.tasks.jvm_compile.analysis_tools import AnalysisTools
-from twitter.pants.tasks.jvm_compile.jvm_compile import JvmCompile
-from twitter.pants.tasks.jvm_compile.scala.zinc_analysis import ZincAnalysis
-from twitter.pants.tasks.jvm_compile.scala.zinc_analysis_parser import ZincAnalysisParser
-from twitter.pants.tasks.jvm_compile.scala.zinc_utils import ZincUtils
+
+from pants.targets.scala_library import ScalaLibrary
+from pants.tasks.jvm_compile.analysis_tools import AnalysisTools
+from pants.tasks.jvm_compile.jvm_compile import JvmCompile
+from pants.tasks.jvm_compile.scala.zinc_analysis import ZincAnalysis
+from pants.tasks.jvm_compile.scala.zinc_analysis_parser import ZincAnalysisParser
+from pants.tasks.jvm_compile.scala.zinc_utils import ZincUtils
 
 
 class ScalaCompile(JvmCompile):

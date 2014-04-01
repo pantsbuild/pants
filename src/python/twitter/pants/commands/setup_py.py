@@ -1,42 +1,31 @@
-# ==================================================================================================
-# Copyright 2012 Twitter, Inc.
-# --------------------------------------------------------------------------------------------------
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this work except in compliance with the License.
-# You may obtain a copy of the License in the LICENSE file, or at:
-#
-#  http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ==================================================================================================
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import print_function
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
 
-import ast
-from collections import defaultdict
 import itertools
 import os
 import pprint
+from collections import defaultdict
 
+import ast
 from twitter.common.collections import OrderedSet
 from twitter.common.dirutil import safe_rmtree
 from twitter.common.dirutil.chroot import Chroot
 from twitter.common.python.installer import InstallerBase, Packager
-from twitter.pants.base.address import Address
-from twitter.pants.base.config import Config
-from twitter.pants.base.target import Target, TargetDefinitionException
-from twitter.pants.commands.command import Command
-from twitter.pants.python.antlr_builder import PythonAntlrBuilder
-from twitter.pants.python.thrift_builder import PythonThriftBuilder
-from twitter.pants.targets.python_antlr_library import PythonAntlrLibrary
-from twitter.pants.targets.python_binary import PythonBinary
-from twitter.pants.targets.python_requirement import PythonRequirement
-from twitter.pants.targets.python_target import PythonTarget
-from twitter.pants.targets.python_thrift_library import PythonThriftLibrary
+
+from pants.base.address import Address
+from pants.base.config import Config
+from pants.base.target import Target, TargetDefinitionException
+from pants.commands.command import Command
+from pants.python.antlr_builder import PythonAntlrBuilder
+from pants.python.thrift_builder import PythonThriftBuilder
+from pants.targets.python_antlr_library import PythonAntlrLibrary
+from pants.targets.python_binary import PythonBinary
+from pants.targets.python_requirement import PythonRequirement
+from pants.targets.python_target import PythonTarget
+from pants.targets.python_thrift_library import PythonThriftLibrary
 
 
 SETUP_BOILERPLATE = """

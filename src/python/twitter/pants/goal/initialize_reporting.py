@@ -1,14 +1,21 @@
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
+
 import os
 import sys
 
 from twitter.common.dirutil import safe_mkdir, safe_rmtree
 from twitter.common.lang import Compatibility
 
-from twitter.pants.reporting.plaintext_reporter import PlainTextReporter
-from twitter.pants.reporting.html_reporter import HtmlReporter
-from twitter.pants.reporting.quiet_reporter import QuietReporter
-from twitter.pants.reporting.report import ReportingError, Report
-from twitter.pants.reporting.reporting_server import ReportingServerManager
+from pants.reporting.html_reporter import HtmlReporter
+from pants.reporting.plaintext_reporter import PlainTextReporter
+from pants.reporting.quiet_reporter import QuietReporter
+from pants.reporting.report import Report, ReportingError
+from pants.reporting.reporting_server import ReportingServerManager
+
 
 StringIO = Compatibility.StringIO
 

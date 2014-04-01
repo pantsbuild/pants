@@ -1,19 +1,25 @@
-import cgi
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
+
 import os
 import re
 import uuid
+from collections import defaultdict, namedtuple
 
-from collections import namedtuple, defaultdict
+import cgi
 from pystache.renderer import Renderer
-
 from twitter.common.dirutil import safe_mkdir
-from twitter.pants.base.build_environment import get_buildroot
-from twitter.pants.base.mustache import MustacheRenderer
-from twitter.pants.base.workunit import WorkUnit
-from twitter.pants.reporting.linkify import linkify
-from twitter.pants.reporting.report import Report
-from twitter.pants.reporting.reporter import Reporter
-from twitter.pants.reporting.reporting_utils import items_to_report_element
+
+from pants.base.build_environment import get_buildroot
+from pants.base.mustache import MustacheRenderer
+from pants.base.workunit import WorkUnit
+from pants.reporting.linkify import linkify
+from pants.reporting.report import Report
+from pants.reporting.reporter import Reporter
+from pants.reporting.reporting_utils import items_to_report_element
 
 
 class HtmlReporter(Reporter):

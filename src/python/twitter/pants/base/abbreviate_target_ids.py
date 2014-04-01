@@ -1,20 +1,9 @@
-# ==================================================================================================
-# Copyright 2012 Twitter, Inc.
-# --------------------------------------------------------------------------------------------------
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this work except in compliance with the License.
-# You may obtain a copy of the License in the LICENSE file, or at:
-#
-#  http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ==================================================================================================
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-__author__ = 'Ryan Williams'
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
+
 
 def abbreviate_target_ids(arr):
   """Map a list of target IDs to shortened versions.
@@ -28,17 +17,17 @@ def abbreviate_target_ids(arr):
   For example: ::
 
      input: [
-       'com.twitter.pants.a.b',
-       'com.twitter.pants.a.c',
-       'com.twitter.pants.d'
+       'com.pants.a.b',
+       'com.pants.a.c',
+       'com.pants.d'
      ]
 
   might return: ::
 
      {
-       'com.twitter.pants.a.b': 'b',
-       'com.twitter.pants.a.c': 'c',
-       'com.twitter.pants.d': 'd'
+       'com.pants.a.b': 'b',
+       'com.pants.a.c': 'c',
+       'com.pants.d': 'd'
      }
 
   This can be useful for debugging purposes, removing a lot of boilerplate from printed lists of
@@ -104,4 +93,3 @@ def abbreviate_target_ids(arr):
     min_subseq_by_key['.'.join(str(segment) for segment in split_key)] = '.'.join(min_subseq)
 
   return min_subseq_by_key
-

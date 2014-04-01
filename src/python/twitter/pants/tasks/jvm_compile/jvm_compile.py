@@ -1,23 +1,29 @@
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
+
 import itertools
 import os
 import shutil
 import uuid
-
 from collections import defaultdict
 from itertools import groupby
 
 from twitter.common import contextutil
 from twitter.common.collections import OrderedSet
 from twitter.common.contextutil import open_zip
-from twitter.common.dirutil import safe_rmtree, safe_mkdir
-from twitter.pants.base.build_environment import get_buildroot
-from twitter.pants.base.target import Target
-from twitter.pants.base.worker_pool import Work
-from twitter.pants.goal.products import MultipleRootedProducts
-from twitter.pants.reporting.reporting_utils import items_to_report_element
-from twitter.pants.tasks.jvm_compile.jvm_dependency_analyzer import JvmDependencyAnalyzer
-from twitter.pants.tasks.nailgun_task import NailgunTask
-from twitter.pants.tasks import Task
+from twitter.common.dirutil import safe_mkdir, safe_rmtree
+
+from pants.base.build_environment import get_buildroot
+from pants.base.target import Target
+from pants.base.worker_pool import Work
+from pants.goal.products import MultipleRootedProducts
+from pants.reporting.reporting_utils import items_to_report_element
+from pants.tasks import Task
+from pants.tasks.jvm_compile.jvm_dependency_analyzer import JvmDependencyAnalyzer
+from pants.tasks.nailgun_task import NailgunTask
 
 
 class JvmCompile(NailgunTask):

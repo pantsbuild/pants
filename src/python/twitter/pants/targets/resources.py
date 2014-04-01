@@ -1,24 +1,13 @@
-# ==================================================================================================
-# Copyright 2012 Twitter, Inc.
-# --------------------------------------------------------------------------------------------------
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this work except in compliance with the License.
-# You may obtain a copy of the License in the LICENSE file, or at:
-#
-#  http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ==================================================================================================
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from twitter.pants.base.build_manual import manual
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
 
-from . import util
-from .internal import InternalTarget
-from .with_sources import TargetWithSources
+from pants.base.build_manual import manual
+from pants.targets import util
+from pants.targets.internal import InternalTarget
+from pants.targets.with_sources import TargetWithSources
 
 
 @manual.builddict(tags=['jvm'])
@@ -34,7 +23,7 @@ class Resources(InternalTarget, TargetWithSources):
   def __init__(self, name, sources, exclusives=None):
     """
     :param string name: The name of this target, which combined with this
-      build file defines the target :class:`twitter.pants.base.address.Address`.
+      build file defines the target :class:`pants.base.address.Address`.
     :param sources: A list of filenames representing the resources
       this library provides.
     """

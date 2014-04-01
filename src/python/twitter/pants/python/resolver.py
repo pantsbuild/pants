@@ -1,30 +1,25 @@
-from __future__ import print_function
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
 
 import os
 import time
 
+from pkg_resources import Environment, WorkingSet
 from twitter.common.dirutil import touch
 from twitter.common.python.base import requirement_is_exact
 from twitter.common.python.fetcher import Fetcher, PyPIFetcher
 from twitter.common.python.http import Crawler
-from twitter.common.python.obtainer import Obtainer, CachingObtainer
 from twitter.common.python.interpreter import PythonInterpreter
+from twitter.common.python.obtainer import CachingObtainer, Obtainer
 from twitter.common.python.package import distribution_compatible
 from twitter.common.python.platforms import Platform
 from twitter.common.python.resolver import resolve
-from twitter.common.python.translator import (
-    ChainedTranslator,
-    EggTranslator,
-    SourceTranslator,
-    Translator
-)
+from twitter.common.python.translator import ChainedTranslator, EggTranslator, SourceTranslator, Translator
 
-from .python_setup import PythonSetup
-
-from pkg_resources import (
-    Environment,
-    WorkingSet,
-)
+from pants.python.python_setup import PythonSetup
 
 
 def get_platforms(platform_list):

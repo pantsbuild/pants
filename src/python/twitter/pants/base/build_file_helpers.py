@@ -1,39 +1,29 @@
-# =================================================================================================
-# Copyright 2011 Twitter, Inc.
-# -------------------------------------------------------------------------------------------------
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this work except in compliance with the License.
-# You may obtain a copy of the License in the LICENSE file, or at:
-#
-#  http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# =================================================================================================
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
 
 import os
 
-from twitter.pants.targets.annotation_processor import AnnotationProcessor
-from twitter.pants.targets.doc import Page
-from twitter.pants.targets.java_agent import JavaAgent
-from twitter.pants.targets.java_antlr_library import JavaAntlrLibrary
-from twitter.pants.targets.java_library import JavaLibrary
-from twitter.pants.targets.java_protobuf_library import JavaProtobufLibrary
-from twitter.pants.targets.java_tests import JavaTests
-from twitter.pants.targets.java_thrift_library import JavaThriftLibrary
-from twitter.pants.targets.jvm_binary import JvmBinary
-from twitter.pants.targets.python_antlr_library import PythonAntlrLibrary
-from twitter.pants.targets.python_binary import PythonBinary
-from twitter.pants.targets.python_library import PythonLibrary
-from twitter.pants.targets.python_tests import PythonTests, PythonTestSuite
-from twitter.pants.targets.python_thrift_library import PythonThriftLibrary
-from twitter.pants.targets.resources import Resources
-from twitter.pants.targets.scala_library import ScalaLibrary
-from twitter.pants.targets.scala_tests import ScalaTests
-from twitter.pants.targets.sources import SourceRoot
+from pants.targets.annotation_processor import AnnotationProcessor
+from pants.targets.doc import Page
+from pants.targets.java_agent import JavaAgent
+from pants.targets.java_antlr_library import JavaAntlrLibrary
+from pants.targets.java_library import JavaLibrary
+from pants.targets.java_protobuf_library import JavaProtobufLibrary
+from pants.targets.java_tests import JavaTests
+from pants.targets.java_thrift_library import JavaThriftLibrary
+from pants.targets.jvm_binary import JvmBinary
+from pants.targets.python_antlr_library import PythonAntlrLibrary
+from pants.targets.python_binary import PythonBinary
+from pants.targets.python_library import PythonLibrary
+from pants.targets.python_tests import PythonTestSuite, PythonTests
+from pants.targets.python_thrift_library import PythonThriftLibrary
+from pants.targets.resources import Resources
+from pants.targets.scala_library import ScalaLibrary
+from pants.targets.scala_tests import ScalaTests
+from pants.targets.sources import SourceRoot
 
 
 def maven_layout(basedir=None):

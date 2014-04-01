@@ -17,7 +17,7 @@ As pants is implemented in python it can be run directly from sources.
 Use the ``pants.bootstrap`` script. ::
 
    $ PANTS_DEV=1 ./pants.bootstrap goal goals
-   *** running pants in dev mode from ./src/python/twitter/pants/bin/pants_exe.py ***
+   *** running pants in dev mode from ./src/python/pants/bin/pants_exe.py ***
    <remainder of output omitted for brevity>
 
 Notice this invocation specifies the ``PANTS_DEV`` environment variable.
@@ -41,8 +41,8 @@ It looks something like::
 
    $ rm pants.pex
    $ ./pants.bootstrap goal my-new-feature
-   Build operating on targets: OrderedSet([PythonBinary(src/python/twitter/pants/BUILD:pants)])
-   Building PythonBinary PythonBinary(src/python/twitter/pants/BUILD:pants):
+   Build operating on targets: OrderedSet([PythonBinary(src/python/pants/BUILD:pants)])
+   Building PythonBinary PythonBinary(src/python/pants/BUILD:pants):
    Wrote /Users/travis/src/science/dist/pants.pex
    AMAZING NEW FEATURE PRINTS HERE
    $ ls pants.pex # gets moved here, though originally "Wrote" to ./dist/
@@ -71,12 +71,12 @@ Running Tests
 Pants has many tests. There are BUILD targets to run those tests.
 We try to keep them passing.
 To make sure a change passes *all* of Pants' tests, use the
-``tests/python/twitter/pants:all`` target.
+``tests/python/pants:all`` target.
 *Do not* use ``PANTS_DEV=1`` when running tests at this time
 as that modifies ``sys.path`` in such a way as resources will
 not be discovered correctly. ::
 
-   ./pants.bootstrap tests/python/twitter/pants:all
+   ./pants.bootstrap tests/python/pants:all
 
 To try all the tests in a few configurations, you can run the same script
 that our Travis CI does. This can take a while, but it's a good idea to

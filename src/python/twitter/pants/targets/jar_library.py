@@ -1,33 +1,22 @@
-# ==================================================================================================
-# Copyright 2011 Twitter, Inc.
-# --------------------------------------------------------------------------------------------------
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this work except in compliance with the License.
-# You may obtain a copy of the License in the LICENSE file, or at:
-#
-#  http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ==================================================================================================
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
 
 from functools import partial
 
-from twitter.common.collections import maybe_list, OrderedSet
+from twitter.common.collections import OrderedSet, maybe_list
 
-from twitter.pants.base.build_manual import manual
-from twitter.pants.base.target import Target, TargetDefinitionException
-
-from . import util
-from .anonymous import AnonymousDeps
-from .exclude import Exclude
-from .external_dependency import ExternalDependency
-from .exportable_jvm_library import ExportableJvmLibrary
-from .pants_target import Pants
-from .jar_dependency import JarDependency
+from pants.base.build_manual import manual
+from pants.base.target import Target, TargetDefinitionException
+from pants.targets import util
+from pants.targets.anonymous import AnonymousDeps
+from pants.targets.exclude import Exclude
+from pants.targets.exportable_jvm_library import ExportableJvmLibrary
+from pants.targets.external_dependency import ExternalDependency
+from pants.targets.jar_dependency import JarDependency
+from pants.targets.pants_target import Pants
 
 
 @manual.builddict(tags=["anylang"])
@@ -39,8 +28,8 @@ class JarLibrary(Target):
   def __init__(self, name, dependencies, overrides=None, exclusives=None):
     """
     :param string name: The name of this target, which combined with this
-      build file defines the target :class:`twitter.pants.base.address.Address`.
-    :param dependencies: List of :class:`twitter.pants.base.target.Target` instances
+      build file defines the target :class:`pants.base.address.Address`.
+    :param dependencies: List of :class:`pants.base.target.Target` instances
       this target depends on.
     :param overrides: List of strings, each of which will be recursively resolved to
       any targets that provide artifacts. Those artifacts will override corresponding

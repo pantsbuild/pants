@@ -1,47 +1,35 @@
-# ==================================================================================================
-# Copyright 2011 Twitter, Inc.
-# --------------------------------------------------------------------------------------------------
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this work except in compliance with the License.
-# You may obtain a copy of the License in the LICENSE file, or at:
-#
-#  http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ==================================================================================================
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import print_function
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
 
-from collections import defaultdict
 import os
 import random
 import shutil
 import sys
 import tempfile
+from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
 from twitter.common.dirutil import safe_mkdir, safe_rmtree
 from twitter.common.python.interpreter import PythonInterpreter
 from twitter.common.python.pex_builder import PEXBuilder
 from twitter.common.python.platforms import Platform
-from twitter.pants.base.build_invalidator import BuildInvalidator, CacheKeyGenerator
-from twitter.pants.base.config import Config
-from twitter.pants.base.parse_context import ParseContext
-from twitter.pants.targets.python_antlr_library import PythonAntlrLibrary
-from twitter.pants.targets.python_binary import PythonBinary
-from twitter.pants.targets.python_library import PythonLibrary
-from twitter.pants.targets.python_requirement import PythonRequirement
-from twitter.pants.targets.python_tests import PythonTests
-from twitter.pants.targets.python_thrift_library import PythonThriftLibrary
 
-from .antlr_builder import PythonAntlrBuilder
-from .python_setup import PythonSetup
-from .resolver import resolve_multi
-from .thrift_builder import PythonThriftBuilder
+from pants.base.build_invalidator import BuildInvalidator, CacheKeyGenerator
+from pants.base.config import Config
+from pants.base.parse_context import ParseContext
+from pants.python.antlr_builder import PythonAntlrBuilder
+from pants.python.python_setup import PythonSetup
+from pants.python.resolver import resolve_multi
+from pants.python.thrift_builder import PythonThriftBuilder
+from pants.targets.python_antlr_library import PythonAntlrLibrary
+from pants.targets.python_binary import PythonBinary
+from pants.targets.python_library import PythonLibrary
+from pants.targets.python_requirement import PythonRequirement
+from pants.targets.python_tests import PythonTests
+from pants.targets.python_thrift_library import PythonThriftLibrary
 
 
 class PythonChroot(object):

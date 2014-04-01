@@ -236,7 +236,7 @@ Python target types
 ^^^^^^^^^^^^^^^^^^^
 
 BUILD files themselves are just Python.  The only thing magical is that the
-statement `from twitter.pants import *` has been autoinjected.  This
+statement `from pants import *` has been autoinjected.  This
 provides a number of Python-specific targets such as:
 
 1. `python_library`
@@ -246,7 +246,7 @@ provides a number of Python-specific targets such as:
 
 and a whole host of other targets including Java, Scala, Python, Markdown,
 the universal `pants` target and so forth.  See
-`src/python/twitter/pants/__init__.py` for a comprehensive list of targets.
+`src/python/pants/__init__.py` for a comprehensive list of targets.
 
 
 `python_library`

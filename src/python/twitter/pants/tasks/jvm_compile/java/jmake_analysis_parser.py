@@ -1,10 +1,16 @@
-from collections import defaultdict
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
+
 import os
 import re
+from collections import defaultdict
 
-from twitter.pants.base.build_environment import get_buildroot
-from twitter.pants.tasks.jvm_compile.analysis_parser import ParseError, AnalysisParser
-from twitter.pants.tasks.jvm_compile.java.jmake_analysis import JMakeAnalysis
+from pants.base.build_environment import get_buildroot
+from pants.tasks.jvm_compile.analysis_parser import AnalysisParser, ParseError
+from pants.tasks.jvm_compile.java.jmake_analysis import JMakeAnalysis
 
 
 class JMakeAnalysisParser(AnalysisParser):

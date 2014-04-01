@@ -1,13 +1,16 @@
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 python_library(
   name = 'engine',
   sources = globs('*.py'),
   dependencies = [
-    pants('src/python/twitter/common/collections'),
-    pants('src/python/twitter/common/lang'),
-    pants('src/python/twitter/pants/base:workunit'),
-    pants('src/python/twitter/pants/goal'),
-    pants('src/python/twitter/pants/targets:common'),
-    pants('src/python/twitter/pants/tasks:check_exclusives'),
-    pants('src/python/twitter/pants/tasks:task_error'),
+    pants('src/python/pants/BUILD.commons:twitter.common.collections'),
+    pants('src/python/pants/BUILD.commons:twitter.common.lang'),
+    pants('src/python/pants/base:workunit'),
+    pants('src/python/pants/goal'),
+    pants('src/python/pants/targets:common'),
+    pants('src/python/pants/tasks:check_exclusives'),
+    pants('src/python/pants/tasks:task_error'),
   ],
 )

@@ -1,13 +1,17 @@
-from twitter.common.collections import OrderedSet
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-__author__ = 'Mark Chu-Carroll (markcc@foursquare.com)'
-
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
 
 from collections import defaultdict
 from copy import copy
-from twitter.pants.base.target import Target
-from twitter.pants.tasks import Task, TaskError
-from twitter.pants.targets.internal import InternalTarget
+
+from twitter.common.collections import OrderedSet
+
+from pants.base.target import Target
+from pants.targets.internal import InternalTarget
+from pants.tasks import Task, TaskError
 
 
 class CheckExclusives(Task):
@@ -284,4 +288,3 @@ class ExclusivesMapping(object):
   def set_base_classpath_for_group(self, group_key, classpath):
     # set the initial classpath of the elements of group_key to classpath.
     self._group_classpaths[group_key] = OrderedSet(reversed(classpath))
-

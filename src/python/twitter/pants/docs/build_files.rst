@@ -41,11 +41,11 @@ Did a change in one ``BUILD`` file break others? ::
 
     $ ./pants goal list ::
       ...lots of output...
-      File "twitter/pants/targets/internal.py", line 174, in dependencies
-      File "twitter/pants/targets/internal.py", line 189, in _maybe_apply_deps
-      File "twitter/pants/targets/internal.py", line 195, in update_dependencies
-      File "twitter/pants/targets/pants_target.py", line 60, in resolve
-    KeyError: 'Failed to find target for: src/python/twitter/pants/docs/BUILD:obsolete'
+      File "pants/targets/internal.py", line 174, in dependencies
+      File "pants/targets/internal.py", line 189, in _maybe_apply_deps
+      File "pants/targets/internal.py", line 195, in update_dependencies
+      File "pants/targets/pants_target.py", line 60, in resolve
+    KeyError: 'Failed to find target for: src/python/pants/docs/BUILD:obsolete'
     $ # Instead of listing all targets, a strack trace. We found a problem
 
 ``depmap`` Do I pull in the dependencies I expect?

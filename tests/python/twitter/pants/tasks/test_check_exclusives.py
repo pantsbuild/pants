@@ -1,9 +1,15 @@
-from twitter.pants.base.config import Config
-from twitter.pants.goal import Context
-from twitter.pants.testutils import MockTarget
-from twitter.pants.tasks import TaskError
-from twitter.pants.tasks.check_exclusives import CheckExclusives
-from twitter.pants.testutils.base_mock_target_test import BaseMockTargetTest
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
+
+from pants.base.config import Config
+from pants.goal import Context
+from pants.tasks import TaskError
+from pants.tasks.check_exclusives import CheckExclusives
+from pants.testutils import MockTarget
+from pants.testutils.base_mock_target_test import BaseMockTargetTest
 
 
 class CheckExclusivesTest(BaseMockTargetTest):
@@ -101,9 +107,3 @@ class CheckExclusivesTest(BaseMockTargetTest):
     egroups.update_compatible_classpaths("a=1,b=1", ["a1", "b1", "xxx"])
     self.assertEquals(egroups.get_classpath_for_group("a=1,b=1"),
                       ["xxx", "update_a1bn", "update_all", "update_without_group", "a1", "b1"])
-
-
-
-
-
-

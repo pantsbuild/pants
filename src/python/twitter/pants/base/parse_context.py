@@ -1,33 +1,21 @@
-# ==================================================================================================
-# Copyright 2011 Twitter, Inc.
-# --------------------------------------------------------------------------------------------------
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this work except in compliance with the License.
-# You may obtain a copy of the License in the LICENSE file, or at:
-#
-#  http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ==================================================================================================
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
 
 import collections
 import copy
 import os
-
-from functools import partial
-
 from contextlib import contextmanager
+from functools import partial
 
 from twitter.common.dirutil.fileset import Fileset
 from twitter.common.lang import Compatibility
 
-from .build_environment import get_buildroot
-from .build_file import BuildFile
-from .config import Config
+from pants.base.build_environment import get_buildroot
+from pants.base.build_file import BuildFile
+from pants.base.config import Config
 
 
 class ParseContext(object):
@@ -42,7 +30,7 @@ class ParseContext(object):
   _parsed = set()
 
   _strs_to_exec = [
-    "from twitter.pants.base.build_file_context import *",
+    "from pants.base.build_file_context import *",
     "from twitter.common.quantity import Amount, Time",
   ]
 
@@ -112,7 +100,7 @@ class ParseContext(object):
   @classmethod
   def default_globals(cls, config=None):
     """
-    Has twitter.pants.*, but not file-specfic things like __file__
+    Has pants.*, but not file-specfic things like __file__
     If you want to add new imports to be available to all BUILD files, add a section to the config
     similar to:
 
@@ -137,7 +125,7 @@ class ParseContext(object):
   def parse(self, **globalargs):
     """The entry point to parsing of a BUILD file.
 
-    from twitter.pants.targets.sources import SourceRoot
+    from pants.targets.sources import SourceRoot
 
     See locate().
     """
@@ -156,8 +144,8 @@ class ParseContext(object):
             buildfile_dir = os.path.dirname(buildfile.full_path)
 
             # TODO(John Sirois): XXX imports are done here to prevent a cycles
-            from twitter.pants.targets.jvm_binary import Bundle
-            from twitter.pants.targets.sources import SourceRoot
+            from pants.targets.jvm_binary import Bundle
+            from pants.targets.sources import SourceRoot
 
             class RelativeBundle(Bundle):
               def __init__(self, mapper=None, relative_to=None):

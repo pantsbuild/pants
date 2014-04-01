@@ -1,8 +1,11 @@
-from __future__ import print_function
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
 
 import os
 import sys
-
 from collections import defaultdict
 from contextlib import contextmanager
 
@@ -11,15 +14,15 @@ from twitter.common.dirutil import Lock
 from twitter.common.process import ProcessProviderFactory
 from twitter.common.process.process_provider import ProcessProvider
 
-from twitter.pants.base.build_environment import get_buildroot
-from twitter.pants.base.parse_context import ParseContext
-from twitter.pants.base.target import Target
-from twitter.pants.base.workunit import WorkUnit
-from twitter.pants.goal.products import Products
-from twitter.pants.java.distribution.distribution import Distribution
-from twitter.pants.reporting.report import Report
-from twitter.pants.targets.pants_target import Pants
-from twitter.pants.targets.sources import SourceRoot
+from pants.base.build_environment import get_buildroot
+from pants.base.parse_context import ParseContext
+from pants.base.target import Target
+from pants.base.workunit import WorkUnit
+from pants.goal.products import Products
+from pants.java.distribution.distribution import Distribution
+from pants.reporting.report import Report
+from pants.targets.pants_target import Pants
+from pants.targets.sources import SourceRoot
 
 
 # Utility definition for grabbing process info for locking.

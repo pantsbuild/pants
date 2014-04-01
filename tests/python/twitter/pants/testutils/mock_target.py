@@ -1,9 +1,14 @@
-__author__ = 'Ryan Williams'
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
 
 from collections import defaultdict
-from twitter.pants.base.parse_context import ParseContext
-from twitter.pants.targets.internal import InternalTarget
-from twitter.pants.targets.with_sources import TargetWithSources
+
+from pants.base.parse_context import ParseContext
+from pants.targets.internal import InternalTarget
+from pants.targets.with_sources import TargetWithSources
 
 
 class MockTarget(InternalTarget, TargetWithSources):
@@ -25,4 +30,3 @@ class MockTarget(InternalTarget, TargetWithSources):
     work(self)
     for dep in self.dependencies:
       dep.walk(work)
-

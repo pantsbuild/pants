@@ -28,10 +28,10 @@ The following commands must be run from the pants repo root.
   rm pants.pex
   ./pants.bootstrap
   # Build the BUILD dictionary data.
-  ./pants goal builddict # (or ./pants py src/python/twitter/pants goal builddict to try out local tweaks)
+  ./pants goal builddict # (or ./pants py src/python/pants goal builddict to try out local tweaks)
 
   # Doc generation commands must be run from the doc dir.
-  cd src/python/twitter/pants/docs
+  cd src/python/pants/docs
   # Generate rst files.
   ./gen.py
   # Generate the site.

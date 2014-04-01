@@ -12,7 +12,7 @@ System-wide Installation
 
 The simplest installation method is installing for all users on your system. ::
 
-   pip install twitter.pants
+   pip install pants
 
 This installs pants (and its dependencies) into your Python distribution
 site-packages, making it available to all users on your system. This
@@ -30,7 +30,7 @@ as it does not modify the system Python libraries. ::
 
    $ virtualenv /tmp/pants
    $ source /tmp/pants/bin/activate
-   $ pip install twitter.pants \
+   $ pip install pants \
      --allow-external elementtree \
      --allow-unverified elementtree
    $ pants

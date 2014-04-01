@@ -1,18 +1,16 @@
-from collections import defaultdict
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
+
 import json
 import os
 import re
+from collections import defaultdict
 
-from twitter.pants.tasks.jvm_compile.analysis_parser import AnalysisParser, ParseError
-from twitter.pants.tasks.jvm_compile.scala.zinc_analysis import (
-    APIs,
-    Compilations,
-    CompileSetup,
-    Relations,
-    SourceInfos,
-    Stamps,
-    ZincAnalysis,
-)
+from pants.tasks.jvm_compile.analysis_parser import AnalysisParser, ParseError
+from pants.tasks.jvm_compile.scala.zinc_analysis import APIs, Compilations, CompileSetup, Relations, SourceInfos, Stamps, ZincAnalysis
 
 
 class ZincAnalysisParser(AnalysisParser):

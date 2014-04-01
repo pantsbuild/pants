@@ -1,9 +1,17 @@
-import httplib
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
+
 import urlparse
-from twitter.common.contextutil import temporary_file_path, temporary_file
+
+import httplib
+from twitter.common.contextutil import temporary_file, temporary_file_path
 from twitter.common.quantity import Amount, Data
-from twitter.pants.cache.artifact import TarballArtifact
-from twitter.pants.cache.artifact_cache import ArtifactCache
+
+from pants.cache.artifact import TarballArtifact
+from pants.cache.artifact_cache import ArtifactCache
 
 
 class RESTfulArtifactCache(ArtifactCache):

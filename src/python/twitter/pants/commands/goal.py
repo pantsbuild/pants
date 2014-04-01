@@ -1,61 +1,49 @@
-# ==================================================================================================
-# Copyright 2011 Twitter, Inc.
-# --------------------------------------------------------------------------------------------------
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this work except in compliance with the License.
-# You may obtain a copy of the License in the LICENSE file, or at:
-#
-#  http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ==================================================================================================
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import print_function
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
 
 import inspect
 import multiprocessing
 import os
 import re
-import sys
 import signal
 import socket
+import sys
 import time
 import traceback
-
 from contextlib import contextmanager
 from optparse import Option, OptionParser
 
 from twitter.common import log
 from twitter.common.collections import OrderedSet
-from twitter.common.dirutil import safe_rmtree, safe_mkdir
+from twitter.common.dirutil import safe_mkdir, safe_rmtree
 from twitter.common.lang import Compatibility
 from twitter.common.log.options import LogOptions
 
-from twitter.pants import binary_util
-from twitter.pants.base.address import Address
-from twitter.pants.base.build_environment import get_buildroot
-from twitter.pants.base.build_file import BuildFile
-from twitter.pants.base.config import Config
-from twitter.pants.base.parse_context import ParseContext
-from twitter.pants.base.rcfile import RcFile
-from twitter.pants.base.run_info import RunInfo
-from twitter.pants.base.target import Target, TargetDefinitionException
-from twitter.pants.base.workunit import WorkUnit
-from twitter.pants.commands.command import Command
-from twitter.pants.engine.engine import Engine
-from twitter.pants.engine.group_engine import GroupEngine
-from twitter.pants.goal import Context, GoalError, Phase
-from twitter.pants.goal import Goal as goal, Group as group
-from twitter.pants.goal.initialize_reporting import update_reporting
-from twitter.pants.reporting.reporting_server import ReportingServer, ReportingServerManager
-from twitter.pants.tasks import Task, TaskError
-from twitter.pants.tasks.console_task import ConsoleTask
-from twitter.pants.tasks.list_goals import ListGoals
-from twitter.pants.tasks.targets_help import TargetsHelp
+from pants import binary_util
+from pants.base.address import Address
+from pants.base.build_environment import get_buildroot
+from pants.base.build_file import BuildFile
+from pants.base.config import Config
+from pants.base.parse_context import ParseContext
+from pants.base.rcfile import RcFile
+from pants.base.run_info import RunInfo
+from pants.base.target import Target, TargetDefinitionException
+from pants.base.workunit import WorkUnit
+from pants.commands.command import Command
+from pants.engine.engine import Engine
+from pants.engine.group_engine import GroupEngine
+from pants.goal import Context, GoalError, Phase
+from pants.goal import Goal as goal, Group as group
+from pants.goal.initialize_reporting import update_reporting
+from pants.reporting.reporting_server import ReportingServer, ReportingServerManager
+from pants.tasks import Task, TaskError
+from pants.tasks.console_task import ConsoleTask
+from pants.tasks.list_goals import ListGoals
+from pants.tasks.targets_help import TargetsHelp
+
 
 try:
   import colors
@@ -492,43 +480,43 @@ class Goal(Command):
 
 
 # Install all default pants provided goals
-from twitter.pants.targets.benchmark import Benchmark
-from twitter.pants.targets.java_library import JavaLibrary
-from twitter.pants.targets.java_tests import JavaTests as junit_tests
-from twitter.pants.targets.jvm_binary import JvmBinary
-from twitter.pants.targets.scala_library import ScalaLibrary
-from twitter.pants.targets.scala_tests import ScalaTests
-from twitter.pants.targets.scalac_plugin import ScalacPlugin
-from twitter.pants.tasks.antlr_gen import AntlrGen
-from twitter.pants.tasks.benchmark_run import BenchmarkRun
-from twitter.pants.tasks.binary_create import BinaryCreate
-from twitter.pants.tasks.bootstrap_jvm_tools import BootstrapJvmTools
-from twitter.pants.tasks.build_lint import BuildLint
-from twitter.pants.tasks.builddictionary import BuildBuildDictionary
-from twitter.pants.tasks.bundle_create import BundleCreate
-from twitter.pants.tasks.check_exclusives import CheckExclusives
-from twitter.pants.tasks.check_published_deps import CheckPublishedDeps
-from twitter.pants.tasks.checkstyle import Checkstyle
-from twitter.pants.tasks.detect_duplicates import DuplicateDetector
-from twitter.pants.tasks.filedeps import FileDeps
-from twitter.pants.tasks.ivy_resolve import IvyResolve
-from twitter.pants.tasks.jar_create import JarCreate
-from twitter.pants.tasks.javadoc_gen import JavadocGen
-from twitter.pants.tasks.junit_run import JUnitRun
-from twitter.pants.tasks.jvm_compile.java.java_compile import JavaCompile
-from twitter.pants.tasks.jvm_compile.scala.scala_compile import ScalaCompile
-from twitter.pants.tasks.jvm_run import JvmRun
-from twitter.pants.tasks.listtargets import ListTargets
-from twitter.pants.tasks.markdown_to_html import MarkdownToHtml
-from twitter.pants.tasks.nailgun_task import NailgunTask
-from twitter.pants.tasks.pathdeps import PathDeps
-from twitter.pants.tasks.prepare_resources import PrepareResources
-from twitter.pants.tasks.protobuf_gen import ProtobufGen
-from twitter.pants.tasks.scala_repl import ScalaRepl
-from twitter.pants.tasks.scaladoc_gen import ScaladocGen
-from twitter.pants.tasks.scrooge_gen import ScroogeGen
-from twitter.pants.tasks.specs_run import SpecsRun
-from twitter.pants.tasks.thrift_gen import ThriftGen
+from pants.targets.benchmark import Benchmark
+from pants.targets.java_library import JavaLibrary
+from pants.targets.java_tests import JavaTests as junit_tests
+from pants.targets.jvm_binary import JvmBinary
+from pants.targets.scala_library import ScalaLibrary
+from pants.targets.scala_tests import ScalaTests
+from pants.targets.scalac_plugin import ScalacPlugin
+from pants.tasks.antlr_gen import AntlrGen
+from pants.tasks.benchmark_run import BenchmarkRun
+from pants.tasks.binary_create import BinaryCreate
+from pants.tasks.bootstrap_jvm_tools import BootstrapJvmTools
+from pants.tasks.build_lint import BuildLint
+from pants.tasks.builddictionary import BuildBuildDictionary
+from pants.tasks.bundle_create import BundleCreate
+from pants.tasks.check_exclusives import CheckExclusives
+from pants.tasks.check_published_deps import CheckPublishedDeps
+from pants.tasks.checkstyle import Checkstyle
+from pants.tasks.detect_duplicates import DuplicateDetector
+from pants.tasks.filedeps import FileDeps
+from pants.tasks.ivy_resolve import IvyResolve
+from pants.tasks.jar_create import JarCreate
+from pants.tasks.javadoc_gen import JavadocGen
+from pants.tasks.junit_run import JUnitRun
+from pants.tasks.jvm_compile.java.java_compile import JavaCompile
+from pants.tasks.jvm_compile.scala.scala_compile import ScalaCompile
+from pants.tasks.jvm_run import JvmRun
+from pants.tasks.listtargets import ListTargets
+from pants.tasks.markdown_to_html import MarkdownToHtml
+from pants.tasks.nailgun_task import NailgunTask
+from pants.tasks.pathdeps import PathDeps
+from pants.tasks.prepare_resources import PrepareResources
+from pants.tasks.protobuf_gen import ProtobufGen
+from pants.tasks.scala_repl import ScalaRepl
+from pants.tasks.scaladoc_gen import ScaladocGen
+from pants.tasks.scrooge_gen import ScroogeGen
+from pants.tasks.specs_run import SpecsRun
+from pants.tasks.thrift_gen import ThriftGen
 
 
 def _cautious_rmtree(root):
@@ -922,7 +910,7 @@ goal(
   action=BuildBuildDictionary,
 ).install()
 
-from twitter.pants.tasks.idea_gen import IdeaGen
+from pants.tasks.idea_gen import IdeaGen
 
 goal(
   name='idea',
@@ -931,7 +919,7 @@ goal(
 ).install().with_description('Create an IntelliJ IDEA project from the given targets.')
 
 
-from twitter.pants.tasks.eclipse_gen import EclipseGen
+from pants.tasks.eclipse_gen import EclipseGen
 
 goal(
   name='eclipse',
@@ -940,7 +928,7 @@ goal(
 ).install().with_description('Create an Eclipse project from the given targets.')
 
 
-from twitter.pants.tasks.provides import Provides
+from pants.tasks.provides import Provides
 
 goal(
   name='provides',
@@ -949,7 +937,7 @@ goal(
 ).install().with_description('Emit the list of symbols provided by the given targets.')
 
 
-from twitter.pants.tasks.python.setup import SetupPythonEnvironment
+from pants.tasks.python.setup import SetupPythonEnvironment
 
 goal(
   name='python-setup',
@@ -957,7 +945,7 @@ goal(
 ).install('setup').with_description(
 "Setup the target's build environment.")
 
-from twitter.pants.tasks.paths import Path, Paths
+from pants.tasks.paths import Path, Paths
 
 goal(
   name='path',
@@ -970,7 +958,7 @@ goal(
 ).install().with_description('Find all dependency paths from one target to another')
 
 
-from twitter.pants.tasks.dependees import ReverseDepmap
+from pants.tasks.dependees import ReverseDepmap
 
 goal(
   name='dependees',
@@ -978,7 +966,7 @@ goal(
 ).install().with_description('Print a reverse dependency mapping for the given targets')
 
 
-from twitter.pants.tasks.depmap import Depmap
+from pants.tasks.depmap import Depmap
 
 goal(
   name='depmap',
@@ -987,7 +975,7 @@ goal(
                              ' digraph dotfile for the dependency set of a target')
 
 
-from twitter.pants.tasks.dependencies import Dependencies
+from pants.tasks.dependencies import Dependencies
 
 goal(
   name='dependencies',
@@ -995,7 +983,7 @@ goal(
 ).install().with_description('Extract textual infomation about the dependencies of a target')
 
 
-from twitter.pants.tasks.filemap import Filemap
+from pants.tasks.filemap import Filemap
 
 goal(
   name='filemap',
@@ -1004,7 +992,7 @@ goal(
                              ' the target that owns the source file')
 
 
-from twitter.pants.tasks.minimal_cover import MinimalCover
+from pants.tasks.minimal_cover import MinimalCover
 
 goal(
   name='minimize',
@@ -1012,7 +1000,7 @@ goal(
 ).install().with_description('Print the minimal cover of the given targets.')
 
 
-from twitter.pants.tasks.filter import Filter
+from pants.tasks.filter import Filter
 
 goal(
   name='filter',
@@ -1020,7 +1008,7 @@ goal(
 ).install().with_description('Filter the input targets based on various criteria.')
 
 
-from twitter.pants.tasks.sorttargets import SortTargets
+from pants.tasks.sorttargets import SortTargets
 
 goal(
   name='sort',
@@ -1028,7 +1016,7 @@ goal(
 ).install().with_description('Topologically sort the input targets.')
 
 
-from twitter.pants.tasks.roots import ListRoots
+from pants.tasks.roots import ListRoots
 
 goal(
   name='roots',

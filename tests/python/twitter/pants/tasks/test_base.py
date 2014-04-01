@@ -1,34 +1,23 @@
-# ==================================================================================================
-# Copyright 2012 Twitter, Inc.
-# --------------------------------------------------------------------------------------------------
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this work except in compliance with the License.
-# You may obtain a copy of the License in the LICENSE file, or at:
-#
-#  http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ==================================================================================================
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import pytest
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
 
+from StringIO import StringIO
 from contextlib import closing
 from optparse import OptionGroup, OptionParser
-from StringIO import StringIO
 
+import pytest
 from twitter.common.collections import maybe_list
 
-from twitter.pants.base.context_utils import create_context, create_config, create_run_tracker
-from twitter.pants.base.target import Target
-from twitter.pants.base_build_root_test import BaseBuildRootTest
-from twitter.pants.commands.goal import SpecParser
-from twitter.pants.goal import Mkflag, Context
-from twitter.pants.tasks import Task
-from twitter.pants.tasks.console_task import ConsoleTask
+from pants.base.context_utils import create_config, create_context, create_run_tracker
+from pants.base.target import Target
+from pants.base_build_root_test import BaseBuildRootTest
+from pants.commands.goal import SpecParser
+from pants.goal import Context, Mkflag
+from pants.tasks import Task
+from pants.tasks.console_task import ConsoleTask
 
 
 def prepare_task(task_type, config=None, args=None, targets=None, **kwargs):
@@ -76,9 +65,9 @@ class TaskTest(BaseBuildRootTest):
   def assertDeps(self, target, expected_deps=None):
     """Check that actual and expected dependencies of the given target match.
 
-    :param target: :class:`twitter.pants.base.target.Target` to check
+    :param target: :class:`pants.base.target.Target` to check
       dependencies of.
-    :param expected_deps: :class:`twitter.pants.base.target.Target` or list of
+    :param expected_deps: :class:`pants.base.target.Target` or list of
       ``Target`` instances that are expected dependencies of ``target``.
     """
     expected_deps_list = maybe_list(expected_deps or [], expected_type=Target)

@@ -1,29 +1,16 @@
-# ==================================================================================================
-# Copyright 2011 Twitter, Inc.
-# --------------------------------------------------------------------------------------------------
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this work except in compliance with the License.
-# You may obtain a copy of the License in the LICENSE file, or at:
-#
-#  http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ==================================================================================================
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import print_function
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
 
 import os
 import sys
 
 from twitter.common import log
 
-from twitter.pants.version import VERSION as _VERSION
-
-from .build_root import BuildRoot
+from pants.base.build_root import BuildRoot
+from pants.version import VERSION as _VERSION
 
 
 def get_version():
@@ -47,7 +34,7 @@ def set_buildroot(path):
   BuildRoot().path = path
 
 
-from twitter.pants.scm import Scm
+from pants.scm import Scm
 
 
 _SCM = None
@@ -61,7 +48,7 @@ def get_scm():
     # We know about git, so attempt an auto-configure
     git_dir = os.path.join(get_buildroot(), '.git')
     if os.path.isdir(git_dir):
-      from twitter.pants.scm.git import Git
+      from pants.scm.git import Git
       git = Git(worktree=get_buildroot())
       try:
         log.info('Detected git repository on branch %s' % git.branch_name)
@@ -78,4 +65,3 @@ def set_scm(scm):
       raise ValueError('The scm must be an instance of Scm, given %s' % scm)
     global _SCM
     _SCM = scm
-

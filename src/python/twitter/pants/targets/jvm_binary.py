@@ -1,37 +1,25 @@
-# ==================================================================================================
-# Copyright 2012 Twitter, Inc.
-# --------------------------------------------------------------------------------------------------
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this work except in compliance with the License.
-# You may obtain a copy of the License in the LICENSE file, or at:
-#
-#  http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ==================================================================================================
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
 
 import os
-
 from functools import partial
 
 from twitter.common.collections import maybe_list
 from twitter.common.dirutil import Fileset
 from twitter.common.lang import Compatibility
 
-from twitter.pants.base.build_manual import manual
-from twitter.pants.base.parse_context import ParseContext
-from twitter.pants.base.target import TargetDefinitionException
-
-from . import util
-from .internal import InternalTarget
-from .jar_library import JarLibrary
-from .jvm_target import JvmTarget
-from .pants_target import Pants
-from .resources import WithResources
+from pants.base.build_manual import manual
+from pants.base.parse_context import ParseContext
+from pants.base.target import TargetDefinitionException
+from pants.targets import util
+from pants.targets.internal import InternalTarget
+from pants.targets.jar_library import JarLibrary
+from pants.targets.jvm_target import JvmTarget
+from pants.targets.pants_target import Pants
+from pants.targets.resources import WithResources
 
 
 @manual.builddict(tags=["jvm"])
@@ -58,7 +46,7 @@ class JvmBinary(JvmTarget, WithResources):
                exclusives=None):
     """
     :param string name: The name of this target, which combined with this
-      build file defines the target :class:`twitter.pants.base.address.Address`.
+      build file defines the target :class:`pants.base.address.Address`.
     :param string main: The name of the ``main`` class, e.g.,
       ``'com.twitter.common.examples.pingpong.Main'``. This class may be
       present as the source of this target or depended-upon library.
@@ -202,10 +190,10 @@ class JvmApp(InternalTarget):
   def __init__(self, name, binary, bundles, basename=None):
     """
     :param string name: The name of this target, which combined with this
-      build file defines the target :class:`twitter.pants.base.address.Address`.
-    :param binary: The :class:`twitter.pants.targets.jvm_binary.JvmBinary`,
-      or a :class:`twitter.pants.targets.pants_target.Pants` pointer to one.
-    :param bundles: One or more :class:`twitter.pants.targets.jvm_binary.Bundle`'s
+      build file defines the target :class:`pants.base.address.Address`.
+    :param binary: The :class:`pants.targets.jvm_binary.JvmBinary`,
+      or a :class:`pants.targets.pants_target.Pants` pointer to one.
+    :param bundles: One or more :class:`pants.targets.jvm_binary.Bundle`'s
       describing "extra files" that should be included with this app
       (e.g.: config files, startup scripts).
     :param string basename: Name of this application, if different from the

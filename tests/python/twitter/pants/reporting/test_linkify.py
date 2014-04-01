@@ -1,9 +1,15 @@
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
+
 import os
 import shutil
 import tempfile
 import unittest
 
-from twitter.pants.reporting.linkify import linkify
+from pants.reporting.linkify import linkify
 
 
 def ensure_file_exists(path):
@@ -51,4 +57,3 @@ class RunInfoTest(unittest.TestCase):
     ensure_file_exists(os.path.join(self._buildroot, 'foo/bar/BUILD'))
     self._do_test_linkify('/browse/foo/bar/BUILD', 'foo/bar')
     self._do_test_linkify('/browse/foo/bar/BUILD', 'foo/bar:target')
-

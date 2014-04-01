@@ -1,9 +1,16 @@
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
+
+import errno
 import os
 import shutil
-import errno
 import tarfile
+
 from twitter.common.contextutil import open_tar
-from twitter.common.dirutil import safe_mkdir_for, safe_mkdir
+from twitter.common.dirutil import safe_mkdir, safe_mkdir_for
 
 
 class ArtifactError(Exception):

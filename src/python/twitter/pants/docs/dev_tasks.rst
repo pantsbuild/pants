@@ -92,18 +92,18 @@ Let's examine the Task class, which is the "abstract class"
 we'll need to subclass. The following simplified example highlights
 the most useful methods.
 
-* :py:class:`twitter.pants.tasks.__init__.Task` - This is the base class
+* :py:class:`pants.tasks.__init__.Task` - This is the base class
   used to implement all the stuff pants knows how to do. When instantiating
   a task it has the opportunity to perform setup actions, or fetch
   configuration info from the context or ``pants.ini``. If it needs
   products produced by some other task it must register interest in
   those products (e.g.: "I'm a java compiler, I need java sources.").
 
-* :py:meth:`twitter.pants.tasks.__init__.Task.execute` - Do some work.
+* :py:meth:`pants.tasks.__init__.Task.execute` - Do some work.
   This is where the task does its thing. In addition to anything stashed
   away during instantiation, it has access to the targets graph.
 
-* :py:meth:`twitter.pants.tasks.__init__.Task.setup_parser` - Specify
+* :py:meth:`pants.tasks.__init__.Task.setup_parser` - Specify
   command-line flags. These are useful for functionality that may be
   modified per-invocation. Use ``pants.ini`` for configuration that
   should always be used in the repo.
@@ -117,7 +117,7 @@ particular types, and taking actions on those targets. For this reason
 its important to understand now to navigate the targets graph.
 
 The targets graph is provided to your
-:py:meth:`twitter.pants.tasks.__init__.Task.execute` method, and you have
+:py:meth:`pants.tasks.__init__.Task.execute` method, and you have
 exclusive access to read and/or mutate it in place during execution.
 Its provided as the list of *active concrete targets*. *Active* meaning
 these targets are reachable by one or more ``target_roots`` specified on
@@ -151,7 +151,7 @@ Tasks must be installed before they are available for use.
 Fortunately this is a simple process. They are installed
 in ``goal.py`` as follows: ::
 
-   from twitter.pants.tasks.pagerank import PageRank
+   from pants.tasks.pagerank import PageRank
    goal(name='pagerank', action=PageRank).install().with_description('PageRank the given targets.')
 
 
@@ -164,7 +164,7 @@ into the repo, and via command-line flags.
 
 The configuration file is always called ``pants.ini`` and is a standard
 ``ini`` file loaded with ``ConfigParser``. During instantiation, tasks have
-access to a :py:class:`twitter.pants.base.config.Config`
+access to a :py:class:`pants.base.config.Config`
 to read these settings. ::
 
    # Let's read mykey from the mytask pants.ini section.

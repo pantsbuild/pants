@@ -1,26 +1,5 @@
-# ==================================================================================================
-# Copyright 2014 Twitter, Inc.
-# --------------------------------------------------------------------------------------------------
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this work except in compliance with the License.
-# You may obtain a copy of the License in the LICENSE file, or at:
-#
-#  http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ==================================================================================================
-
-# These targets form a self contained (in this file) monolithic pants that can and should only be
-# used for publishing the twitter.pants distribution.  It serves as a transitional aid while the
-# proper fine grained targets for pants packages, targets and tasks and their underlying code get
-# untangled.
-
-# TODO(John Sirois): Kill this file and fix the src/python/twitter/pants/BUILD:pants-packaged
-# referent when the pants code and target internal dependencies get sorted out.
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
   name='_pants_transitional_publishable_library_',
@@ -47,25 +26,25 @@ python_library(
     pants('3rdparty/python:python_daemon'),
     pants('3rdparty/python:requests'),
     pants('3rdparty/python:setuptools'),
-    pants('src/python/twitter/common/collections'),
-    pants('src/python/twitter/common/config'),
-    pants('src/python/twitter/common/confluence'),
-    pants('src/python/twitter/common/contextutil'),
-    pants('src/python/twitter/common/decorators'),
-    pants('src/python/twitter/common/lang'),
-    pants('src/python/twitter/common/log'),
-    pants('src/python/twitter/common/process'),
-    pants('src/python/twitter/common/python'),
-    pants('src/python/twitter/common/quantity'),
-    pants('src/python/twitter/common/rwbuf'),
-    pants('src/python/twitter/common/threading'),
-    pants('src/python/twitter/common/util'),
+    pants('src/python/pants/BUILD.commons:twitter.common.collections'),
+    pants('src/python/pants/BUILD.commons:twitter.common.config'),
+    pants('src/python/pants/BUILD.commons:twitter.common.confluence'),
+    pants('src/python/pants/BUILD.commons:twitter.common.contextutil'),
+    pants('src/python/pants/BUILD.commons:twitter.common.decorators'),
+    pants('src/python/pants/BUILD.commons:twitter.common.lang'),
+    pants('src/python/pants/BUILD.commons:twitter.common.log'),
+    pants('src/python/pants/BUILD.commons:twitter.common.process'),
+    pants('src/python/pants/BUILD.commons:twitter.common.python'),
+    pants('src/python/pants/BUILD.commons:twitter.common.quantity'),
+    pants('src/python/pants/BUILD.commons:twitter.common.rwbuf'),
+    pants('src/python/pants/BUILD.commons:twitter.common.threading'),
+    pants('src/python/pants/BUILD.commons:twitter.common.util'),
   ]
 )
 
 python_binary(
   name='_pants_transitional_publishable_binary_',
-  entry_point = 'twitter.pants.bin.pants_exe:main',
+  entry_point = 'pants.bin.pants_exe:main',
   dependencies=[
     pants(':_pants_transitional_publishable_library_')
   ]

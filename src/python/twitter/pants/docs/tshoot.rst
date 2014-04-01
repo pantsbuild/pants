@@ -48,9 +48,9 @@ Nailgun 5 seconds
 
 If Pants fails with a stack trace that ends with something like ::
 
-    File "twitter/pants/tasks/nailgun_task.py", line 255, in _spawn_nailgun_server
-    File "twitter/pants/tasks/nailgun_task.py", line 226, in _await_nailgun_server
-    twitter.pants.java.nailgun_client.NailgunError: Failed to read ng output after 5 seconds
+    File "pants/tasks/nailgun_task.py", line 255, in _spawn_nailgun_server
+    File "pants/tasks/nailgun_task.py", line 226, in _await_nailgun_server
+    pants.java.nailgun_client.NailgunError: Failed to read ng output after 5 seconds
 
 Pants uses a program called nailgun to run some JVM jobs. Pants runs
 nailgun as a server in the background and then sends requests to it. If

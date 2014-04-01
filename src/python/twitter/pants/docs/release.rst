@@ -29,7 +29,7 @@ updating version numbers for the libraries you will be publishing. You can
 generate a list of libraries requiring publishing with: ::
 
    $ ./pants.bootstrap goal dependencies \
-       src/python/twitter/pants:_pants_transitional_publishable_library_ | sort -u | grep -v =
+       src/python/pants:_pants_transitional_publishable_library_ | sort -u | grep -v =
    src/python/twitter/common/collections/BUILD:collections
    src/python/twitter/common/config/BUILD:config
    src/python/twitter/common/confluence/BUILD:confluence
@@ -37,19 +37,19 @@ generate a list of libraries requiring publishing with: ::
 
 After updating the checked-in version numbers, publish locally and verify the release. ::
 
-   PANTS_DEV=1 ./pants.bootstrap setup_py --recursive src/python/twitter/pants:pants-packaged
+   PANTS_DEV=1 ./pants.bootstrap setup_py --recursive src/python/pants:pants-packaged
    VENV_DIR=$(mktemp -d -t pants.XXXXX)
    virtualenv $VENV_DIR
    source $VENV_DIR/bin/activate
    pip install --allow-external elementtree --allow-unverified elementtree \
-     --find-links=file://$(pwd)/dist twitter.pants==0.0.17
+     --find-links=file://$(pwd)/dist pants==0.0.17
    pants goal list ::
    deactivate
 
 Now that we've smoke-tested this release, publish to PyPi. ::
 
    PANTS_DEV=1 ./pants.bootstrap setup_py --recursive --run='sdist upload' \
-     src/python/twitter/pants:pants-packaged
+     src/python/pants:pants-packaged
 
 Check PyPi to ensure everything looks good. Finally, announce the release to
 `pants-users` and `pants-devel`.

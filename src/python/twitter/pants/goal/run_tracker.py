@@ -1,21 +1,27 @@
-from contextlib import contextmanager
-import httplib
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
+
 import json
 import os
 import sys
 import threading
 import time
 import urllib
+from contextlib import contextmanager
 from urlparse import urlparse
 
-from twitter.pants.base.config import Config
-from twitter.pants.base.run_info import RunInfo
-from twitter.pants.base.worker_pool import WorkerPool
-from twitter.pants.base.workunit import WorkUnit
-from twitter.pants.reporting.report import Report
+import httplib
 
-from .aggregated_timings import AggregatedTimings
-from .artifact_cache_stats import ArtifactCacheStats
+from pants.base.config import Config
+from pants.base.run_info import RunInfo
+from pants.base.worker_pool import WorkerPool
+from pants.base.workunit import WorkUnit
+from pants.goal.aggregated_timings import AggregatedTimings
+from pants.goal.artifact_cache_stats import ArtifactCacheStats
+from pants.reporting.report import Report
 
 
 class RunTracker(object):

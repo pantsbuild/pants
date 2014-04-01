@@ -1,16 +1,21 @@
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
 
 import os
 import shlex
 
 from twitter.common.dirutil import safe_open
 
-from twitter.pants.base.target import Target
-from twitter.pants.base.workunit import WorkUnit
-from twitter.pants.tasks import TaskError
-from twitter.pants.tasks.jvm_compile.analysis_tools import AnalysisTools
-from twitter.pants.tasks.jvm_compile.java.jmake_analysis import JMakeAnalysis
-from twitter.pants.tasks.jvm_compile.java.jmake_analysis_parser import JMakeAnalysisParser
-from twitter.pants.tasks.jvm_compile.jvm_compile import JvmCompile
+from pants.base.target import Target
+from pants.base.workunit import WorkUnit
+from pants.tasks import TaskError
+from pants.tasks.jvm_compile.analysis_tools import AnalysisTools
+from pants.tasks.jvm_compile.java.jmake_analysis import JMakeAnalysis
+from pants.tasks.jvm_compile.java.jmake_analysis_parser import JMakeAnalysisParser
+from pants.tasks.jvm_compile.jvm_compile import JvmCompile
 
 
 # From http://kenai.com/projects/jmake/sources/mercurial/content/src/com/sun/tools/jmake/Main.java?rev=26

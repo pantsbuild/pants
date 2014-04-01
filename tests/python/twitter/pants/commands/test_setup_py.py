@@ -1,26 +1,28 @@
-from contextlib import contextmanager
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
+
 import os
 import unittest
+from contextlib import contextmanager
 
+import pytest
+from mock import MagicMock, Mock, call
 from twitter.common.collections import OrderedSet
-from twitter.common.contextutil import temporary_file, temporary_dir
+from twitter.common.collections import OrderedSet
+from twitter.common.contextutil import temporary_dir, temporary_file
 from twitter.common.dirutil import safe_mkdir, touch
 from twitter.common.dirutil.chroot import Chroot
-from twitter.common.collections import OrderedSet
-from twitter.pants.base.parse_context import ParseContext
-from twitter.pants.base.target import Target, TargetDefinitionException
-from twitter.pants.commands.setup_py import SetupPy
-from twitter.pants.targets.pants_target import Pants as pants
-from twitter.pants.targets.python_artifact import PythonArtifact as setup_py
-from twitter.pants.targets.python_binary import PythonBinary as python_binary
-from twitter.pants.targets.python_library import PythonLibrary as python_library
 
-from mock import (
-    MagicMock,
-    Mock,
-    call,
-)
-import pytest
+from pants.base.parse_context import ParseContext
+from pants.base.target import Target, TargetDefinitionException
+from pants.commands.setup_py import SetupPy
+from pants.targets.pants_target import Pants as pants
+from pants.targets.python_artifact import PythonArtifact as setup_py
+from pants.targets.python_binary import PythonBinary as python_binary
+from pants.targets.python_library import PythonLibrary as python_library
 
 
 def create_dependencies(depmap):
@@ -254,11 +256,11 @@ def test_find_packages():
   assert_single_chroot(['twitter'], [], resources)
 
   # assert that nearest-submodule is honored
-  with yield_chroot(['twitter', 'twitter.pants'], [], resources) as chroot:
+  with yield_chroot(['twitter', 'pants'], [], resources) as chroot:
     _, _, r = SetupPy.find_packages(chroot)
     assert r == {
       'twitter': set(['README.rst']),
-      'twitter.pants': set([
+      'pants': set([
         os.path.join('templates', 'ivy.mk'),
         os.path.join('templates', 'maven.mk'),
       ])
@@ -288,4 +290,3 @@ def test_nearest_subpackage():
       'twitter.util.topo', ['twitter', 'twitter.util'])
   assert 'twitter' == SetupPy.nearest_subpackage(
       'twitter.utilization', ['twitter', 'twitter.util'])
-

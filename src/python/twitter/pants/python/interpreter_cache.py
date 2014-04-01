@@ -1,38 +1,21 @@
-# ==================================================================================================
-# Copyright 2013 Twitter, Inc.
-# --------------------------------------------------------------------------------------------------
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this work except in compliance with the License.
-# You may obtain a copy of the License in the LICENSE file, or at:
-#
-#  http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ==================================================================================================
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import print_function
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
 
 import os
 import shutil
 
-from twitter.common.dirutil import safe_mkdir
-from twitter.common.python.package import EggPackage, SourcePackage
-from twitter.common.python.installer import EggInstaller
-from twitter.common.python.interpreter import (
-    PythonCapability,
-    PythonIdentity,
-    PythonInterpreter,
-)
-from twitter.common.python.obtainer import Obtainer
-
-from .python_setup import PythonSetup
-from .resolver import crawler_from_config, fetchers_from_config
-
 from pkg_resources import Requirement
+from twitter.common.dirutil import safe_mkdir
+from twitter.common.python.installer import EggInstaller
+from twitter.common.python.interpreter import PythonCapability, PythonIdentity, PythonInterpreter
+from twitter.common.python.obtainer import Obtainer
+from twitter.common.python.package import EggPackage, SourcePackage
+
+from pants.python.python_setup import PythonSetup
+from pants.python.resolver import crawler_from_config, fetchers_from_config
 
 
 # TODO(wickman) Create a safer version of this and add to twitter.common.dirutil

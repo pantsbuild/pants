@@ -84,7 +84,7 @@ Open the "Run -> Edit Configurations..." dialog box.
 
 * Add a new Python configuration.
 * Set the "Script" to
-  `/Users/travis/src/commons/src/python/twitter/pants/bin/pants_exe.py`
+  `/Users/travis/src/commons/src/python/pants/bin/pants_exe.py`
 * Set the "Script parameters" to your pants command-line args,
   such as `goal goals`.
 * Set the "Working directory" to where you want to run pants from. Note this

@@ -1,39 +1,42 @@
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 python_library(
   name = 'pants_exe',
   sources = ['pants_exe.py'],
   dependencies = [
     pants('3rdparty/python:psutil'),
-    pants('src/python/twitter/common/dirutil'),
-    pants('src/python/twitter/pants/base:address'),
-    pants('src/python/twitter/pants/base:build_environment'),
-    pants('src/python/twitter/pants/base:config'),
-    pants('src/python/twitter/pants/base:rcfile'),
-    pants('src/python/twitter/pants/commands:command'),
+    pants('src/python/pants/BUILD.commons:twitter.common.dirutil'),
+    pants('src/python/pants/base:address'),
+    pants('src/python/pants/base:build_environment'),
+    pants('src/python/pants/base:config'),
+    pants('src/python/pants/base:rcfile'),
+    pants('src/python/pants/commands:command'),
 
     # XXX these are necessary to parse BUILD.commons.  Should instead be
     # added as plugins to pants.ini
-    pants('src/python/twitter/pants/python:python_chroot'),
-    pants('src/python/twitter/pants/scm:git'),
-    pants('src/python/twitter/pants/targets:java'),
-    pants('src/python/twitter/pants/targets:jvm'),
-    pants('src/python/twitter/pants/targets:scala'),
-    pants('src/python/twitter/pants/tasks:args_resource_mapper'),
-    pants('src/python/twitter/pants/tasks:checkstyle'),
-    pants('src/python/twitter/pants/tasks:what_changed'),
+    pants('src/python/pants/python:python_chroot'),
+    pants('src/python/pants/scm:git'),
+    pants('src/python/pants/targets:java'),
+    pants('src/python/pants/targets:jvm'),
+    pants('src/python/pants/targets:scala'),
+    pants('src/python/pants/tasks:args_resource_mapper'),
+    pants('src/python/pants/tasks:checkstyle'),
+    pants('src/python/pants/tasks:what_changed'),
 
     # XXX The remaining are clear abstraction leaks.
     # The goal target should be goal:run_tracker but it is inseparable from goal; also
     # an abstraction leak.
-    pants('src/python/twitter/pants/goal:initialize_reporting'),
-    pants('src/python/twitter/pants/goal'),
-    pants('src/python/twitter/pants/reporting'),
-    pants('src/python/twitter/pants/tasks:nailgun_task'),
+    pants('src/python/pants/goal:initialize_reporting'),
+    pants('src/python/pants/goal'),
+    pants('src/python/pants/reporting'),
+    pants('src/python/pants/tasks:nailgun_task'),
   ],
 )
 
 python_binary(
   name = 'pants',
-  entry_point = 'twitter.pants.bin.pants_exe:main',
+  entry_point = 'pants.bin.pants_exe:main',
   platforms=[
     'current',
     'linux-x86_64',
@@ -41,25 +44,25 @@ python_binary(
   ],
   dependencies = [
     pants(':pants_exe'),
-    pants('src/python/twitter/pants/commands:pants_old'),
-    pants('src/python/twitter/pants/commands:pants_new'),
+    pants('src/python/pants/commands:pants_old'),
+    pants('src/python/pants/commands:pants_new'),
   ],
 )
 
 python_binary(
   name = 'pants_new',
-  entry_point = 'twitter.pants.bin.pants_exe:main',
+  entry_point = 'pants.bin.pants_exe:main',
   dependencies = [
     pants(':pants_exe'),
-    pants('src/python/twitter/pants/commands:pants_new'),
+    pants('src/python/pants/commands:pants_new'),
   ],
 )
 
 python_binary(
   name = 'pants_old',
-  entry_point = 'twitter.pants.bin.pants_exe:main',
+  entry_point = 'pants.bin.pants_exe:main',
   dependencies = [
     pants(':pants_exe'),
-    pants('src/python/twitter/pants/commands:pants_old'),
+    pants('src/python/pants/commands:pants_old'),
   ],
 )

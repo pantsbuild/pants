@@ -1,46 +1,33 @@
-# ==================================================================================================
-# Copyright 2011 Twitter, Inc.
-# --------------------------------------------------------------------------------------------------
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this work except in compliance with the License.
-# You may obtain a copy of the License in the LICENSE file, or at:
-#
-#  http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ==================================================================================================
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from collections import defaultdict
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
 
 import itertools
 import os
 import shutil
 import sys
 import threading
-
+from collections import defaultdict
 from contextlib import contextmanager
 
 from twitter.common.collections.orderedset import OrderedSet
 
-from twitter.pants.base.build_invalidator import BuildInvalidator, CacheKeyGenerator
-from twitter.pants.base.config import Config
-from twitter.pants.base.hash_utils import hash_file
-from twitter.pants.base.worker_pool import Work
-from twitter.pants.base.workunit import WorkUnit
-from twitter.pants.cache.cache_setup import create_artifact_cache
-from twitter.pants.cache.read_write_artifact_cache import ReadWriteArtifactCache
-from twitter.pants.ivy.bootstrapper import Bootstrapper  # XXX
-from twitter.pants.java.executor import Executor  # XXX
-from twitter.pants.reporting.reporting_utils import items_to_report_element
-
-from .jvm_tool_bootstrapper import JvmToolBootstrapper  # XXX
-from .cache_manager import CacheManager, InvalidationCheck, VersionedTargetSet
-from .ivy_utils import IvyUtils  # XXX
-from .task_error import TaskError
+from pants.base.build_invalidator import BuildInvalidator, CacheKeyGenerator
+from pants.base.config import Config
+from pants.base.hash_utils import hash_file
+from pants.base.worker_pool import Work
+from pants.base.workunit import WorkUnit
+from pants.cache.cache_setup import create_artifact_cache
+from pants.cache.read_write_artifact_cache import ReadWriteArtifactCache
+from pants.ivy.bootstrapper import Bootstrapper  # XXX
+from pants.java.executor import Executor  # XXX
+from pants.reporting.reporting_utils import items_to_report_element
+from pants.tasks.cache_manager import CacheManager, InvalidationCheck, VersionedTargetSet
+from pants.tasks.ivy_utils import IvyUtils  # XXX
+from pants.tasks.jvm_tool_bootstrapper import JvmToolBootstrapper  # XXX
+from pants.tasks.task_error import TaskError
 
 
 class Task(object):

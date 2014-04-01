@@ -1,33 +1,23 @@
-# ==================================================================================================
-# Copyright 2012 Twitter, Inc.
-# --------------------------------------------------------------------------------------------------
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this work except in compliance with the License.
-# You may obtain a copy of the License in the LICENSE file, or at:
-#
-#  http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ==================================================================================================
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
 
 import os
 import pkgutil
 import shutil
 import tempfile
-
 from xml.dom import minidom
 
 from twitter.common.dirutil import safe_mkdir
-from twitter.pants.base.build_environment import get_buildroot
-from twitter.pants.base.generator import TemplateData, Generator
-from twitter.pants.targets.java_tests import JavaTests
-from twitter.pants.targets.scala_tests import ScalaTests
-from twitter.pants.targets.sources import SourceRoot
-from twitter.pants.tasks.ide_gen import IdeGen, Project, SourceSet
+
+from pants.base.build_environment import get_buildroot
+from pants.base.generator import Generator, TemplateData
+from pants.targets.java_tests import JavaTests
+from pants.targets.scala_tests import ScalaTests
+from pants.targets.sources import SourceRoot
+from pants.tasks.ide_gen import IdeGen, Project, SourceSet
 
 
 _TEMPLATE_BASEDIR = 'templates/idea'
@@ -277,4 +267,3 @@ class IdeaGen(IdeGen):
     generated_component_names = set(
       [ name for (name, _) in self._parse_xml_component_elements(path) ])
     return [ x[1] for x in mergable_components if x[0] not in generated_component_names]
-

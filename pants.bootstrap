@@ -18,7 +18,7 @@
 MY_DIR=$(dirname $0)
 VIRTUAL_PYTHON=$MY_DIR/.python/bootstrap
 
-PANTS_EXE=$MY_DIR/src/python/twitter/pants/bin/pants_exe.py
+PANTS_EXE=$MY_DIR/src/python/pants/bin/pants_exe.py
 PANTS_BOOTSTRAP_ARGS=${PANTS_BOOTSTRAP_ARGS:-''}
 
 function with_virtualenv() {
@@ -31,7 +31,7 @@ function with_virtualenv() {
 
 function build_pants() {
   with_virtualenv python $PYTHON_ARGS $PANTS_EXE build $PANTS_BOOTSTRAP_ARGS \
-    src/python/twitter/pants:pants
+    src/python/pants:pants
 }
 
 function run_pants_bare() {
@@ -63,7 +63,7 @@ fi
 
 if [ ! -z "${PANTS_DEV}" ]; then
   # TODO(John Sirois): ideally this would just use pants.pex to run the pants target in py mode:
-  # ./pants.pex py src/python/twitter/pants "$@"
+  # ./pants.pex py src/python/pants "$@"
   echo "*** running pants in dev mode from $PANTS_EXE ***" 1>&2
   run_pants_bare "$@"
 else

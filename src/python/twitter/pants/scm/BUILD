@@ -1,3 +1,6 @@
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 python_library(
   name = 'all',
   dependencies = [
@@ -9,7 +12,7 @@ python_library(
   name = 'scm',
   sources = ['__init__.py'],
   dependencies = [
-    pants('src/python/twitter/common/lang'),
+    pants('src/python/pants/BUILD.commons:twitter.common.lang'),
   ],
 )
 
@@ -18,6 +21,6 @@ python_library(
   sources = ['git.py'],
   dependencies = [
     pants(':scm'),
-    pants('src/python/twitter/common/log'),
+    pants('src/python/pants/BUILD.commons:twitter.common.log'),
   ],
 )

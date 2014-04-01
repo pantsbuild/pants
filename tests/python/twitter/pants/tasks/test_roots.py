@@ -1,12 +1,17 @@
-import os
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
+
+import os
 from contextlib import contextmanager
 
-from twitter.pants.base.build_environment import get_buildroot
-from twitter.pants.base.target import Target
-from twitter.pants.targets.sources import SourceRoot
-from twitter.pants.tasks.roots import ListRoots
-from twitter.pants.tasks.test_base import ConsoleTaskTest
+from pants.base.build_environment import get_buildroot
+from pants.base.target import Target
+from pants.targets.sources import SourceRoot
+from pants.tasks.roots import ListRoots
+from pants.tasks.test_base import ConsoleTaskTest
 
 
 @contextmanager

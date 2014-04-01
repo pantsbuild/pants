@@ -42,7 +42,7 @@ If you know the Pants internals well enough to know the name of a
 ``Task`` class, you can use that class' name as a category to set
 command-line options affecting it::
 
-    [twitter.pants.tasks.nailgun_task.NailgunTask]
+    [pants.tasks.nailgun_task.NailgunTask]
     # Don't spawn compilation daemons on this shared build server
     options: --no-ng-daemons
 

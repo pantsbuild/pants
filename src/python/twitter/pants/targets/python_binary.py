@@ -1,18 +1,8 @@
-# ==================================================================================================
-# Copyright 2011 Twitter, Inc.
-# --------------------------------------------------------------------------------------------------
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this work except in compliance with the License.
-# You may obtain a copy of the License in the LICENSE file, or at:
-#
-#  http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ==================================================================================================
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
 
 import os
 
@@ -20,10 +10,9 @@ from twitter.common.collections import maybe_list
 from twitter.common.lang import Compatibility
 from twitter.common.python.pex_info import PexInfo
 
-from twitter.pants.base.build_manual import manual
-from twitter.pants.base.target import Target, TargetDefinitionException
-
-from .python_target import PythonTarget
+from pants.base.build_manual import manual
+from pants.base.target import Target, TargetDefinitionException
+from pants.targets.python_target import PythonTarget
 
 
 @manual.builddict(tags=['python'])
@@ -33,7 +22,7 @@ class PythonBinary(PythonTarget):
   Python binaries are pex files, self-contained executable shell
   scripts that contain a complete Python environment capable of
   running the target. For more information about pex files see
-  https://github.com/twitter/commons/blob/master/src/python/twitter/pants/python/README.md"""
+  https://github.com/twitter/commons/blob/master/src/python/pants/python/README.md"""
 
   # TODO(wickman) Consider splitting pex options out into a separate PexInfo builder that can be
   # attached to the binary target.  Ideally the PythonBinary target is agnostic about pex mechanics
@@ -56,7 +45,7 @@ class PythonBinary(PythonTarget):
     :param name: target name
     :param source: the python source file that becomes this binary's __main__.
       If None specified, drops into an interpreter by default.
-    :param dependencies: List of :class:`twitter.pants.base.target.Target` instances
+    :param dependencies: List of :class:`pants.base.target.Target` instances
       this target depends on.
     :type dependencies: list of targets
     :param entry_point: the default entry point for this binary.  if None, drops into the entry

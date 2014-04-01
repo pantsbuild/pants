@@ -1,31 +1,22 @@
-# ==================================================================================================
-# Copyright 2011 Twitter, Inc.
-# --------------------------------------------------------------------------------------------------
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this work except in compliance with the License.
-# You may obtain a copy of the License in the LICENSE file, or at:
-#
-#  http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ==================================================================================================
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
 
 import os
 
 from twitter.common.lang import Compatibility
-from twitter.pants.base.build_file import BuildFile
+
+from pants.base.build_file import BuildFile
 
 
 class Address(object):
   """A target address.
 
   An address is a unique name representing a
-  :class:`twitter.pants.base.target.Target`. Its composed of the
-  :class:`twitter.pants.base.build_file.BuildFile` plus target name.
+  :class:`pants.base.target.Target`. Its composed of the
+  :class:`pants.base.build_file.BuildFile` plus target name.
 
   While not their only use, a noteworthy use of addresses is specifying
   target dependencies. For example:

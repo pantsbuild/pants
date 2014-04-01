@@ -1,9 +1,16 @@
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
+
 import os
 import urlparse
-from twitter.pants.cache.pinger import Pinger
-from twitter.pants.cache.combined_artifact_cache import CombinedArtifactCache
-from twitter.pants.cache.local_artifact_cache import LocalArtifactCache
-from twitter.pants.cache.restful_artifact_cache import RESTfulArtifactCache
+
+from pants.cache.combined_artifact_cache import CombinedArtifactCache
+from pants.cache.local_artifact_cache import LocalArtifactCache
+from pants.cache.pinger import Pinger
+from pants.cache.restful_artifact_cache import RESTfulArtifactCache
 
 
 def select_best_url(spec, pinger, log):

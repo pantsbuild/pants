@@ -1,30 +1,19 @@
-#==================================================================================================
-# Copyright 2014 Twitter, Inc.
-# --------------------------------------------------------------------------------------------------
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this work except in compliance with the License.
-# You may obtain a copy of the License in the LICENSE file, or at:
-#
-#  http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ==================================================================================================
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
 
 import os
-
 from textwrap import dedent
 
-from twitter.pants.base_build_root_test import BaseBuildRootTest
-from twitter.pants.base.context_utils import create_config
-from twitter.pants.python.thrift_builder import PythonThriftBuilder
-from twitter.pants.targets.python_thrift_library import PythonThriftLibrary
-from twitter.pants.targets.sources import SourceRoot
+from mock import MagicMock, call, mock_open, patch
 
-from mock import call, MagicMock, mock_open, patch
+from pants.base.context_utils import create_config
+from pants.base_build_root_test import BaseBuildRootTest
+from pants.python.thrift_builder import PythonThriftBuilder
+from pants.targets.python_thrift_library import PythonThriftLibrary
+from pants.targets.sources import SourceRoot
 
 
 sample_ini_test = """

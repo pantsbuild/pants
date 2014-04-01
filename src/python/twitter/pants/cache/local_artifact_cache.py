@@ -1,10 +1,17 @@
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
+
 import os
 import shutil
 import uuid
 
-from twitter.common.dirutil import safe_mkdir, safe_mkdir_for, safe_delete
-from twitter.pants.cache.artifact import TarballArtifact, ArtifactError
-from twitter.pants.cache.artifact_cache import ArtifactCache
+from twitter.common.dirutil import safe_delete, safe_mkdir, safe_mkdir_for
+
+from pants.cache.artifact import ArtifactError, TarballArtifact
+from pants.cache.artifact_cache import ArtifactCache
 
 
 class LocalArtifactCache(ArtifactCache):

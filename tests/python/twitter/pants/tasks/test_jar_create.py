@@ -1,39 +1,28 @@
-# ==================================================================================================
-# Copyright 2013 Twitter, Inc.
-# --------------------------------------------------------------------------------------------------
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this work except in compliance with the License.
-# You may obtain a copy of the License in the LICENSE file, or at:
-#
-#  http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ==================================================================================================
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
 
 import os
 import tempfile
-
 from collections import defaultdict
-from contextlib import contextmanager, closing
+from contextlib import closing, contextmanager
 from textwrap import dedent
 
 from twitter.common.contextutil import temporary_dir
 from twitter.common.dirutil import safe_open, safe_rmtree
 
-from twitter.pants.base.context_utils import create_context
-from twitter.pants.base_build_root_test import BaseBuildRootTest
-from twitter.pants.goal.products import MultipleRootedProducts
-from twitter.pants.java.jar import open_jar
-from twitter.pants.targets.java_library import JavaLibrary
-from twitter.pants.targets.java_thrift_library import JavaThriftLibrary
-from twitter.pants.targets.resources import Resources
-from twitter.pants.targets.scala_library import ScalaLibrary
-from twitter.pants.targets.sources import SourceRoot
-from twitter.pants.tasks.jar_create import is_jvm_library, JarCreate
+from pants.base.context_utils import create_context
+from pants.base_build_root_test import BaseBuildRootTest
+from pants.goal.products import MultipleRootedProducts
+from pants.java.jar import open_jar
+from pants.targets.java_library import JavaLibrary
+from pants.targets.java_thrift_library import JavaThriftLibrary
+from pants.targets.resources import Resources
+from pants.targets.scala_library import ScalaLibrary
+from pants.targets.sources import SourceRoot
+from pants.tasks.jar_create import JarCreate, is_jvm_library
 
 
 class JarCreateTestBase(BaseBuildRootTest):
@@ -257,4 +246,3 @@ class JarCreateExecuteTest(JarCreateTestBase):
 
   def test_javadoc_jar_not_required(self):
     self.assert_javadoc_jar_contents(self.context(), empty=True, jar_javadoc=False)
-

@@ -1,15 +1,20 @@
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
 
 import os
 from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
 
-from twitter.pants.base.build_environment import get_buildroot
-from twitter.pants.targets.internal import InternalTarget
-from twitter.pants.targets.jar_dependency import JarDependency
-from twitter.pants.targets.jar_library import JarLibrary
-from twitter.pants.targets.jvm_target import JvmTarget
-from twitter.pants.tasks import TaskError, Task
+from pants.base.build_environment import get_buildroot
+from pants.targets.internal import InternalTarget
+from pants.targets.jar_dependency import JarDependency
+from pants.targets.jar_library import JarLibrary
+from pants.targets.jvm_target import JvmTarget
+from pants.tasks import Task, TaskError
 
 
 class JvmDependencyAnalyzer(object):

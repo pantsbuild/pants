@@ -1,7 +1,13 @@
-from twitter.pants.base.double_dag import DoubleDag
-from twitter.pants.reporting.report import Report
-from twitter.pants.testutils import MockLogger, MockTarget
-from twitter.pants.testutils.base_mock_target_test import BaseMockTargetTest
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
+
+from pants.base.double_dag import DoubleDag
+from pants.reporting.report import Report
+from pants.testutils import MockLogger, MockTarget
+from pants.testutils.base_mock_target_test import BaseMockTargetTest
 
 
 def make_dag(nodes):
@@ -120,4 +126,3 @@ class DoubleDagTest(BaseMockTargetTest):
     c = MockTarget('c', [b])
     d = MockTarget('d', [c, a])
     e = MockTarget('e', [d])
-

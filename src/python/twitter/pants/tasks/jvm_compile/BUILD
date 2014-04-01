@@ -1,3 +1,6 @@
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 python_library(
   name = 'analysis',
   sources = ['analysis.py'],
@@ -7,7 +10,7 @@ python_library(
   name = 'analysis_parser',
   sources = ['analysis_parser.py'],
   dependencies = [
-    pants('src/python/twitter/pants/tasks:task_error'),
+    pants('src/python/pants/tasks:task_error'),
   ]
 )
 
@@ -15,8 +18,8 @@ python_library(
   name = 'analysis_tools',
   sources = ['analysis_tools.py'],
   dependencies = [
-    pants('src/python/twitter/common/contextutil'),
-    pants('src/python/twitter/pants/base:build_environment'),
+    pants('src/python/pants/BUILD.commons:twitter.common.contextutil'),
+    pants('src/python/pants/base:build_environment'),
   ]
 )
 
@@ -27,11 +30,11 @@ python_library(
     pants(':analysis'),
     pants(':analysis_tools'),
     pants(':jvm_compile'),
-    pants('src/python/twitter/common/dirutil'),
-    pants('src/python/twitter/pants/base:build_environment'),
-    pants('src/python/twitter/pants/base:target'),
-    pants('src/python/twitter/pants/base:workunit'),
-    pants('src/python/twitter/pants/tasks:task_error'),
+    pants('src/python/pants/BUILD.commons:twitter.common.dirutil'),
+    pants('src/python/pants/base:build_environment'),
+    pants('src/python/pants/base:target'),
+    pants('src/python/pants/base:workunit'),
+    pants('src/python/pants/tasks:task_error'),
   ],
 )
 
@@ -40,15 +43,15 @@ python_library(
   sources = ['jvm_compile.py'],
   dependencies = [
     pants(':jvm_dependency_analyzer'),
-    pants('src/python/twitter/common/contextutil'),
-    pants('src/python/twitter/common/dirutil'),
-    pants('src/python/twitter/pants/base:build_environment'),
-    pants('src/python/twitter/pants/base:target'),
-    pants('src/python/twitter/pants/base:worker_pool'),
-    pants('src/python/twitter/pants/goal:products'),
-    pants('src/python/twitter/pants/reporting'),
-    pants('src/python/twitter/pants/tasks:nailgun_task'),
-    pants('src/python/twitter/pants/tasks:task'),
+    pants('src/python/pants/BUILD.commons:twitter.common.contextutil'),
+    pants('src/python/pants/BUILD.commons:twitter.common.dirutil'),
+    pants('src/python/pants/base:build_environment'),
+    pants('src/python/pants/base:target'),
+    pants('src/python/pants/base:worker_pool'),
+    pants('src/python/pants/goal:products'),
+    pants('src/python/pants/reporting'),
+    pants('src/python/pants/tasks:nailgun_task'),
+    pants('src/python/pants/tasks:task'),
   ],
 )
 
@@ -56,11 +59,11 @@ python_library(
   name = 'jvm_dependency_analyzer',
   sources = ['jvm_dependency_analyzer.py'],
   dependencies = [
-    pants('src/python/twitter/common/collections'),
-    pants('src/python/twitter/pants/base:build_environment'),
-    pants('src/python/twitter/pants/targets:common'),
-    pants('src/python/twitter/pants/targets:jvm'),
-    pants('src/python/twitter/pants/tasks:common'),
+    pants('src/python/pants/BUILD.commons:twitter.common.collections'),
+    pants('src/python/pants/base:build_environment'),
+    pants('src/python/pants/targets:common'),
+    pants('src/python/pants/targets:jvm'),
+    pants('src/python/pants/tasks:common'),
   ],
 )
 
@@ -72,13 +75,13 @@ python_library(
     pants(':analysis_parser'),
     pants(':analysis_tools'),
     pants(':jvm_compile'),
-    pants('src/python/twitter/common/collections'),
-    pants('src/python/twitter/common/contextutil'),
-    pants('src/python/twitter/common/dirutil'),
-    pants('src/python/twitter/pants/base:build_environment'),
-    pants('src/python/twitter/pants/base:hash_utils'),
-    pants('src/python/twitter/pants/base:workunit'),
-    pants('src/python/twitter/pants/targets:scala'),
-    pants('src/python/twitter/pants/tasks:task_error'),
+    pants('src/python/pants/BUILD.commons:twitter.common.collections'),
+    pants('src/python/pants/BUILD.commons:twitter.common.contextutil'),
+    pants('src/python/pants/BUILD.commons:twitter.common.dirutil'),
+    pants('src/python/pants/base:build_environment'),
+    pants('src/python/pants/base:hash_utils'),
+    pants('src/python/pants/base:workunit'),
+    pants('src/python/pants/targets:scala'),
+    pants('src/python/pants/tasks:task_error'),
   ],
 )
