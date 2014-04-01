@@ -20,15 +20,17 @@ class NailgunSession(object):
     """Thrown if there is an error in the underlying nailgun protocol."""
 
   # See: http://www.martiansoftware.com/nailgun/protocol.html
-  HEADER_FMT = '>Ic'
+  HEADER_FMT = b'>Ic'
   HEADER_LENGTH = 5
 
   BUFF_SIZE = 8096
 
   @classmethod
   def _send_chunk(cls, sock, command, payload=''):
-    header = struct.pack(cls.HEADER_FMT, len(payload), command)
-    sock.sendall(header + payload)
+    command_str = command.encode()
+    payload_str = payload.encode()
+    header = struct.pack(cls.HEADER_FMT, len(payload_str), command_str)
+    sock.sendall(header + payload_str)
 
   def __init__(self, sock, ins, out, err):
     self._sock = sock
