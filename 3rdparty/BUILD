@@ -318,6 +318,8 @@ jar_library(name='thrift-0.5.0-finagle',
 jar_library(name='thrift',
             dependencies=[ pants(':thrift-0.5.0') ])
 
+jar_library(name='twitter-commons',
+            dependencies=[])
 jar_library(name='twitter-text',
             dependencies=[ jar(org='com.twitter', name='twitter-text', rev='1.5.0') ])
 
