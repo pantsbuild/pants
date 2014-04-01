@@ -3,7 +3,7 @@
 
 SHA = '0741ced0f787771d82b5703bddb2990e2d3dcae7'
 
-REPO = ('https://raw.githubusercontent.com/pantsbuild/cheeseshop/master/'
+REPO = ('https://raw.githubusercontent.com/pantsbuild/cheeseshop/gh-pages/'
         'third_party/twitter-commons/%s/index.html' % SHA)
 
 def commons_dep(name):
