@@ -1,0 +1,22 @@
+Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+Running pingpong tests:
+
+./pants goal test tests/java/com/pants/examples/pingpong
+
+Running the pingpong example, pinging itself:
+
+./pants goal run src/java/com/pants/examples/pingpong/main \
+    --jvm-run-args="-http_port=8888 -ping_target=localhost:8888"
+
+Initiate the pingpong sequence:
+$ curl localhost:8888/ping/hello
+
+To see diagnostics, just point your browser to:
+  http://localhost:8888/ (index page, which links to the below)
+  http://localhost:8888/vars
+  http://localhost:8888/graphview
+  http://localhost:8888/threads
+  http://localhost:8888/contention
+  http://localhost:8888/pprof/profile
