@@ -29,7 +29,7 @@ class AppendingCacheKeyGenerator(CacheKeyGenerator):
 
 
 def print_vt(vt):
-  print '%d (%s) %s: [ %s ]' % (len(vt.targets), vt.cache_key, vt.valid, ', '.join(['%s(%s)' % (v.id, v.cache_key) for v in vt.versioned_targets]))
+  print('%d (%s) %s: [ %s ]' % (len(vt.targets), vt.cache_key, vt.valid, ', '.join(['%s(%s)' % (v.id, v.cache_key) for v in vt.versioned_targets])))
 
 
 class CacheManagerTest(BaseMockTargetTest):

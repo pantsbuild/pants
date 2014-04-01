@@ -106,7 +106,7 @@ class CheckExclusives(Task):
           if self.signal_error:
             raise TaskError(msg)
           else:
-            print "Warning: %s" % msg
+            print('Warning: %s' % msg)
 
     if self.context.products.is_required_data('exclusives_groups'):
       mapping = ExclusivesMapping(self.context)

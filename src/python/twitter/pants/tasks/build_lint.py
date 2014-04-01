@@ -131,4 +131,4 @@ class BuildLint(Task):
         if 'diff' in self.actions:
           diff = '\n'.join(difflib.unified_diff(old_buildfile_source.split('\n'),
             new_buildfile_source.split('\n'), buildfile_path))
-          print diff
+          print(diff)

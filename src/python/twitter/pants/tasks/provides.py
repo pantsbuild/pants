@@ -81,7 +81,7 @@ class Provides(Task):
               class_name = line[:-6].replace('/', '.')
               do_write(class_name)
               do_write('\n')
-      print 'Wrote provides information to %s' % outpath
+      print('Wrote provides information to %s' % outpath)
 
   def get_jar_paths(self, ivyinfo, target, conf):
     jar_paths = OrderedSet()
