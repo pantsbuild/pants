@@ -91,7 +91,7 @@ class NailgunSession(object):
         self._input_reader.stop()
 
   def _read_response(self):
-    buff = ''
+    buff = b''
     while True:
       command, payload, buff = self._read_chunk(buff)
       if command == '1':

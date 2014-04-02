@@ -148,10 +148,12 @@ def get_syms():
     r[s] = o
   return r
 
+# Needed since x may be a str or a unicode, so we can't hard-code str.lower or unicode.lower.
+_lower = lambda x: x.lower
 
 def tocl(d):
   """Generate TOC, in-page links to the IDs we're going to define below"""
-  anchors = sorted(d.keys(), key=str.lower)
+  anchors = sorted(d.keys(), key=_lower)
   return TemplateData(t="All The Things", e=[a for a in anchors])
 
 
@@ -162,7 +164,7 @@ def tags_tocl(d, tag_list, title):
   title: pretty title
   """
   filtered_anchors = []
-  for anc in sorted(d.keys(), key=str.lower):
+  for anc in sorted(d.keys(), key=_lower):
     entry = d[anc]
     if not "tags" in entry: continue
     found = [t for t in tag_list if t in entry["tags"]]
@@ -241,7 +243,7 @@ class BuildBuildDictionary(Task):
     tocs = [tocl(d),
             tags_tocl(d, ["java", "scala", "jvm", "anylang"], "JVM"),
             tags_tocl(d, ["python", "anylang"], "Python")]
-    defns = [d[t]["defn"] for t in sorted(d.keys(), key=str.lower)]
+    defns = [d[t]["defn"] for t in sorted(d.keys(), key=_lower)]
     filename = os.path.join(self._outdir, 'build_dictionary.rst')
     self.context.log.info('Generating %s' % filename)
     with safe_open(filename, 'w') as outfile:
@@ -258,12 +260,12 @@ class BuildBuildDictionary(Task):
       goals = []
       for g in raw_goals:
         # TODO(lahosken) generalize indent_docstring, use here
-        doc = (g.task_type.__doc__ or "").replace("\n", " ").strip()
+        doc = (g.task_type.__doc__ or '').replace('\n\'', ' \'').strip()
         goals.append(TemplateData(name=g.task_type.__name__, doc=doc))
       phase_dict[phase.name] = TemplateData(phase=phase, goals=goals)
       phase_names.append(phase.name)
 
-    phases = [phase_dict[name] for name in sorted(phase_names, key=str.lower)]
+    phases = [phase_dict[name] for name in sorted(phase_names, key=_lower)]
 
     template = resource_string(__name__,
                                os.path.join(self._templates_dir, 'goals_reference.mustache'))

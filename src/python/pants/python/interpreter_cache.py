@@ -164,7 +164,7 @@ class PythonInterpreterCache(object):
         elif interpreter.identity.matches(filt):
           yield interpreter
 
-  def setup(self, paths=(), force=False, filters=('',)):
+  def setup(self, paths=(), force=False, filters=(b'',)):
     has_setup = False
     setup_paths = paths or os.getenv('PATH').split(os.pathsep)
     self.setup_cached()

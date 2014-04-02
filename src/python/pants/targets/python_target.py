@@ -38,7 +38,7 @@ class PythonTarget(TargetWithDependencies, TargetWithSources):
           provides.__class__.__name__)
     self.provides = provides
 
-    self.compatibility = maybe_list(compatibility or ())
+    self.compatibility = maybe_list(compatibility or [b''])
     for req in self.compatibility:
       try:
         PythonIdentity.parse_requirement(req)

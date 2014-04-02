@@ -26,7 +26,8 @@ import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.args.constraints.NotNull;
 import com.twitter.common.base.Closure;
-import com.twitter.common.examples.pingpong.handler.PingHandler;
+
+import com.pants.examples.pingpong.handler.PingHandler;
 
 /**
  * An application that serves HTTP requests to /ping/{message}/{ttl}, and

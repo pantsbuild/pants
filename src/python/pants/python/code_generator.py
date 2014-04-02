@@ -49,7 +49,7 @@ class CodeGenerator(object):
   @property
   def package_dir(self):
     """Return the code generation root."""
-    return "."
+    return '.'
 
   @property
   def install_requires(self):
@@ -73,15 +73,15 @@ class CodeGenerator(object):
             namespace_packages = %(namespace_packages)s)
     """)
     boilerplate = boilerplate % {
-      'package_name': self.package_name(),
-      'package_dir': self.package_dir,
-      'target_name': self.target.name,
-      'install_requires': self.install_requires,
-      'packages': repr(self.created_packages),
-      'namespace_packages': repr(list(self.created_namespace_packages))
+      'package_name': self.package_name().encode('utf-8'),
+      'package_dir': self.package_dir.encode('utf-8'),
+      'target_name': self.target.name.encode('utf-8'),
+      'install_requires': [x.encode('utf-8') for x in self.install_requires],
+      'packages': repr([x.encode('utf-8') for x in self.created_packages]),
+      'namespace_packages': repr([x.encode('utf-8') for x in self.created_namespace_packages])
     }
     self.chroot.write(boilerplate.encode('utf8'), os.path.join(self.codegen_root, 'setup.py'))
-    self.chroot.write("include *.py".encode('utf8'), os.path.join(self.codegen_root, 'MANIFEST.in'))
+    self.chroot.write('include *.py'.encode('utf8'), os.path.join(self.codegen_root, 'MANIFEST.in'))
 
   @property
   def sdist_root(self):

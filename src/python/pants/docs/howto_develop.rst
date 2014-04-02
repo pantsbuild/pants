@@ -71,12 +71,12 @@ Running Tests
 Pants has many tests. There are BUILD targets to run those tests.
 We try to keep them passing.
 To make sure a change passes *all* of Pants' tests, use the
-``tests/python/pants:all`` target.
+``tests/python/pants_test:all`` target.
 *Do not* use ``PANTS_DEV=1`` when running tests at this time
 as that modifies ``sys.path`` in such a way as resources will
 not be discovered correctly. ::
 
-   ./pants.bootstrap tests/python/pants:all
+   ./pants.bootstrap tests/python/pants_test:all
 
 To try all the tests in a few configurations, you can run the same script
 that our Travis CI does. This can take a while, but it's a good idea to

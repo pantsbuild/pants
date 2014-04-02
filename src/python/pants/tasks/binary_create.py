@@ -97,7 +97,7 @@ class BinaryCreate(JvmBinaryTask):
       manifest.addentry(Manifest.MANIFEST_VERSION, '1.0')
       manifest.addentry(
         Manifest.CREATED_BY,
-        'python %s pants %s (Twitter, Inc.)' % (platform.python_version(), get_version())
+        'python %s pants %s' % (platform.python_version(), get_version())
       )
       main = binary.main or '*** java -jar not supported, please use -cp and pick a main ***'
       manifest.addentry(Manifest.MAIN_CLASS,  main)
