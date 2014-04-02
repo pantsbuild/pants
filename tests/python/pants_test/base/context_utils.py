@@ -40,7 +40,7 @@ def create_config(sample_ini='', defaults=None):
     raise ValueError('The sample_ini supplied must be a string, given: %s' % sample_ini)
 
   parser = Config.create_parser(defaults)
-  with io.BytesIO(sample_ini) as ini:
+  with io.BytesIO(sample_ini.encode('utf-8')) as ini:
     parser.readfp(ini)
   return Config(parser)
 
