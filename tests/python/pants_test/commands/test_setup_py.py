@@ -240,53 +240,53 @@ def test_find_packages():
       assert r == dict((k, set(v)) for (k, v) in resources.items())
 
   # assert both packages and namespace packages work
-  assert_single_chroot(['twitter'], [], {})
-  assert_single_chroot(['twitter'], ['twitter'], {})
+  assert_single_chroot(['foo'], [], {})
+  assert_single_chroot(['foo'], ['foo'], {})
 
   # assert resources work
-  assert_single_chroot(['twitter'], [], {'twitter': ['blork.dat']})
+  assert_single_chroot(['foo'], [], {'foo': ['blork.dat']})
 
   resources = {
-    'twitter': [
-      'README.rst',
-      os.path.join('pants', 'templates', 'ivy.mk'),
-      os.path.join('pants', 'templates', 'maven.mk'),
+    'foo': [
+      'f0',
+      os.path.join('bar', 'baz', 'f1'),
+      os.path.join('bar', 'baz', 'f2'),
     ]
   }
-  assert_single_chroot(['twitter'], [], resources)
+  assert_single_chroot(['foo'], [], resources)
 
   # assert that nearest-submodule is honored
-  with yield_chroot(['twitter', 'pants'], [], resources) as chroot:
+  with yield_chroot(['foo', 'foo.bar'], [], resources) as chroot:
     _, _, r = SetupPy.find_packages(chroot)
     assert r == {
-      'twitter': set(['README.rst']),
-      'pants': set([
-        os.path.join('templates', 'ivy.mk'),
-        os.path.join('templates', 'maven.mk'),
+      'foo': set(['f0']),
+      'foo.bar': set([
+        os.path.join('baz', 'f1'),
+        os.path.join('baz', 'f2'),
       ])
     }
 
   # assert that nearest submodule splits on module prefixes
   with yield_chroot(
-      ['twitter', 'twitter.util'],
+      ['foo', 'foo.bar'],
       [],
-      {'twitter.utilization': ['README.rst']}) as chroot:
+      {'foo.bar1': ['f0']}) as chroot:
 
     _, _, r = SetupPy.find_packages(chroot)
-    assert r == {'twitter': set(['utilization/README.rst'])}
+    assert r == {'foo': set(['bar1/f0'])}
 
 
 def test_nearest_subpackage():
   # degenerate
-  assert SetupPy.nearest_subpackage('twitter', []) == 'twitter'
-  assert SetupPy.nearest_subpackage('twitter', ['twitter']) == 'twitter'
-  assert SetupPy.nearest_subpackage('twitter', ['foursquare']) == 'twitter'
+  assert SetupPy.nearest_subpackage('foo', []) == 'foo'
+  assert SetupPy.nearest_subpackage('foo', ['foo']) == 'foo'
+  assert SetupPy.nearest_subpackage('foo', ['bar']) == 'foo'
 
   # common prefix
-  assert 'twitter' == SetupPy.nearest_subpackage('twitter.util', ['twitter'])
-  assert 'twitter.util' == SetupPy.nearest_subpackage(
-      'twitter.util', ['twitter', 'twitter.util'])
-  assert 'twitter.util' == SetupPy.nearest_subpackage(
-      'twitter.util.topo', ['twitter', 'twitter.util'])
-  assert 'twitter' == SetupPy.nearest_subpackage(
-      'twitter.utilization', ['twitter', 'twitter.util'])
+  assert 'foo' == SetupPy.nearest_subpackage('foo.bar', ['foo'])
+  assert 'foo.bar' == SetupPy.nearest_subpackage(
+      'foo.bar', ['foo', 'foo.bar'])
+  assert 'foo.bar' == SetupPy.nearest_subpackage(
+      'foo.bar.topo', ['foo', 'foo.bar'])
+  assert 'foo' == SetupPy.nearest_subpackage(
+      'foo.barization', ['foo', 'foo.bar'])
