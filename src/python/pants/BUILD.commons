@@ -3,7 +3,7 @@
 
 SHA = '0741ced0f787771d82b5703bddb2990e2d3dcae7'
 
-REPO = ('https://s3.amazonaws.com/4sq-pub/third_party/twitter-commons/%s/index.html' % SHA)
+REPO = ('http://pantsbuild.github.io/cheeseshop/third_party/twitter-commons/%s/index.html' % SHA)
 
 def commons_dep(name):
   return python_requirement(requirement='twitter.common.%s' % name, repository=REPO)
