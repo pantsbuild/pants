@@ -25,6 +25,7 @@ python_tests(
   dependencies = [
     'src/antlr/pants/python/test:csv',
     'src/antlr/pants/python/test:eval',
+    'src/python/pants/python:python_setup',
   ],
 )
 

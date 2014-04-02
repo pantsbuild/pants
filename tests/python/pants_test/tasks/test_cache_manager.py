@@ -65,7 +65,7 @@ class CacheManagerTest(BaseMockTargetTest):
     all_vts = self.cache_manager._sort_and_validate_targets(targets)
 
     [ print_vt(vt) for vt in all_vts ]
-    print ''
+    print('')
 
     invalid_vts = filter(lambda vt: not vt.valid, all_vts)
     self.assertEquals(5, len(invalid_vts))
