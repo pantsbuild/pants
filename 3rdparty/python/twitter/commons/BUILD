@@ -3,5 +3,3 @@
 
 # see/edit requirements.txt in this directory to change deps.
 python_requirements()
-
-dependencies(name='antlr-3.1.3', dependencies=[':antlr-python-runtime'])

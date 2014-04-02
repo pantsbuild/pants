@@ -26,6 +26,7 @@ from pants.targets.python_binary import PythonBinary
 from pants.targets.python_egg import PythonEgg
 from pants.targets.python_library import PythonLibrary
 from pants.targets.python_requirement import PythonRequirement
+from pants.targets.python_requirements import python_requirements
 from pants.targets.python_tests import PythonTestSuite, PythonTests
 from pants.targets.python_thrift_library import PythonThriftLibrary
 from pants.targets.repository import Repository

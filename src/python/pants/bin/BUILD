@@ -6,7 +6,7 @@ python_library(
   sources = ['pants_exe.py'],
   dependencies = [
     pants('3rdparty/python:psutil'),
-    pants('3rdparty/python:twitter.common.dirutil'),
+    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('src/python/pants/base:address'),
     pants('src/python/pants/base:build_environment'),
     pants('src/python/pants/base:config'),
