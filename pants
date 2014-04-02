@@ -2,7 +2,87 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-source build-support/python/libvirtualenv.sh
-setup_virtualenv 'pants' 'twitter.pants==0.0.17' \
-  '--allow-external elementtree --allow-unverified elementtree'
-exec pants "$@"
+HERE=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
+
+VENV_DIR="${HERE}/build-support/pants_deps.venv"
+
+REQUIREMENTS=(
+  ${HERE}/3rdparty/python/requirements.txt
+  ${HERE}/3rdparty/python/twitter/commons/requirements.txt
+)
+
+PANTS_EXE=src/python/pants/bin/pants_exe.py
+PANTS_BINARY=src/python/pants/bin:pants
+PANTS_PEX="${HERE}/pants.pex"
+
+function log() {
+  echo -e "$@" 1>&2
+}
+
+function die() {
+  (($# > 0)) && log "$@"
+  exit 1
+}
+
+function fingerprint_data() {
+  openssl md5 | cut -d' ' -f2
+}
+
+function activate_venv() {
+  source "${VENV_DIR}/bin/activate"
+}
+
+function create_venv() {
+  rm -rf "${VENV_DIR}"
+  "${HERE}/build-support/virtualenv" "${VENV_DIR}"
+}
+
+function activate_pants_bare() {
+  fingerprint=""
+  for req in ${REQUIREMENTS[@]}; do
+    fingerprint="${fingerprint}$(cat ${req} | fingerprint_data)"
+  done
+  fingerprint=$(echo "${fingerprint}" | fingerprint_data)
+
+  BOOTSTRAPPED_FILE="${VENV_DIR}/BOOTSTRAPPED.${fingerprint}"
+
+  if ! [ -f ${BOOTSTRAPPED_FILE} ]; then
+    log "Bootstrapping pants_deps with requirements:"
+    for req in ${REQUIREMENTS[@]}; do
+      log "  ${req}"
+    done
+
+    create_venv
+    activate_venv
+    for req in ${REQUIREMENTS[@]}; do
+      pip install -r "$req" || die "Failed to install requirements from ${req}."
+    done
+    touch "${BOOTSTRAPPED_FILE}"
+  else
+    activate_venv
+  fi
+}
+
+function run_pants_bare() {
+  activate_pants_bare
+  PYTHONPATH=src/python python ${PANTS_EXE} "$@"
+}
+
+function exec_pants_bare() {
+  activate_pants_bare
+  PYTHONPATH=src/python exec python ${PANTS_EXE} "$@"
+}
+
+if [ ! -z "${PANTS_DEV}" ]; then
+  log "*** Running pants in dev mode from ${PANTS_EXE} ***"
+  exec_pants_bare "$@"
+else
+  if [ ! -e "${PANTS_PEX}" ]; then
+    log "Building pants.pex to ${PANTS_PEX}..."
+    rm -rf ${PANTS_PEX} && \
+    run_pants_bare py -v --pex ${PANTS_BINARY} && \
+    mv -v dist/pants.pex ${PANTS_PEX} && \
+    chmod +x ${PANTS_PEX}
+  fi
+  exec "${PANTS_PEX}" "$@"
+fi

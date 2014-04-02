@@ -5,8 +5,8 @@ python_library(
   name = 'engine',
   sources = globs('*.py'),
   dependencies = [
-    pants('3rdparty/python:twitter.common.collections'),
-    pants('3rdparty/python:twitter.common.lang'),
+    pants('3rdparty/python/twitter/commons:twitter.common.collections'),
+    pants('3rdparty/python/twitter/commons:twitter.common.lang'),
     pants('src/python/pants/base:workunit'),
     pants('src/python/pants/goal'),
     pants('src/python/pants/targets:common'),

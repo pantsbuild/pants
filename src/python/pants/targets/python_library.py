@@ -35,6 +35,9 @@ class PythonLibrary(PythonTarget):
       The :ref:`setup_py <bdict_setup_py>` (implemented by
       :class:`pants.targets.artifact.PythonArtifact`)
       to publish that represents this target outside the repo.
+    :param compatibility: either a string or list of strings that represents
+      interpreter compatibility for this target, using the Requirement-style format,
+      e.g. ``'CPython>=3', or just ['>=2.7','<3']`` for requirements agnostic to interpreter class.
     :param dict exclusives: An optional dict of exclusives tags. See CheckExclusives for details.
     """
     PythonTarget.__init__(self,

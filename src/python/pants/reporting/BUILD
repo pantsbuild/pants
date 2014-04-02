@@ -6,8 +6,8 @@ python_library(
   sources = globs('*.py'),
   resources = rglobs('assets/*') + globs('templates/*.mustache'),
   dependencies = [
-    pants('3rdparty/python:twitter.common.dirutil'),
-    pants('3rdparty/python:twitter.common.threading'),
+    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
+    pants('3rdparty/python/twitter/commons:twitter.common.threading'),
     pants('src/python/pants/base:build_environment'),
     pants('src/python/pants/base:build_file'),
     pants('src/python/pants/base:mustache'),

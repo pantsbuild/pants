@@ -6,9 +6,9 @@ python_library(
   sources = globs('distribution/*.py'),
   resources = globs('distribution/*.class'),
   dependencies = [
-    pants('3rdparty/python:twitter.common.contextutil'),
-    pants('3rdparty/python:twitter.common.lang'),
-    pants('3rdparty/python:twitter.common.log'),
+    pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
+    pants('3rdparty/python/twitter/commons:twitter.common.lang'),
+    pants('3rdparty/python/twitter/commons:twitter.common.log'),
     pants('src/python/pants/base:revision'),
   ]
 )
@@ -18,10 +18,10 @@ python_library(
   sources = ['executor.py'],
   dependencies = [
     pants(':distribution'),
-    pants('3rdparty/python:twitter.common.collections'),
-    pants('3rdparty/python:twitter.common.contextutil'),
-    pants('3rdparty/python:twitter.common.lang'),
-    pants('3rdparty/python:twitter.common.log'),
+    pants('3rdparty/python/twitter/commons:twitter.common.collections'),
+    pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
+    pants('3rdparty/python/twitter/commons:twitter.common.lang'),
+    pants('3rdparty/python/twitter/commons:twitter.common.log'),
   ]
 )
 
@@ -29,8 +29,8 @@ python_library(
   name = 'jar',
   sources = globs('jar/*.py'),
   dependencies = [
-    pants('3rdparty/python:twitter.common.contextutil'),
-    pants('3rdparty/python:twitter.common.lang'),
+    pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
+    pants('3rdparty/python/twitter/commons:twitter.common.lang'),
   ]
 )
 
@@ -45,10 +45,10 @@ python_library(
   dependencies = [
     pants('3rdparty/python:psutil'),
     pants(':nailgun_client'),
-    pants('3rdparty/python:twitter.common.collections'),
-    pants('3rdparty/python:twitter.common.dirutil'),
-    pants('3rdparty/python:twitter.common.lang'),
-    pants('3rdparty/python:twitter.common.log'),
+    pants('3rdparty/python/twitter/commons:twitter.common.collections'),
+    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
+    pants('3rdparty/python/twitter/commons:twitter.common.lang'),
+    pants('3rdparty/python/twitter/commons:twitter.common.log'),
     pants('src/python/pants/base:build_environment'),
   ],
 )
