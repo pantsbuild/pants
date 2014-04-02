@@ -2,5 +2,3 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_requirements()
-
-dependencies(name='antlr-3.1.3', dependencies=[':antlr-python-runtime'])

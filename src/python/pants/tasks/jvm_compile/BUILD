@@ -18,7 +18,7 @@ python_library(
   name = 'analysis_tools',
   sources = ['analysis_tools.py'],
   dependencies = [
-    pants('src/python/pants/BUILD.commons:twitter.common.contextutil'),
+    pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('src/python/pants/base:build_environment'),
   ]
 )
@@ -30,7 +30,7 @@ python_library(
     pants(':analysis'),
     pants(':analysis_tools'),
     pants(':jvm_compile'),
-    pants('src/python/pants/BUILD.commons:twitter.common.dirutil'),
+    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('src/python/pants/base:build_environment'),
     pants('src/python/pants/base:target'),
     pants('src/python/pants/base:workunit'),
@@ -43,8 +43,8 @@ python_library(
   sources = ['jvm_compile.py'],
   dependencies = [
     pants(':jvm_dependency_analyzer'),
-    pants('src/python/pants/BUILD.commons:twitter.common.contextutil'),
-    pants('src/python/pants/BUILD.commons:twitter.common.dirutil'),
+    pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
+    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('src/python/pants/base:build_environment'),
     pants('src/python/pants/base:target'),
     pants('src/python/pants/base:worker_pool'),
@@ -59,7 +59,7 @@ python_library(
   name = 'jvm_dependency_analyzer',
   sources = ['jvm_dependency_analyzer.py'],
   dependencies = [
-    pants('src/python/pants/BUILD.commons:twitter.common.collections'),
+    pants('3rdparty/python/twitter/commons:twitter.common.collections'),
     pants('src/python/pants/base:build_environment'),
     pants('src/python/pants/targets:common'),
     pants('src/python/pants/targets:jvm'),
@@ -75,9 +75,9 @@ python_library(
     pants(':analysis_parser'),
     pants(':analysis_tools'),
     pants(':jvm_compile'),
-    pants('src/python/pants/BUILD.commons:twitter.common.collections'),
-    pants('src/python/pants/BUILD.commons:twitter.common.contextutil'),
-    pants('src/python/pants/BUILD.commons:twitter.common.dirutil'),
+    pants('3rdparty/python/twitter/commons:twitter.common.collections'),
+    pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
+    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('src/python/pants/base:build_environment'),
     pants('src/python/pants/base:hash_utils'),
     pants('src/python/pants/base:workunit'),

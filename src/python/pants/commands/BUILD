@@ -5,7 +5,7 @@ python_library(
   name = 'command',
   sources = ['command.py', 'register.py'],
   dependencies = [
-    pants('src/python/pants/BUILD.commons:twitter.common.collections'),
+    pants('3rdparty/python/twitter/commons:twitter.common.collections'),
     pants('src/python/pants/base:build_file'),
     pants('src/python/pants/base:target'),
   ]
@@ -33,7 +33,7 @@ python_library(
   sources = ['build.py'],
   dependencies = [
     pants(':command'),
-    pants('src/python/pants/BUILD.commons:twitter.common.collections'),
+    pants('3rdparty/python/twitter/commons:twitter.common.collections'),
     pants('src/python/pants/base:address'),
     pants('src/python/pants/base:config'),
     pants('src/python/pants/base:target'),
@@ -56,7 +56,7 @@ python_library(
   sources = ['py.py'],
   dependencies = [
     pants(':command'),
-    pants('src/python/pants/BUILD.commons:twitter.common.python'),
+    pants('3rdparty/python/twitter/commons:twitter.common.python'),
     pants('src/python/pants/base:address'),
     pants('src/python/pants/base:config'),
     pants('src/python/pants/base:parse_context'),
@@ -72,9 +72,9 @@ python_library(
   sources = ['setup_py.py'],
   dependencies = [
     pants(':command'),
-    pants('src/python/pants/BUILD.commons:twitter.common.collections'),
-    pants('src/python/pants/BUILD.commons:twitter.common.dirutil'),
-    pants('src/python/pants/BUILD.commons:twitter.common.python'),
+    pants('3rdparty/python/twitter/commons:twitter.common.collections'),
+    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
+    pants('3rdparty/python/twitter/commons:twitter.common.python'),
     pants('src/python/pants/base:address'),
     pants('src/python/pants/base:config'),
     pants('src/python/pants/base:target'),
@@ -89,12 +89,12 @@ python_library(
   sources = ['goal.py'],
   dependencies = [
     pants(':command'),
-    pants('3rdparty/python:python_daemon'),
-    pants('src/python/pants/BUILD.commons:twitter.common.collections'),
-    pants('src/python/pants/BUILD.commons:twitter.common.dirutil'),
-    pants('src/python/pants/BUILD.commons:twitter.common.lang'),
-    pants('src/python/pants/BUILD.commons:twitter.common.log'),
-    pants('src/python/pants/BUILD.commons:twitter.common.log'),
+    pants('3rdparty/python:python-daemon'),
+    pants('3rdparty/python/twitter/commons:twitter.common.collections'),
+    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
+    pants('3rdparty/python/twitter/commons:twitter.common.lang'),
+    pants('3rdparty/python/twitter/commons:twitter.common.log'),
+    pants('3rdparty/python/twitter/commons:twitter.common.log'),
     pants('src/python/pants/base:address'),
     pants('src/python/pants/base:build_environment'),
     pants('src/python/pants/base:build_file'),

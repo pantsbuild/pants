@@ -22,7 +22,7 @@ python_library(
   sources = ['antlr_builder.py'],
   dependencies = [
     pants(':code_generator'),
-    pants('src/python/pants/BUILD.commons:twitter.common.dirutil'),
+    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('src/python/pants/ivy'),
   ]
 )
@@ -33,7 +33,7 @@ python_library(
   dependencies = [
     pants(':code_generator'),
     pants(':python_chroot'),
-    pants('src/python/pants/BUILD.commons:twitter.common.python'),
+    pants('3rdparty/python/twitter/commons:twitter.common.python'),
     pants('src/python/pants/base:config'),
     pants('src/python/pants/targets:python'),
   ]
@@ -44,7 +44,7 @@ python_library(
   sources = ['code_generator.py'],
   dependencies = [
     pants(':sdist_builder'),
-    pants('src/python/pants/BUILD.commons:twitter.common.dirutil'),
+    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
   ]
 )
 
@@ -56,8 +56,8 @@ python_library(
     pants('3rdparty/python:setuptools'),
     pants(':python_setup'),
     pants(':resolver'),
-    pants('src/python/pants/BUILD.commons:twitter.common.dirutil'),
-    pants('src/python/pants/BUILD.commons:twitter.common.python'),
+    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
+    pants('3rdparty/python/twitter/commons:twitter.common.python'),
   ]
 )
 
@@ -80,11 +80,11 @@ python_library(
     pants(':python_setup'),
     pants(':resolver'),
     pants(':thrift_builder'),
-    pants('src/python/pants/BUILD.commons:twitter.common.collections'),
-    pants('src/python/pants/BUILD.commons:twitter.common.decorators'),
-    pants('src/python/pants/BUILD.commons:twitter.common.dirutil'),
-    pants('src/python/pants/BUILD.commons:twitter.common.python'),
-    pants('src/python/pants/BUILD.commons:twitter.common.quantity'),
+    pants('3rdparty/python/twitter/commons:twitter.common.collections'),
+    pants('3rdparty/python/twitter/commons:twitter.common.decorators'),
+    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
+    pants('3rdparty/python/twitter/commons:twitter.common.python'),
+    pants('3rdparty/python/twitter/commons:twitter.common.quantity'),
     pants('src/python/pants/base:config'),
     pants('src/python/pants/base:parse_context'),
     pants('src/python/pants/base:target'),
@@ -98,8 +98,8 @@ python_library(
   sources = ['resolver.py'],
   dependencies = [
     pants(':python_setup'),
-    pants('src/python/pants/BUILD.commons:twitter.common.collections'),
-    pants('src/python/pants/BUILD.commons:twitter.common.python'),
+    pants('3rdparty/python/twitter/commons:twitter.common.collections'),
+    pants('3rdparty/python/twitter/commons:twitter.common.python'),
     pants('src/python/pants/targets:python'),
   ],
 )
@@ -108,8 +108,8 @@ python_library(
   name = 'sdist_builder',
   sources = ['sdist_builder.py'],
   dependencies = [
-    pants('src/python/pants/BUILD.commons:twitter.common.contextutil'),
-    pants('src/python/pants/BUILD.commons:twitter.common.python'),
+    pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
+    pants('3rdparty/python/twitter/commons:twitter.common.python'),
   ]
 )
 
@@ -118,12 +118,12 @@ python_library(
   sources = ['test_builder.py'],
   dependencies = [
     pants(':python_chroot'),
-    pants('src/python/pants/BUILD.commons:twitter.common.collections'),
-    pants('src/python/pants/BUILD.commons:twitter.common.contextutil'),
-    pants('src/python/pants/BUILD.commons:twitter.common.dirutil'),
-    pants('src/python/pants/BUILD.commons:twitter.common.lang'),
-    pants('src/python/pants/BUILD.commons:twitter.common.quantity'),
-    pants('src/python/pants/BUILD.commons:twitter.common.python'),
+    pants('3rdparty/python/twitter/commons:twitter.common.collections'),
+    pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
+    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
+    pants('3rdparty/python/twitter/commons:twitter.common.lang'),
+    pants('3rdparty/python/twitter/commons:twitter.common.quantity'),
+    pants('3rdparty/python/twitter/commons:twitter.common.python'),
     pants('src/python/pants/base:config'),
     pants('src/python/pants/base:parse_context'),
     pants('src/python/pants/base:target'),

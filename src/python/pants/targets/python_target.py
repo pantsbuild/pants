@@ -6,7 +6,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from collections import defaultdict
 
-from twitter.common.collections import OrderedSet
+from twitter.common.collections import maybe_list, OrderedSet
 from twitter.common.python.interpreter import PythonIdentity
 
 from pants.base.target import Target, TargetDefinitionException
@@ -38,12 +38,12 @@ class PythonTarget(TargetWithDependencies, TargetWithSources):
           provides.__class__.__name__)
     self.provides = provides
 
-    self.compatibility = compatibility or ['']
+    self.compatibility = maybe_list(compatibility or ())
     for req in self.compatibility:
       try:
         PythonIdentity.parse_requirement(req)
       except ValueError as e:
-        raise TargetDefinitionException(str(e))
+        raise TargetDefinitionException(self, str(e))
 
   def _walk(self, walked, work, predicate=None):
     super(PythonTarget, self)._walk(walked, work, predicate)

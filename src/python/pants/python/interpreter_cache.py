@@ -158,8 +158,11 @@ class PythonInterpreterCache(object):
 
   def matches(self, filters):
     for interpreter in self._interpreters:
-      if any(interpreter.identity.matches(filt) for filt in filters):
-        yield interpreter
+      for filt in filters:
+        if not filt:
+          yield interpreter
+        elif interpreter.identity.matches(filt):
+          yield interpreter
 
   def setup(self, paths=(), force=False, filters=('',)):
     has_setup = False
