@@ -5,9 +5,9 @@ python_library(
   name = 'base-test',
   sources = ['context_utils.py'],
   dependencies = [
-    pants('src/python/pants/BUILD.commons:twitter.common.collections'),
-    pants('src/python/pants/BUILD.commons:twitter.common.dirutil'),
-    pants('src/python/pants/BUILD.commons:twitter.common.lang'),
+    pants('3rdparty/python:twitter.common.collections'),
+    pants('3rdparty/python:twitter.common.dirutil'),
+    pants('3rdparty/python:twitter.common.lang'),
     pants('src/python/pants/base:config'),
     pants('src/python/pants/base:target'),
     pants('src/python/pants/goal'),
@@ -51,8 +51,8 @@ python_tests(
   name = 'address',
   sources = ['test_address.py'],
   dependencies = [
-    pants('src/python/pants/BUILD.commons:twitter.common.contextutil'),
-    pants('src/python/pants/BUILD.commons:twitter.common.dirutil'),
+    pants('3rdparty/python:twitter.common.contextutil'),
+    pants('3rdparty/python:twitter.common.dirutil'),
     pants('src/python/pants/base:address'),
     pants('src/python/pants/base:build_environment'),
   ]
@@ -62,8 +62,8 @@ python_tests(
   name = 'build_file',
   sources = ['test_build_file.py'],
   dependencies = [
-    pants('src/python/pants/BUILD.commons:twitter.common.collections'),
-    pants('src/python/pants/BUILD.commons:twitter.common.dirutil'),
+    pants('3rdparty/python:twitter.common.collections'),
+    pants('3rdparty/python:twitter.common.dirutil'),
     pants('src/python/pants/base:build_file'),
   ]
 )
@@ -72,7 +72,7 @@ python_tests(
   name = 'build_invalidator',
   sources = ['test_build_invalidator.py'],
   dependencies = [
-    pants('src/python/pants/BUILD.commons:twitter.common.contextutil'),
+    pants('3rdparty/python:twitter.common.contextutil'),
     pants('src/python/pants/base:build_invalidator'),
   ]
 )
@@ -81,8 +81,8 @@ python_tests(
   name = 'build_root',
   sources = ['test_build_root.py'],
   dependencies = [
-    pants('src/python/pants/BUILD.commons:twitter.common.contextutil'),
-    pants('src/python/pants/BUILD.commons:twitter.common.dirutil'),
+    pants('3rdparty/python:twitter.common.contextutil'),
+    pants('3rdparty/python:twitter.common.dirutil'),
     pants('src/python/pants/base:build_root'),
   ]
 )
@@ -110,7 +110,7 @@ python_tests(
   sources = ['test_hash_utils.py'],
   dependencies = [
     pants('3rdparty/python:mox'),
-    pants('src/python/pants/BUILD.commons:twitter.common.contextutil'),
+    pants('3rdparty/python:twitter.common.contextutil'),
     pants('src/python/pants/base:hash_utils'),
   ]
 )
@@ -120,8 +120,8 @@ python_tests(
   sources = ['test_parse_context.py'],
   dependencies = [
     pants('tests/python/pants:base-test'),
-    pants('src/python/pants/BUILD.commons:twitter.common.contextutil'),
-    pants('src/python/pants/BUILD.commons:twitter.common.dirutil'),
+    pants('3rdparty/python:twitter.common.contextutil'),
+    pants('3rdparty/python:twitter.common.dirutil'),
     pants('src/python/pants/base:address'),
     pants('src/python/pants/base:build_file'),
     pants('src/python/pants/base:parse_context'),
@@ -141,7 +141,7 @@ python_tests(
   name = 'run_info',
   sources = ['test_run_info.py'],
   dependencies = [
-    pants('src/python/pants/BUILD.commons:twitter.common.contextutil'),
+    pants('3rdparty/python:twitter.common.contextutil'),
     pants('src/python/pants/base:run_info'),
   ]
 )

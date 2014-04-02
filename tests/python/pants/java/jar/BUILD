@@ -5,9 +5,9 @@ python_tests(
   name = 'jar',
   sources = globs('*.py'),
   dependencies = [
-    pants('src/python/pants/BUILD.commons:twitter.common.collections'),
-    pants('src/python/pants/BUILD.commons:twitter.common.dirutil'),
-    pants('src/python/pants/BUILD.commons:twitter.common.lang'),
+    pants('3rdparty/python:twitter.common.collections'),
+    pants('3rdparty/python:twitter.common.dirutil'),
+    pants('3rdparty/python:twitter.common.lang'),
     pants('src/python/pants/java:jar'),
   ]
 )

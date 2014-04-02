@@ -5,8 +5,8 @@ python_tests(
   name = 'cache',
   sources = globs('*.py'),
   dependencies = [
-    pants('src/python/pants/BUILD.commons:twitter.common.contextutil'),
-    pants('src/python/pants/BUILD.commons:twitter.common.dirutil'),
+    pants('3rdparty/python:twitter.common.contextutil'),
+    pants('3rdparty/python:twitter.common.dirutil'),
     pants('src/python/pants/base:build_invalidator'),
     pants('src/python/pants/cache'),
     pants('tests/python/pants/testutils'),

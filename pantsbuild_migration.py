@@ -110,7 +110,7 @@ class BuildFile(object):
       return  # File is empty (possibly except for a comment).
     def _translate(line):
       return line.replace('twitter/pants', 'pants').replace('twitter.pants', 'pants').replace(
-        'src/python/twitter/common/', 'src/python/pants/BUILD.commons:twitter.common.'
+        'src/python/twitter/common/', '3rdparty/python:twitter.common.'
       )
     self._body = map(_translate, self._old_lines[p:])
     # Remove any trailing empty lines.

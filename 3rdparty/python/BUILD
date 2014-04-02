@@ -10,7 +10,7 @@ def make_dep(name, version, dependency_name=None):
   """
   dependency_name = dependency_name or name
   versioned_name = "%s==%s" % (dependency_name, version)
-  python_requirement(requirement=versioned_name, name=name)
+  return python_requirement(requirement=versioned_name, name=name)
 
 
 make_dep('ansicolors', '1.0.2')
@@ -41,3 +41,29 @@ make_dep('thrift', '0.9.1')
 make_dep('zc-zookeeper-static', '3.4.4')
 
 dependencies(name='antlr-python-runtime', dependencies=[':antlr-3.1.3'])
+
+
+# twitter.common deps.
+# TODO: Make these regular egg deps.
+
+SHA = '0741ced0f787771d82b5703bddb2990e2d3dcae7'
+
+REPO = ('http://pantsbuild.github.io/cheeseshop/third_party/twitter-commons/%s/index.html' % SHA)
+
+def commons_dep(name):
+  return python_requirement(requirement='twitter.common.%s' % name, repository=REPO)
+
+commons_dep('collections')
+commons_dep('config')
+commons_dep('confluence')
+commons_dep('contextutil')
+commons_dep('decorators')
+commons_dep('dirutil')
+commons_dep('lang')
+commons_dep('log')
+commons_dep('process')
+commons_dep('python')
+commons_dep('quantity')
+commons_dep('rwbuf') # XXX(fixme)
+commons_dep('threading')
+commons_dep('util')

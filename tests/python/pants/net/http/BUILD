@@ -7,9 +7,9 @@ python_tests(
   dependencies = [
     pants('3rdparty/python:mox'),
     pants('3rdparty/python:requests'),
-    pants('src/python/pants/BUILD.commons:twitter.common.contextutil'),
-    pants('src/python/pants/BUILD.commons:twitter.common.lang'),
-    pants('src/python/pants/BUILD.commons:twitter.common.quantity'),
+    pants('3rdparty/python:twitter.common.contextutil'),
+    pants('3rdparty/python:twitter.common.lang'),
+    pants('3rdparty/python:twitter.common.quantity'),
     pants('src/python/pants/net'),
   ]
 )

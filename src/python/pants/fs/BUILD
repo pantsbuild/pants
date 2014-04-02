@@ -5,8 +5,8 @@ python_library(
   name = 'fs',
   sources = globs('*.py'),
   dependencies = [
-    pants('src/python/pants/BUILD.commons:twitter.common.collections'),
-    pants('src/python/pants/BUILD.commons:twitter.common.contextutil'),
-    pants('src/python/pants/BUILD.commons:twitter.common.lang'),
+    pants('3rdparty/python:twitter.common.collections'),
+    pants('3rdparty/python:twitter.common.contextutil'),
+    pants('3rdparty/python:twitter.common.lang'),
   ]
 )

@@ -19,7 +19,7 @@ python_library(
   name = 'aggregated_timings',
   sources = ['aggregated_timings.py'],
   dependencies = [
-    pants('src/python/pants/BUILD.commons:twitter.common.dirutil'),
+    pants('3rdparty/python:twitter.common.dirutil'),
   ]
 )
 
@@ -28,7 +28,7 @@ python_library(
   name = 'artifact_cache_stats',
   sources = ['artifact_cache_stats.py'],
   dependencies = [
-    pants('src/python/pants/BUILD.commons:twitter.common.dirutil'),
+    pants('3rdparty/python:twitter.common.dirutil'),
   ]
 )
 
@@ -37,9 +37,9 @@ python_library(
   sources = ['context.py'],
   dependencies = [
     pants(':products'),
-    pants('src/python/pants/BUILD.commons:twitter.common.collections'),
-    pants('src/python/pants/BUILD.commons:twitter.common.dirutil'),
-    pants('src/python/pants/BUILD.commons:twitter.common.process'),
+    pants('3rdparty/python:twitter.common.collections'),
+    pants('3rdparty/python:twitter.common.dirutil'),
+    pants('3rdparty/python:twitter.common.process'),
     pants('src/python/pants/base:build_environment'),
     pants('src/python/pants/base:parse_context'),
     pants('src/python/pants/base:target'),
@@ -64,8 +64,8 @@ python_library(
   name = 'initialize_reporting',  # XXX shouldn't this be in reporting?!
   sources = ['initialize_reporting.py'],
   dependencies = [
-    pants('src/python/pants/BUILD.commons:twitter.common.dirutil'),
-    pants('src/python/pants/BUILD.commons:twitter.common.lang'),
+    pants('3rdparty/python:twitter.common.dirutil'),
+    pants('3rdparty/python:twitter.common.lang'),
     pants('src/python/pants/reporting'),
   ],
 )
@@ -83,7 +83,7 @@ python_library(
   name = 'products',
   sources = ['products.py'],
   dependencies = [
-    pants('src/python/pants/BUILD.commons:twitter.common.collections'),
+    pants('3rdparty/python:twitter.common.collections'),
   ],
 )
 

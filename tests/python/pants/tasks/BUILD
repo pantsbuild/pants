@@ -5,7 +5,7 @@ python_library(
   name = 'base-test',
   sources = ['test_base.py'],
   dependencies = [
-    pants('src/python/pants/BUILD.commons:twitter.common.collections'),
+    pants('3rdparty/python:twitter.common.collections'),
     pants('src/python/pants/base:target'),
     pants('src/python/pants/commands:goal'),
     pants('src/python/pants/goal'),
@@ -108,7 +108,7 @@ python_tests(
   name = 'config',
   sources = ['test_config.py'],
   dependencies = [
-    pants('src/python/pants/BUILD.commons:twitter.common.contextutil'),
+    pants('3rdparty/python:twitter.common.contextutil'),
     pants('src/python/pants/base:config'),
   ]
 )
@@ -172,7 +172,7 @@ python_tests(
   sources = ['test_detect_duplicates.py'],
   dependencies = [
     pants(':base-test'),
-    pants('src/python/pants/BUILD.commons:twitter.common.dirutil'),
+    pants('3rdparty/python:twitter.common.dirutil'),
     pants('src/python/pants/tasks:detect_duplicates'),
     pants('src/python/pants/tasks:task_error'),
     pants('tests/python/pants/base:base-test'),
@@ -204,8 +204,8 @@ python_tests(
   sources = ['test_jar_create.py'],
   dependencies = [
     pants(':base-test'),
-    pants('src/python/pants/BUILD.commons:twitter.common.contextutil'),
-    pants('src/python/pants/BUILD.commons:twitter.common.dirutil'),
+    pants('3rdparty/python:twitter.common.contextutil'),
+    pants('3rdparty/python:twitter.common.dirutil'),
     pants('src/python/pants/java:jar'),
     pants('src/python/pants/targets:common'),
     pants('src/python/pants/targets:java'),
@@ -251,7 +251,7 @@ python_tests(
   name = 'protobuf_gen',
   sources = ['test_protobuf_gen.py'],
   dependencies = [
-    pants('src/python/pants/BUILD.commons:twitter.common.contextutil'),
+    pants('3rdparty/python:twitter.common.contextutil'),
     pants('src/python/pants/tasks:protobuf_gen'),
   ],
 )

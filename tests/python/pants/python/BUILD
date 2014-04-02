@@ -41,8 +41,8 @@ python_tests(
 python_tests(name = 'test_resolver',
   sources = ['test_resolver.py'],
   dependencies = [
-    pants('src/python/pants/BUILD.commons:twitter.common.contextutil'),
-    pants('src/python/pants/BUILD.commons:twitter.common.python'),
+    pants('3rdparty/python:twitter.common.contextutil'),
+    pants('3rdparty/python:twitter.common.python'),
     pants('src/python/pants/base:config'),
     pants('src/python/pants/python:resolver'),
   ],
@@ -52,8 +52,8 @@ python_tests(name = 'test_thrift_builder',
   sources = ['test_thrift_builder.py'],
   dependencies = [
     pants('3rdparty/python:mock'),
-    pants('src/python/pants/BUILD.commons:twitter.common.config'),
-    pants('src/python/pants/BUILD.commons:twitter.common.python'),
+    pants('3rdparty/python:twitter.common.config'),
+    pants('3rdparty/python:twitter.common.python'),
     pants('src/python/pants/python:thrift_builder'),
     pants('tests/python/pants:base-test'),
     pants('tests/python/pants/base:base-test')
