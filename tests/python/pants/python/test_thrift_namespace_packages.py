@@ -6,8 +6,8 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import unittest
 
-from twitter.birds.duck.ttypes import Duck
-from twitter.birds.goose.ttypes import Goose
+from pants.birds.duck.ttypes import Duck
+from pants.birds.goose.ttypes import Goose
 
 
 class ThritNamespacePackagesTest(unittest.TestCase):

@@ -38,12 +38,12 @@ class PythonTarget(TargetWithDependencies, TargetWithSources):
           provides.__class__.__name__)
     self.provides = provides
 
-    self.compatibility = compatibility or ['']
+    self.compatibility = compatibility or [b'']
     for req in self.compatibility:
       try:
         PythonIdentity.parse_requirement(req)
       except ValueError as e:
-        raise TargetDefinitionException(str(e))
+        raise TargetDefinitionException(self, str(e))
 
   def _walk(self, walked, work, predicate=None):
     super(PythonTarget, self)._walk(walked, work, predicate)

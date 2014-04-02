@@ -48,7 +48,7 @@ class Build(Command):
     self.interpreter_cache.setup()
     interpreters = self.interpreter_cache.select_interpreter(
         list(self.interpreter_cache.matches([self.options.interpreter]
-            if self.options.interpreter else [''])))
+            if self.options.interpreter else [b''])))
     if len(interpreters) != 1:
       self.error('Unable to detect suitable interpreter.')
     else:

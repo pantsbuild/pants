@@ -1,0 +1,11 @@
+We use these thrift files to test the 'namespace packages' functionality
+in python_thrift_library:
+
+Python does not normally allow the contents of a package to be retrieved from
+more than one location. If two modules on the pythonpath share some package
+prefix (in our case two python_thrift_library eggs containing two different
+modules under 'twitter.birds') then python will only consider the first location
+at which it finds that package prefix. Namespace packages solve this by adding
+some magic words to the __init__.py files in the intermediate modules.
+
+TODO: Stop supporting this? namespace packages are not endorsed by the python community.

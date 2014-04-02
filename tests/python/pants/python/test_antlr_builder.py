@@ -8,9 +8,9 @@ import unittest
 
 import antlr3
 import antlr3.tree
-from twitter.common.python.test.Eval import Eval
-from twitter.common.python.test.ExprLexer import ExprLexer
-from twitter.common.python.test.ExprParser import ExprParser
+from pants.python.test.Eval import Eval
+from pants.python.test.ExprLexer import ExprLexer
+from pants.python.test.ExprParser import ExprParser
 
 
 # We import this gratuitously, just to test that namespace packages work correctly in the
