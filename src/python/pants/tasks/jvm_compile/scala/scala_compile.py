@@ -46,7 +46,7 @@ class ScalaCompile(JvmCompile):
   def create_analysis_tools(self):
     return AnalysisTools(self.context, ZincAnalysisParser(self._classes_dir), ZincAnalysis)
 
-  def extra_classpath_elements(self):
+  def extra_compile_time_classpath_elements(self):
     # Classpath entries necessary for our compiler plugins.
     return self._zinc_utils.plugin_jars()
 
