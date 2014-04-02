@@ -8,7 +8,7 @@ java_tests(name='handler',
     pants('3rdparty:junit'),
     pants('3rdparty/jvm/com/twitter/common:base'),
     pants('3rdparty/jvm/com/twitter/common:testing-easymock'),
-    pants('src/java/com/twitter/common/examples/pingpong/handler'),
+    pants('src/java/com/pants/examples/pingpong/handler'),
   ],
   sources=globs('*.java'),
 )
