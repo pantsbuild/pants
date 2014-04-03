@@ -298,8 +298,8 @@ class SetupPy(Command):
   def write_setup(self, root_target, chroot):
     """Write the setup.py of a target.  Must be run after writing the contents to the chroot."""
 
-    # NB: several explicit str conversions below force non-unicode strings in order to comply with
-    # setuptools expectations.
+    # NB: several explicit str conversions below force non-unicode strings in order to comply
+    # with setuptools expectations.
 
     setup_keywords = root_target.provides.setup_py_keywords
 
