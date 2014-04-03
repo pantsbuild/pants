@@ -22,7 +22,8 @@ class PythonBinary(PythonTarget):
   Python binaries are pex files, self-contained executable shell
   scripts that contain a complete Python environment capable of
   running the target. For more information about pex files see
-  https://github.com/twitter/commons/blob/master/src/python/pants/python/README.md"""
+  http://pantsbuild.github.io/python-readme.html#how-pex-files-work.
+  """
 
   # TODO(wickman) Consider splitting pex options out into a separate PexInfo builder that can be
   # attached to the binary target.  Ideally the PythonBinary target is agnostic about pex mechanics
