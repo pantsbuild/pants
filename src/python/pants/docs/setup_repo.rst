@@ -45,7 +45,7 @@ excerpts that define/use ``thrift_workdir``::
 It's also handy for defining values that are used in several contexts, since these values
 will be available in all those contexts. The code that combines DEFAULT values with
 others is in Pants'
-`base/config.py <https://github.com/twitter/commons/blob/master/src/python/pants/base/config.py>`_.
+`base/config.py <https://github.com/pantsbuild/pants/blob/master/src/python/pants/base/config.py>`_.
 
 .. TODO update base/config.py link if/when source code moves
 

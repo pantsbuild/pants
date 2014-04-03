@@ -83,10 +83,10 @@ BUILD for a Simple Binary
 *************************
 
 The `Twitter Commons Java pingpong sample
-<https://github.com/twitter/commons/tree/master/src/java/com/twitter/common/examples/pingpong>`_
+<https://github.com/pantsbuild/pants/tree/master/src/java/com/pants/examples/pingpong>`_
 code shows the BUILD file for a simple Java binary (in the ``main/`` directory):
 
-.. literalinclude:: ../../../../java/com/twitter/common/examples/pingpong/main/BUILD
+.. literalinclude:: ../../../../java/com/pants/examples/pingpong/main/BUILD
    :start-after: under the License.
 
 This small program has just one library, a `java_library`.
@@ -97,7 +97,7 @@ yourself thinking "we should move some of this code to another directory,"
 you probably also want to set up a ``BUILD` file with a ``java_library``
 (or ``scala_library``) target.
 
-.. literalinclude:: ../../../../java/com/twitter/common/examples/pingpong/handler/BUILD
+.. literalinclude:: ../../../../java/com/pants/examples/pingpong/handler/BUILD
    :start-after: java_library:
 
 This library depends on other build targets and jars; if your code imports
@@ -116,7 +116,7 @@ of version conflicts, we use the :doc:`3rdparty` idiom: we keep references
 to these "third-party" jars together in ``BUILD`` files under the
 ``3rdparty/jvm/`` directory. Thus, ``pingpong-lib`` has some dependencies like:
 
-.. literalinclude:: ../../../../java/com/twitter/common/examples/pingpong/handler/BUILD
+.. literalinclude:: ../../../../java/com/pants/examples/pingpong/handler/BUILD
    :start-after: java_library:
    :end-before: src/java
 

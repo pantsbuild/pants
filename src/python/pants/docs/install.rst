@@ -36,7 +36,7 @@ as it does not modify the system Python libraries. ::
    $ pants
 
 To simplify a virtualenv-based installation, consider adding a wrapper script
-to your repo. See https://github.com/twitter/commons/blob/master/pants for an
+to your repo. See https://github.com/pantsbuild/pants/blob/master/pants for an
 example.
 
 

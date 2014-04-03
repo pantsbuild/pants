@@ -63,7 +63,7 @@ Getting Pants Source Code
 
 After deciding on the change you'd like to make we'll need to get the code. ::
 
-   git clone https://github.com/twitter/commons
+   git clone https://github.com/pantsbuild/pants
 
 After getting the code, you may want to familiarize yourself with the
 :doc:`internals` or :doc:`howto_develop`. We'll create a new branch off master
@@ -77,7 +77,7 @@ Run the CI Tests
 Before posting a review but certainly before the branch ships you should run
 relevant tests. If you're not sure what those are you can always run the
 same test set-up that's run on `Travis CI
-<https://travis-ci.org/twitter/commons/>`_.
+<https://travis-ci.org/pantsbuild/pants>`_.
 
 To run the full jvm and python suite including a pants self-rebuild. ::
 
