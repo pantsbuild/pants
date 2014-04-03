@@ -7,8 +7,8 @@ package com.pants.examples.usethrift;
 
 import org.junit.Test;
 
-import com.twitter.common.examples.distance.thriftjava.Distance;
-import com.twitter.common.examples.precipitation.thriftjava.Precipitation;
+import com.pants.examples.distance.thriftjava.Distance;
+import com.pants.examples.precipitation.thriftjava.Precipitation;
 
 /* Not testing behavior; we're happy if this compiles. */
 public class UseThriftTest {
