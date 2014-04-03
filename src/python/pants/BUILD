@@ -16,10 +16,10 @@ python_library(
     name='pants',
     version='0.0.17',
     description="Twitter's pants build tool.",
-    url='https://github.com/twitter/commons',
+    url='https://github.com/pantsbuild/pants',
     license='Apache License, Version 2.0',
     zip_safe=True,
-    namespace_packages=['twitter'],
+    namespace_packages=['pants'],
     classifiers=[
       'Intended Audience :: Developers',
       'License :: OSI Approved :: Apache Software License',
