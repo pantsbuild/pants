@@ -4,9 +4,7 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-import exceptions
 import os
-import warnings
 
 from pants.base.parse_context import ParseContext
 from pants.targets.python_requirement import PythonRequirement
@@ -47,12 +45,6 @@ def python_requirements(requirements_relpath='requirements.txt'):
               if repository is not None:
                 raise ValueError('Only 1 --find-links url is supported per requirements file')
               repository = value
-              continue
-          warnings.warn_explicit(
-              message='Ignoring line `%s` in requirements file %s' % (line, requirements_path),
-              category=exceptions.UserWarning,
-              filename=build_file.relpath,
-              lineno=0)
 
   for requirement in requirements:
     PythonRequirement(requirement, repository=repository)
