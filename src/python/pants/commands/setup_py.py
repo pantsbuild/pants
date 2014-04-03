@@ -56,7 +56,7 @@ class SetupPy(Command):
       PythonAntlrLibrary: PythonAntlrBuilder,
       PythonThriftLibrary: PythonThriftBuilder,
   }
-  SOURCE_ROOT = 'src'
+  SOURCE_ROOT = b'src'
   __command__ = 'setup_py'
 
   @classmethod
@@ -297,9 +297,13 @@ class SetupPy(Command):
 
   def write_setup(self, root_target, chroot):
     """Write the setup.py of a target.  Must be run after writing the contents to the chroot."""
+
+    # NB: several explicit str conversions below force non-unicode strings in order to comply
+    # with setuptools expectations.
+
     setup_keywords = root_target.provides.setup_py_keywords
 
-    package_dir = {'': self.SOURCE_ROOT}
+    package_dir = {b'': self.SOURCE_ROOT}
     packages, namespace_packages, resources = self.find_packages(chroot)
 
     if namespace_packages:
@@ -309,7 +313,8 @@ class SetupPy(Command):
       setup_keywords.update(
           package_dir=package_dir,
           packages=list(sorted(packages)),
-          package_data=dict((package, list(rs)) for (package, rs) in resources.items()))
+          package_data=dict((str(package), list(map(str, rs)))
+                            for (package, rs) in resources.items()))
 
     install_requires = set()
     for dep in self.minified_dependencies(root_target):
