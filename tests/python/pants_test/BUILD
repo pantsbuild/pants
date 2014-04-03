@@ -5,7 +5,7 @@ python_library(
   name = 'base-test',
   sources = ['base_build_root_test.py'],
   dependencies = [
-    pants('3rdparty/python:twitter.common.dirutil'),
+    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('src/python/pants/base:address'),
     pants('src/python/pants/base:build_root'),
     pants('src/python/pants/base:target'),
@@ -26,9 +26,9 @@ python_tests(
   sources = ['test_thrift_util.py'],
   dependencies = [
     pants(':base-test'),
-    pants('3rdparty/python:twitter.common.contextutil'),
-    pants('3rdparty/python:twitter.common.dirutil'),
-    pants('3rdparty/python:twitter.common.lang'),
+    pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
+    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
+    pants('3rdparty/python/twitter/commons:twitter.common.lang'),
     pants('src/python/pants:thrift_util'),
   ]
 )

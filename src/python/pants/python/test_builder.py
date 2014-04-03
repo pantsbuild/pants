@@ -28,7 +28,6 @@ from pants.base.config import Config
 from pants.base.parse_context import ParseContext
 from pants.python.python_chroot import PythonChroot
 from pants.targets.python_requirement import PythonRequirement
-from pants.targets.python_target import PythonTarget
 from pants.targets.python_tests import PythonTests, PythonTestSuite
 
 

@@ -3,4 +3,7 @@
 
 python_requirements()
 
-dependencies(name='antlr-3.1.3', dependencies=[':antlr-python-runtime'])
+# Note: cannot currently be a dependencies() target, because that's just
+# an alias for jar_library. 
+# TODO: Make a real 'dependencies'/'alias' target type. 
+python_library(name='antlr-3.1.3', dependencies=[':antlr-python-runtime'])
