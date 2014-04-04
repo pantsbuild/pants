@@ -42,6 +42,14 @@ Common Pants build idioms.
    ThriftDeps
    publish
 
+Using Pants With...
+-------------------
+
+.. toctree::
+   :maxdepth: 1
+
+   with_intellij
+
 Advanced Documentation
 ----------------------
 

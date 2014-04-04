@@ -3,11 +3,8 @@ Pants Development with IntelliJ IDEA
 ####################################
 
 This page documents how to develop pants with `IntelliJ IDEA <http://www.jetbrains.com/idea/>`_\.
-
-.. TODO: Add a comment about using "pants goal idea" to generate project files
-         when the goals reference is available. Users may mistakenly end up
-         here when looking to auto-generate projects for JVM libraries.
-
+(To use IntelliJ with Pants, not necessarily to develop Pants itself,
+see :doc:`with_intellij`.)
 
 **************
 IntelliJ Setup
