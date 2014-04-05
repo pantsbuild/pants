@@ -42,11 +42,10 @@ python_binary(
     'linux-x86_64',
     'macosx-10.4-x86_64',
   ],
-  # 3.0 - 3.2 did not support unicode literals so we 3.x for now since it would take some
-  # work to make the codebase compatible.
-  # TODO(John Sirois): Ideally we'd just exclude 3.0 - 3.2 - figure out how to make this work.
+  # 3.0 - 3.2 did not support unicode literals so we don't support these for now since it would
+  # take some work to make the codebase compatible.
   # Additionally we force a an ascii string for python 3.3.x here.
-  compatibility=b'CPython>=2.6,<3',
+  compatibility=b'CPython>=2.6,<3,>=3.3',
   dependencies = [
     pants(':pants_exe'),
     pants('src/python/pants/commands:pants_old'),

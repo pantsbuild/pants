@@ -82,8 +82,10 @@ if [ ! -z "${PANTS_DEV}" ]; then
 else
   if [ ! -e "${PANTS_PEX}" ]; then
     log "Building pants.pex to ${PANTS_PEX}..."
+    # 3.0 - 3.2 did not support unicode literals so we don't support these for now since it would
+    # take some work to make the codebase compatible.
     rm -rf ${PANTS_PEX} && \
-    run_pants_bare py -v --pex ${PANTS_BINARY} && \
+    run_pants_bare py -v --pex --interpreter "CPython>=2.6,<3,>=3.3" ${PANTS_BINARY} && \
     mv -v dist/pants.pex ${PANTS_PEX} && \
     chmod +x ${PANTS_PEX}
   fi
