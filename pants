@@ -82,8 +82,10 @@ if [ ! -z "${PANTS_DEV}" ]; then
 else
   if [ ! -e "${PANTS_PEX}" ]; then
     log "Building pants.pex to ${PANTS_PEX}..."
+    # TODO(John sirois): Re-plumb build such that it grabs constraints from the built python_binary
+    # target(s).
     rm -rf ${PANTS_PEX} && \
-    run_pants_bare py -v --pex ${PANTS_BINARY} && \
+    run_pants_bare build -v -i "CPython>=2.6,<3" -i "CPython>=3.3" ${PANTS_BINARY} && \
     mv -v dist/pants.pex ${PANTS_PEX} && \
     chmod +x ${PANTS_PEX}
   fi
