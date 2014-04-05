@@ -64,7 +64,11 @@ def resolve_and_link(config, requirement, target_link, installer_provider, logge
     sdist = link.fetch()
     logger('    installing %s' % sdist)
     installer = installer_provider(sdist)
-    dist_location = installer.bdist()
+    try:
+      dist_location = installer.bdist()
+    except installer.InstallFailure as e:
+      logger('      failed to install, skipping: %s' % e)
+      continue
     target_location = os.path.join(os.path.dirname(target_link), os.path.basename(dist_location))
     shutil.move(dist_location, target_location)
     safe_link(target_location, target_link)
