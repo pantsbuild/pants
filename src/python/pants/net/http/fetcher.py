@@ -172,16 +172,16 @@ class Fetcher(object):
       if content_length:
         download_kb = int(Amount(content_length, Data.BYTES).as_(Data.KB))
         self.download_size = Amount(download_kb, Data.KB)
-        self.chunk = content_length / self._width
+        self.chunk_size = content_length / self._width
       else:
-        self.chunk = self._chunk_size.as_(Data.BYTES)
+        self.chunk_size = self._chunk_size.as_(Data.BYTES)
 
       self.chunks = 0
       self.read = 0
 
     def recv_chunk(self, data):
       self.read += len(data)
-      chunk_count = self.read // self.chunk
+      chunk_count = int(self.read / self.chunk_size)
       if chunk_count > self.chunks:
         self.chunks = chunk_count
         if self.size:
