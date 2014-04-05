@@ -45,7 +45,7 @@ class SetupPythonEnvironment(Task):
     ifilters = self.context.options.python_interpreter
     self._cache.setup(force=self.context.options.python_setup_force,
         paths=self.context.options.python_setup_paths,
-        filters=ifilters or [''])
+        filters=ifilters or [b''])
     all_interpreters = set(self._cache.interpreters)
     for target in self.context.targets(is_python_root):
       self.context.log.info('Setting up interpreters for %s' % target)

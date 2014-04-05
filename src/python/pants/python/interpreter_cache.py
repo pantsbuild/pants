@@ -19,7 +19,7 @@ from pants.python.resolver import crawler_from_config, fetchers_from_config
 
 
 # TODO(wickman) Create a safer version of this and add to twitter.common.dirutil
-def safe_link(src, dst):
+def _safe_link(src, dst):
   try:
     os.unlink(dst)
   except OSError:
@@ -27,17 +27,19 @@ def safe_link(src, dst):
   os.symlink(src, dst)
 
 
-def resolve_interpreter(config, interpreter, requirement, logger=print):
+def _resolve_interpreter(config, interpreter, requirement, logger=print):
   """Given a :class:`PythonInterpreter` and :class:`Config`, and a requirement,
      return an interpreter with the capability of resolving that requirement or
-     None if it's not possible to install a suitable requirement."""
-  interpreter_cache = PythonInterpreterCache.cache_dir(config)
+    ``None`` if it's not possible to install a suitable requirement."""
+  interpreter_cache = PythonInterpreterCache._cache_dir(config)
   interpreter_dir = os.path.join(interpreter_cache, str(interpreter.identity))
   if interpreter.satisfies(PythonCapability([requirement])):
     return interpreter
+
   def installer_provider(sdist):
     return EggInstaller(sdist, strict=requirement.key != 'setuptools', interpreter=interpreter)
-  egg = resolve_and_link(
+
+  egg = _resolve_and_link(
       config,
       requirement,
       os.path.join(interpreter_dir, requirement.key),
@@ -49,7 +51,7 @@ def resolve_interpreter(config, interpreter, requirement, logger=print):
     logger('Failed to resolve requirement %s for %s' % (requirement, interpreter))
 
 
-def resolve_and_link(config, requirement, target_link, installer_provider, logger=print):
+def _resolve_and_link(config, requirement, target_link, installer_provider, logger=print):
   if os.path.exists(target_link) and os.path.exists(os.path.realpath(target_link)):
     egg = EggPackage(os.path.realpath(target_link))
     if egg.satisfies(requirement):
@@ -67,7 +69,7 @@ def resolve_and_link(config, requirement, target_link, installer_provider, logge
     dist_location = installer.bdist()
     target_location = os.path.join(os.path.dirname(target_link), os.path.basename(dist_location))
     shutil.move(dist_location, target_location)
-    safe_link(target_location, target_link)
+    _safe_link(target_location, target_link)
     logger('    installed %s' % target_location)
     return EggPackage(target_location)
 
@@ -78,39 +80,52 @@ def resolve_and_link(config, requirement, target_link, installer_provider, logge
 # added a replacement=False keyword arg.  Sadly, they removed this keyword
 # arg in setuptools >= 1 so we have to simply failover using TypeError as a
 # catch for 'Invalid Keyword Argument'.
-def failsafe_parse(requirement):
+def _failsafe_parse(requirement):
   try:
     return Requirement.parse(requirement, replacement=False)
   except TypeError:
     return Requirement.parse(requirement)
 
 
-def resolve(config, interpreter, logger=print):
+def _resolve(config, interpreter, logger=print):
   """Resolve and cache an interpreter with a setuptools and wheel capability."""
 
-  setuptools_requirement = failsafe_parse(
+  setuptools_requirement = _failsafe_parse(
       'setuptools==%s' % config.get('python-setup', 'setuptools_version', default='2.2'))
-  wheel_requirement = failsafe_parse(
+  wheel_requirement = _failsafe_parse(
       'wheel==%s' % config.get('python-setup', 'wheel_version', default='0.22.0'))
 
-  interpreter = resolve_interpreter(config, interpreter, setuptools_requirement, logger=logger)
+  interpreter = _resolve_interpreter(config, interpreter, setuptools_requirement, logger=logger)
   if interpreter:
-    return resolve_interpreter(config, interpreter, wheel_requirement, logger=logger)
+    return _resolve_interpreter(config, interpreter, wheel_requirement, logger=logger)
 
 
 class PythonInterpreterCache(object):
   @staticmethod
-  def cache_dir(config):
+  def _cache_dir(config):
     return PythonSetup(config).scratch_dir('interpreter_cache', default_name='interpreters')
+
+  @staticmethod
+  def _matches(interpreter, filters):
+    return any(interpreter.identity.matches(filt) for filt in filters)
+
+  @classmethod
+  def _matching(cls, interpreters, filters):
+    for interpreter in interpreters:
+      if cls._matches(interpreter, filters):
+        yield interpreter
 
   @classmethod
   def select_interpreter(cls, compatibilities, allow_multiple=False):
+    """Given a set of interpreters, either return them all if ``allow_multiple`` is ``True``;
+    otherwise, return the lowest compatible interpreter.
+    """
     if allow_multiple:
       return compatibilities
     return [min(compatibilities)] if compatibilities else []
 
   def __init__(self, config, logger=None):
-    self._path = self.cache_dir(config)
+    self._path = self._cache_dir(config)
     self._config = config
     safe_mkdir(self._path)
     self._interpreters = set()
@@ -118,9 +133,10 @@ class PythonInterpreterCache(object):
 
   @property
   def interpreters(self):
+    """Returns the set of cached interpreters."""
     return self._interpreters
 
-  def interpreter_from_path(self, path):
+  def _interpreter_from_path(self, path, filters):
     interpreter_dir = os.path.basename(path)
     identity = PythonIdentity.from_path(interpreter_dir)
     try:
@@ -128,49 +144,66 @@ class PythonInterpreterCache(object):
     except OSError:
       return None
     interpreter = PythonInterpreter(executable, identity)
-    return resolve(self._config, interpreter, logger=self._logger)
+    if self._matches(interpreter, filters):
+      return _resolve(self._config, interpreter, logger=self._logger)
+    return None
 
-  def setup_interpreter(self, interpreter):
+  def _setup_interpreter(self, interpreter):
     interpreter_dir = os.path.join(self._path, str(interpreter.identity))
     safe_mkdir(interpreter_dir)
-    safe_link(interpreter.binary, os.path.join(interpreter_dir, 'python'))
-    return resolve(self._config, interpreter, logger=self._logger)
+    _safe_link(interpreter.binary, os.path.join(interpreter_dir, 'python'))
+    return _resolve(self._config, interpreter, logger=self._logger)
 
-  def setup_cached(self):
+  def _setup_cached(self, filters):
     for interpreter_dir in os.listdir(self._path):
       path = os.path.join(self._path, interpreter_dir)
-      pi = self.interpreter_from_path(path)
+      pi = self._interpreter_from_path(path, filters)
       if pi:
         self._logger('Detected interpreter %s: %s' % (pi.binary, str(pi.identity)))
         self._interpreters.add(pi)
 
-  def setup_paths(self, paths):
-    for interpreter in PythonInterpreter.all(paths):
+  def _setup_paths(self, paths, filters):
+    for interpreter in self._matching(PythonInterpreter.all(paths), filters):
       identity_str = str(interpreter.identity)
       path = os.path.join(self._path, identity_str)
-      pi = self.interpreter_from_path(path)
+      pi = self._interpreter_from_path(path, filters)
       if pi is None:
-        self.setup_interpreter(interpreter)
-        pi = self.interpreter_from_path(path)
+        self._setup_interpreter(interpreter)
+        pi = self._interpreter_from_path(path, filters)
         if pi is None:
           continue
       self._interpreters.add(pi)
 
   def matches(self, filters):
-    for interpreter in self._interpreters:
-      if any(interpreter.identity.matches(filt) for filt in filters):
-        yield interpreter
+    """Given some filters, yield any interpreter that matches at least one of them.
+
+    :param filters: A sequence of strings that constrain the interpreter compatibility for this
+      cache, using the Requirement-style format, e.g. ``'CPython>=3', or just ['>=2.7','<3']``
+      for requirements agnostic to interpreter class.
+    """
+    for match in self._matching(self._interpreters, filters):
+      yield match
 
   def setup(self, paths=(), force=False, filters=(b'',)):
+    """Sets up a cache of python interpreters.
+
+    NB: Must be called prior to accessing the ``interpreters`` property or the ``matches`` method.
+
+    :param paths: The paths to search for a python interpreter; the system ``PATH`` by default.
+    :param bool force: When ``True`` the interpreter cache is always re-built.
+    :param filters: A sequence of strings that constrain the interpreter compatibility for this
+      cache, using the Requirement-style format, e.g. ``'CPython>=3', or just ['>=2.7','<3']``
+      for requirements agnostic to interpreter class.
+    """
     has_setup = False
     setup_paths = paths or os.getenv('PATH').split(os.pathsep)
-    self.setup_cached()
+    self._setup_cached(filters)
     if force:
       has_setup = True
-      self.setup_paths(setup_paths)
+      self._setup_paths(setup_paths, filters)
     matches = list(self.matches(filters))
     if len(matches) == 0 and not has_setup:
-      self.setup_paths(setup_paths)
+      self._setup_paths(setup_paths, filters)
       matches = list(self.matches(filters))
     if len(matches) == 0:
       self._logger('Found no valid interpreters!')
