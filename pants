@@ -83,7 +83,7 @@ else
   if [ ! -e "${PANTS_PEX}" ]; then
     log "Building pants.pex to ${PANTS_PEX}..."
     rm -rf ${PANTS_PEX} && \
-    run_pants_bare build -v ${PANTS_BINARY} && \
+    PANTS_VEBOSE=1 PEX_VERBOSE=1 PYTHON_VERBOSE=5 run_pants_bare build -v ${PANTS_BINARY} && \
     mv -v dist/pants.pex ${PANTS_PEX} && \
     chmod +x ${PANTS_PEX}
   fi
