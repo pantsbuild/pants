@@ -208,9 +208,12 @@ class JvmCompile(NailgunTask):
     self._confs = context.config.getlist(config_section, 'confs', default=['default'])
 
     # Runtime dependencies.
-    self._runtime_deps_key = self._language + '-runtime-deps'
     runtime_deps = context.config.getlist(config_section, 'runtime-deps', default=[])
-    self.register_jvm_tool(self._runtime_deps_key, runtime_deps)
+    if runtime_deps:
+      self._runtime_deps_key = self._language + '-runtime-deps'
+      self.register_jvm_tool(self._runtime_deps_key, runtime_deps)
+    else:
+      self._runtime_deps_key = None
 
     # Set up dep checking if needed.
     def munge_flag(flag):
@@ -403,7 +406,8 @@ class JvmCompile(NailgunTask):
         self._register_products(relevant_targets, sources_by_target, self._analysis_file)
 
     # Update the classpath for downstream tasks.
-    runtime_deps = self._jvm_tool_bootstrapper.get_jvm_tool_classpath(self._runtime_deps_key)
+    runtime_deps = self._jvm_tool_bootstrapper.get_jvm_tool_classpath(self._runtime_deps_key) \
+      if self._runtime_deps_key else []
     for conf in self._confs:
       egroups.update_compatible_classpaths(group_id, [(conf, self._classes_dir)])
       for dep in runtime_deps:

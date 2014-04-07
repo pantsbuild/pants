@@ -13,6 +13,7 @@ import socket
 import sys
 import time
 import traceback
+
 from contextlib import contextmanager
 from optparse import Option, OptionParser
 
@@ -44,13 +45,6 @@ from pants.tasks.console_task import ConsoleTask
 from pants.tasks.list_goals import ListGoals
 from pants.tasks.targets_help import TargetsHelp
 
-
-try:
-  import colors
-except ImportError:
-  turn_off_colored_logging = True
-else:
-  turn_off_colored_logging = False
 
 StringIO = Compatibility.StringIO
 
@@ -166,7 +160,7 @@ class Goal(Command):
                 "if set."),
     Option("-q", "--quiet", action="store_true", dest="quiet", default=False,
            help="Squelches all console output apart from errors."),
-    Option("--no-colors", dest="no_color", action="store_true", default=turn_off_colored_logging,
+    Option("--no-colors", dest="no_color", action="store_true", default=False,
            help="Do not colorize log messages."),
     Option("-n", "--dry-run", action="store_true", dest="dry_run", default=False,
       help="Print the commands that would be run, without actually running them."),
