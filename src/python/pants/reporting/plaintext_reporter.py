@@ -10,18 +10,7 @@ from pants.base.workunit import WorkUnit
 from pants.reporting.report import Report
 from pants.reporting.reporter import Reporter
 
-
-try:
-  from colors import cyan, green, red, yellow
-  _colorfunc_map = {
-    Report.FATAL: red,
-    Report.ERROR: red,
-    Report.WARN: yellow,
-    Report.INFO: green,
-    Report.DEBUG: cyan
-  }
-except ImportError:
-  _colorfunc_map = {}
+from colors import cyan, green, red, yellow
 
 
 class PlainTextReporter(Reporter):
@@ -39,6 +28,14 @@ class PlainTextReporter(Reporter):
   #   cache_stats: Show artifact cache report at the end of the run.
   Settings = namedtuple('Settings',
                         Reporter.Settings._fields + ('outfile', 'color', 'indent', 'timing', 'cache_stats'))
+
+  _COLOR_BY_LEVEL = {
+    Report.FATAL: red,
+    Report.ERROR: red,
+    Report.WARN: yellow,
+    Report.INFO: green,
+    Report.DEBUG: cyan
+  }
 
   def __init__(self, run_tracker, settings):
     Reporter.__init__(self, run_tracker, settings)
@@ -112,7 +109,7 @@ class PlainTextReporter(Reporter):
     elements = [e if isinstance(e, basestring) else e[0] for e in msg_elements]
     msg = '\n' + ''.join(elements)
     if self.settings.color:
-      msg = _colorfunc_map.get(level, lambda x: x)(msg)
+      msg = self._COLOR_BY_LEVEL.get(level, lambda x: x)(msg)
     self.emit(self._prefix(workunit, msg))
     self.flush()
 

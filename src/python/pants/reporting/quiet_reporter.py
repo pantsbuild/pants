@@ -10,12 +10,7 @@ from collections import namedtuple
 from pants.reporting.report import Report
 from pants.reporting.reporter import Reporter
 
-
-try:
-  from colors import red
-  _maybe_color = red
-except ImportError:
-  _maybe_color = lambda x: x
+from colors import red
 
 
 class QuietReporter(Reporter):
@@ -48,7 +43,7 @@ class QuietReporter(Reporter):
     elements = [e if isinstance(e, basestring) else e[0] for e in msg_elements]
     msg = '\n' + ''.join(elements)
     if self.settings.color:
-      msg = _maybe_color(msg)
+      msg = red(msg)
     self._emit(msg)
 
   def handle_output(self, workunit, label, s):
