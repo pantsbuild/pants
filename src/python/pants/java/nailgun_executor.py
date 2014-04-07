@@ -12,6 +12,7 @@ import time
 
 from collections import namedtuple
 
+import psutil
 
 # TODO: Once we integrate standard logging into our reporting framework, we  can consider making
 #  some of the log.debug() below into log.info(). Right now it just looks wrong on the console.
@@ -24,8 +25,6 @@ from pants.base.build_environment import get_buildroot
 
 from .executor import Executor, SubprocessExecutor
 from .nailgun_client import NailgunClient
-
-import psutil
 
 
 class NailgunExecutor(Executor):
