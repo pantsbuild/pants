@@ -64,7 +64,7 @@ class NailgunTask(Task):
 
     Call only in execute() or later. TODO: Enforce this.
     """
-    if self.context.options.nailgun_daemon and not os.environ.get('PANTS_DEV'):
+    if self.context.options.nailgun_daemon:
       classpath = os.pathsep.join(
         self._jvm_tool_bootstrapper.get_jvm_tool_classpath(self._nailgun_bootstrap_key))
       client = NailgunExecutor(self._workdir, classpath, distribution=self._dist)
