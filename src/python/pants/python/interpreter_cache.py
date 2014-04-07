@@ -64,11 +64,7 @@ def resolve_and_link(config, requirement, target_link, installer_provider, logge
     sdist = link.fetch()
     logger('    installing %s' % sdist)
     installer = installer_provider(sdist)
-    try:
-      dist_location = installer.bdist()
-    except installer.InstallFailure as e:
-      logger('      failed to install, skipping: %s' % e)
-      continue
+    dist_location = installer.bdist()
     target_location = os.path.join(os.path.dirname(target_link), os.path.basename(dist_location))
     shutil.move(dist_location, target_location)
     safe_link(target_location, target_link)
@@ -124,7 +120,7 @@ class PythonInterpreterCache(object):
   def interpreters(self):
     return self._interpreters
 
-  def interpreter_from_path(self, path):
+  def interpreter_from_path(self, path, filters):
     interpreter_dir = os.path.basename(path)
     identity = PythonIdentity.from_path(interpreter_dir)
     try:
@@ -132,7 +128,9 @@ class PythonInterpreterCache(object):
     except OSError:
       return None
     interpreter = PythonInterpreter(executable, identity)
-    return resolve(self._config, interpreter, logger=self._logger)
+    if any(interpreter.identity.matches(filt) for filt in filters):
+      return resolve(self._config, interpreter, logger=self._logger)
+    return None
 
   def setup_interpreter(self, interpreter):
     interpreter_dir = os.path.join(self._path, str(interpreter.identity))
@@ -140,19 +138,19 @@ class PythonInterpreterCache(object):
     safe_link(interpreter.binary, os.path.join(interpreter_dir, 'python'))
     return resolve(self._config, interpreter, logger=self._logger)
 
-  def setup_cached(self):
+  def setup_cached(self, filters):
     for interpreter_dir in os.listdir(self._path):
       path = os.path.join(self._path, interpreter_dir)
-      pi = self.interpreter_from_path(path)
+      pi = self.interpreter_from_path(path, filters)
       if pi:
         self._logger('Detected interpreter %s: %s' % (pi.binary, str(pi.identity)))
         self._interpreters.add(pi)
 
-  def setup_paths(self, paths):
+  def setup_paths(self, paths, filters):
     for interpreter in PythonInterpreter.all(paths):
       identity_str = str(interpreter.identity)
       path = os.path.join(self._path, identity_str)
-      pi = self.interpreter_from_path(path)
+      pi = self.interpreter_from_path(path, filters)
       if pi is None:
         self.setup_interpreter(interpreter)
         pi = self.interpreter_from_path(path)
@@ -168,13 +166,13 @@ class PythonInterpreterCache(object):
   def setup(self, paths=(), force=False, filters=(b'',)):
     has_setup = False
     setup_paths = paths or os.getenv('PATH').split(os.pathsep)
-    self.setup_cached()
+    self.setup_cached(filters)
     if force:
       has_setup = True
-      self.setup_paths(setup_paths)
+      self.setup_paths(setup_paths, filters)
     matches = list(self.matches(filters))
     if len(matches) == 0 and not has_setup:
-      self.setup_paths(setup_paths)
+      self.setup_paths(setup_paths, filters)
       matches = list(self.matches(filters))
     if len(matches) == 0:
       self._logger('Found no valid interpreters!')

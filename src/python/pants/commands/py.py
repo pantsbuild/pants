@@ -41,8 +41,11 @@ class Py(Command):
                       help='Run the target environment in an IPython interpreter.')
     parser.add_option('-r', '--req', dest='extra_requirements', default=[], action='append',
                       help='Additional Python requirements to add to this chroot.')
-    parser.add_option('-i', '--interpreter', dest='interpreter', default=None,
-                      help='The interpreter requirement for this chroot.')
+    parser.add_option('-i', '--interpreter', dest='interpreters', default=[], action='append',
+                      help="Constrain what Python interpreters to use.  Uses Requirement "
+                           "format from pkg_resources, e.g. 'CPython>=2.6,<3' or 'PyPy'. "
+                           "By default, no constraints are used.  Multiple constraints may "
+                           "be added.  They will be ORed together.")
     parser.add_option('-e', '--entry_point', dest='entry_point', default=None,
                       help='The entry point for the generated PEX.')
     parser.add_option('-v', '--verbose', dest='verbose', default=False, action='store_true',
@@ -55,11 +58,12 @@ class Py(Command):
     self.target = None
     self.extra_targets = []
     self.config = Config.load()
+
+    interpreters = self.options.interpreters or [b'']
     self.interpreter_cache = PythonInterpreterCache(self.config, logger=self.debug)
-    self.interpreter_cache.setup()
+    self.interpreter_cache.setup(filters=interpreters)
     interpreters = self.interpreter_cache.select_interpreter(
-        list(self.interpreter_cache.matches([self.options.interpreter]
-            if self.options.interpreter else [b''])))
+        list(self.interpreter_cache.matches(interpreters)))
     if len(interpreters) != 1:
       self.error('Unable to detect suitable interpreter.')
     self.interpreter = interpreters[0]

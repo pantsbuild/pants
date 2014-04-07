@@ -83,7 +83,7 @@ else
   if [ ! -e "${PANTS_PEX}" ]; then
     log "Building pants.pex to ${PANTS_PEX}..."
     rm -rf ${PANTS_PEX} && \
-    run_pants_bare py -v --pex ${PANTS_BINARY} && \
+    run_pants_bare py -v --pex -i "CPython>=2.6,<3" -i "CPython>=3.3" ${PANTS_BINARY} && \
     mv -v dist/pants.pex ${PANTS_PEX} && \
     chmod +x ${PANTS_PEX}
   fi
