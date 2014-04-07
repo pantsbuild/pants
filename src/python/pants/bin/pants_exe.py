@@ -56,6 +56,8 @@ def _help(version, root_dir):
   print()
   print('Available subcommands:\n\t%s' % '\n\t'.join(_find_all_commands()))
   print()
+  print('Friendly docs: http://pantsbuild.github.io/')
+  print()
   print("""Default subcommand flags can be stored in ~/.pantsrc using the 'options' key of a
 section named for the subcommand in ini style format, ie:
   [build]
