@@ -68,6 +68,7 @@ Pants Reference Documentation
 
    build_dictionary
    goals_reference
+   config_reference
 
 
 Contributing to Pants

@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
@@ -56,9 +57,9 @@ def gen_base_reference(rst_filename, dirname):
     fh.write('\n'.join(lines))
 
 def copy_builddict(docs_dir):
-  for filename in ['build_dictionary.rst', 'goals_reference.rst']:
+  for filename in ['build_dictionary.rst', 'config_reference.rst', 'goals_reference.rst']:
     filepath = os.path.abspath(os.path.join(docs_dir,
-        '../../../../../dist/builddict', filename))
+        '../../../../dist/builddict', filename))
     try:
       shutil.copy(filepath, docs_dir)
     except IOError as e:

@@ -10,6 +10,7 @@ import sys
 from twitter.common.dirutil import safe_mkdir, safe_rmtree
 from twitter.common.lang import Compatibility
 
+from pants.base.config import Config
 from pants.reporting.html_reporter import HtmlReporter
 from pants.reporting.plaintext_reporter import PlainTextReporter
 from pants.reporting.quiet_reporter import QuietReporter
@@ -25,8 +26,7 @@ def initial_reporting(config, run_tracker):
 
   Will be changed after we parse cmd-line flags.
   """
-  reports_dir = config.get('reporting', 'reports_dir',
-                           default=os.path.join(config.getdefault('pants_workdir'), 'reports'))
+  reports_dir = os.path.join(config.get_option(Config.DEFAULT_PANTS_WORKDIR), 'reports')
   link_to_latest = os.path.join(reports_dir, 'latest')
   if os.path.exists(link_to_latest):
     os.unlink(link_to_latest)
