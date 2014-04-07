@@ -9,8 +9,10 @@ import os
 import re
 import sys
 import time
+
 from collections import namedtuple
 
+import psutil
 
 # TODO: Once we integrate standard logging into our reporting framework, we  can consider making
 #  some of the log.debug() below into log.info(). Right now it just looks wrong on the console.
@@ -18,6 +20,7 @@ from twitter.common import log
 from twitter.common.collections import maybe_list
 from twitter.common.dirutil import safe_open
 from twitter.common.lang import Compatibility
+
 from pants.base.build_environment import get_buildroot
 
 from .executor import Executor, SubprocessExecutor
@@ -44,10 +47,10 @@ class NailgunExecutor(Executor):
       return cls(fingerprint, int(pid), int(port))
 
   # Used to identify we own a given java nailgun server
-  _PANTS_NG_ARG_PREFIX = '-Dpants.buildroot'
-  _PANTS_NG_ARG = '%s=%s' % (_PANTS_NG_ARG_PREFIX, get_buildroot())
+  _PANTS_NG_ARG_PREFIX = b'-Dpants.buildroot'
+  _PANTS_NG_ARG = b'%s=%s' % (_PANTS_NG_ARG_PREFIX, get_buildroot())
 
-  _PANTS_FINGERPRINT_ARG_PREFIX = '-Dpants.nailgun.fingerprint='
+  _PANTS_FINGERPRINT_ARG_PREFIX = b'-Dpants.nailgun.fingerprint='
 
   @staticmethod
   def _check_pid(pid):
@@ -60,7 +63,7 @@ class NailgunExecutor(Executor):
   @staticmethod
   def create_owner_arg(workdir):
     # Currently the owner is identified via the full path to the workdir.
-    return '-Dpants.nailgun.owner=%s' % workdir
+    return b'-Dpants.nailgun.owner=%s' % workdir
 
   @classmethod
   def _create_fingerprint_arg(cls, fingerprint):
@@ -85,6 +88,59 @@ class NailgunExecutor(Executor):
   def _log_kill(pid, port=None, logger=None):
     logger = logger or log.info
     logger('killing ng server @ pid:%d%s' % (pid, ' port:%d' % port if port else ''))
+
+  @classmethod
+  def _find_ngs(cls, everywhere=False):
+    def cmdline_matches(cmdline):
+      if everywhere:
+        return any(filter(lambda arg: arg.startswith(cls._PANTS_NG_ARG_PREFIX), cmdline))
+      else:
+        return cls._PANTS_NG_ARG in cmdline
+
+    for proc in psutil.process_iter():
+      try:
+        if b'java' == proc.name and cmdline_matches(proc.cmdline):
+          yield proc
+      except (psutil.AccessDenied, psutil.NoSuchProcess):
+        pass
+
+  @classmethod
+  def killall(cls, logger=None, everywhere=False):
+    """Kills all nailgun servers started by pants.
+
+    :param bool everywhere: If ``True`` Kills all pants-started nailguns on this machine; otherwise
+      restricts the nailguns killed to those started for the current build root.
+    """
+    success = True
+    for proc in cls._find_ngs(everywhere=everywhere):
+      try:
+        cls._log_kill(proc.pid, logger=logger)
+        proc.kill()
+      except (psutil.AccessDenied, psutil.NoSuchProcess):
+        success = False
+    return success
+
+  @staticmethod
+  def _find_ng_listen_port(proc):
+    for connection in proc.get_connections(kind=b'tcp'):
+      if connection.status == b'LISTEN':
+        host, port = connection.laddr
+        return port
+    return None
+
+  @classmethod
+  def _find(cls, workdir):
+    owner_arg = cls.create_owner_arg(workdir)
+    for proc in cls._find_ngs(everywhere=False):
+      try:
+        if owner_arg in proc.cmdline:
+          fingerprint = cls.parse_fingerprint_arg(proc.cmdline)
+          port = cls._find_ng_listen_port(proc)
+          if fingerprint and port:
+            return cls.Endpoint(fingerprint, proc.pid, port)
+      except (psutil.AccessDenied, psutil.NoSuchProcess):
+        pass
+    return None
 
   def __init__(self, workdir, nailgun_classpath, distribution=None, ins=None):
     super(NailgunExecutor, self).__init__(distribution=distribution)
@@ -137,13 +193,10 @@ class NailgunExecutor(Executor):
         pass
 
   def _get_nailgun_endpoint(self):
-    if self._find:
-      endpoint = self._find(self._workdir)
-      if endpoint:
-        log.debug('Found ng server with fingerprint %s @ pid:%d port:%d' % endpoint)
-      return endpoint
-    else:
-      return None
+    endpoint = self._find(self._workdir)
+    if endpoint:
+      log.debug('Found ng server with fingerprint %s @ pid:%d port:%d' % endpoint)
+    return endpoint
 
   def _get_nailgun_client(self, jvm_args, classpath, stdout, stderr):
     classpath = self._nailgun_classpath + classpath
@@ -247,59 +300,3 @@ class NailgunExecutor(Executor):
 
   def __str__(self):
     return 'NailgunExecutor(%s, server=%s)' % (self._distribution, self._get_nailgun_endpoint())
-
-
-# TODO(jsirois): Make psutil and other deps available in dev mode, so we don't need such tricks.
-try:
-  import psutil
-
-  def _find_ngs(everywhere=False):
-    def cmdline_matches(cmdline):
-      if everywhere:
-        return any(filter(lambda arg: arg.startswith(NailgunExecutor._PANTS_NG_ARG_PREFIX), cmdline))
-      else:
-        return NailgunExecutor._PANTS_NG_ARG in cmdline
-
-    for proc in psutil.process_iter():
-      try:
-        if 'java' == proc.name and cmdline_matches(proc.cmdline):
-          yield proc
-      except (psutil.AccessDenied, psutil.NoSuchProcess):
-        pass
-
-  def killall(logger=None, everywhere=False):
-    success = True
-    for proc in _find_ngs(everywhere=everywhere):
-      try:
-        NailgunExecutor._log_kill(proc.pid, logger=logger)
-        proc.kill()
-      except (psutil.AccessDenied, psutil.NoSuchProcess):
-        success = False
-    return success
-
-  NailgunExecutor.killall = staticmethod(killall)
-
-  def _find_ng_listen_port(proc):
-    for connection in proc.get_connections(kind='tcp'):
-      if connection.status == 'LISTEN':
-        host, port = connection.laddr
-        return port
-    return None
-
-  def _find(workdir):
-    owner_arg = NailgunExecutor.create_owner_arg(workdir)
-    for proc in _find_ngs(everywhere=False):
-      try:
-        if owner_arg in proc.cmdline:
-          fingerprint = NailgunExecutor.parse_fingerprint_arg(proc.cmdline)
-          port = _find_ng_listen_port(proc)
-          if fingerprint and port:
-            return NailgunExecutor.Endpoint(fingerprint, proc.pid, port)
-      except (psutil.AccessDenied, psutil.NoSuchProcess):
-        pass
-    return None
-
-  NailgunExecutor._find = staticmethod(_find)
-except ImportError:
-  NailgunExecutor.killall = None
-  NailgunExecutor._find = None
