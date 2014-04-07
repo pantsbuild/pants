@@ -97,6 +97,18 @@ class Config(object):
 
   DEFAULT_SECTION = ConfigParser.DEFAULTSECT
 
+  DEFAULT_PANTS_DISTDIR = ConfigOption.create(
+    section=DEFAULT_SECTION,
+    option='pants_distdir',
+    help='Directory where pants will write user visible artifacts.',
+    default=os.path.join(get_buildroot(), 'dist'))
+
+  DEFAULT_PANTS_SUPPORTDIR = ConfigOption.create(
+    section=DEFAULT_SECTION,
+    option='pants_supportdir',
+    help='Directory of pants support files (e.g.: ivysettings.xml).',
+    default=os.path.join(get_buildroot(), 'build-support'))
+
   DEFAULT_PANTS_WORKDIR = ConfigOption.create(
     section=DEFAULT_SECTION,
     option='pants_workdir',
@@ -142,8 +154,8 @@ class Config(object):
       user=getpass.getuser(),
       pants_bootstrapdir=os.path.expanduser('~/.pants.d'),
       pants_workdir=cls.DEFAULT_PANTS_WORKDIR.default,
-      pants_supportdir=os.path.join(get_buildroot(), 'build-support'),
-      pants_distdir=os.path.join(get_buildroot(), 'dist')
+      pants_supportdir=cls.DEFAULT_PANTS_SUPPORTDIR.default,
+      pants_distdir=cls.DEFAULT_PANTS_DISTDIR.default,
     )
     if defaults:
       standard_defaults.update(defaults)
