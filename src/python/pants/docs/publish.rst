@@ -83,7 +83,8 @@ Things can go wrong; you can recover:
     ...
     FAILURE: java -jar .../ivy/lib/ivy-2.2.0.jar ... exited non-zero (1) 'failed to push com.twitter#archimedes_common;0.0.42'
 
-  It's usually a sign that something strange happened in a *previous* publish.
+  This is usually a sign that something strange happened in a *previous*
+  publish.
   Perhaps someone published an artifact "by hand" instead of using Pants.
   Perhaps someone used Pants to publish an artifact but it failed to update
   the pushdb in source control. E.g., merge conflicts can happen, and folks
@@ -102,16 +103,18 @@ Things can go wrong; you can recover:
   (``git pull`` or equivalent) to get the latest version of the pushdb
   and try again.
 
-* Pushing the pushdb to origin can fail, even though artifact-uploading succeeded. Perhaps you
+* Pushing the pushdb to origin can fail, even though artifact-uploading succeeded.
+  Perhaps you
   were publishing at about the same time someone else was; you might get a
   merge conflict when trying to push.
 
   (There's a temptation to ignore this error: the artifact uploaded OK; nobody
-  expects a merge conflict when publishing. Alas, ignoring the error now means
+  expects a git merge conflict when publishing.
+  Alas, ignoring the error now means
   that your *next* publish will probably fail, since Pants has lost track of
   the current version number.)
 
-  :ref:`Troubleshoot a Failed Push to Origin <publish-pushdb-push>`
+  See: :ref:`Troubleshoot a Failed Push to Origin <publish-pushdb-push>`
 
 ******
 How To
@@ -145,7 +148,8 @@ Troubleshooting
 ***************
 
 Sometimes publishing doesn't do what you want. The fix usually involves
-publishing again, perhaps passing ``--publish-override``,
+publishing again, perhaps passing
+``--publish-override`` (override the version number to use),
 ``--publish-force``, and/or ``--publish-restart-at``. The following
 are some usual symptoms/questions:
 
@@ -159,11 +163,16 @@ contents of the pushdb; but apparently, someone previously published
 that version of the artifact without updating the pushdb.
 
 Examine the publish repo to find out what version number you actually
-want to use.
+want to use. E.g., if you notice that versions up to 2.5.7 exist and
+you want to bump the patch version, you want to override the default
+version number and use 2.5.8 instead.
 
 Try publishing again, but pass ``--publish-override`` to specify the
 version number to use instead of incrementing the version number from
-the pushdb.
+the pushdb. Be sure to use a version number that has not
+already been published this time. For example, to override the default
+publish version number for the org.archie buoyancy artifact, you might
+pass ``--publish-override=org.archie#buoyancy=2.5.8``.
 
 .. _publish-pushdb-push:
 
@@ -191,22 +200,47 @@ be merged to the branch on origin.
 You are now in a bad state: you've pushed some artifacts, but the pushdb
 doesn't "remember" them.
 
-The exact steps to fix things up depend on what was happening on your
-local repo. Some good things to consider.
+* Look at the pushdb's source control history to if someone made a conflicting
+  publish. If so, contact them.
+  (You're about to try to fix the problem; if they also encountered
+  problems, they are probably also about to fix the problem.
+  You might want to coordinate and take turns.)
 
-  * Update your source tree, discarding local changes.
-    In git, this might be a ``reset origin/master``
-    (if ``master`` is your release branch) and a ``pull``.
-  * Look at the pushdb's source control history to if someone made a conflicting
-    publish. If so, contact them.
-    (You're about to try to publish again; if they also encountered
-    problems, they are probably also about to try again. You might want to
-    coordinate and take turns.)
-  * Try publishing again.
-    Since you uploaded new versions artifacts but the pushdb doesn't "remember"
-    that, you might run into errors with this publish, as ivy hits
-    Versioned Artifact Already Exists.
-    Use ``--publish_override`` to set version numbers for these.
+* Git couldn't auto-merge your change to the pushdb; can you fix the merge
+  "by hand"? If the problem is just a merge conflict in the pushdb, you can
+  fix things by fixing the merge. (But if someone else was trying to publish
+  a particular artifact at the same time you were, your changes may be too
+  "entangled" to salvage this way.)
+
+**Depending on how "entangled" your state is,** you either want to
+reset and start over or merge the pushdb by hand.
+
+**To reset and start over** In git, this might mean::
+
+    git reset origin/master # (if ``master`` is your release branch)
+    git pull
+    ./pants goal clean-all && ./pants goal publish <your previous args>
+
+Since you uploaded new versions artifacts but the reset pushdb doesn't
+"remember" that, you might  get
+"Versioned Artifact Already Exists"
+errors.
+Use ``--publish_override`` to set version numbers to avoid these.
+
+**To merge the pushdb by hand** In git, this might mean
+
+* Use ``git status`` to check your change.
+* Commit it with ``git commit``.
+* ``git commit -a -m "pants build committing publish data for push of org#artifact;version"``
+* as fast as you can, execute the following steps::
+
+    git fetch origin master
+    git rebase origin/master
+    git push origin master
+
+* If that worked, great; if it didn't work, you might try repeating that
+  last set of steps *or* (if it keeps on not working) giving up, resetting,
+  and starting over.
 
 .. _publish-no-provides:
 
