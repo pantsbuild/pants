@@ -22,7 +22,7 @@ except ImportError:
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 sys.path.insert(0, os.path.abspath('../../..'))
 
-pants_egg_dir = os.path.abspath('../../../../../.pants.d/python/eggs')
+pants_egg_dir = os.path.abspath('../../../../.pants.d/python/eggs')
 if not os.path.exists(pants_egg_dir):
   raise RuntimeError(''.join([
     'Pants egg dependencies do not exist! Please build pants before ',
