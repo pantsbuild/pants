@@ -76,8 +76,7 @@ fi
 if [[ "${skip_java:-false}" == "false" ]]; then
   banner "Running jvm tests"
   (
-    ./pants.pex goal test {src,tests}/java/com/twitter/common:: $daemons -x && \
-    ./pants.pex goal test {src,tests}/scala/com/twitter/common:: $daemons -x
+    ./pants.pex goal test {src,tests}/{java,scala}:: $daemons -x
   ) || die "Jvm test failure."
 fi
 
