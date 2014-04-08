@@ -27,7 +27,7 @@ from pants import binary_util
 from pants.base.address import Address
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
-from pants.base.config import Config
+from pants.base.config import Config, ConfigOption
 from pants.base.parse_context import ParseContext
 from pants.base.rcfile import RcFile
 from pants.base.run_info import RunInfo
@@ -533,7 +533,8 @@ except ImportError:
 
 class Invalidator(ConsoleTask):
   def execute(self, targets):
-    build_invalidator_dir = self.context.config.get('tasks', 'build_invalidator')
+    build_invalidator_dir = os.path.join(
+      self.context.config.get_option(Config.DEFAULT_PANTS_WORKDIR), 'build_invalidator')
     _cautious_rmtree(build_invalidator_dir)
 goal(
   name='invalidate',
