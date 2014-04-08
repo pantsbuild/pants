@@ -150,15 +150,18 @@ class PythonInterpreterCache(object):
 
   def setup_paths(self, paths, filters):
     for interpreter in PythonInterpreter.all(paths):
-      identity_str = str(interpreter.identity)
-      path = os.path.join(self._path, identity_str)
-      pi = self.interpreter_from_path(path, filters)
-      if pi is None:
-        self.setup_interpreter(interpreter)
-        pi = self.interpreter_from_path(path, filters)
-        if pi is None:
-          continue
-      self._interpreters.add(pi)
+      for filt in filters:
+        if interpreter.identity.matches(filt):
+          print('>>> %s passes filter %s' % (interpreter, filt))
+          identity_str = str(interpreter.identity)
+          path = os.path.join(self._path, identity_str)
+          pi = self.interpreter_from_path(path, filters)
+          if pi is None:
+            self.setup_interpreter(interpreter)
+            pi = self.interpreter_from_path(path, filters)
+            if pi is None:
+              continue
+          self._interpreters.add(pi)
 
   def matches(self, filters):
     for interpreter in self._interpreters:
