@@ -716,8 +716,8 @@ class JarPublish(ScmPublish, Task):
 
     # Todo(Tejal Desai): Add tests for handling java sources changes.
     if isinstance(target, ScalaLibrary):
-      for java_source in target.java_sources:
-        for source in java_source.sources:
+      for java_source in sorted(target.java_sources):
+        for source in sorted(java_source.sources):
           path = os.path.join(java_source.target_base, source)
           with open(path) as fd:
             sha.update(source)
