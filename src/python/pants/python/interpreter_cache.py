@@ -153,7 +153,7 @@ class PythonInterpreterCache(object):
       pi = self.interpreter_from_path(path, filters)
       if pi is None:
         self.setup_interpreter(interpreter)
-        pi = self.interpreter_from_path(path)
+        pi = self.interpreter_from_path(path, filters)
         if pi is None:
           continue
       self._interpreters.add(pi)
