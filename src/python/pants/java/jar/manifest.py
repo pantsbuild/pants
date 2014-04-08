@@ -20,6 +20,7 @@ class Manifest(object):
   """
   @staticmethod
   def _wrap(text):
+    text = text.encode('ascii')
     with closing(StringIO(text)) as fp:
       yield fp.read(70)
       while True:
@@ -36,7 +37,7 @@ class Manifest(object):
   CLASS_PATH = 'Class-Path'
 
   def __init__(self, contents=''):
-    self._contents = contents.strip()
+    self._contents = contents.strip().encode('ascii')
 
   def addentry(self, header, value):
     if len(header) > 68:
@@ -46,4 +47,5 @@ class Manifest(object):
     self._contents += '\n'.join(self._wrap('%s: %s' % (header, value)))
 
   def contents(self):
-    return self._contents + '\n'
+    padded = self._contents + '\n'
+    return padded.encode('ascii')
