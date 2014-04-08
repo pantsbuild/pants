@@ -7,11 +7,14 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import inspect
 import os
 
+from collections import defaultdict
 from pkg_resources import resource_string
 from twitter.common.dirutil import Fileset, safe_open
 
+from pants.base.build_environment import get_buildroot
 from pants.base.build_file_helpers import maven_layout
 from pants.base.build_manual import get_builddict_info
+from pants.base.config import ConfigOption
 from pants.base.generator import Generator, TemplateData
 from pants.base.parse_context import ParseContext
 from pants.goal.phase import Phase
@@ -237,6 +240,7 @@ class BuildBuildDictionary(Task):
 
   def execute(self, targets):
     self._gen_goals_reference()
+    self._gen_config_reference()
 
     d = assemble()
     template = resource_string(__name__, os.path.join(self._templates_dir, 'page.mustache'))
@@ -273,4 +277,21 @@ class BuildBuildDictionary(Task):
     self.context.log.info('Generating %s' % filename)
     with safe_open(filename, 'w') as outfile:
       generator = Generator(template, phases=phases)
+      generator.write(outfile)
+
+  def _gen_config_reference(self):
+    options_by_section = defaultdict(list)
+    for option in ConfigOption.all():
+      if isinstance(option.default, unicode):
+        option.default = option.default.replace(get_buildroot(), '%(buildroot)s')
+      options_by_section[option.section].append(option)
+    sections = list()
+    for section, options in options_by_section.items():
+      sections.append(TemplateData(section=section, options=options))
+    template = resource_string(__name__,
+                               os.path.join(self._templates_dir, 'pants_ini_reference.mustache'))
+    filename = os.path.join(self._outdir, 'pants_ini_reference.rst')
+    self.context.log.info('Generating %s' % filename)
+    with safe_open(filename, 'w') as outfile:
+      generator = Generator(template, sections=sections)
       generator.write(outfile)

@@ -57,7 +57,7 @@ def gen_base_reference(rst_filename, dirname):
     fh.write('\n'.join(lines))
 
 def copy_builddict(docs_dir):
-  for filename in ['build_dictionary.rst', 'goals_reference.rst']:
+  for filename in ['build_dictionary.rst', 'goals_reference.rst', 'pants_ini_reference.rst']:
     filepath = os.path.abspath(os.path.join(docs_dir,
         '../../../../dist/builddict', filename))
     try:

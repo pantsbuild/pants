@@ -13,10 +13,8 @@ from xml.dom import minidom
 from twitter.common.dirutil import safe_mkdir
 
 from pants.base.build_environment import get_buildroot
+from pants.base.config import ConfigOption
 from pants.base.generator import Generator, TemplateData
-from pants.targets.java_tests import JavaTests
-from pants.targets.scala_tests import ScalaTests
-from pants.targets.sources import SourceRoot
 from pants.tasks.ide_gen import IdeGen, Project, SourceSet
 
 
@@ -41,6 +39,20 @@ _SCALA_VERSIONS = {
 
 
 class IdeaGen(IdeGen):
+  _IDEA_JAVA_MAX_HEAP_MB = ConfigOption.create(
+    section='idea',
+    option='java_maximum_heap_size_mb',
+    help='Max heap size for javac in megabytes.',
+    valtype=int,
+    default=512)
+
+  _IDEA_SCALA_MAX_HEAP_MB = ConfigOption.create(
+    section='idea',
+    option='scala_maximum_heap_size_mb',
+    help='Max heap size for scalac in megabytes.',
+    valtype=int,
+    default=512)
+
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
     IdeGen.setup_parser(option_group, args, mkflag)
@@ -98,14 +110,14 @@ class IdeaGen(IdeGen):
     self.scala_language_level = _SCALA_VERSIONS.get(context.options.idea_scala_language_level, None)
     self.scala_maximum_heap_size = (
       context.options.idea_gen_scala_maximum_heap_size
-      or context.config.getint('idea', 'scala_maximum_heap_size_mb', default=512)
+      or context.config.get_option(self._IDEA_SCALA_MAX_HEAP_MB)
     )
     self.fsc = context.options.idea_gen_fsc
 
     self.java_encoding = context.options.idea_gen_java_encoding
     self.java_maximum_heap_size = (
       context.options.idea_gen_java_maximum_heap_size
-      or context.config.getint('idea', 'java_maximum_heap_size_mb', default=128)
+      or context.config.get_option(self._IDEA_JAVA_MAX_HEAP_MB)
     )
 
     idea_version = _VERSIONS[context.options.idea_gen_version]

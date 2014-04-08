@@ -1,0 +1,27 @@
+*******************
+pants.ini Reference
+*******************
+
+All repos using pants have a ``pants.ini`` file at the root,
+in `configparser <http://docs.python.org/2/library/configparser.html>`_ format.
+Users can override the default config with a ``~/.pants.new.rc`` file.
+
+.. NOTE:: As of April 2014, this configuration reference is incomplete while migrating
+          options to the format used to generate this reference.
+
+
+The following configuration options are provided:
+
+{{#sections}}
+
+.. _configref_section_{{section}}
+
+{{section}} section
+-----------------------------------------------------------------------------
+
+{{#options}}
+    ``{{option}}`` - {{help}} (default: ``{{default}}``)
+
+{{/options}}
+
+{{/sections}}
