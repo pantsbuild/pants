@@ -128,8 +128,10 @@ class PythonInterpreterCache(object):
     except OSError:
       return None
     interpreter = PythonInterpreter(executable, identity)
-    if any(interpreter.identity.matches(filt) for filt in filters):
-      return resolve(self._config, interpreter, logger=self._logger)
+    for filt in filters:
+      if interpreter.identity.matches(filt):
+        print('>>> %s passes filter %s' % (interpreter, filt))
+        return resolve(self._config, interpreter, logger=self._logger)
     return None
 
   def setup_interpreter(self, interpreter):
