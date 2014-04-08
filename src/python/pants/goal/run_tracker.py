@@ -83,7 +83,7 @@ class RunTracker(object):
 
     # Create a 'latest' symlink, after we add_infos, so we're guaranteed that the file exists.
     link_to_latest = os.path.join(os.path.dirname(self.info_dir), 'latest')
-    if os.path.exists(link_to_latest):
+    if os.path.lexists(link_to_latest):
       os.unlink(link_to_latest)
     os.symlink(self.info_dir, link_to_latest)
 
