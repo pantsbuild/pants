@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
 source build-support/python/libvirtualenv.sh
-setup_virtualenv 'rbt' 'RBTools==0.5.5' \
+setup_virtualenv 'rbt' 'RBTools==0.6' \
   '--allow-external RBTools --allow-unverified RBTools'
 exec rbt "$@"
