@@ -66,9 +66,11 @@ if [[ "${skip_distribution:-false}" == "false" ]]; then
   # setup_py
   banner "Running pants distribution tests"
   (
-    ./pants.pex src/python/pants:_pants_transitional_publishable_binary_ && \
+    ./pants.pex -i "CPython>=2.6,<3" -i "CPython>=3.3" \
+      src/python/pants:_pants_transitional_publishable_binary_ && \
     mv dist/_pants_transitional_publishable_binary_.pex dist/self.pex && \
-    ./dist/self.pex src/python/pants:_pants_transitional_publishable_binary_ && \
+    ./dist/self.pex build -i "CPython>=2.6,<3" -i "CPython>=3.3" \
+      src/python/pants:_pants_transitional_publishable_binary_ && \
     ./dist/self.pex setup_py --recursive src/python/pants:pants-packaged
   ) || die "Failed to create pants distributions."
 fi
@@ -83,7 +85,8 @@ fi
 if [[ "${skip_python:-false}" == "false" ]]; then
   banner "Running python tests"
   (
-    PANTS_PYTHON_TEST_FAILSOFT=1 ./pants.pex build --timeout=5 tests/python/pants_test:all
+    PANTS_PYTHON_TEST_FAILSOFT=1 ./pants.pex build -i "CPython>=2.6,<3" -i "CPython>=3.3" \
+      --timeout=5 tests/python/pants_test:all
   ) || die "Python test failure"
 fi
 
