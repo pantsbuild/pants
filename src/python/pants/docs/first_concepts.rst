@@ -142,6 +142,18 @@ It probably invokes other tools.
 For example, depending on the code in the relevant targets, that "compile"
 goal might invoke ``javac`` a few times and ``scalac``.
 
+Pants caches things it builds.
+Thus, if you change one source file and re-build, Pants probably doesn't
+"build the world."
+It just builds a few things.
+Pants keys its cache on hashed file contents.
+This is a straightforward way to build the right things after some files'
+contents change.
+(It *can* surprise you if you ``touch`` a file, start a compile, and
+nothing happens.
+If you want to, e.g., see ``Foo.java``'s compile warnings
+again, instead of using ``touch``, you might append a newline.)
+
 *********
 Next Step
 *********
