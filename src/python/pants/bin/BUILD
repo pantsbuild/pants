@@ -45,6 +45,8 @@ python_binary(
   # 3.0 - 3.2 did not support unicode literals so we don't support these for now since it would
   # take some work to make the codebase compatible.
   # Additionally we force a an ascii string for python 3.3.x here.
+  # TODO(John Sirois): Undo the bytestring annotation once
+  # https://github.com/twitter/commons/issues/279 is fixed.
   compatibility=b'CPython>=2.6,<3,>=3.3',
   dependencies = [
     pants(':pants_exe'),
