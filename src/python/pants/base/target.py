@@ -382,7 +382,9 @@ class Target(AbstractTarget):
 
   @manual.builddict()
   def with_description(self, description):
-    """Set a human-readable description of this target."""
+    """Set a human-readable description of this target.
+
+    :param description: Descriptive string"""
     self.description = description
     return self
 

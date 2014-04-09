@@ -21,7 +21,42 @@ from pants.goal.phase import Phase
 from pants.tasks import Task, TaskError
 
 
-def entry(nom, classdoc=None, msg_rst=None, argspec=None, funcdoc=None, methods=None):
+def indent_docstring_by_n(s, n=1):
+  """Given a non-empty docstring, return version indented N spaces.
+  Given an empty thing, return the thing itself."""
+  # In reST, it's useful to have strings that are similarly-indented.
+  # If we have a classdoc indented by 2 next to an __init__ funcdoc indented
+  # by 4, reST doesn't format things nicely. Oh, totally-dedenting doesn't
+  # format nicely either.
+
+  # Docstring indentation: more gnarly than you'd think:
+  # http://www.python.org/dev/peps/pep-0257/#handling-docstring-indentation
+  if not s: return s
+  # Convert tabs to spaces (following the normal Python rules)
+  # and split into a list of lines:
+  lines = s.expandtabs().splitlines()
+  # Determine minimum indentation (first line doesn't count):
+  indent = 999
+  for line in lines[1:]:
+    stripped = line.lstrip()
+    if stripped:
+      indent = min(indent, len(line) - len(stripped))
+  # Remove indentation (first line is special):
+  trimmed = [lines[0].strip()]
+  if indent < 999:
+    for line in lines[1:]:
+      trimmed.append(line[indent:].rstrip())
+  # Strip off trailing and leading blank lines:
+  while trimmed and not trimmed[-1]:
+    trimmed.pop()
+  while trimmed and not trimmed[0]:
+    trimmed.pop(0)
+  # Return a single string:
+  indent = n * " "
+  return '\n'.join([indent + t for t in trimmed])
+
+
+def entry(nom, classdoc=None, msg_rst=None, argspec=None, funcdoc=None, methods=None, indent=1):
   """Create a struct that our template expects to see.
 
   :param nom: Symbol name, e.g. python_binary
@@ -32,46 +67,12 @@ def entry(nom, classdoc=None, msg_rst=None, argspec=None, funcdoc=None, methods=
   :param methods: list of entries for class' methods
   """
 
-  def indent_docstring_by_1(s):
-    """Given a non-empty docstring, return a version indented by a space.
-    Given an empty thing, return the thing itself
-    """
-    # In reST, it's useful to have strings that are similarly-indented.
-    # If we have a classdoc indented by 2 next to an __init__ funcdoc indented
-    # by 4, reST doesn't format things nicely. Oh, totally-dedenting doesn't
-    # format nicely either.
-
-    # Docstring indentation: more gnarly than you'd think:
-    # http://www.python.org/dev/peps/pep-0257/#handling-docstring-indentation
-    if not s: return s
-    # Convert tabs to spaces (following the normal Python rules)
-    # and split into a list of lines:
-    lines = s.expandtabs().splitlines()
-    # Determine minimum indentation (first line doesn't count):
-    indent = 999
-    for line in lines[1:]:
-      stripped = line.lstrip()
-      if stripped:
-        indent = min(indent, len(line) - len(stripped))
-    # Remove indentation (first line is special):
-    trimmed = [lines[0].strip()]
-    if indent < 999:
-      for line in lines[1:]:
-        trimmed.append(line[indent:].rstrip())
-    # Strip off trailing and leading blank lines:
-    while trimmed and not trimmed[-1]:
-      trimmed.pop()
-    while trimmed and not trimmed[0]:
-      trimmed.pop(0)
-    # Return a single string:
-    return '\n'.join([" " + t for t in trimmed])
-
   return TemplateData(
     nom=nom.strip(),
-    classdoc=indent_docstring_by_1(classdoc),
-    msg_rst=indent_docstring_by_1(msg_rst),
+    classdoc=indent_docstring_by_n(classdoc),
+    msg_rst=indent_docstring_by_n(msg_rst, indent),
     argspec=argspec,
-    funcdoc=indent_docstring_by_1(funcdoc),
+    funcdoc=indent_docstring_by_n(funcdoc, indent),
     methods=methods,
     showmethods=(methods and len(methods) > 0))
 
@@ -104,7 +105,8 @@ def entry_for_one_method(nom, method):
   argspec = inspect.formatargspec(args[1:], varargs, varkw, defaults)
   return entry(nom,
                argspec=argspec,
-               funcdoc=(method.__doc__ or "").replace("\n", " "))
+               funcdoc=(method.__doc__ or ""),
+               indent=2)
 
 
 def entry_for_one(nom, sym):
@@ -120,6 +122,7 @@ PREDEFS = {  # some hardwired entries
   "Amount": {"defn": msg_entry("Amount", """
                                 `Amount from twitter.commons.quantity <https://github.com/twitter/commons/blob/master/src/python/twitter/common/quantity/__init__.py>`_
                                 E.g., ``Amount(2, Time.MINUTES)``.""")},
+  "fancy_pants": {"suppress": True},  # unused alias for pants
   "__file__": {"defn": msg_entry("__file__", "Path to BUILD file (string).")},
   "globs": {"defn": entry_for_one("globs", Fileset.globs)},
   "jar_library": {"defn": msg_entry("jar_library",
@@ -127,7 +130,7 @@ PREDEFS = {  # some hardwired entries
   "java_tests": {"defn": msg_entry("java_tests",
                   """Old name for `junit_tests`_""")},
   "maven_layout": {"defn": entry_for_one("maven_layout", maven_layout)},
-  "python_artifact": {"suppress": True}, # unused alias for PythonArtifact
+  "python_artifact": {"suppress": True},  # unused alias for PythonArtifact
   "rglobs": {"defn": entry_for_one("rglobs", Fileset.rglobs)},
   "ROOT_DIR": {"defn": msg_entry("ROOT_DIR",
                                   "Root directory of source code (string).")},
@@ -153,6 +156,7 @@ def get_syms():
 
 # Needed since x may be a str or a unicode, so we can't hard-code str.lower or unicode.lower.
 _lower = lambda x: x.lower
+
 
 def tocl(d):
   """Generate TOC, in-page links to the IDs we're going to define below"""
