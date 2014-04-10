@@ -369,7 +369,8 @@ class JarPublish(ScmPublish, Task):
     else:
       self.repos = context.config.getdict(JarPublish._CONFIG_SECTION, 'repos')
       if not self.repos:
-        raise TaskError("This repo is not yet set for publishing to the world! Please re-run with --publish-local")
+        raise TaskError("This repo is not yet set for publishing to the world!"
+                        "Please re-run with --publish-local")
       for repo, data in self.repos.items():
         auth = data.get('auth')
         if auth:
