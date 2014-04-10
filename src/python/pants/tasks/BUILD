@@ -314,7 +314,6 @@ python_library(
 python_library(
   name = 'ivy_resolve',
   sources = ['ivy_resolve.py'],
-  resources = globs('templates/ivy_resolve/*.mustache'),
   dependencies = [
     pants(':common'),
     pants(':cache_manager'),
@@ -329,6 +328,7 @@ python_library(
 python_library(
   name = 'ivy_utils',
   sources = ['ivy_utils.py'],
+  resources = globs('templates/ivy_resolve/*.mustache'),
   dependencies = [
     pants(':common'),
     pants('3rdparty/python/twitter/commons:twitter.common.collections'),

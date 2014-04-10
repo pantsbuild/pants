@@ -47,8 +47,6 @@ class IvyUtils(object):
   """Useful methods related to interaction with ivy."""
   def __init__(self, config, options, log):
     self._log = log
-    self._config = config
-    self._options = options
 
     # TODO(pl): This is super awful, but options doesn't have a nice way to get out
     # attributes that might not be there, and even then the attribute value might be
