@@ -33,6 +33,7 @@ python_test_suite(
     pants(':depmap'),
     pants(':filemap'),
     pants(':filter'),
+    pants(':ivy_utils'),
     pants(':jar_create'),
     pants(':jar_library_with_empty_dependencies'),
     pants(':listtargets'),
@@ -215,6 +216,17 @@ python_tests(
     pants('tests/python/pants_test/base:base-test'),
     pants('tests/python/pants_test:base-test'),
   ],
+)
+
+python_tests(
+  name = 'ivy_utils',
+  sources = ['test_ivy_utils.py'],
+  dependencies = [
+    pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
+    pants('src/python/pants/tasks:ivy_utils'),
+    pants('tests/python/pants_test/base:base-test'),
+    pants('tests/python/pants_test:base-test'),
+  ]
 )
 
 # XXX this should be in targets?

@@ -47,8 +47,6 @@ class IvyUtils(object):
   """Useful methods related to interaction with ivy."""
   def __init__(self, config, options, log):
     self._log = log
-    self._config = config
-    self._options = options
 
     # TODO(pl): This is super awful, but options doesn't have a nice way to get out
     # attributes that might not be there, and even then the attribute value might be
@@ -197,14 +195,31 @@ class IvyUtils(object):
 
   def _generate_ivy(self, targets, jars, excludes, ivyxml, confs):
     org, name = self.identify(targets)
+
+    # As it turns out force is not transitive - it only works for dependencies pants knows about
+    # directly (declared in BUILD files - present in generated ivy.xml). The user-level ivy docs
+    # don't make this clear [1], but the source code docs do (see isForce docs) [2]. I was able to
+    # edit the generated ivy.xml and use the override feature [3] though and that does work
+    # transitively as you'd hope.
+    #
+    # [1] http://ant.apache.org/ivy/history/2.3.0/settings/conflict-managers.html
+    # [2] https://svn.apache.org/repos/asf/ant/ivy/core/branches/2.3.0/
+    #     src/java/org/apache/ivy/core/module/descriptor/DependencyDescriptor.java
+    # [3] http://ant.apache.org/ivy/history/2.3.0/ivyfile/override.html
+    dependencies = [self._generate_jar_template(jar, confs) for jar in jars]
+    overrides = [self._generate_override_template(dep) for dep in dependencies if dep.force]
+
+    excludes = [self._generate_exclude_template(exclude) for exclude in excludes]
+
     template_data = TemplateData(
         org=org,
         module=name,
         version='latest.integration',
         publications=None,
         configurations=confs,
-        dependencies=[self._generate_jar_template(jar, confs) for jar in jars],
-        excludes=[self._generate_exclude_template(exclude) for exclude in excludes])
+        dependencies=dependencies,
+        excludes=excludes,
+        overrides=overrides)
 
     safe_mkdir(os.path.dirname(ivyxml))
     with open(ivyxml, 'w') as output:
@@ -300,6 +315,9 @@ class IvyUtils(object):
 
   def _generate_exclude_template(self, exclude):
     return TemplateData(org=exclude.org, name=exclude.name)
+
+  def _generate_override_template(self, jar):
+    return TemplateData(org=jar.org, module=jar.module, version=jar.version)
 
   def is_classpath_artifact(self, path):
     """Subclasses can override to determine whether a given artifact represents a classpath
