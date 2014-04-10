@@ -36,6 +36,7 @@ def gen_targets_reference(targets_rst, targets_dir):
     lines.append(TEMPLATE.substitute(otype='targets', name=root))
 
   with open(targets_rst, 'w') as fh:
+    print("Writing to file '%s'" % targets_rst)
     fh.write('\n'.join(lines))
 
 def gen_base_reference(rst_filename, dirname):
@@ -54,6 +55,7 @@ def gen_base_reference(rst_filename, dirname):
     lines.append(TEMPLATE.substitute(otype='base', name=root))
 
   with open(rst_filename, 'w') as fh:
+    print("Writing to file '%s'" % rst_filename)
     fh.write('\n'.join(lines))
 
 def copy_builddict(docs_dir):
@@ -61,6 +63,7 @@ def copy_builddict(docs_dir):
     filepath = os.path.abspath(os.path.join(docs_dir,
         '../../../../dist/builddict', filename))
     try:
+      print("Copying '%s' to '%s'" % (filepath, docs_dir))
       shutil.copy(filepath, docs_dir)
     except IOError as e:
       raise IOError("Forgot to `./pants goal builddict` first? \n\n%s" % e)

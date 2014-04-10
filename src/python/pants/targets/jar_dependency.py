@@ -31,17 +31,7 @@ class Artifact(object):
   )
 
   def __init__(self, name, type_=None, ext=None, conf=None, url=None, classifier=None):
-    """
-    :param name: The name of the published artifact. This name must not include revision.
-    :param type_: The type of the published artifact. It's usually its extension, but not
-      necessarily. For instance, ivy files are of type 'ivy' but have 'xml' extension.
-    :param ext: The extension of the published artifact.
-    :param conf: The public configuration in which this artifact is published. The '*' wildcard can
-      be used to designate all public configurations.
-    :param url: The url at which this artifact can be found if it isn't located at the standard
-      location in the repository
-    :param classifier: The maven classifier of this artifact.
-    """
+    """ See the arguments in JarDependency.with_artifact(). """
     self.name = name
     self.type_ = type_ or 'jar'
     self.ext = ext
@@ -89,7 +79,8 @@ class JarDependency(ExternalDependency, AbstractTarget):
       will properly hyperlink {\ @link}s.
     :param string type_: Artifact packaging type.
     :param string classifier: Classifier specifying the artifact variant to use.
-      Use ``with_artifact`` to include multiple artifacts with different classifiers.
+      Use multiple ``with_artifact`` statements to include multiple artifacts of the same org.name,
+      but with different classifiers.
     :param boolean mutable: Inhibit caching of this mutable artifact. A common use is for
       Maven -SNAPSHOT style artifacts in an active development/integration cycle.
     """
@@ -185,9 +176,22 @@ class JarDependency(ExternalDependency, AbstractTarget):
   def has_label(self, label):
     return False
 
+  @manual.builddict()
   def with_artifact(self, name=None, type_=None, ext=None, url=None, configuration=None,
                     classifier=None):
-    """Sets an alternative artifact to fetch or adds additional artifacts if called multiple times.
+    """
+    Sets an alternative artifact to fetch or adds additional artifacts if called multiple times.
+
+    :param name: The name of the published artifact. This name must not include revision.
+    :param type_: The type of the published artifact. It's usually the same as the artifact's file
+      extension, but not necessarily. For instance, ivy files are of type 'ivy' but have 'xml' as
+      their file extension.
+    :param ext: The file extension of the published artifact.
+    :param conf: The public configuration in which this artifact is published. The '*' wildcard can
+      be used to designate all public configurations.
+    :param url: The url at which this artifact can be found if it isn't located at the standard
+      location in the repository.
+    :param classifier: The maven classifier of this artifact.
     """
     artifact = Artifact(name or self.name, type_=type_, ext=ext, url=url, conf=configuration,
                         classifier=classifier)

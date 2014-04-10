@@ -42,7 +42,7 @@ the code you want with the version you want, then great. Leave it there.)
 
 (You don't *need* a tree of ``BUILD`` files; you could instead have, e.g., one
 ``3rdparty/jvm/BUILD`` file. In a large organization, a tree can ease some
-things. For example, ``git log`` quicky answers questions like "Who set up
+things. For example, ``git log`` quickly answers questions like "Who set up
 this dependency? Who cares if I bump the version?")
 
 Additionally, some families of jars have different groupId's but are logically
@@ -130,5 +130,26 @@ transitive dependencies from JVM targets::
       ]
     )
 
+**If you notice a missing dependency**, check for a naming conflict. When bringing in multiple jars
+with the same org, name, and version, only the first reference will win, and subsequent references
+will be silently discarded. One way that this can occur is with dependencies that use a classifier
+to differentiate themselves. Consider this example::
 
+    jar_library(name = 'stanford-corenlp',
+      dependencies = [
+        jar(org = 'edu.stanford.nlp', name = 'stanford-corenlp', rev = '3.3.1').with_sources(),
+        jar(org = 'edu.stanford.nlp', name = 'stanford-corenlp', rev = '3.3.1', classifier='models')
+      ]
+    )
 
+In the above example, the ``edu.stanford.nlp.stanford-corenlp-3.3.1-models.jar`` will be silently
+skipped by pants. To bring both jars in, use the ``.with_artifacts()`` method of the
+:ref:`bdict_jar` target. Using this method, the above example would be transformed into::
+
+    jar_library(name = 'stanford-corenlp',
+      dependencies = [
+        jar(org = 'edu.stanford.nlp', name = 'stanford-corenlp', rev = '3.3.1').with_sources().with_artifact(classifier='models').with_artifact(classifier=''),
+      ]
+    )
+
+And as a result, both jars will now be brought into the target's classpath.
