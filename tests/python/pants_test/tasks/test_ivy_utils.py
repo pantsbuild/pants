@@ -58,7 +58,6 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
     self.ivy_utils = IvyUtils(create_config(), self.create_options(), logging.Logger('test'))
 
   def test_force_override(self):
-    print(self.build_root)
     jars = list(self.simple.dependencies)
     with temporary_file_path() as ivyxml:
       self.ivy_utils._generate_ivy([self.simple], jars=jars, excludes=[], ivyxml=ivyxml,
