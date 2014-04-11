@@ -18,11 +18,11 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
    />
 
   {{#lib.configurations?}}
-  <configurations>
-    {{#lib.configurations}}
-    <conf name="{{.}}"/>
-    {{/lib.configurations}}
-  </configurations>
+    <configurations>
+      {{#lib.configurations}}
+      <conf name="{{.}}"/>
+      {{/lib.configurations}}
+     </configurations>
   {{/lib.configurations?}}
 
   {{#lib.publications?}}
@@ -52,7 +52,7 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
                 {{#mutable}}changing="true"{{/mutable}}
     >
       {{#configurations}}
-      <conf name="{{.}}" mapped="{{.}}"/>
+      <conf name="{{.}}"/>
       {{/configurations}}
       {{#artifacts}}
       <artifact

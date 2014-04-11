@@ -141,7 +141,7 @@ class JvmdocGen(Task):
           'Cannot provide %s target mappings for combined output' % self._jvmdoc.product_type)
     elif catalog or self.active:
       def docable(target):
-        return language_predicate(target) and (self._include_codegen or not is_codegen(target))
+        return language_predicate(target) and (self._include_codegen or not target.is_codegen)
 
       with self.invalidated(filter(docable, targets)) as invalidation_check:
         safe_mkdir(self._output_dir)

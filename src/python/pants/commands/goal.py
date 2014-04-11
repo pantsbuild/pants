@@ -495,6 +495,7 @@ from pants.tasks.detect_duplicates import DuplicateDetector
 from pants.tasks.filedeps import FileDeps
 from pants.tasks.ivy_resolve import IvyResolve
 from pants.tasks.jar_create import JarCreate
+from pants.tasks.jar_publish import JarPublish
 from pants.tasks.javadoc_gen import JavadocGen
 from pants.tasks.junit_run import JUnitRun
 from pants.tasks.jvm_compile.java.java_compile import JavaCompile
@@ -793,22 +794,24 @@ class JavadocJarShim(JavadocGen):
                                          active=False)
 
 
-class JarCreateGoal(JarCreate):
-  def __init__(self, context):
-    super(JarCreateGoal, self).__init__(context, False)
-
 goal(name='javadoc_publish',
-     action=JavadocJarShim).install('jar')
+     action=JavadocJarShim).install('publish')
 goal(name='scaladoc_publish',
-     action=ScaladocJarShim).install('jar')
+     action=ScaladocJarShim).install('publish')
 goal(name='jar',
-     action=JarCreateGoal,
+     action=JarCreate,
      dependencies=['compile', 'resources', 'bootstrap']).install('jar').with_description('Create one or more jars.')
 goal(name='check_published_deps',
      action=CheckPublishedDeps
 ).install('check_published_deps').with_description(
   'Find references to outdated artifacts published from this BUILD tree.')
 
+goal(name='jar_create_publish',
+     action=JarCreate,
+     dependencies=['compile', 'resources']).install('publish')
+
+goal(name='publish',
+     action=JarPublish).install('publish').with_description('Publish one or more artifacts.')
 
 goal(name='junit',
      action=JUnitRun,
