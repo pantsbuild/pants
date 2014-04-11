@@ -1,0 +1,10 @@
+language: scala
+script:
+  - sbt scriptit
+jdk:
+  - openjdk6
+notifications:
+  email:
+  # TODO: change to zinc@typesafe.com once permissions to send emails from
+  #       Travis to zinc group are sorted out
+    - grek@typesafe.com
