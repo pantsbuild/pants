@@ -1,5 +1,5 @@
 # use scala 2.11 jars
 
-zinc -debug -scala-library {{scala.2.11.library}} -scala-compiler {{scala.2.11.compiler}} -scala-extra {{scala.2.11.extra}} A.scala
+zinc -debug -scala-library {{scala.2.11.0-RC3.library}} -scala-compiler {{scala.2.11.0-RC3.compiler}} -scala-extra {{scala.2.11.0-RC3.extra}} A.scala
 
 exists A.class
