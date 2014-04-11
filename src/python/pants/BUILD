@@ -13,7 +13,7 @@ python_library(
 
   # TODO(wickman) This version should be automatically pulled in from pants.version
   provides=setup_py(
-    name='pants',
+    name='pantsbuild.pants',
     version='0.0.17',
     description="Twitter's pants build tool.",
     url='https://github.com/pantsbuild/pants',
