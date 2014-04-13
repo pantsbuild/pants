@@ -981,6 +981,14 @@ goal(
 ).install().with_description('Extract textual infomation about the dependencies of a target')
 
 
+from pants.tasks.dependencies_graph import DependenciesGraph
+
+goal(
+  name='dependencies-graph',
+  action=DependenciesGraph,
+  dependencies=[]
+).install().with_description('Extract information about all dependencies and jars of targets in JSON format')
+
 from pants.tasks.filemap import Filemap
 
 goal(
