@@ -38,6 +38,7 @@ python_test_suite(
   dependencies = [
     pants(':test_maven_layout'),
     pants(':test_thrift_util'),
+    pants('tests/python/example_test/hello/greet'),
     pants('tests/python/pants_test/base'),
     pants('tests/python/pants_test/cache'),
     pants('tests/python/pants_test/commands'),
