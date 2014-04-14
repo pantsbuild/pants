@@ -3,7 +3,11 @@
 
 scala_library(name = 'jvm-run-example-lib',
   dependencies = [],
-  sources = ['JvmRunExample.scala']
+  sources = ['JvmRunExample.scala'],
+  java_sources = [pants('src/java/com/pants/examples/hello/greet:greet')],
+  provides=artifact(org='com.pants.common.example',
+                    name='scala_lib',
+                    repo = 'build-support/ivy:public',),
 )
 
 jvm_binary(name ='jvm-run-example',
