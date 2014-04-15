@@ -11,6 +11,7 @@ how to build & test pants, and finally how to get your change committed.
    :maxdepth: 1
 
    howto_contribute
+   howto_ask
    howto_develop
    dev_tasks
    intellij

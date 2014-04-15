@@ -10,6 +10,12 @@ it upstream", here's what to do:
 .. TODO: Document the release process.
 .. TODO: Coding Conventions section
 
+******************************
+Questions, Issues, Bug Reports
+******************************
+
+See :doc:`howto_ask`
+
 ************
 Mailing List
 ************

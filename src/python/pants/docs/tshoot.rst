@@ -63,3 +63,10 @@ One typical cause behind this symptom: if you removed your machine's Ivy cache,
 Pants may try to use symbolic links to files that have gone away.
 To recover from this, :ref:`washpants`.
 
+******************************
+Questions, Issues, Bug Reports
+******************************
+
+See :doc:`howto_ask`
+
+
