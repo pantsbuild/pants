@@ -21,6 +21,7 @@ twitter.common.decorators
 twitter.common.dirutil
 twitter.common.lang
 twitter.common.log
+twitter.common.options
 twitter.common.process
 twitter.common.python
 twitter.common.quantity
