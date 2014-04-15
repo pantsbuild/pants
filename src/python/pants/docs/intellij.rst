@@ -42,8 +42,8 @@ python interpreter.
 
 In the "Modules" section, make a new module and add two source roots, for the
 sources and tests. Think of source roots as what your would put on the
-PYTHONPATH - the parent directory of what you'll import. Mark the "twitter"
-directory as sources or tests.
+PYTHONPATH - the parent directory of what you'll import. Mark the "pants" directory as 
+sources for source root and "pants_test" directory as test_sources for configuring test root.
 
 .. image:: images/intellij-project-structure-modules-sources.png
 
@@ -51,8 +51,7 @@ Lastly, we need to add egg dependencies. From the pants source repo, fetch the
 eggs and move to a location outside the source repo so they survive
 cleaning. ::
 
-   $ ./build-support/python/clean.sh
-   $ ./pants.bootstrap
+   $ ./pants
    $ mv .pants.d/python/eggs ~/Documents/IntelliJ/pants-eggs
 
 In the Project Structure -> Modules -> Dependencies dialog, add the eggs as
