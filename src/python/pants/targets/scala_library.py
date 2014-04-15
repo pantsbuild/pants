@@ -105,4 +105,5 @@ class ScalaLibrary(ExportableJvmLibrary, WithResources):
           raise TargetDefinitionException(self,
                                           "Associated Java Target %s also provides an artifact"
                                           % java_target)
+        self.update_dependencies(java_target.dependencies)
         java_target.update_dependencies([self])

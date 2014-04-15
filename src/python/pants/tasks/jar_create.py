@@ -21,6 +21,7 @@ from pants.tasks.javadoc_gen import javadoc
 from pants.tasks.scaladoc_gen import scaladoc
 
 
+
 DEFAULT_CONFS = ['default']
 
 
