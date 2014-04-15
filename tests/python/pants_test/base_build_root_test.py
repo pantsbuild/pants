@@ -7,6 +7,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import os
 import unittest
 from tempfile import mkdtemp
+from textwrap import dedent
 
 from twitter.common.dirutil import safe_mkdir, safe_open, safe_rmtree
 
@@ -79,3 +80,44 @@ class BaseBuildRootTest(unittest.TestCase):
     Returns the corresponding Target or else None if the address does not point to a defined Target.
     """
     return Target.get(Address.parse(cls.build_root, address, is_relative=False))
+
+  @classmethod
+  def create_library(cls, path, target_type, name, sources, **kwargs):
+    """Creates a library target of given type at the BUILD file at path with sources
+
+     path: The relative path to the BUILD file from the build root.
+     target_type: valid pants target type.
+     name: Name of the library target.
+     sources: List of source file at the path relative to path.
+     **kwargs: Optional attributes that can be set for any library target.
+       Currently it includes support for provides, resources, java_sources
+    """
+    cls.create_files(path, sources)
+    cls.create_target(path, dedent('''
+          %(target_type)s(name='%(name)s',
+            sources=[%(sources)s],
+            %(resources)s
+            %(provides)s
+            %(java_sources)s
+          )
+        ''' % dict(target_type=target_type,
+                   name=name,
+                   sources=repr(sources or []),
+                   resources=('resources=pants("%s"),' % kwargs.get('resources')
+                              if kwargs.has_key('resources') else ''),
+                   provides=(dedent('''provides=artifact(
+                                                  org = 'com.twitter',
+                                                  name = '%s',
+                                                  repo = pants('build-support/ivy:ivy')
+                                                ),
+                                     '''% name if kwargs.has_key('provides') else '')),
+                   java_sources=('java_sources=[%s]'
+                                 % ','.join(map(lambda str_target: 'pants("%s")' % str_target,
+                                                kwargs.get('java_sources')))
+                                 if kwargs.has_key('java_sources') else ''),
+                   )))
+    return cls.target('%s:%s' % (path, name))
+
+  @classmethod
+  def create_resources(cls, path, name, *sources):
+    return cls.create_library(path, 'resources', name, sources)

@@ -28,7 +28,7 @@ class TestPythonThriftBuilder(BaseBuildRootTest):
   @classmethod
   def setUpClass(self):
     super(TestPythonThriftBuilder, self).setUpClass()
-    SourceRoot.register(os.path.realpath(os.path.join(self.BUILD_ROOT, 'test_thrift_replacement')),
+    SourceRoot.register(os.path.realpath(os.path.join(self.build_root, 'test_thrift_replacement')),
                         PythonThriftLibrary)
     self.create_target('test_thrift_replacement', dedent('''
       python_thrift_library(name='one',
@@ -42,7 +42,7 @@ class TestPythonThriftBuilder(BaseBuildRootTest):
     with patch('__builtin__.open', m, create=True):
       with patch('shutil.copyfile'):
         builder = PythonThriftBuilder(target=self.target('test_thrift_replacement:one'),
-                                    root_dir=self.BUILD_ROOT,
+                                    root_dir=self.build_root,
                                     config=create_config(sample_ini=sample_ini_test))
 
         builder._modify_thrift = MagicMock()
@@ -50,7 +50,7 @@ class TestPythonThriftBuilder(BaseBuildRootTest):
         builder.run_thrifts()
 
         builder._modify_thrift.assert_called_once_with(os.path.realpath('%s/thrift/py-thrift/%s'
-                                                                      % (self.BUILD_ROOT,
+                                                                      % (self.build_root,
                                                                         'thrift/keyword.thrift')))
 
   def test_keyword_replaced(self):
@@ -67,12 +67,12 @@ class TestPythonThriftBuilder(BaseBuildRootTest):
       }
     ''')
     builder = PythonThriftBuilder(target=self.target('test_thrift_replacement:one'),
-                                  root_dir=self.BUILD_ROOT,
+                                  root_dir=self.build_root,
                                   config=create_config(sample_ini=sample_ini_test))
     m = mock_open(read_data=thrift_contents)
     with patch('__builtin__.open', m, create=True):
       builder = PythonThriftBuilder(target=self.target('test_thrift_replacement:one'),
-                                  root_dir=self.BUILD_ROOT,
+                                  root_dir=self.build_root,
                                   config=create_config(sample_ini=sample_ini_test))
       builder._modify_thrift('thrift_dummmy.thrift')
       expected_open_call_list = [call('thrift_dummmy.thrift'), call('thrift_dummmy.thrift', 'w')]
@@ -92,12 +92,12 @@ class TestPythonThriftBuilder(BaseBuildRootTest):
       }
     ''')
     builder = PythonThriftBuilder(target=self.target('test_thrift_replacement:one'),
-                                  root_dir=self.BUILD_ROOT,
+                                  root_dir=self.build_root,
                                   config=create_config(sample_ini=sample_ini_test))
     m = mock_open(read_data=thrift_contents)
     with patch('__builtin__.open', m, create=True):
       builder = PythonThriftBuilder(target=self.target('test_thrift_replacement:one'),
-                                  root_dir=self.BUILD_ROOT,
+                                  root_dir=self.build_root,
                                   config=create_config(sample_ini=sample_ini_test))
       builder._modify_thrift('thrift_dummmy.thrift')
       expected_open_call_list = [call('thrift_dummmy.thrift'), call('thrift_dummmy.thrift', 'w')]
