@@ -28,7 +28,7 @@ def initial_reporting(config, run_tracker):
   """
   reports_dir = os.path.join(config.get_option(Config.DEFAULT_PANTS_WORKDIR), 'reports')
   link_to_latest = os.path.join(reports_dir, 'latest')
-  if os.path.exists(link_to_latest):
+  if os.path.lexists(link_to_latest):
     os.unlink(link_to_latest)
 
   run_id = run_tracker.run_info.get_info('id')
