@@ -27,6 +27,7 @@ from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy import Ivy
 from pants.targets.internal import InternalTarget
 from pants.targets.resources import Resources
+from pants.targets.scala_library import ScalaLibrary
 from pants.tasks import Task, TaskError
 from pants.tasks.scm_publish import ScmPublish, Semver
 
@@ -715,7 +716,7 @@ class JarPublish(ScmPublish, Task):
         sha.update(source)
         sha.update(fd.read())
 
-    # Todo(Tejal Desai): Add tests for handling java sources changes.
+    # TODO(Tejal Desai): Add tests for handling java sources changes.
     if isinstance(target, ScalaLibrary):
       for java_source in sorted(target.java_sources):
         for source in sorted(java_source.sources):
