@@ -108,23 +108,15 @@ class BundleCreate(JvmBinaryTask):
       libdir = os.path.join(bundledir, 'libs')
       os.mkdir(libdir)
 
-      # Add internal dependencies to the bundle.
-      def add_jars(target):
-        target_jars = self.context.products.get('jars').get(target)
-        if target_jars is not None:
-          for basedir, jars in target_jars.items():
-            for internaljar in jars:
-              os.symlink(os.path.join(basedir, internaljar),
-                         os.path.join(libdir, internaljar))
-              classpath.add(internaljar)
-      app.binary.walk(add_jars, lambda t: t.is_internal)
-
       # Add external dependencies to the bundle.
       for basedir, externaljar in self.list_jar_dependencies(app.binary):
         path = os.path.join(basedir, externaljar)
         os.symlink(path, os.path.join(libdir, externaljar))
         classpath.add(externaljar)
 
+    # TODO: There should probably be a separate 'binary_jars' product type,
+    # so we can more easily distinguish binary jars (that contain all the classes of their
+    # transitive deps) and per-target jars.
     for basedir, jars in self.context.products.get('jars').get(app.binary).items():
       if len(jars) != 1:
         raise TaskError('Expected 1 mapped binary for %s but found: %s' % (app.binary, jars))
@@ -132,9 +124,12 @@ class BundleCreate(JvmBinaryTask):
       binary = jars[0]
       binary_jar = os.path.join(basedir, binary)
       bundle_jar = os.path.join(bundledir, binary)
+      # Add the internal classes into the bundle_jar.
       if not classpath:
         os.symlink(binary_jar, bundle_jar)
       else:
+        # TODO: Can we copy the existing jar and inject the manifest in, instead of
+        # laboriously copying the contents one by one? Would that be more efficient?
         with open_zip(binary_jar, 'r') as src:
           with open_zip(bundle_jar, 'w', compression=ZIP_DEFLATED) as dest:
             for item in src.infolist():
