@@ -8,16 +8,56 @@ import os
 import re
 import sys
 
+from contextlib import contextmanager
+
+from twitter.common.contextutil import temporary_file_path
 from twitter.common.dirutil import safe_mkdir, safe_open
+from twitter.common.util.command_util import CommandUtil
 
 from pants import binary_util
 from pants.base.build_environment import get_buildroot
+from pants.java.jar.manifest import Manifest
 from pants.base.workunit import WorkUnit
 from pants.java.util import execute_java
 from pants.targets.java_tests import JavaTests as junit_tests
 from pants.tasks import TaskError
 from pants.tasks.jvm_task import JvmTask
 
+
+@contextmanager
+def _get_minimized_jar_classpath(classpath):
+  """
+    Bundles all of the jar paths in the given classpath into the classpath property of a new jar,
+    and provides a context manager which yields the original classpath with the jar paths replaced
+    by a single path to the new jar.
+  """
+
+  def partition(pred, iterable):
+    """
+      Takes a list and a predicate and returns two lists; a partition of the original list of
+      elements that pass/do not pass the predicate.
+    """
+    partition = {True: [], False: []}
+    for elem in iterable:
+      partition[pred(elem)].append(elem)
+    return partition[True], partition[False]
+
+  jar_classpath, non_jar_classpath = partition(lambda x: x.endswith('.jar'), classpath)
+  manifest = Manifest()
+  manifest.addentry(Manifest.CLASS_PATH, ' '.join(jar_classpath))
+  manifest.addentry(Manifest.CREATED_BY, 'Pants_JAR_Minimizer')
+  manifest.addentry(Manifest.MANIFEST_VERSION, '1.0')
+
+  # The minimized classpath is only valid while the temporary jar it references exists
+  with temporary_file_path() as classpath_jar_filepath:
+    with temporary_file_path() as manifest_filepath:
+      with safe_open(manifest_filepath, 'w') as manifest_file:
+        manifest_file.write(manifest.contents())
+      CommandUtil.execute(['jar', 'cmf', manifest_filepath, classpath_jar_filepath])
+    minimized_classpath = [classpath_jar_filepath] + non_jar_classpath
+    print (minimized_classpath)
+    print (classpath)
+    yield minimized_classpath
 
 class JUnitRun(JvmTask):
   _MAIN = 'com.twitter.common.junit.runner.ConsoleRunner'
@@ -240,19 +280,20 @@ class JUnitRun(JvmTask):
           # results summaries for example for each batch but no overall summary.
           # http://jira.local.twitter.com/browse/AWESOME-1114
           result = 0
-          for batch in self._partition(tests):
-            with binary_util.safe_args(batch) as batch_tests:
-              result += abs(execute_java(
-                classpath=classpath,
-                main=main,
-                jvm_options=(jvm_args or []) + self.jvm_args,
-                args=self.opts + batch_tests,
-                workunit_factory=self.context.new_workunit,
-                workunit_name='run',
-                workunit_labels=[WorkUnit.TEST]
-              ))
-              if result != 0 and self.fail_fast:
-                break
+          with _get_minimized_jar_classpath(classpath) as minimized_classpath:
+            for batch in self._partition(tests):
+              with binary_util.safe_args(batch) as batch_tests:
+                result += abs(execute_java(
+                  classpath=minimized_classpath,
+                  main=main,
+                  jvm_options=(jvm_args or []) + self.jvm_args,
+                  args=self.opts + batch_tests,
+                  workunit_factory=self.context.new_workunit,
+                  workunit_name='run',
+                  workunit_labels=[WorkUnit.TEST]
+                ))
+                if result != 0 and self.fail_fast:
+                  break
           if result != 0:
             raise TaskError('java %s ... exited non-zero (%i)' % (main, result))
 
