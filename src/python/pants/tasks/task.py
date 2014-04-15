@@ -318,8 +318,6 @@ class Task(object):
       # Cache the artifacts.
       args_tuples = []
       for vts, artifactfiles in vts_artifactfiles_pairs:
-        if self.context.options.verify_artifact_cache:
-          pass  # TODO: Verify that the artifact we just built is identical to the cached one?
         args_tuples.append((vts.cache_key, artifactfiles))
       return Work(lambda *args: cache.insert(*args), args_tuples, 'insert')
     else:

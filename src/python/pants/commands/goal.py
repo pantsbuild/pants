@@ -172,21 +172,6 @@ class Goal(Command):
       callback=_set_bool, dest="write_to_artifact_cache", default=True,
       help="Whether to write artifacts to cache if configured to do so."),
 
-    # NONE OF THE ARTIFACT CACHE FLAGS BELOW DO ANYTHING ANY MORE.
-    # TODO: Remove them once all uses of them are killed.
-    Option("--verify-artifact-cache", "--no-verify-artifact-cache", action="callback",
-      callback=_set_bool, dest="verify_artifact_cache", default=False,
-      help="Whether to verify that cached artifacts are identical after rebuilding them."),
-
-    Option("--local-artifact-cache-readonly", "--no-local-artifact-cache-readonly", action="callback",
-           callback=_set_bool, dest="local_artifact_cache_readonly", default=False,
-           help="If set, we don't write to local artifact caches, even when writes are enabled."),
-    # Note that remote writes are disabled by default, so you have control over who's populating
-    # the shared cache.
-    Option("--remote-artifact-cache-readonly", "--no-remote-artifact-cache-readonly", action="callback",
-           callback=_set_bool, dest="remote_artifact_cache_readonly", default=True,
-           help="If set, we don't write to remote artifact caches, even when writes are enabled."),
-
     Option("--all", dest="target_directory", action="append",
            help="DEPRECATED: Use [dir]: with no flag in a normal target position on the command "
                 "line. (Adds all targets found in the given directory's BUILD file. Can be "
