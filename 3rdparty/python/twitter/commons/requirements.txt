@@ -26,5 +26,6 @@ twitter.common.process
 twitter.common.python
 twitter.common.quantity
 twitter.common.rwbuf
+twitter.common.string
 twitter.common.threading
 twitter.common.util
