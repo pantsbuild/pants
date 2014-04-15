@@ -55,6 +55,8 @@ def _get_minimized_jar_classpath(classpath):
         manifest_file.write(manifest.contents())
       CommandUtil.execute(['jar', 'cmf', manifest_filepath, classpath_jar_filepath])
     minimized_classpath = [classpath_jar_filepath] + non_jar_classpath
+    print (minimized_classpath)
+    print (classpath)
     yield minimized_classpath
 
 class JUnitRun(JvmTask):
