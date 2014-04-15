@@ -16,6 +16,7 @@ from twitter.common.util.command_util import CommandUtil
 
 from pants import binary_util
 from pants.base.build_environment import get_buildroot
+from pants.java.jar.manifest import Manifest
 from pants.base.workunit import WorkUnit
 from pants.java.util import execute_java
 from pants.targets.java_tests import JavaTests as junit_tests
