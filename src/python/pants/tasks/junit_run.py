@@ -6,13 +6,13 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import os
 import re
-import subprocess
 import sys
 
 from contextlib import contextmanager
 
 from twitter.common.contextutil import temporary_file_path
 from twitter.common.dirutil import safe_mkdir, safe_open
+from twitter.common.util.command_util import CommandUtil
 
 from pants import binary_util
 from pants.base.build_environment import get_buildroot
@@ -52,7 +52,7 @@ def _get_minimized_jar_classpath(classpath):
     with temporary_file_path() as manifest_filepath:
       with safe_open(manifest_filepath, 'w') as manifest_file:
         manifest_file.write(manifest.contents())
-      subprocess.call(['jar', 'cmf', manifest_filepath, classpath_jar_filepath])
+      CommandUtil.execute(['jar', 'cmf', manifest_filepath, classpath_jar_filepath])
     minimized_classpath = [classpath_jar_filepath] + non_jar_classpath
     yield minimized_classpath
 
