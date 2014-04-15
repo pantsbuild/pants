@@ -5,13 +5,6 @@
 # can use these jar_library deps by specifying pants('3rdparty:[name]') in their dependencies list.
 
 ###################
-# Documentation
-#
-
-page(name='readme', source='README.md')
-
-
-###################
 # Production libs
 #
 
