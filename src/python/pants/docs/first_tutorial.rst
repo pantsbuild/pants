@@ -19,9 +19,9 @@ Now you're ready to invoke pants for more useful things.
 
 You invoke pants with *goals* (like ``test`` or ``bundle``) and the
 *build targets* to use (like
-``tests/java/com/pants/examples/pingpong/BUILD:pingpong``). For example, ::
+``tests/java/com/pants/examples/hello/greet/BUILD:greet``). For example, ::
 
-    ./pants goal test tests/java/com/pants/examples/pingpong/BUILD:pingpong
+    ./pants goal test tests/java/com/pants/examples/hello/greet/BUILD:greet
 
 Goals (the "verbs" of Pants) produce new files from Targets (the "nouns").
 
@@ -40,7 +40,7 @@ Pants knows about goals ("verbs" like ``bundle`` and ``test``) and targets
 (build-able things in your source code). A typical pants command-line
 invocation looks like ::
 
-    $ ./pants goal test tests/java/com/pants/examples/pingpong/BUILD:pingpong
+    ./pants goal test tests/java/com/pants/examples/hello/greet/BUILD:greet
 
 Looking at the pieces of this we see
 
@@ -73,7 +73,7 @@ Looking at the pieces of this we see
     You can specify more than one goal on a command line. E.g., to generate an
     Eclipse project *and* run tests, we could have said ``eclipse tests``.
 
-``tests/java/com/pants/examples/pingpong/BUILD:pingpong``
+``tests/java/com/pants/examples/hello/greet/BUILD:greet``
     This is a *build target*, a "build-able" thing in your source code. To define
     these, you set up configuration files named ``BUILD`` in your source code file
     tree. (You'll see more about these later.)
@@ -163,25 +163,25 @@ BUILD Files
 We told pants what target to build, but where are these defined? Scattered
 around the source tree are ``BUILD`` files. These ``BUILD`` files define
 targets. For example, this code snippet of
-``java/com/twitter/common/examples/pingpong/main/BUILD`` defines the binary
+``java/com/pants/examples/hello/main/BUILD`` defines the binary
 program we compiled and ran.  This target is named ``main`` and
 is of type ``jvm_binary``:
 
-.. literalinclude:: ../../../../java/com/pants/examples/pingpong/main/BUILD
-   :start-after: under the License.
+.. literalinclude:: ../../../java/com/pants/examples/hello/main/BUILD
+   :start-after: Like Hello world
 
 That ``dependencies`` is interesting. This build target depends on
-other build targets; the ``dependencies`` lists those other targets.
+another build target; the ``dependencies`` lists depended-upon targets.
 To build a runnable Java binary, we need to first compile its dependencies.
 
 The ``main`` binary has one dependency,
-``pants('src/java/com/pants/examples/pingpong/handler')``.
-That src/.../handler is the *address* of another target. Addresses look,
+``pants('src/java/com/pants/examples/hello/greet')``.
+That src/.../greet is the *address* of another target. Addresses look,
 roughly, like ``path/to/BUILD:targetname``.
-We can see this build target in the ``.../pingpong/handler/BUILD`` file:
+We can see this build target in the ``.../hello/greet/BUILD`` file:
 
-.. literalinclude:: ../../../../java/com/pants/examples/pingpong/handler/BUILD
-   :start-after: java_library:
+.. literalinclude:: ../../../java/com/pants/examples/hello/greet/BUILD
+   :start-after: see LICENSE
 
 Pants uses dependency information to figure out how to build your code.
 You might find it useful for other purposes, too. For example, if you change

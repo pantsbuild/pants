@@ -26,7 +26,8 @@ for a likely-looking ``BUILD`` file--in this example,
 In the appropriate ``BUILD`` file, you want to find a
 :ref:`bdict_dependencies` with a :ref:`bdict_jar` dependency:
 
-.. literalinclude:: ../../../../../3rdparty/jvm/com/sun/jersey/BUILD
+.. literalinclude:: ../../../../3rdparty/jvm/com/sun/jersey/BUILD
+   :start-after: LICENSE
    :end-before: jersey-server
 
 
@@ -55,19 +56,19 @@ such as ``3rdparty/jvm/com/fasterxml/jackson/BUILD`` for the jackson family of j
 Your Code's BUILD File
 **********************
 
-To set up your code to import the external jar, you'll add a
+To set up your code to import the external jar, you add a
 dependency to the appropriate Java target[s] in your ``BUILD`` file
 and add ``import`` statements in your Java code.
 
 For example, your ``BUILD`` file might have
 
-.. literalinclude:: ../../../../java/com/twitter/common/examples/pingpong/handler/BUILD
-   :start-after: java_library:
+.. literalinclude:: ../../../../tests/java/com/pants/examples/hello/greet/BUILD
+   :start-after: sources
    :end-before: src/java
 
 And your Java code might have::
 
-    import com.sun.jersey.guice.spi.container.servlet.GuiceContainer;
+    import org.junit.Test;
 
 ******************************************
 Troubleshooting a JVM Dependencies Problem
@@ -78,7 +79,7 @@ different versions of some package, you can dump your dependency "tree"
 with versions with an Ivy resolve report. To generate a report for
 a target such as the ``pingpong`` example::
 
-    $ ./pants goal resolve src/java/com/twitter/common/examples/pingpong --ivy-open
+    $ ./pants goal resolve src/java/com/pants/examples/pingpong --ivy-open
 
 Ivy's report shows which things depend on which versions. You can see which
 package is pulling in the package-version you didn't expect. (It might not
@@ -113,7 +114,7 @@ hand-picked versions::
         jar(org='retro', name='retro-factory', rev='5.0.18').intransitive(),
 	# Don't use retro's expected (old, incompatible) common-logging
         # version, yipe; use the same version we use everywhere else:
-	pants('3rdparty/common-logging'),
+	pants('3rdparty/jvm/common-logging'),
       ])
 
 **If you notice a small number of transitive dependencies to exclude**
@@ -153,3 +154,4 @@ skipped by pants. To bring both jars in, use the ``.with_artifacts()`` method of
     )
 
 And as a result, both jars will now be brought into the target's classpath.
+

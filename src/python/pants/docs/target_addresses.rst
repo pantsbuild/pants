@@ -19,20 +19,20 @@ The following target addresses all specify the same single target.
 ::
 
   # Fully qualified target address is the BUILD file path plus target name.
-  $ ./pants goal list src/java/com/twitter/common/application/BUILD:application
-  src/java/com/twitter/common/application/BUILD:application
+  $ ./pants goal list src/java/com/pants/examples/hello/main/BUILD:main
+  src/java/com/pants/examples/hello/main/BUILD:main
 
   # Specify the default target, which matches the parent directory name
-  $ ./pants goal list src/java/com/twitter/common/application/BUILD
-  src/java/com/twitter/common/application/BUILD:application
+  $ ./pants goal list src/java/com/pants/examples/hello/main/BUILD
+  src/java/com/pants/examples/hello/main/BUILD:main
 
   # The BUILD file name is optional.
-  $ ./pants goal list src/java/com/twitter/common/application
-  src/java/com/twitter/common/application/BUILD:application
+  $ ./pants goal list src/java/com/pants/examples/hello/main
+  src/java/com/pants/examples/hello/main/BUILD:main
 
   # Trailing forward slashes are ignored to accommodate command-line completion.
-  ./pants goal list src/java/com/twitter/common/application/
-  src/java/com/twitter/common/application/BUILD:application
+  $ ./pants goal list src/java/com/pants/examples/hello/main/
+  src/java/com/pants/examples/hello/main/BUILD:main
 
   # Targets can be referenced relatively within the same BUILD file.
   java_library(name='application', ...)
@@ -48,23 +48,28 @@ A trailing single colon specifies a glob of targets at the specified location.
 
 ::
 
-  $ ./pants goal list src/java/com/twitter/common/application:
-  src/java/com/twitter/common/application/BUILD:action
-  src/java/com/twitter/common/application/BUILD:application
+    $ ./pants goal list tests/python/pants_test/:
+    tests/python/pants_test/BUILD:base-test
+    tests/python/pants_test/BUILD:test_maven_layout
+    tests/python/pants_test/BUILD:test_thrift_util
+    tests/python/pants_test/BUILD:all
+
 
 A trailing double colon specifies a recursive glob of targets at the specified
 location.
 
 ::
 
-  $ ./pants goal list src/java/com/twitter/common/application::
-  src/java/com/twitter/common/application/BUILD:action
-  src/java/com/twitter/common/application/BUILD:application
-  src/java/com/twitter/common/application/http/BUILD:http
-  src/java/com/twitter/common/application/modules/BUILD:applauncher
-  src/java/com/twitter/common/application/modules/BUILD:lifecycle
-  src/java/com/twitter/common/application/modules/BUILD:http
-  src/java/com/twitter/common/application/modules/BUILD:log
-  src/java/com/twitter/common/application/modules/BUILD:stats
-  src/java/com/twitter/common/application/modules/BUILD:stats_export
-  src/java/com/twitter/common/application/modules/BUILD:thrift
+    $ ./pants goal list tests/python/pants_test/::
+    tests/python/pants_test/BUILD:base-test
+    tests/python/pants_test/BUILD:test_maven_layout
+    tests/python/pants_test/BUILD:test_thrift_util
+    tests/python/pants_test/BUILD:all
+    tests/python/pants_test/base/BUILD:base-test
+    tests/python/pants_test/base/BUILD:all
+    tests/python/pants_test/base/BUILD:base
+    ...
+    tests/python/pants_test/tasks/BUILD:sorttargets
+    tests/python/pants_test/tasks/BUILD:targets_help
+    tests/python/pants_test/tasks/BUILD:what_changed
+    tests/python/pants_test/testutils/BUILD:testutils
