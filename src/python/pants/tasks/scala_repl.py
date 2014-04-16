@@ -51,13 +51,11 @@ class ScalaRepl(JvmTask):
 
     print('')  # Start REPL output on a new line.
     try:
+      # NOTE: We execute with no workunit, as capturing REPL output makes it very sluggish.
       execute_java(classpath=classpath,
                    main=self.main,
                    jvm_options=self.jvm_args,
-                   args=self.args,
-                   workunit_factory=self.context.new_workunit,
-                   workunit_name='repl',
-                   workunit_labels=[WorkUnit.REPL, WorkUnit.JVM])
+                   args=self.args)
     except KeyboardInterrupt:
       # TODO(John Sirois): Confirm with Steve Gury that finally does not work on mac and an
       # explicit catch of KeyboardInterrupt is required.

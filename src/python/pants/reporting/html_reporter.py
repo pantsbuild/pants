@@ -4,13 +4,12 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+import cgi
+from collections import defaultdict, namedtuple
 import os
 import re
 import uuid
-from collections import defaultdict, namedtuple
 
-import cgi
-from pystache.renderer import Renderer
 from twitter.common.dirutil import safe_mkdir
 
 from pants.base.build_environment import get_buildroot
@@ -182,7 +181,7 @@ class HtmlReporter(Reporter):
         output_files[path] = f
       else:
         f = output_files[path]
-      f.write(self._htmlify_text(s))
+      f.write(self._htmlify_text(s).encode('utf-8'))
       # We must flush in the same thread as the write.
       f.flush()
 
@@ -262,7 +261,7 @@ class HtmlReporter(Reporter):
 
   def _htmlify_text(self, s):
     """Make text HTML-friendly."""
-    colored = self._handle_ansi_color_codes(cgi.escape(str(s)))
+    colored = self._handle_ansi_color_codes(cgi.escape(s.decode('utf-8')))
     return linkify(self._buildroot, colored).replace('\n', '</br>')
 
   _ANSI_COLOR_CODE_RE = re.compile(r'\033\[((\d|;)*)m')
