@@ -361,7 +361,7 @@ class JarPublish(ScmPublish, Task):
       local_repo = dict(
         resolver='publish_local',
         path=os.path.abspath(os.path.expanduser(context.options.jar_publish_local)),
-        confs=['*'],
+        confs=['default'],
         auth=None
       )
       self.repos = defaultdict(lambda: local_repo)
@@ -571,7 +571,12 @@ class JarPublish(ScmPublish, Task):
 
         pushdb.set_version(target, newver, head_sha, newfingerprint)
 
-        ivyxml = stage_artifacts(target, jar, newver.version(), changelog, confs=repo['confs'])
+        confs = set (repo['confs'])
+        if self.context.options.jar_create_sources:
+          confs.add('sources')
+        if self.context.options.jar_create_javadoc:
+          confs.add('javadocs')
+        ivyxml = stage_artifacts(target, jar, newver.version(), changelog, confs=list(confs))
 
         if self.dryrun:
           print('Skipping publish of %s in test mode.' % jar_coordinate(jar, newver.version()))
