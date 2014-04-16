@@ -104,7 +104,7 @@ class JarCreateExecuteTest(JarCreateTestBase):
                        '''))
 
     def get_source_root_fs_path(path):
-        return os.path.realpath(os.path.join(cls.BUILD_ROOT, path))
+        return os.path.realpath(os.path.join(cls.build_root, path))
 
     SourceRoot.register(get_source_root_fs_path('src/resources'), Resources)
     SourceRoot.register(get_source_root_fs_path('src/java'), JavaLibrary)
