@@ -78,6 +78,7 @@ python_library(
     pants('3rdparty/python/twitter/commons:twitter.common.collections'),
     pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
+    pants('3rdparty/python/twitter/commons:twitter.common.lang'),
     pants('src/python/pants/base:build_environment'),
     pants('src/python/pants/base:hash_utils'),
     pants('src/python/pants/base:workunit'),

@@ -43,6 +43,7 @@ python_test_suite(
     pants(':scrooge_gen'),
     pants(':sorttargets'),
     pants(':what_changed'),
+    pants('tests/python/pants_test/tasks/jvm_compile')
   ],
 )
 
