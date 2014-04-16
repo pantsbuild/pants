@@ -128,6 +128,11 @@ class JarCreate(Task):
     def add_genjar(typename, target, name):
       self.context.products.get(typename).add(target, self._output_dir).append(name)
 
+    # TODO (tdesai) Avoid jar_create creating 2 jars with java sources for scala_library
+    # with java_sources
+    # Currently, publish fails fast if scala_library owning java sources pointed by
+    # java_library target also provides an artifact. However, jar_create ends up
+    # creating 2 jars one scala and other java both including the java_sources.
     if self.jar_classes:
       self._jar(jar_targets(is_jvm_library), functools.partial(add_genjar, 'jars'))
 
