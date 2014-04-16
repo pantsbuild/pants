@@ -173,15 +173,6 @@ class Goal(Command):
     Option("--write-to-artifact-cache", "--no-write-to-artifact-cache", action="callback",
       callback=_set_bool, dest="write_to_artifact_cache", default=True,
       help="Whether to write artifacts to cache if configured to do so."),
-
-    Option("--all", dest="target_directory", action="append",
-           help="DEPRECATED: Use [dir]: with no flag in a normal target position on the command "
-                "line. (Adds all targets found in the given directory's BUILD file. Can be "
-                "specified more than once.)"),
-    Option("--all-recursive", dest="recursive_directory", action="append",
-           help="DEPRECATED: Use [dir]:: with no flag in a normal target position on the command "
-                "line. (Adds all targets found recursively under the given directory. Can be "
-                "specified more than once to add more than one root target directory to scan.)"),
   ]
 
   output = None
@@ -432,17 +423,6 @@ class Goal(Command):
       self.targets,
       requested_goals=self.requested_goals,
       lock=lock)
-
-    if self.options.recursive_directory:
-      context.log.warn(
-        '--all-recursive is deprecated, use a target spec with the form [dir]:: instead')
-      for dir in self.options.recursive_directory:
-        self.add_target_recursive(dir)
-
-    if self.options.target_directory:
-      context.log.warn('--all is deprecated, use a target spec with the form [dir]: instead')
-      for dir in self.options.target_directory:
-        self.add_target_directory(dir)
 
     unknown = []
     for phase in self.phases:
