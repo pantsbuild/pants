@@ -11,6 +11,7 @@ import re
 import signal
 import socket
 import sys
+import textwrap
 import time
 import traceback
 
@@ -62,9 +63,10 @@ goal(name='goals', action=ListGoals).install().with_description('List all docume
 goal(name='targets', action=TargetsHelp).install().with_description('List all target types.')
 
 
-class Help(Task):
+class Help(ConsoleTask):
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
+    super(Help, cls).setup_parser(option_group, args, mkflag)
     default = None
     if len(args) > 1 and (not args[1].startswith('-')):
       default = args[1]
@@ -77,7 +79,7 @@ class Help(Task):
       return self.list_goals('You must supply a goal name to provide help for.')
     phase = Phase(goal)
     if not phase.goals():
-      return self.list_goals('Goal %s is unknown.' % goal)
+      self.list_goals('Goal %s is unknown.' % goal)
 
     parser = OptionParser()
     parser.set_usage('%s goal %s ([target]...)' % (sys.argv[0], goal))
@@ -314,13 +316,15 @@ class Goal(Command):
       ]
       parser.set_usage("\n%s" % format_usage(usages))
       parser.epilog = ("Either lists all installed goals, provides extra help for a goal or else "
-                       "attempts to achieve the specified goal for the listed targets." """
-                       Note that target specs accept two special forms:
-                         [dir]:  to include all targets in the specified directory
-                         [dir]:: to include all targets found in all BUILD files recursively under
-                                 the directory""")
+                       "attempts to achieve the specified goal for the listed targets.")
 
       parser.print_help()
+
+      # Add some text that we can't put in the epilog, because that formats away newlines.
+      print(textwrap.dedent("""
+        Note that target specs accept two special forms:
+          [dir]:  to include all targets in the specified directory
+          [dir]:: to include all targets found recursively under the directory"""))
       sys.exit(0)
     else:
       goals, specs = Goal.parse_args(args)
@@ -526,7 +530,7 @@ goal(
   name='invalidate',
   action=Invalidator,
   dependencies=['ng-killall']
-).install().with_description('Invalidate all targets')
+).install().with_description('Invalidate all targets.')
 
 
 class Cleaner(ConsoleTask):
@@ -536,7 +540,7 @@ goal(
   name='clean-all',
   action=Cleaner,
   dependencies=['invalidate']
-).install().with_description('Cleans all build output')
+).install().with_description('Clean all build output.')
 
 
 class AsyncCleaner(ConsoleTask):
@@ -546,7 +550,7 @@ goal(
   name='clean-all-async',
   action=AsyncCleaner,
   dependencies=['invalidate']
-).install().with_description('Cleans all build output in a background process')
+).install().with_description('Clean all build output in a background process.')
 
 
 class NailgunKillall(ConsoleTask):
@@ -564,7 +568,7 @@ class NailgunKillall(ConsoleTask):
 goal(
   name='ng-killall',
   action=NailgunKillall
-).install().with_description('Kill any running nailgun servers spawned by pants.')
+).install().with_description('Kill running nailgun servers.')
 
 
 class RunServer(ConsoleTask):
@@ -666,26 +670,26 @@ goal(
   name='killserver',
   action=KillServer,
   serialize=False,
-).install().with_description('Kill the pants reporting server.')
+).install().with_description('Kill the reporting server.')
 
 
 # TODO(pl): Make the dependency of every other phase on this phase less explicit
 goal(
   name='bootstrap-jvm-tools',
   action=BootstrapJvmTools,
-).install('bootstrap').with_description('Bootstrap tools needed for building')
+).install('bootstrap').with_description('Bootstrap tools needed for building.')
 
 # TODO(John Sirois): Resolve eggs
 goal(
   name='ivy',
   action=IvyResolve,
   dependencies=['gen', 'check-exclusives', 'bootstrap']
-).install('resolve').with_description('Resolves jar dependencies and produces dependency reports.')
+).install('resolve').with_description('Resolve dependencies and produce dependency reports.')
 
 goal(name='check-exclusives',
   dependencies=['gen'],
   action=CheckExclusives).install('check-exclusives').with_description(
-  'Check exclusives declarations to verify that dependencies are consistent.')
+  'Check for exclusivity violations.')
 
 # TODO(John Sirois): gen attempted as the sole Goal should gen for all known gen types but
 # recognize flags to narrow the gen set
@@ -728,9 +732,8 @@ def _is_scala(target):
 goal(name='scala',
      action=ScalaCompile,
      group=group('jvm', _is_scala),
-     dependencies=['gen', 'resolve', 'check-exclusives', 'bootstrap']).install('compile').with_description(
-       'Compile both generated and checked in code.'
-     )
+     dependencies=['gen', 'resolve', 'check-exclusives', 'bootstrap']).install('compile').\
+       with_description('Compile source code.')
 
 class AptCompile(JavaCompile): pass  # So they're distinct in log messages etc.
 
@@ -785,18 +788,18 @@ goal(name='scaladoc_publish',
      action=ScaladocJarShim).install('publish')
 goal(name='jar',
      action=JarCreate,
-     dependencies=['compile', 'resources', 'bootstrap']).install('jar').with_description('Create one or more jars.')
+     dependencies=['compile', 'resources', 'bootstrap']).install('jar').with_description(
+       'Create one or more jars.')
 goal(name='check_published_deps',
      action=CheckPublishedDeps
-).install('check_published_deps').with_description(
-  'Find references to outdated artifacts published from this BUILD tree.')
+).install('check_published_deps').with_description('Find references to outdated artifacts.')
 
 goal(name='jar_create_publish',
      action=JarCreate,
      dependencies=['compile', 'resources']).install('publish')
 
 goal(name='publish',
-     action=JarPublish).install('publish').with_description('Publish one or more artifacts.')
+     action=JarPublish).install('publish').with_description('Publish artifacts.')
 
 goal(name='junit',
      action=JUnitRun,
@@ -845,8 +848,8 @@ goal(
   name='jvm-run-dirty',
   action=JvmRun,
   serialize=False,
-).install('run-dirty').with_description('Run a (currently JVM only) binary target, using ' +
-  'only currently existing binaries, skipping compilation')
+).install('run-dirty').with_description('Run a (currently JVM only) binary target, '
+          'skipping compilation.')
 
 # repl doesn't need the serialization lock. It's reasonable to have
 # a repl running in a workspace while there's a compile going on unrelated code.
@@ -856,26 +859,25 @@ goal(
   dependencies=['compile', 'resources', 'bootstrap'],
   serialize=False,
 ).install('repl').with_description(
-  'Run a (currently Scala only) REPL with the classpath set according to the targets.')
+  'Run a (currently Scala only) REPL.')
 
 goal(
   name='scala-repl-dirty',
   action=ScalaRepl,
   serialize=False,
 ).install('repl-dirty').with_description(
-  'Run a (currently Scala only) REPL with the classpath set according to the targets, ' +
-  'using the currently existing binaries, skipping compilation')
+  'Run a (currently Scala only) REPL, skipping compilation.')
 
 goal(
   name='filedeps',
   action=FileDeps
-).install('filedeps').with_description('Print out a list of all files the target depends on')
+).install('filedeps').with_description('Print out the source and BUILD files the target depends on.')
 
 goal(
   name='pathdeps',
   action=PathDeps
 ).install('pathdeps').with_description(
-  'Print out a list of all paths containing build files the target depends on')
+  'Print out all paths containing BUILD files the target depends on.')
 
 goal(
   name='list',
@@ -917,7 +919,7 @@ goal(
   name='provides',
   action=Provides,
   dependencies=['jar', 'bootstrap']
-).install().with_description('Emit the list of symbols provided by the given targets.')
+).install().with_description('Print the symbols provided by the given targets.')
 
 
 from pants.tasks.python.setup import SetupPythonEnvironment
@@ -933,12 +935,12 @@ from pants.tasks.paths import Path, Paths
 goal(
   name='path',
   action=Path,
-).install().with_description('Find a dependency path from one target to another')
+).install().with_description('Find a dependency path from one target to another.')
 
 goal(
   name='paths',
   action=Paths,
-).install().with_description('Find all dependency paths from one target to another')
+).install().with_description('Find all dependency paths from one target to another.')
 
 
 from pants.tasks.dependees import ReverseDepmap
@@ -946,7 +948,7 @@ from pants.tasks.dependees import ReverseDepmap
 goal(
   name='dependees',
   action=ReverseDepmap
-).install().with_description('Print a reverse dependency mapping for the given targets')
+).install().with_description("Print the target's dependees.")
 
 
 from pants.tasks.depmap import Depmap
@@ -954,8 +956,7 @@ from pants.tasks.depmap import Depmap
 goal(
   name='depmap',
   action=Depmap
-).install().with_description('Generates either a textual dependency tree or a graphviz'
-                             ' digraph dotfile for the dependency set of a target')
+).install().with_description("Depict the target's dependencies.")
 
 
 from pants.tasks.dependencies import Dependencies
@@ -963,7 +964,7 @@ from pants.tasks.dependencies import Dependencies
 goal(
   name='dependencies',
   action=Dependencies
-).install().with_description('Extract textual infomation about the dependencies of a target')
+).install().with_description("Print the target's dependencies.")
 
 
 from pants.tasks.filemap import Filemap
@@ -971,8 +972,7 @@ from pants.tasks.filemap import Filemap
 goal(
   name='filemap',
   action=Filemap
-).install().with_description('Outputs a mapping from source file to'
-                             ' the target that owns the source file')
+).install().with_description('Outputs a mapping from source file to owning target.')
 
 
 from pants.tasks.minimal_cover import MinimalCover
@@ -996,7 +996,7 @@ from pants.tasks.sorttargets import SortTargets
 goal(
   name='sort',
   action=SortTargets
-).install().with_description('Topologically sort the input targets.')
+).install().with_description("Topologically sort the targets.")
 
 
 from pants.tasks.roots import ListRoots
@@ -1004,4 +1004,4 @@ from pants.tasks.roots import ListRoots
 goal(
   name='roots',
   action=ListRoots,
-).install('roots').with_description("Prints the source roots and associated target types defined in the repo.")
+).install('roots').with_description("Print the workspace's source roots and associated target types.")
