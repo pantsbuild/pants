@@ -82,6 +82,16 @@ class BaseBuildRootTest(unittest.TestCase):
     return Target.get(Address.parse(cls.build_root, address, is_relative=False))
 
   @classmethod
+  def create_files(cls, path, files):
+    """Writes to a file under the buildroot with contents same as file name.
+
+     path:  The relative path to the file from the build root.
+     files: List of file names.
+    """
+    for f in files:
+      cls.create_file(os.path.join(path, f), contents=f)
+
+  @classmethod
   def create_library(cls, path, target_type, name, sources, **kwargs):
     """Creates a library target of given type at the BUILD file at path with sources
 

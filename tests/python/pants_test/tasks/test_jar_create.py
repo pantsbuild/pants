@@ -38,27 +38,6 @@ class JarCreateTestBase(BaseBuildRootTest):
     options.update(**kwargs)
     return options
 
-  @classmethod
-  def create_files(cls, path, files):
-    for f in files:
-      cls.create_file(os.path.join(path, f), contents=f)
-
-  @classmethod
-  def library(cls, path, target_type, name, sources):
-    cls.create_files(path, sources)
-
-    cls.create_target(path, dedent('''
-      %(target_type)s(name='%(name)s',
-        sources=[%(sources)s],
-      )
-    ''' % dict(target_type=target_type, name=name, sources=repr(sources or []))))
-
-    return cls.target('%s:%s' % (path, name))
-
-  @classmethod
-  def resources(cls, path, name, *sources):
-    return cls.library(path, 'resources', name, sources)
-
 
 class JarCreateMiscTest(JarCreateTestBase):
   def test_jar_create_init(self):
@@ -135,7 +114,7 @@ class JarCreateExecuteTest(JarCreateTestBase):
     opts = dict(jar_create_outdir=self.jar_outdir)
     opts.update(**options)
     return create_context(config=config, options=self.create_options(**opts),
-                          target_roots=[self.jl, self.sl, self.jtl])
+                          target_roots=[self.jl, self.sl, self.jtl, self.scala_lib])
 
   @contextmanager
   def add_products(self, context, product_type, target, *products):
@@ -179,6 +158,7 @@ class JarCreateExecuteTest(JarCreateTestBase):
         with self.add_data(context, 'resources_by_target', self.res, 'r.txt.transformed'):
           with self.add_data(context, 'classes_by_target', self.scala_lib, 'scala_foo.class',
                              'java_foo.class'):
+            print("\n %s" %context)
             JarCreate(context).execute(context.targets())
             if empty:
               self.assertTrue(context.products.get('jars').empty())
