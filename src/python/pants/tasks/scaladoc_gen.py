@@ -30,6 +30,8 @@ def create_scaladoc_command(classpath, gendir, *targets):
   sources = []
   for target in targets:
     sources.extend(target.sources_relative_to_buildroot())
+    for java_target in target.java_sources:
+      sources.extend(java_target.sources_relative_to_buildroot())
 
   if not sources:
     return None

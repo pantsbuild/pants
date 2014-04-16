@@ -575,7 +575,7 @@ class JarPublish(ScmPublish, Task):
         if self.context.options.jar_create_sources:
           confs.add('sources')
         if self.context.options.jar_create_javadoc:
-          confs.add('javadocs')
+          confs.add('docs')
         ivyxml = stage_artifacts(target, jar, newver.version(), changelog, confs=list(confs))
 
         if self.dryrun:
