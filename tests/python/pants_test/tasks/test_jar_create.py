@@ -240,9 +240,3 @@ class JarCreateExecuteTest(JarCreateTestBase):
 
   def test_javadoc_jar_flagged(self):
     self.assert_javadoc_jar_contents(self.context(jar_create_javadoc=True))
-
-  def test_javadoc_jar_constructor_required(self):
-    self.assert_javadoc_jar_contents(self.context(), jar_javadoc=True)
-
-  def test_javadoc_jar_not_required(self):
-    self.assert_javadoc_jar_contents(self.context(), empty=True, jar_javadoc=False)
