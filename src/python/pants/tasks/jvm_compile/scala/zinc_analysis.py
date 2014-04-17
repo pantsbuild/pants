@@ -110,6 +110,21 @@ class ZincAnalysisElement(object):
       outfile.write(item)
       outfile.write('\n')
 
+  def anonymize_keys(self, anonymizer, arg):
+    old_keys = list(arg.keys())
+    for k in old_keys:
+      vals = arg[k]
+      del arg[k]
+      arg[anonymizer.convert(k)] = vals
+
+  def anonymize_values(self, anonymizer, arg):
+    for k, vals in arg.iteritems():
+      arg[k] = [anonymizer.convert(v) for v in vals]
+
+  def anonymize_base64_values(self, anonymizer, arg):
+    for k, vals in arg.iteritems():
+      arg[k] = [anonymizer.convert_base64_string(v) for v in vals]
+
 
 class ZincAnalysis(Analysis):
   """Parsed representation of a zinc analysis.
@@ -371,8 +386,18 @@ class ZincAnalysis(Analysis):
     self.compilations.write(outfile, inline_vals=True, rebasings=rebasings)
     self.compile_setup.write(outfile, inline_vals=True, rebasings=rebasings)
 
-  # Extra methods re json.
+  # Extra methods on this class only.
 
+  # Anonymize the contents of this analysis. Useful for creating test data.
+  # Note that the resulting file is not a valid analysis, as the base64-encoded serialized objects
+  # will be replaced with random base64 strings. So these are useful for testing analysis parsing,
+  # splitting and merging, but not for actually reading into Zinc.
+  def anonymize(self, anonymizer):
+    for element in [self.relations, self.stamps, self.apis, self.source_infos,
+                    self.compilations, self.compile_setup]:
+      element.anonymize(anonymizer)
+
+  # Write this analysis to JSON.
   def write_json_to_path(self, outfile_path):
     with open(outfile_path, 'w') as outfile:
       self.write_json(outfile)
@@ -417,6 +442,11 @@ class Relations(ZincAnalysisElement):
      self.inheritance_internal_dep, self.inheritance_external_dep,
      self.classes, self.used) = self.args
 
+  def anonymize(self, anonymizer):
+    for a in self.args:
+      self.anonymize_values(anonymizer, a)
+      self.anonymize_keys(anonymizer, a)
+
 
 class Stamps(ZincAnalysisElement):
   headers = ('product stamps', 'source stamps', 'binary stamps', 'class names')
@@ -424,6 +454,11 @@ class Stamps(ZincAnalysisElement):
   def __init__(self, args):
     super(Stamps, self).__init__(args)
     (self.products, self.sources, self.binaries, self.classnames) = self.args
+
+  def anonymize(self, anonymizer):
+    for a in self.args:
+      self.anonymize_keys(anonymizer, a)
+    self.anonymize_values(anonymizer, self.classnames)
 
   # We make equality ignore the values in classnames: classnames is a map from
   # jar file to one representative class in that jar, and the representative can change.
@@ -447,6 +482,11 @@ class APIs(ZincAnalysisElement):
     super(APIs, self).__init__(args)
     (self.internal, self.external) = self.args
 
+  def anonymize(self, anonymizer):
+    for a in self.args:
+      self.anonymize_base64_values(anonymizer, a)
+      self.anonymize_keys(anonymizer, a)
+
 
 class SourceInfos(ZincAnalysisElement):
   headers = ("source infos", )
@@ -454,6 +494,11 @@ class SourceInfos(ZincAnalysisElement):
   def __init__(self, args):
     super(SourceInfos, self).__init__(args)
     (self.source_infos, ) = self.args
+
+  def anonymize(self, anonymizer):
+    for a in self.args:
+      self.anonymize_base64_values(anonymizer, a)
+      self.anonymize_keys(anonymizer, a)
 
 
 class Compilations(ZincAnalysisElement):
@@ -466,6 +511,9 @@ class Compilations(ZincAnalysisElement):
     # We clear them here to prevent them propagating through splits/merges.
     self.compilations.clear()
 
+  def anonymize(self, anonymizer):
+    pass
+
 
 class CompileSetup(ZincAnalysisElement):
   headers = ('output mode', 'output directories','compile options','javac options',
@@ -475,6 +523,14 @@ class CompileSetup(ZincAnalysisElement):
     super(CompileSetup, self).__init__(args)
     (self.output_mode, self.output_dirs, self.compile_options, self.javac_options,
      self.compiler_version, self.compile_order) = self.args
+
+  def anonymize(self, anonymizer):
+    self.anonymize_values(anonymizer, self.output_dirs)
+    for k, vs in list(self.compile_options.items()):  # Make a copy, so we can del as we go.
+      # Remove mentions of custom plugins.
+      for v in vs:
+        if v.startswith('-Xplugin') or v.startswith('-P'):
+          del self.compile_options[k]
 
 
 class ZincAnalysisJSONEncoder(json.JSONEncoder):

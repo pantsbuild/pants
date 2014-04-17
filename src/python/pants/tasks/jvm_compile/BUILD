@@ -56,6 +56,12 @@ python_library(
 )
 
 python_library(
+  name = 'anonymizer',
+  sources = ['anonymizer.py'],
+  dependencies = []
+)
+
+python_library(
   name = 'jvm_dependency_analyzer',
   sources = ['jvm_dependency_analyzer.py'],
   dependencies = [
@@ -69,7 +75,7 @@ python_library(
 
 python_library(
   name = 'scala',
-  sources = globs('scala/*.py'),
+  sources = globs('scala/*.py') - ['anonymize.py'],
   dependencies = [
     pants(':analysis'),
     pants(':analysis_parser'),
@@ -86,3 +92,13 @@ python_library(
     pants('src/python/pants/tasks:task_error'),
   ],
 )
+
+python_binary(
+  name = 'anonymize_zinc_analysis',
+  entry_point = 'pants.tasks.jvm_compile.scala.anonymize_analysis:main',
+  dependencies = [
+    pants(':anonymizer'),
+    pants(':scala'),
+    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
+    ],
+  )
