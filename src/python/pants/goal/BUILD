@@ -71,10 +71,19 @@ python_library(
 )
 
 python_library(
+  name = 'option_helpers',
+  sources = ['option_helpers.py'],
+  dependencies = [
+    pants('src/python/pants/base:config'),
+  ],
+)
+
+python_library(
   name = 'phase',
   sources = ['phase.py'],
   dependencies = [
     pants(':error'),
+    pants(':option_helpers'),
     pants('src/python/pants/base:build_manual'),
   ],
 )

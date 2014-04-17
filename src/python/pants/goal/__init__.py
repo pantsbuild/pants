@@ -89,14 +89,22 @@ class Goal(object):
   def task_type(self):
     return self._task
 
+  def _namespace_for_parser(self, phase, sep):
+    phase_leader = phase.goals() == [self] or self.name == phase.name
+    return self.name if phase_leader else '%s%s%s' % (phase.name, sep, self.name)
+
+  def title_for_option_group(self, phase):
+    return self._namespace_for_parser(phase, ':')
+
   def setup_parser(self, phase, parser, args):
     """Allows a task to add its command line args to the global sepcification."""
-    def namespace(sep):
-      phase_leader = phase.goals() == [self] or self.name == phase.name
-      return self.name if phase_leader else '%s%s%s' % (phase.name, sep, self.name)
-    mkflag = Mkflag(namespace)
+    def namespace_for_mkflag(sep):
+      return self._namespace_for_parser(phase, sep)
 
-    option_group = OptionGroup(parser, title=namespace(':'))
+    mkflag = Mkflag(namespace_for_mkflag)
+
+    option_group = OptionGroup(parser,
+                               title=self.title_for_option_group(phase))
     self.task_setup_parser(option_group, args, mkflag)
     if option_group.option_list:
       parser.add_option_group(option_group)

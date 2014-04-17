@@ -59,6 +59,11 @@ class Phase(PhaseBase):
 
   @staticmethod
   def setup_parser(parser, args, phases):
+    """Set up an OptionParser with options info for a phase and its deps.
+    This readies the parser to handle options for this phase and its deps.
+    It does not set up everything you might want for displaying help.
+    For that, you want setup_parser_for_help.
+    """
     def do_setup_parser(phase, setup):
       for goal in phase.goals():
         if goal not in setup:

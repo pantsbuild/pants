@@ -16,7 +16,7 @@ import time
 import traceback
 
 from contextlib import contextmanager
-from optparse import Option, OptionParser
+from optparse import OptionParser
 
 from twitter.common import log
 from twitter.common.collections import OrderedSet
@@ -40,6 +40,9 @@ from pants.engine.group_engine import GroupEngine
 from pants.goal import Context, GoalError, Phase
 from pants.goal import Goal as goal, Group as group
 from pants.goal.initialize_reporting import update_reporting
+from pants.goal.option_helpers import (
+  add_global_options,
+  setup_parser_for_phase_help)
 from pants.reporting.reporting_server import ReportingServer, ReportingServerManager
 from pants.tasks import Task, TaskError
 from pants.tasks.console_task import ConsoleTask
@@ -81,21 +84,13 @@ class Help(ConsoleTask):
     if not phase.goals():
       self.list_goals('Goal %s is unknown.' % goal)
 
-    parser = OptionParser()
-    parser.set_usage('%s goal %s ([target]...)' % (sys.argv[0], goal))
-    parser.epilog = phase.description
-    Goal.add_global_options(parser)
-    Phase.setup_parser(parser, [], [phase])
+    parser = setup_parser_for_phase_help(phase)
     parser.parse_args(['--help'])
 
   def list_goals(self, message):
     return _list_goals(self.context, message)
 
 goal(name='help', action=Help).install().with_description('Provide help for the specified goal.')
-
-
-def _set_bool(option, opt_str, value, parser):
-  setattr(parser.values, option.dest, not opt_str.startswith("--no"))
 
 
 class SpecParser(object):
@@ -144,43 +139,7 @@ class Goal(Command):
   """Lists installed goals or else executes a named goal."""
 
   __command__ = 'goal'
-
-  GLOBAL_OPTIONS = [
-    Option("-t", "--timeout", dest="conn_timeout", type='int',
-           default=Config.load().getdefault('connection_timeout'),
-           help="Number of seconds to wait for http connections."),
-    Option("-x", "--time", action="store_true", dest="time", default=False,
-           help="Times goal phases and outputs a report."),
-    Option("-e", "--explain", action="store_true", dest="explain", default=False,
-           help="Explain the execution of goals."),
-    Option("-k", "--kill-nailguns", action="store_true", dest="cleanup_nailguns", default=False,
-           help="Kill nailguns before exiting"),
-    Option("-d", "--logdir", dest="logdir",
-           help="[%default] Forks logs to files under this directory."),
-    Option("-l", "--level", dest="log_level", type="choice", choices=['debug', 'info', 'warn'],
-           help="[info] Sets the logging level to one of 'debug', 'info' or 'warn'."
-                "if set."),
-    Option("-q", "--quiet", action="store_true", dest="quiet", default=False,
-           help="Squelches all console output apart from errors."),
-    Option("--no-colors", dest="no_color", action="store_true", default=False,
-           help="Do not colorize log messages."),
-    Option("-n", "--dry-run", action="store_true", dest="dry_run", default=False,
-      help="Print the commands that would be run, without actually running them."),
-
-    Option("--read-from-artifact-cache", "--no-read-from-artifact-cache", action="callback",
-      callback=_set_bool, dest="read_from_artifact_cache", default=True,
-      help="Whether to read artifacts from cache instead of building them, if configured to do so."),
-    Option("--write-to-artifact-cache", "--no-write-to-artifact-cache", action="callback",
-      callback=_set_bool, dest="write_to_artifact_cache", default=True,
-      help="Whether to write artifacts to cache if configured to do so."),
-  ]
-
   output = None
-
-  @staticmethod
-  def add_global_options(parser):
-    for option in Goal.GLOBAL_OPTIONS:
-      parser.add_option(option)
 
   @staticmethod
   def parse_args(args):
@@ -213,7 +172,7 @@ class Goal(Command):
   @classmethod
   def execute(cls, context, *names):
     parser = OptionParser()
-    cls.add_global_options(parser)
+    add_global_options(parser)
     phases = [Phase(name) for name in names]
     Phase.setup_parser(parser, [], phases)
     options, _ = parser.parse_args([])
@@ -273,7 +232,7 @@ class Goal(Command):
 
   def setup_parser(self, parser, args):
     self.config = Config.load()
-    Goal.add_global_options(parser)
+    add_global_options(parser)
 
     # We support attempting zero or more goals.  Multiple goals must be delimited from further
     # options and non goal args with a '--'.  The key permutations we need to support:
@@ -430,7 +389,7 @@ class Goal(Command):
         unknown.append(phase)
 
     if unknown:
-      _list_goals(context, 'Unknown goal(s): %s' % ' '.join(phase.name for phase in unknown))
+      _list_goals(context, 'Unknown goal(s): %s\n' % ' '.join(phase.name for phase in unknown))
       return 1
 
     return Goal._execute(context, self.phases, print_timing=self.options.time)

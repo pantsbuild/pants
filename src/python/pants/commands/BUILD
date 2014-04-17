@@ -107,6 +107,7 @@ python_library(
     pants('src/python/pants/engine'),
     pants('src/python/pants/goal'),
     pants('src/python/pants/goal:initialize_reporting'),
+    pants('src/python/pants/goal:option_helpers'),
     pants('src/python/pants/reporting'),
     pants('src/python/pants/targets:common'),
     pants('src/python/pants/targets:java'),
