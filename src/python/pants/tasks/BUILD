@@ -714,8 +714,8 @@ python_library(
 """
 
 python_library(
-  name = 'thrift_gen',
-  sources = ['thrift_gen.py'],
+  name = 'apache_thrift_gen',
+  sources = ['apache_thrift_gen.py'],
   dependencies = [
     pants(':common'),
     pants(':code_gen'),

@@ -9,6 +9,7 @@ python_test_suite(
     pants(':exclusive'),
     pants(':internal'),
     pants(':jar_library'),
+    pants(':java_thrift_library'),
     pants(':pants_target'),
     pants(':python_binary'),
     pants(':python_target'),
@@ -66,6 +67,16 @@ python_tests(
     pants('src/python/pants/base:parse_context'),
     pants('src/python/pants/base:target'),
     pants('src/python/pants/targets:jvm'),
+  ]
+)
+
+python_tests(
+  name = 'java_thrift_library',
+  sources = ['test_java_thrift_library.py'],
+  dependencies = [
+    pants('src/python/pants/targets:java'),
+    pants('tests/python/pants_test:base-test'),
+    pants('tests/python/pants_test/base:base-test'),
   ]
 )
 

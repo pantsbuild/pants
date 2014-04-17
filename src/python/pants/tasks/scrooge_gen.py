@@ -20,7 +20,9 @@ from pants.targets.java_thrift_library import JavaThriftLibrary
 from pants.targets.scala_library import ScalaLibrary
 from pants.tasks import TaskError
 from pants.tasks.nailgun_task import NailgunTask
-from pants.thrift_util import calculate_compile_sources, calculate_compile_sources_HACK_FOR_SCROOGE_LEGACY
+from pants.thrift_util import (
+    calculate_compile_sources,
+    calculate_compile_sources_HACK_FOR_SCROOGE_LEGACY)
 
 
 CompilerConfig = namedtuple('CompilerConfig', ['name', 'config_section', 'profile',
@@ -114,6 +116,8 @@ class ScroogeGen(NailgunTask):
                                                default=[':%s' % compiler.profile])
       self._jvm_tool_bootstrapper.register_jvm_tool(compiler.name, bootstrap_tools)
 
+    self.defaults = JavaThriftLibrary.Defaults(context.config)
+
   def _tempname(self):
     # don't assume the user's cwd is buildroot
     pants_workdir = self.context.config.getdefault('pants_workdir')
@@ -124,6 +128,8 @@ class ScroogeGen(NailgunTask):
     return path
 
   def execute(self, targets):
+    self._validate_compiler_configs(targets)
+
     gentargets_by_dependee = self.context.dependents(
         on_predicate=self.is_gentarget,
         from_predicate=lambda t: not self.is_gentarget(t))
@@ -137,10 +143,13 @@ class ScroogeGen(NailgunTask):
     gentargets = filter(self.is_gentarget, targets)
 
     for target in gentargets:
+      compiler = self.defaults.get_compiler(target)
+      language = self.defaults.get_language(target)
+      rpc_style = self.defaults.get_rpc_style(target)
       partial_cmd = self.PartialCmd(
-          compiler=self.compiler_for_name[target.compiler],
-          language=target.language,
-          rpc_style=target.rpc_style,
+          compiler=self.compiler_for_name[compiler],
+          language=language,
+          rpc_style=rpc_style,
           namespace_map=tuple(sorted(target.namespace_map.items()) if target.namespace_map else ()))
       partial_cmds[partial_cmd].add(target)
 
@@ -232,7 +241,7 @@ class ScroogeGen(NailgunTask):
                                          excludes=gentarget.excludes)
 
     def create_geninfo(key):
-      compiler = self.compiler_for_name[gentarget.compiler]
+      compiler = self.compiler_for_name[self.defaults.get_compiler(gentarget)]
       gen_info = self.context.config.getdict(compiler.config_section, key,
                                              default={'gen': key,
                                                       'deps': {'service': [], 'structs': []}})
@@ -246,7 +255,7 @@ class ScroogeGen(NailgunTask):
       return self.GenInfo(gen, deps)
 
     return self._inject_target(gentarget, dependees,
-                               create_geninfo(gentarget.language),
+                               create_geninfo(self.defaults.get_language(gentarget)),
                                gen_files_for_source,
                                create_target)
 
@@ -260,7 +269,7 @@ class ScroogeGen(NailgunTask):
       files.extend(genfiles)
     deps = OrderedSet(geninfo.deps['service' if has_service else 'structs'])
     deps.update(target.dependencies)
-    target_type = _TARGET_TYPE_FOR_LANG[target.language]
+    target_type = _TARGET_TYPE_FOR_LANG[self.defaults.get_language(target)]
     tgt = create_target(files, deps, target_type)
     tgt.derived_from = target
     tgt.add_labels('codegen', 'synthetic')
@@ -312,15 +321,24 @@ class ScroogeGen(NailgunTask):
       self.write_gen_file_map_for_target(gen_file_map, target, outdir)
 
   def is_gentarget(self, target):
-    result = (isinstance(target, JavaThriftLibrary)
-              and target.compiler in self.compiler_for_name.keys())
+    if not isinstance(target, JavaThriftLibrary):
+      return False
 
-    if result and target.language not in self.compiler_for_name[target.compiler].langs:
-      raise TaskError("%s can not generate %s" % (target.compiler, target.language))
-    return result
+    compiler = self.defaults.get_compiler(target)
+    if compiler not in self.compiler_for_name.keys():
+      return False
+
+    language = self.defaults.get_language(target)
+    if language not in self.compiler_for_name[compiler].langs:
+      raise TaskError("%s can not generate %s" % (compiler, language))
+
+    return True
+
+  def _validate_compiler_configs(self, targets):
+    self._validate(self.defaults, targets)
 
   @staticmethod
-  def _validate(targets):
+  def _validate(defaults, targets):
     ValidateCompilerConfig = namedtuple('ValidateCompilerConfig', ['language', 'rpc_style'])
 
     def compiler_config(tgt):
@@ -330,7 +348,8 @@ class ScroogeGen(NailgunTask):
       # sources. As there's no permutation allowing the creation of
       # incompatible sources with the same language+rpc_style we omit
       # the compiler from the signature at this time.
-      return ValidateCompilerConfig(language=tgt.language, rpc_style=tgt.rpc_style)
+      return ValidateCompilerConfig(language=defaults.get_language(tgt),
+                                    rpc_style=defaults.get_rpc_style(tgt))
 
     mismatched_compiler_configs = defaultdict(set)
 
