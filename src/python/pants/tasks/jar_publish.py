@@ -571,7 +571,7 @@ class JarPublish(ScmPublish, Task):
 
         pushdb.set_version(target, newver, head_sha, newfingerprint)
 
-        confs = set (repo['confs'])
+        confs = set(repo['confs'])
         if self.context.options.jar_create_sources:
           confs.add('sources')
         if self.context.options.jar_create_javadoc:
