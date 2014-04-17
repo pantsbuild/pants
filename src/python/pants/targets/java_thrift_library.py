@@ -10,6 +10,7 @@ from functools import partial
 from twitter.common.collections import maybe_list
 
 from pants.base.build_manual import manual
+from pants.base.config import Config
 from pants.base.target import TargetDefinitionException
 from pants.targets.jar_dependency import JarDependency
 from pants.targets.jvm_target import JvmTarget
@@ -20,15 +21,38 @@ from pants.targets.pants_target import Pants
 class JavaThriftLibrary(JvmTarget):
   """Generates a stub Java or Scala library from thrift IDL files."""
 
+  class Defaults(object):
+    @staticmethod
+    def _check_java_thrift_library(target):
+      if not isinstance(target, JavaThriftLibrary):
+        raise ValueError('Expected a JavaThriftLibrary, got: %s of type %s' % (target, type(target)))
 
+    def __init__(self, config=None):
+      self._config = config or Config.load()
+
+    def _get_default(self, key, fallback):
+      return self._config.get('java-thrift-library', key, default=fallback)
+
+    def get_compiler(self, target):
+      self._check_java_thrift_library(target)
+      return target.compiler or self._get_default('compiler', 'thrift')
+
+    def get_language(self, target):
+      self._check_java_thrift_library(target)
+      return target.language or self._get_default('language', 'java')
+
+    def get_rpc_style(self, target):
+      self._check_java_thrift_library(target)
+      return target.rpc_style or self._get_default('rpc_style', 'sync')
+
+
+  # TODO(John Sirois): Tasks should register the values they support in a plugin-registration phase.
+  # In general a plugin will contribute a target and a task, but in this case we have a shared
+  # target that can be used by at least 2 tasks - ThriftGen and ScroogeGen.  This is likely not
+  # uncommon (gcc & clang) so the arrangement needs to be cleaned up and supported well.
   _COMPILERS = frozenset(['thrift', 'scrooge', 'scrooge-legacy'])
-  _COMPILER_DEFAULT = 'thrift'
-
   _LANGUAGES = frozenset(['java', 'scala'])
-  _LANGUAGE_DEFAULT = 'java'
-
   _RPC_STYLES = frozenset(['sync', 'finagle', 'ostrich'])
-  _RPC_STYLE_DEFAULT = 'sync'
 
   def __init__(self,
                name,
@@ -36,9 +60,9 @@ class JavaThriftLibrary(JvmTarget):
                provides=None,
                dependencies=None,
                excludes=None,
-               compiler=_COMPILER_DEFAULT,
-               language=_LANGUAGE_DEFAULT,
-               rpc_style=_RPC_STYLE_DEFAULT,
+               compiler=None,
+               language=None,
+               rpc_style=None,
                namespace_map=None,
                exclusives=None):
     """
@@ -55,12 +79,11 @@ class JavaThriftLibrary(JvmTarget):
     :type dependencies: list of targets
     :param excludes: List of :class:`pants.targets.exclude.Exclude` instances
       to filter this target's transitive dependencies against.
-    :param compiler: An optional compiler used to compile the thrift files.
-    :param language: The language used to generate the output files.
-      One of 'java' or 'scala' with a default of 'java'.
+    :param compiler: The compiler used to compile the thrift files; default is 'thrift'
+      (The apache thrift compiler).
+    :param language: The language used to generate the output files; defaults to 'java'.
     :param rpc_style: An optional rpc style to generate service stubs with.
-      One of 'sync', 'finagle' or 'ostrich' with a default of 'sync'.
-    :param namespace_map: A dictionary of namespaces to remap (old: new)
+    :param namespace_map: An optional dictionary of namespaces to remap {old: new}
     :param exclusives: An optional map of exclusives tags. See CheckExclusives for details.
     """
 
@@ -85,21 +108,13 @@ class JavaThriftLibrary(JvmTarget):
                  raise_type=partial(TargetDefinitionException, self))
 
     def check_value_for_arg(arg, value, values):
-      if value not in values:
+      if value is not None and value not in values:
         raise TargetDefinitionException(self, "%s may only be set to %s ('%s' not valid)" %
                                         (arg, ', or '.join(map(repr, values)), value))
       return value
 
-    # TODO(John Sirois): The defaults should be grabbed from the workspace config.
-
-    # some gen BUILD files explicitly set this to None
-    compiler = compiler or self._COMPILER_DEFAULT
     self.compiler = check_value_for_arg('compiler', compiler, self._COMPILERS)
-
-    language = language or self._LANGUAGE_DEFAULT
     self.language = check_value_for_arg('language', language, self._LANGUAGES)
-
-    rpc_style = rpc_style or self._RPC_STYLE_DEFAULT
     self.rpc_style = check_value_for_arg('rpc_style', rpc_style, self._RPC_STYLES)
 
     self.namespace_map = namespace_map

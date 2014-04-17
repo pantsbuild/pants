@@ -286,6 +286,7 @@ python_tests(
   sources = ['test_scrooge_gen.py'],
   dependencies = [
     pants('tests/python/pants_test:base-test'),
+    pants('src/python/pants/targets:java'),
     pants('src/python/pants/tasks:task_error'),
     pants('src/python/pants/tasks:scrooge_gen'),
   ],

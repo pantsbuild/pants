@@ -480,7 +480,7 @@ from pants.tasks.scala_repl import ScalaRepl
 from pants.tasks.scaladoc_gen import ScaladocGen
 from pants.tasks.scrooge_gen import ScroogeGen
 from pants.tasks.specs_run import SpecsRun
-from pants.tasks.thrift_gen import ThriftGen
+from pants.tasks.apache_thrift_gen import ApacheThriftGen
 
 
 def _cautious_rmtree(root):
@@ -673,7 +673,7 @@ goal(name='check-exclusives',
 
 # TODO(John Sirois): gen attempted as the sole Goal should gen for all known gen types but
 # recognize flags to narrow the gen set
-goal(name='thrift', action=ThriftGen).install('gen').with_description('Generate code.')
+goal(name='thrift', action=ApacheThriftGen).install('gen').with_description('Generate code.')
 goal(name='scrooge',
      dependencies=['bootstrap'],
      action=ScroogeGen).install('gen')

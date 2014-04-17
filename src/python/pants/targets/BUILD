@@ -81,6 +81,7 @@ python_library(
     pants('3rdparty/python/twitter/commons:twitter.common.collections'),
     pants('3rdparty/python/twitter/commons:twitter.common.lang'),
     pants('src/python/pants/base:build_manual'),
+    pants('src/python/pants/base:config'),
     pants('src/python/pants/base:target'),
   ],
 )

@@ -45,7 +45,7 @@ def _copytree(from_base, to_base):
       safe_link(os.path.join(dirpath, filename), os.path.join(to_path, filename))
 
 
-class ThriftGen(CodeGen):
+class ApacheThriftGen(CodeGen):
   GenInfo = namedtuple('GenInfo', ['gen', 'deps'])
   ThriftSession = namedtuple('ThriftSession', ['outdir', 'cmd', 'process'])
 
@@ -97,6 +97,8 @@ class ThriftGen(CodeGen):
     self.thrift_binary = select_thrift_binary(context.config,
                                               version=context.options.thrift_version)
 
+    self.defaults = JavaThriftLibrary.Defaults(context.config)
+
   def invalidate_for(self):
     return self.gen_langs
 
@@ -106,7 +108,8 @@ class ThriftGen(CodeGen):
     return [self.thrift_binary]
 
   def is_gentarget(self, target):
-    return ((isinstance(target, JavaThriftLibrary) and target.compiler == 'thrift')
+    return ((isinstance(target, JavaThriftLibrary)
+             and self.defaults.get_compiler(target) == 'thrift')
             or isinstance(target, PythonThriftLibrary))
 
   def is_forced(self, lang):

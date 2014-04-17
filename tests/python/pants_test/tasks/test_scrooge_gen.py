@@ -8,6 +8,7 @@ from textwrap import dedent
 
 import pytest
 
+from pants.targets.java_thrift_library import JavaThriftLibrary
 from pants.tasks import TaskError
 from pants.tasks.scrooge_gen import ScroogeGen
 from pants_test.base_build_root_test import BaseBuildRootTest
@@ -16,6 +17,8 @@ from pants_test.base_build_root_test import BaseBuildRootTest
 class ScroogeGenTest(BaseBuildRootTest):
 
   def test_validate(self):
+    defaults = JavaThriftLibrary.Defaults()
+
     self.create_target('test_validate', dedent('''
       java_thrift_library(name='one',
         sources=None,
@@ -38,8 +41,8 @@ class ScroogeGenTest(BaseBuildRootTest):
       )
     '''))
 
-    ScroogeGen._validate([self.target('test_validate:one')])
-    ScroogeGen._validate([self.target('test_validate:two')])
+    ScroogeGen._validate(defaults, [self.target('test_validate:one')])
+    ScroogeGen._validate(defaults, [self.target('test_validate:two')])
 
     with pytest.raises(TaskError):
-      ScroogeGen._validate([self.target('test_validate:three')])
+      ScroogeGen._validate(defaults, [self.target('test_validate:three')])
