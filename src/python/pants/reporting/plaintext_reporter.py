@@ -47,23 +47,23 @@ class PlainTextReporter(Reporter):
   def close(self):
     """Implementation of Reporter callback."""
     if self.settings.timing:
-      self.emit('\n')
-      self.emit('\nCumulative Timings')
-      self.emit('\n==================')
-      self.emit('\n')
+      self.emit(b'\n')
+      self.emit(b'\nCumulative Timings')
+      self.emit(b'\n==================')
+      self.emit(b'\n')
       self.emit(self._format_aggregated_timings(self.run_tracker.cumulative_timings))
-      self.emit('\n')
-      self.emit('\nSelf Timings')
-      self.emit('\n============')
-      self.emit('\n')
+      self.emit(b'\n')
+      self.emit(b'\nSelf Timings')
+      self.emit(b'\n============')
+      self.emit(b'\n')
       self.emit(self._format_aggregated_timings(self.run_tracker.self_timings))
     if self.settings.cache_stats:
-      self.emit('\n')
-      self.emit('\nArtifact Cache Stats')
-      self.emit('\n====================')
-      self.emit('\n')
+      self.emit(b'\n')
+      self.emit(b'\nArtifact Cache Stats')
+      self.emit(b'\n====================')
+      self.emit(b'\n')
       self.emit(self._format_artifact_cache_stats(self.run_tracker.artifact_cache_stats))
-    self.emit('\n')
+    self.emit(b'\n')
 
   def start_workunit(self, workunit):
     """Implementation of Reporter callback."""
@@ -72,19 +72,19 @@ class PlainTextReporter(Reporter):
 
     if workunit.parent and workunit.parent.has_label(WorkUnit.MULTITOOL):
       # For brevity, we represent each consecutive invocation of a multitool with a dot.
-      self.emit('.')
+      self.emit(b'.')
     elif not workunit.parent or \
         all([not x.has_label(WorkUnit.MULTITOOL) and not x.has_label(WorkUnit.BOOTSTRAP)
              for x in workunit.parent.ancestors()]):
       # Bootstrapping can be chatty, so don't show anything for its sub-workunits.
-      self.emit('\n%s %s %s[%s]' %
+      self.emit(b'\n%s %s %s[%s]' %
                        (workunit.start_time_string(),
                         workunit.start_delta_string(),
                         self._indent(workunit),
                         workunit.name if self.settings.indent else workunit.path()))
       if self._show_output(workunit):
         # So that emitted output starts on a new line (see below).
-        self.emit(self._prefix(workunit, '\n'))
+        self.emit(self._prefix(workunit, b'\n'))
     self.flush()
 
   def end_workunit(self, workunit):
@@ -95,7 +95,7 @@ class PlainTextReporter(Reporter):
     if workunit.outcome() != WorkUnit.SUCCESS and not self._show_output(workunit):
       # Emit the suppressed workunit output, if any, to aid in debugging the problem.
       for name, outbuf in workunit.outputs().items():
-        self.emit(self._prefix(workunit, '\n==== %s ====\n' % name))
+        self.emit(self._prefix(workunit, b'\n==== %s ====\n' % name))
         self.emit(self._prefix(workunit, outbuf.read_from(0)))
         self.flush()
 
@@ -107,7 +107,7 @@ class PlainTextReporter(Reporter):
     # If the element is a (msg, detail) pair, we ignore the detail. There's no
     # useful way to display it on the console.
     elements = [e if isinstance(e, basestring) else e[0] for e in msg_elements]
-    msg = '\n' + ''.join(elements)
+    msg = b'\n' + b''.join(elements)
     if self.settings.color:
       msg = self._COLOR_BY_LEVEL.get(level, lambda x: x)(msg)
     self.emit(self._prefix(workunit, msg))
@@ -144,20 +144,20 @@ class PlainTextReporter(Reporter):
     return workunit.has_label(WorkUnit.REPL) or workunit.has_label(WorkUnit.RUN)
 
   def _format_aggregated_timings(self, aggregated_timings):
-    return '\n'.join(['%(timing).3f %(label)s' % x for x in aggregated_timings.get_all()])
+    return b'\n'.join([b'%(timing).3f %(label)s' % x for x in aggregated_timings.get_all()])
 
   def _format_artifact_cache_stats(self, artifact_cache_stats):
     stats = artifact_cache_stats.get_all()
-    return 'No artifact cache reads.' if not stats else \
-    '\n'.join(['%(cache_name)s - Hits: %(num_hits)d Misses: %(num_misses)d' % x
-               for x in stats])
+    return b'No artifact cache reads.' if not stats else \
+    b'\n'.join([b'%(cache_name)s - Hits: %(num_hits)d Misses: %(num_misses)d' % x
+                for x in stats])
 
   def _indent(self, workunit):
-    return '  ' * (len(workunit.ancestors()) - 1)
+    return b'  ' * (len(workunit.ancestors()) - 1)
 
-  _time_string_filler = ' ' * len('HH:MM:SS mm:ss ')
+  _time_string_filler = b' ' * len('HH:MM:SS mm:ss ')
   def _prefix(self, workunit, s):
     if self.settings.indent:
-      return s.replace('\n', '\n' + PlainTextReporter._time_string_filler + self._indent(workunit))
+      return s.replace(b'\n', b'\n' + PlainTextReporter._time_string_filler + self._indent(workunit))
     else:
       return PlainTextReporter._time_string_filler + s
