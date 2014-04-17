@@ -30,6 +30,7 @@ def create_scaladoc_command(classpath, gendir, *targets):
   sources = []
   for target in targets:
     sources.extend(target.sources_relative_to_buildroot())
+    # TODO(Tejal Desai): pantsbuild/pants/65: Remove java_sources attribute for ScalaLibrary
     for java_target in target.java_sources:
       sources.extend(java_target.sources_relative_to_buildroot())
 

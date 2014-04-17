@@ -721,7 +721,7 @@ class JarPublish(ScmPublish, Task):
         sha.update(source)
         sha.update(fd.read())
 
-    # TODO(Tejal Desai): Add tests for handling java sources changes.
+    # TODO(Tejal Desai): pantsbuild/pants/65: Remove java_sources attribute for ScalaLibrary
     if isinstance(target, ScalaLibrary):
       for java_source in sorted(target.java_sources):
         for source in sorted(java_source.sources):
