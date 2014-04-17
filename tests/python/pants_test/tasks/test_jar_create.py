@@ -158,7 +158,6 @@ class JarCreateExecuteTest(JarCreateTestBase):
         with self.add_data(context, 'resources_by_target', self.res, 'r.txt.transformed'):
           with self.add_data(context, 'classes_by_target', self.scala_lib, 'scala_foo.class',
                              'java_foo.class'):
-            print("\n %s" %context)
             JarCreate(context).execute(context.targets())
             if empty:
               self.assertTrue(context.products.get('jars').empty())
