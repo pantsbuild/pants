@@ -38,27 +38,6 @@ class JarCreateTestBase(BaseBuildRootTest):
     options.update(**kwargs)
     return options
 
-  @classmethod
-  def create_files(cls, path, files):
-    for f in files:
-      cls.create_file(os.path.join(path, f), contents=f)
-
-  @classmethod
-  def library(cls, path, target_type, name, sources):
-    cls.create_files(path, sources)
-
-    cls.create_target(path, dedent('''
-      %(target_type)s(name='%(name)s',
-        sources=[%(sources)s],
-      )
-    ''' % dict(target_type=target_type, name=name, sources=repr(sources or []))))
-
-    return cls.target('%s:%s' % (path, name))
-
-  @classmethod
-  def resources(cls, path, name, *sources):
-    return cls.library(path, 'resources', name, sources)
-
 
 class JarCreateMiscTest(JarCreateTestBase):
   def test_jar_create_init(self):
@@ -74,7 +53,7 @@ class JarCreateMiscTest(JarCreateTestBase):
 
   def test_resources_with_scala_java_files(self):
     for ftype in ('java', 'scala'):
-      target = self.resources(os.path.join('project', ftype),
+      target = self.create_resources(os.path.join('project', ftype),
                               'target_%s' % ftype,
                               'hello.%s' % ftype)
       self.assertFalse(is_jvm_library(target))
@@ -82,36 +61,26 @@ class JarCreateMiscTest(JarCreateTestBase):
 
 class JarCreateExecuteTest(JarCreateTestBase):
   @classmethod
-  def library_with_resources(cls, path, target_type, name, sources, resources=None):
-    cls.create_files(path, sources)
-
-    cls.create_target(path, dedent('''
-      %(target_type)s(name='%(name)s',
-        sources=[%(sources)s],
-        %(resources)s
-      )
-    ''' % dict(target_type=target_type,
-               name=name,
-               sources=repr(sources or []),
-               resources=('resources=pants("%s")' % resources if resources else ''))))
-
-    return cls.target('%s:%s' % (path, name))
+  def java_library(cls, path, name, sources, **kwargs):
+    return cls.create_library(path, 'java_library', name, sources, **kwargs)
 
   @classmethod
-  def java_library(cls, path, name, sources, resources=None):
-    return cls.library_with_resources(path, 'java_library', name, sources, resources=resources)
-
-  @classmethod
-  def scala_library(cls, path, name, sources, resources=None):
-    return cls.library_with_resources(path, 'scala_library', name, sources, resources=resources)
+  def scala_library(cls, path, name, sources, **kwargs):
+    return cls.create_library(path, 'scala_library', name, sources, **kwargs)
 
   @classmethod
   def java_thrift_library(cls, path, name, *sources):
-    return cls.library(path, 'java_thrift_library', name, sources)
+    return cls.create_library(path, 'java_thrift_library', name, sources)
 
   @classmethod
   def setUpClass(cls):
     super(JarCreateExecuteTest, cls).setUpClass()
+    cls.create_target('build-support/ivy',
+                      dedent('''
+                         repo(name = 'ivy',
+                              url = 'https://art.twitter.biz/',
+                              push_db = 'dummy.pushdb')
+                       '''))
 
     def get_source_root_fs_path(path):
         return os.path.realpath(os.path.join(cls.build_root, path))
@@ -121,11 +90,17 @@ class JarCreateExecuteTest(JarCreateTestBase):
     SourceRoot.register(get_source_root_fs_path('src/scala'), ScalaLibrary)
     SourceRoot.register(get_source_root_fs_path('src/thrift'), JavaThriftLibrary)
 
-    cls.res = cls.resources('src/resources/com/twitter', 'spam', 'r.txt')
+    cls.res = cls.create_resources('src/resources/com/twitter', 'spam', 'r.txt')
     cls.jl = cls.java_library('src/java/com/twitter', 'foo', ['a.java'],
                               resources='src/resources/com/twitter:spam')
     cls.sl = cls.scala_library('src/scala/com/twitter', 'bar', ['c.scala'])
     cls.jtl = cls.java_thrift_library('src/thrift/com/twitter', 'baz', 'd.thrift')
+    cls.java_lib_foo= cls.java_library('src/java/com/twitter/foo', 'java_foo', ['java_foo.java'])
+    cls.scala_lib = cls.scala_library('src/scala/com/twitter/foo',
+                                      'scala_foo',
+                                      ['scala_foo.scala'],
+                                      provides=True,
+                                      java_sources=['src/java/com/twitter/foo:java_foo'])
 
   def setUp(self):
     super(JarCreateExecuteTest, self).setUp()
@@ -139,7 +114,7 @@ class JarCreateExecuteTest(JarCreateTestBase):
     opts = dict(jar_create_outdir=self.jar_outdir)
     opts.update(**options)
     return create_context(config=config, options=self.create_options(**opts),
-                          target_roots=[self.jl, self.sl, self.jtl])
+                          target_roots=[self.jl, self.sl, self.jtl, self.scala_lib])
 
   @contextmanager
   def add_products(self, context, product_type, target, *products):
@@ -181,13 +156,17 @@ class JarCreateExecuteTest(JarCreateTestBase):
     with self.add_data(context, 'classes_by_target', self.jl, 'a.class', 'b.class'):
       with self.add_data(context, 'classes_by_target', self.sl, 'c.class'):
         with self.add_data(context, 'resources_by_target', self.res, 'r.txt.transformed'):
-          JarCreate(context).execute(context.targets())
-          if empty:
-            self.assertTrue(context.products.get('jars').empty())
-          else:
-            self.assert_jar_contents(context, 'jars', self.jl,
-                                     'a.class', 'b.class', 'r.txt.transformed')
-            self.assert_jar_contents(context, 'jars', self.sl, 'c.class')
+          with self.add_data(context, 'classes_by_target', self.scala_lib, 'scala_foo.class',
+                             'java_foo.class'):
+            JarCreate(context).execute(context.targets())
+            if empty:
+              self.assertTrue(context.products.get('jars').empty())
+            else:
+              self.assert_jar_contents(context, 'jars', self.jl,
+                                      'a.class', 'b.class', 'r.txt.transformed')
+              self.assert_jar_contents(context, 'jars', self.sl, 'c.class')
+              self.assert_jar_contents(context, 'jars', self.scala_lib, 'scala_foo.class',
+                                       'java_foo.class')
 
   def test_classfile_jar_required(self):
     context = self.context()

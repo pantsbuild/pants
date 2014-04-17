@@ -14,6 +14,7 @@ from pants.targets.internal import InternalTarget
 from pants.targets.jar_dependency import JarDependency
 from pants.targets.jar_library import JarLibrary
 from pants.targets.jvm_target import JvmTarget
+from pants.targets.scala_library import ScalaLibrary
 from pants.tasks import Task, TaskError
 
 
@@ -57,6 +58,11 @@ class JvmDependencyAnalyzer(object):
           for jardep in target.dependencies:
             if isinstance(jardep, JarDependency):
               jarlibs_by_id[(jardep.org, jardep.name)].add(target)
+        # TODO(Tejal Desai): pantsbuild/pants/65: Remove java_sources attribute for ScalaLibrary
+        if isinstance(target, ScalaLibrary):
+          for java_source in target.java_sources:
+            for src in java_source.sources_relative_to_buildroot():
+              targets_by_file[os.path.join(buildroot, src)].add(java_source)
 
     # Compute class -> target.
     with self._context.new_workunit(name='map_classes'):

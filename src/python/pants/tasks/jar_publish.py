@@ -27,6 +27,7 @@ from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy import Ivy
 from pants.targets.internal import InternalTarget
 from pants.targets.resources import Resources
+from pants.targets.scala_library import ScalaLibrary
 from pants.tasks import Task, TaskError
 from pants.tasks.scm_publish import ScmPublish, Semver
 
@@ -360,7 +361,7 @@ class JarPublish(ScmPublish, Task):
       local_repo = dict(
         resolver='publish_local',
         path=os.path.abspath(os.path.expanduser(context.options.jar_publish_local)),
-        confs=['*'],
+        confs=['default'],
         auth=None
       )
       self.repos = defaultdict(lambda: local_repo)
@@ -369,7 +370,8 @@ class JarPublish(ScmPublish, Task):
     else:
       self.repos = context.config.getdict(JarPublish._CONFIG_SECTION, 'repos')
       if not self.repos:
-        raise TaskError("This repo is not yet set for publishing to the world! Please re-run with --publish-local")
+        raise TaskError("This repo is not yet set for publishing to the world!"
+                        "Please re-run with --publish-local")
       for repo, data in self.repos.items():
         auth = data.get('auth')
         if auth:
@@ -569,7 +571,12 @@ class JarPublish(ScmPublish, Task):
 
         pushdb.set_version(target, newver, head_sha, newfingerprint)
 
-        ivyxml = stage_artifacts(target, jar, newver.version(), changelog, confs=repo['confs'])
+        confs = set(repo['confs'])
+        if self.context.options.jar_create_sources:
+          confs.add('sources')
+        if self.context.options.jar_create_javadoc:
+          confs.add('docs')
+        ivyxml = stage_artifacts(target, jar, newver.version(), changelog, confs=list(confs))
 
         if self.dryrun:
           print('Skipping publish of %s in test mode.' % jar_coordinate(jar, newver.version()))
@@ -714,7 +721,16 @@ class JarPublish(ScmPublish, Task):
         sha.update(source)
         sha.update(fd.read())
 
-    # TODO(John Sirois): handle resources and circular dep scala_library java_sources
+    # TODO(Tejal Desai): pantsbuild/pants/65: Remove java_sources attribute for ScalaLibrary
+    if isinstance(target, ScalaLibrary):
+      for java_source in sorted(target.java_sources):
+        for source in sorted(java_source.sources):
+          path = os.path.join(java_source.target_base, source)
+          with open(path) as fd:
+            sha.update(source)
+            sha.update(fd.read())
+
+    # TODO(John Sirois): handle resources
 
     for jarsig in sorted([jar_coordinate(j) for j in target.jar_dependencies if j.rev]):
       sha.update(jarsig)

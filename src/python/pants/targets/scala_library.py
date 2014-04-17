@@ -73,9 +73,22 @@ class ScalaLibrary(ExportableJvmLibrary, WithResources):
     self._raw_java_sources = util.resolve(java_sources)
 
     self.add_labels('scala')
+    # Defer resolves until done parsing the current BUILD file, certain source_root arrangements
+    # might allow java and scala sources to co-mingle and so have targets in the same BUILD.
+    self._post_construct(self._link_java_cycles)
 
   @property
   def java_sources(self):
+    return self._java_sources
+
+  def resolve(self):
+    # TODO(John Sirois): Clean this up when BUILD parse refactoring is tackled.
+    unused_resolved_java_sources = self.java_sources
+
+    for resolved in super(ScalaLibrary, self).resolve():
+      yield resolved
+
+  def _link_java_cycles(self):
     if self._raw_java_sources is not None:
       self._java_sources = list(Target.resolve_all(maybe_list(self._raw_java_sources, Target),
                                                    JavaLibrary))
@@ -87,12 +100,10 @@ class ScalaLibrary(ExportableJvmLibrary, WithResources):
       # case to force scala compilation to precede java - since scalac supports generating java
       # stubs for these cycles and javac does not this is both necessary and always correct.
       for java_target in self._java_sources:
+        # If this scala library provides an artifact, Fail if the java target also.
+        if self.provides and java_target.provides:
+          raise TargetDefinitionException(self,
+                                          "Associated Java Target %s also provides an artifact"
+                                          % java_target)
+        self.update_dependencies(java_target.dependencies)
         java_target.update_dependencies([self])
-    return self._java_sources
-
-  def resolve(self):
-    # TODO(John Sirois): Clean this up when BUILD parse refactoring is tackled.
-    unused_resolved_java_sources = self.java_sources
-
-    for resolved in super(ScalaLibrary, self).resolve():
-      yield resolved

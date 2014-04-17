@@ -15,6 +15,7 @@ from pants.base.build_environment import get_buildroot
 from pants.fs.fs import safe_filename
 from pants.java.jar import Manifest, open_jar
 from pants.targets.jvm_binary import JvmBinary
+from pants.targets.scala_library import ScalaLibrary
 from pants.tasks import Task, TaskError
 from pants.tasks.javadoc_gen import javadoc
 from pants.tasks.scaladoc_gen import scaladoc
@@ -127,6 +128,10 @@ class JarCreate(Task):
     def add_genjar(typename, target, name):
       self.context.products.get(typename).add(target, self._output_dir).append(name)
 
+    # TODO(Tejal Desai) pantsbuild/pants/65: Avoid creating 2 jars with java sources for
+    # scala_library with java_sources. Currently publish fails fast if scala_library owning
+    # java sources pointed by java_library target also provides an artifact. However, jar_create
+    # ends up creating 2 jars one scala and other java both including the java_sources.
     if self.jar_classes:
       self._jar(jar_targets(is_jvm_library), functools.partial(add_genjar, 'jars'))
 
@@ -188,6 +193,13 @@ class JarCreate(Task):
       with self.create_jar(target, jar_path) as jar:
         for source in target.sources:
           jar.write(os.path.join(get_buildroot(), target.target_base, source), source)
+
+        # TODO(Tejal Desai): pantsbuild/pants/65 Remove java_sources attribute for ScalaLibrary
+        if isinstance(target, ScalaLibrary):
+          for java_source in target.java_sources:
+            for source in java_source.sources:
+              jar.write(os.path.join(get_buildroot(), java_source.target_base, source),
+                        source)
 
         if target.has_resources:
           for resources in target.resources:
