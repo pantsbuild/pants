@@ -13,6 +13,7 @@ import ast
 from twitter.common.collections import OrderedSet
 from twitter.common.dirutil import safe_rmtree
 from twitter.common.dirutil.chroot import Chroot
+from twitter.common.python.compatibility import string, to_bytes
 from twitter.common.python.installer import InstallerBase, Packager
 
 from pants.base.address import Address
@@ -332,8 +333,39 @@ class SetupPy(Command):
       setup_keywords['entry_points']['console_scripts'].append(
           '%s = %s' % (binary_name, entry_point))
 
+    # From http://stackoverflow.com/a/13105359
+    def convert(input):
+      if isinstance(input, dict):
+        out = dict()
+        for key, value in input.items():
+          out[convert(key)] = convert(value)
+        return out
+      elif isinstance(input, list):
+        return [convert(element) for element in input]
+      elif isinstance(input, string):
+        return to_bytes(input)
+      else:
+        return input
+
+    # Distutils does not support unicode strings in setup.py, so we must
+    # explicitly convert to binary strings as pants uses unicode_literals.
+    # Ideally we would write the output stream with an encoding, however,
+    # pprint.pformat embeds u's in the string itself during conversion.
+    # For that reason we convert each unicode string independently.
+    #
+    # hoth:~ travis$ python
+    # Python 2.6.8 (unknown, Aug 25 2013, 00:04:29)
+    # [GCC 4.2.1 Compatible Apple LLVM 5.0 (clang-500.0.68)] on darwin
+    # Type "help", "copyright", "credits" or "license" for more information.
+    # >>> import pprint
+    # >>> data = {u'entry_points': {u'console_scripts': [u'pants = pants.bin.pants_exe:main']}}
+    # >>> pprint.pformat(data, indent=4)
+    # "{   u'entry_points': {   u'console_scripts': [   u'pants = pants.bin.pants_exe:main']}}"
+    # >>>
+    #
+    # For more information, see http://bugs.python.org/issue13943
     chroot.write(SETUP_BOILERPLATE % {
-      'setup_dict': pprint.pformat(setup_keywords, indent=4),
+      'setup_dict': pprint.pformat(convert(setup_keywords), indent=4),
       'setup_target': repr(root_target)
     }, 'setup.py')
 
