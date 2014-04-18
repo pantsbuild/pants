@@ -73,6 +73,7 @@ class ScalaLibrary(ExportableJvmLibrary, WithResources):
     self._raw_java_sources = util.resolve(java_sources)
 
     self.add_labels('scala')
+
     # Defer resolves until done parsing the current BUILD file, certain source_root arrangements
     # might allow java and scala sources to co-mingle and so have targets in the same BUILD.
     self._post_construct(self._link_java_cycles)
@@ -105,5 +106,5 @@ class ScalaLibrary(ExportableJvmLibrary, WithResources):
           raise TargetDefinitionException(self,
                                           "Associated Java Target %s also provides an artifact"
                                           % java_target)
-        self.update_dependencies(java_target.dependencies)
+        self.update_dependencies(dep for dep in java_target.dependencies if dep != self)
         java_target.update_dependencies([self])
