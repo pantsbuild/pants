@@ -13,6 +13,7 @@ python_test_suite(
     pants(':pants_target'),
     pants(':python_binary'),
     pants(':python_target'),
+    pants(':scala_library'),
     pants(':target'),
     pants(':util'),
   ]
@@ -98,6 +99,16 @@ python_tests(
     pants('src/python/pants/base:parse_context'),
     pants('src/python/pants/base:target'),
     pants('src/python/pants/targets:python'),
+  ]
+)
+
+python_tests(
+  name = 'scala_library',
+  sources = ['test_scala_library.py'],
+  dependencies = [
+    pants('src/python/pants/targets:java'),
+    pants('src/python/pants/targets:scala'),
+    pants('tests/python/pants_test:base-test'),
   ]
 )
 
