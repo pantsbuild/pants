@@ -76,7 +76,9 @@ class JvmRun(JvmTask):
     # Run the first target that is a binary.
     binaries = filter(is_binary, targets)
     if len(binaries) > 0:  # We only run the first one.
-      main = binaries[0].main or self.main or raise TaskError('main not specified')
+      main = binaries[0].main or self.main
+      if not main:
+        raise TaskError('main not specified')
       egroups = self.context.products.get_data('exclusives_groups')
       group_key = egroups.get_group_key_for_target(binaries[0])
       group_classpath = egroups.get_classpath_for_group(group_key)
