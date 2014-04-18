@@ -577,8 +577,6 @@ class RunServer(ConsoleTask):
       s = reporting_queue.get()
     # The child process is done reporting, and is now in the server loop, so we can proceed.
     server_port = ReportingServerManager.get_current_server_port()
-    if server_port:
-      binary_util.ui_open('http://localhost:%d/run/latest' % server_port)
     return ret
 
 goal(
