@@ -6,8 +6,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from textwrap import dedent
 
-from twitter.common.collections import OrderedSet
-
 from pants_test.base_build_root_test import BaseBuildRootTest
 
 
@@ -60,7 +58,7 @@ class ScalaLibraryTest(BaseBuildRootTest):
     cls.java_library_no_dep = cls.target('java:no_scala_dep')
 
   def test_mixed_linkage(self):
-    self.assertEqual(OrderedSet(self.lib_hub_and_spoke.resolve()), self.scala_library.dependencies,
+    self.assertEqual(set(self.lib_hub_and_spoke.resolve()), set(self.scala_library.dependencies),
                      'The scala end of a mixed language logical lib should be linked with the java'
                      'code deps excluding itself.')
 
@@ -70,7 +68,7 @@ class ScalaLibraryTest(BaseBuildRootTest):
                      'The java end of a mixed language logical lib with an explicit dep should be '
                      'unaffected by linking.')
 
-    self.assertEqual(OrderedSet([self.scala_library]), self.java_library_no_dep.dependencies,
+    self.assertEqual(set([self.scala_library]), set(self.java_library_no_dep.dependencies),
                      'The java end of a mixed language logical lib with an no explicit dep should '
                      'be linked to scala.')
 
