@@ -13,7 +13,7 @@ elementtree==1.2.7_20070827_preview
 Markdown==2.1.1
 mock==1.0.1
 mox==0.5.3
-psutil==1.1.2
+psutil==1.1.3
 Pygments==1.4
 pystache==0.5.3
 pytest==2.5.2
