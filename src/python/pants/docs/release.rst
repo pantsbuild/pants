@@ -28,7 +28,7 @@ At this time version numbers are checked-into BUILD files. Send a review
 updating version numbers for the libraries you will be publishing. You can
 generate a list of libraries requiring publishing with: ::
 
-   $ ./pants.bootstrap goal dependencies \
+   $ ./pants goal dependencies \
        src/python/pants:_pants_transitional_publishable_library_ | sort -u | grep -v =
    src/python/twitter/common/collections/BUILD:collections
    src/python/twitter/common/config/BUILD:config
@@ -37,7 +37,7 @@ generate a list of libraries requiring publishing with: ::
 
 After updating the checked-in version numbers, publish locally and verify the release. ::
 
-   PANTS_DEV=1 ./pants.bootstrap setup_py --recursive src/python/pants:pants-packaged
+   PANTS_DEV=1 ./pants setup_py --recursive src/python/pants:pants-packaged
    VENV_DIR=$(mktemp -d -t pants.XXXXX)
    virtualenv $VENV_DIR
    source $VENV_DIR/bin/activate
@@ -48,7 +48,7 @@ After updating the checked-in version numbers, publish locally and verify the re
 
 Now that we've smoke-tested this release, publish to PyPi. ::
 
-   PANTS_DEV=1 ./pants.bootstrap setup_py --recursive --run='sdist upload' \
+   PANTS_DEV=1 ./pants setup_py --recursive --run='sdist upload' \
      src/python/pants:pants-packaged
 
 Check PyPi to ensure everything looks good. Finally, announce the release to

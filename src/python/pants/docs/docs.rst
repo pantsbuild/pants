@@ -27,7 +27,6 @@ The following commands must be run from the pants repo root.
   # which are required when Sphinx inspects pants sources.
   cd /path/to/pants/repo
   rm pants.pex
-  ./pants.bootstrap
   # Build the BUILD dictionary data.
   ./pants goal builddict # (or ./pants py src/python/pants goal builddict to try out local tweaks)
 
