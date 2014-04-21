@@ -58,7 +58,10 @@ function activate_pants_bare() {
     create_venv
     activate_venv
     for req in ${REQUIREMENTS[@]}; do
-      pip install -r "$req" || die "Failed to install requirements from ${req}."
+      # Install as an egg so IDEs can grok all deps. Installing as sources may
+      # run afoul of this bug: http://youtrack.jetbrains.com/issue/PY-6477. 
+      # TODO: Remove the --egg once this is resolved. It won't work in the wheel world anyway.
+      pip install --egg -r "${req}" || die "Failed to install requirements from ${req}."
     done
     touch "${BOOTSTRAPPED_FILE}"
   else
