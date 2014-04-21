@@ -25,17 +25,6 @@ python_library(
 )
 
 python_library(
-  name = 'args_resource_mapper',
-  sources = ['args_resource_mapper.py'],
-  dependencies = [
-    pants(':common'),
-    pants('src/python/pants/java:jar'),
-    pants('src/python/pants/targets:java'),
-    pants('src/python/pants/targets:scala'),
-  ],
-)
-
-python_library(
   name = 'benchmark_run',
   sources = ['benchmark_run.py'],
   dependencies = [
