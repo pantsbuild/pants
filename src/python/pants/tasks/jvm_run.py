@@ -7,6 +7,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import shlex
 
 from twitter.common.dirutil import safe_open
+from twitter.common.lang import Compatibility
 
 from pants.base.workunit import WorkUnit
 from pants.java.executor import CommandLineGrabber
@@ -37,6 +38,9 @@ class JvmRun(JvmTask):
       action='store', default=None,
       help = '[%default] Instead of running, just write the cmd line to this file')
 
+    option_group.add_option(mkflag('main'), dest='run_main',
+      help='Run binary specified by this fully qualified name.')
+
   def __init__(self, context):
     Task.__init__(self, context)
     self.jvm_args = context.config.getlist('jvm-run', 'jvm_args', default=[])
@@ -52,6 +56,9 @@ class JvmRun(JvmTask):
     self.confs = context.config.getlist('jvm-run', 'confs', default=['default'])
     self.only_write_cmd_line = context.options.only_write_cmd_line
     context.products.require_data('exclusives_groups')
+    self.main = context.options.run_main
+    if self.main and not isinstance(self.main, Compatibility.string):
+      raise TargetDefinitionException(self, 'main must be a fully qualified classname')
 
   def execute(self, targets):
     # The called binary may block for a while, allow concurrent pants activity during this pants
@@ -69,7 +76,9 @@ class JvmRun(JvmTask):
     # Run the first target that is a binary.
     binaries = filter(is_binary, targets)
     if len(binaries) > 0:  # We only run the first one.
-      main = binaries[0].main
+      main = binaries[0].main or self.main
+      if not main:
+        raise TaskError('main not specified')
       egroups = self.context.products.get_data('exclusives_groups')
       group_key = egroups.get_group_key_for_target(binaries[0])
       group_classpath = egroups.get_classpath_for_group(group_key)
