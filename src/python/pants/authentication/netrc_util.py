@@ -39,6 +39,6 @@ class Netrc(object):
             self._login[host] = login
             self._password[host] = password
         if len(self._login) == 0:
-          raise TaskError('Found no usable authentication blocks for twitter in ~/.netrc')
+          raise TaskError('Found no usable authentication blocks in ~/.netrc')
       except NetrcParseError as e:
         raise TaskError('Problem parsing ~/.netrc: %s' % e)

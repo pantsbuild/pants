@@ -6,13 +6,7 @@ A library owner/maintainer can *publish* versioned artifacts that
 folks elsewhere can fetch and import. In the JVM world, these are jars
 (with poms)
 on a server that Maven (or Ivy) looks for. (In the Python world, these are
-eggs; but as of late 2013, Pants doesn't help publish these.)
-
-.. WARNING::
-   This page describes ``pants goal publish``. Alas, this goal is not, in fact,
-   built into Pants *yet*. If you work in an organization with a Pants guru,
-   you might have a ``publish`` goal. Otherwise, please consider this a sneak
-   preview of an upcoming feature.
+eggs; but as of early 2014, Pants doesn't help publish these.)
 
 This page talks about publishing artifacts. We assume you already know enough
 about Pants to *build* the library that underlies an artifact.
@@ -142,6 +136,59 @@ all publishing to happen on this source control branch, which you maintain
 extra-carefully. You can
 :ref:`configure your repo <setup_publish_restrict_branch>`
 so the ``publish`` goal only allows ``publish``-ing from this special branch.
+
+*****************************************
+Authenticating to the Artifact Repository
+*****************************************
+
+Your artifact repository probably doesn't accept anonymous uploads; you probably
+need to authenticate (prove that you are really you). Depending on how
+the artifact repository set up, Pants might need to interact the authentication
+system. (Or it might not. E.g., if your system uses Kerberos, when Pants invokes
+artifact-upload commands, Kerberos tickets should work automatically.)
+
+If Pants needs to provide your username and password, you can enable this
+via Pants' ``.netrc`` support. Pants can parse
+`.netrc files
+<http://www.gnu.org/software/inetutils/manual/html_node/The-_002enetrc-File.html>`_
+to get a user's username and password on an artifact repository machine.
+To make this work:
+
+* Each user needs a ``~/.netrc`` file with a section that looks like ::
+
+    machine our-artifacts.archimedes.org
+      login sandy
+      password myamazingpa$sword
+
+* One of your top-level ``BUILD`` files needs a target that represents
+  ``netrc`` auth::
+
+    from pants.authentication.netrc import Netrc
+    netrc = Netrc()
+
+    credentials(
+      name = 'netrc',
+      username=netrc.getusername,
+      password=netrc.getpassword)
+
+* Your ``pants.ini`` file's ``'auth'`` section for that repository should
+  refer to that target::
+
+    [jar-publish]
+    workdir: %(pants_workdir)s/publish
+    repos: {
+        'external': {
+          'resolver': 'art.archimedes.org',
+          'confs': ['default', 'sources', 'docs', 'changelog'],
+          'auth': 'BUILD.archimedes:netrc',
+          'help': 'Configure your ~/.netrc for artifact repo access!'
+        },
+    }
+
+If you need to implement some other kind of authentication,
+you might look at `the Netrc implementation
+<https://github.com/pantsbuild/pants/blob/master/src/python/pants/authentication/netrc_util.py>`_
+and the :ref:`bdict_credentials` target type for inspiration.
 
 ***************
 Troubleshooting
