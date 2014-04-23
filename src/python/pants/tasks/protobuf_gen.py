@@ -39,6 +39,7 @@ class ProtobufGen(CodeGen):
     self.protoc_version = self.context.config.get('protobuf-gen', 'version')
     self.output_dir = (context.options.protobuf_gen_create_outdir or
                        context.config.get('protobuf-gen', 'workdir'))
+    self.plugins = self.context.config.getlist('protobuf-gen', 'plugins', default=[])
 
     def resolve_deps(key):
       deps = OrderedSet()
@@ -90,15 +91,23 @@ class ProtobufGen(CodeGen):
     bases, sources = self._calculate_sources(targets)
 
     if lang == 'java':
-      safe_mkdir(self.java_out)
-      gen = '--java_out=%s' % self.java_out
+      output_dir = self.java_out
+      gen_flag = '--java_out'
     elif lang == 'python':
-      safe_mkdir(self.py_out)
-      gen = '--python_out=%s' % self.py_out
+      output_dir = self.py_out
+      gen_flag = '--python_out'
     else:
       raise TaskError('Unrecognized protobuf gen lang: %s' % lang)
 
+    safe_mkdir(output_dir)
+    gen = '%s=%s' % (gen_flag, output_dir)
+
     args = [self.protobuf_binary, gen]
+
+    if self.plugins:
+      for plugin in self.plugins:
+        # TODO(Eric Ayers) Is it a good assumption that the generated source output dir is acceptable for all plugins?
+        args.append("--%s_protobuf_out=%s" % (plugin, output_dir))
 
     for base in bases:
       args.append('--proto_path=%s' % base)
