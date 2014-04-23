@@ -33,12 +33,12 @@ def execute_java(classpath, main, jvm_options=None, args=None, executor=None,
     raise ValueError('The executor argument must be a java Executor instance, give %s of type %s'
                      % (executor, type(executor)))
 
-  with executor.runner(classpath, main, args=args, jvm_options=jvm_options) as runner:
-    workunit_name = workunit_name or main
-    return execute_runner(runner,
-                          workunit_factory=workunit_factory,
-                          workunit_name=workunit_name,
-                          workunit_labels=workunit_labels)
+  runner = executor.runner(classpath, main, args=args, jvm_options=jvm_options)
+  workunit_name = workunit_name or main
+  return execute_runner(runner,
+                        workunit_factory=workunit_factory,
+                        workunit_name=workunit_name,
+                        workunit_labels=workunit_labels)
 
 
 def execute_runner(runner, workunit_factory=None, workunit_name=None, workunit_labels=None):

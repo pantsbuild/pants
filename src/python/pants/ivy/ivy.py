@@ -1,10 +1,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
-
-from contextlib import contextmanager
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
 
 from twitter.common.collections import maybe_list
 from twitter.common.lang import Compatibility
@@ -57,16 +55,15 @@ class Ivy(object):
 
     Raises Ivy.Error if the command fails for any reason.
     """
-    with self.runner(jvm_options=jvm_options, args=args, executor=executor) as runner:
-      try:
-        result = util.execute_runner(runner, workunit_factory, workunit_name, workunit_labels)
-        if result != 0:
-          raise self.Error('Ivy command failed with exit code %d%s'
-                          % (result, ': ' + ' '.join(args) if args else ''))
-      except self._java.Error as e:
-        raise self.Error('Problem executing ivy: %s' % e)
+    runner = self.runner(jvm_options=jvm_options, args=args, executor=executor)
+    try:
+      result = util.execute_runner(runner, workunit_factory, workunit_name, workunit_labels)
+      if result != 0:
+        raise self.Error('Ivy command failed with exit code %d%s'
+                         % (result, ': ' + ' '.join(args) if args else ''))
+    except self._java.Error as e:
+      raise self.Error('Problem executing ivy: %s' % e)
 
-  @contextmanager
   def runner(self, jvm_options=None, args=None, executor=None):
     """Creates an ivy commandline client runner for the given args."""
     args = args or []
@@ -85,6 +82,5 @@ class Ivy(object):
     if self._ivy_settings and '-settings' not in args:
       args = ['-settings', self._ivy_settings] + args
 
-    with executor.runner(classpath=self._classpath, main='org.apache.ivy.Main',
-                         jvm_options=jvm_options, args=args) as runner:
-      yield runner
+    return executor.runner(classpath=self._classpath, main='org.apache.ivy.Main',
+                           jvm_options=jvm_options, args=args)

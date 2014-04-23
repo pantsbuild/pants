@@ -1,8 +1,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
 
 import os
 import subprocess
@@ -11,11 +11,10 @@ from contextlib import contextmanager
 
 from twitter.common import log
 from twitter.common.collections import maybe_list
-from twitter.common.contextutil import environment_as, temporary_file_path
+from twitter.common.contextutil import environment_as
 from twitter.common.lang import AbstractClass, Compatibility
 
 from pants.java.distribution import Distribution
-from pants.java.jar import Manifest, open_jar
 
 
 class Executor(AbstractClass):
@@ -70,11 +69,9 @@ class Executor(AbstractClass):
 
     self._distribution = distribution
 
-  @contextmanager
   def runner(self, classpath, main, jvm_options=None, args=None):
     """Returns an `Executor.Runner` for the given java command."""
-    with self._get_minimized_jar_classpath(classpath) as minimized_classpath:
-      yield self._runner(*self._scrub_args(minimized_classpath, main, jvm_options, args))
+    return self._runner(*self._scrub_args(classpath, main, jvm_options, args))
 
   def execute(self, classpath, main, jvm_options=None, args=None, stdout=None, stderr=None):
     """Launches the java program defined by the classpath and main.
@@ -101,39 +98,9 @@ class Executor(AbstractClass):
     cmd.extend(args)
     return cmd
 
-  @staticmethod
-  @contextmanager
-  def _get_minimized_jar_classpath(classpath):
-    """
-    Classpaths need to be minimized since pants can pass too many command line arguments to java if
-    the classpath is too large. This function alleviates this problem by placing all of the jars in
-    the classpath into one single JAR.
-    """
-
-    jar_classpath = []
-    non_jar_classpath = []
-    for path in classpath:
-      if path.endswith('.jar'):
-        jar_classpath.append(path)
-      else:
-        non_jar_classpath.append(path)
-
-    manifest = Manifest()
-    manifest.addentry(Manifest.CLASS_PATH, ' '.join(jar_classpath))
-    manifest.addentry(Manifest.CREATED_BY, 'Pants_JAR_Minimizer')
-    manifest.addentry(Manifest.MANIFEST_VERSION, '1.0')
-
-    # The minimized classpath is only valid while the temporary jar it references exists
-    with temporary_file_path() as classpath_jar_filepath:
-      with open_jar(classpath_jar_filepath, 'w') as classpath_jar:
-        classpath_jar.writestr(Manifest.PATH, manifest.contents())
-      minimized_classpath = [classpath_jar_filepath] + non_jar_classpath
-      yield minimized_classpath
-
 
 class CommandLineGrabber(Executor):
   """Doesn't actually execute anything, just captures the cmd line."""
-
   def __init__(self, distribution=None):
     super(CommandLineGrabber, self).__init__(distribution=distribution)
     self._command = None  # Initialized when we run something.
