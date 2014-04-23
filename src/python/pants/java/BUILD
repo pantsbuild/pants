@@ -18,7 +18,6 @@ python_library(
   sources = ['executor.py'],
   dependencies = [
     pants(':distribution'),
-    pants(':jar'),
     pants('3rdparty/python/twitter/commons:twitter.common.collections'),
     pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.lang'),
