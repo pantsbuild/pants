@@ -16,11 +16,11 @@ from pants.tasks.jvm_task import JvmTask
 class SpecsRun(JvmTask):
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
-    option_group.add_option(mkflag('skip'), mkflag('skip', negate=True), dest = 'specs_run_skip',
+    option_group.add_option(mkflag('skip'), mkflag('skip', negate=True), dest='specs_run_skip',
                             action='callback', callback=mkflag.set_bool, default=False,
                             help='[%default] Skip running specs')
 
-    option_group.add_option(mkflag('debug'), mkflag('debug', negate=True), dest = 'specs_run_debug',
+    option_group.add_option(mkflag('debug'), mkflag('debug', negate=True), dest='specs_run_debug',
                             action='callback', callback=mkflag.set_bool, default=False,
                             help='[%default] Run specs with a debugger')
 
@@ -43,7 +43,7 @@ class SpecsRun(JvmTask):
     self._specs_bootstrap_key = 'specs'
     bootstrap_tools = context.config.getlist('specs-run', 'bootstrap-tools',
                                              default=[':scala-specs-2.9.3'])
-    self._jvm_tool_bootstrapper.register_jvm_tool(self._specs_bootstrap_key, bootstrap_tools)
+    self.register_jvm_tool(self._specs_bootstrap_key, bootstrap_tools)
 
     self.confs = context.config.getlist('specs-run', 'confs', default=['default'])
 
@@ -67,8 +67,7 @@ class SpecsRun(JvmTask):
         args.append('--specs=%s' % ','.join(tests))
         specs_runner_main = 'com.twitter.common.testing.ExplicitSpecsRunnerMain'
 
-        bootstrapped_cp = self._jvm_tool_bootstrapper.get_jvm_tool_classpath(
-            self._specs_bootstrap_key)
+        bootstrapped_cp = self.tool_classpath(self._specs_bootstrap_key)
         classpath = self.classpath(
             bootstrapped_cp,
             confs=self.confs,

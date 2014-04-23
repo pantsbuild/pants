@@ -87,7 +87,7 @@ class Scalastyle(NailgunTask):
 
     if scala_sources:
       def call(srcs):
-        cp = self._jvm_tool_bootstrapper.get_jvm_tool_classpath(self._scalastyle_bootstrap_key)
+        cp = self.tool_classpath(self._scalastyle_bootstrap_key)
         return self.runjava(classpath=cp,
                             main=Scalastyle._MAIN,
                             args=['-c', self._scalastyle_config] + srcs)

@@ -34,7 +34,7 @@ class AntlrGen(CodeGen, NailgunTask):
     active_compilers = set(map(lambda t: t.compiler, context.targets(predicate=self.is_gentarget)))
     for compiler, tools in self._all_possible_antlr_bootstrap_tools():
       if compiler in active_compilers:
-        self._jvm_tool_bootstrapper.register_jvm_tool(compiler, tools)
+        self.register_jvm_tool(compiler, tools)
 
   def is_gentarget(self, target):
     return isinstance(target, JavaAntlrLibrary)
@@ -48,7 +48,7 @@ class AntlrGen(CodeGen, NailgunTask):
   def prepare_gen(self, targets):
     compilers = set(map(lambda t: t.compiler, targets))
     for compiler in compilers:
-      classpath = self._jvm_tool_bootstrapper.get_jvm_tool_classpath(compiler)
+      classpath = self.tool_classpath(compiler)
       self._classpath_by_compiler[compiler] = classpath
 
   def genlang(self, lang, targets):
@@ -127,7 +127,7 @@ class AntlrGen(CodeGen, NailgunTask):
 
     deps = OrderedSet()
     for dep in self.context.config.getlist(key, 'javadeps'):
-        deps.update(self.context.resolve(dep))
+      deps.update(self.context.resolve(dep))
     return deps
 
   def _all_possible_antlr_bootstrap_tools(self):

@@ -18,10 +18,11 @@ from pants.base.build_environment import get_buildroot
 from pants.base.hash_utils import hash_file
 from pants.base.workunit import WorkUnit
 from pants.tasks import TaskError
-
+from pants.tasks.jvm_tool_bootstrapper import JvmToolBootstrapper
 
 # Well known metadata file required to register scalac plugins with nsc.
 _PLUGIN_INFO_FILE = 'scalac-plugin.xml'
+
 
 class ZincUtils(object):
   """Convenient wrapper around zinc invocations.
@@ -30,30 +31,34 @@ class ZincUtils(object):
   """
   _ZINC_MAIN = 'com.typesafe.zinc.Main'
 
-  def __init__(self, context, nailgun_task, jvm_options, color, jvm_tool_bootstrapper):
+  def __init__(self, context, nailgun_task, jvm_options, color):
     self.context = context
     self._nailgun_task = nailgun_task  # We run zinc on this task's behalf.
     self._jvm_options = jvm_options
     self._color = color
-    self._jvm_tool_bootstrapper = jvm_tool_bootstrapper
+    self._jvm_tool_bootstrapper = JvmToolBootstrapper(self.context.products)
 
     # The target scala version.
     self._compile_bootstrap_key = 'scalac'
     compile_bootstrap_tools = context.config.getlist('scala-compile', 'compile-bootstrap-tools',
                                                      default=[':scala-compile-2.9.3'])
-    self._jvm_tool_bootstrapper.register_jvm_tool(self._compile_bootstrap_key, compile_bootstrap_tools)
+    self._jvm_tool_bootstrapper.register_jvm_tool(self._compile_bootstrap_key,
+                                                  compile_bootstrap_tools)
 
     # The zinc version (and the scala version it needs, which may differ from the target version).
     self._zinc_bootstrap_key = 'zinc'
-    zinc_bootstrap_tools = context.config.getlist('scala-compile', 'zinc-bootstrap-tools', default=[':zinc'])
+    zinc_bootstrap_tools = context.config.getlist('scala-compile', 'zinc-bootstrap-tools',
+                                                  default=[':zinc'])
     self._jvm_tool_bootstrapper.register_jvm_tool(self._zinc_bootstrap_key, zinc_bootstrap_tools)
 
     # Compiler plugins.
-    plugins_bootstrap_tools = context.config.getlist('scala-compile', 'scalac-plugin-bootstrap-tools',
+    plugins_bootstrap_tools = context.config.getlist('scala-compile',
+                                                     'scalac-plugin-bootstrap-tools',
                                                      default=[])
     if plugins_bootstrap_tools:
       self._plugins_bootstrap_key = 'plugins'
-      self._jvm_tool_bootstrapper.register_jvm_tool(self._plugins_bootstrap_key, plugins_bootstrap_tools)
+      self._jvm_tool_bootstrapper.register_jvm_tool(self._plugins_bootstrap_key,
+                                                    plugins_bootstrap_tools)
     else:
       self._plugins_bootstrap_key = None
 
@@ -153,7 +158,7 @@ class ZincUtils(object):
 
   # These are the names of the various jars zinc needs. They are, conveniently and
   # non-coincidentally, the names of the flags used to pass the jar locations to zinc.
-  zinc_jar_names = ['compiler-interface', 'sbt-interface' ]
+  ZINC_JAR_NAMES = ['compiler-interface', 'sbt-interface']
 
   @staticmethod
   def identify_zinc_jars(zinc_classpath):
@@ -162,7 +167,7 @@ class ZincUtils(object):
     TODO: Make these mappings explicit instead of deriving them by jar name heuristics.
     """
     ret = OrderedDict()
-    ret.update(ZincUtils.identify_jars(ZincUtils.zinc_jar_names, zinc_classpath))
+    ret.update(ZincUtils.identify_jars(ZincUtils.ZINC_JAR_NAMES, zinc_classpath))
     return ret
 
   @staticmethod
@@ -213,4 +218,8 @@ class ZincUtils(object):
     return plugins
 
   def log_zinc_file(self, analysis_file):
-    self.context.log.debug('Calling zinc on: %s (%s)' % (analysis_file, hash_file(analysis_file).upper() if os.path.exists(analysis_file) else 'nonexistent'))
+    self.context.log.debug('Calling zinc on: %s (%s)' %
+                           (analysis_file,
+                            hash_file(analysis_file).upper()
+                            if os.path.exists(analysis_file)
+                            else 'nonexistent'))

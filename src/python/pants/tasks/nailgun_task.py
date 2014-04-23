@@ -49,7 +49,7 @@ class NailgunTask(Task):
         self.__class__.__name__)
 
     self._nailgun_bootstrap_key = 'nailgun'
-    self._jvm_tool_bootstrapper.register_jvm_tool(self._nailgun_bootstrap_key, [':nailgun-server'])
+    self.register_jvm_tool(self._nailgun_bootstrap_key, [':nailgun-server'])
 
     start = time.time()
     try:
@@ -66,7 +66,7 @@ class NailgunTask(Task):
     """
     if self.context.options.nailgun_daemon:
       classpath = os.pathsep.join(
-        self._jvm_tool_bootstrapper.get_jvm_tool_classpath(self._nailgun_bootstrap_key))
+        self.tool_classpath(self._nailgun_bootstrap_key))
       client = NailgunExecutor(self._workdir, classpath, distribution=self._dist)
     else:
       client = SubprocessExecutor(self._dist)

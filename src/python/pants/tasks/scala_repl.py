@@ -7,7 +7,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import shlex
 import subprocess
 
-from pants.base.workunit import WorkUnit
 from pants.java.util import execute_java
 from pants.tasks import Task
 from pants.tasks.jvm_task import JvmTask
@@ -16,10 +15,10 @@ from pants.tasks.jvm_task import JvmTask
 class ScalaRepl(JvmTask):
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
-    option_group.add_option(mkflag("jvmargs"), dest = "run_jvmargs", action="append",
-      help = "Run the repl in a jvm with these extra jvm args.")
-    option_group.add_option(mkflag('args'), dest = 'run_args', action='append',
-                            help = 'run the repl in a jvm with extra args.')
+    option_group.add_option(mkflag("jvmargs"), dest="run_jvmargs", action="append",
+                            help="Run the repl in a jvm with these extra jvm args.")
+    option_group.add_option(mkflag('args'), dest='run_args', action='append',
+                            help='run the repl in a jvm with extra args.')
 
   def __init__(self, context):
     Task.__init__(self, context)
@@ -30,7 +29,7 @@ class ScalaRepl(JvmTask):
     self.confs = context.config.getlist('scala-repl', 'confs', default=['default'])
     self._bootstrap_key = 'scala-repl'
     bootstrap_tools = context.config.getlist('scala-repl', 'bootstrap-tools')
-    self._jvm_tool_bootstrapper.register_jvm_tool(self._bootstrap_key, bootstrap_tools)
+    self.register_jvm_tool(self._bootstrap_key, bootstrap_tools)
     self.main = context.config.get('scala-repl', 'main')
     self.args = context.config.getlist('scala-repl', 'args', default=[])
     if context.options.run_args:
@@ -40,7 +39,7 @@ class ScalaRepl(JvmTask):
   def execute(self, targets):
     # The repl session may last a while, allow concurrent pants activity during this pants idle
     # period.
-    tools_classpath = self._jvm_tool_bootstrapper.get_jvm_tool_classpath(self._bootstrap_key)
+    tools_classpath = self.tool_classpath(self._bootstrap_key)
 
     self.context.lock.release()
     self.save_stty_options()

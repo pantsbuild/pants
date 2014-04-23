@@ -114,7 +114,7 @@ class ScroogeGen(NailgunTask):
     for name, compiler in self.compiler_for_name.items():
       bootstrap_tools = context.config.getlist(compiler.config_section, 'bootstrap-tools',
                                                default=[':%s' % compiler.profile])
-      self._jvm_tool_bootstrapper.register_jvm_tool(compiler.name, bootstrap_tools)
+      self.register_jvm_tool(compiler.name, bootstrap_tools)
 
     self.defaults = JavaThriftLibrary.Defaults(context.config)
 
@@ -210,7 +210,7 @@ class ScroogeGen(NailgunTask):
 
         args.extend(changed_srcs)
 
-        classpath = self._jvm_tool_bootstrapper.get_jvm_tool_classpath(compiler.name)
+        classpath = self.tool_classpath(compiler.name)
         returncode = self.runjava(classpath=classpath,
                                   main=compiler.main,
                                   jvm_options=compiler.jvm_args,

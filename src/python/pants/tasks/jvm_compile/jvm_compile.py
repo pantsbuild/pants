@@ -38,14 +38,14 @@ class JvmCompile(NailgunTask):
     NailgunTask.setup_parser(option_group, args, mkflag)
 
     option_group.add_option(mkflag('warnings'), mkflag('warnings', negate=True),
-                            dest=subcls._language+'_compile_warnings',
+                            dest=subcls._language + '_compile_warnings',
                             default=True,
                             action='callback',
                             callback=mkflag.set_bool,
                             help='[%default] Compile with all configured warnings enabled.')
 
     option_group.add_option(mkflag('partition-size-hint'),
-                            dest=subcls._language+'_partition_size_hint',
+                            dest=subcls._language + '_partition_size_hint',
                             action='store',
                             type='int',
                             default=-1,
@@ -54,17 +54,17 @@ class JvmCompile(NailgunTask):
                                  'to 0 to compile target-by-target. Default is set in pants.ini.')
 
     option_group.add_option(mkflag('missing-deps'),
-                            dest=subcls._language+'_missing_deps',
+                            dest=subcls._language + '_missing_deps',
                             choices=['off', 'warn', 'fatal'],
                             default='warn',
                             help='[%default] One of off, warn, fatal. '
-                                 'Check for missing dependencies in ' +  subcls._language + 'code. '
+                                 'Check for missing dependencies in ' + subcls._language + 'code. '
                                  'Reports actual dependencies A -> B where there is no '
                                  'transitive BUILD file dependency path from A to B.'
                                  'If fatal, missing deps are treated as a build error.')
 
     option_group.add_option(mkflag('missing-direct-deps'),
-                            dest=subcls._language+'_missing_direct_deps',
+                            dest=subcls._language + '_missing_direct_deps',
                             choices=['off', 'warn', 'fatal'],
                             default='off',
                             help='[%default] One of off, warn, fatal. '
@@ -79,17 +79,17 @@ class JvmCompile(NailgunTask):
                                  'these.')
 
     option_group.add_option(mkflag('unnecessary-deps'),
-                            dest=subcls._language+'_unnecessary_deps',
+                            dest=subcls._language + '_unnecessary_deps',
                             choices=['off', 'warn', 'fatal'],
                             default='off',
                             help='[%default] One of off, warn, fatal. Check for declared '
-                                 'dependencies in ' +  subcls._language + ' code that are not '
+                                 'dependencies in ' + subcls._language + ' code that are not '
                                  'needed. This is a very strict check. For example, generated code '
                                  'will often legitimately have BUILD dependencies that are unused '
                                  'in practice.')
 
     option_group.add_option(mkflag('delete-scratch'), mkflag('delete-scratch', negate=True),
-                            dest=subcls._language+'_delete_scratch',
+                            dest=subcls._language + '_delete_scratch',
                             default=True,
                             action='callback',
                             callback=mkflag.set_bool,
@@ -98,7 +98,6 @@ class JvmCompile(NailgunTask):
 
   # Subclasses must implement.
   # --------------------------
-
   _language = None
   _file_suffix = None
   _config_section = None
@@ -118,10 +117,8 @@ class JvmCompile(NailgunTask):
     Subclasses must implement."""
     raise NotImplementedError()
 
-
   # Subclasses may override.
   # ------------------------
-
   def extra_compile_time_classpath_elements(self):
     """Extra classpath elements common to all compiler invocations.
 
@@ -141,10 +138,8 @@ class JvmCompile(NailgunTask):
     """Any extra post-execute work."""
     pass
 
-
   # Common code.
   # ------------
-
   @staticmethod
   def _analysis_for_target(analysis_dir, target):
     return os.path.join(analysis_dir, target.id + '.analysis')
@@ -406,7 +401,7 @@ class JvmCompile(NailgunTask):
         self._register_products(relevant_targets, sources_by_target, self._analysis_file)
 
     # Update the classpath for downstream tasks.
-    runtime_deps = self._jvm_tool_bootstrapper.get_jvm_tool_classpath(self._runtime_deps_key) \
+    runtime_deps = self.tool_classpath(self._runtime_deps_key) \
       if self._runtime_deps_key else []
     for conf in self._confs:
       egroups.update_compatible_classpaths(group_id, [(conf, self._classes_dir)])
