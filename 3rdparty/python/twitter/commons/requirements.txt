@@ -10,7 +10,7 @@
 #  src/python/twitter/common/python/interpreter.py | 3 ++-
 #  1 file changed, 2 insertions(+), 1 deletion(-)
 
---find-links https://pantsbuild.github.io/cheeseshop/third_party/twitter-commons/d232cbdcab788da1e3ad6e2333ba395b9de9a555/index.html
+--find-links https://pantsbuild.github.io/cheeseshop/third_party/twitter-commons/b3ebdadaac0cc1376c98e5b2490d42effd99a2e4/index.html
 --no-index
 
 twitter.common.collections

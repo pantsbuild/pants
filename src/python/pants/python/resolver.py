@@ -4,20 +4,13 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-import os
-import time
-
-from pkg_resources import Environment, WorkingSet
-from twitter.common.dirutil import touch
-from twitter.common.python.base import requirement_is_exact
 from twitter.common.python.fetcher import Fetcher, PyPIFetcher
 from twitter.common.python.http import Crawler
 from twitter.common.python.interpreter import PythonInterpreter
-from twitter.common.python.obtainer import CachingObtainer, Obtainer
-from twitter.common.python.package import distribution_compatible
+from twitter.common.python.obtainer import CachingObtainer
 from twitter.common.python.platforms import Platform
 from twitter.common.python.resolver import resolve
-from twitter.common.python.translator import ChainedTranslator, EggTranslator, SourceTranslator, Translator
+from twitter.common.python.translator import Translator
 
 from pants.python.python_setup import PythonSetup
 
@@ -43,7 +36,9 @@ def crawler_from_config(config, conn_timeout=None):
 class PantsObtainer(CachingObtainer):
   def iter(self, requirement):
     if hasattr(requirement, 'repository') and requirement.repository:
-      obtainer = Obtainer(
+      obtainer = CachingObtainer(
+          install_cache=self.install_cache,
+          ttl=self.ttl,
           crawler=self._crawler,
           fetchers=[Fetcher([requirement.repository])],
           translators=self._translator)
