@@ -7,8 +7,6 @@ export set ARCHFLAGS=-Wno-error=unused-command-line-argument-hard-error-in-futur
 
 HERE=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
 
-VENV_DIR="${HERE}/build-support/pants_deps.venv"
-
 REQUIREMENTS=(
   ${HERE}/3rdparty/python/requirements.txt
   ${HERE}/3rdparty/python/twitter/commons/requirements.txt
@@ -27,17 +25,25 @@ function die() {
   exit 1
 }
 
+function venv_dir() {
+  if [ ! -z "${PANTS_DEV}" ]; then
+    echo ${HERE}/build-support/pants_dev_deps.venv
+  else
+    echo ${HERE}/build-support/pants_deps.venv
+  fi
+}
+
 function fingerprint_data() {
   openssl md5 | cut -d' ' -f2
 }
 
 function activate_venv() {
-  source "${VENV_DIR}/bin/activate"
+  source "$(venv_dir)/bin/activate"
 }
 
 function create_venv() {
-  rm -rf "${VENV_DIR}"
-  "${HERE}/build-support/virtualenv" "${VENV_DIR}"
+  rm -rf "$(venv_dir)"
+  "${HERE}/build-support/virtualenv" "$(venv_dir)"
 }
 
 function activate_pants_bare() {
@@ -46,8 +52,11 @@ function activate_pants_bare() {
     fingerprint="${fingerprint}$(cat ${req} | fingerprint_data)"
   done
   fingerprint=$(echo "${fingerprint}" | fingerprint_data)
+  if [ ! -z "${PANTS_DEV}" ]; then
+    fingerprint="PANTS_DEV.${fingerprint}"
+  fi
 
-  BOOTSTRAPPED_FILE="${VENV_DIR}/BOOTSTRAPPED.${fingerprint}"
+  BOOTSTRAPPED_FILE="$(venv_dir)/BOOTSTRAPPED.${fingerprint}"
 
   if ! [ -f ${BOOTSTRAPPED_FILE} ]; then
     log "Bootstrapping pants_deps with requirements:"
@@ -55,13 +64,19 @@ function activate_pants_bare() {
       log "  ${req}"
     done
 
+    if [ ! -z "${PANTS_DEV}" ]; then
+      # Install as an egg so IDEs can grok all deps. Installing as sources may
+      # run afoul of this bug: http://youtrack.jetbrains.com/issue/PY-6477.
+      # TODO: Remove the --egg once this is resolved. It won't work in the wheel world anyway.
+      pip_extra="--egg"
+    else
+      pip_extra=""
+    fi
+
     create_venv
     activate_venv
     for req in ${REQUIREMENTS[@]}; do
-      # Install as an egg so IDEs can grok all deps. Installing as sources may
-      # run afoul of this bug: http://youtrack.jetbrains.com/issue/PY-6477. 
-      # TODO: Remove the --egg once this is resolved. It won't work in the wheel world anyway.
-      pip install --egg -r "${req}" || die "Failed to install requirements from ${req}."
+      pip install ${pip_extra} -r "${req}" || die "Failed to install requirements from ${req}."
     done
     touch "${BOOTSTRAPPED_FILE}"
   else
