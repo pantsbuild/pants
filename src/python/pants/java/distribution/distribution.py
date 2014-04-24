@@ -30,10 +30,12 @@ class Distribution(object):
   _CACHE = {}
 
   @classmethod
-  def cached(cls, minimum_version=None, jdk=False):
+  def cached(cls, minimum_version=None, maximum_version=None, jdk=False):
     def scan_constraint_match():
       for dist in cls._CACHE.values():
         if minimum_version and dist.version < minimum_version:
+          continue
+        if maximum_version and dist.version > maximum_version:
           continue
         if jdk and not dist.jdk:
           continue
@@ -44,12 +46,12 @@ class Distribution(object):
     if not dist:
       dist = scan_constraint_match()
       if not dist:
-        dist = cls.locate(minimum_version=minimum_version, jdk=jdk)
+        dist = cls.locate(minimum_version=minimum_version, maximum_version=maximum_version, jdk=jdk)
       cls._CACHE[key] = dist
     return dist
 
   @classmethod
-  def locate(cls, minimum_version=None, jdk=False):
+  def locate(cls, minimum_version=None, maximum_version=None, jdk=False):
     """Finds a java distribution that meets any given constraints and returns it.
 
     First looks in JDK_HOME and JAVA_HOME if defined falling back to a search on the PATH.
@@ -69,35 +71,40 @@ class Distribution(object):
 
     for path in filter(None, search_path()):
       try:
-        dist = cls(path, minimum_version=minimum_version, jdk=jdk)
+        dist = cls(path, minimum_version=minimum_version, maximum_version=maximum_version, jdk=jdk)
         dist.validate()
         log.debug('Located %s for constraints: minimum_version'
-                  ' %s, jdk %s' % (dist, minimum_version, jdk))
+                  ' %s, maximum_version %s, jdk %s' % (dist, minimum_version, maximum_version, jdk))
         return dist
       except (ValueError, cls.Error):
         pass
 
-    raise cls.Error('Failed to locate a %s distribution with minimum_version %s'
-                    % ('JDK' if jdk else 'JRE', minimum_version))
+    raise cls.Error('Failed to locate a %s distribution with minimum_version %s, maximum_version %s'
+                    % ('JDK' if jdk else 'JRE', minimum_version, maximum_version))
 
   @staticmethod
-  def _parse_java_version(version):
+  def _parse_java_version(name, version):
     # Java version strings have been well defined since release 1.3.1 as defined here:
     #  http://www.oracle.com/technetwork/java/javase/versioning-naming-139433.html
     # These version strings comply with semver except that the traditional pre-release semver
     # slot (the 4th) can be delimited by an _ in the case of update releases of the jdk.
     # We accomodate that difference here.
-    return Revision.semver(version.replace('_', '-'))
+    if isinstance(version, Compatibility.string):
+      version = Revision.semver(version.replace('_', '-'))
+    if version and not isinstance(version, Revision):
+      raise ValueError('%s must be a string or a Revision object, given: %s' % (name, version))
+    return version
 
   @staticmethod
   def _is_executable(path):
     return os.path.isfile(path) and os.access(path, os.X_OK)
 
-  def __init__(self, bin_path='/usr/bin', minimum_version=None, jdk=False):
+  def __init__(self, bin_path='/usr/bin', minimum_version=None, maximum_version=None, jdk=False):
     """Creates a distribution wrapping the given bin_path.
 
     :param string bin_path: the path to the java distributions bin dir
     :param minimum_version: a modified semantic version string or else a Revision object
+    :param maximum_version: a modified semantic version string or else a Revision object
     :param bool jdk: ``True`` to require the distribution be a JDK vs a JRE
     """
 
@@ -105,12 +112,8 @@ class Distribution(object):
       raise ValueError('The specified distribution path is invalid: %s' % bin_path)
     self._bin_path = bin_path
 
-    if isinstance(minimum_version, Compatibility.string):
-      minimum_version = self._parse_java_version(minimum_version)
-    if minimum_version and not isinstance(minimum_version, Revision):
-      raise ValueError('minimum_version must be a string or a Revision object,'
-                       ' given: %s' % minimum_version)
-    self._minimum_version = minimum_version
+    self._minimum_version = self._parse_java_version("minimum_version", minimum_version)
+    self._maximum_version = self._parse_java_version("maximum_version", maximum_version)
 
     self._jdk = jdk
 
@@ -118,6 +121,8 @@ class Distribution(object):
     self._system_properties = None
     self._version = None
     self._validated_binaries = {}
+
+
 
   @property
   def jdk(self):
@@ -184,6 +189,11 @@ class Distribution(object):
         if version < self._minimum_version:
           raise self.Error('The java distribution at %s is too old; expecting at least %s and'
                            ' got %s' % (java, self._minimum_version, version))
+      if self._maximum_version:
+        version = self._get_version(java)
+        if version > self._maximum_version:
+          raise self.Error('The java distribution at %s is too new; expecting no older than'
+                           ' %s and got %s' % (java, self._maximum_version, version))
 
     try:
       self._validated_executable('javac')  # Calling purely for the check and cache side effects
@@ -194,7 +204,8 @@ class Distribution(object):
 
   def _get_version(self, java):
     if not self._version:
-      self._version = self._parse_java_version(self._get_system_properties(java)['java.version'])
+      self._version = self._parse_java_version('java.version',
+                                               self._get_system_properties(java)['java.version'])
     return self._version
 
   def _get_system_properties(self, java):
@@ -238,5 +249,5 @@ class Distribution(object):
     self._validated_binaries[name] = exe
 
   def __repr__(self):
-    return 'Distribution(%r, minimum_version=%r, jdk=%r)' % (self._bin_path, self._minimum_version,
-                                                             self._jdk)
+    return ('Distribution(%r, minimum_version=%r, maximum_version=%r jdk=%r)'
+           % (self._bin_path, self._minimum_version, self._maximum_version, self._jdk))

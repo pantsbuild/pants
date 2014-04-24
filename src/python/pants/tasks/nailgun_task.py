@@ -40,7 +40,7 @@ class NailgunTask(Task):
                                      help="[%default] Use nailgun daemons to execute java tasks.")
       NailgunTask._DAEMON_OPTION_PRESENT = True
 
-  def __init__(self, context, minimum_version=None, jdk=False):
+  def __init__(self, context, minimum_version=None, maximum_version=None, jdk=False):
     super(NailgunTask, self).__init__(context)
 
     default_workdir_root = os.path.join(context.config.getdefault('pants_workdir'), 'ng')
@@ -53,7 +53,8 @@ class NailgunTask(Task):
 
     start = time.time()
     try:
-      self._dist = Distribution.cached(minimum_version=minimum_version, jdk=jdk)
+      self._dist = Distribution.cached(minimum_version=minimum_version,
+                                       maximum_version=maximum_version, jdk=jdk)
       # TODO(John Sirois): Use a context timer when AWESOME-1265 gets merged.
       context.log.debug('Located java distribution in %.3fs' % (time.time() - start))
     except Distribution.Error as e:

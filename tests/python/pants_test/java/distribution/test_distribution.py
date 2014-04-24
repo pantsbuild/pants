@@ -72,10 +72,14 @@ class MockDistributionTest(unittest.TestCase):
     with pytest.raises(Distribution.Error):
       with self.distribution(executables=self.exe('java', '1.7.0_25')) as jdk:
         Distribution(bin_path=jdk, minimum_version='1.7.0_45').validate()
+    with pytest.raises(Distribution.Error):
+      with self.distribution(executables=self.exe('java', '1.8.0_1')) as jdk:
+        Distribution(bin_path=jdk, maximum_version='1.7.9999').validate()
 
     with self.distribution(executables=self.exe('java', '1.7.0_25')) as jdk:
       Distribution(bin_path=jdk, minimum_version='1.7.0_25').validate()
       Distribution(bin_path=jdk, minimum_version=Revision.semver('1.6.0')).validate()
+      Distribution(bin_path=jdk, minimum_version='1.7.0_25', maximum_version='1.7.999').validate()
 
   def test_validated_binary(self):
     with pytest.raises(Distribution.Error):
@@ -111,6 +115,9 @@ class MockDistributionTest(unittest.TestCase):
       with self.distribution(executables=self.exe('java', '1.6.0')) as jdk:
         with env(PATH=jdk):
           Distribution.locate(minimum_version='1.7.0')
+      with self.distribution(executables=self.exe('java', '1.8.0')) as jdk:
+        with env(PATH=jdk):
+          Distribution.locate(maximum_version='1.7.999')
 
     with pytest.raises(Distribution.Error):
       with self.distribution(executables=self.exe('java')) as jdk:
@@ -133,6 +140,10 @@ class MockDistributionTest(unittest.TestCase):
     with self.distribution(executables=self.exe('java', '1.7.0')) as jdk:
       with env(PATH=jdk):
         Distribution.locate(minimum_version='1.6.0')
+      with env(PATH=jdk):
+        Distribution.locate(maximum_version='1.7.999')
+      with env(PATH=jdk):
+        Distribution.locate(minimum_version='1.6.0', maximum_version='1.7.999')
 
     with self.distribution(executables=self.exe('bin/java')) as jdk:
       with env(JDK_HOME=jdk):
@@ -160,9 +171,14 @@ class LiveDistributionTest(unittest.TestCase):
   def test_validate_live(self):
     with pytest.raises(Distribution.Error):
       Distribution(bin_path=os.path.dirname(self.JAVA), minimum_version='999.9.9').validate()
+    with pytest.raises(Distribution.Error):
+      Distribution(bin_path=os.path.dirname(self.JAVA), maximum_version='0.0.1').validate()
 
     Distribution(bin_path=os.path.dirname(self.JAVA)).validate()
     Distribution(bin_path=os.path.dirname(self.JAVA), minimum_version='1.3.1').validate()
+    Distribution(bin_path=os.path.dirname(self.JAVA), maximum_version='999.999.999').validate()
+    Distribution(bin_path=os.path.dirname(self.JAVA), minimum_version='1.3.1',
+                 maximum_version='999.999.999').validate()
     Distribution.locate(jdk=False)
 
   @pytest.mark.skipif('not LiveDistributionTest.JAVAC', reason='No javac executable on the PATH.')
