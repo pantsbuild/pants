@@ -98,11 +98,11 @@ class IdeaGen(IdeGen):
                             dest="idea_gen_java_maximum_heap_size",
                             help="[%default] Sets the maximum heap size (in megabytes) for javac.")
 
-  def __init__(self, context):
-    IdeGen.__init__(self, context)
+  def __init__(self, context, workdir):
+    super(IdeaGen, self).__init__(context, workdir)
 
 
-    self.intellij_output_dir = os.path.join(self.work_dir, 'out')
+    self.intellij_output_dir = os.path.join(self.gen_project_workdir, 'out')
     self.nomerge = not context.options.idea_gen_merge
     self.open = context.options.idea_gen_open
     self.bash = context.options.idea_gen_bash
@@ -125,7 +125,7 @@ class IdeaGen(IdeGen):
     self.module_template = os.path.join(_TEMPLATE_BASEDIR, 'module-%s.mustache' % idea_version)
 
     self.project_filename = os.path.join(self.cwd, '%s.ipr' % self.project_name)
-    self.module_filename = os.path.join(self.work_dir, '%s.iml' % self.project_name)
+    self.module_filename = os.path.join(self.gen_project_workdir, '%s.iml' % self.project_name)
 
   def generate_project(self, project):
     def is_test(source_set):
@@ -236,7 +236,7 @@ class IdeaGen(IdeGen):
     shutil.move(ipr, self.project_filename)
     shutil.move(iml, self.module_filename)
 
-    print('\nGenerated project at %s%s' % (self.work_dir, os.sep))
+    print('\nGenerated project at %s%s' % (self.gen_project_workdir, os.sep))
 
     return self.project_filename if self.open else None
 

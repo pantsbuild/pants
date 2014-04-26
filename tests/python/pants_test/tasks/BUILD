@@ -88,6 +88,7 @@ python_tests(
   name = 'check_exclusives',
   sources = ['test_check_exclusives.py'],
   dependencies = [
+    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('src/python/pants/base:config'),
     pants('src/python/pants/goal:context'),
     pants('src/python/pants/tasks:check_exclusives'),

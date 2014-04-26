@@ -54,8 +54,8 @@ class Depmap(ConsoleTask):
                             help='Specifies the internal dependency graph should be'
                                  ' output in the dot digraph format')
 
-  def __init__(self, context):
-    ConsoleTask.__init__(self, context)
+  def __init__(self, context, workdir):
+    super(Depmap, self).__init__(context, workdir)
 
     if (self.context.options.depmap_is_internal_only
         and self.context.options.depmap_is_external_only):

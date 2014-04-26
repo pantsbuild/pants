@@ -34,8 +34,8 @@ class BinaryCreate(JvmBinaryTask):
                             action="callback", callback=mkflag.set_bool,
                             help="[%default] Create the binary jar with zip64 extensions.")
 
-  def __init__(self, context):
-    JvmBinaryTask.__init__(self, context)
+  def __init__(self, context, workdir):
+    super(BinaryCreate, self).__init__(context, workdir)
 
     self.outdir = os.path.abspath(
       context.options.jvm_binary_create_outdir or

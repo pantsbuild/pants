@@ -66,8 +66,8 @@ class CheckExclusives(Task):
                             help=("[%default] Signal an error and abort the build if an " +
                                   "exclusives collision is detected"))
 
-  def __init__(self, context, signal_error=None):
-    Task.__init__(self, context)
+  def __init__(self, context, workdir, signal_error=None):
+    super(CheckExclusives, self).__init__(context, workdir)
     self.signal_error = (context.options.exclusives_error_on_collision
                          if signal_error is None else signal_error)
 

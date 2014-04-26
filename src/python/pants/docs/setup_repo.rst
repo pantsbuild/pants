@@ -186,8 +186,8 @@ subclass should use ``restrict_push_branches``. Set up your repo's
 
     # ./BUILD.myorg
     class MyorgJarPublish(JarPublish):
-      def __init__(self, context):
-        super(MyorgJarPublish, self).__init__(context, restrict_push_branches=['master'])
+      def __init__(self, context, workdir):
+        super(MyorgJarPublish, self).__init__(context, workdir, restrict_push_branches=['master'])
 
     goal(name='publish',
          action=MyorgJarPublish).install('publish').with_description('Publish one or more artifacts.')

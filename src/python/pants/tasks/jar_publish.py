@@ -347,8 +347,8 @@ class JarPublish(ScmPublish, Task):
                             %(flag)s=src/java/com/twitter/common/base
                             ''' % dict(flag=flag))
 
-  def __init__(self, context, scm=None):
-    Task.__init__(self, context)
+  def __init__(self, context, workdir, scm=None):
+    super(JarPublish, self).__init__(context, workdir)
     ScmPublish.__init__(self, scm or get_scm(),
                         self.context.config.getlist(
                           JarPublish._CONFIG_SECTION, 'restrict_push_branches'))

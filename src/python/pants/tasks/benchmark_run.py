@@ -35,8 +35,8 @@ class BenchmarkRun(JvmTask):
                                  "concatenated. Example use: --bench-caliper-args='-Dsize=10,20 "
                                  "-Dcomplex=true,false' --bench-caliper-args=-Dmem=1,2,3")
 
-  def __init__(self, context):
-    super(BenchmarkRun, self).__init__(context)
+  def __init__(self, context, workdir):
+    super(BenchmarkRun, self).__init__(context, workdir)
 
     config = context.config
     self.confs = config.getlist('benchmark-run', 'confs', default=['default'])

@@ -9,9 +9,7 @@ from pants.tasks.console_task import ConsoleTask
 
 
 class ListRoots(ConsoleTask):
-  """
-  List the registered source roots of the repo.
-  """
+  """List the registered source roots of the repo."""
 
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):

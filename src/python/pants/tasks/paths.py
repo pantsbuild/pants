@@ -17,8 +17,8 @@ from pants.tasks.console_task import ConsoleTask
 
 
 class PathFinder(ConsoleTask):
-  def __init__(self, context):
-    ConsoleTask.__init__(self, context)
+  def __init__(self, context, workdir):
+    super(PathFinder, self).__init__(context, workdir)
     self.log = context.log
     self.target_roots = context.target_roots
 

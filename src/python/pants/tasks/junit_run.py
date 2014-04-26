@@ -137,8 +137,8 @@ class JUnitRun(JvmTask):
                             help="An arbitrary argument to pass directly to the test runner. "
                                    "This option can be specified multiple times.")
 
-  def __init__(self, context):
-    super(JUnitRun, self).__init__(context)
+  def __init__(self, context, workdir):
+    super(JUnitRun, self).__init__(context, workdir)
 
     context.products.require_data('exclusives_groups')
 
@@ -165,10 +165,7 @@ class JUnitRun(JvmTask):
     self.context.products.require_data('classes_by_target')
     self.context.products.require_data('classes_by_source')
 
-    self.outdir = (
-      context.options.junit_run_outdir
-      or context.config.get('junit-run', 'workdir')
-    )
+    self.outdir = context.options.junit_run_outdir or self.workdir
 
     self.batch_size = context.options.junit_run_batch_size
     self.fail_fast = context.options.junit_run_fail_fast

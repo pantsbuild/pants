@@ -65,8 +65,8 @@ class Goal(object):
         raise GoalError('Invalid action supplied, must accept 0, 1, or 2 args')
 
       class FuncTask(Task):
-        def __init__(self, context):
-          Task.__init__(self, context)
+        def __init__(self, context, workdir):
+          super(FuncTask, self).__init__(context, workdir)
 
           if not args:
             self.action = lambda targets: action()
@@ -113,10 +113,6 @@ class Goal(object):
     """Allows a task to setup a parser.
     Override this method if you want to initialize the task with more goal data."""
     self._task.setup_parser(group, args, mkflag)
-
-  def prepare(self, context):
-    """Prepares a Task that can be executed to achieve this goal."""
-    return self._task(context)
 
   def install(self, phase=None, first=False, replace=False, before=None, after=None):
     """Install this goal in the specified phase (or a new phase with the same name as this Goal).

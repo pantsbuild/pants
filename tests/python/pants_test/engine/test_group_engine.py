@@ -171,8 +171,8 @@ class GroupEngineTest(EngineTestBase, JvmTargetTest):
 
   def record(self, tag):
     class RecordingTask(Task):
-      def __init__(me, context):
-        super(RecordingTask, me).__init__(context)
+      def __init__(me, context, workdir):
+        super(RecordingTask, me).__init__(context, workdir)
         self.recorded_actions.append(self.construct_action(tag))
 
       def execute(me, targets):

@@ -4,7 +4,10 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from twitter.common.dirutil import safe_mkdtemp, safe_rmtree
+
 from pants.base.config import Config
+from pants.base.target import Target
 from pants.goal import Context
 from pants.tasks import TaskError
 from pants.tasks.check_exclusives import CheckExclusives
@@ -14,10 +17,17 @@ from pants_test.testutils.mock_target import MockTarget
 
 class CheckExclusivesTest(BaseMockTargetTest):
   """Test of the CheckExclusives task."""
+  def setUp(self):
+    # So MockTarget addresses don't collide. TODO: Remove when targets are refactored.
+    Target._clear_all_addresses()
+    self.config = Config.load()
+    self.workdir = safe_mkdtemp()
 
-  @classmethod
-  def setUpClass(cls):
-     cls.config = Config.load()
+  def tearDown(self):
+    safe_rmtree(self.workdir)
+
+  def _make_context(self, target_roots):
+    return Context(self.config, options={}, run_tracker=None, target_roots=target_roots)
 
   def test_check_exclusives(self):
     a = MockTarget('a', exclusives={'a': '1', 'b': '1'})
@@ -26,8 +36,8 @@ class CheckExclusivesTest(BaseMockTargetTest):
     d = MockTarget('d', dependencies=[a, b])
     e = MockTarget('e', dependencies=[a, c], exclusives={'c': '1'})
 
-    context = Context(CheckExclusivesTest.config, options={}, run_tracker=None, target_roots=[d, e])
-    check_exclusives_task = CheckExclusives(context, signal_error=True)
+    context = self._make_context(target_roots=[d, e])
+    check_exclusives_task = CheckExclusives(context, self.workdir, signal_error=True)
     try:
       check_exclusives_task.execute([d, e])
       self.fail("Expected a conflicting exclusives exception to be thrown.")
@@ -41,10 +51,9 @@ class CheckExclusivesTest(BaseMockTargetTest):
     c = MockTarget('c', exclusives={'a': '2', 'b': '2'})
     d = MockTarget('d')
 
-    context = Context(CheckExclusivesTest.config, options={}, run_tracker=None,
-                      target_roots=[a, b, c, d])
+    context = self._make_context(target_roots=[a, b, c, d])
     context.products.require_data('exclusives_groups')
-    check_exclusives_task = CheckExclusives(context, signal_error=True)
+    check_exclusives_task = CheckExclusives(context, self.workdir, signal_error=True)
     check_exclusives_task.execute([a, b, c, d])
     egroups = context.products.get_data('exclusives_groups')
     # Expected compatibility:
@@ -79,10 +88,9 @@ class CheckExclusivesTest(BaseMockTargetTest):
     c = MockTarget('c', exclusives={'a': '2', 'b': '2'})
     d = MockTarget('d')
 
-    context = Context(CheckExclusivesTest.config, options={}, run_tracker=None,
-                      target_roots=[a, b, c, d])
+    context = self._make_context(target_roots=[a, b, c, d])
     context.products.require_data('exclusives_groups')
-    check_exclusives_task = CheckExclusives(context, signal_error=True)
+    check_exclusives_task = CheckExclusives(context, self.workdir, signal_error=True)
     check_exclusives_task.execute([a, b, c, d])
     egroups = context.products.get_data('exclusives_groups')
 

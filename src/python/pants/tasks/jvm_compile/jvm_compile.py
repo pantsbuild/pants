@@ -148,9 +148,9 @@ class JvmCompile(NailgunTask):
   def _portable_analysis_for_target(analysis_dir, target):
     return JvmCompile._analysis_for_target(analysis_dir, target) + '.portable'
 
-  def __init__(self, context, minimum_version=None, jdk=False):
+  def __init__(self, context, workdir, minimum_version=None, jdk=False):
     # TODO(John Sirois): XXX plumb minimum_version via config or flags
-    super(JvmCompile, self).__init__(context, minimum_version=minimum_version, jdk=jdk)
+    super(JvmCompile, self).__init__(context, workdir, minimum_version=minimum_version, jdk=jdk)
     concrete_class = type(self)
     config_section = concrete_class._config_section
 
@@ -162,10 +162,9 @@ class JvmCompile(NailgunTask):
     self._pants_workdir = context.config.getdefault('pants_workdir')
 
     # Various working directories.
-    workdir = context.config.get(config_section, 'workdir')
-    self._classes_dir = os.path.join(workdir, 'classes')
-    self._resources_dir = os.path.join(workdir, 'resources')
-    self._analysis_dir = os.path.join(workdir, 'analysis')
+    self._classes_dir = os.path.join(self.workdir, 'classes')
+    self._resources_dir = os.path.join(self.workdir, 'resources')
+    self._analysis_dir = os.path.join(self.workdir, 'analysis')
 
     self._delete_scratch = get_lang_specific_option('delete_scratch')
 

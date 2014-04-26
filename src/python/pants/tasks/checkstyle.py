@@ -30,8 +30,8 @@ class Checkstyle(NailgunTask):
                             action="callback", callback=mkflag.set_bool,
                             help="[%default] Skip checkstyle.")
 
-  def __init__(self, context):
-    super(Checkstyle, self).__init__(context)
+  def __init__(self, context, workdir):
+    super(Checkstyle, self).__init__(context, workdir)
 
     self._checkstyle_bootstrap_key = 'checkstyle'
     bootstrap_tools = context.config.getlist('checkstyle', 'bootstrap-tools',
@@ -40,7 +40,6 @@ class Checkstyle(NailgunTask):
 
     self._configuration_file = context.config.get('checkstyle', 'configuration')
 
-    self._work_dir = context.config.get('checkstyle', 'workdir')
     self._properties = context.config.getdict('checkstyle', 'properties')
     self._confs = context.config.getlist('checkstyle', 'confs', default=['default'])
     self.context.products.require_data('exclusives_groups')
@@ -77,7 +76,7 @@ class Checkstyle(NailgunTask):
     ]
 
     if self._properties:
-      properties_file = os.path.join(self._work_dir, 'checkstyle.properties')
+      properties_file = os.path.join(self.workdir, 'checkstyle.properties')
       with safe_open(properties_file, 'w') as pf:
         for k, v in self._properties.items():
           pf.write('%s=%s\n' % (k, v))

@@ -85,14 +85,13 @@ class JarCreate(Task):
                             action='callback', callback=mkflag.set_bool,
                             help='[%default] Create javadoc jars.')
 
-  def __init__(self, context):
-    Task.__init__(self, context)
+  def __init__(self, context, workdir):
+    super(JarCreate, self).__init__(context, workdir)
 
     options = context.options
     products = context.products
 
-    self._output_dir = (options.jar_create_outdir or
-                        self.get_workdir(section='jar-create', workdir='jars'))
+    self._output_dir = (options.jar_create_outdir or self.workdir)
     self.transitive = options.jar_create_transitive
     self.confs = context.config.getlist('jar-create', 'confs', default=DEFAULT_CONFS)
     self.compression = ZIP_DEFLATED if options.jar_create_compressed else ZIP_STORED

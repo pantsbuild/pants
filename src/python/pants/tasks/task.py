@@ -43,10 +43,10 @@ class Task(object):
     amongst other tasks.
     """
 
-  def __init__(self, context):
+  def __init__(self, context, workdir):
     self.context = context
-    self.dry_run = self.can_dry_run() and context.options.dry_run
-    self._pants_workdir = self.context.config.getdefault('pants_workdir')
+    self._workdir = workdir
+    self.dry_run = self.can_dry_run() and context.options.dry_run  # TODO(benjy): Get rid of this.
     self._cache_key_generator = CacheKeyGenerator(
         context.config.getdefault('cache_key_gen_version', default=None))
     self._read_artifact_cache_spec = None
@@ -60,6 +60,10 @@ class Task(object):
         context.config.get('tasks', 'build_invalidator', default=default_invalidator_root),
         self.product_type())
     self._jvm_tool_bootstrapper = JvmToolBootstrapper(self.context.products)
+
+  @property
+  def workdir(self):
+    return self._workdir
 
   def register_jvm_tool(self, key, target_addrs):
     self._jvm_tool_bootstrapper.register_jvm_tool(key, target_addrs)
@@ -343,7 +347,7 @@ class Task(object):
     if not targets:
       return []
 
-    work_dir = self.context.config.get('ivy-resolve', 'workdir')
+    ivy_workdir = os.path.join(self.context.config.getdefault('pants_workdir'), 'ivy')
     ivy_utils = IvyUtils(config=self.context.config,
                          options=self.context.options,
                          log=self.context.log)
@@ -353,7 +357,7 @@ class Task(object):
                           invalidate_dependents=True,
                           silent=silent) as invalidation_check:
       global_vts = VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
-      target_workdir = os.path.join(work_dir, global_vts.cache_key.hash)
+      target_workdir = os.path.join(ivy_workdir, global_vts.cache_key.hash)
       target_classpath_file = os.path.join(target_workdir, 'classpath')
       raw_target_classpath_file = target_classpath_file + '.raw'
       raw_target_classpath_file_tmp = raw_target_classpath_file + '.tmp'
@@ -361,7 +365,7 @@ class Task(object):
       # in artifact-cached analysis files are consistent across systems.
       # Note that we have one global, well-known symlink dir, again so that paths are
       # consistent across builds.
-      symlink_dir = os.path.join(work_dir, 'jars')
+      symlink_dir = os.path.join(ivy_workdir, 'jars')
 
       # Note that it's possible for all targets to be valid but for no classpath file to exist at
       # target_classpath_file, e.g., if we previously built a superset of targets.
@@ -406,9 +410,3 @@ class Task(object):
     with IvyUtils.cachepath(target_classpath_file) as classpath:
       stripped_classpath = [path.strip() for path in classpath]
       return [path for path in stripped_classpath if ivy_utils.is_classpath_artifact(path)]
-
-  def get_workdir(self, section="default", key="workdir", workdir=None):
-    return self.context.config.get(section,
-                                   key,
-                                   default=os.path.join(self._pants_workdir,
-                                                        workdir or self.__class__.__name__.lower()))

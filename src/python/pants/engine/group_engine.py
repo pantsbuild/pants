@@ -5,6 +5,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 from collections import defaultdict, namedtuple
+import os
 
 from twitter.common.collections import OrderedDict, OrderedSet, maybe_list
 
@@ -244,12 +245,14 @@ class GroupEngine(Engine):
       context.log.debug('Preparing goals in round %d' % round_num)
       # Prepare tasks roots to leaves and allow for downstream tasks requiring products from
       # upstream tasks they depend upon.
+      pants_workdir = context.config.getdefault('pants_workdir')
       for phase in reversed(phases):
         for goal in reversed(phase.goals()):
           if goal not in prepared_goals:
             context.log.debug('preparing: %s:%s' % (phase.name, goal.name))
             prepared_goals.add(goal)
-            task = goal.task_type(context)
+            task_workdir = os.path.join(pants_workdir, phase.name, goal.name)
+            task = goal.task_type(context, task_workdir)
             tasks_by_goal[goal] = task
 
     return map(lambda p: cls.PhaseExecutor(context, p, tasks_by_goal), phases)

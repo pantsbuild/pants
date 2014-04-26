@@ -33,8 +33,8 @@ class BuildLint(Task):
       action="append", type="choice", choices=['diff', 'rewrite'],
       help="diff=print out diffs, rewrite=apply changes to BUILD files directly.")
 
-  def __init__(self, context):
-    Task.__init__(self, context)
+  def __init__(self, context, workdir):
+    super(BuildLint, self).__init__(context, workdir)
     context.products.require('missing_deps')
     self.transitive = context.options.buildlint_transitive
     self.actions = set(context.options.buildlint_actions)

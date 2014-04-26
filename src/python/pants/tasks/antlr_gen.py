@@ -24,9 +24,8 @@ class AntlrGen(CodeGen, NailgunTask):
     'antlr4': 'antlr4-gen',
   }
 
-  def __init__(self, context):
-    CodeGen.__init__(self, context)
-    NailgunTask.__init__(self, context)
+  def __init__(self, context, workdir):
+    super(AntlrGen, self).__init__(context, workdir)
 
     # TODO(John Sirois): kill if not needed by prepare_gen
     self._classpath_by_compiler = {}
@@ -68,10 +67,10 @@ class AntlrGen(CodeGen, NailgunTask):
       if target.compiler == 'antlr3':
         java_main = 'org.antlr.Tool'
       elif target.compiler == 'antlr4':
-        args.append("-visitor")  # Generate Parse Tree Vistor As Well
+        args.append('-visitor')  # Generate Parse Tree Vistor As Well
         java_main = 'org.antlr.v4.Tool'
       else:
-        raise TaskError("Unknown ANTLR compiler: {}".format(target.compiler))
+        raise TaskError('Unknown ANTLR compiler: {}'.format(target.compiler))
 
       sources = self._calculate_sources([target])
       args.extend(sources)
@@ -97,7 +96,7 @@ class AntlrGen(CodeGen, NailgunTask):
 
   def _create_java_target(self, target, dependees):
     antlr_files_suffix = ["Lexer.java", "Parser.java"]
-    if (target.compiler == 'antlr4'):
+    if target.compiler == 'antlr4':
       antlr_files_suffix = ["BaseListener.java", "BaseVisitor.java",
                             "Listener.java", "Visitor.java"] + antlr_files_suffix
 
@@ -135,5 +134,4 @@ class AntlrGen(CodeGen, NailgunTask):
       yield compiler, self.context.config.getlist(key, 'javadeps')
 
   def _java_out(self, target):
-    key = self._CONFIG_SECTION_BY_COMPILER[target.compiler]
-    return os.path.join(self.context.config.get(key, 'workdir'), 'gen-java')
+    return os.path.join(self.workdir, target.compiler, 'gen-java')

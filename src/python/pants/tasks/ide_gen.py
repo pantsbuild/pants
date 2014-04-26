@@ -82,8 +82,8 @@ class IdeGen(JvmBinaryTask):
                             help="[%default] Includes scala sources in the project; otherwise "
                                  "compiles them and adds them to the project classpath.")
 
-  def __init__(self, context):
-    super(IdeGen, self).__init__(context)
+  def __init__(self, context, workdir):
+    super(IdeGen, self).__init__(context, workdir)
 
     self.project_name = context.options.ide_gen_project_name
     self.python = context.options.ide_gen_python
@@ -96,15 +96,13 @@ class IdeGen(JvmBinaryTask):
     else:
       self.java_jdk = '1.%d' % self.java_language_level
 
-    self.work_dir = os.path.abspath(
-      context.options.ide_gen_project_dir
-      or os.path.join(
-        context.config.get('ide', 'workdir'), self.__class__.__name__, self.project_name
-      )
+    self.gen_project_workdir = os.path.abspath(
+      context.options.ide_gen_project_dir or
+      os.path.join(self.workdir, self.__class__.__name__, self.project_name)
     )
     self.cwd = (
       os.path.abspath(context.options.ide_gen_project_cwd) if context.options.ide_gen_project_cwd
-      else self.work_dir
+      else self.gen_project_workdir
     )
 
     self.intransitive = context.options.ide_gen_intransitive
@@ -205,7 +203,7 @@ class IdeGen(JvmBinaryTask):
 
     self.context.replace_targets(compiles)
 
-    self.binary = self.context.add_new_target(self.work_dir,
+    self.binary = self.context.add_new_target(self.gen_project_workdir,
                                               JvmBinary,
                                               name='%s-external-jars' % self.project_name,
                                               dependencies=jars,
@@ -218,10 +216,10 @@ class IdeGen(JvmBinaryTask):
     )
 
   def map_internal_jars(self, targets):
-    internal_jar_dir = os.path.join(self.work_dir, 'internal-libs')
+    internal_jar_dir = os.path.join(self.gen_project_workdir, 'internal-libs')
     safe_mkdir(internal_jar_dir, clean=True)
 
-    internal_source_jar_dir = os.path.join(self.work_dir, 'internal-libsources')
+    internal_source_jar_dir = os.path.join(self.gen_project_workdir, 'internal-libsources')
     safe_mkdir(internal_source_jar_dir, clean=True)
 
     internal_jars = self.context.products.get('jars')
@@ -252,13 +250,13 @@ class IdeGen(JvmBinaryTask):
           self._project.internal_jars.add(ClasspathEntry(cp_jar, source_jar=cp_source_jar))
 
   def map_external_jars(self):
-    external_jar_dir = os.path.join(self.work_dir, 'external-libs')
+    external_jar_dir = os.path.join(self.gen_project_workdir, 'external-libs')
     safe_mkdir(external_jar_dir, clean=True)
 
-    external_source_jar_dir = os.path.join(self.work_dir, 'external-libsources')
+    external_source_jar_dir = os.path.join(self.gen_project_workdir, 'external-libsources')
     safe_mkdir(external_source_jar_dir, clean=True)
 
-    external_javadoc_jar_dir = os.path.join(self.work_dir, 'external-libjavadoc')
+    external_javadoc_jar_dir = os.path.join(self.gen_project_workdir, 'external-libjavadoc')
     safe_mkdir(external_javadoc_jar_dir, clean=True)
 
     confs = ['default', 'sources', 'javadoc']

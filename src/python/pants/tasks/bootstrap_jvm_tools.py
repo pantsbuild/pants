@@ -12,8 +12,8 @@ from pants.tasks import Task, TaskError
 
 class BootstrapJvmTools(Task):
 
-  def __init__(self, context):
-    super(BootstrapJvmTools, self).__init__(context)
+  def __init__(self, context, workdir):
+    super(BootstrapJvmTools, self).__init__(context, workdir)
     context.products.require_data('jvm_build_tools')
 
   def execute(self, targets):

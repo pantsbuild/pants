@@ -27,8 +27,8 @@ class JvmBinaryTask(Task):
                                  "binaries classfiles as well as all classfiles it depends on "
                                  "transitively.")
 
-  def __init__(self, context):
-    Task.__init__(self, context)
+  def __init__(self, context, workdir):
+    super(JvmBinaryTask, self).__init__(context, workdir)
 
   def is_binary(self, target):
     return isinstance(target, JvmBinary)

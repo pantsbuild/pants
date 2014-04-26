@@ -24,11 +24,11 @@ class PythonThriftBuilder(CodeGenerator):
   class UnknownPlatformException(CodeGenerator.Error):
     def __init__(self, platform):
       super(PythonThriftBuilder.UnknownPlatformException, self).__init__(
-          "Unknown platform: %s!" % str(platform))
+          'Unknown platform: %s!' % str(platform))
 
   def __init__(self, target, root_dir, config, target_suffix=None):
     super(PythonThriftBuilder, self).__init__(target, root_dir, config, target_suffix=target_suffix)
-    self._workdir = os.path.join(config.getdefault(option='thrift_workdir'), 'py-thrift')
+    self._workdir = os.path.join(config.getdefault('pants_workdir'), 'thrift', 'py-thrift')
 
   @property
   def install_requires(self):

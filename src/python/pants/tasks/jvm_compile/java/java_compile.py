@@ -59,8 +59,8 @@ class JavaCompile(JvmCompile):
     option_group.add_option(mkflag("args"), dest="java_compile_args", action="append",
                             help="Pass these extra args to javac.")
 
-  def __init__(self, context):
-    super(JavaCompile, self).__init__(context, jdk=True)
+  def __init__(self, context, workdir):
+    super(JavaCompile, self).__init__(context, workdir, jdk=True)
 
     self._depfile = os.path.join(self._analysis_dir, 'global_depfile')
 

@@ -29,8 +29,8 @@ class DuplicateDetector(JvmBinaryTask):
                             action="callback", callback=mkflag.set_bool,
                             help="[%default] Fail fast if duplicate classes/resources are found.")
 
-  def __init__(self, context):
-    JvmBinaryTask.__init__(self, context)
+  def __init__(self, context, workdir):
+    super(DuplicateDetector, self).__init__(context, workdir)
     self.require_jar_dependencies()
     self.fail_fast = context.options.fail_fast
 

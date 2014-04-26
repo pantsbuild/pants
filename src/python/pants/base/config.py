@@ -23,14 +23,14 @@ class ConfigOption(object):
 
      my_opt = ConfigOption.create(
        section='mycache',
-       option='workdir',
-       help='Directory, relative to pants_workdir, of the mycache workdir.',
+       option='cachedir',
+       help='Directory, relative to pants_workdir, of the cache directory.',
        default='mycache')
 
   Read an option from ``pants.ini`` with ::
 
      mycache_dir = os.path.join(config.get_option(config.DEFAULT_PANTS_WORKDIR),
-                                config.get_option(_REPORTING_REPORTS_DIR))
+                                config.get_option(my_opt))
 
   Please note `configparser <http://docs.python.org/2/library/configparser.html>`_
   is used to retrieve options, so variable interpolation and the default section

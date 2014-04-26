@@ -37,8 +37,8 @@ class SpecsRun(JvmTask):
                             action='callback', callback=mkflag.set_bool,
                             help='[%default] Emit test result with ANSI terminal color codes.')
 
-  def __init__(self, context):
-    super(SpecsRun, self).__init__(context)
+  def __init__(self, context, workdir):
+    super(SpecsRun, self).__init__(context, workdir)
 
     self._specs_bootstrap_key = 'specs'
     bootstrap_tools = context.config.getlist('specs-run', 'bootstrap-tools',
@@ -55,8 +55,6 @@ class SpecsRun(JvmTask):
 
     self.skip = context.options.specs_run_skip
     self.color = context.options.specs_run_color
-
-    self.workdir = context.config.get('specs-run', 'workdir')
 
     self.tests = context.options.specs_run_tests
 

@@ -57,16 +57,15 @@ class IvyResolve(NailgunTask):
                                  "be treated as mutable unless a matching artifact explicitly "
                                  "marks mutable as False.")
 
-  def __init__(self, context, confs=None):
-    super(IvyResolve, self).__init__(context)
-    work_dir = context.config.get('ivy-resolve', 'workdir')
+  def __init__(self, context, workdir, confs=None):
+    super(IvyResolve, self).__init__(context, workdir)
 
     self._ivy_bootstrapper = Bootstrapper.instance()
     self._cachedir = self._ivy_bootstrapper.ivy_cache_dir
     self._confs = confs or context.config.getlist('ivy-resolve', 'confs', default=['default'])
-    self._classpath_dir = os.path.join(work_dir, 'mapped')
+    self._classpath_dir = os.path.join(self.workdir, 'mapped')
 
-    self._outdir = context.options.ivy_resolve_outdir or os.path.join(work_dir, 'reports')
+    self._outdir = context.options.ivy_resolve_outdir or os.path.join(self.workdir, 'reports')
     self._open = context.options.ivy_resolve_open
     self._report = self._open or context.options.ivy_resolve_report
 

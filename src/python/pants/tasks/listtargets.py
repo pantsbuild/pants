@@ -12,41 +12,40 @@ from pants.tasks.task_error import TaskError
 
 
 class ListTargets(ConsoleTask):
-  """
-  Lists all BUILD targets in the system with no arguments, otherwise lists all
-  the BUILD targets that reside in the the BUILD files hosting the specified
-  targets.
+  """Lists all targets matching the target specs.
+
+  If no targets are specified, lists all targets in the workspace.
   """
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
     super(ListTargets, cls).setup_parser(option_group, args, mkflag)
 
     option_group.add_option(
-        mkflag("provides"),
-        action="store_true",
-        dest="list_provides", default=False,
-        help="Specifies only targets that provide an artifact should be "
-        "listed. The output will be 2 columns in this case: "
-        "[target address] [artifact id]")
+        mkflag('provides'),
+        action='store_true',
+        dest='list_provides', default=False,
+        help='Specifies only targets that provide an artifact should be '
+        'listed. The output will be 2 columns in this case: '
+        '[target address] [artifact id]')
 
     option_group.add_option(
-        mkflag("provides-columns"),
-        dest="list_provides_columns",
+        mkflag('provides-columns'),
+        dest='list_provides_columns',
         default='address,artifact_id',
-        help="Specifies the columns to include in listing output when "
-        "restricting the listing to targets that provide an artifact. "
-        "Available columns are: address, artifact_id, repo_name, repo_url "
-        "and repo_db")
+        help='Specifies the columns to include in listing output when '
+        'restricting the listing to targets that provide an artifact. '
+        'Available columns are: address, artifact_id, repo_name, repo_url '
+        'and repo_db')
 
     option_group.add_option(
-        mkflag("documented"),
-        action="store_true",
-        dest="list_documented",
+        mkflag('documented'),
+        action='store_true',
+        dest='list_documented',
         default=False,
-        help="Prints only targets that are documented with a description.")
+        help='Prints only targets that are documented with a description.')
 
-  def __init__(self, context, **kwargs):
-    super(ListTargets, self).__init__(context, **kwargs)
+  def __init__(self, context, workdir, **kwargs):
+    super(ListTargets, self).__init__(context, workdir, **kwargs)
 
     self._provides = context.options.list_provides
     self._provides_columns = context.options.list_provides_columns
@@ -57,7 +56,7 @@ class ListTargets(ConsoleTask):
     if self._provides:
       def extract_artifact_id(target):
         provided_jar, _, _ = target.get_artifact_info()
-        return "%s%s%s" % (provided_jar.org, '#', provided_jar.name)
+        return '%s%s%s' % (provided_jar.org, '#', provided_jar.name)
 
       extractors = dict(
           address=lambda target: str(target.address),
@@ -70,13 +69,13 @@ class ListTargets(ConsoleTask):
       def print_provides(column_extractors, address):
         target = Target.get(address)
         if target.is_exported:
-          return " ".join(extractor(target) for extractor in column_extractors)
+          return ' '.join(extractor(target) for extractor in column_extractors)
 
       try:
         column_extractors = [extractors[col] for col in (self._provides_columns.split(','))]
       except KeyError:
-        raise TaskError("Invalid columns specified %s. Valid ones include address, artifact_id, "
-                        "repo_name, repo_url and repo_db." % self._provides_columns)
+        raise TaskError('Invalid columns specified %s. Valid ones include address, artifact_id, '
+                        'repo_name, repo_url and repo_db.' % self._provides_columns)
 
       print_fn = lambda address: print_provides(column_extractors, address)
     elif self._documented:

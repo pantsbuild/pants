@@ -24,21 +24,19 @@ from pants.tasks.code_gen import CodeGen
 class ProtobufGen(CodeGen):
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
-    option_group.add_option(mkflag("outdir"), dest="protobuf_gen_create_outdir",
-                            help="Emit generated code in to this directory.")
+    option_group.add_option(mkflag('outdir'), dest='protobuf_gen_create_outdir',
+                            help='Emit generated code in to this directory.')
 
-    option_group.add_option(mkflag("lang"), dest="protobuf_gen_langs", default=[],
-                            action="append", type="choice", choices=['python', 'java'],
-                            help="Force generation of protobuf code for these languages.  Both "
-                                 "'python' and 'java' are supported")
+    option_group.add_option(mkflag('lang'), dest='protobuf_gen_langs', default=[],
+                            action='append', type='choice', choices=['python', 'java'],
+                            help='Force generation of protobuf code for these languages.')
 
-  def __init__(self, context):
-    CodeGen.__init__(self, context)
+  def __init__(self, context, workdir):
+    super(ProtobufGen, self).__init__(context, workdir)
 
     self.protoc_supportdir = self.context.config.get('protobuf-gen', 'supportdir')
     self.protoc_version = self.context.config.get('protobuf-gen', 'version')
-    self.output_dir = (context.options.protobuf_gen_create_outdir or
-                       context.config.get('protobuf-gen', 'workdir'))
+    self.output_dir = context.options.protobuf_gen_create_outdir or self.workdir
     self.plugins = self.context.config.getlist('protobuf-gen', 'plugins', default=[])
 
     def resolve_deps(key):
@@ -106,7 +104,8 @@ class ProtobufGen(CodeGen):
 
     if self.plugins:
       for plugin in self.plugins:
-        # TODO(Eric Ayers) Is it a good assumption that the generated source output dir is acceptable for all plugins?
+        # TODO(Eric Ayers) Is it a good assumption that the generated source output dir is
+        # acceptable for all plugins?
         args.append("--%s_protobuf_out=%s" % (plugin, output_dir))
 
     for base in bases:

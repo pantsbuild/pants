@@ -8,7 +8,6 @@ import shlex
 import subprocess
 
 from pants.java.util import execute_java
-from pants.tasks import Task
 from pants.tasks.jvm_task import JvmTask
 
 
@@ -20,8 +19,8 @@ class ScalaRepl(JvmTask):
     option_group.add_option(mkflag('args'), dest='run_args', action='append',
                             help='run the repl in a jvm with extra args.')
 
-  def __init__(self, context):
-    Task.__init__(self, context)
+  def __init__(self, context, workdir):
+    super(ScalaRepl, self).__init__(context, workdir)
     self.jvm_args = context.config.getlist('scala-repl', 'jvm_args', default=[])
     if context.options.run_jvmargs:
       for arg in context.options.run_jvmargs:

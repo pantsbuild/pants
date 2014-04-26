@@ -44,8 +44,8 @@ class EclipseGen(IdeGen):
                                    "configuration should be generated for; can be one of: "
                                    "%s" % supported_versions)
 
-  def __init__(self, context):
-    IdeGen.__init__(self, context)
+  def __init__(self, context, workdir):
+    super(EclipseGen, self).__init__(context, workdir)
 
     version = _VERSIONS[context.options.eclipse_gen_version]
     self.project_template = os.path.join(_TEMPLATE_BASEDIR, 'project-%s.mustache' % version)
@@ -121,7 +121,7 @@ class EclipseGen(IdeGen):
       debug_port=project.debug_port,
     )
 
-    outdir = os.path.abspath(os.path.join(self.work_dir, 'bin'))
+    outdir = os.path.abspath(os.path.join(self.gen_project_workdir, 'bin'))
     safe_mkdir(outdir)
 
     source_sets = defaultdict(OrderedSet)  # base_id -> source_set
@@ -154,7 +154,8 @@ class EclipseGen(IdeGen):
 
     apply_template(self.project_filename, self.project_template, project=configured_project)
     apply_template(self.classpath_filename, self.classpath_template, classpath=configured_classpath)
-    apply_template(os.path.join(self.work_dir, 'Debug on port %d.launch' % project.debug_port),
+    apply_template(os.path.join(self.gen_project_workdir,
+                                'Debug on port %d.launch' % project.debug_port),
                    self.debug_template, project=configured_project)
     apply_template(self.coreprefs_filename, self.coreprefs_template, project=configured_project)
 
@@ -176,4 +177,4 @@ class EclipseGen(IdeGen):
     else:
       safe_delete(self.pydev_filename)
 
-    print('\nGenerated project at %s%s' % (self.work_dir, os.sep))
+    print('\nGenerated project at %s%s' % (self.gen_project_workdir, os.sep))

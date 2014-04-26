@@ -18,8 +18,8 @@ from pants_test.tasks.test_base import prepare_task
 
 class ConsoleTaskTest(unittest.TestCase):
   class Infinite(ConsoleTask):
-    def __init__(self, context, outstream=sys.stdout):
-      super(ConsoleTaskTest.Infinite, self).__init__(context, outstream)
+    def __init__(self, context, workdir, outstream=sys.stdout):
+      super(ConsoleTaskTest.Infinite, self).__init__(context, workdir, outstream)
       self.halt = threading.Event()
 
     def console_output(self, _):

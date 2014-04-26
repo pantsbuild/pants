@@ -90,11 +90,12 @@ class JvmdocGen(Task):
       help='Specifies that %s errors should not cause build errors'
            % jvmdoc.tool_name)
 
-  def __init__(self, context, jvmdoc, output_dir, confs, active):
+  # TODO(benjy): Remove output_dir arg?
+  def __init__(self, context, workdir, jvmdoc, output_dir, confs, active):
     def getattr_options(option):
       return getattr(context.options, option)
 
-    super(JvmdocGen, self).__init__(context)
+    super(JvmdocGen, self).__init__(context, workdir)
 
     self._jvmdoc = jvmdoc
     jvmdoc_tool_name = self._jvmdoc.tool_name
@@ -102,13 +103,10 @@ class JvmdocGen(Task):
     config_section = '%s-gen' % jvmdoc_tool_name
     parser_config = self.setup_parser_config()
 
-    pants_workdir = context.config.getdefault('pants_workdir')
     self._output_dir = (
       output_dir
       or getattr_options(parser_config.outdir_opt)
-      or context.config.get(config_section,
-                            'workdir',
-                            default=os.path.join(pants_workdir, jvmdoc_tool_name))
+      or self.workdir
     )
 
     flagged_codegen = getattr_options(parser_config.include_codegen_opt)

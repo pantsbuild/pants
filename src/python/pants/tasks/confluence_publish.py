@@ -39,8 +39,8 @@ class ConfluencePublish(Task):
     option_group.add_option(mkflag("user"), dest="confluence_user",
                             help="Confluence user name, defaults to unix user.")
 
-  def __init__(self, context):
-    Task.__init__(self, context)
+  def __init__(self, context, workdir):
+    super(ConfluencePublish, self).__init__(context, workdir)
 
     self.url = (
       context.options.confluence_publish_url

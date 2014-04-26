@@ -81,8 +81,8 @@ class Filter(ConsoleTask):
                                  "inclusions or exclusions can be specified at once in a comma "
                                  "separated list or else by using multiple instances of this flag.")
 
-  def __init__(self, context, outstream=sys.stdout):
-    super(Filter, self).__init__(context, outstream)
+  def __init__(self, context, workdir, outstream=sys.stdout):
+    super(Filter, self).__init__(context, workdir, outstream)
 
     self._filters = []
 

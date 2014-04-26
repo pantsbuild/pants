@@ -36,10 +36,10 @@ class SetupPythonEnvironment(Task):
                             default=False, action='store_true',
                             help="Allow multiple interpreters to be bound to an upstream chroot.")
 
-  def __init__(self, context):
+  def __init__(self, context, workdir):
     context.products.require('python')
     self._cache = PythonInterpreterCache(context.config, logger=context.log.debug)
-    super(SetupPythonEnvironment, self).__init__(context)
+    super(SetupPythonEnvironment, self).__init__(context, workdir)
 
   def execute(self, _):
     ifilters = self.context.options.python_interpreter

@@ -43,6 +43,7 @@ python_tests(
   name = 'exclusive',
   sources = ['test_exclusive.py'],
   dependencies = [
+    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('tests/python/pants_test/testutils'),
     pants('src/python/pants/base:config'),
     pants('src/python/pants/goal:context'),

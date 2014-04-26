@@ -37,8 +37,8 @@ class BundleCreate(JvmBinaryTask):
                             help="[%%default] Used in conjunction with %s this packs the archive "
                                  "with its basename as the path prefix." % archive_flag)
 
-  def __init__(self, context):
-    JvmBinaryTask.__init__(self, context)
+  def __init__(self, context, workdir):
+    super(BundleCreate, self).__init__(context, workdir)
 
     self.outdir = (
       context.options.jvm_binary_create_outdir or

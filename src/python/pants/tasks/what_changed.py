@@ -36,11 +36,11 @@ class WhatChanged(ConsoleTask):
                             help='[%default] Shows changed files instead of the targets that own '
                                  'them.')
 
-  def __init__(self, context, workspace, outstream=sys.stdout):
+  def __init__(self, context, workdir, workspace, outstream=sys.stdout):
+    super(WhatChanged, self).__init__(context, workdir, outstream)
+
     if not isinstance(workspace, Workspace):
       raise ValueError('WhatChanged requires a Workspace, given %s' % workspace)
-
-    super(WhatChanged, self).__init__(context, outstream)
 
     self._workspace = workspace
 
@@ -142,11 +142,13 @@ class ScmWorkspace(Workspace):
 
 
 class ScmWhatChanged(WhatChanged):
-  def __init__(self, context, scm=None, outstream=sys.stdout):
+  def __init__(self, context, workdir, scm=None, outstream=sys.stdout):
     """Creates a WhatChanged task that uses an Scm to determine changed files.
 
     context:    The pants execution context.
+    workdir:    The directory to work in.
     scm:        The scm to use, taken from the globally configured scm if None.
     outstream:  The stream to write changed files or targets to.
     """
-    super(ScmWhatChanged, self).__init__(context, ScmWorkspace(scm or get_scm()), outstream)
+    super(ScmWhatChanged, self).__init__(context, workdir, ScmWorkspace(scm or get_scm()),
+                                         outstream)

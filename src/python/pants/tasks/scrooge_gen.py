@@ -31,7 +31,7 @@ CompilerConfig = namedtuple('CompilerConfig', ['name', 'config_section', 'profil
 
 class Compiler(namedtuple('CompilerConfigWithContext', ('context',) + CompilerConfig._fields)):
   @classmethod
-  def fromConfig(cls, context, config):
+  def from_config(cls, context, config):
     return cls(context, **config._asdict())
 
   @property
@@ -39,16 +39,6 @@ class Compiler(namedtuple('CompilerConfigWithContext', ('context',) + CompilerCo
     args = self.context.config.getlist(self.config_section, 'jvm_args', default=[])
     args.append('-Dfile.encoding=UTF-8')
     return args
-
-  @property
-  def outdir(self):
-    pants_workdir_fallback = os.path.join(get_buildroot(), '.pants.d')
-    workdir_fallback = os.path.join(self.context.config.getdefault('pants_workdir',
-                                                                   default=pants_workdir_fallback),
-                                    self.name)
-    outdir = (self.context.options.scrooge_gen_create_outdir
-              or self.context.config.get(self.config_section, 'workdir', default=workdir_fallback))
-    return os.path.relpath(outdir)
 
   @property
   def verbose(self):
@@ -87,7 +77,7 @@ class ScroogeGen(NailgunTask):
 
   class PartialCmd(namedtuple('PC', ['compiler', 'language', 'rpc_style', 'namespace_map'])):
     @property
-    def outdir(self):
+    def relative_outdir(self):
       namespace_sig = None
       if self.namespace_map:
         sha = hashlib.sha1()
@@ -96,19 +86,17 @@ class ScroogeGen(NailgunTask):
           sha.update(ns_to)
         namespace_sig = sha.hexdigest()
       output_style = '-'.join(filter(None, (self.language, self.rpc_style, namespace_sig)))
-      return os.path.join(self.compiler.outdir, output_style)
+      return os.path.join(self.compiler.name, output_style)
 
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
-    option_group.add_option(mkflag("outdir"), dest="scrooge_gen_create_outdir",
-                            help="Emit generated code in to this directory.")
-    option_group.add_option(mkflag("quiet"), dest="scrooge_gen_quiet",
-                            action="callback", callback=mkflag.set_bool, default=None,
-                            help="[%default] Suppress output, overrides verbose flag in pants.ini.")
+    option_group.add_option(mkflag('quiet'), dest='scrooge_gen_quiet',
+                            action='callback', callback=mkflag.set_bool, default=None,
+                            help='[%default] Suppress output, overrides verbose flag in pants.ini.')
 
-  def __init__(self, context):
-    super(ScroogeGen, self).__init__(context)
-    self.compiler_for_name = dict((name, Compiler.fromConfig(context, config))
+  def __init__(self, context, workdir):
+    super(ScroogeGen, self).__init__(context, workdir)
+    self.compiler_for_name = dict((name, Compiler.from_config(context, config))
                                   for name, config in _CONFIG_FOR_COMPILER.items())
 
     for name, compiler in self.compiler_for_name.items():
@@ -118,6 +106,7 @@ class ScroogeGen(NailgunTask):
 
     self.defaults = JavaThriftLibrary.Defaults(context.config)
 
+  # TODO(benjy): Use regular os-located tmpfiles, as we do everywhere else.
   def _tempname(self):
     # don't assume the user's cwd is buildroot
     pants_workdir = self.context.config.getdefault('pants_workdir')
@@ -126,6 +115,9 @@ class ScroogeGen(NailgunTask):
     fd, path = tempfile.mkstemp(dir=tmp_dir, prefix='')
     os.close(fd)
     return path
+
+  def _outdir(self, partial_cmd):
+    return os.path.join(self.workdir, partial_cmd.relative_outdir)
 
   def execute(self, targets):
     self._validate_compiler_configs(targets)
@@ -156,7 +148,7 @@ class ScroogeGen(NailgunTask):
     for partial_cmd, tgts in partial_cmds.items():
       gen_files_for_source = self.gen(partial_cmd, tgts)
 
-      outdir = partial_cmd.outdir
+      outdir = self._outdir(partial_cmd)
       langtarget_by_gentarget = {}
       for target in tgts:
         dependees = dependees_by_gentarget.get(target, [])
@@ -178,7 +170,7 @@ class ScroogeGen(NailgunTask):
 
       compiler = partial_cmd.compiler
       import_paths, changed_srcs = compiler.calc_srcs(invalid_targets, self.is_gentarget)
-      outdir = partial_cmd.outdir
+      outdir = self._outdir(partial_cmd)
       if changed_srcs:
         args = []
 
@@ -219,6 +211,8 @@ class ScroogeGen(NailgunTask):
         try:
           if 0 == returncode:
             gen_files_for_source = self.parse_gen_file_map(gen_file_map_path, outdir)
+          else:
+            gen_files_for_source = None
         finally:
           os.remove(gen_file_map_path)
 
@@ -330,7 +324,7 @@ class ScroogeGen(NailgunTask):
 
     language = self.defaults.get_language(target)
     if language not in self.compiler_for_name[compiler].langs:
-      raise TaskError("%s can not generate %s" % (compiler, language))
+      raise TaskError('%s can not generate %s' % (compiler, language))
 
     return True
 

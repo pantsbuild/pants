@@ -237,8 +237,8 @@ def assemble(predefs=PREDEFS, symbol_hash=None):
 class BuildBuildDictionary(Task):
   """Generate documentation for the Sphinx site."""
 
-  def __init__(self, context):
-    super(BuildBuildDictionary, self).__init__(context)
+  def __init__(self, context, workdir):
+    super(BuildBuildDictionary, self).__init__(context, workdir)
     self._templates_dir = os.path.join('templates', 'builddictionary')
     self._outdir = os.path.join(self.context.config.getdefault("pants_distdir"), "builddict")
 

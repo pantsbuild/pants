@@ -74,12 +74,12 @@ class NailgunSession(object):
     def _should_run(self):
       return not self._stopping.is_set()
 
-  def execute(self, work_dir, main_class, *args, **environment):
+  def execute(self, workdir, main_class, *args, **environment):
     for arg in args:
       self._send_chunk('A', arg)
     for k, v in environment.items():
       self._send_chunk('E', '%s=%s' % (k, v))
-    self._send_chunk('D', work_dir)
+    self._send_chunk('D', workdir)
     self._send_chunk('C', main_class)
 
     if self._input_reader:
@@ -143,7 +143,7 @@ class NailgunClient(object):
                ins=sys.stdin,
                out=sys.stdout,
                err=sys.stderr,
-               work_dir=None):
+               workdir=None):
     """Creates a nailgun client that can be used to issue zero or more nailgun commands.
 
     :param string host: the nailgun server to contact (defaults to localhost)
@@ -153,14 +153,14 @@ class NailgunClient(object):
       in which case no input is read
     :param file out: a stream to write command standard output to (defaults to stdout)
     :param file err: a stream to write command standard error to (defaults to stderr)
-    :param string work_dir: the working directory for all nailgun commands (defaults to PWD)
+    :param string workdir: the working directory for all nailgun commands (defaults to PWD)
     """
     self._host = host
     self._port = port
     self._ins = ins
     self._out = out
     self._err = err
-    self._work_dir = work_dir or os.path.abspath(os.path.curdir)
+    self._workdir = workdir or os.path.abspath(os.path.curdir)
 
     self.execute = self.__call__
 
@@ -187,7 +187,7 @@ class NailgunClient(object):
 
     session = NailgunSession(sock, self._ins, self._out, self._err)
     try:
-      return session.execute(self._work_dir, main_class, *args, **environment)
+      return session.execute(self._workdir, main_class, *args, **environment)
     except socket.error as e:
       raise self.NailgunError('Problem contacting nailgun server %s:%d:'
                               ' %s' % (self._host, self._port, e))
@@ -198,4 +198,4 @@ class NailgunClient(object):
       sock.close()
 
   def __repr__(self):
-    return 'NailgunClient(host=%r, port=%r, work_dir=%r)' % (self._host, self._port, self._work_dir)
+    return 'NailgunClient(host=%r, port=%r, workdir=%r)' % (self._host, self._port, self._workdir)

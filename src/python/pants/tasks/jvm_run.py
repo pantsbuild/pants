@@ -12,7 +12,7 @@ from pants.base.workunit import WorkUnit
 from pants.java.executor import CommandLineGrabber
 from pants.java.util import execute_java
 from pants.targets.jvm_binary import JvmBinary
-from pants.tasks import Task, TaskError
+from pants.tasks import TaskError
 from pants.tasks.jvm_task import JvmTask
 
 
@@ -37,8 +37,8 @@ class JvmRun(JvmTask):
       action='store', default=None,
       help = '[%default] Instead of running, just write the cmd line to this file')
 
-  def __init__(self, context):
-    Task.__init__(self, context)
+  def __init__(self, context, workdir):
+    super(JvmRun, self).__init__(context, workdir)
     self.jvm_args = context.config.getlist('jvm-run', 'jvm_args', default=[])
     if context.options.run_jvmargs:
       for arg in context.options.run_jvmargs:

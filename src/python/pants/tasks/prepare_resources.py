@@ -16,10 +16,9 @@ from pants.tasks import Task
 
 class PrepareResources(Task):
 
-  def __init__(self, context):
-    Task.__init__(self, context)
+  def __init__(self, context, workdir):
+    super(PrepareResources, self).__init__(context, workdir)
 
-    self.workdir = context.config.get('prepare-resources', 'workdir')
     self.confs = context.config.getlist('prepare-resources', 'confs', default=['default'])
     self.context.products.require_data('exclusives_groups')
 

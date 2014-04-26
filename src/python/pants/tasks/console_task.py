@@ -17,8 +17,8 @@ class ConsoleTask(Task):
     option_group.add_option(mkflag("sep"), dest="console_%s_separator" % cls.__name__,
                             default='\\n', help="String to use to separate results.")
 
-  def __init__(self, context, outstream=sys.stdout):
-    super(ConsoleTask, self).__init__(context)
+  def __init__(self, context, workdir, outstream=sys.stdout):
+    super(ConsoleTask, self).__init__(context, workdir)
     separator_option = "console_%s_separator" % self.__class__.__name__
     self._console_separator = getattr(context.options, separator_option).decode('string-escape')
     self._outstream = outstream

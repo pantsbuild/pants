@@ -40,8 +40,8 @@ class ReverseDepmap(ConsoleTask):
                                  "can be specified at once in a comma separated list or else by "
                                  "using multiple instances of this flag.")
 
-  def __init__(self, context):
-    ConsoleTask.__init__(self, context)
+  def __init__(self, context, workdir):
+    super(ReverseDepmap, self).__init__(context, workdir)
 
     self._transitive = context.options.reverse_depmap_transitive
     self._closed = context.options.reverse_depmap_closed
