@@ -19,8 +19,6 @@ from pants.tasks.ivy_utils import IvyModuleRef, IvyUtils
 class Provides(Task):
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
-    option_group.add_option(mkflag('outdir'), dest='provides_outdir',
-      help='Emit provides outputs into this directory.')
     option_group.add_option(mkflag('transitive'), default=False,
       action='store_true', dest='provides_transitive',
       help='Shows the symbols provided not just by the specified targets but by all their transitive dependencies.')
@@ -36,7 +34,6 @@ class Provides(Task):
     self.confs = context.config.getlist('ivy', 'confs', default=['default'])
     self.target_roots = context.target_roots
     self.transitive = context.options.provides_transitive
-    self.outdir = context.options.provides_outdir or self.workdir
     self.also_write_to_stdout = context.options.provides_also_write_to_stdout or False
     # Create a fake target, in case we were run directly on a JarLibrary containing nothing but JarDependencies.
     # TODO(benjy): Get rid of this special-casing of jar dependencies.
@@ -49,7 +46,7 @@ class Provides(Task):
 
   def execute(self, targets):
     for conf in self.confs:
-      outpath = os.path.join(self.outdir, '%s.%s.provides' %
+      outpath = os.path.join(self.workdir, '%s.%s.provides' %
                              (self.ivy_utils.identify(targets)[1], conf))
       if self.transitive:
         outpath += '.transitive'

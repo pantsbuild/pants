@@ -18,10 +18,9 @@ from pants.tasks import Task, TaskError
 
 Jvmdoc = collections.namedtuple('Jvmdoc', ['tool_name', 'product_type'])
 
-ParserConfig = collections.namedtuple(
-                'JvmdocGenParserConfig',
-                ['outdir_opt', 'include_codegen_opt', 'transitive_opt', 'open_opt', 'combined_opt',
-                 'ignore_failure_opt'])
+ParserConfig = collections.namedtuple('JvmdocGenParserConfig',
+                                      ['include_codegen_opt', 'transitive_opt', 'open_opt',
+                                       'combined_opt', 'ignore_failure_opt'])
 
 
 class JvmdocGen(Task):
@@ -33,11 +32,6 @@ class JvmdocGen(Task):
   @classmethod
   def generate_setup_parser(cls, option_group, args, mkflag, jvmdoc):
     parser_config = cls.setup_parser_config()
-    option_group.add_option(
-      mkflag('outdir'),
-      dest=parser_config.outdir_opt,
-      help='Emit %s in this directory.' % jvmdoc.tool_name)
-
     option_group.add_option(
       mkflag('include-codegen'),
       mkflag('include-codegen', negate=True),
@@ -90,8 +84,7 @@ class JvmdocGen(Task):
       help='Specifies that %s errors should not cause build errors'
            % jvmdoc.tool_name)
 
-  # TODO(benjy): Remove output_dir arg?
-  def __init__(self, context, workdir, jvmdoc, output_dir, confs, active):
+  def __init__(self, context, workdir, jvmdoc, confs, active):
     def getattr_options(option):
       return getattr(context.options, option)
 
@@ -102,12 +95,6 @@ class JvmdocGen(Task):
 
     config_section = '%s-gen' % jvmdoc_tool_name
     parser_config = self.setup_parser_config()
-
-    self._output_dir = (
-      output_dir
-      or getattr_options(parser_config.outdir_opt)
-      or self.workdir
-    )
 
     flagged_codegen = getattr_options(parser_config.include_codegen_opt)
     self._include_codegen = (flagged_codegen if flagged_codegen is not None
@@ -122,7 +109,7 @@ class JvmdocGen(Task):
     self.ignore_failure = getattr_options(parser_config.ignore_failure_opt)
 
   def invalidate_for(self):
-    return (self.combined, self.transitive, self._output_dir, self.confs, self._include_codegen)
+    return self.combined, self.transitive, self.workdir, self.confs, self._include_codegen
 
   def generate_execute(self, targets, language_predicate, create_jvmdoc_command):
     """
@@ -142,7 +129,7 @@ class JvmdocGen(Task):
         return language_predicate(target) and (self._include_codegen or not target.is_codegen)
 
       with self.invalidated(filter(docable, targets)) as invalidation_check:
-        safe_mkdir(self._output_dir)
+        safe_mkdir(self.workdir)
         with self.context.state('classpath', []) as cp:
           classpath = [jar for conf, jar in cp if conf in self.confs]
 
@@ -171,7 +158,7 @@ class JvmdocGen(Task):
           self.context.products.get(self._jvmdoc.product_type).add(target, gendir, jvmdocs)
 
   def _generate_combined(self, classpath, targets, create_jvmdoc_command):
-    gendir = os.path.join(self._output_dir, 'combined')
+    gendir = os.path.join(self.workdir, 'combined')
     if targets:
       safe_mkdir(gendir, clean=True)
       command = create_jvmdoc_command(classpath, gendir, *targets)
@@ -216,7 +203,7 @@ class JvmdocGen(Task):
               raise TaskError(message)
 
   def _gendir(self, target):
-    return os.path.join(self._output_dir, target.id)
+    return os.path.join(self.workdir, target.id)
 
 
 def create_jvmdoc(command, gendir):

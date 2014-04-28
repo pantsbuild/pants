@@ -86,9 +86,6 @@ class MarkdownToHtml(Task):
                             action='callback', callback=mkflag.set_bool, default=False,
                             help = '[%default] Generate a fragment of html to embed in a page.')
 
-    option_group.add_option(mkflag('outdir'), dest='markdown_to_html_outdir',
-                            help='Emit generated html in to this directory.')
-
     option_group.add_option(mkflag('extension'), dest = 'markdown_to_html_extensions',
                             action='append',
                             help = 'Override the default markdown extensions and process pages '
@@ -98,8 +95,6 @@ class MarkdownToHtml(Task):
     super(MarkdownToHtml, self).__init__(context, workdir)
 
     self.open = context.options.markdown_to_html_open
-
-    self.outdir = context.options.markdown_to_html_outdir or self.workdir
 
     self.extensions = set(
       context.options.markdown_to_html_extensions
@@ -120,7 +115,7 @@ class MarkdownToHtml(Task):
     # TODO(John Sirois): consider adding change detection
 
     css_relpath = os.path.join('css', 'codehighlight.css')
-    css = emit_codehighlight_css(os.path.join(self.outdir, css_relpath), self.code_style)
+    css = emit_codehighlight_css(os.path.join(self.workdir, css_relpath), self.code_style)
     if css:
       self.context.log.info('Emitted %s' % css)
 
@@ -165,17 +160,17 @@ class MarkdownToHtml(Task):
           path, ext = os.path.splitext(linked_page.source)
           return linked_page.name, os.path.relpath(path + '.html', os.path.dirname(page.source))
 
-        page_path = os.path.join(self.outdir, 'html')
+        page_path = os.path.join(self.workdir, 'html')
         html = process_page(page, page_path, url_builder, lambda p: None, plaingenmap)
         if css and not self.fragment:
-          plaingenmap.add(page, self.outdir, list(css_relpath))
+          plaingenmap.add(page, self.workdir, list(css_relpath))
         if self.open and page in roots:
           show.append(html)
 
         for wiki in page.wikis():
           def get_config(page):
             return page.wiki_config(wiki)
-          basedir = os.path.join(self.outdir, wiki.id)
+          basedir = os.path.join(self.workdir, wiki.id)
           process_page((wiki, page), basedir, wiki.url_builder, get_config,
                        wikigenmap, fragment=True)
 

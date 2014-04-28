@@ -19,8 +19,8 @@ class JavadocGen(JvmdocGen):
   def setup_parser(cls, option_group, args, mkflag):
     cls.generate_setup_parser(option_group, args, mkflag, javadoc)
 
-  def __init__(self, context, workdir, output_dir=None, confs=None, active=True):
-    super(JavadocGen, self).__init__(context, workdir, javadoc, output_dir, confs, active)
+  def __init__(self, context, workdir, confs=None, active=True):
+    super(JavadocGen, self).__init__(context, workdir, javadoc, confs, active)
 
   def execute(self, targets):
     self.generate_execute(targets, is_java, create_javadoc_command)

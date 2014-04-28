@@ -704,19 +704,13 @@ if MarkdownToHtml.AVAILABLE:
 
 
 class ScaladocJarShim(ScaladocGen):
-  def __init__(self, context, output_dir=None, confs=None):
-    super(ScaladocJarShim, self).__init__(context,
-                                          output_dir=output_dir,
-                                          confs=confs,
-                                          active=False)
+  def __init__(self, context, workdir, confs=None):
+    super(ScaladocJarShim, self).__init__(context, workdir, confs=confs, active=False)
 
 
 class JavadocJarShim(JavadocGen):
-  def __init__(self, context, output_dir=None, confs=None):
-    super(JavadocJarShim, self).__init__(context,
-                                         output_dir=output_dir,
-                                         confs=confs,
-                                         active=False)
+  def __init__(self, context, workdir, confs=None):
+    super(JavadocJarShim, self).__init__(context, workdir, confs=confs, active=False)
 
 
 goal(name='javadoc_publish',
