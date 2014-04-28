@@ -4,61 +4,14 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-
-try:
-  import markdown
-
-  WIKILINKS_PATTERN = r'\[\[([^\]]+)\]\]'
-
-  class WikilinksPattern(markdown.inlinepatterns.Pattern):
-    def __init__(self, build_url, markdown_instance=None):
-      markdown.inlinepatterns.Pattern.__init__(self, WIKILINKS_PATTERN, markdown_instance)
-      self.build_url = build_url
-
-    def handleMatch(self, m):
-      alias, url = self.build_url(m.group(2).strip())
-      el = markdown.util.etree.Element('a')
-      el.set('href', url)
-      el.text = markdown.util.AtomicString(alias)
-      return el
-
-  class WikilinksExtension(markdown.Extension):
-    def __init__(self, build_url, configs=None):
-      markdown.Extension.__init__(self, configs or {})
-      self.build_url = build_url
-
-    def extendMarkdown(self, md, md_globals):
-      md.inlinePatterns['wikilinks'] = WikilinksPattern(self.build_url, md)
-
-  HAS_MARKDOWN = True
-except ImportError:
-  HAS_MARKDOWN = False
-
-try:
-  from pygments.formatters.html import HtmlFormatter
-  from pygments.styles import get_all_styles
-
-  def configure_codehighlight_options(option_group, mkflag):
-    all_styles = list(get_all_styles())
-    option_group.add_option(mkflag('code-style'), dest='markdown_to_html_code_style',
-                            type='choice', choices=all_styles,
-                            help='Selects the stylesheet to use for code highlights, one of: '
-                                 '%s.' % ' '.join(all_styles))
-
-  def emit_codehighlight_css(path, style):
-    with safe_open(path, 'w') as css:
-      css.write((HtmlFormatter(style=style)).get_style_defs('.codehilite'))
-    return path
-except ImportError:
-  def configure_codehighlight_options(option_group, mkflag): pass
-  def emit_codehighlight_css(path, style): pass
-
-
 import codecs
 import os
 import re
 import textwrap
 
+import markdown
+from pygments.formatters.html import HtmlFormatter
+from pygments.styles import get_all_styles
 from twitter.common.dirutil import safe_mkdir, safe_open
 
 from pants import binary_util
@@ -69,9 +22,44 @@ from pants.targets.doc import Page
 from pants.tasks import Task, TaskError
 
 
-class MarkdownToHtml(Task):
-  AVAILABLE = HAS_MARKDOWN
+def configure_codehighlight_options(option_group, mkflag):
+  all_styles = list(get_all_styles())
+  option_group.add_option(mkflag('code-style'), dest='markdown_to_html_code_style',
+                          type='choice', choices=all_styles,
+                          help='Selects the stylesheet to use for code highlights, one of: '
+                               '%s.' % ' '.join(all_styles))
 
+def emit_codehighlight_css(path, style):
+  with safe_open(path, 'w') as css:
+    css.write((HtmlFormatter(style=style)).get_style_defs('.codehilite'))
+  return path
+
+
+WIKILINKS_PATTERN = r'\[\[([^\]]+)\]\]'
+
+class WikilinksPattern(markdown.inlinepatterns.Pattern):
+  def __init__(self, build_url, markdown_instance=None):
+    markdown.inlinepatterns.Pattern.__init__(self, WIKILINKS_PATTERN, markdown_instance)
+    self.build_url = build_url
+
+  def handleMatch(self, m):
+    alias, url = self.build_url(m.group(2).strip())
+    el = markdown.util.etree.Element('a')
+    el.set('href', url)
+    el.text = markdown.util.AtomicString(alias)
+    return el
+
+
+class WikilinksExtension(markdown.Extension):
+  def __init__(self, build_url, configs=None):
+    markdown.Extension.__init__(self, configs or {})
+    self.build_url = build_url
+
+  def extendMarkdown(self, md, md_globals):
+    md.inlinePatterns['wikilinks'] = WikilinksPattern(self.build_url, md)
+
+
+class MarkdownToHtml(Task):
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
     configure_codehighlight_options(option_group, mkflag)
@@ -109,9 +97,6 @@ class MarkdownToHtml(Task):
         self.code_style = context.options.markdown_to_html_code_style
 
   def execute(self, targets):
-    if not MarkdownToHtml.AVAILABLE:
-      raise TaskError('Cannot process markdown - no markdown lib on the sys.path')
-
     # TODO(John Sirois): consider adding change detection
 
     css_relpath = os.path.join('css', 'codehighlight.css')

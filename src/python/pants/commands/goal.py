@@ -697,10 +697,9 @@ goal(name='scaladoc',
      dependencies=['compile', 'bootstrap']).install('doc')
 
 
-if MarkdownToHtml.AVAILABLE:
-  goal(name='markdown',
-       action=MarkdownToHtml
-  ).install('markdown').with_description('Generate html from markdown docs.')
+goal(name='markdown',
+     action=MarkdownToHtml
+).install('markdown').with_description('Generate html from markdown docs.')
 
 
 class ScaladocJarShim(ScaladocGen):
