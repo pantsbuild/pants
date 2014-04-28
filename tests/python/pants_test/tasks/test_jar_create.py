@@ -5,13 +5,12 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import os
-import tempfile
 from collections import defaultdict
 from contextlib import closing, contextmanager
 from textwrap import dedent
 
 from twitter.common.contextutil import temporary_dir
-from twitter.common.dirutil import safe_open, safe_rmtree
+from twitter.common.dirutil import safe_open
 
 from pants.goal.products import MultipleRootedProducts
 from pants.java.jar import open_jar
@@ -28,8 +27,7 @@ from pants_test.base.context_utils import create_context
 class JarCreateTestBase(BaseBuildRootTest):
   @staticmethod
   def create_options(**kwargs):
-    options = dict(jar_create_outdir=None,
-                   jar_create_transitive=None,
+    options = dict(jar_create_transitive=None,
                    jar_create_compressed=None,
                    jar_create_classes=None,
                    jar_create_sources=None,
@@ -101,18 +99,8 @@ class JarCreateExecuteTest(JarCreateTestBase):
                                       provides=True,
                                       java_sources=['src/java/com/twitter/foo:java_foo'])
 
-  def setUp(self):
-    super(JarCreateExecuteTest, self).setUp()
-    self.jar_outdir = tempfile.mkdtemp()
-
-  def tearDown(self):
-    super(JarCreateExecuteTest, self).tearDown()
-    safe_rmtree(self.jar_outdir)
-
   def context(self, config='', **options):
-    opts = dict(jar_create_outdir=self.jar_outdir)
-    opts.update(**options)
-    return create_context(config=config, options=self.create_options(**opts),
+    return create_context(config=config, options=self.create_options(**options),
                           target_roots=[self.jl, self.sl, self.jtl, self.scala_lib])
 
   @contextmanager

@@ -24,9 +24,6 @@ from pants.tasks.code_gen import CodeGen
 class ProtobufGen(CodeGen):
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
-    option_group.add_option(mkflag('outdir'), dest='protobuf_gen_create_outdir',
-                            help='Emit generated code in to this directory.')
-
     option_group.add_option(mkflag('lang'), dest='protobuf_gen_langs', default=[],
                             action='append', type='choice', choices=['python', 'java'],
                             help='Force generation of protobuf code for these languages.')
@@ -36,7 +33,6 @@ class ProtobufGen(CodeGen):
 
     self.protoc_supportdir = self.context.config.get('protobuf-gen', 'supportdir')
     self.protoc_version = self.context.config.get('protobuf-gen', 'version')
-    self.output_dir = context.options.protobuf_gen_create_outdir or self.workdir
     self.plugins = self.context.config.getlist('protobuf-gen', 'plugins', default=[])
 
     def resolve_deps(key):
@@ -46,10 +42,10 @@ class ProtobufGen(CodeGen):
       return deps
 
     self.javadeps = resolve_deps('javadeps')
-    self.java_out = os.path.join(self.output_dir, 'gen-java')
+    self.java_out = os.path.join(self.workdir, 'gen-java')
 
     self.pythondeps = resolve_deps('pythondeps')
-    self.py_out = os.path.join(self.output_dir, 'gen-py')
+    self.py_out = os.path.join(self.workdir, 'gen-py')
 
     self.gen_langs = set(context.options.protobuf_gen_langs)
     for lang in ('java', 'python'):
@@ -79,13 +75,6 @@ class ProtobufGen(CodeGen):
     return dict(java=lambda t: t.is_jvm, python=lambda t: t.is_python)
 
   def genlang(self, lang, targets):
-    protobuf_binary = select_binary(
-      self.protoc_supportdir,
-      self.protoc_version,
-      'protoc',
-      self.context.config
-    )
-
     bases, sources = self._calculate_sources(targets)
 
     if lang == 'java':

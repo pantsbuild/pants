@@ -51,9 +51,6 @@ class ApacheThriftGen(CodeGen):
 
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
-    option_group.add_option(mkflag('outdir'), dest='thrift_gen_create_outdir',
-                            help='Emit generated code in to this directory.')
-
     option_group.add_option(mkflag('version'), dest='thrift_version',
                             help='Thrift compiler version.')
 
@@ -64,12 +61,8 @@ class ApacheThriftGen(CodeGen):
   def __init__(self, context, workdir):
     super(ApacheThriftGen, self).__init__(context, workdir)
 
-    output_dir = (
-      context.options.thrift_gen_create_outdir
-      or self.workdir
-    )
-    self.combined_dir = os.path.join(output_dir, 'combined')
-    self.session_dir = os.path.join(output_dir, 'sessions')
+    self.combined_dir = os.path.join(self.workdir, 'combined')
+    self.session_dir = os.path.join(self.workdir, 'sessions')
 
     self.strict = context.config.getbool('thrift-gen', 'strict')
     self.verbose = context.config.getbool('thrift-gen', 'verbose')

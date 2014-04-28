@@ -50,10 +50,6 @@ class JUnitRun(JvmTask):
                                    'specified using any of: [classname], [classname]#[methodname], '
                                    '[filename] or [filename]#[methodname]')
 
-    outdir = mkflag('outdir')
-    option_group.add_option(outdir, dest='junit_run_outdir',
-                            help='Emit output in to this directory.')
-
     xmlreport = mkflag('xmlreport')
     option_group.add_option(xmlreport, mkflag('xmlreport', negate=True),
                             dest='junit_run_xmlreport',
@@ -112,13 +108,13 @@ class JUnitRun(JvmTask):
     option_group.add_option(mkflag('coverage-xml'), mkflag('coverage-xml', negate=True),
                             dest='junit_run_coverage_xml',
                             action='callback', callback=mkflag.set_bool, default=False,
-                            help='[%%default] Produces an xml coverage report in %s.' % outdir)
+                            help='[%%default] Produces an xml coverage report.')
 
     coverage_html_flag = mkflag('coverage-html')
     option_group.add_option(coverage_html_flag, mkflag('coverage-html', negate=True),
                             dest='junit_run_coverage_html',
                             action='callback', callback=mkflag.set_bool, default=False,
-                            help='[%%default] Produces an html coverage report in %s.' % outdir)
+                            help='[%%default] Produces an html coverage report.')
 
     option_group.add_option(mkflag('coverage-html-open'), mkflag('coverage-html-open', negate=True),
                             dest='junit_run_coverage_html_open',
@@ -129,8 +125,8 @@ class JUnitRun(JvmTask):
     option_group.add_option(mkflag('suppress-output'), mkflag('suppress-output', negate=True),
                             dest='junit_run_suppress_output',
                             action='callback', callback=mkflag.set_bool, default=True,
-                            help='[%%default] Redirects test output to files in %s.  '
-                                   'Implied by %s' % (outdir, xmlreport))
+                            help='[%%default] Redirects test output to files.  '
+                                 'Implied by %s' % xmlreport)
 
     option_group.add_option(mkflag("arg"), dest="junit_run_arg",
                             action="append",
@@ -165,14 +161,12 @@ class JUnitRun(JvmTask):
     self.context.products.require_data('classes_by_target')
     self.context.products.require_data('classes_by_source')
 
-    self.outdir = context.options.junit_run_outdir or self.workdir
-
     self.batch_size = context.options.junit_run_batch_size
     self.fail_fast = context.options.junit_run_fail_fast
 
     self.coverage = context.options.junit_run_coverage
     self.coverage_filters = context.options.junit_run_coverage_patterns or []
-    self.coverage_dir = os.path.join(self.outdir, 'coverage')
+    self.coverage_dir = os.path.join(self.workdir, 'coverage')
     self.coverage_instrument_dir = os.path.join(self.coverage_dir, 'classes')
     self.coverage_metadata_file = os.path.join(self.coverage_dir, 'coverage.em')
     self.coverage_file = os.path.join(self.coverage_dir, 'coverage.ec')
@@ -199,7 +193,7 @@ class JUnitRun(JvmTask):
         self.opts.append('-xmlreport')
       self.opts.append('-suppress-output')
       self.opts.append('-outdir')
-      self.opts.append(self.outdir)
+      self.opts.append(self.workdir)
 
     if context.options.junit_run_per_test_timer:
       self.opts.append('-per-test-timer')
