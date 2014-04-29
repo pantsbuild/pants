@@ -1,0 +1,10 @@
+package com.pants.examples.distance;
+
+/**
+ * Structure for expressing distance measures: 8mm, 12 parsecs, etc.
+ * Not so useful on its own.
+ */
+message Distance {
+  optional string unit = 1;
+  required int64 number = 2;
+}
