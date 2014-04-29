@@ -23,48 +23,55 @@ Project Setup
 
 While pants can generate IntelliJ IDEA projects for Java/Scala targets, it
 cannot yet generate projects for Python targets. For this reason you must
-manually create the project. This section walks you through that process.
+manually create the project. This section walks you through that process using
+IntelliJ IDEA 13.1.2.
 
-Open IntelliJ and "Create New Project".
+First you need to bootstrap pants in developer mode.  This is generally the
+way you want to run pants when iterating and it also prepares a virtual
+environment suitable for IDEs::
+
+   $ PANTS_DEV=1 ./pants
+
+Next open IntelliJ and select "Create New Project".
 
 .. image:: images/intellij-new-project-1.png
 
-In the "New Project" window, select "Python Module" and specify the "Project
-name" and "Project location." These should be outside the pants source repo so
-they survive `clean-all` and `git clean` should those be necessary.
+In the "New Project" window, select "Python".
 
 .. image:: images/intellij-new-project-2.png
 
-Open the "File -> Project Structure" window. In the "Project", specify your
-python interpreter.
+Then skip past the project templates screen and land at the Python interpreter
+configuration screen. Click "Configure..." and add a "Python SDK".
+
+.. image:: images/intellij-new-pythonsdk.png
+
+This will be a "local" interpreter and you'll need to select the virtual
+environment bootstrapped above; it's in `build-support/pants_dev_deps.venv`
+(not `build-support/pants_deps.venv`).  This is **important** because the dev virtual
+environment is designed to have 3rdparty deps IDEs can handle.
+
+.. image:: images/intellij-select-venv.png
+
+Next specify a "Project name" and "Project location".
+
+Now open the "File -> Project Structure" window. For the "Project SDK" choice,
+specify the python interpreter you configured above.
 
 .. image:: images/intellij-project-structure-project.png
 
-In the "Modules" section, make a new module and add two source roots, for the
-sources and tests. Think of source roots as what your would put on the
-PYTHONPATH - the parent directory of what you'll import. Mark the "pants" directory as 
-sources for source root and "pants_test" directory as test_sources for configuring test root.
+In the "Modules" section, you need to mark "Sources" and "Tests". This establoshes
+the loose python source roots to add to the PYTHONPATH - the parent directory of what
+you'll import. Mark the `src/python` directory as sources and `tests/python`
+directory as test_sources.
 
 .. image:: images/intellij-project-structure-modules-sources.png
 
-Lastly, we need to add egg dependencies. From the pants source repo, fetch the
-eggs and move to a location outside the source repo so they survive
-cleaning. ::
+Finally in "File -> Settings -> Python Integrated Tools" set the default test runner
+to `py.test` - which is what pants uses to drive python tests.
 
-   $ ./pants
-   $ mv .pants.d/python/eggs ~/Documents/IntelliJ/pants-eggs
+.. image:: images/intellij-configure-tests.png
 
-In the Project Structure -> Modules -> Dependencies dialog, add the eggs as
-follows.
-
-* Select the Dependencies tab.
-* Click on "+" Button.
-* Select "Jars or directories" and add the directory eggs were moved to above.
-* Add as a "jar directory" (this is important).
-
-.. image:: images/intellij-project-structure-modules-dependencies.png
-
-Now your project set is complete!
+Now your project setup is complete!
 
 
 **********************************
@@ -80,7 +87,7 @@ Open the "Run -> Edit Configurations..." dialog box.
 
 * Add a new Python configuration.
 * Set the "Script" to
-  `/Users/travis/src/commons/src/python/pants/bin/pants_exe.py`
+  `/home/jsirois/dev-pants/src/python/pants/bin/pants_exe.py`
 * Set the "Script parameters" to your pants command-line args,
   such as `goal goals`.
 * Set the "Working directory" to where you want to run pants from. Note this
