@@ -52,8 +52,7 @@ environment is designed to have 3rdparty deps IDEs can handle.
 
 .. image:: images/intellij-select-venv.png
 
-Next specify a "Project name" and "Project location." These should be outside the
-pants source repo so they survive `clean-all` and `git clean` should those be necessary.
+Next specify a "Project name" and "Project location".
 
 Now open the "File -> Project Structure" window. In the "Project", specify your
 the python interpreter you configured above.
@@ -72,7 +71,7 @@ to `py.test` - which is what pants uses to drive python tests.
 
 .. image:: images/intellij-configure-tests.png
 
-Now your project set is complete!
+Now your project setup is complete!
 
 
 **********************************
