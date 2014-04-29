@@ -6,3 +6,10 @@ credentials(
   name = 'netrc',
   username=netrc.getusername,
   password=netrc.getpassword)
+
+python_library(
+  name = 'authentication',
+  sources = ['netrc_util.py'],
+  dependencies = [
+  ]
+)
