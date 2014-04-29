@@ -54,8 +54,8 @@ environment is designed to have 3rdparty deps IDEs can handle.
 
 Next specify a "Project name" and "Project location".
 
-Now open the "File -> Project Structure" window. In the "Project", specify your
-the python interpreter you configured above.
+Now open the "File -> Project Structure" window. For the "Project SDK" choice,
+specify the python interpreter you configured above.
 
 .. image:: images/intellij-project-structure-project.png
 
