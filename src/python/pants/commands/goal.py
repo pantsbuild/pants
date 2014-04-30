@@ -4,19 +4,17 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from contextlib import contextmanager
 import inspect
 import multiprocessing
 import os
+import optparse
 import re
 import signal
 import socket
 import sys
-import textwrap
 import time
 import traceback
-
-from contextlib import contextmanager
-from optparse import OptionParser
 
 from twitter.common import log
 from twitter.common.collections import OrderedSet
@@ -24,11 +22,10 @@ from twitter.common.dirutil import safe_mkdir, safe_rmtree
 from twitter.common.lang import Compatibility
 from twitter.common.log.options import LogOptions
 
-from pants import binary_util
 from pants.base.address import Address
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
-from pants.base.config import Config, ConfigOption
+from pants.base.config import Config
 from pants.base.parse_context import ParseContext
 from pants.base.rcfile import RcFile
 from pants.base.run_info import RunInfo
@@ -39,10 +36,9 @@ from pants.engine.engine import Engine
 from pants.engine.group_engine import GroupEngine
 from pants.goal import Context, GoalError, Phase
 from pants.goal import Goal as goal, Group as group
+from pants.goal.help import print_help
 from pants.goal.initialize_reporting import update_reporting
-from pants.goal.option_helpers import (
-  add_global_options,
-  setup_parser_for_phase_help)
+from pants.goal.option_helpers import add_global_options
 from pants.reporting.reporting_server import ReportingServer, ReportingServerManager
 from pants.tasks import Task, TaskError
 from pants.tasks.console_task import ConsoleTask
@@ -53,44 +49,10 @@ from pants.tasks.targets_help import TargetsHelp
 StringIO = Compatibility.StringIO
 
 
-def _list_goals(context, message):
-  """Show all installed goals."""
-  context.log.error(message)
-  # Execute as if the user had run "./pants goals".
-  return Goal.execute(context, 'goals')
-
-
 goal(name='goals', action=ListGoals).install().with_description('List all documented goals.')
 
 
 goal(name='targets', action=TargetsHelp).install().with_description('List all target types.')
-
-
-class Help(ConsoleTask):
-  @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    super(Help, cls).setup_parser(option_group, args, mkflag)
-    default = None
-    if len(args) > 1 and (not args[1].startswith('-')):
-      default = args[1]
-      del args[1]
-    option_group.add_option(mkflag("goal"), dest="help_goal", default=default)
-
-  def execute(self, targets):
-    goal = self.context.options.help_goal
-    if goal is None:
-      return self.list_goals('You must supply a goal name to provide help for.')
-    phase = Phase(goal)
-    if not phase.goals():
-      self.list_goals('Goal %s is unknown.' % goal)
-
-    parser = setup_parser_for_phase_help(phase)
-    parser.parse_args(['--help'])
-
-  def list_goals(self, message):
-    return _list_goals(self.context, message)
-
-goal(name='help', action=Help).install().with_description('Provide help for the specified goal.')
 
 
 class SpecParser(object):
@@ -145,14 +107,12 @@ class Goal(Command):
   def parse_args(args):
     goals = OrderedSet()
     specs = OrderedSet()
-    help = False
     explicit_multi = False
 
     def is_spec(spec):
       return os.sep in spec or ':' in spec
 
     for i, arg in enumerate(args):
-      help = help or 'help' == arg
       if not arg.startswith('-'):
         specs.add(arg) if is_spec(arg) else goals.add(arg)
       elif '--' == arg:
@@ -164,26 +124,9 @@ class Goal(Command):
         break
 
     if explicit_multi:
-      spec_offset = len(goals) + 1 if help else len(goals)
-      specs.update(arg for arg in args[spec_offset:] if not arg.startswith('-'))
+      specs.update(arg for arg in args[len(goals):] if not arg.startswith('-'))
 
     return goals, specs
-
-  @classmethod
-  def execute(cls, context, *names):
-    parser = OptionParser()
-    add_global_options(parser)
-    phases = [Phase(name) for name in names]
-    Phase.setup_parser(parser, [], phases)
-    options, _ = parser.parse_args([])
-    context = Context(context.config, options, context.run_tracker, context.target_roots,
-                      requested_goals=list(names))
-    return cls._execute(context, phases, print_timing=False)
-
-  @staticmethod
-  def _execute(context, phases, print_timing):
-    engine = GroupEngine(print_timing=print_timing)
-    return engine.execute(context, phases)
 
   # TODO(John Sirois): revisit wholesale locking when we move py support into pants new
   @classmethod
@@ -195,6 +138,7 @@ class Goal(Command):
 
   def __init__(self, run_tracker, root_dir, parser, args):
     self.targets = []
+    self.config = None
     Command.__init__(self, run_tracker, root_dir, parser, args)
 
   @contextmanager
@@ -246,105 +190,84 @@ class Goal(Command):
     # ./pants goal compile run -- -x src/java/... => compile, run
 
     if not args:
-      args.append('goals')
+      args.append('help')
 
-    if len(args) == 1 and args[0] in set(['-h', '--help', 'help']):
-      def format_usage(usages):
-        left_colwidth = 0
-        for left, right in usages:
-          left_colwidth = max(left_colwidth, len(left))
-        lines = []
-        for left, right in usages:
-          lines.append('  %s%s%s' % (left, ' ' * (left_colwidth - len(left) + 1), right))
-        return '\n'.join(lines)
+    help_flags = set(['-h', '--help', 'help'])
+    show_help = len(help_flags.intersection(args)) > 0
+    args = filter(lambda f: f not in help_flags, args)
 
-      usages = [
-        ("%prog goal goals ([spec]...)", Phase('goals').description),
-        ("%prog goal help [goal] ([spec]...)", Phase('help').description),
-        ("%prog goal [goal] [spec]...", "Attempt goal against one or more targets."),
-        ("%prog goal [goal] ([goal]...) -- [spec]...", "Attempts all the specified goals."),
-      ]
-      parser.set_usage("\n%s" % format_usage(usages))
-      parser.epilog = ("Either lists all installed goals, provides extra help for a goal or else "
-                       "attempts to achieve the specified goal for the listed targets.")
-
-      parser.print_help()
-
-      # Add some text that we can't put in the epilog, because that formats away newlines.
-      print(textwrap.dedent("""
-        Note that target specs accept two special forms:
-          [dir]:  to include all targets in the specified directory
-          [dir]:: to include all targets found recursively under the directory"""))
+    goals, specs = Goal.parse_args(args)
+    if show_help:
+      print_help(goals)
       sys.exit(0)
-    else:
-      goals, specs = Goal.parse_args(args)
-      self.requested_goals = goals
 
-      with self.run_tracker.new_workunit(name='setup', labels=[WorkUnit.SETUP]):
-        # Bootstrap goals by loading any configured bootstrap BUILD files
-        with self.check_errors('The following bootstrap_buildfiles cannot be loaded:') as error:
-          with self.run_tracker.new_workunit(name='bootstrap', labels=[WorkUnit.SETUP]):
-            for path in self.config.getlist('goals', 'bootstrap_buildfiles', default = []):
-              try:
-                buildfile = BuildFile(get_buildroot(), os.path.relpath(path, get_buildroot()))
-                ParseContext(buildfile).parse()
-              except (TypeError, ImportError, TaskError, GoalError):
-                error(path, include_traceback=True)
-              except (IOError, SyntaxError):
-                error(path)
-        # Now that we've parsed the bootstrap BUILD files, and know about the SCM system.
-        self.run_tracker.run_info.add_scm_info()
+    self.requested_goals = goals
 
-        # Bootstrap user goals by loading any BUILD files implied by targets.
-        spec_parser = SpecParser(self.root_dir)
-        with self.check_errors('The following targets could not be loaded:') as error:
-          with self.run_tracker.new_workunit(name='parse', labels=[WorkUnit.SETUP]):
-            for spec in specs:
-              try:
-                for target, address in spec_parser.parse(spec):
-                  if target:
-                    self.targets.append(target)
-                    # Force early BUILD file loading if this target is an alias that expands
-                    # to others.
-                    unused = list(target.resolve())
-                  else:
-                    siblings = Target.get_all_addresses(address.buildfile)
-                    prompt = 'did you mean' if len(siblings) == 1 else 'maybe you meant one of these'
-                    error('%s => %s?:\n    %s' % (address, prompt,
-                                                  '\n    '.join(str(a) for a in siblings)))
-              except (TypeError, ImportError, TaskError, GoalError):
-                error(spec, include_traceback=True)
-              except (IOError, SyntaxError, TargetDefinitionException):
-                error(spec)
+    with self.run_tracker.new_workunit(name='setup', labels=[WorkUnit.SETUP]):
+      # Bootstrap goals by loading any configured bootstrap BUILD files
+      with self.check_errors('The following bootstrap_buildfiles cannot be loaded:') as error:
+        with self.run_tracker.new_workunit(name='bootstrap', labels=[WorkUnit.SETUP]):
+          for path in self.config.getlist('goals', 'bootstrap_buildfiles', default = []):
+            try:
+              buildfile = BuildFile(get_buildroot(), os.path.relpath(path, get_buildroot()))
+              ParseContext(buildfile).parse()
+            except (TypeError, ImportError, TaskError, GoalError):
+              error(path, include_traceback=True)
+            except (IOError, SyntaxError):
+              error(path)
+      # Now that we've parsed the bootstrap BUILD files, and know about the SCM system.
+      self.run_tracker.run_info.add_scm_info()
 
-      self.phases = [Phase(goal) for goal in goals]
+      # Bootstrap user goals by loading any BUILD files implied by targets.
+      spec_parser = SpecParser(self.root_dir)
+      with self.check_errors('The following targets could not be loaded:') as error:
+        with self.run_tracker.new_workunit(name='parse', labels=[WorkUnit.SETUP]):
+          for spec in specs:
+            try:
+              for target, address in spec_parser.parse(spec):
+                if target:
+                  self.targets.append(target)
+                  # Force early BUILD file loading if this target is an alias that expands
+                  # to others.
+                  unused = list(target.resolve())
+                else:
+                  siblings = Target.get_all_addresses(address.buildfile)
+                  prompt = 'did you mean' if len(siblings) == 1 else 'maybe you meant one of these'
+                  error('%s => %s?:\n    %s' % (address, prompt,
+                                                '\n    '.join(str(a) for a in siblings)))
+            except (TypeError, ImportError, TaskError, GoalError):
+              error(spec, include_traceback=True)
+            except (IOError, SyntaxError, TargetDefinitionException):
+              error(spec)
 
-      rcfiles = self.config.getdefault('rcfiles', type=list,
-                                       default=['/etc/pantsrc', '~/.pants.rc'])
-      if rcfiles:
-        rcfile = RcFile(rcfiles, default_prepend=False, process_default=True)
+    self.phases = [Phase(goal) for goal in goals]
 
-        # Break down the goals specified on the command line to the full set that will be run so we
-        # can apply default flags to inner goal nodes.  Also break down goals by Task subclass and
-        # register the task class hierarchy fully qualified names so we can apply defaults to
-        # baseclasses.
+    rcfiles = self.config.getdefault('rcfiles', type=list,
+                                     default=['/etc/pantsrc', '~/.pants.rc'])
+    if rcfiles:
+      rcfile = RcFile(rcfiles, default_prepend=False, process_default=True)
 
-        sections = OrderedSet()
-        for phase in Engine.execution_order(self.phases):
-          for goal in phase.goals():
-            sections.add(goal.name)
-            for clazz in goal.task_type.mro():
-              if clazz == Task:
-                break
-              sections.add('%s.%s' % (clazz.__module__, clazz.__name__))
+      # Break down the goals specified on the command line to the full set that will be run so we
+      # can apply default flags to inner goal nodes.  Also break down goals by Task subclass and
+      # register the task class hierarchy fully qualified names so we can apply defaults to
+      # baseclasses.
 
-        augmented_args = rcfile.apply_defaults(sections, args)
-        if augmented_args != args:
-          del args[:]
-          args.extend(augmented_args)
-          sys.stderr.write("(using pantsrc expansion: pants goal %s)\n" % ' '.join(augmented_args))
+      sections = OrderedSet()
+      for phase in Engine.execution_order(self.phases):
+        for goal in phase.goals():
+          sections.add(goal.name)
+          for clazz in goal.task_type.mro():
+            if clazz == Task:
+              break
+            sections.add('%s.%s' % (clazz.__module__, clazz.__name__))
 
-      Phase.setup_parser(parser, args, self.phases)
+      augmented_args = rcfile.apply_defaults(sections, args)
+      if augmented_args != args:
+        del args[:]
+        args.extend(augmented_args)
+        sys.stderr.write("(using pantsrc expansion: pants goal %s)\n" % ' '.join(augmented_args))
+
+    Phase.setup_parser(parser, args, self.phases)
 
   def run(self, lock):
     # TODO(John Sirois): Consider moving to straight python logging.  The divide between the
@@ -389,10 +312,11 @@ class Goal(Command):
         unknown.append(phase)
 
     if unknown:
-      _list_goals(context, 'Unknown goal(s): %s\n' % ' '.join(phase.name for phase in unknown))
+      context.log.error('Unknown goal(s): %s\n' % ' '.join(phase.name for phase in unknown))
       return 1
 
-    return Goal._execute(context, self.phases, print_timing=self.options.time)
+    engine = GroupEngine(print_timing=self.options.time)
+    return engine.execute(context, self.phases)
 
   def cleanup(self):
     # TODO: Make this more selective? Only kill nailguns that affect state? E.g., checkstyle
@@ -403,12 +327,8 @@ class Goal(Command):
 
 # Install all default pants provided goals
 from pants.targets.benchmark import Benchmark
-from pants.targets.java_library import JavaLibrary
 from pants.targets.java_tests import JavaTests as junit_tests
 from pants.targets.jvm_binary import JvmBinary
-from pants.targets.scala_library import ScalaLibrary
-from pants.targets.scala_tests import ScalaTests
-from pants.targets.scalac_plugin import ScalacPlugin
 from pants.tasks.antlr_gen import AntlrGen
 from pants.tasks.benchmark_run import BenchmarkRun
 from pants.tasks.binary_create import BinaryCreate

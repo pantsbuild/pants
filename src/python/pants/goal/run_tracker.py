@@ -147,6 +147,10 @@ class RunTracker(object):
     self._main_root_workunit.start()
     self.report.start_workunit(self._main_root_workunit)
 
+  def set_root_outcome(self, outcome):
+    """Useful for setup code that doesn't have a reference to a workunit."""
+    self._main_root_workunit.set_outcome(outcome)
+
   @contextmanager
   def new_workunit(self, name, labels=None, cmd=''):
     """Creates a (hierarchical) subunit of work for the purpose of timing and reporting.

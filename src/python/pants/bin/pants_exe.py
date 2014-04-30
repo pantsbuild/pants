@@ -9,12 +9,14 @@ import os
 import sys
 import traceback
 
+import psutil
 from twitter.common.dirutil import Lock
 
 from pants.base.address import Address
 from pants.base.build_environment import get_buildroot, get_version
 from pants.base.config import Config
 from pants.base.rcfile import RcFile
+from pants.base.workunit import WorkUnit
 from pants.commands.command import Command
 from pants.commands.register import register_commands
 from pants.goal.initialize_reporting import initial_reporting
@@ -22,12 +24,6 @@ from pants.goal.run_tracker import RunTracker
 from pants.reporting.report import Report
 from pants.tasks.nailgun_task import NailgunTask
 
-
-_HELP_ALIASES = set([
-  '-h',
-  '--help',
-  'help',
-])
 
 _BUILD_COMMAND = 'build'
 _LOG_EXIT_OPTION = '--log-exit'
@@ -49,20 +45,6 @@ def _find_all_commands():
   for cmd in Command.all_commands():
     cls = Command.get_command(cmd)
     yield '%s\t%s' % (cmd, cls.__doc__)
-
-
-def _help(version, root_dir):
-  print('Pants %s @ PANTS_BUILD_ROOT: %s' % (version, root_dir))
-  print()
-  print('Available subcommands:\n\t%s' % '\n\t'.join(_find_all_commands()))
-  print()
-  print('Friendly docs: http://pantsbuild.github.io/')
-  print()
-  print("""Default subcommand flags can be stored in ~/.pantsrc using the 'options' key of a
-section named for the subcommand in ini style format, ie:
-  [build]
-  options: --log-exit""")
-  _exit_and_fail()
 
 
 def _add_default_options(command, args):
@@ -97,15 +79,9 @@ def _parse_command(root_dir, args):
   return Command.get_command(command), args
 
 
-try:
-  import psutil
-
-  def _process_info(pid):
-    process = psutil.Process(pid)
-    return '%d (%s)' % (pid, ' '.join(process.cmdline))
-except ImportError:
-  def _process_info(pid):
-    return '%d' % pid
+def _process_info(pid):
+  process = psutil.Process(pid)
+  return '%d (%s)' % (pid, ' '.join(process.cmdline))
 
 
 def _run():
@@ -122,12 +98,17 @@ def _run():
   if not os.path.exists(root_dir):
     _exit_and_fail('PANTS_BUILD_ROOT does not point to a valid path: %s' % root_dir)
 
-  if len(sys.argv) < 2 or (len(sys.argv) == 2 and sys.argv[1] in _HELP_ALIASES):
-    _help(version, root_dir)
+  if len(sys.argv) < 2:
+    argv = ['goal']
+  else:
+    argv = sys.argv[1:]
+  # Hack to force ./pants -h etc. to redirect to goal.
+  if argv[0] != 'goal' and set(['-h', '--help', 'help']).intersection(argv):
+    argv = ['goal'] + argv
 
-  command_class, command_args = _parse_command(root_dir, sys.argv[1:])
+  command_class, command_args = _parse_command(root_dir, argv)
 
-  parser = optparse.OptionParser(version=version)
+  parser = optparse.OptionParser(add_help_option=False, version=version)
   RcFile.install_disable_rc_option(parser)
   parser.add_option(_LOG_EXIT_OPTION,
                     action='store_true',
@@ -157,7 +138,9 @@ def _run():
   try:
     if command.serialized():
       def onwait(pid):
-        print('Waiting on pants process %s to complete' % _process_info(pid), file=sys.stderr)
+        process = psutil.Process(pid)
+        print('Waiting on pants process %d (%s) to complete' %
+              (pid, ' '.join(process.cmdline)), file=sys.stderr)
         return True
       runfile = os.path.join(root_dir, '.pants.run')
       lock = Lock.acquire(runfile, onwait=onwait)
@@ -165,6 +148,8 @@ def _run():
       lock = Lock.unlocked()
     try:
       result = command.run(lock)
+      if result:
+        run_tracker.set_root_outcome(WorkUnit.FAILURE)
       _do_exit(result)
     except KeyboardInterrupt:
       command.cleanup()

@@ -6,11 +6,10 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from pants.commands.build import Build
 from pants.commands.goal import Goal
-from pants.commands.help import Help
 from pants.commands.py import Py
 from pants.commands.setup_py import SetupPy
 
 
 def register_commands():
-  for cmd in (Build, Goal, Help, Py, SetupPy):
+  for cmd in (Build, Goal, Py, SetupPy):
     cmd._register()
