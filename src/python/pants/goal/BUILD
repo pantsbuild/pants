@@ -56,6 +56,16 @@ python_library(
 )
 
 python_library(
+  name = 'help',
+  sources = ['help.py'],
+  dependencies = [
+    ':option_helpers',
+    ':phase',
+    'src/python/pants/version',
+  ],
+)
+
+python_library(
   name = 'group',
   sources = ['group.py'],
 )

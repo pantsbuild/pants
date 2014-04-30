@@ -15,7 +15,6 @@ python_library(
   name = 'pants_old',
   dependencies = [
     pants(':build'),
-    pants(':help'),
     pants(':py'),
     pants(':setup_py'),
   ]
@@ -40,14 +39,6 @@ python_library(
     pants('src/python/pants/targets:common'),
     pants('src/python/pants/python:python_builder'),
     pants('src/python/pants/python:interpreter_cache'),
-  ]
-)
-
-python_library(
-  name = 'help',
-  sources = ['help.py'],
-  dependencies = [
-    pants(':command'),
   ]
 )
 
@@ -106,6 +97,7 @@ python_library(
     pants('src/python/pants/base:workunit'),
     pants('src/python/pants/engine'),
     pants('src/python/pants/goal'),
+    pants('src/python/pants/goal:help'),
     pants('src/python/pants/goal:initialize_reporting'),
     pants('src/python/pants/goal:option_helpers'),
     pants('src/python/pants/reporting'),
