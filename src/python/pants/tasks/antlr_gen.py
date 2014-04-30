@@ -93,7 +93,7 @@ class AntlrGen(CodeGen, NailgunTask):
   def _get_sources_package(self, target):
     parents = set([os.path.dirname(source) for source in target.sources])
     if len(parents) != 1:
-      raise TaskError('Antlr sources in multiple directories, cannot infer package.' +
+      raise TaskError('Antlr sources in multiple directories, cannot infer package.'
                       'Please set package member in antlr target.')
     return parents.pop().replace('/', '.')
 
