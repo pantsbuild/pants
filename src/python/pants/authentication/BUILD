@@ -9,7 +9,5 @@ credentials(
 
 python_library(
   name = 'authentication',
-  sources = ['netrc_util.py'],
-  dependencies = [
-  ]
+  sources = globs('*.py'),
 )

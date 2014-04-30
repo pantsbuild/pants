@@ -8,7 +8,13 @@ import os
 
 from netrc import netrc as NetrcDb, NetrcParseError
 
-from pants.tasks.task_error import TaskError
+
+class NetrcError(Exception):
+  """
+    Raised to indicate Netrc errors
+  """
+  def __init__(self, *args, **kwargs):
+    super(NetrcError, self).__init__(*args, **kwargs)
 
 
 class Netrc(object):
@@ -29,16 +35,17 @@ class Netrc(object):
     if not self._login and not self._password:
       db = os.path.expanduser('~/.netrc')
       if not os.path.exists(db):
-        raise TaskError('A ~/.netrc file is required to authenticate')
+        raise NetrcError('A ~/.netrc file is required to authenticate')
       try:
         db = NetrcDb(db)
         for host, value in db.hosts.items():
+          print("%s" %host)
           auth = db.authenticators(host)
           if auth:
             login, _, password = auth
             self._login[host] = login
             self._password[host] = password
         if len(self._login) == 0:
-          raise TaskError('Found no usable authentication blocks in ~/.netrc')
+          raise NetrcError('Found no usable authentication blocks in ~/.netrc')
       except NetrcParseError as e:
-        raise TaskError('Problem parsing ~/.netrc: %s' % e)
+        raise NetrcError('Problem parsing ~/.netrc: %s' % e)
