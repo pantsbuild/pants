@@ -12,7 +12,7 @@ REQUIREMENTS=(
   ${HERE}/3rdparty/python/twitter/commons/requirements.txt
 )
 
-PANTS_EXE=src/python/pants/bin/pants_exe.py
+PANTS_EXE=${HERE}/src/python/pants/bin/pants_exe.py
 PANTS_BINARY=src/python/pants/bin:pants
 PANTS_PEX="${HERE}/pants.pex"
 
@@ -83,12 +83,12 @@ function activate_pants_bare() {
 
 function run_pants_bare() {
   activate_pants_bare
-  PYTHONPATH=src/python python ${PANTS_EXE} "$@"
+  PYTHONPATH=${HERE}/src/python python ${PANTS_EXE} "$@"
 }
 
 function exec_pants_bare() {
   activate_pants_bare
-  PYTHONPATH=src/python exec python ${PANTS_EXE} "$@"
+  PYTHONPATH=${HERE}/src/python exec python ${PANTS_EXE} "$@"
 }
 
 if [ ! -z "${PANTS_DEV}" ]; then
@@ -101,7 +101,7 @@ else
     # target(s).
     rm -rf ${PANTS_PEX} && \
     run_pants_bare build -v -i "CPython>=2.6,<3" -i "CPython>=3.3" ${PANTS_BINARY} && \
-    mv -v dist/pants.pex ${PANTS_PEX} && \
+    mv -v ${HERE}/dist/pants.pex ${PANTS_PEX} && \
     chmod +x ${PANTS_PEX}
   fi
   exec "${PANTS_PEX}" "$@"
