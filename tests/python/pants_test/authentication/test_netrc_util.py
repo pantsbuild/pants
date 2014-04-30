@@ -1,55 +1,56 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
+
+from contextlib import contextmanager
+import re
 
 import pytest
-import re
-import sys
-import unittest
-
-from mock import mock_open, patch
-from netrc import netrc as NetrcDb
+from mock import MagicMock, mock_open, patch
 
 from pants.authentication.netrc_util import Netrc
-from pants.authentication.netrc_util import NetrcError
 
-class NetrcUtilTest(unittest.TestCase):
 
-  def setUp(self):
-    self._netrc = Netrc()
+@patch('os.path')
+class TestNetrcUtil(object):
 
-  def test_netrc_file_missing_error(self):
-    with patch('os.path') as os_path:
-      os_path.expanduser.return_value = '~/.netrc'
-      os_path.exists.return_value = False
-      with patch.dict('os.environ', {'USER': 'user'}):
-        netrc = Netrc()
-        with pytest.raises(NetrcError) as exc:
-          netrc._ensure_loaded()
-        assert exc.value.message == 'A ~/.netrc file is required to authenticate'
+  class MackOsPath(MagicMock):
+    def __init__(self):
+      self.expanduser.return_value = '~/.netrc'
+      self.exists.return_value = True
 
-  def test_netrc_parse_error(self):
-    netrc_contents = 'machine white \n'
+  def test_netrc_success(self, MackOsPath):
+    with patch('pants.authentication.netrc_util.NetrcDb') as mock_netrc:
+      instance = mock_netrc.return_value
+      instance.hosts = {'host': ('user', 'user', 'passw0rd')}
+      instance.authenticators.return_value = ('user', 'user', 'passw0rd')
+      netrc = Netrc()
+      netrc._ensure_loaded()
+
+  def test_netrc_file_missing_error(self, MackOsPath):
+    MackOsPath.exists.return_value = False
+    netrc = Netrc()
+    with pytest.raises(netrc.NetrcError) as exc:
+      netrc._ensure_loaded()
+    assert exc.value.message == 'A ~/.netrc file is required to authenticate'
+
+  def test_netrc_parse_error(self, MackOsPath):
+    with self.netrc('machine test') as netrc:
+      with pytest.raises(netrc.NetrcError) as exc:
+        netrc._ensure_loaded()
+      assert re.search(r'Problem parsing', exc.value.message)
+
+  def test_netrc_no_usable_blocks(self, MackOsPath):
+    with self.netrc('') as netrc:
+      with pytest.raises(netrc.NetrcError) as exc:
+        netrc._ensure_loaded()
+      assert exc.value.message == 'Found no usable authentication blocks in ~/.netrc'
+
+  @contextmanager
+  def netrc(self, netrc_contents):
     m = mock_open(read_data=netrc_contents)
-    with patch('os.path') as os_path:
-      os_path.exists.return_value = True
-      with patch.dict('os.environ', {'USER': 'user'}):
-        with patch('__builtin__.open', m):
-          netrc = Netrc()
-          with pytest.raises(NetrcError) as exc:
-            netrc._ensure_loaded()
-          assert re.search(r'Problem parsing', exc.value.message)
-
-  def test_netrc_no_usable_blocks(self):
-    netrc_contents = ''
-    m = mock_open(read_data=netrc_contents)
-    with patch('os.path.exists') as os_path:
-      os_path.exists.return_value = True
-      with patch.dict('os.environ', {'USER': 'user'}):
-        with patch('__builtin__.open', m):
-          netrc = Netrc()
-          with pytest.raises(NetrcError) as exc:
-            netrc._ensure_loaded()
-          assert exc.value.message == 'Found no usable authentication blocks in ~/.netrc'
+    with patch('__builtin__.open', m):
+      netrc = Netrc()
+      yield netrc
