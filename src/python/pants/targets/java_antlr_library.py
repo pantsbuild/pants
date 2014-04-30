@@ -18,7 +18,8 @@ class JavaAntlrLibrary(ExportableJvmLibrary):
                provides=None,
                dependencies=None,
                excludes=None,
-               compiler='antlr3'):
+               compiler='antlr3',
+               package=None):
 
     """
     :param string name: The name of this target, which combined with this
@@ -36,6 +37,9 @@ class JavaAntlrLibrary(ExportableJvmLibrary):
       to filter this target's transitive dependencies against.
     :param compiler: The name of the compiler used to compile the ANTLR files.
         Currently only supports 'antlr3' and 'antlr4'
+    :param package: A string which specifies the package to be used on the dependent sources.
+        If unset, the package will be based on the path to the sources. Note that if the sources
+        Are spread among different files, this must be set as the package cannot be inferred.
     """
 
     ExportableJvmLibrary.__init__(self,
@@ -49,3 +53,4 @@ class JavaAntlrLibrary(ExportableJvmLibrary):
     if compiler not in ('antlr3', 'antlr4'):
         raise ValueError("Illegal value for 'compiler': {}".format(compiler))
     self.compiler = compiler
+    self.package = package

@@ -68,16 +68,34 @@ class AntlrGen(CodeGen, NailgunTask):
         java_main = 'org.antlr.Tool'
       elif target.compiler == 'antlr4':
         args.append('-visitor')  # Generate Parse Tree Vistor As Well
+        # Note that this assumes that there is no package set in the antlr file itself,
+        # which is considered an ANTLR best practice.
+        args.append('-package')
+        if target.package is None:
+          args.append(self._get_sources_package(target))
+        else:
+          args.append(target.package)
         java_main = 'org.antlr.v4.Tool'
       else:
         raise TaskError('Unknown ANTLR compiler: {}'.format(target.compiler))
 
       sources = self._calculate_sources([target])
       args.extend(sources)
+
       result = self.runjava(classpath=antlr_classpath, main=java_main,
                             args=args, workunit_name='antlr')
       if result != 0:
         raise TaskError('java %s ... exited non-zero (%i)' % (java_main, result))
+
+  # This checks to make sure that all of the sources have an identical package source structure, and if
+  # they do, uses that as the package. If they are different, then the user will need to set the package
+  # as it cannot be correctly inferred.
+  def _get_sources_package(self, target):
+    parents = set([os.path.dirname(source) for source in target.sources])
+    if len(parents) != 1:
+      raise TaskError('Antlr sources in multiple directories, cannot infer package.'
+                      'Please set package member in antlr target.')
+    return parents.pop().replace('/', '.')
 
   def _calculate_sources(self, targets):
     sources = set()
