@@ -114,6 +114,7 @@ class RESTfulArtifactCache(ArtifactCache):
     if int(response.status / 100) == 2:
       return response
     elif response.status == 404:
+      self.log.debug('404 returned for %s request to %s' % (method, self._url_string(path)))
       return None
     else:
       raise self.CacheError('Failed to %s %s. Error: %d %s' % (method, self._url_string(path),
