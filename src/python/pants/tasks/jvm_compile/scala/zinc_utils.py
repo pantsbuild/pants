@@ -17,6 +17,7 @@ from twitter.common.dirutil import safe_open
 from pants.base.build_environment import get_buildroot
 from pants.base.hash_utils import hash_file
 from pants.base.workunit import WorkUnit
+from pants.targets.jar_dependency import JarDependency
 from pants.tasks import TaskError
 from pants.tasks.jvm_tool_bootstrapper import JvmToolBootstrapper
 
@@ -40,10 +41,10 @@ class ZincUtils(object):
 
     # The target scala version.
     self._compile_bootstrap_key = 'scalac'
-    compile_bootstrap_tools = context.config.getlist('scala-compile', 'compile-bootstrap-tools',
+    self._compile_bootstrap_tools = context.config.getlist('scala-compile', 'compile-bootstrap-tools',
                                                      default=[':scala-compile-2.9.3'])
     self._jvm_tool_bootstrapper.register_jvm_tool(self._compile_bootstrap_key,
-                                                  compile_bootstrap_tools)
+                                                  self._compile_bootstrap_tools)
 
     # The zinc version (and the scala version it needs, which may differ from the target version).
     self._zinc_bootstrap_key = 'zinc'
@@ -120,6 +121,25 @@ class ZincUtils(object):
                                       args=zinc_args,
                                       workunit_name=workunit_name,
                                       workunit_labels=workunit_labels)
+
+  def invalidate_for(self):
+    ret = []
+
+    # Go through all the bootstrap tools required to compile.
+    for t in self._compile_bootstrap_tools:
+      # Resolve to their actual targets.
+      resolved = self.context.resolve(t)
+      resolved_concrete = [r for r in resolved if r.is_concrete]
+
+      # Since there doesn't seem to be a common root identifier method,
+      # use the specific ones depending on type.
+      for r in resolved_concrete:
+        if isinstance(r, JarDependency):
+          ret.append(r.cache_key())
+        else:
+          raise ValueError("Resolved target %s was of unexpected type %s" % (t, r.__class__.___name__))
+
+    return sorted(ret)
 
   def compile(self, opts, classpath, sources, output_dir, analysis_file, upstream_analysis_files):
     args = list(opts)  # Make a copy

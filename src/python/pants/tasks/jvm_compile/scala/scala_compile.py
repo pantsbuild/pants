@@ -42,6 +42,18 @@ class ScalaCompile(JvmCompile):
     # Classpath entries necessary for our compiler plugins.
     return self._zinc_utils.plugin_jars()
 
+  # Invalidate caches if the toolchain changes.
+  def invalidate_for(self):
+    zinc_invalidation_key = self._zinc_utils.invalidate_for()
+    jvm_target_version = None
+
+    # Check scalac args for jvm target version.
+    for arg in self._args:
+      if arg.strip().startswith("-S-target:"):
+        jvm_target_version = arg.strip()
+
+    return [jvm_target_version, zinc_invalidation_key]
+
   def extra_products(self, target):
     ret = []
     if target.is_scalac_plugin and target.classname:

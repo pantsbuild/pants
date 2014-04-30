@@ -93,6 +93,23 @@ class JavaCompile(JvmCompile):
       ret.append((root, [processor_info_file]))
     return ret
 
+  # Make the java target language version part of the cache key hash,
+  # this ensures we invalidate if someone builds against a different version.
+  def invalidate_for(self):
+    ret = []
+    opts = self._javac_opts
+
+    try:
+      # We only care about the target version for now.
+      target_pos = opts.index('-target')
+      if len(opts) >= target_pos + 2:
+        ret.append(opts[target_pos:target_pos + 2])
+    except ValueError:
+      # No target in javac opts.
+      pass
+
+    return ret
+
   def compile(self, args, classpath, sources, classes_output_dir, analysis_file):
     jmake_classpath = self.tool_classpath(self._jmake_bootstrap_key)
     args = [
