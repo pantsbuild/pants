@@ -5,6 +5,7 @@ python_library(
   name = 'cache',
   sources = globs('*.py'),
   dependencies = [
+    pants('3rdparty/python:requests'),
     pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.quantity'),

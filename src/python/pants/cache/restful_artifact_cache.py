@@ -4,9 +4,12 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+import logging
 import urlparse
 
-import httplib
+import requests
+from requests import RequestException
+
 from twitter.common.contextutil import temporary_file, temporary_file_path
 from twitter.common.quantity import Amount, Data
 
@@ -38,6 +41,11 @@ class RESTfulArtifactCache(ArtifactCache):
     self._path_prefix = parsed_url.path.rstrip('/')
     self.compress = compress
 
+    # Reduce the somewhat verbose logging of requests.
+    # TODO do this in a central place
+    logging.getLogger('requests').setLevel(logging.WARNING)
+
+
   def try_insert(self, cache_key, paths):
     with temporary_file_path() as tarfile:
       artifact = TarballArtifact(self.artifact_root, tarfile, self.compress)
@@ -60,16 +68,13 @@ class RESTfulArtifactCache(ArtifactCache):
       if response is None:
         return None
 
-      done = False
       with temporary_file() as outfile:
         total_bytes = 0
         # Read the data in a loop.
-        while not done:
-          data = response.read(self.READ_SIZE)
-          outfile.write(data)
-          if len(data) < self.READ_SIZE:
-            done = True
-          total_bytes += len(data)
+        for chunk in response.iter_content(self.READ_SIZE):
+          outfile.write(chunk)
+          total_bytes += len(chunk)
+
         outfile.close()
         self.log.debug('Read %d bytes from artifact cache at %s' %
                        (total_bytes,self._url_string(remote_path)))
@@ -97,28 +102,35 @@ class RESTfulArtifactCache(ArtifactCache):
     return '%s/%s/%s%s' % (self._path_prefix, cache_key.id, cache_key.hash,
                                '.tar.gz' if self.compress else '.tar')
 
-  def _connect(self):
-    if self._ssl:
-      return httplib.HTTPSConnection(self._netloc, timeout=self._timeout_secs)
-    else:
-      return httplib.HTTPConnection(self._netloc, timeout=self._timeout_secs)
-
   # Returns a response if we get a 200, None if we get a 404 and raises an exception otherwise.
   def _request(self, method, path, body=None):
-    self.log.debug('Sending %s request to %s' % (method, self._url_string(path)))
-    # TODO(benjy): Keep connection open and reuse?
-    conn = self._connect()
-    conn.request(method, path, body=body)
-    response = conn.getresponse()
-    # Allow all 2XX responses. E.g., nginx returns 201 on PUT. HEAD may return 204.
-    if int(response.status / 100) == 2:
-      return response
-    elif response.status == 404:
-      self.log.debug('404 returned for %s request to %s' % (method, self._url_string(path)))
-      return None
-    else:
-      raise self.CacheError('Failed to %s %s. Error: %d %s' % (method, self._url_string(path),
-                                                               response.status, response.reason))
+    url = self._url_string(path)
+    self.log.debug('Sending %s request to %s' % (method, url))
+
+    try:
+      response = None
+      if 'PUT' == method:
+        response = requests.put(url, data=body, timeout=self._timeout_secs)
+      elif 'GET' == method:
+        response = requests.get(url, timeout=self._timeout_secs, stream=True)
+      elif 'HEAD' == method:
+        response = requests.head(url, timeout=self._timeout_secs)
+      elif 'DELETE' == method:
+        response = requests.delete(url, timeout=self._timeout_secs)
+      else:
+        raise ValueError('Unknown request method %s' % method)
+
+      # Allow all 2XX responses. E.g., nginx returns 201 on PUT. HEAD may return 204.
+      if int(response.status_code / 100) == 2:
+        return response
+      elif response.status_code == 404:
+        self.log.debug('404 returned for %s request to %s' % (method, self._url_string(path)))
+        return None
+      else:
+        raise self.CacheError('Failed to %s %s. Error: %d %s' % (method, self._url_string(path),
+                                                                 response.status, response.reason))
+    except RequestException as e:
+      raise self.CacheError(e)
 
   def _url_string(self, path):
     return '%s://%s%s' % (('https' if self._ssl else 'http'), self._netloc, path)
