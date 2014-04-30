@@ -69,12 +69,12 @@ class AntlrGen(CodeGen, NailgunTask):
       elif target.compiler == 'antlr4':
         args.append('-visitor')  # Generate Parse Tree Vistor As Well
         # Note that this assumes that there is no package set in the antlr file itself,
-        # which is consistent with the maven plugin.
+        # which is considered an ANTLR best practice.
         args.append('-package')
         if target.package is None:
-            args.append(self._get_sources_package(target))
+          args.append(self._get_sources_package(target))
         else:
-            args.append(target.package)
+          args.append(target.package)
         java_main = 'org.antlr.v4.Tool'
       else:
         raise TaskError('Unknown ANTLR compiler: {}'.format(target.compiler))
@@ -91,13 +91,11 @@ class AntlrGen(CodeGen, NailgunTask):
   # they do, uses that as the package. If they are different, then the user will need to set the package
   # as it cannot be correctly inferred.
   def _get_sources_package(self, target):
-    parents = [os.path.dirname(source) for source in target.sources]
-    first, rest = parents[0], parents[1:]
-    if all([source == first for source in rest]):
-      return first.replace('/', '.')
-    else:
+    parents = set([os.path.dirname(source) for source in target.sources])
+    if len(parents) != 1:
       raise TaskError('Antlr sources in multiple directories, cannot infer package.' +
                       'Please set package member in antlr target.')
+    return parents.pop().replace('/', '.')
 
   def _calculate_sources(self, targets):
     sources = set()
