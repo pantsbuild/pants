@@ -192,7 +192,8 @@ class Task(object):
     for f in self.invalidate_for_files():
       extra_data.append(hash_file(f))
 
-    cache_manager = CacheManager(self._cache_key_generator,
+    cache_manager = CacheManager(self.context,
+                                 self._cache_key_generator,
                                  self._build_invalidator_dir,
                                  invalidate_dependents,
                                  extra_data,

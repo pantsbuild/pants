@@ -73,16 +73,61 @@ class ProtobufGenCalculateJavaTest(ProtobufGenCalculateGenfilesTestBase):
         'com/twitter/lean/JackSpratt.java')
 
     self.assert_java_files(
-        'jack_spratt.proto',
+        'jack_spratt_no_whitespace.proto',
         '''
           package com.twitter.lean;
           option java_multiple_files = true;
-
-          enum Jake { FOO=1; }
-          message joe_bob {
-          }
+          enum Jake { FOO=1;}
+          message joe_bob {}
         ''',
-        'com/twitter/lean/JackSpratt.java',
+        'com/twitter/lean/JackSprattNoWhitespace.java',
         'com/twitter/lean/Jake.java',
         'com/twitter/lean/joe_bob.java',
         'com/twitter/lean/joe_bobOrBuilder.java')
+
+    self.assert_java_files(
+      'jack_spratt.proto',
+      '''
+        package com.twitter.lean;
+        option java_multiple_files = true;
+
+        enum Jake { FOO=1;
+        }
+        message joe_bob {
+        }
+      ''',
+      'com/twitter/lean/JackSpratt.java',
+      'com/twitter/lean/Jake.java',
+      'com/twitter/lean/joe_bob.java',
+      'com/twitter/lean/joe_bobOrBuilder.java')
+
+    self.assert_java_files(
+      'inner_class.proto',
+      '''
+        package com.pants.protos;
+        option java_multiple_files = true;
+        message Foo {
+          enum Bar {
+            BAZ = 0;
+          }
+        }
+      ''',
+      'com/pants/protos/InnerClass.java',
+      'com/pants/protos/Foo.java',
+      'com/pants/protos/FooOrBuilder.java')
+
+    # TODO(Eric Ayers) This test should pass, but it won't because the .proto parse is not reliable.
+    # https://github.com/pantsbuild/pants/pull/93
+    #
+    # self.assert_java_files(
+    #     'inner_class_no_newline.proto',
+    #     '''
+    #       package com.pants.protos;
+    #       option java_multiple_files = true;
+    #       message Foo {
+    #         enum Bar { BAZ = 0; }
+    #       }
+    #     ''',
+    #     'com/pants/protos/InnerClassNoNewline.java',
+    #     'com/pants/protos/Foo.java',
+    #     'com/pants/protos/FooOrBuilder.java')
