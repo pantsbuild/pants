@@ -326,4 +326,4 @@ class CacheManager(object):
       )
     except IOError as e:
       raise self.CacheValidationErrorError("Problem validating file %s for target %s: %s"
-                                  % (e.filename, target.id, e))
+                                           % (e.filename, target.id, e))
