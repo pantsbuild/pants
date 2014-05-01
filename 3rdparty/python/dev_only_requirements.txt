@@ -1,0 +1,9 @@
+# These are extra requirments only needed for dev tasks in the pantsbuild/pants repo itself.
+
+# For doc publishing
+Sphinx>=1.2,<1.3
+
+# NB: As of 5/1/2014 out layout.html template is sensitive to upgrades
+# of the read the docs theme - so bumping will require fixes there.
+sphinx_rtd_theme==0.1.5
+

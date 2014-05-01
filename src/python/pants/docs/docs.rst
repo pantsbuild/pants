@@ -14,41 +14,27 @@ the `Python documentation`_.
 Generating the site
 -------------------
 
-The following commands must be run from the pants repo root.
+A script encapsulates all that needs to be done.  To generate and preview changes, just::
 
-::
-
-  # Sphinx must be installed locally to generate the site.
-  # This is only required once per machine.
-  easy_install -U Sphinx
-  pip install sphinx_rtd_theme
-
-  # Build pants, which triggers downloading egg dependencies
-  # which are required when Sphinx inspects pants sources.
-  cd /path/to/pants/repo
-  rm pants.pex
-  # Build the BUILD dictionary data.
-  ./pants goal builddict # (or ./pants py src/python/pants goal builddict to try out local tweaks)
-
-  # Doc generation commands must be run from the doc dir.
-  cd src/python/pants/docs
-  # Generate rst files.
-  ./gen.py
-  # Generate the site.
-  make clean html
-
-The site will be generated into ``_build/html``, which should not be checked
-in. ``open _build/html/index.html`` to view your changes.
-
-.. note:: If you make a change to a pydoc comment in the pants source code, you need to follow the
-          complete set of steps above, starting by deleting ``pants.pex``, in order to see your
-          change in the resulting HTML.
+   # This publishes the docs **locally** and opens (-o) them in your browser for review
+   ./build-support/bin/publish_docs.sh -o
 
 -------------------
 Publishing the site
 -------------------
 
-Publishing the site simply involves making the contents of ``_build/html``
-available on a web server.
+Use the same script as for generating the site, but request it also be published.  Don't
+worry - you'll get a chance to abort the publish just before its comitted remotely::
 
-.. TODO(travis): Update publishing section with how to publish.
+   # This publishes the docs locally and opens (-o) them in your browser for review
+   # and then prompts you to confirm you want to publish these docs remotely before
+   # proceeding to publish to http://pantsbuild.github.io
+   ./build-support/bin/publish_docs.sh -op
+
+If you'd like to publish remotely for others to preview your changes easily, there is a
+-d option that will create a copy of the site in a subdir of http://pantsbuild.github.io/ ::
+
+  # This publishes the docs locally and opens (-o) them in your browser for review
+  # and then prompts you to confirm you want to publish these docs remotely before
+  # proceeding to publish to http://pantsbuild.github.io/sirois-test-site
+  ./build-support/bin/publish_docs.sh -opd sirois-test-site
