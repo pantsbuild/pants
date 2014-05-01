@@ -12,9 +12,13 @@ from twitter.common.dirutil import safe_mkdir
 
 from pants.goal.products import MultipleRootedProducts
 from pants.tasks import Task
+from pants.base.target import Target
 
 
 class PrepareResources(Task):
+
+  class NotATargetError(Exception):
+    """Indicates a Target instance was expected."""
 
   def __init__(self, context, workdir):
     super(PrepareResources, self).__init__(context, workdir)
@@ -59,6 +63,8 @@ class PrepareResources(Task):
       group_key = egroups.get_group_key_for_target(targets[0])
 
       for resources_tgt in all_resources_tgts:
+        if resources_tgt and not isinstance(resources_tgt, Target):
+          raise self.NotATargetError("Expected a target, got instance of type %s (%s)" % (resources_tgt.__class__.__name__, resources_tgt))
         resources_dir = target_dir(resources_tgt)
         for conf in self.confs:
           egroups.update_compatible_classpaths(group_key, [(conf, resources_dir)])
