@@ -15,7 +15,7 @@ function usage() {
   echo "Usage: $0 (-h|-opd)"
   echo " -h           print out this help message"
   echo " -o           open the doc site locally"
-  echo " -s           publish the doc site remotely"
+  echo " -p           publish the doc site remotely"
   echo " -d           publish the site to a subdir at this path (useful for public previews)"
 
   if (( $# > 0 )); then
