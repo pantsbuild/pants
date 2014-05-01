@@ -30,7 +30,7 @@ worry - you'll get a chance to abort the publish just before its comitted remote
    # and then prompts you to confirm you want to publish these docs remotely before
    # proceeding to publish to http://pantsbuild.github.io
    ./build-support/bin/publish_docs.sh -op
-   
+
 If you'd like to publish remotely for others to preview your changes easily, there is a
 -d option that will create a copy of the site in a subdir of http://pantsbuild.github.io/ ::
 
