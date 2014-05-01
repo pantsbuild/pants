@@ -4,7 +4,7 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-import errno
+
 try:
   import cPickle as pickle
 except ImportError:
@@ -143,7 +143,6 @@ class InvalidationCheck(object):
     return res
 
   def __init__(self, all_vts, invalid_vts, partition_size_hint=None):
-
     # All the targets, valid and invalid.
     self.all_vts = all_vts
 
@@ -164,9 +163,12 @@ class CacheManager(object):
   and invalidation statistics.
   Note that this is distinct from the ArtifactCache concept, and should probably be renamed.
   """
-  def __init__(self, context, cache_key_generator, build_invalidator_dir,
+
+  class CacheValidationError(Exception):
+    """Indicates a problem accessing the cache."""
+
+  def __init__(self, cache_key_generator, build_invalidator_dir,
                invalidate_dependents, extra_data, only_externaldeps):
-    self._context = context;
     self._cache_key_generator = cache_key_generator
     self._invalidate_dependents = invalidate_dependents
     self._extra_data = pickle.dumps(extra_data)  # extra_data may be None.
@@ -323,7 +325,5 @@ class CacheManager(object):
         fingerprint_extra=fingerprint_extra
       )
     except IOError as e:
-
-      self._context.log.fatal("While validating targets, got IOError: " + str(e.args[0]) + " " + errno.errorcode[e.args[0]] + "\n   accessing file: " + str(e.filename) +  "\n   target: " + target.id)
-
-      raise e
+      raise self.CacheValidationErrorError("Problem validating file %s for target %s: %s"
+                                  % (e.filename, target.id, e))

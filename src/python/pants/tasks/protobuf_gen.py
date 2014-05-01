@@ -31,7 +31,6 @@ class ProtobufGen(CodeGen):
   def __init__(self, context, workdir):
     super(ProtobufGen, self).__init__(context, workdir)
 
-    self._context = context
     self.protoc_supportdir = self.context.config.get('protobuf-gen', 'supportdir')
     self.protoc_version = self.context.config.get('protobuf-gen', 'version')
     self.plugins = self.context.config.getlist('protobuf-gen', 'plugins', default=[])
@@ -134,7 +133,6 @@ class ProtobufGen(CodeGen):
     for source in target.sources:
       path = os.path.join(target.target_base, source)
       genfiles.extend(calculate_genfiles(path, source).get('java', []))
-    self._context.log.debug("Adding target " + target.id + " with genfiles: " + str(genfiles))
     tgt = self.context.add_new_target(self.java_out,
                                       JavaLibrary,
                                       name=target.id,
@@ -167,6 +165,7 @@ DEFAULT_PACKAGE_PARSER = re.compile(r'^\s*package\s+([^;]+)\s*;\s*$')
 OPTION_PARSER = re.compile(r'^\s*option\s+([^ =]+)\s*=\s*([^\s]+)\s*;\s*$')
 TYPE_PARSER = re.compile(r'^\s*(enum|message)\s+([^\s{]+).*')
 END_TYPE_PARSER = re.compile(r'^\s*}')
+
 
 def camelcase(string):
   """Convert snake casing where present to camel casing"""
@@ -221,8 +220,8 @@ def calculate_genfiles(path, source):
               pass
 
     # TODO(Eric Ayers) replace with a real lex/parse understanding of protos
-    # This is a big hack.  The parsing for finding type definintions is not reliable
-    # https://github.com/pantsbuild/pants/pull/93
+    # This is a big hack.  The parsing for finding type definitions is not reliable.
+    # See https://github.com/pantsbuild/pants/issues/96
     types = set()
     if multiple_files:
       if type_depth == 0:

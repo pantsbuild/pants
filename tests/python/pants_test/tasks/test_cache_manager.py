@@ -11,7 +11,7 @@ from pants.base.build_invalidator import CacheKey, CacheKeyGenerator
 from pants.tasks.cache_manager import CacheManager, InvalidationCheck, VersionedTarget
 from pants_test.testutils.base_mock_target_test import BaseMockTargetTest
 from pants_test.testutils.mock_target import MockTarget
-from pants_test.base.context_utils import create_context
+
 
 class AppendingCacheKeyGenerator(CacheKeyGenerator):
   """Generates cache keys for versions of target sets."""
@@ -41,7 +41,7 @@ def print_vt(vt):
 class CacheManagerTest(BaseMockTargetTest):
   class TestCacheManager(CacheManager):
     def __init__(self, tmpdir):
-      CacheManager.__init__(self, create_context(), AppendingCacheKeyGenerator(), tmpdir, True, None, False)
+      CacheManager.__init__(self, AppendingCacheKeyGenerator(), tmpdir, True, None, False)
 
   def setUp(self):
     self._dir = tempfile.mkdtemp()
