@@ -47,6 +47,13 @@ function create_venv() {
 }
 
 function activate_pants_venv() {
+  if [ ! -z "${PANTS_DEV}" ]; then
+    REQUIREMENTS=(
+      ${DEV_REQUIREMENTS[@]}
+      ${REQUIREMENTS[@]}
+    )
+  fi
+
   fingerprint=""
   for req in ${REQUIREMENTS[@]}; do
     fingerprint="${fingerprint}$(cat ${req} | fingerprint_data)"
@@ -58,11 +65,6 @@ function activate_pants_venv() {
   if ! [ -f ${BOOTSTRAPPED_FILE} ]; then
     log "Bootstrapping pants_deps with requirements:"
     if [ ! -z "${PANTS_DEV}" ]; then
-      REQUIREMENTS=(
-        ${DEV_REQUIREMENTS[@]}
-        ${REQUIREMENTS[@]}
-      )
-
       # Install as an egg so IDEs can grok all deps. Installing as sources may
       # run afoul of this bug: http://youtrack.jetbrains.com/issue/PY-6477.
       # TODO: Remove the --egg once this is resolved. It won't work in the wheel world anyway.
