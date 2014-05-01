@@ -217,7 +217,6 @@ def calculate_genfiles(path, source):
             match = END_TYPE_PARSER.match(line)
             if match:
               type_depth -= 1
-              pass
 
     # TODO(Eric Ayers) replace with a real lex/parse understanding of protos
     # This is a big hack.  The parsing for finding type definitions is not reliable.

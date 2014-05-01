@@ -136,9 +136,8 @@ def test_whitespace_insensitivity(self):
 
     self.assert_java_files(
       'no_newline_at_all1.proto',
-      '''
-        package com.pants.protos; option java_multiple_files = true; message Foo { enum Bar { BAZ = 0; } } message FooBar { }
-      ''',
+      'package com.pants.protos; option java_multiple_files = true; message Foo {'
+      + ' enum Bar { BAZ = 0; } } message FooBar { }',
       'com/pants/protos/InnerClassNoNewlineAtAll1.java',
       'com/pants/protos/Foo.java',
       'com/pants/protos/FooOrBuilder.java'

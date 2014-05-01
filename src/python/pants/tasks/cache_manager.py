@@ -325,5 +325,5 @@ class CacheManager(object):
         fingerprint_extra=fingerprint_extra
       )
     except IOError as e:
-      raise self.CacheValidationErrorError("Problem validating file %s for target %s: %s"
-                                           % (e.filename, target.id, e))
+      raise self.CacheValidationError("Problem validating file %s for target %s: %s"
+          % (e.filename, target.id, e))
