@@ -12,6 +12,7 @@ from pants.java.distribution import Distribution
 from pants.java.executor import SubprocessExecutor
 from pants.java.nailgun_executor import NailgunExecutor
 from pants.tasks import Task, TaskError
+from pants.tasks.console_task import ConsoleTask
 
 
 class NailgunTask(Task):
@@ -97,3 +98,17 @@ class NailgunTask(Task):
                                workunit_labels=workunit_labels)
     except executor.Error as e:
       raise TaskError(e)
+
+
+class NailgunKillall(ConsoleTask):
+  """A task to manually kill nailguns."""
+  @classmethod
+  def setup_parser(cls, option_group, args, mkflag):
+    super(NailgunKillall, cls).setup_parser(option_group, args, mkflag)
+    option_group.add_option(mkflag("everywhere"), dest="ng_killall_everywhere",
+                            default=False, action="store_true",
+                            help="[%default] Kill all nailguns servers launched by pants for "
+                                 "all workspaces on the system.")
+
+  def execute(self, targets):
+    NailgunTask.killall(everywhere=self.context.options.ng_killall_everywhere)

@@ -144,6 +144,19 @@ python_library(
 )
 
 python_library(
+  name = 'clean',
+  sources = ['clean.py'],
+  dependencies = [
+    pants(':console_task'),
+    pants(':task_error'),
+    pants('3rdparty/python:python-daemon'),
+    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
+    pants('src/python/pants/base:build_environment'),
+    pants('src/python/pants/base:config'),
+  ],
+)
+
+python_library(
   name = 'code_gen',
   sources = ['code_gen.py'],
   dependencies = [
@@ -491,6 +504,7 @@ python_library(
   sources = ['nailgun_task.py'],
   dependencies = [
     pants(':common'),
+    pants(':console_task'),
     pants('src/python/pants/java:executor'),
     pants('src/python/pants/java:nailgun_executor'),
     pants('src/python/pants/java:distribution'),
@@ -553,6 +567,17 @@ python_library(
     pants('3rdparty/python/twitter/commons:twitter.common.collections'),
     pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('src/python/pants/targets:jvm'),
+  ],
+)
+
+python_library(
+  name = 'reporting_server',
+  sources = ['reporting_server.py'],
+  dependencies = [
+    pants(':console_task'),
+    pants('src/python/pants/base:build_environment'),
+    pants('src/python/pants/base:run_info'),
+    pants('src/python/pants/reporting'),
   ],
 )
 
