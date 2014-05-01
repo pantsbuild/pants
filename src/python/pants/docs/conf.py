@@ -22,16 +22,6 @@ except ImportError:
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 sys.path.insert(0, os.path.abspath('../..'))
 
-pants_egg_dir = os.path.abspath('../../../../.pants.d/python/eggs')
-if not os.path.exists(pants_egg_dir):
-  raise RuntimeError(''.join([
-    'Pants egg dependencies do not exist! Please build pants before ',
-    'generating the documentation site. ',
-    'Missing dir: %s' % pants_egg_dir,
-  ]))
-for egg in os.listdir(pants_egg_dir):
-  sys.path.insert(0, os.path.join(pants_egg_dir, egg))
-
 # -- General configuration -----------------------------------------------------
 
 # If your documentation needs a minimal Sphinx version, state it here.

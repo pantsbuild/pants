@@ -1,0 +1,6 @@
+# These are extra requirments only needed for dev tasks in the pantsbuild/pants repo itself.
+
+# For doc publishing
+sphinx
+sphinx_rtd_theme
+
