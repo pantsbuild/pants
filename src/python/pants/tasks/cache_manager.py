@@ -163,6 +163,10 @@ class CacheManager(object):
   and invalidation statistics.
   Note that this is distinct from the ArtifactCache concept, and should probably be renamed.
   """
+
+  class CacheValidationError(Exception):
+    """Indicates a problem accessing the cache."""
+
   def __init__(self, cache_key_generator, build_invalidator_dir,
                invalidate_dependents, extra_data, only_externaldeps):
     self._cache_key_generator = cache_key_generator
@@ -309,13 +313,17 @@ class CacheManager(object):
     return filter(targets.__contains__, reversed(InternalTarget.sort_targets(targets)))
 
   def _key_for(self, target, dependency_keys):
-    def fingerprint_extra(sha):
-      sha.update(self._extra_data)
-      for key in sorted(dependency_keys):  # Sort to ensure hashing in a consistent order.
-        sha.update(key)
+    try:
+      def fingerprint_extra(sha):
+        sha.update(self._extra_data)
+        for key in sorted(dependency_keys):  # Sort to ensure hashing in a consistent order.
+          sha.update(key)
 
-    return self._cache_key_generator.key_for_target(
-      target,
-      sources=self._sources,
-      fingerprint_extra=fingerprint_extra
-    )
+      return self._cache_key_generator.key_for_target(
+        target,
+        sources=self._sources,
+        fingerprint_extra=fingerprint_extra
+      )
+    except IOError as e:
+      raise self.CacheValidationError("Problem validating file %s for target %s: %s"
+          % (e.filename, target.id, e))

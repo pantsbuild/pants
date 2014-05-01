@@ -164,6 +164,7 @@ class ProtobufGen(CodeGen):
 DEFAULT_PACKAGE_PARSER = re.compile(r'^\s*package\s+([^;]+)\s*;\s*$')
 OPTION_PARSER = re.compile(r'^\s*option\s+([^ =]+)\s*=\s*([^\s]+)\s*;\s*$')
 TYPE_PARSER = re.compile(r'^\s*(enum|message)\s+([^\s{]+).*')
+END_TYPE_PARSER = re.compile(r'^\s*}')
 
 
 def camelcase(string):
@@ -178,7 +179,9 @@ def calculate_genfiles(path, source):
     filename = re.sub(r'\.proto$', '', os.path.basename(source))
     outer_class_name = camelcase(filename)
     multiple_files = False
-    types = set()
+    outer_types = set()
+    inner_types = set()
+    type_depth = 0
     for line in lines:
       match = DEFAULT_PACKAGE_PARSER.match(line)
       if match:
@@ -204,18 +207,40 @@ def calculate_genfiles(path, source):
         else:
           match = TYPE_PARSER.match(line)
           if match:
+            type_depth += 1
             type_ = match.group(2)
-            types.add(type_)
-            if match.group(1) == 'message':
-              types.add('%sOrBuilder' % type_)
+            if type_depth == 1:
+              _record_type(outer_types, type_, match.group(1))
+            else:
+              _record_type(inner_types, type_, match.group(1))
+          else:
+            match = END_TYPE_PARSER.match(line)
+            if match:
+              type_depth -= 1
+
+    # TODO(Eric Ayers) replace with a real lex/parse understanding of protos
+    # This is a big hack.  The parsing for finding type definitions is not reliable.
+    # See https://github.com/pantsbuild/pants/issues/96
+    types = set()
+    if multiple_files:
+      if type_depth == 0:
+        types = outer_types
+      else:
+        # The parse appears to be flaky, roll all of the found types in.
+        types = outer_types.union(inner_types)
 
     genfiles = defaultdict(set)
     genfiles['py'].update(calculate_python_genfiles(source))
     genfiles['java'].update(calculate_java_genfiles(package,
                                                     outer_class_name,
-                                                    types if multiple_files else []))
+                                                    types))
     return genfiles
 
+
+def _record_type(type_set, type_name, type_keyword):
+  type_set.add(type_name)
+  if type_keyword == 'message':
+    type_set.add('%sOrBuilder' % type_name)
 
 def calculate_python_genfiles(source):
   yield re.sub(r'\.proto$', '_pb2.py', source)
