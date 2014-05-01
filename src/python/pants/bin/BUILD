@@ -7,6 +7,7 @@ python_library(
   dependencies = [
     pants('3rdparty/python:psutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
+    pants('src/python/pants/authentication:authentication'),
     pants('src/python/pants/base:address'),
     pants('src/python/pants/base:build_environment'),
     pants('src/python/pants/base:config'),
