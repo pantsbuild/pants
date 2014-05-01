@@ -42,7 +42,6 @@ class _JUnitRunner(object):
       self._jvm_args.extend(context.config.getlist('jvm', 'debug_args'))
 
     self._tests_to_run = context.options.junit_run_tests
-    self._outdir = context.options.junit_run_outdir or context.config.get('junit-run', 'workdir')
     self._batch_size = context.options.junit_run_batch_size
     self._fail_fast = context.options.junit_run_fail_fast
 
@@ -54,7 +53,7 @@ class _JUnitRunner(object):
         self._opts.append('-xmlreport')
       self._opts.append('-suppress-output')
       self._opts.append('-outdir')
-      self._opts.append(self._outdir)
+      self._opts.append(caller.workdir)
 
     if context.options.junit_run_per_test_timer:
       self._opts.append('-per-test-timer')
@@ -187,7 +186,7 @@ class _Coverage(_JUnitRunner):
     super(_Coverage, self).__init__(caller, context)
     self._coverage = context.options.junit_run_coverage
     self._coverage_filters = context.options.junit_run_coverage_patterns or []
-    self._coverage_dir = os.path.join(self._outdir, 'coverage')
+    self._coverage_dir = os.path.join(caller.workdir, 'coverage')
     self._coverage_instrument_dir = os.path.join(self._coverage_dir, 'classes')
     # TODO(ji): These may need to be transferred down to the Emma class, as the suffixes
     # may be emma-specific. Resolve when we also provide cobertura support.
@@ -460,16 +459,6 @@ class JUnitRun(JvmTask):
 
     self.context.products.require_data('classes_by_target')
     self.context.products.require_data('classes_by_source')
-
-    self.opts = []
-    if context.options.junit_run_xmlreport or context.options.junit_run_suppress_output:
-      if self.fail_fast:
-        self.opts.append('-fail-fast')
-      if context.options.junit_run_xmlreport:
-        self.opts.append('-xmlreport')
-      self.opts.append('-suppress-output')
-      self.opts.append('-outdir')
-      self.opts.append(self.workdir)
 
     if self._context.options.junit_run_coverage:
       if self._context.options.junit_coverage_processor == 'emma':
