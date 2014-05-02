@@ -21,11 +21,14 @@ from pants.tasks import TaskError
 from pants.tasks.jvm_task import JvmTask
 from pants.tasks.jvm_tool_bootstrapper import JvmToolBootstrapper
 
+# TODO(ji): Add unit tests.
+# TODO(ji): Add coverage in ci.run (https://github.com/pantsbuild/pants/issues/83)
+
 # The helper classes (_JUnitRunner and its subclasses) need to use
 # methods inherited by JUnitRun from Task. Rather than pass a reference
-# to the entire Task instance, we isolate the methods that are used 
+# to the entire Task instance, we isolate the methods that are used
 # in a named tuple and pass that one around.
-_TaskExports = namedtuple('_TaskExports', 
+_TaskExports = namedtuple('_TaskExports',
                           ['classpath',
                            'get_base_classpath_for_target',
                            'register_jvm_tool',
@@ -148,7 +151,6 @@ class _JUnitRunner(object):
 
     if context.options.junit_run_arg:
       self._opts.extend(context.options.junit_run_arg)
-    sys.stderr.write('\n\n@@@@_JUnitRunner::ctor')
 
 
   def execute(self, targets):
@@ -160,7 +162,7 @@ class _JUnitRunner(object):
         cp=bootstrapped_cp,
         confs=self._context.config.getlist('junit-run', 'confs', default=['default']),
         exclusives_classpath=self._task_exports.get_base_classpath_for_target(targets[0]))
-      
+
       self._context.lock.release()
       self.instrument(targets, tests, junit_classpath)
       try:
@@ -332,13 +334,7 @@ class _Coverage(_JUnitRunner):
     self._coverage_report_html_open = context.options.junit_run_coverage_html_open
     self._coverage_report_html = (self._coverage_report_html_open or
                                   context.options.junit_run_coverage_html)
-    self._coverage = self._coverage or self._coverage_report_html_open
     self._coverage_html_file = os.path.join(self._coverage_dir, 'html', 'index.html')
-    sys.stderr.write('\n\n@@@@_Coverage::ctor')
-
-  @property
-  def coverage(self):
-    return self._coverage
 
   @abstractmethod
   def instrument(self, targets, tests, junit_classpath):
@@ -385,11 +381,8 @@ class Emma(_Coverage):
     task_exports.register_jvm_tool(self._emma_bootstrap_key,
                              context.config.getlist('junit-run', 'emma-bootstrap-tools',
                                                     default=[':emma']))
-    sys.stderr.write('\n\n@@@@_Emma::ctor')
 
   def instrument(self, targets, tests, junit_classpath):
-    if not self.coverage:
-      return
     safe_mkdir(self._coverage_instrument_dir, clean=True)
     emma_classpath = self._task_exports.tool_classpath(self._emma_bootstrap_key)
     with binary_util.safe_args(self.get_coverage_patterns(targets)) as patterns:
@@ -411,16 +404,12 @@ class Emma(_Coverage):
                           " 'failed to instrument'" % (main, result))
 
   def run(self, targets, tests, junit_classpath):
-    if not self.coverage:
-      return
     emma_classpath = self._task_exports.tool_classpath(self._emma_bootstrap_key)
     self._run_tests(tests, [self._coverage_instrument_dir] + junit_classpath + emma_classpath,
                     JUnitRun._MAIN,
                     jvm_args=['-Demma.coverage.out.file=%s' % self._coverage_file])
 
   def report(self, targets, tests, junit_classpath):
-    if not self.coverage:
-      return
     emma_classpath = self._task_exports.tool_classpath(self._emma_bootstrap_key)
     args = [
       'report',
@@ -495,8 +484,9 @@ class JUnitRun(JvmTask):
                                 tool_classpath=self.tool_classpath,
                                 workdir=self.workdir)
 
-    if self._context.options.junit_run_coverage:
-      if self._context.options.junit_coverage_processor == 'emma':
+    options = self._context.options
+    if options.junit_run_coverage or options.junit_run_coverage_html_open:
+      if options.junit_coverage_processor == 'emma':
         self._runner = Emma(task_exports, self._context)
       else:
         raise TaskError('unknown coverage processor %s' % context.options.junit_coverage_processor)
@@ -507,4 +497,3 @@ class JUnitRun(JvmTask):
   def execute(self, targets):
     if not self._context.options.junit_run_skip:
       self._runner.execute(targets)
-
