@@ -119,7 +119,7 @@ Throughout the review process, there is one workflow rule to keep in mind to
 play nice with rbt's expectations.  Once you post a diff, don't alter the
 commits that form that diff.  Put another way, its fine to rebase commits
 not yet exposed to ReviewBoard, but once they are via `./rbt post` you should
-refrain from forther rebasing those commits.  In practice this makes sense;
+refrain from further rebasing those commits.  In practice this makes sense;
 in general, you want to rebase local commits into the logical commits you send
 as diffs in the ReviewBoard workflow.
 
