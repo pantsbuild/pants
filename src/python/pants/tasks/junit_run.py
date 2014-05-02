@@ -5,6 +5,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 from abc import abstractmethod
+from collections import namedtuple
 import os
 import re
 import sys
@@ -19,6 +20,17 @@ from pants.targets.java_tests import JavaTests as junit_tests
 from pants.tasks import TaskError
 from pants.tasks.jvm_task import JvmTask
 from pants.tasks.jvm_tool_bootstrapper import JvmToolBootstrapper
+
+# The helper classes (_JUnitRunner and its subclasses) need to use
+# methods inherited by JUnitRun from Task. Rather than pass a reference
+# to the entire Task instance, we isolate the methods that are used 
+# in a named tuple and pass that one around.
+_TaskExports = namedtuple('_TaskExports', 
+                          ['classpath',
+                           'get_base_classpath_for_target',
+                           'register_jvm_tool',
+                           'tool_classpath',
+                           'workdir'])
 
 def _classfile_to_classname(cls):
   clsname, _ = os.path.splitext(cls.replace('/', '.'))
@@ -96,11 +108,11 @@ class _JUnitRunner(object):
                             help="An arbitrary argument to pass directly to the test runner. "
                                    "This option can be specified multiple times.")
 
-  def __init__(self, caller, context):
-    self._caller = caller
+  def __init__(self, task_exports, context):
+    self._task_exports = task_exports
     self._context = context
     self._junit_bootstrap_key = 'junit'
-    caller.register_jvm_tool(self._junit_bootstrap_key,
+    task_exports.register_jvm_tool(self._junit_bootstrap_key,
                              context.config.getlist('junit-run', 'junit-bootstrap-tools',
                                                     default=[':junit']))
     self._jvm_args = context.config.getlist('junit-run', 'jvm_args', default=[])
@@ -121,7 +133,7 @@ class _JUnitRunner(object):
         self._opts.append('-xmlreport')
       self._opts.append('-suppress-output')
       self._opts.append('-outdir')
-      self._opts.append(caller.workdir)
+      self._opts.append(task_exports.workdir)
 
     if context.options.junit_run_per_test_timer:
       self._opts.append('-per-test-timer')
@@ -143,11 +155,11 @@ class _JUnitRunner(object):
     tests = list(self._get_tests_to_run() if self._tests_to_run
                  else self._calculate_tests_from_targets(targets))
     if tests:
-      bootstrapped_cp = self._caller.tool_classpath(self._junit_bootstrap_key)
-      junit_classpath = self._caller.classpath(
+      bootstrapped_cp = self._task_exports.tool_classpath(self._junit_bootstrap_key)
+      junit_classpath = self._task_exports.classpath(
         cp=bootstrapped_cp,
         confs=self._context.config.getlist('junit-run', 'confs', default=['default']),
-        exclusives_classpath=self._caller.get_base_classpath_for_target(targets[0]))
+        exclusives_classpath=self._task_exports.get_base_classpath_for_target(targets[0]))
       
       self._context.lock.release()
       self.instrument(targets, tests, junit_classpath)
@@ -301,11 +313,11 @@ class _Coverage(_JUnitRunner):
 
 
 
-  def __init__(self, caller, context):
-    super(_Coverage, self).__init__(caller, context)
+  def __init__(self, task_exports, context):
+    super(_Coverage, self).__init__(task_exports, context)
     self._coverage = context.options.junit_run_coverage
     self._coverage_filters = context.options.junit_run_coverage_patterns or []
-    self._coverage_dir = os.path.join(caller.workdir, 'coverage')
+    self._coverage_dir = os.path.join(task_exports.workdir, 'coverage')
     self._coverage_instrument_dir = os.path.join(self._coverage_dir, 'classes')
     # TODO(ji): These may need to be transferred down to the Emma class, as the suffixes
     # may be emma-specific. Resolve when we also provide cobertura support.
@@ -367,10 +379,10 @@ class _Coverage(_JUnitRunner):
 class Emma(_Coverage):
   """Class to run coverage tests with Emma."""
 
-  def __init__(self, caller, context):
-    super(Emma, self).__init__(caller, context)
+  def __init__(self, task_exports, context):
+    super(Emma, self).__init__(task_exports, context)
     self._emma_bootstrap_key = 'emma'
-    caller.register_jvm_tool(self._emma_bootstrap_key,
+    task_exports.register_jvm_tool(self._emma_bootstrap_key,
                              context.config.getlist('junit-run', 'emma-bootstrap-tools',
                                                     default=[':emma']))
     sys.stderr.write('\n\n@@@@_Emma::ctor')
@@ -379,7 +391,7 @@ class Emma(_Coverage):
     if not self.coverage:
       return
     safe_mkdir(self._coverage_instrument_dir, clean=True)
-    emma_classpath = self._caller.tool_classpath(self._emma_bootstrap_key)
+    emma_classpath = self._task_exports.tool_classpath(self._emma_bootstrap_key)
     with binary_util.safe_args(self.get_coverage_patterns(targets)) as patterns:
       args = [
         'instr',
@@ -401,7 +413,7 @@ class Emma(_Coverage):
   def run(self, targets, tests, junit_classpath):
     if not self.coverage:
       return
-    emma_classpath = self._caller.tool_classpath(self._emma_bootstrap_key)
+    emma_classpath = self._task_exports.tool_classpath(self._emma_bootstrap_key)
     self._run_tests(tests, [self._coverage_instrument_dir] + junit_classpath + emma_classpath,
                     JUnitRun._MAIN,
                     jvm_args=['-Demma.coverage.out.file=%s' % self._coverage_file])
@@ -409,7 +421,7 @@ class Emma(_Coverage):
   def report(self, targets, tests, junit_classpath):
     if not self.coverage:
       return
-    emma_classpath = self._caller.tool_classpath(self._emma_bootstrap_key)
+    emma_classpath = self._task_exports.tool_classpath(self._emma_bootstrap_key)
     args = [
       'report',
       '-in', self._coverage_metadata_file,
@@ -473,19 +485,23 @@ class JUnitRun(JvmTask):
     self._context = context
     context.products.require_data('exclusives_groups')
 
-
     # List of FQCN, FQCN#method, sourcefile or sourcefile#method.
-
     self.context.products.require_data('classes_by_target')
     self.context.products.require_data('classes_by_source')
 
+    task_exports = _TaskExports(classpath=self.classpath,
+                                get_base_classpath_for_target=self.get_base_classpath_for_target,
+                                register_jvm_tool=self.register_jvm_tool,
+                                tool_classpath=self.tool_classpath,
+                                workdir=self.workdir)
+
     if self._context.options.junit_run_coverage:
       if self._context.options.junit_coverage_processor == 'emma':
-        self._runner = Emma(self, self._context)
+        self._runner = Emma(task_exports, self._context)
       else:
         raise TaskError('unknown coverage processor %s' % context.options.junit_coverage_processor)
     else:
-      self._runner = _JUnitRunner(self, self._context)
+      self._runner = _JUnitRunner(task_exports, self._context)
 
 
   def execute(self, targets):
