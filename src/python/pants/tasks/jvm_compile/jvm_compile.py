@@ -639,7 +639,8 @@ class JvmCompile(NailgunTask):
         if os.path.isfile(jarpath) and ((jarpath.endswith('.jar') or jarpath.endswith('.zip'))):
           with open_zip(jarpath, 'r') as jar:
             for cls in jar.namelist():
-              # First jar with a given class wins, just like when classloading.
+              # First jar with a given class wi)ns, just like when classloading.
+              self.context.log.info("Class is: %s" % (repr(cls)))
               if cls.endswith('.class') and not cls in self._class_to_jarfile:
                 self._class_to_jarfile[cls] = jarpath
         elif os.path.isdir(jarpath):

@@ -22,5 +22,11 @@ jvm_binary(name='main',
     pants('3rdparty/jvm/com/twitter/common:args'),
     pants('3rdparty/jvm/com/twitter/common:base'),
     pants('src/java/com/pants/examples/pingpong/handler'),
+      jar(org='info.cukes', name='cucumber-core', rev='1.1.6',
+      url='https://nexus.corp.squareup.com/',).with_sources(),
+      jar(org='info.cukes', name='cucumber-guice', rev='1.1.6',
+      url='https://nexus.corp.squareup.com/',).with_sources(),
+      jar(org='info.cukes', name='cucumber-java', rev='1.1.6',
+      url='https://nexus.corp.squareup.com/',).with_sources(),
   ]
 )
