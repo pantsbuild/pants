@@ -640,7 +640,7 @@ class JvmCompile(NailgunTask):
           with open_zip(jarpath, 'r') as jar:
             for cls in jar.namelist():
               # First jar with a given class wins, just like when classloading.
-              if cls.endswith('.class') and not cls in self._class_to_jarfile:
+              if cls.endswith(b'.class') and not cls in self._class_to_jarfile:
                 self._class_to_jarfile[cls] = jarpath
         elif os.path.isdir(jarpath):
           for dirpath, _, filenames in os.walk(jarpath, followlinks=True):
