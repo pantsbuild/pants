@@ -5,6 +5,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 from pants.base.build_manual import manual
+from pants.base.payload import EmptyPayload
 from pants.base.target import Target
 
 
@@ -12,16 +13,15 @@ from pants.base.target import Target
 class Repository(Target):
   """An artifact repository, such as a maven repo."""
 
-  def __init__(self, name, url, push_db, exclusives=None):
+  def __init__(self, url=None, push_db=None, **kwargs):
     """
     :param string name: Name of the repository.
     :param string url: Optional URL of the repository.
     :param string push_db: Path of the push history file.
     """
 
-    super(Repository, self).__init__(name, exclusives=exclusives)
+    super(Repository, self).__init__(payload=EmptyPayload(), **kwargs)
 
-    self.name = name
     self.url = url
     self.push_db = push_db
 

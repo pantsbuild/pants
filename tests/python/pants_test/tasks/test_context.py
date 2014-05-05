@@ -6,18 +6,16 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from pants.base.config import Config
 from pants.goal import Context
-from pants_test.testutils.base_mock_target_test import BaseMockTargetTest
-from pants_test.testutils.mock_target import MockTarget
+from pants_test.base_test import BaseTest
 
 
-class ContextTest(BaseMockTargetTest):
-  @classmethod
-  def setUpClass(cls):
-    cls.config = Config.load()
-
-  @classmethod
-  def create_context(cls, **kwargs):
-    return Context(cls.config, run_tracker=None, **kwargs)
+class ContextTest(BaseTest):
+  def create_context(self, **kwargs):
+    return Context(self.config,
+                   build_graph=self.build_graph,
+                   build_file_parser=self.build_file_parser,
+                   run_tracker=None,
+                   **kwargs)
 
   def test_dependents_empty(self):
     context = self.create_context(options={}, target_roots=[])
@@ -25,11 +23,11 @@ class ContextTest(BaseMockTargetTest):
     self.assertEquals(0, len(dependees))
 
   def test_dependents_direct(self):
-    a = MockTarget('a')
-    b = MockTarget('b', [a])
-    c = MockTarget('c', [b])
-    d = MockTarget('d', [c, a])
-    e = MockTarget('e', [d])
+    a = self.make_target('a')
+    b = self.make_target('b', dependencies=[a])
+    c = self.make_target('c', dependencies=[b])
+    d = self.make_target('d', dependencies=[c, a])
+    e = self.make_target('e', dependencies=[d])
     context = self.create_context(options={}, target_roots=[a, b, c, d, e])
     dependees = context.dependents(lambda t: t in set([e, c]))
     self.assertEquals(set([c]), dependees.pop(d))

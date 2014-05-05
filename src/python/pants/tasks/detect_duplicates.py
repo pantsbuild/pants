@@ -10,7 +10,7 @@ from contextlib import closing
 from zipfile import ZipFile
 
 from pants.java.jar import Manifest
-from pants.tasks import TaskError
+from pants.tasks.task import TaskError
 from pants.tasks.jvm_binary_task import JvmBinaryTask
 
 

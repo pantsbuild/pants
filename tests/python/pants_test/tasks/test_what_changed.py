@@ -6,14 +6,14 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from textwrap import dedent
 
-from pants.base.target import TargetDefinitionException
+from pants.base.exceptions import TargetDefinitionException
 from pants.tasks.what_changed import WhatChanged, Workspace
 from pants_test.tasks.test_base import ConsoleTaskTest
 
 
 class BaseWhatChangedTest(ConsoleTaskTest):
   @classmethod
-  def task_type(cls):
+  def task_type(self):
     return WhatChanged
 
   def workspace(self, files=None, parent=None):
@@ -43,16 +43,15 @@ class WhatChangedTestBasic(BaseWhatChangedTest):
 
 
 class WhatChangedTest(BaseWhatChangedTest):
-  @classmethod
-  def setUpClass(cls):
-    super(WhatChangedTest, cls).setUpClass()
+  def setUp(self):
+    super(WhatChangedTest, self).setUp()
 
-    cls.create_target('root', dedent('''
+    self.add_to_build_file('root', dedent('''
       source_root('src/py', python_library)
       source_root('resources/a1', resources)
     '''))
 
-    cls.create_target('root/src/py/a', dedent('''
+    self.add_to_build_file('root/src/py/a', dedent('''
       python_library(
         name='alpha',
         sources=['b/c', 'd'],
@@ -61,20 +60,20 @@ class WhatChangedTest(BaseWhatChangedTest):
 
       jar_library(
         name='beta',
-        dependencies=[
+        jars=[
           jar(org='gamma', name='ray', rev='1.137.bruce_banner')
         ]
       )
     '''))
 
-    cls.create_target('root/src/py/1', dedent('''
+    self.add_to_build_file('root/src/py/1', dedent('''
       python_library(
         name='numeric',
         sources=['2']
       )
     '''))
 
-    cls.create_target('root/src/thrift', dedent('''
+    self.add_to_build_file('root/src/thrift', dedent('''
       java_thrift_library(
         name='thrift',
         sources=['a.thrift']
@@ -86,14 +85,14 @@ class WhatChangedTest(BaseWhatChangedTest):
       )
     '''))
 
-    cls.create_target('root/resources/a', dedent('''
+    self.add_to_build_file('root/resources/a', dedent('''
       resources(
         name='a_resources',
         sources=['a.resources']
       )
     '''))
 
-    cls.create_target('root/src/java/a', dedent('''
+    self.add_to_build_file('root/src/java/a', dedent('''
       java_library(
         name='a_java',
         sources=['a.java'],
@@ -101,18 +100,18 @@ class WhatChangedTest(BaseWhatChangedTest):
       )
     '''))
 
-    cls.create_target('root/3rdparty/BUILD.twitter', dedent('''
+    self.add_to_build_file('root/3rdparty/BUILD.twitter', dedent('''
       jar_library(
         name='dummy',
-        dependencies=[
+        jars=[
           jar(org='foo', name='ray', rev='1.45')
         ])
     '''))
 
-    cls.create_target('root/3rdparty/BUILD', dedent('''
+    self.add_to_build_file('root/3rdparty/BUILD', dedent('''
       jar_library(
         name='dummy1',
-        dependencies=[
+        jars=[
           jar(org='foo1', name='ray', rev='1.45')
         ])
     '''))
@@ -157,7 +156,7 @@ class WhatChangedTest(BaseWhatChangedTest):
     )
 
   def test_resource_type_error(self):
-    self.create_target('root/resources/a1', dedent('''
+    self.add_to_build_file('root/resources/a1', dedent('''
       java_library(
         name='a1',
         sources=['a1.test'],
@@ -165,6 +164,6 @@ class WhatChangedTest(BaseWhatChangedTest):
       )
     '''))
     self.assert_console_raises(
-      TargetDefinitionException,
+      Exception,
       workspace=self.workspace(files=['root/resources/a1/a1.test'])
     )

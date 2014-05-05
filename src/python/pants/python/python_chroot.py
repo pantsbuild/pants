@@ -17,17 +17,19 @@ from twitter.common.python.interpreter import PythonInterpreter
 from twitter.common.python.pex_builder import PEXBuilder
 from twitter.common.python.platforms import Platform
 
+from pants.base.build_environment import get_buildroot
 from pants.base.build_invalidator import BuildInvalidator, CacheKeyGenerator
 from pants.base.config import Config
-from pants.base.parse_context import ParseContext
 from pants.python.antlr_builder import PythonAntlrBuilder
 from pants.python.python_setup import PythonSetup
 from pants.python.resolver import resolve_multi
 from pants.python.thrift_builder import PythonThriftBuilder
+from pants.targets.dependencies import Dependencies
 from pants.targets.python_antlr_library import PythonAntlrLibrary
 from pants.targets.python_binary import PythonBinary
 from pants.targets.python_library import PythonLibrary
 from pants.targets.python_requirement import PythonRequirement
+from pants.targets.python_requirement_library import PythonRequirementLibrary
 from pants.targets.python_tests import PythonTests
 from pants.targets.python_thrift_library import PythonThriftLibrary
 
@@ -35,7 +37,7 @@ from pants.targets.python_thrift_library import PythonThriftLibrary
 class PythonChroot(object):
   _VALID_DEPENDENCIES = {
     PythonLibrary: 'libraries',
-    PythonRequirement: 'reqs',
+    PythonRequirementLibrary: 'reqs',
     PythonBinary: 'binaries',
     PythonThriftLibrary: 'thrifts',
     PythonAntlrLibrary: 'antlrs',
@@ -52,6 +54,7 @@ class PythonChroot(object):
                target,
                root_dir,
                extra_targets=None,
+               extra_requirements=None,
                builder=None,
                platforms=None,
                interpreter=None,
@@ -62,6 +65,7 @@ class PythonChroot(object):
     self._platforms = platforms
     self._interpreter = interpreter or PythonInterpreter.get()
     self._extra_targets = list(extra_targets) if extra_targets is not None else []
+    self._extra_requirements = list(extra_requirements) if extra_requirements is not None else []
     self._builder = builder or PEXBuilder(tempfile.mkdtemp(), interpreter=self._interpreter)
 
     # Note: unrelated to the general pants artifact cache.
@@ -90,16 +94,33 @@ class PythonChroot(object):
   def path(self):
     return self._builder.path()
 
+  def sources_relative_to_source_root(target):
+    abs_target_source_root = os.path.join(get_buildroot(), target.target_base)
+    for source in target.sources_relative_to_buildroot():
+      abs_source_path = os.path.join(get_buildroot(), source)
+      resource_rel_path = os.path.relpath(abs_source_path, abs_target_source_root)
+      yield abs_source_path, resource_rel_path
+
   def _dump_library(self, library):
     def copy_to_chroot(base, path, add_function):
       src = os.path.join(self._root, base, path)
       add_function(src, path)
 
     self.debug('  Dumping library: %s' % library)
-    for filename in library.sources:
-      copy_to_chroot(library.target_base, filename, self._builder.add_source)
-    for filename in library.resources:
-      copy_to_chroot(library.target_base, filename, self._builder.add_resource)
+
+    abs_target_source_root = os.path.join(get_buildroot(), library.target_base)
+
+    for filename in library.payload.sources_relative_to_buildroot():
+      abs_source_path = os.path.join(get_buildroot(), filename)
+      source_rel_path = os.path.relpath(abs_source_path, abs_target_source_root)
+      copy_to_chroot(library.target_base, source_rel_path, self._builder.add_source)
+
+    resources = [os.path.join(library.payload.sources_rel_path, resource)
+                 for resource in library.payload.resources]
+    for filename in resources:
+      abs_resource_path = os.path.join(get_buildroot(), filename)
+      resource_rel_path = os.path.relpath(abs_resource_path, abs_target_source_root)
+      copy_to_chroot(library.target_base, resource_rel_path, self._builder.add_resource)
 
   def _dump_requirement(self, req, dynamic, repo):
     self.debug('  Dumping requirement: %s%s%s' % (str(req),
@@ -121,8 +142,7 @@ class PythonChroot(object):
       shutil.copy(sdist, os.path.join(cache_dir, os.path.basename(sdist)))
       self._build_invalidator.update(library_key)
 
-    with ParseContext.temp():
-      return PythonRequirement(builder.requirement_string(), repository=cache_dir, use_2to3=True)
+    return PythonRequirement(builder.requirement_string(), repository=cache_dir, use_2to3=True)
 
   def _generate_thrift_requirement(self, library):
     return self._generate_requirement(library, PythonThriftBuilder)
@@ -137,6 +157,8 @@ class PythonChroot(object):
         if isinstance(trg, target_type):
           children[target_key].add(trg)
           return
+        elif isinstance(trg, Dependencies):
+          return
       raise self.InvalidDependencyException(trg)
     for target in targets:
       target.walk(add_dep)
@@ -144,7 +166,6 @@ class PythonChroot(object):
 
   def dump(self):
     self.debug('Building PythonBinary %s:' % self._target)
-
     targets = self.resolve([self._target] + self._extra_targets)
 
     for lib in targets['libraries'] | targets['binaries']:
@@ -156,23 +177,19 @@ class PythonChroot(object):
         if thr not in self.MEMOIZED_THRIFTS:
           self.MEMOIZED_THRIFTS[thr] = self._generate_thrift_requirement(thr)
         generated_reqs.add(self.MEMOIZED_THRIFTS[thr])
-      with ParseContext.temp():
-        # trick pants into letting us add this python requirement, otherwise we get
-        # TargetDefinitionException: Error in target BUILD.temp:thrift: duplicate to
-        # PythonRequirement(thrift)
-        #
-        # TODO(wickman) Instead of just blindly adding a PythonRequirement for thrift, we
-        # should first detect if any explicit thrift requirements have been added and use
-        # those.  Only if they have not been supplied should we auto-inject it.
-        generated_reqs.add(PythonRequirement('thrift', use_2to3=True,
-            name='thrift-' + ''.join(random.sample('0123456789abcdef' * 8, 8))))
+
+      generated_reqs.add(PythonRequirement('thrift', use_2to3=True))
 
     for antlr in targets['antlrs']:
       generated_reqs.add(self._generate_antlr_requirement(antlr))
 
-    targets['reqs'] |= generated_reqs
+    reqs_from_libraries = OrderedSet()
+    for req_lib in targets['reqs']:
+      for req in req_lib.payload.requirements:
+        reqs_from_libraries.add(req)
+
     reqs_to_build = OrderedSet()
-    for req in targets['reqs']:
+    for req in reqs_from_libraries | generated_reqs | self._extra_requirements:
       if not req.should_build(self._interpreter.python, Platform.current()):
         self.debug('Skipping %s based upon version filter' % req)
         continue

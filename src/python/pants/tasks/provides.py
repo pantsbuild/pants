@@ -12,7 +12,7 @@ from twitter.common.contextutil import open_zip as open_jar
 
 from pants.targets.jar_dependency import JarDependency
 from pants.targets.jvm_binary import JvmBinary
-from pants.tasks import Task
+from pants.tasks.task import Task
 from pants.tasks.ivy_utils import IvyModuleRef, IvyUtils
 
 
@@ -37,12 +37,13 @@ class Provides(Task):
     self.also_write_to_stdout = context.options.provides_also_write_to_stdout or False
     # Create a fake target, in case we were run directly on a JarLibrary containing nothing but JarDependencies.
     # TODO(benjy): Get rid of this special-casing of jar dependencies.
-    context.add_new_target(self.workdir,
-      JvmBinary,
-      name='provides',
-      dependencies=self.target_roots,
-      configurations=self.confs)
-    context.products.require('jars')
+    # TODO(pl): Is this necessary?  Now JarLibrary only contains a payload of JarDependency
+    # context.add_new_target(self.workdir,
+    #   JvmBinary,
+    #   name='provides',
+    #   dependencies=self.target_roots,
+    #   configurations=self.confs)
+    # context.products.require('jars')
 
   def execute(self, targets):
     for conf in self.confs:

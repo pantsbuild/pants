@@ -15,7 +15,7 @@ from pants.base.build_environment import get_buildroot
 from pants.fs import archive
 from pants.java.jar import Manifest, open_jar
 from pants.targets.jvm_binary import JvmApp, JvmBinary
-from pants.tasks import TaskError
+from pants.tasks.task import TaskError
 from pants.tasks.jvm_binary_task import JvmBinaryTask
 
 
@@ -64,13 +64,13 @@ class BundleCreate(JvmBinaryTask):
       assert self.is_app(target), "%s is not a valid app target" % target
 
       self.binary = target if isinstance(target, JvmBinary) else target.binary
-      self.bundles = [] if isinstance(target, JvmBinary) else target.bundles
+      self.bundles = [] if isinstance(target, JvmBinary) else target.payload.bundles
       self.basename = target.basename
 
   def execute(self, _):
     archiver = archive.archiver(self._archiver_type) if self._archiver_type else None
     for target in self.context.target_roots:
-      for app in map(self.App, filter(self.App.is_app, target.resolve())):
+      for app in map(self.App, filter(self.App.is_app, [target])):
         basedir = self.bundle(app)
         if archiver:
 
@@ -108,7 +108,7 @@ class BundleCreate(JvmBinaryTask):
               os.symlink(os.path.join(base_dir, internal_jar), os.path.join(lib_dir, internal_jar))
               classpath.add(internal_jar)
 
-      app.binary.walk(add_jars, lambda t: t.is_internal and t != app.binary)
+      app.binary.walk(add_jars, lambda t: t != app.binary)
 
       # Add external dependencies to the bundle.
       for basedir, external_jar in self.list_jar_dependencies(app.binary):

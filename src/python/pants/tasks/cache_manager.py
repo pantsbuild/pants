@@ -10,17 +10,10 @@ try:
 except ImportError:
   import pickle
 
-from pants.base.build_invalidator import (
-    BuildInvalidator,
-    CacheKeyGenerator,
-    NO_SOURCES,
-    TARGET_SOURCES)
+from pants.base.build_graph import sort_targets
+from pants.base.build_invalidator import BuildInvalidator, CacheKeyGenerator
 from pants.base.target import Target
-from pants.targets.external_dependency import ExternalDependency
-from pants.targets.internal import InternalTarget
 from pants.targets.jar_library import JarLibrary
-from pants.targets.pants_target import Pants
-from pants.targets.with_sources import TargetWithSources
 
 
 class VersionedTargetSet(object):
@@ -55,8 +48,8 @@ class VersionedTargetSet(object):
     # The following line is a no-op if cache_key was set in the VersionedTarget __init__ method.
     self.cache_key = CacheKeyGenerator.combine_cache_keys([vt.cache_key
                                                            for vt in versioned_targets])
-    self.num_sources = self.cache_key.num_sources
-    self.sources = self.cache_key.sources
+    self.payloads = self.cache_key.payloads
+    self.num_chunking_units = self.cache_key.num_chunking_units
     self.valid = not cache_manager.needs_update(self.cache_key)
 
   def update(self):
@@ -83,7 +76,6 @@ class VersionedTarget(VersionedTargetSet):
     # Must come after the assignments above, as they are used in the parent's __init__.
     VersionedTargetSet.__init__(self, cache_manager, [self])
     self.id = target.id
-    self.dependencies = set()
 
 
 # The result of calling check() on a CacheManager.
@@ -117,20 +109,20 @@ class InvalidationCheck(object):
     class VtGroup(object):
       def __init__(self):
         self.vts = []
-        self.total_sources = 0
+        self.total_chunking_units = 0
 
     current_group = VtGroup()
 
     def add_to_current_group(vt):
       current_group.vts.append(vt)
-      current_group.total_sources += vt.num_sources
+      current_group.total_chunking_units += vt.num_chunking_units
 
     def close_current_group():
       if len(current_group.vts) > 0:
         new_vt = VersionedTargetSet.from_versioned_targets(current_group.vts)
         res.append(new_vt)
         current_group.vts = []
-        current_group.total_sources = 0
+        current_group.total_chunking_units = 0
 
     current_color = None
     for vt in versioned_targets:
@@ -142,12 +134,12 @@ class InvalidationCheck(object):
           close_current_group()
           current_color = color
       add_to_current_group(vt)
-      if current_group.total_sources > 1.5 * partition_size_hint and len(current_group.vts) > 1:
+      if current_group.total_chunking_units > 1.5 * partition_size_hint and len(current_group.vts) > 1:
         # Too big. Close the current group without this vt and add it to the next one.
         current_group.vts.pop()
         close_current_group()
         add_to_current_group(vt)
-      elif current_group.total_sources > partition_size_hint:
+      elif current_group.total_chunking_units > partition_size_hint:
         close_current_group()
     close_current_group()  # Close the last group, if any.
 
@@ -178,7 +170,7 @@ class InvalidationCheck(object):
         if (partition_size_hint or vt_colors) else invalid_vts
 
 
-class CacheManager(object):
+class InvalidationCacheManager(object):
   """Manages cache checks, updates and invalidation keeping track of basic change
   and invalidation statistics.
   Note that this is distinct from the ArtifactCache concept, and should probably be renamed.
@@ -187,13 +179,14 @@ class CacheManager(object):
   class CacheValidationError(Exception):
     """Indicates a problem accessing the cache."""
 
-  def __init__(self, cache_key_generator, build_invalidator_dir,
-               invalidate_dependents, extra_data, only_externaldeps):
+  def __init__(self,
+               cache_key_generator,
+               build_invalidator_dir,
+               invalidate_dependents,
+               extra_data):
     self._cache_key_generator = cache_key_generator
     self._invalidate_dependents = invalidate_dependents
     self._extra_data = pickle.dumps(extra_data)  # extra_data may be None.
-    self._sources = NO_SOURCES if only_externaldeps else TARGET_SOURCES
-
     self._invalidator = BuildInvalidator(build_invalidator_dir)
 
   def update(self, vts):
@@ -247,38 +240,7 @@ class CacheManager(object):
     id_to_hash = {}
 
     for target in ordered_targets:
-      dependency_keys = set()
-      if self._invalidate_dependents and hasattr(target, 'dependencies'):
-        # Note that we only need to do this for the immediate deps, because those will already
-        # reflect changes in their own deps.
-        for dep in target.dependencies:
-          # We rely on the fact that any deps have already been processed, either in an earlier
-          # round or because they came first in ordered_targets.
-          # Note that only external deps (e.g., JarDependency) or targets with sources can
-          # affect invalidation. Other targets (JarLibrary, Pants) are just dependency scaffolding.
-          if isinstance(dep, ExternalDependency):
-            dependency_keys.add(dep.cache_key())
-          elif isinstance(dep, TargetWithSources):
-            fprint = id_to_hash.get(dep.id, None)
-            if fprint is None:
-              # It may have been processed in a prior round, and therefore the fprint should
-              # have been written out by the invalidator.
-              fprint = self._invalidator.existing_hash(dep.id)
-              # Note that fprint may still be None here. E.g., a codegen target is in the list
-              # of deps, but its fprint is not visible to our self._invalidator (that of the
-              # target synthesized from it is visible, so invalidation will still be correct.)
-              #
-              # Another case where this can happen is a dep of a codegen target on, say,
-              # a java target that hasn't been built yet (again, the synthesized target will
-              # depend on that same java target, so invalidation will still be correct.)
-              # TODO(benjy): Make this simpler and more obviously correct.
-            if fprint is not None:
-              dependency_keys.add(fprint)
-          elif isinstance(dep, JarLibrary) or isinstance(dep, Pants):
-            pass
-          else:
-            raise ValueError('Cannot calculate a cache_key for a dependency: %s' % dep)
-      cache_key = self._key_for(target, dependency_keys)
+      cache_key = self._key_for(target, transitive=self._invalidate_dependents)
       id_to_hash[target.id] = cache_key.hash
 
       # Create a VersionedTarget corresponding to @target.
@@ -287,44 +249,6 @@ class CacheManager(object):
       # Add the new VersionedTarget to the list of computed VersionedTargets.
       versioned_targets.append(versioned_target)
 
-      # Add to the mapping from Targets to VersionedTargets, for use in hooking up VersionedTarget
-      # dependencies below.
-      versioned_targets_by_target[target] = versioned_target
-
-    # Having created all applicable VersionedTargets, now we build the VersionedTarget dependency
-    # graph, looking through targets that don't correspond to VersionedTargets themselves.
-    versioned_target_deps_by_target = {}
-
-    def get_versioned_target_deps_for_target(target):
-      # For every dependency of @target, we will store its corresponding VersionedTarget here. For
-      # dependencies that don't correspond to a VersionedTarget (e.g. pass-through dependency
-      # wrappers), we will resolve their actual dependencies and find VersionedTargets for them.
-      versioned_target_deps = set([])
-      if hasattr(target, 'dependencies'):
-        for dep in target.dependencies:
-          for dependency in dep.resolve():
-            if dependency in versioned_targets_by_target:
-              # If there exists a VersionedTarget corresponding to this Target, store it and
-              # continue.
-              versioned_target_deps.add(versioned_targets_by_target[dependency])
-            elif dependency in versioned_target_deps_by_target:
-              # Otherwise, see if we've already resolved this dependency to the VersionedTargets it
-              # depends on, and use those.
-              versioned_target_deps.update(versioned_target_deps_by_target[dependency])
-            else:
-              # Otherwise, compute the VersionedTargets that correspond to this dependency's
-              # dependencies, cache and use the computed result.
-              versioned_target_deps_by_target[dependency] = get_versioned_target_deps_for_target(
-                  dependency)
-              versioned_target_deps.update(versioned_target_deps_by_target[dependency])
-
-      # Return the VersionedTarget dependencies that this target's VersionedTarget should depend on.
-      return versioned_target_deps
-
-    # Initialize all VersionedTargets to point to the VersionedTargets they depend on.
-    for versioned_target in versioned_targets:
-      versioned_target.dependencies = get_versioned_target_deps_for_target(versioned_target.target)
-
     return versioned_targets
 
   def needs_update(self, cache_key):
@@ -332,21 +256,11 @@ class CacheManager(object):
 
   def _order_target_list(self, targets):
     """Orders the targets topologically, from least to most dependent."""
-    targets = set(t for t in targets if isinstance(t, Target))
-    return filter(targets.__contains__, reversed(InternalTarget.sort_targets(targets)))
+    return filter(targets.__contains__, reversed(sort_targets(targets)))
 
-  def _key_for(self, target, dependency_keys):
+  def _key_for(self, target, transitive=False):
     try:
-      def fingerprint_extra(sha):
-        sha.update(self._extra_data)
-        for key in sorted(dependency_keys):  # Sort to ensure hashing in a consistent order.
-          sha.update(key)
-
-      return self._cache_key_generator.key_for_target(
-        target,
-        sources=self._sources,
-        fingerprint_extra=fingerprint_extra
-      )
+      return self._cache_key_generator.key_for_target(target, transitive=transitive)
     except IOError as e:
-      raise self.CacheValidationError("Problem validating file %s for target %s: %s"
-          % (e.filename, target.id, e))
+      raise self.CacheValidationError("Problem validating file %s for target %s: %s" %
+                                      (e.filename, target.id, e))

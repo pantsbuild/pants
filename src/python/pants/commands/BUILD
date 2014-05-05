@@ -7,7 +7,9 @@ python_library(
   dependencies = [
     pants('3rdparty/python/twitter/commons:twitter.common.collections'),
     pants('src/python/pants/base:build_file'),
+    pants('src/python/pants/base:build_file_parser'),
     pants('src/python/pants/base:target'),
+    pants('src/python/pants/base:build_graph'),
   ]
 )
 
@@ -35,6 +37,7 @@ python_library(
     pants('3rdparty/python/twitter/commons:twitter.common.collections'),
     pants('src/python/pants/base:address'),
     pants('src/python/pants/base:config'),
+    pants('src/python/pants/base:spec_parser'),
     pants('src/python/pants/base:target'),
     pants('src/python/pants/targets:common'),
     pants('src/python/pants/python:python_builder'),
@@ -50,7 +53,6 @@ python_library(
     pants('3rdparty/python/twitter/commons:twitter.common.python'),
     pants('src/python/pants/base:address'),
     pants('src/python/pants/base:config'),
-    pants('src/python/pants/base:parse_context'),
     pants('src/python/pants/base:target'),
     pants('src/python/pants/python:python_chroot'),
     pants('src/python/pants/python:interpreter_cache'),
@@ -88,9 +90,9 @@ python_library(
     pants('src/python/pants/base:build_environment'),
     pants('src/python/pants/base:build_file'),
     pants('src/python/pants/base:config'),
-    pants('src/python/pants/base:parse_context'),
     pants('src/python/pants/base:rcfile'),
     pants('src/python/pants/base:target'),
+    pants('src/python/pants/base:spec_parser'),
     pants('src/python/pants/base:workunit'),
     pants('src/python/pants/engine'),
     pants('src/python/pants/goal'),

@@ -11,7 +11,6 @@ from zipimport import zipimporter
 from pkg_resources import Distribution, EggMetadata, PathMetadata
 
 from pants.base.build_manual import manual
-from pants.base.parse_context import ParseContext
 from pants.targets.python_requirement import PythonRequirement
 
 

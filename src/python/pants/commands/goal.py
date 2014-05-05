@@ -16,13 +16,14 @@ from twitter.common.dirutil import safe_mkdir
 from twitter.common.lang import Compatibility
 from twitter.common.log.options import LogOptions
 
-from pants.base.address import Address
+from pants.base.address import BuildFileAddress, parse_spec
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
-from pants.base.config import Config
-from pants.base.parse_context import ParseContext
+from pants.base.config import Config, ConfigOption
 from pants.base.rcfile import RcFile
-from pants.base.target import Target, TargetDefinitionException
+from pants.base.target import Target
+from pants.base.exceptions import TargetDefinitionException
+from pants.base.spec_parser import SpecParser
 from pants.base.workunit import WorkUnit
 from pants.commands.command import Command
 from pants.engine.engine import Engine
@@ -31,55 +32,13 @@ from pants.goal import Context, GoalError, Phase, register
 from pants.goal.help import print_help
 from pants.goal.initialize_reporting import update_reporting
 from pants.goal.option_helpers import add_global_options
-from pants.tasks import Task, TaskError
+from pants.tasks.task import Task
+from pants.tasks.task_error import TaskError
 from pants.tasks.nailgun_task import NailgunTask
 from pants.tasks.console_task import ConsoleTask
 
 
 StringIO = Compatibility.StringIO
-
-
-
-class SpecParser(object):
-  """Parses goal target specs; either simple target addresses or else sibling (:) or descendant
-  (::) selector forms
-  """
-
-  def __init__(self, root_dir):
-    self._root_dir = root_dir
-
-  def _get_dir(self, spec):
-    path = spec.split(':', 1)[0]
-    if os.path.isdir(path):
-      return path
-    else:
-      if os.path.isfile(path):
-        return os.path.dirname(path)
-      else:
-        return spec
-
-  def _parse_addresses(self, spec):
-    if spec.endswith('::'):
-      dir = self._get_dir(spec[:-len('::')])
-      for buildfile in BuildFile.scan_buildfiles(self._root_dir, os.path.join(self._root_dir, dir)):
-        for address in Target.get_all_addresses(buildfile):
-          yield address
-    elif spec.endswith(':'):
-      dir = self._get_dir(spec[:-len(':')])
-      for address in Target.get_all_addresses(BuildFile(self._root_dir, dir)):
-        yield address
-    else:
-      yield Address.parse(self._root_dir, spec)
-
-  def parse(self, spec):
-    """Parses the given target spec into one or more targets.
-
-    Returns a generator of target, address pairs in which the target may be None if the address
-    points to a non-existent target.
-    """
-    for address in self._parse_addresses(spec):
-      target = Target.get(address)
-      yield target, address
 
 
 class Goal(Command):
@@ -186,45 +145,18 @@ class Goal(Command):
       print_help(goals)
       sys.exit(0)
 
+
     self.requested_goals = goals
 
     with self.run_tracker.new_workunit(name='setup', labels=[WorkUnit.SETUP]):
-      # Bootstrap goals by loading any configured bootstrap BUILD files
-      with self.check_errors('The following bootstrap_buildfiles cannot be loaded:') as error:
-        with self.run_tracker.new_workunit(name='bootstrap', labels=[WorkUnit.SETUP]):
-          for path in self.config.getlist('goals', 'bootstrap_buildfiles', default = []):
-            try:
-              buildfile = BuildFile(get_buildroot(), os.path.relpath(path, get_buildroot()))
-              ParseContext(buildfile).parse()
-            except (TypeError, ImportError, TaskError, GoalError):
-              error(path, include_traceback=True)
-            except (IOError, SyntaxError):
-              error(path)
-      # Now that we've parsed the bootstrap BUILD files, and know about the SCM system.
-      self.run_tracker.run_info.add_scm_info()
-
       # Bootstrap user goals by loading any BUILD files implied by targets.
-      spec_parser = SpecParser(self.root_dir)
-      with self.check_errors('The following targets could not be loaded:') as error:
-        with self.run_tracker.new_workunit(name='parse', labels=[WorkUnit.SETUP]):
-          for spec in specs:
-            try:
-              for target, address in spec_parser.parse(spec):
-                if target:
-                  self.targets.append(target)
-                  # Force early BUILD file loading if this target is an alias that expands
-                  # to others.
-                  unused = list(target.resolve())
-                else:
-                  siblings = Target.get_all_addresses(address.buildfile)
-                  prompt = 'did you mean' if len(siblings) == 1 else 'maybe you meant one of these'
-                  error('%s => %s?:\n    %s' % (address, prompt,
-                                                '\n    '.join(str(a) for a in siblings)))
-            except (TypeError, ImportError, TaskError, GoalError):
-              error(spec, include_traceback=True)
-            except (IOError, SyntaxError, TargetDefinitionException):
-              error(spec)
-
+      spec_parser = SpecParser(self.root_dir, self.build_file_parser)
+      with self.run_tracker.new_workunit(name='parse', labels=[WorkUnit.SETUP]):
+        for spec in specs:
+          for address in spec_parser.parse_addresses(spec):
+            self.build_file_parser.inject_spec_closure_into_build_graph(address.spec,
+                                                                        self.build_graph)
+            self.targets.append(self.build_graph.get_target(address))
     self.phases = [Phase(goal) for goal in goals]
 
     rcfiles = self.config.getdefault('rcfiles', type=list,
@@ -286,6 +218,8 @@ class Goal(Command):
       self.run_tracker,
       self.targets,
       requested_goals=self.requested_goals,
+      build_graph=self.build_graph,
+      build_file_parser=self.build_file_parser,
       lock=lock)
 
     unknown = []

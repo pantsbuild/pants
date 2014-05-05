@@ -10,12 +10,13 @@ from collections import defaultdict
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot
-from pants.targets.internal import InternalTarget
+from pants.base.build_graph import sort_targets
 from pants.targets.jar_dependency import JarDependency
 from pants.targets.jar_library import JarLibrary
 from pants.targets.jvm_target import JvmTarget
 from pants.targets.scala_library import ScalaLibrary
-from pants.tasks import Task, TaskError
+from pants.tasks.task import Task
+from pants.tasks.task_error import TaskError
 
 
 class JvmDependencyAnalyzer(object):
@@ -55,9 +56,8 @@ class JvmDependencyAnalyzer(object):
           for src in target.sources_relative_to_buildroot():
             targets_by_file[os.path.join(buildroot, src)].add(target)
         elif isinstance(target, JarLibrary):
-          for jardep in target.dependencies:
-            if isinstance(jardep, JarDependency):
-              jarlibs_by_id[(jardep.org, jardep.name)].add(target)
+          for jardep in target.jar_dependencies:
+            jarlibs_by_id[(jardep.org, jardep.name)].add(target)
         # TODO(Tejal Desai): pantsbuild/pants/65: Remove java_sources attribute for ScalaLibrary
         if isinstance(target, ScalaLibrary):
           for java_source in target.java_sources:
@@ -120,16 +120,15 @@ class JvmDependencyAnalyzer(object):
   def _compute_transitive_deps_by_target(self):
     """Map from target to all the targets it depends on, transitively."""
     # Sort from least to most dependent.
-    sorted_targets = reversed(InternalTarget.sort_targets(self._context.targets()))
+    sorted_targets = reversed(sort_targets(self._context.targets()))
     transitive_deps_by_target = defaultdict(set)
     # Iterate in dep order, to accumulate the transitive deps for each target.
     for target in sorted_targets:
       transitive_deps = set()
-      if hasattr(target, 'dependencies'):
-        for dep in target.dependencies:
-          transitive_deps.update(transitive_deps_by_target.get(dep, []))
-          transitive_deps.add(dep)
-        transitive_deps_by_target[target] = transitive_deps
+      for dep in target.dependencies:
+        transitive_deps.update(transitive_deps_by_target.get(dep, []))
+        transitive_deps.add(dep)
+      transitive_deps_by_target[target] = transitive_deps
     return transitive_deps_by_target
 
   def check(self, srcs, actual_deps):

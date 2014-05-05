@@ -4,14 +4,9 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from abc import abstractmethod
+from pants.base.payload import EmptyPayload
+from pants.base.target import Target
 
-from twitter.common.lang import AbstractClass
-
-
-class ExternalDependency(AbstractClass):
-  @abstractmethod
-  def cache_key(self):
-    """
-      Returns the key that can uniquely identify this target in the build cache.
-    """
+class Dependencies(Target):
+  def __init__(self, *args, **kwargs):
+    super(Dependencies, self).__init__(payload=EmptyPayload(), *args, **kwargs)

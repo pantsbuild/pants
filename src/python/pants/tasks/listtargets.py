@@ -59,7 +59,7 @@ class ListTargets(ConsoleTask):
         return '%s%s%s' % (provided_jar.org, '#', provided_jar.name)
 
       extractors = dict(
-          address=lambda target: str(target.address),
+          address=lambda target: target.address.build_file_spec,
           artifact_id=extract_artifact_id,
           repo_name=lambda target: target.provides.repo.name,
           repo_url=lambda target: target.provides.repo.url,
@@ -67,7 +67,7 @@ class ListTargets(ConsoleTask):
       )
 
       def print_provides(column_extractors, address):
-        target = Target.get(address)
+        target = self.context.build_graph.get_target(address)
         if target.is_exported:
           return ' '.join(extractor(target) for extractor in column_extractors)
 
@@ -80,12 +80,13 @@ class ListTargets(ConsoleTask):
       print_fn = lambda address: print_provides(column_extractors, address)
     elif self._documented:
       def print_documented(address):
-        target = Target.get(address)
+        target = self.context.build_graph.get_target(address)
         if target.description:
-          return '%s\n  %s' % (address, '\n  '.join(target.description.strip().split('\n')))
+          return '%s\n  %s' % (address.build_file_spec,
+                               '\n  '.join(target.description.strip().split('\n')))
       print_fn = print_documented
     else:
-      print_fn = lambda addr: str(addr)
+      print_fn = lambda addr: addr.build_file_spec
 
     visited = set()
     for address in self._addresses():
@@ -99,6 +100,11 @@ class ListTargets(ConsoleTask):
       for target in self.context.target_roots:
         yield target.address
     else:
-      for buildfile in BuildFile.scan_buildfiles(self._root_dir):
-        for address in Target.get_all_addresses(buildfile):
-          yield address
+      build_file_parser = self.context.build_file_parser
+      build_graph = self.context.build_graph
+      for build_file in BuildFile.scan_buildfiles(get_buildroot()):
+        build_file_parser.parse_build_file(build_file)
+        for address in build_file_parser.addresses_by_build_file[build_file]:
+          build_file_parser.inject_spec_closure_into_build_graph(address.spec, build_graph)
+      for target in build_graph._target_by_address.values():
+        yield target.address

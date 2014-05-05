@@ -7,7 +7,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import os
 
 from pants.base.build_environment import get_buildroot
-from pants.tasks import Task
+from pants.tasks.task import Task
 
 
 class JvmTask(Task):

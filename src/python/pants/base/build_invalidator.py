@@ -8,11 +8,9 @@ import errno
 import hashlib
 import itertools
 import os
-from abc import abstractmethod
 from collections import namedtuple
 
 from twitter.common.dirutil import safe_mkdir
-from twitter.common.lang import Compatibility, Interface
 
 from pants.base.hash_utils import hash_all
 from pants.base.target import Target
@@ -23,58 +21,19 @@ from pants.fs.fs import safe_filename
 #  - id identifies the set of targets.
 #  - hash is a fingerprint of all invalidating inputs to the build step, i.e., it uniquely
 #    determines a given version of the artifacts created when building the target set.
-#  - num_sources is the number of source files used to build this version of the target set.
-#    Needed only for display.
-#  - sources is an (optional) list of the source files used to compute this key.
-#    Needed only for display.
+#  - num_chunking_units: The number of "units" of chunking the payloads together contribute
+#    to the chunking algorithm.  Right now this is used to count the number of source files
+#    in a scala target set for breaking up zinc invocations.
+#  - payloads is the list of Target Payloads used to compute this key
 
-CacheKey = namedtuple('CacheKey', ['id', 'hash', 'num_sources', 'sources'])
-
-
-class SourceScope(Interface):
-  """Selects sources of a given scope from targets."""
-
-  @abstractmethod
-  def select(self, target):
-    """Selects source files from the given target and returns them as absolute paths."""
-
-  @abstractmethod
-  def valid(self, target):
-    """Returns True if the given target can be used with this SourceScope."""
+CacheKey = namedtuple('CacheKey', ['id', 'hash', 'num_chunking_units', 'payloads'])
 
 
-class NoSources(SourceScope):
-  """A SourceScope where all targets are valid but no sources are ever selected."""
-
-  def select(self, target):
-    return []
-
-  def valid(self, target):
-    return True
-
-NO_SOURCES = NoSources()
-
-
-class DefaultSourceScope(SourceScope):
-  """Selects sources from subclasses of TargetWithSources."""
-
-  def __init__(self, recursive, include_buildfile):
-    self._recursive = recursive
-    self._include_buildfile = include_buildfile
-
-  def select(self, tgt):
-    return tgt.expand_files(self._recursive, self._include_buildfile)
-
-  def valid(self, target):
-    return hasattr(target, 'expand_files')
-
-TARGET_SOURCES = DefaultSourceScope(recursive=False, include_buildfile=False)
-TRANSITIVE_SOURCES = DefaultSourceScope(recursive=True, include_buildfile=False)
-
-# Bump this to invalidate all existing keys in artifact caches across all pants deployments in the world.
-# Do this if you've made a change that invalidates existing artifacts, e.g.,  fixed a bug that
-# caused bad artifacts to be cached.
+# Bump this to invalidate all existing keys in artifact caches across all pants deployments in the
+# world. Do this if you've made a change that invalidates existing artifacts, e.g.,  fixed a bug
+# that caused bad artifacts to be cached.
 GLOBAL_CACHE_KEY_GEN_VERSION = '6'
+
 
 class CacheKeyGenerator(object):
   """Generates cache keys for versions of target sets."""
@@ -95,77 +54,39 @@ class CacheKeyGenerator(object):
     else:
       combined_id = Target.maybe_readable_combine_ids(cache_key.id for cache_key in cache_keys)
       combined_hash = hash_all(sorted(cache_key.hash for cache_key in cache_keys))
-      combined_num_sources = sum(cache_key.num_sources for cache_key in cache_keys)
-      combined_sources = \
-        sorted(list(itertools.chain(*[cache_key.sources for cache_key in cache_keys])))
-      return CacheKey(combined_id, combined_hash, combined_num_sources, combined_sources)
+      combined_payloads = sorted(list(itertools.chain(*[cache_key.payloads
+                                                        for cache_key in cache_keys])))
+      summed_chunking_units = sum([cache_key.num_chunking_units for cache_key in cache_keys])
+      return CacheKey(combined_id, combined_hash, summed_chunking_units, combined_payloads)
 
   def __init__(self, cache_key_gen_version=None):
-    """cache_key_gen_version - If provided, added to all cache keys. Allows you to invalidate all cache
-                               keys in a single pants repo, by changing this value in config.
     """
-    self._cache_key_gen_version = (cache_key_gen_version or '') + '_' + GLOBAL_CACHE_KEY_GEN_VERSION
+    cache_key_gen_version - If provided, added to all cache keys. Allows you to invalidate
+      all cache keys in a single pants repo, by changing this value in config.
+    """
 
-  def key_for_target(self, target, sources=TARGET_SOURCES, fingerprint_extra=None):
+    self._cache_key_gen_version = '_'.join([cache_key_gen_version or '',
+                                            GLOBAL_CACHE_KEY_GEN_VERSION])
+
+  def key_for_target(self, target, transitive=False):
     """Get a key representing the given target and its sources.
 
     A key for a set of targets can be created by calling combine_cache_keys()
     on the target's individual cache keys.
 
     :target: The target to create a CacheKey for.
-    :sources: A source scope to select from the target for hashing, defaults to TARGET_SOURCES.
     :fingerprint_extra: A function that accepts a sha hash and updates it with extra fprint data.
     """
-    if not fingerprint_extra:
-      if not sources or not sources.valid(target):
-        raise ValueError('A target needs to have at least one of sources or a '
-                         'fingerprint_extra function to generate a CacheKey.')
-    if not sources:
-      sources = NO_SOURCES
 
-    sha = hashlib.sha1()
-    srcs = sorted(sources.select(target))
-    actual_srcs = self._sources_hash(sha, srcs)
-    if fingerprint_extra:
-      fingerprint_extra(sha)
-    sha.update(self._cache_key_gen_version)
-    return CacheKey(target.id, sha.hexdigest(), len(actual_srcs), actual_srcs)
-
-  def key_for(self, target_id, sources):
-    """Get a cache key representing some id and its associated source files.
-
-    Useful primarily in tests. Normally we use key_for_target().
-    """
-    sha = hashlib.sha1()
-    actual_srcs = self._sources_hash(sha, sources)
-    return CacheKey(target_id, sha.hexdigest(), len(actual_srcs), actual_srcs)
-
-  def _walk_paths(self, paths):
-    """Recursively walk the given paths.
-
-    :returns: Iterable of (relative_path, absolute_path).
-    """
-    for path in sorted(paths):
-      if os.path.isdir(path):
-        for dir_name, _, filenames in sorted(os.walk(path)):
-          for filename in filenames:
-            filename = os.path.join(dir_name, filename)
-            yield os.path.relpath(filename, path), filename
-      else:
-        yield os.path.basename(path), path
-
-  def _sources_hash(self, sha, paths):
-    """Update a SHA1 digest with the content of all files under the given paths.
-
-    :returns: The files found under the given paths.
-    """
-    files = []
-    for relative_filename, filename in self._walk_paths(paths):
-      with open(filename, "rb") as fd:
-        sha.update(Compatibility.to_bytes(relative_filename))
-        sha.update(fd.read())
-      files.append(filename)
-    return files
+    hasher = hashlib.sha1()
+    hasher.update(self._cache_key_gen_version)
+    key_suffix = hasher.hexdigest()[:12]
+    if transitive:
+      target_key = target.transitive_invalidation_hash()
+    else:
+      target_key = target.invalidation_hash()
+    full_key = '{target_key}#{key_suffix}'.format(target_key=target_key, key_suffix=key_suffix)
+    return CacheKey(target.id, full_key, target.payload.num_chunking_units, (target.payload,))
 
 
 # A persistent map from target set to cache key, which is a fingerprint of all

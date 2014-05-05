@@ -3,7 +3,7 @@
 
 scala_library(name = 'jvm-run-example-lib',
   dependencies = [],
-  sources = ['JvmRunExample.scala']
+  sources = ['JvmRunExample.scala'],
 )
 
 jvm_binary(name ='jvm-run-example',

@@ -13,7 +13,8 @@ from twitter.common.dirutil import safe_mkdir
 
 from pants import binary_util
 from pants.ivy.bootstrapper import Bootstrapper
-from pants.tasks import TaskError
+from pants.targets.jar_library import JarLibrary
+from pants.tasks.task import TaskError
 from pants.tasks.cache_manager import VersionedTargetSet
 from pants.tasks.ivy_utils import IvyUtils
 from pants.tasks.nailgun_task import NailgunTask
@@ -88,6 +89,7 @@ class IvyResolve(NailgunTask):
     """Resolves the specified confs for the configured targets and returns an iterator over
     tuples of (conf, jar path).
     """
+
     groups = self.context.products.get_data('exclusives_groups')
     executor = self.create_java_executor()
 

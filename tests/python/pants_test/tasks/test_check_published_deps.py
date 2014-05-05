@@ -16,11 +16,10 @@ class CheckPublishedDepsTest(ConsoleTaskTest):
   def task_type(cls):
     return CheckPublishedDeps
 
-  @classmethod
-  def setUpClass(cls):
-    super(CheckPublishedDepsTest, cls).setUpClass()
+  def setUp(self):
+    super(CheckPublishedDepsTest, self).setUp()
 
-    cls.create_file('repo/pushdb/publish.properties', dedent('''
+    self.create_file('repo/pushdb/publish.properties', dedent('''
         revision.major.org.name%lib1=2
         revision.minor.org.name%lib1=0
         revision.patch.org.name%lib1=0
@@ -30,14 +29,14 @@ class CheckPublishedDepsTest(ConsoleTaskTest):
         revision.patch.org.name%lib2=0
         revision.sha.org.name%lib2=12345
         '''))
-    cls.create_target('repo/BUILD', dedent('''
+    self.add_to_build_file('repo/BUILD', dedent('''
         import os
         repo(name='repo',
              url='http://www.www.com',
              push_db=os.path.join(os.path.dirname(__file__), 'pushdb', 'publish.properties'))
         '''))
 
-    cls.create_target('provider/BUILD', dedent('''
+    self.add_to_build_file('provider/BUILD', dedent('''
         java_library(name='lib1',
           provides=artifact(
             org='org.name',
@@ -51,17 +50,17 @@ class CheckPublishedDepsTest(ConsoleTaskTest):
             repo=pants('repo')),
           sources=[])
         '''))
-    cls.create_target('outdated/BUILD', dedent('''
+    self.add_to_build_file('outdated/BUILD', dedent('''
         jar_library(name='outdated',
-          dependencies=[jar(org='org.name', name='lib1', rev='1.0.0')]
+          jars=[jar(org='org.name', name='lib1', rev='1.0.0')]
         )
         '''))
-    cls.create_target('uptodate/BUILD', dedent('''
+    self.add_to_build_file('uptodate/BUILD', dedent('''
         jar_library(name='uptodate',
-          dependencies=[jar(org='org.name', name='lib2', rev='2.0.0')]
+          jars=[jar(org='org.name', name='lib2', rev='2.0.0')]
         )
         '''))
-    cls.create_target('both/BUILD', dedent('''
+    self.add_to_build_file('both/BUILD', dedent('''
         dependencies(name='both',
           dependencies=[
             pants('outdated'),

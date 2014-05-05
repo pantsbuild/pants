@@ -4,10 +4,11 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+import os.path
 from collections import defaultdict
 
 from pants.base.build_environment import get_buildroot
-from pants.tasks import Task
+from pants.tasks.task import Task
 
 
 class CodeGen(Task):
@@ -57,17 +58,10 @@ class CodeGen(Task):
     raise NotImplementedError
 
   def getdependencies(self, gentarget):
-    # TODO(John Sirois): fix python/jvm dependencies handling to be uniform
-    if hasattr(gentarget, 'internal_dependencies'):
-      return gentarget.internal_dependencies
-    else:
-      return gentarget.dependencies
+    return gentarget.dependencies
 
   def updatedependencies(self, target, dependency):
-    if hasattr(target, 'update_dependencies'):
-      target.update_dependencies([dependency])
-    else:
-      target.dependencies.add(dependency)
+    target.inject_dependency(dependency.address)
 
   def execute(self, targets):
     gentargets = [t for t in targets if self.is_gentarget(t)]
@@ -124,7 +118,8 @@ class CodeGen(Task):
             syn_target.derived_from = target
             syn_target.add_labels('codegen', 'synthetic')
             if write_to_artifact_cache and target in invalid_vts_by_target:
-              generated_sources = list(syn_target.sources_absolute_paths())
+              generated_sources = [os.path.join(get_buildroot(), path)
+                                   for path in syn_target.sources_relative_to_buildroot()]
               vts_artifactfiles_pairs.append((invalid_vts_by_target[target], generated_sources))
             langtarget_by_gentarget[target] = syn_target
           genmap = self.context.products.get(lang)

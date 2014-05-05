@@ -4,37 +4,44 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+import shutil
+import tempfile
+
 from twitter.common.dirutil import safe_mkdtemp, safe_rmtree
 
 from pants.base.config import Config
 from pants.base.target import Target
 from pants.goal import Context
-from pants.tasks import TaskError
+from pants.tasks.task import TaskError
 from pants.tasks.check_exclusives import CheckExclusives
-from pants_test.testutils.base_mock_target_test import BaseMockTargetTest
-from pants_test.testutils.mock_target import MockTarget
+from pants_test.base_test import BaseTest
 
 
-class CheckExclusivesTest(BaseMockTargetTest):
+class CheckExclusivesTest(BaseTest):
   """Test of the CheckExclusives task."""
+
   def setUp(self):
-    # So MockTarget addresses don't collide. TODO: Remove when targets are refactored.
-    Target._clear_all_addresses()
-    self.config = Config.load()
-    self.workdir = safe_mkdtemp()
+    super(CheckExclusivesTest, self).setUp()
+    self.workdir = tempfile.mkdtemp()
 
   def tearDown(self):
-    safe_rmtree(self.workdir)
+    shutil.rmtree(self.workdir, ignore_errors=True)
+    super(CheckExclusivesTest, self).tearDown()
 
   def _make_context(self, target_roots):
-    return Context(self.config, options={}, run_tracker=None, target_roots=target_roots)
+    return Context(self.config,
+                   options={},
+                   run_tracker=None,
+                   target_roots=target_roots,
+                   build_graph=self.build_graph,
+                   build_file_parser=self.build_file_parser)
 
   def test_check_exclusives(self):
-    a = MockTarget('a', exclusives={'a': '1', 'b': '1'})
-    b = MockTarget('b', exclusives={'a': '1'})
-    c = MockTarget('c', exclusives={'a': '2'})
-    d = MockTarget('d', dependencies=[a, b])
-    e = MockTarget('e', dependencies=[a, c], exclusives={'c': '1'})
+    a = self.make_target(':a', exclusives={'a': '1', 'b': '1'})
+    b = self.make_target(':b', exclusives={'a': '1'})
+    c = self.make_target(':c', exclusives={'a': '2'})
+    d = self.make_target(':d', dependencies=[a, b])
+    e = self.make_target(':e', dependencies=[a, c], exclusives={'c': '1'})
 
     context = self._make_context(target_roots=[d, e])
     check_exclusives_task = CheckExclusives(context, self.workdir, signal_error=True)
@@ -46,10 +53,10 @@ class CheckExclusivesTest(BaseMockTargetTest):
 
   def test_classpath_compatibility(self):
     # test the compatibility checks for different exclusive groups.
-    a = MockTarget('a', exclusives={'a': '1', 'b': '1'})
-    b = MockTarget('b', exclusives={'a': '1', 'b': '<none>'})
-    c = MockTarget('c', exclusives={'a': '2', 'b': '2'})
-    d = MockTarget('d')
+    a = self.make_target(':a', exclusives={'a': '1', 'b': '1'})
+    b = self.make_target(':b', exclusives={'a': '1', 'b': '<none>'})
+    c = self.make_target(':c', exclusives={'a': '2', 'b': '2'})
+    d = self.make_target(':d')
 
     context = self._make_context(target_roots=[a, b, c, d])
     context.products.require_data('exclusives_groups')
@@ -83,10 +90,10 @@ class CheckExclusivesTest(BaseMockTargetTest):
 
   def test_classpath_updates(self):
     # Check that exclusive groups classpaths accumulate properly.
-    a = MockTarget('a', exclusives={'a': '1', 'b': '1'})
-    b = MockTarget('b', exclusives={'a': '1', 'b': '<none>'})
-    c = MockTarget('c', exclusives={'a': '2', 'b': '2'})
-    d = MockTarget('d')
+    a = self.make_target(':a', exclusives={'a': '1', 'b': '1'})
+    b = self.make_target(':b', exclusives={'a': '1', 'b': '<none>'})
+    c = self.make_target(':c', exclusives={'a': '2', 'b': '2'})
+    d = self.make_target(':d')
 
     context = self._make_context(target_roots=[a, b, c, d])
     context.products.require_data('exclusives_groups')

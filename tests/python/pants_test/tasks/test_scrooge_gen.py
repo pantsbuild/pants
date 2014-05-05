@@ -9,33 +9,33 @@ from textwrap import dedent
 import pytest
 
 from pants.targets.java_thrift_library import JavaThriftLibrary
-from pants.tasks import TaskError
+from pants.tasks.task import TaskError
 from pants.tasks.scrooge_gen import ScroogeGen
-from pants_test.base_build_root_test import BaseBuildRootTest
+from pants_test.base_test import BaseTest
 
 
-class ScroogeGenTest(BaseBuildRootTest):
+class ScroogeGenTest(BaseTest):
 
   def test_validate(self):
     defaults = JavaThriftLibrary.Defaults()
 
-    self.create_target('test_validate', dedent('''
+    self.add_to_build_file('test_validate', dedent('''
       java_thrift_library(name='one',
-        sources=None,
-        dependencies=None,
+        sources=[],
+        dependencies=[],
       )
     '''))
 
-    self.create_target('test_validate', dedent('''
+    self.add_to_build_file('test_validate', dedent('''
       java_thrift_library(name='two',
-        sources=None,
+        sources=[],
         dependencies=[pants(':one')],
       )
     '''))
 
-    self.create_target('test_validate', dedent('''
+    self.add_to_build_file('test_validate', dedent('''
       java_thrift_library(name='three',
-        sources=None,
+        sources=[],
         dependencies=[pants(':one')],
         rpc_style='finagle',
       )

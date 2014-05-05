@@ -10,7 +10,7 @@ import re
 from pants.base.config import Config
 from pants.base.target import Target
 from pants.process.xargs import Xargs
-from pants.tasks import TaskError
+from pants.tasks.task import TaskError
 from pants.tasks.nailgun_task import NailgunTask
 
 

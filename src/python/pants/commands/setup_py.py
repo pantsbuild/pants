@@ -18,7 +18,8 @@ from twitter.common.python.installer import InstallerBase, Packager
 
 from pants.base.address import Address
 from pants.base.config import Config
-from pants.base.target import Target, TargetDefinitionException
+from pants.base.target import Target
+from pants.base.exceptions import TargetDefinitionException
 from pants.commands.command import Command
 from pants.python.antlr_builder import PythonAntlrBuilder
 from pants.python.thrift_builder import PythonThriftBuilder
@@ -62,7 +63,7 @@ class SetupPy(Command):
 
   @classmethod
   def _combined_dependencies(cls, target):
-    dependencies = getattr(target, 'dependencies', OrderedSet())
+    dependencies = OrderedSet(target.dependencies)
     if isinstance(target, PythonTarget) and target.provides:
       return dependencies | OrderedSet(target.provides.binaries.values())
     else:
@@ -72,16 +73,15 @@ class SetupPy(Command):
   def _construct_provider_map(cls, root_target, descendant, parents, providers, depmap):
     if isinstance(descendant, PythonTarget) and descendant.provides:
       providers.append(descendant)
-    for dependency in cls._combined_dependencies(descendant):
+    for dep in cls._combined_dependencies(descendant):
       for prv in providers:
-        for dep in dependency.resolve():
-          depmap[prv].add(dep)
-          if dep in parents:
-            raise TargetDefinitionException(root_target,
-               '%s and %s combined have a cycle!' % (root_target, dep))
-          parents.add(dep)
-          cls._construct_provider_map(root_target, dep, parents, providers, depmap)
-          parents.remove(dep)
+        depmap[prv].add(dep)
+        if dep in parents:
+          raise TargetDefinitionException(root_target,
+             '%s and %s combined have a cycle!' % (root_target, dep))
+        parents.add(dep)
+        cls._construct_provider_map(root_target, dep, parents, providers, depmap)
+        parents.remove(dep)
     if isinstance(descendant, PythonTarget) and descendant.provides:
       assert providers[-1] == descendant
       providers.pop()
@@ -137,7 +137,7 @@ class SetupPy(Command):
   def iter_entry_points(cls, target):
     """Yields the name, entry_point pairs of binary targets in this PythonArtifact."""
     for name, binary_target in target.provides.binaries.items():
-      concrete_target = binary_target.get()
+      concrete_target = binary_target
       if not isinstance(concrete_target, PythonBinary) or concrete_target.entry_point is None:
         raise TargetDefinitionException(target,
             'Cannot add a binary to a PythonArtifact if it does not contain an entry_point.')
@@ -398,7 +398,7 @@ class SetupPy(Command):
     if self.options.recursive:
       setup_targets = OrderedSet()
       def add_providing_target(target):
-        if isinstance(target, PythonTarget) and getattr(target, 'provides', None):
+        if isinstance(target, PythonTarget) and target.provides:
           setup_targets.add(target)
           return OrderedSet(target.provides.binaries.values())
       self.target.walk(add_providing_target)

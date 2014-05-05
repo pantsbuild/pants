@@ -3,12 +3,15 @@
 
 python_library(
   name = 'base-test',
-  sources = ['base_build_root_test.py'],
+  sources = ['base_test.py'],
   dependencies = [
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('src/python/pants/base:address'),
     pants('src/python/pants/base:build_root'),
+    pants('src/python/pants/base:build_graph'),
+    pants('src/python/pants/base:build_file_parser'),
     pants('src/python/pants/base:target'),
+    pants('src/python/pants/base:build_file_aliases'),
     pants('src/python/pants/targets:common'),
   ]
 )

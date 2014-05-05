@@ -6,9 +6,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from pants.base.build_manual import manual
 from pants.base.target import Target
-from pants.targets.internal import InternalTarget
-from pants.targets.pants_target import Pants
-from pants.targets.with_sources import TargetWithSources
 
 
 class Wiki(Target):
@@ -25,10 +22,10 @@ class Wiki(Target):
     self.url_builder = url_builder
 
 
-class Page(InternalTarget, TargetWithSources):
+class Page(Target):
   """Describes a single documentation page."""
 
-  def __init__(self, name, source, dependencies=None, resources=None, exclusives=None):
+  def __init__(self, resources=None, **kwargs):
     """
     :param string name: The name of this target, which combined with this
       build file defines the target :class:`pants.base.address.Address`.
@@ -38,8 +35,9 @@ class Page(InternalTarget, TargetWithSources):
     :type dependencies: list of targets
     :param resources: An optional list of Resources objects.
     """
-    InternalTarget.__init__(self, name, dependencies, exclusives=exclusives)
-    TargetWithSources.__init__(self, name, sources=[source], exclusives=exclusives)
+
+    payload = None
+    super(Page, self).__init__(**kwargs)
 
     self.resources = self._resolve_paths(resources) if resources else []
     self._wikis = {}

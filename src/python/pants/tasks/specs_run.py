@@ -9,7 +9,7 @@ from twitter.common.collections import OrderedSet
 from pants.base.workunit import WorkUnit
 from pants.binary_util import safe_args
 from pants.java.util import execute_java
-from pants.tasks import TaskError
+from pants.tasks.task import TaskError
 from pants.tasks.jvm_task import JvmTask
 
 

@@ -6,7 +6,6 @@ python_library(
   sources = globs('*.py'),
   dependencies = [
     pants('3rdparty/python/twitter/commons:twitter.common.collections'),
-    pants('src/python/pants/base:parse_context'),
     pants('src/python/pants/base:target'),
     pants('src/python/pants/python:interpreter_cache'),
     pants('src/python/pants/targets:python'),

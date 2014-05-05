@@ -4,13 +4,11 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-import unittest
-
 from pants.base.target import Target
+from pants.base.payload import PythonRequirementLibraryPayload
 
 
-class BaseMockTargetTest(unittest.TestCase):
-  """A baseclass useful for tests using ``MockTarget``s.."""
-
-  def setUp(self):
-    Target._clear_all_addresses()
+class PythonRequirementLibrary(Target):
+  def __init__(self, requirements=None, *args, **kwargs):
+    payload = PythonRequirementLibraryPayload(requirements)
+    super(PythonRequirementLibrary, self).__init__(*args, payload=payload, **kwargs)

@@ -8,7 +8,6 @@ import itertools
 import os
 
 from pants.targets.jvm_binary import JvmApp
-from pants.targets.with_sources import TargetWithSources
 from pants.tasks.console_task import ConsoleTask
 
 
@@ -16,7 +15,7 @@ class FileDeps(ConsoleTask):
   def console_output(self, targets):
     files = set()
     for target in targets:
-      if isinstance(target, TargetWithSources):
+      if target.has_sources():
         files.update(target.expand_files(recursive=False))
       if isinstance(target, JvmApp):
         files.update(itertools.chain(*[bundle.filemap.keys() for bundle in target.bundles]))

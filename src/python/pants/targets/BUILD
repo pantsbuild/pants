@@ -16,15 +16,10 @@ python_library(
   name = 'common',
   sources = [
     'anonymous.py',
+    'dependencies.py',
     'doc.py',
-    'external_dependency.py',
-    'pants_target.py',
     'repository.py',
-    'resources.py',  # XXX dependency on InternalTarget which is an abstraction leak
-    'sources.py',
-    'util.py',
-    'with_dependencies.py',
-    'with_sources.py',
+    'resources.py',
   ],
   dependencies = [
     # pants(':jvm'), XXX internal.py is in :jvm, so common won't work without it.
@@ -33,8 +28,7 @@ python_library(
     pants('src/python/pants/base:address'),
     pants('src/python/pants/base:build_environment'),
     pants('src/python/pants/base:build_manual'),
-    pants('src/python/pants/base:parse_context'),
-    pants('src/python/pants/base:target'),
+    # pants('src/python/pants/base:target'), # XXX(fixme)
   ],
 )
 
@@ -46,7 +40,6 @@ python_library(
     'credentials.py',
     'exclude.py',
     'exportable_jvm_library.py',
-    'internal.py',  # XXX fixme
     'jar_dependency.py',
     'jar_library.py',
     'jarable.py',
@@ -59,8 +52,8 @@ python_library(
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.lang'),
     pants('src/python/pants/base:build_manual'),
-    pants('src/python/pants/base:parse_context'),
-    pants('src/python/pants/base:target'),
+    pants('src/python/pants/base:payload'),
+    # pants('src/python/pants/base:target'), # XXX(fixme)
   ],
 )
 
@@ -115,6 +108,7 @@ python_library(
     'python_target.py',
     'python_tests.py',
     'python_thrift_library.py',
+    'python_requirement_library.py',
   ],
   dependencies = [
     pants('3rdparty/python:setuptools'),
@@ -124,7 +118,6 @@ python_library(
     pants('3rdparty/python/twitter/commons:twitter.common.python'),
     pants('3rdparty/python/twitter/commons:twitter.common.quantity'),
     pants('src/python/pants/base:build_manual'),
-    pants('src/python/pants/base:parse_context'),
     pants('src/python/pants/base:target'),
   ],
 )

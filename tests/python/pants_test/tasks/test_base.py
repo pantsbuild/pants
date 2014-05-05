@@ -15,13 +15,19 @@ from twitter.common.collections import maybe_list
 from pants.base.target import Target
 from pants.commands.goal import SpecParser
 from pants.goal import Context, Mkflag
-from pants.tasks import Task
+from pants.tasks.task import Task
 from pants.tasks.console_task import ConsoleTask
-from pants_test.base_build_root_test import BaseBuildRootTest
+from pants_test.base_test import BaseTest
 from pants_test.base.context_utils import create_config, create_run_tracker
 
 
-def prepare_task(task_type, config=None, args=None, targets=None, **kwargs):
+def prepare_task(task_type,
+                 config=None,
+                 args=None,
+                 targets=None,
+                 build_graph=None,
+                 build_file_parser=None,
+                 **kwargs):
   """Prepares a Task for execution.
 
   task_type: The class of the Task to create.
@@ -46,15 +52,19 @@ def prepare_task(task_type, config=None, args=None, targets=None, **kwargs):
 
   run_tracker = create_run_tracker()
 
-  context = Context(config, options, run_tracker, targets or [])
+  context = Context(config,
+                    options,
+                    run_tracker,
+                    targets or [],
+                    build_graph=build_graph,
+                    build_file_parser=build_file_parser)
   return task_type(context, workdir, **kwargs)
 
 
-class TaskTest(BaseBuildRootTest):
+class TaskTest(BaseTest):
   """A baseclass useful for testing Tasks."""
 
-  @classmethod
-  def targets(cls, spec):
+  def targets(self, spec):
     """Resolves a target spec to one or more Target objects.
 
     spec: Either BUILD target address or else a target glob using the siblings ':' or
@@ -62,7 +72,11 @@ class TaskTest(BaseBuildRootTest):
 
     Returns the set of all Targets found.
     """
-    return set(target for target, _ in SpecParser(cls.build_root).parse(spec) if target)
+    addresses = list(SpecParser(self.build_root, self.build_file_parser).parse_addresses(spec))
+    for address in addresses:
+      self.build_file_parser.inject_spec_closure_into_build_graph(address.spec, self.build_graph)
+    targets = [self.build_graph.get_target(address) for address in addresses]
+    return targets
 
   def assertDeps(self, target, expected_deps=None):
     """Check that actual and expected dependencies of the given target match.
@@ -79,11 +93,10 @@ class TaskTest(BaseBuildRootTest):
 class ConsoleTaskTest(TaskTest):
   """A baseclass useful for testing ConsoleTasks."""
 
-  @classmethod
-  def setUpClass(cls):
-    super(ConsoleTaskTest, cls).setUpClass()
+  def setUp(self):
+    super(ConsoleTaskTest, self).setUp()
 
-    task_type = cls.task_type()
+    task_type = self.task_type()
     assert issubclass(task_type, ConsoleTask), \
         'task_type() must return a ConsoleTask subclass, got %s' % task_type
 
@@ -103,8 +116,13 @@ class ConsoleTaskTest(TaskTest):
     Returns the text output of the task.
     """
     with closing(StringIO()) as output:
-      task = prepare_task(self.task_type(), config=config, args=args, targets=targets,
-                          outstream=output)
+      task = prepare_task(self.task_type(),
+                          config=config,
+                          args=args,
+                          targets=targets,
+                          outstream=output,
+                          build_graph=self.build_graph,
+                          build_file_parser=self.build_file_parser)
       task.execute(list(targets or ()) + list(extra_targets or ()))
       return output.getvalue()
 
@@ -121,7 +139,13 @@ class ConsoleTaskTest(TaskTest):
 
     Returns the list of items returned from invoking the console task's console_output method.
     """
-    task = prepare_task(self.task_type(), config=config, args=args, targets=targets, **kwargs)
+    task = prepare_task(self.task_type(),
+                        config=config,
+                        args=args,
+                        targets=targets,
+                        build_graph=self.build_graph,
+                        build_file_parser=self.build_file_parser,
+                        **kwargs)
     return list(task.console_output(list(targets or ()) + list(extra_targets or ())))
 
   def assert_entries(self, sep, *output, **kwargs):

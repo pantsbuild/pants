@@ -36,7 +36,6 @@ python_test_suite(
     pants(':ivy_utils'),
     pants(':jar_create'),
     pants(':jar_publish'),
-    pants(':jar_library_with_empty_dependencies'),
     pants(':listtargets'),
     pants(':minimal_cover'),
     pants(':protobuf_gen'),
@@ -79,6 +78,7 @@ python_tests(
   name = 'cache_manager',
   sources = ['test_cache_manager.py'],
   dependencies = [
+    pants('tests/python/pants_test/base:base-test'),
     pants('tests/python/pants_test/testutils'),
     pants('src/python/pants/base:build_invalidator'),
     pants('src/python/pants/tasks:cache_manager'),
@@ -242,17 +242,6 @@ python_tests(
     pants('tests/python/pants_test/base:base-test'),
     pants('tests/python/pants_test:base-test'),
   ]
-)
-
-# XXX this should be in targets?
-python_tests(
-  name = 'jar_library_with_empty_dependencies',
-  sources = ['test_jar_library_with_empty_dependencies.py'],
-  dependencies = [
-    pants('src/python/pants/base:parse_context'),
-    pants('src/python/pants/base:target'),
-    pants('src/python/pants/targets:jvm'),
-  ],
 )
 
 python_tests(

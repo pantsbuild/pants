@@ -8,12 +8,12 @@ from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
 
-import pants.base.build_file_context
+import pants.base.build_file_aliases
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
+from pants.base.source_root import SourceRoot
 from pants.base.target import Target
-from pants.targets.sources import SourceRoot
-from pants.tasks import TaskError
+from pants.tasks.task import TaskError
 from pants.tasks.console_task import ConsoleTask
 
 
@@ -52,18 +52,20 @@ class ReverseDepmap(ConsoleTask):
     if self._dependees_type:
       base_paths = OrderedSet()
       for dependees_type in self._dependees_type:
+        # FIXME(pl): This should be a standard function provided by the plugin/BuildFileParser
+        # machinery
         try:
           # Try to do a fully qualified import 1st for filtering on custom types.
           from_list, module, type_name = dependees_type.rsplit('.', 2)
-          __import__('%s.%s' % (from_list, module), fromlist=[from_list])
+          module = __import__('%s.%s' % (from_list, module), fromlist=[from_list])
+          target_type = getattr(module, type_name)
         except (ImportError, ValueError):
           # Fall back on pants provided target types.
-          if hasattr(pants.base.build_file_context, dependees_type):
-            type_name = getattr(pants.base.build_file_context, dependees_type)
-          else:
+          if dependees_type not in pants.base.build_file_aliases.target_aliases:
             raise TaskError('Invalid type name: %s' % dependees_type)
+          target_type = pants.base.build_file_aliases.target_aliases[dependees_type]
         # Find the SourceRoot for the given input type
-        base_paths.update(SourceRoot.roots(type_name))
+        base_paths.update(SourceRoot.roots(target_type))
       if not base_paths:
         raise TaskError('No SourceRoot set for any target type in %s.' % self._dependees_type +
                         '\nPlease define a source root in BUILD file as:' +
@@ -73,26 +75,30 @@ class ReverseDepmap(ConsoleTask):
     else:
       buildfiles = BuildFile.scan_buildfiles(get_buildroot())
 
+    build_graph = self.context.build_graph
+    build_file_parser = self.context.build_file_parser
+
     dependees_by_target = defaultdict(set)
-    for buildfile in buildfiles:
-      for address in Target.get_all_addresses(buildfile):
-        for target in Target.get(address).resolve():
-          # TODO(John Sirois): tighten up the notion of targets written down in a BUILD by a
-          # user vs. targets created by pants at runtime.
-          target = self.get_concrete_target(target)
-          if hasattr(target, 'dependencies'):
-            for dependencies in target.dependencies:
-              for dependency in dependencies.resolve():
-                dependency = self.get_concrete_target(dependency)
-                dependees_by_target[dependency].add(target)
+    for build_file in buildfiles:
+      build_file_parser.parse_build_file(build_file)
+      for address in build_file_parser.addresses_by_build_file[build_file]:
+        build_file_parser.inject_spec_closure_into_build_graph(address.spec, build_graph)
+      for address in build_file_parser.addresses_by_build_file[build_file]:
+        target = build_graph.get_target(address)
+        # TODO(John Sirois): tighten up the notion of targets written down in a BUILD by a
+        # user vs. targets created by pants at runtime.
+        target = self.get_concrete_target(target)
+        for dependency in target.dependencies:
+          dependency = self.get_concrete_target(dependency)
+          dependees_by_target[dependency].add(target)
 
     roots = set(self.context.target_roots)
     if self._closed:
       for root in roots:
-        yield str(root.address)
+        yield root.address.build_file_spec
 
     for dependant in self.get_dependants(dependees_by_target, roots):
-      yield str(dependant.address)
+      yield dependant.address.build_file_spec
 
   def get_dependants(self, dependees_by_target, roots):
     check = set(roots)
@@ -107,4 +113,4 @@ class ReverseDepmap(ConsoleTask):
       known_dependants = dependants
 
   def get_concrete_target(self, target):
-    return target.derived_from if isinstance(target, Target) else target
+    return target.cloned_from

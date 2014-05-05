@@ -24,7 +24,8 @@ from pants.cache.read_write_artifact_cache import ReadWriteArtifactCache
 from pants.ivy.bootstrapper import Bootstrapper  # XXX
 from pants.java.executor import Executor  # XXX
 from pants.reporting.reporting_utils import items_to_report_element
-from pants.tasks.cache_manager import CacheManager, InvalidationCheck, VersionedTargetSet
+from pants.tasks.cache_manager import (InvalidationCacheManager, InvalidationCheck,
+                                       VersionedTargetSet)
 from pants.tasks.ivy_utils import IvyUtils  # XXX
 from pants.tasks.jvm_tool_bootstrapper import JvmToolBootstrapper  # XXX
 from pants.tasks.task_error import TaskError
@@ -188,11 +189,10 @@ class Task(object):
     for f in self.invalidate_for_files():
       extra_data.append(hash_file(f))
 
-    cache_manager = CacheManager(self._cache_key_generator,
-                                 self._build_invalidator_dir,
-                                 invalidate_dependents,
-                                 extra_data,
-                                 only_externaldeps=only_buildfiles)
+    cache_manager = InvalidationCacheManager(self._cache_key_generator,
+                                             self._build_invalidator_dir,
+                                             invalidate_dependents,
+                                             extra_data)
 
     # We separate locally-modified targets from others by coloring them differently.
     # This can be a performance win, because these targets are more likely to be iterated
@@ -232,17 +232,17 @@ class Task(object):
 
     if not silent:
       targets = []
-      sources = []
+      payloads = []
       num_invalid_partitions = len(invalidation_check.invalid_vts_partitioned)
       for vt in invalidation_check.invalid_vts_partitioned:
         targets.extend(vt.targets)
-        sources.extend(vt.cache_key.sources)
+        payloads.extend(vt.cache_key.payloads)
       if len(targets):
         msg_elements = ['Invalidated ',
                         items_to_report_element([t.address.reference() for t in targets], 'target')]
-        if len(sources) > 0:
+        if len(payloads) > 0:
           msg_elements.append(' containing ')
-          msg_elements.append(items_to_report_element(sources, 'source file'))
+          msg_elements.append(items_to_report_element(payloads, 'payload file'))
         if num_invalid_partitions > 1:
           msg_elements.append(' in %d target partitions' % num_invalid_partitions)
         msg_elements.append('.')
@@ -344,7 +344,6 @@ class Task(object):
 
   def ivy_resolve(self, targets, executor=None, symlink_ivyxml=False, silent=False,
                   workunit_name=None, workunit_labels=None):
-
     if executor and not isinstance(executor, Executor):
       raise ValueError('The executor must be an Executor instance, given %s of type %s'
                        % (executor, type(executor)))
@@ -362,7 +361,6 @@ class Task(object):
                          log=self.context.log)
 
     with self.invalidated(targets,
-                          only_buildfiles=True,
                           invalidate_dependents=True,
                           silent=silent) as invalidation_check:
       global_vts = VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)

@@ -14,6 +14,7 @@ import sys
 import keyword
 from twitter.common.dirutil import safe_mkdir
 
+from pants.base.build_environment import get_buildroot
 from pants.python.code_generator import CodeGenerator
 from pants.targets.python_thrift_library import PythonThriftLibrary
 from pants.thrift_util import select_thrift_binary
@@ -48,8 +49,10 @@ class PythonThriftBuilder(CodeGenerator):
     all_thrifts = set()
 
     def collect_sources(target):
-      for source in target.sources:
-        all_thrifts.add((target.target_base, source))
+      abs_target_base = os.path.join(get_buildroot(), target.target_base)
+      for source in target.payload.sources_relative_to_buildroot():
+        source_root_relative_source = os.path.relpath(source, abs_target_base)
+        all_thrifts.add((target.target_base, source_root_relative_source))
 
     self.target.walk(collect_sources, predicate=is_py_thrift)
 

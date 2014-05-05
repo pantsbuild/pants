@@ -16,15 +16,11 @@ class PythonTests(PythonTarget):
   """Tests a Python library."""
 
   def __init__(self,
-               name,
-               sources,
-               resources=None,
-               dependencies=None,
                timeout=Amount(2, Time.MINUTES),
                coverage=None,
                soft_dependencies=False,
                entry_point='pytest',
-               exclusives=None):
+               **kwargs):
     """
     :param name: See PythonLibrary target
     :param sources: A list of filenames representing the source code
@@ -46,7 +42,7 @@ class PythonTests(PythonTarget):
     self._soft_dependencies = bool(soft_dependencies)
     self._coverage = maybe_list(coverage) if coverage is not None else []
     self._entry_point = entry_point
-    super(PythonTests, self).__init__(name, sources, resources, dependencies, exclusives=exclusives)
+    super(PythonTests, self).__init__(**kwargs)
     self.add_labels('python', 'tests')
 
   @property
@@ -64,6 +60,3 @@ class PythonTests(PythonTarget):
 
 class PythonTestSuite(PythonTarget):
   """Tests one or more python test targets."""
-
-  def __init__(self, name, dependencies=None):
-    super(PythonTestSuite, self).__init__(name, (), (), dependencies)

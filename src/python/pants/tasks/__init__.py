@@ -3,7 +3,3 @@
 
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
-
-from pants.tasks.task import Task
-from pants.tasks.task_error import TaskError
-

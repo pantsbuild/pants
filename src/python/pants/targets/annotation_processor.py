@@ -6,22 +6,13 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from pants.base.build_manual import manual
 from pants.targets.exportable_jvm_library import ExportableJvmLibrary
-from pants.targets.resources import WithResources
 
 
 @manual.builddict(tags=['java'])
-class AnnotationProcessor(ExportableJvmLibrary, WithResources):
+class AnnotationProcessor(ExportableJvmLibrary):
   """Produces a Java library containing one or more annotation processors."""
 
-  def __init__(self,
-               name,
-               sources,
-               provides=None,
-               dependencies=None,
-               excludes=None,
-               resources=None,
-               processors=None,
-               exclusives=None):
+  def __init__(self, processors=None, *args, **kwargs):
 
     """
     :param string name: The name of this target, which combined with this
@@ -44,14 +35,7 @@ class AnnotationProcessor(ExportableJvmLibrary, WithResources):
       annotation processors this library exports.
     :param exclusives: An optional map of exclusives tags. See CheckExclusives for details.
     """
-    super(AnnotationProcessor, self).__init__(
-        name,
-        sources,
-        provides,
-        dependencies,
-        excludes,
-        exclusives=exclusives)
+    super(AnnotationProcessor, self).__init__(*args, **kwargs)
 
-    self.resources = resources
     self.processors = processors
     self.add_labels('java', 'apt')

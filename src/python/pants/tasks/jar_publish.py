@@ -21,15 +21,19 @@ from twitter.common.log.options import LogOptions
 
 from pants.base.address import Address
 from pants.base.build_environment import get_buildroot, get_scm
+from pants.base.build_graph import sort_targets
 from pants.base.generator import Generator, TemplateData
 from pants.base.target import Target
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy import Ivy
-from pants.targets.internal import InternalTarget
 from pants.targets.resources import Resources
 from pants.targets.scala_library import ScalaLibrary
-from pants.tasks import Task, TaskError
+from pants.tasks.task import Task
+from pants.tasks.task_error import TaskError
 from pants.tasks.scm_publish import ScmPublish, Semver
+
+
+# XXX(pl): This entire file still needs to be converted over to new Targets
 
 
 class PushDb(object):
@@ -217,7 +221,7 @@ def jar_coordinate(jar, rev=None):
 
 
 def target_internal_dependencies(target):
-  return filter(lambda tgt: not isinstance(tgt, Resources), target.internal_dependencies)
+  return filter(lambda tgt: not isinstance(tgt, Resources), target.dependencies)
 
 
 class JarPublish(Task, ScmPublish):
@@ -460,8 +464,6 @@ class JarPublish(Task, ScmPublish):
       return get_db(tgt)[0]
 
     def fingerprint_internal(tgt):
-      if not tgt.is_internal:
-        raise ValueError('Expected an internal target for fingerprinting, got %s' % tgt)
       pushdb, _, _ = get_db(tgt)
       _, _, _, fingerprint = pushdb.as_jar_with_version(tgt)
       return fingerprint or '0.0.0'
@@ -709,7 +711,7 @@ class JarPublish(Task, ScmPublish):
       return tgt in candidates and tgt.is_exported
 
     return OrderedSet(filter(exportable,
-                             reversed(InternalTarget.sort_targets(filter(exportable, candidates)))))
+                             reversed(sort_targets(filter(exportable, candidates)))))
 
   def fingerprint(self, target, fingerprint_internal):
     sha = hashlib.sha1()

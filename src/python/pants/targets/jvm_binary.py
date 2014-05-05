@@ -11,19 +11,16 @@ from twitter.common.collections import maybe_list
 from twitter.common.dirutil import Fileset
 from twitter.common.lang import Compatibility
 
+from pants.base.build_environment import get_buildroot
 from pants.base.build_manual import manual
-from pants.base.parse_context import ParseContext
-from pants.base.target import TargetDefinitionException
-from pants.targets import util
-from pants.targets.internal import InternalTarget
-from pants.targets.jar_library import JarLibrary
+from pants.base.payload import BundlePayload
+from pants.base.target import Target
+from pants.base.exceptions import TargetDefinitionException
 from pants.targets.jvm_target import JvmTarget
-from pants.targets.pants_target import Pants
-from pants.targets.resources import WithResources
 
 
 @manual.builddict(tags=["jvm"])
-class JvmBinary(JvmTarget, WithResources):
+class JvmBinary(JvmTarget):
   """Produces a JVM binary optionally identifying a launcher main class.
 
   Below are a summary of how key goals affect targets of this type:
@@ -34,16 +31,13 @@ class JvmBinary(JvmTarget, WithResources):
     this means the jar has a manifest specifying the main class.
   * ``run`` - Executes the main class of this binary locally.
   """
-  def __init__(self, name,
+  def __init__(self,
+               name=None,
                main=None,
                basename=None,
                source=None,
-               resources=None,
-               dependencies=None,
-               excludes=None,
                deploy_excludes=None,
-               configurations=None,
-               exclusives=None):
+               **kwargs):
     """
     :param string name: The name of this target, which combined with this
       build file defines the target :class:`pants.base.address.Address`.
@@ -68,12 +62,8 @@ class JvmBinary(JvmTarget, WithResources):
       This parameter is not intended for general use.
     :type configurations: tuple of strings
     """
-    super(JvmBinary, self).__init__(name=name,
-                                    sources=[source] if source else None,
-                                    dependencies=dependencies,
-                                    excludes=excludes,
-                                    configurations=configurations,
-                                    exclusives=exclusives)
+    sources = [source] if source else None
+    super(JvmBinary, self).__init__(name=name, sources=sources, **kwargs)
 
     if main and not isinstance(main, Compatibility.string):
       raise TargetDefinitionException(self, 'main must be a fully qualified classname')
@@ -83,7 +73,6 @@ class JvmBinary(JvmTarget, WithResources):
 
     self.main = main
     self.basename = basename or name
-    self.resources = resources
     self.deploy_excludes = deploy_excludes or []
 
 
@@ -92,7 +81,6 @@ class RelativeToMapper(object):
 
   def __init__(self, base):
     """The base directory files should be mapped from."""
-
     self.base = base
 
   def __call__(self, file):
@@ -100,6 +88,9 @@ class RelativeToMapper(object):
 
   def __repr__(self):
     return 'IdentityMapper(%s)' % self.base
+
+  def __hash__(self):
+    return hash(self.base)
 
 
 @manual.builddict(tags=["jvm"])
@@ -126,9 +117,9 @@ class Bundle(object):
     ]
   """
 
-  def __init__(self, base=None, mapper=None, relative_to=None):
+  def __init__(self, rel_path=None, mapper=None, relative_to=None):
     """
-    :param base: Base path of the "source" file paths. By default, path of the
+    :param rel_path: Base path of the "source" file paths. By default, path of the
       BUILD file. Useful for assets that don't live in the source code repo.
     :param mapper: Function that takes a path string and returns a path string. Takes a path in
       the source tree, returns a path to use in the resulting bundle. By default, an identity
@@ -139,15 +130,15 @@ class Bundle(object):
     if mapper and relative_to:
       raise ValueError("Must specify exactly one of 'mapper' or 'relative_to'")
 
-    self._base = base or ParseContext.path()
+    self._rel_path = rel_path
 
     if relative_to:
-      base = os.path.join(self._base, relative_to)
-      if not os.path.isdir(base):
+      base = os.path.join(get_buildroot(), self._rel_path, relative_to)
+      if not os.path.isdir(os.path.join(get_buildroot(), base)):
         raise ValueError('Could not find a directory to bundle relative to at %s' % base)
       self.mapper = RelativeToMapper(base)
     else:
-      self.mapper = mapper or RelativeToMapper(self._base)
+      self.mapper = mapper or RelativeToMapper(os.path.join(get_buildroot(), self._rel_path))
 
     self.filemap = {}
 
@@ -156,6 +147,7 @@ class Bundle(object):
     """Add files to the bundle, where ``filesets`` is a filename, ``globs``, or ``rglobs``.
     Note this is a variable length param and may be specified any number of times.
     """
+
     for fileset in filesets:
       paths = fileset() if isinstance(fileset, Fileset) \
                         else fileset if hasattr(fileset, '__iter__') \
@@ -163,22 +155,19 @@ class Bundle(object):
       for path in paths:
         abspath = path
         if not os.path.isabs(abspath):
-          abspath = os.path.join(self._base, path)
+          abspath = os.path.join(get_buildroot(), self._rel_path, path)
         if not os.path.exists(abspath):
           raise ValueError('Given path: %s with absolute path: %s which does not exist'
                            % (path, abspath))
         self.filemap[abspath] = self.mapper(abspath)
     return self
 
-  def resolve(self):
-    yield self
-
   def __repr__(self):
     return 'Bundle(%s, %s)' % (self.mapper, self.filemap)
 
 
 @manual.builddict(tags=["jvm"])
-class JvmApp(InternalTarget):
+class JvmApp(Target):
   """A JVM-based application consisting of a binary plus "extra files".
 
   Invoking the ``bundle`` goal on one of these targets creates a
@@ -187,12 +176,10 @@ class JvmApp(InternalTarget):
   extra files like config files, startup scripts, etc.
   """
 
-  def __init__(self, name, binary, bundles, basename=None):
+  def __init__(self, name=None, bundles=None, basename=None, **kwargs):
     """
     :param string name: The name of this target, which combined with this
       build file defines the target :class:`pants.base.address.Address`.
-    :param binary: The :class:`pants.targets.jvm_binary.JvmBinary`,
-      or a :class:`pants.targets.pants_target.Pants` pointer to one.
     :param bundles: One or more :class:`pants.targets.jvm_binary.Bundle`'s
       describing "extra files" that should be included with this app
       (e.g.: config files, startup scripts).
@@ -200,83 +187,25 @@ class JvmApp(InternalTarget):
       ``name``. Pants uses this in the ``bundle`` goal to name the distribution
       artifact. In most cases this parameter is not necessary.
     """
-    super(JvmApp, self).__init__(name, dependencies=[])
-
-    self._binaries = maybe_list(
-        util.resolve(binary),
-        expected_type=(Pants, JarLibrary, JvmBinary),
-        raise_type=partial(TargetDefinitionException, self))
-
-    self._bundles = maybe_list(bundles, expected_type=Bundle,
-                               raise_type=partial(TargetDefinitionException, self))
+    payload = BundlePayload(bundles)
+    super(JvmApp, self).__init__(name=name, payload=payload, **kwargs)
 
     if name == basename:
       raise TargetDefinitionException(self, 'basename must not equal name.')
     self.basename = basename or name
 
-    self._resolved_binary = None
-    self._resolved_bundles = []
-
-  def is_jvm_app(self):
-    return True
+  @property
+  def bundles(self):
+    return self.payload.bundles
 
   @property
   def binary(self):
-    self._maybe_resolve_binary()
-    return self._resolved_binary
-
-  def _maybe_resolve_binary(self):
-    if self._binaries is not None:
-      binaries_list = []
-      for binary in self._binaries:
-        binaries_list.extend(filter(lambda t: t.is_concrete, binary.resolve()))
-
-      if len(binaries_list) != 1 or not isinstance(binaries_list[0], JvmBinary):
-        raise TargetDefinitionException(self,
-                                        'must supply exactly 1 JvmBinary, got %s' % binaries_list)
-      self._resolved_binary = binaries_list[0]
-      self.update_dependencies([self._resolved_binary])
-      self._binaries = None
+    # TODO(pl): Assert there is only one dep and it is a JvmBinary
+    return self.dependencies[0]
 
   @property
-  def bundles(self):
-    self._maybe_resolve_bundles()
-    return self._resolved_bundles
+  def jar_dependencies(self):
+    return self.binary.jar_dependencies
 
-  def _maybe_resolve_bundles(self):
-    if self._bundles is not None:
-      def is_resolvable(item):
-        return hasattr(item, 'resolve')
-
-      def is_bundle(bundle):
-        return isinstance(bundle, Bundle)
-
-      def resolve(item):
-        return list(item.resolve()) if is_resolvable(item) else [None]
-
-      if is_resolvable(self._bundles):
-        self._bundles = resolve(self._bundles)
-
-      try:
-        for item in iter(self._bundles):
-          for bundle in resolve(item):
-            if not is_bundle(bundle):
-              raise TypeError()
-            self._resolved_bundles.append(bundle)
-      except TypeError:
-        raise TargetDefinitionException(self, 'bundles must be one or more Bundle objects, '
-                                              'got %s' % self._bundles)
-      self._bundles = None
-
-  @property
-  def dependencies(self):
-    self._maybe_resolve_binary()
-    return super(JvmApp, self).dependencies
-
-  def resolve(self):
-    # TODO(John Sirois): Clean this up when BUILD parse refactoring is tackled.
-    unused_resolved_binary = self.binary
-    unused_resolved_bundles = self.bundles
-
-    for resolved in super(JvmApp, self).resolve():
-      yield resolved
+  def is_jvm_app(self):
+    return True

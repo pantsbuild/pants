@@ -7,7 +7,8 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 from functools import reduce
 
 from pants.python.interpreter_cache import PythonInterpreterCache
-from pants.tasks import Task, TaskError
+from pants.tasks.task import Task
+from pants.tasks.task_error import TaskError
 from pants.tasks.python.target import is_python_root
 
 

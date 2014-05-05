@@ -17,7 +17,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.workunit import WorkUnit
 from pants.java.util import execute_java
 from pants.targets.java_tests import JavaTests as junit_tests
-from pants.tasks import TaskError
+from pants.tasks.task import TaskError
 from pants.tasks.jvm_task import JvmTask
 from pants.tasks.jvm_tool_bootstrapper import JvmToolBootstrapper
 

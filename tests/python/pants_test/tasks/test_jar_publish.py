@@ -12,14 +12,17 @@ from mock import Mock
 
 from pants.tasks.jar_publish import JarPublish
 from pants.tasks.task_error import TaskError
-from pants_test.base_build_root_test import BaseBuildRootTest
+from pants_test.base_test import BaseTest
 from pants_test.tasks.test_base import prepare_task
 
 
-class JarPublishTest(BaseBuildRootTest):
+class JarPublishTest(BaseTest):
 
   def test_smoke_publish(self):
-    task = prepare_task(JarPublish, args=['--test-local=/tmp'])
+    task = prepare_task(JarPublish,
+                        args=['--test-local=/tmp'],
+                        build_graph=self.build_graph,
+                        build_file_parser=self.build_file_parser)
     task.scm = Mock()
     task.execute([])
 

@@ -14,40 +14,42 @@ def add_log4j_excludes(jar):
             .exclude(org='com.sun.jdmk', name='jmxtools')
             .exclude(org='com.sun.jmx', name='jmxri'))
 
-
+''
 # TODO(John Sirois): XXX only antlr2 is directly referenced by BUILDs
 jar_library(name='antlr2',
-            dependencies=[ jar(org='antlr', name='antlr', rev='2.7.7') ])
+            jars = [ jar(org='antlr', name='antlr', rev='2.7.7') ])
 
 jar_library(name='antlr3',
-            dependencies=[ jar(org='antlr', name='antlr', rev='3.1.3') ])
+            jars = [ jar(org='antlr', name='antlr', rev='3.1.3') ])
 
 jar_library(name='antlr-3.4',
-            dependencies=[
+            jars = [
                 jar(org='org.antlr', name='antlr', rev='3.4'),
                 jar(org='org.antlr', name='antlr-runtime', rev='3.4')
              ]
            )
 
 jar_library(name='antlr4',
-            dependencies=[
+            jars=[
                 jar(org='org.antlr', name='antlr4', rev='4.2.2').with_sources(),
                 jar(org='org.antlr', name='antlr4-runtime', rev='4.2.2').with_sources()
              ]
            )
 
 jar_library(name='checkstyle',
-            dependencies=[
+            jars = [
               jar(org='com.puppycrawl.tools', name='checkstyle', rev='5.5')
                 .exclude(org='com.google.collections', name='google-collections')
                 .with_sources(),
+            ],
+            dependencies = [
               # Needs this as the replacement for the excluded google-collections.
               pants(':guava'),
-            ]
+            ],
            )
 
 jar_library(name='commons-lang',
-            dependencies=[
+            jars = [
               jar(org='commons-lang', name='commons-lang', rev='2.5').with_sources()
             ]
            )
@@ -57,14 +59,16 @@ jar_library(name='commons-lang',
 FINAGLE_REV = '6.8.1'
 
 jar_library(name='finagle-core',
-            dependencies=[
+            jars = [
               jar(org='com.twitter', name='finagle-core_2.9.2', rev=FINAGLE_REV)
                 .with_sources(),
-              pants(':util-core'),
+            ],
+            dependencies = [
+              pants(':util-core')
             ])
 
 jar_library(name='finagle-thrift',
-            dependencies=[
+            jars = [
               jar(org='com.twitter', name='finagle-thrift_2.9.2', rev=FINAGLE_REV)
             ])
 
@@ -72,7 +76,7 @@ jar_library(name='finagle-thrift',
 GUAVA_REV = '15.0'
 
 jar_library(name='guava',
-            dependencies=[
+            jars = [
               jar(
                 org='com.google.guava', name='guava', rev=GUAVA_REV,
                 apidocs='http://docs.guava-libraries.googlecode.com/git-history/'
@@ -80,13 +84,15 @@ jar_library(name='guava',
               ).with_sources().with_docs(),
 
               # Defined in provided scope so we provide here
-              pants(':jsr305'),
               jar(org='javax.inject', name='javax.inject', rev='1').with_sources(),
-            ]
+            ],
+            dependencies = [
+              pants(':jsr305'),
+            ],
            )
 
 jar_library(name='guice',
-            dependencies=[
+            jars = [
               jar(
                 org='com.google.inject', name='guice', rev='3.0',
                 apidocs='http://google-guice.googlecode.com/svn/tags/3.0/javadoc/'
@@ -95,58 +101,60 @@ jar_library(name='guice',
            )
 
 jar_library(name='jsr305',
-            dependencies=[
+            jars = [
               jar(org='com.google.code.findbugs', name='jsr305', rev='1.3.9')
             ]
            )
 
 jar_library(name='log4j',
-            dependencies=[
+            jars = [
               add_log4j_excludes(jar(org='log4j', name='log4j', rev='1.2.15').with_sources())
             ])
 
 jar_library(name='protobuf-2.4.1',
-            dependencies=[
+            jars = [
               jar(org='com.google.protobuf', name='protobuf-java', rev='2.4.1').with_sources()
             ]
            )
 
 jar_library(name='protobuf-java',
-            dependencies=[ pants(':protobuf-2.4.1') ])
+            dependencies = [
+              pants(':protobuf-2.4.1')
+            ])
 
 jar_library(name='scala-compiler',
-            dependencies=[
+            jars = [
               jar(org='org.scala-lang', name='scala-compiler', rev='2.9.3').with_sources()
             ]
            )
 
 jar_library(name='scala-library',
-            dependencies=[
+            jars = [
               jar(org='org.scala-lang', name='scala-library', rev='2.9.3').with_sources()
             ]
            )
 
 jar_library(name='scrooge-core',
-            dependencies=[
+            jars = [
               # used by scrooge-generator in BUILD.tools:scrooge-gen
               jar(org='com.twitter', name='scrooge-core_2.9.2', rev='3.12.1').with_sources()
             ]
           )
 
 jar_library(name='slf4j-api',
-            dependencies=[
+            jars = [
               jar(org='org.slf4j', name='slf4j-api', rev='1.6.1').with_sources()
             ]
 )
 
 jar_library(name='libthrift-0.5.0',
-            dependencies=[
+            jars = [
               jar(org='org.apache.thrift', name='libthrift', rev='0.5.0-1'),
             ]
            )
 
 jar_library(name='thrift-0.5.0',
-            dependencies=[
+            dependencies = [
               pants(':commons-lang'),
               pants(':libthrift-0.5.0'),
               pants(':slf4j-api'),
@@ -154,7 +162,7 @@ jar_library(name='thrift-0.5.0',
            )
 
 jar_library(name='thrift-0.5.0-finagle',
-            dependencies=[
+            dependencies = [
               pants(':thrift-0.5.0'),
 
               # finagle thrift extra deps
@@ -165,13 +173,13 @@ jar_library(name='thrift-0.5.0-finagle',
            )
 
 jar_library(name='thrift',
-            dependencies=[ pants(':thrift-0.5.0') ])
+            dependencies = [ pants(':thrift-0.5.0') ])
 
 # common rev for all com.twitter%util* artifacts
 UTIL_REV = '6.8.1'
 
 jar_library(name='util-core',
-            dependencies=[
+            jars = [
 		    jar(org='com.twitter', name='util-core_2.9.2', rev=UTIL_REV).with_sources() ])
 
 
@@ -180,7 +188,7 @@ jar_library(name='util-core',
 #
 
 jar_library(name='easymock',
-            dependencies=[
+            jars = [
               jar(org='org.easymock', name='easymock', rev='3.2').with_sources(),
               # Class extension is needed to support the old version of easymockclassextension that
               # is not dependend on by the easymock dependency
@@ -189,25 +197,27 @@ jar_library(name='easymock',
            )
 
 jar_library(name='mockito',
-            dependencies=[
+            jars = [
               jar(org='org.mockito', name='mockito-all', rev='1.9.0').with_sources()
             ]
            )
 
 jar_library(name='hamcrest-core',
-            dependencies=[ jar(org='org.hamcrest', name='hamcrest-core', rev='1.3') ])
+            jars = [ jar(org='org.hamcrest', name='hamcrest-core', rev='1.3') ])
 
 jar_library(name='junit',
-            dependencies=[
+            jars = [
               jar(org='junit', name='junit-dep', rev='4.11').with_sources(),
-              pants(':hamcrest-core')
-            ]
+            ],
+            dependencies = [
+              pants(':hamcrest-core'),
+            ],
            )
 
 jar_library(name='specs_2.9',
-            dependencies=[
+            jars = [
               jar(org='org.scala-tools.testing', name='specs_2.9.3', rev='1.6.9')
             ]
            )
 
-jar_library(name='specs', dependencies=[ pants(':specs_2.9') ])
+jar_library(name='specs', dependencies = [ pants(':specs_2.9') ])

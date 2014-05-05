@@ -10,24 +10,18 @@ from pants.base.config import Config
 from pants.base.target import Target
 from pants.goal import Context
 from pants.tasks.check_exclusives import CheckExclusives
-from pants_test.testutils.base_mock_target_test import BaseMockTargetTest
-from pants_test.testutils.mock_target import MockTarget
+from pants_test.base_test import BaseTest
 
 
-class ExclusivesTargetTest(BaseMockTargetTest):
+class ExclusivesTargetTest(BaseTest):
   """Test exclusives propagation in the dependency graph"""
 
-  def setUp(self):
-    # So MockTarget addresses don't collide. TODO: Remove when targets are refactored.
-    Target._clear_all_addresses()
-    self.config = Config.load()
-
   def setupTargets(self):
-    a = MockTarget('a', exclusives={'a': '1', 'b': '1'})
-    b = MockTarget('b', exclusives={'a': '1'})
-    c = MockTarget('c', exclusives = {'a': '2'})
-    d = MockTarget('d', dependencies=[a, b])
-    e = MockTarget('e', dependencies=[a, c], exclusives={'c': '1'})
+    a = self.make_target(':a', exclusives={'a': '1', 'b': '1'})
+    b = self.make_target(':b', exclusives={'a': '1'})
+    c = self.make_target(':c', exclusives = {'a': '2'})
+    d = self.make_target(':d', dependencies=[a, b])
+    e = self.make_target(':e', dependencies=[a, c], exclusives={'c': '1'})
     return a, b, c, d, e
 
   def testPropagation(self):

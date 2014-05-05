@@ -43,11 +43,17 @@ class BuildFile(object):
     raises IOError if the specified path does not house a BUILD file and must_exist is True
     """
 
-    path = os.path.abspath(os.path.join(root_dir, relpath))
+
+    if not os.path.isabs(root_dir):
+      raise IOError('BuildFile root_dir {root_dir} must be an absolute path.'
+                    .format(root_dir=root_dir))
+
+    path = os.path.join(root_dir, relpath)
     buildfile = os.path.join(path, BuildFile._CANONICAL_NAME) if os.path.isdir(path) else path
 
     if os.path.isdir(buildfile):
-      raise IOError("%s is a directory" % buildfile)
+      raise IOError('Path to buildfile ({buildfile}) is a directory, but it must be a file.'
+                    .format(buildfile=buildfile))
 
     if must_exist:
       if not os.path.exists(buildfile):
@@ -69,6 +75,7 @@ class BuildFile(object):
       self.name, PythonIdentity.get()))
 
     self.relpath = os.path.relpath(self.full_path, self.root_dir)
+    self.spec_path = os.path.dirname(self.relpath)
     self.canonical_relpath = os.path.join(os.path.dirname(self.relpath), BuildFile._CANONICAL_NAME)
 
   def exists(self):
@@ -130,13 +137,18 @@ class BuildFile(object):
     if (os.path.exists(self._bytecode_path) and
         os.path.getmtime(self.full_path) <= os.path.getmtime(self._bytecode_path)):
       with open(self._bytecode_path, 'rb') as bytecode:
-        return marshal.load(bytecode)
-    else:
-      with open(self.full_path, 'rb') as source:
-        code = compile(source.read(), self.full_path, 'exec')
-        with open(self._bytecode_path, 'wb') as bytecode:
-          marshal.dump(code, bytecode)
-        return code
+        try:
+          return marshal.load(bytecode)
+        except Exception:
+          logger.warn('Failed to marshall BUILD file bytecode at {_bytecode_path}.'
+                      ' Exception was: {e}'
+                      .format(_bytecode_path=self._bytecode_path, e=e))
+
+    with open(self.full_path, 'rb') as source:
+      code = compile(source.read(), '<string>', 'exec', flags=0, dont_inherit=True)
+      with open(self._bytecode_path, 'wb') as bytecode:
+        marshal.dump(code, bytecode)
+      return code
 
   def __eq__(self, other):
     result = other and (

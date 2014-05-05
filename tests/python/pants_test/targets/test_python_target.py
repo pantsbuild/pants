@@ -5,48 +5,58 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import os
+import pytest
 from textwrap import dedent
 
-from pants.base.parse_context import ParseContext
-from pants.base.target import TargetDefinitionException
+from pants.base.source_root import SourceRoot
+from pants.base.exceptions import TargetDefinitionException
 from pants.targets.artifact import Artifact
 from pants.targets.python_artifact import PythonArtifact
 from pants.targets.python_target import PythonTarget
 from pants.targets.repository import Repository
-from pants.targets.sources import SourceRoot
-from pants_test.base_build_root_test import BaseBuildRootTest
+from pants_test.base_test import BaseTest
 
 
-class PythonTargetTest(BaseBuildRootTest):
+class PythonTargetTest(BaseTest):
 
-  @classmethod
-  def setUpClass(self):
-    super(PythonTargetTest, self).setUpClass()
+  def setUp(self):
+    super(PythonTargetTest, self).setUp()
     SourceRoot.register(os.path.realpath(os.path.join(self.build_root, 'test_python_target')),
                         PythonTarget)
 
-    self.create_target('test_thrift_replacement', dedent('''
+    self.add_to_build_file('test_thrift_replacement', dedent('''
       python_thrift_library(name='one',
         sources=['thrift/keyword.thrift'],
-        dependencies=None
       )
     '''))
 
   def test_validation(self):
-    with ParseContext.temp('PythonTargetTest/test_validation'):
 
-      # Adding a JVM Artifact as a provides on a PythonTarget doesn't make a lot of sense. This test
-      # sets up that very scenario, and verifies that pants throws a TargetDefinitionException.
-      self.assertRaises(TargetDefinitionException, PythonTarget, name="one", sources=[],
-        provides=Artifact(org='com.twitter', name='one-jar',
-        repo=Repository(name='internal', url=None, push_db=None, exclusives=None)))
+    self.make_target(spec=':internal',
+                     target_type=Repository,
+                     url=None,
+                     push_db=None,
+                     exclusives=None)
+    # Adding a JVM Artifact as a provides on a PythonTarget doesn't make a lot of sense.
+    # This test sets up that very scenario, and verifies that pants throws a
+    # TargetDefinitionException.
+    with pytest.raises(TargetDefinitionException):
+      self.make_target(target_type=PythonTarget,
+                       spec=":one",
+                       provides=Artifact(org='com.twitter', name='one-jar', repo=':internal'))
 
-      name = "test-with-PythonArtifact"
-      pa = PythonArtifact(name='foo', version='1.0', description='foo')
+    spec = ":test-with-PythonArtifact"
+    pa = PythonArtifact(name='foo', version='1.0', description='foo')
 
-      # This test verifies that adding a 'setup_py' provides to a PythonTarget is okay.
-      self.assertEquals(PythonTarget(name=name, provides=pa, sources=[]).name, name)
-      name = "test-with-none"
+    # This test verifies that adding a 'setup_py' provides to a PythonTarget is okay.
+    pt_with_artifact = self.make_target(spec=spec,
+                                        target_type=PythonTarget,
+                                        provides=pa)
+    self.assertEquals(pt_with_artifact.address.spec, spec)
 
-      # This test verifies that having no provides is okay.
-      self.assertEquals(PythonTarget(name=name, provides=None, sources=[]).name, name)
+    spec = ":test-with-none"
+    # This test verifies that having no provides is okay.
+    pt_no_artifact = self.make_target(spec=spec,
+                                      target_type=PythonTarget,
+                                      provides=None)
+    self.assertEquals(pt_no_artifact.address.spec, spec)

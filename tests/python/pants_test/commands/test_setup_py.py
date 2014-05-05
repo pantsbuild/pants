@@ -16,25 +16,14 @@ from twitter.common.contextutil import temporary_dir, temporary_file
 from twitter.common.dirutil import safe_mkdir, touch
 from twitter.common.dirutil.chroot import Chroot
 
-from pants.base.parse_context import ParseContext
-from pants.base.target import Target, TargetDefinitionException
+from pants.base.target import Target
+from pants.base.exceptions import TargetDefinitionException
 from pants.commands.setup_py import SetupPy
-from pants.targets.pants_target import Pants as pants
-from pants.targets.python_artifact import PythonArtifact as setup_py
-from pants.targets.python_binary import PythonBinary as python_binary
-from pants.targets.python_library import PythonLibrary as python_library
+from pants.targets.python_artifact import PythonArtifact
+from pants.targets.python_binary import PythonBinary
+from pants.targets.python_library import PythonLibrary
 
-
-def create_dependencies(depmap):
-  target_map = {}
-  with ParseContext.temp():
-    for name, deps in depmap.items():
-      target_map[name] = python_library(
-        name=name,
-        provides=setup_py(name=name, version='0.0.0'),
-        dependencies=[pants(':%s' % dep) for dep in deps]
-      )
-  return target_map
+from pants_test.base_test import BaseTest
 
 
 class MockableSetupPyCommand(SetupPy):
@@ -42,14 +31,28 @@ class MockableSetupPyCommand(SetupPy):
     self.target = target
 
 
-class TestSetupPy(unittest.TestCase):
-  def tearDown(self):
-    Target._clear_all_addresses()
+class TestSetupPy(BaseTest):
+
+  def create_dependencies(self, depmap):
+    target_map = {}
+    for name, deps in depmap.items():
+      target_map[name] = self.make_target(
+        spec=name,
+        target_type=PythonLibrary,
+        provides=PythonArtifact(name=name, version='0.0.0')
+      )
+    for name, deps in depmap.items():
+      target = target_map[name]
+      dep_targets = [target_map[name] for name in deps]
+      for dep in dep_targets:
+        self.build_graph.inject_dependency(target.address, dep.address)
+    return target_map
+
 
   def test_minified_dependencies_1(self):
     # foo -> bar -> baz
     dep_map = {'foo': ['bar'], 'bar': ['baz'], 'baz': []}
-    target_map = create_dependencies(dep_map)
+    target_map = self.create_dependencies(dep_map)
     assert SetupPy.minified_dependencies(target_map['foo']) == OrderedSet([target_map['bar']])
     assert SetupPy.minified_dependencies(target_map['bar']) == OrderedSet([target_map['baz']])
     assert SetupPy.minified_dependencies(target_map['baz']) == OrderedSet()
@@ -67,7 +70,7 @@ class TestSetupPy(unittest.TestCase):
 
   def test_execution_minified_dependencies_1(self):
     dep_map = {'foo': ['bar'], 'bar': ['baz'], 'baz': []}
-    target_map = create_dependencies(dep_map)
+    target_map = self.create_dependencies(dep_map)
     with self.run_execute(target_map['foo'], recursive=False) as setup_py:
       setup_py.run_one.assert_called_with(target_map['foo'])
     with self.run_execute(target_map['foo'], recursive=True) as setup_py:
@@ -83,7 +86,7 @@ class TestSetupPy(unittest.TestCase):
     #  v      |
     # bar ----'
     dep_map = {'foo': ['bar', 'baz'], 'bar': ['baz'], 'baz': []}
-    target_map = create_dependencies(dep_map)
+    target_map = self.create_dependencies(dep_map)
     assert SetupPy.minified_dependencies(target_map['foo']) == OrderedSet([target_map['bar']])
     assert SetupPy.minified_dependencies(target_map['bar']) == OrderedSet([target_map['baz']])
     assert SetupPy.minified_dependencies(target_map['baz']) == OrderedSet()
@@ -93,33 +96,37 @@ class TestSetupPy(unittest.TestCase):
     #    |               |
     #    `----> bak <----'
     dep_map = {'foo': ['bar', 'baz'], 'bar': ['bak'], 'baz': ['bak'], 'bak': []}
-    target_map = create_dependencies(dep_map)
+    target_map = self.create_dependencies(dep_map)
     assert SetupPy.minified_dependencies(target_map['foo']) == OrderedSet(
-        [target_map['bar'], target_map['baz']])
+        [target_map['baz'], target_map['bar']])
     assert SetupPy.minified_dependencies(target_map['bar']) == OrderedSet([target_map['bak']])
     assert SetupPy.minified_dependencies(target_map['baz']) == OrderedSet([target_map['bak']])
 
   def test_binary_target_injected_into_minified_dependencies(self):
-    with ParseContext.temp():
-      foo = python_library(
+    foo_bin_dep = self.make_target(
+      spec = ':foo_bin_dep',
+      target_type = PythonLibrary,
+    )
+
+    foo_bin = self.make_target(
+      spec = ':foo_bin',
+      target_type = PythonBinary,
+      entry_point = 'foo.bin.foo',
+      dependencies = [
+        foo_bin_dep,
+      ]
+    )
+
+    foo = self.make_target(
+      spec = ':foo',
+      target_type = PythonLibrary,
+      provides = PythonArtifact(
         name = 'foo',
-        provides = setup_py(
-          name = 'foo',
-          version = '0.0.0',
-        ).with_binaries(
-          foo_binary = pants(':foo_bin')
-        )
+        version = '0.0.0',
+      ).with_binaries(
+        foo_binary = ':foo_bin',
       )
-
-      foo_bin = python_binary(
-        name = 'foo_bin',
-        entry_point = 'foo.bin.foo',
-        dependencies = [ pants(':foo_bin_dep') ]
-      )
-
-      foo_bin_dep = python_library(
-        name = 'foo_bin_dep'
-      )
+    )
 
     assert SetupPy.minified_dependencies(foo) == OrderedSet([foo_bin, foo_bin_dep])
     entry_points = dict(SetupPy.iter_entry_points(foo))
@@ -132,31 +139,36 @@ class TestSetupPy(unittest.TestCase):
       setup_py_command.run_one.assert_called_with(foo)
 
   def test_binary_target_injected_into_minified_dependencies_with_provider(self):
-    with ParseContext.temp():
-      bar = python_library(
-        name = 'bar',
-        provides = setup_py(
-          name = 'bar',
-          version = '0.0.0',
-        ).with_binaries(
-          bar_binary = pants(':bar_bin')
-        )
-      )
-
-      bar_bin = python_binary(
-        name = 'bar_bin',
-        entry_point = 'bar.bin.bar',
-        dependencies = [ pants(':bar_bin_dep') ]
-      )
-
-      bar_bin_dep = python_library(
+    bar_bin_dep = self.make_target(
+      spec = ':bar_bin_dep',
+      target_type = PythonLibrary,
+      provides = PythonArtifact(
         name = 'bar_bin_dep',
-        provides = setup_py(
-          name = 'bar_bin_dep',
-          version = '0.0.0',
-        )
+        version = '0.0.0',
       )
+    )
 
+    bar_bin = self.make_target(
+      spec = ':bar_bin',
+      target_type = PythonBinary,
+      entry_point = 'bar.bin.bar',
+      dependencies = [
+        bar_bin_dep,
+      ],
+    )
+
+    bar = self.make_target(
+      spec = ':bar',
+      target_type = PythonLibrary,
+      provides = PythonArtifact(
+        name = 'bar',
+        version = '0.0.0',
+      ).with_binaries(
+        bar_binary = ':bar_bin'
+      )
+    )
+
+    # TODO(pl): Why is this set ordered?  Does the order actually matter?
     assert SetupPy.minified_dependencies(bar) == OrderedSet([bar_bin, bar_bin_dep])
     entry_points = dict(SetupPy.iter_entry_points(bar))
     assert entry_points == {'bar_binary': 'bar.bin.bar'}
@@ -171,22 +183,25 @@ class TestSetupPy(unittest.TestCase):
       ], any_order=True)
 
   def test_binary_cycle(self):
-    with ParseContext.temp():
-      foo = python_library(
+    foo = self.make_target(
+      spec = ':foo',
+      target_type = PythonLibrary,
+      provides = PythonArtifact(
         name = 'foo',
-        provides = setup_py(
-          name = 'foo',
-          version = '0.0.0',
-        ).with_binaries(
-          foo_binary = pants(':foo_bin')
-        )
+        version = '0.0.0',
+      ).with_binaries(
+        foo_binary = ':foo_bin',
       )
+    )
 
-      foo_bin = python_binary(
-        name = 'foo_bin',
-        entry_point = 'foo.bin.foo',
-        dependencies = [ pants(':foo') ]
-      )
+    foo_bin = self.make_target(
+      spec = ':foo_bin',
+      target_type = PythonBinary,
+      entry_point = 'foo.bin.foo',
+      dependencies = [
+        foo,
+      ],
+    )
 
     with pytest.raises(TargetDefinitionException):
       SetupPy.minified_dependencies(foo)

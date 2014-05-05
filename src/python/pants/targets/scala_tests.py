@@ -6,21 +6,13 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from pants.base.build_manual import manual
 from pants.targets.jvm_target import JvmTarget
-from pants.targets.resources import WithResources
 
 
 @manual.builddict(tags=['scala'])
-class ScalaTests(JvmTarget, WithResources):
+class ScalaTests(JvmTarget):
   """Tests a Scala library."""
 
-  def __init__(self,
-               name,
-               sources=None,
-               java_sources=None,
-               dependencies=None,
-               excludes=None,
-               resources=None,
-               exclusives=None):
+  def __init__(self, **kwargs):
 
     """
     :param name: The name of this module target, addressable via pants via the portion of the spec
@@ -43,11 +35,6 @@ class ScalaTests(JvmTarget, WithResources):
     :param resources: An optional list of Resources that should be in this target's classpath.
     :param exclusives: An optional map of exclusives tags. See CheckExclusives for details.
     """
-    super(ScalaTests, self).__init__(name, sources, dependencies, excludes, exclusives=exclusives)
 
-    # TODO(John Sirois): Merge handling with ScalaLibrary.java_sources - which is different and
-    # likely more correct.
-    self.java_sources = java_sources
-
-    self.resources = resources
+    super(ScalaTests, self).__init__(**kwargs)
     self.add_labels('scala', 'tests')

@@ -7,12 +7,10 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 from pkg_resources import Requirement
 
 from pants.base.build_manual import manual
-from pants.base.target import Target
-from pants.targets.external_dependency import ExternalDependency
 
 
 @manual.builddict(tags=["python"])
-class PythonRequirement(Target, ExternalDependency):
+class PythonRequirement(object):
   """Pants wrapper around pkg_resources.Requirement"""
 
   def __init__(self, requirement, name=None, repository=None, version_filter=None, use_2to3=False,
@@ -26,7 +24,6 @@ class PythonRequirement(Target, ExternalDependency):
     self._version_filter = version_filter or (lambda py, pl: True)
     # TODO(wickman) Unify this with PythonTarget .compatibility
     self.compatibility = compatibility or ['']
-    Target.__init__(self, self._name, exclusives=exclusives)
 
   def should_build(self, python, platform):
     return self._version_filter(python, platform)

@@ -22,6 +22,7 @@ python_library(
   sources = ['antlr_builder.py'],
   dependencies = [
     pants(':code_generator'),
+    pants('3rdparty/python:antlr-3.1.3'),
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('src/python/pants/ivy'),
   ]
@@ -86,7 +87,6 @@ python_library(
     pants('3rdparty/python/twitter/commons:twitter.common.python'),
     pants('3rdparty/python/twitter/commons:twitter.common.quantity'),
     pants('src/python/pants/base:config'),
-    pants('src/python/pants/base:parse_context'),
     pants('src/python/pants/base:target'),
     pants('src/python/pants/base:build_invalidator'),
     pants('src/python/pants/targets:python'),
@@ -125,7 +125,6 @@ python_library(
     pants('3rdparty/python/twitter/commons:twitter.common.quantity'),
     pants('3rdparty/python/twitter/commons:twitter.common.python'),
     pants('src/python/pants/base:config'),
-    pants('src/python/pants/base:parse_context'),
     pants('src/python/pants/base:target'),
     pants('src/python/pants/targets:python'),
     pants('3rdparty/python:coverage'),

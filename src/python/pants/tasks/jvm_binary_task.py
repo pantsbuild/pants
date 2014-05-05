@@ -17,7 +17,8 @@ from pants.base.build_environment import get_version
 from pants.fs.archive import ZIP
 from pants.java.jar import Manifest, open_jar
 from pants.targets.jvm_binary import JvmBinary
-from pants.tasks import Task, TaskError
+from pants.tasks.task import Task
+from pants.tasks.task_error import TaskError
 
 
 class JvmBinaryTask(Task):
@@ -82,7 +83,7 @@ class JvmBinaryTask(Task):
               self._dump(os.path.join(base_dir, internal_jar), jar)
 
       with self.context.new_workunit(name='add-generated-jars'):
-        binary.walk(add_jars, lambda t: t.is_internal)
+        binary.walk(add_jars)
 
       with self.context.new_workunit(name='add-dependency-jars'):
         for basedir, external_jar in self.list_jar_dependencies(binary):
@@ -153,5 +154,5 @@ class JvmBinaryTask(Task):
             else:
               self.context.log.debug('Excluding %s from binary' % externaljar)
 
-    binary.walk(add_jars, lambda t: t.is_internal)
+    binary.walk(add_jars)
     return externaljars

@@ -25,7 +25,6 @@ from twitter.common.python.pex import PEX
 from twitter.common.python.pex_builder import PEXBuilder
 
 from pants.base.config import Config
-from pants.base.parse_context import ParseContext
 from pants.python.python_chroot import PythonChroot
 from pants.targets.python_requirement import PythonRequirement
 from pants.targets.python_tests import PythonTests, PythonTestSuite
@@ -109,14 +108,13 @@ class PythonTestBuilder(object):
   @classmethod
   def generate_test_targets(cls):
     if cls.TESTING_TARGETS is None:
-      with ParseContext.temp():
-        cls.TESTING_TARGETS = [
-          PythonRequirement('pytest'),
-          PythonRequirement('pytest-cov'),
-          PythonRequirement('coverage==3.6b1'),
-          PythonRequirement('unittest2', version_filter=lambda py, pl: py.startswith('2')),
-          PythonRequirement('unittest2py3k', version_filter=lambda py, pl: py.startswith('3'))
-        ]
+      cls.TESTING_TARGETS = [
+        PythonRequirement('pytest'),
+        PythonRequirement('pytest-cov'),
+        PythonRequirement('coverage==3.6b1'),
+        PythonRequirement('unittest2', version_filter=lambda py, pl: py.startswith('2')),
+        PythonRequirement('unittest2py3k', version_filter=lambda py, pl: py.startswith('3'))
+      ]
     return cls.TESTING_TARGETS
 
   @staticmethod
@@ -182,7 +180,7 @@ class PythonTestBuilder(object):
       chroot = PythonChroot(
           target,
           self.root_dir,
-          extra_targets=self.generate_test_targets(),
+          extra_requirements=self.generate_test_targets(),
           builder=builder,
           platforms=('current',),
           interpreter=self.interpreter,
@@ -194,7 +192,7 @@ class PythonTestBuilder(object):
       if coverage_enabled:
         coverage_rc, args = self.cov_setup(target, builder.chroot())
         test_args.extend(args)
-      sources = [os.path.join(target.target_base, source) for source in target.sources]
+      sources = target.sources_relative_to_buildroot()
       po = PEX(builder.path(), interpreter=self.interpreter).run(
           args=test_args + sources, blocking=False, setsid=True)
       # TODO(wickman)  If coverage is enabled, write an intermediate .html that points to
@@ -216,7 +214,7 @@ class PythonTestBuilder(object):
             print("Unable to kill process group: %d" % po.pid)
           elif e.errno != errno.ESRCH:
             rv = PythonTestResult.exception()
-    self.successes[target._create_id()] = rv
+    self.successes[target.id] = rv
     return rv
 
   def _run_python_test_suite(self, target, fail_hard=True):
@@ -226,8 +224,7 @@ class PythonTestBuilder(object):
         tests.add(trg)
       elif isinstance(trg, PythonTestSuite):
         for dependency in trg.dependencies:
-          for dep in dependency.resolve():
-            _gather_deps(dep)
+          _gather_deps(dependency)
     _gather_deps(target)
 
     failed = False

@@ -12,7 +12,7 @@ from pants.base.workunit import WorkUnit
 from pants.java.executor import CommandLineGrabber
 from pants.java.util import execute_java
 from pants.targets.jvm_binary import JvmBinary
-from pants.tasks import TaskError
+from pants.tasks.task import TaskError
 from pants.tasks.jvm_task import JvmTask
 
 

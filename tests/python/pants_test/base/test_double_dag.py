@@ -6,16 +6,15 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from pants.base.double_dag import DoubleDag
 from pants.reporting.report import Report
-from pants_test.testutils.base_mock_target_test import BaseMockTargetTest
+from pants_test.base_test import BaseTest
 from pants_test.testutils.mock_logger import MockLogger
-from pants_test.testutils.mock_target import MockTarget
 
 
 def make_dag(nodes):
   return DoubleDag(nodes, lambda t: t.dependencies, MockLogger(Report.INFO))
 
 
-class DoubleDagTest(BaseMockTargetTest):
+class DoubleDagTest(BaseTest):
 
   def check_dag_node(self, dag, data, children, parents):
     node = dag.lookup(data)
@@ -25,11 +24,11 @@ class DoubleDagTest(BaseMockTargetTest):
     self.assertEquals(node.parents, set(map(dag.lookup, parents)))
 
   def test_simple_dag(self):
-    a = MockTarget('a')
-    b = MockTarget('b', [a])
-    c = MockTarget('c', [b])
-    d = MockTarget('d', [c, a])
-    e = MockTarget('e', [d])
+    a = self.make_target('a')
+    b = self.make_target('b', dependencies=[a])
+    c = self.make_target('c', dependencies=[b])
+    d = self.make_target('d', dependencies=[c, a])
+    e = self.make_target('e', dependencies=[d])
 
     def test_dag(dag):
       self.assertEquals(dag._roots, set([dag.lookup(e)]))
@@ -48,24 +47,24 @@ class DoubleDagTest(BaseMockTargetTest):
 
   def test_binary_search_dag(self):
 
-    rrr = MockTarget('rrr')
-    rrl = MockTarget('rrl')
-    rlr = MockTarget('rlr')
-    rll = MockTarget('rll')
-    lrr = MockTarget('lrr')
-    lrl = MockTarget('lrl')
-    llr = MockTarget('llr')
-    lll = MockTarget('lll')
+    rrr = self.make_target('rrr')
+    rrl = self.make_target('rrl')
+    rlr = self.make_target('rlr')
+    rll = self.make_target('rll')
+    lrr = self.make_target('lrr')
+    lrl = self.make_target('lrl')
+    llr = self.make_target('llr')
+    lll = self.make_target('lll')
 
-    rr = MockTarget('rr', [rrr, rrl])
-    rl = MockTarget('rl', [rlr, rll])
-    lr = MockTarget('lr', [lrr, lrl])
-    ll = MockTarget('ll', [llr, lll])
+    rr = self.make_target('rr', dependencies=[rrr, rrl])
+    rl = self.make_target('rl', dependencies=[rlr, rll])
+    lr = self.make_target('lr', dependencies=[lrr, lrl])
+    ll = self.make_target('ll', dependencies=[llr, lll])
 
-    r = MockTarget('r', [rr, rl])
-    l = MockTarget('l', [lr, ll])
+    r = self.make_target('r', dependencies=[rr, rl])
+    l = self.make_target('l', dependencies=[lr, ll])
 
-    root = MockTarget('root', [r, l])
+    root = self.make_target('root', dependencies=[r, l])
 
     def test_dag(dag):
 
@@ -104,10 +103,10 @@ class DoubleDagTest(BaseMockTargetTest):
     test_dag(make_dag([l, lll, rrr, rll, ll, lrl, llr, rl, root, r, lr, rlr, rr, lrr, rrl]))
 
   def test_diamond_in_different_orders(self):
-    a = MockTarget('a')
-    b = MockTarget('b', [a])
-    c = MockTarget('c', [a])
-    d = MockTarget('d', [c, b])
+    a = self.make_target('a')
+    b = self.make_target('b', dependencies=[a])
+    c = self.make_target('c', dependencies=[a])
+    d = self.make_target('d', dependencies=[c, b])
 
     def test_diamond_dag(dag):
       self.assertEquals(dag._roots, set([dag.lookup(d)]))
@@ -122,8 +121,8 @@ class DoubleDagTest(BaseMockTargetTest):
     test_diamond_dag(make_dag([b, d, a, c]))
 
   def test_find_children_across_unused_target(self):
-    a = MockTarget('a')
-    b = MockTarget('b', [a])
-    c = MockTarget('c', [b])
-    d = MockTarget('d', [c, a])
-    e = MockTarget('e', [d])
+    a = self.make_target('a')
+    b = self.make_target('b', dependencies=[a])
+    c = self.make_target('c', dependencies=[b])
+    d = self.make_target('d', dependencies=[c, a])
+    e = self.make_target('e', dependencies=[d])

@@ -13,11 +13,11 @@ from twitter.common.contextutil import temporary_file_path
 
 from pants.tasks.ivy_utils import IvyUtils
 
-from pants_test.base_build_root_test import BaseBuildRootTest
+from pants_test.base_test import BaseTest
 from pants_test.base.context_utils import create_config
 
 
-class IvyUtilsTestBase(BaseBuildRootTest):
+class IvyUtilsTestBase(BaseTest):
   @staticmethod
   def create_options(**kwargs):
     options = dict(ivy_mutable_pattern=None,
@@ -35,30 +35,25 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
   # + classifiers
   # + with_artifact
 
-  @classmethod
-  def setUpClass(cls):
-    super(IvyUtilsGenerateIvyTest, cls).setUpClass()
+  def setUp(self):
+    super(IvyUtilsGenerateIvyTest, self).setUp()
 
-    cls.create_target('src/java/targets',
+    self.add_to_build_file('src/java/targets',
         dedent('''
             jar_library(
               name='simple',
-              dependencies=[
+              jars=[
                 jar('org1', 'name1', 'rev1'),
                 jar('org2', 'name2', 'rev2', force=True),
               ]
             )
         '''))
 
-    cls.simple = cls.target('src/java/targets:simple')
-
-  def setUp(self):
-    super(IvyUtilsGenerateIvyTest, self).setUp()
-
+    self.simple = self.target('src/java/targets:simple')
     self.ivy_utils = IvyUtils(create_config(), self.create_options(), logging.Logger('test'))
 
   def test_force_override(self):
-    jars = list(self.simple.dependencies)
+    jars = list(self.simple.payload.jars)
     with temporary_file_path() as ivyxml:
       self.ivy_utils._generate_ivy([self.simple], jars=jars, excludes=[], ivyxml=ivyxml,
                                    confs=['default'])

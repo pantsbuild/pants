@@ -13,7 +13,7 @@ from pants.goal.error import GoalError
 from pants.goal.group import Group
 from pants.goal.phase import Phase
 from pants.goal.run_tracker import RunTracker
-from pants.tasks import Task
+from pants.tasks.task import Task
 
 
 class Mkflag(object):

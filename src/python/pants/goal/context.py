@@ -14,15 +14,14 @@ from twitter.common.dirutil import Lock
 from twitter.common.process import ProcessProviderFactory
 from twitter.common.process.process_provider import ProcessProvider
 
+from pants.base.address import SyntheticAddress
 from pants.base.build_environment import get_buildroot
-from pants.base.parse_context import ParseContext
+from pants.base.source_root import SourceRoot
 from pants.base.target import Target
 from pants.base.workunit import WorkUnit
 from pants.goal.products import Products
 from pants.java.distribution.distribution import Distribution
 from pants.reporting.report import Report
-from pants.targets.pants_target import Pants
-from pants.targets.sources import SourceRoot
 
 
 # Utility definition for grabbing process info for locking.
@@ -68,9 +67,11 @@ class Context(object):
       self._run_tracker.log(Report.FATAL, *msg_elements)
 
   def __init__(self, config, options, run_tracker, target_roots, requested_goals=None,
-               lock=None, log=None, target_base=None):
+               lock=None, log=None, target_base=None, build_graph=None, build_file_parser=None):
     self._config = config
     self._options = options
+    self.build_graph = build_graph
+    self.build_file_parser = build_file_parser
     self.run_tracker = run_tracker
     self._lock = lock or Lock.unlocked()
     self._log = log or Context.Log(run_tracker)
@@ -146,7 +147,8 @@ class Context(object):
     return os.path.realpath(self.config.get('ivy', 'cache_dir'))
 
   def __str__(self):
-    return 'Context(id:%s, state:%s, targets:%s)' % (self.id, self.state, self.targets())
+    ident = Target.identify(self.targets())
+    return 'Context(id:%s, state:%s, targets:%s)' % (ident, self.state, self.targets())
 
   def submit_foreground_work_and_wait(self, work, workunit_parent=None):
     """Returns the pool to which tasks can submit foreground (blocking) work."""
@@ -212,56 +214,33 @@ class Context(object):
     """
     self._target_roots = list(target_roots)
 
-    self._targets = OrderedSet()
-    for target in self._target_roots:
-      self.add_target(target)
-    self.id = Target.identify(self._targets)
-
-  def add_target(self, target):
-    """Adds a target and its transitive dependencies to the run context.
-
-    The target is not added to the target roots.
-    """
-    def add_targets(tgt):
-      self._targets.update(tgt for tgt in tgt.resolve() if isinstance(tgt, self._target_base))
-    target.walk(add_targets)
-
-  def add_new_target(self, target_base, target_type, *args, **kwargs):
+  def add_new_target(self, address, target_type, dependencies=None, **kwargs):
     """Creates a new target, adds it to the context and returns it.
 
     This method ensures the target resolves files against the given target_base, creating the
     directory if needed and registering a source root.
     """
-    if 'derived_from' in kwargs:
-      derived_from = kwargs.get('derived_from')
-      del kwargs['derived_from']
-    else:
-      derived_from = None
-    target = self._create_new_target(target_base, target_type, *args, **kwargs)
-    self.add_target(target)
-    if derived_from:
-      target.derived_from = derived_from
-    return target
-
-  def _create_new_target(self, target_base, target_type, *args, **kwargs):
+    target_base = os.path.join(get_buildroot(), address.spec_path)
     if not os.path.exists(target_base):
       os.makedirs(target_base)
-    SourceRoot.register(target_base, target_type)
-    with ParseContext.temp(target_base):
-      return target_type(*args, **kwargs)
+    SourceRoot.register(address.spec_path)
+    if dependencies:
+      dependencies = [dep.address for dep in dependencies]
 
-  def remove_target(self, target):
-    """Removes the given Target object from the context completely if present."""
-    if target in self.target_roots:
-      self.target_roots.remove(target)
-    self._targets.discard(target)
+    self.build_graph.inject_synthetic_target(address=address,
+                                             target_type=target_type,
+                                             dependencies=dependencies,
+                                             **kwargs)
+    return self.build_graph.get_target(address)
 
   def targets(self, predicate=None):
     """Selects targets in-play in this run from the target roots and their transitive dependencies.
 
     If specified, the predicate will be used to narrow the scope of targets returned.
     """
-    return filter(predicate, self._targets)
+    target_root_addresses = [target.address for target in self._target_roots]
+    target_set = self.build_graph.transitive_subgraph_of_addresses(target_root_addresses)
+    return list(filter(predicate, target_set))
 
   def dependents(self, on_predicate=None, from_predicate=None):
     """Returns  a map from targets that satisfy the from_predicate to targets they depend on that
@@ -270,16 +249,15 @@ class Context(object):
     core = set(self.targets(on_predicate))
     dependees = defaultdict(set)
     for target in self.targets(from_predicate):
-      if hasattr(target, 'dependencies'):
-        for dependency in target.dependencies:
-          if dependency in core:
-            dependees[target].add(dependency)
+      for dependency in target.dependencies:
+        if dependency in core:
+          dependees[target].add(dependency)
     return dependees
 
   def resolve(self, spec):
     """Returns an iterator over the target(s) the given address points to."""
-    with ParseContext.temp():
-      return Pants(spec).resolve()
+    self.build_file_parser.inject_spec_closure_into_build_graph(spec, self.build_graph)
+    return self.build_graph.transitive_subgraph_of_addresses([SyntheticAddress(spec)])
 
   @contextmanager
   def state(self, key, default=None):

@@ -8,9 +8,8 @@ import shutil
 import tempfile
 
 from pants.base.build_invalidator import CacheKey, CacheKeyGenerator
-from pants.tasks.cache_manager import CacheManager, InvalidationCheck, VersionedTarget
-from pants_test.testutils.base_mock_target_test import BaseMockTargetTest
-from pants_test.testutils.mock_target import MockTarget
+from pants.tasks.cache_manager import InvalidationCacheManager, InvalidationCheck, VersionedTarget
+from pants_test.base_test import BaseTest
 
 
 class AppendingCacheKeyGenerator(CacheKeyGenerator):
@@ -24,11 +23,12 @@ class AppendingCacheKeyGenerator(CacheKeyGenerator):
       sorted_cache_keys = sorted(cache_keys)  # For commutativity.
       combined_id = ','.join([cache_key.id for cache_key in sorted_cache_keys])
       combined_hash = ','.join([cache_key.hash for cache_key in sorted_cache_keys])
-      combined_num_sources = reduce(lambda x, y: x + y, [cache_key.num_sources for cache_key in sorted_cache_keys], 0)
+      combined_num_sources = reduce(lambda x, y: x + y,
+                                    [cache_key.num_sources for cache_key in sorted_cache_keys], 0)
       return CacheKey(combined_id, combined_hash, combined_num_sources, [])
 
-  def key_for_target(self, target, sources=None, fingerprint_extra=None):
-    return CacheKey(target.id, target.id, target.num_sources, [])
+  def key_for_target(self, target, sources=None, transitive=False):
+    return CacheKey(target.id, target.id, target.payload.num_chunking_units, [])
 
   def key_for(self, tid, sources):
     return CacheKey(tid, tid, len(sources), [])
@@ -38,28 +38,31 @@ def print_vt(vt):
   print('%d (%s) %s: [ %s ]' % (len(vt.targets), vt.cache_key, vt.valid, ', '.join(['%s(%s)' % (v.id, v.cache_key) for v in vt.versioned_targets])))
 
 
-class CacheManagerTest(BaseMockTargetTest):
-  class TestCacheManager(CacheManager):
+class InvalidationCacheManagerTest(BaseTest):
+  class TestInvalidationCacheManager(InvalidationCacheManager):
     def __init__(self, tmpdir):
-      CacheManager.__init__(self, AppendingCacheKeyGenerator(), tmpdir, True, None, False)
+      InvalidationCacheManager.__init__(self, AppendingCacheKeyGenerator(), tmpdir, True, None)
 
   def setUp(self):
+    super(InvalidationCacheManagerTest, self).setUp()
     self._dir = tempfile.mkdtemp()
-    self.cache_manager = CacheManagerTest.TestCacheManager(self._dir)
+    self.cache_manager = InvalidationCacheManagerTest.TestInvalidationCacheManager(self._dir)
 
   def tearDown(self):
     shutil.rmtree(self._dir, ignore_errors=True)
+    super(InvalidationCacheManagerTest, self).tearDown()
 
   def make_vts(self, target):
     return VersionedTarget(self.cache_manager, target, target.id)
 
   def test_partition(self):
-    # Set up test targets.
-    a = MockTarget('a', [], 1)
-    b = MockTarget('b', [a], 1)
-    c = MockTarget('c', [b], 1)
-    d = MockTarget('d', [c, a], 1)
-    e = MockTarget('e', [d], 1)
+    # The default EmptyPayload chunking unit happens to be 1, so each of these Targets
+    # has a chunking unit contribution of 1
+    a = self.make_target(':a', dependencies=[])
+    b = self.make_target(':b', dependencies=[a])
+    c = self.make_target(':c', dependencies=[b])
+    d = self.make_target(':d', dependencies=[c, a])
+    e = self.make_target(':e', dependencies=[d])
 
     targets = [a, b, c, d, e]
 

@@ -13,6 +13,7 @@ from twitter.common.contextutil import temporary_dir
 from twitter.common.dirutil import safe_open
 from pants.base.target import Target
 
+from pants.base.source_root import SourceRoot
 from pants.goal.products import MultipleRootedProducts
 from pants.java.jar import open_jar
 from pants.targets.java_library import JavaLibrary
@@ -20,13 +21,12 @@ from pants.targets.java_thrift_library import JavaThriftLibrary
 from pants.targets.jvm_binary import JvmBinary
 from pants.targets.resources import Resources
 from pants.targets.scala_library import ScalaLibrary
-from pants.targets.sources import SourceRoot
 from pants.tasks.jar_create import JarCreate, is_jvm_library
-from pants_test.base_build_root_test import BaseBuildRootTest
+from pants_test.base_test import BaseTest
 from pants_test.base.context_utils import create_context
 
 
-class JarCreateTestBase(BaseBuildRootTest):
+class JarCreateTestBase(BaseTest):
   @staticmethod
   def create_options(**kwargs):
     options = dict(jar_create_transitive=None,
@@ -46,7 +46,11 @@ class JarCreateMiscTest(JarCreateTestBase):
           pants_supportdir: /tmp/build-support
           """).strip()
 
-    JarCreate(create_context(config=ini, options=self.create_options()), '/tmp/workdir')
+    JarCreate(create_context(config=ini,
+                             options=self.create_options(),
+                             build_graph=self.build_graph,
+                             build_file_parser=self.build_file_parser),
+              '/tmp/workdir')
 
   def test_resources_with_scala_java_files(self):
     for ftype in ('java', 'scala'):
@@ -57,33 +61,28 @@ class JarCreateMiscTest(JarCreateTestBase):
 
 
 class JarCreateExecuteTest(JarCreateTestBase):
-  @classmethod
-  def java_library(cls, path, name, sources, **kwargs):
-    return cls.create_library(path, 'java_library', name, sources, **kwargs)
+  def java_library(self, path, name, sources, **kwargs):
+    return self.create_library(path, 'java_library', name, sources, **kwargs)
 
-  @classmethod
-  def scala_library(cls, path, name, sources, **kwargs):
-    return cls.create_library(path, 'scala_library', name, sources, **kwargs)
+  def scala_library(self, path, name, sources, **kwargs):
+    return self.create_library(path, 'scala_library', name, sources, **kwargs)
 
-  @classmethod
-  def jvm_binary(cls, path, name, source=None, resources=None):
-    cls.create_files(path, [source])
-    cls.create_target(path, dedent('''
+  def jvm_binary(self, path, name, source=None, resources=None):
+    self.create_files(path, [source])
+    self.add_to_build_file(path, dedent('''
           jvm_binary(name=%(name)r,
             source=%(source)r,
-            resources=%(resources)r,
+            resources=[%(resources)r],
           )
         ''' % dict(name=name, source=source, resources=resources)))
-    return cls.target('%s:%s' % (path, name))
+    return self.target('%s:%s' % (path, name))
 
-  @classmethod
-  def java_thrift_library(cls, path, name, *sources):
-    return cls.create_library(path, 'java_thrift_library', name, sources)
+  def java_thrift_library(self, path, name, *sources):
+    return self.create_library(path, 'java_thrift_library', name, sources)
 
-  @classmethod
-  def setUpClass(cls):
-    super(JarCreateExecuteTest, cls).setUpClass()
-    cls.create_target('build-support/ivy',
+  def setUp(self):
+    super(JarCreateExecuteTest, self).setUp()
+    self.add_to_build_file('build-support/ivy',
                       dedent('''
                          repo(name = 'ivy',
                               url = 'https://art.twitter.biz/',
@@ -91,29 +90,32 @@ class JarCreateExecuteTest(JarCreateTestBase):
                        '''))
 
     def get_source_root_fs_path(path):
-      return os.path.realpath(os.path.join(cls.build_root, path))
+      return os.path.realpath(os.path.join(self.build_root, path))
 
     SourceRoot.register(get_source_root_fs_path('src/resources'), Resources)
     SourceRoot.register(get_source_root_fs_path('src/java'), JavaLibrary, JvmBinary)
     SourceRoot.register(get_source_root_fs_path('src/scala'), ScalaLibrary)
     SourceRoot.register(get_source_root_fs_path('src/thrift'), JavaThriftLibrary)
 
-    cls.res = cls.create_resources('src/resources/com/twitter', 'spam', 'r.txt')
-    cls.jl = cls.java_library('src/java/com/twitter', 'foo', ['a.java'],
+    self.res = self.create_resources('src/resources/com/twitter', 'spam', 'r.txt')
+    self.jl = self.java_library('src/java/com/twitter', 'foo', ['a.java'],
                               resources='src/resources/com/twitter:spam')
-    cls.sl = cls.scala_library('src/scala/com/twitter', 'bar', ['c.scala'])
-    cls.jtl = cls.java_thrift_library('src/thrift/com/twitter', 'baz', 'd.thrift')
-    cls.java_lib_foo = cls.java_library('src/java/com/twitter/foo', 'java_foo', ['java_foo.java'])
-    cls.scala_lib = cls.scala_library('src/scala/com/twitter/foo',
+    self.sl = self.scala_library('src/scala/com/twitter', 'bar', ['c.scala'])
+    self.jtl = self.java_thrift_library('src/thrift/com/twitter', 'baz', 'd.thrift')
+    self.java_lib_foo = self.java_library('src/java/com/twitter/foo', 'java_foo', ['java_foo.java'])
+    self.scala_lib = self.scala_library('src/scala/com/twitter/foo',
                                       'scala_foo',
                                       ['scala_foo.scala'],
                                       provides=True,
                                       java_sources=['src/java/com/twitter/foo:java_foo'])
-    cls.binary = cls.jvm_binary('src/java/com/twitter/baz', 'baz', source='b.java',
+    self.binary = self.jvm_binary('src/java/com/twitter/baz', 'baz', source='b.java',
                                 resources='src/resources/com/twitter:spam')
 
   def context(self, config='', **options):
-    return create_context(config=config, options=self.create_options(**options),
+    return create_context(config=config,
+                          options=self.create_options(**options),
+                          build_graph=self.build_graph,
+                          build_file_parser=self.build_file_parser,
                           target_roots=[self.jl, self.sl, self.binary, self.jtl, self.scala_lib])
 
   @contextmanager

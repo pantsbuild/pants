@@ -5,7 +5,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 from pants.targets.jar_dependency import JarDependency
-from pants.tasks import TaskError
+from pants.tasks.task import TaskError
 from pants.tasks.console_task import ConsoleTask
 
 
@@ -75,7 +75,7 @@ class Depmap(ConsoleTask):
       raise TaskError("One or more target addresses are required.")
 
     for target in self.context.target_roots:
-      if all(self._is_jvm(t) for t in target.resolve() if t.is_concrete):
+      if self._is_jvm(target):
         if self.is_graph:
           for line in self._output_digraph(target):
             yield line
@@ -117,7 +117,7 @@ class Depmap(ConsoleTask):
           indent += 1
 
         if self._is_jvm(dep):
-          for internal_dep in dep.internal_dependencies:
+          for internal_dep in dep.dependencies:
             output += output_deps(internal_dep, indent, outputted)
 
         if not self.is_internal_only:
@@ -130,8 +130,7 @@ class Depmap(ConsoleTask):
                   output += [output_dep(jar_dep_id, indent)]
                   outputted.add(jar_dep_id)
         return output
-
-    return [dependency for t in target.resolve() for dependency in output_deps(t)]
+    return output_deps(target)
 
   def _output_digraph(self, target):
     color_by_type = {}
@@ -160,26 +159,25 @@ class Depmap(ConsoleTask):
         if parent:
           output.append('  "%s" -> "%s";' % (self._dep_id(parent)[0], self._dep_id(dep)[0]))
 
-        for dependency in dep.resolve():
-          if self._is_jvm(dependency):
-            for internal_dependency in dependency.internal_dependencies:
-              output += output_deps(outputted, internal_dependency, dependency)
+        if self._is_jvm(dependency):
+          for internal_dependency in dependency.internal_dependencies:
+            output += output_deps(outputted, internal_dependency, dependency)
 
-          for jar in (dependency.jar_dependencies if self._is_jvm(dependency) else [dependency]):
-            jar_id, internal = self._dep_id(jar)
-            if output_candidate(internal):
-              if jar not in outputted:
-                output += [output_dep(jar)]
-                outputted.add(jar)
+        for jar in (dependency.jar_dependencies if self._is_jvm(dependency) else [dependency]):
+          jar_id, internal = self._dep_id(jar)
+          if output_candidate(internal):
+            if jar not in outputted:
+              output += [output_dep(jar)]
+              outputted.add(jar)
 
-              target_id, _ = self._dep_id(target)
-              dep_id, _ = self._dep_id(dependency)
-              left_id = target_id if self.is_external_only else dep_id
-              if (left_id, jar_id) not in outputted:
-                styled = internal and not self.is_internal_only
-                output += ['  "%s" -> "%s"%s;' % (left_id, jar_id,
-                                                  ' [style="dashed"]' if styled else '')]
-                outputted.add((left_id, jar_id))
+            target_id, _ = self._dep_id(target)
+            dep_id, _ = self._dep_id(dependency)
+            left_id = target_id if self.is_external_only else dep_id
+            if (left_id, jar_id) not in outputted:
+              styled = internal and not self.is_internal_only
+              output += ['  "%s" -> "%s"%s;' % (left_id, jar_id,
+                                                ' [style="dashed"]' if styled else '')]
+              outputted.add((left_id, jar_id))
       return output
     header = ['digraph "%s" {' % target.id]
     graph_attr = ['  node [shape=rectangle, colorscheme=set312;];', '  rankdir=LR;']

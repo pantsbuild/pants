@@ -9,10 +9,10 @@ import re
 import sys
 
 import pants.base.build_file_aliases
-from pants.base.address import Address
+from pants.base.address import Address, SyntheticAddress
 from pants.base.build_environment import get_buildroot
 from pants.base.target import Target
-from pants.tasks import TaskError
+from pants.tasks.task import TaskError
 from pants.tasks.console_task import ConsoleTask
 
 
@@ -37,12 +37,12 @@ def _create_filters(list_option, predicate):
     yield filter
 
 
-def _get_target(address):
+def _get_target(spec, build_graph):
   try:
-    address = Address.parse(get_buildroot(), address, is_relative=False)
+    address = SyntheticAddress(spec)
   except IOError as e:
     raise TaskError('Failed to parse address: %s: %s' % (address, e))
-  match = Target.get(address)
+  match = build_graph.get_target(address)
   if not match:
     raise TaskError('Invalid target address: %s' % address)
   return match
@@ -86,12 +86,14 @@ class Filter(ConsoleTask):
 
     self._filters = []
 
-    def filter_for_address(address):
-      match = _get_target(address)
+    def filter_for_address(spec):
+      match = _get_target(spec, self.context.build_graph)
       return lambda target: target == match
     self._filters.extend(_create_filters(context.options.filter_target, filter_for_address))
 
     def filter_for_type(name):
+      # FIXME(pl): This should be a standard function provided by the plugin/BuildFileParser
+      # machinery
       try:
         # Try to do a fully qualified import 1st for filtering on custom types.
         from_list, module, type_name = name.rsplit('.', 2)
@@ -99,16 +101,16 @@ class Filter(ConsoleTask):
         target_type = getattr(module, type_name)
       except (ImportError, ValueError):
         # Fall back on pants provided target types.
-        if not hasattr(pants.base.build_file_aliases, name):
+        if name not in pants.base.build_file_aliases.target_aliases:
           raise TaskError('Invalid type name: %s' % name)
-        target_type = getattr(pants.base.build_file_aliases, name)
+        target_type = pants.base.build_file_aliases.target_aliases[name]
       if not issubclass(target_type, Target):
         raise TaskError('Not a Target type: %s' % name)
       return lambda target: isinstance(target, target_type)
     self._filters.extend(_create_filters(context.options.filter_type, filter_for_type))
 
-    def filter_for_ancestor(address):
-      ancestor = _get_target(address)
+    def filter_for_ancestor(spec):
+      ancestor = _get_target(spec, self.context.build_graph)
       children = set()
       ancestor.walk(children.add)
       return lambda target: target in children
@@ -116,7 +118,7 @@ class Filter(ConsoleTask):
 
     def filter_for_regex(regex):
       parser = re.compile(regex)
-      return lambda target: parser.search(str(target.address))
+      return lambda target: parser.search(str(target.address.build_file_spec))
     self._filters.extend(_create_filters(context.options.filter_regex, filter_for_regex))
 
   def console_output(self, _):
@@ -128,4 +130,4 @@ class Filter(ConsoleTask):
           if not filter(target):
             break
         else:
-          yield str(target.address)
+          yield target.address.build_file_spec

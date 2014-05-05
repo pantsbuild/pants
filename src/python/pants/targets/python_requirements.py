@@ -6,11 +6,12 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import os
 
-from pants.base.parse_context import ParseContext
 from pants.targets.python_requirement import PythonRequirement
 
 
-def python_requirements(requirements_relpath='requirements.txt'):
+def python_requirements(rel_path=None,
+                        target_type=None,
+                        requirements_relpath='requirements.txt'):
   """Translates a pip requirements file into an equivalent set of PythonRequirement targets.
 
   NB that there are some requirements files that can't be unambiguously translated; ie: multiple
@@ -22,13 +23,10 @@ def python_requirements(requirements_relpath='requirements.txt'):
       this function to the requirements file.  By default a `requirements.txt` file sibling to the
       BUILD file is assumed.
   """
-  # TODO(John Sirois): Rework this when Patrick's target re-work branch lands - it may need special
-  # handling.
   requirements = []
   repository = None
 
-  build_file = ParseContext.locate().current_buildfile
-  requirements_path = os.path.join(build_file.parent_path, requirements_relpath)
+  requirements_path = os.path.join(rel_path, requirements_relpath)
   with open(requirements_path) as fp:
     for line in fp:
       line = line.strip()
@@ -47,4 +45,5 @@ def python_requirements(requirements_relpath='requirements.txt'):
               repository = value
 
   for requirement in requirements:
-    PythonRequirement(requirement, repository=repository)
+    req = PythonRequirement(requirement, repository=repository)
+    target_type(name=req.project_name, requirements=[req])

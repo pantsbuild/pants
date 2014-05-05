@@ -9,7 +9,7 @@ import os
 import re
 from collections import defaultdict
 
-from pants.tasks import Task
+from pants.tasks.task import Task
 
 
 class BuildLint(Task):

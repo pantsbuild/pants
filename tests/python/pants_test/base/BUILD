@@ -33,7 +33,6 @@ python_test_suite(
     pants(':double_dag'),
     pants(':generator'),
     pants(':hash_utils'),
-    pants(':parse_context'),
     pants(':revision'),
     pants(':run_info'),
   ]
@@ -44,6 +43,7 @@ python_tests(
   sources = ['test_abbreviate_target_ids.py'],
   dependencies = [
     pants('src/python/pants/base:abbreviate_target_ids'),
+    'tests/python/pants_test:base-test',
   ]
 )
 
@@ -55,6 +55,7 @@ python_tests(
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('src/python/pants/base:address'),
     pants('src/python/pants/base:build_environment'),
+    'tests/python/pants_test:base-test',
   ]
 )
 
@@ -65,6 +66,7 @@ python_tests(
     pants('3rdparty/python/twitter/commons:twitter.common.collections'),
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('src/python/pants/base:build_file'),
+    'tests/python/pants_test:base-test',
   ]
 )
 
@@ -74,6 +76,7 @@ python_tests(
   dependencies = [
     pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('src/python/pants/base:build_invalidator'),
+    'tests/python/pants_test:base-test',
   ]
 )
 
@@ -84,6 +87,7 @@ python_tests(
     pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('src/python/pants/base:build_root'),
+    'tests/python/pants_test:base-test',
   ]
 )
 
@@ -94,6 +98,7 @@ python_tests(
     pants('src/python/pants/base:double_dag'),
     pants('src/python/pants/reporting'),
     pants('tests/python/pants_test/testutils'),
+    'tests/python/pants_test:base-test',
   ]
 )
 
@@ -102,6 +107,7 @@ python_tests(
   sources = ['test_generator.py'],
   dependencies = [
     pants('src/python/pants/base:generator'),
+    'tests/python/pants_test:base-test',
   ]
 )
 
@@ -112,20 +118,7 @@ python_tests(
     pants('3rdparty/python:mox'),
     pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('src/python/pants/base:hash_utils'),
-  ]
-)
-
-python_tests(
-  name = 'parse_context',
-  sources = ['test_parse_context.py'],
-  dependencies = [
-    pants('tests/python/pants_test:base-test'),
-    pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
-    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
-    pants('src/python/pants/base:address'),
-    pants('src/python/pants/base:build_file'),
-    pants('src/python/pants/base:parse_context'),
-    pants('src/python/pants/base:target'),
+    'tests/python/pants_test:base-test',
   ]
 )
 
@@ -134,6 +127,7 @@ python_tests(
   sources = ['test_revision.py'],
   dependencies = [
     pants('src/python/pants/base:revision'),
+    'tests/python/pants_test:base-test',
   ]
 )
 
@@ -143,5 +137,6 @@ python_tests(
   dependencies = [
     pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('src/python/pants/base:run_info'),
+    'tests/python/pants_test:base-test',
   ]
 )

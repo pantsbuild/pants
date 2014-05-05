@@ -11,7 +11,7 @@ from twitter.common.dirutil import safe_mkdir
 
 from pants.targets.java_antlr_library import JavaAntlrLibrary
 from pants.targets.java_library import JavaLibrary
-from pants.tasks import TaskError
+from pants.tasks.task import TaskError
 from pants.tasks.code_gen import CodeGen
 from pants.tasks.nailgun_task import NailgunTask
 

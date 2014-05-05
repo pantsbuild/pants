@@ -6,25 +6,24 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from textwrap import dedent
 
-from pants_test.base_build_root_test import BaseBuildRootTest
+from pants_test.base_test import BaseTest
 
 
-class ScalaLibraryTest(BaseBuildRootTest):
+class ScalaLibraryTest(BaseTest):
 
-  @classmethod
-  def setUpClass(cls):
-    super(ScalaLibraryTest, cls).setUpClass()
+  def setUp(self):
+    super(ScalaLibraryTest, self).setUp()
 
-    cls.create_target('3rdparty', dedent('''
+    self.add_to_build_file('3rdparty', dedent('''
         jar_library(
           name='hub-and-spoke',
-          dependencies=[
+          jars=[
             jar('org.jalopy', 'hub-and-spoke', '0.0.1')
           ]
         )
         '''))
 
-    cls.create_target('scala', dedent('''
+    self.add_to_build_file('scala', dedent('''
         scala_library(
           name='lib',
           sources=[],
@@ -35,7 +34,7 @@ class ScalaLibraryTest(BaseBuildRootTest):
         )
         '''))
 
-    cls.create_target('java', dedent('''
+    self.add_to_build_file('java', dedent('''
         java_library(
           name='explicit_scala_dep',
           sources=[],
@@ -52,23 +51,18 @@ class ScalaLibraryTest(BaseBuildRootTest):
         )
         '''))
 
-    cls.lib_hub_and_spoke = cls.target('3rdparty:hub-and-spoke')
-    cls.scala_library = cls.target('scala:lib')
-    cls.java_library_explicit_dep = cls.target('java:explicit_scala_dep')
-    cls.java_library_no_dep = cls.target('java:no_scala_dep')
+    self.lib_hub_and_spoke = self.target('3rdparty:hub-and-spoke')
+    self.scala_library = self.target('scala:lib')
+    self.java_library_explicit_dep = self.target('java:explicit_scala_dep')
+    self.java_library_no_dep = self.target('java:no_scala_dep')
 
   def test_mixed_linkage(self):
-    self.assertEqual(set(self.lib_hub_and_spoke.resolve()), set(self.scala_library.dependencies),
+    self.assertEqual(set(self.lib_hub_and_spoke.jar_dependencies),
+                     set(self.scala_library.jar_dependencies),
                      'The scala end of a mixed language logical lib should be linked with the java'
                      'code deps excluding itself.')
 
-    deps = set(self.lib_hub_and_spoke.resolve())
-    deps.add(self.scala_library)
-    self.assertEqual(deps, set(self.java_library_explicit_dep.dependencies),
+    self.assertEqual(set(self.scala_library.jar_dependencies),
+                     set(self.java_library_explicit_dep.jar_dependencies),
                      'The java end of a mixed language logical lib with an explicit dep should be '
                      'unaffected by linking.')
-
-    self.assertEqual(set([self.scala_library]), set(self.java_library_no_dep.dependencies),
-                     'The java end of a mixed language logical lib with an no explicit dep should '
-                     'be linked to scala.')
-

@@ -22,25 +22,23 @@ class MinimalCoverEmptyTest(BaseMinimalCovertTest):
 
 
 class MinimalCoverTest(BaseMinimalCovertTest):
+  def setUp(self):
+    super(MinimalCoverTest, self).setUp()
 
-  @classmethod
-  def setUpClass(cls):
-    super(MinimalCoverTest, cls).setUpClass()
-
-    def create_target(path, name, *deps):
+    def add_to_build_file(path, name, *deps):
       all_deps = ["pants('%s')" % dep for dep in list(deps)]
-      cls.create_target(path, dedent('''
+      self.add_to_build_file(path, dedent('''
           python_library(name='%s',
             dependencies=[%s]
           )
           ''' % (name, ','.join(all_deps))))
 
-    create_target('common/a', 'a')
-    create_target('common/b', 'b')
-    create_target('common/c', 'c')
-    create_target('overlaps', 'one', 'common/a', 'common/b')
-    create_target('overlaps', 'two', 'common/a', 'common/c')
-    create_target('overlaps', 'three', 'common/a', 'overlaps:one')
+    add_to_build_file('common/a', 'a')
+    add_to_build_file('common/b', 'b')
+    add_to_build_file('common/c', 'c')
+    add_to_build_file('overlaps', 'one', 'common/a', 'common/b')
+    add_to_build_file('overlaps', 'two', 'common/a', 'common/c')
+    add_to_build_file('overlaps', 'three', 'common/a', 'overlaps:one')
 
   def test_roots(self):
     self.assert_console_output(

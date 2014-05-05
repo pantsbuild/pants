@@ -231,7 +231,7 @@ class IvyUtils(object):
   def _calculate_classpath(self, targets):
 
     def is_jardependant(target):
-      return target.is_jar or target.is_jvm
+      return target.is_jar_library
 
     jars = OrderedDict()
     excludes = set()
@@ -247,19 +247,17 @@ class IvyUtils(object):
       )
 
     def collect_jars(target):
-      if target.is_jar:
-        add_jar(target)
-      elif target.jar_dependencies:
+      if target.is_jvm or target.is_jar_library:
         for jar in target.jar_dependencies:
           if jar.rev:
             add_jar(jar)
 
       # Lift jvm target-level excludes up to the global excludes set
-      if target.is_jvm and target.excludes:
-        excludes.update(target.excludes)
+      if target.is_jvm and target.payload.excludes:
+        excludes.update(target.payload.excludes)
 
     for target in targets:
-      target.walk(collect_jars, is_jardependant)
+      target.walk(collect_jars)
 
     return jars.values(), excludes
 
@@ -349,7 +347,7 @@ class IvyUtils(object):
     self.exec_ivy(mapdir,
                   [target],
                   ivyargs,
-                  confs=target.configurations,
+                  confs=target.payload.configurations,
                   ivy=Bootstrapper.default_ivy(executor),
                   workunit_factory=workunit_factory,
                   workunit_name='map-jars')

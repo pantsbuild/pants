@@ -6,16 +6,16 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from twitter.common.collections import maybe_list
 
+from pants.base.address import SyntheticAddress
 from pants.base.build_manual import manual
-from pants.base.target import Target, TargetDefinitionException
-from pants.targets import util
+from pants.base.target import Target
+from pants.base.exceptions import TargetDefinitionException
 from pants.targets.exportable_jvm_library import ExportableJvmLibrary
 from pants.targets.java_library import JavaLibrary
-from pants.targets.resources import WithResources
 
 
 @manual.builddict(tags=['scala'])
-class ScalaLibrary(ExportableJvmLibrary, WithResources):
+class ScalaLibrary(ExportableJvmLibrary):
   """A collection of Scala code.
 
   Normally has conceptually-related sources; invoking the ``compile`` goal
@@ -25,15 +25,7 @@ class ScalaLibrary(ExportableJvmLibrary, WithResources):
   more sensible thing to bundle.
   """
 
-  def __init__(self,
-               name,
-               sources=None,
-               java_sources=None,
-               provides=None,
-               dependencies=None,
-               excludes=None,
-               resources=None,
-               exclusives=None):
+  def __init__(self, java_sources=None, **kwargs):
     """
     :param string name: The name of this target, which combined with this
       build file defines the target :class:`pants.base.address.Address`.
@@ -56,55 +48,25 @@ class ScalaLibrary(ExportableJvmLibrary, WithResources):
       targets containing resources that belong on this library's classpath.
     :param exclusives: An optional list of exclusives tags.
     """
-    super(ScalaLibrary, self).__init__(
-        name,
-        sources,
-        provides,
-        dependencies,
-        excludes,
-        exclusives=exclusives)
-
-    if (sources is None) and (resources is None):
-      raise TargetDefinitionException(self, 'Must specify sources and/or resources.')
-
-    self.resources = resources
-
-    self._java_sources = []
-    self._raw_java_sources = util.resolve(java_sources)
-
+    self._java_sources_specs = java_sources or []
+    super(ScalaLibrary, self).__init__(**kwargs)
     self.add_labels('scala')
 
-    # Defer resolves until done parsing the current BUILD file, certain source_root arrangements
-    # might allow java and scala sources to co-mingle and so have targets in the same BUILD.
-    self._post_construct(self._link_java_cycles)
+  @property
+  def traversable_specs(self):
+    for spec in super(ScalaLibrary, self).traversable_specs:
+      yield spec
+    for java_source_spec in self._java_sources_specs:
+      yield java_source_spec
+
+  def get_jar_dependencies(self):
+    for jar in super(ScalaLibrary, self).get_jar_dependencies():
+      yield jar
+    for java_source_target in self.java_sources:
+      for jar in java_source_target.jar_dependencies:
+        yield jar
 
   @property
   def java_sources(self):
-    return self._java_sources
-
-  def resolve(self):
-    # TODO(John Sirois): Clean this up when BUILD parse refactoring is tackled.
-    unused_resolved_java_sources = self.java_sources
-
-    for resolved in super(ScalaLibrary, self).resolve():
-      yield resolved
-
-  def _link_java_cycles(self):
-    if self._raw_java_sources is not None:
-      self._java_sources = list(Target.resolve_all(maybe_list(self._raw_java_sources, Target),
-                                                   JavaLibrary))
-
-      self._raw_java_sources = None
-
-      # TODO(John Sirois): reconsider doing this auto-linking.
-      # We have circular java/scala dep, add an inbound dependency edge from java to scala in this
-      # case to force scala compilation to precede java - since scalac supports generating java
-      # stubs for these cycles and javac does not this is both necessary and always correct.
-      for java_target in self._java_sources:
-        # If this scala library provides an artifact, Fail if the java target also.
-        if self.provides and java_target.provides:
-          raise TargetDefinitionException(self,
-                                          "Associated Java Target %s also provides an artifact"
-                                          % java_target)
-        self.update_dependencies(dep for dep in java_target.dependencies if dep != self)
-        java_target.update_dependencies([self])
+    for spec in self._java_sources_specs:
+      yield self._build_graph.get_target_from_spec(spec)

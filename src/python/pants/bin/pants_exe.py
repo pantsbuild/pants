@@ -68,7 +68,7 @@ def _synthesize_command(root_dir, args):
 
   # assume 'build' if a command was omitted.
   try:
-    Address.parse(root_dir, command)
+    # Address.parse(root_dir, command)
     return _BUILD_COMMAND, _add_default_options(_BUILD_COMMAND, args)
   except:
     _exit_and_fail('Failed to execute pants build: %s' % traceback.format_exc())

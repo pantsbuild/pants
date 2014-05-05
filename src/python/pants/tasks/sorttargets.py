@@ -34,16 +34,12 @@ class SortTargets(ConsoleTask):
     depmap = defaultdict(set)
 
     def map_deps(target):
-      # TODO(John Sirois): rationalize target hierarchies - this is the only 'safe' way to treat
-      # both python and jvm targets today.
-      if hasattr(target, 'dependencies'):
-        deps = depmap[str(target.address)]
-        for dep in target.dependencies:
-          for resolved in filter(self._is_target, dep.resolve()):
-            deps.add(str(resolved.address))
+      deps = depmap[target.address.build_file_spec]
+      for dep in target.dependencies:
+        deps.add(dep.address.build_file_spec)
 
     for root in self.context.target_roots:
-      root.walk(map_deps, self._is_target)
+      root.walk(map_deps)
 
     tsorted = []
     for group in topological_sort(depmap):
@@ -51,7 +47,7 @@ class SortTargets(ConsoleTask):
     if self._reverse:
       tsorted = reversed(tsorted)
 
-    roots = set(str(root.address) for root in self.context.target_roots)
+    roots = set(root.address.build_file_spec for root in self.context.target_roots)
     for address in tsorted:
       if address in roots:
         yield address

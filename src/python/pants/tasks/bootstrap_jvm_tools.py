@@ -7,7 +7,8 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import threading
 
 from pants.base.workunit import WorkUnit
-from pants.tasks import Task, TaskError
+from pants.tasks.task import Task
+from pants.tasks.task_error import TaskError
 
 
 class BootstrapJvmTools(Task):

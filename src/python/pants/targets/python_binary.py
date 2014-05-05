@@ -11,7 +11,8 @@ from twitter.common.lang import Compatibility
 from twitter.common.python.pex_info import PexInfo
 
 from pants.base.build_manual import manual
-from pants.base.target import Target, TargetDefinitionException
+from pants.base.target import Target
+from pants.base.exceptions import TargetDefinitionException
 from pants.targets.python_target import PythonTarget
 
 
@@ -28,9 +29,7 @@ class PythonBinary(PythonTarget):
   # TODO(wickman) Consider splitting pex options out into a separate PexInfo builder that can be
   # attached to the binary target.  Ideally the PythonBinary target is agnostic about pex mechanics
   def __init__(self,
-               name,
                source=None,
-               dependencies=None,
                entry_point=None,
                inherit_path=False,        # pex option
                zip_safe=True,             # pex option
@@ -40,8 +39,7 @@ class PythonBinary(PythonTarget):
                ignore_errors=False,       # pex option
                allow_pypi=False,          # pex option
                platforms=(),
-               compatibility=None,
-               exclusives=None):
+               **kwargs):
     """
     :param name: target name
     :param source: the python source file that becomes this binary's __main__.
@@ -64,21 +62,12 @@ class PythonBinary(PythonTarget):
     :param dict exclusives: An optional dict of exclusives tags. See CheckExclusives for details.
     """
 
-    # TODO(John Sirois): Fixup TargetDefinitionException - it has awkward Target base-class
-    # initialization requirements right now requiring this Target.__init__.
-    Target.__init__(self, name, exclusives=exclusives)
+    sources = [] if source is None else [source]
+    super(PythonBinary, self).__init__(sources=sources, **kwargs)
 
     if source is None and entry_point is None:
       raise TargetDefinitionException(self,
           'A python binary target must specify either source or entry_point.')
-
-    PythonTarget.__init__(self,
-        name,
-        [] if source is None else [source],
-        compatibility=compatibility,
-        dependencies=dependencies,
-        exclusives=exclusives,
-    )
 
     if not isinstance(platforms, (list, tuple)) and not isinstance(platforms, Compatibility.string):
       raise TargetDefinitionException(self, 'platforms must be a list, tuple or string.')
@@ -94,7 +83,7 @@ class PythonBinary(PythonTarget):
 
     if source and entry_point:
       entry_point_module = entry_point.split(':', 1)[0]
-      source_entry_point = self._translate_to_entry_point(self.sources[0])
+      source_entry_point = self._translate_to_entry_point(self.payload.sources[0])
       if entry_point_module != source_entry_point:
         raise TargetDefinitionException(self,
             'Specified both source and entry_point but they do not agree: %s vs %s' % (
@@ -122,9 +111,9 @@ class PythonBinary(PythonTarget):
   def entry_point(self):
     if self._entry_point:
       return self._entry_point
-    elif self.sources:
-      assert len(self.sources) == 1
-      return self._translate_to_entry_point(self.sources[0])
+    elif self.payload.sources:
+      assert len(self.payload.sources) == 1
+      return self._translate_to_entry_point(self.payload.sources[0])
     else:
       return None
 

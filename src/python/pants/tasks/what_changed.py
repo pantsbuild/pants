@@ -60,7 +60,7 @@ class WhatChanged(ConsoleTask):
         for touched_target in self._owning_targets(path):
           if touched_target not in touched_targets:
             touched_targets.add(touched_target)
-            yield str(touched_target.address)
+            yield touched_target.address.build_file_spec
 
   def _get_touched_files(self):
     try:
@@ -70,18 +70,23 @@ class WhatChanged(ConsoleTask):
 
   def _owning_targets(self, path):
     for build_file in self._candidate_owners(path):
+      build_graph = self.context.build_graph
+      build_file_parser = self.context.build_file_parser
+      build_file_parser.parse_build_file(build_file)
+      for address in build_file_parser.addresses_by_build_file[build_file]:
+        build_file_parser.inject_spec_closure_into_build_graph(address.spec, build_graph)
       is_build_file = (build_file.full_path == os.path.join(get_buildroot(), path))
-      for address in Target.get_all_addresses(build_file):
-        target = Target.get(address)
 
+      for target in build_graph._target_by_address.values():
         # A synthesized target can never own permanent files on disk
-        if target != target.derived_from:
+        if target != target.cloned_from:
           # TODO(John Sirois): tighten up the notion of targets written down in a BUILD by a user
           # vs. targets created by pants at runtime.
           continue
 
-        if target and (is_build_file or ((target.has_sources() or target.has_resources)
-                                         and self._owns(target, path))):
+        target_owns_path = ((target.has_sources() or target.has_resources) and
+                            self._owns(target, path))
+        if (is_build_file and target.address.build_file == build_file) or target_owns_path:
           yield target
 
   def _candidate_owners(self, path):
@@ -96,16 +101,16 @@ class WhatChanged(ConsoleTask):
   def _owns(self, target, path):
     if target not in self._filemap:
       files = self._filemap[target]
-      files_owned_by_target = target.sources if target.has_sources() else []
+      files_owned_by_target = (target.sources_relative_to_buildroot() if target.has_sources()
+                               else [])
       # TODO (tdesai): This case to handle resources in PythonTarget.
       # Remove this when we normalize resources handling across python and jvm targets.
       if target.has_resources:
         for resource in target.resources:
-          if isinstance(resource, Compatibility.string):
-            files_owned_by_target.extend(target.resources)
+          full_resource_path = os.path.join(target.payload.sources_rel_path, resource)
+          files_owned_by_target.append(full_resource_path)
       for owned_file in files_owned_by_target:
-        owned_path = os.path.join(target.target_base, owned_file)
-        files.add(owned_path)
+        files.add(owned_file)
     return path in self._filemap[target]
 
 

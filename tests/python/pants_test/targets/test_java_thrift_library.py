@@ -10,16 +10,14 @@ import pytest
 
 from pants.targets.java_thrift_library import JavaThriftLibrary
 from pants_test.base.context_utils import create_config
-from pants_test.base_build_root_test import BaseBuildRootTest
+from pants_test.base_test import BaseTest
 
 
-class JavaThriftLibraryDefaultsTest(BaseBuildRootTest):
+class JavaThriftLibraryDefaultsTest(BaseTest):
+  def setUp(self):
+    super(JavaThriftLibraryDefaultsTest, self).setUp()
 
-  @classmethod
-  def setUpClass(cls):
-    super(JavaThriftLibraryDefaultsTest, cls).setUpClass()
-
-    cls.create_target('thrift', dedent('''
+    self.add_to_build_file('thrift', dedent('''
         java_thrift_library(
           name='default',
           sources=[],
@@ -49,11 +47,11 @@ class JavaThriftLibraryDefaultsTest(BaseBuildRootTest):
         )
         '''))
 
-    cls.target_default = cls.target('thrift:default')
-    cls.target_compiler = cls.target('thrift:compiler')
-    cls.target_language = cls.target('thrift:language')
-    cls.target_rpc_style = cls.target('thrift:rpc_style')
-    cls.target_invalid = cls.target('thrift:invalid')
+    self.target_default = self.target('thrift:default')
+    self.target_compiler = self.target('thrift:compiler')
+    self.target_language = self.target('thrift:language')
+    self.target_rpc_style = self.target('thrift:rpc_style')
+    self.target_invalid = self.target('thrift:invalid')
 
   @staticmethod
   def create_defaults(ini=''):

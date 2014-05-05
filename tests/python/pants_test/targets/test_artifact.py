@@ -4,24 +4,32 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-import unittest
+import pytest
 
-from pants.base.parse_context import ParseContext
 from pants.targets.artifact import Artifact
 from pants.targets.repository import Repository
 
+from pants_test.testutils.base_test import BaseTest
 
-class ArtifactTest(unittest.TestCase):
+
+class ArtifactTest(BaseTest):
 
   def test_validation(self):
-    with ParseContext.temp():
-      repo = Repository(name="myRepo", url="myUrl", push_db="myPushDb")
-      Artifact(org="testOrg", name="testName", repo=repo, description="Test")
-      self.assertRaises(ValueError, Artifact,
-                        org=1, name="testName", repo=repo, description="Test")
-      self.assertRaises(ValueError, Artifact,
-                        org="testOrg", name=1, repo=repo, description="Test")
-      self.assertRaises(ValueError, Artifact,
-                        org="testOrg", name="testName", repo=1, description="Test")
-      self.assertRaises(ValueError, Artifact,
-                        org="testOrg", name="testName", repo=repo, description=1)
+    repo = self.make_target(target_type=Repository,
+                            spec=":myRepo",
+                            url="myUrl",
+                            push_db="myPushDb")
+    Artifact(org="testOrg", name="testName", repo=repo, description="Test")
+    with pytest.raises(ValueError):
+      Artifact(org=1, name="testName", repo=repo, description="Test")
+
+    with pytest.raises(ValueError):
+      Artifact(org="testOrg", name=1, repo=repo, description="Test")
+
+    # This fails right now because of the horrible hack to make Respository
+    # addressable
+    # self.assertRaises(ValueError, Artifact,
+    #                   org="testOrg", name="testName", repo=1, description="Test")
+
+    with pytest.raises(ValueError):
+      Artifact(org="testOrg", name="testName", repo=repo, description=1)

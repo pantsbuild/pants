@@ -12,7 +12,7 @@ from twitter.common.lang import Compatibility
 from pants.base.address import Address
 from pants.base.build_environment import get_buildroot
 from pants.base.target import Target
-from pants.tasks import TaskError
+from pants.tasks.task import TaskError
 from pants.tasks.console_task import ConsoleTask
 
 

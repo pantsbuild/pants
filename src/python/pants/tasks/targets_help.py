@@ -8,8 +8,8 @@ import inspect
 import textwrap
 from string import Template
 
+from pants.base.source_root import SourceRoot
 from pants.base.target import Target
-from pants.targets.sources import SourceRoot
 from pants.tasks.console_task import ConsoleTask
 
 

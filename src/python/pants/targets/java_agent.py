@@ -7,7 +7,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 from twitter.common.lang import Compatibility
 
 from pants.base.build_manual import manual
-from pants.base.target import TargetDefinitionException
+from pants.base.exceptions import TargetDefinitionException
 from pants.targets.java_library import JavaLibrary
 
 

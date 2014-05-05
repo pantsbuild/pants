@@ -12,17 +12,7 @@ from pants.targets.scala_library import ScalaLibrary
 class ScalacPlugin(ScalaLibrary):
   """Defines a target that produces a scalac_plugin."""
 
-  def __init__(self,
-               name,
-               classname,
-               plugin=None,
-               sources=None,
-               java_sources=None,
-               provides=None,
-               dependencies=None,
-               excludes=None,
-               resources=None,
-               exclusives=None):
+  def __init__(self, classname=None, plugin=None, *args, **kwargs):
 
     """
     :param name: The name of this module target, addressable via pants via the portion of the
@@ -49,16 +39,8 @@ class ScalacPlugin(ScalaLibrary):
     :param exclusives: An optional map of exclusives tags. See CheckExclusives for details.
     """
 
-    super(ScalacPlugin, self).__init__(
-        name,
-        sources,
-        java_sources,
-        provides,
-        dependencies,
-        excludes,
-        resources,
-        exclusives=exclusives)
+    super(ScalacPlugin, self).__init__(*args, **kwargs)
 
-    self.plugin = plugin or name
+    self.plugin = plugin or self.name
     self.classname = classname
     self.add_labels('scalac_plugin')

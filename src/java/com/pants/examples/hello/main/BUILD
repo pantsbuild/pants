@@ -4,8 +4,12 @@
 # Like Hello World, but built with Pants.
 
 jvm_app(name='main',
-  binary=(':main-bin'),
-  bundles=bundle(relative_to='config').add(globs('config/*'))
+  dependencies = [
+    ':main-bin'
+  ],
+  bundles = [
+    bundle(relative_to='config').add(globs('config/*'))
+  ]
 )
 
 # The binary, the "runnable" part:

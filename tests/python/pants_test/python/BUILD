@@ -23,6 +23,7 @@ python_tests(
   name = 'test_antlr_builder',
   sources = ['test_antlr_builder.py'],
   dependencies = [
+    '3rdparty/python:antlr-3.1.3',
     'src/antlr/pants/python/test:csv',
     'src/antlr/pants/python/test:eval',
     'src/python/pants/python:python_setup',

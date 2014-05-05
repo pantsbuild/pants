@@ -9,7 +9,7 @@ import os
 from twitter.common.dirutil import safe_open
 
 from pants.process.xargs import Xargs
-from pants.tasks import TaskError
+from pants.tasks.task import TaskError
 from pants.tasks.nailgun_task import NailgunTask
 
 
@@ -45,22 +45,24 @@ class Checkstyle(NailgunTask):
     self.context.products.require_data('exclusives_groups')
 
   def execute(self, targets):
-    if not self.context.options.checkstyle_skip:
-      with self.invalidated(filter(Checkstyle._is_checked, targets)) as invalidation_check:
-        invalid_targets = []
-        for vt in invalidation_check.invalid_vts:
-          invalid_targets.extend(vt.targets)
-        sources = self.calculate_sources(invalid_targets)
-        if sources:
-          result = self.checkstyle(sources, invalid_targets)
-          if result != 0:
-            raise TaskError('java %s ... exited non-zero (%i)' % (CHECKSTYLE_MAIN, result))
+    if self.context.options.checkstyle_skip:
+      return
+    targets = filter(Checkstyle._is_checked, targets)
+    with self.invalidated(targets) as invalidation_check:
+      invalid_targets = []
+      for vt in invalidation_check.invalid_vts:
+        invalid_targets.extend(vt.targets)
+      sources = self.calculate_sources(invalid_targets)
+      if sources:
+        result = self.checkstyle(sources, invalid_targets)
+        if result != 0:
+          raise TaskError('java %s ... exited non-zero (%i)' % (CHECKSTYLE_MAIN, result))
 
   def calculate_sources(self, targets):
     sources = set()
     for target in targets:
-      sources.update([os.path.join(target.target_base, source)
-                      for source in target.sources if source.endswith('.java')])
+      sources.update([os.path.join(target.payload.sources_rel_path, source)
+                      for source in target.payload.sources if source.endswith('.java')])
     return sources
 
   def checkstyle(self, sources, targets):

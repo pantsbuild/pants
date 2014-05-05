@@ -20,17 +20,22 @@ class Filemap(ConsoleTask):
     for target in self._find_targets():
       if target not in visited:
         visited.add(target)
-        if hasattr(target, 'sources') and target.sources is not None:
-          for sourcefile in target.sources:
-            path = os.path.join(target.target_base, sourcefile)
-            yield '%s %s' % (path, target.address)
+        if hasattr(target.payload, 'sources') and target.payload.sources is not None:
+          for sourcefile in target.payload.sources:
+            path = os.path.normpath(os.path.join(target.payload.sources_rel_path,
+                                                 sourcefile))
+            yield '%s %s' % (path, target.address.build_file_spec)
 
   def _find_targets(self):
     if len(self.context.target_roots) > 0:
       for target in self.context.target_roots:
         yield target
     else:
-      for buildfile in BuildFile.scan_buildfiles(get_buildroot()):
-        target_addresses = Target.get_all_addresses(buildfile)
-        for target_address in target_addresses:
-          yield Target.get(target_address)
+      build_file_parser = self.context.build_file_parser
+      build_graph = self.context.build_graph
+      for build_file in BuildFile.scan_buildfiles(get_buildroot()):
+        build_file_parser.parse_build_file(build_file)
+        for address in build_file_parser.addresses_by_build_file[build_file]:
+          build_file_parser.inject_spec_closure_into_build_graph(address.spec, build_graph)
+      for target in build_graph._target_by_address.values():
+        yield target

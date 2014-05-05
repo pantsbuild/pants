@@ -17,8 +17,8 @@ from twitter.common.dirutil import safe_open
 from pants.base.build_environment import get_buildroot
 from pants.base.hash_utils import hash_file
 from pants.base.workunit import WorkUnit
-from pants.targets.jar_dependency import JarDependency
-from pants.tasks import TaskError
+from pants.targets.jar_library import JarLibrary
+from pants.tasks.task import TaskError
 from pants.tasks.jvm_tool_bootstrapper import JvmToolBootstrapper
 
 # Well known metadata file required to register scalac plugins with nsc.
@@ -126,19 +126,12 @@ class ZincUtils(object):
     ret = []
 
     # Go through all the bootstrap tools required to compile.
-    for t in self._compile_bootstrap_tools:
+    for target in self._compile_bootstrap_tools:
       # Resolve to their actual targets.
-      resolved = self.context.resolve(t)
-      resolved_concrete = [r for r in resolved if r.is_concrete]
-
-      # Since there doesn't seem to be a common root identifier method,
-      # use the specific ones depending on type.
-      for r in resolved_concrete:
-        if isinstance(r, JarDependency):
-          ret.append(r.cache_key())
-        else:
-          raise ValueError("Resolved target %s was of unexpected type %s" % (t, r.__class__.___name__))
-
+      resolved_libs = [t for t in self.context.resolve(target) if isinstance(t, JarLibrary)]
+      for lib in resolved_libs:
+        for jar in lib.jar_dependencies:
+          ret.append(jar.cache_key())
     return sorted(ret)
 
   def compile(self, opts, classpath, sources, output_dir, analysis_file, upstream_analysis_files):

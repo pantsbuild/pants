@@ -8,7 +8,7 @@ import os
 import shutil
 
 from pants.java.util import execute_java
-from pants.tasks import TaskError
+from pants.tasks.task import TaskError
 from pants.tasks.jvm_task import JvmTask
 
 

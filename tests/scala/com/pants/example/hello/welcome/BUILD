@@ -9,5 +9,5 @@ junit_tests(name='welcome',
     pants('3rdparty:junit'),
     pants('3rdparty:specs'),
   ],
-  sources=[globs('*.scala')],
+  sources=globs('*.scala'),
 )

@@ -10,7 +10,6 @@ from pants.base import ParseContext
 from pants.targets.exclude import Exclude
 from pants.targets.jar_dependency import JarDependency
 from pants.targets.jar_library import JarLibrary
-from pants.targets.pants_target import Pants
 
 
 class JarLibraryWithOverrides(unittest.TestCase):

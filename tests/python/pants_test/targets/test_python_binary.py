@@ -6,46 +6,62 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import pytest
 
-from pants.base.parse_context import ParseContext
-from pants.base.target import Target, TargetDefinitionException
+from pants.base.address import SyntheticAddress
+from pants.base.exceptions import TargetDefinitionException
 from pants.targets.python_binary import PythonBinary
-from pants_test.base_build_root_test import BaseBuildRootTest
+from pants_test.base_test import BaseTest
 
 
-class TestPythonBinary(BaseBuildRootTest):
-  def tearDown(self):
-    Target._clear_all_addresses()
-
+class TestPythonBinary(BaseTest):
   def test_python_binary_must_have_some_entry_point(self):
-    with ParseContext.temp('src'):
-      with pytest.raises(TargetDefinitionException):
-        PythonBinary(name = 'binary')
+    with pytest.raises(TargetDefinitionException):
+      self.make_target(spec=':binary', target_type=PythonBinary)
 
   def test_python_binary_with_entry_point_no_source(self):
-    with ParseContext.temp('src'):
-      assert PythonBinary(name = 'binary', entry_point = 'blork').entry_point == 'blork'
+    assert self.make_target(spec=':binary',
+                            target_type=PythonBinary,
+                            entry_point = 'blork').entry_point == 'blork'
 
   def test_python_binary_with_source_no_entry_point(self):
-    with ParseContext.temp('src'):
-      assert PythonBinary(name = 'binary1', source = 'blork.py').entry_point == 'blork'
-      assert PythonBinary(name = 'binary2', source = 'bin/blork.py').entry_point == 'bin.blork'
+    assert self.make_target(spec=':binary1',
+                            target_type=PythonBinary,
+                            source = 'blork.py').entry_point == 'blork'
+    assert self.make_target(spec=':binary2',
+                            target_type=PythonBinary,
+                            source = 'bin/blork.py').entry_point == 'bin.blork'
 
   def test_python_binary_with_entry_point_and_source(self):
-    with ParseContext.temp('src'):
-      assert 'blork' == PythonBinary(
-          name = 'binary1', entry_point = 'blork', source='blork.py').entry_point
-      assert 'blork:main' == PythonBinary(
-          name = 'binary2', entry_point = 'blork:main', source='blork.py').entry_point
-      assert 'bin.blork:main' == PythonBinary(
-          name = 'binary3', entry_point = 'bin.blork:main', source='bin/blork.py').entry_point
+    assert 'blork' == self.make_target(spec=':binary1',
+                                       target_type=PythonBinary,
+                                       entry_point = 'blork',
+                                       source='blork.py').entry_point
+    assert 'blork:main' == self.make_target(spec=':binary2',
+                                            target_type=PythonBinary,
+                                            entry_point = 'blork:main',
+                                            source='blork.py').entry_point
+    assert 'bin.blork:main' == self.make_target(spec=':binary3',
+                                                target_type=PythonBinary,
+                                                entry_point = 'bin.blork:main',
+                                                source='bin/blork.py').entry_point
 
   def test_python_binary_with_entry_point_and_source_mismatch(self):
-    with ParseContext.temp('src'):
-      with pytest.raises(TargetDefinitionException):
-        PythonBinary(name = 'binary1', entry_point = 'blork', source='hork.py')
-      with pytest.raises(TargetDefinitionException):
-        PythonBinary(name = 'binary2', entry_point = 'blork:main', source='hork.py')
-      with pytest.raises(TargetDefinitionException):
-        PythonBinary(name = 'binary3', entry_point = 'bin.blork', source='blork.py')
-      with pytest.raises(TargetDefinitionException):
-        PythonBinary(name = 'binary4', entry_point = 'bin.blork', source='bin.py')
+    with pytest.raises(TargetDefinitionException):
+      self.make_target(spec=':binary1',
+                       target_type=PythonBinary,
+                       entry_point = 'blork',
+                       source='hork.py')
+    with pytest.raises(TargetDefinitionException):
+      self.make_target(spec=':binary2',
+                       target_type=PythonBinary,
+                       entry_point = 'blork:main',
+                       source='hork.py')
+    with pytest.raises(TargetDefinitionException):
+      self.make_target(spec=':binary3',
+                       target_type=PythonBinary,
+                       entry_point = 'bin.blork',
+                       source='blork.py')
+    with pytest.raises(TargetDefinitionException):
+      self.make_target(spec=':binary4',
+                       target_type=PythonBinary,
+                       entry_point = 'bin.blork',
+                       source='bin.py')

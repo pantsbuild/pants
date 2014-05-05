@@ -9,6 +9,7 @@ import sys
 
 from twitter.common.dirutil import safe_mkdir
 
+from pants.base.build_environment import get_buildroot
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy import Ivy
 from pants.python.code_generator import CodeGenerator
@@ -25,8 +26,8 @@ class PythonAntlrBuilder(CodeGenerator):
       '-main', 'org.antlr.Tool',
       '--', '-fo', output_dir
     ]
-    for source in self.target.sources:
-      abs_path = os.path.abspath(os.path.join(self.root, self.target.target_base, source))
+    for source in self.target.sources_relative_to_buildroot():
+      abs_path = os.path.join(get_buildroot(), source)
       args.append(abs_path)
 
     try:
