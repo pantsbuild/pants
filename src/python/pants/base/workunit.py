@@ -10,7 +10,8 @@ import time
 import uuid
 
 from twitter.common.dirutil import safe_mkdir_for
-from twitter.common.rwbuf.read_write_buffer import FileBackedRWBuf  # XXX pull back into pants
+
+from pants.rwbuf.read_write_buffer import FileBackedRWBuf
 
 
 class WorkUnit(object):
@@ -42,12 +43,14 @@ class WorkUnit(object):
   @staticmethod
   def outcome_string(outcome):
     """Returns a human-readable string describing the outcome."""
-    return WorkUnit.choose_for_outcome(outcome, 'ABORTED', 'FAILURE', 'WARNING', 'SUCCESS', 'UNKNOWN')
+    return WorkUnit.choose_for_outcome(outcome,
+                                       'ABORTED', 'FAILURE', 'WARNING', 'SUCCESS', 'UNKNOWN')
 
   # Labels describing a workunit.  Reporting code can use this to decide how to display
   # information about this workunit.
   #
-  # Note that a workunit can have multiple labels where this makes sense, e.g., TOOL, COMPILER and NAILGUN.
+  # Note that a workunit can have multiple labels where this makes sense, e.g., TOOL, COMPILER
+  # and NAILGUN.
   SETUP = 0      # Parsing build files etc.
   PHASE = 1      # Executing a phase.
   GOAL = 2       # Executing a goal.
