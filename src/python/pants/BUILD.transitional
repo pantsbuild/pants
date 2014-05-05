@@ -36,7 +36,6 @@ python_library(
     pants('3rdparty/python/twitter/commons:twitter.common.process'),
     pants('3rdparty/python/twitter/commons:twitter.common.python'),
     pants('3rdparty/python/twitter/commons:twitter.common.quantity'),
-    pants('3rdparty/python/twitter/commons:twitter.common.rwbuf'),
     pants('3rdparty/python/twitter/commons:twitter.common.threading'),
     pants('3rdparty/python/twitter/commons:twitter.common.util'),
   ]
