@@ -14,27 +14,18 @@ from twitter.common.dirutil import safe_mkdir
 from pants.base.build_environment import get_buildroot
 from pants.fs.fs import safe_filename
 from pants.java.jar import Manifest, open_jar
-from pants.targets.jvm_binary import JvmBinary
 from pants.targets.scala_library import ScalaLibrary
 from pants.tasks import Task, TaskError
 from pants.tasks.javadoc_gen import javadoc
 from pants.tasks.scaladoc_gen import scaladoc
 
 
-
-DEFAULT_CONFS = ['default']
-
-
-def is_binary(target):
-  return isinstance(target, JvmBinary)
-
-
 def is_java_library(target):
-  return target.has_sources('.java') and not is_binary(target)
+  return target.has_sources('.java')
 
 
 def is_scala_library(target):
-  return target.has_sources('.scala') and not is_binary(target)
+  return target.has_sources('.scala')
 
 
 def is_jvm_library(target):
@@ -89,7 +80,6 @@ class JarCreate(Task):
     products = context.products
 
     self.transitive = options.jar_create_transitive
-    self.confs = context.config.getlist('jar-create', 'confs', default=DEFAULT_CONFS)
     self.compression = ZIP_DEFLATED if options.jar_create_compressed else ZIP_STORED
 
     self.jar_classes = options.jar_create_classes or products.isrequired('jars')

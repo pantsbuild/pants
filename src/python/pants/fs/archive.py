@@ -47,7 +47,7 @@ class TarArchiver(Archiver):
   def create(self, basedir, outdir, name, prefix=None):
     tarpath = os.path.join(outdir, '%s.%s' % (name, self.extension))
     with open_tar(tarpath, self.mode, dereference=True, errorlevel=1) as tar:
-      tar.add(basedir, arcname=prefix or '')
+      tar.add(basedir, arcname=prefix or '.')
     return tarpath
 
 
@@ -94,6 +94,7 @@ ZIP = ZipArchiver(ZIP_DEFLATED)
 _ARCHIVER_BY_TYPE = OrderedDict(tar=TGZ, tgz=TGZ, tbz2=TBZ2, zip=ZIP)
 
 TYPE_NAMES = frozenset(_ARCHIVER_BY_TYPE.keys())
+
 
 def archiver(typename):
   """Returns Archivers in common configurations.

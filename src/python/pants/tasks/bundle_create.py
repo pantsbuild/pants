@@ -4,16 +4,16 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from contextlib import contextmanager
 import os
-from zipfile import ZIP_DEFLATED
+import shutil
 
 from twitter.common.collections import OrderedSet
-from twitter.common.contextutil import open_zip
 from twitter.common.dirutil import safe_mkdir
 
 from pants.base.build_environment import get_buildroot
 from pants.fs import archive
-from pants.java.jar import Manifest
+from pants.java.jar import Manifest, open_jar
 from pants.targets.jvm_binary import JvmApp, JvmBinary
 from pants.tasks import TaskError
 from pants.tasks.jvm_binary_task import JvmBinaryTask
@@ -23,7 +23,12 @@ class BundleCreate(JvmBinaryTask):
 
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
-    JvmBinaryTask.setup_parser(option_group, args, mkflag)
+    option_group.add_option(mkflag("deployjar"), mkflag("deployjar", negate=True),
+                            dest="bundle_create_deployjar", default=False,
+                            action="callback", callback=mkflag.set_bool,
+                            help="[%default] Create a monolithic deploy jar containing the "
+                                 "binaries' classfiles as well as all the classfiles they depend "
+                                 "on transitively to go inside the bundle.")
 
     archive_flag = mkflag("archive")
     option_group.add_option(archive_flag, dest="bundle_create_archive",
@@ -40,26 +45,12 @@ class BundleCreate(JvmBinaryTask):
   def __init__(self, context, workdir):
     super(BundleCreate, self).__init__(context, workdir)
 
-    self.outdir = (
-      context.options.jvm_binary_create_outdir or
-      context.config.get('bundle-create', 'outdir',
-                         default=context.config.getdefault('pants_distdir'))
-    )
+    self._outdir = context.config.getdefault('pants_distdir')
+    self._prefix = context.options.bundle_create_prefix
+    self._archiver_type = context.options.bundle_create_archive
+    self._create_deployjar = context.options.bundle_create_deployjar
 
-    self.prefix = context.options.bundle_create_prefix
-
-    def fill_archiver_type():
-      self.archiver_type = context.options.bundle_create_archive
-      # If no option specified, check if anyone is requiring it
-      if not self.archiver_type:
-        for archive_type in archive.TYPE_NAMES:
-          if context.products.isrequired(archive_type):
-            self.archiver_type = archive_type
-
-    fill_archiver_type()
-    self.deployjar = context.options.jvm_binary_create_deployjar
-    if not self.deployjar:
-      self.context.products.require('jars', predicate=self.is_binary)
+    self.context.products.require('jars')
     self.require_jar_dependencies()
 
   class App(object):
@@ -77,19 +68,18 @@ class BundleCreate(JvmBinaryTask):
       self.basename = target.basename
 
   def execute(self, _):
-    archiver = archive.archiver(self.archiver_type) if self.archiver_type else None
+    archiver = archive.archiver(self._archiver_type) if self._archiver_type else None
     for target in self.context.target_roots:
       for app in map(self.App, filter(self.App.is_app, target.resolve())):
         basedir = self.bundle(app)
         if archiver:
-          archivemap = self.context.products.get(self.archiver_type)
+
           archivepath = archiver.create(
             basedir,
-            self.outdir,
+            self._outdir,
             app.basename,
-            prefix=app.basename if self.prefix else None
+            prefix=app.basename if self._prefix else None
           )
-          archivemap.add(app, self.outdir, [archivepath])
           self.context.log.info('created %s' % os.path.relpath(archivepath, get_buildroot()))
 
   def bundle(self, app):
@@ -98,21 +88,33 @@ class BundleCreate(JvmBinaryTask):
     """
     assert(isinstance(app, BundleCreate.App))
 
-    bundledir = os.path.join(self.outdir, '%s-bundle' % app.basename)
-    self.context.log.info('creating %s' % os.path.relpath(bundledir, get_buildroot()))
+    bundle_dir = os.path.join(self._outdir, '%s-bundle' % app.basename)
+    self.context.log.info('creating %s' % os.path.relpath(bundle_dir, get_buildroot()))
 
-    safe_mkdir(bundledir, clean=True)
+    safe_mkdir(bundle_dir, clean=True)
 
     classpath = OrderedSet()
-    if not self.deployjar:
-      libdir = os.path.join(bundledir, 'libs')
-      os.mkdir(libdir)
+    if not self._create_deployjar:
+      lib_dir = os.path.join(bundle_dir, 'libs')
+      os.mkdir(lib_dir)
+
+      jarmap = self.context.products.get('jars')
+
+      def add_jars(target):
+        generated = jarmap.get(target)
+        if generated:
+          for base_dir, internal_jars in generated.items():
+            for internal_jar in internal_jars:
+              os.symlink(os.path.join(base_dir, internal_jar), os.path.join(lib_dir, internal_jar))
+              classpath.add(internal_jar)
+
+      app.binary.walk(add_jars, lambda t: t.is_internal and not t == app.binary)
 
       # Add external dependencies to the bundle.
-      for basedir, externaljar in self.list_jar_dependencies(app.binary):
-        path = os.path.join(basedir, externaljar)
-        os.symlink(path, os.path.join(libdir, externaljar))
-        classpath.add(externaljar)
+      for basedir, external_jar in self.list_jar_dependencies(app.binary):
+        path = os.path.join(basedir, external_jar)
+        os.symlink(path, os.path.join(lib_dir, external_jar))
+        classpath.add(external_jar)
 
     # TODO: There should probably be a separate 'binary_jars' product type,
     # so we can more easily distinguish binary jars (that contain all the classes of their
@@ -123,28 +125,29 @@ class BundleCreate(JvmBinaryTask):
 
       binary = jars[0]
       binary_jar = os.path.join(basedir, binary)
-      bundle_jar = os.path.join(bundledir, binary)
-      # Add the internal classes into the bundle_jar.
-      if not classpath:
-        os.symlink(binary_jar, bundle_jar)
-      else:
-        # TODO: Can we copy the existing jar and inject the manifest in, instead of
-        # laboriously copying the contents one by one? Would that be more efficient?
-        with open_zip(binary_jar, 'r') as src:
-          with open_zip(bundle_jar, 'w', compression=ZIP_DEFLATED) as dest:
-            for item in src.infolist():
-              buf = src.read(item.filename)
-              if Manifest.PATH == item.filename:
-                manifest = Manifest(buf)
-                manifest.addentry(Manifest.CLASS_PATH,
-                                  ' '.join(os.path.join('libs', jar) for jar in classpath))
-                buf = manifest.contents()
-              dest.writestr(item, buf)
+      bundle_jar = os.path.join(bundle_dir, '%s.jar' % app.binary.basename)
+
+      with self._binary_jar(app.binary, binary_jar, bundle_jar) as jar:
+        manifest = self.create_main_manifest(app.binary)
+        if classpath:
+          manifest.addentry(Manifest.CLASS_PATH,
+                            ' '.join(os.path.join('libs', jar) for jar in classpath))
+        jar.writestr(Manifest.PATH, manifest.contents())
 
     for bundle in app.bundles:
       for path, relpath in bundle.filemap.items():
-        bundlepath = os.path.join(bundledir, relpath)
-        safe_mkdir(os.path.dirname(bundlepath))
-        os.symlink(path, bundlepath)
+        bundle_path = os.path.join(bundle_dir, relpath)
+        safe_mkdir(os.path.dirname(bundle_path))
+        os.symlink(path, bundle_path)
 
-    return bundledir
+    return bundle_dir
+
+  @contextmanager
+  def _binary_jar(self, binary, binary_path, bundled_binary_path):
+    if self._create_deployjar:
+      with self.deployjar(binary, bundled_binary_path) as jar:
+        yield jar
+    else:
+      shutil.copy(binary_path, bundled_binary_path)
+      with open_jar(bundled_binary_path, 'a') as jar:
+        yield jar

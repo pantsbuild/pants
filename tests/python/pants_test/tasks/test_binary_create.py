@@ -25,4 +25,4 @@ class BinaryCreateTest(unittest.TestCase):
                'jvm_binary_create_deployjar': None}
     binary_create = BinaryCreate(create_context(config=sample_ini_test_1, options=options),
                                  '/tmp/workdir')
-    self.assertEquals(binary_create.outdir, '/tmp/dist')
+    self.assertEquals(binary_create._outdir, '/tmp/dist')
