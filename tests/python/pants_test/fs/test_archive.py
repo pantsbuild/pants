@@ -1,3 +1,4 @@
+# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
@@ -21,15 +22,19 @@ class ArchiveTest(unittest.TestCase):
         relpath = os.path.normpath(os.path.relpath(path, root))
         if empty_dirs:
           listing.update(os.path.normpath(os.path.join(relpath, d)) for d in dirs)
-        listing.update(os.path.normpath(os.path.join(relpath, f)) for f in files)
+        listing.update(os.path.normpath(os.path.join(relpath, f.decode('utf-8'))) for f in files)
       return listing
 
     def test_round_trip(prefix=None):
       with temporary_dir() as fromdir:
         safe_mkdir(os.path.join(fromdir, 'a/b/c'))
         touch(os.path.join(fromdir, 'a/b/d/e.txt'))
-        with temporary_dir() as archivedir:
+        touch(os.path.join(fromdir, u'a/b/d/文件.java'))
+        #touch(os.path.join(fromdir, u'a/b/文件/f.java'))
+
+      with temporary_dir() as archivedir:
           archive = archiver.create(fromdir, archivedir, 'archive', prefix=prefix)
+          os.system("cp %s /tmp/foo.zip" % (archive))
           with temporary_dir() as todir:
             archiver.extract(archive, todir)
             fromlisting = listtree(fromdir)
@@ -38,6 +43,7 @@ class ArchiveTest(unittest.TestCase):
               if empty_dirs:
                 fromlisting.add(prefix)
             self.assertEqual(fromlisting, listtree(todir))
+
 
     test_round_trip()
     test_round_trip(prefix='jake')
