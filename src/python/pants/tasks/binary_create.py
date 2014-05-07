@@ -37,9 +37,10 @@ class BinaryCreate(JvmBinaryTask):
   def __init__(self, context, workdir):
     super(BinaryCreate, self).__init__(context, workdir)
 
+    self.context = context
     self.outdir = os.path.abspath(
-      context.options.jvm_binary_create_outdir or
-      context.config.get('binary-create', 'outdir',
+      self.context.options.jvm_binary_create_outdir or
+      self.context.config.get('binary-create', 'outdir',
                          default=context.config.getdefault('pants_distdir'))
     )
     self.compression = ZIP_DEFLATED if context.options.binary_create_compressed else ZIP_STORED
@@ -48,10 +49,9 @@ class BinaryCreate(JvmBinaryTask):
       or context.config.getbool('binary-create', 'zip64', default=False)
     )
     self.deployjar = context.options.jvm_binary_create_deployjar
-
-    context.products.require('jars', predicate=self.is_binary)
-    context.products.require_data('classes_by_target')
-    context.products.require_data('resources_by_target')
+    self.context.products.require('jars', predicate=self.is_binary)
+    self.context.products.require_data('classes_by_target')
+    self.context.products.require_data('resources_by_target')
     if self.deployjar:
       self.require_jar_dependencies()
 
@@ -77,11 +77,13 @@ class BinaryCreate(JvmBinaryTask):
             for internaljar in jars:
               self.dump(os.path.join(basedir, internaljar), jar)
 
-      binary.walk(add_jars, lambda t: t.is_internal)
+      with self.context.new_workunit(name='add-generated-jars'):
+        binary.walk(add_jars, lambda t: t.is_internal)
 
       if self.deployjar:
-        for basedir, externaljar in self.list_jar_dependencies(binary):
-          self.dump(os.path.join(basedir, externaljar), jar)
+        with self.context.new_workunit(name='add-dependency-jars'):
+          for basedir, externaljar in self.list_jar_dependencies(binary):
+            self.dump(os.path.join(basedir, externaljar), jar)
 
       def write_binary_data(product_type):
         data = self.context.products.get_data(product_type).get(binary)
@@ -90,20 +92,22 @@ class BinaryCreate(JvmBinaryTask):
             for rel_path in rel_paths:
               jar.write(os.path.join(root, rel_path), arcname=rel_path)
 
-      write_binary_data('classes_by_target')
-      write_binary_data('resources_by_target')
+      with self.context.new_workunit(name='add-binary-data'):
+        write_binary_data('classes_by_target')
+        write_binary_data('resources_by_target')
 
-      manifest = Manifest()
-      manifest.addentry(Manifest.MANIFEST_VERSION, '1.0')
-      manifest.addentry(
-        Manifest.CREATED_BY,
-        'python %s pants %s' % (platform.python_version(), get_version())
-      )
-      main = binary.main or '*** java -jar not supported, please use -cp and pick a main ***'
-      manifest.addentry(Manifest.MAIN_CLASS,  main)
-      jar.writestr(Manifest.PATH, manifest.contents())
+      with self.context.new_workunit(name='add-manifest'):
+        manifest = Manifest()
+        manifest.addentry(Manifest.MANIFEST_VERSION, '1.0')
+        manifest.addentry(
+          Manifest.CREATED_BY,
+          'python %s pants %s' % (platform.python_version(), get_version())
+        )
+        main = binary.main or '*** java -jar not supported, please use -cp and pick a main ***'
+        manifest.addentry(Manifest.MAIN_CLASS,  main)
+        jar.writestr(Manifest.PATH, manifest.contents())
 
-      jarmap.add(binary, self.outdir, [binary_jarname])
+        jarmap.add(binary, self.outdir, [binary_jarname])
 
   def dump(self, jarpath, jarfile):
     self.context.log.debug('  dumping %s' % jarpath)
