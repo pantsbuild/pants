@@ -82,9 +82,11 @@ class PlainTextReporter(Reporter):
                         workunit.start_delta_string(),
                         self._indent(workunit),
                         workunit.name if self.settings.indent else workunit.path()))
-      if self._show_output(workunit):
-        # So that emitted output starts on a new line (see below).
+      # Start output on a new line.
+      if self._show_output_indented(workunit):
         self.emit(self._prefix(workunit, b'\n'))
+      elif self._show_output_unindented(workunit):
+        self.emit(b'\n')
     self.flush()
 
   def end_workunit(self, workunit):
@@ -143,6 +145,7 @@ class PlainTextReporter(Reporter):
     # Indenting looks weird in these cases.
     return workunit.has_label(WorkUnit.REPL) or workunit.has_label(WorkUnit.RUN)
 
+
   def _format_aggregated_timings(self, aggregated_timings):
     return b'\n'.join([b'%(timing).3f %(label)s' % x for x in aggregated_timings.get_all()])
 
@@ -156,8 +159,11 @@ class PlainTextReporter(Reporter):
     return b'  ' * (len(workunit.ancestors()) - 1)
 
   _time_string_filler = b' ' * len('HH:MM:SS mm:ss ')
+
   def _prefix(self, workunit, s):
     if self.settings.indent:
-      return s.replace(b'\n', b'\n' + PlainTextReporter._time_string_filler + self._indent(workunit))
+      def replace(x, c):
+        return x.replace(c, c + PlainTextReporter._time_string_filler + self._indent(workunit))
+      return replace(replace(s, b'\r'), b'\n')
     else:
       return PlainTextReporter._time_string_filler + s

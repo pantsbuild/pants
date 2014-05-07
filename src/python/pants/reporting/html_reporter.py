@@ -264,12 +264,27 @@ class HtmlReporter(Reporter):
     colored = self._handle_ansi_color_codes(cgi.escape(s.decode('utf-8')))
     return linkify(self._buildroot, colored).replace('\n', '</br>')
 
-  _ANSI_COLOR_CODE_RE = re.compile(r'\033\[((\d|;)*)m')
+  _ANSI_COLOR_CODE_RE = re.compile(r'\033\[((?:\d|;)*)m')
+
   def _handle_ansi_color_codes(self, s):
-    """Replace ansi color sequences with spans of appropriately named css classes."""
-    def ansi_code_to_css(code):
-      return ' '.join(['ansi-%s' % c for c in code.split(';')])
-    return '<span>' +\
-           HtmlReporter._ANSI_COLOR_CODE_RE.sub(
-             lambda m: '</span><span class="%s">' % ansi_code_to_css(m.group(1)), s) +\
-           '</span>'
+    """Replace ansi escape sequences with spans of appropriately named css classes."""
+    parts = HtmlReporter._ANSI_COLOR_CODE_RE.split(s)
+    ret = []
+    span_depth = 0
+    # Note that len(parts) is always odd: text, code, text, code, ..., text.
+    for i in range(0, len(parts), 2):
+      ret.append(parts[i])
+      if i + 1 < len(parts):
+        for code in parts[i + 1].split(';'):
+          if code == 0:  # Reset.
+            while span_depth > 0:
+              ret.append('</span>')
+              span_depth -= 1
+          else:
+            ret.append('<span class="ansi-%s">' % code)
+            span_depth += 1
+    while span_depth > 0:
+      ret.append('</span>')
+      span_depth -= 1
+
+    return ''.join(ret)
