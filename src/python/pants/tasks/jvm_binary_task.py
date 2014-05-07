@@ -101,7 +101,7 @@ class JvmBinaryTask(Task):
       for root, dirs, files in os.walk(tmpdir):
         for f in files:
           path = os.path.join(root, f)
-          relpath = os.path.relpath(path, tmpdir)
+          relpath = os.path.relpath(path, tmpdir).decode('utf-8')
           if Manifest.PATH != relpath:
             jar_file.write(path, relpath)
 
