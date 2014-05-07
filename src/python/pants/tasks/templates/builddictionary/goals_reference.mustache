@@ -31,14 +31,57 @@ goal.
 {{phase.description}}
 {{/phase.description}}
 
-**Installed tasks:**
-
 {{#goals}}
-* Implemented by class ``{{name}}``
+
+.. _gref_cli_{{ogroup.xref}}:
+
+*
+{{#ogroup.title}}
+  **{{{ogroup.title}}}**
+{{/ogroup.title}}
+  Implemented by class ``{{name}}``
+
 
 {{#doc}}
-  {{{doc}}}
+{{{doc}}}
 {{/doc}}
 
+{{#ogroup}}
+{{#options}}
+  * | ``{{st}}``
+{{#typ}}
+      ``{{typ}}``
+{{/typ}}
+{{#default}}
+      (Default: ``{{default}}``)
+{{/default}}
+    |
+{{hlp}}
+
+{{/options}}
+{{/ogroup}}
+
 {{/goals}}
+
+
+**Other command-line options:**
+
+  `Common`_
+{{#leftover_ogs}}
+  :ref:`{{title}} <gref_cli_{{xref}}>`
+{{/leftover_ogs}}
+
+
 {{/phases}}
+
+
+Common
+-----------------------------------------------------------------------------
+
+These command-line flags are available with all Pants goals.
+
+{{#glopts}}
+  ``{{st}}``
+{{hlp}}
+
+{{/glopts}}

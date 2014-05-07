@@ -5,10 +5,12 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import inspect
+import optparse
 import os
 
 from collections import defaultdict
 from pkg_resources import resource_string
+
 from twitter.common.dirutil import Fileset, safe_open
 
 from pants.base.build_environment import get_buildroot
@@ -17,6 +19,7 @@ from pants.base.build_manual import get_builddict_info
 from pants.base.config import ConfigOption
 from pants.base.generator import Generator, TemplateData
 from pants.base.parse_context import ParseContext
+from pants.goal.option_helpers import add_global_options
 from pants.goal.phase import Phase
 from pants.tasks import Task, TaskError
 
@@ -155,7 +158,7 @@ def get_syms():
   return r
 
 # Needed since x may be a str or a unicode, so we can't hard-code str.lower or unicode.lower.
-_lower = lambda x: x.lower
+_lower = lambda x: x.lower()
 
 
 def tocl(d):
@@ -213,6 +216,82 @@ def entry_for_one_class(nom, klas):
                methods=methods)
 
 
+def gen_goals_glopts_reference_data():
+  global_option_parser = optparse.OptionParser(add_help_option=False)
+  add_global_options(global_option_parser)
+  glopts = []
+  for o in global_option_parser.option_list:
+    hlp = None
+    if o.help:
+      hlp = indent_docstring_by_n(o.help.replace("[%default]", "").strip(), 2)
+    glopts.append(TemplateData(st=str(o), hlp=hlp))
+  return glopts
+
+
+def gref_template_data_from_options(og):
+  """Get data for the Goals Reference from an optparse.OptionGroup"""
+  if not og: return None
+  title = og.title or ""
+  xref = "".join([c for c in title if c.isalnum()])
+  option_l = []
+  for o in og.option_list:
+    default = None
+    if o.default and not str(o.default).startswith("('NO',"):
+      default = o.default
+    hlp = None
+    if o.help:
+      hlp = indent_docstring_by_n(o.help.replace("[%default]", "").strip(), 6)
+    option_l.append(TemplateData(
+        st=str(o),
+        default=default,
+        hlp=hlp,
+        typ=o.type))
+  return TemplateData(
+    title=title,
+    options=option_l,
+    xref=xref)
+
+
+def gen_goals_phases_reference_data():
+  """Generate the goals reference rst doc."""
+  phase_dict = {}
+  phase_names = []
+  for phase, raw_goals in Phase.all():
+    parser = optparse.OptionParser(add_help_option=False)
+    phase.setup_parser(parser, [], [phase])
+    options_by_title = defaultdict(lambda: None)
+    for group in parser.option_groups:
+      options_by_title[group.title] = group
+    found_option_groups = set()
+    goals = []
+    for goal in sorted(raw_goals, key=(lambda x: x.name.lower())):
+      doc = indent_docstring_by_n(goal.task_type.__doc__ or "", 2)
+      options_title = goal.title_for_option_group(phase)
+      og = options_by_title[options_title]
+      if og:
+        found_option_groups.add(options_title)
+      goals.append(TemplateData(
+          name=goal.task_type.__name__,
+          doc=doc,
+          ogroup=gref_template_data_from_options(og)))
+
+    leftover_option_groups = []
+    for group in parser.option_groups:
+      if group.title in found_option_groups: continue
+      leftover_option_groups.append(gref_template_data_from_options(group))
+    leftover_options = []
+    for option in parser.option_list:
+      leftover_options.append(TemplateData(st=str(option)))
+    phase_dict[phase.name] = TemplateData(phase=phase,
+                                          goals=goals,
+                                          leftover_opts=leftover_options,
+                                          leftover_ogs=leftover_option_groups)
+    phase_names.append(phase.name)
+
+  phases = [phase_dict[name] for name in sorted(phase_names, key=_lower)]
+  return phases
+
+
 def assemble(predefs=PREDEFS, symbol_hash=None):
   """Assemble big hash of entries suitable for smushing into a template.
 
@@ -245,7 +324,10 @@ class BuildBuildDictionary(Task):
   def execute(self, targets):
     self._gen_goals_reference()
     self._gen_config_reference()
+    self._gen_build_dictionary()
 
+  def _gen_build_dictionary(self):
+    """Generate the BUILD dictionary reference rst doc."""
     d = assemble()
     template = resource_string(__name__, os.path.join(self._templates_dir, 'page.mustache'))
     tocs = [tocl(d),
@@ -262,25 +344,15 @@ class BuildBuildDictionary(Task):
 
   def _gen_goals_reference(self):
     """Generate the goals reference rst doc."""
-    phase_dict = {}
-    phase_names = []
-    for phase, raw_goals in Phase.all():
-      goals = []
-      for g in raw_goals:
-        # TODO(lahosken) generalize indent_docstring, use here
-        doc = (g.task_type.__doc__ or '').replace('\n\'', ' \'').strip()
-        goals.append(TemplateData(name=g.task_type.__name__, doc=doc))
-      phase_dict[phase.name] = TemplateData(phase=phase, goals=goals)
-      phase_names.append(phase.name)
-
-    phases = [phase_dict[name] for name in sorted(phase_names, key=_lower)]
+    phases = gen_goals_phases_reference_data()
+    glopts = gen_goals_glopts_reference_data()
 
     template = resource_string(__name__,
                                os.path.join(self._templates_dir, 'goals_reference.mustache'))
     filename = os.path.join(self._outdir, 'goals_reference.rst')
     self.context.log.info('Generating %s' % filename)
     with safe_open(filename, 'w') as outfile:
-      generator = Generator(template, phases=phases)
+      generator = Generator(template, phases=phases, glopts=glopts)
       generator.write(outfile)
 
   def _gen_config_reference(self):
