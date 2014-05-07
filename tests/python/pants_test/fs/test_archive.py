@@ -19,9 +19,9 @@ class ArchiveTest(unittest.TestCase):
     def listtree(root):
       listing = set()
       for path, dirs, files in os.walk(root):
-        relpath = os.path.normpath(os.path.relpath(path, root))
+        relpath = os.path.normpath(os.path.relpath(path, root)).decode('utf-8')
         if empty_dirs:
-          listing.update(os.path.normpath(os.path.join(relpath, d)) for d in dirs)
+          listing.update(os.path.normpath(os.path.join(relpath, d.decode('utf-8'))) for d in dirs)
         listing.update(os.path.normpath(os.path.join(relpath, f.decode('utf-8'))) for f in files)
       return listing
 
@@ -30,9 +30,9 @@ class ArchiveTest(unittest.TestCase):
         safe_mkdir(os.path.join(fromdir, 'a/b/c'))
         touch(os.path.join(fromdir, 'a/b/d/e.txt'))
         touch(os.path.join(fromdir, u'a/b/d/文件.java'))
-        #touch(os.path.join(fromdir, u'a/b/文件/f.java'))
+        touch(os.path.join(fromdir, u'a/b/文件/f.java'))
 
-      with temporary_dir() as archivedir:
+        with temporary_dir() as archivedir:
           archive = archiver.create(fromdir, archivedir, 'archive', prefix=prefix)
           os.system("cp %s /tmp/foo.zip" % (archive))
           with temporary_dir() as todir:
