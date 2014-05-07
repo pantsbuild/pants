@@ -196,12 +196,12 @@ goal(name='scaladoc_publish', action=ScaladocJarShim
 # Bundling and publishing.
 
 goal(name='jar', action=JarCreate, dependencies=['compile', 'resources', 'bootstrap']
-).install('jar').with_description('Create one or more jars.')
+).install('jar')
 
 goal(name='binary', action=BinaryCreate, dependencies=['jar', 'bootstrap']
 ).install().with_description('Create a jvm binary jar.')
 
-goal(name='bundle', action=BundleCreate, dependencies=['binary', 'bootstrap']
+goal(name='bundle', action=BundleCreate, dependencies=['jar', 'bootstrap']
 ).install().with_description('Create an application bundle from binary targets.')
 
 goal(name='check_published_deps', action=CheckPublishedDeps

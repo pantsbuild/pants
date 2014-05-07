@@ -11,11 +11,13 @@ from textwrap import dedent
 
 from twitter.common.contextutil import temporary_dir
 from twitter.common.dirutil import safe_open
+from pants.base.target import Target
 
 from pants.goal.products import MultipleRootedProducts
 from pants.java.jar import open_jar
 from pants.targets.java_library import JavaLibrary
 from pants.targets.java_thrift_library import JavaThriftLibrary
+from pants.targets.jvm_binary import JvmBinary
 from pants.targets.resources import Resources
 from pants.targets.scala_library import ScalaLibrary
 from pants.targets.sources import SourceRoot
@@ -44,9 +46,7 @@ class JarCreateMiscTest(JarCreateTestBase):
           pants_supportdir: /tmp/build-support
           """).strip()
 
-    jar_create = JarCreate(create_context(config=ini, options=self.create_options()),
-                           '/tmp/workdir')
-    self.assertEquals(jar_create.confs, ['default'])
+    JarCreate(create_context(config=ini, options=self.create_options()), '/tmp/workdir')
 
   def test_resources_with_scala_java_files(self):
     for ftype in ('java', 'scala'):
@@ -66,6 +66,17 @@ class JarCreateExecuteTest(JarCreateTestBase):
     return cls.create_library(path, 'scala_library', name, sources, **kwargs)
 
   @classmethod
+  def jvm_binary(cls, path, name, source=None, resources=None):
+    cls.create_files(path, [source])
+    cls.create_target(path, dedent('''
+          jvm_binary(name=%(name)r,
+            source=%(source)r,
+            resources=%(resources)r,
+          )
+        ''' % dict(name=name, source=source, resources=resources)))
+    return cls.target('%s:%s' % (path, name))
+
+  @classmethod
   def java_thrift_library(cls, path, name, *sources):
     return cls.create_library(path, 'java_thrift_library', name, sources)
 
@@ -80,10 +91,10 @@ class JarCreateExecuteTest(JarCreateTestBase):
                        '''))
 
     def get_source_root_fs_path(path):
-        return os.path.realpath(os.path.join(cls.build_root, path))
+      return os.path.realpath(os.path.join(cls.build_root, path))
 
     SourceRoot.register(get_source_root_fs_path('src/resources'), Resources)
-    SourceRoot.register(get_source_root_fs_path('src/java'), JavaLibrary)
+    SourceRoot.register(get_source_root_fs_path('src/java'), JavaLibrary, JvmBinary)
     SourceRoot.register(get_source_root_fs_path('src/scala'), ScalaLibrary)
     SourceRoot.register(get_source_root_fs_path('src/thrift'), JavaThriftLibrary)
 
@@ -92,16 +103,18 @@ class JarCreateExecuteTest(JarCreateTestBase):
                               resources='src/resources/com/twitter:spam')
     cls.sl = cls.scala_library('src/scala/com/twitter', 'bar', ['c.scala'])
     cls.jtl = cls.java_thrift_library('src/thrift/com/twitter', 'baz', 'd.thrift')
-    cls.java_lib_foo= cls.java_library('src/java/com/twitter/foo', 'java_foo', ['java_foo.java'])
+    cls.java_lib_foo = cls.java_library('src/java/com/twitter/foo', 'java_foo', ['java_foo.java'])
     cls.scala_lib = cls.scala_library('src/scala/com/twitter/foo',
                                       'scala_foo',
                                       ['scala_foo.scala'],
                                       provides=True,
                                       java_sources=['src/java/com/twitter/foo:java_foo'])
+    cls.binary = cls.jvm_binary('src/java/com/twitter/baz', 'baz', source='b.java',
+                                resources='src/resources/com/twitter:spam')
 
   def context(self, config='', **options):
     return create_context(config=config, options=self.create_options(**options),
-                          target_roots=[self.jl, self.sl, self.jtl, self.scala_lib])
+                          target_roots=[self.jl, self.sl, self.binary, self.jtl, self.scala_lib])
 
   @contextmanager
   def add_products(self, context, product_type, target, *products):
@@ -142,19 +155,22 @@ class JarCreateExecuteTest(JarCreateTestBase):
   def assert_classfile_jar_contents(self, context, empty=False):
     with self.add_data(context, 'classes_by_target', self.jl, 'a.class', 'b.class'):
       with self.add_data(context, 'classes_by_target', self.sl, 'c.class'):
-        with self.add_data(context, 'resources_by_target', self.res, 'r.txt.transformed'):
-          with self.add_data(context, 'classes_by_target', self.scala_lib, 'scala_foo.class',
-                             'java_foo.class'):
-            with temporary_dir() as workdir:
-              JarCreate(context, workdir).execute(context.targets())
-              if empty:
-                self.assertTrue(context.products.get('jars').empty())
-              else:
-                self.assert_jar_contents(context, 'jars', self.jl,
-                                        'a.class', 'b.class', 'r.txt.transformed')
-                self.assert_jar_contents(context, 'jars', self.sl, 'c.class')
-                self.assert_jar_contents(context, 'jars', self.scala_lib, 'scala_foo.class',
-                                         'java_foo.class')
+        with self.add_data(context, 'classes_by_target', self.binary, 'b.class'):
+          with self.add_data(context, 'resources_by_target', self.res, 'r.txt.transformed'):
+            with self.add_data(context, 'classes_by_target', self.scala_lib, 'scala_foo.class',
+                               'java_foo.class'):
+              with temporary_dir() as workdir:
+                JarCreate(context, workdir).execute(context.targets())
+                if empty:
+                  self.assertTrue(context.products.get('jars').empty())
+                else:
+                  self.assert_jar_contents(context, 'jars', self.jl,
+                                           'a.class', 'b.class', 'r.txt.transformed')
+                  self.assert_jar_contents(context, 'jars', self.sl, 'c.class')
+                  self.assert_jar_contents(context, 'jars', self.binary,
+                                           'b.class', 'r.txt.transformed')
+                  self.assert_jar_contents(context, 'jars', self.scala_lib, 'scala_foo.class',
+                                           'java_foo.class')
 
   def test_classfile_jar_required(self):
     context = self.context()
