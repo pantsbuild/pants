@@ -36,9 +36,11 @@ want to track down exactly what, you can reset your state:
 * **Clean more cached files:** If your source tree lives under source control,
   use your source control tool to clean up more files.
   For example with ``git``, you might do something like::
+
     $ git status  # look for untracked files
     $ git add path/to/file1 path/to/file2  # preserve untracked files you don't want deleted
     $ git clean -fdx  # delete all untracked files
+
 * **Stop background processes:**
   ``./pants goal ng-killall --ng-killall-everywhere``
 

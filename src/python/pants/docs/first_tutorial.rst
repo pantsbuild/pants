@@ -84,7 +84,7 @@ Looking at the pieces of this we see
 
     You can specify more than one target on a command line. Pants will carry out
     its goals on all specified targets. E.g., you might use this to generate an Eclipse
-    project based on Pingpong's source and tests.
+    project based on Hello World's source and tests.
 
 Output
 ======
@@ -95,7 +95,7 @@ Pants produces files, both build outputs and intermediate files generated
 ``dist/``
     By default, build outputs go in the ``dist/`` directory. So far, you've
     just run the ``test`` goal, which doesn't output a file. But if you'd
-    instead invoked, for example, the ``bundle`` goal on a ``jvm_binary``
+    instead invoked, for example, the ``bundle`` goal on a ``jvm_app``
     target, Pants would have populated this directory with many JVM ``.jar``
     files.
 
@@ -163,20 +163,20 @@ BUILD Files
 We told pants what target to build, but where are these defined? Scattered
 around the source tree are ``BUILD`` files. These ``BUILD`` files define
 targets. For example, this code snippet of
-``java/com/pants/examples/hello/main/BUILD`` defines the binary
-program we compiled and ran.  This target is named ``main`` and
-is of type ``jvm_binary``:
+``java/com/pants/examples/hello/main/BUILD`` defines two targets:
+the app we ran and the binary that contains its code.
+These targets are named ``main`` (of type ``jvm_app``)
+and and ``main-bin`` (of type ``jvm_binary``):
 
 .. literalinclude:: ../../../java/com/pants/examples/hello/main/BUILD
-   :start-after: Like Hello world
+   :start-after: Like Hello World
 
-That ``dependencies`` is interesting. This build target depends on
-another build target; the ``dependencies`` lists depended-upon targets.
+That ``dependencies`` is interesting. The ``main-bin`` build target depends on
+other build targets; its ``dependencies`` lists those.
 To build a runnable Java binary, we need to first compile its dependencies.
-
-The ``main`` binary has one dependency,
-``pants('src/java/com/pants/examples/hello/greet')``.
-That src/.../greet is the *address* of another target. Addresses look,
+The ``main-bin`` binary has two dependencies,
+``pants('src/java/com/pants/examples/hello/greet')``
+is the *address* of another target. Addresses look,
 roughly, like ``path/to/BUILD:targetname``.
 We can see this build target in the ``.../hello/greet/BUILD`` file:
 

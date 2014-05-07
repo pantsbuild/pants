@@ -48,10 +48,10 @@ class JvmBinary(JvmTarget, WithResources):
     :param string name: The name of this target, which combined with this
       build file defines the target :class:`pants.base.address.Address`.
     :param string main: The name of the ``main`` class, e.g.,
-      ``'com.twitter.common.examples.pingpong.Main'``. This class may be
+      ``'com.pants.examples.hello.main.HelloMain'``. This class may be
       present as the source of this target or depended-upon library.
     :param string basename: Base name for the generated ``.jar`` file, e.g.,
-      ``'pingpong'``. (By default, uses ``name`` param)
+      ``'hello'``. (By default, uses ``name`` param)
     :param string source: Name of one ``.java`` or ``.scala`` file (a good
       place for a ``main``).
     :param resources: List of ``resource``\s to include in bundle.

@@ -25,11 +25,11 @@ especially relevant.
   or ``jvm_app`` targets.
 
   Bundling a ``jvm_binary`` target is appropriate when your application
-  is entirely jar-based; that is, its entirely class files and resources
-  packaged inside the jars themselves. If you application requires
+  is entirely jar-based; that is, it's entirely class files and resources
+  packaged inside the jars themselves. If your application requires
   "extra stuff" (e.g.: start scripts, config files) use a ``jvm_app``
-  which allows you to include files in the bundle directory that are
-  supplemental to the binary jar and its dependencies.
+  which allows you to include files in the bundle directory that
+  supplement the binary jar and its dependencies.
   You can learn :ref:`more about bundles <jvm_bundles>`.
 
 **Runnable Binary**
@@ -44,7 +44,7 @@ especially relevant.
 
 **Importable Code**
 
-  ``java_library`` BUILD targets make Java source code ``import``\able. The
+  ``java_library`` BUILD targets make Java source code ``import``\-able. The
   rule of thumb is that each directory of ``.java`` files has a ``BUILD`` file
   with a ``java_library`` target. A JVM target that has a ``java_library`` in
   its ``dependencies`` can import its code. ``scala_library`` targets are
@@ -56,7 +56,7 @@ especially relevant.
 
   Pants can ``publish`` a JVM library so code in other repos can use it;
   if the ``*_library`` target has a ``provides`` parameter, that specifies
-  the repo/address at which to publish.
+  the repo/address at which to :doc:`publish <publish>`.
 
   An ``annotation_processor`` BUILD target defines a Java library
   one containing one or more annotation processors.
@@ -82,51 +82,75 @@ especially relevant.
 BUILD for a Simple Binary
 *************************
 
-The `Twitter Commons Java pingpong sample
-<https://github.com/pantsbuild/pants/tree/master/src/java/com/pants/examples/pingpong>`_
+The `Pants Build Java hello world sample
+<https://github.com/pantsbuild/pants/tree/master/src/java/com/pants/examples/hello>`_
 code shows the BUILD file for a simple Java binary (in the ``main/`` directory):
 
-.. literalinclude:: ../../../../java/com/pants/examples/pingpong/main/BUILD
-   :start-after: under the License.
+.. literalinclude:: ../../../java/com/pants/examples/hello/main/BUILD
+   :start-after: runnable
 
-This small program has just one library, a `java_library`.
+This small program has just two dependencies. One is a library, a
+``java_library``, a compiled set of source code from this workspace.
+The other is a "third party" dependency, a pre-compiled artifact
+whose source lives somewhere outside the workspace.
+
+Depending on a Library
+======================
+
 The rule of thumb is that
 each directory of ``.java`` or ``.scala`` files has a library target. If you
 find
 yourself thinking "we should move some of this code to another directory,"
 you probably also want to set up a ``BUILD` file with a ``java_library``
-(or ``scala_library``) target.
+(or ``scala_library``) target. Here we see the library target which
+``main-bin`` depends on. This library target lives in ``hello/greet/BUILD``:
 
-.. literalinclude:: ../../../../java/com/pants/examples/pingpong/handler/BUILD
-   :start-after: java_library:
+.. literalinclude:: ../../../java/com/pants/examples/hello/greet/BUILD
+   :start-after: LICENSE
 
-This library depends on other build targets and jars; if your code imports
+This library could depend on other build targets and artifacts;
+if your code imports
 something, that implies a ``BUILD`` dependency.
-Some of the depended-upon targets come from the same repository; for example
-``.../common/application``. If we peeked at that ``BUILD`` target, we'd see it
-was another ``java_library``.
-Some of these dependencies are ``jar``\ s built elsewhere.
 
 Depending on a Jar
 ==================
 
-The `pingpong-lib` example depends on some jars. Instead of compiling
+The `main-bin` example depends a jar, ``log4j``. Instead of compiling
 from source, Pants invokes `ivy` to fetch these jars. To reduce danger
 of version conflicts, we use the :doc:`3rdparty` idiom: we keep references
 to these "third-party" jars together in ``BUILD`` files under the
-``3rdparty/jvm/`` directory. Thus, ``pingpong-lib`` has some dependencies like:
+``3rdparty/`` directory. Thus, ``main`` has dependencies:
 
-.. literalinclude:: ../../../../java/com/pants/examples/pingpong/handler/BUILD
-   :start-after: java_library:
-   :end-before: src/java
+.. literalinclude:: ../../../java/com/pants/examples/hello/main/BUILD
+   :start-after: jvm_binary
+   :end-before: HelloMain.java
 
-The ``BUILD`` files in ``3rdparty/jvm/``, e.g.,
-``3rdparty/jvm/com/sun/jersey/BUILD``, have targets like:
+The ``BUILD`` files in ``3rdparty/`` have targets like::
 
-.. literalinclude:: ../../../../../3rdparty/jvm/com/sun/jersey/BUILD
-   :lines: 3-4
+    dependencies(name='log4j',
+        dependencies=[
+           jar(org='log4j', name='log4j', rev='1.2.15').with_sources()
+	     .exclude(org='jline', name='jline')
+             .exclude(org='javax.jms', name='jms')
+             .exclude(org='com.sun.jdmk', name='jmxtools')
+             .exclude(org='com.sun.jmx', name='jmxri'))
+        ])
 
 Those :ref:`jar() things <bdict_jar>` are references to public jars.
+
+A Test Target
+=============
+
+The `Pants Java Hello World example tests
+<https://github.com/pantsbuild/pants/tree/master/tests/java/com/pants/examples/hello>`_
+are normal JUnit tests. To run them with Pants, we
+need a target for them:
+
+.. literalinclude:: ../../../../tests/java/com/pants/examples/hello/greet/BUILD
+   :start-after: Test the
+
+As with other targets, this one depends on code that it imports. Thus, a typical
+test target depends on the library that it tests.
 
 ***********************
 The Usual Commands: JVM
@@ -137,35 +161,41 @@ The Usual Commands: JVM
   test targets, Pants runs the tests. If they aren't test targets, Pants will
   still compile them since it knows it must compile before it can test.
 
-  ``pants goal test src/java/com/myorg/myproject tests/java/com/myorg/myproject``
+  ``./pants goal test src/java/com/pants/examples/hello/:: tests/java/com/pants/examples/hello/::``
 
-  **Run just those two troublesome tests:** (assuming they're JUnit tests; other
+  **Run just that one troublesome test class:** (assuming a JUnit test; other
   frameworks use other flags)
 
-  ``pants goal test tests/java/com/myorg/myproject --test-junit-test=com.myorg.myproject.HarshTest --test-junit-test=com.myorg.myproject.HarsherTest``
+  ``./pants goal test tests/java/com/pants/examples/hello/:: --test-junit-test=com.pants.examples.hello.greet.GreetingTest``
 
 **Packaging Binaries**
   To create a jar containing just the code built by a JVM target, use the
   `jar` goal::
 
-      pants goal jar src/java/com/myorg/myproject
+      ./pants goal jar src/java/com/pants/examples/hello/greet
 
-  To create "bundle" (a runnable thing and its dependencies)::
+  To create :ref:`bundle <jvm_bundles>` (a runnable thing and its
+  dependencies, perhaps including helper files)::
 
-      ./pants goal bundle src/main/java/yourproject --bundle-archive=zip -v
+      ./pants goal bundle src/java/com/pants/examples/hello/main --bundle-archive=zip
 
   If your bundle is JVM, it's a zipfile which can run by means of an
   ``unzip`` and seting your ``CLASSPATH`` to ``$BASEDIR/my_service.jar``
   (where ``$BASEDIR is`` the directory you've just unzipped).
 
 **Get Help**
-  Get the list of goals::
 
-    ./pants goal goals
+  Get basic help::
+
+      ./pants goal help
+
+  Get a list of goals::
+
+      ./pants goal goals
 
   Get help for one goal::
 
-    ./pants goal help onegoal
+      ./pants goal help onegoal
 
 *********
 Toolchain
@@ -218,50 +248,76 @@ Bundles: Deploy-able Runnable File Trees
 You can enjoy your web service on your development machine's ``localhost``,
 but to let other people enjoy it, you probably want to copy it to a server
 machine. With Pants, the easiest way to do this is to create a *bundle*: a
-directory tree of ``.jar`` and helper files. If your ``jvm_app`` has
-a ``bundles`` parameter, it can specify trees of files to include in the tree.
+directory tree of ``.jar`` and helper files.
 
-If you want to set up a tree of static files but don't need it to be runnable,
+Our "hello world" sample application needs a configuration file to run
+correctly. (You can try to run without the configuration file, but the
+program crashes immediately.) We define a ``jvm_app`` that represents
+a runnable binary and "bundles" of extra files:
+
+.. literalinclude:: ../../../java/com/pants/examples/hello/main/BUILD
+   :start-after: Like Hello World
+   :end-before: The binary
+
+Here, we keep the extra files in a subdirectory, ``config/`` so that
+they don't clutter up this directory. (In this simple example, there's
+just one file, so there isn't actually much clutter.) By using the
+:ref:`bdict_bundle`\'s ``relative_to`` parameter, we "strip off" that
+subdirectory; in the generated bundle, these extra files will be in
+the top directory.
+
+(If you want to set up a tree of static files but don't need it to be runnable,
 you can define a ``jvm_app`` target with bundles (and/or resources) but whose
 ``jvm_binary`` has no source or main; the resulting bundle will have
-the files you want (along with a couple of not-so-useful stub ``.jar`` files).
+the files you want (along with a couple of not-so-useful stub ``.jar`` files).)
 
 **Generating a Bundle**
 
-Invoke ``./pants goal bundle`` on a JVM app or JVM binary target.
+Invoke ``./pants goal bundle`` on a JVM app or JVM binary target::
+
+  ./pants goal bundle src/java/com/pants/examples/hello/main:main
 
 **Contents of a Bundle**
 
-A bundle is basically a directory tree containing ``.jar``\s. The
-``.jar`` in the top-level directory has a manifest so you can run
-it with ``java -jar``::
+The generated bundle is basically a directory tree containing ``.jar``\s and
+extra files. The ``.jar`` in the top-level directory has a manifest
+so you can run it with ``java -jar``::
 
+    $ cd dist/main-bundle/
+    $ java -jar main-bin.jar
+    16:52:11 INFO : Hello, world!
+
+The "bundle" is basically a tree of files::
+
+    $ cd dist/main-bundle/
     $ find .
-    pingpong.jar
-    libs/
-    libs/org.scala-lang-scala-library-2.9.2.jar
-    libs/org.sonatype.sisu.inject-cglib-2.2.1-v20090111.jar
-    libs/pingpong.jar
-    libs/src.java.com.twitter.common.examples.pingpong.pingpong-lib.jar
-    libs/...
+    .
+    ./libs
+    ./libs/javax.activation-activation-1.1.jar
+    ./libs/javax.mail-mail-1.4.jar
+    ./libs/log4j-log4j-1.2.15.jar
+    ./log4j.properties
+    ./main-bin.jar
+    $ jar -tf main-bin.jar
+    com/
+    com/pants/
+    com/pants/examples/
+    com/pants/examples/hello/
+    com/pants/examples/hello/greet/
+    com/pants/examples/hello/greet/Greeting.class
+    com/pants/examples/hello/main/
+    com/pants/examples/hello/main/HelloMain.class
+    META-INF/
+    META-INF/MANIFEST.MF
 
-If your ``jvm_app`` has a ``bundles`` parameter, this might specify
-directories of files to copy into the generated bundle. E.g., your
-``jvm_app``` might have a ``bundles`` like ::
-
-    bundles = [ bundle().add(rglobs('tools/config/*')), ]
-
-In this case, you'd expect files from this directory to show up in
-the bundle::
-
-    tools/config/
-    tools/config/launcher.scala
-    tools/config/...
+That ``log4j.properties`` file came from the ``bundles=`` parameter.
+The ``libs/`` directory contains 3rdparty jars.
+The jar in the top directory contains code compiled for this target.
 
 **Deploying a Bundle**
 
 Instead of just creating a directory tree, you can pass
-``--bundle-archive`` to ``.pants goal bundle`` to generate
+``--bundle-archive`` to ``./pants goal bundle`` to generate
 an archive file (a zipped tarfile or some other format) instead.
 You can copy the archive somewhere, then unpack it on
 the destination machine. If there are some "standard jars" that are

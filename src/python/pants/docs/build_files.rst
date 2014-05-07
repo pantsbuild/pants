@@ -32,9 +32,8 @@ goals can be especially helpful:
 
 ``list`` Did I define the targets I meant to? ::
 
-    $ ./pants goal list src/java/com/twitter/common/examples/pingpong:
-    src/java/com/twitter/common/examples/pingpong/BUILD:pingpong-lib
-    src/java/com/twitter/common/examples/pingpong/BUILD:pingpong
+    $ ./pants goal list src/java/com/pants/examples/hello/greet
+    src/java/com/pants/examples/hello/greet/BUILD:greet
 
 ``list ::`` List **every** target to find out:
 Did a change in one ``BUILD`` file break others? ::
@@ -49,22 +48,25 @@ Did a change in one ``BUILD`` file break others? ::
     $ # Instead of listing all targets, a strack trace. We found a problem
 
 ``depmap`` Do I pull in the dependencies I expect?
-(JVM languages only) (This lists dependencies from your source; it doesn't catch
-dependencies pulled in from 3rdparty ``.jars``)::
+(JVM languages only) This lists dependencies from your source; it doesn't catch
+dependencies pulled in from 3rdparty ``.jars``. For example, here it shows
+that ``main-bin`` depends on the 3rdparty ``log4j`` jar, but not that
+``log4j`` depends on ``javax.mail``::
 
-    $ ./pants goal depmap src/java/com/twitter/common/examples/pingpong:pingpong-lib
-    internal-src.java.com.twitter.common.examples.pingpong.pingpong-lib
-      internal-src.java.com.twitter.common.application.application
-        internal-src.java.com.twitter.common.application.modules.applauncher
-          internal-src.java.com.twitter.common.application.action
-            ...more output...
+    $ ./pants goal depmap src/java/com/pants/examples/hello/main
+    internal-src.java.com.pants.examples.hello.main.main
+      internal-src.java.com.pants.examples.hello.main.main-bin
+        internal-src.java.com.pants.examples.hello.greet.greet
+        log4j-log4j-1.2.15
 
 ``filedeps`` What source files do I depend on? ::
 
-    $ ./pants goal filedeps src/java/com/twitter/common/examples/pingpong:pingpong-lib
-    ~archie/pantsbuild/src/java/com/twitter/common/util/Stat.java
-    ~archie/pantsbuild/src/java/com/twitter/common/net/http/handlers/pprof/ContentionProfileHandler.java
-    ...more output...
+    $ ./pants goal filedeps src/java/com/pants/examples/hello/main
+    ~archie/workspace/pants/src/java/com/pants/examples/hello/greet/BUILD
+    ~archie/workspace/pants/src/java/com/pants/examples/hello/greet/Greeting.java
+    ~archie/workspace/pants/src/java/com/pants/examples/hello/main/BUILD
+    ~archie/workspace/pants/src/java/com/pants/examples/hello/main/config/log4j.properties
+    ~archie/workspace/pants/src/java/com/pants/examples/hello/main/HelloMain.java
 
 .. _usage-default-target:
 
@@ -298,10 +300,10 @@ targets and register those targets in a Pants data structure.
 Though your repo might contain many ``BUILD`` files, Pants might not execute all
 of them. If you invoke::
 
-    ./pants goal test tests/java/com/twitter/common/examples/pingpong:pingpong
+    ./pants goal test tests/java/com/pants/examples/hello/greet:greet
 
 Pants executes the source tree's top-level ``BUILD`` file (executed on every Pants run) and
-``tests/java/com/twitter/common/examples/pingpong/BUILD``. The ``pingpong`` target
+``tests/java/com/pants/examples/hello/greet/BUILD``. The ``greet`` target
 depends on targets from other ``BUILD`` files, so Pants executes those ``BUILD``
 files, too; it iterates over the dependency tree, executing ``BUILD`` files as it
 goes. It does *not* execute ``BUILD`` files that don't contain targets in that

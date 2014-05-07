@@ -77,9 +77,9 @@ Troubleshooting a JVM Dependencies Problem
 If you're working in JVM (Java or Scala) and suspect you're pulling in
 different versions of some package, you can dump your dependency "tree"
 with versions with an Ivy resolve report. To generate a report for
-a target such as the ``pingpong`` example::
+a target such as the ``hello/main`` example::
 
-    $ ./pants goal resolve src/java/com/pants/examples/pingpong --ivy-open
+    $ ./pants goal resolve src/java/com/pants/examples/hello/main --ivy-open
 
 Ivy's report shows which things depend on which versions. You can see which
 package is pulling in the package-version you didn't expect. (It might not
