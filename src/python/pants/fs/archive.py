@@ -45,8 +45,9 @@ class TarArchiver(Archiver):
     self.extension = extension
 
   def create(self, basedir, outdir, name, prefix=None):
-    tarpath = os.path.join(outdir, '%s.%s' % (name, self.extension))
+    tarpath = os.path.join(outdir, '%s.%s' % (name.decode('utf-8'), self.extension))
     with open_tar(tarpath, self.mode, dereference=True, errorlevel=1) as tar:
+      basedir = basedir.decode('utf-8')
       tar.add(basedir, arcname=prefix or '.')
     return tarpath
 
@@ -77,11 +78,13 @@ class ZipArchiver(Archiver):
     zippath = os.path.join(outdir, '%s.zip' % name)
     with open_zip(zippath, 'w', compression=ZIP_DEFLATED) as zip:
       for root, _, files in os.walk(basedir):
+        root = root.decode('utf-8')
         for file in files:
+          file = file.decode('utf-8')
           full_path = os.path.join(root, file)
           relpath = os.path.relpath(full_path, basedir)
           if prefix:
-            relpath = os.path.join(prefix, relpath)
+            relpath = os.path.join(prefix.decode('utf-8'), relpath)
           zip.write(full_path, relpath)
     return zippath
 
