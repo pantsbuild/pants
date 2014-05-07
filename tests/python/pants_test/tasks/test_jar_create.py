@@ -44,9 +44,7 @@ class JarCreateMiscTest(JarCreateTestBase):
           pants_supportdir: /tmp/build-support
           """).strip()
 
-    jar_create = JarCreate(create_context(config=ini, options=self.create_options()),
-                           '/tmp/workdir')
-    self.assertEquals(jar_create.confs, ['default'])
+    JarCreate(create_context(config=ini, options=self.create_options()), '/tmp/workdir')
 
   def test_resources_with_scala_java_files(self):
     for ftype in ('java', 'scala'):
