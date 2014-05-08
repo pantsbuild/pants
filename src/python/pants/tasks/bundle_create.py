@@ -116,23 +116,28 @@ class BundleCreate(JvmBinaryTask):
         os.symlink(path, os.path.join(lib_dir, external_jar))
         classpath.add(external_jar)
 
-    # TODO: There should probably be a separate 'binary_jars' product type,
-    # so we can more easily distinguish binary jars (that contain all the classes of their
-    # transitive deps) and per-target jars.
-    for basedir, jars in self.context.products.get('jars').get(app.binary).items():
-      if len(jars) != 1:
-        raise TaskError('Expected 1 mapped binary for %s but found: %s' % (app.binary, jars))
+    # If the jvm_binary target had sources/resources then jar_create will already have
+    # created a jar for it, which we must augment.  If not, we simply create a new jar.
+    existing_jar_products = self.context.products.get('jars').get(app.binary)
+    if existing_jar_products:
+      existing_jars = []
+      for basedir, jars in existing_jar_products.items():
+        for jar in jars:
+          existing_jars.append(os.path.join(basedir, jar))
+      if len(existing_jars) != 1:
+        raise TaskError('Expected 1 mapped binary for %s but found: %s' %
+                        (app.binary, existing_jars))
+      binary_jar = existing_jars[0]
+    else:
+      binary_jar = None
+    bundle_jar = os.path.join(bundle_dir, '%s.jar' % app.binary.basename)
 
-      binary = jars[0]
-      binary_jar = os.path.join(basedir, binary)
-      bundle_jar = os.path.join(bundle_dir, '%s.jar' % app.binary.basename)
-
-      with self._binary_jar(app.binary, binary_jar, bundle_jar) as jar:
-        manifest = self.create_main_manifest(app.binary)
-        if classpath:
-          manifest.addentry(Manifest.CLASS_PATH,
-                            ' '.join(os.path.join('libs', jar) for jar in classpath))
-        jar.writestr(Manifest.PATH, manifest.contents())
+    with self._binary_jar(app.binary, binary_jar, bundle_jar) as jar:
+      manifest = self.create_main_manifest(app.binary)
+      if classpath:
+        manifest.addentry(Manifest.CLASS_PATH,
+                          ' '.join(os.path.join('libs', jar) for jar in classpath))
+      jar.writestr(Manifest.PATH, manifest.contents())
 
     for bundle in app.bundles:
       for path, relpath in bundle.filemap.items():
@@ -148,6 +153,12 @@ class BundleCreate(JvmBinaryTask):
       with self.deployjar(binary, bundled_binary_path) as jar:
         yield jar
     else:
-      shutil.copy(binary_path, bundled_binary_path)
-      with open_jar(bundled_binary_path, 'a') as jar:
-        yield jar
+      if binary_path:
+        # Augment a copy of the existing jar.
+        shutil.copy(binary_path, bundled_binary_path)
+        with open_jar(bundled_binary_path, 'a') as jar:
+          yield jar
+      else:
+        # Create a new jar.
+        with open_jar(bundled_binary_path, 'w') as jar:
+          yield jar
