@@ -160,13 +160,24 @@ class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler) {
 
   /**
    * Run a compile. The resulting analysis is also cached in memory.
+   *  Note:  This variant automatically contructs an error-reporter.
    */
   def compile(inputs: Inputs)(log: Logger): Analysis = compile(inputs, None)(log)
 
   /**
    * Run a compile. The resulting analysis is also cached in memory.
+   *
+   *  Note:  This variant automatically contructs an error-reporter.
    */
   def compile(inputs: Inputs, cwd: Option[File])(log: Logger): Analysis = {
+    val maxErrors     = 100
+    compile(inputs, cwd, new LoggerReporter(maxErrors, log, identity))(log)
+  }
+
+  /**
+   * Run a compile. The resulting analysis is also cached in memory.
+   */
+  def compile(inputs: Inputs, cwd: Option[File], reporter: xsbti.Reporter)(log: Logger): Analysis = {
     import inputs._
     if (forceClean && Compiler.analysisIsEmpty(cacheFile)) Util.cleanAllClasses(classesDirectory)
     val getAnalysis: File => Option[Analysis] = analysisMap.get _
@@ -175,8 +186,6 @@ class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler) {
     val compileOutput = CompileOutput(classesDirectory)
     val globalsCache  = Compiler.residentCache
     val progress      = None
-    val maxErrors     = 100
-    val reporter      = new LoggerReporter(maxErrors, log, identity)
     val skip          = false
     val incOpts       = incOptions.options
     val compileSetup  = new CompileSetup(compileOutput, new CompileOptions(scalacOptions, javacOptions), scalac.scalaInstance.actualVersion, compileOrder, incOpts.nameHashing)
