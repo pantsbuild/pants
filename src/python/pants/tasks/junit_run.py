@@ -35,6 +35,7 @@ _TaskExports = namedtuple('_TaskExports',
                            'tool_classpath',
                            'workdir'])
 
+
 def _classfile_to_classname(cls):
   clsname, _ = os.path.splitext(cls.replace('/', '.'))
   return clsname
@@ -165,13 +166,15 @@ class _JUnitRunner(object):
 
       self._context.lock.release()
       self.instrument(targets, tests, junit_classpath)
+      def report():
+        self.report(targets, tests, junit_classpath)
       try:
         self.run(targets, tests, junit_classpath)
-      except Exception as pokemon:
-        sys.stderr.write('execute raised %s' % pokemon)
-      finally:
-        self.report(targets, tests, junit_classpath)
-
+      except TaskError:
+        report()
+        raise
+      else:
+        report()
 
   def instrument(self, targets, tests, junit_classpath):
     """Called from coverage classes. Run any code instrumentation needed.
@@ -265,7 +268,6 @@ class _JUnitRunner(object):
     else:  # It's a classname.
       classname = classname_or_srcfile
       yield classname + methodname
-
 
 
 class _Coverage(_JUnitRunner):
