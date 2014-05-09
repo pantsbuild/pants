@@ -478,7 +478,6 @@ python_library(
   name = 'markdown_to_html',
   sources = ['markdown_to_html.py'],
   dependencies = [
-    pants('3rdparty/python:elementtree'),
     pants('3rdparty/python:Markdown'),
     pants('3rdparty/python:Pygments'),
     pants(':common'),

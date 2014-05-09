@@ -30,9 +30,7 @@ as it does not modify the system Python libraries. ::
 
    $ virtualenv /tmp/pants
    $ source /tmp/pants/bin/activate
-   $ pip install pants \
-     --allow-external elementtree \
-     --allow-unverified elementtree
+   $ pip install pants
    $ pants
 
 To simplify a virtualenv-based installation, consider adding a wrapper script

@@ -41,8 +41,7 @@ After updating the checked-in version numbers, publish locally and verify the re
    VENV_DIR=$(mktemp -d -t pants.XXXXX)
    virtualenv $VENV_DIR
    source $VENV_DIR/bin/activate
-   pip install --allow-external elementtree --allow-unverified elementtree \
-     --find-links=file://$(pwd)/dist pants==0.0.17
+   pip install --find-links=file://$(pwd)/dist pants==0.0.17
    pants goal list ::
    deactivate
 
