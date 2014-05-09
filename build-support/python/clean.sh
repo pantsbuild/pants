@@ -1,8 +1,8 @@
 #!/bin/bash
 
-SCIENCE_BASE=$(dirname $0)/../..
-rm -rf $HOME/.pex
-rm -rf $SCIENCE_BASE/.pants.d
-rm -rf $SCIENCE_BASE/.python
-rm -f  $SCIENCE_BASE/pants.pex
-find $SCIENCE_BASE -name '*.pyc' | xargs rm -f
+PANTS_BASE=$(dirname $0)/../..
+rm -rf ${HOME}/.pex
+rm -rf ${PANTS_BASE}/build-support/pants_deps.venv
+rm -rf ${PANTS_BASE}/build-support/pants_dev_deps.venv
+rm -f  ${PANTS_BASE}/pants.pex
+find ${PANTS_BASE} -name '*.pyc' | xargs rm -f
