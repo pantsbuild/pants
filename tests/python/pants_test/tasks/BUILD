@@ -35,6 +35,7 @@ python_test_suite(
     pants(':filter'),
     pants(':ivy_utils'),
     pants(':jar_create'),
+    pants(':jar_publish'),
     pants(':jar_library_with_empty_dependencies'),
     pants(':listtargets'),
     pants(':minimal_cover'),
@@ -215,6 +216,18 @@ python_tests(
     pants('src/python/pants/targets:scala'),
     pants('src/python/pants/goal:products'),
     pants('src/python/pants/tasks:jar_create'),
+    pants('tests/python/pants_test/base:base-test'),
+    pants('tests/python/pants_test:base-test'),
+  ],
+)
+
+python_tests(
+  name = 'jar_publish',
+  sources = ['test_jar_publish.py'],
+  dependencies = [
+    pants('3rdparty/python:mock'),
+    pants(':base-test'),
+    pants('src/python/pants/tasks:jar_publish'),
     pants('tests/python/pants_test/base:base-test'),
     pants('tests/python/pants_test:base-test'),
   ],

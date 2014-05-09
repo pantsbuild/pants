@@ -220,7 +220,7 @@ def target_internal_dependencies(target):
   return filter(lambda tgt: not isinstance(tgt, Resources), target.internal_dependencies)
 
 
-class JarPublish(ScmPublish, Task):
+class JarPublish(Task, ScmPublish):
   """Publish jars to a maven repository.
 
   At a high-level, pants uses `Apache Ivy <http://ant.apache.org/ivy/>`_ to
