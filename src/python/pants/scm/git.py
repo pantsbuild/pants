@@ -39,19 +39,17 @@ class Git(Scm):
 
   @property
   def commit_id(self):
-    sha = self._check_output(['rev-parse', 'HEAD'], raise_type=Scm.LocalException)
-    return self._cleanse(sha)
+    return self._check_output(['rev-parse', 'HEAD'], raise_type=Scm.LocalException)
 
   @property
   def tag_name(self):
     tag = self._check_output(['describe', '--tags', '--always'], raise_type=Scm.LocalException)
-    return None if b'cannot' in tag else self._cleanse(tag)
+    return None if b'cannot' in tag else tag
 
   @property
   def branch_name(self):
     branch = self._check_output(['rev-parse', '--abbrev-ref', 'HEAD'],
                                 raise_type=Scm.LocalException)
-    branch = self._cleanse(branch)
     return None if branch == 'HEAD' else branch
 
   def changed_files(self, from_commit=None, include_untracked=False):
@@ -131,7 +129,7 @@ class Git(Scm):
     out, _ = process.communicate()
 
     self._check_result(cmd, process.returncode, failure_msg, raise_type)
-    return out
+    return self._cleanse(out)
 
   def _create_git_cmdline(self, args):
     return [self._gitcmd, '--git-dir=%s' % self._gitdir, '--work-tree=%s' % self._worktree] + args

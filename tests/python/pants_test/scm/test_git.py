@@ -83,7 +83,7 @@ class GitTest(unittest.TestCase):
 
       touch(cls.readme_file)
       subprocess.check_call(['git', 'add', 'README'])
-      subprocess.check_call(['git', 'commit', '-am', 'initial commit.'])
+      subprocess.check_call(['git', 'commit', '-am', 'initial commit with decode -> \x81b'])
       subprocess.check_call(['git', 'tag', 'first'])
       subprocess.check_call(['git', 'push', '--tags', 'depot', 'master'])
       subprocess.check_call(['git', 'branch', '--set-upstream', 'master', 'depot/master'])
