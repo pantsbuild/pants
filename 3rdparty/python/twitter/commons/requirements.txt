@@ -11,7 +11,6 @@
 #  1 file changed, 2 insertions(+), 1 deletion(-)
 
 --find-links https://pantsbuild.github.io/cheeseshop/third_party/twitter-commons/b3ebdadaac0cc1376c98e5b2490d42effd99a2e4/index.html
---no-index
 
 twitter.common.collections
 twitter.common.config
