@@ -113,6 +113,47 @@ By providing a target with the default name, you simplify interacting with your 
 command-line. This gives users a better experience using your library.
 In BUILD files, dependencies are less verbose, which improves readability.
 
+The 1:1:1 Rule
+**************
+
+Your code's organization, including ``BUILD`` target configuration, makes
+building easier or harder. Some folks summarize elegant code layout choice
+with the **1:1:1** rule of thumb:
+
+* **1 Folder**
+* **1 Package**
+* **1 BUILD Target**
+
+If there's a set of code that usually goes together, it makes sense for it to
+be in one folder using one package namespace.
+The folder should have a ``BUILD`` file with one target to build that set of
+code.
+
+If there's a subset of code that *doesn't* usually go together with the rest
+of the code in some directory/target, it makes sense to move that code out
+into another folder and its own package namespace.
+The new folder should have its own ``BUILD`` file containing a target to build
+that code.
+
+Code belongs at the "leaves" of your directory tree. E.g., if
+``.../foo/Foo.java`` exists, you don't want to create ``.../foo/bar/Bar.java``
+in a subdirectory. (Or if you do, then you want to move the other foo
+code to ``../foo/justfoonotbar/Foo.java`` or somesuch.) This keeps all the code
+for a package in 1 Folder, 1 BUILD target.
+
+**1:1:1**  is a "rule of thumb", not a law.
+If your code breaks this rule, it will still build.
+**1:1:1** tends to make your code easier to work with.
+
+If you're new to Pants, you might feel overwhelmed by all these ``BUILD``
+files; you might think it's simpler to have fewer of them: maybe just one
+``BUILD`` file in the "top folder" for a project that builds code from
+several directories. But this "target coarseness" can waste your time:
+you have a huge target that depends on everything that your source depends on.
+If you divide your code into smaller, coherent targets, each of those targets
+has only a subset of those dependencies.
+
+
 .. _usage-avoid-rglobs:
 
 Avoid rglobs
