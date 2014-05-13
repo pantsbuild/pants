@@ -54,6 +54,7 @@ class CacheManagerTest(BaseMockTargetTest):
     return VersionedTarget(self.cache_manager, target, target.id)
 
   def test_partition(self):
+    # Set up test targets.
     a = MockTarget('a', [], 1)
     b = MockTarget('b', [a], 1)
     c = MockTarget('c', [b], 1)
@@ -62,26 +63,59 @@ class CacheManagerTest(BaseMockTargetTest):
 
     targets = [a, b, c, d, e]
 
+    def print_partitions(partitions):
+      strs = []
+      for partition in partitions:
+        strs.append('(%s)' % ', '.join([t.id for t in partition.targets]))
+      print('[%s]' % ' '.join(strs))
+
+    # Verify basic data structure soundness.
     all_vts = self.cache_manager._sort_and_validate_targets(targets)
-
-    [ print_vt(vt) for vt in all_vts ]
-    print('')
-
     invalid_vts = filter(lambda vt: not vt.valid, all_vts)
     self.assertEquals(5, len(invalid_vts))
-
     self.assertEquals(5, len(all_vts))
-
     vts_targets = [vt.targets[0] for vt in all_vts]
     self.assertEquals(set(targets), set(vts_targets))
 
+    # Test a simple partition.
     ic = InvalidationCheck(all_vts, [], 3)
     partitioned = ic.all_vts_partitioned
+    print_partitions(partitioned)
 
-    [ print_vt(vt) for vt in partitioned ]
-
-    # NOTE(ryan): several correct partitionings are possible, but in all cases 4 1-source targets will be added to the
-    # first partition before it exceeds the limit of 3, and the final target will be in a partition by itself.
+    # Several correct partitionings are possible, but in all cases 4 1-source targets will be
+    # added to the first partition before it exceeds the limit of 3, and the final target will
+    # be in a partition by itself.
     self.assertEquals(2, len(partitioned))
     self.assertEquals(4, len(partitioned[0].targets))
     self.assertEquals(1, len(partitioned[1].targets))
+
+    # Test partition with colors.
+    red = 'red'
+    blue = 'blue'
+
+    colors = {
+      all_vts[0]: blue,
+      all_vts[1]: red,
+      all_vts[2]: red,
+      all_vts[3]: red,
+      all_vts[4]: blue
+    }
+
+    # As a reference, we partition without colors.
+    ic = InvalidationCheck(all_vts, [], 2)
+    partitioned = ic.all_vts_partitioned
+    print_partitions(partitioned)
+
+    self.assertEquals(2, len(partitioned))
+    self.assertEquals(3, len(partitioned[0].targets))
+    self.assertEquals(2, len(partitioned[1].targets))
+
+    # Now apply color restrictions.
+    ic = InvalidationCheck(all_vts, [], 2, vt_colors=colors)
+    partitioned = ic.all_vts_partitioned
+    print_partitions(partitioned)
+
+    self.assertEquals(3, len(partitioned))
+    self.assertEquals(1, len(partitioned[0].targets))
+    self.assertEquals(3, len(partitioned[1].targets))
+    self.assertEquals(1, len(partitioned[2].targets))

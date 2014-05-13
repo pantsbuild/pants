@@ -15,7 +15,7 @@ from twitter.common.collections import OrderedSet
 from twitter.common.contextutil import open_zip, temporary_dir
 from twitter.common.dirutil import safe_mkdir, safe_rmtree
 
-from pants.base.build_environment import get_buildroot
+from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.target import Target
 from pants.base.worker_pool import Work
 from pants.goal.products import MultipleRootedProducts
@@ -226,6 +226,12 @@ class JvmCompile(NailgunTask):
     else:
       self._dep_analyzer = None
 
+    # If non-zero, and we have fewer than this number of locally-changed targets,
+    # then we partition them separately, to preserve stability in the face of repeated
+    # compilations.
+    self._locally_changed_targets_heuristic_limit = context.config.getint(config_section,
+        'locally_changed_targets_heuristic_limit', 0)
+
     self._class_to_jarfile = None  # Computed lazily as needed.
 
     self.context.products.require_data('exclusives_groups')
@@ -275,14 +281,26 @@ class JvmCompile(NailgunTask):
       for jar in self.extra_compile_time_classpath_elements():
         classpath.insert(0, (conf, jar))
 
+    # TODO(benjy): Should sources_by_target and locally_changed_targets be on all Tasks?
+
     # Target -> sources (relative to buildroot).
     sources_by_target = self._compute_current_sources_by_target(relevant_targets)
+
+    # If needed, find targets that we've changed locally (as opposed to
+    # changes synced in from the SCM).
+    locally_changed_targets = None
+    if self._locally_changed_targets_heuristic_limit:
+      locally_changed_targets = self._find_locally_changed_targets(sources_by_target)
+      if locally_changed_targets and \
+              len(locally_changed_targets) > self._locally_changed_targets_heuristic_limit:
+        locally_changed_targets = None
 
     # Invalidation check. Everything inside the with block must succeed for the
     # invalid targets to become valid.
     with self.invalidated(relevant_targets,
                           invalidate_dependents=True,
-                          partition_size_hint=self._partition_size_hint) as invalidation_check:
+                          partition_size_hint=self._partition_size_hint,
+                          locally_changed_targets=locally_changed_targets) as invalidation_check:
       if invalidation_check.invalid_vts:
         # The analysis for invalid and deleted sources is no longer valid.
         invalid_targets = [vt.target for vt in invalidation_check.invalid_vts]
@@ -607,6 +625,28 @@ class JvmCompile(NailgunTask):
         sources.extend(self._resolve_target_sources(target.java_sources, '.java'))
       return sources
     return dict([(t, calculate_sources(t)) for t in targets])
+
+  def _find_locally_changed_targets(self, sources_by_target):
+    """Finds the targets whose sources have been modified locally.
+
+    Returns a list of targets, or None if no SCM is available.
+    """
+    # Compute the src->targets mapping. There should only be one target per source,
+    # but that's not yet a hard requirement, so the value is a list of targets.
+    # TODO(benjy): Might this inverse mapping be needed elsewhere too?
+    targets_by_source = defaultdict(list)
+    for tgt, srcs in sources_by_target.items():
+      for src in srcs:
+        targets_by_source[src].append(tgt)
+
+    ret = OrderedSet()
+    scm = get_scm()
+    if not scm:
+      return None
+    changed_files = scm.changed_files(include_untracked=True)
+    for f in changed_files:
+      ret.update(targets_by_source.get(f, []))
+    return list(ret)
 
   def _resolve_target_sources(self, target_sources, extension=None, relative_to_target_base=False):
     """Given a list of pants targets, extract their sources as a list.

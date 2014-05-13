@@ -157,25 +157,32 @@ class Task(object):
 
   @contextmanager
   def invalidated(self, targets, only_buildfiles=False, invalidate_dependents=False,
-                  partition_size_hint=sys.maxint, silent=False):
+                  partition_size_hint=sys.maxint, silent=False, locally_changed_targets=None):
     """Checks targets for invalidation, first checking the artifact cache.
     Subclasses call this to figure out what to work on.
 
-    targets:               The targets to check for changes.
-    only_buildfiles:       If True, then only the target's BUILD files are checked for changes, not
-                           its sources.
-    invalidate_dependents: If True then any targets depending on changed targets are invalidated.
-    partition_size_hint:   Each VersionedTargetSet in the yielded list will represent targets
-                           containing roughly this number of source files, if possible. Set to
-                           sys.maxint for a single VersionedTargetSet. Set to 0 for one
-                           VersionedTargetSet per target. It is up to the caller to do the right
-                           thing with whatever partitioning it asks for.
+    targets:                 The targets to check for changes.
+    only_buildfiles:         If True, then only the target's BUILD files are checked for changes,
+                             not its sources.
+    invalidate_dependents:   If True then any targets depending on changed targets are invalidated.
+    partition_size_hint:     Each VersionedTargetSet in the yielded list will represent targets
+                             containing roughly this number of source files, if possible. Set to
+                             sys.maxint for a single VersionedTargetSet. Set to 0 for one
+                             VersionedTargetSet per target. It is up to the caller to do the right
+                             thing with whatever partitioning it asks for.
+    locally_changed_targets: Targets that we've edited locally. If specified, and there aren't too
+                             many of them, we keep these in separate partitions from other targets,
+                             as these are more likely to have build errors, and so to be rebuilt over
+                             and over, and partitioning them separately is a performance win.
 
     Yields an InvalidationCheck object reflecting the (partitioned) targets.
 
     If no exceptions are thrown by work in the block, the build cache is updated for the targets.
     Note: the artifact cache is not updated. That must be done manually.
     """
+    # TODO(benjy): Compute locally_changed_targets here instead of passing it in? We currently pass
+    # it in because JvmCompile already has the source->target mapping for other reasons, and also
+    # to selectively enable this feature.
     extra_data = [self.invalidate_for()]
 
     for f in self.invalidate_for_files():
@@ -187,7 +194,21 @@ class Task(object):
                                  extra_data,
                                  only_externaldeps=only_buildfiles)
 
-    invalidation_check = cache_manager.check(targets, partition_size_hint)
+    # We separate locally-modified targets from others by coloring them differently.
+    # This can be a performance win, because these targets are more likely to be iterated
+    # over, and this preserves "chunk stability" for them.
+    colors = {}
+
+    # But we only do so if there aren't too many, or this optimization will backfire.
+    locally_changed_target_limit = 10
+
+    if locally_changed_targets and len(locally_changed_targets) < locally_changed_target_limit:
+      for t in targets:
+        if t in locally_changed_targets:
+          colors[t] = 'locally_changed'
+        else:
+          colors[t] = 'not_locally_changed'
+    invalidation_check = cache_manager.check(targets, partition_size_hint, colors)
 
     if invalidation_check.invalid_vts and self.artifact_cache_reads_enabled():
       with self.context.new_workunit('cache'):
@@ -207,7 +228,7 @@ class Task(object):
           self._report_targets('No cached artifacts for ', uncached_targets, '.')
       # Now that we've checked the cache, re-partition whatever is still invalid.
       invalidation_check = \
-        InvalidationCheck(invalidation_check.all_vts, uncached_vts, partition_size_hint)
+        InvalidationCheck(invalidation_check.all_vts, uncached_vts, partition_size_hint, colors)
 
     if not silent:
       targets = []

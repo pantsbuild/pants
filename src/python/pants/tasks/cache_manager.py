@@ -92,7 +92,7 @@ class VersionedTarget(VersionedTargetSet):
 # are implemented.
 class InvalidationCheck(object):
   @classmethod
-  def _partition_versioned_targets(cls, versioned_targets, partition_size_hint):
+  def _partition_versioned_targets(cls, versioned_targets, partition_size_hint, vt_colors=None):
     """Groups versioned targets so that each group has roughly the same number of sources.
 
     versioned_targets is a list of VersionedTarget objects  [vt1, vt2, vt3, vt4, vt5, vt6, ...].
@@ -102,6 +102,9 @@ class InvalidationCheck(object):
     of [vt4, vt5] and VT3 is [vt6].
 
     The new versioned targets are chosen to have roughly partition_size_hint sources.
+
+    If vt_colors is specified, it must be a map from VersionedTarget -> opaque 'color' values.
+    Two VersionedTargets will be in the same partition only if they have the same color.
 
     This is useful as a compromise between flat mode, where we build all targets in a
     single compiler invocation, and non-flat mode, where we invoke a compiler for each target,
@@ -129,7 +132,15 @@ class InvalidationCheck(object):
         current_group.vts = []
         current_group.total_sources = 0
 
+    current_color = None
     for vt in versioned_targets:
+      if vt_colors:
+        color = vt_colors.get(vt, current_color)
+        if current_color is None:
+          current_color = color
+        if color != current_color:
+          close_current_group()
+          current_color = color
       add_to_current_group(vt)
       if current_group.total_sources > 1.5 * partition_size_hint and len(current_group.vts) > 1:
         # Too big. Close the current group without this vt and add it to the next one.
@@ -142,20 +153,29 @@ class InvalidationCheck(object):
 
     return res
 
-  def __init__(self, all_vts, invalid_vts, partition_size_hint=None):
+  def __init__(self, all_vts, invalid_vts, partition_size_hint=None, target_colors=None):
+    # target_colors is specified by Target. We need it by VersionedTarget.
+    vt_colors = {}
+    if target_colors:
+      for vt in all_vts:
+        if vt.target in target_colors:
+          vt_colors[vt] = target_colors[vt.target]
+
     # All the targets, valid and invalid.
     self.all_vts = all_vts
 
     # All the targets, partitioned if so requested.
-    self.all_vts_partitioned = self._partition_versioned_targets(
-      all_vts, partition_size_hint) if partition_size_hint else all_vts
+    self.all_vts_partitioned = \
+      self._partition_versioned_targets(all_vts, partition_size_hint, vt_colors) \
+        if (partition_size_hint or vt_colors) else all_vts
 
     # Just the invalid targets.
     self.invalid_vts = invalid_vts
 
     # Just the invalid targets, partitioned if so requested.
-    self.invalid_vts_partitioned = self._partition_versioned_targets(
-        invalid_vts, partition_size_hint) if partition_size_hint else invalid_vts
+    self.invalid_vts_partitioned = \
+      self._partition_versioned_targets(invalid_vts, partition_size_hint, vt_colors) \
+        if (partition_size_hint or vt_colors) else invalid_vts
 
 
 class CacheManager(object):
@@ -192,16 +212,19 @@ class CacheManager(object):
     self._invalidator.force_invalidate(vts.cache_key)
     vts.valid = False
 
-  def check(self, targets, partition_size_hint=None):
+  def check(self, targets, partition_size_hint=None, target_colors=None):
     """Checks whether each of the targets has changed and invalidates it if so.
 
     Returns a list of VersionedTargetSet objects (either valid or invalid). The returned sets
     'cover' the input targets, possibly partitioning them, and are in topological order.
     The caller can inspect these in order and, e.g., rebuild the invalid ones.
+
+    If target_colors is specified, it must be a map from Target -> opaque 'color' values.
+    Two Targets will be in the same partition only if they have the same color.
     """
     all_vts = self._sort_and_validate_targets(targets)
     invalid_vts = filter(lambda vt: not vt.valid, all_vts)
-    return InvalidationCheck(all_vts, invalid_vts, partition_size_hint)
+    return InvalidationCheck(all_vts, invalid_vts, partition_size_hint, target_colors)
 
   def _sort_and_validate_targets(self, targets):
     """Validate each target.
