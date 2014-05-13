@@ -48,14 +48,12 @@ class NailgunTask(Task):
     self._nailgun_bootstrap_key = 'nailgun'
     self.register_jvm_tool(self._nailgun_bootstrap_key, [':nailgun-server'])
 
-    start = time.time()
-    try:
-      self._dist = Distribution.cached(minimum_version=minimum_version,
-                                       maximum_version=maximum_version, jdk=jdk)
-      # TODO(John Sirois): Use a context timer when AWESOME-1265 gets merged.
-      context.log.debug('Located java distribution in %.3fs' % (time.time() - start))
-    except Distribution.Error as e:
-      raise TaskError(e)
+    with self.context.new_workunit(name='jvm-locate'):
+      try:
+        self._dist = Distribution.cached(minimum_version=minimum_version,
+                                         maximum_version=maximum_version, jdk=jdk)
+      except Distribution.Error as e:
+        raise TaskError(e)
 
   def create_java_executor(self):
     """Create java executor that uses this task's ng daemon, if allowed.

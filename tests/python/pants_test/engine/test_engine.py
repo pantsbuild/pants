@@ -4,61 +4,10 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-import mox
-
-from pants.engine.engine import Engine, Timer
+from pants.engine.engine import Engine
 from pants.tasks import TaskError
 from pants_test.base.context_utils import create_context
 from pants_test.engine.base_engine_test import EngineTestBase
-
-
-class TimerTest(mox.MoxTestBase, EngineTestBase):
-  def setUp(self):
-    super(TimerTest, self).setUp()
-    self.ticker = self.mox.CreateMockAnything()
-
-  def test_begin(self):
-    self.ticker().AndReturn(0)  # start timer
-    self.ticker().AndReturn(11)  # start timed goal_succeed #1
-    self.ticker().AndReturn(13)  # finish timed goal_succeed #1
-    self.ticker().AndReturn(17)  # start timed goal_succeed #2
-    self.ticker().AndReturn(23)  # finish timed goal_succeed #2
-    self.ticker().AndReturn(29)  # start timed goal_fail #1
-    self.ticker().AndReturn(42)  # finish timed goal_fail #1
-    self.ticker().AndReturn(42)  # start timed goal_muddle #1
-    self.ticker().AndReturn(42)  # finish timed goal_muddle #1
-    self.ticker().AndReturn(42)  # finish timer
-    self.mox.ReplayAll()
-
-    goal_succeed = self.installed_goal('succeed', phase='first')
-    goal_fail = self.installed_goal('fail', phase='first')
-    goal_muddle = self.installed_goal('muddle', phase='second')
-
-    with Timer.begin(self.ticker) as timer:
-      with timer.timed(goal_succeed):
-        pass
-      with timer.timed(goal_succeed):
-        pass
-      with timer.timed(goal_fail):
-        pass
-      with timer.timed(goal_muddle):
-        pass
-
-    self.assertEqual(42, timer.elapsed)
-
-    first_timings = timer.timings.pop(self.as_phase('first'))
-    second_timings = timer.timings.pop(self.as_phase('second'))
-    self.assertEqual(0, len(timer.timings))
-
-    goal_succeed_timings = first_timings.pop(goal_succeed)
-    goal_fail_timings = first_timings.pop(goal_fail)
-    self.assertEqual(0, len(first_timings))
-    self.assertEqual([2, 6], goal_succeed_timings)
-    self.assertEqual([13], goal_fail_timings)
-
-    goal_muddle_timings = second_timings.pop(goal_muddle)
-    self.assertEqual(0, len(second_timings))
-    self.assertEqual([0], goal_muddle_timings)
 
 
 class ExecutionOrderTest(EngineTestBase):
@@ -81,7 +30,7 @@ class ExecutionOrderTest(EngineTestBase):
 class EngineTest(EngineTestBase):
   class RecordingEngine(Engine):
     def __init__(self, action=None):
-      super(EngineTest.RecordingEngine, self).__init__(print_timing=False)
+      super(EngineTest.RecordingEngine, self).__init__()
       self._action = action
       self._attempts = []
 
@@ -89,8 +38,8 @@ class EngineTest(EngineTestBase):
     def attempts(self):
       return self._attempts
 
-    def attempt(self, timer, context, phases):
-      self._attempts.append((timer, context, phases))
+    def attempt(self, context, phases):
+      self._attempts.append((context, phases))
       if self._action:
         self._action()
 
@@ -100,8 +49,7 @@ class EngineTest(EngineTestBase):
   def assert_attempt(self, engine, *phase_names):
     self.assertEqual(1, len(engine.attempts))
 
-    timer, context, phases = engine.attempts[0]
-    self.assertTrue(timer.elapsed >= 0, 'Expected timer to be finished.')
+    context, phases = engine.attempts[0]
     self.assertEqual(self.context, context)
     self.assertEqual(self.as_phases(*phase_names), phases)
 

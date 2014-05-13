@@ -179,14 +179,6 @@ python_library(
 )
 
 python_library(
-  name = 'timer',
-  sources = ['timer.py'],
-  dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.lang'),
-  ],
-)
-
-python_library(
   name = 'worker_pool',
   sources = ['worker_pool.py'],
   dependencies = [

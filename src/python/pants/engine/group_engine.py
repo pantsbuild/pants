@@ -129,19 +129,18 @@ class GroupEngine(Engine):
     def phase(self):
       return self._phase
 
-    def attempt(self, timer, explain):
+    def attempt(self, explain):
       """Executes the named phase against the current context tracking goal executions in executed.
       """
 
       def execute_task(goal, task, targets):
-        """Execute and time a single goal that has had all of its dependencies satisfied."""
-        with timer.timed(goal):
-          # TODO (Senthil Kumaran):
-          # Possible refactoring of the Task Execution Logic (AWESOME-1019)
-          if explain:
-            self._context.log.debug("Skipping execution of %s in explain mode" % goal.name)
-          else:
-            task.execute(targets)
+        """Execute a single goal that has had all of its dependencies satisfied."""
+        # TODO (Senthil Kumaran):
+        # Possible refactoring of the Task Execution Logic (AWESOME-1019)
+        if explain:
+          self._context.log.debug("Skipping execution of %s in explain mode" % goal.name)
+        else:
+          task.execute(targets)
 
       goals = self._phase.goals()
       if not goals:
@@ -257,7 +256,7 @@ class GroupEngine(Engine):
 
     return map(lambda p: cls.PhaseExecutor(context, p, tasks_by_goal), phases)
 
-  def attempt(self, timer, context, phases):
+  def attempt(self, context, phases):
     phase_executors = self._prepare(context, phases)
 
     execution_phases = ' -> '.join(map(str, map(lambda e: e.phase.name, phase_executors)))
@@ -281,7 +280,7 @@ class GroupEngine(Engine):
       context.acquire_lock()
     try:
       for phase_executor in phase_executors:
-        phase_executor.attempt(timer, explain)
+        phase_executor.attempt(explain)
         if phase_executor is outer_lock_holder:
           context.release_lock()
     finally:

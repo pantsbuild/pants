@@ -286,11 +286,3 @@ class Context(object):
     value = self._state.get(key, default)
     yield value
     self._state[key] = value
-
-  @contextmanager
-  def timing(self, label):
-    if self.timer:
-      with self.timer.timing(label):
-        yield
-    else:
-      yield

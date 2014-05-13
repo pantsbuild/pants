@@ -157,7 +157,7 @@ class GroupEngineTest(EngineTestBase, JvmTargetTest):
     exclusives_mapping._populate_target_maps(self.context.targets())
     self.context.products.safe_create_data('exclusives_groups', lambda: exclusives_mapping)
 
-    self.engine = GroupEngine(print_timing=False)
+    self.engine = GroupEngine()
     self.recorded_actions = []
 
   def tearDown(self):
