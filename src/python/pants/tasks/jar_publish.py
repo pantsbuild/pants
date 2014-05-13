@@ -352,8 +352,7 @@ class JarPublish(Task, ScmPublish):
     ScmPublish.__init__(self, scm or get_scm(),
                         self.context.config.getlist(
                           JarPublish._CONFIG_SECTION, 'restrict_push_branches'))
-    self.outdir = os.path.join(context.config.getdefault('pants_workdir'), 'publish')
-    self.cachedir = os.path.join(self.outdir, 'cache')
+    self.cachedir = os.path.join(self.workdir, 'cache')
 
     self._jvmargs = context.config.getlist(JarPublish._CONFIG_SECTION, 'ivy_jvmargs', default=[])
 
@@ -468,7 +467,7 @@ class JarPublish(Task, ScmPublish):
       return fingerprint or '0.0.0'
 
     def artifact_path(jar, version, name=None, suffix='', extension='jar', artifact_ext=''):
-      return os.path.join(self.outdir, jar.org, jar.name + artifact_ext,
+      return os.path.join(self.workdir, jar.org, jar.name + artifact_ext,
                           '%s%s-%s%s.%s' % ((name or jar.name),
                                             artifact_ext if name != 'ivy' else '',
                                             version,
@@ -514,7 +513,7 @@ class JarPublish(Task, ScmPublish):
 
     head_sha = self.scm.commit_id
 
-    safe_rmtree(self.outdir)
+    safe_rmtree(self.workdir)
     published = []
     skip = (self.restart_at is not None)
     for target in exported_targets:
@@ -602,10 +601,10 @@ class JarPublish(Task, ScmPublish):
             args = [
               '-settings', ivysettings,
               '-ivy', ivyxml_path,
-              '-deliverto', '%s/[organisation]/[module]/ivy-[revision].xml' % self.outdir,
+              '-deliverto', '%s/[organisation]/[module]/ivy-[revision].xml' % self.workdir,
               '-publish', resolver,
               '-publishpattern', '%s/[organisation]/[module]/'
-                                 '[artifact]-[revision](-[classifier]).[ext]' % self.outdir,
+                                 '[artifact]-[revision](-[classifier]).[ext]' % self.workdir,
               '-revision', newver.version(),
               '-m2compatible',
             ]
@@ -751,10 +750,10 @@ class JarPublish(Task, ScmPublish):
   def generate_ivysettings(self, publishedjars, publish_local=None):
     template_relpath = os.path.join('templates', 'jar_publish', 'ivysettings.mustache')
     template = pkgutil.get_data(__name__, template_relpath)
-    with safe_open(os.path.join(self.outdir, 'ivysettings.xml'), 'w') as wrapper:
+    with safe_open(os.path.join(self.workdir, 'ivysettings.xml'), 'w') as wrapper:
       generator = Generator(template,
                             ivysettings=self.ivysettings,
-                            dir=self.outdir,
+                            dir=self.workdir,
                             cachedir=self.cachedir,
                             published=[TemplateData(org=jar.org, name=jar.name)
                                        for jar in publishedjars],
