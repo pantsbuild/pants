@@ -117,7 +117,8 @@ The 1:1:1 Rule
 **************
 
 Your code's organization, including ``BUILD`` target configuration, makes
-building easier or harder. Some folks summarize elegant code layout choice
+building easier or harder. Some folks summarize clear and scalable code
+layout choice
 with the **1:1:1** rule of thumb:
 
 * **1 Folder**
