@@ -238,9 +238,6 @@ class JvmCompile(NailgunTask):
   def product_type(self):
     return 'classes'
 
-  def can_dry_run(self):
-    return True
-
   def move(self, src, dst):
     if self._delete_scratch:
       shutil.move(src, dst)
@@ -286,7 +283,7 @@ class JvmCompile(NailgunTask):
     with self.invalidated(relevant_targets,
                           invalidate_dependents=True,
                           partition_size_hint=self._partition_size_hint) as invalidation_check:
-      if invalidation_check.invalid_vts and not self.dry_run:
+      if invalidation_check.invalid_vts:
         # The analysis for invalid and deleted sources is no longer valid.
         invalid_targets = [vt.target for vt in invalidation_check.invalid_vts]
         invalid_sources_by_target = {}

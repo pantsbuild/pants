@@ -46,7 +46,6 @@ class Task(object):
   def __init__(self, context, workdir):
     self.context = context
     self._workdir = workdir
-    self.dry_run = self.can_dry_run() and context.options.dry_run  # TODO(benjy): Get rid of this.
     self._cache_key_generator = CacheKeyGenerator(
         context.config.getdefault('cache_key_gen_version', default=None))
     self._read_artifact_cache_spec = None
@@ -129,16 +128,6 @@ class Task(object):
     they both have the same product type.
     """
     return self.__class__.__name__
-
-  def can_dry_run(self):
-    """Subclasses can override this to indicate that they respect the --dry-run flag.
-
-    It's the subclass task's responsibility to do the right thing if this flag is set.
-
-    Note that tasks such as codegen and ivy resolution cannot dry-run, because subsequent
-    cache key computation will fail on missing sources/external deps.
-    """
-    return False
 
   def execute(self, targets):
     """Executes this task against targets, which may be a subset of the current context targets."""
@@ -240,9 +229,8 @@ class Task(object):
 
     # Yield the result, and then mark the targets as up to date.
     yield invalidation_check
-    if not self.dry_run:
-      for vt in invalidation_check.invalid_vts:
-        vt.update()  # In case the caller doesn't update.
+    for vt in invalidation_check.invalid_vts:
+      vt.update()  # In case the caller doesn't update.
 
   def check_artifact_cache_for(self, invalidation_check):
     """Decides which VTS to check the artifact cache for.

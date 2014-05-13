@@ -33,8 +33,6 @@ GLOBAL_OPTIONS = [
          help='Squelches all console output apart from errors.'),
   Option('--no-colors', dest='no_color', action='store_true', default=False,
          help='Do not colorize log messages.'),
-  Option('-n', '--dry-run', action='store_true', dest='dry_run', default=False,
-         help='Print the commands that would be run, without actually running them.'),
 
   Option('--read-from-artifact-cache', '--no-read-from-artifact-cache', action='callback',
          callback=_set_bool, dest='read_from_artifact_cache', default=True,

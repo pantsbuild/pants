@@ -281,9 +281,6 @@ class Goal(Command):
     is_explain = self.options.explain
     update_reporting(self.options, is_console_task() or is_explain, self.run_tracker)
 
-    if self.options.dry_run:
-      print('****** Dry Run ******')
-
     context = Context(
       self.config,
       self.options,
