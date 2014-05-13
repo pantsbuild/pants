@@ -94,11 +94,11 @@ class CacheManagerTest(BaseMockTargetTest):
     blue = 'blue'
 
     colors = {
-      all_vts[0]: blue,
-      all_vts[1]: red,
-      all_vts[2]: red,
-      all_vts[3]: red,
-      all_vts[4]: blue
+      a: blue,
+      b: red,
+      c: red,
+      d: red,
+      e: blue
     }
 
     # As a reference, we partition without colors.
@@ -111,7 +111,7 @@ class CacheManagerTest(BaseMockTargetTest):
     self.assertEquals(2, len(partitioned[1].targets))
 
     # Now apply color restrictions.
-    ic = InvalidationCheck(all_vts, [], 2, vt_colors=colors)
+    ic = InvalidationCheck(all_vts, [], 2, target_colors=colors)
     partitioned = ic.all_vts_partitioned
     print_partitions(partitioned)
 
