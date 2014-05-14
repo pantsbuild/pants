@@ -397,13 +397,13 @@ class Emma(_Coverage):
         ]
       for pattern in patterns:
         args.extend(['-filter', pattern])
-        main = 'emma'
-        result = execute_java(classpath=emma_classpath, main=main, args=args,
-                              workunit_factory=self._context.new_workunit,
-                              workunit_name='emma-instrument')
-        if result != 0:
-          raise TaskError("java %s ... exited non-zero (%i)"
-                          " 'failed to instrument'" % (main, result))
+      main = 'emma'
+      result = execute_java(classpath=emma_classpath, main=main, args=args,
+                            workunit_factory=self._context.new_workunit,
+                            workunit_name='emma-instrument')
+      if result != 0:
+        raise TaskError("java %s ... exited non-zero (%i)"
+                        " 'failed to instrument'" % (main, result))
 
   def run(self, targets, tests, junit_classpath):
     emma_classpath = self._task_exports.tool_classpath(self._emma_bootstrap_key)
