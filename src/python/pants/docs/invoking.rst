@@ -7,7 +7,8 @@ something like ::
 
     ./pants goal test bundle path/to/target path/to/another/target
 
-For a full description of specifying target addresses, see **TODO**
+For a full description of specifying target addresses, see
+:doc:`target_addresses`
 
 rc files
 --------
