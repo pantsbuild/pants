@@ -64,14 +64,6 @@ function activate_pants_venv() {
 
   if ! [ -f ${BOOTSTRAPPED_FILE} ]; then
     log "Bootstrapping pants_deps with requirements:"
-    if [ ! -z "${PANTS_DEV}" ]; then
-      # Install as an egg so IDEs can grok all deps. Installing as sources may
-      # run afoul of this bug: http://youtrack.jetbrains.com/issue/PY-6477.
-      # TODO: Remove the --egg once this is resolved. It won't work in the wheel world anyway.
-      pip_extra="--egg"
-    else
-      pip_extra=""
-    fi
 
     for req in ${REQUIREMENTS[@]}; do
       log "  ${req}"
