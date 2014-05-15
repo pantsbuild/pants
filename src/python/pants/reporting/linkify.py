@@ -9,7 +9,6 @@ import re
 
 from pants.base.build_file import BuildFile
 
-
 # A regex to recognize substrings that are probably URLs or file paths. Broken down for readability.
 _PREFIX = r'(https?://)?/?' # http://, https:// or / or nothing.
 _OPTIONAL_PORT = r'(:\d+)?'
@@ -32,18 +31,19 @@ def linkify(buildroot, s):
     if m.group(1):
       return m.group(0)  # It's an http(s) url.
     path = m.group(0)
+
     if path.startswith('/'):
       path = os.path.relpath(path, buildroot)
     else:
       # See if it's a reference to a target in a BUILD file.
-      # TODO: Deal with sibling BUILD files?
       parts = path.split(':')
       if len(parts) == 2:
         putative_dir = parts[0]
       else:
         putative_dir = path
       if os.path.isdir(os.path.join(buildroot, putative_dir)):
-        path = os.path.join(putative_dir, BuildFile._CANONICAL_NAME)
+        build_file = BuildFile(buildroot, putative_dir, must_exist=False)
+        path = build_file.relpath
     if os.path.exists(os.path.join(buildroot, path)):
       # The reporting server serves file content at /browse/<path_from_buildroot>.
       return '/browse/%s' % path

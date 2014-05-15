@@ -86,3 +86,23 @@ class BuildFileTest(unittest.TestCase):
         BuildFileTest.buildfile('grandparent/parent/child1/BUILD.twitter'),
         BuildFileTest.buildfile('grandparent/parent/child2/child3/BUILD'),
     ]), self.buildfile.descendants())
+
+  def testMustExistFalse(self):
+    buildfile = BuildFile(BuildFileTest.root_dir, "path-that-does-not-exist/BUILD", must_exist=False)
+    self.assertEquals(OrderedSet([buildfile]), buildfile.family())
+
+  def testSuffixOnly(self):
+    BuildFileTest.makedirs('suffix-test')
+    BuildFileTest.touch('suffix-test/BUILD.suffix')
+    BuildFileTest.touch('suffix-test/BUILD.suffix2')
+    BuildFileTest.makedirs('suffix-test/child')
+    BuildFileTest.touch('suffix-test/child/BUILD.suffix3')
+    buildfile = BuildFileTest.buildfile('suffix-test/BUILD.suffix')
+    self.assertEquals(OrderedSet([BuildFileTest.buildfile('suffix-test/BUILD.suffix2')]),
+        OrderedSet(buildfile.siblings()))
+    self.assertEquals(OrderedSet([BuildFileTest.buildfile('suffix-test/BUILD.suffix'), 
+        BuildFileTest.buildfile('suffix-test/BUILD.suffix2')]),
+        buildfile.family())
+    self.assertEquals(OrderedSet([BuildFileTest.buildfile('suffix-test/child/BUILD.suffix3')]),
+        buildfile.descendants())
+

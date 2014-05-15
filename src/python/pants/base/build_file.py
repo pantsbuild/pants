@@ -15,7 +15,7 @@ from twitter.common.python.interpreter import PythonIdentity
 
 class BuildFile(object):
   _CANONICAL_NAME = 'BUILD'
-  _PATTERN = re.compile('^%s(\.[a-z]+)?$' % _CANONICAL_NAME)
+  _PATTERN = re.compile('^%s(\.[a-zA-Z0-9_-]+)?$' % _CANONICAL_NAME)
 
   @staticmethod
   def _is_buildfile_name(name):
@@ -49,11 +49,24 @@ class BuildFile(object):
                     .format(root_dir=root_dir))
 
     path = os.path.join(root_dir, relpath)
-    buildfile = os.path.join(path, BuildFile._CANONICAL_NAME) if os.path.isdir(path) else path
+    self.build_basename = BuildFile._CANONICAL_NAME
+    buildfile = os.path.join(path, self.build_basename) if os.path.isdir(path) else path
 
     if os.path.isdir(buildfile):
       raise IOError('Path to buildfile ({buildfile}) is a directory, but it must be a file.'
                     .format(buildfile=buildfile))
+
+    if must_exist:
+      if not os.path.exists(os.path.dirname(buildfile)):
+        raise IOError("Path to BUILD file does not exist at: %s" % os.path.dirname(buildfile))
+
+    # Look for BUILD a file with a suffix that is a candidates to be the first BUILD file
+    if not os.path.exists(buildfile):
+      for build in glob1(os.path.dirname(buildfile), 'BUILD*'):
+        if BuildFile._is_buildfile_name(build):
+          self.build_basename = build
+          buildfile = os.path.join(path, self.build_basename)
+          break
 
     if must_exist:
       if not os.path.exists(buildfile):
@@ -61,9 +74,6 @@ class BuildFile(object):
 
       if not BuildFile._is_buildfile_name(os.path.basename(buildfile)):
         raise IOError("%s is not a BUILD file" % buildfile)
-
-      if not os.path.exists(buildfile):
-        raise IOError("BUILD file does not exist at: %s" % buildfile)
 
     self.root_dir = os.path.realpath(root_dir)
     self.full_path = os.path.realpath(buildfile)
@@ -76,7 +86,7 @@ class BuildFile(object):
 
     self.relpath = os.path.relpath(self.full_path, self.root_dir)
     self.spec_path = os.path.dirname(self.relpath)
-    self.canonical_relpath = os.path.join(os.path.dirname(self.relpath), BuildFile._CANONICAL_NAME)
+    self.canonical_relpath = os.path.join(os.path.dirname(self.relpath), os.path.basename(buildfile))
 
   def exists(self):
     """Returns True if this BuildFile corresponds to a real BUILD file on disk."""
@@ -95,7 +105,7 @@ class BuildFile(object):
 
     def find_parent(dir):
       parent = os.path.dirname(dir)
-      buildfile = os.path.join(parent, BuildFile._CANONICAL_NAME)
+      buildfile = os.path.join(parent, self.build_basename)
       if os.path.exists(buildfile) and not os.path.isdir(buildfile):
         return parent, BuildFile(self.root_dir, os.path.relpath(buildfile, self.root_dir))
       else:
