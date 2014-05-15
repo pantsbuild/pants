@@ -4,18 +4,15 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from contextlib import contextmanager
 import os
-import shutil
 
 from twitter.common.collections import OrderedSet
 from twitter.common.dirutil import safe_mkdir
 
 from pants.base.build_environment import get_buildroot
 from pants.fs import archive
-from pants.java.jar import Manifest, open_jar
+from pants.java.jar import Manifest
 from pants.targets.jvm_binary import JvmApp, JvmBinary
-from pants.tasks.task import TaskError
 from pants.tasks.jvm_binary_task import JvmBinaryTask
 
 
@@ -23,35 +20,31 @@ class BundleCreate(JvmBinaryTask):
 
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
-    option_group.add_option(mkflag("deployjar"), mkflag("deployjar", negate=True),
-                            dest="bundle_create_deployjar", default=False,
-                            action="callback", callback=mkflag.set_bool,
-                            help="[%default] Create a monolithic deploy jar containing the "
-                                 "binaries' classfiles as well as all the classfiles they depend "
-                                 "on transitively to go inside the bundle.")
+    option_group.add_option(mkflag('deployjar'), mkflag('deployjar', negate=True),
+                            dest='bundle_create_deployjar', default=False,
+                            action='callback', callback=mkflag.set_bool,
+                            help="[%default] Expand 3rdparty jars into loose classfiles in the "
+                                 "bundle's root dir. If unset, the root will contain internal classfiles"
+                                 "only, and 3rdparty jars will go into the bundle's libs dir.")
 
-    archive_flag = mkflag("archive")
-    option_group.add_option(archive_flag, dest="bundle_create_archive",
-                            type="choice", choices=list(archive.TYPE_NAMES),
-                            help="[%%default] Create an archive from the bundle. "
-                                 "Choose from %s" % sorted(archive.TYPE_NAMES))
+    archive_flag = mkflag('archive')
+    option_group.add_option(archive_flag, dest='bundle_create_archive',
+                            type='choice', choices=list(archive.TYPE_NAMES),
+                            help='[%%default] Create an archive from the bundle. '
+                                 'Choose from %s' % sorted(archive.TYPE_NAMES))
 
-    option_group.add_option(mkflag("archive-prefix"), mkflag("archive-prefix", negate=True),
-                            dest="bundle_create_prefix", default=False,
-                            action="callback", callback=mkflag.set_bool,
-                            help="[%%default] Used in conjunction with %s this packs the archive "
-                                 "with its basename as the path prefix." % archive_flag)
+    option_group.add_option(mkflag('archive-prefix'), mkflag('archive-prefix', negate=True),
+                            dest='bundle_create_prefix', default=False,
+                            action='callback', callback=mkflag.set_bool,
+                            help='[%%default] Used in conjunction with %s this packs the archive '
+                                 'with its basename as the path prefix.' % archive_flag)
 
   def __init__(self, context, workdir):
     super(BundleCreate, self).__init__(context, workdir)
-
     self._outdir = context.config.getdefault('pants_distdir')
     self._prefix = context.options.bundle_create_prefix
     self._archiver_type = context.options.bundle_create_archive
     self._create_deployjar = context.options.bundle_create_deployjar
-
-    self.context.products.require('jars')
-    self.require_jar_dependencies()
 
   class App(object):
     """A uniform interface to an app."""
@@ -61,7 +54,7 @@ class BundleCreate(JvmBinaryTask):
       return isinstance(target, (JvmApp, JvmBinary))
 
     def __init__(self, target):
-      assert self.is_app(target), "%s is not a valid app target" % target
+      assert self.is_app(target), '%s is not a valid app target' % target
 
       self.binary = target if isinstance(target, JvmBinary) else target.binary
       self.bundles = [] if isinstance(target, JvmBinary) else target.payload.bundles
@@ -73,7 +66,6 @@ class BundleCreate(JvmBinaryTask):
       for app in map(self.App, filter(self.App.is_app, [target])):
         basedir = self.bundle(app)
         if archiver:
-
           archivepath = archiver.create(
             basedir,
             self._outdir,
@@ -83,8 +75,9 @@ class BundleCreate(JvmBinaryTask):
           self.context.log.info('created %s' % os.path.relpath(archivepath, get_buildroot()))
 
   def bundle(self, app):
-    """Create a self-contained application bundle containing the target
-    classes, dependencies and resources.
+    """Create a self-contained application bundle.
+
+    The bundle will contain the target classes, dependencies and resources.
     """
     assert(isinstance(app, BundleCreate.App))
 
@@ -94,6 +87,9 @@ class BundleCreate(JvmBinaryTask):
     safe_mkdir(bundle_dir, clean=True)
 
     classpath = OrderedSet()
+    # If creating a deployjar, we add the external dependencies to the bundle as
+    # loose classes, and have no classpath. Otherwise we add the external dependencies
+    # to the bundle as jars in a libs directory.
     if not self._create_deployjar:
       lib_dir = os.path.join(bundle_dir, 'libs')
       os.mkdir(lib_dir)
@@ -116,23 +112,10 @@ class BundleCreate(JvmBinaryTask):
         os.symlink(path, os.path.join(lib_dir, external_jar))
         classpath.add(external_jar)
 
-    # If the jvm_binary target had sources/resources then jar_create will already have
-    # created a jar for it, which we must augment.  If not, we simply create a new jar.
-    existing_jar_products = self.context.products.get('jars').get(app.binary)
-    if existing_jar_products:
-      existing_jars = []
-      for basedir, jars in existing_jar_products.items():
-        for jar in jars:
-          existing_jars.append(os.path.join(basedir, jar))
-      if len(existing_jars) != 1:
-        raise TaskError('Expected 1 mapped binary for %s but found: %s' %
-                        (app.binary, existing_jars))
-      binary_jar = existing_jars[0]
-    else:
-      binary_jar = None
     bundle_jar = os.path.join(bundle_dir, '%s.jar' % app.binary.basename)
 
-    with self._binary_jar(app.binary, binary_jar, bundle_jar) as jar:
+    with self.monolithic_jar(app.binary, bundle_jar,
+                                   with_external_deps=self._create_deployjar) as jar:
       manifest = self.create_main_manifest(app.binary)
       if classpath:
         manifest.addentry(Manifest.CLASS_PATH,
@@ -146,19 +129,3 @@ class BundleCreate(JvmBinaryTask):
         os.symlink(path, bundle_path)
 
     return bundle_dir
-
-  @contextmanager
-  def _binary_jar(self, binary, binary_path, bundled_binary_path):
-    if self._create_deployjar:
-      with self.deployjar(binary, bundled_binary_path) as jar:
-        yield jar
-    else:
-      if binary_path:
-        # Augment a copy of the existing jar.
-        shutil.copy(binary_path, bundled_binary_path)
-        with open_jar(bundled_binary_path, 'a') as jar:
-          yield jar
-      else:
-        # Create a new jar.
-        with open_jar(bundled_binary_path, 'w') as jar:
-          yield jar

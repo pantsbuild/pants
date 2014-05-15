@@ -18,11 +18,7 @@ class BinaryCreate(JvmBinaryTask):
 
   def __init__(self, context, workdir):
     super(BinaryCreate, self).__init__(context, workdir)
-
     self._outdir = context.config.getdefault('pants_distdir')
-
-    self.context.products.require('jars')
-    self.require_jar_dependencies()
 
   def execute(self, targets):
     for binary in filter(self.is_binary, targets):
@@ -35,7 +31,7 @@ class BinaryCreate(JvmBinaryTask):
     binary_jarpath = os.path.join(self._outdir, binary_jarname)
     self.context.log.info('creating %s' % os.path.relpath(binary_jarpath, get_buildroot()))
 
-    with self.deployjar(binary, binary_jarpath) as jar:
+    with self.monolithic_jar(binary, binary_jarpath, with_external_deps=True) as jar:
       with self.context.new_workunit(name='add-manifest'):
         manifest = self.create_main_manifest(binary)
         jar.writestr(Manifest.PATH, manifest.contents())

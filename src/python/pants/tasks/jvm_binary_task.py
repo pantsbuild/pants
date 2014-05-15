@@ -41,37 +41,38 @@ class JvmBinaryTask(Task):
     manifest.addentry(Manifest.MAIN_CLASS, main)
     return manifest
 
-  def require_jar_dependencies(self, predicate=None):
-    """Requests external jar dependency mappings be collected.
-
-    By default a mapping is requested for all binaries in the context.
-
-    :param predicate: An optional selector for targets to have their jar dependencies mapped.
-    """
-    self.context.products.require('jar_dependencies', predicate=predicate or self.is_binary)
+  def __init__(self, context, workdir):
+    super(JvmBinaryTask, self).__init__(context, workdir)
+    self.context.products.require('jars')
+    self.context.products.require('jar_dependencies', predicate=self.is_binary)
 
   def list_jar_dependencies(self, binary, confs=None):
     """Returns the external jar dependencies of the given binary.
 
-    NB: This listing needs to be requested with a call to ``require_jar_dependencies`` in the
-    task constructor.
-
-    :returns: An iterable of (basedir, jarfile) tuples where the jarfile names are guaranteed to be
-      unique amongst each other.
+    :returns: An iterable of (basedir, jarfile) tuples where the jarfile names are
+              guaranteed to be unique.
     """
     jardepmap = self.context.products.get('jar_dependencies') or {}
-
     if confs:
       return self._mapped_dependencies(jardepmap, binary, confs)
     else:
       return self._unexcluded_dependencies(jardepmap, binary)
 
   @contextmanager
-  def deployjar(self, binary, path):
-    """Dumps a deploy jar for the given binary to the given jar path.
+  def monolithic_jar(self, binary, path, with_external_deps):
+    """Creates a jar containing the class files for a jvm_binary target and all its deps.
 
-    If a jar exists at `path` it will be over-written.
+    Yields a handle to the open jarfile, so the caller can add to the jar if needed.
+
+    :param binary: The jvm_binary target to operate on.
+    :param path: Write the output jar here, overwriting an existing file, if any.
+    :param with_external_deps: If True, unpack external jar deps and add their classes to the jar.
     """
+    # TODO(benjy): There's actually nothing here that requires 'binary' to be a jvm_binary.
+    # It could be any target. And that might actually be useful.
+    # TODO(benjy): Get the classfiles directly from the class products, instead of unpacking
+    # the per-target jars?
+
     jarmap = self.context.products.get('jars')
 
     with open_jar(path, 'w', compression=zipfile.ZIP_DEFLATED) as jar:
@@ -85,9 +86,10 @@ class JvmBinaryTask(Task):
       with self.context.new_workunit(name='add-generated-jars'):
         binary.walk(add_jars)
 
-      with self.context.new_workunit(name='add-dependency-jars'):
-        for basedir, external_jar in self.list_jar_dependencies(binary):
-          self._dump(os.path.join(basedir, external_jar), jar)
+      if with_external_deps:
+        with self.context.new_workunit(name='add-dependency-jars'):
+          for basedir, external_jar in self.list_jar_dependencies(binary):
+            self._dump(os.path.join(basedir, external_jar), jar)
 
       yield jar
 

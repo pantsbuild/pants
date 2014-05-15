@@ -19,10 +19,6 @@ pants_distdir = /tmp/dist
 class BinaryCreateTest(unittest.TestCase):
 
   def test_binary_create_init(self):
-    options = {'jvm_binary_create_outdir': None,
-               'binary_create_compressed': None,
-               'binary_create_zip64': None,
-               'jvm_binary_create_deployjar': None}
-    binary_create = BinaryCreate(create_context(config=sample_ini_test_1, options=options),
+    binary_create = BinaryCreate(create_context(config=sample_ini_test_1),
                                  '/tmp/workdir')
     self.assertEquals(binary_create._outdir, '/tmp/dist')

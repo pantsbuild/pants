@@ -209,8 +209,6 @@ class IdeGen(JvmBinaryTask):
                                               dependencies=jars,
                                               excludes=excludes,
                                               configurations=('default', 'sources', 'javadoc'))
-    self.require_jar_dependencies(predicate=lambda t: t == self.binary)
-
     self.context.log.debug('pruned to cp:\n\t%s' % '\n\t'.join(
       str(t) for t in self.context.targets())
     )

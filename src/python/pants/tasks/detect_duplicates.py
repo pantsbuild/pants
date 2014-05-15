@@ -31,7 +31,6 @@ class DuplicateDetector(JvmBinaryTask):
 
   def __init__(self, context, workdir):
     super(DuplicateDetector, self).__init__(context, workdir)
-    self.require_jar_dependencies()
     self.fail_fast = context.options.fail_fast
 
   def execute(self, targets):
