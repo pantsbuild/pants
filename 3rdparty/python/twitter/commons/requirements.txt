@@ -1,16 +1,7 @@
 # To toggle to public releases, comment out these search override flags and optionally add version
 # constraints to the requirements below.
 
-# commit d232cbdcab788da1e3ad6e2333ba395b9de9a555
-# Author: John Sirois <jsirois@twitter.com>
-# Date:   Tue Apr 8 11:58:01 2014 -0700
-#
-#     Support unicode literal requirement strings in python <3.
-#
-#  src/python/twitter/common/python/interpreter.py | 3 ++-
-#  1 file changed, 2 insertions(+), 1 deletion(-)
-
---find-links https://pantsbuild.github.io/cheeseshop/third_party/twitter-commons/b3ebdadaac0cc1376c98e5b2490d42effd99a2e4/index.html
+--find-links https://pantsbuild.github.io/cheeseshop/third_party/twitter-commons/c4a0cd39293142e9d7714cc58396735e284c77d8/index.html
 --no-index
 
 twitter.common.collections
