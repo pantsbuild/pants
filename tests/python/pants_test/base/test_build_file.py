@@ -40,6 +40,7 @@ class BuildFileTest(unittest.TestCase):
 
     BuildFileTest.touch('grandparent/parent/BUILD')
     BuildFileTest.touch('grandparent/parent/BUILD.twitter')
+    # Tricky!  This is a directory
     BuildFileTest.makedirs('grandparent/parent/BUILD.dir')
     BuildFileTest.makedirs('grandparent/BUILD')
     BuildFileTest.touch('BUILD')
@@ -86,3 +87,45 @@ class BuildFileTest(unittest.TestCase):
         BuildFileTest.buildfile('grandparent/parent/child1/BUILD.twitter'),
         BuildFileTest.buildfile('grandparent/parent/child2/child3/BUILD'),
     ]), self.buildfile.descendants())
+
+  def testMustExistFalse(self):
+    buildfile = BuildFile(BuildFileTest.root_dir, "path-that-does-not-exist/BUILD", must_exist=False)
+    self.assertEquals(OrderedSet([buildfile]), buildfile.family())
+
+  def testSuffixOnly(self):
+    BuildFileTest.makedirs('suffix-test')
+    BuildFileTest.touch('suffix-test/BUILD.suffix')
+    BuildFileTest.touch('suffix-test/BUILD.suffix2')
+    BuildFileTest.makedirs('suffix-test/child')
+    BuildFileTest.touch('suffix-test/child/BUILD.suffix3')
+    buildfile = BuildFileTest.buildfile('suffix-test/BUILD.suffix')
+    self.assertEquals(OrderedSet([BuildFileTest.buildfile('suffix-test/BUILD.suffix2')]),
+        OrderedSet(buildfile.siblings()))
+    self.assertEquals(OrderedSet([BuildFileTest.buildfile('suffix-test/BUILD.suffix'),
+        BuildFileTest.buildfile('suffix-test/BUILD.suffix2')]),
+        buildfile.family())
+    self.assertEquals(OrderedSet([BuildFileTest.buildfile('suffix-test/child/BUILD.suffix3')]),
+        buildfile.descendants())
+
+  def testAncestorsSuffix1(self):
+    BuildFileTest.makedirs('suffix-test1/parent')
+    BuildFileTest.touch('suffix-test1/parent/BUILD.suffix')
+    BuildFileTest.touch('suffix-test1/BUILD')
+    buildfile = BuildFileTest.buildfile('suffix-test1/parent/BUILD.suffix')
+    self.assertEquals(OrderedSet([
+        BuildFileTest.buildfile('suffix-test1/BUILD'),
+        BuildFileTest.buildfile('BUILD'),
+        BuildFileTest.buildfile('BUILD.twitter')]),
+        buildfile.ancestors())
+
+  def testAncestorsSuffix2(self):
+    BuildFileTest.makedirs('suffix-test2')
+    BuildFileTest.makedirs('suffix-test2/subdir')
+    BuildFileTest.touch('suffix-test2/subdir/BUILD.foo')
+    BuildFileTest.touch('suffix-test2/BUILD.bar')
+    buildfile = BuildFileTest.buildfile('suffix-test2/subdir/BUILD.foo')
+    self.assertEquals(OrderedSet([
+        BuildFileTest.buildfile('suffix-test2/BUILD.bar'),
+        BuildFileTest.buildfile('BUILD'),
+        BuildFileTest.buildfile('BUILD.twitter')]),
+        buildfile.ancestors())
