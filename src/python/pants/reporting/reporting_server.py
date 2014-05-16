@@ -18,11 +18,12 @@ from datetime import date, datetime
 import mimetypes
 import pystache
 from pystache import Renderer
+
 from twitter.common.dirutil import safe_mkdir
 
 from pants.base.build_environment import get_buildroot
 from pants.base.mustache import MustacheRenderer
-from pants.goal.run_tracker import RunInfo
+from pants.base.run_info import RunInfo
 
 
 # Google Prettyprint plugin files.

@@ -8,7 +8,7 @@ import threading
 
 from pants.base.workunit import WorkUnit
 from pants.tasks.task import Task
-from pants.tasks.task_error import TaskError
+from pants.base.exceptions import TaskError
 
 
 class BootstrapJvmTools(Task):

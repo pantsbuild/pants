@@ -8,7 +8,7 @@ import shutil
 import tempfile
 
 from pants.base.build_invalidator import CacheKey, CacheKeyGenerator
-from pants.tasks.cache_manager import InvalidationCacheManager, InvalidationCheck, VersionedTarget
+from pants.base.cache_manager import InvalidationCacheManager, InvalidationCheck, VersionedTarget
 from pants_test.base_test import BaseTest
 
 

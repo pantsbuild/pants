@@ -26,7 +26,6 @@ python_tests(
     pants(':engine_test_base'),
     pants('3rdparty/python:mox'),
     pants('src/python/pants/engine'),
-    pants('src/python/pants/tasks:task_error'),
   ],
 )
 

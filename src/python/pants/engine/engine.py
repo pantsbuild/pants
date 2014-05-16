@@ -9,7 +9,7 @@ from abc import abstractmethod
 from twitter.common.lang import AbstractClass
 
 from pants.goal import GoalError
-from pants.tasks.task_error import TaskError
+from pants.base.exceptions import TaskError
 
 
 class Engine(AbstractClass):

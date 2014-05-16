@@ -13,10 +13,10 @@ from twitter.common.lang import AbstractClass, Compatibility
 
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.build_file import BuildFile
+from pants.base.exceptions import TaskError
 from pants.base.target import Target
 from pants.scm import Scm
 from pants.tasks.console_task import ConsoleTask
-from pants.tasks.task_error import TaskError
 
 
 class WhatChanged(ConsoleTask):

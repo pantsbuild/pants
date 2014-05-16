@@ -6,12 +6,12 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import re
 
+from mock import Mock
 import pytest
 
-from mock import Mock
-
+from pants.base.exceptions import TaskError
 from pants.tasks.jar_publish import JarPublish
-from pants.tasks.task_error import TaskError
+
 from pants_test.base_test import BaseTest
 from pants_test.tasks.test_base import prepare_task
 

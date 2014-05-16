@@ -11,7 +11,6 @@ from pants.base.build_manual import manual
 from pants.base.target import Target
 from pants.base.exceptions import TargetDefinitionException
 from pants.targets.exportable_jvm_library import ExportableJvmLibrary
-from pants.targets.java_library import JavaLibrary
 
 
 @manual.builddict(tags=['scala'])

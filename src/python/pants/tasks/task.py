@@ -15,20 +15,20 @@ from contextlib import contextmanager
 from twitter.common.collections.orderedset import OrderedSet
 
 from pants.base.build_invalidator import BuildInvalidator, CacheKeyGenerator
+from pants.base.cache_manager import (InvalidationCacheManager, InvalidationCheck,
+                                      VersionedTargetSet)
 from pants.base.config import Config
+from pants.base.exceptions import TaskError
 from pants.base.hash_utils import hash_file
 from pants.base.worker_pool import Work
 from pants.base.workunit import WorkUnit
 from pants.cache.cache_setup import create_artifact_cache
 from pants.cache.read_write_artifact_cache import ReadWriteArtifactCache
-from pants.ivy.bootstrapper import Bootstrapper  # XXX
-from pants.java.executor import Executor  # XXX
+from pants.ivy.bootstrapper import Bootstrapper  # XXX ?
+from pants.java.executor import Executor  # XXX ?
 from pants.reporting.reporting_utils import items_to_report_element
-from pants.tasks.cache_manager import (InvalidationCacheManager, InvalidationCheck,
-                                       VersionedTargetSet)
 from pants.tasks.ivy_utils import IvyUtils  # XXX
 from pants.tasks.jvm_tool_bootstrapper import JvmToolBootstrapper  # XXX
-from pants.tasks.task_error import TaskError
 
 
 class Task(object):

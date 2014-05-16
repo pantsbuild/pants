@@ -10,7 +10,7 @@ python_library(
   name = 'analysis_parser',
   sources = ['analysis_parser.py'],
   dependencies = [
-    pants('src/python/pants/tasks:task_error'),
+    pants('src/python/pants/base:exceptions'),
   ]
 )
 
@@ -32,9 +32,9 @@ python_library(
     pants(':jvm_compile'),
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('src/python/pants/base:build_environment'),
+    pants('src/python/pants/base:exceptions'),
     pants('src/python/pants/base:target'),
     pants('src/python/pants/base:workunit'),
-    pants('src/python/pants/tasks:task_error'),
   ],
 )
 
@@ -86,10 +86,10 @@ python_library(
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.lang'),
     pants('src/python/pants/base:build_environment'),
+    pants('src/python/pants/base:exceptions'),
     pants('src/python/pants/base:hash_utils'),
     pants('src/python/pants/base:workunit'),
     pants('src/python/pants/targets:scala'),
-    pants('src/python/pants/tasks:task_error'),
   ],
 )
 

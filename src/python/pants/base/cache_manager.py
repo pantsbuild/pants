@@ -13,7 +13,6 @@ except ImportError:
 from pants.base.build_graph import sort_targets
 from pants.base.build_invalidator import BuildInvalidator, CacheKeyGenerator
 from pants.base.target import Target
-from pants.targets.jar_library import JarLibrary
 
 
 class VersionedTargetSet(object):

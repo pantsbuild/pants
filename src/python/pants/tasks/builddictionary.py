@@ -16,10 +16,10 @@ from twitter.common.dirutil import Fileset, safe_open
 from pants.base.build_environment import get_buildroot
 from pants.base.build_manual import get_builddict_info
 from pants.base.config import ConfigOption
+from pants.base.exceptions import TaskError
 from pants.base.generator import Generator, TemplateData
 from pants.goal.phase import Phase
 from pants.tasks.task import Task
-from pants.tasks.task_error import TaskError
 
 
 def indent_docstring_by_n(s, n=1):

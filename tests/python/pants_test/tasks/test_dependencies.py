@@ -8,8 +8,8 @@ from textwrap import dedent
 
 import pytest
 
+from pants.base.exceptions import TaskError
 from pants.tasks.dependencies import Dependencies
-from pants.tasks.task_error import TaskError
 from pants.targets.jar_dependency import JarDependency
 from pants.targets.jar_library import JarLibrary
 from pants.targets.python_library import PythonLibrary

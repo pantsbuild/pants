@@ -3,7 +3,7 @@
 
 python_library(
   name = 'reporting',
-  sources = globs('*.py'),
+  sources = globs('*.py') - ['report.py'],
   resources = rglobs('assets/*') + globs('templates/*.mustache'),
   dependencies = [
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
@@ -11,9 +11,18 @@ python_library(
     pants('src/python/pants/base:build_environment'),
     pants('src/python/pants/base:build_file'),
     pants('src/python/pants/base:mustache'),
+    pants('src/python/pants/base:run_info'),
     pants('src/python/pants/base:workunit'),
-    pants('src/python/pants/goal:run_tracker'),  # XXX
     pants('3rdparty/python:ansicolors'),
     pants('3rdparty/python:pystache'),
+    pants(':report'),
   ]
+)
+
+python_library(
+  name = 'report',
+  sources = ['report.py'],
+  dependencies = [
+    pants('3rdparty/python/twitter/commons:twitter.common.threading'),
+  ],
 )

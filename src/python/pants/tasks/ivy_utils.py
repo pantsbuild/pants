@@ -17,13 +17,13 @@ from twitter.common.collections import OrderedDict, OrderedSet
 from twitter.common.dirutil import safe_mkdir, safe_open
 
 from pants.base.build_environment import get_buildroot
+from pants.base.exceptions import TaskError
 from pants.base.generator import Generator, TemplateData
 from pants.base.revision import Revision
 from pants.base.target import Target
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy import Ivy
 from pants.java import util
-from pants.tasks.task_error import TaskError
 
 
 IvyModuleRef = namedtuple('IvyModuleRef', ['org', 'name', 'rev'])

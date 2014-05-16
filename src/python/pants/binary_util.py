@@ -23,7 +23,7 @@ else:
   import urllib2 as urllib_error
 
 from .base.config import Config
-from .tasks.task_error import TaskError
+from .base.exceptions import TaskError
 
 
 _ID_BY_OS = {

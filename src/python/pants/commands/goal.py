@@ -22,7 +22,7 @@ from pants.base.build_file import BuildFile
 from pants.base.config import Config, ConfigOption
 from pants.base.rcfile import RcFile
 from pants.base.target import Target
-from pants.base.exceptions import TargetDefinitionException
+from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.base.spec_parser import SpecParser
 from pants.base.workunit import WorkUnit
 from pants.commands.command import Command
@@ -33,7 +33,6 @@ from pants.goal.help import print_help
 from pants.goal.initialize_reporting import update_reporting
 from pants.goal.option_helpers import add_global_options
 from pants.tasks.task import Task
-from pants.tasks.task_error import TaskError
 from pants.tasks.nailgun_task import NailgunTask
 from pants.tasks.console_task import ConsoleTask
 

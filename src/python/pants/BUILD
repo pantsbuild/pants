@@ -47,7 +47,7 @@ python_library(
     pants('3rdparty/python/twitter/commons:twitter.common.lang'),
     pants('3rdparty/python/twitter/commons:twitter.common.log'),
     pants('src/python/pants/base:config'),
-    pants('src/python/pants/tasks:task_error'),
+    pants('src/python/pants/base:exceptions'),
   ],
 )
 

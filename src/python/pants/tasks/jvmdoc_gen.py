@@ -13,8 +13,8 @@ import subprocess
 from twitter.common.dirutil import safe_mkdir
 
 from pants import binary_util
+from pants.base.exceptions import TaskError
 from pants.tasks.task import Task
-from pants.tasks.task_error import TaskError
 
 
 Jvmdoc = collections.namedtuple('Jvmdoc', ['tool_name', 'product_type'])

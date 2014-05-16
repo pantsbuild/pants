@@ -6,8 +6,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from collections import namedtuple
 
-from pants.goal.run_tracker import RunTracker
-
 
 class Reporter(object):
   """Formats and emits reports.

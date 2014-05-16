@@ -10,6 +10,7 @@ python_library(
     pants('src/python/pants/base:build_root'),
     pants('src/python/pants/base:build_graph'),
     pants('src/python/pants/base:build_file_parser'),
+    pants('src/python/pants/base:exceptions'),
     pants('src/python/pants/base:target'),
     pants('src/python/pants/base:build_file_aliases'),
     pants('src/python/pants/targets:common'),

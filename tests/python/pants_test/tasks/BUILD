@@ -81,7 +81,7 @@ python_tests(
     pants(':base'),
     pants('tests/python/pants_test/testutils'),
     pants('src/python/pants/base:build_invalidator'),
-    pants('src/python/pants/tasks:cache_manager'),
+    pants('src/python/pants/base:cache_manager'),
   ]
 )
 
@@ -94,7 +94,6 @@ python_tests(
     pants('src/python/pants/base:config'),
     pants('src/python/pants/goal:context'),
     pants('src/python/pants/tasks:check_exclusives'),
-    pants('src/python/pants/tasks:task_error'),
   ]
 )
 
@@ -147,7 +146,6 @@ python_tests(
     pants('src/python/pants/base:build_environment'),
     pants('src/python/pants/targets:python'),
     pants('src/python/pants/targets:common'),
-    pants('src/python/pants/tasks:task_error'),
     pants('src/python/pants/tasks:dependees'),
   ]
 )
@@ -157,7 +155,6 @@ python_tests(
   sources = ['test_dependencies.py'],
   dependencies = [
     pants(':base'),
-    pants('src/python/pants/tasks:task_error'),
     pants('src/python/pants/tasks:dependencies'),
   ]
 )
@@ -167,7 +164,6 @@ python_tests(
   sources = ['test_depmap.py'],
   dependencies = [
     pants(':base'),
-    pants('src/python/pants/tasks:task_error'),
     pants('src/python/pants/tasks:depmap'),
   ]
 )
@@ -179,7 +175,6 @@ python_tests(
     pants(':base'),
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('src/python/pants/tasks:detect_duplicates'),
-    pants('src/python/pants/tasks:task_error'),
   ],
 )
 
@@ -286,7 +281,6 @@ python_tests(
   dependencies = [
     pants(':base'),
     pants('src/python/pants/targets:java'),
-    pants('src/python/pants/tasks:task_error'),
     pants('src/python/pants/tasks:scrooge_gen'),
   ],
 )

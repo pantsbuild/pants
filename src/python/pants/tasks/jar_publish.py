@@ -22,6 +22,7 @@ from twitter.common.log.options import LogOptions
 from pants.base.address import Address
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.build_graph import sort_targets
+from pants.base.exceptions import TaskError
 from pants.base.generator import Generator, TemplateData
 from pants.base.target import Target
 from pants.ivy.bootstrapper import Bootstrapper
@@ -29,7 +30,6 @@ from pants.ivy.ivy import Ivy
 from pants.targets.resources import Resources
 from pants.targets.scala_library import ScalaLibrary
 from pants.tasks.task import Task
-from pants.tasks.task_error import TaskError
 from pants.tasks.scm_publish import ScmPublish, Semver
 
 

@@ -14,11 +14,11 @@ from twitter.common.collections.orderedset import OrderedSet
 from twitter.common.contextutil import temporary_dir
 
 from pants.base.build_environment import get_version
+from pants.base.exceptions import TaskError
 from pants.fs.archive import ZIP
 from pants.java.jar import Manifest, open_jar
 from pants.targets.jvm_binary import JvmBinary
 from pants.tasks.task import Task
-from pants.tasks.task_error import TaskError
 
 
 class JvmBinaryTask(Task):

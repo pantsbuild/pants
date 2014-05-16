@@ -6,7 +6,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import os
 
-from pants.tasks.task_error import TaskError
+from pants.base.exceptions import TaskError
 
 
 class ParseError(TaskError):
