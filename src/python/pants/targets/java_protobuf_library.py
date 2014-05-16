@@ -12,14 +12,7 @@ from pants.targets.exportable_jvm_library import ExportableJvmLibrary
 class JavaProtobufLibrary(ExportableJvmLibrary):
   """Generates a stub Java library from protobuf IDL files."""
 
-  def __init__(self,
-               name,
-               sources,
-               provides=None,
-               dependencies=None,
-               excludes=None,
-               buildflags=None,
-               exclusives=None):
+  def __init__(self, buildflags=None, **kwargs):
 
     """
     :param string name: The name of this target, which combined with this
@@ -39,12 +32,5 @@ class JavaProtobufLibrary(ExportableJvmLibrary):
     :param exclusives: An optional map of exclusives tags. See CheckExclusives for details.
     """
 
-    ExportableJvmLibrary.__init__(self,
-                                  name,
-                                  sources,
-                                  provides,
-                                  dependencies,
-                                  excludes,
-                                  exclusives=exclusives)
-
+    super(JavaProtobufLibrary, self).__init__(**kwargs)
     self.add_labels('codegen')
