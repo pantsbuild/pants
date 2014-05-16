@@ -16,17 +16,15 @@ from twitter.common.dirutil.chroot import Chroot
 from twitter.common.python.compatibility import string, to_bytes
 from twitter.common.python.installer import InstallerBase, Packager
 
-from pants.base.address import Address
 from pants.base.build_environment import get_buildroot
 from pants.base.config import Config
-from pants.base.target import Target
 from pants.base.exceptions import TargetDefinitionException
 from pants.commands.command import Command
 from pants.python.antlr_builder import PythonAntlrBuilder
 from pants.python.thrift_builder import PythonThriftBuilder
 from pants.targets.python_antlr_library import PythonAntlrLibrary
 from pants.targets.python_binary import PythonBinary
-from pants.targets.python_requirement import PythonRequirement
+from pants.targets.python_requirement_library import PythonRequirementLibrary
 from pants.targets.python_target import PythonTarget
 from pants.targets.python_thrift_library import PythonThriftLibrary
 
@@ -324,11 +322,9 @@ class SetupPy(Command):
 
     install_requires = set()
     for dep in self.minified_dependencies(root_target):
-      if isinstance(dep, PythonRequirement):
-        install_requires.add(str(dep.requirement))
-      elif isinstance(dep, PythonTarget) and dep.provides:
-        install_requires.add(dep.provides.key)
-    setup_keywords['install_requires'] = list(install_requires)
+      if isinstance(dep, PythonRequirementLibrary):
+        [install_requires.add(str(req.requirement)) for req in dep.payload.requirements]
+    setup_keywords['install_requires'] = sorted(list(install_requires))
 
     for binary_name, entry_point in self.iter_entry_points(root_target):
       if 'entry_points' not in setup_keywords:
