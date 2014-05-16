@@ -4,15 +4,15 @@
 python_library(
   name='_pants_transitional_publishable_library_',
   sources=rglobs('*.py'),
-  resources=[
-    globs('java/distribution/*.class'),
-    rglobs('reporting/assets/*') + globs('reporting/templates/*.mustache'),
-    globs('tasks/builddictionary/*.mustache'),
-    globs('tasks/templates/eclipse/*.mustache'),
-    globs('tasks/templates/idea/*.mustache'),
-    globs('tasks/templates/ivy_resolve/*.mustache'),
-    globs('tasks/templates/jar_publish/*.mustache'),
-  ],
+  resources=(
+    globs('java/distribution/*.class') +
+    rglobs('reporting/assets/*') + globs('reporting/templates/*.mustache') +
+    globs('tasks/builddictionary/*.mustache') +
+    globs('tasks/templates/eclipse/*.mustache') +
+    globs('tasks/templates/idea/*.mustache') +
+    globs('tasks/templates/ivy_resolve/*.mustache') +
+    globs('tasks/templates/jar_publish/*.mustache')
+  ),
   dependencies=[
     pants('3rdparty/python:ansicolors'),
     pants('3rdparty/python:coverage'),
