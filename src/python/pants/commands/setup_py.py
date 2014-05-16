@@ -17,6 +17,7 @@ from twitter.common.python.compatibility import string, to_bytes
 from twitter.common.python.installer import InstallerBase, Packager
 
 from pants.base.address import Address
+from pants.base.build_environment import get_buildroot
 from pants.base.config import Config
 from pants.base.target import Target
 from pants.base.exceptions import TargetDefinitionException
@@ -257,8 +258,9 @@ class SetupPy(Command):
     self._config = Config.load()
     self._root = root_dir
 
-    address = Address.parse(root_dir, self.args[0])
-    self.target = Target.get(address)
+    self.build_file_parser.inject_spec_closure_into_build_graph(self.args[0], self.build_graph)
+    self.target = self.build_graph.get_target_from_spec(self.args[0])
+
     if self.target is None:
       self.error('%s is not a valid target!' % self.args[0])
 
@@ -288,8 +290,11 @@ class SetupPy(Command):
         for relpath, abspath in self.iter_generated_sources(target, self._root, self._config):
           write_codegen_source(relpath, abspath)
       else:
-        for source in list(target.sources) + list(target.resources):
-          write_target_source(target, source)
+        for source in list(target.payload.sources) + list(target.payload.resources):
+          abs_source_path = os.path.join(get_buildroot(), target.payload.sources_rel_path, source)
+          abs_source_root_path = os.path.join(get_buildroot(), target.target_base)
+          source_root_relative_path = os.path.relpath(abs_source_path, abs_source_root_path)
+          write_target_source(target, source_root_relative_path)
 
     write_target(root_target)
     for dependency in self.minified_dependencies(root_target):

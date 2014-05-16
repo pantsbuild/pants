@@ -51,7 +51,8 @@ class PythonTarget(Target):
   def traversable_specs(self):
     if self._provides:
       for spec in self._provides._binaries.values():
-        yield spec
+        address = SyntheticAddress(spec, relative_to=self.address.spec_path)
+        yield address.spec
 
   @property
   def provides(self):
