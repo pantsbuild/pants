@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  name = 'base-test',
+  name = 'context_utils',
   sources = ['context_utils.py'],
   dependencies = [
     pants('3rdparty/python/twitter/commons:twitter.common.collections'),
@@ -43,7 +43,7 @@ python_tests(
   sources = ['test_abbreviate_target_ids.py'],
   dependencies = [
     pants('src/python/pants/base:abbreviate_target_ids'),
-    'tests/python/pants_test:base-test',
+    pants('tests/python/pants_test:base_test'),
   ]
 )
 
@@ -55,7 +55,7 @@ python_tests(
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('src/python/pants/base:address'),
     pants('src/python/pants/base:build_environment'),
-    'tests/python/pants_test:base-test',
+    pants('tests/python/pants_test:base_test'),
   ]
 )
 
@@ -66,7 +66,7 @@ python_tests(
     pants('3rdparty/python/twitter/commons:twitter.common.collections'),
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('src/python/pants/base:build_file'),
-    'tests/python/pants_test:base-test',
+    pants('tests/python/pants_test:base_test'),
   ]
 )
 
@@ -76,7 +76,7 @@ python_tests(
   dependencies = [
     pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('src/python/pants/base:build_invalidator'),
-    'tests/python/pants_test:base-test',
+    pants('tests/python/pants_test:base_test'),
   ]
 )
 
@@ -87,7 +87,7 @@ python_tests(
     pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('src/python/pants/base:build_root'),
-    'tests/python/pants_test:base-test',
+    pants('tests/python/pants_test:base_test'),
   ]
 )
 
@@ -97,8 +97,8 @@ python_tests(
   dependencies = [
     pants('src/python/pants/base:double_dag'),
     pants('src/python/pants/reporting'),
+    pants('tests/python/pants_test:base_test'),
     pants('tests/python/pants_test/testutils'),
-    'tests/python/pants_test:base-test',
   ]
 )
 
@@ -107,7 +107,7 @@ python_tests(
   sources = ['test_generator.py'],
   dependencies = [
     pants('src/python/pants/base:generator'),
-    'tests/python/pants_test:base-test',
+    pants('tests/python/pants_test:base_test'),
   ]
 )
 
@@ -118,7 +118,7 @@ python_tests(
     pants('3rdparty/python:mox'),
     pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('src/python/pants/base:hash_utils'),
-    'tests/python/pants_test:base-test',
+    pants('tests/python/pants_test:base_test'),
   ]
 )
 
@@ -127,7 +127,7 @@ python_tests(
   sources = ['test_revision.py'],
   dependencies = [
     pants('src/python/pants/base:revision'),
-    'tests/python/pants_test:base-test',
+    pants('tests/python/pants_test:base_test'),
   ]
 )
 
@@ -137,6 +137,6 @@ python_tests(
   dependencies = [
     pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('src/python/pants/base:run_info'),
-    'tests/python/pants_test:base-test',
+    pants('tests/python/pants_test:base_test'),
   ]
 )

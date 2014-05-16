@@ -76,7 +76,7 @@ python_library(
   dependencies = [
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.lang'),
-    # pants('src/python/pants/reporting'),
+    pants('src/python/pants/reporting'),
   ],
 )
 
@@ -115,7 +115,7 @@ python_library(
     pants('src/python/pants/base:run_info'),
     pants('src/python/pants/base:worker_pool'),
     pants('src/python/pants/base:workunit'),
-    # pants('src/python/pants/reporting'), # XXX(fixme)
+    pants('src/python/pants/reporting'), # XXX(fixme)
     pants('src/python/pants/base:config'),
   ],
 )

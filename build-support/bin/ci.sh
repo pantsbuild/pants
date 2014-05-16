@@ -92,8 +92,7 @@ fi
 if [[ "${skip_python:-false}" == "false" ]]; then
   banner "Running python tests"
   (
-    PANTS_PYTHON_TEST_FAILSOFT=1 ./pants.pex build ${INTERPRETER_CONSTRAINTS[@]} \
-      --timeout=5 tests/python/pants_test:all
+    PANTS_PYTHON_TEST_FAILSOFT=1 ./pants.pex build ${INTERPRETER_CONSTRAINTS[@]} --timeout=5 tests/python/pants_test:all
   ) || die "Python test failure"
 fi
 

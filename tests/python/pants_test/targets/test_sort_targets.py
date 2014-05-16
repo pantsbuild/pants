@@ -9,7 +9,7 @@ from pants.base.payload import EmptyPayload
 from pants.base.target import Target
 from pants.base.exceptions import TargetDefinitionException
 
-from pants_test.testutils.base_test import BaseTest
+from pants_test.base_test import BaseTest
 
 
 class SortTargetsTest(BaseTest):

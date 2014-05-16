@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  name = 'base-test',
+  name = 'base_test',
   sources = ['base_test.py'],
   dependencies = [
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
@@ -20,7 +20,7 @@ python_tests(
   name = 'test_maven_layout',
   sources = ['test_maven_layout.py'],
   dependencies = [
-    pants(':base-test'),
+    pants(':base_test'),
   ]
 )
 
@@ -28,7 +28,7 @@ python_tests(
   name = 'test_thrift_util',
   sources = ['test_thrift_util.py'],
   dependencies = [
-    pants(':base-test'),
+    pants(':base_test'),
     pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.lang'),

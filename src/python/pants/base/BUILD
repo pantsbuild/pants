@@ -56,20 +56,6 @@ python_library(
 )
 
 python_library(
-  name = 'build_file_context',  # XXX(fixme)
-  # sources = ['build_file_context.py'],
-  dependencies = [
-    pants(':build_environment'),
-    pants(':build_file_aliases'),
-    pants(':build_file_helpers'),
-    pants(':config'),
-    pants('src/python/pants/goal'),
-    # pants('src/python/pants/targets:common'),
-    # pants('src/python/pants/tasks:common'),
-  ]
-)
-
-python_library(
   name = 'build_graph',
   sources = ['build_graph.py'],
   dependencies = [
@@ -78,21 +64,12 @@ python_library(
   ]
 )
 
-
-python_library(
-  name = 'build_file_helpers',  # XXX(fixme)
-  sources = [],
-  dependencies = [
-    # pants('src/python/pants/targets:all'),  # XXX(fixme)
-  ]
-)
-
 python_library(
   name = 'build_invalidator',
   sources = ['build_invalidator.py'],
   dependencies = [
     pants(':hash_utils'),
-    # pants(':target'), # XXX(fixme)
+    pants(':target'), # XXX(fixme)
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.lang'),
     pants('3rdparty/python/twitter/commons:twitter.common.python'),

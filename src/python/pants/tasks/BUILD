@@ -74,7 +74,6 @@ python_library(
   dependencies = [
     pants(':common'),
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
-    pants('src/python/pants/base:build_file_helpers'),
     pants('src/python/pants/base:generator'),
     pants('src/python/pants/goal:phase'),
     pants('3rdparty/python:setuptools'),
@@ -196,7 +195,6 @@ python_library(
     pants('3rdparty/python/twitter/commons:twitter.common.collections'),
     pants('src/python/pants/base:build_environment'),
     pants('src/python/pants/base:build_file'),
-    pants('src/python/pants/base:build_file_context'),
     pants('src/python/pants/base:target'),
     pants('src/python/pants/targets:common'),
   ],
@@ -340,7 +338,7 @@ python_library(
     pants('src/python/pants/base:build_environment'),
     pants('src/python/pants/base:generator'),
     pants('src/python/pants/base:revision'),
-    # pants('src/python/pants/base:target'), # XXX(fixme)
+    pants('src/python/pants/base:target'), # XXX(fixme)
     pants('src/python/pants/ivy'),
     pants('src/python/pants/java:util'),
   ],

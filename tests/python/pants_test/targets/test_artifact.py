@@ -9,7 +9,7 @@ import pytest
 from pants.targets.artifact import Artifact
 from pants.targets.repository import Repository
 
-from pants_test.testutils.base_test import BaseTest
+from pants_test.base_test import BaseTest
 
 
 class ArtifactTest(BaseTest):

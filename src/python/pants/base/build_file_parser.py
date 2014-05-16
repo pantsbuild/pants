@@ -331,14 +331,16 @@ class BuildFileParser(object):
     try:
       build_file_code = build_file.code()
     except:
-      logger.exception("Error parsing {build_file}.")
+      logger.exception("Error parsing {build_file}."
+                       .format(build_file=build_file))
       traceback.print_exc()
       raise
 
     try:
       Compatibility.exec_function(build_file_code, parse_context)
     except:
-      logger.exception("Error running {build_file}.")
+      logger.exception("Error running {build_file}."
+                       .format(build_file=build_file))
       traceback.print_exc()
       raise
 
