@@ -163,6 +163,9 @@ The Usual Commands: JVM
 
   ``./pants goal test src/java/com/pants/examples/hello/:: tests/java/com/pants/examples/hello/::``
 
+  Output from the test run is written to ``.pants.d/test/junit/``; you
+  can see it on the console with ``--no-test-junit-suppress-output``.
+
   **Run just that one troublesome test class:** (assuming a JUnit test; other
   frameworks use other flags)
 
@@ -328,4 +331,3 @@ from the archive.
    :maxdepth: 1
 
    from_maven
-

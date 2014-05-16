@@ -104,7 +104,7 @@ class _JUnitRunner(object):
     option_group.add_option(mkflag('suppress-output'), mkflag('suppress-output', negate=True),
                             dest='junit_run_suppress_output',
                             action='callback', callback=mkflag.set_bool, default=True,
-                            help='[%%default] Redirects test output to files.  '
+                            help='[%%default] Redirects test output to files (in .pants.d/test/junit).  '
                                  'Implied by %s' % xmlreport)
 
     option_group.add_option(mkflag("arg"), dest="junit_run_arg",
