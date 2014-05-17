@@ -128,7 +128,7 @@ class RESTfulArtifactCache(ArtifactCache):
         return None
       else:
         raise self.CacheError('Failed to %s %s. Error: %d %s' % (method, self._url_string(path),
-                                                                 response.status, response.reason))
+                                                                 response.status_code, response.reason))
     except RequestException as e:
       raise self.CacheError(e)
 
