@@ -102,8 +102,7 @@ class ZincAnalysisElement(object):
         if item:
           items.append(item)
 
-    if rebasings:  # Re-sort if we rebased. Otherwise things are already sorted.
-      items.sort()
+    items.sort()
     outfile.write(header + ':\n')
     outfile.write('%d items\n' % len(items))
     for item in items:
