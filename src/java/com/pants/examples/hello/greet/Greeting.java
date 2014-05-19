@@ -5,9 +5,15 @@ package com.pants.examples.hello.greet;
 
 public final class Greeting {
   public static String greet(String s) {
-    return "Hello, " + s + "!";
+    return EnglishGreeting.salutation() + ", " + s + "!";
   }
   private Greeting() {
       // not called. placates checkstyle
   }
+}
+
+class EnglishGreeting {
+ public static String salutation() {
+   return "Hello";
+ }
 }
