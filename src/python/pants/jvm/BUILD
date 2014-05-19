@@ -70,7 +70,9 @@ python_library(
 python_library(
   name = 'jvm_tool_task_mixin',
   sources = ['jvm_tool_task_mixin.py'],
-  dependencies = [],
+  dependencies = [
+    pants(':jvm_tool_bootstrapper'),
+  ],
 )
 
 

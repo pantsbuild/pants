@@ -10,11 +10,11 @@ from twitter.common.collections import OrderedSet
 from twitter.common.dirutil import safe_mkdir
 
 from pants.jvm.jvm_tool_task_mixin import JvmToolTaskMixin
+from pants.jvm.nailgun_task import NailgunTask
 from pants.targets.java_antlr_library import JavaAntlrLibrary
 from pants.targets.java_library import JavaLibrary
 from pants.tasks.task import TaskError
 from pants.tasks.code_gen import CodeGen
-from pants.jvm.nailgun_task import NailgunTask
 
 
 class AntlrGen(CodeGen, NailgunTask, JvmToolTaskMixin):
