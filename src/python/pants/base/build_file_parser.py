@@ -52,19 +52,18 @@ class TargetProxy(object):
     self.target_type = target_type
     self.build_file = build_file
     self.kwargs = kwargs
-    self.dependencies = self.kwargs.pop('dependencies', [])
+    self.name = kwargs['name']
+    self.address = BuildFileAddress(build_file, self.name)
+    self.description = None
 
+    self.dependencies = self.kwargs.pop('dependencies', [])
+    self._dependency_addresses = None
     for dep_spec in self.dependencies:
       if not isinstance(dep_spec, Compatibility.string):
         msg = ('dependencies passed to Target constructors must be strings.  {dep_spec} is not'
                ' a string.  Target type was: {target_type}.  Current BUILD file is: {build_file}.'
                .format(target_type=target_type, build_file=build_file, dep_spec=dep_spec))
         raise TargetDefinitionException(target=self, msg=msg)
-
-    self.name = kwargs['name']
-    self.address = BuildFileAddress(build_file, self.name)
-    self.description = None
-    self._dependency_addresses = None
 
   @property
   def dependency_addresses(self):

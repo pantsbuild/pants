@@ -83,7 +83,8 @@ class PythonBinary(PythonTarget):
 
     if source and entry_point:
       entry_point_module = entry_point.split(':', 1)[0]
-      source_entry_point = self._translate_to_entry_point(self.payload.sources[0])
+      entry_source = list(self.sources_relative_to_source_root())[0]
+      source_entry_point = self._translate_to_entry_point(entry_source)
       if entry_point_module != source_entry_point:
         raise TargetDefinitionException(self,
             'Specified both source and entry_point but they do not agree: %s vs %s' % (
@@ -113,7 +114,8 @@ class PythonBinary(PythonTarget):
       return self._entry_point
     elif self.payload.sources:
       assert len(self.payload.sources) == 1
-      return self._translate_to_entry_point(self.payload.sources[0])
+      entry_source = list(self.sources_relative_to_source_root())[0]
+      return self._translate_to_entry_point(entry_source)
     else:
       return None
 
