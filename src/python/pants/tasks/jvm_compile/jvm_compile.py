@@ -19,13 +19,14 @@ from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.target import Target
 from pants.base.worker_pool import Work
 from pants.goal.products import MultipleRootedProducts
+from pants.jvm.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.reporting.reporting_utils import items_to_report_element
 from pants.tasks.task import Task
 from pants.tasks.jvm_compile.jvm_dependency_analyzer import JvmDependencyAnalyzer
-from pants.tasks.nailgun_task import NailgunTask
+from pants.jvm.nailgun_task import NailgunTask
 
 
-class JvmCompile(NailgunTask):
+class JvmCompile(NailgunTask, JvmToolTaskMixin):
   """A common framework for JVM compilation.
 
   To subclass for a specific JVM language, implement the static values and methods

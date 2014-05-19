@@ -9,14 +9,15 @@ import os
 from twitter.common.collections import OrderedSet
 from twitter.common.dirutil import safe_mkdir
 
+from pants.jvm.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.targets.java_antlr_library import JavaAntlrLibrary
 from pants.targets.java_library import JavaLibrary
 from pants.tasks.task import TaskError
 from pants.tasks.code_gen import CodeGen
-from pants.tasks.nailgun_task import NailgunTask
+from pants.jvm.nailgun_task import NailgunTask
 
 
-class AntlrGen(CodeGen, NailgunTask):
+class AntlrGen(CodeGen, NailgunTask, JvmToolTaskMixin):
 
   # Maps the compiler attribute of a target to the config key in pants.ini
   _CONFIG_SECTION_BY_COMPILER = {

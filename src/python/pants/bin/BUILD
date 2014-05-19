@@ -30,7 +30,7 @@ python_library(
     pants('src/python/pants/goal:initialize_reporting'),
     pants('src/python/pants/goal'),
     pants('src/python/pants/reporting'),
-    pants('src/python/pants/tasks:nailgun_task'),
+    pants('src/python/pants/jvm:nailgun_task'),
   ],
 )
 

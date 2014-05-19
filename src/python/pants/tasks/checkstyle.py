@@ -8,15 +8,16 @@ import os
 
 from twitter.common.dirutil import safe_open
 
+from pants.jvm.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.process.xargs import Xargs
 from pants.tasks.task import TaskError
-from pants.tasks.nailgun_task import NailgunTask
+from pants.jvm.nailgun_task import NailgunTask
 
 
 CHECKSTYLE_MAIN = 'com.puppycrawl.tools.checkstyle.Main'
 
 
-class Checkstyle(NailgunTask):
+class Checkstyle(NailgunTask, JvmToolTaskMixin):
   @staticmethod
   def _is_checked(target):
     return target.is_java and not target.is_synthetic

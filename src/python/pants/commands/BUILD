@@ -100,9 +100,9 @@ python_library(
     pants('src/python/pants/goal:initialize_reporting'),
     pants('src/python/pants/goal:option_helpers'),
     pants('src/python/pants/goal:register'),
+    pants('src/python/pants/jvm:nailgun_task'),
     pants('src/python/pants/reporting'),
     pants('src/python/pants/tasks:common'),
     pants('src/python/pants/tasks:console_task'),
-    pants('src/python/pants/tasks:nailgun_task'),
   ],
 )

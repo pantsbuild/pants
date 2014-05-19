@@ -12,7 +12,6 @@ from pants.tasks.antlr_gen import AntlrGen
 from pants.tasks.apache_thrift_gen import ApacheThriftGen
 from pants.tasks.benchmark_run import BenchmarkRun
 from pants.tasks.binary_create import BinaryCreate
-from pants.tasks.bootstrap_jvm_tools import BootstrapJvmTools
 from pants.tasks.build_lint import BuildLint
 from pants.tasks.builddictionary import BuildBuildDictionary
 from pants.tasks.bundle_create import BundleCreate
@@ -29,7 +28,6 @@ from pants.tasks.filedeps import FileDeps
 from pants.tasks.filemap import Filemap
 from pants.tasks.filter import Filter
 from pants.tasks.idea_gen import IdeaGen
-from pants.tasks.ivy_resolve import IvyResolve
 from pants.tasks.jar_create import JarCreate
 from pants.tasks.jar_publish import JarPublish
 from pants.tasks.javadoc_gen import JavadocGen
@@ -41,7 +39,9 @@ from pants.tasks.list_goals import ListGoals
 from pants.tasks.listtargets import ListTargets
 from pants.tasks.markdown_to_html import MarkdownToHtml
 from pants.tasks.minimal_cover import MinimalCover
-from pants.tasks.nailgun_task import NailgunKillall
+from pants.jvm.bootstrap_jvm_tools import BootstrapJvmTools
+from pants.jvm.ivy_resolve import IvyResolve
+from pants.jvm.nailgun_task import NailgunKillall
 from pants.tasks.paths import Path, Paths
 from pants.tasks.pathdeps import PathDeps
 from pants.tasks.prepare_resources import PrepareResources

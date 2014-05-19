@@ -11,7 +11,7 @@ from textwrap import dedent
 
 from twitter.common.contextutil import temporary_file_path
 
-from pants.tasks.ivy_utils import IvyUtils
+from pants.jvm.ivy_utils import IvyUtils
 
 from pants_test.base_test import BaseTest
 from pants_test.base.context_utils import create_config

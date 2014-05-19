@@ -8,11 +8,12 @@ import os
 import shutil
 
 from pants.java.util import execute_java
+from pants.jvm.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.tasks.task import TaskError
 from pants.tasks.jvm_task import JvmTask
 
 
-class BenchmarkRun(JvmTask):
+class BenchmarkRun(JvmTask, JvmToolTaskMixin):
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
     option_group.add_option(mkflag("target"), dest="target_class", action="append",

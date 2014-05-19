@@ -12,11 +12,11 @@ from twitter.common.collections import OrderedSet
 from pants.base.build_environment import get_buildroot
 from pants.base.build_graph import sort_targets
 from pants.base.exceptions import TaskError
+from pants.jvm.ivy_task_mixin import IvyTaskMixin
 from pants.targets.jar_dependency import JarDependency
 from pants.targets.jar_library import JarLibrary
 from pants.targets.jvm_target import JvmTarget
 from pants.targets.scala_library import ScalaLibrary
-from pants.tasks.task import Task
 
 
 class JvmDependencyAnalyzer(object):
@@ -74,7 +74,7 @@ class JvmDependencyAnalyzer(object):
 
     # Compute jar -> target.
     with self._context.new_workunit(name='map_jars'):
-      with Task.symlink_map_lock:
+      with IvyTaskMixin.symlink_map_lock:
         all_symlinks_map = self._context.products.get_data('symlink_map').copy()
         # We make a copy, so it's safe to use outside the lock.
 

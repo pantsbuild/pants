@@ -33,7 +33,6 @@ python_test_suite(
     pants(':depmap'),
     pants(':filemap'),
     pants(':filter'),
-    pants(':ivy_utils'),
     pants(':jar_create'),
     pants(':jar_publish'),
     pants(':listtargets'),
@@ -222,16 +221,6 @@ python_tests(
     pants(':base'),
     pants('src/python/pants/tasks:jar_publish'),
   ],
-)
-
-python_tests(
-  name = 'ivy_utils',
-  sources = ['test_ivy_utils.py'],
-  dependencies = [
-    pants(':base'),
-    pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
-    pants('src/python/pants/tasks:ivy_utils'),
-  ]
 )
 
 python_tests(

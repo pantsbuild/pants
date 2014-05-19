@@ -8,10 +8,11 @@ import shlex
 import subprocess
 
 from pants.java.util import execute_java
+from pants.jvm.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.tasks.jvm_task import JvmTask
 
 
-class ScalaRepl(JvmTask):
+class ScalaRepl(JvmTask, JvmToolTaskMixin):
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
     option_group.add_option(mkflag("jvmargs"), dest="run_jvmargs", action="append",

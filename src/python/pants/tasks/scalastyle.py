@@ -9,12 +9,13 @@ import re
 
 from pants.base.config import Config
 from pants.base.target import Target
+from pants.jvm.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.process.xargs import Xargs
 from pants.tasks.task import TaskError
-from pants.tasks.nailgun_task import NailgunTask
+from pants.jvm.nailgun_task import NailgunTask
 
 
-class Scalastyle(NailgunTask):
+class Scalastyle(NailgunTask, JvmToolTaskMixin):
   """Checks scala source files to ensure they're stylish.
 
   Scalastyle is configured via the 'scalastyle' pants.ini section.

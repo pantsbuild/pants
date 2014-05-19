@@ -13,7 +13,7 @@ from twitter.common.contextutil import open_zip as open_jar
 from pants.targets.jar_dependency import JarDependency
 from pants.targets.jvm_binary import JvmBinary
 from pants.tasks.task import Task
-from pants.tasks.ivy_utils import IvyModuleRef, IvyUtils
+from pants.jvm.ivy_utils import IvyModuleRef, IvyUtils
 
 
 class Provides(Task):

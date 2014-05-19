@@ -33,7 +33,7 @@ from pants.goal.help import print_help
 from pants.goal.initialize_reporting import update_reporting
 from pants.goal.option_helpers import add_global_options
 from pants.tasks.task import Task
-from pants.tasks.nailgun_task import NailgunTask
+from pants.jvm.nailgun_task import NailgunTask
 from pants.tasks.console_task import ConsoleTask
 
 

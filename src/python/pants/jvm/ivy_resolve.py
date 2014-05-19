@@ -15,12 +15,13 @@ from pants import binary_util
 from pants.base.cache_manager import VersionedTargetSet
 from pants.base.exceptions import TaskError
 from pants.ivy.bootstrapper import Bootstrapper
-from pants.targets.jar_library import JarLibrary
-from pants.tasks.ivy_utils import IvyUtils
-from pants.tasks.nailgun_task import NailgunTask
+from pants.jvm.ivy_task_mixin import IvyTaskMixin
+from pants.jvm.jvm_tool_task_mixin import JvmToolTaskMixin
+from pants.jvm.ivy_utils import IvyUtils
+from pants.jvm.nailgun_task import NailgunTask
 
 
-class IvyResolve(NailgunTask):
+class IvyResolve(NailgunTask, IvyTaskMixin, JvmToolTaskMixin):
 
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):

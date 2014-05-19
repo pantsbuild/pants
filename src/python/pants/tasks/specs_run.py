@@ -9,11 +9,12 @@ from twitter.common.collections import OrderedSet
 from pants.base.workunit import WorkUnit
 from pants.binary_util import safe_args
 from pants.java.util import execute_java
+from pants.jvm.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.tasks.task import TaskError
 from pants.tasks.jvm_task import JvmTask
 
 
-class SpecsRun(JvmTask):
+class SpecsRun(JvmTask, JvmToolTaskMixin):
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
     option_group.add_option(mkflag('skip'), mkflag('skip', negate=True), dest='specs_run_skip',

@@ -12,11 +12,12 @@ from pants.java import util
 from pants.java.distribution import Distribution
 from pants.java.executor import SubprocessExecutor
 from pants.java.nailgun_executor import NailgunExecutor
+from pants.jvm.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.tasks.task import Task
 from pants.tasks.console_task import ConsoleTask
 
 
-class NailgunTask(Task):
+class NailgunTask(Task, JvmToolTaskMixin):
 
   _DAEMON_OPTION_PRESENT = False
 
