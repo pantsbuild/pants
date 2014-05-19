@@ -46,7 +46,7 @@ When you invoke Pants, you specify goals and targets: the actions to
 take, and the things to carry out those actions upon.
 Together, your chosen goals and targets determine what Pants produces.
 Invoking the ``bundle`` goal produces an archive; invoking the
-``test`` goal displayes test results on the console. Assuming you didn't
+``test`` goal displays test results on the console. Assuming you didn't
 duplicate code between folders, targets in ``tests/com/twitter/mybird/``
 will have different code than those in ``tests/com/twitter/otherbird/``.
 
