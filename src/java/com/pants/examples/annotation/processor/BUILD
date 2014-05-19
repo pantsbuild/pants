@@ -9,6 +9,6 @@ annotation_processor(name='processor',
   dependencies=[
     pants('src/java/com/pants/examples/annotation/example'),
     pants('3rdparty:guava'),
-    ],
+  ],
 )
 

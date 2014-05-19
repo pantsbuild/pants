@@ -28,7 +28,7 @@ import javax.lang.model.util.ElementFilter;
  * class and prints out a list of all such classes to a file named <code>examples.txt</code>.
  */
 public class ExampleProcessor extends AbstractProcessor {
-  private static String EXAMPLES_FILE_NAME = "examples.txt";
+  private final static String EXAMPLES_FILE_NAME = "examples.txt";
   private ProcessingEnvironment processingEnvironment = null;
 
   @Override public Set<String> getSupportedAnnotationTypes() {
