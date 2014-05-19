@@ -97,8 +97,7 @@ Code Review
 ===========
 
 Now that your change is complete, we'll post it for review.
-We use https://rbcommons.com to host code reviews and
-`rbt <http://www.reviewboard.org/docs/rbtools/dev/>`_ (RBTools)
+We use https://rbcommons.com to host code reviews.
 
 Posting the First Draft
 -----------------------
@@ -108,7 +107,8 @@ account at https://rbcommons.com . To create one, visit
 https://rbcommons.com/account/login/ and click "Create one now."
 
 To set up local tools, run `./rbt status`.
-(``./rbt`` is a wrapper around the usual RBTools ``rbt`` script.)
+(``./rbt`` is a wrapper around the usual RBTools
+`rbt <http://www.reviewboard.org/docs/rbtools/dev/>`_ script.)
 The first time this runs it will bootstrap and you will be asked to log in.
 Subsequent runs use your cached login credentials.
 
