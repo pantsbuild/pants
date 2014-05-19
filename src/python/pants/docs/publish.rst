@@ -119,9 +119,7 @@ How To
   with no changes.
 
 * Consider trying a local publish first. This lets you test the to-be-published
-  artifact. E.g., to test with Maven configured to use ``~/.m2/repository``
-  as a local repo, you could publish to that repo with
-  ``./pants goal publish --no-publish-dryrun --publish-local=~/.m2/repository``
+  artifact. See :ref:`publish_local_test`.
 
 * Start the publish: ``./pants goal publish --no-publish-dryrun [target]``
   Don't wander off; Pants will ask for confirmation as it goes
@@ -359,3 +357,28 @@ In this example, when you publish ``high-level``, Pants knows to also publish
 If Pants publishes ``util``, it does *not* automatically try to publish
 ``high-level`` or ``other-high-level``.
 
+.. _publish_local_test:
+
+********************************
+Test with a Fake Local "Publish"
+********************************
+
+The whole reason you publish an artifact so that other codebases can use it.
+Before you really publish, you might want to fake-publish an artifact:
+generate it and put it someplace a place in your development machine;
+then use that artifact from another codebase.
+
+For example, your other codebase might use
+Maven to build, perhaps with Maven configured to use ``~/.m2/repository``
+as a local repo.
+You can make pants publish to that local repo with ::
+
+    ./pants goal publish --no-publish-dryrun --publish-local=~/.m2/repository
+
+In the other codebase, change the dependencies to pull in the new artifact.
+
+If your other codebase *also* uses Pants build, you can depend on the
+locally-published artifact. If the artifact is a jar, then in the
+3rdparty
+:ref:`jar target <bdict_jar>`,
+set ``mutable=True`` and change the version number.
