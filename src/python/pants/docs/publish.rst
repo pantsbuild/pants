@@ -294,9 +294,13 @@ Use ``--publish_override`` to set version numbers to avoid these.
 Does not provide an artifact
 ============================
 
-Pants gets the coordinates at which to publish a target from the target's
-``provides`` parameter. Thus, if you try to publish a target with no
-``provides``, Pants doesn't know what to do. It stops::
+A published artifact lives at a set of coordinates. For Pants to publish an
+artifact, it needs to know the artifact's coordinates.
+Pants gets the coordinates from the target's
+``provides`` parameter. Thus, if you try to publish a target
+that depends on a target
+that has no ``provides``,
+Pants doesn't know what to do. It stops::
 
   FAILURE: The following errors must be resolved to publish.
     Cannot publish src/java/com/twitter/common/base/BUILD:base due to:
@@ -308,6 +312,19 @@ Remember, to publish a target, the target's dependencies must also be published.
 If any of those dependencies have changed since their last publish, Pants
 tries to publish them before publishing the target you specify. Thus, you
 might need to add a ``provides`` to one or more of these.
+
+Silently does not publish
+=========================
+
+A published artifact lives at a set of coordinates. For Pants to publish an
+artifact, it needs to know the artifact's coordinates.
+Pants gets the coordinates from the target's
+``provides`` parameter. Thus, if you try to publish a target
+that has no ``provides``,
+Pants doesn't try. If the target depends on *other*
+targets that *do* provide artifacts, Pants might publish those.
+This is a case of :ref:`goal-target mismatch <tut_goal_target_mismatch>`.
+To fix this, set ``provides`` correctly.
 
 **********************************************
 Want to Publish Something? Publish Many Things

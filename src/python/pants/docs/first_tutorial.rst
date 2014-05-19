@@ -119,7 +119,11 @@ In this example, it doesn't make sense to run library code as a test, so Pants d
 that. Since pants knows that the ``test`` goal depends on the ``compile`` goal, it
 *does* compile the library.
 
-One tricky side effect of this:
+.. _tut_goal_target_mismatch:
+
+*Goal-Target Mismatch*
+
+One tricky side effect of this is accidental *goal-target mismatch*:
 You can invoke a goal that doesn't make sense for a target. E.g., you can invoke
 the ``test`` goal on a target that's not a test suite. Pants won't complain.
 It knows that it should compile code before it tests it; it will happily compile
