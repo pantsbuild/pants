@@ -62,7 +62,7 @@ class BuildFile(object):
 
     # There is no BUILD file without a prefix so select any viable sibling
     if not os.path.exists(buildfile):
-      for build in glob1(os.path.dirname(buildfile), "%s*" % (BuildFile._BUILD_FILE_PREFIX)):
+      for build in sorted(glob1(os.path.dirname(buildfile), "%s*" % (BuildFile._BUILD_FILE_PREFIX))):
         if BuildFile._is_buildfile_name(build):
           self._build_basename = build
           buildfile = os.path.join(path, self._build_basename)
@@ -104,7 +104,7 @@ class BuildFile(object):
 
     def find_parent(dir):
       parent = os.path.dirname(dir)
-      for parent_buildfile in glob1(parent, '%s*' % (BuildFile._BUILD_FILE_PREFIX)):
+      for parent_buildfile in sorted(glob1(parent, '%s*' % (BuildFile._BUILD_FILE_PREFIX))):
         buildfile = os.path.join(parent, parent_buildfile)
         if os.path.exists(buildfile) and not os.path.isdir(buildfile) and \
             BuildFile._is_buildfile_name(os.path.basename(buildfile)):
@@ -127,7 +127,7 @@ class BuildFile(object):
     """Returns an iterator over all the BUILD files co-located with this BUILD file not including
     this BUILD file itself"""
 
-    for build in glob1(self.parent_path, '%s*' % (BuildFile._BUILD_FILE_PREFIX)):
+    for build in sorted(glob1(self.parent_path, '%s*' % (BuildFile._BUILD_FILE_PREFIX))):
       if self.name != build and BuildFile._is_buildfile_name(build):
         siblingpath = os.path.join(os.path.dirname(self.relpath), build)
         if not os.path.isdir(os.path.join(self.root_dir, siblingpath)):
