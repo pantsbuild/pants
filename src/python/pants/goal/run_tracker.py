@@ -55,6 +55,7 @@ class RunTracker(object):
       raise ValueError('Expected a Config object, given %s of type %s' % (config, type(config)))
     info_dir = RunInfo.dir(config)
     stats_upload_url = config.getdefault('stats_upload_url', default=None)
+    stats_upload_timeout = config.getdefault('stats_upload_timeout', default=2)
     num_foreground_workers = config.getdefault('num_foreground_workers', default=8)
     num_background_workers = config.getdefault('num_background_workers', default=8)
     return cls(info_dir,
@@ -65,6 +66,7 @@ class RunTracker(object):
   def __init__(self,
                info_dir,
                stats_upload_url=None,
+               stats_upload_timeout=2,
                num_foreground_workers=8,
                num_background_workers=8):
     self.run_timestamp = time.time()  # A double, so we get subsecond precision for ids.
@@ -80,6 +82,7 @@ class RunTracker(object):
     self.run_info.add_basic_info(run_id, self.run_timestamp)
     self.run_info.add_info('cmd_line', cmd_line)
     self.stats_url = stats_upload_url
+    self.stats_timeout = stats_upload_timeout
 
     # Create a 'latest' symlink, after we add_infos, so we're guaranteed that the file exists.
     link_to_latest = os.path.join(os.path.dirname(self.info_dir), 'latest')
@@ -232,9 +235,9 @@ class RunTracker(object):
       url = urlparse(self.stats_url)
       try:
         if url.scheme == 'https':
-          http_conn = httplib.HTTPSConnection(url.netloc)
+          http_conn = httplib.HTTPSConnection(url.netloc, timeout=self.stats_timeout)
         else:
-          http_conn = httplib.HTTPConnection(url.netloc)
+          http_conn = httplib.HTTPConnection(url.netloc, timeout=self.stats_timeout)
         http_conn.request('POST', url.path, urllib.urlencode(params), headers)
         resp = http_conn.getresponse()
         if resp.status != 200:
