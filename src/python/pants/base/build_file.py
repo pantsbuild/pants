@@ -14,8 +14,8 @@ from twitter.common.python.interpreter import PythonIdentity
 
 
 class BuildFile(object):
-  _CANONICAL_NAME = 'BUILD'
-  _PATTERN = re.compile('^%s(\.[a-zA-Z0-9_-]+)?$' % _CANONICAL_NAME)
+  _BUILD_FILE_PREFIX = 'BUILD'
+  _PATTERN = re.compile('^%s(\.[a-zA-Z0-9_-]+)?$' % _BUILD_FILE_PREFIX)
 
   @staticmethod
   def _is_buildfile_name(name):
@@ -49,8 +49,8 @@ class BuildFile(object):
                     .format(root_dir=root_dir))
 
     path = os.path.join(root_dir, relpath)
-    self.build_basename = BuildFile._CANONICAL_NAME
-    buildfile = os.path.join(path, self.build_basename) if os.path.isdir(path) else path
+    self._build_basename = BuildFile._BUILD_FILE_PREFIX
+    buildfile = os.path.join(path, self._build_basename) if os.path.isdir(path) else path
 
     if os.path.isdir(buildfile):
       raise IOError('Path to buildfile ({buildfile}) is a directory, but it must be a file.'
@@ -60,12 +60,12 @@ class BuildFile(object):
       if not os.path.exists(os.path.dirname(buildfile)):
         raise IOError("Path to BUILD file does not exist at: %s" % os.path.dirname(buildfile))
 
-    # Look for BUILD a file with a suffix that is a candidates to be the first BUILD file
+    # There is no BUILD file without a prefix so select any viable sibling
     if not os.path.exists(buildfile):
-      for build in glob1(os.path.dirname(buildfile), 'BUILD*'):
+      for build in glob1(os.path.dirname(buildfile), "%s*" % (BuildFile._BUILD_FILE_PREFIX)):
         if BuildFile._is_buildfile_name(build):
-          self.build_basename = build
-          buildfile = os.path.join(path, self.build_basename)
+          self._build_basename = build
+          buildfile = os.path.join(path, self._build_basename)
           break
 
     if must_exist:
@@ -86,7 +86,6 @@ class BuildFile(object):
 
     self.relpath = os.path.relpath(self.full_path, self.root_dir)
     self.spec_path = os.path.dirname(self.relpath)
-    self.canonical_relpath = os.path.join(os.path.dirname(self.relpath), os.path.basename(buildfile))
 
   def exists(self):
     """Returns True if this BuildFile corresponds to a real BUILD file on disk."""
@@ -105,17 +104,18 @@ class BuildFile(object):
 
     def find_parent(dir):
       parent = os.path.dirname(dir)
-      buildfile = os.path.join(parent, self.build_basename)
-      if os.path.exists(buildfile) and not os.path.isdir(buildfile):
-        return parent, BuildFile(self.root_dir, os.path.relpath(buildfile, self.root_dir))
-      else:
-        return parent, None
+      for parent_buildfile in glob1(parent, '%s*' % (BuildFile._BUILD_FILE_PREFIX)):
+        buildfile = os.path.join(parent, parent_buildfile)
+        if os.path.exists(buildfile) and not os.path.isdir(buildfile) and \
+            BuildFile._is_buildfile_name(os.path.basename(buildfile)):
+          return parent,  BuildFile(self.root_dir, os.path.relpath(buildfile, self.root_dir))
+      return parent, None
 
     parent_buildfiles = OrderedSet()
 
     parentdir = os.path.dirname(self.full_path)
     visited = set()
-    while parentdir not in visited and self.root_dir != parentdir:
+    while parentdir not in visited and os.path.abspath(self.root_dir) != os.path.abspath(parentdir):
       visited.add(parentdir)
       parentdir, buildfile = find_parent(parentdir)
       if buildfile:
@@ -127,7 +127,7 @@ class BuildFile(object):
     """Returns an iterator over all the BUILD files co-located with this BUILD file not including
     this BUILD file itself"""
 
-    for build in glob1(self.parent_path, 'BUILD*'):
+    for build in glob1(self.parent_path, '%s*' % (BuildFile._BUILD_FILE_PREFIX)):
       if self.name != build and BuildFile._is_buildfile_name(build):
         siblingpath = os.path.join(os.path.dirname(self.relpath), build)
         if not os.path.isdir(os.path.join(self.root_dir, siblingpath)):
@@ -136,7 +136,7 @@ class BuildFile(object):
   def family(self):
     """Returns an iterator over all the BUILD files co-located with this BUILD file including this
     BUILD file itself.  The family forms a single logical BUILD file composed of the canonical BUILD
-    file and optional sibling build files each with their own extension, eg: BUILD.extras."""
+    file if it exists and sibling build files each with their own extension, eg: BUILD.extras."""
 
     yield self
     for sibling in self.siblings():

@@ -100,9 +100,21 @@ class BuildFileTest(unittest.TestCase):
     buildfile = BuildFileTest.buildfile('suffix-test/BUILD.suffix')
     self.assertEquals(OrderedSet([BuildFileTest.buildfile('suffix-test/BUILD.suffix2')]),
         OrderedSet(buildfile.siblings()))
-    self.assertEquals(OrderedSet([BuildFileTest.buildfile('suffix-test/BUILD.suffix'), 
+    self.assertEquals(OrderedSet([BuildFileTest.buildfile('suffix-test/BUILD.suffix'),
         BuildFileTest.buildfile('suffix-test/BUILD.suffix2')]),
         buildfile.family())
     self.assertEquals(OrderedSet([BuildFileTest.buildfile('suffix-test/child/BUILD.suffix3')]),
         buildfile.descendants())
 
+    def testAncestorsSuffix(self):
+      buildfile = BuildFileTest.buildfile('grandparent/parent/BUILD.dir')
+      self.assertEquals(OrderedSet(['grandparent/BUILD', 'BUILD', 'BUILD.twitter']),
+                        self.buildfile.ancestors())
+      BuildFileTest.makedirs('suffix-test')
+      BuildFileTest.makedirs('suffix-test/subdir')
+      BuildFileTest.touch('suffix-test/subdir/BUILD.foo')
+      BuildFileTest.touch('suffix-test/BUILD.bar')
+      BuildFileTest.touch('BUILD.baz')
+      BuildFileTest.touch('BUILD.foobar')
+      self.assertEquals(OrderedSet(['suffix-test/BUILD.bar', 'BUILD.baz', 'BUILD.foobar']),
+                        self.buildfile.ancestors())
