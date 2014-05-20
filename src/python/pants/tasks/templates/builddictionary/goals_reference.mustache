@@ -33,6 +33,7 @@ goal.
 
 {{#goals}}
 
+{{#ogroup}}
 .. _gref_cli_{{ogroup.xref}}:
 
 *
@@ -40,6 +41,10 @@ goal.
   **{{{ogroup.title}}}**
 {{/ogroup.title}}
   Implemented by class ``{{name}}``
+{{/ogroup}}
+{{^ogroup}}
+* Implemented by class ``{{name}}``
+{{/ogroup}}
 
 
 {{#doc}}
