@@ -54,7 +54,7 @@ def resolve_multi(config,
                   interpreter=None,
                   platforms=None,
                   conn_timeout=None,
-                  ttl=10000):
+                  ttl=3600):
   """Multi-platform dependency resolution for PEX files.
 
      Given a pants configuration and a set of requirements, return a list of distributions

@@ -40,6 +40,7 @@ class BuildFileTest(unittest.TestCase):
 
     BuildFileTest.touch('grandparent/parent/BUILD')
     BuildFileTest.touch('grandparent/parent/BUILD.twitter')
+    # Tricky!  This is a directory
     BuildFileTest.makedirs('grandparent/parent/BUILD.dir')
     BuildFileTest.makedirs('grandparent/BUILD')
     BuildFileTest.touch('BUILD')
@@ -106,15 +107,25 @@ class BuildFileTest(unittest.TestCase):
     self.assertEquals(OrderedSet([BuildFileTest.buildfile('suffix-test/child/BUILD.suffix3')]),
         buildfile.descendants())
 
-    def testAncestorsSuffix(self):
-      buildfile = BuildFileTest.buildfile('grandparent/parent/BUILD.dir')
-      self.assertEquals(OrderedSet(['grandparent/BUILD', 'BUILD', 'BUILD.twitter']),
-                        self.buildfile.ancestors())
-      BuildFileTest.makedirs('suffix-test')
-      BuildFileTest.makedirs('suffix-test/subdir')
-      BuildFileTest.touch('suffix-test/subdir/BUILD.foo')
-      BuildFileTest.touch('suffix-test/BUILD.bar')
-      BuildFileTest.touch('BUILD.baz')
-      BuildFileTest.touch('BUILD.foobar')
-      self.assertEquals(OrderedSet(['suffix-test/BUILD.bar', 'BUILD.baz', 'BUILD.foobar']),
-                        self.buildfile.ancestors())
+  def testAncestorsSuffix1(self):
+    BuildFileTest.makedirs('suffix-test1/parent')
+    BuildFileTest.touch('suffix-test1/parent/BUILD.suffix')
+    BuildFileTest.touch('suffix-test1/BUILD')
+    buildfile = BuildFileTest.buildfile('suffix-test1/parent/BUILD.suffix')
+    self.assertEquals(OrderedSet([
+        BuildFileTest.buildfile('suffix-test1/BUILD'),
+        BuildFileTest.buildfile('BUILD'),
+        BuildFileTest.buildfile('BUILD.twitter')]),
+        buildfile.ancestors())
+
+  def testAncestorsSuffix2(self):
+    BuildFileTest.makedirs('suffix-test2')
+    BuildFileTest.makedirs('suffix-test2/subdir')
+    BuildFileTest.touch('suffix-test2/subdir/BUILD.foo')
+    BuildFileTest.touch('suffix-test2/BUILD.bar')
+    buildfile = BuildFileTest.buildfile('suffix-test2/subdir/BUILD.foo')
+    self.assertEquals(OrderedSet([
+        BuildFileTest.buildfile('suffix-test2/BUILD.bar'),
+        BuildFileTest.buildfile('BUILD'),
+        BuildFileTest.buildfile('BUILD.twitter')]),
+        buildfile.ancestors())
