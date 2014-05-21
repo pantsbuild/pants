@@ -57,6 +57,7 @@ class Py(Command):
 
     self.target = None
     self.extra_targets = []
+    self.extra_requirements = []
     self.config = Config.load()
 
     interpreters = self.options.interpreters or [b'']
@@ -69,7 +70,7 @@ class Py(Command):
     self.interpreter = interpreters[0]
 
     for req in self.options.extra_requirements:
-      self.extra_targets.append(PythonRequirement(req, use_2to3=True))
+      self.extra_requirements.append(PythonRequirement(req, use_2to3=True))
 
     # We parse each arg in the context of the cli usage:
     #   ./pants command (options) [spec] (build args)
@@ -106,11 +107,10 @@ class Py(Command):
         not_a_target(debug_msg=e)
         break
 
-      for resolved in filter(lambda t: t.is_concrete, target.resolve()):
-        if isinstance(resolved, PythonBinary):
-          binaries.append(resolved)
-        else:
-          self.extra_targets.append(resolved)
+      if isinstance(target, PythonBinary):
+        binaries.append(target)
+      else:
+        self.extra_targets.append(target)
 
     if len(binaries) == 0:
       # treat as a chroot
@@ -161,7 +161,7 @@ class Py(Command):
       requirements = self.config.getlist('python-ipython', 'requirements', default=[])
 
       for requirement in requirements:
-        self.extra_targets.append(PythonRequirement(requirement))
+        self.extra_requirements.append(PythonRequirement(requirement))
 
     executor = PythonChroot(
         self.target,
@@ -169,6 +169,7 @@ class Py(Command):
         builder=builder,
         interpreter=self.interpreter,
         extra_targets=self.extra_targets,
+        extra_requirements=self.extra_requirements,
         conn_timeout=self.options.conn_timeout)
 
     executor.dump()
