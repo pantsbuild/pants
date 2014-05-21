@@ -7,14 +7,12 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import os
 import sys
 from abc import abstractmethod
-from collections import defaultdict
 
-from twitter.common.lang import AbstractClass, Compatibility
+from twitter.common.lang import AbstractClass
 
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.build_file import BuildFile
 from pants.base.exceptions import TaskError
-from pants.base.target import Target
 from pants.scm import Scm
 from pants.tasks.console_task import ConsoleTask
 
@@ -47,7 +45,7 @@ class WhatChanged(ConsoleTask):
     self._parent = context.options.what_changed_create_prefix
     self._show_files = context.options.what_changed_show_files
 
-    self._filemap = defaultdict(set)
+    self._filemap = {}
 
   def console_output(self, _):
     touched_files = self._get_touched_files()
@@ -77,17 +75,19 @@ class WhatChanged(ConsoleTask):
         build_file_parser.inject_spec_closure_into_build_graph(address.spec, build_graph)
       is_build_file = (build_file.full_path == os.path.join(get_buildroot(), path))
 
-      for target in build_graph._target_by_address.values():
-        # A synthesized target can never own permanent files on disk
-        if target != target.cloned_from:
-          # TODO(John Sirois): tighten up the notion of targets written down in a BUILD by a user
-          # vs. targets created by pants at runtime.
-          continue
-
-        target_owns_path = ((target.has_sources() or target.has_resources) and
-                            self._owns(target, path))
-        if (is_build_file and target.address.build_file == build_file) or target_owns_path:
-          yield target
+      for target in build_graph.sorted_targets():
+        # HACK: Python targets currently wrap old-style file resources in a synthetic
+        # resources target, but they do so lazily, when target.resources is first accessed.
+        # We force that access here, so that the targets will show up in the subsequent
+        # invocation of build_graph.sorted_targets().
+        if target.has_resources:
+          _ = target.resources
+      for target in build_graph.sorted_targets():
+        if (is_build_file and not target.is_synthetic and
+            target.address.build_file == build_file) or self._owns(target, path):
+          # We call concrete_derived_from because of the python target resources hack
+          # mentioned above; It's really the original target that owns the resource files.
+          yield target.concrete_derived_from
 
   def _candidate_owners(self, path):
     build_file = BuildFile(get_buildroot(), relpath=os.path.dirname(path), must_exist=False)
@@ -100,17 +100,7 @@ class WhatChanged(ConsoleTask):
 
   def _owns(self, target, path):
     if target not in self._filemap:
-      files = self._filemap[target]
-      files_owned_by_target = (target.sources_relative_to_buildroot() if target.has_sources()
-                               else [])
-      # TODO (tdesai): This case to handle resources in PythonTarget.
-      # Remove this when we normalize resources handling across python and jvm targets.
-      if target.has_resources:
-        for resource in target.resources:
-          full_resource_path = os.path.join(target.payload.sources_rel_path, resource)
-          files_owned_by_target.append(full_resource_path)
-      for owned_file in files_owned_by_target:
-        files.add(owned_file)
+      self._filemap[target] = set(target.sources_relative_to_buildroot())
     return path in self._filemap[target]
 
 

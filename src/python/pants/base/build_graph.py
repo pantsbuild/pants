@@ -54,14 +54,26 @@ class BuildGraph(object):
     )
     return self._target_dependees_by_address[address]
 
-  def get_clonal_ancestor(self, address):
-    """Get the ancestor of a cloned Target, usually from codgen.
-    If a Target was injected programmatically as a clone of another Target, e.g. from codegen,
-    this allows us to trace its ancestry.  If a Target has no ancestors, default to returning
-    itself.
+  def get_derived_from(self, address):
+    """Get the target the specified target was derived from.
+
+    If a Target was injected programmatically, e.g. from codegen, this allows us to trace its
+    ancestry.  If a Target is not derived, default to returning itself.
     """
     parent_address = self._derived_from_by_derivative_address.get(address, address)
     return self.get_target(parent_address)
+
+  def get_concrete_derived_from(self, address):
+    """Get the concrete target the specified target was (directly or indirectly) derived from.
+
+    The returned target is guaranteed to not have been derived from any other target.
+    """
+    current_address = address
+    next_address = self._derived_from_by_derivative_address.get(current_address, current_address)
+    while next_address != current_address:
+      current_address = next_address
+      next_address = self._derived_from_by_derivative_address.get(current_address, current_address)
+    return self.get_target(current_address)
 
   def inject_target(self, target, dependencies=None, derived_from=None):
     dependencies = dependencies or frozenset()

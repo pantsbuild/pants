@@ -99,20 +99,13 @@ class PythonChroot(object):
       add_function(src, path)
 
     self.debug('  Dumping library: %s' % library)
+    for relpath in library.payload.sources_relative_to_sourceroot():
+      copy_to_chroot(library.target_base, relpath, self._builder.add_source)
 
-    abs_target_source_root = os.path.join(get_buildroot(), library.target_base)
-
-    for filename in library.payload.sources_relative_to_buildroot():
-      abs_source_path = os.path.join(get_buildroot(), filename)
-      source_rel_path = os.path.relpath(abs_source_path, abs_target_source_root)
-      copy_to_chroot(library.target_base, source_rel_path, self._builder.add_source)
-
-    resources = [os.path.join(library.payload.sources_rel_path, resource)
-                 for resource in library.payload.resources]
-    for filename in resources:
-      abs_resource_path = os.path.join(get_buildroot(), filename)
-      resource_rel_path = os.path.relpath(abs_resource_path, abs_target_source_root)
-      copy_to_chroot(library.target_base, resource_rel_path, self._builder.add_resource)
+    for resources_tgt in library.resources:
+      for resource_file_from_source_root in resources_tgt.sources_relative_to_source_root():
+        copy_to_chroot(resources_tgt.target_base, resource_file_from_source_root,
+                       self._builder.add_resource)
 
   def _dump_requirement(self, req, dynamic, repo):
     self.debug('  Dumping requirement: %s%s%s' % (str(req),

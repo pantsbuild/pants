@@ -6,10 +6,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import os
 
-from twitter.common.lang import Compatibility
-
-from pants.base.build_file import BuildFile
-
 
 # TODO(pl): Add a nice docstring for this
 def parse_spec(spec, relative_to=''):

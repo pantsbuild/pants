@@ -113,4 +113,4 @@ class ReverseDepmap(ConsoleTask):
       known_dependants = dependants
 
   def get_concrete_target(self, target):
-    return target.cloned_from
+    return target.concrete_derived_from

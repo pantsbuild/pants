@@ -36,8 +36,8 @@ class PrepareResources(Task):
     for resources_tgts in map(extract_resources, targets):
       all_resources_tgts.update(resources_tgts)
 
-    def target_dir(resources_tgt):
-      return os.path.join(self.workdir, resources_tgt.id)
+    def compute_target_dir(tgt):
+      return os.path.join(self.workdir, tgt.id)
 
     with self.invalidated(all_resources_tgts) as invalidation_check:
       invalid_targets = set()
@@ -45,33 +45,24 @@ class PrepareResources(Task):
         invalid_targets.update(vt.targets)
 
       for resources_tgt in invalid_targets:
-        resources_dir = target_dir(resources_tgt)
-        safe_mkdir(resources_dir, clean=True)
-        relative_resource_dir = os.path.relpath(resources_tgt.address.spec_path,
-                                                resources_tgt.target_base)
-        for relative_resource_path in resources_tgt.payload.sources:
-          full_resource_path = os.path.join(relative_resource_dir, relative_resource_path)
-          basedir = os.path.dirname(full_resource_path)
-          destdir = os.path.join(resources_dir, basedir)
+        target_dir = compute_target_dir(resources_tgt)
+        safe_mkdir(target_dir, clean=True)
+        for resource_file_from_source_root in resources_tgt.sources_relative_to_source_root():
+          basedir = os.path.dirname(resource_file_from_source_root)
+          destdir = os.path.join(target_dir, basedir)
           safe_mkdir(destdir)
           # TODO: Symlink instead?
-          shutil.copy(os.path.join(resources_tgt.target_base, full_resource_path),
-                      os.path.join(resources_dir, full_resource_path))
+          shutil.copy(os.path.join(resources_tgt.target_base, resource_file_from_source_root),
+                      os.path.join(target_dir, resource_file_from_source_root))
 
       resources_by_target = self.context.products.get_data('resources_by_target')
       egroups = self.context.products.get_data('exclusives_groups')
       group_key = egroups.get_group_key_for_target(targets[0])
 
       for resources_tgt in all_resources_tgts:
-        resources_dir = target_dir(resources_tgt)
+        target_dir = compute_target_dir(resources_tgt)
         for conf in self.confs:
-          egroups.update_compatible_classpaths(group_key, [(conf, resources_dir)])
+          egroups.update_compatible_classpaths(group_key, [(conf, target_dir)])
         if resources_by_target is not None:
-          target_resources = resources_by_target[resources_tgt]
-          buildroot_relative_sources = resources_tgt.sources_relative_to_buildroot()
-          abs_sources = [os.path.join(get_buildroot(), source)
-                         for source in buildroot_relative_sources]
-          abs_target_base = os.path.join(get_buildroot(), resources_tgt.target_base)
-          source_root_relative_sources = [os.path.relpath(source, abs_target_base)
-                                          for source in abs_sources]
-          target_resources.add_rel_paths(resources_dir, source_root_relative_sources)
+          resources_by_target[resources_tgt].add_rel_paths(
+            target_dir, resources_tgt.sources_relative_to_source_root())
