@@ -9,15 +9,18 @@ import optparse
 import os
 
 from collections import defaultdict
-from pkg_resources import resource_string
 
+from pkg_resources import resource_string
 from twitter.common.dirutil import Fileset, safe_open
 
 from pants.base.build_environment import get_buildroot
 from pants.base.build_manual import get_builddict_info
+from pants.base.build_file_aliases import maven_layout
+from pants.base.build_file_parser import BuildFileParser
 from pants.base.config import ConfigOption
 from pants.base.exceptions import TaskError
 from pants.base.generator import Generator, TemplateData
+from pants.goal.option_helpers import add_global_options
 from pants.goal.phase import Phase
 from pants.tasks.task import Task
 
@@ -130,9 +133,10 @@ PREDEFS = {  # some hardwired entries
                   """Old name for `dependencies`_""")},
   "java_tests": {"defn": msg_entry("java_tests",
                   """Old name for `junit_tests`_""")},
-
-  # TODO(pl): Fix this for new Target/alias semantics
-  # "maven_layout": {"defn": entry_for_one("maven_layout", maven_layout)},
+  "pants": {"defn": msg_entry("pants",
+                  """In old Pants versions, a reference to a Pants targets. (In new Pants versions, just use strings.)"""),
+            "tags": ["anylang"]},
+  "maven_layout": {"defn": entry_for_one("maven_layout", maven_layout)},
   "python_artifact": {"suppress": True},  # unused alias for PythonArtifact
 
   "rglobs": {"defn": entry_for_one("rglobs", Fileset.rglobs)},
@@ -150,10 +154,9 @@ PREDEFS = {  # some hardwired entries
 # Returns list of duples [(name, object), (name, object), (name, object),...]
 def get_syms():
   r = {}
-  vc = ParseContext.default_globals()
+  vc = BuildFileParser.report_registered_context()
   for s in vc:
     if s in PREDEFS: continue
-    if s[0].isupper(): continue  # REMIND see both jvm_binary and JvmBinary??
     o = vc[s]
     r[s] = o
   return r

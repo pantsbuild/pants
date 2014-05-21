@@ -19,32 +19,30 @@ outdir: %s
 """ % OUTDIR
 
 
-# TODO(pl): Fix builddict and reenable these tests
+class BaseBuildBuildDictionaryTest(TaskTest):
 
-# class BaseBuildBuildDictionaryTest(TaskTest):
-
-#   def execute_task(self, config=sample_ini_test_1):
-#     with closing(StringIO()) as output:
-#       task = prepare_task(BuildBuildDictionary, config=config)
-#       task.execute(())
-#       return output.getvalue()
+  def execute_task(self, config=sample_ini_test_1):
+    with closing(StringIO()) as output:
+      task = prepare_task(BuildBuildDictionary, config=config)
+      task.execute(())
+      return output.getvalue()
 
 
-# class BuildBuildDictionaryTestEmpty(BaseBuildBuildDictionaryTest):
+class BuildBuildDictionaryTestEmpty(BaseBuildBuildDictionaryTest):
 
-#   def test_builddict_empty(self):
-#     """Execution should be silent."""
-#     # We don't care _that_ much that execution be silent. Nice if at least
-#     # one test executes the task and doesn't explode, tho.
-#     self.assertEqual('', self.execute_task())
+  def test_builddict_empty(self):
+    """Execution should be silent."""
+    # We don't care _that_ much that execution be silent. Nice if at least
+    # one test executes the task and doesn't explode, tho.
+    self.assertEqual('', self.execute_task())
 
 
-# class ExtractedContentSanityTests(BaseBuildBuildDictionaryTest):
-#   def test_usual_syms(self):
-#     usual_syms = assemble()
-#     usual_names = usual_syms.keys()
-#     self.assertTrue(len(usual_names) > 20, "Strangely few symbols found")
-#     for expected in ['jvm_binary', 'python_binary']:
-#       self.assertTrue(expected in usual_names, "Didn't find %s" % expected)
-#     for unexpected in ['__builtins__', 'Target']:
-#       self.assertTrue(unexpected not in usual_names, "Found %s" % unexpected)
+class ExtractedContentSanityTests(BaseBuildBuildDictionaryTest):
+  def test_usual_syms(self):
+    usual_syms = assemble()
+    usual_names = usual_syms.keys()
+    self.assertTrue(len(usual_names) > 20, "Strangely few symbols found")
+    for expected in ['jvm_binary', 'python_binary']:
+      self.assertTrue(expected in usual_names, "Didn't find %s" % expected)
+    for unexpected in ['__builtins__', 'Target']:
+      self.assertTrue(unexpected not in usual_names, "Found %s" % unexpected)

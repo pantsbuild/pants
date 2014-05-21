@@ -164,6 +164,21 @@ class BuildFileParser(object):
     cls._applicative_path_relative_utils = {}
     cls._target_alias_map = {}
 
+  @classmethod
+  def report_registered_context(cls):
+    """Return dict of syms defined in BUILD files, useful for docs/help.
+
+    This dict isn't so useful for actually parsing BUILD files.
+    It's useful for generating things like
+    http://pantsbuild.github.io/build_dictionary.html
+    """
+    retval = {}
+    retval.update(cls._exposed_objects)
+    retval.update(cls._partial_path_relative_utils)
+    retval.update(cls._applicative_path_relative_utils)
+    retval.update(cls._target_alias_map)
+    return retval
+
   # TODO(pl): For the next four methods, provide detailed documentation.  Especially for the middle
   # two, the semantics are slightly tricky.
   @classmethod
