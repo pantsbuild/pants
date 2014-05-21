@@ -18,6 +18,15 @@ class BuildFile(object):
   _PATTERN = re.compile('^%s(\.[a-zA-Z0-9_-]+)?$' % _BUILD_FILE_PREFIX)
 
   @staticmethod
+  def _get_all_build_files(path):
+    """Returns all the BUILD files on a path"""
+    results = []
+    for build in glob1(path, "%s*" % (BuildFile._BUILD_FILE_PREFIX)):
+      if BuildFile._is_buildfile_name(build):
+        results.append(build)
+    return sorted(results)
+
+  @staticmethod
   def _is_buildfile_name(name):
     return BuildFile._PATTERN.match(name)
 
@@ -62,11 +71,10 @@ class BuildFile(object):
 
     # There is no BUILD file without a prefix so select any viable sibling
     if not os.path.exists(buildfile):
-      for build in sorted(glob1(os.path.dirname(buildfile), "%s*" % (BuildFile._BUILD_FILE_PREFIX))):
-        if BuildFile._is_buildfile_name(build):
-          self._build_basename = build
-          buildfile = os.path.join(path, self._build_basename)
-          break
+      for build in BuildFile._get_all_build_files(os.path.dirname(buildfile)):
+        self._build_basename = build
+        buildfile = os.path.join(path, self._build_basename)
+        break
 
     if must_exist:
       if not os.path.exists(buildfile):
@@ -104,10 +112,9 @@ class BuildFile(object):
 
     def find_parent(dir):
       parent = os.path.dirname(dir)
-      for parent_buildfile in sorted(glob1(parent, '%s*' % (BuildFile._BUILD_FILE_PREFIX))):
+      for parent_buildfile in BuildFile._get_all_build_files(parent):
         buildfile = os.path.join(parent, parent_buildfile)
-        if os.path.exists(buildfile) and not os.path.isdir(buildfile) and \
-            BuildFile._is_buildfile_name(os.path.basename(buildfile)):
+        if os.path.exists(buildfile) and not os.path.isdir(buildfile):
           return parent,  BuildFile(self.root_dir, os.path.relpath(buildfile, self.root_dir))
       return parent, None
 
@@ -127,8 +134,8 @@ class BuildFile(object):
     """Returns an iterator over all the BUILD files co-located with this BUILD file not including
     this BUILD file itself"""
 
-    for build in sorted(glob1(self.parent_path, '%s*' % (BuildFile._BUILD_FILE_PREFIX))):
-      if self.name != build and BuildFile._is_buildfile_name(build):
+    for build in BuildFile._get_all_build_files(self.parent_path):
+      if self.name != build :
         siblingpath = os.path.join(os.path.dirname(self.relpath), build)
         if not os.path.isdir(os.path.join(self.root_dir, siblingpath)):
           yield BuildFile(self.root_dir, siblingpath)
