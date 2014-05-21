@@ -99,7 +99,7 @@ class PythonChroot(object):
       add_function(src, path)
 
     self.debug('  Dumping library: %s' % library)
-    for relpath in library.payload.sources_relative_to_sourceroot():
+    for relpath in library.sources_relative_to_source_root():
       copy_to_chroot(library.target_base, relpath, self._builder.add_source)
 
     for resources_tgt in library.resources:
