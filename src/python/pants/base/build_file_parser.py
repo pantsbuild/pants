@@ -222,6 +222,14 @@ class BuildFileParser(object):
 
     self.addresses_by_build_file = defaultdict(set)
 
+  def inject_address_into_build_graph(self, address, build_graph):
+    self._populate_target_proxy_for_address(address)
+    target_proxy = self._target_proxy_by_address[address]
+
+    if not build_graph.contains_address(address):
+      target = target_proxy.to_target(build_graph)
+      build_graph.inject_target(target)
+
   def inject_address_closure_into_build_graph(self,
                                               address,
                                               build_graph,
@@ -265,6 +273,18 @@ class BuildFileParser(object):
     build_file = BuildFileCache.spec_path_to_build_file(self._root_dir, spec_path)
     address = BuildFileAddress(build_file, target_name)
     self.inject_address_closure_into_build_graph(address, build_graph, addresses_already_closed)
+
+  def _populate_target_proxy_for_address(self, address):
+    self.parse_build_file_family(address.build_file)
+
+    if address not in self._target_proxy_by_address:
+      raise ValueError('{address} from spec {spec} was not found in BUILD file {build_file}.'
+                       .format(address=address,
+                               spec=address.spec,
+                               build_file=address.build_file))
+
+    target_proxy = self._target_proxy_by_address[address]
+
 
   def _populate_target_proxy_transitive_closure_for_address(self,
                                                             address,
