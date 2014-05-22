@@ -8,4 +8,7 @@ scala_library(name='welcome',
     pants('src/java/com/pants/examples/hello/greet:greet'),
   ],
   sources=globs('*.scala'),
+  resources = [
+    'src/resources/com/pants/example/hello',
+  ],
 )

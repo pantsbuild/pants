@@ -3,15 +3,30 @@
 
 package com.pants.example.hello.exe
 
+import java.io.{BufferedReader, InputStreamReader}
+
 import com.pants.example.hello.welcome
 
 // A simple jvm binary to illustrate Scala BUILD targets
 
 object Exe {
+  /** Test that resources are properly namespaced. */
+  def getWorld: String = {
+    val is =
+      this.getClass.getClassLoader.getResourceAsStream(
+        "com/pants/example/hello/world.txt"
+      )
+    try {
+      new BufferedReader(new InputStreamReader(is)).readLine()
+    } finally {
+      is.close()
+    }
+  }
+
   def main(args: Array[String]) {
     println("Num args passed: " + args.size + ". Stand by for welcome...")
     if (args.size <= 0) {
-      println("Hello, World!")
+      println("Hello, " + getWorld + "!")
     } else {
       val w = welcome.WelcomeEverybody(args)
       w.foreach(s => println(s))
