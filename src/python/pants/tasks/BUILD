@@ -83,8 +83,8 @@ python_library(
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('src/python/pants/base:build_environment'),
     pants('src/python/pants/fs'),
-    pants('src/python/pants/java:jar'),
     pants('src/python/pants/targets:jvm'),
+    pants('src/python/pants/jvm:jar_task'),
   ],
 )
 
@@ -306,6 +306,7 @@ python_library(
     pants('src/python/pants/fs'),
     pants('src/python/pants/java:jar'),
     pants('src/python/pants/targets:jvm'),
+    pants('src/python/pants/jvm:jar_task'),
   ],
 )
 
@@ -361,6 +362,7 @@ python_library(
     pants(':common'),
     pants('3rdparty/python/twitter/commons:twitter.common.collections'),
     pants('src/python/pants/targets:jvm'),
+    pants('src/python/pants/jvm:jar_task'),
   ],
 )
 

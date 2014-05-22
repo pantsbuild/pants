@@ -66,6 +66,7 @@ python_library(
   ],
 )
 
+
 python_library(
   name = 'jvm_tool_task_mixin',
   sources = ['jvm_tool_task_mixin.py'],
@@ -87,5 +88,15 @@ python_library(
     pants('src/python/pants/jvm:jvm_tool_task_mixin'),
     pants('src/python/pants/tasks:task'),
     pants('src/python/pants/tasks:console_task'),
+  ],
+)
+
+
+python_library(
+  name = 'jar_task',
+  sources = ['jar_task.py'],
+  dependencies = [
+    pants(':nailgun_task'),
+    pants('src/python/pants/java:jar'),
   ],
 )
