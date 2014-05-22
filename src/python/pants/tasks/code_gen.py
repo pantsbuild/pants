@@ -115,8 +115,7 @@ class CodeGen(Task):
               target,
               dependees_by_gentarget.get(target, [])
             )
-            syn_target.derived_from = target
-            syn_target.add_labels('codegen', 'synthetic')
+            syn_target.add_labels('codegen')
             if write_to_artifact_cache and target in invalid_vts_by_target:
               generated_sources = [os.path.join(get_buildroot(), path)
                                    for path in syn_target.sources_relative_to_buildroot()]

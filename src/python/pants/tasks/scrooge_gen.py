@@ -265,8 +265,7 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
     deps.update(target.dependencies)
     target_type = _TARGET_TYPE_FOR_LANG[self.defaults.get_language(target)]
     tgt = create_target(files, deps, target_type)
-    tgt.derived_from = target
-    tgt.add_labels('codegen', 'synthetic')
+    tgt.add_labels('codegen')
     for dependee in dependees:
       dependee.inject_dependency(tgt.address)
     return tgt

@@ -58,11 +58,6 @@ class AbstractTarget(object):
     return self.has_label('codegen')
 
   @property
-  def is_synthetic(self):
-    """Returns True if the target is a synthetic target injected by the runtime."""
-    return self.has_label('synthetic')
-
-  @property
   def is_jar_library(self):
     """Returns True if the target is an external jar library."""
     return self.has_label('jars')
