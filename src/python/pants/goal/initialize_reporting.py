@@ -78,7 +78,9 @@ def update_reporting(options, is_console_task, run_tracker):
   old_outfile.close()
 
   log_level = Report.log_level_from_string(options.log_level or 'info')
-  color = not options.no_color
+  # Ideally, we'd use terminfo or somesuch to discover whether a
+  # terminal truly supports color, but most that don't set TERM=dumb.
+  color = (not options.no_color) and (os.getenv('TERM') != 'dumb')
   timing = options.time
   cache_stats = options.time  # TODO: Separate flag for this?
 
