@@ -4,6 +4,7 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+import sys
 
 try:
   import cPickle as pickle
@@ -260,6 +261,11 @@ class InvalidationCacheManager(object):
   def _key_for(self, target, transitive=False):
     try:
       return self._cache_key_generator.key_for_target(target, transitive=transitive)
-    except IOError as e:
-      raise self.CacheValidationError("Problem validating file %s for target %s: %s" %
-                                      (e.filename, target.id, e))
+    except Exception as e:
+      # This is a catch-all for problems we haven't caught up with and given a better diagnostic.
+      # TODO(Eric Ayers): If you see this exception, add a fix to catch the problem earlier.
+      exc_info = sys.exc_info()
+      new_exception = self.CacheValidationError("Problem validating target %s in %s: %s" %
+                                                (target.id, target.address.spec_path, e))
+
+      raise self.CacheValidationError, new_exception, exc_info[2]
