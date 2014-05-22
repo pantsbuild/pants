@@ -106,17 +106,20 @@ Posting the First Draft
 account at https://rbcommons.com . To create one, visit
 https://rbcommons.com/account/login/ and click "Create one now."
 
-To set up local tools, run `./rbt status`.
+To set up local tools, run ``./rbt help``.
 (``./rbt`` is a wrapper around the usual RBTools
 `rbt <http://www.reviewboard.org/docs/rbtools/dev/>`_ script.)
-The first time this runs it will bootstrap and you will be asked to log in.
-Subsequent runs use your cached login credentials.
+The first time this runs it will bootstrap: you'll see a lot
+of building info.
 
 Post your change for review::
 
    ./rbt post -o -g
 
-This will create a new review, but not yet publish it.
+The first time you ``post``, rbt asks you to log in.
+Subsequent runs use your cached login credentials.
+
+This ``post`` creates a new review, but does not yet publish it.
 
 At the provided URL, there's a web form. To get your change reviewed,
 you must fill in the change description, reviewers, testing done, etc.
