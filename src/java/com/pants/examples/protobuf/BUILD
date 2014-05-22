@@ -3,7 +3,7 @@
 
 jvm_binary(name='protobuf',
   dependencies=[
-    'src/protobuf/com/pants/examples/distance',
+    'src/protobuf/com/pants/examples/trip:proto',
   ],
   source='ExampleProtobuf.java',
   main='com.pants.examples.protobuf.ExampleProtobuf',

@@ -3,4 +3,7 @@
 
 java_protobuf_library(name='proto',
   sources=globs('*.proto'),
+  dependencies=[
+    'src/protobuf/com/pants/examples/distance:proto',
+  ],
 )
