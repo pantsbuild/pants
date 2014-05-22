@@ -39,13 +39,10 @@ python_library(
   name = 'binary_create',
   sources = ['binary_create.py'],
   dependencies = [
-    pants(':common'),
     pants(':jvm_binary_task'),
-    pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('src/python/pants/base:build_environment'),
     pants('src/python/pants/fs'),
-    pants('src/python/pants/java:jar'),
   ],
 )
 
@@ -76,15 +73,12 @@ python_library(
   name = 'bundle_create',
   sources = ['bundle_create.py'],
   dependencies = [
-    pants(':common'),
     pants(':jvm_binary_task'),
     pants('3rdparty/python/twitter/commons:twitter.common.collections'),
-    pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('src/python/pants/base:build_environment'),
     pants('src/python/pants/fs'),
     pants('src/python/pants/targets:jvm'),
-    pants('src/python/pants/jvm:jar_task'),
   ],
 )
 
@@ -305,8 +299,8 @@ python_library(
     pants('src/python/pants/base:build_environment'),
     pants('src/python/pants/fs'),
     pants('src/python/pants/java:jar'),
-    pants('src/python/pants/targets:jvm'),
     pants('src/python/pants/jvm:jar_task'),
+    pants('src/python/pants/targets:jvm'),
   ],
 )
 
@@ -359,7 +353,6 @@ python_library(
   name = 'jvm_binary_task',
   sources = ['jvm_binary_task.py'],
   dependencies = [
-    pants(':common'),
     pants('3rdparty/python/twitter/commons:twitter.common.collections'),
     pants('src/python/pants/targets:jvm'),
     pants('src/python/pants/jvm:jar_task'),
