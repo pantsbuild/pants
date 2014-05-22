@@ -138,7 +138,8 @@ PREDEFS = {  # some hardwired entries
             "tags": ["anylang"]},
   "maven_layout": {"defn": entry_for_one("maven_layout", maven_layout)},
   "python_artifact": {"suppress": True},  # unused alias for PythonArtifact
-
+  "python_test_suite": {"defn": msg_entry("python_test_suite",
+                                          """Deprecated way to group Python tests; use `dependencies`_""")},
   "rglobs": {"defn": entry_for_one("rglobs", Fileset.rglobs)},
   "ROOT_DIR": {"defn": msg_entry("ROOT_DIR",
                                   "Root directory of source code (string).")},

@@ -28,7 +28,7 @@ from pants.targets.python_egg import PythonEgg
 from pants.targets.python_library import PythonLibrary
 from pants.targets.python_requirement import PythonRequirement
 from pants.targets.python_requirement_library import PythonRequirementLibrary
-from pants.targets.python_tests import PythonTestSuite, PythonTests
+from pants.targets.python_tests import PythonTests
 from pants.targets.python_thrift_library import PythonThriftLibrary
 from pants.targets.repository import Repository
 from pants.targets.resources import Resources
@@ -60,7 +60,7 @@ target_aliases = {
   'python_antlr_library': PythonAntlrLibrary,
   'python_thrift_library': PythonThriftLibrary,
   'python_tests': PythonTests,
-  'python_test_suite': PythonTestSuite,
+  'python_test_suite': Dependencies,  # Legacy alias.
   'repo': Repository,
   'resources': Resources,
   'scala_library': ScalaLibrary,
@@ -127,7 +127,7 @@ def maven_layout(basedir='', rel_path=None):
   root('src/main/thrift', JavaThriftLibrary, Page, PythonThriftLibrary)
 
   root('src/test/java', JavaLibrary, JavaTests, Page)
-  root('src/test/python', Page, PythonLibrary, PythonTests, PythonTestSuite)
+  root('src/test/python', Page, PythonLibrary, PythonTests)
   root('src/test/resources', Page, Resources)
   root('src/test/scala', JavaTests, Page, ScalaLibrary, ScalaTests)
 

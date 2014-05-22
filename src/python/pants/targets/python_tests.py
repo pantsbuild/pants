@@ -56,7 +56,3 @@ class PythonTests(PythonTarget):
   @property
   def entry_point(self):
     return self._entry_point
-
-
-class PythonTestSuite(PythonTarget):
-  """Tests one or more python test targets."""

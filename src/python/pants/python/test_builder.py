@@ -15,7 +15,6 @@ import time
 import signal
 import sys
 
-from twitter.common.collections import OrderedSet
 from twitter.common.contextutil import temporary_file
 from twitter.common.dirutil import safe_mkdir
 from twitter.common.lang import Compatibility
@@ -27,7 +26,7 @@ from twitter.common.python.pex_builder import PEXBuilder
 from pants.base.config import Config
 from pants.python.python_chroot import PythonChroot
 from pants.targets.python_requirement import PythonRequirement
-from pants.targets.python_tests import PythonTests, PythonTestSuite
+from pants.targets.python_tests import PythonTests
 
 
 class PythonTestResult(object):
@@ -217,25 +216,6 @@ class PythonTestBuilder(object):
     self.successes[target.id] = rv
     return rv
 
-  def _run_python_test_suite(self, target, fail_hard=True):
-    tests = OrderedSet([])
-    def _gather_deps(trg):
-      if isinstance(trg, PythonTests):
-        tests.add(trg)
-      elif isinstance(trg, PythonTestSuite):
-        for dependency in trg.dependencies:
-          _gather_deps(dependency)
-    _gather_deps(target)
-
-    failed = False
-    for test in tests:
-      rv = self._run_python_test(test)
-      if not rv.success:
-        failed = True
-        if fail_hard:
-          return rv
-    return PythonTestResult.rc(1 if failed else 0)
-
   def _run_tests(self, targets):
     fail_hard = 'PANTS_PYTHON_TEST_FAILSOFT' not in os.environ
     if 'PANTS_PY_COVERAGE' in os.environ:
@@ -246,13 +226,8 @@ class PythonTestBuilder(object):
     for target in targets:
       if isinstance(target, PythonTests):
         rv = self._run_python_test(target)
-      elif isinstance(target, PythonTestSuite):
-        rv = self._run_python_test_suite(target, fail_hard)
-      else:
-        raise PythonTestBuilder.InvalidDependencyException(
-          "Invalid dependency in python test target: %s" % target)
-      if not rv.success:
-        failed = True
-        if fail_hard:
-          return rv
+        if not rv.success:
+          failed = True
+          if fail_hard:
+            return rv
     return PythonTestResult.rc(1 if failed else 0)

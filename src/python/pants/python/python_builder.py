@@ -9,7 +9,7 @@ from twitter.common.python.interpreter import PythonInterpreter
 from pants.python.binary_builder import PythonBinaryBuilder
 from pants.python.test_builder import PythonTestBuilder
 from pants.targets.python_binary import PythonBinary
-from pants.targets.python_tests import PythonTestSuite, PythonTests
+from pants.targets.python_tests import PythonTests
 
 
 class PythonBuilder(object):
@@ -27,7 +27,7 @@ class PythonBuilder(object):
 
     # PythonBuilder supports PythonTests and PythonBinaries
     for target in targets:
-      if isinstance(target, PythonTests) or isinstance(target, PythonTestSuite):
+      if isinstance(target, PythonTests):
         test_targets.append(target)
       elif isinstance(target, PythonBinary):
         binary_targets.append(target)

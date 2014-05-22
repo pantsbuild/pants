@@ -76,7 +76,6 @@ class TargetsHelp(ConsoleTask):
     'PythonRequirement': 'python_requirement',
     'PythonThriftLibrary': 'python_thrift_library',
     'PythonTests': 'python_tests',
-    'PythonTestSuite': 'python_test_suite',
     'Repository': 'repo',
     'Resources': 'resources',
     'ScalaLibrary': 'scala_library',
