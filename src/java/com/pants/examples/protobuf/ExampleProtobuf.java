@@ -4,6 +4,7 @@
 package com.pants.examples.protobuf;
 
 import com.pants.examples.distance.Distances;
+import com.pants.examples.trip.Trips;
 
 class ExampleProtobuf {
 
@@ -11,6 +12,8 @@ class ExampleProtobuf {
   }
 
   public static void main(String[] args) {
-      System.out.println(Distances.Distance.newBuilder().setNumber(12).setUnit("parsecs").build());
+      Distances.Distance d = Distances.Distance.newBuilder().setNumber(12).setUnit("parsecs").build()); 
+      System.out.println(d);
+      System.out.println(Trips.Trip.newBuilder().setDestination("Atlanta").setDistance(d).build());
   }
 }
