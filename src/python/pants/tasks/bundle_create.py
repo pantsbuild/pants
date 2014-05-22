@@ -11,7 +11,6 @@ from twitter.common.dirutil import safe_mkdir
 
 from pants.base.build_environment import get_buildroot
 from pants.fs import archive
-from pants.java.jar import Manifest
 from pants.targets.jvm_binary import JvmApp, JvmBinary
 from pants.tasks.jvm_binary_task import JvmBinaryTask
 
@@ -115,12 +114,10 @@ class BundleCreate(JvmBinaryTask):
     bundle_jar = os.path.join(bundle_dir, '%s.jar' % app.binary.basename)
 
     with self.monolithic_jar(app.binary, bundle_jar,
-                                   with_external_deps=self._create_deployjar) as jar:
-      manifest = self.create_main_manifest(app.binary)
+                             with_external_deps=self._create_deployjar) as jar:
+      self.add_main_manifest_entry(jar, app.binary)
       if classpath:
-        manifest.addentry(Manifest.CLASS_PATH,
-                          ' '.join(os.path.join('libs', jar) for jar in classpath))
-      jar.writestr(Manifest.PATH, manifest.contents())
+        jar.classpath([os.path.join('libs', jar) for jar in classpath])
 
     for bundle in app.bundles:
       for path, relpath in bundle.filemap.items():

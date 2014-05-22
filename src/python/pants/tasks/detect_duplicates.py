@@ -5,11 +5,12 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import os
+
 from collections import defaultdict
 from contextlib import closing
 from zipfile import ZipFile
 
-from pants.java.jar import Manifest
+from pants.java.jar.jar import Jar
 from pants.tasks.task import TaskError
 from pants.tasks.jvm_binary_task import JvmBinaryTask
 
@@ -50,7 +51,7 @@ class DuplicateDetector(JvmBinaryTask):
       with closing(ZipFile(jarpath)) as zip:
         for file_name in zip.namelist():
           jar_name = os.path.basename(jarpath)
-          if (not self._isdir(file_name)) and Manifest.PATH != file_name:
+          if (not self._isdir(file_name)) and Jar.MANIFEST_PATH != file_name:
             artifacts_by_file_name[file_name].add(jar_name)
         zip.close()
 

@@ -201,7 +201,7 @@ goal(name='jar', action=JarCreate, dependencies=['compile', 'resources', 'bootst
 goal(name='binary', action=BinaryCreate, dependencies=['jar', 'bootstrap']
 ).install().with_description('Create a jvm binary jar.')
 
-goal(name='bundle', action=BundleCreate, dependencies=['jar', 'bootstrap', 'binary']
+goal(name='bundle', action=BundleCreate, dependencies=['jar', 'bootstrap']
 ).install().with_description('Create an application bundle from binary targets.')
 
 goal(name='check_published_deps', action=CheckPublishedDeps

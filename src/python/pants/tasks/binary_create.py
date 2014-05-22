@@ -9,7 +9,6 @@ import os
 from twitter.common.dirutil import safe_mkdir
 
 from pants.base.build_environment import get_buildroot
-from pants.java.jar import Manifest
 from pants.tasks.jvm_binary_task import JvmBinaryTask
 
 
@@ -32,6 +31,4 @@ class BinaryCreate(JvmBinaryTask):
     self.context.log.info('creating %s' % os.path.relpath(binary_jarpath, get_buildroot()))
 
     with self.monolithic_jar(binary, binary_jarpath, with_external_deps=True) as jar:
-      with self.context.new_workunit(name='add-manifest'):
-        manifest = self.create_main_manifest(binary)
-        jar.writestr(Manifest.PATH, manifest.contents())
+      self.add_main_manifest_entry(jar, binary)

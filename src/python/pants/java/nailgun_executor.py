@@ -169,7 +169,7 @@ class NailgunExecutor(Executor):
       def cmd(this):
         return ' '.join(command)
 
-      def run(this, stdout=sys.stdout, stderr=sys.stderr):
+      def run(this, stdout=None, stderr=None):
         nailgun = self._get_nailgun_client(jvm_options, classpath, stdout, stderr)
         try:
           log.debug('Executing via %s: %s' % (nailgun, this.cmd))

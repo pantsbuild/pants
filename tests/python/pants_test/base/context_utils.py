@@ -5,6 +5,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import io
+import sys
 from twitter.common.collections import maybe_list
 from twitter.common.dirutil import safe_mkdtemp
 from twitter.common.lang import Compatibility
@@ -12,6 +13,7 @@ from twitter.common.lang import Compatibility
 from pants.base.config import Config
 from pants.base.target import Target
 from pants.goal import Context, RunTracker
+from pants.reporting.plaintext_reporter import PlainTextReporter
 from pants.reporting.report import Report
 
 
@@ -56,6 +58,13 @@ def create_run_tracker(info_dir=None):
   info_dir = info_dir or safe_mkdtemp()
   run_tracker = RunTracker(info_dir)
   report = Report()
+  settings = PlainTextReporter.Settings(outfile=sys.stdout,
+                                        log_level=Report.INFO,
+                                        color=False,
+                                        indent=True,
+                                        timing=False,
+                                        cache_stats=False)
+  report.add_reporter('test_debug', PlainTextReporter(run_tracker, settings))
   run_tracker.start(report)
   return run_tracker
 

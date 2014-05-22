@@ -3,11 +3,10 @@
 
 python_tests(
   name = 'jar',
-  sources = globs('*.py'),
+  sources = ['test_jar.py'],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.collections'),
+    pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
-    pants('3rdparty/python/twitter/commons:twitter.common.lang'),
     pants('src/python/pants/java:jar'),
   ]
 )
