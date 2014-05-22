@@ -10,6 +10,7 @@ try:
 except ImportError:
   import pickle
 
+import sys
 from pants.base.build_graph import sort_targets
 from pants.base.build_invalidator import BuildInvalidator, CacheKeyGenerator
 from pants.base.target import Target
@@ -260,6 +261,9 @@ class InvalidationCacheManager(object):
   def _key_for(self, target, transitive=False):
     try:
       return self._cache_key_generator.key_for_target(target, transitive=transitive)
-    except IOError as e:
-      raise self.CacheValidationError("Problem validating file %s for target %s: %s" %
-                                      (e.filename, target.id, e))
+    except Exception as e:
+      exc_info = sys.exc_info()
+      new_exception = self.CacheValidationError("Problem validating target %s in %s: %s" %
+                                                (target.id, target.address.spec_path, e))
+
+      raise self.CacheValidationError, new_exception, exc_info[2]
