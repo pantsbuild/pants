@@ -74,6 +74,8 @@ not be discovered correctly. ::
 
    ./pants tests/python/pants_test:all
 
+To bring up the ``pdb`` debugger when tests fail, pass the ``--pdb`` flag.
+
 To try all the tests in a few configurations, you can run the same script
 that our Travis CI does. This can take a while, but it's a good idea to
 run it before you contribute a change or merge it to master::
@@ -85,6 +87,55 @@ make sure it passes all tests.
 
 For convenience, some other test targets enable more granular test running.
 Please see the BUILD files for details.
+
+*********
+Debugging
+*********
+
+To run Pants under ``pdb`` and set a breakpoint, you can typically add ::
+
+  import pdb; pdb.set_trace()
+
+...where you first want to break. If the code is in a test, instead use ::
+
+    import pytest; pytest.set_trace()
+
+To run tests and bring up ``pdb`` for failing tests, you can
+instead pass ``--pdb``::
+
+    $ ./pants tests/python/pants_test/tasks: --pdb
+    ... plenty of test output ...
+    tests/python/pants_test/tasks/test_targets_help.py E
+    >>>>>>>>>>>>>>>>>>>>>>>>>>>>>> traceback >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+    cls = <class 'pants_test.tasks.test_targets_help.TargetsHelpTest'>
+
+        @classmethod
+        def setUpClass(cls):
+    >     super(TargetsHelpTest, cls).setUpClass()
+    E     AttributeError: 'super' object has no attribute 'setUpClass'
+
+    tests/python/pants_test/tasks/test_targets_help.py:24: AttributeError
+    >>>>>>>>>>>>>>>>>>>>>>>>>>>>> entering PDB >>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    > /Users/lhosken/workspace/pants/tests/python/pants_test/tasks/test_targets_help.py(24)setUpClass()
+    -> super(TargetsHelpTest, cls).setUpClass()
+    (Pdb)
+
+Debug quickly; that test target will time out in a couple of minutes,
+quitting you out.
+
+To start an interactive Python shell that can ``import`` Pants modules,
+use the usual ``./pants py`` on a ``python_library`` target that builds
+(or depends on) the modules you want::
+
+    $ ./pants py src/python/pants/targets:common
+    /Users/lhosken/workspace/pants src/python/pants/targets:common
+    Python 2.6.8 (unknown, Mar  9 2014, 22:16:00)
+    [GCC 4.2.1 Compatible Apple LLVM 5.0 (clang-500.0.68)] on darwin
+    Type "help", "copyright", "credits" or "license" for more information.
+    (InteractiveConsole)
+    >>> from pants.targets import repository
+    >>>
 
 .. Writing Tests section
 .. Documenting section
