@@ -16,14 +16,14 @@ rc files
 If there's a command line flag that you always (or nearly always) use,
 you might set up a configuration file to ease this. A typical Pants
 installation looks for machine-specific settings in ``/etc/pantsrc`` and
-personal settings in ``~/.pants.new.rc``, with personal settings overriding
+personal settings in ``~/.pants.rc``, with personal settings overriding
 machine-specific settings.
 
 For example, suppose that every time you invoke Pants to compile Java code, you
 pass flags ``--compile-javac-args=-source --compile-javac-args=7
 --compile-javac-args=-target --compile-javac-args=7``.
 Instead of passing them on the command line each time, you could set up a
-``~/.pants.new.rc`` \file::
+``~/.pants.rc`` \file::
 
     [javac]
     options:
@@ -47,14 +47,14 @@ command-line options affecting it::
     # Don't spawn compilation daemons on this shared build server
     options: --no-ng-daemons
 
-Although ``/etc/pantsrc`` and ``~/.pants.new.rc`` are the typical places for
+Although ``/etc/pantsrc`` and ``~/.pants.rc`` are the typical places for
 this configuration, you can check :ref:`pants.ini <setup-pants-ini>`
 to find out what your source tree uses. ::
 
     # excerpt from pants.ini
     [DEFAULT]
     # Look for these rcfiles - they need not exist on the system
-    rcfiles: ['/etc/pantsrc', '~/.pants.new.rc']
+    rcfiles: ['/etc/pantsrc', '~/.pants.CUSTOM.rc'] # different .rc name!
 
 In this list, later files override earlier ones.
 
