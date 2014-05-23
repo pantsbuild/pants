@@ -26,7 +26,7 @@ function usage() {
   echo " -d           if running jvm tests, don't use nailgun daemons"
   echo " -j           skip jvm tests"
   echo " -p           skip python tests"
-
+  echo " -c           skip pants integration tests"
   if (( $# > 0 )); then
     die "$@"
   else
@@ -36,7 +36,7 @@ function usage() {
 
 daemons="--ng-daemons"
 
-while getopts "hbsdjp" opt; do
+while getopts "hbsdjpc" opt; do
   case ${opt} in
     h) usage ;;
     b) skip_bootstrap="true" ;;
@@ -44,6 +44,7 @@ while getopts "hbsdjp" opt; do
     d) daemons="--no-ng-daemons" ;;
     j) skip_java="true" ;;
     p) skip_python="true" ;;
+    c) skip_integration="true" ;;
     *) usage "Invalid option: -${OPTARG}" ;;
   esac
 done
@@ -94,6 +95,14 @@ if [[ "${skip_python:-false}" == "false" ]]; then
   (
     PANTS_PYTHON_TEST_FAILSOFT=1 ./pants.pex build ${INTERPRETER_CONSTRAINTS[@]} --timeout=5 tests/python/pants_test:all
   ) || die "Python test failure"
+fi
+
+if [[ "${skip_integration:-false}" == "false" ]]; then
+  banner "Running Pants Integration tests"
+  (
+    PANTS_PYTHON_TEST_FAILSOFT=1 ./pants.pex build ${INTERPRETER_CONSTRAINTS[@]} \
+       tests/python/pants_test:integration
+  ) || die "Pants Integration test failure"
 fi
 
 banner "CI SUCCESS"

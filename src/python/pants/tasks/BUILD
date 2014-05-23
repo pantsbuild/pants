@@ -312,7 +312,8 @@ python_library(
 python_library(
   name = 'jar_publish',
   sources = ['jar_publish.py'],
-  resources = globs('templates/jar_publish/*.mustache'),
+  resources = globs('templates/jar_publish/*.mustache') +
+              globs('src/python/pants/jvm/templates/ivy_resolve/*.mustache'),
   dependencies = [
     pants(':common'),
     pants(':scm_publish'),

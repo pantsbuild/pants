@@ -17,6 +17,15 @@ python_library(
   ]
 )
 
+python_library(
+  name = 'int-test',
+  sources = ['pants_run_integration_test.py'],
+  dependencies = [
+    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
+    pants('src/python/pants/commands:goal'),
+  ]
+)
+
 python_tests(
   name = 'test_maven_layout',
   sources = ['test_maven_layout.py'],
@@ -34,6 +43,13 @@ python_tests(
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.lang'),
     pants('src/python/pants:thrift_util'),
+  ]
+)
+
+python_test_suite(
+  name = 'integration',
+  dependencies = [
+    pants('tests/python/pants_test/tasks:jar_publish_integration'),
   ]
 )
 

@@ -224,6 +224,15 @@ python_tests(
 )
 
 python_tests(
+  name = 'jar_publish_integration',
+  sources = ['test_jar_publish_integration.py'],
+  dependencies = [
+    pants('3rdparty/python:mock'),
+    pants('tests/python/pants_test:int-test'),
+  ],
+)
+
+python_tests(
   name = 'listtargets',
   sources = ['test_listtargets.py'],
   dependencies = [

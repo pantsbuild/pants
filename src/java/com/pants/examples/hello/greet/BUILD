@@ -8,4 +8,7 @@ java_library(name = 'greet',
   resources = [
     'src/resources/com/pants/example/hello',
   ],
+  provides = artifact(org='com.pants.examples',
+                    name='hello-greet',
+                    repo='build-support/ivy:public',),
 )

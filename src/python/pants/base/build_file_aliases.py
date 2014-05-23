@@ -153,11 +153,20 @@ class ZGlobs(FilesetRelPathWrapper):
   wrapped_fn = Fileset.zglobs
 
 
+class BuildFilePath(object):
+  def __init__(self, rel_path):
+    self.rel_path = rel_path
+
+  def __call__(self, *args, **kwargs):
+    return os.path.join(get_buildroot(), self.rel_path)
+
+
 applicative_path_relative_util_aliases = {
   'source_root': SourceRoot,
   'globs': Globs,
   'rglobs': RGlobs,
   'zglobs': ZGlobs,
+  'buildfile_path': BuildFilePath,
 }
 
 partial_path_relative_util_aliases = {

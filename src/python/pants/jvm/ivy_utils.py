@@ -44,6 +44,9 @@ class IvyInfo(object):
 
 
 class IvyUtils(object):
+  IVY_TEMPLATE_PACKAGE_NAME = __name__
+  IVY_TEMPLATE_PATH = os.path.join('templates', 'ivy_resolve', 'ivy.mustache')
+
   """Useful methods related to interaction with ivy."""
   def __init__(self, config, options, log):
     self._log = log
@@ -62,7 +65,7 @@ class IvyUtils(object):
     # Disable cache in File.getCanonicalPath(), makes Ivy work with -symlink option properly on ng.
     self._jvm_options.append('-Dsun.io.useCanonCaches=false')
     self._workdir = os.path.join(config.getdefault('pants_workdir'), 'ivy')
-    self._template_path = os.path.join('templates', 'ivy_resolve', 'ivy.mustache')
+    self._template_path = self.IVY_TEMPLATE_PATH
 
     if self._mutable_pattern:
       try:
