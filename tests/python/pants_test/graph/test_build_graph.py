@@ -13,11 +13,10 @@ import pytest
 from twitter.common.contextutil import pushd, temporary_dir
 from twitter.common.dirutil import touch
 
-from pants.base.address import BuildFileAddress, SyntheticAddress
-from pants.base.build_environment import set_buildroot
-from pants.base.build_file import BuildFile
+from pants.base.address import SyntheticAddress
 from pants.base.build_file_parser import BuildFileParser
 from pants.base.build_graph import BuildGraph
+from pants.base.build_root import BuildRoot
 from pants.base.target import Target
 
 
@@ -25,11 +24,11 @@ class BuildGraphTest(unittest.TestCase):
   @contextmanager
   def workspace(self, *buildfiles):
     with temporary_dir() as root_dir:
-      set_buildroot(root_dir)
-      with pushd(root_dir):
-        for buildfile in buildfiles:
-          touch(os.path.join(root_dir, buildfile))
-        yield os.path.realpath(root_dir)
+      with BuildRoot().temporary(root_dir):
+        with pushd(root_dir):
+          for buildfile in buildfiles:
+            touch(os.path.join(root_dir, buildfile))
+          yield os.path.realpath(root_dir)
 
   def test_transitive_closure_spec(self):
     class FakeTarget(Target):

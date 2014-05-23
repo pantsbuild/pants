@@ -9,11 +9,8 @@ import traceback
 
 from twitter.common.collections import OrderedSet
 
-from pants.base.address import BuildFileAddress, parse_spec
-from pants.base.build_file import BuildFile
 from pants.base.config import Config
 from pants.base.spec_parser import SpecParser
-from pants.base.target import Target
 from pants.commands.command import Command
 from pants.python.interpreter_cache import PythonInterpreterCache
 from pants.python.python_builder import PythonBuilder
@@ -38,6 +35,8 @@ class Build(Command):
                            "be added.  They will be ORed together.")
     parser.add_option('-v', '--verbose', dest='verbose', default=False, action='store_true',
                       help='Show verbose output.')
+    parser.add_option('-f', '--fast', dest='fast', default=False, action='store_true',
+                      help='Run tests in a single chroot.')
     parser.disable_interspersed_args()
     parser.epilog = ('Builds the specified Python target(s). Use ./pants goal for JVM and other '
                      'targets.')
@@ -121,12 +120,13 @@ class Build(Command):
 
   def _python_build(self, targets):
     try:
-      executor = PythonBuilder(self.run_tracker, self.root_dir)
+      executor = PythonBuilder(self.run_tracker)
       return executor.build(
         targets,
         self.build_args,
         interpreter=self.interpreter,
-        conn_timeout=self.options.conn_timeout)
+        conn_timeout=self.options.conn_timeout,
+        fast_tests=self.options.fast)
     except:
       self.error("Problem executing PythonBuilder for targets %s: %s" % (targets,
                                                                          traceback.format_exc()))

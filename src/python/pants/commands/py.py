@@ -55,8 +55,8 @@ class Py(Command):
   def __init__(self, run_tracker, root_dir, parser, argv):
     Command.__init__(self, run_tracker, root_dir, parser, argv)
 
-    self.target = None
-    self.extra_targets = []
+    self.binary = None
+    self.targets = []
     self.extra_requirements = []
     self.config = Config.load()
 
@@ -78,23 +78,20 @@ class Py(Command):
     # Our command token and our options are parsed out so we see args of the form:
     #   [spec] (build args)
     #   [spec]... -- (build args)
-    binaries = []
     for k in range(len(self.args)):
       arg = self.args.pop(0)
       if arg == '--':
         break
 
       def not_a_target(debug_msg):
-        self.debug('Not a target, assuming option: %s.' % e)
+        self.debug('Not a target, assuming option: %s.' % debug_msg)
         # We failed to parse the arg as a target or else it was in valid address format but did not
         # correspond to a real target.  Assume this is the 1st of the build args and terminate
         # processing args for target addresses.
         self.args.insert(0, arg)
 
-      target = None
       try:
         print(root_dir, arg)
-        # import pdb; pdb.set_trace()
         self.build_file_parser.inject_spec_closure_into_build_graph(arg, self.build_graph)
         spec_path, target_name = parse_spec(arg)
         build_file = BuildFile(root_dir, spec_path)
@@ -108,25 +105,14 @@ class Py(Command):
         break
 
       if isinstance(target, PythonBinary):
-        binaries.append(target)
-      else:
-        self.extra_targets.append(target)
+        if self.binary:
+          self.error('Can only process 1 binary target. Found %s and %s.' % (self.binary, target))
+        else:
+          self.binary = target
+      self.targets.append(target)
 
-    if len(binaries) == 0:
-      # treat as a chroot
-      pass
-    elif len(binaries) == 1:
-      # We found a binary and are done, the rest of the args get passed to it
-      self.target = binaries[0]
-    else:
-      self.error('Can only process 1 binary target, %s contains %d:\n\t%s' % (
-        arg, len(binaries), '\n\t'.join(str(binary.address) for binary in binaries)
-      ))
-
-    if self.target is None:
-      if not self.extra_targets:
-        self.error('No valid target specified!')
-      self.target = self.extra_targets.pop(0)
+    if not self.targets:
+      self.error('No valid targets specified!')
 
   def debug(self, message):
     if self.options.verbose:
@@ -140,11 +126,10 @@ class Py(Command):
       self.error('Cannot specify both --entry_point and --ipython!')
 
     if self.options.verbose:
-      print('Build operating on target: %s %s' % (self.target,
-        'Extra targets: %s' % ' '.join(map(str, self.extra_targets)) if self.extra_targets else ''))
+      print('Build operating on targets: %s' % ' '.join(self.targets))
 
     builder = PEXBuilder(tempfile.mkdtemp(), interpreter=self.interpreter,
-        pex_info=self.target.pexinfo if isinstance(self.target, PythonBinary) else None)
+                         pex_info=self.binary.pexinfo if self.binary else None)
 
     if self.options.entry_point:
       builder.set_entry_point(self.options.entry_point)
@@ -164,20 +149,20 @@ class Py(Command):
         self.extra_requirements.append(PythonRequirement(requirement))
 
     executor = PythonChroot(
-        self.target,
-        self.root_dir,
-        builder=builder,
-        interpreter=self.interpreter,
-        extra_targets=self.extra_targets,
+        targets=self.targets,
         extra_requirements=self.extra_requirements,
+        builder=builder,
+        platforms=self.binary.platforms if self.binary else None,
+        interpreter=self.interpreter,
         conn_timeout=self.options.conn_timeout)
 
     executor.dump()
 
     if self.options.pex:
-      pex_name = os.path.join(self.root_dir, 'dist', '%s.pex' % self.target.name)
-      builder.build(pex_name)
-      print('Wrote %s' % pex_name)
+      pex_name = self.binary.name if self.binary else Target.maybe_readable_identify(self.targets)
+      pex_path = os.path.join(self.root_dir, 'dist', '%s.pex' % pex_name)
+      builder.build(pex_path)
+      print('Wrote %s' % pex_path)
       return 0
     else:
       builder.freeze()

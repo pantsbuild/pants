@@ -12,20 +12,20 @@ import pytest
 from twitter.common.contextutil import pushd, temporary_dir
 from twitter.common.dirutil import touch
 
-from pants.base.address import Address, BuildFileAddress, SyntheticAddress
-from pants.base.build_environment import set_buildroot
+from pants.base.address import BuildFileAddress, SyntheticAddress
 from pants.base.build_file import BuildFile
+from pants.base.build_root import BuildRoot
 
 
 class AddressTest(unittest.TestCase):
   @contextmanager
   def workspace(self, *buildfiles):
     with temporary_dir() as root_dir:
-      set_buildroot(root_dir)
-      with pushd(root_dir):
-        for buildfile in buildfiles:
-          touch(os.path.join(root_dir, buildfile))
-        yield os.path.realpath(root_dir)
+      with BuildRoot().temporary(root_dir):
+        with pushd(root_dir):
+          for buildfile in buildfiles:
+            touch(os.path.join(root_dir, buildfile))
+          yield os.path.realpath(root_dir)
 
   def assertAddress(self, spec_path, target_name, address):
     self.assertEqual(spec_path, address.spec_path)

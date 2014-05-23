@@ -5,7 +5,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 from twitter.common.collections import maybe_list
-from twitter.common.quantity import Amount, Time
 
 from pants.base.build_manual import manual
 from pants.targets.python_target import PythonTarget
@@ -15,12 +14,7 @@ from pants.targets.python_target import PythonTarget
 class PythonTests(PythonTarget):
   """Tests a Python library."""
 
-  def __init__(self,
-               timeout=Amount(2, Time.MINUTES),
-               coverage=None,
-               soft_dependencies=False,
-               entry_point='pytest',
-               **kwargs):
+  def __init__(self, coverage=None, **kwargs):
     """
     :param name: See PythonLibrary target
     :param sources: A list of filenames representing the source code
@@ -30,18 +24,11 @@ class PythonTests(PythonTarget):
     :param dependencies: List of :class:`pants.base.target.Target` instances
       this target depends on.
     :type dependencies: list of targets
-    :param timeout: Amount of time before this test should be considered timed-out.
     :param coverage: the module(s) whose coverage should be generated, e.g.
       'twitter.common.log' or ['twitter.common.log', 'twitter.common.http']
-    :param soft_dependencies: Whether or not we should ignore dependency resolution
-      errors for this test.
-    :param entry_point: The entry point to use to run the tests.
     :param dict exclusives: An optional dict of exclusives tags. See CheckExclusives for details.
     """
-    self._timeout = timeout
-    self._soft_dependencies = bool(soft_dependencies)
     self._coverage = maybe_list(coverage) if coverage is not None else []
-    self._entry_point = entry_point
     super(PythonTests, self).__init__(**kwargs)
     self.add_labels('python', 'tests')
 
@@ -52,7 +39,3 @@ class PythonTests(PythonTarget):
   @property
   def coverage(self):
     return self._coverage
-
-  @property
-  def entry_point(self):
-    return self._entry_point

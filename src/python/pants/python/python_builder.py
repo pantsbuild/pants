@@ -13,11 +13,10 @@ from pants.targets.python_tests import PythonTests
 
 
 class PythonBuilder(object):
-  def __init__(self, run_tracker, root_dir):
-    self._root_dir = root_dir
+  def __init__(self, run_tracker):
     self._run_tracker = run_tracker
 
-  def build(self, targets, args, interpreter=None, conn_timeout=None):
+  def build(self, targets, args, interpreter=None, conn_timeout=None, fast_tests=False):
     test_targets = []
     binary_targets = []
     interpreter = interpreter or PythonInterpreter.get()
@@ -35,16 +34,15 @@ class PythonBuilder(object):
     rv = PythonTestBuilder(
         test_targets,
         args,
-        self._root_dir,
         interpreter=interpreter,
-        conn_timeout=conn_timeout).run()
+        conn_timeout=conn_timeout,
+        fast=fast_tests).run()
     if rv != 0:
       return rv
 
     for binary_target in binary_targets:
       rv = PythonBinaryBuilder(
           binary_target,
-          self._root_dir,
           self._run_tracker,
           interpreter=interpreter,
           conn_timeout=conn_timeout).run()

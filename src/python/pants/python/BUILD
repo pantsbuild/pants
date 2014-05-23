@@ -118,11 +118,9 @@ python_library(
   sources = ['test_builder.py'],
   dependencies = [
     pants(':python_chroot'),
-    pants('3rdparty/python/twitter/commons:twitter.common.collections'),
     pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.lang'),
-    pants('3rdparty/python/twitter/commons:twitter.common.quantity'),
     pants('3rdparty/python/twitter/commons:twitter.common.python'),
     pants('src/python/pants/base:config'),
     pants('src/python/pants/base:target'),

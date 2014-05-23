@@ -73,7 +73,7 @@ target_aliases = {
 from twitter.common.quantity import Amount, Time
 from pants.goal import Goal, Group, Phase
 from pants.targets.exclude import Exclude
-from .build_environment import get_buildroot, get_version, set_buildroot, get_scm, set_scm
+from .build_environment import get_buildroot, get_version, get_scm, set_scm
 from .config import Config
 
 object_aliases = {
@@ -84,7 +84,6 @@ object_aliases = {
   'config': Config,
   'get_version': get_version,
   'get_buildroot': get_buildroot,
-  'set_buildroot': set_buildroot,
   'get_scm': get_scm,
   'set_scm': set_scm,
   'jar': JarDependency,

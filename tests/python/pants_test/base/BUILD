@@ -54,7 +54,7 @@ python_tests(
     pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('src/python/pants/base:address'),
-    pants('src/python/pants/base:build_environment'),
+    pants('src/python/pants/base:build_root'),
     pants('tests/python/pants_test:base_test'),
   ]
 )

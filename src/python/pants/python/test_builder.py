@@ -4,26 +4,23 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-
 try:
   import configparser
 except ImportError:
   import ConfigParser as configparser
-import errno
+import itertools
 import os
-import time
-import signal
 import sys
 
 from twitter.common.contextutil import temporary_file
 from twitter.common.dirutil import safe_mkdir
 from twitter.common.lang import Compatibility
-from twitter.common.quantity import Amount, Time
 from twitter.common.python.interpreter import PythonInterpreter
 from twitter.common.python.pex import PEX
 from twitter.common.python.pex_builder import PEXBuilder
 
 from pants.base.config import Config
+from pants.base.target import Target
 from pants.python.python_chroot import PythonChroot
 from pants.targets.python_requirement import PythonRequirement
 from pants.targets.python_tests import PythonTests
@@ -31,17 +28,12 @@ from pants.targets.python_tests import PythonTests
 
 class PythonTestResult(object):
   @staticmethod
-  def timeout():
-    return PythonTestResult('TIMEOUT')
-
-  @staticmethod
   def exception():
     return PythonTestResult('EXCEPTION')
 
   @staticmethod
   def rc(value):
-    return PythonTestResult('SUCCESS' if value == 0 else 'FAILURE',
-                            rc=value)
+    return PythonTestResult('SUCCESS' if value == 0 else 'FAILURE', rc=value)
 
   def __init__(self, msg, rc=None):
     self._rc = rc
@@ -68,12 +60,16 @@ exclude_lines =
 ignore_errors = True
 """
 
-def generate_coverage_config(target):
+def generate_coverage_config(targets):
   cp = configparser.ConfigParser()
   cp.readfp(Compatibility.StringIO(DEFAULT_COVERAGE_CONFIG))
   cp.add_section('html')
-  target_dir = os.path.join(Config.load().getdefault('pants_distdir'), 'coverage',
-      os.path.dirname(target.address.buildfile.relpath), target.name)
+  if len(targets) == 1:
+    target = targets[0]
+    relpath = os.path.join(os.path.dirname(target.address.buildfile.relpath), target.name)
+  else:
+    relpath = Target.maybe_readable_identify(targets)
+  target_dir = os.path.join(Config.load().getdefault('pants_distdir'), 'coverage', relpath)
   safe_mkdir(target_dir)
   cp.set('html', 'directory', target_dir)
   return cp
@@ -83,121 +79,119 @@ class PythonTestBuilder(object):
   class InvalidDependencyException(Exception): pass
   class ChrootBuildingException(Exception): pass
 
-  TESTING_TARGETS = None
+  _TESTING_TARGETS = [
+    PythonRequirement('pytest'),
+    PythonRequirement('pytest-timeout'),
+    PythonRequirement('pytest-cov'),
+    PythonRequirement('coverage==3.6b1'),
+    PythonRequirement('unittest2', version_filter=lambda py, pl: py.startswith('2')),
+    PythonRequirement('unittest2py3k', version_filter=lambda py, pl: py.startswith('3'))
+  ]
 
-  # TODO(wickman) Expose these as configuratable parameters
-  TEST_TIMEOUT = Amount(2, Time.MINUTES)
-  TEST_POLL_PERIOD = Amount(100, Time.MILLISECONDS)
-
-  def __init__(self, targets, args, root_dir, interpreter=None, conn_timeout=None):
+  def __init__(self, targets, args, interpreter=None, conn_timeout=None, fast=False):
     self.targets = targets
     self.args = args
-    self.root_dir = root_dir
     self.interpreter = interpreter or PythonInterpreter.get()
-    self.successes = {}
     self._conn_timeout = conn_timeout
 
-  def run(self):
-    self.successes = {}
-    rv = self._run_tests(self.targets)
-    for target in sorted(self.successes):
-      print('%-80s.....%10s' % (target, self.successes[target]))
-    return 0 if rv.success else 1
+    # If fast is true, we run all the tests in a single chroot. This is MUCH faster than
+    # creating a chroot for each test target. However running each test separately is more
+    # correct, as the isolation verifies that its dependencies are correctly declared.
+    self._fast = fast
 
-  @classmethod
-  def generate_test_targets(cls):
-    if cls.TESTING_TARGETS is None:
-      cls.TESTING_TARGETS = [
-        PythonRequirement('pytest'),
-        PythonRequirement('pytest-cov'),
-        PythonRequirement('coverage==3.6b1'),
-        PythonRequirement('unittest2', version_filter=lambda py, pl: py.startswith('2')),
-        PythonRequirement('unittest2py3k', version_filter=lambda py, pl: py.startswith('3'))
-      ]
-    return cls.TESTING_TARGETS
+  def run(self):
+    if self._fast:
+      return self._run_python_tests(self.targets)
+    else:
+      results = {}
+      # Coverage often throws errors despite tests succeeding, so force failsoft in that case.
+      fail_hard = ('PANTS_PYTHON_TEST_FAILSOFT' not in os.environ and
+                   'PANTS_PY_COVERAGE' not in os.environ)
+      for target in self.targets:
+        if isinstance(target, PythonTests):
+          rv = self._run_python_tests([target])
+          results[target.id] = rv
+          if not rv.success and fail_hard:
+            break
+      for target in sorted(results):
+        print('%-80s.....%10s' % (target, results[target]))
+      return 0 if all(rc.success for rc in results.values()) else 1
 
   @staticmethod
-  def generate_junit_args(target):
+  def generate_junit_args(targets):
     args = []
     xml_base = os.getenv('JUNIT_XML_BASE')
-    if xml_base:
+    if xml_base and targets:
       xml_base = os.path.abspath(os.path.normpath(xml_base))
-      xml_path = os.path.join(
-        xml_base, os.path.dirname(target.address.buildfile.relpath), target.name + '.xml')
-      try:
-        os.makedirs(os.path.dirname(xml_path))
-      except OSError as e:
-        if e.errno != errno.EEXIST:
-          raise PythonTestBuilder.ChrootBuildingException(
-            "Unable to establish JUnit target: %s!  %s" % (target, e))
+      if len(targets) == 1:
+        target = targets[0]
+        relpath = os.path.join(os.path.dirname(target.address.buildfile.relpath),
+                               target.name + '.xml')
+      else:
+        relpath = Target.maybe_readable_identify(targets) + '.xml'
+      xml_path = os.path.join(xml_base, relpath)
+      safe_mkdir(os.path.dirname(xml_path))
       args.append('--junitxml=%s' % xml_path)
     return args
 
   @staticmethod
-  def cov_setup(target, chroot):
-    cp = generate_coverage_config(target)
+  def cov_setup(targets):
+    cp = generate_coverage_config(targets)
     with temporary_file(cleanup=False) as fp:
       cp.write(fp)
       filename = fp.name
-    if target.coverage:
-      source = target.coverage
-    else:
-      # This technically makes the assumption that tests/python/<target> will be testing
-      # src/python/<target>.  To change to honest measurements, do target.walk() here instead,
-      # however this results in very useless and noisy coverage reports.
-      source = set(os.path.dirname(source).replace(os.sep, '.') for source in target.sources)
+
+    def compute_coverage_modules(target):
+      if target.coverage:
+        return target.coverage
+      else:
+        # This technically makes the assumption that tests/python/<target> will be testing
+        # src/python/<target>.  To change to honest measurements, do target.walk() here instead,
+        # however this results in very useless and noisy coverage reports.
+        # Note in particular that this doesn't work for pants's own tests, as those are under
+        # the top level package 'pants_tests', rather than just 'pants'.
+        return set(os.path.dirname(source).replace(os.sep, '.')
+                   for source in target.sources_relative_to_source_root())
+
+    coverage_modules = set(itertools.chain([compute_coverage_modules(t) for t in targets]))
     args = ['-p', 'pytest_cov',
             '--cov-config', filename,
             '--cov-report', 'html',
             '--cov-report', 'term']
-    for module in source:
+    for module in coverage_modules:
       args.extend(['--cov', module])
     return filename, args
 
-  @staticmethod
-  def wait_on(popen, timeout=TEST_TIMEOUT):
-    total_wait = Amount(0, Time.SECONDS)
-    while total_wait < timeout:
-      rc = popen.poll()
-      if rc is not None:
-        return PythonTestResult.rc(rc)
-      total_wait += PythonTestBuilder.TEST_POLL_PERIOD
-      time.sleep(PythonTestBuilder.TEST_POLL_PERIOD.as_(Time.SECONDS))
-    popen.kill()
-    return PythonTestResult.timeout()
-
-  def _run_python_test(self, target):
-    po = None
-    rv = PythonTestResult.exception()
+  def _run_python_tests(self, targets):
     coverage_rc = None
     coverage_enabled = 'PANTS_PY_COVERAGE' in os.environ
 
     try:
       builder = PEXBuilder(interpreter=self.interpreter)
-      builder.info.entry_point = target.entry_point
-      builder.info.ignore_errors = target._soft_dependencies
+      builder.info.entry_point = 'pytest'
       chroot = PythonChroot(
-          target,
-          self.root_dir,
-          extra_requirements=self.generate_test_targets(),
+          targets,
+          extra_requirements=self._TESTING_TARGETS,
           builder=builder,
           platforms=('current',),
           interpreter=self.interpreter,
           conn_timeout=self._conn_timeout)
       builder = chroot.dump()
       builder.freeze()
-      test_args = PythonTestBuilder.generate_junit_args(target)
+      test_args = []
+      test_args.extend(PythonTestBuilder.generate_junit_args(targets))
       test_args.extend(self.args)
       if coverage_enabled:
-        coverage_rc, args = self.cov_setup(target, builder.chroot())
+        coverage_rc, args = self.cov_setup(targets)
         test_args.extend(args)
-      sources = target.sources_relative_to_buildroot()
-      po = PEX(builder.path(), interpreter=self.interpreter).run(
-          args=test_args + sources, blocking=False, setsid=True)
-      # TODO(wickman)  If coverage is enabled, write an intermediate .html that points to
+
+      sources = list(itertools.chain(*[t.sources_relative_to_buildroot() for t in targets]))
+      pex = PEX(builder.path(), interpreter=self.interpreter)
+      rc = pex.run(args=test_args + sources, blocking=True, setsid=True)
+      # TODO(wickman): If coverage is enabled, write an intermediate .html that points to
       # each of the coverage reports generated and webbrowser.open to that page.
-      rv = PythonTestBuilder.wait_on(po, timeout=target.timeout)
-    except Exception as e:
+      rv = PythonTestResult.rc(rc)
+    except Exception:
       import traceback
       print('Failed to run test!', file=sys.stderr)
       traceback.print_exc()
@@ -205,29 +199,4 @@ class PythonTestBuilder(object):
     finally:
       if coverage_rc:
         os.unlink(coverage_rc)
-      if po and po.returncode != 0:
-        try:
-          os.killpg(po.pid, signal.SIGTERM)
-        except OSError as e:
-          if e.errno == errno.EPERM:
-            print("Unable to kill process group: %d" % po.pid)
-          elif e.errno != errno.ESRCH:
-            rv = PythonTestResult.exception()
-    self.successes[target.id] = rv
     return rv
-
-  def _run_tests(self, targets):
-    fail_hard = 'PANTS_PYTHON_TEST_FAILSOFT' not in os.environ
-    if 'PANTS_PY_COVERAGE' in os.environ:
-      # Coverage often throws errors despite tests succeeding, so make PANTS_PY_COVERAGE
-      # force FAILSOFT.
-      fail_hard = False
-    failed = False
-    for target in targets:
-      if isinstance(target, PythonTests):
-        rv = self._run_python_test(target)
-        if not rv.success:
-          failed = True
-          if fail_hard:
-            return rv
-    return PythonTestResult.rc(1 if failed else 0)

@@ -20,7 +20,7 @@ class PythonBinaryBuilder(object):
   class NotABinaryTargetException(Exception):
     pass
 
-  def __init__(self, target, root_dir, run_tracker, interpreter=None, conn_timeout=None):
+  def __init__(self, target, run_tracker, interpreter=None, conn_timeout=None):
     self.target = target
     self.interpreter = interpreter or PythonInterpreter.get()
     if not isinstance(target, PythonBinary):
@@ -41,9 +41,9 @@ class PythonBinaryBuilder(object):
     builder = PEXBuilder(distpath, pex_info=pexinfo, interpreter=self.interpreter)
 
     self.chroot = PythonChroot(
-        target,
-        root_dir,
+        targets=[target],
         builder=builder,
+        platforms=target.platforms,
         interpreter=self.interpreter,
         conn_timeout=conn_timeout)
 

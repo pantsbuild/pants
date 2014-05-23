@@ -10,6 +10,7 @@ import sys
 from twitter.common import log
 
 from pants.base.build_root import BuildRoot
+from pants.scm import Scm
 from pants.version import VERSION as _VERSION
 
 
@@ -24,17 +25,6 @@ def get_buildroot():
   except BuildRoot.NotFoundError as e:
     print(e.message, file=sys.stderr)
     sys.exit(1)
-
-
-def set_buildroot(path):
-  """Sets the pants ROOT_DIR.
-
-  Generally only useful for tests.
-  """
-  BuildRoot().path = path
-
-
-from pants.scm import Scm
 
 
 _SCM = None

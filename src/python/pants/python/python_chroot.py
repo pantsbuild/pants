@@ -50,22 +50,19 @@ class PythonChroot(object):
       Exception.__init__(self, "Not a valid Python dependency! Found: %s" % target)
 
   def __init__(self,
-               target,
-               root_dir,
-               extra_targets=None,
+               targets,
                extra_requirements=None,
                builder=None,
                platforms=None,
                interpreter=None,
                conn_timeout=None):
     self._config = Config.load()
-    self._target = target
-    self._root = root_dir
+    self._targets = targets
+    self._extra_requirements = list(extra_requirements) if extra_requirements else []
     self._platforms = platforms
     self._interpreter = interpreter or PythonInterpreter.get()
-    self._extra_targets = list(extra_targets) if extra_targets is not None else []
-    self._extra_requirements = list(extra_requirements) if extra_requirements is not None else []
     self._builder = builder or PEXBuilder(tempfile.mkdtemp(), interpreter=self._interpreter)
+    self._conn_timeout = conn_timeout
 
     # Note: unrelated to the general pants artifact cache.
     self._egg_cache_root = os.path.join(
@@ -95,7 +92,7 @@ class PythonChroot(object):
 
   def _dump_library(self, library):
     def copy_to_chroot(base, path, add_function):
-      src = os.path.join(self._root, base, path)
+      src = os.path.join(get_buildroot(), base, path)
       add_function(src, path)
 
     self.debug('  Dumping library: %s' % library)
@@ -118,7 +115,7 @@ class PythonChroot(object):
 
   def _generate_requirement(self, library, builder_cls):
     library_key = self._key_generator.key_for_target(library)
-    builder = builder_cls(library, self._root, self._config, '-' + library_key.hash[:8])
+    builder = builder_cls(library, get_buildroot(), self._config, '-' + library_key.hash[:8])
 
     cache_dir = os.path.join(self._egg_cache_root, library_key.id)
     if self._build_invalidator.needs_update(library_key):
@@ -150,8 +147,8 @@ class PythonChroot(object):
     return children
 
   def dump(self):
-    self.debug('Building PythonBinary %s:' % self._target)
-    targets = self.resolve([self._target] + self._extra_targets)
+    self.debug('Building chroot for %s:' % self._targets)
+    targets = self.resolve(self._targets)
 
     for lib in targets['libraries'] | targets['binaries']:
       self._dump_library(lib)
@@ -181,14 +178,12 @@ class PythonChroot(object):
       reqs_to_build.add(req)
       self._dump_requirement(req._requirement, False, req._repository)
 
-    platforms = self._platforms
-    if isinstance(self._target, PythonBinary):
-      platforms = self._target.platforms
     distributions = resolve_multi(
          self._config,
          reqs_to_build,
          interpreter=self._interpreter,
-         platforms=platforms)
+         platforms=self._platforms,
+         conn_timeout=self._conn_timeout)
 
     locations = set()
     for platform, dist_set in distributions.items():
