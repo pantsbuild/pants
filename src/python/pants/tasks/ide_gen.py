@@ -259,7 +259,7 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
     safe_mkdir(external_javadoc_jar_dir, clean=True)
 
     confs = ['default', 'sources', 'javadoc']
-    for entry in self.list_external_jar_dependencies(self.binary, confs=confs):
+    for entry in self.list_jar_dependencies(self.binary, confs=confs):
       jar = entry.get('default')
       if jar:
         cp_jar = os.path.join(external_jar_dir, os.path.basename(jar))
