@@ -1,7 +1,8 @@
 package com.pants.examples.antlr;
 
 import java.io.IOException;
-import com.pants.examples.vector.Vectornd;
+import com.pants.examples.json.JsonLexer;
+import com.pants.examples.json.JsonParser;
 
 class ExampleAntlr {
 
