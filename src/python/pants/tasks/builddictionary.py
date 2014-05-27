@@ -129,8 +129,6 @@ PREDEFS = {  # some hardwired entries
   "fancy_pants": {"suppress": True},  # unused alias for pants
   "__file__": {"defn": msg_entry("__file__", "Path to BUILD file (string).")},
   "globs": {"defn": entry_for_one("globs", Fileset.globs)},
-  "jar_library": {"defn": msg_entry("jar_library",
-                  """Old name for `dependencies`_""")},
   "java_tests": {"defn": msg_entry("java_tests",
                   """Old name for `junit_tests`_""")},
   "pants": {"defn": msg_entry("pants",

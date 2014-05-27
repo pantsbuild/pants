@@ -16,9 +16,7 @@ from pants.targets.jar_dependency import JarDependency
 
 @manual.builddict(tags=["anylang"])
 class JarLibrary(Target):
-  """A set of dependencies that may be depended upon,
-  as if depending upon the set of dependencies directly.
-  """
+  """A set of jars that may be depended upon."""
 
   def __init__(self, jars=None, *args, **kwargs):
     """
