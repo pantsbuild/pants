@@ -146,10 +146,10 @@ class JarRules(object):
     default_dup_action = Duplicate.validate_action(default_dup_action or Duplicate.SKIP)
     additional_rules = maybe_list(additional_rules or [], expected_type=(Duplicate, Skip))
 
-    rules = [Skip('^META-INF/[^/]+\.SF$'),  # signature file
-             Skip('^META-INF/[^/]+\.DSA$'),  # default signature alg. file
-             Skip('^META-INF/[^/]+\.RSA$'),  # default signature alg. file
-             Duplicate('^META-INF/services/', Duplicate.CONCAT)]  # 1 svc fqcn per line
+    rules = [Skip(r'^META-INF/[^/]+\.SF$'),  # signature file
+             Skip(r'^META-INF/[^/]+\.DSA$'),  # default signature alg. file
+             Skip(r'^META-INF/[^/]+\.RSA$'),  # default signature alg. file
+             Duplicate(r'^META-INF/services/', Duplicate.CONCAT)]  # 1 svc fqcn per line
 
     return cls(rules=rules + additional_rules, default_dup_action=default_dup_action)
 

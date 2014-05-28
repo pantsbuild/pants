@@ -29,6 +29,8 @@ class Manifest(object):
           return
         yield ' %s' % chunk
 
+  PATH = 'META-INF/MANIFEST.MF'
+
   MANIFEST_VERSION = 'Manifest-Version'
   CREATED_BY = 'Created-By'
   MAIN_CLASS = 'Main-Class'

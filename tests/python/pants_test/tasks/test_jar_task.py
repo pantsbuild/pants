@@ -6,24 +6,23 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import os
 
-from contextlib import closing, contextmanager
+from contextlib import contextmanager
 
 from twitter.common.contextutil import open_zip, temporary_dir, temporary_file
 from twitter.common.dirutil import safe_mkdir, safe_mkdtemp, safe_rmtree
 
-from pants.java.jar.jar import Jar
-from pants.jvm.ivy_task_mixin import _resolve
-from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
+from pants.jvm.jar_task import JarTask
+
+from pants_test.jvm.jar_task_test_base import JarTaskTestBase
 
 
-class JarTest(JvmToolTaskTestBase):
+class JarTaskTest(JarTaskTestBase):
 
   def setUp(self):
-    self.workdir = safe_mkdtemp()
+    super(JarTaskTest, self).setUp()
 
-    context = self.context()
-    jar_tool_targets = list(context.resolve(Jar.tool_targets(context.config)))
-    self.jar_tool_classpath = _resolve(context, self.workdir, jar_tool_targets)
+    self.workdir = safe_mkdtemp()
+    self.jar_task = self.prepare_execute(self.context(), self.workdir, JarTask)
 
   def tearDown(self):
     if self.workdir:
@@ -48,7 +47,7 @@ class JarTest(JvmToolTaskTestBase):
         fd.write('e')
 
       with self.jarfile() as existing_jarfile:
-        with closing(Jar(self.jar_tool_classpath, existing_jarfile)) as jar:
+        with self.jar_task.open_jar(existing_jarfile) as jar:
           jar.write(data_file, 'f/g/h')
 
         with open_zip(existing_jarfile) as jar:
@@ -58,15 +57,15 @@ class JarTest(JvmToolTaskTestBase):
   def test_update_writestr(self):
     def assert_writestr(path, contents, *entries):
       with self.jarfile() as existing_jarfile:
-        with closing(Jar(self.jar_tool_classpath, existing_jarfile)) as jar:
+        with self.jar_task.open_jar(existing_jarfile) as jar:
           jar.writestr(path, contents)
 
         with open_zip(existing_jarfile) as jar:
           self.assert_listing(jar, *entries)
           self.assertEquals(contents, jar.read(path))
 
-    assert_writestr('a.txt', 'b', 'a.txt')
-    assert_writestr('a/b/c.txt', 'd', 'a/', 'a/b/', 'a/b/c.txt')
+    assert_writestr('a.txt', b'b', 'a.txt')
+    assert_writestr('a/b/c.txt', b'd', 'a/', 'a/b/', 'a/b/c.txt')
 
   def test_overwrite_write(self):
     with temporary_dir() as chroot:
@@ -77,7 +76,7 @@ class JarTest(JvmToolTaskTestBase):
         fd.write('e')
 
       with self.jarfile() as existing_jarfile:
-        with closing(Jar(self.jar_tool_classpath, existing_jarfile, overwrite=True)) as jar:
+        with self.jar_task.open_jar(existing_jarfile, overwrite=True) as jar:
           jar.write(data_file, 'f/g/h')
 
         with open_zip(existing_jarfile) as jar:
@@ -86,39 +85,29 @@ class JarTest(JvmToolTaskTestBase):
 
   def test_overwrite_writestr(self):
     with self.jarfile() as existing_jarfile:
-      with closing(Jar(self.jar_tool_classpath, existing_jarfile, overwrite=True)) as jar:
-        jar.writestr('README', '42')
+      with self.jar_task.open_jar(existing_jarfile, overwrite=True) as jar:
+        jar.writestr('README', b'42')
 
       with open_zip(existing_jarfile) as jar:
         self.assert_listing(jar, 'README')
         self.assertEquals('42', jar.read('README'))
 
   def test_custom_manifest(self):
-    contents = 'Manifest-Version: 1.0\r\nCreated-By: test\r\n\r\n'
+    contents = b'Manifest-Version: 1.0\r\nCreated-By: test\r\n\r\n'
 
     with self.jarfile() as existing_jarfile:
-      with closing(Jar(self.jar_tool_classpath, existing_jarfile, overwrite=True)) as jar:
-        jar.writestr('README', '42')
+      with self.jar_task.open_jar(existing_jarfile, overwrite=True) as jar:
+        jar.writestr('README', b'42')
 
       with open_zip(existing_jarfile) as jar:
         self.assert_listing(jar, 'README')
         self.assertEquals('42', jar.read('README'))
         self.assertNotEqual(contents, jar.read('META-INF/MANIFEST.MF'))
 
-      with closing(Jar(self.jar_tool_classpath, existing_jarfile, overwrite=False)) as jar:
+      with self.jar_task.open_jar(existing_jarfile, overwrite=False) as jar:
         jar.writestr('META-INF/MANIFEST.MF', contents)
 
       with open_zip(existing_jarfile) as jar:
         self.assert_listing(jar, 'README')
         self.assertEquals('42', jar.read('README'))
         self.assertEquals(contents, jar.read('META-INF/MANIFEST.MF'))
-
-  def test_no_close(self):
-    with self.jarfile() as existing_jarfile:
-      with closing(Jar(self.jar_tool_classpath, existing_jarfile)) as jar:
-        jar.writestr('README', '42')
-
-      jar = Jar(self.jar_tool_classpath, existing_jarfile)
-      jar.writestr('more', 'stuff')
-      with open_zip(existing_jarfile) as jar:
-        self.assert_listing(jar, 'README')

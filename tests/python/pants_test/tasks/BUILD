@@ -315,3 +315,14 @@ python_tests(
     pants('src/python/pants/tasks:what_changed'),
   ],
 )
+
+python_tests(
+  name = 'jar_task',
+  sources = ['test_jar_task.py'],
+  dependencies = [
+    pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
+    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
+    pants('src/python/pants/jvm:jar_task'),
+    pants('tests/python/pants_test/jvm:jvm_tool_task_test_base'),
+  ]
+)

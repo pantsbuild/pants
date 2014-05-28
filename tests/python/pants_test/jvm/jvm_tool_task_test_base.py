@@ -36,19 +36,34 @@ class JvmToolTaskTestBase(BaseTest):
             raise e
         return dest
 
-    def link_tree(path, optional=False):
+    def link_tree(path, optional=False, force=False):
       src = os.path.join(self.real_build_root, path)
       if not optional or os.path.exists(src):
         for abspath, dirs, files in os.walk(src):
           for f in files:
-            link(os.path.relpath(os.path.join(abspath, f), self.real_build_root))
+            link(os.path.relpath(os.path.join(abspath, f), self.real_build_root), force=force)
 
     # TODO(John Sirois): Find a way to do this cleanly
     link('pants.ini', force=True)
-    link('BUILD')
-    link('BUILD.tools')
+    link('BUILD', force=True)
+    link('BUILD.tools', force=True)
     support_dir = real_config.getdefault('pants_supportdir')
-    link_tree(os.path.relpath(os.path.join(support_dir, 'ivy'), self.real_build_root))
+    link_tree(os.path.relpath(os.path.join(support_dir, 'ivy'), self.real_build_root), force=True)
+
+  def prepare_execute(self, context, workdir, task_type):
+    """Prepares a jvm tool using task for execution, ensuring any required jvm tools are
+    bootstrapped.
+
+    NB: Other task pre-requisites will not be ensured and tests must instead setup their own product
+    requirements if any.
+
+    :returns: The prepared Task
+    """
+    # TODO(John Sirois): This is emulating Engine behavior - construct reverse order, then execute;
+    # instead it should probably just be using an Engine.
+    task = task_type(context, workdir)
+    BootstrapJvmTools(context, workdir).execute(context.targets())
+    return task
 
   def execute(self, context, workdir, task_type):
     """Executes the given task ensuring any required jvm tools are bootstrapped.
@@ -58,6 +73,5 @@ class JvmToolTaskTestBase(BaseTest):
     """
     # TODO(John Sirois): This is emulating Engine behavior - construct reverse order, then execute;
     # instead it should probably just be using an Engine.
-    task = task_type(context, workdir)
-    BootstrapJvmTools(context, workdir).execute(context.targets())
+    task = self.prepare_execute(context, workdir, task_type)
     task.execute(context.targets())

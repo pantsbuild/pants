@@ -14,7 +14,6 @@ from twitter.common.dirutil import safe_mkdir
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.fs.fs import safe_filename
-from pants.java.jar.jar import Jar
 from pants.java.jar.manifest import Manifest
 from pants.jvm.jar_task import JarTask
 from pants.targets.jvm_binary import JvmBinary
@@ -231,4 +230,4 @@ class JarCreate(JarTask):
       manifest.addentry('Can-Retransform-Classes', 'true')
     if agent.can_set_native_method_prefix:
       manifest.addentry('Can-Set-Native-Method-Prefix', 'true')
-    jarfile.writestr(Jar.MANIFEST_PATH, manifest.contents())
+    jarfile.writestr(Manifest.PATH, manifest.contents())

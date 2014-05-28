@@ -5,7 +5,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import os
-import time
 
 from pants.base.exceptions import TaskError
 from pants.java import util
@@ -43,10 +42,11 @@ class NailgunTask(Task, JvmToolTaskMixin):
                                      help="[%default] Use nailgun daemons to execute java tasks.")
       NailgunTask._DAEMON_OPTION_PRESENT = True
 
-  def __init__(self, context, workdir, minimum_version=None, maximum_version=None, jdk=False):
+  def __init__(self, context, workdir, minimum_version=None, maximum_version=None, jdk=False,
+               nailgun_name=None):
     super(NailgunTask, self).__init__(context, workdir)
     self._executor_workdir = os.path.join(context.config.getdefault('pants_workdir'), 'ng',
-                                          self.__class__.__name__)
+                                          nailgun_name or self.__class__.__name__)
     self._nailgun_bootstrap_key = 'nailgun'
     self.register_jvm_tool(self._nailgun_bootstrap_key, [':nailgun-server'])
 
