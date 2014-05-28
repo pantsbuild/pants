@@ -5,6 +5,7 @@ python_library(
   name = 'base_test',
   sources = ['base_test.py'],
   dependencies = [
+    pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('src/python/pants/base:address'),
     pants('src/python/pants/base:build_root'),
@@ -14,6 +15,7 @@ python_library(
     pants('src/python/pants/base:target'),
     pants('src/python/pants/base:build_file_aliases'),
     pants('src/python/pants/targets:common'),
+    pants('tests/python/pants_test/base:context_utils')
   ]
 )
 

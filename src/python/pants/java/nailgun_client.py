@@ -141,8 +141,8 @@ class NailgunClient(object):
                host=DEFAULT_NG_HOST,
                port=DEFAULT_NG_PORT,
                ins=sys.stdin,
-               out=sys.stdout,
-               err=sys.stderr,
+               out=None,
+               err=None,
                workdir=None):
     """Creates a nailgun client that can be used to issue zero or more nailgun commands.
 
@@ -158,8 +158,8 @@ class NailgunClient(object):
     self._host = host
     self._port = port
     self._ins = ins
-    self._out = out
-    self._err = err
+    self._out = out or sys.stdout
+    self._err = err or sys.stderr
     self._workdir = workdir or os.path.abspath(os.path.curdir)
 
     self.execute = self.__call__

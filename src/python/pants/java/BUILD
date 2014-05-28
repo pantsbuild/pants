@@ -27,9 +27,8 @@ python_library(
 
 python_library(
   name = 'jar',
-  sources = globs('jar/*.py'),
+  sources = globs('jar/manifest.py'),
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.lang'),
   ]
 )

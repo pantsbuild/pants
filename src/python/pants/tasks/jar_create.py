@@ -6,19 +6,24 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import functools
 import os
+
 from contextlib import contextmanager
-from zipfile import ZIP_DEFLATED, ZIP_STORED
 
 from twitter.common.dirutil import safe_mkdir
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.fs.fs import safe_filename
-from pants.java.jar import Manifest, open_jar
+from pants.java.jar.manifest import Manifest
+from pants.jvm.jar_task import JarTask
+from pants.targets.jvm_binary import JvmBinary
 from pants.targets.scala_library import ScalaLibrary
-from pants.tasks.task import Task
 from pants.tasks.javadoc_gen import javadoc
 from pants.tasks.scaladoc_gen import scaladoc
+
+
+def is_jvm_binary(target):
+  return isinstance(target, JvmBinary)
 
 
 def is_java_library(target):
@@ -30,7 +35,9 @@ def is_scala_library(target):
 
 
 def is_jvm_library(target):
-  return is_java_library(target) or is_scala_library(target)
+  return (is_java_library(target)
+          or is_scala_library(target)
+          or (is_jvm_binary(target) and target.has_resources))
 
 
 def jarname(target, extension='.jar'):
@@ -48,7 +55,7 @@ def _abs_and_relative_sources(target):
     yield os.path.join(abs_source_root, source), source
 
 
-class JarCreate(Task):
+class JarCreate(JarTask):
   """Jars jvm libraries and optionally their sources and their docs."""
 
   @classmethod
@@ -87,7 +94,7 @@ class JarCreate(Task):
     products = context.products
 
     self.transitive = options.jar_create_transitive
-    self.compression = ZIP_DEFLATED if options.jar_create_compressed else ZIP_STORED
+    self.compressed = options.jar_create_compressed
 
     self.jar_classes = options.jar_create_classes or products.isrequired('jars')
     if self.jar_classes:
@@ -147,7 +154,7 @@ class JarCreate(Task):
         target, path, existing
       ))
     self._jars[path] = target
-    with open_jar(path, 'w', compression=self.compression) as jar:
+    with self.open_jar(path, overwrite=True, compressed=self.compressed) as jar:
       yield jar
 
   def _jar(self, jvm_targets, add_genjar):

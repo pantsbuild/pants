@@ -4,12 +4,13 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from StringIO import StringIO
+import os
+import pytest
+
 from contextlib import closing
 from optparse import OptionGroup, OptionParser
-import os
+from StringIO import StringIO
 
-import pytest
 from twitter.common.collections import maybe_list
 
 from pants.base.target import Target

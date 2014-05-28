@@ -5,11 +5,12 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import os
+
 from collections import defaultdict
 from contextlib import closing
 from zipfile import ZipFile
 
-from pants.java.jar import Manifest
+from pants.java.jar.manifest import Manifest
 from pants.tasks.task import TaskError
 from pants.tasks.jvm_binary_task import JvmBinaryTask
 

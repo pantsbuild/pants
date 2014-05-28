@@ -5,6 +5,5 @@ python_test_suite(
   name = 'java',
   dependencies = [
     pants('tests/python/pants_test/java/distribution'),
-    pants('tests/python/pants_test/java/jar'),
   ]
 )

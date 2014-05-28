@@ -6,18 +6,21 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import os
 import unittest
+
 from tempfile import mkdtemp
 from textwrap import dedent
 
+from twitter.common.contextutil import environment_as, temporary_file
 from twitter.common.dirutil import safe_mkdir, safe_open, safe_rmtree
 
-from pants.base.address import Address, SyntheticAddress
+from pants.base.address import SyntheticAddress
 from pants.base.build_graph import BuildGraph
 from pants.base.build_root import BuildRoot
 from pants.base.build_file_parser import BuildFileCache, BuildFileParser
 from pants.base.config import Config
 from pants.base.source_root import SourceRoot
 from pants.base.target import Target
+from pants_test.base.context_utils import create_context
 
 
 def make_default_build_file_parser(build_root):
@@ -92,12 +95,34 @@ class BaseTest(unittest.TestCase):
     return target
 
   def setUp(self):
+    self.real_build_root = BuildRoot().path
     self.build_root = mkdtemp(suffix='_BUILD_ROOT')
     BuildRoot().path = self.build_root
     self.create_file('pants.ini')
     self.build_file_parser = make_default_build_file_parser(self.build_root)
     self.build_graph = BuildGraph()
-    self.config = Config.load()
+
+  def config(self, overrides=''):
+    """Returns a config valid for the test build root."""
+    if overrides:
+      with temporary_file() as fp:
+        fp.write(overrides)
+        fp.close()
+        with environment_as(PANTS_CONFIG_OVERRIDE=fp.name):
+          return Config.load()
+    else:
+      return Config.load()
+
+  def create_options(self, **kwargs):
+    return dict(**kwargs)
+
+  def context(self, config='', options=None, target_roots=None, **kwargs):
+    return create_context(config=self.config(overrides=config),
+                          options=self.create_options(**(options or {})),
+                          target_roots=target_roots,
+                          build_graph=self.build_graph,
+                          build_file_parser=self.build_file_parser,
+                          **kwargs)
 
   def tearDown(self):
     BuildRoot().reset()
@@ -134,14 +159,13 @@ class BaseTest(unittest.TestCase):
      name: Name of the library target.
      sources: List of source file at the path relative to path.
      **kwargs: Optional attributes that can be set for any library target.
-       Currently it includes support for provides, resources, java_sources
+       Currently it includes support for resources and java_sources
     """
     self.create_files(path, sources)
     self.add_to_build_file(path, dedent('''
           %(target_type)s(name='%(name)s',
             sources=%(sources)s,
             %(resources)s
-            %(provides)s
             %(java_sources)s
           )
         ''' % dict(target_type=target_type,
@@ -149,12 +173,6 @@ class BaseTest(unittest.TestCase):
                    sources=repr(sources or []),
                    resources=('resources=[pants("%s")],' % kwargs.get('resources')
                               if kwargs.has_key('resources') else ''),
-                   provides=(dedent('''provides=artifact(
-                                                  org = 'com.twitter',
-                                                  name = '%s',
-                                                  repo = pants('build-support/ivy:ivy')
-                                                ),
-                                     '''% name if kwargs.has_key('provides') else '')),
                    java_sources=('java_sources=[%s]'
                                  % ','.join(map(lambda str_target: 'pants("%s")' % str_target,
                                                 kwargs.get('java_sources')))

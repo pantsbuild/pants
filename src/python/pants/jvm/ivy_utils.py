@@ -102,6 +102,26 @@ class IvyUtils(object):
       self._overrides.update(parse_override(o) for o in options.ivy_resolve_overrides)
 
   @staticmethod
+  def _generate_exclude_template(exclude):
+    return TemplateData(org=exclude.org, name=exclude.name)
+
+  @staticmethod
+  def _generate_override_template(jar):
+    return TemplateData(org=jar.org, module=jar.module, version=jar.version)
+
+  @staticmethod
+  def is_classpath_artifact(path):
+    """Subclasses can override to determine whether a given artifact represents a classpath
+    artifact."""
+    return path.endswith('.jar') or path.endswith('.war')
+
+  @classmethod
+  def is_mappable_artifact(cls, org, name, path):
+    """Subclasses can override to determine whether a given artifact represents a mappable
+    artifact."""
+    return cls.is_classpath_artifact(path)
+
+  @staticmethod
   @contextmanager
   def cachepath(path):
     if not os.path.exists(path):
@@ -313,22 +333,6 @@ class IvyUtils(object):
         configurations=[conf for conf in jar.configurations if conf in confs])
     override = self._overrides.get((jar.org, jar.name))
     return override(template) if override else template
-
-  def _generate_exclude_template(self, exclude):
-    return TemplateData(org=exclude.org, name=exclude.name)
-
-  def _generate_override_template(self, jar):
-    return TemplateData(org=jar.org, module=jar.module, version=jar.version)
-
-  def is_classpath_artifact(self, path):
-    """Subclasses can override to determine whether a given artifact represents a classpath
-    artifact."""
-    return path.endswith('.jar') or path.endswith('.war')
-
-  def is_mappable_artifact(self, org, name, path):
-    """Subclasses can override to determine whether a given artifact represents a mappable
-    artifact."""
-    return self.is_classpath_artifact(path)
 
   def mapto_dir(self):
     """Subclasses can override to establish an isolated jar mapping directory."""

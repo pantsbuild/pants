@@ -201,15 +201,17 @@ python_tests(
   name = 'jar_create',
   sources = ['test_jar_create.py'],
   dependencies = [
-    pants(':base'),
     pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
+    pants('src/python/pants/base:source_root'),
     pants('src/python/pants/java:jar'),
     pants('src/python/pants/targets:common'),
     pants('src/python/pants/targets:java'),
     pants('src/python/pants/targets:scala'),
     pants('src/python/pants/goal:products'),
     pants('src/python/pants/tasks:jar_create'),
+    pants('tests/python/pants_test/base:context_utils'),
+    pants('tests/python/pants_test/jvm:jar_task_test_base'),
   ],
 )
 
@@ -312,4 +314,15 @@ python_tests(
     pants('src/python/pants/base:target'),
     pants('src/python/pants/tasks:what_changed'),
   ],
+)
+
+python_tests(
+  name = 'jar_task',
+  sources = ['test_jar_task.py'],
+  dependencies = [
+    pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
+    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
+    pants('src/python/pants/jvm:jar_task'),
+    pants('tests/python/pants_test/jvm:jvm_tool_task_test_base'),
+  ]
 )
