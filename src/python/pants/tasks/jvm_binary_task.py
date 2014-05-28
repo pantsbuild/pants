@@ -34,7 +34,7 @@ class JvmBinaryTask(JarTask):
     self.context.products.require('jars')
     self.context.products.require('jar_dependencies', predicate=self.is_binary)
 
-  def list_jar_dependencies(self, binary, confs=None):
+  def list_external_jar_dependencies(self, binary, confs=None):
     """Returns the external jar dependencies of the given binary.
 
     :returns: An iterable of (basedir, jarfile) tuples where the jarfile names are
@@ -83,7 +83,7 @@ class JvmBinaryTask(JarTask):
 
         if with_external_deps:
           with self.context.new_workunit(name='add-dependency-jars'):
-            for basedir, external_jar in self.list_jar_dependencies(binary):
+            for basedir, external_jar in self.list_external_jar_dependencies(binary):
               external_jar_path = os.path.join(basedir, external_jar)
               self.context.log.debug('  dumping %s' % external_jar_path)
               jar.writejar(external_jar_path)
