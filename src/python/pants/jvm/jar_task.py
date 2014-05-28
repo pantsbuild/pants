@@ -261,9 +261,10 @@ class JarTask(NailgunTask):
 
       args.append(path)
 
+      jvm_args = self.context.config.getlist('jar-tool', 'jvm_args', default=['-Xmx64M'])
       self.runjava(self.tool_classpath(self._JAR_TOOL_CLASSPATH_KEY),
                    'com.twitter.common.jar.tool.Main',
-                   jvm_options=['-Xmx64M'],
+                   jvm_options=jvm_args,
                    args=args,
                    workunit_name='jar-tool',
                    workunit_labels=[WorkUnit.TOOL, WorkUnit.JVM, WorkUnit.NAILGUN])
