@@ -13,6 +13,7 @@ from twitter.common.dirutil import safe_mkdir
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+from pants.base.workunit import WorkUnit
 from pants.fs.fs import safe_filename
 from pants.java.jar.manifest import Manifest
 from pants.jvm.jar_task import JarTask
@@ -127,24 +128,25 @@ class JarCreate(JarTask):
     def add_genjar(typename, target, name):
       self.context.products.get(typename).add(target, self.workdir).append(name)
 
-    # TODO(Tejal Desai) pantsbuild/pants/65: Avoid creating 2 jars with java sources for
-    # scala_library with java_sources. Currently publish fails fast if scala_library owning
-    # java sources pointed by java_library target also provides an artifact. However, jar_create
-    # ends up creating 2 jars one scala and other java both including the java_sources.
-    if self.jar_classes:
-      self._jar(jar_targets(is_jvm_library), functools.partial(add_genjar, 'jars'))
+    with self.context.new_workunit(name='jar-create', labels=[WorkUnit.MULTITOOL]):
+      # TODO(Tejal Desai) pantsbuild/pants/65: Avoid creating 2 jars with java sources for
+      # scala_library with java_sources. Currently publish fails fast if scala_library owning
+      # java sources pointed by java_library target also provides an artifact. However, jar_create
+      # ends up creating 2 jars one scala and other java both including the java_sources.
+      if self.jar_classes:
+        self._jar(jar_targets(is_jvm_library), functools.partial(add_genjar, 'jars'))
 
-    if self.jar_sources:
-      self.sourcejar(jar_targets(is_jvm_library), functools.partial(add_genjar, 'source_jars'))
+      if self.jar_sources:
+        self.sourcejar(jar_targets(is_jvm_library), functools.partial(add_genjar, 'source_jars'))
 
-    if self.jar_javadoc:
-      javadoc_add_genjar = functools.partial(add_genjar, 'javadoc_jars')
-      self.javadocjar(jar_targets(is_java_library),
-                      self.context.products.get(javadoc.product_type),
-                      javadoc_add_genjar)
-      self.javadocjar(jar_targets(is_scala_library),
-                      self.context.products.get(scaladoc.product_type),
-                      javadoc_add_genjar)
+      if self.jar_javadoc:
+        javadoc_add_genjar = functools.partial(add_genjar, 'javadoc_jars')
+        self.javadocjar(jar_targets(is_java_library),
+                        self.context.products.get(javadoc.product_type),
+                        javadoc_add_genjar)
+        self.javadocjar(jar_targets(is_scala_library),
+                        self.context.products.get(scaladoc.product_type),
+                        javadoc_add_genjar)
 
   @contextmanager
   def create_jar(self, target, path):
