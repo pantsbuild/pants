@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<SimpleVegetable>
+  <commonName>Broccoli</commonName>
+  <scientificName>Brassica oleracea</scientificName>
+  <colorRGB>065280</colorRGB>
+  <tasty>true</tasty>
+</SimpleVegetable>
