@@ -159,14 +159,13 @@ class BaseTest(unittest.TestCase):
      name: Name of the library target.
      sources: List of source file at the path relative to path.
      **kwargs: Optional attributes that can be set for any library target.
-       Currently it includes support for provides, resources, java_sources
+       Currently it includes support for resources and java_sources
     """
     self.create_files(path, sources)
     self.add_to_build_file(path, dedent('''
           %(target_type)s(name='%(name)s',
             sources=%(sources)s,
             %(resources)s
-            %(provides)s
             %(java_sources)s
           )
         ''' % dict(target_type=target_type,
@@ -174,12 +173,6 @@ class BaseTest(unittest.TestCase):
                    sources=repr(sources or []),
                    resources=('resources=[pants("%s")],' % kwargs.get('resources')
                               if kwargs.has_key('resources') else ''),
-                   provides=(dedent('''provides=artifact(
-                                                  org = 'com.twitter',
-                                                  name = '%s',
-                                                  repo = pants('build-support/ivy:ivy')
-                                                ),
-                                     '''% name if kwargs.has_key('provides') else '')),
                    java_sources=('java_sources=[%s]'
                                  % ','.join(map(lambda str_target: 'pants("%s")' % str_target,
                                                 kwargs.get('java_sources')))

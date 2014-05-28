@@ -25,6 +25,8 @@ class JarTaskTest(JarTaskTestBase):
     self.jar_task = self.prepare_execute(self.context(), self.workdir, JarTask)
 
   def tearDown(self):
+    super(JarTaskTest, self).tearDown()
+
     if self.workdir:
       safe_rmtree(self.workdir)
 

@@ -54,7 +54,7 @@ class Jar(object):
       :returns: The path to the source data.
       """
 
-  class FileSystemEntry(Entry,):
+  class FileSystemEntry(Entry):
     """An entry backed by an existing file on disk."""
 
     def __init__(self, src, dest=None):

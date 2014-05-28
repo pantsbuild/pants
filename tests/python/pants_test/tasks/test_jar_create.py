@@ -80,13 +80,6 @@ class JarCreateExecuteTest(JarCreateTestBase):
   def setUp(self):
     super(JarCreateExecuteTest, self).setUp()
 
-    self.add_to_build_file('build-support/ivy',
-                           dedent('''
-                               repo(name = 'ivy',
-                                    url = 'https://art.twitter.biz/',
-                                    push_db = 'dummy.pushdb')
-                             '''))
-
     def get_source_root_fs_path(path):
       return os.path.realpath(os.path.join(self.build_root, path))
 
@@ -104,7 +97,6 @@ class JarCreateExecuteTest(JarCreateTestBase):
     self.scala_lib = self.scala_library('src/scala/com/twitter/foo',
                                         'scala_foo',
                                         ['scala_foo.scala'],
-                                        provides=True,
                                         java_sources=['src/java/com/twitter/foo:java_foo'])
     self.binary = self.jvm_binary('src/java/com/twitter/baz', 'baz', source='b.java',
                                   resources='src/resources/com/twitter:spam')
