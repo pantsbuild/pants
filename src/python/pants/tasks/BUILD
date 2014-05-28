@@ -297,6 +297,7 @@ python_library(
     pants(':scaladoc_gen'),
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('src/python/pants/base:build_environment'),
+    pants('src/python/pants/base:workunit'),
     pants('src/python/pants/fs'),
     pants('src/python/pants/java:jar'),
     pants('src/python/pants/jvm:jar_task'),
