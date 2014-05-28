@@ -10,6 +10,7 @@ import re
 import signal
 import socket
 
+from pants import binary_util
 from pants.base.build_environment import get_buildroot
 from pants.base.run_info import RunInfo
 from pants.reporting.reporting_server import ReportingServer, ReportingServerManager
@@ -31,12 +32,20 @@ class RunServer(ConsoleTask):
                                  'temporarily showing build results to a colleague. The special '
                                  'value ALL means any client may connect. Use with caution, as '
                                  'your source code is exposed to all allowed clients!')
+    option_group.add_option(mkflag('open'), mkflag('open', negate=True), dest='server_open',
+                            action='callback', callback=mkflag.set_bool, default=False,
+                            help='[%default] Attempt to open the server web ui in a browser.')
 
   def console_output(self, targets):
     DONE = '__done_reporting'
 
+    def maybe_open(port):
+      if self.context.options.server_open:
+        binary_util.ui_open('http://localhost:%d' % port)
+
     port = ReportingServerManager.get_current_server_port()
     if port:
+      maybe_open(port)
       return ['Server already running at http://localhost:%d' % port]
 
     def run_server(reporting_queue):
@@ -72,8 +81,8 @@ class RunServer(ConsoleTask):
         done_reporting()
         raise
 
-    # We do reporting on behalf of the child process (necessary, since reporting may be buffered in a
-    # background thread). We use multiprocessing.Process() to spawn the child so we can use that
+    # We do reporting on behalf of the child process (necessary, since reporting may be buffered in
+    # a background thread). We use multiprocessing.Process() to spawn the child so we can use that
     # module's inter-process Queue implementation.
     reporting_queue = multiprocessing.Queue()
     proc = multiprocessing.Process(target=run_server, args=[reporting_queue])
@@ -86,6 +95,7 @@ class RunServer(ConsoleTask):
       s = reporting_queue.get()
     # The child process is done reporting, and is now in the server loop, so we can proceed.
     server_port = ReportingServerManager.get_current_server_port()
+    maybe_open(server_port)
     return ret
 
 

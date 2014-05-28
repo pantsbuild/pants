@@ -137,13 +137,12 @@ class Goal(Command):
 
     help_flags = set(['-h', '--help', 'help'])
     show_help = len(help_flags.intersection(args)) > 0
-    args = filter(lambda f: f not in help_flags, args)
+    non_help_args = filter(lambda f: f not in help_flags, args)
 
-    goals, specs = Goal.parse_args(args)
+    goals, specs = Goal.parse_args(non_help_args)
     if show_help:
       print_help(goals)
       sys.exit(0)
-
 
     self.requested_goals = goals
 
@@ -179,6 +178,8 @@ class Goal(Command):
 
       augmented_args = rcfile.apply_defaults(sections, args)
       if augmented_args != args:
+        # TODO(John Sirois): Cleanup this currently important mutation of the passed in args
+        # once the 2-layer of command -> goal is squashed into one.
         del args[:]
         args.extend(augmented_args)
         sys.stderr.write("(using pantsrc expansion: pants goal %s)\n" % ' '.join(augmented_args))
