@@ -24,7 +24,7 @@ for a likely-looking ``BUILD`` file--in this example,
 ``3rdparty/jvm/com/google/sun/jersey/BUILD``.
 
 In the appropriate ``BUILD`` file, you want to find a
-:ref:`bdict_dependencies` with a :ref:`bdict_jar` dependency:
+:ref:`bdict_jar_library` with the :ref:`bdict_jar`\s you want:
 
 .. literalinclude:: ../../../../3rdparty/jvm/com/sun/jersey/BUILD
    :start-after: LICENSE
@@ -32,8 +32,8 @@ In the appropriate ``BUILD`` file, you want to find a
 
 
 Here, the
-:ref:`bdict_dependencies` name defines a target address that other build
-targets can refer to. The :ref:`bdict_jar` dependencies refer to Jars known
+:ref:`bdict_jar_library`\s's name defines a target address that other build
+targets can refer to. The :ref:`bdict_jar`\s refer to jars known
 to your Ivy resolver.
 
 If there's already a ``jar`` importing the code you want but with a
@@ -109,10 +109,12 @@ tell Pants not to pull in its dependencies. In your ``3rdparty/.../BUILD``
 file, call the ``jar``\'s ``intransitive`` method; then carefully add
 hand-picked versions::
 
-    dependencies(name="retro-naming-factory",
-      dependencies=[
+    jar_library(name="retro-naming-factory",
+      jars=[
         jar(org='retro', name='retro-factory', rev='5.0.18').intransitive(),
-	# Don't use retro's expected (old, incompatible) common-logging
+      ],
+      dependencies=[
+        # Don't use retro's expected (old, incompatible) common-logging
         # version, yipe; use the same version we use everywhere else:
 	pants('3rdparty/jvm/common-logging'),
       ])
@@ -137,7 +139,7 @@ will be silently discarded. One way that this can occur is with dependencies tha
 to differentiate themselves. Consider this example::
 
     jar_library(name = 'stanford-corenlp',
-      dependencies = [
+      jars = [
         jar(org = 'edu.stanford.nlp', name = 'stanford-corenlp', rev = '3.3.1').with_sources(),
         jar(org = 'edu.stanford.nlp', name = 'stanford-corenlp', rev = '3.3.1', classifier='models')
       ]
@@ -145,10 +147,10 @@ to differentiate themselves. Consider this example::
 
 In the above example, the ``edu.stanford.nlp.stanford-corenlp-3.3.1-models.jar`` will be silently
 skipped by pants. To bring both jars in, use the ``.with_artifacts()`` method of the
-:ref:`bdict_jar` target. Using this method, the above example would be transformed into::
+:ref:`bdict_jar`. Using this method, the above example would be transformed into::
 
     jar_library(name = 'stanford-corenlp',
-      dependencies = [
+      jars = [
         jar(org = 'edu.stanford.nlp', name = 'stanford-corenlp', rev = '3.3.1').with_sources().with_artifact(classifier='models').with_artifact(classifier=''),
       ]
     )

@@ -112,32 +112,6 @@ This library could depend on other build targets and artifacts;
 if your code imports
 something, that implies a ``BUILD`` dependency.
 
-Depending on a Jar
-==================
-
-The `main-bin` example depends a jar, ``log4j``. Instead of compiling
-from source, Pants invokes `ivy` to fetch these jars. To reduce danger
-of version conflicts, we use the :doc:`3rdparty` idiom: we keep references
-to these "third-party" jars together in ``BUILD`` files under the
-``3rdparty/`` directory. Thus, ``main`` has dependencies:
-
-.. literalinclude:: ../../../java/com/pants/examples/hello/main/BUILD
-   :start-after: jvm_binary
-   :end-before: HelloMain.java
-
-The ``BUILD`` files in ``3rdparty/`` have targets like::
-
-    dependencies(name='log4j',
-        dependencies=[
-           jar(org='log4j', name='log4j', rev='1.2.15').with_sources()
-	     .exclude(org='jline', name='jline')
-             .exclude(org='javax.jms', name='jms')
-             .exclude(org='com.sun.jdmk', name='jmxtools')
-             .exclude(org='com.sun.jmx', name='jmxri'))
-        ])
-
-Those :ref:`jar() things <bdict_jar>` are references to public jars.
-
 A Test Target
 =============
 
@@ -151,6 +125,31 @@ need a target for them:
 
 As with other targets, this one depends on code that it imports. Thus, a typical
 test target depends on the library that it tests.
+
+Depending on a Jar
+==================
+
+The test example depends on a jar, ``junit``. Instead of compiling
+from source, Pants invokes `ivy` to fetch such jars. To reduce the danger
+of version conflicts, we use the :doc:`3rdparty` idiom: we keep references
+to these "third-party" jars together in ``BUILD`` files under the
+``3rdparty/`` directory. Thus, the test has a ``3rdparty:`` dependency:
+
+.. literalinclude:: ../../../../tests/java/com/pants/examples/hello/greet/BUILD
+   :start-after: Test the
+
+The ``BUILD`` files in ``3rdparty/`` have targets like::
+
+    jar_library(name='junit',
+                jars = [
+                  jar(org='junit', name='junit-dep', rev='4.11').with_sources(),
+                ],
+                dependencies = [
+                  pants(':hamcrest-core'),
+                ],
+               )
+
+Those :ref:`jar() things <bdict_jar>` are references to public jars.
 
 ***********************
 The Usual Commands: JVM
@@ -183,7 +182,7 @@ The Usual Commands: JVM
       ./pants goal bundle src/java/com/pants/examples/hello/main --bundle-archive=zip
 
   If your bundle is JVM, it's a zipfile which can run by means of an
-  ``unzip`` and seting your ``CLASSPATH`` to ``$BASEDIR/my_service.jar``
+  ``unzip`` and setting your ``CLASSPATH`` to ``$BASEDIR/my_service.jar``
   (where ``$BASEDIR is`` the directory you've just unzipped).
 
 **Get Help**
