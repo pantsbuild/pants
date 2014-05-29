@@ -141,14 +141,12 @@ class Task(object):
     BuildInvalidator(self._build_invalidator_dir).force_invalidate_all()
 
   @contextmanager
-  def invalidated(self, targets, only_buildfiles=False, invalidate_dependents=False,
+  def invalidated(self, targets, invalidate_dependents=False,
                   partition_size_hint=sys.maxint, silent=False, locally_changed_targets=None):
     """Checks targets for invalidation, first checking the artifact cache.
     Subclasses call this to figure out what to work on.
 
     targets:                 The targets to check for changes.
-    only_buildfiles:         If True, then only the target's BUILD files are checked for changes,
-                             not its sources.
     invalidate_dependents:   If True then any targets depending on changed targets are invalidated.
     partition_size_hint:     Each VersionedTargetSet in the yielded list will represent targets
                              containing roughly this number of source files, if possible. Set to

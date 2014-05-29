@@ -4,13 +4,17 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from glob import glob1
+import logging
+import marshal
 import os
 import re
-from glob import glob1
 
-import marshal
 from twitter.common.collections import OrderedSet
 from twitter.common.python.interpreter import PythonIdentity
+
+
+logger = logging.getLogger(__name__)
 
 
 class BuildFile(object):
@@ -156,7 +160,7 @@ class BuildFile(object):
       with open(self._bytecode_path, 'rb') as bytecode:
         try:
           return marshal.load(bytecode)
-        except Exception:
+        except Exception as e:
           logger.warn('Failed to marshall BUILD file bytecode at {_bytecode_path}.'
                       ' Exception was: {e}'
                       .format(_bytecode_path=self._bytecode_path, e=e))
