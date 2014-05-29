@@ -15,7 +15,7 @@ python_test_suite(
   name = 'engine',
   dependencies = [
     pants(':test_engine'),
-    pants(':test_group_engine'),
+    pants(':test_linear_engine'),
   ]
 )
 
@@ -30,16 +30,11 @@ python_tests(
 )
 
 python_tests(
-  name = 'test_group_engine',
-  sources = ['test_group_engine.py'],
+  name = 'test_linear_engine',
+  sources = ['test_linear_engine.py'],
   dependencies = [
     pants(':engine_test_base'),
     pants('src/python/pants/engine'),
-    pants('src/python/pants/goal'),
-    pants('src/python/pants/backend/core/tasks:check_exclusives'),
     pants('src/python/pants/backend/core/tasks:common'),
-    pants('src/python/pants/backend/python/targets:python'),
-    pants('src/python/pants/backend/jvm/targets:java'),
-    pants('src/python/pants/backend/jvm/targets:scala'),
   ],
 )

@@ -63,8 +63,8 @@ class CodeGen(Task):
   def updatedependencies(self, target, dependency):
     target.inject_dependency(dependency.address)
 
-  def execute(self, targets):
-    gentargets = [t for t in targets if self.is_gentarget(t)]
+  def execute(self):
+    gentargets = self.context.targets(self.is_gentarget)
     capabilities = self.genlangs() # lang_name => predicate
     gentargets_by_dependee = self.context.dependents(
       on_predicate=self.is_gentarget,
@@ -105,7 +105,8 @@ class CodeGen(Task):
       # Link synthetic targets for all in-play gen targets.
       invalid_vts_by_target = dict([(vt.target, vt) for vt in invalidation_check.invalid_vts])
       vts_artifactfiles_pairs = []
-      write_to_artifact_cache = self.artifact_cache_writes_enabled() if invalid_vts_by_target else False
+      write_to_artifact_cache = (self.artifact_cache_writes_enabled() if invalid_vts_by_target
+                                 else False)
       for lang, tgts in gentargets_bylang.items():
         if tgts:
           langtarget_by_gentarget = {}

@@ -45,7 +45,8 @@ class Provides(Task):
     #   configurations=self.confs)
     # context.products.require('jars')
 
-  def execute(self, targets):
+  def execute(self):
+    targets = self.context.targets()
     for conf in self.confs:
       outpath = os.path.join(self.workdir, '%s.%s.provides' %
                              (self.ivy_utils.identify(targets)[1], conf))

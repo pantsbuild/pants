@@ -18,7 +18,7 @@ class BootstrapJvmTools(Task, IvyTaskMixin):
     super(BootstrapJvmTools, self).__init__(context, workdir)
     context.products.require_data('jvm_build_tools')
 
-  def execute(self, targets):
+  def execute(self):
     context = self.context
     if context.products.is_required_data('jvm_build_tools_classpath_callbacks'):
       tool_product_map = context.products.get_data('jvm_build_tools') or {}

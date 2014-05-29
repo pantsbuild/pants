@@ -83,14 +83,15 @@ class PathFinder(ConsoleTask):
 
 
 class Path(PathFinder):
-  def execute(self, targets):
+  def execute(self):
     if len(self.target_roots) != 2:
       raise TaskError('Specify two targets please (found %d)' % len(self.target_roots))
 
     self._find_path(self.target_roots[0], self.target_roots[1], self.log)
 
+
 class Paths(PathFinder):
-  def execute(self, targets):
+  def execute(self):
     if len(self.target_roots) != 2:
       raise TaskError('Specify two targets please (found %d)' % len(self.target_roots))
 

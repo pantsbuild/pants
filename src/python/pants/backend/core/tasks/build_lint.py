@@ -44,7 +44,7 @@ class BuildLint(Task):
     if not self.actions:
       self.actions.add('diff')
 
-  def execute(self, targets):
+  def execute(self):
     # Map from buildfile path to map of target name -> missing deps for that target.
     buildfile_paths = defaultdict(lambda: defaultdict(list))
     genmap_trans = self.context.products.get('missing_deps')
@@ -56,6 +56,7 @@ class BuildLint(Task):
       buildfile_paths[target.address.buildfile.full_path][target.name] += missing_deps
 
     if self.transitive:
+      targets = self.context.targets()
       for target in targets:
         add_buildfile_for_target(target, genmap_trans)
         if self.include_intransitive:

@@ -115,7 +115,7 @@ class JvmToolTaskTestBase(BaseTest):
     # TODO(John Sirois): This is emulating Engine behavior - construct reverse order, then execute;
     # instead it should probably just be using an Engine.
     task = task_type(context, workdir)
-    BootstrapJvmTools(context, workdir).execute(context.targets())
+    BootstrapJvmTools(context, workdir).execute()
     return task
 
   def execute(self, context, workdir, task_type):
@@ -127,4 +127,4 @@ class JvmToolTaskTestBase(BaseTest):
     # TODO(John Sirois): This is emulating Engine behavior - construct reverse order, then execute;
     # instead it should probably just be using an Engine.
     task = self.prepare_execute(context, workdir, task_type)
-    task.execute(context.targets())
+    task.execute()

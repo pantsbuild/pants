@@ -34,8 +34,10 @@ python_test_suite(
     pants(':depmap'),
     pants(':filemap'),
     pants(':filter'),
+    pants(':group_task'),
     pants(':jar_create'),
     pants(':jar_publish'),
+    pants(':jar_task'),
     pants(':listtargets'),
     pants(':minimal_cover'),
     pants(':protobuf_gen'),
@@ -365,5 +367,17 @@ python_tests(
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('src/python/pants/backend/jvm/tasks:jar_task'),
     pants('tests/python/pants_test/jvm:jvm_tool_task_test_base'),
+  ]
+)
+
+python_tests(
+  name = 'group_task',
+  sources = ['test_group_task.py'],
+  dependencies = [
+    pants('src/python/pants/targets:java'),
+    pants('src/python/pants/targets:python'),
+    pants('src/python/pants/targets:scala'),
+    pants('src/python/pants/tasks:group_task'),
+    pants('tests/python/pants_test:base_test'),
   ]
 )

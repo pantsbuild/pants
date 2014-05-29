@@ -23,7 +23,7 @@ class JarPublishTest(BaseTest):
                         build_graph=self.build_graph,
                         build_file_parser=self.build_file_parser)
     task.scm = Mock()
-    task.execute([])
+    task.execute()
 
   def test_publish_local_only(self):
     with pytest.raises(TaskError) as exc:

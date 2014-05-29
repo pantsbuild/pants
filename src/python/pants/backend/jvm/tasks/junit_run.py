@@ -496,6 +496,7 @@ class JUnitRun(JvmTask, JvmToolTaskMixin):
       self._runner = _JUnitRunner(task_exports, self._context)
 
 
-  def execute(self, targets):
+  def execute(self):
     if not self._context.options.junit_run_skip:
+      targets = self.context.targets()
       self._runner.execute(targets)

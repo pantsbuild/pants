@@ -446,7 +446,7 @@ class JarPublish(Task, ScmPublish):
     context.products.require('jars')
     context.products.require('source_jars')
 
-  def execute(self, targets):
+  def execute(self):
     self.check_clean_master(commit=(not self.dryrun and self.commit))
 
     exported_targets = self.exported_targets()

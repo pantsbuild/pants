@@ -68,7 +68,7 @@ class BenchmarkRun(JvmTask, JvmToolTaskMixin):
 
     self.caliper_args.extend(context.options.extra_caliper_args)
 
-  def execute(self, targets):
+  def execute(self):
     # For rewriting JDK classes to work, the JAR file has to be listed specifically in
     # the JAR manifest as something that goes in the bootclasspath.
     # The MANIFEST list a jar 'allocation.jar' this is why we have to rename it
@@ -83,6 +83,7 @@ class BenchmarkRun(JvmTask, JvmToolTaskMixin):
 
     benchmark_tools_classpath = self.tool_classpath(self._benchmark_bootstrap_key)
 
+    targets = self.context.targets()
     classpath = self.classpath(benchmark_tools_classpath,
                                confs=self.confs,
                                exclusives_classpath=self.get_base_classpath_for_target(targets[0]))

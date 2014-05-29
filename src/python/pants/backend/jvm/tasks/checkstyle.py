@@ -24,7 +24,7 @@ class Checkstyle(NailgunTask, JvmToolTaskMixin):
 
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
-    NailgunTask.setup_parser(option_group, args, mkflag)
+    super(Checkstyle, cls).setup_parser(option_group, args, mkflag)
 
     option_group.add_option(mkflag("skip"), mkflag("skip", negate=True),
                             dest="checkstyle_skip", default=False,
@@ -45,10 +45,10 @@ class Checkstyle(NailgunTask, JvmToolTaskMixin):
     self._confs = context.config.getlist('checkstyle', 'confs', default=['default'])
     self.context.products.require_data('exclusives_groups')
 
-  def execute(self, targets):
+  def execute(self):
     if self.context.options.checkstyle_skip:
       return
-    targets = filter(Checkstyle._is_checked, targets)
+    targets = self.context.targets(self._is_checked)
     with self.invalidated(targets) as invalidation_check:
       invalid_targets = []
       for vt in invalidation_check.invalid_vts:

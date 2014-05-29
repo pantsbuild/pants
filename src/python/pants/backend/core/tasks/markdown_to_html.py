@@ -98,7 +98,7 @@ class MarkdownToHtml(Task):
       if context.options.markdown_to_html_code_style:
         self.code_style = context.options.markdown_to_html_code_style
 
-  def execute(self, targets):
+  def execute(self):
     # TODO(John Sirois): consider adding change detection
 
     css_relpath = os.path.join('css', 'codehighlight.css')
@@ -125,7 +125,7 @@ class MarkdownToHtml(Task):
     plaingenmap = self.context.products.get('markdown_html')
     wikigenmap = self.context.products.get('wiki_html')
     show = []
-    for page in filter(is_page, targets):
+    for page in self.context.targets(is_page):
       _, ext = os.path.splitext(page.source)
       if ext in self.extensions:
         def process_page(key, outdir, url_builder, config, genmap, fragment=False):

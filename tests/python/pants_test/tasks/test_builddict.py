@@ -24,7 +24,7 @@ class BaseBuildBuildDictionaryTest(TaskTest):
   def execute_task(self, config=sample_ini_test_1):
     with closing(StringIO()) as output:
       task = prepare_task(BuildBuildDictionary, config=config)
-      task.execute(())
+      task.execute()
       return output.getvalue()
 
 

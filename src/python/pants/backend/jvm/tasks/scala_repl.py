@@ -36,7 +36,7 @@ class ScalaRepl(JvmTask, JvmToolTaskMixin):
       for arg in context.options.run_args:
         self.args.extend(shlex.split(arg))
 
-  def execute(self, targets):
+  def execute(self):
     # The repl session may last a while, allow concurrent pants activity during this pants idle
     # period.
     tools_classpath = self.tool_classpath(self._bootstrap_key)
@@ -44,6 +44,7 @@ class ScalaRepl(JvmTask, JvmToolTaskMixin):
     self.context.lock.release()
     self.save_stty_options()
 
+    targets = self.context.targets()
     classpath = self.classpath(tools_classpath,
                                confs=self.confs,
                                exclusives_classpath=self.get_base_classpath_for_target(targets[0]))

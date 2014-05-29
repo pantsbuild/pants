@@ -23,11 +23,12 @@ class PrepareResources(Task):
     self.confs = context.config.getlist('prepare-resources', 'confs', default=['default'])
     self.context.products.require_data('exclusives_groups')
 
-  def execute(self, targets):
+  def execute(self):
     if self.context.products.is_required_data('resources_by_target'):
       self.context.products.safe_create_data('resources_by_target',
                                              lambda: defaultdict(MultipleRootedProducts))
 
+    targets = self.context.targets()
     if len(targets) == 0:
       return
     def extract_resources(target):

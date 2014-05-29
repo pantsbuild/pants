@@ -24,28 +24,29 @@ from pants.reporting.reporting_utils import items_to_report_element
 from pants.backend.core.tasks.task import Task
 from pants.backend.jvm.tasks.jvm_compile.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
+from pants.tasks.group_task import GroupMember
 
 
-class JvmCompile(NailgunTask, JvmToolTaskMixin):
+class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
   """A common framework for JVM compilation.
 
   To subclass for a specific JVM language, implement the static values and methods
   mentioned below under "Subclasses must implement".
   """
 
-  @staticmethod
-  def setup_parser(subcls, option_group, args, mkflag):
-    NailgunTask.setup_parser(option_group, args, mkflag)
+  @classmethod
+  def setup_parser(cls, option_group, args, mkflag):
+    super(JvmCompile, cls).setup_parser(option_group, args, mkflag)
 
     option_group.add_option(mkflag('warnings'), mkflag('warnings', negate=True),
-                            dest=subcls._language + '_compile_warnings',
+                            dest=cls._language + '_compile_warnings',
                             default=True,
                             action='callback',
                             callback=mkflag.set_bool,
                             help='[%default] Compile with all configured warnings enabled.')
 
     option_group.add_option(mkflag('partition-size-hint'),
-                            dest=subcls._language + '_partition_size_hint',
+                            dest=cls._language + '_partition_size_hint',
                             action='store',
                             type='int',
                             default=-1,
@@ -54,21 +55,21 @@ class JvmCompile(NailgunTask, JvmToolTaskMixin):
                                  'to 0 to compile target-by-target. Default is set in pants.ini.')
 
     option_group.add_option(mkflag('missing-deps'),
-                            dest=subcls._language + '_missing_deps',
+                            dest=cls._language + '_missing_deps',
                             choices=['off', 'warn', 'fatal'],
                             default='warn',
                             help='[%default] One of off, warn, fatal. '
-                                 'Check for missing dependencies in ' + subcls._language + 'code. '
+                                 'Check for missing dependencies in ' + cls._language + 'code. '
                                  'Reports actual dependencies A -> B where there is no '
                                  'transitive BUILD file dependency path from A to B.'
                                  'If fatal, missing deps are treated as a build error.')
 
     option_group.add_option(mkflag('missing-direct-deps'),
-                            dest=subcls._language + '_missing_direct_deps',
+                            dest=cls._language + '_missing_direct_deps',
                             choices=['off', 'warn', 'fatal'],
                             default='off',
                             help='[%default] One of off, warn, fatal. '
-                                 'Check for missing direct dependencies in ' + subcls._language +
+                                 'Check for missing direct dependencies in ' + cls._language +
                                  ' code. Reports actual dependencies A -> B where there is no '
                                  'direct BUILD file dependency path from A to B. This is a very '
                                  'strict check, as in practice it is common to rely on transitive, '
@@ -79,17 +80,17 @@ class JvmCompile(NailgunTask, JvmToolTaskMixin):
                                  'these.')
 
     option_group.add_option(mkflag('unnecessary-deps'),
-                            dest=subcls._language + '_unnecessary_deps',
+                            dest=cls._language + '_unnecessary_deps',
                             choices=['off', 'warn', 'fatal'],
                             default='off',
                             help='[%default] One of off, warn, fatal. Check for declared '
-                                 'dependencies in ' + subcls._language + ' code that are not '
+                                 'dependencies in ' + cls._language + ' code that are not '
                                  'needed. This is a very strict check. For example, generated code '
                                  'will often legitimately have BUILD dependencies that are unused '
                                  'in practice.')
 
     option_group.add_option(mkflag('delete-scratch'), mkflag('delete-scratch', negate=True),
-                            dest=subcls._language + '_delete_scratch',
+                            dest=cls._language + '_delete_scratch',
                             default=True,
                             action='callback',
                             callback=mkflag.set_bool,
@@ -101,6 +102,13 @@ class JvmCompile(NailgunTask, JvmToolTaskMixin):
   _language = None
   _file_suffix = None
   _config_section = None
+
+  @classmethod
+  def name(cls):
+    return cls._language
+
+  def select(self, target):
+    return target.has_sources(self._file_suffix)
 
   def create_analysis_tools(self):
     """Returns an AnalysisTools implementation.
@@ -242,9 +250,6 @@ class JvmCompile(NailgunTask, JvmToolTaskMixin):
     # Generated lazily, so do not access directly. Call self._get_deleted_sources().
     self._lazy_deleted_sources = None
 
-  def product_type(self):
-    return 'classes'
-
   def move(self, src, dst):
     if self._delete_scratch:
       shutil.move(src, dst)
@@ -253,14 +258,12 @@ class JvmCompile(NailgunTask, JvmToolTaskMixin):
 
   # TODO(benjy): Break this monstrosity up? Previous attempts to do so
   #              turned out to be more trouble than it was worth.
-  def execute(self, targets):
+  def execute_chunk(self, relevant_targets):
     # TODO(benjy): Add a pre-execute phase for injecting deps into targets, so e.g.,
     # we can inject a dep on the scala runtime library and still have it ivy-resolve.
 
     # In case we have no relevant targets and return early.
     self._create_empty_products()
-
-    relevant_targets = [t for t in targets if t.has_sources(self._file_suffix)]
 
     if not relevant_targets:
       return

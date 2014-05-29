@@ -96,7 +96,8 @@ class CheckExclusives(Task):
         conflicting_keys[k] = exclusives_map[k]
     return conflicting_keys
 
-  def execute(self, targets):
+  def execute(self):
+    targets = self.context.targets()
     # compute transitive exclusives
     for t in targets:
       t._propagate_exclusives()

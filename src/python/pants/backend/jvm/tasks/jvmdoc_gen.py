@@ -112,7 +112,7 @@ class JvmdocGen(Task):
   def invalidate_for(self):
     return self.combined, self.transitive, self.workdir, self.confs, self._include_codegen
 
-  def generate_execute(self, targets, language_predicate, create_jvmdoc_command):
+  def generate_execute(self, language_predicate, create_jvmdoc_command):
     """
     Generate an execute method given a language predicate and command to create documentation
 
@@ -129,6 +129,7 @@ class JvmdocGen(Task):
       def docable(target):
         return language_predicate(target) and (self._include_codegen or not target.is_codegen)
 
+      targets = self.context.targets()
       with self.invalidated(filter(docable, targets)) as invalidation_check:
         safe_mkdir(self.workdir)
         with self.context.state('classpath', []) as cp:

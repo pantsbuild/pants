@@ -6,19 +6,18 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import itertools
 import os
-import shutil
 import sys
 import threading
-from collections import defaultdict
+
+from abc import abstractmethod
 from contextlib import contextmanager
 
 from twitter.common.collections.orderedset import OrderedSet
+from twitter.common.lang import AbstractClass
 
 from pants.base.build_invalidator import BuildInvalidator, CacheKeyGenerator
-from pants.base.cache_manager import (InvalidationCacheManager, InvalidationCheck,
-                                      VersionedTargetSet)
+from pants.base.cache_manager import (InvalidationCacheManager, InvalidationCheck)
 from pants.base.config import Config
-from pants.base.exceptions import TaskError
 from pants.base.hash_utils import hash_file
 from pants.base.worker_pool import Work
 from pants.base.workunit import WorkUnit
@@ -27,7 +26,7 @@ from pants.cache.read_write_artifact_cache import ReadWriteArtifactCache
 from pants.reporting.reporting_utils import items_to_report_element
 
 
-class Task(object):
+class TaskBase(AbstractClass):
 
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
@@ -57,6 +56,9 @@ class Task(object):
   @property
   def workdir(self):
     return self._workdir
+
+  def prepare(self):
+    """TODO(John Sirois): doc me"""
 
   def setup_artifact_cache_from_config(self, config_section=None):
     """Subclasses can call this in their __init__() to set up artifact caching for that task type.
@@ -113,10 +115,6 @@ class Task(object):
     they both have the same product type.
     """
     return self.__class__.__name__
-
-  def execute(self, targets):
-    """Executes this task against targets, which may be a subset of the current context targets."""
-    raise TaskError('execute() not implemented')
 
   def invalidate_for(self):
     """Provides extra objects that participate in invalidation.
@@ -331,3 +329,9 @@ class Task(object):
       prefix,
       items_to_report_element([t.address.reference() for t in targets], 'target'),
       suffix)
+
+
+class Task(TaskBase):
+  @abstractmethod
+  def execute(self):
+    """Executes this task."""

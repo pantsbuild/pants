@@ -90,6 +90,8 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
 
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
+    super(ScroogeGen, cls).setup_parser(option_group, args, mkflag)
+
     option_group.add_option(mkflag('quiet'), dest='scrooge_gen_quiet',
                             action='callback', callback=mkflag.set_bool, default=None,
                             help='[%default] Suppress output, overrides verbose flag in pants.ini.')
@@ -119,7 +121,8 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
   def _outdir(self, partial_cmd):
     return os.path.join(self.workdir, partial_cmd.relative_outdir)
 
-  def execute(self, targets):
+  def execute(self):
+    targets = self.context.targets()
     self._validate_compiler_configs(targets)
 
     gentargets_by_dependee = self.context.dependents(

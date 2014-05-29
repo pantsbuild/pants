@@ -1,0 +1,242 @@
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
+
+import os
+
+from abc import abstractmethod, abstractproperty
+from collections import defaultdict
+
+from twitter.common.collections import OrderedSet
+
+from pants.base.build_graph import coalesce_targets
+from pants.base.workunit import WorkUnit
+from pants.goal import Mkflag
+from pants.tasks.task import Task, TaskBase
+from pants.tasks.check_exclusives import ExclusivesMapping
+
+
+class GroupMember(TaskBase):
+  @classmethod
+  def name(cls):
+    """Returns a name for this group for display purposes.
+
+    By default returns the GroupMember subtype's class name.
+    """
+    return cls.__name__
+
+  @abstractmethod
+  def select(self, target):
+    """Return ``True`` to claim the target for processing."""
+
+  def prepare_execute(self, chunks):
+    """Prepare to execute the group action across the given chunks.
+
+    Chunks are guaranteed to be presented in least dependent to most dependent order and to contain
+    only directly or indirectly invalidated targets.
+
+    By default no preparation is done.
+    """
+
+  @abstractmethod
+  def execute_chunk(self, targets):
+    """Process the targets in this chunk.
+
+    This chunk or targets' dependencies are guaranteed to have been processed in a prior
+    ``execute_chunk`` round by some group member - possibly this one.
+    """
+
+  def post_execute(self):
+    """Called when all invalid targets claimed by the group have been processed.
+
+    By default no post processing is done.
+    """
+
+
+class GroupIterator(object):
+  """Iterates the goals in a group over the chunks they own,"""
+
+  def __init__(self, targets, group_members):
+    """Creates an iterator that yields tuples of ``(GroupMember, [chunk Targets])``.
+
+    Chunks will be returned least dependant to most dependant such that a group member processing a
+    chunk can be assured that any dependencies of the chunk have been processed already.
+
+    :param list targets: The universe of targets to divide up amongst group members.
+    :param list group_members: A list of group members that forms the group to iterate.
+    """
+    self._targets = targets
+    self._group_members = group_members
+
+  def __iter__(self):
+    for group_member, chunk in self._create_chunks():
+      yield group_member, chunk
+
+  def _create_chunks(self):
+    def discriminator(tgt):
+      for member in self._group_members:
+        if member.select(tgt):
+          return member
+      return None
+
+    coalesced = coalesce_targets(self._targets, discriminator)
+    coalesced = list(reversed(coalesced))
+
+    chunks = []
+    group_member = None
+    chunk_start = 0
+    for chunk_num, target in enumerate(coalesced):
+      target_group_member = discriminator(target)
+      if target_group_member != group_member and chunk_num > chunk_start:
+        chunks.append((group_member, coalesced[chunk_start:chunk_num]))
+        chunk_start = chunk_num
+      group_member = target_group_member
+    if chunk_start < len(coalesced):
+      chunks.append((group_member, coalesced[chunk_start:]))
+    return chunks
+
+
+class ExclusivesIterator(object):
+  """Iterates over groups of compatible targets."""
+
+  @classmethod
+  def from_context(cls, context):
+    exclusives = context.products.get_data('exclusives_groups')
+    return cls(exclusives)
+
+  def __init__(self, exclusives_mapping):
+    """Creates an iterator that yields lists of compatible targets.``.
+
+    Chunks will be returned in least exclusive to most exclusive order.
+
+    :param exclusives_mapping: An ``ExclusivesMapping`` that contains the exclusive chunked targets
+      to iterate.
+    """
+    if not isinstance(exclusives_mapping, ExclusivesMapping):
+      raise ValueError('An ExclusivesMapping is required, given %s of type %s'
+                       % (exclusives_mapping, type(exclusives_mapping)))
+    self._exclusives_mapping = exclusives_mapping
+
+  def __iter__(self):
+    sorted_excl_group_keys = self._exclusives_mapping.get_ordered_group_keys()
+    for excl_group_key in sorted_excl_group_keys:
+      yield self._exclusives_mapping.get_targets_for_group_key(excl_group_key)
+
+
+class GroupTask(Task):
+  _GROUPS = dict()
+
+  @classmethod
+  def named(cls, name, product_type, flag_namespace=None):
+    """DOC ME"""
+    group_task = cls._GROUPS.get(name)
+    if not group_task:
+      class SingletonGroupTask(GroupTask):
+        _MEMBER_TYPES = []
+
+        @classmethod
+        def setup_parser(cls, option_group, args, mkflag):
+          base_namespace = flag_namespace or mkflag.namespace
+          for member_type in cls._member_types():
+            member_namespace = base_namespace + [member_type.name()]
+            mkflag = Mkflag(*member_namespace)
+            member_type.setup_parser(option_group, args, mkflag)
+
+        @classmethod
+        def product_type(cls):
+          return product_type
+
+        @property
+        def group_name(self):
+          return name
+
+      group_task = SingletonGroupTask
+      cls._GROUPS[name] = group_task
+
+    if group_task.product_type() != product_type:
+      raise ValueError('The group %r was already registered with product type: %r - refusing to '
+                       'overwrite with new product type: %r' % (name, group_task.product_type(),
+                                                                product_type))
+
+    return group_task
+
+  @classmethod
+  def _member_types(cls):
+    member_types = getattr(cls, '_MEMBER_TYPES')
+    if member_types is None:
+      raise TypeError('New GroupTask types must be created via GroupTask.named.')
+    return member_types
+
+  @classmethod
+  def add_member(cls, group_member):
+    """DOC ME"""
+    if not issubclass(group_member, GroupMember):
+      raise ValueError('Only GroupMember subclasses can join a GroupTask, '
+                       'given %s of type %s' % (group_member, type(group_member)))
+
+    cls._member_types().append(group_member)
+
+  def __init__(self, context, workdir):
+    super(GroupTask, self).__init__(context, workdir)
+
+    self._group_members = []
+
+  @abstractmethod
+  def product_type(self):
+    """GroupTask must be sub-classed to provide a product type."""
+
+  @abstractproperty
+  def group_name(self):
+    """GroupTask must be sub-classed to provide a group name."""
+
+  def prepare(self):
+    for member_type in self._member_types():
+      group_member = member_type(self.context, os.path.join(self.workdir, member_type.name()))
+      group_member.prepare()
+      self._group_members.append(group_member)
+
+  def execute(self):
+    with self.context.new_workunit(name=self.group_name, labels=[WorkUnit.GROUP]):
+      # TODO(John Sirois): implement group-level invalidation? This might be able to be done in
+      # prepare_execute though by members.
+
+      # First, divide the set of all targets to be built into compatible chunks, based
+      # on their declared exclusives. Then, for each chunk of compatible exclusives, do
+      # further sub-chunking. At the end, we'll have a list of chunks to be built,
+      # which will go through the chunks of each exclusives-compatible group separately.
+
+      # TODO(markcc); chunks with incompatible exclusives require separate ivy resolves.
+      # Either interleave the ivy task in this group so that it runs once for each batch of
+      # chunks with compatible exclusives, or make the compilation tasks do their own ivy
+      # resolves for each batch of targets they're asked to compile.
+
+      ordered_chunks = []
+      chunks_by_member = defaultdict(list)
+
+      # TODO(John Sirois): GroupTask is currently dependent on CheckExclusives but this
+      # is wired indirectly in register.py.  Kill the dependency and push the exclusives bit
+      # into the GroupMembers that need it or else find a clean way to programatically depend
+      # on CheckExclusives.
+      for exclusive_chunk in ExclusivesIterator.from_context(self.context):
+        for group_member, chunk in GroupIterator(exclusive_chunk, self._group_members):
+          ordered_chunks.append((group_member, chunk))
+          chunks_by_member[group_member].append(chunk)
+
+      self.context.log.debug('::: created chunks(%d)' % len(ordered_chunks))
+      for i, (group_member, goal_chunk) in enumerate(ordered_chunks):
+        self.context.log.debug('  chunk(%d) [flavor=%s]:\n\t%s' % (
+            i, group_member.name(), '\n\t'.join(sorted(map(str, goal_chunk)))))
+
+      # prep
+      for group_member, chunks in chunks_by_member.items():  # needs an ordering discipline?
+        group_member.prepare_execute(chunks)
+
+      # chunk zig zag
+      for group_member, chunk in ordered_chunks:
+        group_member.execute_chunk(chunk)
+
+      # finalize
+      for group_member in self._group_members:
+        group_member.post_execute()

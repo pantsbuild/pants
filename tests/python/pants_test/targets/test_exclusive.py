@@ -36,7 +36,7 @@ class ExclusivesTargetTest(BaseTest):
     context.products.require_data('exclusives_groups')
     with temporary_dir() as workdir:
       check_exclusives_task = CheckExclusives(context, workdir, signal_error=True)
-      check_exclusives_task.execute([a, b, c, d])
+      check_exclusives_task.execute()
     egroups = context.products.get_data('exclusives_groups')
     self.assertEquals(egroups.get_targets_for_group_key("a=1"), set([a, b, d]))
     self.assertEquals(egroups.get_targets_for_group_key("a=2"), set([c]))

@@ -20,7 +20,7 @@ class ScalaCompile(JvmCompile):
 
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
-    JvmCompile.setup_parser(ScalaCompile, option_group, args, mkflag)
+    super(ScalaCompile, cls).setup_parser(option_group, args, mkflag)
 
     option_group.add_option(mkflag('plugins'), dest='plugins', default=None,
       action='append', help='Use these scalac plugins. Default is set in pants.ini.')

@@ -54,7 +54,7 @@ class JavaCompile(JvmCompile):
 
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
-    JvmCompile.setup_parser(JavaCompile, option_group, args, mkflag)
+    super(JavaCompile, cls).setup_parser(option_group, args, mkflag)
 
     option_group.add_option(mkflag("args"), dest="java_compile_args", action="append",
                             help="Pass these extra args to javac.")

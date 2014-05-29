@@ -59,8 +59,10 @@ class SpecsRun(JvmTask, JvmToolTaskMixin):
 
     self.tests = context.options.specs_run_tests
 
-  def execute(self, targets):
+  def execute(self):
     if not self.skip:
+      targets = self.context.targets()
+
       def run_tests(tests):
         args = ['--color'] if self.color else []
         args.append('--specs=%s' % ','.join(tests))

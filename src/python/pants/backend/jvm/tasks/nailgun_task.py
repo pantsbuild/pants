@@ -12,11 +12,11 @@ from pants.java.distribution import Distribution
 from pants.java.executor import SubprocessExecutor
 from pants.java.nailgun_executor import NailgunExecutor
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
-from pants.backend.core.tasks.task import Task
+from pants.backend.core.tasks.task import Task, TaskBase
 from pants.backend.core.tasks.console_task import ConsoleTask
 
 
-class NailgunTask(Task, JvmToolTaskMixin):
+class NailgunTaskBase(TaskBase, JvmToolTaskMixin):
 
   _DAEMON_OPTION_PRESENT = False
 
@@ -36,15 +36,15 @@ class NailgunTask(Task, JvmToolTaskMixin):
 
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
-    if not NailgunTask._DAEMON_OPTION_PRESENT:
+    if not NailgunTaskBase._DAEMON_OPTION_PRESENT:
       option_group.parser.add_option("--ng-daemons", "--no-ng-daemons", dest="nailgun_daemon",
                                      default=True, action="callback", callback=mkflag.set_bool,
                                      help="[%default] Use nailgun daemons to execute java tasks.")
-      NailgunTask._DAEMON_OPTION_PRESENT = True
+      NailgunTaskBase._DAEMON_OPTION_PRESENT = True
 
   def __init__(self, context, workdir, minimum_version=None, maximum_version=None, jdk=False,
                nailgun_name=None):
-    super(NailgunTask, self).__init__(context, workdir)
+    super(NailgunTaskBase, self).__init__(context, workdir)
     self._executor_workdir = os.path.join(context.config.getdefault('pants_workdir'), 'ng',
                                           nailgun_name or self.__class__.__name__)
     self._nailgun_bootstrap_key = 'nailgun'
@@ -100,6 +100,11 @@ class NailgunTask(Task, JvmToolTaskMixin):
       raise TaskError(e)
 
 
+class NailgunTask(NailgunTaskBase, Task):
+  # TODO(John Sirois): This just prevents ripple - maybe inline
+  pass
+
+
 class NailgunKillall(ConsoleTask):
   """A task to manually kill nailguns."""
   @classmethod
@@ -110,5 +115,5 @@ class NailgunKillall(ConsoleTask):
                             help="[%default] Kill all nailguns servers launched by pants for "
                                  "all workspaces on the system.")
 
-  def execute(self, targets):
-    NailgunTask.killall(everywhere=self.context.options.ng_killall_everywhere)
+  def execute(self):
+    NailgunTaskBase.killall(everywhere=self.context.options.ng_killall_everywhere)

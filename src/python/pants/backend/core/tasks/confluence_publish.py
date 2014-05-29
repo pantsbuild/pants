@@ -65,8 +65,9 @@ class ConfluencePublish(Task):
   def api(self):
     return 'confluence1'
 
-  def execute(self, targets):
+  def execute(self):
     pages = []
+    targets = self.context.targets()
     for target in targets:
       if isinstance(target, Page):
         wikiconfig = target.wiki_config(self.wiki())

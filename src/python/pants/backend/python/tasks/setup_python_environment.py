@@ -42,7 +42,7 @@ class SetupPythonEnvironment(Task):
     self._cache = PythonInterpreterCache(context.config, logger=context.log.debug)
     super(SetupPythonEnvironment, self).__init__(context, workdir)
 
-  def execute(self, _):
+  def execute(self):
     ifilters = self.context.options.python_interpreter
     self._cache.setup(force=self.context.options.python_setup_force,
         paths=self.context.options.python_setup_paths,
