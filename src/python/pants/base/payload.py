@@ -111,9 +111,9 @@ class JvmTargetPayload(SourcesMixin, Payload):
     hasher.update(sources_hash)
     if self.provides:
       hasher.update(bytes(hash(self.provides)))
-    for exclude in self.excludes:
+    for exclude in sorted(self.excludes):
       hasher.update(bytes(hash(exclude)))
-    for config in self.configurations:
+    for config in sorted(self.configurations):
       hasher.update(config)
     return hasher.hexdigest()
 

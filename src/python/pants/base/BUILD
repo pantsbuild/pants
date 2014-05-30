@@ -121,6 +121,11 @@ python_library(
 )
 
 python_library(
+  name = 'fingerprint_strategy',
+  sources = ['fingerprint_strategy.py'],
+)
+
+python_library(
   name = 'generator',
   sources = ['generator.py'],
   dependencies = [
@@ -202,6 +207,7 @@ python_library(
     pants(':address'),
     pants(':build_environment'),
     pants(':build_manual'),
+    pants(':fingerprint_strategy'),
     pants(':hash_utils'),
     pants(':source_root'),
     pants('3rdparty/python/twitter/commons:twitter.common.collections'),

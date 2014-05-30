@@ -5,15 +5,38 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 from collections import defaultdict
+from hashlib import sha1
 import os
 import shutil
 import threading
 
+from pants.backend.jvm.ivy_utils import IvyUtils
+from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.cache_manager import (InvalidationCacheManager, InvalidationCheck,
                                       VersionedTargetSet)
+from pants.base.fingerprint_strategy import FingerprintStrategy
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.java.executor import Executor
-from pants.backend.jvm.ivy_utils import IvyUtils
+
+
+class IvyResolveFingerprintStrategy(FingerprintStrategy):
+  @classmethod
+  def name(cls):
+    return 'ivy_resolve'
+
+  def compute_fingerprint(self, target):
+    if isinstance(target, JarLibrary):
+      return target.payload.invalidation_hash()
+    elif isinstance(target, JvmTarget):
+      hasher = sha1()
+      for exclude in sorted(target.payload.excludes):
+        hasher.update(bytes(repr(exclude)))
+      for config in sorted(target.payload.configurations):
+        hasher.update(config)
+      return hasher.hexdigest()
+    else:
+      return sha1().hexdigest()
 
 
 class IvyTaskMixin(object):
@@ -33,7 +56,7 @@ class IvyTaskMixin(object):
     ivy = Bootstrapper.default_ivy(java_executor=executor,
                                    bootstrap_workunit_factory=self.context.new_workunit)
 
-    targets = set(targets)
+    targets = set([target for target in targets if isinstance(target, (JvmTarget, JarLibrary))])
 
     if not targets:
       return []
@@ -43,9 +66,12 @@ class IvyTaskMixin(object):
                          options=self.context.options,
                          log=self.context.log)
 
+    fingerprint_strategy = IvyResolveFingerprintStrategy()
+
     with self.invalidated(targets,
                           invalidate_dependents=True,
-                          silent=silent) as invalidation_check:
+                          silent=silent,
+                          fingerprint_strategy=fingerprint_strategy) as invalidation_check:
       global_vts = VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
       target_workdir = os.path.join(ivy_workdir, global_vts.cache_key.hash)
       target_classpath_file = os.path.join(target_workdir, 'classpath')

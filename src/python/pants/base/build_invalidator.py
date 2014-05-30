@@ -68,23 +68,25 @@ class CacheKeyGenerator(object):
     self._cache_key_gen_version = '_'.join([cache_key_gen_version or '',
                                             GLOBAL_CACHE_KEY_GEN_VERSION])
 
-  def key_for_target(self, target, transitive=False):
+  def key_for_target(self, target, transitive=False, fingerprint_strategy=None):
     """Get a key representing the given target and its sources.
 
     A key for a set of targets can be created by calling combine_cache_keys()
     on the target's individual cache keys.
 
     :target: The target to create a CacheKey for.
-    :fingerprint_extra: A function that accepts a sha hash and updates it with extra fprint data.
+    :transitive: Whether or not to include a fingerprint of all of :target:'s dependencies.
+    :fingerprint_strategy: A FingerprintStrategy instance, which can do per task, finer grained
+      fingerprinting of a given Target.
     """
 
     hasher = hashlib.sha1()
     hasher.update(self._cache_key_gen_version)
     key_suffix = hasher.hexdigest()[:12]
     if transitive:
-      target_key = target.transitive_invalidation_hash()
+      target_key = target.transitive_invalidation_hash(fingerprint_strategy)
     else:
-      target_key = target.invalidation_hash()
+      target_key = target.invalidation_hash(fingerprint_strategy)
     full_key = '{target_key}#{key_suffix}'.format(target_key=target_key, key_suffix=key_suffix)
     return CacheKey(target.id, full_key, target.payload.num_chunking_units, (target.payload,))
 

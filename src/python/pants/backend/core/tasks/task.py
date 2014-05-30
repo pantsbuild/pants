@@ -141,8 +141,13 @@ class Task(object):
     BuildInvalidator(self._build_invalidator_dir).force_invalidate_all()
 
   @contextmanager
-  def invalidated(self, targets, invalidate_dependents=False,
-                  partition_size_hint=sys.maxint, silent=False, locally_changed_targets=None):
+  def invalidated(self,
+                  targets,
+                  invalidate_dependents=False,
+                  partition_size_hint=sys.maxint,
+                  silent=False,
+                  locally_changed_targets=None,
+                  fingerprint_strategy=None):
     """Checks targets for invalidation, first checking the artifact cache.
     Subclasses call this to figure out what to work on.
 
@@ -190,7 +195,10 @@ class Task(object):
           colors[t] = 'locally_changed'
         else:
           colors[t] = 'not_locally_changed'
-    invalidation_check = cache_manager.check(targets, partition_size_hint, colors)
+    invalidation_check = cache_manager.check(targets,
+                                             partition_size_hint,
+                                             colors,
+                                             fingerprint_strategy)
 
     if invalidation_check.invalid_vts and self.artifact_cache_reads_enabled():
       with self.context.new_workunit('cache'):
