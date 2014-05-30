@@ -128,7 +128,7 @@ class ExclusivesIterator(object):
 
 
 class GroupTask(Task):
-  """A task that uses coordinates group members who all produce a single product type.
+  """A task that coordinates group members who all produce a single product type.
 
   The canonical example is a group of different compilers targeting the same output format; for
   example: javac, groovyc, scalac and clojure aot all produce classfiles for the jvm and may depend
