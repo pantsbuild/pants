@@ -113,9 +113,8 @@ class LinearEngine(Engine):
     # linearized set of phases as such (where x -> y means x depends on y and *z means z needs to be
     # serialized):
     #   a -> b -> *c -> d -> *e -> f
-    # Then there is no locking while the 1st phase, 'f', executes but then we grab the lock at the
-    # beginning of the execution of 'e' and don't relinquish until the largest scope serialization
-    # requirement from c is past.
+    # Then we grab the lock at the beginning of f's execution and don't relinquish until the largest
+    # scope serialization requirement from c is past.
     serialized_phase_executors = list(filter(lambda pe: pe.phase.serialize, phase_executors))
     outer_lock_holder = serialized_phase_executors[-1] if serialized_phase_executors else None
 
