@@ -8,7 +8,7 @@ import unittest
 
 from pants.base.target import Target
 from pants.base.exceptions import TargetDefinitionException
-from pants.targets.jar_library import JarLibrary
+from pants.backend.jvm.targets.jar_library import JarLibrary
 
 
 class JarLibraryTest(unittest.TestCase):

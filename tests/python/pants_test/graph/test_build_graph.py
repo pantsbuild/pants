@@ -31,10 +31,6 @@ class BuildGraphTest(unittest.TestCase):
           yield os.path.realpath(root_dir)
 
   def test_transitive_closure_spec(self):
-    class FakeTarget(Target):
-      def __init__(self, *args, **kwargs):
-        super(FakeTarget, self).__init__(*args, payload=None, **kwargs)
-
     with self.workspace('./BUILD', 'a/BUILD', 'a/b/BUILD') as root_dir:
       with open(os.path.join(root_dir, './BUILD'), 'w') as build:
         build.write(dedent('''
@@ -57,11 +53,8 @@ class BuildGraphTest(unittest.TestCase):
           fake(name="bat")
         '''))
 
-      parser = BuildFileParser(root_dir=root_dir,
-                               exposed_objects={},
-                               path_relative_utils={},
-                               target_alias_map={'fake': FakeTarget})
-
+      parser = BuildFileParser(root_dir=root_dir)
+      parser.register_target_alias('fake', Target)
       build_graph = BuildGraph()
       parser.inject_spec_closure_into_build_graph(':foo', build_graph)
       self.assertEqual(len(build_graph.dependencies_of(SyntheticAddress(':foo'))), 1)

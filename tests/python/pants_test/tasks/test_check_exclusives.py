@@ -7,8 +7,8 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import shutil
 import tempfile
 
-from pants.tasks.task import TaskError
-from pants.tasks.check_exclusives import CheckExclusives
+from pants.backend.core.tasks.check_exclusives import CheckExclusives
+from pants.backend.core.tasks.task import TaskError
 from pants_test.base_test import BaseTest
 
 

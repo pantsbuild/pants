@@ -7,9 +7,9 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import unittest
 
 from pants.base import ParseContext
-from pants.targets.exclude import Exclude
-from pants.targets.jar_dependency import JarDependency
-from pants.targets.jar_library import JarLibrary
+from pants.backend.jvm.targets.exclude import Exclude
+from pants.backend.jvm.targets.jar_dependency import JarDependency
+from pants.backend.jvm.targets.jar_library import JarLibrary
 
 
 class JarLibraryWithOverrides(unittest.TestCase):

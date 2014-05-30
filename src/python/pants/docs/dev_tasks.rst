@@ -151,7 +151,7 @@ Tasks must be installed before they are available for use.
 Fortunately this is a simple process. They are installed
 in ``goal.py`` as follows: ::
 
-   from pants.tasks.pagerank import PageRank
+   from pants.backend.core.tasks.pagerank import PageRank
    goal(name='pagerank', action=PageRank).install().with_description('PageRank the given targets.')
 
 

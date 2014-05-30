@@ -10,7 +10,7 @@ python_library(
     pants('src/python/pants/base:exceptions'),
     pants('src/python/pants/base:workunit'),
     pants('src/python/pants/goal'),
-    pants('src/python/pants/targets:common'),
-    pants('src/python/pants/tasks:check_exclusives'),
+    pants('src/python/pants/backend/core/targets:common'),
+    pants('src/python/pants/backend/core/tasks:check_exclusives'),
   ],
 )

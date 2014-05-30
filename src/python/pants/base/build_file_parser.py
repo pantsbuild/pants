@@ -152,20 +152,13 @@ class BuildFileCache(object):
 
 
 class BuildFileParser(object):
-  _exposed_objects = {}
-  _partial_path_relative_utils = {}
-  _applicative_path_relative_utils = {}
-  _target_alias_map = {}
+  def clear_registered_context(self):
+    self._exposed_objects = {}
+    self._partial_path_relative_utils = {}
+    self._applicative_path_relative_utils = {}
+    self._target_alias_map = {}
 
-  @classmethod
-  def clear_registered_context(cls):
-    cls._exposed_objects = {}
-    cls._partial_path_relative_utils = {}
-    cls._applicative_path_relative_utils = {}
-    cls._target_alias_map = {}
-
-  @classmethod
-  def report_registered_context(cls):
+  def report_registered_context(self):
     """Return dict of syms defined in BUILD files, useful for docs/help.
 
     This dict isn't so useful for actually parsing BUILD files.
@@ -173,47 +166,64 @@ class BuildFileParser(object):
     http://pantsbuild.github.io/build_dictionary.html
     """
     retval = {}
-    retval.update(cls._exposed_objects)
-    retval.update(cls._partial_path_relative_utils)
-    retval.update(cls._applicative_path_relative_utils)
-    retval.update(cls._target_alias_map)
+    retval.update(self._exposed_objects)
+    retval.update(self._partial_path_relative_utils)
+    retval.update(self._applicative_path_relative_utils)
+    retval.update(self._target_alias_map)
     return retval
+
+  def report_target_aliases(self):
+    return self._target_alias_map.copy()
+
+  def register_alias_groups(self, alias_map):
+    for alias, obj in alias_map.get('exposed_objects', {}).iteritems():
+      self.register_exposed_object(alias, obj)
+
+    for alias, obj in alias_map.get('applicative_path_relative_utils', {}).iteritems():
+      self.register_applicative_path_relative_util(alias, obj)
+
+    for alias, obj in alias_map.get('partial_path_relative_utils', {}).iteritems():
+      self.register_partial_path_relative_util(alias, obj)
+
+    for alias, obj in alias_map.get('target_aliases', {}).iteritems():
+      self.register_target_alias(alias, obj)
 
   # TODO(pl): For the next four methods, provide detailed documentation.  Especially for the middle
   # two, the semantics are slightly tricky.
-  @classmethod
-  def register_exposed_object(cls, alias, obj):
-    if alias in cls._exposed_objects:
+  def register_exposed_object(self, alias, obj):
+    if alias in self._exposed_objects:
       logger.warn('Object alias {alias} has already been registered.  Overwriting!'
                   .format(alias=alias))
-    cls._exposed_objects[alias] = obj
+    self._exposed_objects[alias] = obj
 
-  @classmethod
-  def register_applicative_path_relative_util(cls, alias, obj):
-    if alias in cls._applicative_path_relative_utils:
+  def register_applicative_path_relative_util(self, alias, obj):
+    if alias in self._applicative_path_relative_utils:
       logger.warn('Applicative path relative util alias {alias} has already been registered.'
                   '  Overwriting!'
                   .format(alias=alias))
-    cls._applicative_path_relative_utils[alias] = obj
+    self._applicative_path_relative_utils[alias] = obj
 
-  @classmethod
-  def register_partial_path_relative_util(cls, alias, obj):
-    if alias in cls._partial_path_relative_utils:
+  def register_partial_path_relative_util(self, alias, obj):
+    if alias in self._partial_path_relative_utils:
       logger.warn('Partial path relative util alias {alias} has already been registered.'
                   '  Overwriting!'
                   .format(alias=alias))
-    cls._partial_path_relative_utils[alias] = obj
+    self._partial_path_relative_utils[alias] = obj
 
-  @classmethod
-  def register_target_alias(cls, alias, obj):
-    if alias in cls._target_alias_map:
+  def register_target_alias(self, alias, obj):
+    if alias in self._target_alias_map:
       logger.warn('Target alias {alias} has already been registered.  Overwriting!'
                   .format(alias=alias))
-    cls._target_alias_map[alias] = obj
+    self._target_alias_map[alias] = obj
 
   def __init__(self, root_dir, run_tracker=None):
     self._root_dir = root_dir
     self.run_tracker = run_tracker
+
+    self._exposed_objects = {}
+    self._partial_path_relative_utils = {}
+    self._applicative_path_relative_utils = {}
+    self._target_alias_map = {}
 
     self._target_proxy_by_address = {}
     self._target_proxies_by_build_file = defaultdict(set)

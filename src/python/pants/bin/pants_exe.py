@@ -14,15 +14,17 @@ from twitter.common.dirutil import Lock
 
 from pants.base.address import Address
 from pants.base.build_environment import get_buildroot, get_version
+from pants.base.build_file_parser import BuildFileParser
+from pants.base.build_graph import BuildGraph
+from pants.base.dev_backend_loader import load_backends_from_source
 from pants.base.config import Config
 from pants.base.rcfile import RcFile
 from pants.base.workunit import WorkUnit
 from pants.commands.command import Command
-from pants.commands.register import register_commands
 from pants.goal.initialize_reporting import initial_reporting
 from pants.goal.run_tracker import RunTracker
 from pants.reporting.report import Report
-from pants.jvm.nailgun_task import NailgunTask
+from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 
 
 _BUILD_COMMAND = 'build'
@@ -56,7 +58,6 @@ def _add_default_options(command, args):
 
 
 def _synthesize_command(root_dir, args):
-  register_commands()
   command = args[0]
 
   if command in Command.all_commands():
@@ -106,8 +107,6 @@ def _run():
   if argv[0] != 'goal' and set(['-h', '--help', 'help']).intersection(argv):
     argv = ['goal'] + argv
 
-  command_class, command_args = _parse_command(root_dir, argv)
-
   parser = optparse.OptionParser(add_help_option=False, version=version)
   RcFile.install_disable_rc_option(parser)
   parser.add_option(_LOG_EXIT_OPTION,
@@ -117,11 +116,6 @@ def _run():
                     help = 'Log an exit message on success or failure.')
 
   config = Config.load()
-
-  # TODO: This can be replaced once extensions are enabled with
-  # https://github.com/pantsbuild/pants/issues/5
-  roots = config.getlist('parse', 'roots', default=[])
-  sys.path.extend(map(lambda root: os.path.join(root_dir, root), roots))
 
   # XXX(wickman) This should be in the command goal, not un pants_exe.py!
   run_tracker = RunTracker.from_config(config)
@@ -134,7 +128,18 @@ def _run():
   else:
     run_tracker.log(Report.INFO, '(To run a reporting server: ./pants goal server)')
 
-  command = command_class(run_tracker, root_dir, parser, command_args)
+  build_file_parser = BuildFileParser(root_dir=root_dir, run_tracker=run_tracker)
+  build_graph = BuildGraph(run_tracker=run_tracker)
+
+  load_backends_from_source(build_file_parser)
+
+  command_class, command_args = _parse_command(root_dir, argv)
+  command = command_class(run_tracker,
+                          root_dir,
+                          parser,
+                          command_args,
+                          build_file_parser,
+                          build_graph)
   try:
     if command.serialized():
       def onwait(pid):

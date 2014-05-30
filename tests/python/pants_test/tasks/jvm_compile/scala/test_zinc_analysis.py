@@ -11,8 +11,8 @@ import unittest
 
 from twitter.common.contextutil import Timer, temporary_dir
 
-from pants.tasks.jvm_compile.scala.zinc_analysis import ZincAnalysis
-from pants.tasks.jvm_compile.scala.zinc_analysis_parser import ZincAnalysisParser
+from pants.backend.jvm.tasks.jvm_compile.scala.zinc_analysis import ZincAnalysis
+from pants.backend.jvm.tasks.jvm_compile.scala.zinc_analysis_parser import ZincAnalysisParser
 
 
 class ZincAnalysisTest(unittest.TestCase):

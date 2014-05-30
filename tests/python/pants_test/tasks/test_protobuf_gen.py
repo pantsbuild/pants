@@ -9,7 +9,7 @@ import pytest
 
 from twitter.common.contextutil import temporary_file
 
-from pants.tasks.protobuf_gen import calculate_genfiles
+from pants.backend.codegen.tasks.protobuf_gen import calculate_genfiles
 
 
 class ProtobufGenCalculateGenfilesTestBase(unittest.TestCase):

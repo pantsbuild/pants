@@ -7,6 +7,6 @@ python_library(
   dependencies = [
     pants('src/python/pants/base:target'),
     pants('src/python/pants/reporting'),
-    pants('src/python/pants/targets:common'),
+    pants('src/python/pants/backend/core/targets:common'),
   ],
 )

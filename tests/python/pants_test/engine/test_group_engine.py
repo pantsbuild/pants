@@ -9,10 +9,13 @@ from textwrap import dedent
 
 import pytest
 
+from pants.backend.core.tasks.check_exclusives import ExclusivesMapping
+from pants.backend.core.tasks.task import Task
 from pants.engine.group_engine import GroupEngine, GroupIterator, GroupMember
 from pants.goal import Goal, Group
-from pants.tasks.task import Task
-from pants.tasks.check_exclusives import ExclusivesMapping
+from pants.backend.jvm.targets.java_library import JavaLibrary
+from pants.backend.jvm.targets.scala_library import ScalaLibrary
+from pants.backend.python.targets.python_library import PythonLibrary
 from pants_test.base.context_utils import create_context
 from pants_test.base_test import BaseTest
 from pants_test.engine.base_engine_test import EngineTestBase
@@ -32,6 +35,16 @@ class GroupMemberTest(unittest.TestCase):
 
 
 class JvmTargetTest(BaseTest):
+  @property
+  def alias_groups(self):
+    return {
+      'target_aliases': {
+        'scala_library': ScalaLibrary,
+        'java_library': JavaLibrary,
+        'python_library': PythonLibrary,
+      },
+    }
+
   def java_library(self, path, name, deps=None):
     self._library(path, 'java_library', name, deps)
 
@@ -49,7 +62,7 @@ class JvmTargetTest(BaseTest):
       )
     ''' % dict(target_type=target_type,
                name=name,
-               deps=','.join('pants("%s")' % d for d in (deps or [])))))
+               deps=','.join('"%s"' % d for d in (deps or [])))))
 
   def targets(self, *addresses):
     return map(self.target, addresses)

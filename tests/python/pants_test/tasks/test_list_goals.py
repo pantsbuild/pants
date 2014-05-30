@@ -6,9 +6,9 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from pants.goal import Goal
 from pants.goal.phase import Phase
-from pants.tasks.task import Task
-from pants.tasks import ConsoleTaskTest
-from pants.tasks.list_goals import ListGoals
+from pants.backend.core.tasks.task import Task
+from pants.backend.core.tasks.import ConsoleTaskTest
+from pants.backend.core.tasks.list_goals import ListGoals
 
 
 class ListGoalsTest(ConsoleTaskTest):

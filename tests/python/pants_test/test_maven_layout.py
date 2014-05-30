@@ -4,10 +4,25 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from pants.backend.maven_layout.maven_layout import maven_layout
+from pants.backend.jvm.targets.java_library import JavaLibrary
+from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants_test.base_test import BaseTest
 
 
 class MavenLayoutTest(BaseTest):
+  @property
+  def alias_groups(self):
+    return {
+      'target_aliases': {
+        'scala_library': ScalaLibrary,
+        'java_library': JavaLibrary,
+      },
+      'partial_path_relative_utils': {
+        'maven_layout': maven_layout,
+      }
+    }
+
   def setUp(self):
     super(MavenLayoutTest, self).setUp()
 

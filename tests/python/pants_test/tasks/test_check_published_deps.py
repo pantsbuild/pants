@@ -6,11 +6,31 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from textwrap import dedent
 
-from pants.tasks.check_published_deps import CheckPublishedDeps
+from pants.backend.core.targets.dependencies import Dependencies
+from pants.backend.jvm.targets.artifact import Artifact
+from pants.backend.jvm.targets.jar_dependency import JarDependency
+from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.backend.jvm.targets.java_library import JavaLibrary
+from pants.backend.jvm.targets.repository import Repository
+from pants.backend.jvm.tasks.check_published_deps import CheckPublishedDeps
 from pants_test.tasks.test_base import ConsoleTaskTest
 
 
 class CheckPublishedDepsTest(ConsoleTaskTest):
+  @property
+  def alias_groups(self):
+    return {
+      'target_aliases': {
+        'dependencies': Dependencies,
+        'jar_library': JarLibrary,
+        'java_library': JavaLibrary,
+        'repo': Repository,
+      },
+      'exposed_objects': {
+        'artifact': Artifact,
+        'jar': JarDependency,
+      },
+    }
 
   @classmethod
   def task_type(cls):
@@ -41,13 +61,13 @@ class CheckPublishedDepsTest(ConsoleTaskTest):
           provides=artifact(
             org='org.name',
             name='lib1',
-            repo=pants('repo')),
+            repo='repo'),
           sources=[])
         java_library(name='lib2',
           provides=artifact(
             org='org.name',
             name='lib2',
-            repo=pants('repo')),
+            repo='repo'),
           sources=[])
         '''))
     self.add_to_build_file('outdated/BUILD', dedent('''
@@ -63,8 +83,8 @@ class CheckPublishedDepsTest(ConsoleTaskTest):
     self.add_to_build_file('both/BUILD', dedent('''
         dependencies(name='both',
           dependencies=[
-            pants('outdated'),
-            pants('uptodate'),
+            'outdated',
+            'uptodate',
           ]
         )
         '''))

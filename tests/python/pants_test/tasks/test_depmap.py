@@ -6,9 +6,20 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from textwrap import dedent
 
+from pants.backend.core.targets.dependencies import Dependencies
+from pants.backend.core.targets.resources import Resources
+from pants.backend.core.tasks.dependees import ReverseDepmap
+from pants.backend.core.tasks.task import TaskError
+from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
-from pants.tasks.depmap import Depmap
-
+from pants.base.source_root import SourceRoot
+from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.backend.jvm.targets.java_library import JavaLibrary
+from pants.backend.jvm.targets.jvm_binary import Bundle, JvmApp, JvmBinary
+from pants.backend.jvm.targets.scala_library import ScalaLibrary
+from pants.backend.jvm.tasks.depmap import Depmap
+from pants.backend.python.targets.python_binary import PythonBinary
+from pants.backend.python.targets.python_library import PythonLibrary
 from pants_test.tasks.test_base import ConsoleTaskTest
 
 
@@ -19,6 +30,28 @@ class BaseDepmapTest(ConsoleTaskTest):
 
 
 class DepmapTest(BaseDepmapTest):
+  @property
+  def alias_groups(self):
+    return {
+      'target_aliases': {
+        'dependencies': Dependencies,
+        'jar_library': JarLibrary,
+        'java_library': JavaLibrary,
+        'jvm_app': JvmApp,
+        'jvm_binary': JvmBinary,
+        'python_binary': PythonBinary,
+        'python_library': PythonLibrary,
+        'resources': Resources,
+        'scala_library': ScalaLibrary,
+      },
+      'exposed_objects': {
+        'pants': lambda x: x,
+      },
+      'partial_path_relative_utils': {
+        'bundle': Bundle,
+      },
+    }
+
   def setUp(self):
     super(DepmapTest, self).setUp()
 

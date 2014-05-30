@@ -13,19 +13,49 @@ from textwrap import dedent
 from twitter.common.contextutil import open_zip, temporary_dir
 from twitter.common.dirutil import safe_open
 
+from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
+from pants.backend.core.targets.resources import Resources
+from pants.backend.jvm.targets.artifact import Artifact
+from pants.backend.jvm.targets.java_library import JavaLibrary
+from pants.backend.jvm.targets.jvm_binary import JvmBinary
+from pants.backend.jvm.targets.repository import Repository
+from pants.backend.jvm.targets.scala_library import ScalaLibrary
+from pants.backend.jvm.tasks.jar_create import JarCreate, is_jvm_library
+from pants.base.build_environment import get_buildroot
 from pants.base.source_root import SourceRoot
 from pants.goal.products import MultipleRootedProducts
-from pants.targets.java_library import JavaLibrary
-from pants.targets.java_thrift_library import JavaThriftLibrary
-from pants.targets.jvm_binary import JvmBinary
-from pants.targets.resources import Resources
-from pants.targets.scala_library import ScalaLibrary
-from pants.tasks.jar_create import JarCreate, is_jvm_library
-from pants_test.jvm.jar_task_test_base import JarTaskTestBase
 from pants_test.base.context_utils import create_context
+from pants_test.jvm.jar_task_test_base import JarTaskTestBase
+from pants_test.tasks.test_base import ConsoleTaskTest
 
 
 class JarCreateTestBase(JarTaskTestBase):
+  @property
+  def alias_groups(self):
+    super_groups = super(JarTaskTestBase, self).alias_groups.copy()
+    local_groups = {
+      'target_aliases': {
+        'java_library': JavaLibrary,
+        'jvm_binary': JvmBinary,
+        'resources': Resources,
+        'scala_library': ScalaLibrary,
+        'java_thrift_library': JavaThriftLibrary,
+        'repo': Repository,
+      },
+      'exposed_objects': {
+        'pants': lambda x: x,
+        'artifact': Artifact,
+      },
+      'applicative_path_relative_utils': {
+        'source_root': SourceRoot,
+      },
+    }
+    for key, group_map in local_groups.iteritems():
+      super_group = super_groups.get(key, {})
+      super_group.update(group_map)
+      super_groups[key] = super_group
+    return super_groups
+
   def create_options(self, **kwargs):
     options = dict(jar_create_transitive=True,
                    jar_create_compressed=False,

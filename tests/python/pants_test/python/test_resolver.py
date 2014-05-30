@@ -10,7 +10,7 @@ from twitter.common.contextutil import temporary_file
 from twitter.common.python.platforms import Platform
 
 from pants.base.config import Config
-from pants.python.resolver import get_platforms
+from pants.backend.python.resolver import get_platforms
 
 
 class ResolverTest(unittest.TestCase):

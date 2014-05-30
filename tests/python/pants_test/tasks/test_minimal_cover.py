@@ -6,7 +6,8 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from textwrap import dedent
 
-from pants.tasks.minimal_cover import MinimalCover
+from pants.backend.core.tasks.minimal_cover import MinimalCover
+from pants.backend.python.targets.python_library import PythonLibrary
 from pants_test.tasks.test_base import ConsoleTaskTest
 
 
@@ -22,11 +23,19 @@ class MinimalCoverEmptyTest(BaseMinimalCovertTest):
 
 
 class MinimalCoverTest(BaseMinimalCovertTest):
+  @property
+  def alias_groups(self):
+    return {
+      'target_aliases': {
+        'python_library': PythonLibrary,
+      },
+    }
+
   def setUp(self):
     super(MinimalCoverTest, self).setUp()
 
     def add_to_build_file(path, name, *deps):
-      all_deps = ["pants('%s')" % dep for dep in list(deps)]
+      all_deps = ["'%s'" % dep for dep in list(deps)]
       self.add_to_build_file(path, dedent('''
           python_library(name='%s',
             dependencies=[%s]

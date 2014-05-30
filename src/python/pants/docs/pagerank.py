@@ -7,7 +7,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 from collections import defaultdict
 
 from pants import is_concrete  # XXX This target doesn't exist
-from pants.tasks.console_task import ConsoleTask
+from pants.backend.core.tasks.console_task import ConsoleTask
 
 
 class PageRank(ConsoleTask):

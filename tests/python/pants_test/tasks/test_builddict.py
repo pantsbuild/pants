@@ -7,7 +7,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 from StringIO import StringIO
 from contextlib import closing
 
-from pants.tasks.builddictionary import BuildBuildDictionary, assemble
+from pants.backend.core.tasks.builddictionary import BuildBuildDictionary, assemble
 from pants_test.tasks.test_base import TaskTest, prepare_task
 
 

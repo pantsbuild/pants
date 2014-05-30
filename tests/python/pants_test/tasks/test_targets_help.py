@@ -9,7 +9,7 @@ import os.path
 from pants.base.build_environment import get_buildroot
 from pants.base.source_root import SourceRoot
 from pants.base.target import Target
-from pants.tasks.targets_help import TargetsHelp
+from pants.backend.core.tasks.targets_help import TargetsHelp
 from pants_test.tasks.test_base import ConsoleTaskTest
 
 

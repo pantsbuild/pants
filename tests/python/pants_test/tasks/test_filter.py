@@ -6,11 +6,26 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from textwrap import dedent
 
-from pants.tasks.filter import Filter
+from pants.backend.core.targets.doc import Page
+from pants.backend.core.tasks.filter import Filter
+from pants.backend.jvm.targets.java_library import JavaLibrary
+from pants.backend.python.targets.python_library import PythonLibrary
+from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants_test.tasks.test_base import ConsoleTaskTest
 
 
 class BaseFilterTest(ConsoleTaskTest):
+  @property
+  def alias_groups(self):
+    return {
+      'target_aliases': {
+        'java_library': JavaLibrary,
+        'page': Page,
+        'python_library': PythonLibrary,
+        'python_requirement_library': PythonRequirementLibrary,
+      },
+    }
+
   @classmethod
   def task_type(cls):
     return Filter
@@ -39,7 +54,7 @@ class FilterTest(BaseFilterTest):
       if path not in requirement_injected:
         self.add_to_build_file(path, "python_requirement_library(name='foo')")
         requirement_injected.add(path)
-      all_deps = ["pants('%s')" % dep for dep in deps] + ["pants(':foo')"]
+      all_deps = ["'%s'" % dep for dep in deps] + ["':foo'"]
       self.add_to_build_file(path, dedent('''
           python_library(name='%s',
             dependencies=[%s]
@@ -120,7 +135,8 @@ class FilterTest(BaseFilterTest):
       'overlaps/BUILD:two',
       'overlaps/BUILD:three',
       'overlaps/BUILD:foo',
-      args=['--test-type=python_requirement_library,pants.targets.python_library.PythonLibrary'],
+      args=['--test-type=python_requirement_library,'
+            'pants.backend.python.targets.python_library.PythonLibrary'],
       targets=self.targets('::')
     )
 

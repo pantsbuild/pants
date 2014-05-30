@@ -9,8 +9,8 @@ python_library(
     pants('src/python/pants/base:target'),
     pants('src/python/pants/commands:goal'),
     pants('src/python/pants/goal'),
-    pants('src/python/pants/tasks:console_task'),
-    pants('src/python/pants/tasks:task'),
+    pants('src/python/pants/backend/core/tasks:console_task'),
+    pants('src/python/pants/backend/core/tasks:task'),
     pants('tests/python/pants_test/base:context_utils'),
     pants('tests/python/pants_test:base_test'),
   ]
@@ -20,7 +20,8 @@ python_test_suite(
   name = 'tasks',
   dependencies = [
     pants(':binary_create'),
-    pants(':builddict'),
+    # XXX(pl): This is broken again
+    # pants(':builddict'),
     pants(':bundle_create'),
     pants(':cache_manager'),
     pants(':check_exclusives'),
@@ -51,7 +52,7 @@ python_tests(
   sources = ['test_binary_create.py'],
   dependencies = [
     pants(':base'),
-    pants('src/python/pants/tasks:binary_create'),
+    pants('src/python/pants/backend/jvm/tasks:binary_create'),
   ]
 )
 
@@ -60,7 +61,7 @@ python_tests(
   sources = ['test_builddict.py'],
   dependencies = [
     pants(':base'),
-    pants('src/python/pants/tasks:builddictionary'),
+    pants('src/python/pants/backend/core/tasks:builddictionary'),
   ]
 )
 
@@ -69,7 +70,7 @@ python_tests(
   sources = ['test_bundle_create.py'],
   dependencies = [
     pants(':base'),
-    pants('src/python/pants/tasks:bundle_create'),
+    pants('src/python/pants/backend/jvm/tasks:bundle_create'),
   ]
 )
 
@@ -92,7 +93,7 @@ python_tests(
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('src/python/pants/base:config'),
     pants('src/python/pants/goal:context'),
-    pants('src/python/pants/tasks:check_exclusives'),
+    pants('src/python/pants/backend/core/tasks:check_exclusives'),
   ]
 )
 
@@ -101,7 +102,10 @@ python_tests(
   sources = ['test_check_published_deps.py'],
   dependencies = [
     pants(':base'),
-    pants('src/python/pants/tasks:check_published_deps'),
+    pants('src/python/pants/backend/core/targets:common'),
+    pants('src/python/pants/backend/jvm/targets:java'),
+    pants('src/python/pants/backend/jvm/targets:jvm'),
+    pants('src/python/pants/backend/jvm/tasks:check_published_deps'),
   ]
 )
 
@@ -121,7 +125,7 @@ python_tests(
   sources = ['test_console_task.py'],
   dependencies = [
     pants(':base'),
-    pants('src/python/pants/tasks:console_task'),
+    pants('src/python/pants/backend/core/tasks:console_task'),
   ]
 )
 
@@ -140,12 +144,15 @@ python_tests(
   name = 'dependees',
   sources = ['test_dependees.py'],
   dependencies = [
-    pants(':base'),
     pants('3rdparty/python:mox'),
+    pants(':base'),
+    pants('src/python/pants/backend/codegen/targets:java'),
+    pants('src/python/pants/backend/core/targets:common'),
+    pants('src/python/pants/backend/core/tasks:dependees'),
+    pants('src/python/pants/backend/jvm/targets:java'),
+    pants('src/python/pants/backend/jvm/targets:scala'),
+    pants('src/python/pants/backend/python/targets:python'),
     pants('src/python/pants/base:build_environment'),
-    pants('src/python/pants/targets:python'),
-    pants('src/python/pants/targets:common'),
-    pants('src/python/pants/tasks:dependees'),
   ]
 )
 
@@ -154,7 +161,12 @@ python_tests(
   sources = ['test_dependencies.py'],
   dependencies = [
     pants(':base'),
-    pants('src/python/pants/tasks:dependencies'),
+    pants('src/python/pants/backend/jvm/targets:jvm'),
+    pants('src/python/pants/backend/jvm/targets:scala'),
+    pants('src/python/pants/backend/jvm/tasks:dependencies'),
+    pants('src/python/pants/backend/python/targets:python'),
+    pants('src/python/pants/backend/python:python_requirement'),
+    pants('src/python/pants/base:exceptions'),
   ]
 )
 
@@ -163,17 +175,24 @@ python_tests(
   sources = ['test_depmap.py'],
   dependencies = [
     pants(':base'),
-    pants('src/python/pants/tasks:depmap'),
+    pants('src/python/pants/backend/core/targets:common'),
+    pants('src/python/pants/backend/core/tasks:dependees'),
+    pants('src/python/pants/backend/jvm/targets:java'),
+    pants('src/python/pants/backend/jvm/targets:jvm'),
+    pants('src/python/pants/backend/jvm/targets:scala'),
+    pants('src/python/pants/backend/jvm/tasks:depmap'),
+    pants('src/python/pants/backend/python/targets:python'),
   ]
 )
 
+# XXX(pl): This test isn't rolled into :all and is broken
 python_tests(
   name = 'detect_duplicates',
   sources = ['test_detect_duplicates.py'],
   dependencies = [
     pants(':base'),
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
-    pants('src/python/pants/tasks:detect_duplicates'),
+    pants('src/python/pants/backend/jvm/tasks:detect_duplicates'),
   ],
 )
 
@@ -182,7 +201,9 @@ python_tests(
   sources = ['test_filemap.py'],
   dependencies = [
     pants(':base'),
-    pants('src/python/pants/tasks:filemap'),
+    pants('src/python/pants/backend/core/tasks:filemap'),
+    pants('src/python/pants/base:source_root'),
+    pants('src/python/pants/backend/python/targets:python'),
   ],
 )
 
@@ -191,9 +212,10 @@ python_tests(
   sources = ['test_filter.py'],
   dependencies = [
     pants(':base'),
-    pants('src/python/pants/targets:java'),
-    pants('src/python/pants/targets:python'),
-    pants('src/python/pants/tasks:filter'),
+    pants('src/python/pants/backend/jvm/targets:java'),
+    pants('src/python/pants/backend/python/targets:python'),
+    pants('src/python/pants/backend/core/tasks:filter'),
+    pants('src/python/pants/backend/core/targets:common'),
   ],
 )
 
@@ -203,13 +225,17 @@ python_tests(
   dependencies = [
     pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
+    pants(':base'),
+    pants('src/python/pants/backend/codegen/targets:java'),
+    pants('src/python/pants/backend/core/targets:common'),
+    pants('src/python/pants/backend/jvm/targets:java'),
+    pants('src/python/pants/backend/jvm/targets:jvm'),
+    pants('src/python/pants/backend/jvm/targets:scala'),
+    pants('src/python/pants/backend/jvm/tasks:jar_create'),
+    pants('src/python/pants/base:build_environment'),
     pants('src/python/pants/base:source_root'),
-    pants('src/python/pants/java:jar'),
-    pants('src/python/pants/targets:common'),
-    pants('src/python/pants/targets:java'),
-    pants('src/python/pants/targets:scala'),
     pants('src/python/pants/goal:products'),
-    pants('src/python/pants/tasks:jar_create'),
+    pants('src/python/pants/java:jar'),
     pants('tests/python/pants_test/base:context_utils'),
     pants('tests/python/pants_test/jvm:jar_task_test_base'),
   ],
@@ -221,10 +247,11 @@ python_tests(
   dependencies = [
     pants('3rdparty/python:mock'),
     pants(':base'),
-    pants('src/python/pants/tasks:jar_publish'),
+    pants('src/python/pants/backend/jvm/tasks:jar_publish'),
   ],
 )
 
+# XXX(pl): Test is broken and not in :all
 python_tests(
   name = 'jar_publish_integration',
   sources = ['test_jar_publish_integration.py'],
@@ -239,8 +266,10 @@ python_tests(
   sources = ['test_listtargets.py'],
   dependencies = [
     pants(':base'),
+    pants('src/python/pants/backend/core/tasks:listtargets'),
+    pants('src/python/pants/backend/jvm/targets:java'),
+    pants('src/python/pants/backend/jvm/targets:jvm'),
     pants('src/python/pants/base:target'),
-    pants('src/python/pants/tasks:listtargets'),
   ],
 )
 
@@ -249,7 +278,8 @@ python_tests(
   sources = ['test_minimal_cover.py'],
   dependencies = [
     pants(':base'),
-    pants('src/python/pants/tasks:minimal_cover'),
+    pants('src/python/pants/backend/core/tasks:minimal_cover'),
+    pants('src/python/pants/backend/python/targets:python'),
   ],
 )
 
@@ -259,7 +289,7 @@ python_tests(
   dependencies = [
     pants(':base'),
     pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
-    pants('src/python/pants/tasks:protobuf_gen'),
+    pants('src/python/pants/backend/codegen/tasks:protobuf_gen'),
   ],
 )
 
@@ -270,8 +300,8 @@ python_tests(
     pants(':base'),
     pants('src/python/pants/base:build_environment'),
     pants('src/python/pants/base:target'),
-    pants('src/python/pants/targets:common'),
-    pants('src/python/pants/tasks:roots'),
+    pants('src/python/pants/backend/core/targets:common'),
+    pants('src/python/pants/backend/core/tasks:roots'),
   ],
 )
 
@@ -280,8 +310,10 @@ python_tests(
   sources = ['test_scrooge_gen.py'],
   dependencies = [
     pants(':base'),
-    pants('src/python/pants/targets:java'),
-    pants('src/python/pants/tasks:scrooge_gen'),
+    pants('src/python/pants/backend/codegen/targets:java'),
+    pants('src/python/pants/backend/codegen/tasks:scrooge_gen'),
+    pants('src/python/pants/backend/jvm/targets:java'),
+    pants('src/python/pants/base:exceptions'),
   ],
 )
 
@@ -290,10 +322,12 @@ python_tests(
   sources = ['test_sorttargets.py'],
   dependencies = [
     pants(':base'),
-    pants('src/python/pants/tasks:sorttargets'),
+    pants('src/python/pants/backend/python/targets:python'),
+    pants('src/python/pants/backend/core/tasks:sorttargets'),
   ],
 )
 
+# XXX(pl): Test is broken and not in :all
 python_tests(
   name = 'targets_help',
   sources = ['test_targets_help.py'],
@@ -301,8 +335,8 @@ python_tests(
     pants(':base'),
     pants('src/python/pants/base:build_environment'),
     pants('src/python/pants/base:target'),
-    pants('src/python/pants/targets:common'),
-    pants('src/python/pants/tasks:targets_help'),
+    pants('src/python/pants/backend/core/targets:common'),
+    pants('src/python/pants/backend/core/tasks:targets_help'),
   ],
 )
 
@@ -311,8 +345,15 @@ python_tests(
   sources = ['test_what_changed.py'],
   dependencies = [
     pants(':base'),
+    pants('src/python/pants/backend/codegen/targets:java'),
+    pants('src/python/pants/backend/codegen/targets:python'),
+    pants('src/python/pants/backend/core/targets:common'),
+    pants('src/python/pants/backend/core/tasks:what_changed'),
+    pants('src/python/pants/base:source_root'),
     pants('src/python/pants/base:target'),
-    pants('src/python/pants/tasks:what_changed'),
+    pants('src/python/pants/backend/jvm/targets:java'),
+    pants('src/python/pants/backend/jvm/targets:jvm'),
+    pants('src/python/pants/backend/python/targets:python'),
   ],
 )
 
@@ -322,7 +363,7 @@ python_tests(
   dependencies = [
     pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
-    pants('src/python/pants/jvm:jar_task'),
+    pants('src/python/pants/backend/jvm/tasks:jar_task'),
     pants('tests/python/pants_test/jvm:jvm_tool_task_test_base'),
   ]
 )

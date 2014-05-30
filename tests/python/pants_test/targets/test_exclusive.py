@@ -6,7 +6,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from twitter.common.contextutil import temporary_dir
 
-from pants.tasks.check_exclusives import CheckExclusives
+from pants.backend.core.tasks.check_exclusives import CheckExclusives
 from pants_test.base_test import BaseTest
 
 

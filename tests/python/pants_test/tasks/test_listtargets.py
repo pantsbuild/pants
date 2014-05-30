@@ -7,10 +7,13 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import os
 from textwrap import dedent
 
+from pants.backend.core.targets.dependencies import Dependencies
+from pants.backend.core.tasks.listtargets import ListTargets
 from pants.base.target import Target
-from pants.tasks.listtargets import ListTargets
+from pants.backend.jvm.targets.artifact import Artifact
+from pants.backend.jvm.targets.java_library import JavaLibrary
+from pants.backend.jvm.targets.repository import Repository
 from pants_test.tasks.test_base import ConsoleTaskTest
-
 
 class BaseListTargetsTest(ConsoleTaskTest):
   @classmethod
@@ -26,6 +29,20 @@ class ListTargetsTestEmpty(BaseListTargetsTest):
 
 
 class ListTargetsTest(BaseListTargetsTest):
+  @property
+  def alias_groups(self):
+    return {
+      'target_aliases': {
+        'dependencies': Dependencies,
+        'java_library': JavaLibrary,
+        'repo': Repository,
+      },
+      'exposed_objects': {
+        'pants': lambda x: x,
+        'artifact': Artifact,
+      },
+    }
+
   def setUp(self):
     super(ListTargetsTest, self).setUp()
 

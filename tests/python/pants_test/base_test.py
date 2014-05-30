@@ -23,25 +23,6 @@ from pants.base.target import Target
 from pants_test.base.context_utils import create_context
 
 
-def make_default_build_file_parser(build_root):
-  from pants.base.build_file_aliases import (target_aliases, object_aliases,
-                                             applicative_path_relative_util_aliases,
-                                             partial_path_relative_util_aliases)
-  for alias, target_type in target_aliases.items():
-    BuildFileParser.register_target_alias(alias, target_type)
-
-  for alias, obj in object_aliases.items():
-    BuildFileParser.register_exposed_object(alias, obj)
-
-  for alias, util in applicative_path_relative_util_aliases.items():
-    BuildFileParser.register_applicative_path_relative_util(alias, util)
-
-  for alias, util in partial_path_relative_util_aliases.items():
-    BuildFileParser.register_partial_path_relative_util(alias, util)
-
-  return BuildFileParser(root_dir=build_root)
-
-
 class BaseTest(unittest.TestCase):
   """A baseclass useful for tests requiring a temporary buildroot."""
 
@@ -94,12 +75,17 @@ class BaseTest(unittest.TestCase):
                                    derived_from=derived_from)
     return target
 
+  @property
+  def alias_groups(self):
+    return {}
+
   def setUp(self):
     self.real_build_root = BuildRoot().path
     self.build_root = mkdtemp(suffix='_BUILD_ROOT')
     BuildRoot().path = self.build_root
     self.create_file('pants.ini')
-    self.build_file_parser = make_default_build_file_parser(self.build_root)
+    self.build_file_parser = BuildFileParser(self.build_root)
+    self.build_file_parser.register_alias_groups(self.alias_groups)
     self.build_graph = BuildGraph()
 
   def config(self, overrides=''):

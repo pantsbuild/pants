@@ -28,8 +28,8 @@ python_tests(
   sources = ['test_artifact.py'],
   dependencies = [
     pants(':base'),
-    pants('src/python/pants/targets:common'),
-    pants('src/python/pants/targets:jvm'),
+    pants('src/python/pants/backend/core/targets:common'),
+    pants('src/python/pants/backend/jvm/targets:jvm'),
   ]
 )
 
@@ -38,7 +38,8 @@ python_tests(
   sources = ['test_bundle.py'],
   dependencies = [
     pants(':base'),
-    pants('src/python/pants/targets:jvm'),
+    pants('src/python/pants/backend/core'),
+    pants('src/python/pants/backend/jvm/targets:jvm'),
   ]
 )
 
@@ -50,7 +51,7 @@ python_tests(
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('src/python/pants/base:config'),
     pants('src/python/pants/goal:goal'),
-    pants('src/python/pants/tasks:check_exclusives'),
+    pants('src/python/pants/backend/core/tasks:check_exclusives'),
   ]
 )
 
@@ -62,7 +63,7 @@ python_tests(
     pants('src/python/pants/base:target'),
     pants('src/python/pants/base:build_graph'),
     pants('src/python/pants/base:payload'),
-    pants('src/python/pants/targets:common'),
+    pants('src/python/pants/backend/core/targets:common'),
   ]
 )
 
@@ -72,7 +73,7 @@ python_tests(
   dependencies = [
     pants(':base'),
     pants('src/python/pants/base:target'),
-    pants('src/python/pants/targets:jvm'),
+    pants('src/python/pants/backend/jvm/targets:jvm'),
   ]
 )
 
@@ -81,7 +82,8 @@ python_tests(
   sources = ['test_java_thrift_library.py'],
   dependencies = [
     pants(':base'),
-    pants('src/python/pants/targets:java'),
+    pants('src/python/pants/backend/codegen/targets:java'),
+    pants('src/python/pants/backend/jvm/targets:java'),
     pants('tests/python/pants_test/base:context_utils'),
   ]
 )
@@ -92,7 +94,7 @@ python_tests(
   dependencies = [
     pants(':base'),
     pants('src/python/pants/base:target'),
-    pants('src/python/pants/targets:python'),
+    pants('src/python/pants/backend/python/targets:python'),
   ]
 )
 
@@ -101,8 +103,9 @@ python_tests(
   sources = ['test_scala_library.py'],
   dependencies = [
     pants(':base'),
-    pants('src/python/pants/targets:java'),
-    pants('src/python/pants/targets:scala'),
+    pants('src/python/pants/backend/jvm/targets:java'),
+    pants('src/python/pants/backend/jvm/targets:jvm'),
+    pants('src/python/pants/backend/jvm/targets:scala'),
   ]
 )
 
@@ -111,8 +114,12 @@ python_tests(
   sources = ['test_python_target.py'],
   dependencies = [
     pants(':base'),
+    pants('src/python/pants/backend/jvm/targets:jvm'),
+    pants('src/python/pants/backend/python/targets:python'),
+    pants('src/python/pants/backend/python:python_artifact'),
+    pants('src/python/pants/base:exceptions'),
+    pants('src/python/pants/base:source_root'),
     pants('src/python/pants/base:target'),
-    pants('src/python/pants/targets:python'),
   ]
 )
 

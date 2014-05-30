@@ -6,10 +6,26 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from textwrap import dedent
 
+from pants.backend.jvm.targets.jar_dependency import JarDependency
+from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.backend.jvm.targets.java_library import JavaLibrary
+from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants_test.base_test import BaseTest
 
 
 class ScalaLibraryTest(BaseTest):
+  @property
+  def alias_groups(self):
+    return {
+      'target_aliases': {
+        'scala_library': ScalaLibrary,
+        'java_library': JavaLibrary,
+        'jar_library': JarLibrary,
+      },
+      'exposed_objects': {
+        'jar': JarDependency,
+      }
+    }
 
   def setUp(self):
     super(ScalaLibraryTest, self).setUp()
@@ -28,8 +44,8 @@ class ScalaLibraryTest(BaseTest):
           name='lib',
           sources=[],
           java_sources=[
-            pants('java:explicit_scala_dep'),
-            pants('java:no_scala_dep'),
+            'java:explicit_scala_dep',
+            'java:no_scala_dep',
           ]
         )
         '''))
@@ -39,8 +55,8 @@ class ScalaLibraryTest(BaseTest):
           name='explicit_scala_dep',
           sources=[],
           dependencies=[
-            pants('scala:lib'),
-            pants('3rdparty:hub-and-spoke'),
+            'scala:lib',
+            '3rdparty:hub-and-spoke',
           ]
         )
 

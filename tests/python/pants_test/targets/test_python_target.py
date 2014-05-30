@@ -8,12 +8,12 @@ import os
 import pytest
 from textwrap import dedent
 
-from pants.base.source_root import SourceRoot
+from pants.backend.jvm.targets.artifact import Artifact
+from pants.backend.jvm.targets.repository import Repository
+from pants.backend.python.python_artifact import PythonArtifact
+from pants.backend.python.targets.python_target import PythonTarget
 from pants.base.exceptions import TargetDefinitionException
-from pants.targets.artifact import Artifact
-from pants.targets.python_artifact import PythonArtifact
-from pants.targets.python_target import PythonTarget
-from pants.targets.repository import Repository
+from pants.base.source_root import SourceRoot
 from pants_test.base_test import BaseTest
 
 

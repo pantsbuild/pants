@@ -24,9 +24,9 @@ python_tests(
   sources = ['test_antlr_builder.py'],
   dependencies = [
     '3rdparty/python:antlr-3.1.3',
-    'src/antlr/pants/python/test:csv',
-    'src/antlr/pants/python/test:eval',
-    'src/python/pants/python:python_setup',
+    'src/antlr/pants/backend/python/test:csv',
+    'src/antlr/pants/backend/python/test:eval',
+    'src/python/pants/backend/python:python_setup',
   ],
 )
 
@@ -46,18 +46,19 @@ python_tests(name = 'test_resolver',
     pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.python'),
     pants('src/python/pants/base:config'),
-    pants('src/python/pants/python:resolver'),
+    pants('src/python/pants/backend/python:resolver'),
   ],
 )
 
 python_tests(name = 'test_thrift_builder',
   sources = ['test_thrift_builder.py'],
   dependencies = [
-    pants('3rdparty/python:mock'),
     pants('3rdparty/python/twitter/commons:twitter.common.config'),
     pants('3rdparty/python/twitter/commons:twitter.common.python'),
-    pants('src/python/pants/python:thrift_builder'),
+    pants('3rdparty/python:mock'),
+    pants('src/python/pants/backend/codegen/targets:python'),
+    pants('src/python/pants/backend/python:thrift_builder'),
+    pants('tests/python/pants_test/base:context_utils'),
     pants('tests/python/pants_test:base_test'),
-    pants('tests/python/pants_test/base:context_utils')
   ]
 )

@@ -193,7 +193,7 @@ Code Layout
   (TODO OMG bluffing) Utility classes useful to many things that work
   with Java code.
 
-`python <https://github.com/pantsbuild/pants/tree/master/src/python/pants/python/>`_
+`python <https://github.com/pantsbuild/pants/tree/master/src/python/pants/backend/python/>`_
   (TODO OMG bluffing) Utility classes useful to many things that work
   with Python code.
 
@@ -201,7 +201,7 @@ Code Layout
   Source of the Target classes; e.g., the code behind `jvm_binary`
   lives here. If you define a new Target type, add its code here.
 
-`tasks <https://github.com/pantsbuild/pants/tree/master/src/python/pants/tasks/>`_
+`tasks <https://github.com/pantsbuild/pants/tree/master/src/python/pants/backend/core/tasks/>`_
   Source of the Task classes. E.g., `junit_run`, the code that
   invokes JUnit if someone tests a `java_tests` target.
 

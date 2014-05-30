@@ -10,6 +10,6 @@ python_tests(
   sources = ['test_zinc_analysis.py'],
   dependencies = [
     pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
-    pants('src/python/pants/tasks/jvm_compile:scala'),
+    pants('src/python/pants/backend/jvm/tasks/jvm_compile:scala'),
   ]
 )

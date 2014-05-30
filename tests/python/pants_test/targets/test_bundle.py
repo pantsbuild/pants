@@ -6,10 +6,26 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from textwrap import dedent
 
+from pants.backend.core.wrapped_globs import Globs
+from pants.backend.jvm.targets.jvm_binary import Bundle, JvmApp, JvmBinary
 from pants_test.base_test import BaseTest
 
 
 class BundleTest(BaseTest):
+  @property
+  def alias_groups(self):
+    return {
+      'target_aliases': {
+        'jvm_app': JvmApp,
+        'jvm_binary': JvmBinary,
+      },
+      'partial_path_relative_utils': {
+        'bundle': Bundle,
+      },
+      'applicative_path_relative_utils': {
+        'globs': Globs,
+      },
+    }
 
   def test_bundle_filemap_dest_bypath(self):
     self.create_dir('src/java/org/archimedes/buoyancy/config')

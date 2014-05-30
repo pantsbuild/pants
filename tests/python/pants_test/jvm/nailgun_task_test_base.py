@@ -4,7 +4,7 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from pants.jvm.nailgun_task import NailgunTask
+from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 
 from .jvm_tool_task_test_base import JvmToolTaskTestBase
 

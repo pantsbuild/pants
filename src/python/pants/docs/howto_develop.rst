@@ -128,13 +128,13 @@ To start an interactive Python shell that can ``import`` Pants modules,
 use the usual ``./pants py`` on a ``python_library`` target that builds
 (or depends on) the modules you want::
 
-    $ ./pants py src/python/pants/targets:common
-    /Users/lhosken/workspace/pants src/python/pants/targets:common
+    $ ./pants py src/python/pants/backend/core/targets:common
+    /Users/lhosken/workspace/pants src/python/pants/backend/core/targets:common
     Python 2.6.8 (unknown, Mar  9 2014, 22:16:00)
     [GCC 4.2.1 Compatible Apple LLVM 5.0 (clang-500.0.68)] on darwin
     Type "help", "copyright", "credits" or "license" for more information.
     (InteractiveConsole)
-    >>> from pants.targets import repository
+    >>> from pants.backend.core.targets import repository
     >>>
 
 .. Writing Tests section
