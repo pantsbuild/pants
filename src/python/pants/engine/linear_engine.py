@@ -12,7 +12,19 @@ from pants.engine.engine import Engine
 
 
 class LinearEngine(Engine):
-  """DOC ME"""
+  """An engine that operates on a linearized phase graph.
+
+  In order to attempt to execute a set of requested phases against a portion of the target graph
+  the engine 1st linearizes the phase graph such that tasks that depend on a phase are ordered
+  after all tasks in that phase.  The linearization further maintains strict in-phase ordering of
+  tasks as-installed in their phases.
+
+  With this linearized task list the engine 1st prepares all the tasks in reverse order such that
+  a task depending on products from an earlier phase can request these.
+
+  Finally the engine executes the prepared tasks in the order established in the linearized task
+  list.
+  """
 
   class PhaseExecutor(object):
     def __init__(self, context, phase, tasks_by_goal):
@@ -25,7 +37,11 @@ class LinearEngine(Engine):
       return self._phase
 
     def attempt(self, explain):
-      """DOC ME"""
+      """Attempts to execute the phase's tasks in installed order.
+
+      :param bool explain: If ``True`` then the phase plan will be explained instead of being
+        executed.
+      """
       goals = self._phase.goals()
       if not goals:
         raise TaskError('No goals installed for phase %s' % self._phase)
@@ -96,9 +112,10 @@ class LinearEngine(Engine):
     # We take a conservative locking strategy and lock in the widest needed scope.  If we have a
     # linearized set of phases as such (where x -> y means x depends on y and *z means z needs to be
     # serialized):
-    #   a -> b -> *c -> d -> *e
-    # Then we grab the lock at the beginning of e's execution and don't relinquish until the largest
-    # scope serialization requirement from c is past.
+    #   a -> b -> *c -> d -> *e -> f
+    # Then there is no locking while the 1st phase, 'f', executes but then we grab the lock at the
+    # beginning of the execution of 'e' and don't relinquish until the largest scope serialization
+    # requirement from c is past.
     serialized_phase_executors = list(filter(lambda pe: pe.phase.serialize, phase_executors))
     outer_lock_holder = serialized_phase_executors[-1] if serialized_phase_executors else None
 

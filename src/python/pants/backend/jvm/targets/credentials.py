@@ -14,8 +14,7 @@ class Credentials(Target):
   or more of these.
   """
 
-  def __init__(self, name, username=None, password=None,
-               exclusives=None):
+  def __init__(self, username=None, password=None, **kwargs):
     """
     :param string name: The name of these credentials.
     :param username: Either a constant username value or else a callable that can fetch one.
@@ -23,7 +22,7 @@ class Credentials(Target):
     :param password: Either a constant password value or else a callable that can fetch one.
     :type password: string or callable
     """
-    Target.__init__(self, name, exclusives=exclusives)
+    super(Credentials, self).__init__(**kwargs)
     self._username = username if callable(username) else lambda: username
     self._password = password if callable(password) else lambda: password
 

@@ -4,12 +4,9 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-import os
-
 from abc import abstractmethod, abstractproperty
 from collections import defaultdict
-
-from twitter.common.collections import OrderedSet
+import os
 
 from pants.base.build_graph import coalesce_targets
 from pants.base.workunit import WorkUnit
@@ -29,15 +26,21 @@ class GroupMember(TaskBase):
 
   @abstractmethod
   def select(self, target):
-    """Return ``True`` to claim the target for processing."""
+    """Return ``True`` to claim the target for processing.
+
+    Group members are consulted in the order registered in their ``GroupTask`` and the 1st group
+    member to select a target claims it.  Only that group member will be asked to prepare execution
+    and later execute over a chunk containing the target.
+    """
 
   def prepare_execute(self, chunks):
-    """Prepare to execute the group action across the given chunks.
+    """Prepare to execute the group action across the given target chunks.
 
     Chunks are guaranteed to be presented in least dependent to most dependent order and to contain
     only directly or indirectly invalidated targets.
 
-    By default no preparation is done.
+    :param list chunks: A list of chunks, each chunk being a list of targets that should be
+      processed together.
     """
 
   @abstractmethod
@@ -46,22 +49,21 @@ class GroupMember(TaskBase):
 
     This chunk or targets' dependencies are guaranteed to have been processed in a prior
     ``execute_chunk`` round by some group member - possibly this one.
+
+    :param list targets: A list of targets that should be processed together (ie: 1 chunk)
     """
 
   def post_execute(self):
-    """Called when all invalid targets claimed by the group have been processed.
-
-    By default no post processing is done.
-    """
+    """Called when all invalid targets claimed by the group have been processed."""
 
 
 class GroupIterator(object):
-  """Iterates the goals in a group over the chunks they own,"""
+  """Iterates the goals in a group over the chunks they own."""
 
   def __init__(self, targets, group_members):
     """Creates an iterator that yields tuples of ``(GroupMember, [chunk Targets])``.
 
-    Chunks will be returned least dependant to most dependant such that a group member processing a
+    Chunks will be returned least dependent to most dependent such that a group member processing a
     chunk can be assured that any dependencies of the chunk have been processed already.
 
     :param list targets: The universe of targets to divide up amongst group members.
@@ -81,30 +83,30 @@ class GroupIterator(object):
           return member
       return None
 
-    coalesced = coalesce_targets(self._targets, discriminator)
-    coalesced = list(reversed(coalesced))
+    coalesced = list(reversed(coalesce_targets(self._targets, discriminator)))
 
     chunks = []
+
+    def add_chunk(member, chunk):
+      if member is not None:
+        chunks.append((member, chunk))
+
     group_member = None
     chunk_start = 0
     for chunk_num, target in enumerate(coalesced):
       target_group_member = discriminator(target)
       if target_group_member != group_member and chunk_num > chunk_start:
-        chunks.append((group_member, coalesced[chunk_start:chunk_num]))
+        add_chunk(group_member, coalesced[chunk_start:chunk_num])
         chunk_start = chunk_num
       group_member = target_group_member
     if chunk_start < len(coalesced):
-      chunks.append((group_member, coalesced[chunk_start:]))
+      add_chunk(group_member, coalesced[chunk_start:])
+
     return chunks
 
 
 class ExclusivesIterator(object):
   """Iterates over groups of compatible targets."""
-
-  @classmethod
-  def from_context(cls, context):
-    exclusives = context.products.get_data('exclusives_groups')
-    return cls(exclusives)
 
   def __init__(self, exclusives_mapping):
     """Creates an iterator that yields lists of compatible targets.``.
@@ -126,11 +128,32 @@ class ExclusivesIterator(object):
 
 
 class GroupTask(Task):
+  """A task that uses coordinates group members who all produce a single product type.
+
+  The canonical example is a group of different compilers targeting the same output format; for
+  example: javac, groovyc, scalac and clojure aot all produce classfiles for the jvm and may depend
+  on each others outputs for linkage.
+
+  Since group members may depend on other group members outputs (a grouped task is only useful if
+  they do!), a group task ensures that each member is executed in the proper order with the proper
+  input targets such that its product dependencies are met.  Group members only need claim the
+  targets they own in their `select` implementation and the group task will figure out the rest
+  from the dependency relationships between the targets selected by the groups members.
+  """
+
   _GROUPS = dict()
 
   @classmethod
   def named(cls, name, product_type, flag_namespace=None):
-    """DOC ME"""
+    """Returns ``GroupTask`` for the given name.
+
+    The logical group embodied by a task is identified with its name and only 1 GroupTask will be
+    created for a given name.  If the task has already been created, it will just be returned.
+
+    :param string name: The logical name of the group.
+    :param string product_type:  The name of the product type this group cooperatively produces.
+    :param list flag_namespace:
+    """
     group_task = cls._GROUPS.get(name)
     if not group_task:
       class SingletonGroupTask(GroupTask):
@@ -171,7 +194,12 @@ class GroupTask(Task):
 
   @classmethod
   def add_member(cls, group_member):
-    """DOC ME"""
+    """Enlists a member in this group.
+
+    A group task delegates all its work to group members who act cooperatively on targets they
+    claim. The order members are added affects the target claim process by setting the order the
+    group members are asked to claim targets in on a first-come, first-served basis.
+    """
     if not issubclass(group_member, GroupMember):
       raise ValueError('Only GroupMember subclasses can join a GroupTask, '
                        'given %s of type %s' % (group_member, type(group_member)))
@@ -192,6 +220,7 @@ class GroupTask(Task):
     """GroupTask must be sub-classed to provide a group name."""
 
   def prepare(self):
+    self.context.products.require_data('exclusives_groups')
     for member_type in self._member_types():
       group_member = member_type(self.context, os.path.join(self.workdir, member_type.name()))
       group_member.prepare()
@@ -219,7 +248,8 @@ class GroupTask(Task):
       # is wired indirectly in register.py.  Kill the dependency and push the exclusives bit
       # into the GroupMembers that need it or else find a clean way to programatically depend
       # on CheckExclusives.
-      for exclusive_chunk in ExclusivesIterator.from_context(self.context):
+      exclusives = self.context.products.get_data('exclusives_groups')
+      for exclusive_chunk in ExclusivesIterator(exclusives):
         for group_member, chunk in GroupIterator(exclusive_chunk, self._group_members):
           ordered_chunks.append((group_member, chunk))
           chunks_by_member[group_member].append(chunk)
@@ -230,7 +260,7 @@ class GroupTask(Task):
             i, group_member.name(), '\n\t'.join(sorted(map(str, goal_chunk)))))
 
       # prep
-      for group_member, chunks in chunks_by_member.items():  # needs an ordering discipline?
+      for group_member, chunks in chunks_by_member.items():
         group_member.prepare_execute(chunks)
 
       # chunk zig zag

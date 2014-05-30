@@ -15,8 +15,6 @@ from pants.backend.core.tasks.task import Task
 class BuildLint(Task):
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
-    Task.setup_parser(option_group, args, mkflag)
-
     option_group.add_option(mkflag("transitive"), mkflag("transitive", negate=True),
       dest="buildlint_transitive", default=False,
       action="callback", callback=mkflag.set_bool,

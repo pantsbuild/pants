@@ -59,7 +59,7 @@ class ApacheThriftGen(CodeGen):
                             help='Force generation of thrift code for these languages.')
 
   def __init__(self, context, workdir):
-    CodeGen.__init__(self, context, workdir)
+    super(ApacheThriftGen, self).__init__(context, workdir)
     self.combined_dir = os.path.join(self.workdir, 'combined')
     self.combined_relpath = os.path.relpath(self.combined_dir, get_buildroot())
     self.session_dir = os.path.join(self.workdir, 'sessions')

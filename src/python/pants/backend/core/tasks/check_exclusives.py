@@ -58,7 +58,6 @@ class CheckExclusives(Task):
 
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
-    Task.setup_parser(option_group, args, mkflag)
     option_group.add_option(mkflag('error_on_collision'),
                             mkflag('error_on_collision', negate=True),
                             dest='exclusives_error_on_collision', default=True,
