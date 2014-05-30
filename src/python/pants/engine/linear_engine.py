@@ -96,15 +96,15 @@ class LinearEngine(Engine):
             task.prepare()
             tasks_by_goal[goal] = task
 
-    return map(lambda p: cls.PhaseExecutor(context, p, tasks_by_goal), phases)
+    return [cls.PhaseExecutor(context, p, tasks_by_goal) for p in phases]
 
   def attempt(self, context, phases):
     phase_executors = self._prepare(context, phases)
 
-    execution_phases = ' -> '.join(map(str, map(lambda e: e.phase.name, phase_executors)))
+    execution_phases = ' -> '.join(e.phase.name for e in phase_executors)
     context.log.debug('Executing goals in phases %s' % execution_phases)
 
-    explain = getattr(context.options, 'explain', None)
+    explain = getattr(context.options, 'explain', False)
     if explain:
       print("Phase Execution Order:\n\n%s\n" % execution_phases)
       print("Phase [Goal->Task] Order:\n")
@@ -115,7 +115,7 @@ class LinearEngine(Engine):
     #   a -> b -> *c -> d -> *e -> f
     # Then we grab the lock at the beginning of f's execution and don't relinquish until the largest
     # scope serialization requirement from c is past.
-    serialized_phase_executors = list(filter(lambda pe: pe.phase.serialize, phase_executors))
+    serialized_phase_executors = [pe for pe in phase_executors if pe.phase.serialize]
     outer_lock_holder = serialized_phase_executors[-1] if serialized_phase_executors else None
 
     if outer_lock_holder:

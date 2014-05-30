@@ -38,7 +38,9 @@ class Mkflag(object):
     name: The simple flag name to be prefixed.
     negate: True to prefix the flag with '--no-'.
     """
-    return '--%s%s-%s' % ('no-' if negate else '', '-'.join(self._namespace), name)
+    return '--{negate}{namespace}-{name}'.format(negate='no-' if negate else '',
+                                                 namespace='-'.join(self._namespace),
+                                                 name=name)
 
   def set_bool(self, option, opt_str, _, parser):
     """An Option callback to parse bool flags that recognizes the --no- negation prefix."""
