@@ -12,6 +12,13 @@ jar-sharing. You should know the
 (`Maven/Ivy groupId, artifactId, and version <http://maven.apache.org/guides/mini/guide-central-repository-upload.html>`_)
 you want to use.
 
+The 3rdparty pattern described here eases avoiding diamond dependency
+problems and version conflicts. If your code depends on artifacts
+``foo`` and ``bar``; and if ``foo`` and ``bar`` depend on different versions
+of the ``baz`` artifact; then some code will be linked together with a
+version of ``baz`` it didn't "expect." Tracking versioned
+dependencies in one place makes it easier to reason about them.
+
 ************
 3rdparty/jvm
 ************
@@ -69,6 +76,31 @@ For example, your ``BUILD`` file might have
 And your Java code might have::
 
     import org.junit.Test;
+
+*************************
+"Round Trip" Dependencies
+*************************
+
+Depending on your workspace's relation with the rest of the world, you might
+want to look out for "round trip" dependencies.
+You can publish an artifact *near* generated from your workspace's source code
+and consume a third-party artifact *far* that depends on *near*.
+If you're not careful, you might depend on two versions of the *near* code:
+the local source code and an artifact you published a while ago.
+When consuming such third-party artifacts, exclude dependencies that
+"collide" with source code and depend on local source::
+
+    jar_library(name='far',
+      jars=[
+        # exclude conflicting dep:
+        jar(org='org.archie', name='far', rev='0.0.18').with_sources()
+          .exclude(org='org.archimedes', name='near')
+      ]
+      dependencies=[
+        # and re-include local version of source manually:
+        pants('util/near'),
+      ]
+    )
 
 ******************************************
 Troubleshooting a JVM Dependencies Problem

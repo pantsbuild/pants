@@ -16,7 +16,8 @@ use a ``3rdparty/`` directory to hold these dependencies.
 If two parts of your code depend on two versions of the same package, some tool
 will pick one version to use. The behavior depends on the tool, but you can
 be sure that one part of your code is *not* using the version it expects.
-This is known as a *diamond dependencies problem* or
+This is known as a *diamond dependencies problem*,
+*dependencies version conflict*, or
 *dependency hell*; you don't want it.
 
 By keeping external dependencies in one place, you make it easier
