@@ -9,13 +9,13 @@ import shlex
 
 from twitter.common.dirutil import safe_open
 
-from pants.base.target import Target
-from pants.base.workunit import WorkUnit
-from pants.backend.core.tasks.task import TaskError
 from pants.backend.jvm.tasks.jvm_compile.analysis_tools import AnalysisTools
 from pants.backend.jvm.tasks.jvm_compile.java.jmake_analysis import JMakeAnalysis
 from pants.backend.jvm.tasks.jvm_compile.java.jmake_analysis_parser import JMakeAnalysisParser
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
+from pants.base.exceptions import TaskError
+from pants.base.target import Target
+from pants.base.workunit import WorkUnit
 
 
 # From http://kenai.com/projects/jmake/sources/mercurial/content

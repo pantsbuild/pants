@@ -4,22 +4,23 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from collections import defaultdict
 import os
 import shutil
-from collections import defaultdict
 
 from twitter.common.collections.orderedset import OrderedSet
 from twitter.common.dirutil import safe_mkdir
 
 from pants import binary_util
-from pants.base.build_environment import get_buildroot
-from pants.base.target import Target
-from pants.goal.phase import Phase
-from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
-from pants.base.exceptions import TaskError
 from pants.backend.jvm.tasks.checkstyle import Checkstyle
 from pants.backend.jvm.tasks.jvm_binary_task import JvmBinaryTask
+from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
+from pants.base.build_environment import get_buildroot
+from pants.base.exceptions import TaskError
+from pants.base.target import Target
+from pants.goal.phase import Phase
+
 
 # We use custom checks for scala and java targets here for 2 reasons:
 # 1.) jvm_binary could have either a scala or java source file attached so we can't do a pure

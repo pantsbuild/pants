@@ -6,10 +6,10 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import threading
 
-from pants.base.workunit import WorkUnit
-from pants.base.exceptions import TaskError
-from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
 from pants.backend.core.tasks.task import Task
+from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
+from pants.base.exceptions import TaskError
+from pants.base.workunit import WorkUnit
 
 
 class BootstrapJvmTools(Task, IvyTaskMixin):

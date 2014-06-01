@@ -6,6 +6,7 @@ python_library(
   name = 'plugin',
   sources = ['__init__.py', 'register.py'],
   dependencies = [
+    pants('src/python/pants/backend/core/tasks:group_task'),
     pants('src/python/pants/backend/jvm/targets:all'),
     pants('src/python/pants/backend/jvm/tasks:all'),
     ':ivy_utils',

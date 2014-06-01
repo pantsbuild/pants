@@ -4,6 +4,7 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from collections import defaultdict
 import functools
 import getpass
 import hashlib
@@ -12,7 +13,6 @@ import os
 import pkgutil
 import shutil
 import sys
-from collections import defaultdict
 
 from twitter.common.collections import OrderedDict, OrderedSet
 from twitter.common.config import Properties
@@ -33,8 +33,6 @@ from pants.base.generator import Generator, TemplateData
 from pants.base.target import Target
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy import Ivy
-
-
 
 
 class PushDb(object):

@@ -9,9 +9,8 @@ import re
 import sys
 
 from pants.backend.core.tasks.console_task import ConsoleTask
-from pants.backend.core.tasks.task import TaskError
-from pants.base.address import Address, SyntheticAddress
-from pants.base.build_environment import get_buildroot
+from pants.base.address import SyntheticAddress
+from pants.base.exceptions import TaskError
 from pants.base.target import Target
 
 

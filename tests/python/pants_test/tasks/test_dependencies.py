@@ -4,18 +4,16 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from textwrap import dedent
-
 import pytest
 
-from pants.base.exceptions import TaskError
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
+from pants.backend.jvm.tasks.dependencies import Dependencies
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
-from pants.backend.jvm.tasks.dependencies import Dependencies
+from pants.base.exceptions import TaskError
 
 from pants_test.tasks.test_base import ConsoleTaskTest
 

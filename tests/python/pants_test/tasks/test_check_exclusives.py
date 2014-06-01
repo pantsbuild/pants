@@ -8,7 +8,8 @@ import shutil
 import tempfile
 
 from pants.backend.core.tasks.check_exclusives import CheckExclusives
-from pants.backend.core.tasks.task import TaskError
+from pants.base.exceptions import TaskError
+
 from pants_test.base_test import BaseTest
 
 

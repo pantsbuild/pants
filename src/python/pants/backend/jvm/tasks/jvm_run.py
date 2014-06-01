@@ -8,12 +8,12 @@ import shlex
 
 from twitter.common.dirutil import safe_open
 
+from pants.backend.jvm.targets.jvm_binary import JvmBinary
+from pants.backend.jvm.tasks.jvm_task import JvmTask
+from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit
 from pants.java.executor import CommandLineGrabber
 from pants.java.util import execute_java
-from pants.backend.jvm.targets.jvm_binary import JvmBinary
-from pants.backend.core.tasks.task import TaskError
-from pants.backend.jvm.tasks.jvm_task import JvmTask
 
 
 def is_binary(target):

@@ -4,13 +4,12 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from collections import defaultdict
 import inspect
 import optparse
 import os
-
-from collections import defaultdict
-
 from pkg_resources import resource_string
+
 from twitter.common.dirutil import Fileset, safe_open
 
 from pants.backend.core.tasks.task import Task

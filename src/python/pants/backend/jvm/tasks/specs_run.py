@@ -6,12 +6,12 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from twitter.common.collections import OrderedSet
 
+from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
+from pants.backend.jvm.tasks.jvm_task import JvmTask
+from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit
 from pants.binary_util import safe_args
 from pants.java.util import execute_java
-from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
-from pants.backend.core.tasks.task import TaskError
-from pants.backend.jvm.tasks.jvm_task import JvmTask
 
 
 class SpecsRun(JvmTask, JvmToolTaskMixin):

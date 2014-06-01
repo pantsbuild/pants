@@ -4,11 +4,12 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from pants.targets.java_library import JavaLibrary
-from pants.targets.python_library import PythonLibrary
-from pants.targets.scala_library import ScalaLibrary
-from pants.tasks.check_exclusives import ExclusivesMapping
-from pants.tasks.group_task import GroupIterator, GroupMember, GroupTask
+from pants.backend.core.tasks.check_exclusives import ExclusivesMapping
+from pants.backend.core.tasks.group_task import GroupMember, GroupIterator, GroupTask
+from pants.backend.jvm.targets.java_library import JavaLibrary
+from pants.backend.jvm.targets.scala_library import ScalaLibrary
+from pants.backend.python.targets.python_library import PythonLibrary
+
 from pants_test.base_test import BaseTest
 
 

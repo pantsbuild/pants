@@ -4,8 +4,9 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from pants.backend.core.tasks.task import Task
 from pants.engine.linear_engine import LinearEngine
-from pants.tasks.task import Task
+
 from pants_test.base_test import BaseTest
 from pants_test.engine.base_engine_test import EngineTestBase
 

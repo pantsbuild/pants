@@ -4,10 +4,10 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from collections import defaultdict
 import os
 import re
 import subprocess
-from collections import defaultdict
 
 from twitter.common import log
 from twitter.common.collections import OrderedSet
@@ -15,12 +15,12 @@ from twitter.common.dirutil import safe_mkdir
 
 from pants.backend.codegen.targets.java_protobuf_library import JavaProtobufLibrary
 from pants.backend.codegen.tasks.code_gen import CodeGen
-from pants.base.address import SyntheticAddress
-from pants.base.build_environment import get_buildroot
-from pants.binary_util import select_binary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.python.targets.python_library import PythonLibrary
-from pants.backend.core.tasks.task import TaskError
+from pants.base.address import SyntheticAddress
+from pants.base.build_environment import get_buildroot
+from pants.base.exceptions import TaskError
+from pants.binary_util import select_binary
 
 
 class ProtobufGen(CodeGen):

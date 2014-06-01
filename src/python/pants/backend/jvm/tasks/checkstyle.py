@@ -9,9 +9,9 @@ import os
 from twitter.common.dirutil import safe_open
 
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
-from pants.process.xargs import Xargs
-from pants.backend.core.tasks.task import TaskError
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
+from pants.base.exceptions import TaskError
+from pants.process.xargs import Xargs
 
 
 CHECKSTYLE_MAIN = 'com.puppycrawl.tools.checkstyle.Main'

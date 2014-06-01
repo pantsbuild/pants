@@ -4,21 +4,21 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from collections import defaultdict
 import os
 import shutil
 import time
-from collections import defaultdict
 
 from twitter.common.dirutil import safe_mkdir
 
 from pants import binary_util
+from pants.backend.jvm.ivy_utils import IvyUtils
+from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
+from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
+from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.cache_manager import VersionedTargetSet
 from pants.base.exceptions import TaskError
 from pants.ivy.bootstrapper import Bootstrapper
-from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
-from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
-from pants.backend.jvm.ivy_utils import IvyUtils
-from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 
 
 class IvyResolve(NailgunTask, IvyTaskMixin, JvmToolTaskMixin):

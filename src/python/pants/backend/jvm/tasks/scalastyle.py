@@ -7,12 +7,12 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import os
 import re
 
-from pants.base.config import Config
-from pants.base.target import Target
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
-from pants.process.xargs import Xargs
-from pants.backend.core.tasks.task import TaskError
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
+from pants.base.config import Config
+from pants.base.exceptions import TaskError
+from pants.base.target import Target
+from pants.process.xargs import Xargs
 
 
 class Scalastyle(NailgunTask, JvmToolTaskMixin):

@@ -4,9 +4,9 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from contextlib import closing, contextmanager
 import os
 import subprocess
-from contextlib import closing, contextmanager
 
 import posixpath
 from twitter.common import log
@@ -22,8 +22,8 @@ else:
   import urllib2 as urllib_request
   import urllib2 as urllib_error
 
-from .base.config import Config
-from .base.exceptions import TaskError
+from pants.base.config import Config
+from pants.base.exceptions import TaskError
 
 
 _ID_BY_OS = {

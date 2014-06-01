@@ -4,22 +4,23 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-import os
-import textwrap
 from contextlib import closing
 from itertools import chain
+import os
+import textwrap
 from xml.etree import ElementTree
 
 from twitter.common.collections import OrderedDict
 from twitter.common.contextutil import open_zip as open_jar
 from twitter.common.dirutil import safe_open
 
-from pants.base.build_environment import get_buildroot
-from pants.base.hash_utils import hash_file
-from pants.base.workunit import WorkUnit
 from pants.backend.jvm.jvm_tool_bootstrapper import JvmToolBootstrapper
 from pants.backend.jvm.targets.jar_library import JarLibrary
-from pants.backend.core.tasks.task import TaskError
+from pants.base.build_environment import get_buildroot
+from pants.base.exceptions import TaskError
+from pants.base.hash_utils import hash_file
+from pants.base.workunit import WorkUnit
+
 
 # Well known metadata file required to register scalac plugins with nsc.
 _PLUGIN_INFO_FILE = 'scalac-plugin.xml'

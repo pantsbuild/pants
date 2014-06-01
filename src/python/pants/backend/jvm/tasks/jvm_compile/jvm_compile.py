@@ -4,27 +4,26 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from collections import defaultdict
 import itertools
 import os
 import shutil
 import uuid
-from collections import defaultdict
-from itertools import groupby
 
 from twitter.common.collections import OrderedSet
 from twitter.common.contextutil import open_zip, temporary_dir
 from twitter.common.dirutil import safe_mkdir, safe_rmtree
 
+from pants.backend.core.tasks.group_task import GroupMember
+from pants.backend.core.tasks.task import Task
+from pants.backend.jvm.tasks.jvm_compile.jvm_dependency_analyzer import JvmDependencyAnalyzer
+from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
+from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.target import Target
 from pants.base.worker_pool import Work
 from pants.goal.products import MultipleRootedProducts
-from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.reporting.reporting_utils import items_to_report_element
-from pants.backend.core.tasks.task import Task
-from pants.backend.jvm.tasks.jvm_compile.jvm_dependency_analyzer import JvmDependencyAnalyzer
-from pants.backend.jvm.tasks.nailgun_task import NailgunTask
-from pants.tasks.group_task import GroupMember
 
 
 class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
@@ -351,7 +350,7 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
               [invalid_sources_by_target.get(t, []) for t in vts.targets]))
           de_duped_sources = list(OrderedSet(sources))
           if len(sources) != len(de_duped_sources):
-            counts = [(src, len(list(srcs))) for src, srcs in groupby(sorted(sources))]
+            counts = [(src, len(list(srcs))) for src, srcs in itertools.groupby(sorted(sources))]
             self.context.log.warn(
                 'De-duped the following sources:\n\t%s' %
                 '\n\t'.join(sorted('%d %s' % (cnt, src) for src, cnt in counts if cnt > 1)))

@@ -6,14 +6,14 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import os
 
+from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
+from pants.backend.core.tasks.task import Task, TaskBase
+from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.base.exceptions import TaskError
 from pants.java import util
 from pants.java.distribution import Distribution
 from pants.java.executor import SubprocessExecutor
 from pants.java.nailgun_executor import NailgunExecutor
-from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
-from pants.backend.core.tasks.task import Task, TaskBase
-from pants.backend.core.tasks.console_task import ConsoleTask
 
 
 class NailgunTaskBase(TaskBase, JvmToolTaskMixin):

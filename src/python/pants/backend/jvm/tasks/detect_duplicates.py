@@ -4,10 +4,9 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-import os
-
 from collections import defaultdict
 from contextlib import closing
+import os
 from zipfile import ZipFile
 
 from pants.backend.jvm.tasks.jvm_binary_task import JvmBinaryTask

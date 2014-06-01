@@ -4,14 +4,14 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from collections import defaultdict, namedtuple
+from contextlib import contextmanager
 import errno
 import os
 import pkgutil
 import re
 import threading
 import xml
-from collections import defaultdict, namedtuple
-from contextlib import contextmanager
 
 from twitter.common.collections import OrderedDict, OrderedSet
 from twitter.common.dirutil import safe_mkdir, safe_open

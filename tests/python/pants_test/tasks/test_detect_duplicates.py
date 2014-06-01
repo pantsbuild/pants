@@ -13,8 +13,8 @@ import pytest
 
 from twitter.common.dirutil import safe_rmtree, touch
 
-from pants.base.exceptions import TaskError
 from pants.backend.jvm.tasks.detect_duplicates import DuplicateDetector
+from pants.base.exceptions import TaskError
 
 from pants_test.base.context_utils import create_context
 from pants_test.tasks.test_base import TaskTest

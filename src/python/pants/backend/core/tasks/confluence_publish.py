@@ -11,9 +11,9 @@ from twitter.common.confluence import Confluence, ConfluenceError
 from twitter.common.dirutil import safe_open
 
 from pants import binary_util
-from pants.base.exceptions import TaskError
 from pants.backend.core.targets.doc import Page
 from pants.backend.core.tasks.task import Task
+from pants.base.exceptions import TaskError
 
 
 """Classes to ease publishing Page targets to Confluence wikis."""

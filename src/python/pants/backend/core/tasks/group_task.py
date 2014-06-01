@@ -8,11 +8,11 @@ from abc import abstractmethod, abstractproperty
 from collections import defaultdict
 import os
 
+from pants.backend.core.tasks.check_exclusives import ExclusivesMapping
+from pants.backend.core.tasks.task import TaskBase, Task
 from pants.base.build_graph import coalesce_targets
 from pants.base.workunit import WorkUnit
 from pants.goal import Mkflag
-from pants.tasks.task import Task, TaskBase
-from pants.tasks.check_exclusives import ExclusivesMapping
 
 
 class GroupMember(TaskBase):

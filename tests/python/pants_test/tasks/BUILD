@@ -365,7 +365,9 @@ python_tests(
   dependencies = [
     pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
+    pants('src/python/pants/backend/jvm/targets:jvm'),
     pants('src/python/pants/backend/jvm/tasks:jar_task'),
+    pants('src/python/pants/base:source_root'),
     pants('tests/python/pants_test/jvm:jvm_tool_task_test_base'),
   ]
 )
@@ -374,10 +376,11 @@ python_tests(
   name = 'group_task',
   sources = ['test_group_task.py'],
   dependencies = [
-    pants('src/python/pants/targets:java'),
-    pants('src/python/pants/targets:python'),
-    pants('src/python/pants/targets:scala'),
-    pants('src/python/pants/tasks:group_task'),
+    pants('src/python/pants/backend/core/tasks:check_exclusives'),
+    pants('src/python/pants/backend/core/tasks:group_task'),
+    pants('src/python/pants/backend/jvm/targets:java'),
+    pants('src/python/pants/backend/jvm/targets:scala'),
+    pants('src/python/pants/backend/python/targets:python'),
     pants('tests/python/pants_test:base_test'),
   ]
 )
