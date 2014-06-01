@@ -29,7 +29,7 @@ from pants.base.target import Target
 from pants.base.workunit import WorkUnit
 from pants.commands.command import Command
 from pants.engine.engine import Engine
-from pants.engine.group_engine import GroupEngine
+from pants.engine.linear_engine import LinearEngine
 from pants.goal import Context, GoalError, Phase
 from pants.goal.help import print_help
 from pants.goal.initialize_reporting import update_reporting
@@ -231,7 +231,7 @@ class Goal(Command):
       context.log.error('Unknown goal(s): %s\n' % ' '.join(phase.name for phase in unknown))
       return 1
 
-    engine = GroupEngine()
+    engine = LinearEngine()
     return engine.execute(context, self.phases)
 
   def cleanup(self):

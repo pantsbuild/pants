@@ -4,21 +4,19 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from abc import abstractmethod
+from contextlib import contextmanager
 import itertools
 import os
-import shutil
 import sys
 import threading
-from collections import defaultdict
-from contextlib import contextmanager
 
 from twitter.common.collections.orderedset import OrderedSet
+from twitter.common.lang import AbstractClass
 
 from pants.base.build_invalidator import BuildInvalidator, CacheKeyGenerator
-from pants.base.cache_manager import (InvalidationCacheManager, InvalidationCheck,
-                                      VersionedTargetSet)
+from pants.base.cache_manager import (InvalidationCacheManager, InvalidationCheck)
 from pants.base.config import Config
-from pants.base.exceptions import TaskError
 from pants.base.hash_utils import hash_file
 from pants.base.worker_pool import Work
 from pants.base.workunit import WorkUnit
@@ -27,7 +25,27 @@ from pants.cache.read_write_artifact_cache import ReadWriteArtifactCache
 from pants.reporting.reporting_utils import items_to_report_element
 
 
-class Task(object):
+class TaskBase(AbstractClass):
+  """Defines a lifecycle that prepares a task for execution and provides the base machinery
+  needed to execute it.
+
+  Provides the base lifecycle methods that allow a task to interact with the command line, other
+  tasks and the user.  The lifecycle is linear and run via the following sequence:
+  1. setup_parser - expose command line flags
+  2. __init__ - distill configuration into the information needed to execute
+  3. prepare - request any products needed from phase dependencies
+
+  Provides access to the current run context for scoping work.
+
+  Also provides the basic facilities for doing work efficiently including providing a work directory
+  for scratch space on disk, an invalidator for checking which targets need work done on, and an
+  artifact cache for re-using previously cached work.
+
+  #TODO(John Sirois):  Lifecycle is currently split between TaskBase and Task and lifecycle
+  (interface) and helpers (utility) are currently conflated.  Tease these apart and narrow the scope
+  of the helpers.  Ideally console tasks don't inherit a workdir, invalidator or build cache for
+  example.
+  """
 
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
@@ -57,6 +75,15 @@ class Task(object):
   @property
   def workdir(self):
     return self._workdir
+
+  def prepare(self):
+    """Prepares a task for execution.
+
+    Called before execution and prior to any tasks that may be (indirectly) depended upon.
+
+    Typically a task that requires products from other phases would register interest in those
+    products here and then retrieve the requested product mappings when executed.
+    """
 
   def setup_artifact_cache_from_config(self, config_section=None):
     """Subclasses can call this in their __init__() to set up artifact caching for that task type.
@@ -113,10 +140,6 @@ class Task(object):
     they both have the same product type.
     """
     return self.__class__.__name__
-
-  def execute(self, targets):
-    """Executes this task against targets, which may be a subset of the current context targets."""
-    raise TaskError('execute() not implemented')
 
   def invalidate_for(self):
     """Provides extra objects that participate in invalidation.
@@ -331,3 +354,16 @@ class Task(object):
       prefix,
       items_to_report_element([t.address.reference() for t in targets], 'target'),
       suffix)
+
+
+class Task(TaskBase):
+  """An executable task.
+
+  Tasks form the atoms of work done by pants and when executed generally produce artifacts as a
+  side effect whether these be files on disk (for example compilation outputs) or characters output
+  to the terminal (for example dependency graph metadata).
+  """
+
+  @abstractmethod
+  def execute(self):
+    """Executes this task."""

@@ -4,10 +4,9 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from contextlib import contextmanager
 import functools
 import os
-
-from contextlib import contextmanager
 
 from twitter.common.dirutil import safe_mkdir
 
@@ -61,16 +60,12 @@ class JarCreate(JarTask):
 
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
+    super(JarCreate, cls).setup_parser(option_group, args, mkflag)
+
     option_group.add_option(mkflag('compressed'), mkflag('compressed', negate=True),
                             dest='jar_create_compressed', default=True,
                             action='callback', callback=mkflag.set_bool,
                             help='[%default] Create compressed jars.')
-
-    option_group.add_option(mkflag('transitive'), mkflag('transitive', negate=True),
-                            dest='jar_create_transitive', default=True,
-                            action='callback', callback=mkflag.set_bool,
-                            help='[%default] Create jars for the transitive closure of internal '
-                                 'targets reachable from the roots specified on the command line.')
 
     option_group.add_option(mkflag('classes'), mkflag('classes', negate=True),
                             dest='jar_create_classes', default=True,
@@ -94,7 +89,6 @@ class JarCreate(JarTask):
     options = context.options
     products = context.products
 
-    self.transitive = options.jar_create_transitive
     self.compressed = options.jar_create_compressed
 
     self.jar_classes = options.jar_create_classes or products.isrequired('jars')
@@ -119,11 +113,11 @@ class JarCreate(JarTask):
 
     self._jars = {}
 
-  def execute(self, targets):
+  def execute(self):
     safe_mkdir(self.workdir)
 
     def jar_targets(predicate):
-      return filter(predicate, (targets if self.transitive else self.context.target_roots))
+      return self.context.targets(predicate)
 
     def add_genjar(typename, target, name):
       self.context.products.get(typename).add(target, self.workdir).append(name)

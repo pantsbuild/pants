@@ -4,8 +4,9 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from pants.goal import Goal as goal, Group as group
+from pants.goal import Goal as goal
 
+from pants.backend.core.tasks.group_task import GroupTask
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.artifact import Artifact
 from pants.backend.jvm.targets.benchmark import Benchmark
@@ -26,7 +27,6 @@ from pants.backend.jvm.tasks.binary_create import BinaryCreate
 from pants.backend.jvm.tasks.bootstrap_jvm_tools import BootstrapJvmTools
 from pants.backend.jvm.tasks.bundle_create import BundleCreate
 from pants.backend.jvm.tasks.check_published_deps import CheckPublishedDeps
-from pants.backend.jvm.tasks.checkstyle import Checkstyle
 from pants.backend.jvm.tasks.dependencies import Dependencies
 from pants.backend.jvm.tasks.depmap import Depmap
 from pants.backend.jvm.tasks.filedeps import FileDeps
@@ -103,38 +103,36 @@ def register_goals():
 
   # Compilation.
 
-  # When chunking a group, we don't need a new chunk for targets with no sources at all
-  # (which do sometimes exist, e.g., when creating a BUILD file ahead of its code).
-  def _has_sources(target, extension):
-    return target.has_sources(extension) or target.has_label('sources') and not target.sources
+  # AnnotationProcessors are java targets, but we need to force them into their own compilation
+  # rounds so that they are on classpath of any dependees downstream that may use them. Without
+  # forcing a separate member type we could get a java chunk containing a mix of apt processors and
+  # code that relied on the un-compiled apt processor in the same javac invocation.  If so, javac
+  # would not be smart enough to compile the apt processors 1st and activate them.
+  class AptCompile(JavaCompile):
+    @classmethod
+    def name(cls):
+      return 'apt'
 
-  # Note: codegen targets shouldn't really be 'is_java' or 'is_scala', but right now they
-  # are so they don't cause a lot of islands while chunking. The jvm group doesn't act on them
-  # anyway (it acts on their synthetic counterparts) so it doesn't matter where they get chunked.
-  # TODO: Make chunking only take into account the targets actually acted on? This would require
-  # task types to declare formally the targets they act on.
-  def _is_java(target):
-    return (target.is_java or
-            (isinstance(target, (JvmBinary, JavaTests, Benchmark))
-             and _has_sources(target, '.java'))) and not target.is_apt
-
-  def _is_scala(target):
-    return (target.is_scala or
-            (isinstance(target, (JvmBinary, JavaTests, Benchmark))
-             and _has_sources(target, '.scala')))
+    def select(self, target):
+      return super(AptCompile, self).select(target) and target.is_apt
 
 
-  class AptCompile(JavaCompile): pass  # So they're distinct in log messages etc.
+  jvm_compile = GroupTask.named('jvm-compilers', product_type='classes', flag_namespace=['compile'])
 
-  jvm_compile_deps = ['gen', 'resolve', 'check-exclusives', 'bootstrap']
+  # At some point ScalaLibrary targets will be able to won mixed scala and java source sets.
+  # At that point, the ScalaCompile group member will still only select targets via
+  # has_sources('*.scala'); however if the JavaCompile group member were registered earlier, it
+  # would claim the ScalaLibrary targets with mixed source sets leaving those targets un-compiled
+  # by scalac and resulting in systemic compile errors.
+  jvm_compile.add_member(ScalaCompile)
 
-  goal(name='apt', action=AptCompile, group=group('jvm', lambda t: t.is_apt), dependencies=jvm_compile_deps
-  ).install('compile')
+  # Its important we add AptCompile before JavaCompile since it 1st selector wins and apt code is a
+  # subset of java code
+  jvm_compile.add_member(AptCompile)
 
-  goal(name='java', action=JavaCompile, group=group('jvm', _is_java), dependencies=jvm_compile_deps
-  ).install('compile')
+  jvm_compile.add_member(JavaCompile)
 
-  goal(name='scala', action=ScalaCompile, group=group('jvm', _is_scala), dependencies=jvm_compile_deps
+  goal(name='jvm', action=jvm_compile, dependencies=['gen', 'resolve', 'check-exclusives', 'bootstrap']
   ).install('compile').with_description('Compile source code.')
 
   # Generate documentation.

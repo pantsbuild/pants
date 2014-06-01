@@ -4,13 +4,12 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-import re
-
 from mock import Mock
 import pytest
 
 from pants.backend.jvm.tasks.jar_publish import JarPublish
 from pants.base.exceptions import TaskError
+
 from pants_test.base_test import BaseTest
 from pants_test.tasks.test_base import prepare_task
 
@@ -23,7 +22,7 @@ class JarPublishTest(BaseTest):
                         build_graph=self.build_graph,
                         build_file_parser=self.build_file_parser)
     task.scm = Mock()
-    task.execute([])
+    task.execute()
 
   def test_publish_local_only(self):
     with pytest.raises(TaskError) as exc:

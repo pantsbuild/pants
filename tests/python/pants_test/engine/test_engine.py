@@ -4,9 +4,8 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from pants.base.exceptions import TaskError
 from pants.engine.engine import Engine
-from pants.backend.core.tasks.task import TaskError
-
 from pants_test.base.context_utils import create_context
 from pants_test.engine.base_engine_test import EngineTestBase
 

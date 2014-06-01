@@ -4,13 +4,12 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from collections import defaultdict
 import inspect
 import optparse
 import os
-
-from collections import defaultdict
-
 from pkg_resources import resource_string
+
 from twitter.common.dirutil import Fileset, safe_open
 
 from pants.backend.core.tasks.task import Task
@@ -324,7 +323,7 @@ class BuildBuildDictionary(Task):
     self._templates_dir = os.path.join('templates', 'builddictionary')
     self._outdir = os.path.join(self.context.config.getdefault("pants_distdir"), "builddict")
 
-  def execute(self, targets):
+  def execute(self):
     self._gen_goals_reference()
     self._gen_config_reference()
     self._gen_build_dictionary()

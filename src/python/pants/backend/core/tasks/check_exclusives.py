@@ -58,7 +58,6 @@ class CheckExclusives(Task):
 
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
-    Task.setup_parser(option_group, args, mkflag)
     option_group.add_option(mkflag('error_on_collision'),
                             mkflag('error_on_collision', negate=True),
                             dest='exclusives_error_on_collision', default=True,
@@ -96,7 +95,8 @@ class CheckExclusives(Task):
         conflicting_keys[k] = exclusives_map[k]
     return conflicting_keys
 
-  def execute(self, targets):
+  def execute(self):
+    targets = self.context.targets()
     # compute transitive exclusives
     for t in targets:
       t._propagate_exclusives()

@@ -14,6 +14,7 @@ dependencies(
     ':dependees',
     ':filemap',
     ':filter',
+    ':group_task',
     ':list_goals',
     ':listtargets',
     ':markdown_to_html',
@@ -139,6 +140,19 @@ python_library(
     pants('src/python/pants/base:address'),
     pants('src/python/pants/base:build_environment'),
     pants('src/python/pants/base:target'),
+  ],
+)
+
+python_library(
+  name = 'group_task',
+  sources = ['group_task.py'],
+  dependencies = [
+    pants(':check_exclusives'),
+    pants(':task'),
+    pants('3rdparty/python/twitter/commons:twitter.common.lang'),
+    pants('3rdparty/python/twitter/commons:twitter.common.collections'),
+    pants('src/python/pants/base:build_graph'),
+    pants('src/python/pants/base:workunit'),
   ],
 )
 

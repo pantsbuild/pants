@@ -34,7 +34,7 @@ def _async_cautious_rmtree(root):
 
 class Invalidator(ConsoleTask):
   """Invalidate the entire build."""
-  def execute(self, targets):
+  def execute(self):
     build_invalidator_dir = os.path.join(
       self.context.config.get_option(Config.DEFAULT_PANTS_WORKDIR), 'build_invalidator')
     _cautious_rmtree(build_invalidator_dir)
@@ -42,7 +42,7 @@ class Invalidator(ConsoleTask):
 
 class Cleaner(ConsoleTask):
   """Clean all current build products."""
-  def execute(self, targets):
+  def execute(self):
     _cautious_rmtree(self.context.config.getdefault('pants_workdir'))
 
 
@@ -50,6 +50,6 @@ class Cleaner(ConsoleTask):
 # cleaning the renamed workdir taxes the filesystem.
 class AsyncCleaner(ConsoleTask):
   """Clean all current build products in a background process."""
-  def execute(self, targets):
+  def execute(self):
     _async_cautious_rmtree(self.context.config.getdefault('pants_workdir'))
 

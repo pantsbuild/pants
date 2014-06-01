@@ -11,18 +11,41 @@ from contextlib import contextmanager
 from twitter.common.contextutil import open_zip, temporary_dir, temporary_file
 from twitter.common.dirutil import safe_mkdir, safe_mkdtemp, safe_rmtree
 
-from pants.jvm.jar_task import JarTask
+from pants.backend.jvm.targets.repository import Repository
+from pants.backend.jvm.tasks.jar_task import JarTask
+from pants.base.source_root import SourceRoot
 
 from pants_test.jvm.jar_task_test_base import JarTaskTestBase
 
 
 class JarTaskTest(JarTaskTestBase):
 
+  class TestJarTask(JarTask):
+    def execute(self):
+      pass
+
+  @property
+  def alias_groups(self):
+    super_groups = super(JarTaskTest, self).alias_groups.copy()
+    local_groups = {
+      'target_aliases': {
+        'repo': Repository,
+        },
+      'applicative_path_relative_utils': {
+        'source_root': SourceRoot,
+        },
+      }
+    for key, group_map in local_groups.iteritems():
+      super_group = super_groups.get(key, {})
+      super_group.update(group_map)
+      super_groups[key] = super_group
+    return super_groups
+
   def setUp(self):
     super(JarTaskTest, self).setUp()
 
     self.workdir = safe_mkdtemp()
-    self.jar_task = self.prepare_execute(self.context(), self.workdir, JarTask)
+    self.jar_task = self.prepare_execute(self.context(), self.workdir, self.TestJarTask)
 
   def tearDown(self):
     super(JarTaskTest, self).tearDown()

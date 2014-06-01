@@ -4,16 +4,11 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-import copy
 from collections import defaultdict
+import copy
 
-from twitter.common.lang import Compatibility
-
-from pants.base.address import Address
-from pants.base.build_environment import get_buildroot
-from pants.base.target import Target
-from pants.backend.core.tasks.task import TaskError
 from pants.backend.core.tasks.console_task import ConsoleTask
+from pants.base.exceptions import TaskError
 
 
 class PathFinder(ConsoleTask):
@@ -83,14 +78,15 @@ class PathFinder(ConsoleTask):
 
 
 class Path(PathFinder):
-  def execute(self, targets):
+  def execute(self):
     if len(self.target_roots) != 2:
       raise TaskError('Specify two targets please (found %d)' % len(self.target_roots))
 
     self._find_path(self.target_roots[0], self.target_roots[1], self.log)
 
+
 class Paths(PathFinder):
-  def execute(self, targets):
+  def execute(self):
     if len(self.target_roots) != 2:
       raise TaskError('Specify two targets please (found %d)' % len(self.target_roots))
 

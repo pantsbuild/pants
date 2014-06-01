@@ -7,9 +7,9 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 from functools import reduce
 
 from pants.backend.core.tasks.task import Task
-from pants.base.exceptions import TaskError
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.targets.python_root import is_python_root
+from pants.base.exceptions import TaskError
 
 
 class SetupPythonEnvironment(Task):
@@ -42,7 +42,7 @@ class SetupPythonEnvironment(Task):
     self._cache = PythonInterpreterCache(context.config, logger=context.log.debug)
     super(SetupPythonEnvironment, self).__init__(context, workdir)
 
-  def execute(self, _):
+  def execute(self):
     ifilters = self.context.options.python_interpreter
     self._cache.setup(force=self.context.options.python_setup_force,
         paths=self.context.options.python_setup_paths,

@@ -60,14 +60,15 @@ python_library(
     pants(':jvm_dependency_analyzer'),
     pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
+    pants('src/python/pants/backend/core/tasks:group_task'),
+    pants('src/python/pants/backend/core/tasks:task'),
+    pants('src/python/pants/backend/jvm/tasks:jvm_tool_task_mixin'),
+    pants('src/python/pants/backend/jvm/tasks:nailgun_task'),
     pants('src/python/pants/base:build_environment'),
     pants('src/python/pants/base:target'),
     pants('src/python/pants/base:worker_pool'),
     pants('src/python/pants/goal:products'),
-    pants('src/python/pants/backend/jvm/tasks:jvm_tool_task_mixin'),
-    pants('src/python/pants/backend/jvm/tasks:nailgun_task'),
     pants('src/python/pants/reporting'),
-    pants('src/python/pants/backend/core/tasks:task'),
   ],
 )
 

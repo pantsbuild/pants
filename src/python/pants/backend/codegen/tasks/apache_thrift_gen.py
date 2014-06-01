@@ -4,11 +4,11 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from collections import defaultdict, namedtuple
 import errno
 import os
 import re
 import subprocess
-from collections import defaultdict, namedtuple
 
 from twitter.common import log
 from twitter.common.collections import OrderedSet
@@ -17,11 +17,11 @@ from twitter.common.dirutil import safe_mkdir
 from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
 from pants.backend.codegen.targets.python_thrift_library import PythonThriftLibrary
 from pants.backend.codegen.tasks.code_gen import CodeGen
-from pants.base.address import SyntheticAddress
-from pants.base.build_environment import get_buildroot
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.python.targets.python_library import PythonLibrary
-from pants.backend.core.tasks.task import TaskError
+from pants.base.address import SyntheticAddress
+from pants.base.build_environment import get_buildroot
+from pants.base.exceptions import TaskError
 from pants.thrift_util import calculate_compile_roots, select_thrift_binary
 
 
@@ -59,7 +59,7 @@ class ApacheThriftGen(CodeGen):
                             help='Force generation of thrift code for these languages.')
 
   def __init__(self, context, workdir):
-    CodeGen.__init__(self, context, workdir)
+    super(ApacheThriftGen, self).__init__(context, workdir)
     self.combined_dir = os.path.join(self.workdir, 'combined')
     self.combined_relpath = os.path.relpath(self.combined_dir, get_buildroot())
     self.session_dir = os.path.join(self.workdir, 'sessions')

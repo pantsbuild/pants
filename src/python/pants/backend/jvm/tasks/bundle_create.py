@@ -19,6 +19,8 @@ class BundleCreate(JvmBinaryTask):
 
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
+    super(BundleCreate, cls).setup_parser(option_group, args, mkflag)
+
     option_group.add_option(mkflag('deployjar'), mkflag('deployjar', negate=True),
                             dest='bundle_create_deployjar', default=False,
                             action='callback', callback=mkflag.set_bool,
@@ -59,7 +61,7 @@ class BundleCreate(JvmBinaryTask):
       self.bundles = [] if isinstance(target, JvmBinary) else target.payload.bundles
       self.basename = target.basename
 
-  def execute(self, _):
+  def execute(self):
     archiver = archive.archiver(self._archiver_type) if self._archiver_type else None
     for target in self.context.target_roots:
       for app in map(self.App, filter(self.App.is_app, [target])):

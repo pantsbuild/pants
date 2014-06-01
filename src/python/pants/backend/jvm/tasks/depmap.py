@@ -4,9 +4,9 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from pants.backend.jvm.targets.jar_dependency import JarDependency
-from pants.backend.core.tasks.task import TaskError
 from pants.backend.core.tasks.console_task import ConsoleTask
+from pants.backend.jvm.targets.jar_dependency import JarDependency
+from pants.base.exceptions import TaskError
 
 
 # XXX(pl): JVM hairball violator

@@ -21,18 +21,17 @@ from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.targets.repository import Repository
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.jar_create import JarCreate, is_jvm_library
-from pants.base.build_environment import get_buildroot
 from pants.base.source_root import SourceRoot
 from pants.goal.products import MultipleRootedProducts
+
 from pants_test.base.context_utils import create_context
 from pants_test.jvm.jar_task_test_base import JarTaskTestBase
-from pants_test.tasks.test_base import ConsoleTaskTest
 
 
 class JarCreateTestBase(JarTaskTestBase):
   @property
   def alias_groups(self):
-    super_groups = super(JarTaskTestBase, self).alias_groups.copy()
+    super_groups = super(JarCreateTestBase, self).alias_groups.copy()
     local_groups = {
       'target_aliases': {
         'java_library': JavaLibrary,

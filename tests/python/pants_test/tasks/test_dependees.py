@@ -12,15 +12,16 @@ from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
 from pants.backend.core.targets.dependencies import Dependencies
 from pants.backend.core.targets.resources import Resources
 from pants.backend.core.tasks.dependees import ReverseDepmap
-from pants.backend.core.tasks.task import TaskError
-from pants.base.build_environment import get_buildroot
-from pants.base.source_root import SourceRoot
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_tests import PythonTests
+from pants.base.build_environment import get_buildroot
+from pants.base.exceptions import TaskError
+from pants.base.source_root import SourceRoot
+
 from pants_test.tasks.test_base import ConsoleTaskTest
 
 

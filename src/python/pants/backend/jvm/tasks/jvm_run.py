@@ -8,12 +8,12 @@ import shlex
 
 from twitter.common.dirutil import safe_open
 
+from pants.backend.jvm.targets.jvm_binary import JvmBinary
+from pants.backend.jvm.tasks.jvm_task import JvmTask
+from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit
 from pants.java.executor import CommandLineGrabber
 from pants.java.util import execute_java
-from pants.backend.jvm.targets.jvm_binary import JvmBinary
-from pants.backend.core.tasks.task import TaskError
-from pants.backend.jvm.tasks.jvm_task import JvmTask
 
 
 def is_binary(target):
@@ -53,7 +53,7 @@ class JvmRun(JvmTask):
     self.only_write_cmd_line = context.options.only_write_cmd_line
     context.products.require_data('exclusives_groups')
 
-  def execute(self, targets):
+  def execute(self):
     # The called binary may block for a while, allow concurrent pants activity during this pants
     # idle period.
     #
@@ -67,7 +67,7 @@ class JvmRun(JvmTask):
 
     self.context.lock.release()
     # Run the first target that is a binary.
-    binaries = filter(is_binary, targets)
+    binaries = self.context.targets(is_binary)
     if len(binaries) > 0:  # We only run the first one.
       main = binaries[0].main
       egroups = self.context.products.get_data('exclusives_groups')

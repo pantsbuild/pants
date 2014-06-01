@@ -4,17 +4,17 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from abc import abstractmethod
 import os
 import sys
-from abc import abstractmethod
 
 from twitter.common.lang import AbstractClass
 
+from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.build_file import BuildFile
 from pants.base.exceptions import TaskError
 from pants.scm import Scm
-from pants.backend.core.tasks.console_task import ConsoleTask
 
 
 class WhatChanged(ConsoleTask):

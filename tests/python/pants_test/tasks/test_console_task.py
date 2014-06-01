@@ -7,16 +7,17 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import os
 import sys
 import threading
-import unittest
+
 from Queue import Empty, Queue
 
 import pytest
 
 from pants.backend.core.tasks.console_task import ConsoleTask
+from pants_test.base_test import BaseTest
 from pants_test.tasks.test_base import prepare_task
 
 
-class ConsoleTaskTest(unittest.TestCase):
+class ConsoleTaskTest(BaseTest):
   class Infinite(ConsoleTask):
     def __init__(self, context, workdir, outstream=sys.stdout):
       super(ConsoleTaskTest.Infinite, self).__init__(context, workdir, outstream)
@@ -31,13 +32,16 @@ class ConsoleTaskTest(unittest.TestCase):
 
   def test_sigpipe(self):
     r, w = os.pipe()
-    task = prepare_task(self.Infinite, outstream=os.fdopen(w, 'w'))
+    task = prepare_task(task_type=self.Infinite,
+                        outstream=os.fdopen(w, 'w'),
+                        build_graph=self.build_graph,
+                        build_file_parser=self.build_file_parser)
 
     raised = Queue(maxsize=1)
 
     def execute():
       try:
-        task.execute([])
+        task.execute()
       except IOError as e:
         raised.put(e)
 

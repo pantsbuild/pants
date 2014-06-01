@@ -7,19 +7,19 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 from abc import abstractmethod
 from collections import namedtuple
 import os
-import re
 import sys
 
 from twitter.common.dirutil import safe_mkdir, safe_open
 
 from pants import binary_util
-from pants.base.build_environment import get_buildroot
-from pants.base.workunit import WorkUnit
-from pants.java.util import execute_java
 from pants.backend.jvm.targets.java_tests import JavaTests as junit_tests
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
-from pants.backend.core.tasks.task import TaskError
+from pants.base.build_environment import get_buildroot
+from pants.base.exceptions import TaskError
+from pants.base.workunit import WorkUnit
+from pants.java.util import execute_java
+
 
 # TODO(ji): Add unit tests.
 # TODO(ji): Add coverage in ci.run (https://github.com/pantsbuild/pants/issues/83)
@@ -39,6 +39,7 @@ _TaskExports = namedtuple('_TaskExports',
 def _classfile_to_classname(cls):
   clsname, _ = os.path.splitext(cls.replace('/', '.'))
   return clsname
+
 
 class _JUnitRunner(object):
   """Helper class to run JUnit tests with or without coverage.
@@ -152,7 +153,6 @@ class _JUnitRunner(object):
 
     if context.options.junit_run_arg:
       self._opts.extend(context.options.junit_run_arg)
-
 
   def execute(self, targets):
     tests = list(self._get_tests_to_run() if self._tests_to_run
@@ -314,8 +314,6 @@ class _Coverage(_JUnitRunner):
                             action='callback', callback=mkflag.set_bool, default=False,
                             help='[%%default] Tries to open the generated html coverage report, '
                                    'implies %s.' % coverage_html_flag)
-
-
 
   def __init__(self, task_exports, context):
     super(_Coverage, self).__init__(task_exports, context)
@@ -495,7 +493,7 @@ class JUnitRun(JvmTask, JvmToolTaskMixin):
     else:
       self._runner = _JUnitRunner(task_exports, self._context)
 
-
-  def execute(self, targets):
+  def execute(self):
     if not self._context.options.junit_run_skip:
+      targets = self.context.targets()
       self._runner.execute(targets)

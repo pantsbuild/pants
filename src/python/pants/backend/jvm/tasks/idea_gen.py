@@ -55,7 +55,7 @@ class IdeaGen(IdeGen):
 
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
-    IdeGen.setup_parser(option_group, args, mkflag)
+    super(IdeaGen, cls).setup_parser(option_group, args, mkflag)
 
     supported_versions = sorted(list(_VERSIONS.keys()))
     option_group.add_option(mkflag("idea-version"), dest="idea_gen_version",

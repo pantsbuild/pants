@@ -6,10 +6,10 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import threading
 
-from pants.base.workunit import WorkUnit
-from pants.base.exceptions import TaskError
-from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
 from pants.backend.core.tasks.task import Task
+from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
+from pants.base.exceptions import TaskError
+from pants.base.workunit import WorkUnit
 
 
 class BootstrapJvmTools(Task, IvyTaskMixin):
@@ -18,7 +18,7 @@ class BootstrapJvmTools(Task, IvyTaskMixin):
     super(BootstrapJvmTools, self).__init__(context, workdir)
     context.products.require_data('jvm_build_tools')
 
-  def execute(self, targets):
+  def execute(self):
     context = self.context
     if context.products.is_required_data('jvm_build_tools_classpath_callbacks'):
       tool_product_map = context.products.get_data('jvm_build_tools') or {}

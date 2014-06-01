@@ -16,12 +16,12 @@ from pygments.styles import get_all_styles
 from twitter.common.dirutil import safe_mkdir, safe_open
 
 from pants import binary_util
+from pants.backend.core.targets.doc import Page
+from pants.backend.core.tasks.task import Task
 from pants.base.address import Address
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.target import Target
-from pants.backend.core.targets.doc import Page
-from pants.backend.core.tasks.task import Task
 
 
 def configure_codehighlight_options(option_group, mkflag):
@@ -98,7 +98,7 @@ class MarkdownToHtml(Task):
       if context.options.markdown_to_html_code_style:
         self.code_style = context.options.markdown_to_html_code_style
 
-  def execute(self, targets):
+  def execute(self):
     # TODO(John Sirois): consider adding change detection
 
     css_relpath = os.path.join('css', 'codehighlight.css')
@@ -125,7 +125,7 @@ class MarkdownToHtml(Task):
     plaingenmap = self.context.products.get('markdown_html')
     wikigenmap = self.context.products.get('wiki_html')
     show = []
-    for page in filter(is_page, targets):
+    for page in self.context.targets(is_page):
       _, ext = os.path.splitext(page.source)
       if ext in self.extensions:
         def process_page(key, outdir, url_builder, config, genmap, fragment=False):

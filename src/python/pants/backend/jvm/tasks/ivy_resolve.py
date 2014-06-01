@@ -4,28 +4,28 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from collections import defaultdict
 import os
 import shutil
 import time
-from collections import defaultdict
 
 from twitter.common.dirutil import safe_mkdir
 
 from pants import binary_util
+from pants.backend.jvm.ivy_utils import IvyUtils
+from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
+from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
+from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.cache_manager import VersionedTargetSet
 from pants.base.exceptions import TaskError
 from pants.ivy.bootstrapper import Bootstrapper
-from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
-from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
-from pants.backend.jvm.ivy_utils import IvyUtils
-from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 
 
 class IvyResolve(NailgunTask, IvyTaskMixin, JvmToolTaskMixin):
 
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
-    NailgunTask.setup_parser(option_group, args, mkflag)
+    super(IvyResolve, cls).setup_parser(option_group, args, mkflag)
 
     flag = mkflag('override')
     option_group.add_option(flag, action='append', dest='ivy_resolve_overrides',
@@ -86,13 +86,14 @@ class IvyResolve(NailgunTask, IvyTaskMixin, JvmToolTaskMixin):
   def invalidate_for(self):
     return self.context.options.ivy_resolve_overrides
 
-  def execute(self, targets):
+  def execute(self):
     """Resolves the specified confs for the configured targets and returns an iterator over
     tuples of (conf, jar path).
     """
 
     groups = self.context.products.get_data('exclusives_groups')
     executor = self.create_java_executor()
+    targets = self.context.targets()
 
     # Below, need to take the code that actually execs ivy, and invoke it once for each
     # group. Then after running ivy, we need to take the resulting classpath, and load it into

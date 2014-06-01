@@ -7,12 +7,12 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import os
 import re
 
-from pants.base.config import Config
-from pants.base.target import Target
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
-from pants.process.xargs import Xargs
-from pants.backend.core.tasks.task import TaskError
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
+from pants.base.config import Config
+from pants.base.exceptions import TaskError
+from pants.base.target import Target
+from pants.process.xargs import Xargs
 
 
 class Scalastyle(NailgunTask, JvmToolTaskMixin):
@@ -33,7 +33,7 @@ class Scalastyle(NailgunTask, JvmToolTaskMixin):
 
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
-    NailgunTask.setup_parser(option_group, args, mkflag)
+    super(Scalastyle, cls).setup_parser(option_group, args, mkflag)
 
     option_group.add_option(mkflag("skip"), mkflag("skip", negate=True),
                             dest="scalastyle_skip", default=False,
@@ -61,12 +61,13 @@ class Scalastyle(NailgunTask, JvmToolTaskMixin):
     self._scalastyle_bootstrap_key = 'scalastyle'
     self.register_jvm_tool(self._scalastyle_bootstrap_key, [':scalastyle'])
 
-  def execute(self, targets):
+  def execute(self):
     if self.context.options.scalastyle_skip:
       self.context.log.debug('Skipping checkstyle.')
       return
 
     check_targets = list()
+    targets = self.context.targets()
     for target in targets:
       for tgt in target.resolve():
         if isinstance(tgt, Target) and tgt.has_sources('.scala'):

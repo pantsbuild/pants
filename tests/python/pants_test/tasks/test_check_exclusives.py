@@ -8,7 +8,8 @@ import shutil
 import tempfile
 
 from pants.backend.core.tasks.check_exclusives import CheckExclusives
-from pants.backend.core.tasks.task import TaskError
+from pants.base.exceptions import TaskError
+
 from pants_test.base_test import BaseTest
 
 
@@ -33,7 +34,7 @@ class CheckExclusivesTest(BaseTest):
     context = self.context(target_roots=[d, e])
     check_exclusives_task = CheckExclusives(context, self.workdir, signal_error=True)
     try:
-      check_exclusives_task.execute([d, e])
+      check_exclusives_task.execute()
       self.fail("Expected a conflicting exclusives exception to be thrown.")
     except TaskError:
       pass
@@ -48,7 +49,7 @@ class CheckExclusivesTest(BaseTest):
     context = self.context(target_roots=[a, b, c, d])
     context.products.require_data('exclusives_groups')
     check_exclusives_task = CheckExclusives(context, self.workdir, signal_error=True)
-    check_exclusives_task.execute([a, b, c, d])
+    check_exclusives_task.execute()
     egroups = context.products.get_data('exclusives_groups')
     # Expected compatibility:
     # a is compatible with nothing but itself.
@@ -85,7 +86,7 @@ class CheckExclusivesTest(BaseTest):
     context = self.context(target_roots=[a, b, c, d])
     context.products.require_data('exclusives_groups')
     check_exclusives_task = CheckExclusives(context, self.workdir, signal_error=True)
-    check_exclusives_task.execute([a, b, c, d])
+    check_exclusives_task.execute()
     egroups = context.products.get_data('exclusives_groups')
 
     egroups.set_base_classpath_for_group("a=1,b=1", ["a1", "b1"])

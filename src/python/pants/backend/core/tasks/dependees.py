@@ -9,11 +9,10 @@ from collections import defaultdict
 from twitter.common.collections import OrderedSet
 
 from pants.backend.core.tasks.console_task import ConsoleTask
-from pants.backend.core.tasks.task import TaskError
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
+from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
-from pants.base.target import Target
 
 
 class ReverseDepmap(ConsoleTask):

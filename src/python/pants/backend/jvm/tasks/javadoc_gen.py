@@ -22,8 +22,8 @@ class JavadocGen(JvmdocGen):
   def __init__(self, context, workdir, confs=None, active=True):
     super(JavadocGen, self).__init__(context, workdir, javadoc, confs, active)
 
-  def execute(self, targets):
-    self.generate_execute(targets, is_java, create_javadoc_command)
+  def execute(self):
+    self.generate_execute(is_java, create_javadoc_command)
 
 
 def create_javadoc_command(classpath, gendir, *targets):

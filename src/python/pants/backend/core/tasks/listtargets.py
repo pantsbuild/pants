@@ -7,7 +7,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
 from pants.base.exceptions import TaskError
-from pants.base.target import Target
 from pants.backend.core.tasks.console_task import ConsoleTask
 
 
