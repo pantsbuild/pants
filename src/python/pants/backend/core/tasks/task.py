@@ -72,7 +72,7 @@ class Task(object):
   def setup_artifact_cache(self, read_spec, write_spec):
     """Subclasses can call this in their __init__() to set up artifact caching for that task type.
 
-    See docstring for pants.cache.create_artifact_cache() for details on the spec format.
+    See docstring for pants.cache.cache_setup.create_artifact_cache() for details on the spec format.
     The cache is created lazily, as needed.
 
     """
