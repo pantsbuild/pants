@@ -2,6 +2,22 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+# This bootstrap script runs in 2 modes controlled by environment variables.
+#
+# With no special environment variables exported, the script will create a pants.pex from local
+# sources if there is none at the root of the repo and then run that.
+#
+# If PANTS_DEV is exported then this script will instead run pants from the live sources in this
+# repo.
+#
+# Further support is added for projects wrapping pants with custom external extensions.  In the
+# future this will work differently (see: https://github.com/pantsbuild/pants/issues/5), but
+# currently pants extenders can invoke this script exporting a few environment variables to include
+# the extension source and requirements for development purposes:
+# WRAPPER_SRCPATH       This is a colon separated list of paths containing extension sourcecode.
+# WRAPPER_REQUIREMENTS  This is a colon separated list of pip install compatible requirements.txt
+#                       files.
+
 HERE=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
 
 source ${HERE}/build-support/pants_venv
@@ -10,18 +26,46 @@ PANTS_EXE=${HERE}/src/python/pants/bin/pants_exe.py
 PANTS_BINARY=src/python/pants/bin:pants
 PANTS_PEX="${HERE}/pants.pex"
 
+PY=${PY:-$(which python)}
+
+if [[ ! -z "${WRAPPER_REQUIREMENTS}" ]]; then
+  PANTS_DEV=1
+  DEV_REQUIREMENTS=(
+    $(echo ${WRAPPER_REQUIREMENTS} | tr : ' ')
+    ${DEV_REQUIREMENTS[@]}
+  )
+fi
+
+PANTS_SRCPATH=(
+  ${HERE}/src/python
+)
+if [[ ! -z "${WRAPPER_SRCPATH}" ]]; then
+  PANTS_DEV=1
+  PANTS_SRCPATH=(
+    $(echo ${WRAPPER_SRCPATH} | tr : ' ')
+    ${PANTS_SRCPATH[@]}
+  )
+fi
+PANTS_SRCPATH="$(echo ${PANTS_SRCPATH[@]} | tr ' ' :)"
+
 function run_pants_bare() {
   activate_pants_venv
-  PYTHONPATH=${HERE}/src/python python ${PANTS_EXE} "$@"
+  PYTHONPATH="${PANTS_SRCPATH}" python ${PANTS_EXE} "$@"
 }
 
 function exec_pants_bare() {
   activate_pants_venv
-  PYTHONPATH=${HERE}/src/python exec python ${PANTS_EXE} "$@"
+  PYTHONPATH="${PANTS_SRCPATH}" exec python ${PANTS_EXE} "$@"
 }
 
 if [ ! -z "${PANTS_DEV}" ]; then
   log "*** Running pants in dev mode from ${PANTS_EXE} ***"
+  if [[ ! -z "${WRAPPER_REQUIREMENTS}" ]]; then
+    log "***   with extra requirements: ${WRAPPER_REQUIREMENTS} ***"
+  fi
+  if [[ ! -z "${WRAPPER_SRCPATH}" ]]; then
+    log "***   with extra sources ${WRAPPER_SRCPATH} ***"
+  fi
   exec_pants_bare "$@"
 else
   if [ ! -e "${PANTS_PEX}" ]; then
