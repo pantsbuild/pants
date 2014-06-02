@@ -163,6 +163,22 @@ class TaskBase(AbstractClass):
     """Invalidates all targets for this task."""
     BuildInvalidator(self._build_invalidator_dir).force_invalidate_all()
 
+  def create_cache_manager(self, invalidate_dependents):
+    """Creates a cache manager that can be used to invalidate targets on behalf of this task.
+
+    Use this if you need to check for invalid targets but can't use the contextmanager created by
+    invalidated(), e.g., because you don't want to mark the targets as valid when done.
+    """
+    extra_data = [self.invalidate_for()]
+
+    for f in self.invalidate_for_files():
+      extra_data.append(hash_file(f))
+
+    return InvalidationCacheManager(self._cache_key_generator,
+                                    self._build_invalidator_dir,
+                                    invalidate_dependents,
+                                    extra_data)
+
   @contextmanager
   def invalidated(self,
                   targets,
@@ -194,15 +210,8 @@ class TaskBase(AbstractClass):
     # TODO(benjy): Compute locally_changed_targets here instead of passing it in? We currently pass
     # it in because JvmCompile already has the source->target mapping for other reasons, and also
     # to selectively enable this feature.
-    extra_data = [self.invalidate_for()]
 
-    for f in self.invalidate_for_files():
-      extra_data.append(hash_file(f))
-
-    cache_manager = InvalidationCacheManager(self._cache_key_generator,
-                                             self._build_invalidator_dir,
-                                             invalidate_dependents,
-                                             extra_data)
+    cache_manager = self.create_cache_manager(invalidate_dependents)
 
     # We separate locally-modified targets from others by coloring them differently.
     # This can be a performance win, because these targets are more likely to be iterated
@@ -218,6 +227,7 @@ class TaskBase(AbstractClass):
           colors[t] = 'locally_changed'
         else:
           colors[t] = 'not_locally_changed'
+    # TODO(benjy): Can fingerprint_strategy be a constructor arg of the cache manager?
     invalidation_check = cache_manager.check(targets,
                                              partition_size_hint,
                                              colors,
