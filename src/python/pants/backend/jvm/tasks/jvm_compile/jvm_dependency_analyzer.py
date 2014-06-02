@@ -205,6 +205,19 @@ class JvmDependencyAnalyzer(object):
       # a missing dep.
       return not dep.startswith(self._context.java_home)
 
+    def target_or_java_dep_in_targets(target, targets):
+      # We want to check if the target is in the targets collection
+      #
+      # However, for the special case of scala_library that has a java_sources
+      # reference we're ok if that exists in targets even if the scala_library does not.
+
+      if target in targets:
+        return True
+      elif target.is_scala:
+        return any(t in targets for t in target.java_sources)
+      else:
+        return False
+
     # TODO: If recomputing these every time becomes a performance issue, memoize for
     # already-seen targets and incrementally compute for new targets not seen in a previous
     # partition, in this or a previous chunk.
@@ -228,7 +241,8 @@ class JvmDependencyAnalyzer(object):
             # to be in our declared deps to be OK.
             if actual_dep_tgts is None:
               missing_file_deps.add((src_tgt, actual_dep))
-            elif src_tgt not in actual_dep_tgts:  # Obviously intra-target deps are fine.
+            elif not target_or_java_dep_in_targets(src_tgt, actual_dep_tgts):
+              # Obviously intra-target deps are fine.
               canonical_actual_dep_tgt = next(iter(actual_dep_tgts))
               if actual_dep_tgts.isdisjoint(transitive_deps_by_target.get(src_tgt, [])):
                 missing_tgt_deps_map[(src_tgt, canonical_actual_dep_tgt)].append((src, actual_dep))
