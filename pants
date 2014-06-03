@@ -17,6 +17,27 @@
 # WRAPPER_SRCPATH       This is a colon separated list of paths containing extension sourcecode.
 # WRAPPER_REQUIREMENTS  This is a colon separated list of pip install compatible requirements.txt
 #                       files.
+#
+# For example, with a wrapping project layed out like so:
+# /src/wrapper/
+#   src/main/python/
+#     wrapper/
+#       ...
+#   dependencies/python/
+#     BUILD
+#     requirements.txt
+#
+# And a pantsbuild/pants clone like so:
+# /src/pantsbuild-pants
+#
+# You could invoke pants in the wrapper with its custom extension enabled using a script like so:
+# /src/wrapper/pants
+# ==
+# #!/usr/bin/env bash
+# WRAPPER_REQUIREMENTS="/src/wrapper/dependencies/python/requirements.txt" \
+# WRAPPER_SRCPATH=/src/wrapper/src/main/python \
+#    exec /src/pantsbuild-pants/pants "$@"
+#
 
 HERE=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
 
