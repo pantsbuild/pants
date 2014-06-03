@@ -17,7 +17,9 @@ jvm_app(name='main',
 jvm_binary(name = 'main-bin',
   dependencies = [
     pants('src/java/com/pants/examples/hello/greet'),
-    pants('3rdparty:log4j'),
+  ],
+  resources=[
+    pants('src/resources/com/pants/example/hello'),
   ],
   source = 'HelloMain.java',
   main = 'com.pants.examples.hello.main.HelloMain',

@@ -5,9 +5,6 @@ java_library(name = 'greet',
   dependencies = [], # A more realistic example would depend on other libs,
                      # but this "hello world" is pretty simple.
   sources = globs('*.java'),
-  resources = [
-    'src/resources/com/pants/example/hello',
-  ],
   provides = artifact(org='com.pants.examples',
                     name='hello-greet',
                     repo='build-support/ivy:public',),
