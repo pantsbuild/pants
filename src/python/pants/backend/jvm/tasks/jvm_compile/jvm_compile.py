@@ -372,7 +372,7 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
         # Register products for all the valid targets.
         # We register as we go, so dependency checking code can use this data.
         valid_targets = list(set(relevant_targets) - set(invalid_targets))
-        self._register_products(valid_targets, sources_by_target, self._analysis_file)
+        self._register_products(valid_targets, self._analysis_file)
 
         # Figure out the sources and analysis belonging to each partition.
         partitions = []  # Each element is a triple (vts, sources_by_target, analysis).
@@ -423,7 +423,7 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
 
             # Update the products with the latest classes. Must happen before the
             # missing dependencies check.
-            self._register_products(vts.targets, sources_by_target, analysis_file)
+            self._register_products(vts.targets, analysis_file)
             if self._dep_analyzer:
               # Check for missing dependencies.
               actual_deps = self._analysis_parser.parse_deps_from_path(analysis_file,
@@ -453,7 +453,7 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
           vts.update()
       else:
         # Nothing to build. Register products for all the targets in one go.
-        self._register_products(relevant_targets, sources_by_target, self._analysis_file)
+        self._register_products(relevant_targets, self._analysis_file)
 
     self.post_process(relevant_targets)
 
@@ -762,7 +762,7 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
     if self.context.products.is_required_data('resources_by_target'):
       self.context.products.safe_create_data('resources_by_target', make_products)
 
-  def _register_products(self, targets, sources_by_target, analysis_file):
+  def _register_products(self, targets, analysis_file):
     classes_by_source = self.context.products.get_data('classes_by_source')
     classes_by_target = self.context.products.get_data('classes_by_target')
     resources_by_target = self.context.products.get_data('resources_by_target')
@@ -771,7 +771,7 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
       computed_classes_by_source = self._compute_classes_by_source(analysis_file)
       for target in targets:
         target_products = classes_by_target[target] if classes_by_target is not None else None
-        for source in sources_by_target[target]:  # Source is relative to buildroot.
+        for source in self._sources_by_target.get(target, []):  # Source is relative to buildroot.
           classes = computed_classes_by_source.get(source, [])  # Classes are absolute paths.
           if classes_by_target is not None:
             target_products.add_abs_paths(self._classes_dir, classes)

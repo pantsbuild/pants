@@ -48,8 +48,8 @@ class DuplicateDetector(JvmBinaryTask):
     context.products.require_data('resources_by_target')
 
 
-  def execute(self, targets):
-    for binary_target in filter(self.is_binary, targets):
+  def execute(self):
+    for binary_target in filter(self.is_binary, self.context.targets()):
       self.detect_duplicates_for_target(binary_target)
 
   def detect_duplicates_for_target(self, binary_target):
@@ -83,9 +83,10 @@ class DuplicateDetector(JvmBinaryTask):
     resources_by_target = self.context.products.get_data('resources_by_target')
 
     target_products = classes_by_target.get(binary_target)
-    for _, classes in target_products.rel_paths():
-      for cls in classes:
-        artifacts_by_file_name[cls].add(binary_target)
+    if target_products:  # Will be None if binary_target has no sources.
+      for _, classes in target_products.rel_paths():
+        for cls in classes:
+          artifacts_by_file_name[cls].add(binary_target)
 
     target_resources = []
     if binary_target.has_resources:
