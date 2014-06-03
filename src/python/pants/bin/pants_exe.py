@@ -131,7 +131,8 @@ def _run():
   build_file_parser = BuildFileParser(root_dir=root_dir, run_tracker=run_tracker)
   build_graph = BuildGraph(run_tracker=run_tracker)
 
-  load_backends_from_source(build_file_parser)
+  additional_backends = config.getlist('backends', 'packages')
+  load_backends_from_source(build_file_parser, additional_backends=additional_backends)
 
   command_class, command_args = _parse_command(root_dir, argv)
   command = command_class(run_tracker,
