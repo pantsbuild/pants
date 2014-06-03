@@ -52,8 +52,20 @@ class Py(Command):
                       help='Show verbose output.')
     parser.epilog = """Interact with the chroot of the specified target."""
 
-  def __init__(self, run_tracker, root_dir, parser, argv):
-    Command.__init__(self, run_tracker, root_dir, parser, argv)
+  def __init__(self,
+               run_tracker,
+               root_dir,
+               parser,
+               argv,
+               build_file_parser,
+               build_graph):
+    Command.__init__(self,
+                     run_tracker,
+                     root_dir,
+                     parser,
+                     argv,
+                     build_file_parser,
+                     build_graph)
 
     self.binary = None
     self.targets = []

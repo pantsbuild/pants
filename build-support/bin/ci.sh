@@ -74,7 +74,7 @@ if [[ "${skip_distribution:-false}" == "false" ]]; then
   # setup_py
   banner "Running pants distribution tests"
   (
-    ./pants.pex build ${INTERPRETER_CONSTRAINTS[@]} \
+    ./pants.pex py --pex ${INTERPRETER_CONSTRAINTS[@]} \
       src/python/pants:_pants_transitional_publishable_binary_ && \
     mv dist/_pants_transitional_publishable_binary_.pex dist/self.pex && \
     ./dist/self.pex build ${INTERPRETER_CONSTRAINTS[@]} \
