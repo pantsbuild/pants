@@ -52,6 +52,22 @@ How Some Base Classes Interrelate
     If you're giving Pants the ability to do something new, you're probably
     adding a Task. See :doc:`dev_tasks`.
 
+**Backend**
+    Collection of Targets, Goals, Tasks, Commands to do something useful.
+    At Pants' core are the abstractions Target, and Task.
+    These abstractions don't do anything in particular.
+    To build real code, you need to define and register some more specific
+    classes.
+    For example, to build Java code, you want the ``JavaLibrary`` Target,
+    ``JavaCompile`` task (registered in the ``compile`` goal), and many more.
+    We organize this "real" code into "backends". A typical backend defines
+    several classes and registers them with the Pants core.
+    For a design discussion on registering plugins, see the
+    `Plugin Engine
+    <https://groups.google.com/forum/#!topic/pants-devel/uHGpR2K6FBI>`_
+    ``pants-devel`` thread.
+
+
 **Context**
     An API to the state of the world. A Task uses this to find out
     things like the flags the user set on the command line, `pants.ini` config,
@@ -152,6 +168,11 @@ Perhaps there's a lot of overhead starting up the tool, but it takes
 about as long to compile 10 source files as to compile one.
 A ``goal`` with a ``group`` will try to operate on more than one target at
 a time.
+
+For a design discussion of a big Group refactor, see the
+`RFC: GroupEngine / Task Lifecycle change proposal
+<https://groups.google.com/forum/#!msg/pants-devel/glCHuLC9JF4/T6nbPcDVKk0J>`_
+``pants-devel`` thread.
 
 ***********
 Code Layout
