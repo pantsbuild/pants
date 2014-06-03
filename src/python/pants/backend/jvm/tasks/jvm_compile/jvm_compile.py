@@ -15,7 +15,6 @@ from twitter.common.contextutil import open_zip, temporary_dir
 from twitter.common.dirutil import safe_mkdir, safe_rmtree
 
 from pants.backend.core.tasks.group_task import GroupMember
-from pants.backend.core.tasks.task import Task
 from pants.backend.jvm.tasks.jvm_compile.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
@@ -547,7 +546,7 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
             self.move(tmp_analysis, self._analysis_file)
 
     self._ensure_analysis_tmpdir()
-    return Task.do_check_artifact_cache(self, vts, post_process_cached_vts=post_process_cached_vts)
+    return self.do_check_artifact_cache(vts, post_process_cached_vts=post_process_cached_vts)
 
   def _write_to_artifact_cache(self, analysis_file, vts, sources_by_target):
     vt_by_target = dict([(vt.target, vt) for vt in vts.versioned_targets])
