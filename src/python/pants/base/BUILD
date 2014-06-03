@@ -102,6 +102,9 @@ python_library(
 python_library(
   name = 'dev_backend_loader',
   sources = ['dev_backend_loader.py'],
+  dependencies = [
+    pants('3rdparty/python/twitter/commons:twitter.common.collections'),
+  ]
 )
 
 python_library(

@@ -1,6 +1,20 @@
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
+
+from twitter.common.collections import OrderedSet
 
 
-def load_backends_from_source(build_file_parser):
+def load_backends_from_source(build_file_parser, additional_backends=None):
+  """Installs pants backend packages to provide targets and helper functions to BUILD files and
+  goals to the cli.
+
+  :param build_file_parser: The parser to populate with target aliases and helper functions from
+    the backends.
+  :param additional_backends: An optional list of additional packages to load backends from.
+  """
   print("Loading pants backends from source")
   backend_packages = [
     'pants.backend.core',
@@ -9,7 +23,7 @@ def load_backends_from_source(build_file_parser):
     'pants.backend.codegen',
     'pants.backend.maven_layout',
   ]
-  for backend_package in backend_packages:
+  for backend_package in OrderedSet(backend_packages + (additional_backends or [])):
     module = __import__(backend_package + '.register',
                         {}, # globals
                         {}, # locals
