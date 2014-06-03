@@ -138,7 +138,8 @@ class Py(Command):
       self.error('Cannot specify both --entry_point and --ipython!')
 
     if self.options.verbose:
-      print('Build operating on targets: %s' % ' '.join(self.targets))
+      print('Build operating on targets: %s' % ' '.join(str(target) for target in self.targets))
+
 
     builder = PEXBuilder(tempfile.mkdtemp(), interpreter=self.interpreter,
                          pex_info=self.binary.pexinfo if self.binary else None)
