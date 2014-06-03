@@ -5,7 +5,7 @@
 # Required on OS X.
 export set ARCHFLAGS=-Wno-error=unused-command-line-argument-hard-error-in-future
 
-REPO_ROOT=$(cd "$(git rev-parse --show-toplevel)" && pwd)
+REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd "$(git rev-parse --show-toplevel)" && pwd)
 
 REQUIREMENTS=(
   ${REPO_ROOT}/3rdparty/python/requirements.txt
