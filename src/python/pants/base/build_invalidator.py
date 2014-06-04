@@ -87,7 +87,7 @@ class CacheKeyGenerator(object):
       target_key = target.transitive_invalidation_hash(fingerprint_strategy)
     else:
       target_key = target.invalidation_hash(fingerprint_strategy)
-    full_key = '{target_key}#{key_suffix}'.format(target_key=target_key, key_suffix=key_suffix)
+    full_key = '{target_key}_{key_suffix}'.format(target_key=target_key, key_suffix=key_suffix)
     return CacheKey(target.id, full_key, target.payload.num_chunking_units, (target.payload,))
 
 
