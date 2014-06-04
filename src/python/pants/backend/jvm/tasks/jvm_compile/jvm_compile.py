@@ -19,6 +19,7 @@ from pants.backend.jvm.tasks.jvm_compile.jvm_dependency_analyzer import JvmDepen
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
 from pants.base.build_environment import get_buildroot, get_scm
+from pants.base.exceptions import TaskError
 from pants.base.target import Target
 from pants.base.worker_pool import Work
 from pants.goal.products import MultipleRootedProducts
@@ -342,7 +343,7 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
         classpath.insert(0, (conf, jar))
 
     # Target -> sources (relative to buildroot), for just this chunk's targets.
-    sources_by_target = dict((t, self._sources_by_target[t]) for t in relevant_targets)
+    sources_by_target = self._sources_for_targets(relevant_targets)
 
     # If needed, find targets that we've changed locally (as opposed to
     # changes synced in from the SCM).
@@ -363,7 +364,7 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
       if invalidation_check.invalid_vts:
         # Find the invalid sources for this chunk.
         invalid_targets = [vt.target for vt in invalidation_check.invalid_vts]
-        invalid_sources_by_target = dict((t, self._sources_by_target[t]) for t in invalid_targets)
+        invalid_sources_by_target = self._sources_for_targets(invalid_targets)
 
         tmpdir = os.path.join(self._analysis_tmpdir, str(uuid.uuid4()))
         os.mkdir(tmpdir)
@@ -533,9 +534,7 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
           with self.context.new_workunit(name='merge_analysis'):
             self._analysis_tools.merge_from_paths(analyses_to_merge, tmp_analysis)
 
-          # TODO: We've already computed this for all targets, but can't easily plumb that into
-          # this callback. This shouldn't be a performance hit, but if it is - revisit.
-          sources_by_cached_target = self._compute_current_sources_by_target(cached_targets)
+          sources_by_cached_target = self._sources_for_targets(cached_targets)
 
           # Record the cached target -> sources mapping for future use.
           for target, sources in sources_by_cached_target.items():
@@ -740,6 +739,12 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
   @property
   def _analysis_parser(self):
     return self._analysis_tools.parser
+
+  def _sources_for_targets(self, targets):
+    """Returns a map target->sources for the specified targets."""
+    if self._sources_by_target is None:
+      raise TaskError('self._sources_by_target not computed yet.')
+    return dict((t, self._sources_by_target.get(t, [])) for t in targets)
 
   # Work in a tmpdir so we don't stomp the main analysis files on error.
   # The tmpdir is cleaned up in a shutdown hook, because background work

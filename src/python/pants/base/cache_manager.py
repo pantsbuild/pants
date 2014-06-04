@@ -183,11 +183,13 @@ class InvalidationCacheManager(object):
                cache_key_generator,
                build_invalidator_dir,
                invalidate_dependents,
-               extra_data):
+               extra_data,
+               fingerprint_strategy=None):
     self._cache_key_generator = cache_key_generator
     self._invalidate_dependents = invalidate_dependents
     self._extra_data = pickle.dumps(extra_data)  # extra_data may be None.
     self._invalidator = BuildInvalidator(build_invalidator_dir)
+    self._fingerprint_strategy = fingerprint_strategy
 
   def update(self, vts):
     """Mark a changed or invalidated VersionedTargetSet as successfully processed."""
@@ -208,8 +210,7 @@ class InvalidationCacheManager(object):
   def check(self,
             targets,
             partition_size_hint=None,
-            target_colors=None,
-            fingerprint_strategy=None):
+            target_colors=None):
     """Checks whether each of the targets has changed and invalidates it if so.
 
     Returns a list of VersionedTargetSet objects (either valid or invalid). The returned sets
@@ -219,11 +220,11 @@ class InvalidationCacheManager(object):
     If target_colors is specified, it must be a map from Target -> opaque 'color' values.
     Two Targets will be in the same partition only if they have the same color.
     """
-    all_vts = self._sort_and_validate_targets(targets, fingerprint_strategy)
+    all_vts = self._sort_and_validate_targets(targets)
     invalid_vts = filter(lambda vt: not vt.valid, all_vts)
     return InvalidationCheck(all_vts, invalid_vts, partition_size_hint, target_colors)
 
-  def _sort_and_validate_targets(self, targets, fingerprint_strategy=None):
+  def _sort_and_validate_targets(self, targets):
     """Validate each target.
 
     Returns a topologically ordered set of VersionedTargets, each representing one input target.
@@ -244,9 +245,7 @@ class InvalidationCacheManager(object):
     id_to_hash = {}
 
     for target in ordered_targets:
-      cache_key = self._key_for(target,
-                                transitive=self._invalidate_dependents,
-                                fingerprint_strategy=fingerprint_strategy)
+      cache_key = self._key_for(target, transitive=self._invalidate_dependents)
       id_to_hash[target.id] = cache_key.hash
 
       # Create a VersionedTarget corresponding to @target.
@@ -264,11 +263,11 @@ class InvalidationCacheManager(object):
     """Orders the targets topologically, from least to most dependent."""
     return filter(targets.__contains__, reversed(sort_targets(targets)))
 
-  def _key_for(self, target, transitive=False, fingerprint_strategy=None):
+  def _key_for(self, target, transitive=False):
     try:
       return self._cache_key_generator.key_for_target(target,
                                                       transitive=transitive,
-                                                      fingerprint_strategy=fingerprint_strategy)
+                                                      fingerprint_strategy=self._fingerprint_strategy)
     except Exception as e:
       # This is a catch-all for problems we haven't caught up with and given a better diagnostic.
       # TODO(Eric Ayers): If you see this exception, add a fix to catch the problem earlier.

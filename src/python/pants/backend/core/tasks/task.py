@@ -163,11 +163,15 @@ class TaskBase(AbstractClass):
     """Invalidates all targets for this task."""
     BuildInvalidator(self._build_invalidator_dir).force_invalidate_all()
 
-  def create_cache_manager(self, invalidate_dependents):
+  def create_cache_manager(self, invalidate_dependents, fingerprint_strategy=None):
     """Creates a cache manager that can be used to invalidate targets on behalf of this task.
 
     Use this if you need to check for invalid targets but can't use the contextmanager created by
     invalidated(), e.g., because you don't want to mark the targets as valid when done.
+
+    invalidate_dependents:   If True then any targets depending on changed targets are invalidated.
+    fingerprint_strategy:    A FingerprintStrategy instance, which can do per task, finer grained
+                             fingerprinting of a given Target.
     """
     extra_data = [self.invalidate_for()]
 
@@ -177,7 +181,8 @@ class TaskBase(AbstractClass):
     return InvalidationCacheManager(self._cache_key_generator,
                                     self._build_invalidator_dir,
                                     invalidate_dependents,
-                                    extra_data)
+                                    extra_data,
+                                    fingerprint_strategy=fingerprint_strategy)
 
   @contextmanager
   def invalidated(self,
@@ -201,6 +206,8 @@ class TaskBase(AbstractClass):
                              many of them, we keep these in separate partitions from other targets,
                              as these are more likely to have build errors, and so to be rebuilt over
                              and over, and partitioning them separately is a performance win.
+    fingerprint_strategy:    A FingerprintStrategy instance, which can do per task, finer grained
+                             fingerprinting of a given Target.
 
     Yields an InvalidationCheck object reflecting the (partitioned) targets.
 
@@ -211,7 +218,8 @@ class TaskBase(AbstractClass):
     # it in because JvmCompile already has the source->target mapping for other reasons, and also
     # to selectively enable this feature.
 
-    cache_manager = self.create_cache_manager(invalidate_dependents)
+    cache_manager = self.create_cache_manager(invalidate_dependents,
+                                              fingerprint_strategy=fingerprint_strategy)
 
     # We separate locally-modified targets from others by coloring them differently.
     # This can be a performance win, because these targets are more likely to be iterated
@@ -227,11 +235,7 @@ class TaskBase(AbstractClass):
           colors[t] = 'locally_changed'
         else:
           colors[t] = 'not_locally_changed'
-    # TODO(benjy): Can fingerprint_strategy be a constructor arg of the cache manager?
-    invalidation_check = cache_manager.check(targets,
-                                             partition_size_hint,
-                                             colors,
-                                             fingerprint_strategy)
+    invalidation_check = cache_manager.check(targets, partition_size_hint, colors)
 
     if invalidation_check.invalid_vts and self.artifact_cache_reads_enabled():
       with self.context.new_workunit('cache'):
