@@ -292,6 +292,7 @@ python_tests(
     pants(':base'),
     pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('src/python/pants/backend/codegen/tasks:protobuf_gen'),
+    pants('src/python/pants/base:build_environment'),
   ],
 )
 

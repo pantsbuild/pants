@@ -21,6 +21,9 @@ from pants.base.address import SyntheticAddress
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.binary_util import select_binary
+from pants.fs.source_util import extract_temp_files
+from pants.fs.source_util import get_input_streams
+from pants.fs.source_util import pants_temp_dir
 
 
 class ProtobufGen(CodeGen):
@@ -82,37 +85,40 @@ class ProtobufGen(CodeGen):
     return dict(java=lambda t: t.is_jvm, python=lambda t: t.is_python)
 
   def genlang(self, lang, targets):
-    bases, sources = self._calculate_sources(targets)
+    bases, vsources = self._calculate_sources(targets)
+    bases.add(pants_temp_dir())
 
-    if lang == 'java':
-      output_dir = self.java_out
-      gen_flag = '--java_out'
-    elif lang == 'python':
-      output_dir = self.py_out
-      gen_flag = '--python_out'
-    else:
-      raise TaskError('Unrecognized protobuf gen lang: %s' % lang)
+    # Call source_util function to 'expand' zipped sources into temporary files
+    with extract_temp_files(vsources, source_filter = lambda s: s.endswith('.proto')) as sources:
+      if lang == 'java':
+        output_dir = self.java_out
+        gen_flag = '--java_out'
+      elif lang == 'python':
+        output_dir = self.py_out
+        gen_flag = '--python_out'
+      else:
+        raise TaskError('Unrecognized protobuf gen lang: %s' % lang)
 
-    safe_mkdir(output_dir)
-    gen = '%s=%s' % (gen_flag, output_dir)
+      safe_mkdir(output_dir)
+      gen = '%s=%s' % (gen_flag, output_dir)
 
-    args = [self.protobuf_binary, gen]
+      args = [self.protobuf_binary, gen]
 
-    if self.plugins:
-      for plugin in self.plugins:
-        # TODO(Eric Ayers) Is it a good assumption that the generated source output dir is
-        # acceptable for all plugins?
-        args.append("--%s_protobuf_out=%s" % (plugin, output_dir))
+      if self.plugins:
+        for plugin in self.plugins:
+          # TODO(Eric Ayers) Is it a good assumption that the generated source output dir is
+          # acceptable for all plugins?
+          args.append("--%s_protobuf_out=%s" % (plugin, output_dir))
 
-    for base in bases:
-      args.append('--proto_path=%s' % base)
+      for base in bases:
+        args.append('--proto_path=%s' % base)
 
-    args.extend(sources)
-    log.debug('Executing: %s' % ' '.join(args))
-    process = subprocess.Popen(args)
-    result = process.wait()
-    if result != 0:
-      raise TaskError('%s ... exited non-zero (%i)' % (self.protobuf_binary, result))
+      args.extend(sources)
+      log.debug('Executing: %s' % ' '.join(args))
+      process = subprocess.Popen(args)
+      result = process.wait()
+      if result != 0:
+        raise TaskError('%s ... exited non-zero (%i)' % (self.protobuf_binary, result))
 
   def _calculate_sources(self, targets):
     bases = set()
@@ -177,15 +183,21 @@ OPTION_PARSER = re.compile(r'^\s*option\s+([^ =]+)\s*=\s*([^\s]+)\s*;\s*$')
 TYPE_PARSER = re.compile(r'^\s*(enum|message)\s+([^\s{]+).*')
 END_TYPE_PARSER = re.compile(r'^\s*}')
 
-
 def camelcase(string):
   """Convert snake casing where present to camel casing"""
   return ''.join(word.capitalize() for word in string.split('_'))
 
 
 def calculate_genfiles(path, source):
-  with open(path, 'r') as protobuf:
-    lines = protobuf.readlines()
+  genfiles = defaultdict(set)
+  group_path = path
+  group_source = source
+
+  # Call source_util function to 'expand' zipped sources into valid handles
+  for path, source, protobuf in get_input_streams([path],
+                                                  name_map={path: source},
+                                                  source_filter=lambda s: s.endswith('.proto')):
+    lines = protobuf() # protobuf is lambda function which just acts like 'readlines'
     package = ''
     filename = re.sub(r'\.proto$', '', os.path.basename(source))
     outer_class_name = camelcase(filename)
@@ -240,12 +252,12 @@ def calculate_genfiles(path, source):
         # The parse appears to be flaky, roll all of the found types in.
         types = outer_types.union(inner_types)
 
-    genfiles = defaultdict(set)
     genfiles['py'].update(calculate_python_genfiles(source))
     genfiles['java'].update(calculate_java_genfiles(package,
                                                     outer_class_name,
                                                     types))
-    return genfiles
+
+  return genfiles
 
 
 def _record_type(type_set, type_name, type_keyword):
