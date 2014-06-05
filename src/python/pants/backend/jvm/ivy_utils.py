@@ -184,7 +184,7 @@ class IvyUtils(object):
       return None
 
     ret = IvyInfo()
-    etree = xml.etree.ElementTree.parse(self.xml_report_path(targets, conf))
+    etree = xml.etree.ElementTree.parse(path)
     doc = etree.getroot()
     for module in doc.findall('dependencies/module'):
       org = module.get('organisation')

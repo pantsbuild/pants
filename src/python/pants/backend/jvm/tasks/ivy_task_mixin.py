@@ -50,14 +50,15 @@ class IvyTaskMixin(object):
                   silent=False,
                   workunit_name=None,
                   workunit_labels=None):
+    # NOTE: Always pass all the targets to exec_ivy, as they're used to calculate the name of
+    # the generated module, which in turn determines the location of the XML report file
+    # ivy generates. We recompute this name from targets later in order to find that file.
+    # TODO: This is fragile. Refactor so that we're not computing the name twice.
     if executor and not isinstance(executor, Executor):
       raise ValueError('The executor must be an Executor instance, given %s of type %s'
                        % (executor, type(executor)))
     ivy = Bootstrapper.default_ivy(java_executor=executor,
                                    bootstrap_workunit_factory=self.context.new_workunit)
-
-    targets = set([target for target in targets if isinstance(target, (JvmTarget, JarLibrary))])
-
     if not targets:
       return []
 
