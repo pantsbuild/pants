@@ -189,6 +189,21 @@ class BuildFileParserTest(BaseTest):
       self.assertEqual(set([':base', ':foo', ':bat']),
                        set([address.spec for address in addresses]))
 
+  def test_build_file_duplicates(self):
+    # This workspace has two targets in the same file with the same name.
+    self.add_to_build_file('BUILD', 'fake(name="foo")\n')
+    self.add_to_build_file('BUILD', 'fake(name="foo")\n')
+
+    def fake_target(*args, **kwargs):
+      assert False, "This fake target should never be called in this test!"
+
+    alias_map = {'target_aliases': {'fake': fake_target}}
+    self.build_file_parser.register_alias_groups(alias_map=alias_map)
+    with pytest.raises(BuildFileParser.TargetConflictException):
+      base_build_file = BuildFile(self.build_root, 'BUILD')
+      self.build_file_parser.parse_build_file(base_build_file)
+
+
   def test_sibling_build_files_duplicates(self):
     # This workspace is malformed, you can't shadow a name in a sibling BUILD file
     with self.workspace('./BUILD', './BUILD.foo', './BUILD.bar') as root_dir:
@@ -218,7 +233,7 @@ class BuildFileParserTest(BaseTest):
 
       alias_map = {'target_aliases': {'fake': fake_target}}
       self.build_file_parser.register_alias_groups(alias_map=alias_map)
-      with pytest.raises(AssertionError):
+      with pytest.raises(BuildFileParser.SiblingConflictException):
         base_build_file = BuildFile(root_dir, 'BUILD')
         bf_address = BuildFileAddress(base_build_file, 'base')
         self.build_file_parser._populate_target_proxy_transitive_closure_for_address(bf_address)
