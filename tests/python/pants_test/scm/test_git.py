@@ -51,11 +51,13 @@ class VersionTest(unittest.TestCase):
 
 
 def git_version():
+  '''Get a Version() based on installed command-line git's version'''
   process = subprocess.Popen(['git', '--version'], stdout=subprocess.PIPE)
   (stdout, stderr) = process.communicate()
   assert process.returncode == 0, "Failed to determine git version."
-  matches = re.search('(.*)\s(\d+.*\d+)\s(.*)', stdout)
-  return Version(matches.group(2))
+  # stdout is like 'git version 1.9.1.598.g9119e8b\n'  We want '1.9.1.598'
+  matches = re.search(r'\s(\d+(?:\.\d+)*)[\s\.]', stdout)
+  return Version(matches.group(1))
 
 
 @pytest.mark.skipif("git_version() < Version('1.7.10')")
