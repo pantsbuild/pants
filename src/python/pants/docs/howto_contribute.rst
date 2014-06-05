@@ -16,14 +16,24 @@ Questions, Issues, Bug Reports
 
 See :doc:`howto_ask`
 
-************
-Mailing List
-************
+*********************
+Join the Conversation
+*********************
 
 Join the `pants-devel Google Group
 <https://groups.google.com/forum/#!forum/pants-devel>`_
 to keep in touch with other pants developers.
 
+Join the `pants-reviews Google Group
+<https://groups.google.com/forum/#!forum/pants-reviews>`_
+to see many code reviews.
+
+Watch the `pantsbuild/pants Github project
+<https://github.com/pantsbuild/pants>`_ for
+notifications of new issues, etc.
+
+Follow `@pantsbuild on Twitter <https://twitter.com/pantsbuild>`_
+for occasional announcements.
 
 ****************
 Life of a Change
@@ -127,10 +137,10 @@ To make sure it gets seen, add ``pants-reviews`` to the Groups field
 and a specific reviewer to the People field.
 
 When the review looks good, publish it.
-An email will be sent to ``pants-devel`` mailing list and the reviewers
+An email will be sent to the ``pants-reviews`` mailing list and the reviewers
 will take a look. (For your first review, double-check that the mail got sent;
 rbcommons tries to "spoof" mail from you and it doesn't work for everybody's
-email address.)
+email address. If your address doesn't work, you might want to use another one.)
 
 Iterating
 ---------
