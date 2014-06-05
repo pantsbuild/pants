@@ -50,6 +50,10 @@ def applicative_path_relative_util_aliases():
   return {}
 
 
+def target_creation_utils():
+  return {}
+
+
 def register_commands():
   for cmd in (Build, Py, Goal, SetupPy):
     cmd._register()

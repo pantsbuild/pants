@@ -7,12 +7,14 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import os
 import unittest
 
+from contextlib import contextmanager
 from tempfile import mkdtemp
 from textwrap import dedent
 
-from twitter.common.contextutil import environment_as, temporary_file
-from twitter.common.dirutil import safe_mkdir, safe_open, safe_rmtree
+from twitter.common.contextutil import environment_as, pushd, temporary_dir, temporary_file
+from twitter.common.dirutil import safe_mkdir, safe_open, safe_rmtree, touch
 
+from pants.backend.core.targets.dependencies import Dependencies
 from pants.base.address import SyntheticAddress
 from pants.base.build_graph import BuildGraph
 from pants.base.build_root import BuildRoot
@@ -77,7 +79,7 @@ class BaseTest(unittest.TestCase):
 
   @property
   def alias_groups(self):
-    return {}
+    return {'target_aliases': {'dependencies': Dependencies}}
 
   def setUp(self):
     self.real_build_root = BuildRoot().path
@@ -168,3 +170,12 @@ class BaseTest(unittest.TestCase):
 
   def create_resources(self, path, name, *sources):
     return self.create_library(path, 'resources', name, sources)
+
+  @contextmanager
+  def workspace(self, *buildfiles):
+    with temporary_dir() as root_dir:
+      with BuildRoot().temporary(root_dir):
+        with pushd(root_dir):
+          for buildfile in buildfiles:
+            touch(os.path.join(root_dir, buildfile))
+          yield os.path.realpath(root_dir)

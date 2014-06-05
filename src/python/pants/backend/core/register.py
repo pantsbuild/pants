@@ -60,6 +60,10 @@ def partial_path_relative_util_aliases():
   return {}
 
 
+def target_creation_utils():
+  return {}
+
+
 # aliases
 def target_aliases():
   return {

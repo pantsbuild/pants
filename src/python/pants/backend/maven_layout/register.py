@@ -27,6 +27,10 @@ def applicative_path_relative_util_aliases():
   return {}
 
 
+def target_creation_utils():
+  return {}
+
+
 def partial_path_relative_util_aliases():
   return {
     'maven_layout': maven_layout,

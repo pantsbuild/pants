@@ -97,7 +97,6 @@ class TargetProxy(object):
                                build_file=self.build_file))
       raise
 
-
   def __str__(self):
     format_str = ('<TargetProxy(target_type={target_type}, build_file={build_file})'
                   ' [name={name}, address={address}]>')
@@ -157,6 +156,7 @@ class BuildFileParser(object):
     self._partial_path_relative_utils = {}
     self._applicative_path_relative_utils = {}
     self._target_alias_map = {}
+    self._target_creation_utils = {}
 
   def report_registered_context(self):
     """Return dict of syms defined in BUILD files, useful for docs/help.
@@ -176,17 +176,20 @@ class BuildFileParser(object):
     return self._target_alias_map.copy()
 
   def register_alias_groups(self, alias_map):
-    for alias, obj in alias_map.get('exposed_objects', {}).iteritems():
+    for alias, obj in alias_map.get('exposed_objects', {}).items():
       self.register_exposed_object(alias, obj)
 
-    for alias, obj in alias_map.get('applicative_path_relative_utils', {}).iteritems():
+    for alias, obj in alias_map.get('applicative_path_relative_utils', {}).items():
       self.register_applicative_path_relative_util(alias, obj)
 
-    for alias, obj in alias_map.get('partial_path_relative_utils', {}).iteritems():
+    for alias, obj in alias_map.get('partial_path_relative_utils', {}).items():
       self.register_partial_path_relative_util(alias, obj)
 
-    for alias, obj in alias_map.get('target_aliases', {}).iteritems():
+    for alias, obj in alias_map.get('target_aliases', {}).items():
       self.register_target_alias(alias, obj)
+
+    for alias, func in alias_map.get('target_creation_utils', {}).items():
+      self.register_target_creation_utils(alias, func)
 
   # TODO(pl): For the next four methods, provide detailed documentation.  Especially for the middle
   # two, the semantics are slightly tricky.
@@ -216,14 +219,17 @@ class BuildFileParser(object):
                   .format(alias=alias))
     self._target_alias_map[alias] = obj
 
+  def register_target_creation_utils(self, alias, func):
+    if alias in self._target_creation_utils:
+      logger.warn('Target Creation alias {alias} has already been registered.  Overwriting!'
+                  .format(alias=alias))
+    self._target_creation_utils[alias] = func
+
   def __init__(self, root_dir, run_tracker=None):
     self._root_dir = root_dir
     self.run_tracker = run_tracker
 
-    self._exposed_objects = {}
-    self._partial_path_relative_utils = {}
-    self._applicative_path_relative_utils = {}
-    self._target_alias_map = {}
+    self.clear_registered_context()
 
     self._target_proxy_by_address = {}
     self._target_proxies_by_build_file = defaultdict(set)
@@ -294,7 +300,6 @@ class BuildFileParser(object):
                                build_file=address.build_file))
 
     target_proxy = self._target_proxy_by_address[address]
-
 
   def _populate_target_proxy_transitive_closure_for_address(self,
                                                             address,
@@ -372,9 +377,12 @@ class BuildFileParser(object):
       alias, target_type in self._target_alias_map.items()
     )
 
+    for key, func in self._target_creation_utils.items():
+      parse_context.update({key: partial(func, alias_map=parse_context)})
+
     try:
       build_file_code = build_file.code()
-    except:
+    except Exception:
       logger.exception("Error parsing {build_file}."
                        .format(build_file=build_file))
       traceback.print_exc()
@@ -382,7 +390,7 @@ class BuildFileParser(object):
 
     try:
       Compatibility.exec_function(build_file_code, parse_context)
-    except:
+    except Exception:
       logger.exception("Error running {build_file}."
                        .format(build_file=build_file))
       traceback.print_exc()
