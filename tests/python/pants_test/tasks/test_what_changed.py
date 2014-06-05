@@ -39,13 +39,12 @@ class BaseWhatChangedTest(ConsoleTaskTest):
     }
 
   @classmethod
-  def task_type(self):
+  def task_type(cls):
     return WhatChanged
 
   def workspace(self, files=None, parent=None):
     class MockWorkspace(Workspace):
-      @staticmethod
-      def touched_files(p):
+      def touched_files(_, p):
         self.assertEqual(parent or 'HEAD', p)
         return files or []
     return MockWorkspace()
@@ -73,7 +72,7 @@ class WhatChangedTest(BaseWhatChangedTest):
     super(WhatChangedTest, self).setUp()
 
     self.add_to_build_file('root', dedent("""
-      source_root('src/py', python_library)
+      source_root('src/py', python_library, resources)
       source_root('resources/a1', resources)
     """))
 

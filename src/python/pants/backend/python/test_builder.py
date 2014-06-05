@@ -99,9 +99,9 @@ class PythonTestBuilder(object):
     # correct, as the isolation verifies that its dependencies are correctly declared.
     self._fast = fast
 
-  def run(self):
+  def run(self, stdout=None, stderr=None):
     if self._fast:
-      return self._run_python_tests(self.targets)
+      return 0 if self._run_python_tests(self.targets, stdout, stderr).success else 1
     else:
       results = {}
       # Coverage often throws errors despite tests succeeding, so force failsoft in that case.
@@ -109,12 +109,13 @@ class PythonTestBuilder(object):
                    'PANTS_PY_COVERAGE' not in os.environ)
       for target in self.targets:
         if isinstance(target, PythonTests):
-          rv = self._run_python_tests([target])
+          rv = self._run_python_tests([target], stdout, stderr)
           results[target.id] = rv
           if not rv.success and fail_hard:
             break
       for target in sorted(results):
-        print('%-80s.....%10s' % (target, results[target]))
+        # TODO: Replace print() calls in this file with logging.
+        print('%-80s.....%10s' % (target, results[target]), file=stdout)
       return 0 if all(rc.success for rc in results.values()) else 1
 
   @staticmethod
@@ -162,7 +163,7 @@ class PythonTestBuilder(object):
       args.extend(['--cov', module])
     return filename, args
 
-  def _run_python_tests(self, targets):
+  def _run_python_tests(self, targets, stdout, stderr):
     coverage_rc = None
     coverage_enabled = 'PANTS_PY_COVERAGE' in os.environ
 
@@ -187,13 +188,14 @@ class PythonTestBuilder(object):
 
       sources = list(itertools.chain(*[t.sources_relative_to_buildroot() for t in targets]))
       pex = PEX(builder.path(), interpreter=self.interpreter)
-      rc = pex.run(args=test_args + sources, blocking=True, setsid=True)
+      rc = pex.run(args=test_args + sources, blocking=True, setsid=True,
+                   stdout=stdout, stderr=stderr)
       # TODO(wickman): If coverage is enabled, write an intermediate .html that points to
       # each of the coverage reports generated and webbrowser.open to that page.
       rv = PythonTestResult.rc(rc)
     except Exception:
       import traceback
-      print('Failed to run test!', file=sys.stderr)
+      print('Failed to run test!', file=stderr)
       traceback.print_exc()
       rv = PythonTestResult.exception()
     finally:

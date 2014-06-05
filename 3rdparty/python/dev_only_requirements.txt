@@ -1,4 +1,4 @@
-# These are extra requirments only needed for dev tasks in the pantsbuild/pants repo itself.
+# These are extra requirements only needed for dev tasks in the pantsbuild/pants repo itself.
 
 # For doc publishing
 Sphinx>=1.2,<1.3
