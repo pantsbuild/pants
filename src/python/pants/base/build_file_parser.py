@@ -412,12 +412,14 @@ class BuildFileParser(object):
         conflicting_target = self._target_proxy_by_address[target_proxy.address]
         if (conflicting_target.address.build_file != target_proxy.address.build_file):
           raise BuildFileParser.SiblingConflictException(
-              "Both %s and %s define the same target '%s'"
-              % (conflicting_target.address.build_file,
-                 target_proxy.address.build_file,
-                 conflicting_target.address.target_name))
-        raise BuildFileParser.TargetConflictException("File %s defines target '%s' more than once."
-            % (conflicting_target.address.build_file, conflicting_target.address.target_name))
+            "Both {conflicting_file} and {target_file} define the same target '{target_name}'"
+            .format(conflicting_file=conflicting_target.address.build_file, 
+                    target_file=target_proxy.address.build_file,
+                    target_name=conflicting_target.address.target_name))
+        raise BuildFileParser.TargetConflictException(
+          "File {conflicting_file} defines target '{target_name}' more than once."
+          .format(conflicting_file=conflicting_target.address.build_file, 
+                  target_name=conflicting_target.address.target_name))
 
       assert target_proxy.address not in self.addresses_by_build_file[build_file], (
         '{address} has already been associated with {build_file} in the build graph.'
