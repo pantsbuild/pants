@@ -14,7 +14,7 @@ class PythonRequirement(object):
   """Pants wrapper around pkg_resources.Requirement"""
 
   def __init__(self, requirement, name=None, repository=None, version_filter=None, use_2to3=False,
-               compatibility=None, exclusives=None):
+               compatibility=None):
     # TODO(wickman) Allow PythonRequirements to be specified using pip-style vcs or url identifiers,
     # e.g. git+https or just http://...
     self._requirement = Requirement.parse(requirement)
