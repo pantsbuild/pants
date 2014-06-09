@@ -9,7 +9,6 @@ import sys
 from collections import defaultdict
 from contextlib import contextmanager
 
-from twitter.common.collections import OrderedSet
 from twitter.common.dirutil import Lock
 from twitter.common.process import ProcessProviderFactory
 from twitter.common.process.process_provider import ProcessProvider

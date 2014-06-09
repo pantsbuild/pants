@@ -252,10 +252,6 @@ class IvyUtils(object):
       generator.write(output)
 
   def _calculate_classpath(self, targets):
-
-    def is_jardependant(target):
-      return target.is_jar_library
-
     jars = OrderedDict()
     excludes = set()
 

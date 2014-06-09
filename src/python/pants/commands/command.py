@@ -4,13 +4,9 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-import os
-
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_file import BuildFile
-from pants.base.build_file_parser import BuildFileParser
-from pants.base.build_graph import BuildGraph
 from pants.base.config import Config
 from pants.base.target import Target
 from pants.base.workunit import WorkUnit

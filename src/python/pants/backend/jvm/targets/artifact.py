@@ -4,11 +4,9 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from twitter.common.collections import maybe_list
 from twitter.common.lang import Compatibility
 
 from pants.base.build_manual import manual
-from pants.backend.jvm.targets.repository import Repository
 
 
 @manual.builddict(tags=["jvm"])
