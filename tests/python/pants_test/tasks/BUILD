@@ -248,6 +248,7 @@ python_tests(
   sources = ['test_jar_publish.py'],
   dependencies = [
     pants('3rdparty/python:mock'),
+    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants(':base'),
     pants('src/python/pants/backend/jvm/tasks:jar_publish'),
   ],
