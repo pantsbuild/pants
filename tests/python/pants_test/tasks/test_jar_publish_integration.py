@@ -6,18 +6,14 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import os
 
-from twitter.common.collections import maybe_list
-from twitter.common.contextutil import temporary_dir
-from twitter.common.dirutil import safe_mkdtemp, safe_rmtree
+from twitter.common.contextutil import temporary_dir, temporary_file
+
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
-from mock import MagicMock, patch
 
-
-@patch('sys.stdin')
 class JarPublishIntegrationTest(PantsRunIntegrationTest):
 
-  def test_scala_publish(self, MagicMock):
+  def test_scala_publish(self):
     self.publish_test('src/scala/com/pants/example/BUILD:jvm-run-example-lib',
                       'com/pants/example/jvm-example-lib/0.0.1-SNAPSHOT',
                       ['ivy-0.0.1-SNAPSHOT.xml',
@@ -26,8 +22,7 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
                        'jvm-example-lib-0.0.1-SNAPSHOT-sources.jar'],
                       extra_options=['--no-publish-jar_create_publish-javadoc'])
 
-
-  def test_java_publish(self, MagicMock):
+  def test_java_publish(self):
     self.publish_test('src/java/com/pants/examples/hello/greet',
                       'com/pants/examples/hello-greet/0.0.1-SNAPSHOT/',
                       ['ivy-0.0.1-SNAPSHOT.xml',
@@ -36,21 +31,25 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
                        'hello-greet-0.0.1-SNAPSHOT-javadoc.jar',
                        'hello-greet-0.0.1-SNAPSHOT-sources.jar'])
 
-  def publish_test(self, target, package_namepsace, artifacts=[], extra_options=None):
+  def publish_test(self, target, package_namespace, artifacts, extra_options=None,
+                   expected_primary_artifact_count=1):
+
     with temporary_dir() as publish_dir:
-      with patch('__builtin__.raw_input', return_value='Y'):
-        options =  ['--publish-local=%s' % publish_dir,
-                    '--no-publish-dryrun',
-                    '--no-publish-commit',
-                    '--publish-force',
-                    '--publish-jar_create_publish-sources']
-        if extra_options:
-          options.extend(extra_options)
-        with self.run_pants(goal='publish', targets=maybe_list(target),
-                            command_args  =options) as pants_run:
-          for file in artifacts:
-            self.assertTrue(os.path.exists(os.path.join(publish_dir,
-                                                        package_namepsace,
-                                                        file)))
-    self.assertEquals(pants_run, self.PANTS_SUCCESS_CODE)
+      options = ['--publish-local=%s' % publish_dir,
+                 '--no-publish-dryrun',
+                 '--publish-force',
+                 '--publish-jar_create_publish-sources']
+      if extra_options:
+        options.extend(extra_options)
+
+      with temporary_file() as yes:
+        yes.write('y' * expected_primary_artifact_count)
+        yes.flush()
+        yes.seek(0)
+
+        with self.run_pants(['goal', 'publish', target] + options, stdin=yes) as pants_run:
+          self.assertEquals(pants_run, self.PANTS_SUCCESS_CODE)
+          for artifact in artifacts:
+            artifact_path = os.path.join(publish_dir, package_namespace, artifact)
+            self.assertTrue(os.path.exists(artifact_path))
 
