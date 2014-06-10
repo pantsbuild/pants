@@ -229,14 +229,8 @@ def calculate_genfiles(path, source):
             name = match.group(1)
             type_ = match.group(2)
           if in_service:
-            if '{' in uline:
-              type_depth += 1
-              if type_depth == 1:
-                _record_type(outer_types, type_, name)
-            if '}' in uline:
-              type_depth -= 1
-              if type_depth == 0:
-                in_service = False
+            type_depth, in_service = _update_depth(uline, name, type_, inner_types, outer_types,
+                type_depth, in_service)
           else:
             match = TYPE_PARSER.match(line)
             if match:
@@ -244,16 +238,8 @@ def calculate_genfiles(path, source):
               name = match.group(1)
               type_ = match.group(2)
             if in_message:
-              if '{' in uline:
-                type_depth += 1
-                if type_depth == 1:
-                  _record_type(outer_types, type_, name)
-                else:
-                  _record_type(inner_types, type_, name)
-              if '}' in uline:
-                type_depth -= 1
-                if type_depth == 0:
-                  in_message = False
+              type_depth, in_message = _update_depth(uline, name, type_, inner_types, outer_types,
+                  type_depth, in_message)
 
     # TODO(Eric Ayers) replace with a real lex/parse understanding of protos
     # This is a big hack.  The parsing for finding type definitions is not reliable.
@@ -272,6 +258,20 @@ def calculate_genfiles(path, source):
                                                     outer_class_name,
                                                     types))
     return genfiles
+
+def _update_depth(uline, name, type_, inner_types, outer_types, type_depth, in_match):
+  if in_match:
+    if '{' in uline:
+      type_depth += 1
+      if type_depth == 1:
+        _record_type(outer_types, type_, name)
+      else:
+        _record_type(inner_types, type_, name)
+    if '}' in uline:
+      type_depth -= 1
+      if type_depth == 0:
+        in_match = False
+  return type_depth, in_match
 
 def _record_type(type_set, type_name, type_keyword):
   type_set.add(type_name)
