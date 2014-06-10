@@ -2,5 +2,5 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 java_protobuf_library(name='distance',
-  sources=globs('*.proto'),
+  sources=['distances.proto',],
 )

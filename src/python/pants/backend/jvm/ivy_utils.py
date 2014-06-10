@@ -335,11 +335,13 @@ class IvyUtils(object):
     """Subclasses can override to establish an isolated jar mapping directory."""
     return os.path.join(self._workdir, 'mapped-jars')
 
-  def mapjars(self, genmap, target, executor, workunit_factory=None):
-    """
-    Parameters:
-      genmap: the jar_dependencies ProductMapping entry for the required products.
-      target: the target whose jar dependencies are being retrieved.
+  def mapjars(self, genmap, target, executor, workunit_factory=None, jars=None):
+    """Resolves jars for the target and stores their locations in genmap.
+    :param genmap: The jar_dependencies ProductMapping entry for the required products.
+    :param target: The target whose jar dependencies are being retrieved.
+    :param jars: If specified, resolves the given jars rather than
+    :type jars: List of :class:`pants.backend.jvm.targets.jar_dependency.JarDependency` (jar())
+      objects.
     """
     mapdir = os.path.join(self.mapto_dir(), target.id)
     safe_mkdir(mapdir, clean=True)
@@ -354,7 +356,8 @@ class IvyUtils(object):
                   confs=target.payload.configurations,
                   ivy=Bootstrapper.default_ivy(executor),
                   workunit_factory=workunit_factory,
-                  workunit_name='map-jars')
+                  workunit_name='map-jars',
+                  jars=jars)
 
     for org in os.listdir(mapdir):
       orgdir = os.path.join(mapdir, org)
@@ -385,7 +388,8 @@ class IvyUtils(object):
                ivy=None,
                workunit_name='ivy',
                workunit_factory=None,
-               symlink_ivyxml=False):
+               symlink_ivyxml=False,
+               jars=None):
 
     ivy = ivy or Bootstrapper.default_ivy()
     if not isinstance(ivy, Ivy):
@@ -393,7 +397,11 @@ class IvyUtils(object):
                        % (ivy, type(ivy)))
 
     ivyxml = os.path.join(target_workdir, 'ivy.xml')
-    jars, excludes = self._calculate_classpath(targets)
+
+    if not jars:
+      jars, excludes = self._calculate_classpath(targets)
+    else:
+      excludes = set()
 
     ivy_args = ['-ivy', ivyxml]
 

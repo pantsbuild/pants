@@ -169,6 +169,29 @@ class JarLibraryPayload(Payload):
     return hasher.hexdigest()
 
 
+class JavaProtobufLibraryPayload(JvmTargetPayload):
+  def __init__(self, imports, **kwargs):
+    super(JavaProtobufLibraryPayload, self).__init__(**kwargs)
+    self.imports = imports
+
+  def __hash__(self):
+    return hash((self.sources, self.provides, self.excludes, self.configurations))
+
+  def invalidation_hash(self):
+    hasher = sha1()
+    sources_hash = hash_sources(get_buildroot(), self.sources_rel_path, self.sources)
+    hasher.update(sources_hash)
+    if self.provides:
+      hasher.update(bytes(hash(self.provides)))
+    for exclude in sorted(self.excludes):
+      hasher.update(bytes(hash(exclude)))
+    for config in sorted(self.configurations):
+      hasher.update(config)
+    for jar in sorted(self.imports):
+      hasher.update(jar.id)
+    return hasher.hexdigest()
+
+
 class PythonRequirementLibraryPayload(Payload):
   def __init__(self, requirements):
     self.requirements = set(requirements or [])
