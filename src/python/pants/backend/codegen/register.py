@@ -58,7 +58,7 @@ def register_goals():
   goal(name='scrooge', dependencies=['bootstrap'], action=ScroogeGen
   ).install('gen')
 
-  goal(name='protoc', action=ProtobufGen
+  goal(name='protoc', dependencies=['imports'], action=ProtobufGen
   ).install('gen')
 
   goal(name='antlr', dependencies=['bootstrap'], action=AntlrGen

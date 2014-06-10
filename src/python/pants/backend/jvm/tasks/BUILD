@@ -26,6 +26,7 @@ python_library(
     ':filedeps',
     ':ide_gen',
     ':idea_gen',
+    ':ivy_imports',
     ':ivy_resolve',
     ':ivy_task_mixin',
     ':jar_create',
@@ -210,6 +211,22 @@ python_library(
     pants('src/python/pants/backend/core/targets:common'),
     pants('src/python/pants/backend/jvm/targets:java'),
     pants('src/python/pants/backend/jvm/targets:scala'),
+  ],
+)
+
+python_library(
+  name = 'ivy_imports',
+  sources = ['ivy_imports.py'],
+  dependencies = [
+    pants('src/python/pants/backend/jvm:ivy_utils'),
+    pants(':nailgun_task'),
+    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
+    pants('src/python/pants:binary_util'),
+    pants('src/python/pants/base:cache_manager'),
+    pants('src/python/pants/ivy'),
+    pants('src/python/pants/backend/jvm/tasks:ivy_task_mixin'),
+    pants('src/python/pants/backend/jvm/tasks:jvm_tool_task_mixin'),
+    pants('src/python/pants/fs'),
   ],
 )
 

@@ -16,6 +16,7 @@ from twitter.common.dirutil import safe_mkdir
 
 from pants.backend.codegen.targets.java_protobuf_library import JavaProtobufLibrary
 from pants.backend.codegen.tasks.code_gen import CodeGen
+from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.base.address import SyntheticAddress
@@ -82,8 +83,15 @@ class ProtobufGen(CodeGen):
   def genlangs(self):
     return dict(java=lambda t: t.is_jvm, python=lambda t: t.is_python)
 
+  def _proto_path_imports(self, proto_targets):
+    for target in proto_targets:
+      for fileset in target.proto_dirs(self.context):
+        for path in fileset:
+          yield path
+
   def genlang(self, lang, targets):
     bases, sources = self._calculate_sources(targets)
+    bases = bases.union(self._proto_path_imports(targets))
 
     if lang == 'java':
       output_dir = self.java_out
@@ -142,14 +150,22 @@ class ProtobufGen(CodeGen):
       path = os.path.join(target.target_base, source)
       genfiles.extend(calculate_genfiles(path, source).get('java', []))
     spec_path = os.path.relpath(self.java_out, get_buildroot())
-    spec = '{spec_path}:{name}'.format(spec_path=spec_path, name=target.id)
-    address = SyntheticAddress.parse(spec=spec)
+    address = SyntheticAddress(spec_path, target.id)
+    deps = OrderedSet(self.javadeps)
+    jars_tgt = self.context.add_new_target(SyntheticAddress(spec_path, target.id+str('-rjars')),
+                                           JarLibrary,
+                                           jars=target.import_jars(self.context),
+                                           derived_from=target)
+    # Add in the 'spec-rjars' target, which contains all the JarDependency targets created via
+    # jar_sources(jars(...), ...) passed in via the imports parameter. Each of these jars is
+    # expected to contain .proto files bundled together with their .class files.
+    deps.add(jars_tgt)
     tgt = self.context.add_new_target(address,
                                       JavaLibrary,
                                       derived_from=target,
                                       sources=genfiles,
                                       provides=target.provides,
-                                      dependencies=self.javadeps,
+                                      dependencies=deps,
                                       excludes=target.payload.excludes)
     for dependee in dependees:
       dependee.inject_dependency(tgt.address)
@@ -161,13 +177,13 @@ class ProtobufGen(CodeGen):
       path = os.path.join(target.target_base, source)
       genfiles.extend(calculate_genfiles(path, source).get('py', []))
     spec_path = os.path.relpath(self.py_out, get_buildroot())
-    spec = '{spec_path}:{name}'.format(spec_path=spec_path, name=target.id)
-    address = SyntheticAddress.parse(spec=spec)
+    address = SyntheticAddress(spec_path, target.id)
     tgt = self.context.add_new_target(address,
                                       PythonLibrary,
                                       derived_from=target,
                                       sources=genfiles,
                                       dependencies=self.pythondeps)
+    tgt.jar_dependencies.update(target.import_jars(self.context))
     for dependee in dependees:
       dependee.inject_dependency(tgt.address)
     return tgt
@@ -217,9 +233,9 @@ def calculate_genfiles(path, source):
             match = TYPE_PARSER.match(line)
             _update_type_list(match, type_depth, outer_types)
 
-    # TODO(Eric Ayers) replace with a real lex/parse understanding of protos
-    # This is a big hack.  The parsing for finding type definitions is not reliable.
-    # See https://github.com/pantsbuild/pants/issues/96
+    # TODO(Eric Ayers) replace with a real lex/parse understanding of protos This is a big hack.
+    # The parsing for finding type definitions is not reliable. See
+    # https://github.com/pantsbuild/pants/issues/96
     types = outer_types if multiple_files and type_depth == 0 else set()
 
     genfiles = defaultdict(set)

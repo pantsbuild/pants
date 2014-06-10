@@ -34,6 +34,7 @@ from pants.backend.core.wrapped_globs import Globs, RGlobs, ZGlobs
 from pants.base.build_environment import get_buildroot, get_version, get_scm, set_scm
 from pants.base.config import Config
 from pants.base.source_root import SourceRoot
+from pants.fs.source_util import jar_sources
 from pants.goal import Goal, Goal as goal, Phase
 
 
@@ -86,6 +87,7 @@ def object_aliases():
     'set_scm': set_scm,
     'Time': Time,
     'wiki_artifact': WikiArtifact,
+    'jar_sources': jar_sources,
   }
 
 

@@ -30,10 +30,11 @@ from pants.backend.jvm.tasks.bundle_create import BundleCreate
 from pants.backend.jvm.tasks.check_published_deps import CheckPublishedDeps
 from pants.backend.jvm.tasks.dependencies import Dependencies
 from pants.backend.jvm.tasks.depmap import Depmap
-from pants.backend.jvm.tasks.filedeps import FileDeps
 from pants.backend.jvm.tasks.detect_duplicates import DuplicateDetector
 from pants.backend.jvm.tasks.eclipse_gen import EclipseGen
+from pants.backend.jvm.tasks.filedeps import FileDeps
 from pants.backend.jvm.tasks.idea_gen import IdeaGen
+from pants.backend.jvm.tasks.ivy_imports import IvyImports
 from pants.backend.jvm.tasks.ivy_resolve import IvyResolve
 from pants.backend.jvm.tasks.jar_create import JarCreate
 from pants.backend.jvm.tasks.jar_publish import JarPublish
@@ -106,6 +107,9 @@ def register_goals():
   goal(name='ivy', action=IvyResolve, dependencies=['gen', 'check-exclusives', 'bootstrap']
   ).install('resolve').with_description('Resolve dependencies and produce dependency reports.')
 
+  goal(name='ivy-imports', action=IvyImports, dependencies=['bootstrap']
+  ).install('imports').with_description('Resolve dependencies for (currently just .proto) imports.')
+
   # Compilation.
 
   # AnnotationProcessors are java targets, but we need to force them into their own compilation
@@ -124,11 +128,11 @@ def register_goals():
 
   jvm_compile = GroupTask.named('jvm-compilers', product_type='classes', flag_namespace=['compile'])
 
-  # At some point ScalaLibrary targets will be able to won mixed scala and java source sets.
-  # At that point, the ScalaCompile group member will still only select targets via
-  # has_sources('*.scala'); however if the JavaCompile group member were registered earlier, it
-  # would claim the ScalaLibrary targets with mixed source sets leaving those targets un-compiled
-  # by scalac and resulting in systemic compile errors.
+  # At some point ScalaLibrary targets will be able to won mixed scala and java source sets. At that
+  # point, the ScalaCompile group member will still only select targets via has_sources('*.scala');
+  # however if the JavaCompile group member were registered earlier, it would claim the ScalaLibrary
+  # targets with mixed source sets leaving those targets un-compiled by scalac and resulting in
+  # systemic compile errors.
   jvm_compile.add_member(ScalaCompile)
 
   # Its important we add AptCompile before JavaCompile since it 1st selector wins and apt code is a
