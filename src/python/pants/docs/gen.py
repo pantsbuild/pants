@@ -20,7 +20,7 @@ TEMPLATE = Template('\n'.join([
   '', '',
 ]))
 
-def gen_targets_reference(targets_rst, targets_dir):
+def gen_targets_reference(targets_rst, targets_dir_list):
   lines = [
     'Targets Reference',
     '=================',
@@ -29,11 +29,12 @@ def gen_targets_reference(targets_rst, targets_dir):
     '', '',
   ]
 
-  for filename in sorted([filename for filename in os.listdir(targets_dir) if filename.endswith('.py')]):
-    if filename == '__init__.py':
-      continue # Skip because renaming targets causes duplicates.
-    root, _ = os.path.splitext(filename)
-    lines.append(TEMPLATE.substitute(otype='targets', name=root))
+  for targets_dir in targets_dir_list:
+    for filename in sorted([filename for filename in os.listdir(targets_dir) if filename.endswith('.py')]):
+      if filename == '__init__.py':
+        continue # Skip because renaming targets causes duplicates.
+      root, _ = os.path.splitext(filename)
+      lines.append(TEMPLATE.substitute(otype='targets', name=root))
 
   with open(targets_rst, 'w') as fh:
     print("Writing to file '%s'" % targets_rst)
@@ -71,7 +72,8 @@ def copy_builddict(docs_dir):
 def main():
   docs_dir = os.path.dirname(os.path.abspath(__file__))
   pants_src_dir = os.path.dirname(docs_dir)
-  tasks_dir = os.path.join(pants_src_dir, 'tasks')
+  backends = ['codegen', 'core', 'jvm', 'python']
+  tasks_dirs = [os.path.join(pants_src_dir, 'backend', b, 'tasks') for b in backends]
 
   copy_builddict(docs_dir)
 
@@ -83,12 +85,14 @@ def main():
       'This page documents tasks available as part of the pants build system.',
       '', '',
     ]))
-    for filename in sorted([filename for filename in os.listdir(tasks_dir) if filename.endswith('.py')]):
-      root, _ = os.path.splitext(filename)
-      tasks_rst.write(TEMPLATE.substitute(otype='tasks', name=root))
+    for tasks_dir in tasks_dirs:
+      for filename in sorted([filename for filename in os.listdir(tasks_dir) if filename.endswith('.py')]):
+        root, _ = os.path.splitext(filename)
+        tasks_rst.write(TEMPLATE.substitute(otype='tasks', name=root))
 
   targets_rst = os.path.join(docs_dir, 'targets.rst')
-  gen_targets_reference(targets_rst, os.path.join(pants_src_dir, 'targets'))
+  targets_dirs = [os.path.join(pants_src_dir, 'backend', b, 'targets') for b in backends]
+  gen_targets_reference(targets_rst, targets_dirs)
 
   gen_base_reference(os.path.join(docs_dir, 'base.rst'), os.path.join(pants_src_dir, 'base'))
 

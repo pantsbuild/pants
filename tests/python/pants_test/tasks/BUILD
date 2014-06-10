@@ -20,8 +20,7 @@ python_test_suite(
   name = 'tasks',
   dependencies = [
     pants(':binary_create'),
-    # XXX(pl): This is broken again
-    # pants(':builddict'),
+    pants(':builddict'),
     pants(':bundle_create'),
     pants(':cache_manager'),
     pants(':check_exclusives'),

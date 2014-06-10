@@ -13,7 +13,7 @@ from pkg_resources import resource_string
 from twitter.common.dirutil import Fileset, safe_open
 
 from pants.backend.core.tasks.task import Task
-from pants.backend.maven_layout.register import maven_layout
+from pants.backend.maven_layout.maven_layout import maven_layout
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file_parser import BuildFileParser
 from pants.base.build_manual import get_builddict_info
@@ -125,7 +125,10 @@ PREDEFS = {  # some hardwired entries
   "Amount": {"defn": msg_entry("Amount", """
                                 `Amount from twitter.commons.quantity <https://github.com/twitter/commons/blob/master/src/python/twitter/common/quantity/__init__.py>`_
                                 E.g., ``Amount(2, Time.MINUTES)``.""")},
-  "fancy_pants": {"suppress": True},  # unused alias for pants
+  "egg" : {"tags": ["python"],
+           "defn": msg_entry("egg",
+                             "In older Pants, loads a pre-built Python egg "
+                             "from file system. Undefined in newer Pants.")},
   "__file__": {"defn": msg_entry("__file__", "Path to BUILD file (string).")},
   "globs": {"defn": entry_for_one("globs", Fileset.globs)},
   "java_tests": {"defn": msg_entry("java_tests",
@@ -148,16 +151,15 @@ PREDEFS = {  # some hardwired entries
 }
 
 
-# Thingies like scala_library
-# Returns list of duples [(name, object), (name, object), (name, object),...]
-def get_syms():
-  r = {}
-  vc = BuildFileParser.report_registered_context()
-  for s in vc:
-    if s in PREDEFS: continue
-    o = vc[s]
-    r[s] = o
-  return r
+# Report symbols defined in BUILD files (jvm_binary...)
+# Returns dict {"scala_library": ScalaLibrary, "Amount": commons.Amount, ...}
+def get_syms(build_file_parser):
+  retval = {}
+  report = build_file_parser.report_registered_context()
+  for nom in report:
+    if nom in PREDEFS: continue
+    retval[nom] = report[nom]
+  return retval
 
 # Needed since x may be a str or a unicode, so we can't hard-code str.lower or unicode.lower.
 _lower = lambda x: x.lower()
@@ -294,25 +296,28 @@ def gen_goals_phases_reference_data():
   return phases
 
 
-def assemble(predefs=PREDEFS, symbol_hash=None):
+def assemble(predefs=PREDEFS, build_file_parser=None):
   """Assemble big hash of entries suitable for smushing into a template.
 
   predefs: Hash of "hard-wired" predefined entries.
-  symbol_hash: Python syms from which to generate more entries. Default: get from BUILD context"""
-  d = {}
-  for k in PREDEFS:
-    v = PREDEFS[k]
-    if "suppress" in v and v["suppress"]: continue
-    d[k] = v
-  if symbol_hash is None:
-    symbol_hash = get_syms()
-  for k in symbol_hash:
-    bdi = get_builddict_info(symbol_hash[k])
-    if bdi is None: continue
-    d[k] = bdi.copy()
-    if not "defn" in d[k]:
-      d[k]["defn"] = entry_for_one(k, symbol_hash[k])
-  return d
+  build_file_parser: BuildFileParser which knows the BUILD-file symbols defined
+    for this run of Pants; hopefully knows ~the same symbols defined for a
+    "typical" run of Pants.
+  """
+  retval = {}
+  for nom in PREDEFS:
+    val = PREDEFS[nom]
+    if "suppress" in val and val["suppress"]: continue
+    retval[nom] = val
+  if build_file_parser:
+    symbol_hash = get_syms(build_file_parser)
+    for nom in symbol_hash:
+      bdi = get_builddict_info(symbol_hash[nom])
+      if bdi is None: continue
+      retval[nom] = bdi.copy()
+      if not "defn" in retval[nom]:
+        retval[nom]["defn"] = entry_for_one(nom, symbol_hash[nom])
+  return retval
 
 
 class BuildBuildDictionary(Task):
@@ -330,7 +335,7 @@ class BuildBuildDictionary(Task):
 
   def _gen_build_dictionary(self):
     """Generate the BUILD dictionary reference rst doc."""
-    d = assemble()
+    d = assemble(build_file_parser=self.context.build_file_parser)
     template = resource_string(__name__, os.path.join(self._templates_dir, 'page.mustache'))
     tocs = [tocl(d),
             tags_tocl(d, ["java", "scala", "jvm", "anylang"], "JVM"),
