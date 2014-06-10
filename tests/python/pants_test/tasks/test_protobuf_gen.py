@@ -6,10 +6,12 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import unittest
 import pytest
+import os
 
 from twitter.common.contextutil import temporary_file
 
 from pants.backend.codegen.tasks.protobuf_gen import calculate_genfiles
+from pants.base.build_environment import get_buildroot
 
 
 class ProtobufGenCalculateGenfilesTestBase(unittest.TestCase):
@@ -24,6 +26,9 @@ class ProtobufGenCalculateJavaTest(ProtobufGenCalculateGenfilesTestBase):
 
   def assert_java_files(self, rel_path, contents, *expected_files):
     self.assert_files('java', rel_path, contents, *expected_files)
+
+  def assert_java_zipped(self, rel_path, contents, *expected_files):
+    self.assertEqual(set(expected_files), calculate_genfiles(rel_path, rel_path)['java'])
 
   def test_plain(self):
     self.assert_java_files(
@@ -116,6 +121,30 @@ class ProtobufGenCalculateJavaTest(ProtobufGenCalculateGenfilesTestBase):
       'com/pants/protos/InnerClass.java',
       'com/pants/protos/Foo.java',
       'com/pants/protos/FooOrBuilder.java')
+
+  def _generic_zip_test(self, zipname):
+    zippath = os.path.join(get_buildroot(), 'src/resources/com/pants/example/proto', zipname)
+    self.assertEqual(
+      set([
+        'com/twitter/ads/revenue_tables/SnakeCase.java',
+        'com/twitter/ads/revenue_tables/Jake.java',
+        'com/example/foo/bar/Fred.java',
+        'com/example/baz/bip/BamBam.java',
+      ]),
+      calculate_genfiles(zippath, zipname)['java']
+    )
+
+  def test_zipped_protos(self):
+    self._generic_zip_test('zipped.zip')
+
+  def test_tarred_protos(self):
+    self._generic_zip_test('tarred.tar')
+
+  def test_tar_gz_protos(self):
+    self._generic_zip_test('tarred.tar.gz')
+
+  def test_tar_bz2_protos(self):
+    self._generic_zip_test('tarred.tar.bz2')
 
 # TODO(Eric Ayers) This test won't pass because the .proto parse is not reliable.
 #  https://github.com/pantsbuild/pants/issues/96
