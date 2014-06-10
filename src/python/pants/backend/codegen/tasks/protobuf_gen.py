@@ -8,7 +8,6 @@ from collections import defaultdict
 import os
 import re
 import subprocess
-from string import ascii_lowercase
 
 from twitter.common import log
 from twitter.common.collections import OrderedSet
@@ -181,11 +180,7 @@ TYPE_PARSER = re.compile(r'^\s*(enum|message)\s+([^\s{]+).*')
 
 def camelcase(string):
   """Convert snake casing where present to camel casing"""
-  s = ''.join(word.capitalize() for word in string.split('_'))
-  for c in ascii_lowercase:
-    s = s.replace("-" + c, c.upper())
-  return s
-
+  return ''.join(word.capitalize() for word in re.split('[-_]', string))
 
 def calculate_genfiles(path, source):
   with open(path, 'r') as protobuf:
@@ -195,10 +190,7 @@ def calculate_genfiles(path, source):
     outer_class_name = camelcase(filename)
     multiple_files = False
     outer_types = set()
-    inner_types = set()
     type_depth = 0
-    in_service = False
-    in_message = False
     for line in lines:
       match = DEFAULT_PACKAGE_PARSER.match(line)
       if match:
@@ -207,76 +199,39 @@ def calculate_genfiles(path, source):
         match = OPTION_PARSER.match(line)
         if match:
           name = match.group(1)
-          value = match.group(2)
-
-          def string_value():
-            return value.lstrip('"').rstrip('"')
-
-          def bool_value():
-            return value == 'true'
-
+          value = match.group(2).strip('"')
           if 'java_package' == name:
-            package = string_value()
+            package = value
           elif 'java_outer_classname' == name:
-            outer_class_name = string_value()
+            outer_class_name = value
           elif 'java_multiple_files' == name:
-            multiple_files = bool_value()
+            multiple_files = (value == 'true')
         else:
           uline = line.decode('utf-8').strip()
+          type_depth += uline.count('{') - uline.count('}')
           match = SERVICE_PARSER.match(line)
-          if match:
-            in_service = True
-            name = match.group(1)
-            type_ = match.group(2)
-          if in_service:
-            type_depth, in_service = _update_depth(uline, name, type_, inner_types, outer_types,
-                type_depth, in_service)
-          else:
+          _update_type_list(match, type_depth, outer_types)
+          if not match:
             match = TYPE_PARSER.match(line)
-            if match:
-              in_message = True
-              name = match.group(1)
-              type_ = match.group(2)
-            if in_message:
-              type_depth, in_message = _update_depth(uline, name, type_, inner_types, outer_types,
-                  type_depth, in_message)
+            _update_type_list(match, type_depth, outer_types)
 
     # TODO(Eric Ayers) replace with a real lex/parse understanding of protos
     # This is a big hack.  The parsing for finding type definitions is not reliable.
     # See https://github.com/pantsbuild/pants/issues/96
-    types = set()
-    if multiple_files:
-      if type_depth == 0:
-        types = outer_types
-      else:
-        # The parse appears to be flaky, roll all of the found types in.
-        types = outer_types.union(inner_types)
+    types = outer_types if multiple_files and type_depth == 0 else set()
 
     genfiles = defaultdict(set)
     genfiles['py'].update(calculate_python_genfiles(source))
-    genfiles['java'].update(calculate_java_genfiles(package,
-                                                    outer_class_name,
-                                                    types))
+    genfiles['java'].update(calculate_java_genfiles(package, outer_class_name, types))
     return genfiles
 
-def _update_depth(uline, name, type_, inner_types, outer_types, type_depth, in_match):
-  if in_match:
-    if '{' in uline:
-      type_depth += 1
-      if type_depth == 1:
-        _record_type(outer_types, type_, name)
-      else:
-        _record_type(inner_types, type_, name)
-    if '}' in uline:
-      type_depth -= 1
-      if type_depth == 0:
-        in_match = False
-  return type_depth, in_match
+def _update_type_list(match, type_depth, outer_types):
+  if match and type_depth < 2: # This takes care of the case where { } are on the same line.
+    type_name = match.group(2)
+    outer_types.add(type_name)
+    if match.group(1) == 'message':
+      outer_types.add('%sOrBuilder' % type_name)
 
-def _record_type(type_set, type_name, type_keyword):
-  type_set.add(type_name)
-  if type_keyword == 'message':
-    type_set.add('%sOrBuilder' % type_name)
 
 def calculate_python_genfiles(source):
   yield re.sub(r'\.proto$', '_pb2.py', source)
