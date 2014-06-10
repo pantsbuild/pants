@@ -8,6 +8,7 @@ from collections import defaultdict
 import os
 import re
 import subprocess
+from string import ascii_lowercase
 
 from twitter.common import log
 from twitter.common.collections import OrderedSet
@@ -174,13 +175,16 @@ class ProtobufGen(CodeGen):
 
 DEFAULT_PACKAGE_PARSER = re.compile(r'^\s*package\s+([^;]+)\s*;\s*$')
 OPTION_PARSER = re.compile(r'^\s*option\s+([^ =]+)\s*=\s*([^\s]+)\s*;\s*$')
+SERVICE_PARSER = re.compile(r'^\s*(service)\s+([^\s{]+).*')
 TYPE_PARSER = re.compile(r'^\s*(enum|message)\s+([^\s{]+).*')
-END_TYPE_PARSER = re.compile(r'^\s*}')
 
 
 def camelcase(string):
   """Convert snake casing where present to camel casing"""
-  return ''.join(word.capitalize() for word in string.split('_'))
+  s = ''.join(word.capitalize() for word in string.split('_'))
+  for c in ascii_lowercase:
+    s = s.replace("-" + c, c.upper())
+  return s
 
 
 def calculate_genfiles(path, source):
@@ -193,6 +197,8 @@ def calculate_genfiles(path, source):
     outer_types = set()
     inner_types = set()
     type_depth = 0
+    in_service = False
+    in_message = False
     for line in lines:
       match = DEFAULT_PACKAGE_PARSER.match(line)
       if match:
@@ -216,18 +222,38 @@ def calculate_genfiles(path, source):
           elif 'java_multiple_files' == name:
             multiple_files = bool_value()
         else:
-          match = TYPE_PARSER.match(line)
+          uline = line.decode('utf-8').strip()
+          match = SERVICE_PARSER.match(line)
           if match:
-            type_depth += 1
+            in_service = True
+            name = match.group(1)
             type_ = match.group(2)
-            if type_depth == 1:
-              _record_type(outer_types, type_, match.group(1))
-            else:
-              _record_type(inner_types, type_, match.group(1))
-          else:
-            match = END_TYPE_PARSER.match(line)
-            if match:
+          if in_service:
+            if '{' in uline:
+              type_depth += 1
+              if type_depth == 1:
+                _record_type(outer_types, type_, name)
+            if '}' in uline:
               type_depth -= 1
+              if type_depth == 0:
+                in_service = False
+          else:
+            match = TYPE_PARSER.match(line)
+            if match:
+              in_message = True
+              name = match.group(1)
+              type_ = match.group(2)
+            if in_message:
+              if '{' in uline:
+                type_depth += 1
+                if type_depth == 1:
+                  _record_type(outer_types, type_, name)
+                else:
+                  _record_type(inner_types, type_, name)
+              if '}' in uline:
+                type_depth -= 1
+                if type_depth == 0:
+                  in_message = False
 
     # TODO(Eric Ayers) replace with a real lex/parse understanding of protos
     # This is a big hack.  The parsing for finding type definitions is not reliable.
@@ -246,7 +272,6 @@ def calculate_genfiles(path, source):
                                                     outer_class_name,
                                                     types))
     return genfiles
-
 
 def _record_type(type_set, type_name, type_keyword):
   type_set.add(type_name)
