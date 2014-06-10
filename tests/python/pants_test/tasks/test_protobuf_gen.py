@@ -117,6 +117,45 @@ class ProtobufGenCalculateJavaTest(ProtobufGenCalculateGenfilesTestBase):
       'com/pants/protos/Foo.java',
       'com/pants/protos/FooOrBuilder.java')
 
+    self.assert_java_files(
+      'Camel-case.proto',
+      '''
+        package pants.preferences;
+        option java_package = "com.pants.protos.preferences";
+        extend AnotherMessage {
+          BAZ = 0;
+        }
+      ''',
+      'com/pants/protos/preferences/CamelCase.java')
+
+    self.assert_java_files(
+      'pants.proto',
+      '''
+        package pants.preferences;
+        option java_multiple_files = true;
+        option java_package = "com.pants.protos.preferences";
+        message AnotherMessage {
+          BAZ = 0;
+        }
+
+        service SomeService {
+          rpc SomeRpc();
+          rpc AnotherRpc() {
+          }
+        }
+
+        message MessageAfterService {
+          MEH = 0;
+        }
+      ''',
+      'com/pants/protos/preferences/Pants.java',
+      'com/pants/protos/preferences/AnotherMessage.java',
+      'com/pants/protos/preferences/AnotherMessageOrBuilder.java',
+      'com/pants/protos/preferences/SomeService.java',
+      'com/pants/protos/preferences/MessageAfterService.java',
+      'com/pants/protos/preferences/MessageAfterServiceOrBuilder.java',)
+
+
 # TODO(Eric Ayers) This test won't pass because the .proto parse is not reliable.
 #  https://github.com/pantsbuild/pants/issues/96
 @pytest.mark.xfail
