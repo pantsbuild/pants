@@ -59,7 +59,8 @@ def indent_docstring_by_n(s, n=1):
   return '\n'.join([indent + t for t in trimmed])
 
 
-def entry(nom, classdoc=None, msg_rst=None, argspec=None, funcdoc=None, methods=None, indent=1):
+def entry(nom, classdoc=None, msg_rst=None, argspec=None, funcdoc=None,
+          methods=None, impl=None, indent=1):
   """Create a struct that our template expects to see.
 
   :param nom: Symbol name, e.g. python_binary
@@ -68,6 +69,9 @@ def entry(nom, classdoc=None, msg_rst=None, argspec=None, funcdoc=None, methods=
   :param argspec: arg string like (x, y="deflt")
   :param funcdoc: function's __doc__, plain text
   :param methods: list of entries for class' methods
+  :param impl: name of thing that implements this.
+     E.g., "pants.backend.core.tasks.builddict.BuildBuildDictionary"
+  :param indent: spaces to indent; rst uses this for outline level
   """
 
   return TemplateData(
@@ -77,7 +81,8 @@ def entry(nom, classdoc=None, msg_rst=None, argspec=None, funcdoc=None, methods=
     argspec=argspec,
     funcdoc=indent_docstring_by_n(funcdoc, indent),
     methods=methods,
-    showmethods=(methods and len(methods) > 0))
+    showmethods=methods and (len(methods) > 0),
+    impl=impl)
 
 
 def msg_entry(nom, defn):
@@ -93,7 +98,8 @@ def entry_for_one_func(nom, func):
   argspec = inspect.formatargspec(args, varargs, varkw, defaults)
   return entry(nom,
                argspec=argspec,
-               funcdoc=func.__doc__)
+               funcdoc=func.__doc__,
+               impl="{0}.{1}".format(func.__module__, func.__name__))
 
 
 def entry_for_one_method(nom, method):
@@ -187,18 +193,18 @@ def tags_tocl(d, tag_list, title):
   return TemplateData(t=title, e=filtered_anchors)
 
 
-def entry_for_one_class(nom, klas):
+def entry_for_one_class(nom, cls):
   """  Generate a BUILD dictionary entry for a class.
   nom: name like 'python_binary'
-  klas: class like pants.python_binary"""
+  cls: class like pants.python_binary"""
   try:
-    args, varargs, varkw, defaults = inspect.getargspec(klas.__init__)
+    args, varargs, varkw, defaults = inspect.getargspec(cls.__init__)
     argspec = inspect.formatargspec(args[1:], varargs, varkw, defaults)
-    funcdoc = klas.__init__.__doc__
+    funcdoc = cls.__init__.__doc__
 
     methods = []
-    for attrname in dir(klas):
-      attr = getattr(klas, attrname)
+    for attrname in dir(cls):
+      attr = getattr(cls, attrname)
       attr_bdi = get_builddict_info(attr)
       if not attr_bdi: continue
       if inspect.ismethod(attr):
@@ -214,11 +220,11 @@ def entry_for_one_class(nom, klas):
     methods = None
 
   return entry(nom,
-               classdoc=klas.__doc__,
+               classdoc=cls.__doc__,
                argspec=argspec,
                funcdoc=funcdoc,
-               methods=methods)
-
+               methods=methods,
+               impl="{0}.{1}".format(cls.__module__, cls.__name__))
 
 def gen_goals_glopts_reference_data():
   global_option_parser = optparse.OptionParser(add_help_option=False)
@@ -257,7 +263,7 @@ def gref_template_data_from_options(og):
 
 
 def gen_goals_phases_reference_data():
-  """Generate the goals reference rst doc."""
+  """Generate the template data for the goals reference rst doc."""
   phase_dict = {}
   phase_names = []
   for phase, raw_goals in Phase.all():
@@ -274,8 +280,9 @@ def gen_goals_phases_reference_data():
       og = options_by_title[options_title]
       if og:
         found_option_groups.add(options_title)
+      impl = "{0}.{1}".format(goal.task_type.__module__, goal.task_type.__name__)
       goals.append(TemplateData(
-          name=goal.task_type.__name__,
+          impl=impl,
           doc=doc,
           ogroup=gref_template_data_from_options(og)))
 
