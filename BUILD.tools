@@ -95,6 +95,6 @@ jar_library(name = 'scrooge-legacy-gen',
 
 jar_library(name = 'jar-tool',
             jars = [
-              jar(org = 'com.twitter.common', name = 'jar-tool', rev = '0.1.6')
+              jar(org = 'com.twitter.common', name = 'jar-tool', rev = '0.1.7')
             ])
 
