@@ -5,6 +5,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import os
+import shlex
 
 from twitter.common.contextutil import environment_as
 
@@ -27,6 +28,11 @@ class PythonRunTests(PythonTask):
                                  'each test target will create a new chroot, which will be much '
                                  'slower.')
 
+    option_group.add_option(mkflag('options'),
+                            dest='python_run_tests_options',
+                            action='append', default=[],
+                            help='[%default] options to pass to the underlying pytest runner.')
+
   def execute(self):
     def is_python_test(target):
       # Note that we ignore PythonTestSuite, because we'll see the PythonTests targets
@@ -37,8 +43,14 @@ class PythonRunTests(PythonTask):
 
     test_targets = list(filter(is_python_test, self.context.targets()))
     if test_targets:
+      self.context.lock.release()
+
       # TODO(benjy): Only color on terminals that support it.
-      test_builder = PythonTestBuilder(test_targets, ['--color', 'yes'],
+      args = ['--color', 'yes']
+      if self.context.options.python_run_tests_options:
+        for options in self.context.options.python_run_tests_options:
+          args.extend(shlex.split(options))
+      test_builder = PythonTestBuilder(test_targets, args,
                                        interpreter=self.interpreter,
                                        conn_timeout=self.conn_timeout,
                                        fast=self.context.options.python_run_tests_fast)

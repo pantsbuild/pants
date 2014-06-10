@@ -23,8 +23,9 @@ python_library(
   name = 'int-test',
   sources = ['pants_run_integration_test.py'],
   dependencies = [
+    pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
-    pants('src/python/pants/commands:goal'),
+    pants('src/python/pants/base:build_environment'),
   ]
 )
 
