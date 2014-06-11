@@ -4,9 +4,9 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from contextlib import closing, contextmanager
 import os
 import tempfile
-from contextlib import closing, contextmanager
 from zipfile import ZipFile
 
 import pytest
@@ -47,31 +47,36 @@ class DuplicateDetectorTest(TaskTest):
       jar_with_duplicates = generate_jar('dups.jar', duplicate_class_path, unique_class_path)
       jar_without_duplicates = generate_jar('no_dups.jar', unique_class_path)
 
-      jars = []
-      jars.append(test_jar)
-      jars.append(jar_with_duplicates)
-      jars.append(jar_without_duplicates)
-      yield jars
+      yield test_jar, jar_with_duplicates, jar_without_duplicates
 
     with jars() as jars:
-      self.path_with_duplicates = [jars[0], jars[1]]
-      self.path_without_duplicates = [jars[0], jars[2]]
+      test_jar, jar_with_duplicates, jar_without_duplicates = jars
+      self.path_with_duplicates = {
+          'com/twitter/Test.class': set([test_jar]),
+          'com/twitter/commons/Duplicate.class': set([test_jar, jar_with_duplicates]),
+          'org/apache/Unique.class': set([jar_with_duplicates])
+      }
+      self.path_without_duplicates = {
+          'com/twitter/Test.class': set([test_jar]),
+          'com/twitter/commons/Duplicate.class': set([test_jar]),
+          'org/apache/Unique.class': set([jar_without_duplicates])
+      }
 
   def tearDown(self):
     safe_rmtree(self.base_dir)
 
   def test_duplicate_found(self):
-    options = {'fail_fast': False}
-    task = DuplicateDetector(create_context(options=options))
-    self.assertTrue(task._is_conflicts(self.path_with_duplicates, None))
+    options = {'fail_fast': False, 'excludes': None}
+    task = DuplicateDetector(create_context(options=options), workdir=None)
+    self.assertTrue(task._is_conflicts(self.path_with_duplicates, binary_target=None))
 
   def test_duplicate_not_found(self):
-    options = {'fail_fast': False}
-    task = DuplicateDetector(create_context(options=options))
-    self.assertFalse(task._is_conflicts(self.path_without_duplicates, None))
+    options = {'fail_fast': False, 'excludes': None}
+    task = DuplicateDetector(create_context(options=options), workdir=None)
+    self.assertFalse(task._is_conflicts(self.path_without_duplicates, binary_target=None))
 
   def test_fail_fast_error_raised(self):
-    options = {'fail_fast': True}
-    task = DuplicateDetector(create_context(options=options))
+    options = {'fail_fast': True, 'excludes': None}
+    task = DuplicateDetector(create_context(options=options), workdir=None)
     with pytest.raises(TaskError):
-      task._is_conflicts(self.path_with_duplicates, None)
+      task._is_conflicts(self.path_with_duplicates, binary_target=None)
