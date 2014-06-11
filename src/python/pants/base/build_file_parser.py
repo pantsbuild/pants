@@ -11,7 +11,7 @@ from functools import partial
 
 from twitter.common.lang import Compatibility
 
-from pants.base.address import BuildFileAddress, parse_spec
+from pants.base.address import Address, BuildFileAddress, parse_spec
 from pants.base.build_file import BuildFile
 from pants.base.exceptions import TargetDefinitionException
 
@@ -275,24 +275,38 @@ class BuildFileParser(object):
       build_graph.inject_target(target, dependencies=target_proxy.dependency_addresses)
 
       for traversable_spec in target.traversable_dependency_specs:
-        self.inject_spec_closure_into_build_graph(traversable_spec,
-                                                  build_graph,
-                                                  addresses_already_closed)
-        traversable_spec_target = build_graph.get_target_from_spec(traversable_spec)
+        spec_path, target_name = parse_spec(traversable_spec, relative_to=address.spec_path)
+        self._inject_spec_closure_into_build_graph(spec_path,
+                                                   target_name,
+                                                   build_graph,
+                                                   addresses_already_closed)
+        traversable_spec_target = build_graph.get_target(Address(spec_path, target_name))
         if traversable_spec_target not in target.dependencies:
           build_graph.inject_dependency(dependent=target.address,
                                         dependency=traversable_spec_target.address)
           target.mark_transitive_invalidation_hash_dirty()
 
       for traversable_spec in target.traversable_specs:
-        self.inject_spec_closure_into_build_graph(traversable_spec,
-                                                  build_graph,
-                                                  addresses_already_closed)
+        spec_path, target_name = parse_spec(traversable_spec, relative_to=address.spec_path)
+        self._inject_spec_closure_into_build_graph(spec_path,
+                                                   target_name,
+                                                   build_graph,
+                                                   addresses_already_closed)
         target.mark_transitive_invalidation_hash_dirty()
 
   def inject_spec_closure_into_build_graph(self, spec, build_graph, addresses_already_closed=None):
-    addresses_already_closed = addresses_already_closed or set()
     spec_path, target_name = parse_spec(spec)
+    self._inject_spec_closure_into_build_graph(spec_path,
+                                               target_name,
+                                               build_graph,
+                                               addresses_already_closed)
+
+  def _inject_spec_closure_into_build_graph(self,
+                                            spec_path,
+                                            target_name,
+                                            build_graph,
+                                            addresses_already_closed=None):
+    addresses_already_closed = addresses_already_closed or set()
     build_file = BuildFileCache.spec_path_to_build_file(self._root_dir, spec_path)
     address = BuildFileAddress(build_file, target_name)
     self.inject_address_closure_into_build_graph(address, build_graph, addresses_already_closed)
@@ -413,12 +427,12 @@ class BuildFileParser(object):
         if (conflicting_target.address.build_file != target_proxy.address.build_file):
           raise BuildFileParser.SiblingConflictException(
             "Both {conflicting_file} and {target_file} define the same target '{target_name}'"
-            .format(conflicting_file=conflicting_target.address.build_file, 
+            .format(conflicting_file=conflicting_target.address.build_file,
                     target_file=target_proxy.address.build_file,
                     target_name=conflicting_target.address.target_name))
         raise BuildFileParser.TargetConflictException(
           "File {conflicting_file} defines target '{target_name}' more than once."
-          .format(conflicting_file=conflicting_target.address.build_file, 
+          .format(conflicting_file=conflicting_target.address.build_file,
                   target_name=conflicting_target.address.target_name))
 
       assert target_proxy.address not in self.addresses_by_build_file[build_file], (
