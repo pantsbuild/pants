@@ -43,6 +43,7 @@ python_test_suite(
     pants(':roots'),
     pants(':scrooge_gen'),
     pants(':sorttargets'),
+    pants(':targets_help'),
     pants(':what_changed'),
     pants('tests/python/pants_test/tasks/jvm_compile')
   ],
@@ -329,7 +330,6 @@ python_tests(
   ],
 )
 
-# XXX(pl): Test is broken and not in :all
 python_tests(
   name = 'targets_help',
   sources = ['test_targets_help.py'],
