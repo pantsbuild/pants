@@ -782,6 +782,7 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
           if classes_by_source is not None:
             classes_by_source[source].add_abs_paths(self._classes_dir, classes)
 
+    # TODO(pl): https://github.com/pantsbuild/pants/issues/206
     if resources_by_target is not None:
       for target in targets:
         target_resources = resources_by_target[target]
