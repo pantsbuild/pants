@@ -190,7 +190,7 @@ class ApacheThriftGen(CodeGen):
     def create_target(files, deps):
       spec_path = os.path.join(self.combined_relpath, 'gen-java')
       spec = '{spec_path}:{name}'.format(spec_path=spec_path, name=target.id)
-      address = SyntheticAddress(spec=spec)
+      address = SyntheticAddress.parse(spec=spec)
       return self.context.add_new_target(address,
                                          JavaLibrary,
                                          derived_from=target,
@@ -204,7 +204,7 @@ class ApacheThriftGen(CodeGen):
     def create_target(files, deps):
       spec_path = os.path.join(self.combined_relpath, 'gen-py')
       spec = '{spec_path}:{name}'.format(spec_path=spec_path, name=target.id)
-      address = SyntheticAddress(spec=spec)
+      address = SyntheticAddress.parse(spec=spec)
       return self.context.add_new_target(address,
                                          PythonLibrary,
                                          derived_from=target,

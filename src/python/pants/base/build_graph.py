@@ -35,7 +35,7 @@ class BuildGraph(object):
     return address in self._target_by_address
 
   def get_target_from_spec(self, spec):
-    return self.get_target(SyntheticAddress(spec))
+    return self.get_target(SyntheticAddress.parse(spec))
 
   def get_target(self, address):
     return self._target_by_address.get(address, None)

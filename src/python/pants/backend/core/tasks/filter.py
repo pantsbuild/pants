@@ -37,7 +37,7 @@ def _create_filters(list_option, predicate):
 
 def _get_target(spec, build_graph):
   try:
-    address = SyntheticAddress(spec)
+    address = SyntheticAddress.parse(spec)
   except IOError as e:
     raise TaskError('Failed to parse address: %s: %s' % (address, e))
   match = build_graph.get_target(address)

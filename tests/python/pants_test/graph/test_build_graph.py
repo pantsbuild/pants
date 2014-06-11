@@ -57,4 +57,4 @@ class BuildGraphTest(unittest.TestCase):
       parser.register_target_alias('fake', Target)
       build_graph = BuildGraph()
       parser.inject_spec_closure_into_build_graph(':foo', build_graph)
-      self.assertEqual(len(build_graph.dependencies_of(SyntheticAddress(':foo'))), 1)
+      self.assertEqual(len(build_graph.dependencies_of(SyntheticAddress.parse(':foo'))), 1)
