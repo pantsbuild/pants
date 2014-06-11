@@ -160,6 +160,8 @@ class Depmap(ConsoleTask):
         if parent:
           output.append('  "%s" -> "%s";' % (self._dep_id(parent)[0], self._dep_id(dep)[0]))
 
+        # TODO: This is broken. 'dependency' doesn't exist here, and we don't have
+        # internal_dependencies any more anyway.
         if self._is_jvm(dependency):
           for internal_dependency in dependency.internal_dependencies:
             output += output_deps(outputted, internal_dependency, dependency)

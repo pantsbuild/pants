@@ -12,6 +12,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.build_manual import manual
 from pants.base.exceptions import TargetDefinitionException
 
+
 @manual.builddict()
 class SourceRoot(object):
   """Allows registration of a source root for a set of targets.

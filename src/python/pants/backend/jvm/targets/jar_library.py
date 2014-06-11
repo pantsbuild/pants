@@ -4,14 +4,9 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from functools import partial
-
-from twitter.common.collections import OrderedSet, maybe_list
-
 from pants.base.build_manual import manual
 from pants.base.payload import JarLibraryPayload
 from pants.base.target import Target
-from pants.backend.jvm.targets.jar_dependency import JarDependency
 
 
 @manual.builddict(tags=["anylang"])

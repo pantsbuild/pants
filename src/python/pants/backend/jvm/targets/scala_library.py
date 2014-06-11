@@ -4,12 +4,7 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from twitter.common.collections import maybe_list
-
-from pants.base.address import SyntheticAddress
 from pants.base.build_manual import manual
-from pants.base.target import Target
-from pants.base.exceptions import TargetDefinitionException
 from pants.backend.jvm.targets.exportable_jvm_library import ExportableJvmLibrary
 
 

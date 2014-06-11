@@ -406,7 +406,7 @@ class JarPublish(Task, ScmPublish):
         return org, name
       else:
         try:
-          address = Address.parse(get_buildroot(), coordinate)
+          address = Address.parse(get_buildroot(), coordinate)  # TODO: This is broken.
           try:
             target = Target.get(address)
             if not target:

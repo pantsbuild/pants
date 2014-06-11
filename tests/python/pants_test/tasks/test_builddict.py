@@ -7,6 +7,8 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 from StringIO import StringIO
 from contextlib import closing
 
+from pants.base.build_environment import get_buildroot
+from pants.base.build_file_parser import BuildFileParser
 from pants.backend.core.tasks.builddictionary import BuildBuildDictionary, assemble
 from pants_test.tasks.test_base import TaskTest, prepare_task
 
@@ -38,11 +40,11 @@ class BuildBuildDictionaryTestEmpty(BaseBuildBuildDictionaryTest):
 
 
 class ExtractedContentSanityTests(BaseBuildBuildDictionaryTest):
-  def test_usual_syms(self):
-    usual_syms = assemble()
-    usual_names = usual_syms.keys()
-    self.assertTrue(len(usual_names) > 20, "Strangely few symbols found")
-    for expected in ['jvm_binary', 'python_binary']:
-      self.assertTrue(expected in usual_names, "Didn't find %s" % expected)
+  def test_invoke_assemble(self):
+    bfp = BuildFileParser('.', '')
+    # we get our doc'able symbols from a BuildFileParser.
+    # Invoke that functionality without blowing up:
+    syms = assemble(build_file_parser=bfp)
+    # These symbols snuck into old dictionaries, make sure they don't again:
     for unexpected in ['__builtins__', 'Target']:
-      self.assertTrue(unexpected not in usual_names, "Found %s" % unexpected)
+      self.assertTrue(unexpected not in syms.keys(), "Found %s" % unexpected)

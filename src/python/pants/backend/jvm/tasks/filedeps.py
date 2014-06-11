@@ -5,7 +5,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import itertools
-import os
 
 from pants.backend.jvm.targets.jvm_binary import JvmApp
 from pants.backend.core.tasks.console_task import ConsoleTask

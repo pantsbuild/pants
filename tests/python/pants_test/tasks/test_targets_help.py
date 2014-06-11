@@ -19,9 +19,8 @@ class TargetsHelpTest(ConsoleTaskTest):
   def task_type(cls):
     return TargetsHelp
 
-  @classmethod
-  def setUpClass(cls):
-    super(TargetsHelpTest, cls).setUpClass()
+  def setUp(self):
+    super(TargetsHelpTest, self).setUp()
     SourceRoot.register(os.path.join(get_buildroot(), 'fakeroot'), TargetsHelpTest.MyTarget)
 
   def test_list_installed_targets(self):

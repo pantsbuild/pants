@@ -13,7 +13,7 @@ from pkg_resources import resource_string
 from twitter.common.dirutil import Fileset, safe_open
 
 from pants.backend.core.tasks.task import Task
-from pants.backend.maven_layout.register import maven_layout
+from pants.backend.maven_layout.maven_layout import maven_layout
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file_parser import BuildFileParser
 from pants.base.build_manual import get_builddict_info
@@ -59,7 +59,8 @@ def indent_docstring_by_n(s, n=1):
   return '\n'.join([indent + t for t in trimmed])
 
 
-def entry(nom, classdoc=None, msg_rst=None, argspec=None, funcdoc=None, methods=None, indent=1):
+def entry(nom, classdoc=None, msg_rst=None, argspec=None, funcdoc=None,
+          methods=None, impl=None, indent=1):
   """Create a struct that our template expects to see.
 
   :param nom: Symbol name, e.g. python_binary
@@ -68,6 +69,9 @@ def entry(nom, classdoc=None, msg_rst=None, argspec=None, funcdoc=None, methods=
   :param argspec: arg string like (x, y="deflt")
   :param funcdoc: function's __doc__, plain text
   :param methods: list of entries for class' methods
+  :param impl: name of thing that implements this.
+     E.g., "pants.backend.core.tasks.builddict.BuildBuildDictionary"
+  :param indent: spaces to indent; rst uses this for outline level
   """
 
   return TemplateData(
@@ -77,7 +81,8 @@ def entry(nom, classdoc=None, msg_rst=None, argspec=None, funcdoc=None, methods=
     argspec=argspec,
     funcdoc=indent_docstring_by_n(funcdoc, indent),
     methods=methods,
-    showmethods=(methods and len(methods) > 0))
+    showmethods=methods and (len(methods) > 0),
+    impl=impl)
 
 
 def msg_entry(nom, defn):
@@ -93,7 +98,8 @@ def entry_for_one_func(nom, func):
   argspec = inspect.formatargspec(args, varargs, varkw, defaults)
   return entry(nom,
                argspec=argspec,
-               funcdoc=func.__doc__)
+               funcdoc=func.__doc__,
+               impl="{0}.{1}".format(func.__module__, func.__name__))
 
 
 def entry_for_one_method(nom, method):
@@ -125,7 +131,10 @@ PREDEFS = {  # some hardwired entries
   "Amount": {"defn": msg_entry("Amount", """
                                 `Amount from twitter.commons.quantity <https://github.com/twitter/commons/blob/master/src/python/twitter/common/quantity/__init__.py>`_
                                 E.g., ``Amount(2, Time.MINUTES)``.""")},
-  "fancy_pants": {"suppress": True},  # unused alias for pants
+  "egg" : {"tags": ["python"],
+           "defn": msg_entry("egg",
+                             "In older Pants, loads a pre-built Python egg "
+                             "from file system. Undefined in newer Pants.")},
   "__file__": {"defn": msg_entry("__file__", "Path to BUILD file (string).")},
   "globs": {"defn": entry_for_one("globs", Fileset.globs)},
   "java_tests": {"defn": msg_entry("java_tests",
@@ -148,16 +157,15 @@ PREDEFS = {  # some hardwired entries
 }
 
 
-# Thingies like scala_library
-# Returns list of duples [(name, object), (name, object), (name, object),...]
-def get_syms():
-  r = {}
-  vc = BuildFileParser.report_registered_context()
-  for s in vc:
-    if s in PREDEFS: continue
-    o = vc[s]
-    r[s] = o
-  return r
+# Report symbols defined in BUILD files (jvm_binary...)
+# Returns dict {"scala_library": ScalaLibrary, "Amount": commons.Amount, ...}
+def get_syms(build_file_parser):
+  retval = {}
+  report = build_file_parser.report_registered_context()
+  for nom in report:
+    if nom in PREDEFS: continue
+    retval[nom] = report[nom]
+  return retval
 
 # Needed since x may be a str or a unicode, so we can't hard-code str.lower or unicode.lower.
 _lower = lambda x: x.lower()
@@ -185,18 +193,18 @@ def tags_tocl(d, tag_list, title):
   return TemplateData(t=title, e=filtered_anchors)
 
 
-def entry_for_one_class(nom, klas):
+def entry_for_one_class(nom, cls):
   """  Generate a BUILD dictionary entry for a class.
   nom: name like 'python_binary'
-  klas: class like pants.python_binary"""
+  cls: class like pants.python_binary"""
   try:
-    args, varargs, varkw, defaults = inspect.getargspec(klas.__init__)
+    args, varargs, varkw, defaults = inspect.getargspec(cls.__init__)
     argspec = inspect.formatargspec(args[1:], varargs, varkw, defaults)
-    funcdoc = klas.__init__.__doc__
+    funcdoc = cls.__init__.__doc__
 
     methods = []
-    for attrname in dir(klas):
-      attr = getattr(klas, attrname)
+    for attrname in dir(cls):
+      attr = getattr(cls, attrname)
       attr_bdi = get_builddict_info(attr)
       if not attr_bdi: continue
       if inspect.ismethod(attr):
@@ -212,11 +220,11 @@ def entry_for_one_class(nom, klas):
     methods = None
 
   return entry(nom,
-               classdoc=klas.__doc__,
+               classdoc=cls.__doc__,
                argspec=argspec,
                funcdoc=funcdoc,
-               methods=methods)
-
+               methods=methods,
+               impl="{0}.{1}".format(cls.__module__, cls.__name__))
 
 def gen_goals_glopts_reference_data():
   global_option_parser = optparse.OptionParser(add_help_option=False)
@@ -255,7 +263,7 @@ def gref_template_data_from_options(og):
 
 
 def gen_goals_phases_reference_data():
-  """Generate the goals reference rst doc."""
+  """Generate the template data for the goals reference rst doc."""
   phase_dict = {}
   phase_names = []
   for phase, raw_goals in Phase.all():
@@ -272,8 +280,9 @@ def gen_goals_phases_reference_data():
       og = options_by_title[options_title]
       if og:
         found_option_groups.add(options_title)
+      impl = "{0}.{1}".format(goal.task_type.__module__, goal.task_type.__name__)
       goals.append(TemplateData(
-          name=goal.task_type.__name__,
+          impl=impl,
           doc=doc,
           ogroup=gref_template_data_from_options(og)))
 
@@ -294,25 +303,28 @@ def gen_goals_phases_reference_data():
   return phases
 
 
-def assemble(predefs=PREDEFS, symbol_hash=None):
+def assemble(predefs=PREDEFS, build_file_parser=None):
   """Assemble big hash of entries suitable for smushing into a template.
 
   predefs: Hash of "hard-wired" predefined entries.
-  symbol_hash: Python syms from which to generate more entries. Default: get from BUILD context"""
-  d = {}
-  for k in PREDEFS:
-    v = PREDEFS[k]
-    if "suppress" in v and v["suppress"]: continue
-    d[k] = v
-  if symbol_hash is None:
-    symbol_hash = get_syms()
-  for k in symbol_hash:
-    bdi = get_builddict_info(symbol_hash[k])
-    if bdi is None: continue
-    d[k] = bdi.copy()
-    if not "defn" in d[k]:
-      d[k]["defn"] = entry_for_one(k, symbol_hash[k])
-  return d
+  build_file_parser: BuildFileParser which knows the BUILD-file symbols defined
+    for this run of Pants; hopefully knows ~the same symbols defined for a
+    "typical" run of Pants.
+  """
+  retval = {}
+  for nom in PREDEFS:
+    val = PREDEFS[nom]
+    if "suppress" in val and val["suppress"]: continue
+    retval[nom] = val
+  if build_file_parser:
+    symbol_hash = get_syms(build_file_parser)
+    for nom in symbol_hash:
+      bdi = get_builddict_info(symbol_hash[nom])
+      if bdi is None: continue
+      retval[nom] = bdi.copy()
+      if not "defn" in retval[nom]:
+        retval[nom]["defn"] = entry_for_one(nom, symbol_hash[nom])
+  return retval
 
 
 class BuildBuildDictionary(Task):
@@ -330,7 +342,7 @@ class BuildBuildDictionary(Task):
 
   def _gen_build_dictionary(self):
     """Generate the BUILD dictionary reference rst doc."""
-    d = assemble()
+    d = assemble(build_file_parser=self.context.build_file_parser)
     template = resource_string(__name__, os.path.join(self._templates_dir, 'page.mustache'))
     tocs = [tocl(d),
             tags_tocl(d, ["java", "scala", "jvm", "anylang"], "JVM"),

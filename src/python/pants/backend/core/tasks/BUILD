@@ -56,6 +56,13 @@ python_library(
   dependencies = [
     pants(':common'),
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
+    pants('src/python/pants/backend/core/tasks:task'),
+    pants('src/python/pants/backend/maven_layout'),
+    pants('src/python/pants/base:build_environment'),
+    pants('src/python/pants/base:build_file_parser'),
+    pants('src/python/pants/base:build_manual'),
+    pants('src/python/pants/base:config'),
+    pants('src/python/pants/base:exceptions'),
     pants('src/python/pants/base:generator'),
     pants('src/python/pants/goal:option_helpers'),
     pants('src/python/pants/goal:phase'),

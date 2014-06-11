@@ -176,10 +176,10 @@ class JarDependency(object):
       extension, but not necessarily. For instance, ivy files are of type 'ivy' but have 'xml' as
       their file extension.
     :param ext: The file extension of the published artifact.
-    :param conf: The public configuration in which this artifact is published. The '*' wildcard can
-      be used to designate all public configurations.
     :param url: The url at which this artifact can be found if it isn't located at the standard
       location in the repository.
+    :param configuration: The public configuration in which this artifact is published. The '*' wildcard can
+      be used to designate all public configurations.
     :param classifier: The maven classifier of this artifact.
     """
     artifact = Artifact(name or self.name, type_=type_, ext=ext, url=url, conf=configuration,

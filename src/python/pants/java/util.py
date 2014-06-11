@@ -5,7 +5,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import os
-import re
 
 from pants.base.workunit import WorkUnit
 from pants.java.executor import Executor, SubprocessExecutor
