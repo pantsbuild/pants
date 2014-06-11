@@ -83,7 +83,7 @@ class PythonTestBuilder(object):
     PythonRequirement('pytest'),
     PythonRequirement('pytest-timeout'),
     PythonRequirement('pytest-cov'),
-    PythonRequirement('coverage==3.6b1'),
+    PythonRequirement('coverage'),
     PythonRequirement('unittest2', version_filter=lambda py, pl: py.startswith('2')),
     PythonRequirement('unittest2py3k', version_filter=lambda py, pl: py.startswith('3'))
   ]
@@ -171,7 +171,7 @@ class PythonTestBuilder(object):
       builder = PEXBuilder(interpreter=self.interpreter)
       builder.info.entry_point = 'pytest'
       chroot = PythonChroot(
-          targets,
+          targets=targets,
           extra_requirements=self._TESTING_TARGETS,
           builder=builder,
           platforms=('current',),
