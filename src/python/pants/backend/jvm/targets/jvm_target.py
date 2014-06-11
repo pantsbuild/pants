@@ -94,7 +94,8 @@ class JvmTarget(Target, Jarable):
 
     # TODO(pl): This is an awful hack
     if isinstance(self.payload.provides.repo, Compatibility.string):
-      address = SyntheticAddress(self.payload.provides.repo, relative_to=self.address.spec_path)
+      address = SyntheticAddress.parse(self.payload.provides.repo,
+                                       relative_to=self.address.spec_path)
       repo_target = self._build_graph.get_target(address)
       self.payload.provides.repo = repo_target
     return self.payload.provides

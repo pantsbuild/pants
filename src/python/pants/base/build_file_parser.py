@@ -11,7 +11,7 @@ from functools import partial
 
 from twitter.common.lang import Compatibility
 
-from pants.base.address import Address, BuildFileAddress, parse_spec
+from pants.base.address import BuildFileAddress, parse_spec, SyntheticAddress
 from pants.base.build_file import BuildFile
 from pants.base.exceptions import TargetDefinitionException
 
@@ -280,7 +280,7 @@ class BuildFileParser(object):
                                                    target_name,
                                                    build_graph,
                                                    addresses_already_closed)
-        traversable_spec_target = build_graph.get_target(Address(spec_path, target_name))
+        traversable_spec_target = build_graph.get_target(SyntheticAddress(spec_path, target_name))
         if traversable_spec_target not in target.dependencies:
           build_graph.inject_dependency(dependent=target.address,
                                         dependency=traversable_spec_target.address)

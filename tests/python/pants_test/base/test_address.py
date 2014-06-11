@@ -32,10 +32,10 @@ class AddressTest(unittest.TestCase):
     self.assertEqual(target_name, address.target_name)
 
   def test_synthetic_forms(self):
-    self.assertAddress('a/b', 'target', SyntheticAddress('a/b:target'))
-    self.assertAddress('a/b', 'b', SyntheticAddress('a/b'))
-    self.assertAddress('a/b', 'target', SyntheticAddress(':target', 'a/b'))
-    self.assertAddress('', 'target', SyntheticAddress(':target'))
+    self.assertAddress('a/b', 'target', SyntheticAddress.parse('a/b:target'))
+    self.assertAddress('a/b', 'b', SyntheticAddress.parse('a/b'))
+    self.assertAddress('a/b', 'target', SyntheticAddress.parse(':target', 'a/b'))
+    self.assertAddress('', 'target', SyntheticAddress.parse(':target'))
 
   def test_build_file_forms(self):
     with self.workspace('a/b/c/BUILD') as root_dir:

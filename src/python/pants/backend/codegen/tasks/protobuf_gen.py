@@ -142,7 +142,7 @@ class ProtobufGen(CodeGen):
       genfiles.extend(calculate_genfiles(path, source).get('java', []))
     spec_path = os.path.relpath(self.java_out, get_buildroot())
     spec = '{spec_path}:{name}'.format(spec_path=spec_path, name=target.id)
-    address = SyntheticAddress(spec=spec)
+    address = SyntheticAddress.parse(spec=spec)
     tgt = self.context.add_new_target(address,
                                       JavaLibrary,
                                       derived_from=target,
@@ -161,7 +161,7 @@ class ProtobufGen(CodeGen):
       genfiles.extend(calculate_genfiles(path, source).get('py', []))
     spec_path = os.path.relpath(self.py_out, get_buildroot())
     spec = '{spec_path}:{name}'.format(spec_path=spec_path, name=target.id)
-    address = SyntheticAddress(spec=spec)
+    address = SyntheticAddress.parse(spec=spec)
     tgt = self.context.add_new_target(address,
                                       PythonLibrary,
                                       derived_from=target,

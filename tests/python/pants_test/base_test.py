@@ -66,7 +66,7 @@ class BaseTest(unittest.TestCase):
                   dependencies=None,
                   derived_from=None,
                   **kwargs):
-    address = SyntheticAddress(spec)
+    address = SyntheticAddress.parse(spec)
     target = target_type(name=address.target_name,
                          address=address,
                          build_graph=self.build_graph,
