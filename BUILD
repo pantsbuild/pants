@@ -10,6 +10,6 @@ source_root('src/scala', jvm_binary, page, scala_library)
 source_root('src/thrift', java_thrift_library, page, python_thrift_library)
 
 source_root('tests/java', java_library, junit_tests, page)
-source_root('tests/python', page, python_library, python_tests, python_test_suite, python_binary, resources)
+source_root('tests/python', page, python_library, python_tests, python_test_suite, resources)
 source_root('tests/resources', page, resources)
 source_root('tests/scala', page, junit_tests, scala_library, scala_specs)

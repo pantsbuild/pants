@@ -15,7 +15,7 @@ class LinearEngineTest(EngineTestBase, BaseTest):
   def setUp(self):
     super(LinearEngineTest, self).setUp()
 
-    self._context = self.context(options=dict(explain=False, no_lock=False))
+    self._context = self.context(options=dict(explain=False))
     self.assertTrue(self._context.is_unlocked())
 
     self.engine = LinearEngine()

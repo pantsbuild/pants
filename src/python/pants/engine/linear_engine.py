@@ -116,10 +116,7 @@ class LinearEngine(Engine):
     # Then we grab the lock at the beginning of f's execution and don't relinquish until the largest
     # scope serialization requirement from c is past.
     serialized_phase_executors = [pe for pe in phase_executors if pe.phase.serialize]
-    if context.options.no_lock:
-      outer_lock_holder = None
-    else:
-      outer_lock_holder = serialized_phase_executors[-1] if serialized_phase_executors else None
+    outer_lock_holder = serialized_phase_executors[-1] if serialized_phase_executors else None
 
     if outer_lock_holder:
       context.acquire_lock()
