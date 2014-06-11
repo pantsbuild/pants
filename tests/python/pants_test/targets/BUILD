@@ -12,11 +12,11 @@ python_test_suite(
   name = 'targets',
   dependencies = [
     pants(':artifact'),
-    pants(':bundle'),
     pants(':exclusive'),
     pants(':sort_targets'),
     pants(':jar_library'),
     pants(':java_thrift_library'),
+    pants(':jvm_app'),
     pants(':python_binary'),
     pants(':python_target'),
     pants(':scala_library'),
@@ -34,12 +34,13 @@ python_tests(
 )
 
 python_tests(
-  name = 'bundle',
-  sources = ['test_bundle.py'],
+  name = 'jvm_app',
+  sources = ['test_jvm_app.py'],
   dependencies = [
     pants(':base'),
     pants('src/python/pants/backend/core'),
     pants('src/python/pants/backend/jvm/targets:jvm'),
+    pants('src/python/pants/base:exceptions'),
   ]
 )
 

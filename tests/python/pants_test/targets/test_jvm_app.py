@@ -4,14 +4,17 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+import pytest
 from textwrap import dedent
 
 from pants.backend.core.wrapped_globs import Globs
 from pants.backend.jvm.targets.jvm_binary import Bundle, JvmApp, JvmBinary
+from pants.base.exceptions import TargetDefinitionException
+
 from pants_test.base_test import BaseTest
 
 
-class BundleTest(BaseTest):
+class BaseJvmAppTest(BaseTest):
   @property
   def alias_groups(self):
     return {
@@ -27,6 +30,122 @@ class BundleTest(BaseTest):
       },
     }
 
+
+class BinaryTest(BaseJvmAppTest):
+  def setUp(self):
+    super(BinaryTest, self).setUp()
+    self.create_dir('src/java/org/archimedes/buoyancy/config')
+    self.create_file('src/java/org/archimedes/buoyancy/config/densities.xml')
+    self.add_to_build_file('src/java/org/archimedes/buoyancy/BUILD', dedent('''
+      jvm_binary(name='bin')
+    '''))
+    self.add_to_build_file('src/java/org/archimedes/buoyancy/BUILD', dedent('''
+      jvm_binary(name='bin2')
+    '''))
+
+  def test_binary_via_binary(self):
+    self.add_to_build_file('src/java/org/archimedes/buoyancy/BUILD', dedent('''
+      jvm_app(name='buoyancy',
+        binary=':bin',
+        bundles=[
+          bundle().add('config/densities.xml')
+        ]
+      )
+    '''))
+    app = self.target('src/java/org/archimedes/buoyancy')
+    binary = self.target('src/java/org/archimedes/buoyancy:bin')
+    self.assertEquals(app.binary, binary)
+
+  def test_binary_via_dependencies(self):
+    self.add_to_build_file('src/java/org/archimedes/buoyancy/BUILD', dedent('''
+      jvm_app(name='buoyancy',
+        dependencies=[':bin'],
+        bundles=[
+          bundle().add('config/densities.xml')
+        ]
+      )
+    '''))
+    app = self.target('src/java/org/archimedes/buoyancy')
+    binary = self.target('src/java/org/archimedes/buoyancy:bin')
+    self.assertEquals(app.binary, binary)
+
+  def test_degenerate_binaries(self):
+    self.add_to_build_file('src/java/org/archimedes/buoyancy/BUILD', dedent('''
+      jvm_app(name='buoyancy',
+        binary=':bin',
+        dependencies=[':bin'],
+        bundles=[
+          bundle().add('config/densities.xml')
+        ]
+      )
+    '''))
+    app = self.target('src/java/org/archimedes/buoyancy')
+    binary = self.target('src/java/org/archimedes/buoyancy:bin')
+    self.assertEquals(app.binary, binary)
+
+  def test_no_binary(self):
+    self.add_to_build_file('src/java/org/archimedes/buoyancy/BUILD', dedent('''
+      jvm_app(name='buoyancy',
+        bundles=[
+          bundle().add('config/densities.xml')
+        ]
+      )
+    '''))
+    app = self.target('src/java/org/archimedes/buoyancy')
+    with pytest.raises(TargetDefinitionException):
+      app.binary
+
+  def test_too_many_binaries_mixed(self):
+    self.add_to_build_file('src/java/org/archimedes/buoyancy/BUILD', dedent('''
+      jvm_app(name='buoyancy',
+        binary=':bin',
+        dependencies=[':bin2'],
+        bundles=[
+          bundle().add('config/densities.xml')
+        ]
+      )
+    '''))
+    app = self.target('src/java/org/archimedes/buoyancy')
+    with pytest.raises(TargetDefinitionException):
+      app.binary
+
+  def test_too_many_binaries_via_deps(self):
+    self.add_to_build_file('src/java/org/archimedes/buoyancy/BUILD', dedent('''
+      jvm_app(name='buoyancy',
+        dependencies=[':bin', ':bin2'],
+        bundles=[
+          bundle().add('config/densities.xml')
+        ]
+      )
+    '''))
+    app = self.target('src/java/org/archimedes/buoyancy')
+    with pytest.raises(TargetDefinitionException):
+      app.binary
+
+  def test_not_a_binary(self):
+    self.add_to_build_file('src/java/org/archimedes/buoyancy/BUILD', dedent('''
+      jvm_app(name='buoyancy',
+        binary=':bin',
+        bundles=[
+          bundle().add('config/densities.xml')
+        ]
+      )
+    '''))
+
+    self.add_to_build_file('src/java/org/archimedes/buoyancy/BUILD', dedent('''
+      jvm_app(name='buoyancy2',
+        binary=':buoyancy',
+        bundles=[
+          bundle().add('config/densities.xml')
+        ]
+      )
+    '''))
+    app = self.target('src/java/org/archimedes/buoyancy:buoyancy2')
+    with pytest.raises(TargetDefinitionException):
+      app.binary
+
+
+class BundleTest(BaseJvmAppTest):
   def test_bundle_filemap_dest_bypath(self):
     self.create_dir('src/java/org/archimedes/buoyancy/config')
     self.create_file('src/java/org/archimedes/buoyancy/config/densities.xml')
