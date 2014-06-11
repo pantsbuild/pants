@@ -44,8 +44,9 @@ class PythonTarget(Target):
 
     self._provides = provides
 
-    self.compatibility = maybe_list(compatibility or ())
-    for req in self.compatibility:
+    self._compatibility = maybe_list(compatibility or ())
+    # Check that the compatibility requirements are well-formed.
+    for req in self._compatibility:
       try:
         PythonIdentity.parse_requirement(req)
       except ValueError as e:
@@ -69,6 +70,10 @@ class PythonTarget(Target):
         address = SyntheticAddress.parse(binary, relative_to=self.address.spec_path)
         self._provides._binaries[key] = self._build_graph.get_target(address)
     return self._provides
+
+  @property
+  def compatibility(self):
+    return self._compatibility
 
   @property
   def resources(self):
