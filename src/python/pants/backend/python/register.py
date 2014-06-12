@@ -3,7 +3,6 @@
 
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
-from pants.backend.python.tasks.python_binary_create import PythonBinaryCreate
 from pants.backend.python.tasks.python_run_tests import PythonRunTests
 
 from pants.goal import Goal as goal
@@ -64,9 +63,6 @@ def register_goals():
   # TODO(benjy): What is this? Do we need it?
   goal(name='python-setup', action=SetupPythonEnvironment
   ).install('setup').with_description("Setup the target's build environment.")
-
-  goal(name='python-binary-create', action=PythonBinaryCreate, dependencies=['bootstrap', 'check-exclusives', 'resources']
-  ).install('binary')
 
   goal(name='pytest', action=PythonRunTests, dependencies=['bootstrap', 'check-exclusives', 'resources']
   ).install('test')

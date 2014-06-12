@@ -54,7 +54,6 @@ python_test_suite(
   name = 'integration',
   dependencies = [
     pants('tests/python/pants_test/tasks:jar_publish_integration'),
-    pants('tests/python/pants_test/python:interpreter_selection_integration'),
   ]
 )
 
