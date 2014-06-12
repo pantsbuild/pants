@@ -5,7 +5,6 @@ python_library(
     'java_antlr_library.py',
     'java_protobuf_library.py',
     'java_thrift_library.py',
-    'jaxb_library.py',
   ],
   dependencies = [
     pants('src/python/pants/backend/jvm/targets:jvm'),

@@ -12,7 +12,6 @@ from twitter.common.dirutil import safe_mkdir
 from pants.backend.codegen.targets.java_antlr_library import JavaAntlrLibrary
 from pants.backend.codegen.targets.java_protobuf_library import JavaProtobufLibrary
 from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
-from pants.backend.codegen.targets.jaxb_library import JaxbLibrary
 from pants.backend.codegen.targets.python_antlr_library import PythonAntlrLibrary
 from pants.backend.codegen.targets.python_thrift_library import PythonThriftLibrary
 from pants.backend.core.targets.dependencies import Dependencies
@@ -46,7 +45,6 @@ class JvmToolTaskTestBase(BaseTest):
         'java_library': JavaLibrary,
         'java_protobuf_library': JavaProtobufLibrary,
         'java_thrift_library': JavaThriftLibrary,
-        'jaxb_library': JaxbLibrary,
         'junit_tests': JavaTests,
         'jvm_binary': JvmBinary,
         'page': Page,

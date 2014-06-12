@@ -13,6 +13,7 @@ python_library(
     pants('src/python/pants/backend/jvm/targets:jvm'),
     pants('src/python/pants/backend/jvm/targets:scala'),
     pants('src/python/pants/backend/jvm/tasks:bootstrap_jvm_tools'),
+    pants('src/python/pants/backend/jvm/tasks:bootstrap_jvm_tools'),
     pants('src/python/pants/backend/python/targets:python'),
     pants('tests/python/pants_test:base_test'),
   ]
