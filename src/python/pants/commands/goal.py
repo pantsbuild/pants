@@ -7,6 +7,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from contextlib import contextmanager
 import inspect
+import logging
 import os
 import sys
 import traceback
@@ -19,6 +20,7 @@ from twitter.common.log.options import LogOptions
 
 from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.backend.core.tasks.task import Task
+from pants.backend.jvm.tasks.nailgun_task import NailgunTask  # XXX(pl)
 from pants.base.address import BuildFileAddress, parse_spec
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
@@ -35,7 +37,6 @@ from pants.goal import Context, GoalError, Phase
 from pants.goal.help import print_help
 from pants.goal.initialize_reporting import update_reporting
 from pants.goal.option_helpers import add_global_options
-from pants.backend.jvm.tasks.nailgun_task import NailgunTask  # XXX(pl)
 
 
 StringIO = Compatibility.StringIO
@@ -43,6 +44,9 @@ StringIO = Compatibility.StringIO
 
 class Goal(Command):
   """Lists installed goals or else executes a named goal."""
+
+  class IntermixedArgumentsError(GoalError):
+    pass
 
   __command__ = 'goal'
   output = None
@@ -52,17 +56,42 @@ class Goal(Command):
     goals = OrderedSet()
     specs = OrderedSet()
     explicit_multi = False
+    logger = logging.getLogger(__name__)
+    has_double_dash = u'--' in args
+    goal_names = [phase.name for phase, goal in Phase.all()]
+    if not goal_names:
+      raise GoalError(
+        'Arguments cannot be parsed before the list of goals from Phase.all() is populated.')
 
     def is_spec(spec):
-      return os.sep in spec or ':' in spec
+      if os.sep in spec or ':' in spec:
+        return True # Definitely not a goal.
+      if not (spec in goal_names):
+        return True # Definitely not a (known) goal.
+      if has_double_dash:
+        # This means that we're parsing the half of the expression before a --, so assume it's a
+        # goal without warning.
+        return False
+      # Here, it's possible we have a goal and target with the same name. For now, always give
+      # priority to the goal, but give a warning if they might have meant the target (if the BUILD
+      # file exists).
+      try:
+        BuildFile(get_buildroot(), spec)
+        msg = (' Command-line argument "{spec}" is ambiguous, and was assumed to be a goal.'
+               ' If this is incorrect, disambiguate it with the "--" argument to separate goals'
+               ' from targets.')
+        logger.warning(msg.format(spec=spec))
+      except IOError: pass # Awesome, it's unambiguous.
+      return False
+
 
     for i, arg in enumerate(args):
       if not arg.startswith('-'):
         specs.add(arg) if is_spec(arg) else goals.add(arg)
       elif '--' == arg:
         if specs:
-          raise GoalError('Cannot intermix targets with goals when using --. Targets should '
-                          'appear on the right')
+          raise Goal.IntermixedArgumentsError('Cannot intermix targets with goals when using --. '
+                                              'Targets should appear on the right')
         explicit_multi = True
         del args[i]
         break
