@@ -27,13 +27,20 @@ GLOBAL_OPTIONS = [
          help='Kill nailguns before exiting'),
   Option('-d', '--logdir', dest='logdir',
          help='[%default] Write logs to files under this directory.'),
-  Option('-l', '--level', dest='log_level', type='choice', choices=['debug', 'info', 'warn'], default='info',
-         help='[%default] Set the logging level [debug, info, warn].'),
+  Option('-l', '--level', dest='log_level', type='choice', choices=['debug', 'info', 'warn'],
+         default='info', help='[%default] Set the logging level [debug, info, warn].'),
   Option('-q', '--quiet', action='store_true', dest='quiet', default=False,
          help='Squelches all console output apart from errors.'),
+  Option('-i', '--interpreter', dest='interpreter', default=[], action='append',
+         help="Constrain what Python interpreters to use.  Uses Requirement format from "
+              "pkg_resources, e.g. 'CPython>=2.6,<3' or 'PyPy'. By default, no constraints "
+              "are used.  Multiple constraints may be added.  They will be ORed together."),
   Option('--no-colors', dest='no_color', action='store_true', default=False,
          help='Do not colorize log messages.'),
-
+  Option('--no-lock', dest='no_lock', action='store_true', default=False,
+         help="Don't attempt to grab the global lock. This lock prevents two concurrent pants "
+              "instances from stomping on each others data, so only use this if you know what "
+              "you're doing."),
   Option('--read-from-artifact-cache', '--no-read-from-artifact-cache', action='callback',
          callback=_set_bool, dest='read_from_artifact_cache', default=True,
          help='Read build artifacts from cache, if available.'),
