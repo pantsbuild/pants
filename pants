@@ -46,6 +46,7 @@ source ${HERE}/build-support/pants_venv
 PANTS_EXE=${HERE}/src/python/pants/bin/pants_exe.py
 PANTS_BINARY=src/python/pants/bin:pants
 PANTS_PEX="${HERE}/pants.pex"
+FAILED_BOOTSTRAP_SENTINEL="${HERE}/.pants.d/BOOTSTRAP_FAILED"
 
 PY=${PY:-$(which python)}
 
@@ -90,6 +91,10 @@ if [ ! -z "${PANTS_DEV}" ]; then
   exec_pants_bare "$@"
 else
   if [ ! -e "${PANTS_PEX}" ]; then
+    if [ -f ${FAILED_BOOTSTRAP_SENTINEL} ] ; then
+      log "Last bootstrap failed, cleaning up .pants.d"
+      rm -rf ${HERE}/.pants.d
+    fi
     log "Building pants.pex to ${PANTS_PEX}..."
     # TODO(John sirois): Re-plumb build such that it grabs constraints from the built python_binary
     # target(s).
@@ -97,6 +102,12 @@ else
     run_pants_bare build -v -i "CPython>=2.6,<3" -i "CPython>=3.3" ${PANTS_BINARY} && \
     mv -v ${HERE}/dist/pants.pex ${PANTS_PEX} && \
     chmod +x ${PANTS_PEX}
+    if [ $? != 0 ] ; then
+      echo "*** Pants bootstrapping failed."
+      echo "This file is left as a sentinel to record that bootstrapping pants failed." > ${FAILED_BOOTSTRAP_SENTINEL}
+    fi
   fi
-  exec "${PANTS_PEX}" "$@"
+  if [ -e "${PANTS_PEX}" ]; then
+    exec "${PANTS_PEX}" "$@"
+  fi
 fi
