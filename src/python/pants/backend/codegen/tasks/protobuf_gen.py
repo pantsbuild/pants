@@ -142,7 +142,7 @@ class ProtobufGen(CodeGen):
       genfiles.extend(calculate_genfiles(path, source).get('java', []))
     spec_path = os.path.relpath(self.java_out, get_buildroot())
     spec = '{spec_path}:{name}'.format(spec_path=spec_path, name=target.id)
-    address = SyntheticAddress(spec=spec)
+    address = SyntheticAddress.parse(spec=spec)
     tgt = self.context.add_new_target(address,
                                       JavaLibrary,
                                       derived_from=target,
@@ -161,7 +161,7 @@ class ProtobufGen(CodeGen):
       genfiles.extend(calculate_genfiles(path, source).get('py', []))
     spec_path = os.path.relpath(self.py_out, get_buildroot())
     spec = '{spec_path}:{name}'.format(spec_path=spec_path, name=target.id)
-    address = SyntheticAddress(spec=spec)
+    address = SyntheticAddress.parse(spec=spec)
     tgt = self.context.add_new_target(address,
                                       PythonLibrary,
                                       derived_from=target,
@@ -181,6 +181,7 @@ TYPE_PARSER = re.compile(r'^\s*(enum|message)\s+([^\s{]+).*')
 def camelcase(string):
   """Convert snake casing where present to camel casing"""
   return ''.join(word.capitalize() for word in re.split('[-_]', string))
+
 
 def calculate_genfiles(path, source):
   with open(path, 'r') as protobuf:
@@ -224,6 +225,7 @@ def calculate_genfiles(path, source):
     genfiles['py'].update(calculate_python_genfiles(source))
     genfiles['java'].update(calculate_java_genfiles(package, outer_class_name, types))
     return genfiles
+
 
 def _update_type_list(match, type_depth, outer_types):
   if match and type_depth < 2: # This takes care of the case where { } are on the same line.
