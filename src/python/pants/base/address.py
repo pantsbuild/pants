@@ -9,11 +9,28 @@ import os
 from twitter.common.lang import AbstractClass
 
 
-# TODO(pl): Add a nice docstring for this
+
 def parse_spec(spec, relative_to=''):
+  """Parses a target address spec and returns the path from the root of the repo to this Target
+  and Target name.
+  :param string spec: target address spec
+  For Example
+  ::
+    some_target(name='mytarget',
+      dependencies=['path/to/buildfile:targetname']
+    )
+
+  Where  ``path/to/buildfile:targetname`` is the dependent target address spec
+
+  In case, the target name is empty it returns the last component of the path as target name.
+  ::
+    spec_path, target_name = parse_spec('path/to/buildfile/foo')
+
+  Will return spec_path as 'path/to/buildfile/foo' and target_name as 'foo'
+  """
   spec_parts = spec.rsplit(':', 1)
   if len(spec_parts) == 1:
-    spec_path = spec_parts[0]
+    spec_path = os.path.normpath(spec_parts[0])
     assert spec_path, (
       'Attempted to parse a bad spec string {spec}: empty spec string'
       .format(spec=spec)
