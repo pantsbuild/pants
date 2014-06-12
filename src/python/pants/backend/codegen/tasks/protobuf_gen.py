@@ -174,13 +174,13 @@ class ProtobufGen(CodeGen):
 
 DEFAULT_PACKAGE_PARSER = re.compile(r'^\s*package\s+([^;]+)\s*;\s*$')
 OPTION_PARSER = re.compile(r'^\s*option\s+([^ =]+)\s*=\s*([^\s]+)\s*;\s*$')
+SERVICE_PARSER = re.compile(r'^\s*(service)\s+([^\s{]+).*')
 TYPE_PARSER = re.compile(r'^\s*(enum|message)\s+([^\s{]+).*')
-END_TYPE_PARSER = re.compile(r'^\s*}')
 
 
 def camelcase(string):
   """Convert snake casing where present to camel casing"""
-  return ''.join(word.capitalize() for word in string.split('_'))
+  return ''.join(word.capitalize() for word in re.split('[-_]', string))
 
 
 def calculate_genfiles(path, source):
@@ -191,7 +191,6 @@ def calculate_genfiles(path, source):
     outer_class_name = camelcase(filename)
     multiple_files = False
     outer_types = set()
-    inner_types = set()
     type_depth = 0
     for line in lines:
       match = DEFAULT_PACKAGE_PARSER.match(line)
@@ -201,57 +200,40 @@ def calculate_genfiles(path, source):
         match = OPTION_PARSER.match(line)
         if match:
           name = match.group(1)
-          value = match.group(2)
-
-          def string_value():
-            return value.lstrip('"').rstrip('"')
-
-          def bool_value():
-            return value == 'true'
-
+          value = match.group(2).strip('"')
           if 'java_package' == name:
-            package = string_value()
+            package = value
           elif 'java_outer_classname' == name:
-            outer_class_name = string_value()
+            outer_class_name = value
           elif 'java_multiple_files' == name:
-            multiple_files = bool_value()
+            multiple_files = (value == 'true')
         else:
-          match = TYPE_PARSER.match(line)
-          if match:
-            type_depth += 1
-            type_ = match.group(2)
-            if type_depth == 1:
-              _record_type(outer_types, type_, match.group(1))
-            else:
-              _record_type(inner_types, type_, match.group(1))
-          else:
-            match = END_TYPE_PARSER.match(line)
-            if match:
-              type_depth -= 1
+          uline = line.decode('utf-8').strip()
+          type_depth += uline.count('{') - uline.count('}')
+          match = SERVICE_PARSER.match(line)
+          _update_type_list(match, type_depth, outer_types)
+          if not match:
+            match = TYPE_PARSER.match(line)
+            _update_type_list(match, type_depth, outer_types)
 
     # TODO(Eric Ayers) replace with a real lex/parse understanding of protos
     # This is a big hack.  The parsing for finding type definitions is not reliable.
     # See https://github.com/pantsbuild/pants/issues/96
-    types = set()
-    if multiple_files:
-      if type_depth == 0:
-        types = outer_types
-      else:
-        # The parse appears to be flaky, roll all of the found types in.
-        types = outer_types.union(inner_types)
+    types = outer_types if multiple_files and type_depth == 0 else set()
 
     genfiles = defaultdict(set)
     genfiles['py'].update(calculate_python_genfiles(source))
-    genfiles['java'].update(calculate_java_genfiles(package,
-                                                    outer_class_name,
-                                                    types))
+    genfiles['java'].update(calculate_java_genfiles(package, outer_class_name, types))
     return genfiles
 
 
-def _record_type(type_set, type_name, type_keyword):
-  type_set.add(type_name)
-  if type_keyword == 'message':
-    type_set.add('%sOrBuilder' % type_name)
+def _update_type_list(match, type_depth, outer_types):
+  if match and type_depth < 2: # This takes care of the case where { } are on the same line.
+    type_name = match.group(2)
+    outer_types.add(type_name)
+    if match.group(1) == 'message':
+      outer_types.add('%sOrBuilder' % type_name)
+
 
 def calculate_python_genfiles(source):
   yield re.sub(r'\.proto$', '_pb2.py', source)
