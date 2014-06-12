@@ -259,7 +259,16 @@ class JarTask(NailgunTask):
 
       args.append(path)
 
-      jvm_args = self.context.config.getlist('jar-tool', 'jvm_args', default=['-Xmx64M'])
+      default_jvm_args = [
+          '-Xmx64M',
+
+          # We control the tmpdir here for pragmatic reasons:
+          # 1.) The workdir is generally under the build root dir and thus on the same filesystem.
+          # 2.) Copying jar bytes between filesystems is slow, moving them is a metadata operation.
+          '-Djava.io.tmpdir={0}'.format(self.workdir)
+      ]
+      jvm_args = self.context.config.getlist('jar-tool', 'jvm_args', default=default_jvm_args)
+
       self.runjava(self.tool_classpath(self._JAR_TOOL_CLASSPATH_KEY),
                    'com.twitter.common.jar.tool.Main',
                    jvm_options=jvm_args,
