@@ -1,0 +1,12 @@
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+# Demonstrates compiling code with a unicode classes
+
+jvm_binary(name = 'main',
+  dependencies = [
+    'src/java/com/pants/examples/unicode/cucumber'
+  ],
+  source = 'CucumberMain.java',
+  main = 'com.pants.examples.unicode.main.CucumberMain',
+)

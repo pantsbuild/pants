@@ -102,7 +102,7 @@ class DuplicateDetector(JvmBinaryTask):
       with closing(ZipFile(external_dep)) as dep_zip:
         for qualified_file_name in dep_zip.namelist():
           file_name = os.path.basename(qualified_file_name)
-          if file_name.lower() in self._excludes:
+          if file_name.decode('utf-8').lower() in self._excludes:
             continue
           jar_name = os.path.basename(external_dep)
           if (not self._isdir(qualified_file_name)) and Manifest.PATH != qualified_file_name:
