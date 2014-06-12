@@ -257,6 +257,7 @@ python_tests(
   ],
 )
 
+# XXX(pl): Test is broken and not in :all
 python_tests(
   name = 'jar_publish_integration',
   sources = ['test_jar_publish_integration.py'],

@@ -11,6 +11,7 @@ from twitter.common.lang import Compatibility
 from twitter.common.python.pex_info import PexInfo
 
 from pants.base.build_manual import manual
+from pants.base.target import Target
 from pants.base.exceptions import TargetDefinitionException
 from pants.backend.python.targets.python_target import PythonTarget
 
@@ -36,6 +37,7 @@ class PythonBinary(PythonTarget):
                repositories=None,         # pex option
                indices=None,              # pex option
                ignore_errors=False,       # pex option
+               allow_pypi=False,          # pex option
                platforms=(),
                **kwargs):
     """
@@ -53,7 +55,6 @@ class PythonBinary(PythonTarget):
       be written to disk.
     :param repositories: a list of repositories to query for dependencies.
     :param indices: a list of indices to use for packages.
-    :param ignore_errors: should we ignore inability to resolve dependencies?
     :param platforms: extra platforms to target when building this binary.
     :param compatibility: either a string or list of strings that represents
       interpreter compatibility for this target, using the Requirement-style format,

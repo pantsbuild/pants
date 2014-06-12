@@ -20,13 +20,14 @@ class PythonRunTests(PythonTask):
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
     super(PythonRunTests, cls).setup_parser(option_group, args, mkflag)
+    # TODO(benjy): Support pass-thru of pytest flags.
     option_group.add_option(mkflag('fast'), mkflag('fast', negate=True),
                             dest='python_run_tests_fast',
                             action='callback', callback=mkflag.set_bool, default=True,
                             help='[%default] Run all tests in a single chroot. If set to false, '
                                  'each test target will create a new chroot, which will be much '
                                  'slower.')
-    # TODO(benjy): Support direct passthru of pytest flags.
+
     option_group.add_option(mkflag('options'),
                             dest='python_run_tests_options',
                             action='append', default=[],
@@ -46,14 +47,10 @@ class PythonRunTests(PythonTask):
 
       # TODO(benjy): Only color on terminals that support it.
       args = ['--color', 'yes']
-      # TODO(benjy): A less hacky way to find the log level.
-      if self.context.options.log_level == 'debug':
-        args.append('-s')  # Make pytest emit all stdout/stderr, even for successful tests.
       if self.context.options.python_run_tests_options:
         for options in self.context.options.python_run_tests_options:
           args.extend(shlex.split(options))
-      test_builder = PythonTestBuilder(targets=test_targets,
-                                       args=args,
+      test_builder = PythonTestBuilder(test_targets, args,
                                        interpreter=self.interpreter,
                                        conn_timeout=self.conn_timeout,
                                        fast=self.context.options.python_run_tests_fast)
