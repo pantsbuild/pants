@@ -16,10 +16,10 @@ class JavaAntlrLibrary(ExportableJvmLibrary):
                name,
                sources,
                provides=None,
-               dependencies=None,
                excludes=None,
                compiler='antlr3',
-               package=None):
+               package=None,
+               **kwargs):
 
     """
     :param string name: The name of this target, which combined with this
@@ -42,12 +42,12 @@ class JavaAntlrLibrary(ExportableJvmLibrary):
         Are spread among different files, this must be set as the package cannot be inferred.
     """
 
-    ExportableJvmLibrary.__init__(self,
-                                  name,
-                                  sources,
-                                  provides,
-                                  dependencies,
-                                  excludes)
+    super(JavaAntlrLibrary, self).__init__(self,
+                                           name=name,
+                                           sources=sources,
+                                           provides=provides,
+                                           excludes=excludes,
+                                           **kwargs)
     self.add_labels('codegen')
 
     if compiler not in ('antlr3', 'antlr4'):
