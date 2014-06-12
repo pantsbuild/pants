@@ -122,12 +122,22 @@ class ProtobufGenCalculateJavaTest(ProtobufGenCalculateGenfilesTestBase):
       '''
         package pants.preferences;
         option java_package = "com.pants.protos.preferences";
+      ''',
+      'com/pants/protos/preferences/CamelCase.java')
+
+    self.assert_java_files(
+      'curly_braces.proto',
+      '''
+        package pants.preferences;
+        option java_package = "com.pants.protos.preferences";
         option java_multiple_files = true;
         message Wat { message Inner { option meh = true; }
           option Inner field = 1;
         }
+        service SomeService { rpc AndAnother() {} }
       ''',
-      'com/pants/protos/preferences/CamelCase.java',
+      'com/pants/protos/preferences/CurlyBraces.java',
+      'com/pants/protos/preferences/SomeService.java',
       'com/pants/protos/preferences/Wat.java',
       'com/pants/protos/preferences/WatOrBuilder.java')
 
