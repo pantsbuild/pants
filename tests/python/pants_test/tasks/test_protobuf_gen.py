@@ -122,11 +122,14 @@ class ProtobufGenCalculateJavaTest(ProtobufGenCalculateGenfilesTestBase):
       '''
         package pants.preferences;
         option java_package = "com.pants.protos.preferences";
-        extend AnotherMessage {
-          BAZ = 0;
+        option java_multiple_files = true;
+        message Wat { message Inner { option meh = true; }
+          option Inner field = 1;
         }
       ''',
-      'com/pants/protos/preferences/CamelCase.java')
+      'com/pants/protos/preferences/CamelCase.java',
+      'com/pants/protos/preferences/Wat.java',
+      'com/pants/protos/preferences/WatOrBuilder.java')
 
     self.assert_java_files(
       'pants.proto',
@@ -142,6 +145,7 @@ class ProtobufGenCalculateJavaTest(ProtobufGenCalculateGenfilesTestBase):
           rpc SomeRpc();
           rpc AnotherRpc() {
           }
+          rpc AndAnother() {}
         }
 
         message MessageAfterService {

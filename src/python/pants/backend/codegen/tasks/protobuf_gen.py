@@ -182,6 +182,7 @@ def camelcase(string):
   """Convert snake casing where present to camel casing"""
   return ''.join(word.capitalize() for word in re.split('[-_]', string))
 
+
 def calculate_genfiles(path, source):
   with open(path, 'r') as protobuf:
     lines = protobuf.readlines()
@@ -224,6 +225,7 @@ def calculate_genfiles(path, source):
     genfiles['py'].update(calculate_python_genfiles(source))
     genfiles['java'].update(calculate_java_genfiles(package, outer_class_name, types))
     return genfiles
+
 
 def _update_type_list(match, type_depth, outer_types):
   if match and type_depth < 2: # This takes care of the case where { } are on the same line.
