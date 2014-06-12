@@ -9,6 +9,7 @@ python_library(
     ':code_gen',
     ':protobuf_gen',
     ':scrooge_gen',
+    ':jaxb_gen',
   ],
 )
 
@@ -61,6 +62,23 @@ python_library(
   ],
 )
 
+python_library(
+  name = 'jaxb_gen',
+  sources = ['jaxb_gen.py'],
+  dependencies = [
+    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
+    pants(':code_gen'),
+    pants(':common'),
+    pants('src/python/pants/backend/codegen/targets:java'),
+    pants('src/python/pants/backend/jvm/targets:java'),
+    pants('src/python/pants/base:address'),
+    pants('src/python/pants/base:build_environment'),
+    pants('src/python/pants/base:source_root'),
+    pants('src/python/pants/java:distribution'),
+    pants('src/python/pants/base:exceptions'),
+    pants('src/python/pants/backend/jvm/tasks:nailgun_task'),
+  ],
+)
 
 python_library(
   name = 'protobuf_gen',
