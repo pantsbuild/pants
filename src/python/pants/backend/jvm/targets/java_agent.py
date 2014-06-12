@@ -18,7 +18,6 @@ class JavaAgent(JavaLibrary):
   def __init__(self,
                name,
                sources=None,
-               dependencies=None,
                excludes=None,
                resources=None,
                exclusives=None,
@@ -26,7 +25,8 @@ class JavaAgent(JavaLibrary):
                agent_class=None,
                can_redefine=False,
                can_retransform=False,
-               can_set_native_method_prefix=False):
+               can_set_native_method_prefix=False,
+               **kwargs):
     """
     :param string name: The name of this target, which combined with this
       build file defines the target :class:`pants.base.address.Address`.
@@ -56,13 +56,13 @@ class JavaAgent(JavaLibrary):
     """
 
     super(JavaAgent, self).__init__(
-        name,
-        sources,
+        name=name,
+        sources=sources,
         provides=None,
-        dependencies=dependencies,
         excludes=excludes,
         resources=resources,
-        exclusives=exclusives)
+        exclusives=exclusives,
+        **kwargs)
 
     if not premain or agent_class:
       raise TargetDefinitionException(self, "Must have at least one of 'premain' or 'agent_class' "
