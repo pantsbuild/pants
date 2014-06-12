@@ -69,13 +69,9 @@ INTERPRETER_CONSTRAINTS=(
   "CPython>=3.3"
 )
 for constraint in ${INTERPRETER_CONSTRAINTS[@]}; do
-  COMMAND_INTERPRETER_CONSTRAINTS=(
-    ${COMMAND_INTERPRETER_CONSTRAINTS[@]}
+  INTERPRETER_CONSTRAINT_ARGS=(
+    ${INTERPRETER_CONSTRAINT_ARGS[@]}
     -i "${constraint}"
-  )
-  GOAL_INTERPRETER_CONSTRAINTS=(
-    ${GOAL_INTERPRETER_CONSTRAINTS[@]}
-    --test-pytest-interpreter="${constraint}"
   )
 done
 
@@ -84,10 +80,10 @@ if [[ "${skip_distribution:-false}" == "false" ]]; then
   # setup_py
   banner "Running pants distribution tests"
   (
-    ./pants.pex py --pex ${COMMAND_INTERPRETER_CONSTRAINTS[@]} \
+    ./pants.pex py --pex ${INTERPRETER_CONSTRAINT_ARGS[@]} \
       src/python/pants:_pants_transitional_publishable_binary_ && \
     mv dist/_pants_transitional_publishable_binary_.pex dist/self.pex && \
-    ./dist/self.pex build ${COMMAND_INTERPRETER_CONSTRAINTS[@]} \
+    ./dist/self.pex build ${INTERPRETER_CONSTRAINT_ARGS[@]} \
       src/python/pants:_pants_transitional_publishable_binary_ && \
     ./dist/self.pex setup_py --recursive src/python/pants:pants-packaged
   ) || die "Failed to create pants distributions."
@@ -104,7 +100,7 @@ if [[ "${skip_python:-false}" == "false" ]]; then
   banner "Running python tests"
   (
     PANTS_PYTHON_TEST_FAILSOFT=1 ./pants.pex goal test tests/python/pants_test:all \
-      ${GOAL_INTERPRETER_CONSTRAINTS[@]}
+      ${INTERPRETER_CONSTRAINT_ARGS[@]}
   ) || die "Python test failure"
 fi
 
@@ -112,7 +108,7 @@ if [[ "${skip_integration:-false}" == "false" ]]; then
   banner "Running Pants Integration tests"
   (
     PANTS_PYTHON_TEST_FAILSOFT=1 ./pants.pex goal test tests/python/pants_test:integration \
-      ${GOAL_INTERPRETER_CONSTRAINTS[@]}
+      ${INTERPRETER_CONSTRAINT_ARGS[@]}
   ) || die "Pants Integration test failure"
 fi
 
