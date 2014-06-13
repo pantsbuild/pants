@@ -59,12 +59,15 @@ class JMakeAnalysisParser(AnalysisParser):
     for src, deps in src_to_deps.items():
       for dep in deps:
         rel_classfile = dep + '.class'
-        classpath_element = classpath_elements_by_class.get(rel_classfile, None)
-        if classpath_element:  # Dep is on an external jar/classes dir.
-          ret[src].add(classpath_element)
-        else:  # Dep is on an internal class.
-          classfile = os.path.join(buildroot, self.classes_dir, rel_classfile)
-          ret[src].add(classfile)
+        # Check if we have an internal class first.
+        internal_classfile = os.path.join(buildroot, self.classes_dir, rel_classfile)
+        if os.path.exists(internal_classfile):
+          # Dep is on an internal class.
+          ret[src].add(internal_classfile)
+        elif rel_classfile in classpath_elements_by_class:
+          # Dep is on an external jar/classes dir.
+          ret[src].add(classpath_elements_by_class.get(rel_classfile))
+
     return ret
 
   def _parse_deps_at_position(self, infile):
