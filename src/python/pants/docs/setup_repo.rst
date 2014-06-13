@@ -49,6 +49,8 @@ others is in Pants'
 
 .. TODO update base/config.py link if/when source code moves
 
+.. _setup_source_root:
+
 ****************************************
 Configure Code Layout with `source_root`
 ****************************************

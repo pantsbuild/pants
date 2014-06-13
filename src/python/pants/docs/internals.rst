@@ -141,6 +141,14 @@ When you define a new ``Task`` class, you'll want to have at least
 There are some base ``Task`` classes to help you get started. E.g., if your
 goal just outputs information to the console, subclass ``ConsoleTask``.
 
+The user's source code is organized by :ref:`source roots <setup_source_root>`.
+If a task needs to know the path from "the root" to a source file (perhaps
+to turn a path/to/dir/Foo into a package path.to.dir.Foo), it should probably
+compute that based on the source root (``target.target_base``), not the
+build root. The absolute paths to a target's source files are::
+
+    abspaths = [os.path.join(get_buildroot(), target.target_base, rel_path) for rel_path in target.sources_relative_to_source_root()]
+
 Group
 =====
 
