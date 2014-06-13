@@ -4,7 +4,7 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from abc import abstractmethod
+from abc import abstractmethod, abstractproperty
 from contextlib import contextmanager
 import os
 import tempfile
@@ -188,6 +188,23 @@ class JarTask(NailgunTask):
   """
 
   @staticmethod
+  def _write_agent_manifest(agent, jar):
+    # TODO(John Sirois): refactor an agent model to suport 'Boot-Class-Path' properly.
+    manifest = Manifest()
+    manifest.addentry(Manifest.MANIFEST_VERSION, '1.0')
+    if agent.premain:
+      manifest.addentry('Premain-Class', agent.premain)
+    if agent.agent_class:
+      manifest.addentry('Agent-Class', agent.agent_class)
+    if agent.can_redefine:
+      manifest.addentry('Can-Redefine-Classes', 'true')
+    if agent.can_retransform:
+      manifest.addentry('Can-Retransform-Classes', 'true')
+    if agent.can_set_native_method_prefix:
+      manifest.addentry('Can-Set-Native-Method-Prefix', 'true')
+    jar.writestr(Manifest.PATH, manifest.contents())
+
+  @staticmethod
   def _flag(bool_value):
     return 'true' if bool_value else 'false'
 
@@ -233,36 +250,111 @@ class JarTask(NailgunTask):
       raise TaskError('Failed to write to jar at %s: %s' % (path, e))
 
     with jar._render_jar_tool_args() as args:
-      args.append('-update=%s' % self._flag(not overwrite))
-      args.append('-compress=%s' % self._flag(compressed))
+      if args:  # Don't build an empty jar
+        args.append('-update=%s' % self._flag(not overwrite))
+        args.append('-compress=%s' % self._flag(compressed))
 
-      jar_rules = jar_rules or JarRules.default()
-      args.append('-default_action=%s' % self._action_name(jar_rules.default_dup_action))
+        jar_rules = jar_rules or JarRules.default()
+        args.append('-default_action=%s' % self._action_name(jar_rules.default_dup_action))
 
-      skip_patterns = []
-      duplicate_actions = []
+        skip_patterns = []
+        duplicate_actions = []
 
-      for rule in jar_rules.rules:
-        if isinstance(rule, Skip):
-          skip_patterns.append(rule.apply_pattern)
-        elif isinstance(rule, Duplicate):
-          duplicate_actions.append('%s=%s' % (rule.apply_pattern.pattern,
-                                              self._action_name(rule.action)))
-        else:
-          raise ValueError('Unrecognized rule: %s' % rule)
+        for rule in jar_rules.rules:
+          if isinstance(rule, Skip):
+            skip_patterns.append(rule.apply_pattern)
+          elif isinstance(rule, Duplicate):
+            duplicate_actions.append('%s=%s' % (rule.apply_pattern.pattern,
+                                                self._action_name(rule.action)))
+          else:
+            raise ValueError('Unrecognized rule: %s' % rule)
 
-      if skip_patterns:
-        args.append('-skip=%s' % ','.join(p.pattern for p in skip_patterns))
+        if skip_patterns:
+          args.append('-skip=%s' % ','.join(p.pattern for p in skip_patterns))
 
-      if duplicate_actions:
-        args.append('-policies=%s' % ','.join(duplicate_actions))
+        if duplicate_actions:
+          args.append('-policies=%s' % ','.join(duplicate_actions))
 
-      args.append(path)
+        args.append(path)
 
-      jvm_args = self.context.config.getlist('jar-tool', 'jvm_args', default=['-Xmx64M'])
-      self.runjava(self.tool_classpath(self._JAR_TOOL_CLASSPATH_KEY),
-                   'com.twitter.common.jar.tool.Main',
-                   jvm_options=jvm_args,
-                   args=args,
-                   workunit_name='jar-tool',
-                   workunit_labels=[WorkUnit.TOOL, WorkUnit.JVM, WorkUnit.NAILGUN])
+        jvm_args = self.context.config.getlist('jar-tool', 'jvm_args', default=['-Xmx64M'])
+        self.runjava(self.tool_classpath(self._JAR_TOOL_CLASSPATH_KEY),
+                     'com.twitter.common.jar.tool.Main',
+                     jvm_options=jvm_args,
+                     args=args,
+                     workunit_name='jar-tool',
+                     workunit_labels=[WorkUnit.TOOL, WorkUnit.JVM, WorkUnit.NAILGUN])
+
+  class JarBuilder(AbstractClass):
+    """A utility to aid in adding the classes and resources associated with targets to a jar."""
+
+    @abstractproperty
+    def _context(self):
+      """Implementations must supply a context."""
+
+    def add_target(self, jar, target, recursive=False):
+      """Adds the classes and resources for a target to an open jar.
+
+      :param jar: An open jar to add to.
+      :param target: The target to add generated classes and resources for.
+      :param bool recursive: `True` to add classes and resources for the target's transitive
+        internal dependency closure.
+      :returns: The list of targets that actually contributed classes or resources or both to the
+        jar.
+      """
+      classes_by_target = self._context.products.get_data('classes_by_target')
+      resources_by_target = self._context.products.get_data('resources_by_target')
+
+      targets_added = []
+
+      def add_to_jar(tgt):
+        target_classes = classes_by_target.get(tgt)
+
+        target_resources = []
+
+        # TODO(pl): https://github.com/pantsbuild/pants/issues/206
+        resource_products_on_target = resources_by_target.get(tgt)
+        if resource_products_on_target:
+          target_resources.append(resource_products_on_target)
+
+        if tgt.has_resources:
+          target_resources.extend(resources_by_target.get(r) for r in tgt.resources)
+
+        if target_classes or target_resources:
+          targets_added.append(tgt)
+
+          def add_products(target_products):
+            if target_products:
+              for root, products in target_products.rel_paths():
+                for prod in products:
+                  jar.write(os.path.join(root, prod), prod)
+
+          add_products(target_classes)
+          for resources_target in target_resources:
+            add_products(resources_target)
+
+          if tgt.is_java_agent:
+            self._write_agent_manifest(tgt, jar)
+
+      if recursive:
+        target.walk(add_to_jar)
+      else:
+        add_to_jar(target)
+
+      return targets_added
+
+  def prepare_jar_builder(self):
+    """Prepares a ``JarTask.JarBuilder`` for use during ``execute``.
+
+    This method should be called during task preparation to ensure the classes and resources needed
+    for jarring targets are mapped by upstream tasks that generate these.
+    """
+    self.context.products.require_data('classes_by_target')
+    self.context.products.require_data('resources_by_target')
+
+    class PreparedJarBuilder(self.JarBuilder):
+      @property
+      def _context(me):
+        return self.context
+
+    return PreparedJarBuilder()

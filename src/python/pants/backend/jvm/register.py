@@ -169,12 +169,12 @@ def register_goals():
 
   detect_duplicates = goal(name='dup', action=DuplicateDetector)
 
-  goal(name='binary', action=BinaryCreate, dependencies=['jar', 'bootstrap']
+  goal(name='binary', action=BinaryCreate, dependencies=['compile', 'resources', 'bootstrap']
   ).install().with_description('Create a jvm binary jar.')
 
   detect_duplicates.install('binary')
 
-  goal(name='bundle', action=BundleCreate, dependencies=['jar', 'bootstrap']
+  goal(name='bundle', action=BundleCreate, dependencies=['compile', 'resources', 'bootstrap']
   ).install().with_description('Create an application bundle from binary targets.')
 
   detect_duplicates.install('bundle')

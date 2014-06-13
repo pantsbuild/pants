@@ -31,7 +31,7 @@ class JvmBinaryTask(JarTask):
 
   def __init__(self, context, workdir):
     super(JvmBinaryTask, self).__init__(context, workdir)
-    self.context.products.require('jars')
+    self._jar_builder = self.prepare_jar_builder()
     self.context.products.require('jar_dependencies', predicate=self.is_binary)
 
   def list_external_jar_dependencies(self, binary, confs=None):
@@ -58,10 +58,6 @@ class JvmBinaryTask(JarTask):
     """
     # TODO(benjy): There's actually nothing here that requires 'binary' to be a jvm_binary.
     # It could be any target. And that might actually be useful.
-    # TODO(benjy): Get the classfiles directly from the class products, instead of unpacking
-    # the per-target jars?
-
-    jarmap = self.context.products.get('jars')
 
     with self.context.new_workunit(name='create-monolithic-jar'):
       with self.open_jar(path,
@@ -69,17 +65,8 @@ class JvmBinaryTask(JarTask):
                          overwrite=True,
                          compressed=True) as jar:
 
-        def add_jars(target):
-          generated = jarmap.get(target)
-          if generated:
-            for base_dir, jars in generated.items():
-              for internal_jar in jars:
-                internal_jar_path = os.path.join(base_dir, internal_jar)
-                self.context.log.debug('  dumping %s' % internal_jar_path)
-                jar.writejar(internal_jar_path)
-
-        with self.context.new_workunit(name='add-generated-jars'):
-          binary.walk(add_jars)
+        with self.context.new_workunit(name='add-internal-classes'):
+          self._jar_builder.add_target(jar, binary, recursive=True)
 
         if with_external_deps:
           with self.context.new_workunit(name='add-dependency-jars'):
