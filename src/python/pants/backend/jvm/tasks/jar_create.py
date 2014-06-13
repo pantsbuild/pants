@@ -93,8 +93,7 @@ class JarCreate(JarTask):
 
     self.jar_classes = options.jar_create_classes or products.isrequired('jars')
     if self.jar_classes:
-      products.require_data('classes_by_target')
-      products.require_data('resources_by_target')
+      self._jar_builder = self.prepare_jar_builder()
 
     definitely_create_javadoc = options.jar_create_javadoc or products.isrequired('javadoc_jars')
     definitely_dont_create_javadoc = options.jar_create_javadoc is False
@@ -154,37 +153,12 @@ class JarCreate(JarTask):
       yield jar
 
   def _jar(self, jvm_targets, add_genjar):
-    classes_by_target = self.context.products.get_data('classes_by_target')
-    resources_by_target = self.context.products.get_data('resources_by_target')
-
     for target in jvm_targets:
-      target_classes = classes_by_target.get(target)
-
-      target_resources = []
-
-      # TODO(pl): https://github.com/pantsbuild/pants/issues/206
-      resource_products_on_target = resources_by_target.get(target)
-      if resource_products_on_target:
-        target_resources.append(resource_products_on_target)
-
-      if target.has_resources:
-        target_resources.extend(resources_by_target.get(r) for r in target.resources)
-
-      if target_classes or target_resources:
-        jar_name = jarname(target)
-        add_genjar(target, jar_name)
-        jar_path = os.path.join(self.workdir, jar_name)
-        with self.create_jar(target, jar_path) as jarfile:
-          def add_to_jar(target_products):
-            if target_products:
-              for root, products in target_products.rel_paths():
-                for prod in products:
-                  jarfile.write(os.path.join(root, prod), prod)
-          add_to_jar(target_classes)
-          for resources_target in target_resources:
-            add_to_jar(resources_target)
-          if target.is_java_agent:
-            self.write_agent_manifest(target, jarfile)
+      jar_name = jarname(target)
+      jar_path = os.path.join(self.workdir, jar_name)
+      with self.create_jar(target, jar_path) as jarfile:
+        if self._jar_builder.add_target(jarfile, target):
+          add_genjar(target, jar_name)
 
   def sourcejar(self, jvm_targets, add_genjar):
     for target in jvm_targets:
@@ -217,19 +191,3 @@ class JarCreate(JarTask):
           for basedir, javadocfiles in generated.items():
             for javadocfile in javadocfiles:
               jar.write(os.path.join(basedir, javadocfile), javadocfile)
-
-  def write_agent_manifest(self, agent, jarfile):
-    # TODO(John Sirois): refactor an agent model to suport 'Boot-Class-Path' properly.
-    manifest = Manifest()
-    manifest.addentry(Manifest.MANIFEST_VERSION, '1.0')
-    if agent.premain:
-      manifest.addentry('Premain-Class', agent.premain)
-    if agent.agent_class:
-      manifest.addentry('Agent-Class', agent.agent_class)
-    if agent.can_redefine:
-      manifest.addentry('Can-Redefine-Classes', 'true')
-    if agent.can_retransform:
-      manifest.addentry('Can-Retransform-Classes', 'true')
-    if agent.can_set_native_method_prefix:
-      manifest.addentry('Can-Set-Native-Method-Prefix', 'true')
-    jarfile.writestr(Manifest.PATH, manifest.contents())
