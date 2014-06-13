@@ -6,6 +6,7 @@ package com.pants.testproject.javasources;
 public class JavaSource {
 
   public String doStuff() {
+    ScalaWithJavaSources circularDependencyHell = new ScalaWithJavaSources();
     return "do it";
   }
 
