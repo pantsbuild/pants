@@ -289,8 +289,7 @@ class NailgunExecutor(Executor):
                          stdin=in_fd,
                          stdout=out_fd,
                          stderr=err_fd,
-                         close_fds=True,
-                         cwd=get_buildroot())
+                         close_fds=True)
 
     log.debug('Spawned ng server with fingerprint %s @ %d' % (fingerprint, process.pid))
     # Prevents finally blocks and atexit handlers from being executed, unlike sys.exit(). We

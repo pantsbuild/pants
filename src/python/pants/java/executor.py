@@ -14,6 +14,7 @@ from twitter.common.collections import maybe_list
 from twitter.common.contextutil import environment_as
 from twitter.common.lang import AbstractClass, Compatibility
 
+from pants.base.build_environment import get_buildroot
 from pants.java.distribution import Distribution
 
 
@@ -131,6 +132,25 @@ class SubprocessExecutor(Executor):
   def __init__(self, distribution=None, scrub_classpath=True):
     super(SubprocessExecutor, self).__init__(distribution=distribution)
     self._scrub_classpath = scrub_classpath
+    self._buildroot = get_buildroot()
+
+
+  def _create_command(self, classpath, main, jvm_options, args):
+
+    # When running pants under mesos/aurora, the sandbox pathname can be very long. Since it gets
+    # prepended to most components in the classpath (some from ivy, the rest from the build),
+    # in some runs the classpath gets too big and exceeds ARG_MAX.
+    # We prevent this by using paths relative to the current working directory.
+    def make_relative_path(path):
+      path = os.path.realpath(path)
+      relative_path = os.path.relpath(path, self._buildroot)
+      final_path = relative_path if len(relative_path) < len(path) else path
+      return final_path
+
+    classpath = [make_relative_path(p) for p in classpath]
+
+    log.debug('The length of the the classpath is: %s' % len(classpath))
+    return super(SubprocessExecutor, self)._create_command(classpath, main, jvm_options, args)
 
   def _runner(self, classpath, main, jvm_options, args):
     command = self._create_command(classpath, main, jvm_options, args)
@@ -161,7 +181,7 @@ class SubprocessExecutor(Executor):
     with self._maybe_scrubbed_classpath():
       log.debug('Executing: %s' % ' '.join(cmd))
       try:
-        return subprocess.Popen(cmd, **subprocess_args)
+        return subprocess.Popen(cmd, cwd=self._buildroot, **subprocess_args)
       except OSError as e:
         raise self.Error('Problem executing %s: %s' % (self._distribution.java, e))
 
