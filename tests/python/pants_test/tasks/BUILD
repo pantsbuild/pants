@@ -39,6 +39,7 @@ python_test_suite(
     pants(':jar_publish'),
     pants(':jar_task'),
     pants(':jaxb_gen'),
+    pants(':list_goals'),
     pants(':listtargets'),
     pants(':minimal_cover'),
     pants(':protobuf_gen'),
@@ -263,6 +264,17 @@ python_tests(
   dependencies = [
     pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('tests/python/pants_test:int-test'),
+  ],
+)
+
+python_tests(
+  name = 'list_goals',
+  sources = ['test_list_goals.py'],
+  dependencies = [
+    pants(':base'),
+    pants('src/python/pants/backend/core/tasks:list_goals'),
+    pants('src/python/pants/backend/core/tasks:common'),
+    pants('src/python/pants/goal'),
   ],
 )
 
