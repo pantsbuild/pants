@@ -4,6 +4,8 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+import itertools
+
 from pants.backend.core.tasks.check_exclusives import ExclusivesMapping
 from pants.backend.core.tasks.group_task import GroupMember, GroupIterator, GroupTask
 from pants.backend.jvm.targets.java_library import JavaLibrary
@@ -158,17 +160,42 @@ class GroupTaskTest(BaseTest):
     task.prepare()
     task.execute()
 
-    expected = [self.construct_action('javac'),
-                self.prepare_action('javac'),
-                self.construct_action('scalac'),
-                self.prepare_action('scalac'),
-                self.prepare_execute_action('javac', [[self.a], [self.c], [self.e]]),
-                self.prepare_execute_action('scalac', [[self.b], [self.d]]),
-                self.execute_chunk_action('javac', targets=[self.a]),
-                self.execute_chunk_action('scalac', targets=[self.b]),
-                self.execute_chunk_action('javac', targets=[self.c]),
-                self.execute_chunk_action('scalac', targets=[self.d]),
-                self.execute_chunk_action('javac', targets=[self.e]),
-                self.post_execute_action('javac'),
-                self.post_execute_action('scalac')]
-    self.assertEqual(expected, self.recorded_actions)
+    # These items will be executed by GroupTask in order.
+    expected_prepare_actions = [self.construct_action('javac'),
+        self.prepare_action('javac'),
+        self.construct_action('scalac'),
+        self.prepare_action('scalac')]
+
+    # The ordering of the execution of these items isn't guaranteed:
+    #
+    #  https://groups.google.com/d/msg/pants-devel/Rer9_ytsyf8/gi8zokWNexYJ
+    #
+    # So we store these separately, to do a special comparison later on.
+    expected_prepare_execute_actions = [
+        self.prepare_execute_action('javac', [[self.a], [self.c], [self.e]]),
+        self.prepare_execute_action('scalac', [[self.b], [self.d]])
+    ]
+
+    expected_execute_actions = [self.execute_chunk_action('javac', targets=[self.a]),
+        self.execute_chunk_action('scalac', targets=[self.b]),
+        self.execute_chunk_action('javac', targets=[self.c]),
+        self.execute_chunk_action('scalac', targets=[self.d]),
+        self.execute_chunk_action('javac', targets=[self.e]),
+        self.post_execute_action('javac'),
+        self.post_execute_action('scalac')]
+
+    recorded_iter = iter(self.recorded_actions)
+
+    # Now, we compare the list of actions executed, with what we expected, in chunks. We first peel
+    # off the first 4 items from what was executed, and compare with the "expected_prepare_actions"
+    # list.
+    actual_prepare_actions = list(itertools.islice(recorded_iter, len(expected_prepare_actions)))
+    self.assertEqual(expected_prepare_actions, actual_prepare_actions)
+
+    # Next, we slice off the next two elements from the array, store them separately, sort both the
+    # recorded elements and the expected elements, and compare.
+    actual_prepare_execute_actions = list(itertools.islice(recorded_iter, len(expected_prepare_execute_actions)))
+    self.assertEqual(sorted(expected_prepare_execute_actions), sorted(actual_prepare_execute_actions))
+
+    # Finally, compare the remaining items.
+    self.assertEqual(expected_execute_actions, list(recorded_iter))
