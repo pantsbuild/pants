@@ -17,19 +17,19 @@ from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.python_task import PythonTask
 
 
-class PythonRunTests(PythonTask):
+class PytestRun(PythonTask):
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
-    super(PythonRunTests, cls).setup_parser(option_group, args, mkflag)
+    super(PytestRun, cls).setup_parser(option_group, args, mkflag)
     option_group.add_option(mkflag('fast'), mkflag('fast', negate=True),
-                            dest='python_run_tests_fast',
+                            dest='pytest_run_fast',
                             action='callback', callback=mkflag.set_bool, default=True,
                             help='[%default] Run all tests in a single chroot. If set to false, '
                                  'each test target will create a new chroot, which will be much '
                                  'slower.')
     # TODO(benjy): Support direct passthru of pytest flags.
     option_group.add_option(mkflag('options'),
-                            dest='python_run_tests_options',
+                            dest='pytest_run_options',
                             action='append', default=[],
                             help='[%default] options to pass to the underlying pytest runner.')
 
@@ -50,14 +50,14 @@ class PythonRunTests(PythonTask):
       # TODO(benjy): A less hacky way to find the log level.
       if self.context.options.log_level == 'debug':
         args.append('-s')  # Make pytest emit all stdout/stderr, even for successful tests.
-      if self.context.options.python_run_tests_options:
-        for options in self.context.options.python_run_tests_options:
+      if self.context.options.pytest_run_options:
+        for options in self.context.options.pytest_run_options:
           args.extend(shlex.split(options))
       test_builder = PythonTestBuilder(targets=test_targets,
                                        args=args,
                                        interpreter=self.interpreter,
                                        conn_timeout=self.conn_timeout,
-                                       fast=self.context.options.python_run_tests_fast)
+                                       fast=self.context.options.pytest_run_fast)
       with self.context.new_workunit(name='run',
                                      labels=[WorkUnit.TOOL, WorkUnit.TEST]) as workunit:
         # pytest uses py.io.terminalwriter for output. That class detects the terminal

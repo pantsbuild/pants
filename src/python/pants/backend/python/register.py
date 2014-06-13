@@ -4,7 +4,7 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 from pants.backend.python.tasks.python_binary_create import PythonBinaryCreate
-from pants.backend.python.tasks.python_run_tests import PythonRunTests
+from pants.backend.python.tasks.pytest_run import PytestRun
 
 from pants.goal import Goal as goal
 
@@ -68,6 +68,6 @@ def register_goals():
   goal(name='python-binary-create', action=PythonBinaryCreate, dependencies=['bootstrap', 'check-exclusives', 'resources']
   ).install('binary')
 
-  goal(name='pytest', action=PythonRunTests, dependencies=['bootstrap', 'check-exclusives', 'resources']
+  goal(name='pytest', action=PytestRun, dependencies=['bootstrap', 'check-exclusives', 'resources']
   ).install('test')
 
