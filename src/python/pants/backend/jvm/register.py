@@ -167,11 +167,17 @@ def register_goals():
   goal(name='jar', action=JarCreate, dependencies=['compile', 'resources', 'bootstrap']
   ).install('jar')
 
+  detect_duplicates = goal(name='dup', action=DuplicateDetector)
+
   goal(name='binary', action=BinaryCreate, dependencies=['jar', 'bootstrap']
   ).install().with_description('Create a jvm binary jar.')
 
-  goal(name='bundle', action=BundleCreate, dependencies=['jar', 'bootstrap', 'binary']
+  detect_duplicates.install('binary')
+
+  goal(name='bundle', action=BundleCreate, dependencies=['jar', 'bootstrap']
   ).install().with_description('Create an application bundle from binary targets.')
+
+  detect_duplicates.install('bundle')
 
   goal(name='check_published_deps', action=CheckPublishedDeps
   ).install('check_published_deps').with_description('Find references to outdated artifacts.')
@@ -181,9 +187,6 @@ def register_goals():
 
   goal(name='publish', action=JarPublish
   ).install('publish').with_description('Publish artifacts.')
-
-  goal(name='dup',action=DuplicateDetector,
-  ).install('binary')
 
   goal(name='detect-duplicates', action=DuplicateDetector, dependencies=['jar']
   ).install().with_description('Detect duplicate classes and resources on the classpath.')
