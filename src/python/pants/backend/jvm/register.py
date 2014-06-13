@@ -167,7 +167,7 @@ def register_goals():
   goal(name='jar', action=JarCreate, dependencies=['compile', 'resources', 'bootstrap']
   ).install('jar')
 
-  detect_duplicates = goal(name='dup',action=DuplicateDetector)
+  detect_duplicates = goal(name='dup', action=DuplicateDetector)
 
   goal(name='binary', action=BinaryCreate, dependencies=['jar', 'bootstrap']
   ).install().with_description('Create a jvm binary jar.')
