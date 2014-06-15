@@ -12,7 +12,6 @@ from optparse import OptionGroup
 from pants.base.build_manual import manual
 from pants.goal.context import Context
 from pants.goal.error import GoalError
-from pants.goal.group import Group
 from pants.goal.phase import Phase
 from pants.goal.run_tracker import RunTracker
 from pants.backend.core.tasks.task import Task
@@ -135,7 +134,6 @@ __all__ = (
   'Context',
   'Goal',
   'GoalError',
-  'Group',
   'Phase',
   'RunTracker',
 )
