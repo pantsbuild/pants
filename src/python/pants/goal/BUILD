@@ -7,7 +7,6 @@ python_library(
   dependencies = [
     pants(':error'),
     pants(':context'),
-    pants(':group'),
     pants(':phase'),
     pants(':run_tracker'),
     pants('src/python/pants/base:build_manual'),
@@ -61,11 +60,6 @@ python_library(
     ':phase',
     'src/python/pants/version',
   ],
-)
-
-python_library(
-  name = 'group',
-  sources = ['group.py'],
 )
 
 python_library(
