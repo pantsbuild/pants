@@ -31,6 +31,8 @@ class Utf8HeaderTest(unittest.TestCase):
       for src in target.sources_relative_to_buildroot():
         with open(os.path.join(get_buildroot(), src), 'r') as python_file:
           first_line = python_file.readline()
+          if '' == first_line and os.path.basename(src) == '__init__.py':
+            continue
           if not first_line.rstrip() == '# coding=utf-8':
             nonconforming_files.append(src)
 
