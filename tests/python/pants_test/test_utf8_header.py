@@ -29,7 +29,7 @@ class Utf8HeaderTest(unittest.TestCase):
     nonconforming_files = []
     for target in build_file_parser.scan().targets(has_hand_coded_python_files):
       for src in target.sources_relative_to_buildroot():
-        with open(os.path.join(get_buildroot(), src), "r") as python_file:
+        with open(os.path.join(get_buildroot(), src), 'r') as python_file:
           first_line = python_file.readline()
           if not first_line.rstrip() == '# coding=utf-8':
             nonconforming_files.append(src)
