@@ -78,6 +78,14 @@ python_tests(
   ],
 )
 
+python_tests(
+  name = 'python_run_integration',
+  sources = ['test_python_run_integration.py'],
+  dependencies = [
+    pants('tests/python/pants_test:int-test'),
+  ],
+)
+
 # Used by interpreter_selection_integration.
 python_binary(
   name = 'echo_interpreter_version_2.6',

@@ -23,21 +23,15 @@ class InterpreterSelectionIntegrationTest(PantsRunIntegrationTest):
     self._maybe_test_version('2.7')
 
   def _maybe_test_version(self, version):
-    if self._has_version(version):
+    if self.has_python_version(version):
       print('Found python %s. Testing interpreter selection against it.' % version)
       echo = self._echo_version(version)
       v = echo.split('.')  # E.g., 2.6.8 .
+      self.assertTrue(len(v) > 2, 'Not a valid version string: %s' % v)
       self.assertEquals(version, '%s.%s' % (v[0], v[1]))
     else:
       print('No python %s found. Skipping.' % version)
       pytest.skip('No python %s on system' % version)
-
-  def _has_version(self, version):
-    try:
-      subprocess.call(['python%s' % version, '-V'])
-      return True
-    except OSError:
-      return False
 
   def _echo_version(self, version):
     with temporary_dir() as distdir:

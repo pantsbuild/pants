@@ -49,7 +49,7 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
         yes.seek(0)
 
         with self.run_pants(['goal', 'publish', target] + options, stdin=yes) as pants_run:
-          self.assertEquals(pants_run, self.PANTS_SUCCESS_CODE)
+          self.assertEquals(pants_run.returncode, self.PANTS_SUCCESS_CODE)
           for artifact in artifacts:
             artifact_path = os.path.join(publish_dir, package_namespace, artifact)
             self.assertTrue(os.path.exists(artifact_path))

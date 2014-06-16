@@ -207,16 +207,16 @@ def register_goals():
   # Running.
 
   goal(name='jvm-run', action=JvmRun, dependencies=['compile', 'resources', 'bootstrap'], serialize=False
-  ).install('run').with_description('Run a (currently JVM only) binary target.')
+  ).install('run').with_description('Run a binary target.')
 
   goal(name='jvm-run-dirty', action=JvmRun, serialize=False
-  ).install('run-dirty').with_description('Run a (currently JVM only) binary target, skipping compilation.')
+  ).install('run-dirty').with_description('Run a binary target, skipping compilation.')
 
   goal(name='scala-repl', action=ScalaRepl, dependencies=['compile', 'resources', 'bootstrap'], serialize=False
-  ).install('repl').with_description('Run a (currently Scala only) REPL.')
+  ).install('repl').with_description('Run a REPL.')
 
   goal(name='scala-repl-dirty', action=ScalaRepl, serialize=False
-  ).install('repl-dirty').with_description('Run a (currently Scala only) REPL, skipping compilation.')
+  ).install('repl-dirty').with_description('Run a REPL, skipping compilation.')
 
   # IDE support.
 

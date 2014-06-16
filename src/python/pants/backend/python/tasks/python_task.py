@@ -5,6 +5,11 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from contextlib import contextmanager
+import tempfile
+
+from twitter.common.python.pex_builder import PEXBuilder
+
 from pants.backend.core.tasks.task import Task
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.base.exceptions import TaskError
@@ -45,3 +50,13 @@ class PythonTask(Task):
     interpreter = interpreters[0]
     self.context.log.debug('Selected %s' % interpreter)
     return interpreter
+
+  @contextmanager
+  def temporary_pex_builder(self, interpreter=None, pex_info=None, parent_dir=None):
+    """Yields a PEXBuilder and cleans up its chroot when it goes out of context."""
+    path = tempfile.mkdtemp(dir=parent_dir)
+    builder = PEXBuilder(path=path, interpreter=interpreter, pex_info=pex_info)
+    yield builder
+    builder.chroot().delete()
+
+

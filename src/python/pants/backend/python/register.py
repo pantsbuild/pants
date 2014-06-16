@@ -4,13 +4,11 @@
 
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
-from pants.backend.python.tasks.python_binary_create import PythonBinaryCreate
-from pants.backend.python.tasks.pytest_run import PytestRun
-
-from pants.goal import Goal as goal
 
 from pants.backend.core.targets.dependencies import Dependencies
-from pants.commands.goal import Goal
+from pants.backend.python.tasks.python_binary_create import PythonBinaryCreate
+from pants.backend.python.tasks.pytest_run import PytestRun
+from pants.backend.python.tasks.python_run import PythonRun
 from pants.backend.python.commands.build import Build
 from pants.backend.python.commands.py import Py
 from pants.backend.python.commands.setup_py import SetupPy
@@ -22,6 +20,8 @@ from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.setup_python_environment import SetupPythonEnvironment
+from pants.commands.goal import Goal
+from pants.goal import Goal as goal
 
 
 def target_aliases():
@@ -71,4 +71,7 @@ def register_goals():
 
   goal(name='pytest', action=PytestRun, dependencies=['bootstrap', 'check-exclusives', 'resources']
   ).install('test')
+
+  goal(name='python-run', action=PythonRun, dependencies=['bootstrap', 'check-exclusives', 'resources']
+  ).install('run')
 
