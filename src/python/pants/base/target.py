@@ -308,7 +308,7 @@ class Target(AbstractTarget):
     return self.id
 
   def walk(self, work, predicate=None):
-    """Walk of this target's dependency graph visiting each node exactly once.
+    """Walk of this target's dependency graph, in DFS order, visiting each node exactly once.
 
     If a predicate is supplied it will be used to test each target before handing the target to
     work and descending. Work can return targets in which case these will be added to the walk
@@ -324,6 +324,10 @@ class Target(AbstractTarget):
     if predicate and not callable(predicate):
       raise ValueError('predicate must be callable but was %s' % predicate)
     self._build_graph.walk_transitive_dependency_graph([self.address], work, predicate)
+
+  def closure(self):
+    """Returns this target's transitive dependencies, in DFS order."""
+    return self._build_graph.transitive_subgraph_of_addresses([self.address])
 
   @manual.builddict()
   def with_description(self, description):

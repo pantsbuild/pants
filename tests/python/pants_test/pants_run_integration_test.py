@@ -37,7 +37,6 @@ class PantsRunIntegrationTest(unittest.TestCase):
     except OSError:
       return False
 
-  @contextmanager
   def run_pants(self, command, config=None, **kwargs):
     """Runs pants in a subprocess.
 
@@ -72,4 +71,4 @@ class PantsRunIntegrationTest(unittest.TestCase):
       proc = subprocess.Popen(pants_command, env=env,
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
       (stdout_data, stderr_data) = proc.communicate()
-      yield PantsResult(proc.returncode, stdout_data, stderr_data)
+      return PantsResult(proc.returncode, stdout_data, stderr_data)

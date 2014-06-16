@@ -16,6 +16,11 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 class InterpreterSelectionIntegrationTest(PantsRunIntegrationTest):
 
+  def test_conflict(self):
+    pants_run = self._build_pex('tests/python/pants_test/python:'
+                                'deliberately_conficting_compatibility')
+    self.assertNotEqual(0, pants_run.returncode)
+
   def test_select_26(self):
     self._maybe_test_version('2.6')
 
@@ -42,15 +47,19 @@ class InterpreterSelectionIntegrationTest(PantsRunIntegrationTest):
       }
       binary_name = 'echo_interpreter_version_%s' % version
       binary_target = 'tests/python/pants_test/python:' + binary_name
-      # Build a pex.
-      # Avoid some known-to-choke-on interpreters.
-      command = ['goal', 'binary', binary_target,
-                 '--interpreter=CPython>=2.6,<3',
-                 '--interpreter=CPython>=3.3']
-      with self.run_pants(command=command, config=config):
-        # Run the built pex.
-        exe = os.path.join(distdir, binary_name + '.pex')
-        proc = subprocess.Popen([exe], stdout=subprocess.PIPE)
-        (stdout_data, _) = proc.communicate()
-        return stdout_data
+      pants_run = self._build_pex(binary_target, config)
+      self.assertEqual(0, pants_run.returncode)
+      # Run the built pex.
+      exe = os.path.join(distdir, binary_name + '.pex')
+      proc = subprocess.Popen([exe], stdout=subprocess.PIPE)
+      (stdout_data, _) = proc.communicate()
+      return stdout_data
+
+  def _build_pex(self, binary_target, config=None):
+    # Avoid some known-to-choke-on interpreters.
+    command = ['goal', 'binary', binary_target,
+               '--interpreter=CPython>=2.6,<3',
+               '--interpreter=CPython>=3.3']
+    return self.run_pants(command=command, config=config)
+
 

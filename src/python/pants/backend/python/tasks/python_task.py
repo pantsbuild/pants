@@ -8,6 +8,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 from contextlib import contextmanager
 import tempfile
 
+from twitter.common.collections import OrderedSet
 from twitter.common.python.pex_builder import PEXBuilder
 
 from pants.backend.core.tasks.task import Task
@@ -41,12 +42,36 @@ class PythonTask(Task):
     """Subclasses can use this if they're fine with the default interpreter (the usual case)."""
     return self._interpreter
 
-  def select_interpreter(self, compatibilities):
+  def select_interpreter_for_targets(self, targets):
+    """Pick an interpreter compatible with all the specified targets."""
+    allowed_interpreters = OrderedSet(self.interpreter_cache.interpreters)
+    targets_with_compatibilities = []  # Used only for error messages.
+
+    # Constrain allowed_interpreters based on each target's compatibility requirements.
+    for target in targets:
+      if target.is_python and hasattr(target, 'compatibility') and target.compatibility:
+        targets_with_compatibilities.append(target)
+        compatible_with_target = list(self.interpreter_cache.matches(target.compatibility))
+        allowed_interpreters &= compatible_with_target
+
+    if not allowed_interpreters:
+      # Create a helpful error message.
+      unique_compatibilities = set(tuple(t.compatibility) for t in targets_with_compatibilities)
+      unique_compatibilities_strs = [','.join(x) for x in unique_compatibilities if x]
+      targets_with_compatibilities_strs = [str(t) for t in targets_with_compatibilities]
+      raise TaskError('Unable to detect a suitable interpreter for compatibilities: %s '
+                      '(Conflicting targets: %s)' % (' && '.join(unique_compatibilities_strs),
+                                                     ', '.join(targets_with_compatibilities_strs)))
+
+    # Return the lowest compatible interpreter.
+    return self.interpreter_cache.select_interpreter(allowed_interpreters)[0]
+
+  def select_interpreter(self, filters):
     """Subclasses can use this to be more specific about interpreter selection."""
     interpreters = self.interpreter_cache.select_interpreter(
-      list(self.interpreter_cache.matches(compatibilities)))
+      list(self.interpreter_cache.matches(filters)))
     if len(interpreters) != 1:
-      raise TaskError('Unable to detect suitable interpreter.')
+      raise TaskError('Unable to detect a suitable interpreter.')
     interpreter = interpreters[0]
     self.context.log.debug('Selected %s' % interpreter)
     return interpreter

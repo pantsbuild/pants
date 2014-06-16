@@ -29,10 +29,7 @@ class PythonRun(PythonTask):
     if not isinstance(binary, PythonBinary):
       raise TaskError('%s is not a python_binary target.' % binary)
 
-    if binary.compatibility:
-      interpreter = self.select_interpreter(binary.compatibility)
-    else:
-      interpreter = self.interpreter
+    interpreter = self.select_interpreter_for_targets(self.context.targets())
 
     with self.temporary_pex_builder(interpreter=interpreter, pex_info=binary.pexinfo) as builder:
       chroot = PythonChroot(

@@ -39,10 +39,7 @@ class PythonBinaryCreate(PythonTask):
       self.create_binary(binary)
 
   def create_binary(self, binary):
-    if binary.compatibility:
-      interpreter = self.select_interpreter(binary.compatibility)
-    else:
-      interpreter = self.interpreter
+    interpreter = self.select_interpreter_for_targets(binary.closure())
 
     run_info = self.context.run_tracker.run_info
     build_properties = {}

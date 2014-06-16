@@ -66,7 +66,9 @@ python_tests(name = 'test_thrift_builder',
 python_library(
   name = 'echo_interpreter_version_lib',
   sources = ['echo_interpreter_version.py'],
-  dependencies = []
+  dependencies = [],
+  # Play with this to test interpreter selection in the pex machinery.
+  compatibility = ['CPython>=2.6,<3']
 )
 
 python_tests(
@@ -113,6 +115,14 @@ python_binary(
     pants(':echo_interpreter_version_lib'),
   ],
   entry_point = 'pants_test.python.echo_interpreter_version',
-  # Play with this to test interpreter selection in the pex machinery.
-  compatibility = ['CPython>=2.7,<3']
+)
+
+# Useful for manual testing.
+python_binary(
+  name = 'deliberately_conficting_compatibility',
+  dependencies = [
+    pants(':echo_interpreter_version_lib'),
+  ],
+  entry_point = 'pants_test.python.echo_interpreter_version',
+  compatibility = ['CPython<2.6']
 )
