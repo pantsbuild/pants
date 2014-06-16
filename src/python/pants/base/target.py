@@ -253,6 +253,11 @@ class Target(AbstractTarget):
   def is_synthetic(self):
     return self.address.is_synthetic
 
+  @property
+  def is_original(self):
+    """Returns ``True`` if this target is derived from no other."""
+    return self.derived_from == self
+
   def get_all_exclusives(self):
     """ Get a map of all exclusives declarations in the transitive dependency graph.
 

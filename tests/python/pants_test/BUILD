@@ -56,6 +56,8 @@ python_tests(
   dependencies = [
     pants('3rdparty/python/twitter/commons:twitter.common.lang'),
     pants('src/python/pants/base:build_environment'),
+    pants('src/python/pants/base:build_file_parser'),
+    pants('src/python/pants/base:dev_backend_loader'),
   ]
 )
 

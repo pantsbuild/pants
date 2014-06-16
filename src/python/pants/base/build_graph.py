@@ -131,6 +131,13 @@ class BuildGraph(object):
       self._target_dependencies_by_address[dependent].add(dependency)
       self._target_dependees_by_address[dependency].add(dependent)
 
+  def targets(self, predicate=None):
+    """Returns all the targets in the graph in no particular order.
+
+    :param predicate: A target predicate that will be used to filter the targets returned.
+    """
+    return filter(predicate, self._target_by_address.values())
+
   def sorted_targets(self):
     return sort_targets(self._target_by_address.values())
 

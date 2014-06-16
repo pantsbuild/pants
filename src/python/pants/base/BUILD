@@ -40,7 +40,9 @@ python_library(
   sources = ['build_file_parser.py'],
   dependencies = [
     pants('3rdparty/python/twitter/commons:twitter.common.python'),
+    pants(':build_environment'),
     pants(':build_file'),
+    pants(':build_graph'),
     pants(':address'),
   ]
 )
@@ -104,6 +106,11 @@ python_library(
   sources = ['dev_backend_loader.py'],
   dependencies = [
     pants('3rdparty/python/twitter/commons:twitter.common.collections'),
+    pants('src/python/pants/backend/codegen:plugin'),
+    pants('src/python/pants/backend/core:plugin'),
+    pants('src/python/pants/backend/jvm:plugin'),
+    pants('src/python/pants/backend/maven_layout:plugin'),
+    pants('src/python/pants/backend/python:plugin'),
   ]
 )
 

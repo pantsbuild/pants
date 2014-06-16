@@ -5,13 +5,9 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from pants.base.build_environment import get_buildroot
-from pants.base.build_file import BuildFile
-from pants.base.target import Target
-from pants.backend.jvm.targets.jar_dependency import JarDependency
+from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
-from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.backend.jvm.tasks.jar_publish import PushDb
 
 
@@ -32,20 +28,15 @@ class CheckPublishedDeps(ConsoleTask):
     self._print_uptodate = context.options.check_deps_print_uptodate
     self.repos = context.config.getdict('jar-publish', 'repos')
     self._artifacts_to_targets = {}
-    build_graph = self.context.build_graph
-    build_file_parser = self.context.build_file_parser
 
-    # TODO(pl): Hoist this pattern into the BuildFileParser/BuildGraph API
-    for build_file in BuildFile.scan_buildfiles(get_buildroot()):
-      build_file_parser.parse_build_file(build_file)
-      for address in build_file_parser.addresses_by_build_file[build_file]:
-        build_file_parser.inject_spec_closure_into_build_graph(address.spec, build_graph)
-    for target in build_graph._target_by_address.values():
-      if target.is_exported:
-        provided_jar, _, _ = target.get_artifact_info()
-        artifact = (provided_jar.org, provided_jar.name)
-        if not artifact in self._artifacts_to_targets:
-          self._artifacts_to_targets[artifact] = target
+    def is_published(tgt):
+      return tgt.is_exported
+
+    for target in self.context.build_file_parser.scan().targets(predicate=is_published):
+      provided_jar, _, _ = target.get_artifact_info()
+      artifact = (provided_jar.org, provided_jar.name)
+      if not artifact in self._artifacts_to_targets:
+        self._artifacts_to_targets[artifact] = target
 
   def console_output(self, targets):
     push_dbs = {}
