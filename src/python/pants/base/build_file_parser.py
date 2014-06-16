@@ -13,7 +13,9 @@ from functools import partial
 from twitter.common.lang import Compatibility
 
 from pants.base.address import BuildFileAddress, parse_spec, SyntheticAddress
+from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
+from pants.base.build_graph import BuildGraph
 from pants.base.exceptions import TargetDefinitionException
 
 
@@ -450,3 +452,20 @@ class BuildFileParser(object):
                  .format(build_file=build_file))
     for target_proxy in registered_target_proxies:
       logger.debug("  * {target_proxy}".format(target_proxy=target_proxy))
+
+  def scan(self, root=None):
+    """Scans and parses all BUILD files found under ``root``.
+
+    Only BUILD files found under ``root`` are parsed as roots in the graph, but any dependencies of
+    targets parsed in the root tree's BUILD files will be followed and this may lead to BUILD files
+    outside of ``root`` being parsed and included in the returned build graph.
+
+    :param string root: The path to scan; by default, the build root.
+    :returns: A new build graph encapsulating the targets found.
+    """
+    build_graph = BuildGraph()
+    for build_file in BuildFile.scan_buildfiles(root or get_buildroot()):
+      self.parse_build_file(build_file)
+      for address in self.addresses_by_build_file[build_file]:
+        self.inject_spec_closure_into_build_graph(address.spec, build_graph)
+    return build_graph

@@ -6,9 +6,12 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import os
+
 import unittest2 as unittest
 
 from pants.base.build_environment import get_buildroot
+from pants.base.build_file_parser import BuildFileParser
+from pants.base.dev_backend_loader import load_backends_from_source
 
 
 class Utf8HeaderTest(unittest.TestCase):
@@ -17,20 +20,19 @@ class Utf8HeaderTest(unittest.TestCase):
     """
     Look through all .py files and ensure they start with the line '# coding=utf8'
     """
-    buildroot = get_buildroot();
+    build_file_parser = BuildFileParser(get_buildroot())
+    load_backends_from_source(build_file_parser)
+
+    def has_hand_coded_python_files(tgt):
+      return (not tgt.is_synthetic) and tgt.is_original and tgt.has_sources('.py')
 
     nonconforming_files = []
-    for root, dirs, files in os.walk(buildroot):
-      # build-support contains a lot of external files.
-      if root.find(os.sep + "build-support") >= 0:
-        continue
-      for filename in files:
-        if filename.endswith(".py"):
-          path = root + os.sep + filename;
-          with open(path, "r") as pyFile:
-            firstLine = pyFile.readline()
-            if not firstLine.rstrip() == "# coding=utf-8":
-              nonconforming_files.append(path)
+    for target in build_file_parser.scan().targets(has_hand_coded_python_files):
+      for src in target.sources_relative_to_buildroot():
+        with open(os.path.join(get_buildroot(), src), "r") as python_file:
+          first_line = python_file.readline()
+          if not first_line.rstrip() == '# coding=utf-8':
+            nonconforming_files.append(src)
 
     if len(nonconforming_files) > 0:
       self.fail('Expected these files to contain first line "# coding=utf8": '

@@ -7,9 +7,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import os
 
-from pants.base.build_environment import get_buildroot
-from pants.base.build_file import BuildFile
-from pants.base.target import Target
 from pants.backend.core.tasks.console_task import ConsoleTask
 
 
@@ -29,14 +26,6 @@ class Filemap(ConsoleTask):
 
   def _find_targets(self):
     if len(self.context.target_roots) > 0:
-      for target in self.context.target_roots:
-        yield target
+      return self.context.target_roots
     else:
-      build_file_parser = self.context.build_file_parser
-      build_graph = self.context.build_graph
-      for build_file in BuildFile.scan_buildfiles(get_buildroot()):
-        build_file_parser.parse_build_file(build_file)
-        for address in build_file_parser.addresses_by_build_file[build_file]:
-          build_file_parser.inject_spec_closure_into_build_graph(address.spec, build_graph)
-      for target in build_graph._target_by_address.values():
-        yield target
+      return self.context.build_file_parser.scan().targets()

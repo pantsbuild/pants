@@ -131,10 +131,7 @@ python_library(
   name = 'filemap',
   sources = ['filemap.py'],
   dependencies = [
-    pants(':common'),
     pants(':console_task'),
-    pants('src/python/pants/base:build_file'),
-    pants('src/python/pants/base:target'),
   ],
 )
 
@@ -176,11 +173,8 @@ python_library(
   name = 'listtargets',
   sources = ['listtargets.py'],
   dependencies = [
-    pants(':common'),
+    pants('src/python/pants/base:exceptions'),
     pants(':console_task'),
-    pants('src/python/pants/base:build_environment'),
-    pants('src/python/pants/base:build_file'),
-    pants('src/python/pants/base:target'),
   ],
 )
 
