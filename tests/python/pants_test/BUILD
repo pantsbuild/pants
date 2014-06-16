@@ -50,6 +50,15 @@ python_tests(
   ]
 )
 
+python_tests(
+  name = 'test_utf8_header',
+  sources = ['test_utf8_header.py'],
+  dependencies = [
+    pants('3rdparty/python/twitter/commons:twitter.common.lang'),
+    pants('src/python/pants/base:build_environment'),
+  ]
+)
+
 python_test_suite(
   name = 'integration',
   dependencies = [
@@ -63,6 +72,7 @@ python_test_suite(
   dependencies = [
     pants(':test_maven_layout'),
     pants(':test_thrift_util'),
+    pants(':test_utf8_header'),
     pants('tests/python/example_test/hello/greet'),
     pants('tests/python/pants_test/authentication:netrc'),
     pants('tests/python/pants_test/base'),
