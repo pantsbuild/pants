@@ -52,22 +52,22 @@ class FilemapTest(ConsoleTaskTest):
 
   def test_all(self):
     self.assert_console_output(
-      'common/a/one.py common/a/BUILD:a',
-      'common/b/two.py common/b/BUILD:b',
-      'common/b/three.py common/b/BUILD:b',
-      'common/c/four.py common/c/BUILD:c',
+      'common/a/one.py common/a:a',
+      'common/b/two.py common/b:b',
+      'common/b/three.py common/b:b',
+      'common/c/four.py common/c:c',
     )
 
   def test_one(self):
     self.assert_console_output(
-      'common/b/two.py common/b/BUILD:b',
-      'common/b/three.py common/b/BUILD:b',
+      'common/b/two.py common/b:b',
+      'common/b/three.py common/b:b',
       targets=[self.target('common/b')]
     )
 
   def test_dup(self):
     self.assert_console_output(
-      'common/a/one.py common/a/BUILD:a',
-      'common/c/four.py common/c/BUILD:c',
+      'common/a/one.py common/a:a',
+      'common/c/four.py common/c:c',
       targets=[self.target('common/a'), self.target('common/c'), self.target('common/a')]
     )

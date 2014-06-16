@@ -56,7 +56,7 @@ class ListTargets(ConsoleTask):
         return '%s%s%s' % (provided_jar.org, '#', provided_jar.name)
 
       extractors = dict(
-          address=lambda target: target.address.build_file_spec,
+          address=lambda target: target.address.spec,
           artifact_id=extract_artifact_id,
           repo_name=lambda target: target.provides.repo.name,
           repo_url=lambda target: target.provides.repo.url,
@@ -81,7 +81,7 @@ class ListTargets(ConsoleTask):
                                '\n  '.join(target.description.strip().split('\n')))
       print_fn = print_documented
     else:
-      print_fn = lambda target: target.address.build_file_spec
+      print_fn = lambda target: target.address.spec
 
     visited = set()
     for target in self._targets():

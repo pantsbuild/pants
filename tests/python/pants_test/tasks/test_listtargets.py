@@ -84,8 +84,8 @@ class ListTargetsTest(BaseListTargetsTest):
         dependencies(
           name='alias',
           dependencies=[
-            pants('a/b/c/BUILD:c3'),
-            pants('a/b/d/BUILD:d')
+            pants('a/b/c:c3'),
+            pants('a/b/d:d')
           ]
         ).with_description("""
         Exercises alias resolution.
@@ -94,71 +94,71 @@ class ListTargetsTest(BaseListTargetsTest):
         '''))
 
   def test_list_path(self):
-    self.assert_console_output('a/b/BUILD:b', targets=[self.target('a/b')])
+    self.assert_console_output('a/b:b', targets=[self.target('a/b')])
 
   def test_list_siblings(self):
-    self.assert_console_output('a/b/BUILD:b', targets=self.targets('a/b:'))
-    self.assert_console_output('a/b/c/BUILD:c', 'a/b/c/BUILD:c2', 'a/b/c/BUILD:c3',
+    self.assert_console_output('a/b:b', targets=self.targets('a/b:'))
+    self.assert_console_output('a/b/c:c', 'a/b/c:c2', 'a/b/c:c3',
                                targets=self.targets('a/b/c/:'))
 
   def test_list_descendants(self):
-    self.assert_console_output('a/b/c/BUILD:c', 'a/b/c/BUILD:c2', 'a/b/c/BUILD:c3',
+    self.assert_console_output('a/b/c:c', 'a/b/c:c2', 'a/b/c:c3',
                                targets=self.targets('a/b/c/::'))
 
     self.assert_console_output(
-        'a/b/BUILD:b',
-        'a/b/c/BUILD:c',
-        'a/b/c/BUILD:c2',
-        'a/b/c/BUILD:c3',
-        'a/b/d/BUILD:d',
-        'a/b/e/BUILD:e1',
+        'a/b:b',
+        'a/b/c:c',
+        'a/b/c:c2',
+        'a/b/c:c3',
+        'a/b/d:d',
+        'a/b/e:e1',
         targets=self.targets('a/b::'))
 
   def test_list_all(self):
     self.assert_entries('\n',
-        'repos/BUILD:public',
-        'a/BUILD:a',
-        'a/b/BUILD:b',
-        'a/b/c/BUILD:c',
-        'a/b/c/BUILD:c2',
-        'a/b/c/BUILD:c3',
-        'a/b/d/BUILD:d',
-        'a/b/e/BUILD:e1',
-        'f/BUILD:alias')
+        'repos:public',
+        'a:a',
+        'a/b:b',
+        'a/b/c:c',
+        'a/b/c:c2',
+        'a/b/c:c3',
+        'a/b/d:d',
+        'a/b/e:e1',
+        'f:alias')
 
     self.assert_entries(', ',
-        'repos/BUILD:public',
-        'a/BUILD:a',
-        'a/b/BUILD:b',
-        'a/b/c/BUILD:c',
-        'a/b/c/BUILD:c2',
-        'a/b/c/BUILD:c3',
-        'a/b/d/BUILD:d',
-        'a/b/e/BUILD:e1',
-        'f/BUILD:alias',
+        'repos:public',
+        'a:a',
+        'a/b:b',
+        'a/b/c:c',
+        'a/b/c:c2',
+        'a/b/c:c3',
+        'a/b/d:d',
+        'a/b/e:e1',
+        'f:alias',
         args=['--test-sep=, '])
 
     self.assert_console_output(
-        'repos/BUILD:public',
-        'a/BUILD:a',
-        'a/b/BUILD:b',
-        'a/b/c/BUILD:c',
-        'a/b/c/BUILD:c2',
-        'a/b/c/BUILD:c3',
-        'a/b/d/BUILD:d',
-        'a/b/e/BUILD:e1',
-        'f/BUILD:alias')
+        'repos:public',
+        'a:a',
+        'a/b:b',
+        'a/b/c:c',
+        'a/b/c:c2',
+        'a/b/c:c3',
+        'a/b/d:d',
+        'a/b/e:e1',
+        'f:alias')
 
   def test_list_provides(self):
     self.assert_console_output(
-        'a/b/BUILD:b com.twitter#b',
-        'a/b/c/BUILD:c2 com.twitter#c2',
+        'a/b:b com.twitter#b',
+        'a/b/c:c2 com.twitter#c2',
         args=['--test-provides'])
 
   def test_list_provides_customcols(self):
     self.assert_console_output(
-        '/tmp/publish.properties a/b/BUILD:b http://maven.twttr.com public com.twitter#b',
-        '/tmp/publish.properties a/b/c/BUILD:c2 http://maven.twttr.com public com.twitter#c2',
+        '/tmp/publish.properties a/b:b http://maven.twttr.com public com.twitter#b',
+        '/tmp/publish.properties a/b/c:c2 http://maven.twttr.com public com.twitter#c2',
         args=[
             '--test-provides',
             '--test-provides-columns=repo_db,address,repo_url,repo_name,artifact_id'
@@ -168,10 +168,10 @@ class ListTargetsTest(BaseListTargetsTest):
     targets = []
     targets.extend(self.targets('a/b/d/::'))
     targets.extend(self.target('f:alias').dependencies)
-    self.assertEquals(3, len(targets), "Expected a duplicate of a/b/d/BUILD:d")
+    self.assertEquals(3, len(targets), "Expected a duplicate of a/b/d:d")
     self.assert_console_output(
-      'a/b/c/BUILD:c3',
-      'a/b/d/BUILD:d',
+      'a/b/c:c3',
+      'a/b/d:d',
       targets=targets
     )
 
@@ -184,7 +184,7 @@ class ListTargetsTest(BaseListTargetsTest):
 
     self.assert_console_output(
       dedent('''
-      f/BUILD:alias
+      f:alias
         Exercises alias resolution.
         Further description.
       ''').strip(),

@@ -22,7 +22,7 @@ class Filemap(ConsoleTask):
           for sourcefile in target.payload.sources:
             path = os.path.normpath(os.path.join(target.payload.sources_rel_path,
                                                  sourcefile))
-            yield '%s %s' % (path, target.address.build_file_spec)
+            yield '%s %s' % (path, target.address.spec)
 
   def _find_targets(self):
     if len(self.context.target_roots) > 0:
