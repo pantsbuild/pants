@@ -169,7 +169,6 @@ python_library(
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.lang'),
     pants('3rdparty/python/twitter/commons:twitter.common.python'),
-    pants('3rdparty/python:coverage'),
     pants('3rdparty/python:pytest'),
     pants('3rdparty/python:pytest-cov'),
     pants(':python_chroot'),
