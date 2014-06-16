@@ -77,7 +77,7 @@ class ListTargets(ConsoleTask):
     elif self._documented:
       def print_documented(target):
         if target.description:
-          return '%s\n  %s' % (target.address.build_file_spec,
+          return '%s\n  %s' % (target.address.spec,
                                '\n  '.join(target.description.strip().split('\n')))
       print_fn = print_documented
     else:

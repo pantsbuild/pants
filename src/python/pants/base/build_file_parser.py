@@ -467,5 +467,5 @@ class BuildFileParser(object):
     for build_file in BuildFile.scan_buildfiles(root or get_buildroot()):
       self.parse_build_file(build_file)
       for address in self.addresses_by_build_file[build_file]:
-        self.inject_spec_closure_into_build_graph(address.spec, build_graph)
+        self.inject_address_closure_into_build_graph(address, build_graph)
     return build_graph
