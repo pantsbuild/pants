@@ -5,17 +5,26 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+import os
 from textwrap import dedent
 
-import pytest
+from twitter.common.collections import OrderedSet
 
 from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
 from pants.backend.codegen.tasks.scrooge_gen import ScroogeGen
+from pants.backend.jvm.targets.scala_library import ScalaLibrary
+from pants.base.address import SyntheticAddress
 from pants.base.exceptions import TaskError
+from pants.goal.context import Context
 
 from pants_test.base_test import BaseTest
+from pants_test.tasks.test_base import prepare_task
+
+import pytest
+from mock import MagicMock, patch
 
 
+# TODO (tdesai) Issue-240: Use JvmToolTaskTestBase for ScroogeGenTest
 class ScroogeGenTest(BaseTest):
   @property
   def alias_groups(self):
@@ -55,3 +64,45 @@ class ScroogeGenTest(BaseTest):
 
     with pytest.raises(TaskError):
       ScroogeGen._validate(defaults, [self.target('test_validate:three')])
+
+  def test_smoke(self):
+    contents = dedent('''namespace java com.pants.example
+      struct Example {
+      1: optional i64 number
+      }
+    ''')
+
+    self.create_file(relpath='test_smoke/a.thrift', contents=contents)
+    self.add_to_build_file('test_smoke', dedent('''
+      java_thrift_library(name='a',
+        sources=['a.thrift'],
+        dependencies=[],
+        compiler='scrooge',
+        language='scala',
+        rpc_style='finagle'
+      )
+    '''))
+    task_outdir = os.path.join(self.build_root, '.pants.d')
+    task = prepare_task(ScroogeGen,
+                        build_graph=self.build_graph,
+                        targets=[self.target('test_smoke:a')],
+                        build_file_parser=self.build_file_parser)
+
+    with patch('pants.backend.codegen.tasks.scrooge_gen.calculate_services'):
+      task._outdir = MagicMock()
+      task._outdir.return_value = task_outdir
+
+      task.gen = MagicMock()
+      sources = [os.path.join(task_outdir, 'com/pants/example/Example.scala')]
+      task.gen.return_value = {'test_smoke/a.thrift': sources}
+
+      Context.add_new_target = MagicMock()
+      task.execute()
+      spec = '{spec_path}:{name}'.format(spec_path=task_outdir, name='test_smoke.a')
+      address = SyntheticAddress.parse(spec=spec)
+      Context.add_new_target.assert_called_once_with(address,
+                                                     ScalaLibrary,
+                                                     sources=sources,
+                                                     excludes=None,
+                                                     dependencies=OrderedSet(),
+                                                     provides=None)

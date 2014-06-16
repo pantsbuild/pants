@@ -19,6 +19,7 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
+from pants.base.address import SyntheticAddress
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.thrift_util import (
@@ -162,9 +163,9 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
       genmap = self.context.products.get(partial_cmd.language)
       for gentarget, langtarget in langtarget_by_gentarget.items():
         genmap.add(gentarget, get_buildroot(), [langtarget])
-        for dep in gentarget.internal_dependencies:
+        for dep in gentarget.dependencies:
           if self.is_gentarget(dep):
-            langtarget.update_dependencies([langtarget_by_gentarget[dep]])
+            langtarget.inject_dependency(langtarget_by_gentarget[dep].address)
 
   def gen(self, partial_cmd, targets):
     with self.invalidated(targets, invalidate_dependents=True) as invalidation_check:
@@ -230,9 +231,10 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
     assert self.is_gentarget(gentarget)
 
     def create_target(files, deps, target_type):
-      return self.context.add_new_target(outdir,
+      spec = '{spec_path}:{name}'.format(spec_path=outdir, name=gentarget.id)
+      address = SyntheticAddress.parse(spec=spec)
+      return self.context.add_new_target(address,
                                          target_type,
-                                         name=gentarget.id,
                                          sources=files,
                                          provides=gentarget.provides,
                                          dependencies=deps,

@@ -104,3 +104,7 @@ class JvmTarget(Target, Jarable):
   @property
   def resources(self):
     return [self._build_graph.get_target_from_spec(spec) for spec in self._resource_specs]
+
+  @property
+  def excludes(self):
+    return self.payload.excludes

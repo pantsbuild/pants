@@ -337,6 +337,7 @@ python_tests(
   name = 'scrooge_gen',
   sources = ['test_scrooge_gen.py'],
   dependencies = [
+    pants('3rdparty/python:mock'),
     pants(':base'),
     pants('src/python/pants/backend/codegen/targets:java'),
     pants('src/python/pants/backend/codegen/tasks:scrooge_gen'),
