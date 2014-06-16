@@ -11,6 +11,7 @@ import subprocess
 
 import posixpath
 from twitter.common import log
+from twitter.common.collections import OrderedSet
 from twitter.common.contextutil import temporary_file
 from twitter.common.dirutil import chmod_plus_x, safe_delete, safe_open
 from twitter.common.lang import Compatibility
@@ -26,6 +27,23 @@ else:
 from pants.base.config import Config
 from pants.base.exceptions import TaskError
 
+
+# TODO(Garrett Malmquist): Refactor the methods inside this class into BinaryUtil with a convenience
+# factory classmethod which takes a Config. (see John's comment on rb 556).
+class BinaryUtil(object):
+  """Created to wrap custom exceptions."""
+
+  class MissingMachineInfo(TaskError):
+    """Indicates that pants was unable to map this machine's OS to a binary path prefix."""
+
+  class BinaryNotFound(TaskError):
+    def __init__(self, binary, accumulated_errors):
+      super(BinaryNotFound, self).__init__(
+          'Failed to fetch binary {binary} from any source: ({sources})'
+          .format(binary=binary, sources=', '.join(accumulated_errors)))
+
+  class NoBaseUrlsError(TaskError):
+    """Indicates that no urls were specified in pants.ini."""
 
 _ID_BY_OS = {
   'linux': lambda release, machine: ('linux', machine),
@@ -45,42 +63,82 @@ _PATH_BY_ID = {
 }
 
 
-def select_binary(base_path, version, name, config=None):
-  """Selects a binary matching the current os and architecture.
-
-  Raises TaskError if no binary of the given version and name could be found.
-  """
-  # TODO(John Sirois): finish doc of the path structure expexcted under base_path
-  config = config or Config.load()
-  bootstrap_dir = config.getdefault('pants_bootstrapdir')
-  baseurl = config.getdefault('pants_support_baseurl')
-  timeout_secs = config.getdefault('pants_support_fetch_timeout_secs', type=int, default=30)
-
+def select_binary_base_path(base_path, version, name):
+  """Base path used to select the binary file, exposed for associated unit tests."""
   sysname, _, release, _, machine = os.uname()
   os_id = _ID_BY_OS[sysname.lower()]
   if os_id:
     middle_path = _PATH_BY_ID[os_id(release, machine)]
     if middle_path:
-      binary_path = os.path.join(base_path, *(middle_path + [version, name]))
-      bootstrapped_binary_path = os.path.join(bootstrap_dir, binary_path)
-      if not os.path.exists(bootstrapped_binary_path):
-        url = posixpath.join(baseurl, binary_path)
-        log.info('Fetching %s binary from: %s' % (name, url))
-        downloadpath = bootstrapped_binary_path + '~'
-        try:
-          with closing(urllib_request.urlopen(url, timeout=timeout_secs)) as binary:
-            with safe_open(downloadpath, 'wb') as bootstrapped_binary:
-              bootstrapped_binary.write(binary.read())
+      return os.path.join(base_path, *(middle_path + [version, name]))
+  raise BinaryUtil.MissingMachineInfo('No {binary} binary found for: {machine_info}'
+      .format(binary=name, machine_info=(sysname, release, machine)))
 
-          os.rename(downloadpath, bootstrapped_binary_path)
-          chmod_plus_x(bootstrapped_binary_path)
-        except (IOError, urllib_error.HTTPError, urllib_error.URLError) as e:
-          raise TaskError('Failed to fetch binary from %s: %s' % (url, e))
-        finally:
-          safe_delete(downloadpath)
-      log.debug('Selected %s binary bootstrapped to: %s' % (name, bootstrapped_binary_path))
-      return bootstrapped_binary_path
-  raise TaskError('No %s binary found for: %s' % (name, (sysname, release, machine)))
+
+@contextmanager
+def select_binary_stream(base_path, version, name, config=None, url_opener=None):
+  """Select a binary matching the current os and architecture.
+
+  :param url_opener: Optional argument used only for testing, to 'pretend' to open urls.
+  :returns: a 'stream' to download it from a support directory. The returned 'stream' is actually a
+    lambda function which returns the files binary contents.
+  :raises: :class:`pants.binary_util.BinaryUtil.BinaryNotFound` if no binary of the given version
+    and name could not be found.
+  """
+  config = config or Config.load()
+  baseurls = config.getdefault('pants_support_baseurls', type=list, default=[])
+  if not baseurls:
+    raise BinaryUtil.NoBaseUrlsError(
+        'No urls are defined under pants_support_baseurls in the DEFAULT section of pants.ini.')
+  timeout_secs = config.getdefault('pants_support_fetch_timeout_secs', type=int, default=30)
+  binary_path = select_binary_base_path(base_path, version, name)
+  if url_opener is None:
+    url_opener = lambda u: closing(urllib_request.urlopen(u, timeout=timeout_secs))
+
+  downloaded_successfully = False
+  accumulated_errors = []
+  for baseurl in OrderedSet(baseurls): # Wrap in OrderedSet because duplicates are wasteful.
+    url = posixpath.join(baseurl, binary_path)
+    log.info('Attempting to fetch {name} binary from: {url} ...'.format(name=name, url=url))
+    try:
+      with url_opener(url) as binary:
+        log.info('Fetched {name} binary from: {url} .'.format(name=name, url=url))
+        downloaded_successfully = True
+        yield lambda: binary.read()
+        break
+    except (IOError, urllib_error.HTTPError, urllib_error.URLError, ValueError) as e:
+      accumulated_errors.append('Failed to fetch binary from {url}: {error}'
+                                .format(url=url, error=e))
+  if not downloaded_successfully:
+    raise BinaryUtil.BinaryNotFound((base_path, version, name), accumulated_errors)
+
+
+def select_binary(base_path, version, name, config=None):
+  """Selects a binary matching the current os and architecture.
+
+  :raises: :class:`pants.binary_util.BinaryUtil.BinaryNotFound` if no binary of the given version
+    and name could be found.
+  """
+  # TODO(John Sirois): finish doc of the path structure expexcted under base_path
+  config = config or Config.load()
+  bootstrap_dir = config.getdefault('pants_bootstrapdir')
+
+  binary_path = select_binary_base_path(base_path, version, name)
+  bootstrapped_binary_path = os.path.join(bootstrap_dir, binary_path)
+  if not os.path.exists(bootstrapped_binary_path):
+    downloadpath = bootstrapped_binary_path + '~'
+    try:
+      with select_binary_stream(base_path, version, name, config) as stream:
+        with safe_open(downloadpath, 'wb') as bootstrapped_binary:
+          bootstrapped_binary.write(stream())
+        os.rename(downloadpath, bootstrapped_binary_path)
+        chmod_plus_x(bootstrapped_binary_path)
+    finally:
+      safe_delete(downloadpath)
+
+  log.debug('Selected {binary} binary bootstrapped to: {path}'
+            .format(binary=name, path=bootstrapped_binary_path))
+  return bootstrapped_binary_path
 
 
 @contextmanager
