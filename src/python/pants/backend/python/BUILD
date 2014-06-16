@@ -5,6 +5,7 @@ python_library(
   name = 'plugin',
   sources = ['__init__.py', 'register.py'],
   dependencies = [
+    pants('src/python/pants/backend/python/commands:pants_old'),
     pants('src/python/pants/backend/python/targets:python'),
     pants('src/python/pants/backend/python/tasks:python'),
     pants(':all_utils'),
