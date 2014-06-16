@@ -6,13 +6,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import os
-
-from twitter.common.lang import Compatibility
-
-if Compatibility.PY3:
-  import unittest
-else:
-  import unittest2 as unittest
+import unittest2 as unittest
 
 from pants.base.build_environment import get_buildroot
 
@@ -39,4 +33,5 @@ class Utf8HeaderTest(unittest.TestCase):
               nonconforming_files.append(path)
 
     if len(nonconforming_files) > 0:
-      self.fail('Expected these files to contain first line "# coding=utf8": ' + str(nonconforming_files))
+      self.fail('Expected these files to contain first line "# coding=utf8": '
+                + str(nonconforming_files))
