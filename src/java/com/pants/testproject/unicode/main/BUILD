@@ -4,9 +4,10 @@
 # Demonstrates compiling code with a unicode classes
 
 jvm_binary(name = 'main',
+  basename = 'unicode',
   dependencies = [
-    'src/java/com/pants/examples/unicode/cucumber'
+    'src/java/com/pants/testproject/unicode/cucumber'
   ],
   source = 'CucumberMain.java',
-  main = 'com.pants.examples.unicode.main.CucumberMain',
+  main = 'com.pants.testproject.unicode.main.CucumberMain',
 )

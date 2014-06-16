@@ -80,6 +80,14 @@ python_tests(
 )
 
 python_tests(
+  name = 'jvm_bundle_integration',
+  sources = ['test_jvm_bundle_integration.py'],
+  dependencies = [
+    pants('tests/python/pants_test:int-test'),
+  ],
+)
+
+python_tests(
   name = 'cache_manager',
   sources = ['test_cache_manager.py'],
   dependencies = [

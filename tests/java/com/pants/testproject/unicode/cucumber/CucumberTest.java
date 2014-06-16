@@ -3,11 +3,11 @@
 
 // Test the cucumber library which contains unicode classnames
 
-package com.pants.examples.unicode.cucumber;
+package com.pants.testproject.unicode.cucumber;
 
 import org.junit.Test;
 
-import com.pants.examples.unicode.cucumber.CucumberAnnotatedExample;
+import com.pants.testproject.unicode.cucumber.CucumberAnnotatedExample;
 
 import static org.junit.Assert.assertEquals;
 
