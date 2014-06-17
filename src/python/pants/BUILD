@@ -42,6 +42,7 @@ python_library(
   name = 'binary_util',
   sources = ['binary_util.py'],
   dependencies = [
+    pants('3rdparty/python/twitter/commons:twitter.common.collections'),
     pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.lang'),

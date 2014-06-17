@@ -30,6 +30,16 @@ python_library(
 )
 
 python_tests(
+  name = 'test_binary_util',
+  sources = ['test_binary_util.py',],
+  dependencies = [
+    pants(':base_test'),
+    pants('src/python/pants:binary_util'),
+    pants('src/python/pants/base:exceptions')
+  ]
+)
+
+python_tests(
   name = 'test_maven_layout',
   sources = ['test_maven_layout.py'],
   dependencies = [
@@ -73,6 +83,7 @@ dependencies(
 python_test_suite(
   name = 'all',
   dependencies = [
+    pants(':test_binary_util'),
     pants(':test_maven_layout'),
     pants(':test_thrift_util'),
     pants(':test_utf8_header'),
