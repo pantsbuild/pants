@@ -3,7 +3,7 @@
 
 python_library(
   name = 'reporting',
-  sources = globs('*.py') - ['report.py'],
+  sources = globs('*.py') - ['report.py', 'stty_utils.py'],
   resources = rglobs('assets/*') + globs('templates/*.mustache'),
   dependencies = [
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),

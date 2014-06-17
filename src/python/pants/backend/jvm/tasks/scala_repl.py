@@ -6,11 +6,11 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import shlex
-import subprocess
 
 from pants.java.util import execute_java
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.backend.jvm.tasks.jvm_task import JvmTask
+from pants.console.stty_utils import preserve_stty_settings
 
 
 class ScalaRepl(JvmTask, JvmToolTaskMixin):
@@ -41,40 +41,21 @@ class ScalaRepl(JvmTask, JvmToolTaskMixin):
     # The repl session may last a while, allow concurrent pants activity during this pants idle
     # period.
     tools_classpath = self.tool_classpath(self._bootstrap_key)
-
     self.context.lock.release()
-    self.save_stty_options()
+    with preserve_stty_settings():
+      targets = self.context.targets()
+      classpath = self.classpath(tools_classpath,
+                                 confs=self.confs,
+                                 exclusives_classpath=self.get_base_classpath_for_target(targets[0]))
 
-    targets = self.context.targets()
-    classpath = self.classpath(tools_classpath,
-                               confs=self.confs,
-                               exclusives_classpath=self.get_base_classpath_for_target(targets[0]))
-
-    print('')  # Start REPL output on a new line.
-    try:
-      # NOTE: We execute with no workunit, as capturing REPL output makes it very sluggish.
-      execute_java(classpath=classpath,
-                   main=self.main,
-                   jvm_options=self.jvm_args,
-                   args=self.args)
-    except KeyboardInterrupt:
-      # TODO(John Sirois): Confirm with Steve Gury that finally does not work on mac and an
-      # explicit catch of KeyboardInterrupt is required.
-      pass
-    self.restore_ssty_options()
-
-  def save_stty_options(self):
-    """
-    The scala REPL changes some stty parameters and doesn't save/restore them after
-    execution, so if you have a terminal with non-default stty options, you end
-    up to a broken terminal (need to do a 'reset').
-    """
-    self.stty_options = self.run_cmd('stty -g 2>/dev/null')
-
-  def restore_ssty_options(self):
-    self.run_cmd('stty ' + self.stty_options)
-
-  def run_cmd(self, cmd):
-    po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
-    stdout, _ = po.communicate()
-    return stdout
+      print('')  # Start REPL output on a new line.
+      try:
+        # NOTE: We execute with no workunit, as capturing REPL output makes it very sluggish.
+        execute_java(classpath=classpath,
+                     main=self.main,
+                     jvm_options=self.jvm_args,
+                     args=self.args)
+      except KeyboardInterrupt:
+        # TODO(John Sirois): Confirm with Steve Gury that finally does not work on mac and an
+        # explicit catch of KeyboardInterrupt is required.
+        pass

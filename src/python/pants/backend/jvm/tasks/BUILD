@@ -406,9 +406,10 @@ python_library(
   dependencies = [
     pants(':common'),
     pants(':jvm_task'),
-    pants('src/python/pants/base:workunit'),
-    pants('src/python/pants/java:util'),
     pants('src/python/pants/backend/jvm/tasks:jvm_tool_task_mixin'),
+    pants('src/python/pants/base:workunit'),
+    pants('src/python/pants/console:stty_utils'),
+    pants('src/python/pants/java:util'),
   ],
 )
 
