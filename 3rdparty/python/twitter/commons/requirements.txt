@@ -1,7 +1,7 @@
 # To toggle to public releases, comment out these search override flags and optionally add version
 # constraints to the requirements below.
 
---find-links https://pantsbuild.github.io/cheeseshop/third_party/twitter-commons/c4a0cd39293142e9d7714cc58396735e284c77d8/index.html
+--find-links https://pantsbuild.github.io/cheeseshop/third_party/twitter-commons/0da0aff8fc7cce4d2d3991e36bc13f021ec66133/index.html
 --no-index
 
 twitter.common.collections

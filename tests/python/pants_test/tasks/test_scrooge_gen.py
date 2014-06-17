@@ -103,6 +103,6 @@ class ScroogeGenTest(BaseTest):
       Context.add_new_target.assert_called_once_with(address,
                                                      ScalaLibrary,
                                                      sources=sources,
-                                                     excludes=None,
+                                                     excludes=OrderedSet(),
                                                      dependencies=OrderedSet(),
                                                      provides=None)
