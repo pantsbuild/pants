@@ -18,6 +18,14 @@ python_test_suite(
   ]
 )
 
+python_test_suite(
+  name = 'integration',
+  dependencies = [
+    pants(':interpreter_selection_integration'),
+    pants(':python_run_integration'),
+  ]
+)
+
 # XXX this tests the code running the test, not the code under test!
 python_tests(
   name = 'test_antlr_builder',

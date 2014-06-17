@@ -16,8 +16,8 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 class BundleIntegrationTest(PantsRunIntegrationTest):
 
   def test_bundle_of_nonascii_classes(self):
-        with self.run_pants(['goal', 'bundle', 'src/java/com/pants/testproject/unicode/main/BUILD:main']) as pants_run:
-          self.assertEquals(pants_run, self.PANTS_SUCCESS_CODE)
+        pants_run = self.run_pants(['goal', 'bundle', 'src/java/com/pants/testproject/unicode/main/BUILD:main'])
+        self.assertEquals(pants_run.returncode, self.PANTS_SUCCESS_CODE)
         out_path = os.path.join(get_buildroot(), 'dist', 'unicode-bundle')
         java_run = subprocess.Popen(['java', '-jar', 'unicode.jar'],
                                     stdout=subprocess.PIPE,

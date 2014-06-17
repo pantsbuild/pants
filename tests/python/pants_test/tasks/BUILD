@@ -52,6 +52,14 @@ python_test_suite(
   ],
 )
 
+python_test_suite(
+  name = 'integration',
+  dependencies = [
+    pants(':jar_publish_integration'),
+    pants(':jvm_bundle_integration'),
+  ],
+)
+
 python_tests(
   name = 'binary_create',
   sources = ['test_binary_create.py'],

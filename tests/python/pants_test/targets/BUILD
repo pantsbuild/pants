@@ -23,6 +23,13 @@ python_test_suite(
   ]
 )
 
+python_test_suite(
+  name = 'integration',
+  dependencies = [
+    pants(':scala_library_integration'),
+  ],
+)
+
 python_tests(
   name = 'artifact',
   sources = ['test_artifact.py'],

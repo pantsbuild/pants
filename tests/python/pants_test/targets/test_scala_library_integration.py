@@ -10,5 +10,5 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 class TestScalaLibraryIntegrationTest(PantsRunIntegrationTest):
 
   def test_bundle(self):
-        with self.run_pants(['goal', 'test', 'src/scala/com/pants/testproject/javasources/BUILD:javasources']) as pants_run:
-          self.assertEquals(pants_run, self.PANTS_SUCCESS_CODE)
+        pants_run = self.run_pants(['goal', 'test', 'src/scala/com/pants/testproject/javasources/BUILD:javasources'])
+        self.assertEquals(pants_run.returncode, self.PANTS_SUCCESS_CODE)

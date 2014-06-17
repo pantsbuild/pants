@@ -61,12 +61,12 @@ python_tests(
   ]
 )
 
-python_test_suite(
+dependencies(
   name = 'integration',
   dependencies = [
-    pants('tests/python/pants_test/tasks:jar_publish_integration'),
-    pants('tests/python/pants_test/python:interpreter_selection_integration'),
-    pants('tests/python/pants_test/python:python_run_integration'),
+    pants('tests/python/pants_test/targets:integration'),
+    pants('tests/python/pants_test/tasks:integration'),
+    pants('tests/python/pants_test/python:integration'),
   ]
 )
 
