@@ -59,6 +59,26 @@ class BuildFileParserTest(BaseTest):
     with pytest.raises(TargetDefinitionException):
       self.build_file_parser.parse_build_file(build_file_d)
 
+  def test_target_invalid(self):
+    self.add_to_build_file('a/BUILD', 'dependencies(name="a")')
+    with pytest.raises(BuildFileParser.InvalidTargetException):
+      self.build_file_parser.inject_spec_closure_into_build_graph('a:nope', self.build_graph)
+
+    self.add_to_build_file('b/BUILD', 'dependencies(name="a")')
+    with pytest.raises(BuildFileParser.InvalidTargetException):
+      self.build_file_parser.inject_spec_closure_into_build_graph('b', self.build_graph)
+    with pytest.raises(BuildFileParser.InvalidTargetException):
+      self.build_file_parser.inject_spec_closure_into_build_graph('b:b', self.build_graph)
+    with pytest.raises(BuildFileParser.InvalidTargetException):
+      self.build_file_parser.inject_spec_closure_into_build_graph('b:', self.build_graph)
+
+  def test_no_targets(self):
+    self.add_to_build_file('empty/BUILD', 'pass')
+    with pytest.raises(BuildFileParser.EmptyBuildFileException):
+      self.build_file_parser.inject_spec_closure_into_build_graph('empty', self.build_graph)
+    with pytest.raises(BuildFileParser.EmptyBuildFileException):
+      self.build_file_parser.inject_spec_closure_into_build_graph('empty:foo', self.build_graph)
+
   def test_noop_parse(self):
     with self.workspace('BUILD') as root_dir:
       parser = BuildFileParser(root_dir=root_dir)

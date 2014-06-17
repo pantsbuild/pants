@@ -161,6 +161,12 @@ class BuildFileParser(object):
   class SiblingConflictException(Exception):
     """Thrown if the same target is redefined in another BUILD file in the same directory"""
 
+  class InvalidTargetException(Exception):
+    """Thrown if the user called for a target not present in a BUILD file."""
+
+  class EmptyBuildFileException(Exception):
+    """Thrown if the user called for a target when none are present in a BUILD file."""
+
   def clear_registered_context(self):
     self._exposed_objects = {}
     self._partial_path_relative_utils = {}
@@ -325,6 +331,56 @@ class BuildFileParser(object):
 
     target_proxy = self._target_proxy_by_address[address]
 
+  def _raise_incorrect_target_error(self, wrong_target, targets):
+    """Search through the list of targets and return those which originate from the same folder
+    which wrong_target resides in.
+
+    :raises: A helpful error message listing possible correct target addresses.
+    """
+    def path_parts(build): # Gets a tuple of directory, filename.
+        build = str(build)
+        slash = build.rfind('/')
+        if slash < 0:
+          return '', build
+        return build[:slash], build[slash+1:]
+
+    def are_siblings(a, b): # Are the targets in the same directory?
+      return path_parts(a)[0] == path_parts(b)[0]
+
+    valid_specs = []
+    all_same = True
+    # Iterate through all addresses, saving those which are similar to the wrong address.
+    for target in targets:
+      if are_siblings(target.build_file, wrong_target.build_file):
+        possibility = (path_parts(target.build_file)[1], target.spec[target.spec.rfind(':'):])
+        # Keep track of whether there are multiple BUILD files or just one.
+        if all_same and valid_specs and possibility[0] != valid_specs[0][0]:
+          all_same = False
+        valid_specs.append(possibility)
+
+    # Trim out BUILD extensions if there's only one anyway; no need to be redundant.
+    if all_same:
+      valid_specs = [('', tail) for head, tail in valid_specs]
+    # Might be neat to sort by edit distance or something, but for now alphabetical is fine.
+    valid_specs = [''.join(pair) for pair in sorted(valid_specs)]
+
+    # Give different error messages depending on whether BUILD file was empty.
+    if valid_specs:
+      one_of = ' one of' if len(valid_specs) > 1 else '' # Handle plurality, just for UX.
+      raise self.InvalidTargetException((
+          ':{address} from spec {spec} was not found in BUILD file {build_file}. Perhaps you '
+          'meant{one_of}: \n  {specs}').format(address=wrong_target.target_name,
+                                               spec=wrong_target.spec,
+                                               build_file=wrong_target.build_file,
+                                               one_of=one_of,
+                                               specs='\n  '.join(valid_specs)))
+    # There were no targets in the BUILD file.
+    raise self.EmptyBuildFileException((
+        ':{address} from spec {spec} was not found in BUILD file {build_file}, because that '
+        'BUILD file contains no targets.').format(address=wrong_target.target_name,
+                                                  spec=wrong_target.spec,
+                                                  build_file=wrong_target.build_file))
+
   def _populate_target_proxy_transitive_closure_for_address(self,
                                                             address,
                                                             addresses_already_closed=None):
@@ -344,11 +400,8 @@ class BuildFileParser(object):
 
     self.parse_build_file_family(address.build_file)
 
-    if address not in self._target_proxy_by_address:
-      raise ValueError('{address} from spec {spec} was not found in BUILD file {build_file}.'
-                       .format(address=address,
-                               spec=address.spec,
-                               build_file=address.build_file))
+    if address not in self._target_proxy_by_address: # Raise helpful error message.
+      self._raise_incorrect_target_error(address, self._target_proxy_by_address.keys())
 
     target_proxy = self._target_proxy_by_address[address]
     addresses_already_closed.add(address)
