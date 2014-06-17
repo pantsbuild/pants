@@ -66,19 +66,26 @@ class JvmRun(JvmTask):
     # execution engine.  I do not want task code to learn the lock location.
     # http://jira.local.twitter.com/browse/AWESOME-1317
 
-    self.context.lock.release()
-    # Run the first target that is a binary.
-    binaries = self.context.targets(is_binary)
-    if len(binaries) > 0:  # We only run the first one.
-      main = binaries[0].main
+    target_roots = self.context.target_roots
+    if len(target_roots) == 0:
+      raise TaskError('No target specified.')
+    elif len(target_roots) > 1:
+      raise TaskError('Multiple targets specified: %s' % ', '.join([repr(t) for t in target_roots]))
+    binary = target_roots[0]
+
+    if isinstance(binary, JvmBinary):
+      # We can't throw if binary isn't a JvmBinary, because perhaps we were called on a
+      # python_binary, in which case we have to no-op and let python_run do its thing.
+      # TODO(benjy): Some more elegant way to coordinate how tasks claim targets.
       egroups = self.context.products.get_data('exclusives_groups')
-      group_key = egroups.get_group_key_for_target(binaries[0])
+      group_key = egroups.get_group_key_for_target(binary)
       group_classpath = egroups.get_classpath_for_group(group_key)
 
       executor = CommandLineGrabber() if self.only_write_cmd_line else None
+      self.context.lock.release()
       result = execute_java(
         classpath=(self.classpath(confs=self.confs, exclusives_classpath=group_classpath)),
-        main=main,
+        main=binary.main,
         executor=executor,
         jvm_options=self.jvm_args,
         args=self.args,
@@ -91,4 +98,5 @@ class JvmRun(JvmTask):
         with safe_open(self.only_write_cmd_line, 'w') as outfile:
           outfile.write(' '.join(executor.cmd))
       elif result != 0:
-        raise TaskError('java %s ... exited non-zero (%i)' % (main, result), exit_code=result)
+        raise TaskError('java %s ... exited non-zero (%i)' % (binary.main, result),
+                        exit_code=result)
