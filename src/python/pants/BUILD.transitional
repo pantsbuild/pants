@@ -7,11 +7,11 @@ python_library(
   resources=(
     globs('java/distribution/*.class') +
     rglobs('reporting/assets/*') + globs('reporting/templates/*.mustache') +
-    globs('tasks/builddictionary/*.mustache') +
-    globs('jvm/tasks/templates/eclipse/*.mustache') +
-    globs('jvm/tasks/templates/idea/*.mustache') +
-    globs('jvm/tasks/templates/ivy_resolve/*.mustache') +
-    globs('jvm/tasks/templates/jar_publish/*.mustache')
+    globs('backend/core/tasks/templates/builddictionary/*.mustache') +
+    globs('backend/jvm/tasks/templates/eclipse/*.mustache') +
+    globs('backend/jvm/tasks/templates/idea/*.mustache') +
+    globs('backend/jvm/tasks/templates/ivy_resolve/*.mustache') +
+    globs('backend/jvm/tasks/templates/jar_publish/*.mustache')
   ),
   dependencies=[
     pants('3rdparty/python:ansicolors'),
