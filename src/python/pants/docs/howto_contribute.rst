@@ -35,6 +35,9 @@ notifications of new issues, etc.
 Follow `@pantsbuild on Twitter <https://twitter.com/pantsbuild>`_
 for occasional announcements.
 
+Find out when the CI tests go red/green by adding your email address to
+`.travis.yml <https://github.com/pantsbuild/pants/blob/master/.travis.yml>`_.
+
 ****************
 Life of a Change
 ****************
