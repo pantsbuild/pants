@@ -153,11 +153,11 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
     for partial_cmd, tgts in partial_cmds.items():
       gen_files_for_source = self.gen(partial_cmd, tgts)
 
-      outdir = self._outdir(partial_cmd)
+      relative_outdir = os.path.relpath(self._outdir(partial_cmd), get_buildroot())
       langtarget_by_gentarget = {}
       for target in tgts:
         dependees = dependees_by_gentarget.get(target, [])
-        langtarget_by_gentarget[target] = self.createtarget(target, dependees, outdir,
+        langtarget_by_gentarget[target] = self.createtarget(target, dependees, relative_outdir,
                                                             gen_files_for_source)
 
       genmap = self.context.products.get(partial_cmd.language)

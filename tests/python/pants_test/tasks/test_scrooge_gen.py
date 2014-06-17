@@ -14,6 +14,7 @@ from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
 from pants.backend.codegen.tasks.scrooge_gen import ScroogeGen
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.base.address import SyntheticAddress
+from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.goal.context import Context
 
@@ -98,7 +99,8 @@ class ScroogeGenTest(BaseTest):
 
       Context.add_new_target = MagicMock()
       task.execute()
-      spec = '{spec_path}:{name}'.format(spec_path=task_outdir, name='test_smoke.a')
+      relative_task_outdir = os.path.relpath(task_outdir, get_buildroot())
+      spec = '{spec_path}:{name}'.format(spec_path=relative_task_outdir, name='test_smoke.a')
       address = SyntheticAddress.parse(spec=spec)
       Context.add_new_target.assert_called_once_with(address,
                                                      ScalaLibrary,
