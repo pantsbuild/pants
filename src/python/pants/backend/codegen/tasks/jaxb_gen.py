@@ -10,9 +10,8 @@ import os
 import re
 import subprocess
 
-# python documentations say xml parsing is insecure, but this should be safe
-# usage because we're just running it on code in our repositories, not on
-# externally acquired data.
+# python documentations say xml parsing is insecure, but this should be safe usage because we're
+# just running it on code in our repositories, not on externally acquired data.
 from twitter.common.dirutil import safe_mkdir
 from xml.dom.minidom import parse
 
@@ -123,6 +122,7 @@ class JaxbGen(CodeGen, NailgunTask):
   def _guess_package(self, path):
     """Used in genlang to actually invoke the compiler with the proper arguments, and in
     createtarget (via _sources_to_be_generated) to declare what the generated files will be.
+
     """
     package = ''
     slash = path.rfind(os.path.sep)
@@ -147,12 +147,14 @@ class JaxbGen(CodeGen, NailgunTask):
   @classmethod
   def _sources_to_be_generated(self, package, path):
     """This method (or some variation of it) seems to be common amongst all implementations of
-    code-generating tasks. As far as I can tell, its purpose is to peek into the relevant schema
-    files and figure out what the final output files will be. This is typically implemented with a
-    variety of hacks, accompanied by TODO's saying to do it properly in the future (see
-    apache_thrift_gen.py and protobuf_gen.py). The implementation in this file does it 'properly'
-    using python's xml parser, though I am making some assumptions about how .xsd's are supposed to
-    be formatted, as that is not a subject I am particularly informed about.
+    code-generating tasks.
+
+    As far as I can tell, its purpose is to peek into the relevant schema files and figure out what
+    the final output files will be. This is typically implemented with a variety of hacks,
+    accompanied by TODO's saying to do it properly in the future (see apache_thrift_gen.py and
+    protobuf_gen.py). The implementation in this file does it 'properly' using python's xml parser,
+    though I am making some assumptions about how .xsd's are supposed to be formatted, as that is
+    not a subject I am particularly informed about.
     """
     doc = parse(path)
     if package is None:
