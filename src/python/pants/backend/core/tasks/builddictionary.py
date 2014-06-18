@@ -24,7 +24,6 @@ from pants.base.generator import Generator, TemplateData
 from pants.goal.option_helpers import add_global_options
 from pants.goal.phase import Phase
 
-
 def indent_docstring_by_n(s, n=1):
   """Given a non-empty docstring, return version indented N spaces.
   Given an empty thing, return the thing itself."""
@@ -119,6 +118,40 @@ def entry_for_one_method(nom, method):
                indent=2)
 
 
+def entry_for_one_class(nom, cls):
+  """  Generate a BUILD dictionary entry for a class.
+  nom: name like 'python_binary'
+  cls: class like pants.python_binary"""
+  try:
+    args, varargs, varkw, defaults = inspect.getargspec(cls.__init__)
+    argspec = inspect.formatargspec(args[1:], varargs, varkw, defaults)
+    funcdoc = cls.__init__.__doc__
+
+    methods = []
+    for attrname in dir(cls):
+      attr = getattr(cls, attrname)
+      attr_bdi = get_builddict_info(attr)
+      if not attr_bdi: continue
+      if inspect.ismethod(attr):
+        methods.append(entry_for_one_method(attrname, attr))
+        continue
+      raise TaskError('@manual.builddict on non-method %s within class %s '
+                      'but I only know what to do with methods' %
+                      (attrname, nom))
+
+  except TypeError:  # __init__ might not be a Python function
+    argspec = None
+    funcdoc = None
+    methods = None
+
+  return entry(nom,
+               classdoc=cls.__doc__,
+               argspec=argspec,
+               funcdoc=funcdoc,
+               methods=methods,
+               impl="{0}.{1}".format(cls.__module__, cls.__name__))
+
+
 def entry_for_one(nom, sym):
   if inspect.isclass(sym):
     return entry_for_one_class(nom, sym)
@@ -193,39 +226,6 @@ def tags_tocl(d, tag_list, title):
     filtered_anchors.append(anc)
   return TemplateData(t=title, e=filtered_anchors)
 
-
-def entry_for_one_class(nom, cls):
-  """  Generate a BUILD dictionary entry for a class.
-  nom: name like 'python_binary'
-  cls: class like pants.python_binary"""
-  try:
-    args, varargs, varkw, defaults = inspect.getargspec(cls.__init__)
-    argspec = inspect.formatargspec(args[1:], varargs, varkw, defaults)
-    funcdoc = cls.__init__.__doc__
-
-    methods = []
-    for attrname in dir(cls):
-      attr = getattr(cls, attrname)
-      attr_bdi = get_builddict_info(attr)
-      if not attr_bdi: continue
-      if inspect.ismethod(attr):
-        methods.append(entry_for_one_method(attrname, attr))
-        continue
-      raise TaskError('@manual.builddict on non-method %s within class %s '
-                      'but I only know what to do with methods' %
-                      (attrname, nom))
-
-  except TypeError:  # __init__ might not be a Python function
-    argspec = None
-    funcdoc = None
-    methods = None
-
-  return entry(nom,
-               classdoc=cls.__doc__,
-               argspec=argspec,
-               funcdoc=funcdoc,
-               methods=methods,
-               impl="{0}.{1}".format(cls.__module__, cls.__name__))
 
 def gen_goals_glopts_reference_data():
   global_option_parser = optparse.OptionParser(add_help_option=False)

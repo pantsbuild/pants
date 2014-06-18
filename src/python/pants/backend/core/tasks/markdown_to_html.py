@@ -17,12 +17,11 @@ from pygments.styles import get_all_styles
 from twitter.common.dirutil import safe_mkdir, safe_open
 
 from pants import binary_util
-from pants.backend.core.targets.doc import Page
-from pants.backend.core.tasks.task import Task
-from pants.base.address import Address
+from pants.base.address import SyntheticAddress
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
-from pants.base.target import Target
+from pants.backend.core.targets.doc import Page
+from pants.backend.core.tasks.task import Task
 
 
 def configure_codehighlight_options(option_group, mkflag):
@@ -132,7 +131,7 @@ class MarkdownToHtml(Task):
         def process_page(key, outdir, url_builder, config, genmap, fragment=False):
           html_path = self.process(
             outdir,
-            page.target_base,
+            page.payload.sources_rel_path,
             page.source,
             self.fragment or fragment,
             url_builder,
@@ -155,12 +154,16 @@ class MarkdownToHtml(Task):
         if self.open and page in roots:
           show.append(html)
 
-        for wiki in page.wikis():
-          def get_config(page):
-            return page.wiki_config(wiki)
-          basedir = os.path.join(self.workdir, wiki.id)
-          process_page((wiki, page), basedir, wiki.url_builder, get_config,
-                       wikigenmap, fragment=True)
+        if page.provides:
+          for wiki in page.provides:
+            def get_config(page):
+              # Take the first provided WikiArtifact. If a page is published to multiple places, it's
+              # undefined what the "proper" one is to link to. So we just take whatever is "first".
+              for wiki_artifact in page.payload.provides:
+                return wiki_artifact.config
+            basedir = os.path.join(self.workdir, str(hash(wiki)))
+            process_page((wiki, page), basedir, wiki.wiki.url_builder, get_config,
+                         wikigenmap, fragment=True)
 
     if show:
       binary_util.ui_open(*show)
@@ -171,10 +174,12 @@ class MarkdownToHtml(Task):
     def parse_url(spec):
       match = MarkdownToHtml.PANTS_LINK.match(spec)
       if match:
-        page = Target.get(Address.parse(get_buildroot(), match.group(1)))
+        address = SyntheticAddress.parse(match.group(1), relative_to=get_buildroot())
+        page = self.context.build_graph.get_target(address)
         anchor = match.group(2) or ''
         if not page:
-          raise TaskError('Invalid link %s' % match.group(1))
+          raise TaskError('Invalid markdown link to pants target: "%s". ' % match.group(1) +
+                          'Is your page missing a dependency on this target?')
         alias, url = url_builder(page, config=get_config(page))
         return alias, url + anchor
       else:

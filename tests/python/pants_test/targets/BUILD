@@ -20,6 +20,7 @@ python_test_suite(
     pants(':python_binary'),
     pants(':python_target'),
     pants(':scala_library'),
+    pants(':wiki_page')
   ]
 )
 
@@ -143,3 +144,12 @@ python_tests(
   ]
 )
 
+python_tests(
+  name = 'wiki_page',
+  sources = ['test_wiki_page.py'],
+  dependencies = [
+    pants('3rdparty/python/twitter/commons:twitter.common.confluence'),
+    pants('src/python/pants/backend/core/targets:common'),
+    pants('tests/python/pants_test:base_test'),
+  ]
+)

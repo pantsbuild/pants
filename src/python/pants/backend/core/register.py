@@ -10,7 +10,7 @@ import os
 from twitter.common.quantity import Amount, Time
 
 from pants.backend.core.targets.dependencies import Dependencies
-from pants.backend.core.targets.doc import Page, Wiki
+from pants.backend.core.targets.doc import Page, Wiki, WikiArtifact
 from pants.backend.core.targets.resources import Resources
 from pants.backend.core.tasks.build_lint import BuildLint
 from pants.backend.core.tasks.builddictionary import BuildBuildDictionary
@@ -85,6 +85,7 @@ def object_aliases():
     'phase': Phase,
     'set_scm': set_scm,
     'Time': Time,
+    'wiki_artifact': WikiArtifact,
   }
 
 
