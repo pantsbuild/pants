@@ -38,24 +38,23 @@ class ScalaRepl(JvmTask, JvmToolTaskMixin):
         self.args.extend(shlex.split(arg))
 
   def execute(self):
-    # The repl session may last a while, allow concurrent pants activity during this pants idle
-    # period.
-    tools_classpath = self.tool_classpath(self._bootstrap_key)
-    self.context.lock.release()
-    with preserve_stty_settings():
-      targets = self.context.targets()
-      classpath = self.classpath(tools_classpath,
-                                 confs=self.confs,
-                                 exclusives_classpath=self.get_base_classpath_for_target(targets[0]))
+    targets = self.require_homogeneous_root_targets(lambda t: t.is_jvm)
+    if targets:
+      tools_classpath = self.tool_classpath(self._bootstrap_key)
+      self.context.lock.release()
+      with preserve_stty_settings():
+        classpath = self.classpath(tools_classpath,
+                                   confs=self.confs,
+                                   exclusives_classpath=self.get_base_classpath_for_target(targets[0]))
 
-      print('')  # Start REPL output on a new line.
-      try:
-        # NOTE: We execute with no workunit, as capturing REPL output makes it very sluggish.
-        execute_java(classpath=classpath,
-                     main=self.main,
-                     jvm_options=self.jvm_args,
-                     args=self.args)
-      except KeyboardInterrupt:
-        # TODO(John Sirois): Confirm with Steve Gury that finally does not work on mac and an
-        # explicit catch of KeyboardInterrupt is required.
-        pass
+        print('')  # Start REPL output on a new line.
+        try:
+          # NOTE: We execute with no workunit, as capturing REPL output makes it very sluggish.
+          execute_java(classpath=classpath,
+                       main=self.main,
+                       jvm_options=self.jvm_args,
+                       args=self.args)
+        except KeyboardInterrupt:
+          # TODO(John Sirois): Confirm with Steve Gury that finally does not work on mac and an
+          # explicit catch of KeyboardInterrupt is required.
+          pass

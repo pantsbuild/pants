@@ -37,7 +37,5 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
     command = ['goal', 'run', binary_target,
                '--interpreter=CPython>=2.6,<3',
                '--interpreter=CPython>=3.3', '--quiet']
-    # Parsing the version out of the pants output will be fragile, but we assume
-    # that the right thing happened if the exit code is 0.
     pants_run = self.run_pants(command=command)
     return pants_run.stdout_data.rstrip().split('\n')[-1]

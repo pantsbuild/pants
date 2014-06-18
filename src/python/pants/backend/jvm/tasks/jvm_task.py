@@ -7,17 +7,37 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import os
 
-from pants.base.build_environment import get_buildroot
 from pants.backend.core.tasks.task import Task
+from pants.base.build_environment import get_buildroot
+from pants.base.exceptions import TaskError
 
 
 class JvmTask(Task):
   def get_base_classpath_for_target(self, target):
-    """Note: to use this method, the exclusives_groups data product must be available. This should
+    """Returns the base classpath for the specified target.
+
+    Note: to use this method, the exclusives_groups data product must be available. This should
     have been set by the prerequisite java/scala compile."""
     egroups = self.context.products.get_data('exclusives_groups')
     group_key = egroups.get_group_key_for_target(target)
     return egroups.get_classpath_for_group(group_key)
+
+  def get_base_classpath_for_compatible_targets(self, targets):
+    """Returns the base classpath for the specified targets.
+
+    Throws if the targets aren't all in the same exclusive group.
+
+    Note: to use this method, the exclusives_groups data product must be available. This should
+    have been set by the prerequisite java/scala compile.
+    """
+    if not targets:
+      return []
+    egroups = self.context.products.get_data('exclusives_groups')
+    group_keys = set([egroups.get_group_key_for_target(t) for t in targets])
+    if len(group_keys) != 1:
+      raise TaskError('Targets are in different exclusives groups: %s' %
+                      ', '.join([repr(t) for t in targets]))
+    return egroups.get_classpath_for_group(iter(group_keys).next())
 
   def classpath(self, cp=None, confs=None, exclusives_classpath=None):
     classpath = list(cp) if cp else []

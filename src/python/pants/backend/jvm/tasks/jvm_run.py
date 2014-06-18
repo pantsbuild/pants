@@ -65,13 +65,7 @@ class JvmRun(JvmTask):
     # Currently re-acquiring the lock requires a path argument that was set up by the goal
     # execution engine.  I do not want task code to learn the lock location.
     # http://jira.local.twitter.com/browse/AWESOME-1317
-
-    target_roots = self.context.target_roots
-    if len(target_roots) == 0:
-      raise TaskError('No target specified.')
-    elif len(target_roots) > 1:
-      raise TaskError('Multiple targets specified: %s' % ', '.join([repr(t) for t in target_roots]))
-    binary = target_roots[0]
+    binary = self.require_single_root_target()
 
     if isinstance(binary, JvmBinary):
       # We can't throw if binary isn't a JvmBinary, because perhaps we were called on a

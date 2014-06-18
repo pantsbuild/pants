@@ -6,13 +6,13 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 from collections import namedtuple
-from contextlib import contextmanager
+
 import os
 import subprocess
 import unittest
 
 from twitter.common.contextutil import temporary_dir
-from twitter.common.dirutil import safe_open
+from twitter.common.dirutil import safe_open, safe_mkdir
 
 from pants.base.build_environment import get_buildroot
 
@@ -37,7 +37,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
     except OSError:
       return False
 
-  def run_pants(self, command, config=None, **kwargs):
+  def run_pants(self, command, config=None, stdin_data=None, **kwargs):
     """Runs pants in a subprocess.
 
     :param list command: A list of command line arguments coming after `./pants`.
@@ -51,7 +51,13 @@ class PantsRunIntegrationTest(unittest.TestCase):
     that the invoked pants doesn't interact badly with this one.
     """
     config = config.copy() if config else {}
-    with temporary_dir() as workdir:
+    # We can hard-code '.pants.d' here because we know that will always be its value
+    # in the pantsbuild/pants repo (e.g., that's what we .gitignore in that repo).
+    # Grabbing the pants_workdir config would require this pants's config object,
+    # which we don't have a reference to here.
+    workdir_root = os.path.join(get_buildroot(), '.pants.d', 'tmp')
+    safe_mkdir(workdir_root)
+    with temporary_dir(root_dir=workdir_root) as workdir:
       # We add workdir to the DEFAULT section, and also ensure that it's emitted first.
       default_section = config.pop('DEFAULT', {})
       default_section['pants_workdir'] = '%s' % workdir
@@ -67,8 +73,9 @@ class PantsRunIntegrationTest(unittest.TestCase):
         fp.write(ini)
       env = os.environ.copy()
       env['PANTS_CONFIG_OVERRIDE'] = ini_file_name
-      pants_command = [os.path.join(get_buildroot(), self.PANTS_SCRIPT_NAME)] + command + ['--no-lock']
-      proc = subprocess.Popen(pants_command, env=env,
+      pants_command = ([os.path.join(get_buildroot(), self.PANTS_SCRIPT_NAME)] + command +
+                       ['--no-lock', '--kill-nailguns'])
+      proc = subprocess.Popen(pants_command, env=env, stdin=subprocess.PIPE,
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
-      (stdout_data, stderr_data) = proc.communicate()
+      (stdout_data, stderr_data) = proc.communicate(stdin_data)
       return PantsResult(proc.returncode, stdout_data, stderr_data)

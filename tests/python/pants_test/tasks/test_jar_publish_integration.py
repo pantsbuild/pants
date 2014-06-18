@@ -7,7 +7,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import os
 
-from twitter.common.contextutil import temporary_dir, temporary_file
+from twitter.common.contextutil import temporary_dir
 
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
@@ -43,14 +43,10 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
       if extra_options:
         options.extend(extra_options)
 
-      with temporary_file() as yes:
-        yes.write('y' * expected_primary_artifact_count)
-        yes.flush()
-        yes.seek(0)
-
-        pants_run = self.run_pants(['goal', 'publish', target] + options, stdin=yes)
-        self.assertEquals(pants_run.returncode, self.PANTS_SUCCESS_CODE)
-        for artifact in artifacts:
-          artifact_path = os.path.join(publish_dir, package_namespace, artifact)
-          self.assertTrue(os.path.exists(artifact_path))
+      yes = 'y' * expected_primary_artifact_count
+      pants_run = self.run_pants(['goal', 'publish', target] + options, stdin_data=yes)
+      self.assertEquals(pants_run.returncode, self.PANTS_SUCCESS_CODE)
+      for artifact in artifacts:
+        artifact_path = os.path.join(publish_dir, package_namespace, artifact)
+        self.assertTrue(os.path.exists(artifact_path))
 

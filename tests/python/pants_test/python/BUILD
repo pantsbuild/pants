@@ -22,6 +22,7 @@ python_test_suite(
   name = 'integration',
   dependencies = [
     pants(':interpreter_selection_integration'),
+    pants(':python_repl_integration'),
     pants(':python_run_integration'),
   ]
 )
@@ -96,12 +97,20 @@ python_tests(
   ],
 )
 
+python_tests(
+  name = 'python_repl_integration',
+  sources = ['test_python_repl_integration.py'],
+  dependencies = [
+    pants('tests/python/pants_test:int-test'),
+  ],
+)
+
 # Used by interpreter_selection_integration.
 python_binary(
   name = 'echo_interpreter_version_2.6',
   dependencies = [
     pants(':echo_interpreter_version_lib'),
-    ],
+  ],
   entry_point = 'pants_test.python.echo_interpreter_version',
   compatibility = ['CPython>=2.6,<3']
 )
@@ -110,7 +119,7 @@ python_binary(
 python_binary(
   name = 'echo_interpreter_version_2.7',
   dependencies = [
-  pants(':echo_interpreter_version_lib'),
+    pants(':echo_interpreter_version_lib'),
   ],
   entry_point = 'pants_test.python.echo_interpreter_version',
   compatibility = ['CPython>=2.7,<3']

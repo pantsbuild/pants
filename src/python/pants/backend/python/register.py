@@ -8,6 +8,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 from pants.backend.core.targets.dependencies import Dependencies
 from pants.backend.python.tasks.python_binary_create import PythonBinaryCreate
 from pants.backend.python.tasks.pytest_run import PytestRun
+from pants.backend.python.tasks.python_repl import PythonRepl
 from pants.backend.python.tasks.python_run import PythonRun
 from pants.backend.python.commands.build import Build
 from pants.backend.python.commands.py import Py
@@ -74,4 +75,7 @@ def register_goals():
 
   goal(name='python-run', action=PythonRun, dependencies=['bootstrap', 'check-exclusives', 'resources']
   ).install('run')
+
+  goal(name='python-repl', action=PythonRepl, dependencies=['bootstrap', 'check-exclusives', 'resources']
+  ).install('repl')
 

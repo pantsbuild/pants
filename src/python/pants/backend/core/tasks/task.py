@@ -18,6 +18,7 @@ from twitter.common.lang import AbstractClass
 from pants.base.build_invalidator import BuildInvalidator, CacheKeyGenerator
 from pants.base.cache_manager import (InvalidationCacheManager, InvalidationCheck)
 from pants.base.config import Config
+from pants.base.exceptions import TaskError
 from pants.base.hash_utils import hash_file
 from pants.base.worker_pool import Work
 from pants.base.workunit import WorkUnit
@@ -370,6 +371,36 @@ class TaskBase(AbstractClass):
       items_to_report_element([t.address.reference() for t in targets], 'target'),
       suffix)
 
+  def require_single_root_target(self):
+    """If a single target was specified on the cmd line, returns that target.
+
+    Otherwise throws TaskError.
+    """
+    target_roots = self.context.target_roots
+    if len(target_roots) == 0:
+      raise TaskError('No target specified.')
+    elif len(target_roots) > 1:
+      raise TaskError('Multiple targets specified: %s' %
+                      ', '.join([repr(t) for t in target_roots]))
+    return target_roots[0]
+
+  def require_homogeneous_root_targets(self, predicate):
+    """If all targets specified on the cmd line satisfy the predicate, returns them.
+
+    If none satisfy the predicate, returns None.
+
+    Otherwise throws TaskError.
+    """
+    target_roots = self.context.target_roots
+    if len(target_roots) == 0:
+      raise TaskError('No target specified.')
+    elif all([predicate(t) for t in target_roots]):
+      return target_roots
+    elif all([not predicate(t) for t in target_roots]):
+      return None
+    else:
+      raise TaskError('Mutually incompatible targets specified: %s ' %
+                      ', '.join([repr(t) for t in target_roots]))
 
 class Task(TaskBase):
   """An executable task.
