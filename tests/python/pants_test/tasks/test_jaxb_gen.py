@@ -15,6 +15,7 @@ from pants.backend.codegen.tasks.jaxb_gen import JaxbGen
 
 class JaxbGenTestBase(unittest.TestCase):
   """Basically copied from test_protobuf_gen.py.
+
   Contains helper method to check generated temp files.
   """
   def assert_files(self, package, contents, *expected_files):
