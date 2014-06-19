@@ -84,9 +84,14 @@ This is the second readme file! Isn't it exciting?
   def test_wiki_page(self):
     p = self.target('junk/docs:readme')
 
-    self.assertIsInstance(p, Page)
-    self.assertIsInstance(p.provides[0], WikiArtifact)
-    self.assertIsInstance(p.provides[0].wiki, Wiki)
+    # FIXME(areitz): bring these back once TestBase inherits from unittest2.
+    # https://github.com/pantsbuild/pants/issues/253
+    # self.assertIsInstance(p, Page)
+    # self.assertIsInstance(p.provides[0], WikiArtifact)
+    # self.assertIsInstance(p.provides[0].wiki, Wiki)
+    self.assertTrue(isinstance(p, Page), "%s isn't an instance of Page" % p)
+    self.assertTrue(isinstance(p.provides[0], WikiArtifact), "%s isn't an instance of WikiArtifact" % p)
+    self.assertTrue(isinstance(p.provides[0].wiki, Wiki), "%s isn't an instance of Wiki" % p)
     self.assertEquals("~areitz", p.provides[0].config['space'])
     self.assertEquals("test_page", p.provides[0].config['title'])
     self.assertFalse('parent' in p.provides[0].config)
