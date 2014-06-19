@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
-# Required on OS X.
-export set ARCHFLAGS=-Wno-error=unused-command-line-argument-hard-error-in-future
+source build-support/set_archflags.sh
 
 function banner() {
   echo
