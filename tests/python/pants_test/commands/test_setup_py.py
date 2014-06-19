@@ -48,7 +48,6 @@ class TestSetupPy(BaseTest):
         self.build_graph.inject_dependency(target.address, dep.address)
     return target_map
 
-
   def test_minified_dependencies_1(self):
     # foo -> bar -> baz
     dep_map = {'foo': ['bar'], 'bar': ['baz'], 'baz': []}
@@ -56,6 +55,9 @@ class TestSetupPy(BaseTest):
     assert SetupPy.minified_dependencies(target_map['foo']) == OrderedSet([target_map['bar']])
     assert SetupPy.minified_dependencies(target_map['bar']) == OrderedSet([target_map['baz']])
     assert SetupPy.minified_dependencies(target_map['baz']) == OrderedSet()
+    assert SetupPy.install_requires(target_map['foo']) == set(['bar==0.0.0'])
+    assert SetupPy.install_requires(target_map['bar']) == set(['baz==0.0.0'])
+    assert SetupPy.install_requires(target_map['baz']) == set([])
 
   @classmethod
   @contextmanager
@@ -101,6 +103,9 @@ class TestSetupPy(BaseTest):
         [target_map['baz'], target_map['bar']])
     assert SetupPy.minified_dependencies(target_map['bar']) == OrderedSet([target_map['bak']])
     assert SetupPy.minified_dependencies(target_map['baz']) == OrderedSet([target_map['bak']])
+    assert SetupPy.install_requires(target_map['foo']) == set(['bar==0.0.0', 'baz==0.0.0'])
+    assert SetupPy.install_requires(target_map['bar']) == set(['bak==0.0.0'])
+    assert SetupPy.install_requires(target_map['baz']) == set(['bak==0.0.0'])
 
   def test_binary_target_injected_into_minified_dependencies(self):
     foo_bin_dep = self.make_target(
@@ -170,6 +175,7 @@ class TestSetupPy(BaseTest):
 
     # TODO(pl): Why is this set ordered?  Does the order actually matter?
     assert SetupPy.minified_dependencies(bar) == OrderedSet([bar_bin, bar_bin_dep])
+    assert SetupPy.install_requires(bar) == set(['bar_bin_dep==0.0.0'])
     entry_points = dict(SetupPy.iter_entry_points(bar))
     assert entry_points == {'bar_binary': 'bar.bin.bar'}
 

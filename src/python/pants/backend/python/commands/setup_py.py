@@ -238,6 +238,17 @@ class SetupPy(Command):
 
     return packages, namespace_packages, resources
 
+  @classmethod
+  def install_requires(cls, root_target):
+    install_requires = set()
+    for dep in cls.minified_dependencies(root_target):
+      if isinstance(dep, PythonRequirementLibrary):
+        for req in dep.payload.requirements:
+          install_requires.add(str(req.requirement))
+      elif isinstance(dep, PythonTarget) and dep.provides:
+        install_requires.add(dep.provides.key)
+    return install_requires
+
   def setup_parser(self, parser, args):
     parser.set_usage("\n"
                      "  %prog setup_py (options) [spec]\n")
@@ -321,11 +332,7 @@ class SetupPy(Command):
           package_data=dict((str(package), list(map(str, rs)))
                             for (package, rs) in resources.items()))
 
-    install_requires = set()
-    for dep in self.minified_dependencies(root_target):
-      if isinstance(dep, PythonRequirementLibrary):
-        [install_requires.add(str(req.requirement)) for req in dep.payload.requirements]
-    setup_keywords['install_requires'] = sorted(list(install_requires))
+    setup_keywords['install_requires'] = sorted(list(self.install_requires(root_target)))
 
     for binary_name, entry_point in self.iter_entry_points(root_target):
       if 'entry_points' not in setup_keywords:
