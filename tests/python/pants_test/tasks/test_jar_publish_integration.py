@@ -45,7 +45,12 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
 
       yes = 'y' * expected_primary_artifact_count
       pants_run = self.run_pants(['goal', 'publish', target] + options, stdin_data=yes)
-      self.assertEquals(pants_run.returncode, self.PANTS_SUCCESS_CODE)
+      self.assertEquals(pants_run.returncode, self.PANTS_SUCCESS_CODE,
+                        "goal publish expected success, got {0}\n"
+                        "got stderr:\n{1}\n"
+                        "got stdout:\n{2}\n".format(pants_run.returncode,
+                                                    pants_run.stderr_data,
+                                                    pants_run.stdout_data))
       for artifact in artifacts:
         artifact_path = os.path.join(publish_dir, package_namespace, artifact)
         self.assertTrue(os.path.exists(artifact_path))
