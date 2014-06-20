@@ -17,6 +17,7 @@ from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.tasks.checkstyle import Checkstyle
 from pants.backend.jvm.tasks.jvm_binary_task import JvmBinaryTask
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
+from pants.base.address import SyntheticAddress
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.target import Target
@@ -72,8 +73,8 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
                             help="[%default] Includes java sources in the project; otherwise "
                                  "compiles them and adds them to the project classpath.")
     java_language_level = mkflag("java-language-level")
-    # TODO(John Sirois): Advance the default to 7 when 8 is released.
-    option_group.add_option(java_language_level, default=6,
+
+    option_group.add_option(java_language_level, default=7,
                             dest="ide_gen_java_language_level", type="int",
                             help="[%default] Sets the java language and jdk used to compile the "
                                  "project's java sources.")
@@ -87,6 +88,28 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
                             action="callback", callback=mkflag.set_bool, dest='ide_gen_scala',
                             help="[%default] Includes scala sources in the project; otherwise "
                                  "compiles them and adds them to the project classpath.")
+
+
+  class Error(Exception):
+    """IdeGen Error."""
+
+  class TargetUtil(Target):
+    def __init__(self, context):
+      self.context = context
+
+    @property
+    def build_file_parser(self):
+      return self.context.build_file_parser
+
+    @property
+    def build_graph(self):
+      return self.context.build_graph
+
+    def get_all_addresses(self, buildfile):
+      return self.build_file_parser.addresses_by_build_file[buildfile]
+
+    def get(self, address):
+      return self.build_file_parser._target_proxy_by_address[address].to_target(self.build_graph)
 
   def __init__(self, context, workdir):
     super(IdeGen, self).__init__(context, workdir)
@@ -130,12 +153,7 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
                                       default=[':scala-compile-2.9.3'])
       self.register_jvm_tool(self.scalac_bootstrap_key, scalac)
 
-    targets, self._project = self.configure_project(
-        context.targets(),
-        self.checkstyle_suppression_files,
-        self.debug_port)
-
-    self.configure_compile_context(targets)
+    self._prepare_project_later = lambda: self._prepare_project(context)
 
     if self.python:
       self.context.products.require('python')
@@ -146,10 +164,18 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
 
     self.context.products.require('jars')
     self.context.products.require('source_jars')
+    self.context.products.require('ivy_jar_products')
+
+  def _prepare_project(self, context):
+    targets, self._project = self.configure_project(
+        context.targets(),
+        self.checkstyle_suppression_files,
+        self.debug_port)
+
+    self.configure_compile_context(targets)
 
   def configure_project(self, targets, checkstyle_suppression_files, debug_port):
-
-    jvm_targets = Target.extract_jvm_targets(targets)
+    jvm_targets = [t for t in targets if t.has_label('jvm') or t.has_label('java')]
     if self.intransitive:
       jvm_targets = set(self.context.target_roots).intersection(jvm_targets)
     project = Project(self.project_name,
@@ -161,7 +187,8 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
                       debug_port,
                       jvm_targets,
                       not self.intransitive,
-                      self.context.new_workunit)
+                      self.context.new_workunit,
+                      self.TargetUtil(self))
 
     if self.python:
       python_source_paths = self.context.config.getlist('ide', 'python_source_paths', default=[])
@@ -183,11 +210,9 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
     def is_cp(target):
       return (
         target.is_codegen or
-
         # Some IDEs need annotation processors pre-compiled, others are smart enough to detect and
         # proceed in 2 compile rounds
         target.is_apt or
-
         (self.skip_java and is_java(target)) or
         (self.skip_scala and is_scala(target)) or
         (self.intransitive and target not in self.context.target_roots)
@@ -208,13 +233,8 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
       target.walk(prune)
 
     self.context.replace_targets(compiles)
+    self.jar_dependencies = jars
 
-    self.binary = self.context.add_new_target(self.gen_project_workdir,
-                                              JvmBinary,
-                                              name='%s-external-jars' % self.project_name,
-                                              dependencies=jars,
-                                              excludes=excludes,
-                                              configurations=('default', 'sources', 'javadoc'))
     self.context.log.debug('pruned to cp:\n\t%s' % '\n\t'.join(
       str(t) for t in self.context.targets())
     )
@@ -253,6 +273,26 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
 
           self._project.internal_jars.add(ClasspathEntry(cp_jar, source_jar=cp_source_jar))
 
+  def _get_jar_paths(self, jars=None, confs=None):
+    """Returns a list of dicts containing the paths of various jar file resources.
+
+    Keys include 'default' (normal jar path), 'sources' (path to source jar), and 'javadoc'
+    (path to doc jar). None of them are guaranteed to be present, but 'sources' and 'javadoc'
+    will never be present if 'default' isn't.
+
+    :param jardeps: JarDependency objects to resolve paths for
+    :param confs: List of key types to return (eg ['default', 'sources']). Just returns 'default' if
+      left unspecified.
+    """
+    ivy_products = self.context.products.get_data('ivy_jar_products')
+    classpath_maps = []
+    for info_group in ivy_products.values():
+      for info in info_group:
+        for module in info.modules_by_ref.values():
+          for artifact in module.artifacts:
+            classpath_maps.append({'default':artifact.path})
+    return classpath_maps
+
   def map_external_jars(self):
     external_jar_dir = os.path.join(self.gen_project_workdir, 'external-libs')
     safe_mkdir(external_jar_dir, clean=True)
@@ -264,7 +304,7 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
     safe_mkdir(external_javadoc_jar_dir, clean=True)
 
     confs = ['default', 'sources', 'javadoc']
-    for entry in self.list_external_jar_dependencies(self.binary, confs=confs):
+    for entry in self._get_jar_paths(confs=confs):
       jar = entry.get('default')
       if jar:
         cp_jar = os.path.join(external_jar_dir, os.path.basename(jar))
@@ -288,6 +328,7 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
 
   def execute(self):
     """Stages IDE project artifacts to a project directory and generates IDE configuration files."""
+    self._prepare_project_later()
     checkstyle_enabled = len(Phase.goals_of_type(Checkstyle)) > 0
     if checkstyle_enabled:
       checkstyle_classpath = self.tool_classpath(self.checkstyle_bootstrap_key)
@@ -300,7 +341,6 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
       scalac_classpath = []
 
     self._project.set_tool_classpaths(checkstyle_classpath, scalac_classpath)
-
     targets = self.context.targets()
     self.map_internal_jars(targets)
     self.map_external_jars()
@@ -349,6 +389,9 @@ class SourceSet(object):
 
     return self._excludes
 
+  def __str__(self):
+    return str((self.root_dir, self.source_base, self.path))
+
 
 class Project(object):
   """Models a generic IDE project that is comprised of a set of BUILD targets."""
@@ -363,10 +406,12 @@ class Project(object):
         yield ext
 
   def __init__(self, name, has_python, skip_java, skip_scala, root_dir,
-               checkstyle_suppression_files, debug_port, targets, transitive, workunit_factory):
+               checkstyle_suppression_files, debug_port, targets, transitive, workunit_factory,
+               target_util):
     """Creates a new, unconfigured, Project based at root_dir and comprised of the sources visible
     to the given targets."""
 
+    self.target_util = target_util
     self.name = name
     self.root_dir = root_dir
     self.targets = OrderedSet(targets)
@@ -410,21 +455,33 @@ class Project(object):
 
     analyzed = OrderedSet()
     targeted = set()
+    targeted_tuples = {}
+
+    def relative_sources(target):
+      sources = target.payload.sources_relative_to_buildroot()
+      return [os.path.relpath(source, target.target_base) for source in sources]
 
     def source_target(target):
-      return ((self.transitive or target in self.targets) and
+      result = ((self.transitive or target in self.targets) and
               target.has_sources() and
               (not target.is_codegen and
                not (self.skip_java and is_java(target)) and
                not (self.skip_scala and is_scala(target))))
+      return result
 
     def configure_source_sets(relative_base, sources, is_test):
       absolute_base = os.path.join(self.root_dir, relative_base)
       paths = set([os.path.dirname(source) for source in sources])
       for path in paths:
         absolute_path = os.path.join(absolute_base, path)
-        if absolute_path not in targeted:
+        pieces = (relative_base, path)
+        # Previously this if-statement was testing against absolute_path's presence in targeted.
+        # This broke in the (very weird) edge-case where two different sources have the same
+        # absolute path, but choose the split between relative_base and path differently. Its really
+        # important that we distinguish between them still, because the package name changes.
+        if pieces not in targeted_tuples:
           targeted.add(absolute_path)
+          targeted_tuples[pieces] = sources
           self.sources.append(SourceSet(self.root_dir, relative_base, path, is_test))
 
     def find_source_basedirs(target):
@@ -432,48 +489,98 @@ class Project(object):
       if source_target(target):
         absolute_base = os.path.join(self.root_dir, target.target_base)
         dirs.update([os.path.join(absolute_base, os.path.dirname(source))
-                      for source in target.sources])
+                      for source in relative_sources(target)])
       return dirs
 
     def configure_target(target):
       if target not in analyzed:
         analyzed.add(target)
-
         self.has_scala = not self.skip_scala and (self.has_scala or is_scala(target))
 
         if target.has_resources:
           resources_by_basedir = defaultdict(set)
           for resources in target.resources:
-            resources_by_basedir[resources.target_base].update(resources.sources)
+            resources_by_basedir[target.target_base].update(relative_sources(resources))
           for basedir, resources in resources_by_basedir.items():
             self.resource_extensions.update(Project.extract_resource_extensions(resources))
             configure_source_sets(basedir, resources, is_test=False)
 
-        if target.sources:
+        if target.has_sources():
           test = target.is_test
           self.has_tests = self.has_tests or test
-          configure_source_sets(target.target_base, target.sources, is_test=test)
+          base = target.target_base
+          configure_source_sets(base, relative_sources(target), is_test=test)
 
         # Other BUILD files may specify sources in the same directory as this target.  Those BUILD
         # files might be in parent directories (globs('a/b/*.java')) or even children directories if
         # this target globs children as well.  Gather all these candidate BUILD files to test for
         # sources they own that live in the directories this targets sources live in.
         target_dirset = find_source_basedirs(target)
-        candidates = Target.get_all_addresses(target.address.build_file)
-        for ancestor in target.address.build_file.ancestors():
-          candidates.update(Target.get_all_addresses(ancestor))
-        for sibling in target.address.build_file.siblings():
-          candidates.update(Target.get_all_addresses(sibling))
-        for descendant in target.address.build_file.descendants():
-          candidates.update(Target.get_all_addresses(descendant))
-
+        try:
+          candidates = self.target_util.get_all_addresses(target.address.build_file)
+          for ancestor in target.address.build_file.ancestors():
+            candidates.update(self.target_util.get_all_addresses(ancestor))
+          for sibling in target.address.build_file.siblings():
+            candidates.update(self.target_util.get_all_addresses(sibling))
+          for descendant in target.address.build_file.descendants():
+            candidates.update(self.target_util.get_all_addresses(descendant))
+        except AttributeError:
+          return [] # Probably just a synthetic target, that's fine, it has no addresses.
         def is_sibling(target):
           return source_target(target) and target_dirset.intersection(find_source_basedirs(target))
 
-        return filter(is_sibling, [Target.get(a) for a in candidates if a != target.address])
+        return filter(is_sibling, [self.target_util.get(a) for a in candidates if a != target.address])
 
     for target in self.targets:
       target.walk(configure_target, predicate=source_target)
+
+    def source_tuple(source_set):
+      return source_set.root_dir, source_set.source_base, source_set.path
+
+    def full_path(source_set):
+      return os.path.join(source_tuple(source_set))
+
+    # We may get multiple source_sets which have the same full path, but divide it up differently.
+    # If we don't explicitly remove these duplicates, which make it into the final project files
+    # are arbitrary and unpredictable. This is really important, because the 'path' of a source_set
+    # determines its package name, so source files may end up with bad package names. So for the
+    # example source sets:
+    #   SourceSet A: ('root/dir', 'folder/src/app',  'com/app/etc')
+    #   SourceSet B: ('root/dir', 'folder', 'src/app/com/app/etc')
+    # Both have the same full path, but SourceSet B will (incorrectly) write the package name as
+    # 'src.app.com.app.etc' rather than 'com.app.etc'. (This is a real problem in square's internal
+    # repo). The below code attempts to mitigate this by removing SourceSets with duplicate full
+    # paths, following a heuristic to prioritize SourceSets which are 'more likely' to have a
+    # correct package name. Specificially, we favor package names that are not the empty string,
+    # and are shorter. This will correctly choose between things like src.com.foo and com.foo, but
+    # will break if we have a choice between com.foo.bar and foo.bar.
+
+    # Template for warning message to output if there's a conflict.
+    warn_message = ('SourceSet {current} and {previous} evaluate to the same full path. '
+                    'Deferring to {defer} (package name "{package}").')
+    source_full_paths = {}
+    for source_set in sorted(self.sources, key=full_path):
+      full = full_path(source_set)
+      if full in source_full_paths:
+        previous_set = source_full_paths[full]
+        previous = previous_set.path
+        current = source_set.path
+        if previous and len(previous) < len(current):
+          self.context.log.warn(warn_message.format(
+            current=source_set,
+            previous=previous_set,
+            defer=previous_set,
+            package=previous_set.path.replace('/', '.'),
+          ))
+          continue
+        self.context.log.warn(warn_message.format(
+          current=source_set,
+          previous=previous_set,
+          defer=source_set,
+          package=source_set.path.replace('/', '.'),
+        ))
+      source_full_paths[full] = source_set
+    self.sources = source_full_paths.values()
 
     # We need to figure out excludes, in doing so there are 2 cases we should not exclude:
     # 1.) targets depend on A only should lead to an exclude of B
@@ -514,7 +621,6 @@ class Project(object):
     for target in self.targets:
       target.walk(lambda target: targets.add(target), source_target)
     targets.update(analyzed - targets)
-
     self.sources.extend(SourceSet(get_buildroot(), p, None, False) for p in extra_source_paths)
     self.sources.extend(SourceSet(get_buildroot(), p, None, True) for p in extra_test_paths)
 

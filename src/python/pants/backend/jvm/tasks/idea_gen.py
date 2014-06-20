@@ -13,10 +13,10 @@ from xml.dom import minidom
 
 from twitter.common.dirutil import safe_mkdir
 
+from pants.backend.jvm.tasks.ide_gen import IdeGen, Project, SourceSet
 from pants.base.build_environment import get_buildroot
 from pants.base.config import ConfigOption
 from pants.base.generator import Generator, TemplateData
-from pants.backend.jvm.tasks.ide_gen import IdeGen, Project, SourceSet
 
 
 _TEMPLATE_BASEDIR = 'templates/idea'
@@ -124,9 +124,11 @@ class IdeaGen(IdeGen):
     idea_version = _VERSIONS[context.options.idea_gen_version]
     self.project_template = os.path.join(_TEMPLATE_BASEDIR, 'project-%s.mustache' % idea_version)
     self.module_template = os.path.join(_TEMPLATE_BASEDIR, 'module-%s.mustache' % idea_version)
+    self.editor_template = os.path.join(_TEMPLATE_BASEDIR, 'editor-%s.mustache' % idea_version)
 
     self.project_filename = os.path.join(self.cwd, '%s.ipr' % self.project_name)
     self.module_filename = os.path.join(self.gen_project_workdir, '%s.iml' % self.project_name)
+    self.editor_filename = os.path.join(self.gen_project_workdir, '%s.iws' % self.project_name)
 
   def generate_project(self, project):
     def is_test(source_set):
@@ -163,6 +165,11 @@ class IdeaGen(IdeGen):
         fsc=self.fsc,
         compiler_classpath=project.scala_compiler_classpath
       )
+
+    # TODO(Garrett Malmquist): Provide default project.iws so that it opens with a source file.
+    # The framework for this already exists in editor-12.mustache. We don't want to overwrite
+    # exiting iws files, however, because we want users to keep whatever settings they had last when
+    # possible.
 
     configured_module = TemplateData(
       root_dir=get_buildroot(),
@@ -236,9 +243,6 @@ class IdeaGen(IdeGen):
 
     shutil.move(ipr, self.project_filename)
     shutil.move(iml, self.module_filename)
-
-    print('\nGenerated project at %s%s' % (self.gen_project_workdir, os.sep))
-
     return self.project_filename if self.open else None
 
   def _generate_to_tempfile(self, generator):
