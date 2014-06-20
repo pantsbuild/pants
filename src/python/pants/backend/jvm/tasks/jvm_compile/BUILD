@@ -108,6 +108,7 @@ python_library(
     pants('src/python/pants/base:hash_utils'),
     pants('src/python/pants/base:workunit'),
     pants('src/python/pants/backend/jvm:jvm_tool_bootstrapper'),
+    pants('src/python/pants/backend/jvm/scala:target_platform'),
     pants('src/python/pants/backend/jvm/targets:scala'),
   ],
 )

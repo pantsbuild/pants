@@ -211,14 +211,6 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
     # The ivy confs for which we're building.
     self._confs = context.config.getlist(config_section, 'confs', default=['default'])
 
-    # Runtime dependencies.
-    runtime_deps = context.config.getlist(config_section, 'runtime-deps', default=[])
-    if runtime_deps:
-      self._runtime_deps_key = self._language + '-runtime-deps'
-      self.register_jvm_tool(self._runtime_deps_key, runtime_deps)
-    else:
-      self._runtime_deps_key = None
-
     # Set up dep checking if needed.
     def munge_flag(flag):
       return None if flag == 'off' else flag
@@ -269,14 +261,10 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
     for t in all_targets:
       all_group_ids.add(egroups.get_group_key_for_target(t))
 
-    runtime_deps = self.tool_classpath(self._runtime_deps_key) if self._runtime_deps_key else []
-
     for conf in self._confs:
       for group_id in all_group_ids:
         egroups.update_compatible_classpaths(group_id, [(conf, self._classes_dir)])
         egroups.update_compatible_classpaths(group_id, [(conf, self._resources_dir)])
-        for dep in runtime_deps:
-          egroups.update_compatible_classpaths(group_id, [(conf, dep)])
 
     # Target -> sources (relative to buildroot).
     # TODO(benjy): Should sources_by_target be available in all Tasks?
