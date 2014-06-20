@@ -12,6 +12,8 @@ Major contributors in alphabetical order:
 - Brian Wickman
 - David Buchfuhrer
 - John Sirois
+- Larry Hosken
 - Mark McBride
+- Tejal Desai
 
 If you are a contributor, please add your name to the list!

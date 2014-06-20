@@ -14,8 +14,8 @@ class JavaAntlrLibrary(ExportableJvmLibrary):
   """Generates a stub Java library from Antlr grammar files."""
 
   def __init__(self,
-               name,
-               sources,
+               name=None,
+               sources=None,
                provides=None,
                excludes=None,
                compiler='antlr3',
@@ -43,15 +43,18 @@ class JavaAntlrLibrary(ExportableJvmLibrary):
         Are spread among different files, this must be set as the package cannot be inferred.
     """
 
-    super(JavaAntlrLibrary, self).__init__(self,
-                                           name=name,
+    super(JavaAntlrLibrary, self).__init__(name=name,
                                            sources=sources,
                                            provides=provides,
                                            excludes=excludes,
                                            **kwargs)
     self.add_labels('codegen')
 
+    if not sources:
+      raise ValueError("Missing required 'sources' parameter.")
+    self.sources = sources
+
     if compiler not in ('antlr3', 'antlr4'):
-        raise ValueError("Illegal value for 'compiler': {}".format(compiler))
+      raise ValueError("Illegal value for 'compiler': {}".format(compiler))
     self.compiler = compiler
     self.package = package
