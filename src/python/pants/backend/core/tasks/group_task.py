@@ -11,7 +11,7 @@ import os
 
 from pants.backend.core.tasks.check_exclusives import ExclusivesMapping
 from pants.backend.core.tasks.task import TaskBase, Task
-from pants.base.build_graph import coalesce_targets
+from pants.base.build_graph import sort_targets
 from pants.base.workunit import WorkUnit
 from pants.goal import Mkflag
 
@@ -61,6 +61,63 @@ class GroupMember(TaskBase):
 class GroupIterator(object):
   """Iterates the goals in a group over the chunks they own."""
 
+  @staticmethod
+  def coalesce_targets(targets, discriminator):
+    """Returns a list of Targets that `targets` depend on sorted from most dependent to least.
+
+    The targets are grouped where possible by target type as categorized by the given discriminator.
+
+    This algorithm was historically known as the "bang" algorithm from a time when it was
+    optionally enabled by appending a '!' (bang) to the command line target.
+    """
+
+    sorted_targets = filter(discriminator, sort_targets(targets))
+
+    # can do no better for any of these:
+    # []
+    # [a]
+    # [a,b]
+    if len(sorted_targets) <= 2:
+      return sorted_targets
+
+    # For these, we'd like to coalesce if possible, like:
+    # [a,b,a,c,a,c] -> [a,a,a,b,c,c]
+    # adopt a quadratic worst case solution, when we find a type change edge, scan forward for
+    # the opposite edge and then try to swap dependency pairs to move the type back left to its
+    # grouping.  If the leftwards migration fails due to a dependency constraint, we just stop
+    # and move on leaving "type islands".
+    current_type = None
+
+    # main scan left to right no backtracking
+    for i in range(len(sorted_targets) - 1):
+      current_target = sorted_targets[i]
+      if current_type != discriminator(current_target):
+        scanned_back = False
+
+        # scan ahead for next type match
+        for j in range(i + 1, len(sorted_targets)):
+          look_ahead_target = sorted_targets[j]
+          if current_type == discriminator(look_ahead_target):
+            scanned_back = True
+
+            # swap this guy as far back as we can
+            for k in range(j, i, -1):
+              previous_target = sorted_targets[k - 1]
+              mismatching_types = current_type != discriminator(previous_target)
+              not_a_dependency = look_ahead_target not in previous_target.dependencies
+              if mismatching_types and not_a_dependency:
+                sorted_targets[k] = sorted_targets[k - 1]
+                sorted_targets[k - 1] = look_ahead_target
+              else:
+                break  # out of k
+
+            break  # out of j
+
+        if not scanned_back:  # done with coalescing the current type, move on to next
+          current_type = discriminator(current_target)
+
+    return sorted_targets
+
   def __init__(self, targets, group_members):
     """Creates an iterator that yields tuples of ``(GroupMember, [chunk Targets])``.
 
@@ -84,7 +141,7 @@ class GroupIterator(object):
           return member
       return None
 
-    coalesced = list(reversed(coalesce_targets(self._targets, discriminator)))
+    coalesced = list(reversed(self.coalesce_targets(self._targets, discriminator)))
 
     chunks = []
 
