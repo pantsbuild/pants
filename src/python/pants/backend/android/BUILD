@@ -7,5 +7,5 @@ python_library(
   sources = ['__init__.py', 'register.py'],
   dependencies = [
     pants('src/python/pants/backend/android/targets:android'),
-    ]
+  ]
 )

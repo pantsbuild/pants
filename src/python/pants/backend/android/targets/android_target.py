@@ -5,7 +5,9 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from pants.base.payload import JvmTargetPayload
 from pants.base.target import Target
+
 
 class AndroidTarget(Target):
   """A base class for all Android targets"""
@@ -16,36 +18,43 @@ class AndroidTarget(Target):
                sources=None,
                sources_rel_path=None,
                excludes=None,
-               manifest="AndroidManifest.xml",
+               provides=None,
                package=None,
                resources="res",
-               # build_tools_version default should be defined in ini
+               # most recent build_tools_version should be defined elsewhere
                build_tools_version="19.1.0",
                target_sdk_version=None,
                min_sdk_version=None,
-               platform_target=None,
-               keystore="debug",
+               release_type="debug",
                **kwargs):
-      """
-      :param name:
-      :param address:
-      :param sources:
-      :param sources_rel_path: #TODO: Use? Used in payload for Jvm
-      :param excludes:
-      :param manifest: Name of the android manifest (required by tooling to be named AndroidManifest.xml)
-      :param package: Package name of app as string: 'com.pants.examples.hello' #TODO fill w/ manifest parser.
-      :param resources:
-      :param build_tools_version: Android API for the Build Tools (separate from SDK version) Default to latest
-      :param target_sdk_version: Version of the Android SDK the android target is built for
-      :param min_sdk_version:  Earliest supported SDK by the android target
-      :param platform_target: which Google API to use, e.g. "17" or "19"
-      :param keystore: 'debug' or 'release' TODO: Set 'debug as default'
-       :return:
-      """
-      self.add_labels('android')
-      self.build_tools_version = build_tools_version
-      self.release_type = keystore
-      self.resources = resources
-      self.package = package
-      self.target_sdk_version = target_sdk_version
-      #TODO manifest parser for the fields it can handle.
+    """
+    :param name: target name
+    :param sources: A list of filenames representing the source code.
+    :type sources: list of strings
+    :param excludes: One or more :class:`pants.targets.exclude.Exclude` instances
+      to filter this target's transitive dependencies against.
+    :param package: Package name of app, e.g. 'com.pants.examples.hello'
+    :type package: string
+    :param resources: name of directory containing the android resources. Set as 'res' by default.
+    :param build_tools_version: Android API for the Build Tools (separate from SDK version). Default to latest available
+    :param target_sdk_version: Version of the Android SDK the android target is built for
+    :param min_sdk_version:  Earliest supported SDK by the android target
+    :param release_type: Which keystore is used to sign target: 'debug' or 'release'. Set as 'debug' by default.
+    """
+
+    sources_rel_path = sources_rel_path or address.spec_path
+    # No reasons why we might need AndroidPayload have presented themselves, which doesn't mean they won't come up later
+    payload = JvmTargetPayload(sources=sources,
+                               sources_rel_path=sources_rel_path,
+                               provides=provides,
+                               excludes=excludes)
+    super(AndroidTarget, self).__init__(address=address, payload=payload, **kwargs)
+
+    self.add_labels('android')
+    self.build_tools_version = build_tools_version
+    self.min_sdk_version = min_sdk_version
+    self.package = package
+    self.release_type = release_type
+    self.resources = resources
+    self.target_sdk_version = target_sdk_version
+    #TODO write a manifest parser for the fields it can handle.

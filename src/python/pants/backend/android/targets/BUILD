@@ -7,16 +7,17 @@ python_library(
   dependencies = [
     ':android',
   ],
-  )
+)
 
 python_library(
   name = 'android',
   sources = [
     'android_binary.py',
     'android_target.py',
-    ],
+  ],
   dependencies = [
+    pants('src/python/pants/base:payload'),
     pants('src/python/pants/base:target'),
     pants('src/python/pants/backend/core/targets:common'),
-    ],
-  )
+  ],
+)

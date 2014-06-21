@@ -7,6 +7,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from pants.backend.android.targets.android_target import AndroidTarget
 
+
 class AndroidBinary(AndroidTarget):
 
   def __init__(self,
@@ -16,8 +17,6 @@ class AndroidBinary(AndroidTarget):
                dependencies=None,
                excludes=None,
                **kwargs):
-
-    # Placeholder until we get around to thinking about libraries and their needs
 
     # TODO: Add some Compatibility error checks.
     super(AndroidBinary, self).__init__(name=name, sources=sources, **kwargs)

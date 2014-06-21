@@ -10,11 +10,12 @@ from pants.goal import Goal as goal
 from pants.backend.android.targets.android_binary import AndroidBinary
 from pants.backend.android.targets.android_target import AndroidTarget
 
+
 def target_aliases():
   return {
-    'android_binary':AndroidBinary,
+    'android_binary': AndroidBinary,
     'android_target': AndroidTarget,
-    }
+  }
 
 
 def object_aliases():
@@ -38,5 +39,4 @@ def register_commands():
 
 
 def register_goals():
-  #no callable goals yet
   pass
