@@ -59,4 +59,3 @@ class AndroidTarget(Target):
     self.release_type = release_type
     self.resources = resources
     self.target_sdk_version = target_sdk_version
-    #TODO write a manifest parser for the fields it can handle.
