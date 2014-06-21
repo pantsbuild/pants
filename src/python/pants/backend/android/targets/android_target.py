@@ -36,14 +36,16 @@ class AndroidTarget(Target):
     :param package: Package name of app, e.g. 'com.pants.examples.hello'
     :type package: string
     :param resources: name of directory containing the android resources. Set as 'res' by default.
-    :param build_tools_version: Android API for the Build Tools (separate from SDK version). Default to latest available
+    :param build_tools_version: API for the Build Tools (separate from SDK version).
+      Default to latest available
     :param target_sdk_version: Version of the Android SDK the android target is built for
     :param min_sdk_version:  Earliest supported SDK by the android target
-    :param release_type: Which keystore is used to sign target: 'debug' or 'release'. Set as 'debug' by default.
+    :param release_type: Which keystore is used to sign target: 'debug' or 'release'.
+      Set as 'debug' by default.
     """
 
     sources_rel_path = sources_rel_path or address.spec_path
-    # No reasons why we might need AndroidPayload have presented themselves, which doesn't mean they won't come up later
+    # No reasons why we might need AndroidPayload have presented themselves yet
     payload = JvmTargetPayload(sources=sources,
                                sources_rel_path=sources_rel_path,
                                provides=provides,

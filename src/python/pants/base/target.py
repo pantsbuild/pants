@@ -95,7 +95,7 @@ class AbstractTarget(object):
     return self.has_label('tests')
 
   @property
-  def is_test(self):
+  def is_android(self):
     """Returns True if the target is an android target."""
     return self.has_label('android')
 
