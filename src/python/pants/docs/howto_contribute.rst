@@ -112,7 +112,7 @@ Code Review
 Now that your change is complete, we'll post it for review.
 We use https://rbcommons.com to host code reviews.
 
-Posting the First Draft
+Setting up ReviewBoard
 -----------------------
 
 **Before posting your first review,** you must create an
@@ -124,6 +124,20 @@ To set up local tools, run ``./rbt help``.
 `rbt <http://www.reviewboard.org/docs/rbtools/dev/>`_ script.)
 The first time this runs it will bootstrap: you'll see a lot
 of building info.
+
+Playing by ReviewBoard Rules
+----------------------------
+
+Throughout the review process, there is one workflow rule to keep in mind to
+play nice with rbt's expectations.  Once you post a diff, don't alter the
+commits that form that diff.  Put another way, its fine to rebase commits
+not yet exposed to ReviewBoard, but once they are via `./rbt post` you should
+refrain from further rebasing those commits.  In practice this makes sense;
+in general, you want to rebase local commits into the logical commits you send
+as diffs in the ReviewBoard workflow.
+
+Posting the First Draft
+-----------------------
 
 Post your change for review::
 
@@ -169,23 +183,8 @@ At this point you've made a change, had it reviewed and are ready to
 complete things by getting your change in master. (If you're not a committer,
 please ask one do do this section for you.) ::
 
-   cd /path/to/pants/repo
-   ./build-support/bin/ci.sh
-   git checkout master
-   git pull
-   git merge --squash $FEATURE_BRANCH
-   git commit -a
-
-Here, fix up the commit message: replace ``git``'s default message
-("Squashed commit of the following... <long list>") with a summary.
-Finally, ::
-
+   ./rbt patch -c <RB_ID>
    git push origin master
 
 The very last step is closing the review. The change is now complete. Huzzah!
 
-**If you're a committer committing someone else's review,** a handy way to
-patch a local branch with a diff from rbcommons where
-<RB_ID> is a review number like 123::
-
-   ./rbt patch -c <RB_ID>
