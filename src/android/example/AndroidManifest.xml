@@ -15,7 +15,7 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
     <application
         android:allowBackup="true"
         android:icon="@drawable/icon"
-        android:label="@string/myApp">
+        android:label="@string/appName">
         android:theme="@style/AppTheme" >
         <activity
             android:name="com.pants.examples.hello.HelloWorld"
