@@ -13,7 +13,6 @@ class AndroidTarget(Target):
   """A base class for all Android targets"""
 
   def __init__(self,
-               name=None,
                address=None,
                sources=None,
                sources_rel_path=None,
@@ -28,7 +27,8 @@ class AndroidTarget(Target):
                release_type="debug",
                **kwargs):
     """
-    :param name: target name
+    :param string name: The name of this target, which combined with this
+      build file defines the target :class:`pants.base.address.Address`
     :param sources: A list of filenames representing the source code.
     :type sources: list of strings
     :param excludes: One or more :class:`pants.targets.exclude.Exclude` instances
