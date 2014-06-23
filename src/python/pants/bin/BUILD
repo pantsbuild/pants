@@ -15,6 +15,7 @@ python_library(
     pants('src/python/pants/base:rcfile'),
     pants('src/python/pants/commands:command'),
 
+    pants('src/python/pants/backend/android:plugin'),
     pants('src/python/pants/backend/codegen:plugin'),
     pants('src/python/pants/backend/core:plugin'),
     pants('src/python/pants/backend/jvm:plugin'),
