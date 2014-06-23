@@ -106,6 +106,7 @@ python_library(
   sources = ['dev_backend_loader.py'],
   dependencies = [
     pants('3rdparty/python/twitter/commons:twitter.common.collections'),
+    pants('src/python/pants/backend/android:plugin'),
     pants('src/python/pants/backend/codegen:plugin'),
     pants('src/python/pants/backend/core:plugin'),
     pants('src/python/pants/backend/jvm:plugin'),
