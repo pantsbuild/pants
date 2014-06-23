@@ -22,6 +22,7 @@ def load_backends_from_source(build_file_parser, additional_backends=None):
     'pants.backend.jvm',
     'pants.backend.codegen',
     'pants.backend.maven_layout',
+    'pants.backend.android',
   ]
   for backend_package in OrderedSet(backend_packages + (additional_backends or [])):
     module = __import__(backend_package + '.register',
