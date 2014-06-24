@@ -49,7 +49,7 @@ class BuildConfiguration(object):
         objects=self._exposed_objects,
         macros=self._exposed_macros)
 
-  def register_alias_groups(self, aliases):
+  def register_aliases(self, aliases):
     """Registers the given aliases to be exposed in parsed BUILD files."""
     for alias, target_type in aliases.targets.items():
       self.register_target_alias(alias, target_type)

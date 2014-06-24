@@ -8,7 +8,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 from collections import namedtuple
 
 
-class BuildFileAliases(namedtuple('Aliases', ['targets', 'objects', 'macros'])):
+class BuildFileAliases(namedtuple('BuildFileAliases', ['targets', 'objects', 'macros'])):
   """A structure containing set of symbols to be exposed in BUILD files."""
 
   @classmethod

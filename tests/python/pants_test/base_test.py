@@ -91,7 +91,7 @@ class BaseTest(unittest2.TestCase):
     self.create_file('pants.ini')
 
     build_configuration = BuildConfiguration()
-    build_configuration.register_alias_groups(self.alias_groups)
+    build_configuration.register_aliases(self.alias_groups)
     self.build_file_parser = BuildFileParser(build_configuration, self.build_root)
 
     self.build_graph = BuildGraph()

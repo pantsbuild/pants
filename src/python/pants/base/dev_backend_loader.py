@@ -34,14 +34,7 @@ def load_build_configuration_from_source(additional_backends=None):
                          'register_goals'])
 
     build_file_aliases = module.build_file_aliases()
-    for alias, target_type in build_file_aliases.targets.items():
-      build_configuration.register_target_alias(alias, target_type)
-
-    for alias, obj in build_file_aliases.objects.items():
-      build_configuration.register_exposed_object(alias, obj)
-
-    for alias, macro in build_file_aliases.macros.items():
-      build_configuration.register_exposed_macro(alias, macro)
+    build_configuration.register_aliases(build_file_aliases)
 
     module.register_commands()
     module.register_goals()
