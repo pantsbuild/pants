@@ -9,6 +9,7 @@ from textwrap import dedent
 
 from pants.backend.core.tasks.sorttargets import SortTargets
 from pants.backend.python.targets.python_library import PythonLibrary
+from pants.base.build_file_aliases import BuildFileAliases
 from pants_test.tasks.test_base import ConsoleTaskTest
 
 
@@ -26,11 +27,7 @@ class SortTargetsEmptyTest(BaseSortTargetsTest):
 class SortTargetsTest(BaseSortTargetsTest):
   @property
   def alias_groups(self):
-    return {
-      'target_aliases': {
-        'python_library': PythonLibrary,
-      },
-    }
+    return BuildFileAliases.create(targets={'python_library': PythonLibrary})
 
   def setUp(self):
     super(SortTargetsTest, self).setUp()

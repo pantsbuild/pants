@@ -46,48 +46,38 @@ from pants.backend.jvm.tasks.provides import Provides
 from pants.backend.jvm.tasks.scala_repl import ScalaRepl
 from pants.backend.jvm.tasks.scaladoc_gen import ScaladocGen
 from pants.backend.jvm.tasks.specs_run import SpecsRun
+from pants.base.build_file_aliases import BuildFileAliases
 from pants.goal import Goal as goal, Phase
 
 
-def target_aliases():
-  return {
-    'annotation_processor': AnnotationProcessor,
-    'benchmark': Benchmark,
-    'credentials': Credentials,
-    'jar_library': JarLibrary,
-    'java_agent': JavaAgent,
-    'java_library': JavaLibrary,
-    'java_tests': JavaTests,
-    'junit_tests': JavaTests,
-    'jvm_app': JvmApp,
-    'jvm_binary': JvmBinary,
-    'repo': Repository,
-    'scala_library': ScalaLibrary,
-    'scala_specs': ScalaTests,
-    'scala_tests': ScalaTests,
-    'scalac_plugin': ScalacPlugin,
-  }
-
-
-def object_aliases():
-  return {
-    'artifact': Artifact,
-    'jar': JarDependency,
-    'exclude': Exclude,
-  }
-
-def partial_path_relative_util_aliases():
-  return {
-    'bundle': Bundle,
-  }
-
-
-def applicative_path_relative_util_aliases():
-  return {}
-
-
-def target_creation_utils():
-  return {}
+def build_file_aliases():
+  return BuildFileAliases.create(
+    targets={
+      'annotation_processor': AnnotationProcessor,
+      'benchmark': Benchmark,
+      'credentials': Credentials,
+      'jar_library': JarLibrary,
+      'java_agent': JavaAgent,
+      'java_library': JavaLibrary,
+      'java_tests': JavaTests,
+      'junit_tests': JavaTests,
+      'jvm_app': JvmApp,
+      'jvm_binary': JvmBinary,
+      'repo': Repository,
+      'scala_library': ScalaLibrary,
+      'scala_specs': ScalaTests,
+      'scala_tests': ScalaTests,
+      'scalac_plugin': ScalacPlugin,
+    },
+    objects={
+      'artifact': Artifact,
+      'jar': JarDependency,
+      'exclude': Exclude,
+    },
+    macros={
+      'bundle': Bundle,
+    }
+  )
 
 
 def register_commands():

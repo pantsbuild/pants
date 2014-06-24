@@ -7,8 +7,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from textwrap import dedent
 
-import mox
-
 from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
 from pants.backend.core.targets.dependencies import Dependencies
 from pants.backend.core.targets.resources import Resources
@@ -18,10 +16,9 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_tests import PythonTests
-from pants.base.build_environment import get_buildroot
+from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
-
 from pants_test.tasks.test_base import ConsoleTaskTest
 
 
@@ -36,11 +33,11 @@ class ReverseDepmapEmptyTest(BaseReverseDepmapTest):
     self.assert_console_output(targets=[])
 
 
-class ReverseDepmapTest(mox.MoxTestBase, BaseReverseDepmapTest):
+class ReverseDepmapTest(BaseReverseDepmapTest):
   @property
   def alias_groups(self):
-    return {
-      'target_aliases': {
+    return BuildFileAliases.create(
+      targets={
         'dependencies': Dependencies,
         'jar_library': JarLibrary,
         'java_library': JavaLibrary,
@@ -49,10 +46,10 @@ class ReverseDepmapTest(mox.MoxTestBase, BaseReverseDepmapTest):
         'python_tests': PythonTests,
         'resources': Resources,
       },
-      'exposed_objects': {
+      objects={
         'jar': JarDependency,
-      },
-    }
+      }
+    )
 
   def setUp(self):
     super(ReverseDepmapTest, self).setUp()
@@ -209,16 +206,15 @@ class ReverseDepmapTest(mox.MoxTestBase, BaseReverseDepmapTest):
       targets=[self.target('overlaps:four')]
     )
 
-  def test_depeendees_type(self):
-    self._set_up_mocks(PythonTests, ["%s/tests" % get_buildroot()])
+  def test_dependees_type(self):
+    SourceRoot.register('tests', PythonTests)
     self.assert_console_output(
       'tests/d:d',
       args=['--test-type=python_tests'],
       targets=[self.target('common/d')]
     )
 
-  def test_empty_depeendees_type(self):
-    self._set_up_mocks(Dependencies, [])
+  def test_empty_dependees_type(self):
     self.assert_console_raises(
       TaskError,
       args=['--test-type=dependencies'],
@@ -245,8 +241,3 @@ class ReverseDepmapTest(mox.MoxTestBase, BaseReverseDepmapTest):
       'src/java/a:a_java',
        targets=[self.target('resources/a:a_resources')]
     )
-
-  def _set_up_mocks(self, class_type, src_roots):
-    self.mox.StubOutWithMock(SourceRoot, 'roots')
-    SourceRoot.roots(class_type).AndReturn(src_roots)
-    self.mox.ReplayAll()

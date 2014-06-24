@@ -16,13 +16,13 @@ from twitter.common.dirutil import Fileset, safe_open
 from pants.backend.core.tasks.task import Task
 from pants.backend.maven_layout.maven_layout import maven_layout
 from pants.base.build_environment import get_buildroot
-from pants.base.build_file_parser import BuildFileParser
 from pants.base.build_manual import get_builddict_info
 from pants.base.config import ConfigOption
 from pants.base.exceptions import TaskError
 from pants.base.generator import Generator, TemplateData
 from pants.goal.option_helpers import add_global_options
 from pants.goal.phase import Phase
+
 
 def indent_docstring_by_n(s, n=1):
   """Given a non-empty docstring, return version indented N spaces.
@@ -194,12 +194,18 @@ PREDEFS = {  # some hardwired entries
 # Report symbols defined in BUILD files (jvm_binary...)
 # Returns dict {"scala_library": ScalaLibrary, "Amount": commons.Amount, ...}
 def get_syms(build_file_parser):
-  retval = {}
-  report = build_file_parser.report_registered_context()
-  for nom in report:
-    if nom in PREDEFS: continue
-    retval[nom] = report[nom]
-  return retval
+  syms = {}
+
+  def map_symbols(symbols):
+    for sym, item in symbols.items():
+      if sym not in PREDEFS:
+        syms[sym] = item
+
+  aliases = build_file_parser.registered_aliases()
+  map_symbols(aliases.targets)
+  map_symbols(aliases.objects)
+  map_symbols(aliases.macros)
+  return syms
 
 # Needed since x may be a str or a unicode, so we can't hard-code str.lower or unicode.lower.
 _lower = lambda x: x.lower()
@@ -313,8 +319,8 @@ def assemble(predefs=PREDEFS, build_file_parser=None):
     "typical" run of Pants.
   """
   retval = {}
-  for nom in PREDEFS:
-    val = PREDEFS[nom]
+  for nom in predefs:
+    val = predefs[nom]
     if "suppress" in val and val["suppress"]: continue
     retval[nom] = val
   if build_file_parser:

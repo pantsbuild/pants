@@ -15,6 +15,7 @@ from pants.backend.codegen.tasks.scrooge_gen import ScroogeGen
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.base.address import SyntheticAddress
 from pants.base.build_environment import get_buildroot
+from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.exceptions import TaskError
 from pants.goal.context import Context
 
@@ -29,11 +30,7 @@ from mock import MagicMock, patch
 class ScroogeGenTest(BaseTest):
   @property
   def alias_groups(self):
-    return {
-      'target_aliases': {
-        'java_thrift_library': JavaThriftLibrary,
-      },
-    }
+    return BuildFileAliases.create(targets={'java_thrift_library': JavaThriftLibrary})
 
   def test_validate(self):
     defaults = JavaThriftLibrary.Defaults()

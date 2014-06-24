@@ -32,65 +32,55 @@ from pants.backend.core.tasks.sorttargets import SortTargets
 from pants.backend.core.tasks.targets_help import TargetsHelp
 from pants.backend.core.wrapped_globs import Globs, RGlobs, ZGlobs
 from pants.base.build_environment import get_buildroot, get_version, get_scm, set_scm
+from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.config import Config
+from pants.base.macro_context import MacroContext
 from pants.base.source_root import SourceRoot
-from pants.goal import Goal, Goal as goal, Phase
+from pants.commands.goal import Goal
+from pants.goal import Goal as goal, Phase
 
 
 class BuildFilePath(object):
-  def __init__(self, rel_path):
-    self.rel_path = rel_path
+  def __init__(self, macro_context):
+    self.rel_path = MacroContext.verify(macro_context).rel_path
 
-  def __call__(self, *args, **kwargs):
+  def __call__(self):
     return os.path.join(get_buildroot(), self.rel_path)
 
 
-def applicative_path_relative_util_aliases():
-  return {
-    'source_root': SourceRoot,
-    'globs': Globs,
-    'rglobs': RGlobs,
-    'zglobs': ZGlobs,
-    'buildfile_path': BuildFilePath,
-  }
-
-
-def partial_path_relative_util_aliases():
-  return {}
-
-
-def target_creation_utils():
-  return {}
-
-
-# aliases
-def target_aliases():
-  return {
-    'dependencies': Dependencies,
-    'page': Page,
-    'resources': Resources,
-    'wiki': Wiki,
-  }
-
-
-def object_aliases():
-  return {
-    'Amount': Amount,
-    'config': Config,
-    'get_buildroot': get_buildroot,
-    'get_scm': get_scm,
-    'get_version': get_version,
-    'goal': Goal,
-    'pants': lambda x: x,
-    'phase': Phase,
-    'set_scm': set_scm,
-    'Time': Time,
-    'wiki_artifact': WikiArtifact,
-  }
+def build_file_aliases():
+  return BuildFileAliases.create(
+    targets={
+      'dependencies': Dependencies,
+      'page': Page,
+      'resources': Resources,
+      'wiki': Wiki,
+    },
+    objects={
+      'Amount': Amount,
+      'config': Config,
+      'get_buildroot': get_buildroot,
+      'get_scm': get_scm,
+      'get_version': get_version,
+      'goal': goal,
+      'pants': lambda x: x,
+      'phase': Phase,
+      'set_scm': set_scm,
+      'Time': Time,
+       'wiki_artifact': WikiArtifact,
+    },
+    macros={
+      'source_root': SourceRoot,
+      'globs': Globs,
+      'rglobs': RGlobs,
+      'zglobs': ZGlobs,
+      'buildfile_path': BuildFilePath,
+    }
+  )
 
 
 def register_commands():
-  pass
+  Goal._register()
 
 
 def register_goals():

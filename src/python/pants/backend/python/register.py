@@ -20,44 +20,32 @@ from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_tests import PythonTests
-from pants.commands.goal import Goal
+from pants.base.build_file_aliases import BuildFileAliases
 from pants.goal import Goal as goal
 
 
-def target_aliases():
-  return {
-    'python_binary': PythonBinary,
-    'python_library': PythonLibrary,
-    'python_requirement_library': PythonRequirementLibrary,
-    'python_test_suite': Dependencies,  # Legacy alias.
-    'python_tests': PythonTests,
-  }
-
-
-def object_aliases():
-  return {
-    'python_requirement': PythonRequirement,
-    'python_artifact': PythonArtifact,
-    'setup_py': PythonArtifact,
-  }
-
-
-def partial_path_relative_util_aliases():
-  return {
-    'python_requirements': python_requirements,
-  }
-
-
-def applicative_path_relative_util_aliases():
-  return {}
-
-
-def target_creation_utils():
-  return {}
+def build_file_aliases():
+  return BuildFileAliases.create(
+    targets={
+      'python_binary': PythonBinary,
+      'python_library': PythonLibrary,
+      'python_requirement_library': PythonRequirementLibrary,
+      'python_test_suite': Dependencies,  # Legacy alias.
+      'python_tests': PythonTests,
+    },
+    objects={
+      'python_requirement': PythonRequirement,
+      'python_artifact': PythonArtifact,
+      'setup_py': PythonArtifact,
+    },
+    macros={
+      'python_requirements': python_requirements
+    }
+  )
 
 
 def register_commands():
-  for cmd in (Build, Py, Goal, SetupPy):
+  for cmd in (Build, Py, SetupPy):
     cmd._register()
 
 

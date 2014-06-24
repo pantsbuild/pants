@@ -6,15 +6,8 @@ python_library(
   sources = ['jvm_tool_task_test_base.py'],
   dependencies = [
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
-    pants('src/python/pants/backend/android/targets:android'),
-    pants('src/python/pants/backend/codegen/targets:java'),
-    pants('src/python/pants/backend/codegen/targets:python'),
-    pants('src/python/pants/backend/core/targets:common'),
-    pants('src/python/pants/backend/jvm/targets:java'),
-    pants('src/python/pants/backend/jvm/targets:jvm'),
-    pants('src/python/pants/backend/jvm/targets:scala'),
     pants('src/python/pants/backend/jvm/tasks:bootstrap_jvm_tools'),
-    pants('src/python/pants/backend/python/targets:python'),
+    pants('src/python/pants/base:dev_backend_loader'),
     pants('tests/python/pants_test:base_test'),
   ]
 )

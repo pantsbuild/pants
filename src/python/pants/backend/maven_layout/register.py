@@ -6,6 +6,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 from pants.backend.maven_layout.maven_layout import maven_layout
+from pants.base.build_file_aliases import BuildFileAliases
 
 
 def register_goals():
@@ -16,23 +17,5 @@ def register_commands():
   pass
 
 
-def target_aliases():
-  return {}
-
-
-def object_aliases():
-  return {}
-
-
-def applicative_path_relative_util_aliases():
-  return {}
-
-
-def target_creation_utils():
-  return {}
-
-
-def partial_path_relative_util_aliases():
-  return {
-    'maven_layout': maven_layout,
-  }
+def build_file_aliases():
+  return BuildFileAliases.create(macros={'maven_layout': maven_layout})

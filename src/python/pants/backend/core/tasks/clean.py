@@ -5,10 +5,10 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-import daemon
 import os
 import time
 
+import daemon
 from twitter.common.dirutil import safe_rmtree
 
 from pants.backend.core.tasks.console_task import ConsoleTask

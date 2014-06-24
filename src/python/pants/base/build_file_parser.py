@@ -5,10 +5,10 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from collections import defaultdict
 import logging
 import traceback
-from collections import defaultdict
-from functools import partial
+import sys
 
 from twitter.common.lang import Compatibility
 
@@ -16,122 +16,9 @@ from pants.base.address import BuildFileAddress, parse_spec, SyntheticAddress
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
 from pants.base.build_graph import BuildGraph
-from pants.base.exceptions import TargetDefinitionException
 
 
 logger = logging.getLogger(__name__)
-
-
-class TargetProxy(object):
-  def __init__(self, target_type, build_file, args, kwargs):
-    if 'name' not in kwargs:
-      raise ValueError('name is a required parameter to all Target objects'
-                       ' specified within a BUILD file.'
-                       '  Target type was: {target_type}.'
-                       '  Current BUILD file is: {build_file}.'
-                       .format(target_type=target_type,
-                               build_file=build_file))
-
-    if args:
-      raise ValueError('All arguments passed to Targets within BUILD files should'
-                       ' use explicit keyword syntax.'
-                       '  Target type was: {target_type}.'
-                       '  Current BUILD file is: {build_file}.'
-                       '  Arguments passed were: {args}'
-                       .format(target_type=target_type,
-                               build_file=build_file,
-                               args=args))
-
-    if 'build_file' in kwargs:
-      raise ValueError('build_file cannot be passed as an explicit argument to a'
-                       ' target within a BUILD file.'
-                       '  Target type was: {target_type}.'
-                       '  Current BUILD file is: {build_file}.'
-                       '  build_file argument passed was: {build_file_arg}'
-                       .format(target_type=target_type,
-                               build_file=build_file,
-                               build_file_arg=kwargs.get('build_file')))
-
-    self.target_type = target_type
-    self.build_file = build_file
-    self.kwargs = kwargs
-    self.name = kwargs['name']
-    self.address = BuildFileAddress(build_file, self.name)
-    self.description = None
-
-    self.dependencies = self.kwargs.pop('dependencies', [])
-    self._dependency_addresses = None
-    for dep_spec in self.dependencies:
-      if not isinstance(dep_spec, Compatibility.string):
-        msg = ('dependencies passed to Target constructors must be strings.  {dep_spec} is not'
-               ' a string.  Target type was: {target_type}.  Current BUILD file is: {build_file}.'
-               .format(target_type=target_type, build_file=build_file, dep_spec=dep_spec))
-        raise TargetDefinitionException(target=self, msg=msg)
-
-  @property
-  def dependency_addresses(self):
-    def dep_address_iter():
-      for dep_spec in self.dependencies:
-        dep_spec_path, dep_target_name = parse_spec(dep_spec,
-                                                    relative_to=self.build_file.spec_path)
-        dep_build_file = BuildFileCache.spec_path_to_build_file(self.build_file.root_dir,
-                                                                dep_spec_path)
-        dep_address = BuildFileAddress(dep_build_file, dep_target_name)
-        yield dep_address
-
-    if self._dependency_addresses is None:
-      self._dependency_addresses = list(dep_address_iter())
-    return self._dependency_addresses
-
-  def with_description(self, description):
-    self.description = description
-
-  def to_target(self, build_graph):
-    try:
-      return self.target_type(build_graph=build_graph,
-                              address=self.address,
-                              **self.kwargs).with_description(self.description)
-    except Exception:
-      traceback.print_exc()
-      logger.exception('Failed to instantiate Target with type {target_type} with name "{name}"'
-                       ' from {build_file}'
-                       .format(target_type=self.target_type,
-                               name=self.name,
-                               build_file=self.build_file))
-      raise
-
-  def __str__(self):
-    format_str = ('<TargetProxy(target_type={target_type}, build_file={build_file})'
-                  ' [name={name}, address={address}]>')
-    return format_str.format(target_type=self.target_type,
-                             build_file=self.build_file,
-                             name=self.name,
-                             address=self.address)
-
-  def __repr__(self):
-    format_str = 'TargetProxy(target_type={target_type}, build_file={build_file}, kwargs={kwargs})'
-    return format_str.format(target_type=self.target_type,
-                             build_file=self.build_file,
-                             kwargs=self.kwargs)
-
-
-class TargetCallProxy(object):
-  def __init__(self, target_type, build_file, registered_target_proxies):
-    self._target_type = target_type
-    self._build_file = build_file
-    self._registered_target_proxies = registered_target_proxies
-
-  def __call__(self, *args, **kwargs):
-    target_proxy = TargetProxy(self._target_type, self._build_file, args, kwargs)
-    self._registered_target_proxies.add(target_proxy)
-    return target_proxy
-
-  def __repr__(self):
-    return ('<TargetCallProxy(target_type={target_type}, build_file={build_file},'
-            ' registered_target_proxies=<dict with id: {registered_target_proxies_id}>)>'
-            .format(target_type=self._target_type,
-                    build_file=self._build_file,
-                    registered_target_proxies_id=id(self._registered_target_proxies)))
 
 
 class BuildFileCache(object):
@@ -154,6 +41,7 @@ class BuildFileCache(object):
 
 
 class BuildFileParser(object):
+  """Parses BUILD files for a given repo build configuration."""
 
   class TargetConflictException(Exception):
     """Thrown if the same target is redefined in a BUILD file"""
@@ -167,85 +55,10 @@ class BuildFileParser(object):
   class EmptyBuildFileException(Exception):
     """Thrown if the user called for a target when none are present in a BUILD file."""
 
-  def clear_registered_context(self):
-    self._exposed_objects = {}
-    self._partial_path_relative_utils = {}
-    self._applicative_path_relative_utils = {}
-    self._target_alias_map = {}
-    self._target_creation_utils = {}
-
-  def report_registered_context(self):
-    """Return dict of syms defined in BUILD files, useful for docs/help.
-
-    This dict isn't so useful for actually parsing BUILD files.
-    It's useful for generating things like
-    http://pantsbuild.github.io/build_dictionary.html
-    """
-    retval = {}
-    retval.update(self._exposed_objects)
-    retval.update(self._partial_path_relative_utils)
-    retval.update(self._applicative_path_relative_utils)
-    retval.update(self._target_alias_map)
-    return retval
-
-  def report_target_aliases(self):
-    return self._target_alias_map.copy()
-
-  def register_alias_groups(self, alias_map):
-    for alias, obj in alias_map.get('exposed_objects', {}).items():
-      self.register_exposed_object(alias, obj)
-
-    for alias, obj in alias_map.get('applicative_path_relative_utils', {}).items():
-      self.register_applicative_path_relative_util(alias, obj)
-
-    for alias, obj in alias_map.get('partial_path_relative_utils', {}).items():
-      self.register_partial_path_relative_util(alias, obj)
-
-    for alias, obj in alias_map.get('target_aliases', {}).items():
-      self.register_target_alias(alias, obj)
-
-    for alias, func in alias_map.get('target_creation_utils', {}).items():
-      self.register_target_creation_utils(alias, func)
-
-  # TODO(pl): For the next four methods, provide detailed documentation.  Especially for the middle
-  # two, the semantics are slightly tricky.
-  def register_exposed_object(self, alias, obj):
-    if alias in self._exposed_objects:
-      logger.warn('Object alias {alias} has already been registered.  Overwriting!'
-                  .format(alias=alias))
-    self._exposed_objects[alias] = obj
-
-  def register_applicative_path_relative_util(self, alias, obj):
-    if alias in self._applicative_path_relative_utils:
-      logger.warn('Applicative path relative util alias {alias} has already been registered.'
-                  '  Overwriting!'
-                  .format(alias=alias))
-    self._applicative_path_relative_utils[alias] = obj
-
-  def register_partial_path_relative_util(self, alias, obj):
-    if alias in self._partial_path_relative_utils:
-      logger.warn('Partial path relative util alias {alias} has already been registered.'
-                  '  Overwriting!'
-                  .format(alias=alias))
-    self._partial_path_relative_utils[alias] = obj
-
-  def register_target_alias(self, alias, obj):
-    if alias in self._target_alias_map:
-      logger.warn('Target alias {alias} has already been registered.  Overwriting!'
-                  .format(alias=alias))
-    self._target_alias_map[alias] = obj
-
-  def register_target_creation_utils(self, alias, func):
-    if alias in self._target_creation_utils:
-      logger.warn('Target Creation alias {alias} has already been registered.  Overwriting!'
-                  .format(alias=alias))
-    self._target_creation_utils[alias] = func
-
-  def __init__(self, root_dir, run_tracker=None):
+  def __init__(self, build_configuration, root_dir, run_tracker=None):
+    self._build_configuration = build_configuration
     self._root_dir = root_dir
     self.run_tracker = run_tracker
-
-    self.clear_registered_context()
 
     self._target_proxy_by_address = {}
     self._target_proxies_by_build_file = defaultdict(set)
@@ -253,6 +66,10 @@ class BuildFileParser(object):
     self._added_build_file_families = set()
 
     self.addresses_by_build_file = defaultdict(set)
+
+  def registered_aliases(self):
+    """Returns a copy of the registered build file aliases this build file parser uses."""
+    return self._build_configuration.registered_aliases()
 
   def inject_address_into_build_graph(self, address, build_graph):
     self._populate_target_proxy_for_address(address)
@@ -287,12 +104,13 @@ class BuildFileParser(object):
 
     if not build_graph.contains_address(address):
       addresses_already_closed.add(address)
-      for dep_address in target_proxy.dependency_addresses:
+      dep_addresses = target_proxy.dependency_addresses(BuildFileCache.spec_path_to_build_file)
+      for dep_address in dep_addresses:
         self.inject_address_closure_into_build_graph(dep_address,
                                                      build_graph,
                                                      addresses_already_closed)
       target = target_proxy.to_target(build_graph)
-      build_graph.inject_target(target, dependencies=target_proxy.dependency_addresses)
+      build_graph.inject_target(target, dependencies=dep_addresses)
 
       for traversable_spec in target.traversable_dependency_specs:
         spec_path, target_name = self.parse_spec(traversable_spec,
@@ -344,22 +162,20 @@ class BuildFileParser(object):
                                spec=address.spec,
                                build_file=address.build_file))
 
-    target_proxy = self._target_proxy_by_address[address]
-
   def _raise_incorrect_target_error(self, wrong_target, targets):
     """Search through the list of targets and return those which originate from the same folder
     which wrong_target resides in.
 
     :raises: A helpful error message listing possible correct target addresses.
     """
-    def path_parts(build): # Gets a tuple of directory, filename.
+    def path_parts(build):  # Gets a tuple of directory, filename.
         build = str(build)
         slash = build.rfind('/')
         if slash < 0:
           return '', build
         return build[:slash], build[slash+1:]
 
-    def are_siblings(a, b): # Are the targets in the same directory?
+    def are_siblings(a, b):  # Are the targets in the same directory?
       return path_parts(a)[0] == path_parts(b)[0]
 
     valid_specs = []
@@ -421,7 +237,7 @@ class BuildFileParser(object):
     target_proxy = self._target_proxy_by_address[address]
     addresses_already_closed.add(address)
 
-    for dep_address in target_proxy.dependency_addresses:
+    for dep_address in target_proxy.dependency_addresses(BuildFileCache.spec_path_to_build_file):
       if dep_address not in addresses_already_closed:
         self._populate_target_proxy_transitive_closure_for_address(dep_address,
                                                                    addresses_already_closed)
@@ -434,6 +250,7 @@ class BuildFileParser(object):
 
   def parse_build_file(self, build_file):
     """Capture TargetProxies from parsing `build_file`.
+
     Prepare a context for parsing, read a BUILD file from the filesystem, and record the
     TargetProxies generated by executing the code.
     """
@@ -443,73 +260,45 @@ class BuildFileParser(object):
                    .format(build_file=build_file))
       return
 
-    logger.debug("Parsing BUILD file {build_file}."
-                 .format(build_file=build_file))
-
-    parse_context = {}
-
-    # TODO(pl): Don't inject __file__ into the context.  BUILD files should not be aware
-    # of their location on the filesystem.
-    parse_context['__file__'] = build_file.full_path
-
-    parse_context.update(self._exposed_objects)
-    parse_context.update(
-      (key, partial(util, rel_path=build_file.spec_path)) for
-      key, util in self._partial_path_relative_utils.items()
-    )
-    parse_context.update(
-      (key, util(rel_path=build_file.spec_path)) for
-      key, util in self._applicative_path_relative_utils.items()
-    )
-    registered_target_proxies = set()
-    parse_context.update(
-      (alias, TargetCallProxy(target_type=target_type,
-                              build_file=build_file,
-                              registered_target_proxies=registered_target_proxies)) for
-      alias, target_type in self._target_alias_map.items()
-    )
-
-    for key, func in self._target_creation_utils.items():
-      parse_context.update({key: partial(func, alias_map=parse_context)})
+    logger.debug("Parsing BUILD file {build_file}.".format(build_file=build_file))
 
     try:
       build_file_code = build_file.code()
     except Exception:
-      logger.exception("Error parsing {build_file}."
-                       .format(build_file=build_file))
+      logger.exception("Error parsing {build_file}.".format(build_file=build_file))
       traceback.print_exc()
       raise
 
+    parse_context = self._build_configuration.create_parse_context(build_file)
     try:
-      Compatibility.exec_function(build_file_code, parse_context)
+      Compatibility.exec_function(build_file_code, parse_context.parse_globals)
     except Exception:
-      logger.exception("Error running {build_file}."
-                       .format(build_file=build_file))
+      logger.exception("Error parsing {build_file}.".format(build_file=build_file))
       traceback.print_exc()
       raise
 
-    for target_proxy in registered_target_proxies:
+    for target_proxy in parse_context.registered_target_proxies:
       logger.debug('Adding {target_proxy} to the proxy build graph with {address}'
                    .format(target_proxy=target_proxy,
                            address=target_proxy.address))
 
       if target_proxy.address in self._target_proxy_by_address:
         conflicting_target = self._target_proxy_by_address[target_proxy.address]
-        if (conflicting_target.address.build_file != target_proxy.address.build_file):
+        if conflicting_target.address.build_file != target_proxy.address.build_file:
           raise BuildFileParser.SiblingConflictException(
-            "Both {conflicting_file} and {target_file} define the same target '{target_name}'"
-            .format(conflicting_file=conflicting_target.address.build_file,
-                    target_file=target_proxy.address.build_file,
-                    target_name=conflicting_target.address.target_name))
+              "Both {conflicting_file} and {target_file} define the same target '{target_name}'"
+              .format(conflicting_file=conflicting_target.address.build_file,
+                      target_file=target_proxy.address.build_file,
+                      target_name=conflicting_target.address.target_name))
         raise BuildFileParser.TargetConflictException(
-          "File {conflicting_file} defines target '{target_name}' more than once."
-          .format(conflicting_file=conflicting_target.address.build_file,
-                  target_name=conflicting_target.address.target_name))
+            "File {conflicting_file} defines target '{target_name}' more than once."
+            .format(conflicting_file=conflicting_target.address.build_file,
+                    target_name=conflicting_target.address.target_name))
 
       assert target_proxy.address not in self.addresses_by_build_file[build_file], (
-        '{address} has already been associated with {build_file} in the build graph.'
-        .format(address=target_proxy.address,
-                build_file=build_file))
+          '{address} has already been associated with {build_file} in the build graph.'
+          .format(address=target_proxy.address,
+                  build_file=build_file))
 
       self._target_proxy_by_address[target_proxy.address] = target_proxy
       self.addresses_by_build_file[build_file].add(target_proxy.address)
@@ -518,8 +307,10 @@ class BuildFileParser(object):
 
     logger.debug("{build_file} produced the following TargetProxies:"
                  .format(build_file=build_file))
-    for target_proxy in registered_target_proxies:
+    for target_proxy in parse_context.registered_target_proxies:
       logger.debug("  * {target_proxy}".format(target_proxy=target_proxy))
+
+    return parse_context.registered_target_proxies
 
   def scan(self, root=None):
     """Scans and parses all BUILD files found under ``root``.

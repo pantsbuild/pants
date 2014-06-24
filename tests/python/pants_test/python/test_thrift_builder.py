@@ -8,11 +8,12 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import os
 from textwrap import dedent
 
-from mock import MagicMock, call, mock_open, patch
+from mock import call, mock_open, patch
 
-from pants.base.source_root import SourceRoot
-from pants.backend.python.thrift_builder import PythonThriftBuilder
 from pants.backend.codegen.targets.python_thrift_library import PythonThriftLibrary
+from pants.backend.python.thrift_builder import PythonThriftBuilder
+from pants.base.build_file_aliases import BuildFileAliases
+from pants.base.source_root import SourceRoot
 from pants_test.base.context_utils import create_config
 from pants_test.base_test import BaseTest
 
@@ -27,11 +28,7 @@ thrift_workdir: %(pants_workdir)s/thrift
 class TestPythonThriftBuilder(BaseTest):
   @property
   def alias_groups(self):
-    return {
-      'target_aliases': {
-        'python_thrift_library': PythonThriftLibrary,
-      }
-    }
+    return BuildFileAliases.create(targets={'python_thrift_library': PythonThriftLibrary})
 
   def setUp(self):
     super(TestPythonThriftBuilder, self).setUp()

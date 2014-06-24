@@ -8,7 +8,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import os
 from textwrap import dedent
 
-from twitter.common.lang import Compatibility
+import pytest
 
 from pants.backend.jvm.targets.artifact import Artifact
 from pants.backend.jvm.targets.jar_dependency import JarDependency
@@ -17,18 +17,14 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.base.address import BuildFileAddress
 from pants.base.build_file import BuildFile
+from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.build_file_parser import BuildFileParser
 from pants.base.exceptions import TargetDefinitionException
-
+from pants.base.target import Target
 from pants_test.base_test import BaseTest
 
-import pytest
 
-
-class BuildFileParserTest(BaseTest):
-  def setUp(self):
-    super(BuildFileParserTest, self).setUp()
-
+class BuildFileParserBasicsTest(BaseTest):
   def test_target_proxy_exceptions(self):
     self.add_to_build_file('a/BUILD', 'dependencies()')
     build_file_a = BuildFile(self.build_root, 'a/BUILD')
@@ -81,61 +77,33 @@ class BuildFileParserTest(BaseTest):
 
   def test_noop_parse(self):
     with self.workspace('BUILD') as root_dir:
-      parser = BuildFileParser(root_dir=root_dir)
       build_file = BuildFile(root_dir, '')
-      parser.parse_build_file(build_file)
-      registered_proxies = set(parser._target_proxy_by_address.values())
+      registered_proxies = self.build_file_parser.parse_build_file(build_file)
       self.assertEqual(len(registered_proxies), 0)
+
+
+class BuildFileParserTargetTest(BaseTest):
+  class FakeTarget(Target):
+    def __init__(self):
+      assert False, "This fake target should never be called in this test!"
+
+  @property
+  def alias_groups(self):
+    return BuildFileAliases.create(targets={'fake': self.FakeTarget})
 
   def test_trivial_target(self):
     with self.workspace('BUILD') as root_dir:
-      def fake_target(*args, **kwargs):
-        assert False, "This fake target should never be called in this test!"
-
-      alias_map = {'target_aliases': {'fake': fake_target}}
-      self.build_file_parser.register_alias_groups(alias_map=alias_map)
       with open(os.path.join(root_dir, 'BUILD'), 'w') as build:
         build.write('''fake(name='foozle')''')
 
       build_file = BuildFile(root_dir, 'BUILD')
-      self.build_file_parser.parse_build_file(build_file)
-      registered_proxies = set(self.build_file_parser._target_proxy_by_address.values())
+      registered_proxies = self.build_file_parser.parse_build_file(build_file)
 
-    self.assertEqual(len(registered_proxies), 1)
-    proxy = registered_proxies.pop()
-    self.assertEqual(proxy.name, 'foozle')
-    self.assertEqual(proxy.address, BuildFileAddress(build_file, 'foozle'))
-    self.assertEqual(proxy.target_type, fake_target)
-
-  def test_exposed_object(self):
-    with self.workspace('BUILD') as root_dir:
-      alias_map = {'exposed_objects': {'fake_object': object()}}
-      self.build_file_parser.register_alias_groups(alias_map=alias_map)
-
-      with open(os.path.join(root_dir, 'BUILD'), 'w') as build:
-        build.write('''fake_object''')
-
-      build_file = BuildFile(root_dir, 'BUILD')
-      self.build_file_parser.parse_build_file(build_file)
-      registered_proxies = set(self.build_file_parser._target_proxy_by_address.values())
-
-    self.assertEqual(len(registered_proxies), 0)
-
-  def test_path_relative_util(self):
-    with self.workspace('a/b/c/BUILD') as root_dir:
-      def path_relative_util(foozle, rel_path):
-        self.assertEqual(rel_path, 'a/b/c')
-      alias_map = {'partial_path_relative_utils': {'fake_util': path_relative_util}}
-      self.build_file_parser.register_alias_groups(alias_map=alias_map)
-
-      with open(os.path.join(root_dir, 'a/b/c/BUILD'), 'w') as build:
-        build.write('''fake_util("baz")''')
-
-      build_file = BuildFile(root_dir, 'a/b/c/BUILD')
-      self.build_file_parser.parse_build_file(build_file)
-      registered_proxies = set(self.build_file_parser._target_proxy_by_address.values())
-
-    self.assertEqual(len(registered_proxies), 0)
+      self.assertEqual(len(registered_proxies), 1)
+      proxy = registered_proxies.pop()
+      self.assertEqual(proxy.name, 'foozle')
+      self.assertEqual(proxy.address, BuildFileAddress(build_file, 'foozle'))
+      self.assertEqual(proxy.target_type, self.FakeTarget)
 
   def test_transitive_closure_address(self):
     with self.workspace('./BUILD', 'a/BUILD', 'a/b/BUILD') as root_dir:
@@ -159,11 +127,6 @@ class BuildFileParserTest(BaseTest):
         build.write(dedent('''
           fake(name="bat")
         '''))
-      def fake_target(*args, **kwargs):
-        assert False, "This fake target should never be called in this test!"
-
-      alias_map = {'target_aliases': {'fake': fake_target}}
-      self.build_file_parser.register_alias_groups(alias_map=alias_map)
 
       bf_address = BuildFileAddress(BuildFile(root_dir, 'BUILD'), 'foo')
       self.build_file_parser._populate_target_proxy_transitive_closure_for_address(bf_address)
@@ -192,12 +155,6 @@ class BuildFileParserTest(BaseTest):
           fake(name="bat")
         '''))
 
-      def fake_target(*args, **kwargs):
-        assert False, "This fake target should never be called in this test!"
-
-      alias_map = {'target_aliases': {'fake': fake_target}}
-      self.build_file_parser.register_alias_groups(alias_map=alias_map)
-
       bar_build_file = BuildFile(root_dir, 'BUILD.bar')
       base_build_file = BuildFile(root_dir, 'BUILD')
       foo_build_file = BuildFile(root_dir, 'BUILD.foo')
@@ -215,15 +172,9 @@ class BuildFileParserTest(BaseTest):
     self.add_to_build_file('BUILD', 'fake(name="foo")\n')
     self.add_to_build_file('BUILD', 'fake(name="foo")\n')
 
-    def fake_target(*args, **kwargs):
-      assert False, "This fake target should never be called in this test!"
-
-    alias_map = {'target_aliases': {'fake': fake_target}}
-    self.build_file_parser.register_alias_groups(alias_map=alias_map)
     with pytest.raises(BuildFileParser.TargetConflictException):
       base_build_file = BuildFile(self.build_root, 'BUILD')
       self.build_file_parser.parse_build_file(base_build_file)
-
 
   def test_sibling_build_files_duplicates(self):
     # This workspace is malformed, you can't shadow a name in a sibling BUILD file
@@ -249,88 +200,113 @@ class BuildFileParserTest(BaseTest):
           fake(name="base")
         '''))
 
-      def fake_target(*args, **kwargs):
-        assert False, "This fake target should never be called in this test!"
-
-      alias_map = {'target_aliases': {'fake': fake_target}}
-      self.build_file_parser.register_alias_groups(alias_map=alias_map)
       with pytest.raises(BuildFileParser.SiblingConflictException):
         base_build_file = BuildFile(root_dir, 'BUILD')
         bf_address = BuildFileAddress(base_build_file, 'base')
         self.build_file_parser._populate_target_proxy_transitive_closure_for_address(bf_address)
 
-  def test_target_creation(self):
+
+class BuildFileParserExposedObjectTest(BaseTest):
+  @property
+  def alias_groups(self):
+    return BuildFileAliases.create(objects={'fake_object': object()})
+
+  def test_exposed_object(self):
+    with self.workspace('BUILD') as root_dir:
+      with open(os.path.join(root_dir, 'BUILD'), 'w') as build:
+        build.write('''fake_object''')
+
+      build_file = BuildFile(root_dir, 'BUILD')
+      registered_proxies = self.build_file_parser.parse_build_file(build_file)
+
+      self.assertEqual(len(registered_proxies), 0)
+
+
+class BuildFileParserMacroTest(BaseTest):
+  @staticmethod
+  def make_lib(org, name, rev, macro_context=None):
+    dep = macro_context.create_object('jar', org=org, name=name, rev=rev)
+    macro_context.create_object('jar_library', name=name, jars=[dep])
+
+  @staticmethod
+  def create_java_libraries(base_name,
+                            org='com.twitter',
+                            provides_java_name=None,
+                            provides_scala_name=None,
+                            **kwargs):
+
+    macro_context = kwargs['macro_context']
+
+    def provides_artifact(provides_name):
+      if provides_name is None:
+        return None
+      jvm_repo = 'pants-support/ivy:maven-central'
+      return macro_context.create_object('artifact',
+                                         org=org,
+                                         name=provides_name,
+                                         repo=jvm_repo)
+
+    macro_context.create_object('java_library',
+                                name='%s-java' % base_name,
+                                sources=[],
+                                dependencies=[],
+                                provides=provides_artifact(provides_java_name))
+
+    macro_context.create_object('scala_library',
+                                name='%s-scala' % base_name,
+                                sources=[],
+                                dependencies=[],
+                                provides=provides_artifact(provides_scala_name))
+
+  def setUp(self):
+    super(BuildFileParserMacroTest, self).setUp()
+    self._paths = set()
+
+  def path_relative_util(self, path, macro_context):
+    self._paths.add(os.path.join(macro_context.rel_path, path))
+
+  @property
+  def alias_groups(self):
+    return BuildFileAliases.create(
+      targets={
+        'jar_library': JarLibrary,
+        'java_library': JavaLibrary,
+        'scala_library': ScalaLibrary,
+      },
+      macros={
+        'make_lib': self.make_lib,
+        'create_java_libraries': self.create_java_libraries,
+        'path_util': self.path_relative_util,
+      },
+      objects={
+        'artifact': Artifact,
+        'jar': JarDependency,
+      }
+    )
+
+  def test_macros(self):
     contents = dedent('''
                  create_java_libraries(base_name="create-java-libraries",
                                        provides_java_name="test-java",
                                        provides_scala_name="test-scala")
                  make_lib("com.foo.test", "does_not_exists", "1.0")
+                 path_util("baz")
                ''')
     self.create_file('3rdparty/BUILD', contents)
 
-    alias_map = {
-                 'target_aliases': {
-                   'jar_library': JarLibrary,
-                   'java_library': JavaLibrary,
-                   'scala_library': ScalaLibrary
-                   },
-                 'target_creation_utils': {
-                   'make_lib': make_lib,
-                   'create_java_libraries': create_java_libraries
-                   },
-                 'exposed_objects': {
-                   'artifact': Artifact,
-                   'jar': JarDependency
-                   }
-                }
-
-    self.build_file_parser.register_alias_groups(alias_map=alias_map)
     build_file = BuildFile(self.build_root, '3rdparty/BUILD')
-    self.build_file_parser.parse_build_file(build_file)
-    registered_proxies = set(self.build_file_parser._target_proxy_by_address.values())
+    registered_proxies = self.build_file_parser.parse_build_file(build_file)
     self.assertEqual(len(registered_proxies), 3)
     targets_created = {}
     for target_proxy in registered_proxies:
-      targets_created.update({target_proxy.name: target_proxy.target_type})
-    self.assertEquals(set(['does_not_exists',
-                            'create-java-libraries-scala',
-                            'create-java-libraries-java']),
-                       set(targets_created.keys()))
-    self.assertEquals(targets_created['does_not_exists'], JarLibrary)
-    self.assertEquals(targets_created['create-java-libraries-java'], JavaLibrary)
-    self.assertEquals(targets_created['create-java-libraries-scala'], ScalaLibrary)
+      targets_created[target_proxy.name] = target_proxy.target_type
 
+    self.assertEqual(set(['does_not_exists',
+                          'create-java-libraries-scala',
+                          'create-java-libraries-java']),
+                     set(targets_created.keys()))
+    self.assertEqual(targets_created['does_not_exists'], JarLibrary)
+    self.assertEqual(targets_created['create-java-libraries-java'], JavaLibrary)
+    self.assertEqual(targets_created['create-java-libraries-scala'], ScalaLibrary)
 
-
-def make_lib(org, name, rev, alias_map=None):
-  dep = alias_map['jar'](org=org, name=name, rev=rev)
-  alias_map['jar_library'](name=name, jars=[dep])
-
-
-def create_java_libraries(
-  base_name,
-  org='com.twitter',
-  provides_java_name=None,
-  provides_scala_name=None,
-  alias_map=None):
-  if not isinstance(base_name, Compatibility.string):
-    raise ValueError('create_java_libraries base_name must be a string: %s' % base_name)
-
-  def provides_artifact(provides_name):
-    if provides_name is None:
-      return None
-    jvm_repo = 'pants-support/ivy:gem-internal'
-    return alias_map['artifact'](org=org,
-                    name=provides_name,
-                    repo=jvm_repo)
-  alias_map['java_library'](
-    name='%s-java' % base_name,
-    sources=[],
-    dependencies=[],
-    provides=provides_artifact(provides_java_name))
-
-  alias_map['scala_library'](
-    name='%s-scala' % base_name,
-    sources=[],
-    dependencies=[],
-    provides=provides_artifact(provides_scala_name))
+    self.assertEqual(set(['3rdparty/baz']), self._paths)

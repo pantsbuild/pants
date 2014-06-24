@@ -10,6 +10,7 @@ python_library(
     pants('src/python/pants/authentication:authentication'),
     pants('src/python/pants/base:address'),
     pants('src/python/pants/base:build_environment'),
+    pants('src/python/pants/base:build_file_parser'),
     pants('src/python/pants/base:config'),
     pants('src/python/pants/base:dev_backend_loader'),
     pants('src/python/pants/base:rcfile'),

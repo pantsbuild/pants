@@ -14,24 +14,25 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.repository import Repository
 from pants.backend.jvm.tasks.check_published_deps import CheckPublishedDeps
+from pants.base.build_file_aliases import BuildFileAliases
 from pants_test.tasks.test_base import ConsoleTaskTest
 
 
 class CheckPublishedDepsTest(ConsoleTaskTest):
   @property
   def alias_groups(self):
-    return {
-      'target_aliases': {
+    return BuildFileAliases.create(
+      targets={
         'dependencies': Dependencies,
         'jar_library': JarLibrary,
         'java_library': JavaLibrary,
         'repo': Repository,
       },
-      'exposed_objects': {
+      objects={
         'artifact': Artifact,
         'jar': JarDependency,
-      },
-    }
+      }
+    )
 
   @classmethod
   def task_type(cls):

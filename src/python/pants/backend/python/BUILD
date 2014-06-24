@@ -5,6 +5,7 @@ python_library(
   name = 'plugin',
   sources = ['__init__.py', 'register.py'],
   dependencies = [
+    pants('src/python/pants/base:build_file_aliases'),
     pants('src/python/pants/backend/python/commands:pants_old'),
     pants('src/python/pants/backend/python/targets:python'),
     pants('src/python/pants/backend/python/tasks:python'),
@@ -139,7 +140,9 @@ python_library(
 python_library(
   name = 'python_requirements',
   sources = ['python_requirements.py'],
-  dependencies = [],
+  dependencies = [
+    pants('src/python/pants/base:macro_context'),
+  ],
 )
 
 python_library(

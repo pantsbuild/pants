@@ -10,11 +10,12 @@ import os
 from twitter.common.dirutil.fileset import Fileset
 
 from pants.base.build_environment import get_buildroot
+from pants.base.macro_context import MacroContext
 
 
 class FilesetRelPathWrapper(object):
-  def __init__(self, rel_path):
-    self.rel_path = rel_path
+  def __init__(self, macro_context):
+    self.rel_path = MacroContext.verify(macro_context).rel_path
 
   def __call__(self, *args, **kwargs):
     root = os.path.join(get_buildroot(), self.rel_path)
