@@ -14,7 +14,6 @@ from pants.backend.android.targets.android_target import AndroidTarget
 def target_aliases():
   return {
     'android_binary': AndroidBinary,
-    'android_target': AndroidTarget,
   }
 
 
