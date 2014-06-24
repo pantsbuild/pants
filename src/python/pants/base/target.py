@@ -94,6 +94,10 @@ class AbstractTarget(object):
     """Returns True if the target is comprised of tests."""
     return self.has_label('tests')
 
+  @property
+  def is_android(self):
+    """Returns True if the target is an android target."""
+    return self.has_label('android')
 
 @manual.builddict()
 class Target(AbstractTarget):
