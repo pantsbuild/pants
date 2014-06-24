@@ -19,6 +19,7 @@ How to configure build-able things in BUILD files.
    target_addresses
    JVMProjects
    python-readme
+   page
    build_files
    invoking
    tshoot

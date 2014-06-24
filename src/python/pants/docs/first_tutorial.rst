@@ -174,6 +174,7 @@ and and ``main-bin`` (of type ``jvm_binary``):
 
 .. literalinclude:: ../../../java/com/pants/examples/hello/main/BUILD
    :start-after: Like Hello World
+   :end-before: README page
 
 That ``dependencies`` is interesting. The ``main-bin`` build target depends on
 other build targets; its ``dependencies`` lists those.

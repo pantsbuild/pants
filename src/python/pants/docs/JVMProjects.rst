@@ -89,6 +89,7 @@ code shows the BUILD file for a simple Java binary (in the ``main/`` directory):
 
 .. literalinclude:: ../../../java/com/pants/examples/hello/main/BUILD
    :start-after: runnable
+   :end-before: README page
 
 This small program has just two dependencies. One is a library, a
 ``java_library``, a compiled set of source code from this workspace.

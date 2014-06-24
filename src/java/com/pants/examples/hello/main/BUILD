@@ -24,3 +24,9 @@ jvm_binary(name = 'main-bin',
   source = 'HelloMain.java',
   main = 'com.pants.examples.hello.main.HelloMain',
 )
+
+# README page:
+
+page(name="readme",
+  source="README.md")
+
