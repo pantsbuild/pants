@@ -10,25 +10,46 @@ import os
 from twitter.common.lang import AbstractClass
 
 
-
 def parse_spec(spec, relative_to=''):
   """Parses a target address spec and returns the path from the root of the repo to this Target
   and Target name.
-  :param string spec: target address spec
-  For Example
-  ::
+
+  :param string spec: Target address spec.
+  :param string relative_to: For sibling specs, ie: ':another_in_same_build_family', interprets
+    the missing spec_path part as `relative_to`.
+
+  For Example::
+
     some_target(name='mytarget',
       dependencies=['path/to/buildfile:targetname']
     )
 
-  Where  ``path/to/buildfile:targetname`` is the dependent target address spec
+  Where ``path/to/buildfile:targetname`` is the dependent target address spec
 
-  In case, the target name is empty it returns the last component of the path as target name.
-  ::
+  In case the target name is empty it returns the last component of the path as target name, ie::
+
     spec_path, target_name = parse_spec('path/to/buildfile/foo')
 
-  Will return spec_path as 'path/to/buildfile/foo' and target_name as 'foo'
+  Will return spec_path as 'path/to/buildfile/foo' and target_name as 'foo'.
+
+  Optionally, specs can be prefixed with '//' to denote an absolute spec path.  This is normally
+  not significant except when a spec referring to a root level target is needed from deeper in
+  the tree.  For example, in ``path/to/buildfile/BUILD``::
+
+    some_target(name='mytarget',
+      dependencies=[':targetname']
+    )
+
+  The ``targetname`` spec refers to a target defined in ``path/to/buildfile/BUILD*``.  If instead
+  you want to reference ``targetname`` in a root level BUILD file, the absolute form allow this::
+
+    some_target(name='mytarget',
+      dependencies=['//:targetname']
+    )
   """
+  def normalize_absolute_refs(ref):
+    return ref.lstrip('//')
+
   spec_parts = spec.rsplit(':', 1)
   if len(spec_parts) == 1:
     spec_path = os.path.normpath(spec_parts[0])
@@ -37,12 +58,12 @@ def parse_spec(spec, relative_to=''):
       .format(spec=spec)
     )
     target_name = os.path.basename(spec_path)
-    return spec_path, target_name
+    return normalize_absolute_refs(spec_path), target_name
 
   spec_path, target_name = spec_parts
   if not spec_path:
     spec_path = relative_to
-  return spec_path, target_name
+  return normalize_absolute_refs(spec_path), target_name
 
 
 class Address(AbstractClass):

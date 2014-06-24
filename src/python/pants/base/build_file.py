@@ -47,7 +47,7 @@ class BuildFile(object):
           buildfiles.append(BuildFile(root_dir, buildfile_relpath))
     return OrderedSet(sorted(buildfiles, key=lambda buildfile: buildfile.full_path))
 
-  def __init__(self, root_dir, relpath, must_exist=True):
+  def __init__(self, root_dir, relpath=None, must_exist=True):
     """Creates a BuildFile object representing the BUILD file set at the specified path.
 
     root_dir: The base directory of the project
@@ -57,12 +57,11 @@ class BuildFile(object):
     raises IOError if the specified path does not house a BUILD file and must_exist is True
     """
 
-
     if not os.path.isabs(root_dir):
       raise IOError('BuildFile root_dir {root_dir} must be an absolute path.'
                     .format(root_dir=root_dir))
 
-    path = os.path.join(root_dir, relpath)
+    path = os.path.join(root_dir, relpath) if relpath else root_dir
     self._build_basename = BuildFile._BUILD_FILE_PREFIX
     buildfile = os.path.join(path, self._build_basename) if os.path.isdir(path) else path
 
