@@ -24,10 +24,10 @@ class SubprocessExecutorTest(unittest2.TestCase):
     with temporary_dir() as jre:
       path = os.path.join(jre, 'java')
       with safe_open(path, 'w') as fp:
-        fp.write(textwrap.dedent('''
+        fp.write(textwrap.dedent("""
             #!/bin/sh
             echo ${env_var}
-          '''.format(env_var=env_var)).strip())
+          """.format(env_var=env_var)).strip())
       chmod_plus_x(path)
       yield jre
 
