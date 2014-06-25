@@ -41,7 +41,8 @@ def parse_spec(spec, relative_to=''):
     )
 
   The ``targetname`` spec refers to a target defined in ``path/to/buildfile/BUILD*``.  If instead
-  you want to reference ``targetname`` in a root level BUILD file, the absolute form allow this::
+  you want to reference ``targetname`` in a root level BUILD file, use the absolute form.
+  For example::
 
     some_target(name='mytarget',
       dependencies=['//:targetname']
@@ -50,20 +51,37 @@ def parse_spec(spec, relative_to=''):
   def normalize_absolute_refs(ref):
     return ref.lstrip('//')
 
+  def check_path(path):
+    # A root or relative spec is OK
+    if path == '':
+      return
+
+    normpath = os.path.normpath(path)
+    components = normpath.split(os.sep)
+    if components[0] in ('.', '..') or normpath != path:
+      raise ValueError('Spec {spec} has un-normalized path '
+                       'part {path}'.format(spec=spec, path=path))
+    if components[-1].startswith('BUILD'):
+      raise ValueError('Spec {spec} has {trailing} as the last path part and BUILD is '
+                       'reserved files'.format(spec=spec, trailing=components[-1]))
+
+  def check_target_name(name):
+    if not name:
+      raise ValueError('Spec {spec} has no name part'.format(spec=spec))
+
   spec_parts = spec.rsplit(':', 1)
   if len(spec_parts) == 1:
-    spec_path = os.path.normpath(spec_parts[0])
-    assert spec_path, (
-      'Attempted to parse a bad spec string {spec}: empty spec string'
-      .format(spec=spec)
-    )
+    spec_path = normalize_absolute_refs(spec_parts[0])
     target_name = os.path.basename(spec_path)
-    return normalize_absolute_refs(spec_path), target_name
+  else:
+    spec_path, target_name = spec_parts
+    if not spec_path:
+      spec_path = relative_to
+    spec_path = normalize_absolute_refs(spec_path)
 
-  spec_path, target_name = spec_parts
-  if not spec_path:
-    spec_path = relative_to
-  return normalize_absolute_refs(spec_path), target_name
+  check_path(spec_path)
+  check_target_name(target_name)
+  return spec_path, target_name
 
 
 class Address(AbstractClass):

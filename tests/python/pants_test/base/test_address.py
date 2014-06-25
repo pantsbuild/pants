@@ -5,9 +5,9 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-import os
-import unittest
 from contextlib import contextmanager
+import os
+import unittest2
 
 from twitter.common.contextutil import pushd, temporary_dir
 from twitter.common.dirutil import touch
@@ -17,12 +17,8 @@ from pants.base.build_file import BuildFile
 from pants.base.build_root import BuildRoot
 
 
-class ParseSpecTest(unittest.TestCase):
+class ParseSpecTest(unittest2.TestCase):
   def test_parse_spec(self):
-    spec_path, target_name = parse_spec('a/b/c/')
-    self.assertEqual(spec_path, 'a/b/c')
-    self.assertEqual(target_name, 'c')
-
     spec_path, target_name = parse_spec('a/b/c')
     self.assertEqual(spec_path, 'a/b/c')
     self.assertEqual(target_name, 'c')
@@ -45,10 +41,6 @@ class ParseSpecTest(unittest.TestCase):
     self.assertEqual(target_name, 'c')
 
   def test_parse_absolute_spec(self):
-    spec_path, target_name = parse_spec('//a/b/c/')
-    self.assertEqual(spec_path, 'a/b/c')
-    self.assertEqual(target_name, 'c')
-
     spec_path, target_name = parse_spec('//a/b/c')
     self.assertEqual(spec_path, 'a/b/c')
     self.assertEqual(target_name, 'c')
@@ -61,8 +53,46 @@ class ParseSpecTest(unittest.TestCase):
     self.assertEqual(spec_path, '')
     self.assertEqual(target_name, 'c')
 
+  def test_parse_bad_spec_non_normalized(self):
+    self.do_test_bad_spec('')
+    self.do_test_bad_spec('..')
+    self.do_test_bad_spec('.')
 
-class AddressTest(unittest.TestCase):
+    self.do_test_bad_spec('//')
+    self.do_test_bad_spec('//..')
+    self.do_test_bad_spec('//.')
+
+    self.do_test_bad_spec('a/.')
+    self.do_test_bad_spec('a/..')
+    self.do_test_bad_spec('a/../a')
+
+    self.do_test_bad_spec('a/')
+    self.do_test_bad_spec('a/b/')
+
+  def test_parse_bad_spec_bad_name(self):
+    self.do_test_bad_spec('a:')
+    self.do_test_bad_spec('a::')
+
+  def test_parse_bad_spec_build_trailing_path_component(self):
+    self.do_test_bad_spec('BUILD')
+    self.do_test_bad_spec('BUILD.suffix')
+    self.do_test_bad_spec('//BUILD')
+    self.do_test_bad_spec('//BUILD.suffix')
+    self.do_test_bad_spec('a/BUILD')
+    self.do_test_bad_spec('a/BUILD.suffix')
+    self.do_test_bad_spec('//a/BUILD')
+    self.do_test_bad_spec('//a/BUILD.suffix')
+    self.do_test_bad_spec('a/BUILD:b')
+    self.do_test_bad_spec('a/BUILD.suffix:b')
+    self.do_test_bad_spec('//a/BUILD:b')
+    self.do_test_bad_spec('//a/BUILD.suffix:b')
+
+  def do_test_bad_spec(self, spec):
+    with self.assertRaises(ValueError):
+      parse_spec(spec)
+
+
+class BaseAddressTest(unittest2.TestCase):
   @contextmanager
   def workspace(self, *buildfiles):
     with temporary_dir() as root_dir:
@@ -72,28 +102,32 @@ class AddressTest(unittest.TestCase):
             touch(os.path.join(root_dir, buildfile))
           yield os.path.realpath(root_dir)
 
-  def assertAddress(self, spec_path, target_name, address):
+  def assert_address(self, spec_path, target_name, address):
     self.assertEqual(spec_path, address.spec_path)
     self.assertEqual(target_name, address.target_name)
 
-  def test_synthetic_forms(self):
-    self.assertAddress('a/b', 'target', SyntheticAddress.parse('a/b:target'))
-    self.assertAddress('a/b', 'target', SyntheticAddress.parse('//a/b:target'))
-    self.assertAddress('a/b', 'b', SyntheticAddress.parse('a/b'))
-    self.assertAddress('a/b', 'b', SyntheticAddress.parse('//a/b'))
-    self.assertAddress('a/b', 'target', SyntheticAddress.parse(':target', relative_to='a/b'))
-    self.assertAddress('', 'target', SyntheticAddress.parse('//:target', relative_to='a/b'))
-    self.assertAddress('', 'target', SyntheticAddress.parse(':target'))
-    self.assertAddress('a/b', 'target', SyntheticAddress.parse(':target', relative_to='a/b'))
 
+class SyntheticAddressTest(BaseAddressTest):
+  def test_synthetic_forms(self):
+    self.assert_address('a/b', 'target', SyntheticAddress.parse('a/b:target'))
+    self.assert_address('a/b', 'target', SyntheticAddress.parse('//a/b:target'))
+    self.assert_address('a/b', 'b', SyntheticAddress.parse('a/b'))
+    self.assert_address('a/b', 'b', SyntheticAddress.parse('//a/b'))
+    self.assert_address('a/b', 'target', SyntheticAddress.parse(':target', relative_to='a/b'))
+    self.assert_address('', 'target', SyntheticAddress.parse('//:target', relative_to='a/b'))
+    self.assert_address('', 'target', SyntheticAddress.parse(':target'))
+    self.assert_address('a/b', 'target', SyntheticAddress.parse(':target', relative_to='a/b'))
+
+
+class BuildFileAddressTest(BaseAddressTest):
   def test_build_file_forms(self):
     with self.workspace('a/b/c/BUILD') as root_dir:
       build_file = BuildFile(root_dir, relpath='a/b/c')
-      self.assertAddress('a/b/c', 'c', BuildFileAddress(build_file))
-      self.assertAddress('a/b/c', 'foo', BuildFileAddress(build_file, target_name='foo'))
+      self.assert_address('a/b/c', 'c', BuildFileAddress(build_file))
+      self.assert_address('a/b/c', 'foo', BuildFileAddress(build_file, target_name='foo'))
       self.assertEqual('a/b/c:foo', BuildFileAddress(build_file, target_name='foo').spec)
 
     with self.workspace('BUILD') as root_dir:
       build_file = BuildFile(root_dir, relpath='')
-      self.assertAddress('', 'foo', BuildFileAddress(build_file, target_name='foo'))
+      self.assert_address('', 'foo', BuildFileAddress(build_file, target_name='foo'))
       self.assertEqual(':foo', BuildFileAddress(build_file, target_name='foo').spec)
