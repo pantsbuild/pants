@@ -91,15 +91,6 @@ jar_library(name='guava',
             ],
            )
 
-jar_library(name='guice',
-            jars = [
-              jar(
-                org='com.google.inject', name='guice', rev='3.0',
-                apidocs='http://google-guice.googlecode.com/svn/tags/3.0/javadoc/'
-              ).with_sources()
-            ]
-           )
-
 jar_library(name='jsr305',
             jars = [
               jar(org='com.google.code.findbugs', name='jsr305', rev='1.3.9')
@@ -186,21 +177,6 @@ jar_library(name='util-core',
 ###############
 # Test support
 #
-
-jar_library(name='easymock',
-            jars = [
-              jar(org='org.easymock', name='easymock', rev='3.2').with_sources(),
-              # Class extension is needed to support the old version of easymockclassextension that
-              # is not dependend on by the easymock dependency
-              jar(org='org.easymock', name='easymockclassextension', rev='3.2').with_sources(),
-            ]
-           )
-
-jar_library(name='mockito',
-            jars = [
-              jar(org='org.mockito', name='mockito-all', rev='1.9.0').with_sources()
-            ]
-           )
 
 jar_library(name='hamcrest-core',
             jars = [ jar(org='org.hamcrest', name='hamcrest-core', rev='1.3') ])
