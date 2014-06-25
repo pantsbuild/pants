@@ -138,6 +138,16 @@ python_tests(
 )
 
 python_tests(
+  name = 'payload',
+  sources = ['test_payload.py'],
+  dependencies = [
+    pants('src/python/pants/backend/core'),
+    pants('src/python/pants/base:payload'),
+    pants('tests/python/pants_test:base_test'),
+  ]
+)
+
+python_tests(
   name = 'revision',
   sources = ['test_revision.py'],
   dependencies = [

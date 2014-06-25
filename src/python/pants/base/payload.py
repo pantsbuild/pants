@@ -9,8 +9,8 @@ from abc import abstractmethod
 import os
 from hashlib import sha1
 
-from twitter.common.collections import OrderedSet
-from twitter.common.lang import AbstractClass
+from twitter.common.collections import maybe_list, OrderedSet
+from twitter.common.lang import AbstractClass, Compatibility
 
 from pants.base.build_environment import get_buildroot
 
@@ -52,7 +52,11 @@ class Payload(AbstractClass):
     pass
 
 
-class SourcesMixin(object):
+class SourcesPayload(Payload):
+  def __init__(self, sources_rel_path, sources):
+    self.sources_rel_path = sources_rel_path
+    self.sources = maybe_list(sources or [], expected_type=Compatibility.string)
+
   @property
   def num_chunking_units(self):
     return len(self.sources)
@@ -90,15 +94,14 @@ class BundlePayload(Payload):
     return hasher.hexdigest()
 
 
-class JvmTargetPayload(SourcesMixin, Payload):
+class JvmTargetPayload(SourcesPayload):
   def __init__(self,
                sources_rel_path=None,
                sources=None,
                provides=None,
                excludes=None,
                configurations=None):
-    self.sources_rel_path = sources_rel_path
-    self.sources = list(sources or [])
+    super(JvmTargetPayload, self).__init__(sources_rel_path, sources)
     self.provides = provides
     self.excludes = OrderedSet(excludes)
     self.configurations = OrderedSet(configurations)
@@ -119,7 +122,7 @@ class JvmTargetPayload(SourcesMixin, Payload):
     return hasher.hexdigest()
 
 
-class PythonPayload(SourcesMixin, Payload):
+class PythonPayload(SourcesPayload):
   def __init__(self,
                sources_rel_path=None,
                sources=None,
@@ -127,8 +130,7 @@ class PythonPayload(SourcesMixin, Payload):
                requirements=None,
                provides=None,
                compatibility=None):
-    self.sources_rel_path = sources_rel_path
-    self.sources = list(sources or [])
+    super(PythonPayload, self).__init__(sources_rel_path, sources)
     self.resources = list(resources or [])
     self.requirements = requirements
     self.provides = provides
@@ -145,10 +147,9 @@ class PythonPayload(SourcesMixin, Payload):
     #   hasher.update(config)
 
 
-class ResourcesPayload(SourcesMixin, Payload):
+class ResourcesPayload(SourcesPayload):
   def __init__(self, sources_rel_path=None, sources=None):
-    self.sources_rel_path = sources_rel_path
-    self.sources = OrderedSet(sources)
+    super(ResourcesPayload, self).__init__(sources_rel_path, OrderedSet(sources))
 
   def invalidation_hash(self):
     return hash_sources(get_buildroot(), self.sources_rel_path, self.sources)

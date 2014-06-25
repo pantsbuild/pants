@@ -10,7 +10,7 @@ from twitter.common.lang import Compatibility
 from pants.base.address import SyntheticAddress
 from pants.base.build_environment import get_buildroot
 from pants.base.build_manual import manual
-from pants.base.payload import SourcesMixin, Payload, hash_sources
+from pants.base.payload import SourcesPayload, hash_sources
 from pants.base.target import Target
 
 
@@ -69,10 +69,9 @@ class Page(Target):
   to multiple wikis.
   """
 
-  class PagePayload(SourcesMixin, Payload):
+  class PagePayload(SourcesPayload):
     def __init__(self, sources_rel_path, source, resources=None, provides=None):
-      self.sources_rel_path = sources_rel_path
-      self.sources = [source]
+      super(Page.PagePayload, self).__init__(sources_rel_path, [source])
       self.resources = list(resources or [])
       self.provides = list(provides or [])
 
