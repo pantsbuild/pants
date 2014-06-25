@@ -26,9 +26,10 @@ The following target addresses all specify the same single target.
     $ ./pants goal list src/java/com/pants/examples/hello/main
     src/java/com/pants/examples/hello/main:main
 
-* Trailing forward slashes are ignored on the command-line to accommodate tab completion::
+* Relative paths and trailing forward slashes are ignored on the command-line to accommodate tab
+  completion::
 
-    $ ./pants goal list src/java/com/pants/examples/hello/main/
+    $ ./pants goal list ./src/java/com/pants/examples/hello/main/
     src/java/com/pants/examples/hello/main:main
 
   *NB: Neither the `./` or any other relative path form nor the trailing slash are not allowed in
@@ -44,7 +45,7 @@ As a convenience, targets can be referenced relatively within the same BUILD fil
     )
 
 If you need to reference a target in a BUILD file at the root of the repository, there is an
-explicit absolute address prefix mainly useful in BUILD files::
+explicit absolute address prefix mainly useful in BUILD files not at the root of the repo::
 
     java_library(name='application', ...)
     java_library(name='mybird',
