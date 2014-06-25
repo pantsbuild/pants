@@ -38,9 +38,8 @@ class BuildFile(object):
   @staticmethod
   def scan_buildfiles(root_dir, base_path=None):
     """Looks for all BUILD files under base_path"""
-
     buildfiles = []
-    for root, dirs, files in os.walk(base_path if base_path else root_dir):
+    for root, dirs, files in os.walk(os.path.join(root_dir, base_path or '')):
       for filename in files:
         if BuildFile._is_buildfile_name(filename):
           buildfile_relpath = os.path.relpath(os.path.join(root, filename), root_dir)

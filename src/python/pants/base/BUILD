@@ -192,8 +192,8 @@ python_library(
 )
 
 python_library(
-  name = 'spec_parser',
-  sources = ['spec_parser.py'],
+  name = 'cmd_line_spec_parser',
+  sources = ['cmd_line_spec_parser.py'],
   dependencies = [
     pants(':address'),
     pants(':build_file'),

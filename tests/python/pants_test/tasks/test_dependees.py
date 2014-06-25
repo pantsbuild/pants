@@ -156,39 +156,39 @@ class ReverseDepmapTest(mox.MoxTestBase, BaseReverseDepmapTest):
 
   def test_roots(self):
     self.assert_console_output(
-      'overlaps/BUILD:two',
+      'overlaps:two',
       targets=[self.target('common/c')],
       extra_targets=[self.target('common/a')]
     )
 
   def test_normal(self):
     self.assert_console_output(
-      'overlaps/BUILD:two',
+      'overlaps:two',
       targets=[self.target('common/c')]
     )
 
   def test_closed(self):
     self.assert_console_output(
-      'overlaps/BUILD:two',
-      'common/c/BUILD:c',
+      'overlaps:two',
+      'common/c:c',
       args=['--test-closed'],
       targets=[self.target('common/c')]
     )
 
   def test_transitive(self):
     self.assert_console_output(
-      'overlaps/BUILD:one',
-      'overlaps/BUILD:three',
-      'overlaps/BUILD:four',
-      'overlaps/BUILD:five',
+      'overlaps:one',
+      'overlaps:three',
+      'overlaps:four',
+      'overlaps:five',
       args=['--test-transitive'],
       targets=[self.target('common/b')]
     )
 
   def test_nodups_dependees(self):
     self.assert_console_output(
-      'overlaps/BUILD:two',
-      'overlaps/BUILD:three',
+      'overlaps:two',
+      'overlaps:three',
       targets=[
         self.target('common/a'),
         self.target('overlaps:one')
@@ -199,22 +199,22 @@ class ReverseDepmapTest(mox.MoxTestBase, BaseReverseDepmapTest):
     targets = [self.target('common/c')] * 2
     self.assertEqual(2, len(targets))
     self.assert_console_output(
-      'overlaps/BUILD:two',
-      'common/c/BUILD:c',
+      'overlaps:two',
+      'common/c:c',
       args=['--test-closed'],
       targets=targets
     )
 
   def test_aliasing(self):
     self.assert_console_output(
-      'overlaps/BUILD:five',
+      'overlaps:five',
       targets=[self.target('overlaps:four')]
     )
 
   def test_depeendees_type(self):
     self._set_up_mocks(PythonTests, ["%s/tests" % get_buildroot()])
     self.assert_console_output(
-      'tests/d/BUILD:d',
+      'tests/d:d',
       args=['--test-type=python_tests'],
       targets=[self.target('common/d')]
     )
@@ -229,8 +229,8 @@ class ReverseDepmapTest(mox.MoxTestBase, BaseReverseDepmapTest):
 
   def test_compile_idls(self):
     self.assert_console_output(
-      'src/thrift/dependent/BUILD:my-example',
-      'src/thrift/example/BUILD:compiled_scala',
+      'src/thrift/dependent:my-example',
+      'src/thrift/example:compiled_scala',
       targets=[
         self.target('src/thrift/example:mybird'),
       ],
@@ -238,13 +238,13 @@ class ReverseDepmapTest(mox.MoxTestBase, BaseReverseDepmapTest):
 
   def test_external_dependency(self):
     self.assert_console_output(
-      'src/java/example/BUILD:example2',
+      'src/java/example:example2',
        targets=[self.target('src/java/example:mybird')]
     )
 
   def test_resources_dependees(self):
     self.assert_console_output(
-      'src/java/a/BUILD:a_java',
+      'src/java/a:a_java',
        targets=[self.target('resources/a:a_resources')]
     )
 

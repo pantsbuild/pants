@@ -10,7 +10,7 @@ import os
 from twitter.common.lang import AbstractClass
 
 
-def parse_spec(spec, relative_to=''):
+def parse_spec(spec, relative_to=None):
   """Parses a target address spec and returns the path from the root of the repo to this Target
   and Target name.
 
@@ -75,7 +75,7 @@ def parse_spec(spec, relative_to=''):
     target_name = os.path.basename(spec_path)
   else:
     spec_path, target_name = spec_parts
-    if not spec_path:
+    if not spec_path and relative_to:
       spec_path = relative_to
     spec_path = normalize_absolute_refs(spec_path)
 
@@ -168,12 +168,6 @@ class BuildFileAddress(Address):
     default_target_name = os.path.basename(spec_path)
     super(BuildFileAddress, self).__init__(spec_path=spec_path,
                                            target_name=target_name or default_target_name)
-
-  @property
-  def build_file_spec(self):
-    return ("{build_file}:{target_name}"
-            .format(build_file=self.build_file,
-                    target_name=self.target_name))
 
   def __repr__(self):
     return ("BuildFileAddress({build_file}, {target_name})"

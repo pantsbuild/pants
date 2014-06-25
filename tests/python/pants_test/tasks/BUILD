@@ -6,6 +6,7 @@ python_library(
   sources = ['test_base.py'],
   dependencies = [
     pants('3rdparty/python/twitter/commons:twitter.common.collections'),
+    pants('src/python/pants/base:cmd_line_spec_parser'),
     pants('src/python/pants/base:target'),
     pants('src/python/pants/commands:goal'),
     pants('src/python/pants/goal'),

@@ -262,6 +262,17 @@ class BuildFileParser(object):
       target = target_proxy.to_target(build_graph)
       build_graph.inject_target(target)
 
+  def parse_spec(self, spec, relative_to=None, context=None):
+    try:
+      return parse_spec(spec, relative_to=relative_to)
+    except ValueError as e:
+      if context:
+        msg = ('Invalid spec {spec} found while '
+               'parsing {context}: {exc}').format(spec=spec, context=context, exc=e)
+      else:
+        msg = 'Invalid spec {spec}: {exc}'.format(spec=spec, exc=e)
+      raise self.InvalidTargetException(msg)
+
   def inject_address_closure_into_build_graph(self,
                                               address,
                                               build_graph,
@@ -284,7 +295,9 @@ class BuildFileParser(object):
       build_graph.inject_target(target, dependencies=target_proxy.dependency_addresses)
 
       for traversable_spec in target.traversable_dependency_specs:
-        spec_path, target_name = parse_spec(traversable_spec, relative_to=address.spec_path)
+        spec_path, target_name = self.parse_spec(traversable_spec,
+                                                 relative_to=address.spec_path,
+                                                 context='dependencies of {0}'.format(address))
         self._inject_spec_closure_into_build_graph(spec_path,
                                                    target_name,
                                                    build_graph,
@@ -296,7 +309,9 @@ class BuildFileParser(object):
           target.mark_transitive_invalidation_hash_dirty()
 
       for traversable_spec in target.traversable_specs:
-        spec_path, target_name = parse_spec(traversable_spec, relative_to=address.spec_path)
+        spec_path, target_name = self.parse_spec(traversable_spec,
+                                                 relative_to=address.spec_path,
+                                                 context='traversable specs of {0}'.format(address))
         self._inject_spec_closure_into_build_graph(spec_path,
                                                    target_name,
                                                    build_graph,
@@ -304,7 +319,7 @@ class BuildFileParser(object):
         target.mark_transitive_invalidation_hash_dirty()
 
   def inject_spec_closure_into_build_graph(self, spec, build_graph, addresses_already_closed=None):
-    spec_path, target_name = parse_spec(spec)
+    spec_path, target_name = self.parse_spec(spec)
     self._inject_spec_closure_into_build_graph(spec_path,
                                                target_name,
                                                build_graph,

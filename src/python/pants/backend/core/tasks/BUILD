@@ -143,6 +143,7 @@ python_library(
     pants(':console_task'),
     pants('src/python/pants/base:address'),
     pants('src/python/pants/base:build_environment'),
+    pants('src/python/pants/base:cmd_line_spec_parser'),
     pants('src/python/pants/base:target'),
   ],
 )

@@ -21,14 +21,11 @@ from twitter.common.log.options import LogOptions
 from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.backend.core.tasks.task import Task
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask  # XXX(pl)
-from pants.base.address import BuildFileAddress, parse_spec
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
-from pants.base.config import Config, ConfigOption
-from pants.base.exceptions import TargetDefinitionException, TaskError
+from pants.base.config import Config
+from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.rcfile import RcFile
-from pants.base.spec_parser import SpecParser
-from pants.base.target import Target
 from pants.base.workunit import WorkUnit
 from pants.commands.command import Command
 from pants.engine.engine import Engine
@@ -178,7 +175,7 @@ class Goal(Command):
 
     with self.run_tracker.new_workunit(name='setup', labels=[WorkUnit.SETUP]):
       # Bootstrap user goals by loading any BUILD files implied by targets.
-      spec_parser = SpecParser(self.root_dir, self.build_file_parser)
+      spec_parser = CmdLineSpecParser(self.root_dir, self.build_file_parser)
       with self.run_tracker.new_workunit(name='parse', labels=[WorkUnit.SETUP]):
         for spec in specs:
           for address in spec_parser.parse_addresses(spec):

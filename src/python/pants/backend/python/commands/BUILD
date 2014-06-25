@@ -17,7 +17,7 @@ python_library(
     pants('3rdparty/python/twitter/commons:twitter.common.collections'),
     pants('src/python/pants/base:address'),
     pants('src/python/pants/base:config'),
-    pants('src/python/pants/base:spec_parser'),
+    pants('src/python/pants/base:cmd_line_spec_parser'),
     pants('src/python/pants/base:target'),
     pants('src/python/pants/commands:command'),
     pants('src/python/pants/backend/python:interpreter_cache'),

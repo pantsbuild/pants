@@ -24,7 +24,7 @@ class MinimalCover(ConsoleTask):
     for target in self.context.target_roots:
       if target not in internal_deps and target not in minimal_cover:
         minimal_cover.add(target)
-        yield target.address.build_file_spec
+        yield target.address.spec
 
   def _collect_internal_deps(self, target):
     internal_deps = set()

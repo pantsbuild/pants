@@ -11,7 +11,7 @@ import traceback
 from twitter.common.collections import OrderedSet
 
 from pants.base.config import Config
-from pants.base.spec_parser import SpecParser
+from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.commands.command import Command
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.python_builder import PythonBuilder
@@ -72,7 +72,7 @@ class Build(Command):
       self.build_args = self.args[1:] if len(self.args) > 1 else []
 
     self.targets = OrderedSet()
-    spec_parser = SpecParser(self.root_dir, self.build_file_parser)
+    spec_parser = CmdLineSpecParser(self.root_dir, self.build_file_parser)
     self.top_level_addresses = set()
 
     for spec in self.args[0:specs_end]:
