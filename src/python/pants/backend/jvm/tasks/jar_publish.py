@@ -411,7 +411,7 @@ class JarPublish(Task, ScmPublish):
           try:
             target = Target.get(address)
             if not target:
-              siblings = Target.get_all_addresses(address.buildfile)
+              siblings = Target.get_all_addresses(address.build_file)
               prompt = 'did you mean' if len(siblings) == 1 else 'maybe you meant one of these'
               raise TaskError('%s => %s?:\n    %s' % (address, prompt,
                                                       '\n    '.join(str(a) for a in siblings)))
@@ -419,7 +419,7 @@ class JarPublish(Task, ScmPublish):
               raise TaskError('%s is not an exported target' % coordinate)
             return target.provides.org, target.provides.name
           except (ImportError, SyntaxError, TypeError):
-            raise TaskError('Failed to parse %s' % address.buildfile.relpath)
+            raise TaskError('Failed to parse %s' % address.build_file.relpath)
         except IOError:
           raise TaskError('No BUILD file could be found at %s' % coordinate)
 

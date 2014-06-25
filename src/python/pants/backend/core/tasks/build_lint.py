@@ -52,7 +52,7 @@ class BuildLint(Task):
     def add_buildfile_for_target(target, genmap):
       missing_dep_map = genmap[target]
       missing_deps = missing_dep_map[self.context._buildroot] if missing_dep_map else defaultdict(list)
-      buildfile_paths[target.address.buildfile.full_path][target.name] += missing_deps
+      buildfile_paths[target.address.build_file.full_path][target.name] += missing_deps
 
     if self.transitive:
       targets = self.context.targets()

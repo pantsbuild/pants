@@ -67,7 +67,7 @@ def generate_coverage_config(targets):
   cp.add_section('html')
   if len(targets) == 1:
     target = targets[0]
-    relpath = os.path.join(os.path.dirname(target.address.buildfile.relpath), target.name)
+    relpath = os.path.join(os.path.dirname(target.address.build_file.relpath), target.name)
   else:
     relpath = Target.maybe_readable_identify(targets)
   target_dir = os.path.join(Config.load().getdefault('pants_distdir'), 'coverage', relpath)
@@ -126,7 +126,7 @@ class PythonTestBuilder(object):
       xml_base = os.path.abspath(os.path.normpath(xml_base))
       if len(targets) == 1:
         target = targets[0]
-        relpath = os.path.join(os.path.dirname(target.address.buildfile.relpath),
+        relpath = os.path.join(os.path.dirname(target.address.build_file.relpath),
                                target.name + '.xml')
       else:
         relpath = Target.maybe_readable_identify(targets) + '.xml'

@@ -459,12 +459,12 @@ class Project(object):
         # this target globs children as well.  Gather all these candidate BUILD files to test for
         # sources they own that live in the directories this targets sources live in.
         target_dirset = find_source_basedirs(target)
-        candidates = Target.get_all_addresses(target.address.buildfile)
-        for ancestor in target.address.buildfile.ancestors():
+        candidates = Target.get_all_addresses(target.address.build_file)
+        for ancestor in target.address.build_file.ancestors():
           candidates.update(Target.get_all_addresses(ancestor))
-        for sibling in target.address.buildfile.siblings():
+        for sibling in target.address.build_file.siblings():
           candidates.update(Target.get_all_addresses(sibling))
-        for descendant in target.address.buildfile.descendants():
+        for descendant in target.address.build_file.descendants():
           candidates.update(Target.get_all_addresses(descendant))
 
         def is_sibling(target):
