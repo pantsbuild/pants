@@ -10,7 +10,7 @@ from pants.base.payload import JarLibraryPayload
 from pants.base.target import Target
 
 
-@manual.builddict(tags=["anylang"])
+@manual.builddict(tags=["jvm"])
 class JarLibrary(Target):
   """A set of jars that may be depended upon."""
 
