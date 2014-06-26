@@ -56,37 +56,56 @@ as inspired by its misbehaviors. When the fixed source code is in a
 consistent state, remove ``pants.pex`` so that it will get replaced
 on the next ``./pants`` run.
 
-
 *******
 Testing
 *******
+
+.. _dev_run_all_tests:
 
 Running Tests
 =============
 
 Pants has many tests. There are BUILD targets to run those tests.
 We try to keep them passing.
-To make sure a change passes *all* of Pants' tests, use the
-``tests/python/pants_test:all`` target.
-*Do not* use ``PANTS_DEV=1`` when running tests at this time
-as that modifies ``sys.path`` in such a way as resources will
-not be discovered correctly. ::
+`A Travis-CI job <https://travis-ci.org/pantsbuild/pants>`_
+runs tests on each sha pushed to origin on ``github.com/pantsbuild/pants``.
 
-   ./pants tests/python/pants_test:all
+Most test are runnable as regular Pants test targets.
+To find tests that work with a particular feature, you might
+explore ``tests/python/pants_tests/.../BUILD``.
 
-To bring up the ``pdb`` debugger when tests fail, pass the ``--pdb`` flag.
+Typically, you're not sure precisely which tests you need to run, so you
+run all of them.
 
-To try all the tests in a few configurations, you can run the same script
+To run all tests, ::
+
+   ./pants goal test tests::
+
+To run just Pants' *unit* tests (skipping the can-be-slow integration
+tests), use the ``tests/python/pants_test:all`` target::
+
+   ./pants goal test tests/python/pants_test:all
+
+To bring up the ``pdb`` debugger when Python tests fail,
+pass the ``--pdb`` flag.
+
+Before :doc:`contributing a change <howto_contribute>` to Pants,
+make sure it passes **all** of our continuous integration (CI) tests:
+everything builds, all tests pass.
+To try all the CI tests in a few configurations, you can run the same script
 that our Travis CI does. This can take a while, but it's a good idea to
 run it before you contribute a change or merge it to master::
 
    ./build-support/bin/ci.sh
 
-Before :doc:`contributing a change <howto_contribute>` to Pants,
-make sure it passes all tests.
+Sometimes you want to run tests on Travis-CI even though you're not sure
+your change is ready to merge to master.
 
-For convenience, some other test targets enable more granular test running.
-Please see the BUILD files for details.
+* If you can push to the ``pantsbuild/pants`` project,
+  push your development branch to origin. Travis-CI will test it soon after.
+* If you *can't* push to the ``pantsbuild/pants`` project,
+  push a branch to your fork of pantsbuild on github, then open a pull request
+  against pants with your branch. Travis-CI will test it soon after.
 
 *********
 Debugging
