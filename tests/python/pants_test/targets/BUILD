@@ -11,6 +11,7 @@ python_library(
 python_test_suite(
   name = 'targets',
   dependencies = [
+    pants(':android_binary'),
     pants(':artifact'),
     pants(':exclusive'),
     pants(':sort_targets'),
@@ -29,6 +30,15 @@ python_test_suite(
   dependencies = [
     pants(':scala_library_integration'),
   ],
+)
+
+python_tests(
+  name = 'android_binary',
+  sources = ['test_android_binary.py'],
+  dependencies = [
+    pants(':base'),
+    pants('src/python/pants/backend/android/targets:android'),
+  ]
 )
 
 python_tests(
