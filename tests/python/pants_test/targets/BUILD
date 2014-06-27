@@ -11,7 +11,6 @@ python_library(
 python_test_suite(
   name = 'targets',
   dependencies = [
-    pants(':android_binary'),
     pants(':artifact'),
     pants(':exclusive'),
     pants(':sort_targets'),
