@@ -285,6 +285,7 @@ class RelativeToMapper(object):
 class Bundle(object):
   """A set of files to include in an application bundle.
 
+  To learn about application bundles, see :ref:`jvm_bundles`.
   Looking for Java-style resources accessible via the ``Class.getResource`` API?
   Those are :ref:`bdict_resources`\ .
 
