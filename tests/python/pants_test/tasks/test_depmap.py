@@ -12,7 +12,6 @@ from pants.backend.core.targets.resources import Resources
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.jvm_binary import Bundle, JvmApp, JvmBinary
-from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.depmap import Depmap
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
@@ -40,7 +39,6 @@ class DepmapTest(BaseDepmapTest):
         'python_binary': PythonBinary,
         'python_library': PythonLibrary,
         'resources': Resources,
-        'scala_library': ScalaLibrary,
       },
       'exposed_objects': {
         'pants': lambda x: x,
@@ -95,7 +93,7 @@ class DepmapTest(BaseDepmapTest):
     add_to_build_file('common/a', 'a', 'dependencies')
     add_to_build_file('common/b', 'b', 'jar_library')
     self.add_to_build_file('common/c', dedent('''
-      scala_library(name='c',
+      java_library(name='c',
         sources=[],
       )
     '''))
@@ -111,7 +109,7 @@ class DepmapTest(BaseDepmapTest):
     create_jvm_app('common/i', 'i', 'jvm_app', 'common/g:g', "bundle().add('common.g')")
     add_to_build_file('overlaps', 'one', 'jvm_binary', deps=['common/h', 'common/i'])
     self.add_to_build_file('overlaps', dedent('''
-      scala_library(name='two',
+      java_library(name='two',
         dependencies=[pants('overlaps:one')],
         sources=[],
       )
@@ -129,11 +127,11 @@ class DepmapTest(BaseDepmapTest):
       )
     '''))
 
-  # def test_empty(self):
-  #   self.assert_console_raises(
-  #     TaskError,
-  #     targets=[self.target('common/a')]
-  #   )
+  def test_empty(self):
+    self.assert_console_raises(
+      TaskError,
+      targets=[self.target('common/a')]
+    )
 
   def test_jar_library(self):
     self.assert_console_raises(
@@ -141,7 +139,7 @@ class DepmapTest(BaseDepmapTest):
       targets=[self.target('common/b')],
     )
 
-  def test_scala_library(self):
+  def test_java_library(self):
     self.assert_console_output(
       'internal-common.c.c',
       targets=[self.target('common/c')]

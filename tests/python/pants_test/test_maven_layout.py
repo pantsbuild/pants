@@ -7,7 +7,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from pants.backend.maven_layout.maven_layout import maven_layout
 from pants.backend.jvm.targets.java_library import JavaLibrary
-from pants.backend.jvm.targets.scala_library import ScalaLibrary
+from pants.backend.jvm.targets.java_tests import JavaTests
 from pants_test.base_test import BaseTest
 
 
@@ -16,8 +16,8 @@ class MavenLayoutTest(BaseTest):
   def alias_groups(self):
     return {
       'target_aliases': {
-        'scala_library': ScalaLibrary,
         'java_library': JavaLibrary,
+        'junit_tests': JavaTests,
       },
       'partial_path_relative_utils': {
         'maven_layout': maven_layout,
@@ -27,8 +27,8 @@ class MavenLayoutTest(BaseTest):
   def setUp(self):
     super(MavenLayoutTest, self).setUp()
 
-    self.add_to_build_file('projectB/src/main/scala',
-                          'scala_library(name="test", sources=[])')
+    self.add_to_build_file('projectB/src/test/scala',
+                          'junit_tests(name="test", sources=[])')
     self.create_file('projectB/BUILD', 'maven_layout()')
 
     self.add_to_build_file('projectA/subproject/src/main/java',
@@ -36,8 +36,8 @@ class MavenLayoutTest(BaseTest):
     self.create_file('BUILD', 'maven_layout("projectA/subproject")')
 
   def test_layout_here(self):
-    self.assertEqual('projectB/src/main/scala',
-                     self.target('projectB/src/main/scala:test').target_base)
+    self.assertEqual('projectB/src/test/scala',
+                     self.target('projectB/src/test/scala:test').target_base)
 
   def test_subproject_layout(self):
     self.assertEqual('projectA/subproject/src/main/java',

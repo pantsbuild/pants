@@ -8,6 +8,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 from twitter.common.lang import Compatibility
 
 from pants.base.address import SyntheticAddress
+from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import JvmTargetPayload
 from pants.base.target import Target
 from pants.backend.jvm.targets.jar_library import JarLibrary
@@ -95,15 +96,24 @@ class JvmTarget(Target, Jarable):
 
     # TODO(pl): This is an awful hack
     if isinstance(self.payload.provides.repo, Compatibility.string):
-      address = SyntheticAddress.parse(self.payload.provides.repo,
-                                       relative_to=self.address.spec_path)
+      repo_spec = self.payload.provides.repo
+      address = SyntheticAddress.parse(repo_spec, relative_to=self.address.spec_path)
       repo_target = self._build_graph.get_target(address)
+      if repo_target is None:
+        raise TargetDefinitionException(self, 'No such repo target: %s' % repo_spec)
       self.payload.provides.repo = repo_target
     return self.payload.provides
 
   @property
   def resources(self):
-    return [self._build_graph.get_target_from_spec(spec) for spec in self._resource_specs]
+    resources = []
+    for spec in self._resource_specs:
+      address = SyntheticAddress.parse(spec, relative_to=self.address.spec_path)
+      target = self._build_graph.get_target(address)
+      if target is None:
+        raise TargetDefinitionException(self, 'No such resource target: %s' % spec)
+      resources.append(target)
+    return resources
 
   @property
   def excludes(self):

@@ -16,7 +16,6 @@ from pants.backend.core.tasks.dependees import ReverseDepmap
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
-from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.base.build_environment import get_buildroot
@@ -49,7 +48,6 @@ class ReverseDepmapTest(mox.MoxTestBase, BaseReverseDepmapTest):
         'python_library': PythonLibrary,
         'python_tests': PythonTests,
         'resources': Resources,
-        'scala_library': ScalaLibrary,
       },
       'exposed_objects': {
         'jar': JarDependency,
@@ -115,12 +113,12 @@ class ReverseDepmapTest(mox.MoxTestBase, BaseReverseDepmapTest):
       '''))
 
     self.add_to_build_file('src/thrift/example', dedent('''
-      scala_library(
-        name='compiled_scala_user',
+      java_library(
+        name='compiled_java_user',
         dependencies=[
           ':compiled_scala'
         ],
-        sources=['1.scala'],
+        sources=['1.java'],
       )
       '''))
 

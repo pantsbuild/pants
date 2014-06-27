@@ -5,8 +5,11 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from pants.base.build_manual import manual
+from pants.backend.jvm.scala.target_platform import TargetPlatform
 from pants.backend.jvm.targets.exportable_jvm_library import ExportableJvmLibrary
+from pants.base.address import SyntheticAddress
+from pants.base.build_manual import manual
+from pants.base.exceptions import TargetDefinitionException
 
 
 @manual.builddict(tags=['scala'])
@@ -48,6 +51,17 @@ class ScalaLibrary(ExportableJvmLibrary):
     self.add_labels('scala')
 
   @property
+  def traversable_dependency_specs(self):
+    for spec in super(ScalaLibrary, self).traversable_dependency_specs:
+      yield spec
+
+    # TODO(John Sirois): Targets should have a config plumbed as part of the implicit
+    # BuildFileParser injected context and that could be used to allow in general for targets with
+    # knobs and in particular an explict config arg to the TargetPlatform constructor below.
+    for library_spec in TargetPlatform().library_specs:
+      yield library_spec
+
+  @property
   def traversable_specs(self):
     for spec in super(ScalaLibrary, self).traversable_specs:
       yield spec
@@ -64,4 +78,8 @@ class ScalaLibrary(ExportableJvmLibrary):
   @property
   def java_sources(self):
     for spec in self._java_sources_specs:
-      yield self._build_graph.get_target_from_spec(spec)
+      address = SyntheticAddress.parse(spec, relative_to=self.address.spec_path)
+      target = self._build_graph.get_target(address)
+      if target is None:
+        raise TargetDefinitionException(self, 'No such java target: %s' % spec)
+      yield target

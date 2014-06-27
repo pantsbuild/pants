@@ -45,9 +45,14 @@ jar_library(name = 'zinc',
                 .exclude(org = 'org.ensime', name = 'ensime-sbt-cmd')
             ])
 
-jar_library(name = 'scala-compile-2.9.3',
+jar_library(name = 'scala-compiler-2.9.3',
             jars = [
               jar(org = 'org.scala-lang', name = 'scala-compiler', rev = '2.9.3'),
+            ])
+
+jar_library(name = 'scala-library-2.9.3',
+            jars = [
+              jar(org = 'org.scala-lang', name = 'scala-library', rev = '2.9.3'),
             ])
 
 jar_library(name = 'twitter-checkstyle',
@@ -66,16 +71,20 @@ jar_library(name = 'junit',
 
 jar_library(name = 'scala-specs-2.9.3',
             jars = [
-              jar(org = 'org.scala-lang', name = 'scala-library', rev = '2.9.3').intransitive(),
               jar(org = 'org.scala-tools.testing', name = 'specs_2.9.3', rev = '1.6.9'),
               jar(org = 'com.twitter.common', name = 'specs-testing', rev = '0.0.6')
+            ],
+            dependencies = [
+              ':scala-library-2.9.3',
             ])
 
 jar_library(name = 'scala-repl-2.9.3',
             jars = [
-              jar(org = 'org.scala-lang', name = 'scala-compiler', rev = '2.9.3').intransitive(),
-              jar(org = 'org.scala-lang', name = 'scala-library', rev = '2.9.3').intransitive(),
               jar(org = 'org.scala-lang', name = 'jline', rev = '2.9.3').intransitive(),
+            ],
+            dependencies = [
+              ':scala-compiler-2.9.3',
+              ':scala-library-2.9.3',
             ])
 
 jar_library(name = 'scalastyle',

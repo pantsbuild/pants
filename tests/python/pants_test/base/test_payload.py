@@ -8,8 +8,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import pytest
 
 from pants.backend.core.wrapped_globs import Globs
-from pants.backend.jvm.targets.scala_library import ScalaLibrary
-from pants.base.build_file import BuildFile
+from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants_test.base_test import BaseTest
 
 
@@ -18,7 +17,7 @@ class PayloadTest(BaseTest):
   def alias_groups(self):
     return {
       'target_aliases': {
-        'scala_library': ScalaLibrary,
+        'java_library': JavaLibrary,
       },
       'applicative_path_relative_utils': {
         'globs': Globs,
@@ -30,16 +29,15 @@ class PayloadTest(BaseTest):
 
   def test_no_nested_globs(self):
     # nesting no longer allowed
-    self.add_to_build_file('z/BUILD', 'scala_library(name="z", sources=[globs("*")])')
-    build_file_z = BuildFile(self.build_root, 'z/BUILD')
+    self.add_to_build_file('z/BUILD', 'java_library(name="z", sources=[globs("*")])')
     with pytest.raises(ValueError):
       self.build_file_parser.scan(self.build_root)
 
   def test_flat_globs_list(self):
     # flattened allowed
-    self.add_to_build_file('y/BUILD', 'scala_library(name="y", sources=globs("*"))')
+    self.add_to_build_file('y/BUILD', 'java_library(name="y", sources=globs("*"))')
     self.build_file_parser.scan(self.build_root)
 
   def test_single_source(self):
-    self.add_to_build_file('y/BUILD', 'scala_library(name="y", sources="Source.scala")')
+    self.add_to_build_file('y/BUILD', 'java_library(name="y", sources="Source.scala")')
     self.build_file_parser.scan(self.build_root)
