@@ -31,6 +31,11 @@ class ScalaLibraryTest(BaseTest):
   def setUp(self):
     super(ScalaLibraryTest, self).setUp()
 
+    self.create_file('pants.ini', dedent('''
+        [scala-compile]
+        runtime-deps: []
+        '''))
+
     self.add_to_build_file('3rdparty', dedent('''
         jar_library(
           name='hub-and-spoke',

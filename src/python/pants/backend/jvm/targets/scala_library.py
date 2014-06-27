@@ -54,6 +54,10 @@ class ScalaLibrary(ExportableJvmLibrary):
   def traversable_dependency_specs(self):
     for spec in super(ScalaLibrary, self).traversable_dependency_specs:
       yield spec
+
+    # TODO(John Sirois): Targets should have a config plumbed as part of the implicit
+    # BuildFileParser injected context and that could be used to allow in general for targets with
+    # knobs and in particular an explict config arg to the TargetPlatform constructor below.
     for library_spec in TargetPlatform().library_specs:
       yield library_spec
 

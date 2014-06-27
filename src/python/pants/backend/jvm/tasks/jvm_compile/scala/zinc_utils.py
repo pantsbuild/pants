@@ -44,7 +44,7 @@ class ZincUtils(object):
 
     # The target scala version.
     self._compile_bootstrap_key = 'scalac'
-    self._compile_bootstrap_tools = TargetPlatform().compiler_specs
+    self._compile_bootstrap_tools = TargetPlatform(config=context.config).compiler_specs
     self._jvm_tool_bootstrapper.register_jvm_tool(self._compile_bootstrap_key,
                                                   self._compile_bootstrap_tools)
 

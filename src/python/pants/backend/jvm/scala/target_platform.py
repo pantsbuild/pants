@@ -5,8 +5,6 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from twitter.common.lang import Singleton
-
 from pants.base.config import Config
 
 
@@ -17,7 +15,7 @@ from pants.base.config import Config
 # pointee targets to achieve true works-from-default operation.
 
 
-class TargetPlatform(Singleton):
+class TargetPlatform(object):
   """Encapsulates information about the configured default scala target platform."""
 
   def __init__(self, config=None):
@@ -27,10 +25,10 @@ class TargetPlatform(Singleton):
   def compiler_specs(self):
     """Returns a list of target specs pointing to the scalac tool libraries."""
     return self._config.getlist('scala-compile', 'compile-bootstrap-tools',
-                                default=[':scala-compile-2.9.3'])
+                                default=['//:scala-compiler-2.9.3'])
 
   @property
   def library_specs(self):
     """Returns a list of target specs pointing to the scala runtime libraries."""
     return self._config.getlist('scala-compile', 'runtime-deps',
-                                default=[':scala-library-2.9.3'])
+                                default=['//:scala-library-2.9.3'])
