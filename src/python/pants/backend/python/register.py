@@ -20,7 +20,6 @@ from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_tests import PythonTests
-from pants.backend.python.tasks.setup_python_environment import SetupPythonEnvironment
 from pants.commands.goal import Goal
 from pants.goal import Goal as goal
 
@@ -63,10 +62,6 @@ def register_commands():
 
 
 def register_goals():
-  # TODO(benjy): What is this? Do we need it?
-  goal(name='python-setup', action=SetupPythonEnvironment
-  ).install('setup').with_description("Setup the target's build environment.")
-
   goal(name='python-binary-create', action=PythonBinaryCreate, dependencies=['bootstrap', 'check-exclusives', 'resources']
   ).install('binary')
 

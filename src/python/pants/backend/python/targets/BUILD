@@ -5,7 +5,6 @@ python_library(
     'python_binary.py',
     'python_library.py',
     'python_requirement_library.py',
-    'python_root.py',
     'python_target.py',
     'python_tests.py',
   ],
