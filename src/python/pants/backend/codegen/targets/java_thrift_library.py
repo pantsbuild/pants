@@ -5,16 +5,10 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from collections import Iterable
-from functools import partial
-
-from twitter.common.collections import maybe_list
-
+from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.build_manual import manual
 from pants.base.config import Config
 from pants.base.exceptions import TargetDefinitionException
-from pants.backend.jvm.targets.jar_dependency import JarDependency
-from pants.backend.jvm.targets.jvm_target import JvmTarget
 
 
 @manual.builddict(tags=['java'])
@@ -50,7 +44,7 @@ class JavaThriftLibrary(JvmTarget):
   # In general a plugin will contribute a target and a task, but in this case we have a shared
   # target that can be used by at least 2 tasks - ThriftGen and ScroogeGen.  This is likely not
   # uncommon (gcc & clang) so the arrangement needs to be cleaned up and supported well.
-  _COMPILERS = frozenset(['thrift', 'scrooge', 'scrooge-legacy'])
+  _COMPILERS = frozenset(['thrift', 'scrooge'])
   _LANGUAGES = frozenset(['java', 'scala'])
   _RPC_STYLES = frozenset(['sync', 'finagle', 'ostrich'])
 
@@ -62,7 +56,7 @@ class JavaThriftLibrary(JvmTarget):
                **kwargs):
     """
     :param string name: The name of this target, which combined with this
-      build file defines the target :class:`pants.base.address.Address`.
+      build file defines the target:class:`pants.base.address.Address`.
     :param sources: A list of filenames representing the source code
       this library is compiled from.
     :type sources: list of strings
