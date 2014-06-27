@@ -35,6 +35,7 @@ python_test_suite(
     pants(':double_dag'),
     pants(':generator'),
     pants(':hash_utils'),
+    pants(':payload'),
     pants(':revision'),
     pants(':run_info'),
   ]
