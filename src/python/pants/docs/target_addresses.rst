@@ -44,8 +44,9 @@ As a convenience, targets can be referenced relatively within the same BUILD fil
       dependencies=[pants(':application')],
     )
 
-If you need to reference a target in a BUILD file at the root of the repository, there is an
-explicit absolute address prefix mainly useful in BUILD files not at the root of the repo::
+To refer to a target in a top-level BUILD file, prefix the target name with ``//:``. (You can
+prefix any absolute path with //, but it's mainly useful for top-level targets since ":target"
+is relative.) ::
 
     java_library(name='application', ...)
     java_library(name='mybird',
