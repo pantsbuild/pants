@@ -35,12 +35,6 @@ class JavaThriftLibraryDefaultsTest(BaseTest):
         )
 
         java_thrift_library(
-          name='compiler',
-          sources=[],
-          compiler='scrooge-legacy',
-        )
-
-        java_thrift_library(
           name='language',
           sources=[],
           language='scala',
@@ -59,7 +53,6 @@ class JavaThriftLibraryDefaultsTest(BaseTest):
         '''))
 
     self.target_default = self.target('thrift:default')
-    self.target_compiler = self.target('thrift:compiler')
     self.target_language = self.target('thrift:language')
     self.target_rpc_style = self.target('thrift:rpc_style')
     self.target_invalid = self.target('thrift:invalid')
@@ -94,6 +87,5 @@ class JavaThriftLibraryDefaultsTest(BaseTest):
 
   def test_explicit_values(self):
     defaults = self.create_defaults()
-    self.assertEqual('scrooge-legacy', defaults.get_compiler(self.target_compiler))
     self.assertEqual('scala', defaults.get_language(self.target_language))
     self.assertEqual('ostrich', defaults.get_rpc_style(self.target_rpc_style))

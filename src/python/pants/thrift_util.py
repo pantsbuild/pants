@@ -59,30 +59,6 @@ def find_root_thrifts(basedirs, sources, log=None):
   return root_sources
 
 
-def calculate_compile_sources_HACK_FOR_SCROOGE_LEGACY(targets, is_thrift_target):
-  """Calculates the set of thrift source files that need to be compiled
-  as well as their associated import/include directories.
-  It does not exclude sources that are included in other sources.
-
-  A tuple of (include dirs, thrift sources) is returned.
-
-  :targets: The targets to examine.
-  :is_thrift_target: A predicate to pick out thrift targets for consideration in the analysis.
-  """
-
-  dirs = set()
-  sources = set()
-
-  def collect_sources(target):
-    for source in target.sources:
-      dirs.add(os.path.normpath(os.path.join(target.target_base, os.path.dirname(source))))
-      sources.add(os.path.join(target.target_base, source))
-  for target in targets:
-    target.walk(collect_sources, predicate=is_thrift_target)
-
-  return dirs, sources
-
-
 def calculate_compile_sources(targets, is_thrift_target):
   """Calculates the set of thrift source files that need to be compiled.
   It does not exclude sources that are included in other sources.

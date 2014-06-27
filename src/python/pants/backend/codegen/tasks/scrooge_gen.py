@@ -22,9 +22,7 @@ from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.address import SyntheticAddress
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
-from pants.thrift_util import (
-    calculate_compile_sources,
-    calculate_compile_sources_HACK_FOR_SCROOGE_LEGACY)
+from pants.thrift_util import calculate_compile_sources
 
 
 CompilerConfig = namedtuple('CompilerConfig', ['name', 'config_section', 'profile',
@@ -54,6 +52,9 @@ class Compiler(namedtuple('CompilerConfigWithContext', ('context',) + CompilerCo
     return self.context.config.getbool(self.config_section, 'strict', default=False)
 
 
+# TODO(John Sirois): We used to support multiple incompatible scrooge compilers but no longer do.
+# As a result code in this file can be substantially simplified and made more direct.  Do so.
+# See: https://github.com/pantsbuild/pants/issues/288
 _COMPILERS = [
     CompilerConfig(name='scrooge',
                    config_section='scrooge-gen',
@@ -61,12 +62,6 @@ _COMPILERS = [
                    main='com.twitter.scrooge.Main',
                    calc_srcs=calculate_compile_sources,
                    langs=frozenset(['scala', 'java'])),
-    CompilerConfig(name='scrooge-legacy',
-                   config_section='scrooge-legacy-gen',
-                   profile='scrooge-legacy-gen',
-                   main='com.twitter.scrooge.Main',
-                   calc_srcs=calculate_compile_sources_HACK_FOR_SCROOGE_LEGACY,
-                   langs=frozenset(['scala']))
 ]
 
 _CONFIG_FOR_COMPILER = dict((compiler.name, compiler) for compiler in _COMPILERS)
