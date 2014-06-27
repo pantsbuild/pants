@@ -368,6 +368,7 @@ python_library(
   sources = ['jvmdoc_gen.py'],
   dependencies = [
     pants(':common'),
+    pants(':jvm_task'),
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('src/python/pants:binary_util'),
   ],

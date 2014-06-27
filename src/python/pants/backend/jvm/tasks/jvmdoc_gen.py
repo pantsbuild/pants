@@ -14,7 +14,7 @@ import subprocess
 from twitter.common.dirutil import safe_mkdir
 
 from pants import binary_util
-from pants.backend.core.tasks.task import Task
+from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.base.exceptions import TaskError
 
 
@@ -25,7 +25,7 @@ ParserConfig = collections.namedtuple('JvmdocGenParserConfig',
                                        'combined_opt', 'ignore_failure_opt'])
 
 
-class JvmdocGen(Task):
+class JvmdocGen(JvmTask):
   @classmethod
   def setup_parser_config(cls):
     opts = ['%s_%s' % (cls.__name__, opt) for opt in ParserConfig._fields]
@@ -133,24 +133,23 @@ class JvmdocGen(Task):
       targets = self.context.targets()
       with self.invalidated(filter(docable, targets)) as invalidation_check:
         safe_mkdir(self.workdir)
-        with self.context.state('classpath', []) as cp:
-          classpath = [jar for conf, jar in cp if conf in self.confs]
+        classpath = self.classpath(confs=self.confs,
+                                   exclusives_classpath=self.get_base_classpath_for_target(targets[0]))
+        def find_jvmdoc_targets():
+          invalid_targets = set()
+          for vt in invalidation_check.invalid_vts:
+            invalid_targets.update(vt.targets)
 
-          def find_jvmdoc_targets():
-            invalid_targets = set()
-            for vt in invalidation_check.invalid_vts:
-              invalid_targets.update(vt.targets)
-
-            if self.transitive:
-              return invalid_targets
-            else:
-              return set(invalid_targets).intersection(set(self.context.target_roots))
-
-          jvmdoc_targets = list(filter(docable, find_jvmdoc_targets()))
-          if self.combined:
-            self._generate_combined(classpath, jvmdoc_targets, create_jvmdoc_command)
+          if self.transitive:
+            return invalid_targets
           else:
-            self._generate_individual(classpath, jvmdoc_targets, create_jvmdoc_command)
+            return set(invalid_targets).intersection(set(self.context.target_roots))
+
+        jvmdoc_targets = list(filter(docable, find_jvmdoc_targets()))
+        if self.combined:
+          self._generate_combined(classpath, jvmdoc_targets, create_jvmdoc_command)
+        else:
+          self._generate_individual(classpath, jvmdoc_targets, create_jvmdoc_command)
 
       if catalog:
         for target in targets:
