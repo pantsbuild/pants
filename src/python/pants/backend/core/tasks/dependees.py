@@ -94,10 +94,10 @@ class ReverseDepmap(ConsoleTask):
     roots = set(self.context.target_roots)
     if self._closed:
       for root in roots:
-        yield root.address.build_file_spec
+        yield root.address.spec
 
     for dependant in self.get_dependants(dependees_by_target, roots):
-      yield dependant.address.build_file_spec
+      yield dependant.address.spec
 
   def get_dependants(self, dependees_by_target, roots):
     check = set(roots)

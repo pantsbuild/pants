@@ -71,12 +71,12 @@ class FilterTest(BaseFilterTest):
 
   def test_roots(self):
     self.assert_console_output(
-      'common/a/BUILD:a',
-      'common/a/BUILD:foo',
-      'common/b/BUILD:b',
-      'common/b/BUILD:foo',
-      'common/c/BUILD:c',
-      'common/c/BUILD:foo',
+      'common/a:a',
+      'common/a:foo',
+      'common/b:b',
+      'common/b:foo',
+      'common/c:c',
+      'common/c:foo',
       targets=self.targets('common/::'),
       extra_targets=self.targets('overlaps/::')
     )
@@ -85,57 +85,57 @@ class FilterTest(BaseFilterTest):
     targets = [self.target('common/b')] * 2
     self.assertEqual(2, len(targets))
     self.assert_console_output(
-      'common/b/BUILD:b',
+      'common/b:b',
       targets=targets
     )
 
   def test_no_filters(self):
     self.assert_console_output(
-      'common/a/BUILD:a',
-      'common/a/BUILD:foo',
-      'common/b/BUILD:b',
-      'common/b/BUILD:foo',
-      'common/c/BUILD:c',
-      'common/c/BUILD:foo',
-      'overlaps/BUILD:one',
-      'overlaps/BUILD:two',
-      'overlaps/BUILD:three',
-      'overlaps/BUILD:foo',
+      'common/a:a',
+      'common/a:foo',
+      'common/b:b',
+      'common/b:foo',
+      'common/c:c',
+      'common/c:foo',
+      'overlaps:one',
+      'overlaps:two',
+      'overlaps:three',
+      'overlaps:foo',
       targets=self.targets('::')
     )
 
   def test_filter_type(self):
     self.assert_console_output(
-      'common/a/BUILD:a',
-      'common/b/BUILD:b',
-      'common/c/BUILD:c',
-      'overlaps/BUILD:one',
-      'overlaps/BUILD:two',
-      'overlaps/BUILD:three',
+      'common/a:a',
+      'common/b:b',
+      'common/c:c',
+      'overlaps:one',
+      'overlaps:two',
+      'overlaps:three',
       args=['--test-type=python_library'],
       targets=self.targets('::')
     )
 
     self.assert_console_output(
-      'common/a/BUILD:foo',
-      'common/b/BUILD:foo',
-      'common/c/BUILD:foo',
-      'overlaps/BUILD:foo',
+      'common/a:foo',
+      'common/b:foo',
+      'common/c:foo',
+      'overlaps:foo',
       args=['--test-type=-python_library'],
       targets=self.targets('::')
     )
 
     self.assert_console_output(
-      'common/a/BUILD:a',
-      'common/a/BUILD:foo',
-      'common/b/BUILD:b',
-      'common/b/BUILD:foo',
-      'common/c/BUILD:c',
-      'common/c/BUILD:foo',
-      'overlaps/BUILD:one',
-      'overlaps/BUILD:two',
-      'overlaps/BUILD:three',
-      'overlaps/BUILD:foo',
+      'common/a:a',
+      'common/a:foo',
+      'common/b:b',
+      'common/b:foo',
+      'common/c:c',
+      'common/c:foo',
+      'overlaps:one',
+      'overlaps:two',
+      'overlaps:three',
+      'overlaps:foo',
       args=['--test-type=python_requirement_library,'
             'pants.backend.python.targets.python_library.PythonLibrary'],
       targets=self.targets('::')
@@ -143,73 +143,73 @@ class FilterTest(BaseFilterTest):
 
   def test_filter_target(self):
     self.assert_console_output(
-      'common/a/BUILD:a',
-      'overlaps/BUILD:foo',
+      'common/a:a',
+      'overlaps:foo',
       args=['--test-target=common/a,overlaps/:foo'],
       targets=self.targets('::')
     )
 
     self.assert_console_output(
-      'common/a/BUILD:foo',
-      'common/b/BUILD:b',
-      'common/b/BUILD:foo',
-      'common/c/BUILD:c',
-      'common/c/BUILD:foo',
-      'overlaps/BUILD:two',
-      'overlaps/BUILD:three',
+      'common/a:foo',
+      'common/b:b',
+      'common/b:foo',
+      'common/c:c',
+      'common/c:foo',
+      'overlaps:two',
+      'overlaps:three',
       args=['--test-target=-common/a:a,overlaps:one,overlaps:foo'],
       targets=self.targets('::')
     )
 
   def test_filter_ancestor(self):
     self.assert_console_output(
-      'common/a/BUILD:a',
-      'common/a/BUILD:foo',
-      'common/b/BUILD:b',
-      'common/b/BUILD:foo',
-      'overlaps/BUILD:one',
-      'overlaps/BUILD:foo',
+      'common/a:a',
+      'common/a:foo',
+      'common/b:b',
+      'common/b:foo',
+      'overlaps:one',
+      'overlaps:foo',
       args=['--test-ancestor=overlaps:one,overlaps:foo'],
       targets=self.targets('::')
     )
 
     self.assert_console_output(
-      'common/c/BUILD:c',
-      'common/c/BUILD:foo',
-      'overlaps/BUILD:two',
-      'overlaps/BUILD:three',
+      'common/c:c',
+      'common/c:foo',
+      'overlaps:two',
+      'overlaps:three',
       args=['--test-ancestor=-overlaps:one,overlaps:foo'],
       targets=self.targets('::')
     )
 
   def test_filter_regex(self):
     self.assert_console_output(
-      'common/a/BUILD:a',
-      'common/a/BUILD:foo',
-      'common/b/BUILD:b',
-      'common/b/BUILD:foo',
-      'common/c/BUILD:c',
-      'common/c/BUILD:foo',
+      'common/a:a',
+      'common/a:foo',
+      'common/b:b',
+      'common/b:foo',
+      'common/c:c',
+      'common/c:foo',
       args=['--test-regex=^common'],
       targets=self.targets('::')
     )
 
     self.assert_console_output(
-      'common/a/BUILD:foo',
-      'common/b/BUILD:foo',
-      'common/c/BUILD:foo',
-      'overlaps/BUILD:one',
-      'overlaps/BUILD:two',
-      'overlaps/BUILD:three',
-      'overlaps/BUILD:foo',
+      'common/a:foo',
+      'common/b:foo',
+      'common/c:foo',
+      'overlaps:one',
+      'overlaps:two',
+      'overlaps:three',
+      'overlaps:foo',
       args=['--test-regex=+foo,^overlaps'],
       targets=self.targets('::')
     )
 
     self.assert_console_output(
-      'overlaps/BUILD:one',
-      'overlaps/BUILD:two',
-      'overlaps/BUILD:three',
+      'overlaps:one',
+      'overlaps:two',
+      'overlaps:three',
       args=['--test-regex=-^common,foo$'],
       targets=self.targets('::')
     )

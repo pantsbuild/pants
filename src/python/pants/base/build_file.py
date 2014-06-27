@@ -38,16 +38,15 @@ class BuildFile(object):
   @staticmethod
   def scan_buildfiles(root_dir, base_path=None):
     """Looks for all BUILD files under base_path"""
-
     buildfiles = []
-    for root, dirs, files in os.walk(base_path if base_path else root_dir):
+    for root, dirs, files in os.walk(os.path.join(root_dir, base_path or '')):
       for filename in files:
         if BuildFile._is_buildfile_name(filename):
           buildfile_relpath = os.path.relpath(os.path.join(root, filename), root_dir)
           buildfiles.append(BuildFile(root_dir, buildfile_relpath))
     return OrderedSet(sorted(buildfiles, key=lambda buildfile: buildfile.full_path))
 
-  def __init__(self, root_dir, relpath, must_exist=True):
+  def __init__(self, root_dir, relpath=None, must_exist=True):
     """Creates a BuildFile object representing the BUILD file set at the specified path.
 
     root_dir: The base directory of the project
@@ -57,12 +56,11 @@ class BuildFile(object):
     raises IOError if the specified path does not house a BUILD file and must_exist is True
     """
 
-
     if not os.path.isabs(root_dir):
       raise IOError('BuildFile root_dir {root_dir} must be an absolute path.'
                     .format(root_dir=root_dir))
 
-    path = os.path.join(root_dir, relpath)
+    path = os.path.join(root_dir, relpath) if relpath else root_dir
     self._build_basename = BuildFile._BUILD_FILE_PREFIX
     buildfile = os.path.join(path, self._build_basename) if os.path.isdir(path) else path
 

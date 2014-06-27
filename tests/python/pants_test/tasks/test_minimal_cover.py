@@ -52,7 +52,7 @@ class MinimalCoverTest(BaseMinimalCovertTest):
 
   def test_roots(self):
     self.assert_console_output(
-      'common/a/BUILD:a',
+      'common/a:a',
       targets=[self.target('common/a')],
       extra_targets=[self.target('common/b')]
     )
@@ -61,15 +61,15 @@ class MinimalCoverTest(BaseMinimalCovertTest):
     targets = [self.target('common/a')] * 2
     self.assertEqual(2, len(targets))
     self.assert_console_output(
-      'common/a/BUILD:a',
+      'common/a:a',
       targets=targets
     )
 
   def test_disjoint(self):
     self.assert_console_output(
-      'common/a/BUILD:a',
-      'common/b/BUILD:b',
-      'common/c/BUILD:c',
+      'common/a:a',
+      'common/b:b',
+      'common/c:c',
       targets=[
         self.target('common/a'),
         self.target('common/b'),
@@ -79,7 +79,7 @@ class MinimalCoverTest(BaseMinimalCovertTest):
 
   def test_identical(self):
     self.assert_console_output(
-      'common/a/BUILD:a',
+      'common/a:a',
       targets=[
         self.target('common/a'),
         self.target('common/a'),
@@ -89,8 +89,8 @@ class MinimalCoverTest(BaseMinimalCovertTest):
 
   def test_intersection(self):
     self.assert_console_output(
-      'overlaps/BUILD:one',
-      'overlaps/BUILD:two',
+      'overlaps:one',
+      'overlaps:two',
       targets=[
         self.target('overlaps:one'),
         self.target('overlaps:two')
@@ -98,8 +98,8 @@ class MinimalCoverTest(BaseMinimalCovertTest):
     )
 
     self.assert_console_output(
-      'overlaps/BUILD:one',
-      'common/c/BUILD:c',
+      'overlaps:one',
+      'common/c:c',
       targets=[
         self.target('common/a'),
         self.target('common/b'),
@@ -109,8 +109,8 @@ class MinimalCoverTest(BaseMinimalCovertTest):
     )
 
     self.assert_console_output(
-      'overlaps/BUILD:two',
-      'overlaps/BUILD:three',
+      'overlaps:two',
+      'overlaps:three',
       targets=[
         self.target('common/a'),
         self.target('common/b'),

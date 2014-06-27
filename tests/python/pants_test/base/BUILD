@@ -31,6 +31,7 @@ python_test_suite(
     pants(':build_file_parser'),
     pants(':build_invalidator'),
     pants(':build_root'),
+    pants(':cmd_line_spec_parser'),
     pants(':double_dag'),
     pants(':generator'),
     pants(':hash_utils'),
@@ -102,6 +103,15 @@ python_tests(
     pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('src/python/pants/base:build_root'),
+    pants('tests/python/pants_test:base_test'),
+  ]
+)
+
+python_tests(
+  name = 'cmd_line_spec_parser',
+  sources = ['test_cmd_line_spec_parser.py'],
+  dependencies = [
+    pants('src/python/pants/base:cmd_line_spec_parser'),
     pants('tests/python/pants_test:base_test'),
   ]
 )

@@ -5,22 +5,15 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from pants.base.build_graph import BuildGraph, CycleException, sort_targets
-from pants.base.payload import EmptyPayload
-from pants.base.target import Target
-from pants.base.exceptions import TargetDefinitionException
+import pytest
 
+from pants.base.build_graph import CycleException, sort_targets
 from pants_test.base_test import BaseTest
 
 
 class SortTargetsTest(BaseTest):
   def test_validation(self):
     valid = self.make_target(':valid')
-
-  # TODO(pl): Fix up and move to Address tests
-  #     self.assertRaises(TargetDefinitionException,
-  #                       self.make_target,
-  #                       name=1)
 
     self.make_target(':valid2', dependencies=[valid])
 
@@ -36,12 +29,8 @@ class SortTargetsTest(BaseTest):
     # no cycles yet
     sort_targets([a])
     self.build_graph.inject_dependency(a.address, a.address)
-    try:
+    with pytest.raises(CycleException):
       sort_targets([a])
-      self.fail("Expected a cycle to be detected")
-    except CycleException:
-      # expected
-      pass
 
   def test_detect_cycle_indirect(self):
     c = self.make_target(':c')
@@ -52,12 +41,8 @@ class SortTargetsTest(BaseTest):
     sort_targets([a])
 
     self.build_graph.inject_dependency(c.address, a.address)
-    try:
+    with pytest.raises(CycleException):
       sort_targets([a])
-      self.fail("Expected a cycle to be detected")
-    except CycleException:
-      # expected
-      pass
 
   def test_sort(self):
     a = self.make_target(':a')

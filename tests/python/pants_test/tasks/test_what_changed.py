@@ -144,40 +144,40 @@ class WhatChangedTest(BaseWhatChangedTest):
 
   def test_owned(self):
     self.assert_console_output(
-      'root/src/py/a/BUILD:alpha',
-      'root/src/py/1/BUILD:numeric',
+      'root/src/py/a:alpha',
+      'root/src/py/1:numeric',
       workspace=self.workspace(files=['root/src/py/a/b/c', 'root/src/py/a/d', 'root/src/py/1/2'])
     )
 
   def test_multiply_owned(self):
     self.assert_console_output(
-      'root/src/thrift/BUILD:thrift',
-      'root/src/thrift/BUILD:py-thrift',
+      'root/src/thrift:thrift',
+      'root/src/thrift:py-thrift',
       workspace=self.workspace(files=['root/src/thrift/a.thrift'])
     )
 
   def test_build(self):
     self.assert_console_output(
-      'root/src/py/a/BUILD:alpha',
-      'root/src/py/a/BUILD:beta',
+      'root/src/py/a:alpha',
+      'root/src/py/a:beta',
       workspace=self.workspace(files=['root/src/py/a/BUILD'])
     )
 
   def test_resource_changed(self):
     self.assert_console_output(
-      'root/src/py/a/BUILD:alpha',
+      'root/src/py/a:alpha',
       workspace=self.workspace(files=['root/src/py/a/test.resources'])
     )
 
   def test_resource_changed_for_java_lib(self):
     self.assert_console_output(
-      'root/resources/a/BUILD:a_resources',
+      'root/resources/a:a_resources',
       workspace=self.workspace(files=['root/resources/a/a.resources'])
     )
 
   def test_build_sibling(self):
     self.assert_console_output(
-      'root/3rdparty/BUILD.twitter:dummy',
+      'root/3rdparty:dummy',
       workspace=self.workspace(files=['root/3rdparty/BUILD.twitter'])
     )
 

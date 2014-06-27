@@ -6,7 +6,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import os
-import unittest
+import unittest2
 
 from contextlib import contextmanager
 from tempfile import mkdtemp
@@ -26,7 +26,7 @@ from pants.base.target import Target
 from pants_test.base.context_utils import create_context
 
 
-class BaseTest(unittest.TestCase):
+class BaseTest(unittest2.TestCase):
   """A baseclass useful for tests requiring a temporary buildroot."""
 
   def build_path(self, relpath):

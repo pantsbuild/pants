@@ -59,7 +59,7 @@ class WhatChanged(ConsoleTask):
         for touched_target in self._owning_targets(path):
           if touched_target not in touched_targets:
             touched_targets.add(touched_target)
-            yield touched_target.address.build_file_spec
+            yield touched_target.address.spec
 
   def _get_touched_files(self):
     try:

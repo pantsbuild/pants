@@ -10,7 +10,8 @@ import re
 import sys
 
 from pants.backend.core.tasks.console_task import ConsoleTask
-from pants.base.address import SyntheticAddress
+from pants.base.build_environment import get_buildroot
+from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.exceptions import TaskError
 from pants.base.target import Target
 
@@ -34,17 +35,6 @@ def _create_filters(list_option, predicate):
     def filter(target):
       return modifier(any(map(lambda predicate: predicate(target), predicates)))
     yield filter
-
-
-def _get_target(spec, build_graph):
-  try:
-    address = SyntheticAddress.parse(spec)
-  except IOError as e:
-    raise TaskError('Failed to parse address: %s: %s' % (address, e))
-  match = build_graph.get_target(address)
-  if not match:
-    raise TaskError('Invalid target address: %s' % address)
-  return match
 
 
 class Filter(ConsoleTask):
@@ -85,9 +75,20 @@ class Filter(ConsoleTask):
 
     self._filters = []
 
+    def _get_targets(spec):
+      try:
+        spec_parser = CmdLineSpecParser(get_buildroot(), self.context.build_file_parser)
+        addresses = spec_parser.parse_addresses(spec)
+      except (IOError, ValueError) as e:
+        raise TaskError('Failed to parse spec: %s: %s' % (spec, e))
+      matches = set(self.context.build_graph.get_target(address) for address in addresses)
+      if not matches:
+        raise TaskError('No matches for spec: %s' % spec)
+      return matches
+
     def filter_for_address(spec):
-      match = _get_target(spec, self.context.build_graph)
-      return lambda target: target == match
+      matches = _get_targets(spec)
+      return lambda target: target in matches
     self._filters.extend(_create_filters(context.options.filter_target, filter_for_address))
 
     def filter_for_type(name):
@@ -109,15 +110,16 @@ class Filter(ConsoleTask):
     self._filters.extend(_create_filters(context.options.filter_type, filter_for_type))
 
     def filter_for_ancestor(spec):
-      ancestor = _get_target(spec, self.context.build_graph)
+      ancestors = _get_targets(spec)
       children = set()
-      ancestor.walk(children.add)
+      for ancestor in ancestors:
+        ancestor.walk(children.add)
       return lambda target: target in children
     self._filters.extend(_create_filters(context.options.filter_ancestor, filter_for_ancestor))
 
     def filter_for_regex(regex):
       parser = re.compile(regex)
-      return lambda target: parser.search(str(target.address.build_file_spec))
+      return lambda target: parser.search(str(target.address.spec))
     self._filters.extend(_create_filters(context.options.filter_regex, filter_for_regex))
 
   def console_output(self, _):
@@ -129,4 +131,4 @@ class Filter(ConsoleTask):
           if not filter(target):
             break
         else:
-          yield target.address.build_file_spec
+          yield target.address.spec

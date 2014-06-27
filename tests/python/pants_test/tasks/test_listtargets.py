@@ -10,11 +10,11 @@ from textwrap import dedent
 
 from pants.backend.core.targets.dependencies import Dependencies
 from pants.backend.core.tasks.listtargets import ListTargets
-from pants.base.target import Target
 from pants.backend.jvm.targets.artifact import Artifact
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.repository import Repository
 from pants_test.tasks.test_base import ConsoleTaskTest
+
 
 class BaseListTargetsTest(ConsoleTaskTest):
   @classmethod
