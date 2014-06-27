@@ -8,7 +8,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import os
 import re
 
-from pants.binary_util import select_binary
+from pants.binary_util import BinaryUtil
 
 
 INCLUDE_PARSER = re.compile(r'^\s*include\s+"([^"]+)"\s*([\/\/|\#].*)*$')
@@ -128,4 +128,4 @@ def select_thrift_binary(config, version=None):
   """
   thrift_supportdir = config.get('thrift-gen', 'supportdir')
   thrift_version = version or config.get('thrift-gen', 'version')
-  return select_binary(thrift_supportdir, thrift_version, 'thrift', config)
+  return BinaryUtil(config=config).select_binary(thrift_supportdir, thrift_version, 'thrift')

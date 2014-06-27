@@ -8,7 +8,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import os
 
 from pants.base.config import Config
-from pants.binary_util import BinaryUtil, select_binary_stream, select_binary_base_path
+from pants.binary_util import BinaryUtil
 from pants_test.base_test import BaseTest
 
 
@@ -81,19 +81,20 @@ class BinaryUtilTest(BaseTest):
   def _fake_url(cls, binaries, base, binary_key):
     base_path, version, name = binaries[binary_key]
     return '{base}/{binary}'.format(base=base,
-                                    binary=select_binary_base_path(base_path, version, name))
+                                    binary=BinaryUtil().select_binary_base_path(
+                                        base_path, version, name))
 
   def _seens_test(self, binaries, bases, reader, config=None):
     unseen = [item for item in reader.values() if item.startswith('SEEN ')]
     if not config:
       config = self.config_urls(bases)
+    util = BinaryUtil(config=config)
     for key in binaries:
       base_path, version, name = binaries[key]
-      with select_binary_stream(base_path,
-                                version,
-                                name,
-                                config=config,
-                                url_opener=reader) as stream:
+      with util.select_binary_stream(base_path,
+                                     version,
+                                     name,
+                                     url_opener=reader) as stream:
         self.assertEqual(stream(), 'SEEN ' + key.upper())
         unseen.remove(stream())
     self.assertEqual(0, len(unseen)) # Make sure we've seen all the SEENs.
@@ -101,7 +102,8 @@ class BinaryUtilTest(BaseTest):
   def test_nobases(self):
     """Tests exception handling if build support urls are improperly specified."""
     try:
-      with select_binary_stream('bin/foo', '4.4.3', 'foo', self.config_urls()) as stream:
+      util = BinaryUtil(config=self.config_urls())
+      with util.select_binary_stream('bin/foo', '4.4.3', 'foo') as stream:
         self.fail('We should have gotten a "NoBaseUrlsError".')
     except BinaryUtil.NoBaseUrlsError as e:
       pass # expected
@@ -118,9 +120,10 @@ class BinaryUtilTest(BaseTest):
     binaries = [
       ('bin/protobuf', '2.4.1', 'protoc',),
     ]
+    util = BinaryUtil(config=config)
     for base_path, version, name in binaries:
       one = 0
-      with select_binary_stream(base_path, version, name, config=config) as stream:
+      with util.select_binary_stream(base_path, version, name) as stream:
         stream()
         one += 1
       self.assertEqual(one, 1)

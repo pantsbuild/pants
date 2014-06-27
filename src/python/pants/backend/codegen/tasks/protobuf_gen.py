@@ -21,7 +21,7 @@ from pants.backend.python.targets.python_library import PythonLibrary
 from pants.base.address import SyntheticAddress
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
-from pants.binary_util import select_binary
+from pants.binary_util import BinaryUtil
 
 
 class ProtobufGen(CodeGen):
@@ -46,11 +46,10 @@ class ProtobufGen(CodeGen):
       if self.context.products.isrequired(lang):
         self.gen_langs.add(lang)
 
-    self.protobuf_binary = select_binary(
+    self.protobuf_binary = BinaryUtil(config=context.config).select_binary(
       self.protoc_supportdir,
       self.protoc_version,
-      'protoc',
-      context.config
+      'protoc'
     )
 
   def resolve_deps(self, key):
