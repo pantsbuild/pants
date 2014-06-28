@@ -5,9 +5,11 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from pants.base.build_manual import manual
 from pants.backend.android.targets.android_target import AndroidTarget
 
 
+@manual.builddict(tags=['android'])
 class AndroidBinary(AndroidTarget):
   """Produces an Android binary."""
 
@@ -20,10 +22,11 @@ class AndroidBinary(AndroidTarget):
                **kwargs):
     """
    :param string name: The name of this target, which combined with this
-      build file defines the target :class:`pants.base.address.Address`.
+      build file defines the :doc:`target address <target_addresses>`.
     :param sources: A list of filenames representing the source code.
-    :type sources: list of strings
-    :param excludes: One or more :class:`pants.targets.exclude.Exclude` instances
+    :type sources: ``Fileset`` or list of strings. Paths are relative to the
+      BUILD file's directory.
+    :param excludes: List of :ref:`exclude <bdict_exclude>`\s
       to filter this target's transitive dependencies against.
     :param package: Package name of app, e.g. 'com.pants.examples.hello'
     :type package: string
@@ -36,5 +39,5 @@ class AndroidBinary(AndroidTarget):
       Set as 'debug' by default.
     """
 
-    # TODO: Add some Compatibility error checks.
+    # TODO (mateor): Add some Compatibility error checks.
     super(AndroidBinary, self).__init__(name=name, sources=sources, **kwargs)
