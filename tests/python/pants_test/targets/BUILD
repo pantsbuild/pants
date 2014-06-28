@@ -32,15 +32,6 @@ python_test_suite(
 )
 
 python_tests(
-  name = 'android_binary',
-  sources = ['test_android_binary.py'],
-  dependencies = [
-    pants(':base'),
-    pants('src/python/pants/backend/android/targets:android'),
-  ]
-)
-
-python_tests(
   name = 'artifact',
   sources = ['test_artifact.py'],
   dependencies = [
