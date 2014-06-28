@@ -48,6 +48,7 @@ class TargetsHelp(ConsoleTask):
   #         vars()[t.get_alias()] = t
   TARGET_TO_ALIAS = {
     'AndroidBinary': 'android_binary',
+    'AndroidResources': 'android_resources',
     'AnnotationProcessor': 'annotation_processor',
     'Artifact': 'artifact',
     'Benchmark': 'benchmark',
