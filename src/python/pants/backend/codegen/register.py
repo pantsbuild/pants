@@ -7,6 +7,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from pants.goal import Goal as goal
 
+from pants.backend.codegen.targets.android_resources import AndroidResources
 from pants.backend.codegen.targets.java_antlr_library import JavaAntlrLibrary
 from pants.backend.codegen.targets.java_protobuf_library import JavaProtobufLibrary
 from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
@@ -22,6 +23,7 @@ from pants.backend.codegen.tasks.scrooge_gen import ScroogeGen
 
 def target_aliases():
   return {
+    'android_resources': AndroidResources,
     'java_antlr_library': JavaAntlrLibrary,
     'java_protobuf_library': JavaProtobufLibrary,
     'java_thrift_library': JavaThriftLibrary,

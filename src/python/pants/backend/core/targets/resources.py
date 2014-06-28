@@ -10,7 +10,7 @@ from pants.base.payload import ResourcesPayload
 from pants.base.target import Target
 
 
-@manual.builddict(tags=['jvm', 'python'])
+@manual.builddict(tags=['android', 'jvm', 'python'])
 class Resources(Target):
   """A set of files accessible as resources from the JVM classpath.
 
