@@ -11,6 +11,7 @@ import os
 from twitter.common.dirutil import safe_mkdir
 
 from pants.backend.android.targets.android_binary import AndroidBinary
+from pants.backend.codegen.targets.android_resources import AndroidResources
 from pants.backend.codegen.targets.java_antlr_library import JavaAntlrLibrary
 from pants.backend.codegen.targets.java_protobuf_library import JavaProtobufLibrary
 from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
@@ -43,6 +44,7 @@ class JvmToolTaskTestBase(BaseTest):
     return {
       'target_aliases': {
         'android_binary': AndroidBinary,
+        'android_resources': AndroidResources,
         'annotation_processor': AnnotationProcessor,
         'jar_library': JarLibrary,
         'java_antlr_library': JavaAntlrLibrary,
