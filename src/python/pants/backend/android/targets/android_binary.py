@@ -13,13 +13,7 @@ from pants.backend.android.targets.android_target import AndroidTarget
 class AndroidBinary(AndroidTarget):
   """Produces an Android binary."""
 
-  def __init__(self,
-               name=None,
-               sources=None,
-               provides=None,
-               dependencies=None,
-               excludes=None,
-               **kwargs):
+  def __init__(self, *args, **kwargs):
     """
     :param string name: The name of this target, which combined with this
       build file defines the :doc:`target address <target_addresses>`.
@@ -40,4 +34,4 @@ class AndroidBinary(AndroidTarget):
     """
 
     # TODO (mateor): Add some Compatibility error checks.
-    super(AndroidBinary, self).__init__(name=name, sources=sources, **kwargs)
+    super(AndroidBinary, self).__init__(*args, **kwargs)
