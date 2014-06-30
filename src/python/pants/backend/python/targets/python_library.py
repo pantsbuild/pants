@@ -20,7 +20,12 @@ class PythonLibrary(PythonTarget):
      (it is
      recommended that your application uses the pkgutil package to access these
      resources in a .zip-module friendly way.)
-  :param dependencies: List of target specs.
+  :param dependencies: Other targets that this target depends on.
+     These dependencies may
+     be other ``python_library``-like targets (``python_library``,
+     ``python_thrift_library``, ``python_antlr_library`` and so forth) or
+     ``python_requirement_library`` targets.
+  :type dependencies: List of target specs.
   :param provides:
     The :ref:`setup_py <bdict_setup_py>` to publish that represents this
     target outside the repo.
