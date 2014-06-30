@@ -1,6 +1,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+source_root('src/android', page, android_resources, android_binary)
 source_root('src/antlr', page, java_antlr_library, python_antlr_library)
 source_root('src/java', annotation_processor, jvm_binary, java_library, page)
 source_root('src/protobuf', java_protobuf_library, page)

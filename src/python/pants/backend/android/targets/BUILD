@@ -14,6 +14,7 @@ python_library(
   sources = [
     'android_binary.py',
     'android_target.py',
+    'android_resources.py',
   ],
   dependencies = [
     pants('src/python/pants/base:build_manual'),
