@@ -7,7 +7,6 @@ python_library(
   sources = ['__init__.py', 'register.py'],
   dependencies = [
     'src/python/pants/backend/codegen/tasks:all',
-    'src/python/pants/backend/codegen/targets:android',
     'src/python/pants/backend/codegen/targets:java',
     'src/python/pants/backend/codegen/targets:python',
   ]

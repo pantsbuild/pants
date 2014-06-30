@@ -8,12 +8,13 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 from pants.goal import Goal as goal
 
 from pants.backend.android.targets.android_binary import AndroidBinary
-from pants.backend.android.targets.android_target import AndroidTarget
+from pants.backend.android.targets.android_resources import AndroidResources
 
 
 def target_aliases():
   return {
     'android_binary': AndroidBinary,
+    'android_resources': AndroidResources,
   }
 
 

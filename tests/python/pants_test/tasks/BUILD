@@ -259,7 +259,6 @@ python_tests(
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants(':base'),
     pants('src/python/pants/backend/android/targets:android'),
-    pants('src/python/pants/backend/codegen/targets:android'),
     pants('src/python/pants/backend/codegen/targets:java'),
     pants('src/python/pants/backend/core/targets:common'),
     pants('src/python/pants/backend/jvm/targets:java'),
