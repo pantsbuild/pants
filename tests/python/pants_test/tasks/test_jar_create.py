@@ -15,7 +15,7 @@ from twitter.common.contextutil import open_zip, temporary_dir
 from twitter.common.dirutil import safe_open
 
 from pants.backend.android.targets.android_binary import AndroidBinary
-from pants.backend.codegen.targets.android_resources import AndroidResources
+from pants.backend.android.targets.android_resources import AndroidResources
 from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
 from pants.backend.core.targets.resources import Resources
 from pants.backend.jvm.targets.artifact import Artifact

@@ -13,17 +13,14 @@ from pants.backend.android.targets.android_target import AndroidTarget
 class AndroidResources(AndroidTarget):
   """Processes android resources to generate R.java"""
 
-def __init__(self,
-             package=None,
-             **kwargs):
+  def __init__(self,
+               package=None,
+               **kwargs):
     """
-    :param package:  java package (com.company.package) in which to generate the java files.
-    :param dependencies: List of :class:`pants.base.target.Target` instances
-      this target depends on.
-    :type dependencies: list of targets
+    :param package:  java package (com.company.package) in which to generate the output java files.
+    :param dependencies: Other targets that this target depends on.
+    :type dependencies: list of target specs
     """
 
-    super(AndroidResources, self).__init__(**kwargs)
-    self.add_labels('codegen')
-    self.add_labels('aapt')
+    super(AndroidResources, self).__init__(package=package, **kwargs)
     self.package = package
