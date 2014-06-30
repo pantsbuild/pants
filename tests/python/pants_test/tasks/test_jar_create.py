@@ -14,6 +14,8 @@ from textwrap import dedent
 from twitter.common.contextutil import open_zip, temporary_dir
 from twitter.common.dirutil import safe_open
 
+from pants.backend.android.targets.android_binary import AndroidBinary
+from pants.backend.android.targets.android_resources import AndroidResources
 from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
 from pants.backend.core.targets.resources import Resources
 from pants.backend.jvm.targets.artifact import Artifact
@@ -35,6 +37,8 @@ class JarCreateTestBase(JarTaskTestBase):
     super_groups = super(JarCreateTestBase, self).alias_groups.copy()
     local_groups = {
       'target_aliases': {
+        'android_resources': AndroidResources,
+        'android_binary': AndroidBinary,
         'java_library': JavaLibrary,
         'jvm_binary': JvmBinary,
         'resources': Resources,

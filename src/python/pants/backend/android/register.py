@@ -6,11 +6,13 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 from pants.backend.android.targets.android_binary import AndroidBinary
+from pants.backend.android.targets.android_resources import AndroidResources
 
 
 def target_aliases():
   return {
     'android_binary': AndroidBinary,
+    'android_resources': AndroidResources,
   }
 
 
