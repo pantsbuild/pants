@@ -5,8 +5,6 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from pants.goal import Goal as goal
-
 from pants.backend.android.targets.android_binary import AndroidBinary
 from pants.backend.android.targets.android_resources import AndroidResources
 
