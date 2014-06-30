@@ -9,20 +9,21 @@ import pytest
 
 from pants.backend.core.wrapped_globs import Globs
 from pants.backend.jvm.targets.java_library import JavaLibrary
+from pants.base.build_file_aliases import BuildFileAliases
 from pants_test.base_test import BaseTest
 
 
 class PayloadTest(BaseTest):
   @property
   def alias_groups(self):
-    return {
-      'target_aliases': {
+    return BuildFileAliases.create(
+      targets={
         'java_library': JavaLibrary,
       },
-      'applicative_path_relative_utils': {
+      macros={
         'globs': Globs,
       },
-    }
+    )
 
   def setUp(self):
     super(PayloadTest, self).setUp()

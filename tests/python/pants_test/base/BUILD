@@ -128,6 +128,7 @@ python_tests(
   sources = ['test_cmd_line_spec_parser.py'],
   dependencies = [
     pants('3rdparty/python/twitter/commons:twitter.common.collections'),
+    pants('src/python/pants/base:build_file_aliases'),
     pants('src/python/pants/base:cmd_line_spec_parser'),
     pants('tests/python/pants_test:base_test'),
   ]
@@ -169,6 +170,7 @@ python_tests(
   sources = ['test_payload.py'],
   dependencies = [
     pants('src/python/pants/backend/core'),
+    pants('src/python/pants/base:build_file_aliases'),
     pants('src/python/pants/base:payload'),
     pants('tests/python/pants_test:base_test'),
   ]
