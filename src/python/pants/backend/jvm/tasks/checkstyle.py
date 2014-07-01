@@ -44,7 +44,9 @@ class Checkstyle(NailgunTask, JvmToolTaskMixin):
 
     self._properties = context.config.getdict('checkstyle', 'properties')
     self._confs = context.config.getlist('checkstyle', 'confs', default=['default'])
-    self.context.products.require_data('exclusives_groups')
+
+  def prepare(self, round_manager):
+    round_manager.require_data('exclusives_groups')
 
   def execute(self):
     if self.context.options.checkstyle_skip:

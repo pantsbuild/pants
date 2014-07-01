@@ -22,12 +22,22 @@ class EngineTestBase(unittest.TestCase):
     return Phase(cls._namespace(phase_name))
 
   @classmethod
+  def as_phase_without_namespace(cls, phase_name):
+    """Returns a ``Phase`` object of the given name"""
+    return Phase(phase_name)
+
+  @classmethod
   def as_phases(cls, *phase_names):
     """Converts the given phase names to a list of ``Phase`` objects."""
     return map(cls.as_phase, phase_names)
 
   @classmethod
-  def installed_goal(cls, name, action=None, dependencies=None, phase=None):
+  def as_phases_without_namespace(cls, *phase_names):
+    """Returns a ``Phase`` object of the given name"""
+    return map(cls.as_phase_without_namespace, phase_names)
+
+  @classmethod
+  def installed_goal(cls, name, action=None, dependencies=None, phase=None, test_namespace=True):
     """Creates and installs a goal with the given name.
 
     :param string name: The goal name.
@@ -35,10 +45,14 @@ class EngineTestBase(unittest.TestCase):
     :param list dependencies: The list of phase names the goal depends on, if any.
     :param string phase: The name of the phase to install the goal in if different from the goal
       name.
+    :param bool namespace: Prepend the goal and phase name with cls._namespace(), if True.
     :returns The installed ``Goal`` object.
     """
-    goal = Goal(cls._namespace(name),
+    if test_namespace:
+      name = cls._namespace(name)
+      phase = cls._namespace(phase) if phase is not None else None
+    goal = Goal(name,
                 action=action or (lambda: None),
                 dependencies=map(cls._namespace, dependencies or []))
-    goal.install(cls._namespace(phase) if phase is not None else None)
+    goal.install(phase if phase is not None else None)
     return goal

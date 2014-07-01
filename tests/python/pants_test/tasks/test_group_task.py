@@ -12,6 +12,7 @@ from pants.backend.core.tasks.group_task import GroupMember, GroupIterator, Grou
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.python.targets.python_library import PythonLibrary
+from pants.engine.round_manager import RoundManager
 
 from pants_test.base_test import BaseTest
 
@@ -135,7 +136,7 @@ class GroupTaskTest(BaseTest):
         super(RecordingGroupMember, me).__init__(context, workdir)
         self.recorded_actions.append(self.construct_action(name))
 
-      def prepare(me):
+      def prepare(me, round_manager):
         self.recorded_actions.append(self.prepare_action(name))
 
       def select(me, target):
@@ -153,12 +154,12 @@ class GroupTaskTest(BaseTest):
     return RecordingGroupMember
 
   def test_groups(self):
-    group_task = GroupTask.named('jvm-compile', 'classes')
+    group_task = GroupTask.named('jvm-compile', ['classes_by_target', 'classes_by_source'])
     group_task.add_member(self.group_member('javac', lambda t: t.is_java))
     group_task.add_member(self.group_member('scalac', lambda t: t.is_scala))
 
     task = group_task(self._context, workdir='/not/real')
-    task.prepare()
+    task.prepare(round_manager=RoundManager(self._context))
     task.execute()
 
     # These items will be executed by GroupTask in order.

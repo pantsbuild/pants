@@ -10,7 +10,6 @@ import unittest
 from contextlib import contextmanager
 from textwrap import dedent
 
-import pytest
 from twitter.common.contextutil import pushd, temporary_dir
 from twitter.common.dirutil import touch
 

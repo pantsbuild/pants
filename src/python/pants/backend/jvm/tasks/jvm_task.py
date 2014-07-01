@@ -13,6 +13,7 @@ from pants.base.exceptions import TaskError
 
 
 class JvmTask(Task):
+
   def get_base_classpath_for_target(self, target):
     """Returns the base classpath for the specified target.
 

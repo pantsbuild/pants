@@ -122,7 +122,10 @@ def register_goals():
       return super(AptCompile, self).select(target) and target.is_apt
 
 
-  jvm_compile = GroupTask.named('jvm-compilers', product_type='classes', flag_namespace=['compile'])
+  jvm_compile = GroupTask.named(
+    'jvm-compilers',
+    product_type=['classes_by_target', 'classes_by_source'],
+    flag_namespace=['compile'])
 
   # At some point ScalaLibrary targets will be able to won mixed scala and java source sets.
   # At that point, the ScalaCompile group member will still only select targets via

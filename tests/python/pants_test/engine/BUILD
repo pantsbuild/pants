@@ -15,7 +15,7 @@ python_test_suite(
   name = 'engine',
   dependencies = [
     pants(':test_engine'),
-    pants(':test_linear_engine'),
+    pants(':test_round_engine'),
   ]
 )
 
@@ -30,8 +30,8 @@ python_tests(
 )
 
 python_tests(
-  name = 'test_linear_engine',
-  sources = ['test_linear_engine.py'],
+  name = 'test_round_engine',
+  sources = ['test_round_engine.py'],
   dependencies = [
     pants(':engine_test_base'),
     pants('src/python/pants/engine'),

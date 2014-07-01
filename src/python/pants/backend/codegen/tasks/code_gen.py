@@ -19,6 +19,10 @@ class CodeGen(Task):
   in the active context that require codegen unless forced.
   """
 
+  @classmethod
+  def product_type(cls):
+    return ['java', 'scala']
+
   def is_gentarget(self, target):
     """Subclass must return True if it handles generating for the target."""
     raise NotImplementedError
@@ -63,6 +67,9 @@ class CodeGen(Task):
 
   def updatedependencies(self, target, dependency):
     target.inject_dependency(dependency.address)
+
+  def prepare(self, round_manager):
+    round_manager.require_data('jvm_build_tools_classpath_callbacks')
 
   def execute(self):
     gentargets = self.context.targets(self.is_gentarget)

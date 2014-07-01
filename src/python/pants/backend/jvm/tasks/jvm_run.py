@@ -52,7 +52,11 @@ class JvmRun(JvmTask):
       self.jvm_args.extend(context.config.getlist('jvm', 'debug_args'))
     self.confs = context.config.getlist('jvm-run', 'confs', default=['default'])
     self.only_write_cmd_line = context.options.only_write_cmd_line
-    context.products.require_data('exclusives_groups')
+
+  def prepare(self, round_manager):
+    round_manager.require_data('exclusives_groups')
+    round_manager.require_data('java')
+    round_manager.require_data('scala')
 
   def execute(self):
     # The called binary may block for a while, allow concurrent pants activity during this pants

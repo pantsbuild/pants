@@ -81,6 +81,10 @@ class MarkdownToHtml(Task):
                             help = 'Override the default markdown extensions and process pages '
                                    'whose source have these extensions instead.')
 
+  @classmethod
+  def product_type(cls):
+    return ['markdown_html', 'wiki_html']
+
   def __init__(self, context, workdir):
     super(MarkdownToHtml, self).__init__(context, workdir)
 

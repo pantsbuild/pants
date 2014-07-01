@@ -60,6 +60,10 @@ class IvyResolve(NailgunTask, IvyTaskMixin, JvmToolTaskMixin):
                                  "be treated as mutable unless a matching artifact explicitly "
                                  "marks mutable as False.")
 
+  @classmethod
+  def product_type(cls):
+    return ['ivy_jar_products', 'jar_dependencies']
+
   def __init__(self, context, workdir, confs=None):
     super(IvyResolve, self).__init__(context, workdir)
 
@@ -79,10 +83,13 @@ class IvyResolve(NailgunTask, IvyTaskMixin, JvmToolTaskMixin):
     self._ivy_utils = IvyUtils(config=context.config,
                                options=context.options,
                                log=context.log)
-    context.products.require_data('exclusives_groups')
 
     # Typically this should be a local cache only, since classpaths aren't portable.
     self.setup_artifact_cache_from_config(config_section='ivy-resolve')
+
+  def prepare(self, round_manager):
+    round_manager.require_data('resources_by_target')
+    round_manager.require_data('exclusives_groups')
 
   def invalidate_for(self):
     return self.context.options.ivy_resolve_overrides
@@ -136,6 +143,7 @@ class IvyResolve(NailgunTask, IvyTaskMixin, JvmToolTaskMixin):
       if self._report:
         self._generate_ivy_report(group_targets)
 
+    # TODO(ity): populate a Classpath object instead of mutating exclusives_groups
     create_jardeps_for = self.context.products.isrequired('jar_dependencies')
     if create_jardeps_for:
       genmap = self.context.products.get('jar_dependencies')

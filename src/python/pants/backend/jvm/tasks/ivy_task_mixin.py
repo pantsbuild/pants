@@ -26,6 +26,10 @@ class IvyResolveFingerprintStrategy(FingerprintStrategy):
   def name(cls):
     return 'ivy_resolve'
 
+  @classmethod
+  def product_type(cls):
+    return ['symlink_map']
+
   def compute_fingerprint(self, target):
     if isinstance(target, JarLibrary):
       return target.payload.invalidation_hash()

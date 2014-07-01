@@ -234,6 +234,10 @@ class JarTask(NailgunTask):
     jar_bootstrap_tools = context.config.getlist('jar-tool', 'bootstrap-tools', [':jar-tool'])
     self.register_jvm_tool(self._JAR_TOOL_CLASSPATH_KEY, jar_bootstrap_tools)
 
+  def prepare(self, round_manager):
+    round_manager.require_data('classes_by_target')
+    round_manager.require_data('resources_by_target')
+
   @contextmanager
   def open_jar(self, path, overwrite=False, compressed=True, jar_rules=None):
     """Yields a :class:`twitter.pants.jvm.jar_task.Jar` that will be written when the context exits.
@@ -350,9 +354,6 @@ class JarTask(NailgunTask):
     This method should be called during task preparation to ensure the classes and resources needed
     for jarring targets are mapped by upstream tasks that generate these.
     """
-    self.context.products.require_data('classes_by_target')
-    self.context.products.require_data('resources_by_target')
-
     class PreparedJarBuilder(self.JarBuilder):
       @property
       def _context(me):

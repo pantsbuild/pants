@@ -18,11 +18,13 @@ from pants.backend.core.tasks.task import Task
 
 class PrepareResources(Task):
 
+  @classmethod
+  def product_type(cls):
+    return ['resources_by_target']
+
   def __init__(self, context, workdir):
     super(PrepareResources, self).__init__(context, workdir)
-
     self.confs = context.config.getlist('prepare-resources', 'confs', default=['default'])
-    self.context.products.require_data('exclusives_groups')
 
   def execute(self):
     if self.context.products.is_required_data('resources_by_target'):

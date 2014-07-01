@@ -110,6 +110,11 @@ class JvmdocGen(JvmTask):
     self.combined = self.open or getattr_options(parser_config.combined_opt)
     self.ignore_failure = getattr_options(parser_config.ignore_failure_opt)
 
+
+  def prepare(self, round_manager):
+    round_manager.require_data('classes_by_target')
+    round_manager.require_data('classes_by_source')
+
   def invalidate_for(self):
     return self.combined, self.transitive, self.workdir, self.confs, self._include_codegen
 

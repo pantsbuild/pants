@@ -6,7 +6,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import pytest
-
 from pants.base.build_graph import CycleException, sort_targets
 from pants_test.base_test import BaseTest
 

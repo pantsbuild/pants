@@ -70,15 +70,12 @@ class TaskBase(AbstractClass):
 
     default_invalidator_root = os.path.join(self.context.config.getdefault('pants_workdir'),
                                             'build_invalidator')
+    suffix_type = self.__class__.__name__
     self._build_invalidator_dir = os.path.join(
         context.config.get('tasks', 'build_invalidator', default=default_invalidator_root),
-        self.product_type())
+        suffix_type)
 
-  @property
-  def workdir(self):
-    return self._workdir
-
-  def prepare(self):
+  def prepare(self, round_manager):
     """Prepares a task for execution.
 
     Called before execution and prior to any tasks that may be (indirectly) depended upon.
@@ -86,6 +83,10 @@ class TaskBase(AbstractClass):
     Typically a task that requires products from other phases would register interest in those
     products here and then retrieve the requested product mappings when executed.
     """
+
+  @property
+  def workdir(self):
+    return self._workdir
 
   def setup_artifact_cache_from_config(self, config_section=None):
     """Subclasses can call this in their __init__() to set up artifact caching for that task type.
@@ -131,17 +132,15 @@ class TaskBase(AbstractClass):
   def artifact_cache_writes_enabled(self):
     return bool(self._write_artifact_cache_spec) and self.context.options.write_to_artifact_cache
 
+  @classmethod
   def product_type(self):
-    """Set the product type for this task.
+    """The list of products this Task produces. Set the product type(s) for this
+    task i.e. the product type(s) this task creates e.g ['classes'].
 
-    By default, each task is considered as creating a unique product type.
-    Subclasses can override this to specify a shared product type, e.g., 'classes'.
-
-    Tasks with the same product type can invalidate each other's targets, e.g., if a ScalaLibrary
-    depends on a JavaLibrary, a change to the JavaLibrary will invalidate the ScalaLibrary because
-    they both have the same product type.
+    By default, each task is considered as creating a unique product type(s).
+    Subclasses that create products, should override this to specify their unique product type(s).
     """
-    return self.__class__.__name__
+    return []
 
   def invalidate_for(self):
     """Provides extra objects that participate in invalidation.

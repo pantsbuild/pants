@@ -34,7 +34,6 @@ class BuildLint(Task):
 
   def __init__(self, context, workdir):
     super(BuildLint, self).__init__(context, workdir)
-    context.products.require('missing_deps')
     self.transitive = context.options.buildlint_transitive
     self.actions = set(context.options.buildlint_actions)
     self.include_intransitive = context.options.buildlint_include_intransitive
@@ -42,6 +41,9 @@ class BuildLint(Task):
     # diffs would always be printed, even if we only wanted to rewrite.
     if not self.actions:
       self.actions.add('diff')
+
+  def prepare(self, round_manager):
+    round_manager.require('missing_deps')
 
   def execute(self):
     # Map from buildfile path to map of target name -> missing deps for that target.

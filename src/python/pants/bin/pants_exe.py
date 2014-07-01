@@ -13,7 +13,6 @@ import traceback
 import psutil
 from twitter.common.dirutil import Lock
 
-from pants.base.address import Address
 from pants.base.build_environment import get_buildroot, get_version
 from pants.base.build_file_parser import BuildFileParser
 from pants.base.build_graph import BuildGraph

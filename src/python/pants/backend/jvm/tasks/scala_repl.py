@@ -37,6 +37,10 @@ class ScalaRepl(JvmTask, JvmToolTaskMixin):
       for arg in context.options.run_args:
         self.args.extend(shlex.split(arg))
 
+  def prepare(self, round_manager):
+    round_manager.require_data('classes_by_target')
+    round_manager.require_data('classes_by_source')
+
   def execute(self):
     targets = self.require_homogeneous_root_targets(lambda t: t.is_jvm)
     if targets:

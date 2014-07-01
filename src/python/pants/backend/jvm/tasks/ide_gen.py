@@ -137,18 +137,17 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
 
     self.configure_compile_context(targets)
 
+  def prepare(self, round_manager):
     if self.python:
-      self.context.products.require('python')
+      round_manager.require('python')
     if not self.skip_java:
-      self.context.products.require('java')
+      round_manager.require('java')
     if not self.skip_scala:
-      self.context.products.require('scala')
-
-    self.context.products.require('jars')
-    self.context.products.require('source_jars')
+      round_manager.require('scala')
+    round_manager.require('jars')
+    round_manager.require('source_jars')
 
   def configure_project(self, targets, checkstyle_suppression_files, debug_port):
-
     jvm_targets = Target.extract_jvm_targets(targets)
     if self.intransitive:
       jvm_targets = set(self.context.target_roots).intersection(jvm_targets)

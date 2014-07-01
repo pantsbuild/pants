@@ -84,6 +84,10 @@ class JarCreate(JarTask):
                             action='callback', callback=mkflag.set_bool,
                             help='[%default] Create javadoc jars.')
 
+  @classmethod
+  def product_type(cls):
+    return ['jars', 'javadoc_jars', 'source_jars']
+
   def __init__(self, context, workdir):
     super(JarCreate, self).__init__(context, workdir)
 
@@ -105,13 +109,14 @@ class JarCreate(JarTask):
     self.jar_javadoc = (True if definitely_create_javadoc else
                         False if definitely_dont_create_javadoc else
                         create_javadoc)
-    if self.jar_javadoc:
-      products.require(javadoc.product_type)
-      products.require(scaladoc.product_type)
 
     self.jar_sources = products.isrequired('source_jars') or options.jar_create_sources
-
     self._jars = {}
+
+  def prepare(self, round_manager):
+    super(JarCreate, self).prepare(round_manager)
+    round_manager.require('javadoc')
+    round_manager.require('scaladoc')
 
   def execute(self):
     safe_mkdir(self.workdir)
@@ -136,10 +141,10 @@ class JarCreate(JarTask):
       if self.jar_javadoc:
         javadoc_add_genjar = functools.partial(add_genjar, 'javadoc_jars')
         self.javadocjar(jar_targets(is_java_library),
-                        self.context.products.get(javadoc.product_type),
+                        self.context.products.get('javadoc'),
                         javadoc_add_genjar)
         self.javadocjar(jar_targets(is_scala_library),
-                        self.context.products.get(scaladoc.product_type),
+                        self.context.products.get('scaladoc'),
                         javadoc_add_genjar)
 
   @contextmanager

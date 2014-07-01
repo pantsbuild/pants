@@ -442,8 +442,10 @@ class JarPublish(Task, ScmPublish):
     if context.options.jar_publish_restart_at:
       self.restart_at = parse_jarcoordinate(context.options.jar_publish_restart_at)
 
-    context.products.require('jars')
-    context.products.require('source_jars')
+  def prepare(self, round_manager):
+    round_manager.require('jars')
+    round_manager.require('javadoc_jars')
+    round_manager.require('source_jars')
 
   def execute(self):
     self.check_clean_master(commit=(not self.dryrun and self.commit))

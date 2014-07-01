@@ -277,11 +277,10 @@ class GroupTask(Task):
   def group_name(self):
     """GroupTask must be sub-classed to provide a group name."""
 
-  def prepare(self):
-    self.context.products.require_data('exclusives_groups')
+  def prepare(self, round_manager):
     for member_type in self._member_types():
       group_member = member_type(self.context, os.path.join(self.workdir, member_type.name()))
-      group_member.prepare()
+      group_member.prepare(round_manager)
       self._group_members.append(group_member)
 
   def execute(self):

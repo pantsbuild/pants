@@ -107,6 +107,10 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
   def name(cls):
     return cls._language
 
+  @classmethod
+  def product_type(cls):
+    return ['classes_by_target', 'classes_by_source']
+
   def select(self, target):
     return target.has_sources(self._file_suffix)
 
@@ -234,8 +238,6 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
         'locally_changed_targets_heuristic_limit', 0)
 
     self._upstream_class_to_path = None  # Computed lazily as needed.
-
-    self.context.products.require_data('exclusives_groups')
     self.setup_artifact_cache_from_config(config_section=config_section)
 
     # Sources (relative to buildroot) present in the last analysis that have since been deleted.
@@ -245,6 +247,15 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
     # Map of target -> list of sources (relative to buildroot), for all targets in all chunks.
     # Populated in prepare_execute().
     self._sources_by_target = None
+
+  def prepare(self, round_manager):
+    # TODO(ity): this is essentially a fake requirement on 'ivy_jar_products' in order to force
+    # resolve to run before this phase, require on a new 'classpath' product (IvyResolve) instead.
+    # round_manager.require_data('classpath')
+    round_manager.require_data('ivy_jar_products')
+    round_manager.require_data('java')
+    round_manager.require_data('scala')
+
 
   def move(self, src, dst):
     if self._delete_scratch:

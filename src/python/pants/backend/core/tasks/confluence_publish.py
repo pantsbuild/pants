@@ -56,9 +56,11 @@ class ConfluencePublish(Task):
 
     self.force = context.options.confluence_publish_force
     self.open = context.options.confluence_publish_open
-    self.context.products.require('wiki_html')
     self._wiki = None
     self.user = context.options.confluence_user
+
+  def prepare(self, round_manager):
+    round_manager.require('wiki_html')
 
   def wiki(self):
     raise NotImplementedError('Subclasses must provide the wiki target they are associated with')

@@ -473,12 +473,6 @@ class JUnitRun(JvmTask, JvmToolTaskMixin):
     super(JUnitRun, self).__init__(context, workdir)
 
     self._context = context
-    context.products.require_data('exclusives_groups')
-
-    # List of FQCN, FQCN#method, sourcefile or sourcefile#method.
-    self.context.products.require_data('classes_by_target')
-    self.context.products.require_data('classes_by_source')
-
     task_exports = _TaskExports(classpath=self.classpath,
                                 get_base_classpath_for_target=self.get_base_classpath_for_target,
                                 register_jvm_tool=self.register_jvm_tool,
@@ -493,6 +487,12 @@ class JUnitRun(JvmTask, JvmToolTaskMixin):
         raise TaskError('unknown coverage processor %s' % context.options.junit_coverage_processor)
     else:
       self._runner = _JUnitRunner(task_exports, self._context)
+
+  def prepare(self, round_manager):
+    # List of FQCN, FQCN#method, sourcefile or sourcefile#method.
+    round_manager.require_data('classes_by_target')
+    round_manager.require_data('classes_by_source')
+
 
   def execute(self):
     if not self._context.options.junit_run_skip:

@@ -52,17 +52,13 @@ def register_commands():
 
 
 def register_goals():
-  goal(name='thrift', action=ApacheThriftGen
-  ).install('gen').with_description('Generate code.')
+  goal(name='thrift', action=ApacheThriftGen).install('gen').with_description('Generate code.')
 
-  goal(name='scrooge', dependencies=['bootstrap'], action=ScroogeGen
-  ).install('gen')
+  goal(name='scrooge', action=ScroogeGen).install('gen')
 
-  goal(name='protoc', action=ProtobufGen
-  ).install('gen')
+  goal(name='protoc', action=ProtobufGen).install('gen')
 
   goal(name='antlr', dependencies=['bootstrap'], action=AntlrGen
   ).install('gen')
 
-  goal(name='jaxb', action=JaxbGen
-  ).install('gen')
+  goal(name='jaxb', action=JaxbGen).install('gen')
