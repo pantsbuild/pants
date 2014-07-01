@@ -6,18 +6,8 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 
-class MacroContext(object):
-  """The build file context macros operate against."""
-
-  class ScopeError(Exception):
-    """Indicates a macro type or function was called outside of macro scope."""
-
-  @classmethod
-  def verify(cls, macro_context):
-    """Verifies the given macro context is valid and returns it if so."""
-    if not isinstance(macro_context, cls):
-      raise cls.ScopeError()
-    return macro_context
+class ParseContext(object):
+  """The build file context that context aware objects operate against."""
 
   def __init__(self, rel_path, type_aliases):
     self._rel_path = rel_path
@@ -32,5 +22,7 @@ class MacroContext(object):
 
   @property
   def rel_path(self):
-    """Returns the relative path from the build root to the BUILD file the macro is executing in."""
+    """Returns the relative path from the build root to the BUILD file the context aware object is
+    executing in.
+    """
     return self._rel_path

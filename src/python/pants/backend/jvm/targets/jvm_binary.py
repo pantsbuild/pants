@@ -17,7 +17,6 @@ from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.build_environment import get_buildroot
 from pants.base.build_manual import manual
 from pants.base.exceptions import TargetDefinitionException
-from pants.base.macro_context import MacroContext
 from pants.base.payload import BundlePayload
 from pants.base.target import Target
 
@@ -309,8 +308,8 @@ class Bundle(object):
     ]
   """
 
-  def __init__(self, macro_context):
-    self._rel_path = MacroContext.verify(macro_context).rel_path
+  def __init__(self, parse_context):
+    self._rel_path = parse_context.rel_path
     self.filemap = {}
     self.mapper = None
 
@@ -344,9 +343,6 @@ class Bundle(object):
     """Add files to the bundle, where ``filesets`` is a filename, ``globs``, or ``rglobs``.
     Note this is a variable length param and may be specified any number of times.
     """
-    if self.mapper is None:
-      raise MacroContext.ScopeError()
-
     for fileset in filesets:
       paths = fileset() if isinstance(fileset, Fileset) \
                         else fileset if hasattr(fileset, '__iter__') \

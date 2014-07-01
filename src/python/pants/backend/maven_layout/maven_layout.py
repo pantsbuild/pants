@@ -24,11 +24,10 @@ from pants.backend.jvm.targets.scala_tests import ScalaTests
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_tests import PythonTests
-from pants.base.macro_context import MacroContext
 from pants.base.source_root import SourceRoot
 
 
-def maven_layout(basedir='', macro_context=None):
+def maven_layout(parse_context, basedir=''):
   """Sets up typical maven project source roots for all built-in pants target types.
 
   Shortcut for ``source_root('src/main/java', *java targets*)``,
@@ -39,10 +38,8 @@ def maven_layout(basedir='', macro_context=None):
     expecting to find java files in ``src/main/java``, expect them in
     ``**basedir**/src/main/java``.
   """
-  MacroContext.verify(macro_context)
-
   def root(path, *types):
-    SourceRoot.register(os.path.join(macro_context.rel_path, basedir, path), *types)
+    SourceRoot.register(os.path.join(parse_context.rel_path, basedir, path), *types)
 
   root('src/main/antlr', JavaAntlrLibrary, Page, PythonAntlrLibrary)
   root('src/main/java', AnnotationProcessor, JavaAgent, JavaLibrary, JvmBinary, Page)

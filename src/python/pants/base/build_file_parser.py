@@ -269,15 +269,15 @@ class BuildFileParser(object):
       traceback.print_exc()
       raise
 
-    parse_context = self._build_configuration.create_parse_context(build_file)
+    parse_state = self._build_configuration.initialize_parse_state(build_file)
     try:
-      Compatibility.exec_function(build_file_code, parse_context.parse_globals)
+      Compatibility.exec_function(build_file_code, parse_state.parse_globals)
     except Exception:
       logger.exception("Error parsing {build_file}.".format(build_file=build_file))
       traceback.print_exc()
       raise
 
-    for target_proxy in parse_context.registered_target_proxies:
+    for target_proxy in parse_state.registered_target_proxies:
       logger.debug('Adding {target_proxy} to the proxy build graph with {address}'
                    .format(target_proxy=target_proxy,
                            address=target_proxy.address))
@@ -307,10 +307,10 @@ class BuildFileParser(object):
 
     logger.debug("{build_file} produced the following TargetProxies:"
                  .format(build_file=build_file))
-    for target_proxy in parse_context.registered_target_proxies:
+    for target_proxy in parse_state.registered_target_proxies:
       logger.debug("  * {target_proxy}".format(target_proxy=target_proxy))
 
-    return parse_context.registered_target_proxies
+    return parse_state.registered_target_proxies
 
   def scan(self, root=None):
     """Scans and parses all BUILD files found under ``root``.

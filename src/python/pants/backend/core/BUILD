@@ -9,7 +9,6 @@ python_library(
     'src/python/pants/backend/core/targets:all',
     'src/python/pants/backend/core/tasks:all',
     'src/python/pants/base:build_file_aliases',
-    'src/python/pants/base:macro_context',
     ':core',
   ]
 )
@@ -22,6 +21,5 @@ python_library(
     'src/python/pants/backend/core/targets:all',
     'src/python/pants/backend/core/tasks:all',
     'src/python/pants/base:build_environment',
-    'src/python/pants/base:macro_context',
   ]
 )

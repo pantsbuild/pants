@@ -22,7 +22,6 @@ python_library(
     pants('src/python/pants/backend/jvm/targets:java'),
     pants('src/python/pants/backend/jvm/targets:scala'),
     pants('src/python/pants/backend/python/targets:python'),
-    pants('src/python/pants/base:macro_context'),
     pants('src/python/pants/base:source_root'),
   ],
 )

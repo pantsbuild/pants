@@ -12,7 +12,6 @@ from twitter.common.collections import OrderedSet
 from pants.base.build_environment import get_buildroot
 from pants.base.build_manual import manual
 from pants.base.exceptions import TargetDefinitionException
-from pants.base.macro_context import MacroContext
 
 
 @manual.builddict()
@@ -33,8 +32,8 @@ class SourceRoot(object):
   _TYPES_BY_ROOT = {}
   _SEARCHED = set()
 
-  def __init__(self, macro_context):
-    self.rel_path = MacroContext.verify(macro_context).rel_path
+  def __init__(self, parse_context):
+    self.rel_path = parse_context.rel_path
 
   def __call__(self, basedir, *allowed_target_types):
     allowed_target_types = [proxy._target_type for proxy in allowed_target_types]

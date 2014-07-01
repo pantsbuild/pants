@@ -31,7 +31,6 @@ python_library(
     pants('src/python/pants/base:build_environment'),
     pants('src/python/pants/base:build_manual'),
     pants('src/python/pants/base:exceptions'),
-    pants('src/python/pants/base:macro_context'),
     pants('src/python/pants/base:payload'),
     pants('src/python/pants/base:target'),
   ],

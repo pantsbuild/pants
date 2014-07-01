@@ -7,10 +7,8 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import os
 
-from pants.base.macro_context import MacroContext
 
-
-def python_requirements(requirements_relpath='requirements.txt', macro_context=None):
+def python_requirements(parse_context, requirements_relpath='requirements.txt'):
   """Translates a pip requirements file into an equivalent set of PythonRequirement targets.
 
   NB that there are some requirements files that can't be unambiguously translated; ie: multiple
@@ -22,12 +20,10 @@ def python_requirements(requirements_relpath='requirements.txt', macro_context=N
       this function to the requirements file.  By default a `requirements.txt` file sibling to the
       BUILD file is assumed.
   """
-  MacroContext.verify(macro_context)
-
   requirements = []
   repository = None
 
-  requirements_path = os.path.join(macro_context.rel_path, requirements_relpath)
+  requirements_path = os.path.join(parse_context.rel_path, requirements_relpath)
   with open(requirements_path) as fp:
     for line in fp:
       line = line.strip()
@@ -46,7 +42,7 @@ def python_requirements(requirements_relpath='requirements.txt', macro_context=N
               repository = value
 
   for requirement in requirements:
-    req = macro_context.create_object('python_requirement', requirement, repository=repository)
-    macro_context.create_object('python_requirement_library',
+    req = parse_context.create_object('python_requirement', requirement, repository=repository)
+    parse_context.create_object('python_requirement_library',
                                 name=req.project_name,
                                 requirements=[req])

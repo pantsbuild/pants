@@ -20,7 +20,7 @@ class MavenLayoutTest(BaseTest):
         'java_library': JavaLibrary,
         'junit_tests': JavaTests,
       },
-      macros={
+      context_aware_object_factories={
         'maven_layout': maven_layout,
       }
     )

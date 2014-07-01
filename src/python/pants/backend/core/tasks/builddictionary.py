@@ -204,7 +204,7 @@ def get_syms(build_file_parser):
   aliases = build_file_parser.registered_aliases()
   map_symbols(aliases.targets)
   map_symbols(aliases.objects)
-  map_symbols(aliases.macros)
+  map_symbols(aliases.context_aware_object_factories)
   return syms
 
 # Needed since x may be a str or a unicode, so we can't hard-code str.lower or unicode.lower.

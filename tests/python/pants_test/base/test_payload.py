@@ -20,7 +20,7 @@ class PayloadTest(BaseTest):
       targets={
         'java_library': JavaLibrary,
       },
-      macros={
+      context_aware_object_factories={
         'globs': Globs,
       },
     )

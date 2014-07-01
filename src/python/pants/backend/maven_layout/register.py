@@ -5,6 +5,8 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+import functools
+
 from pants.backend.maven_layout.maven_layout import maven_layout
 from pants.base.build_file_aliases import BuildFileAliases
 
@@ -18,4 +20,8 @@ def register_commands():
 
 
 def build_file_aliases():
-  return BuildFileAliases.create(macros={'maven_layout': maven_layout})
+  return BuildFileAliases.create(
+    context_aware_object_factories={
+      'maven_layout': lambda ctx: functools.partial(maven_layout, ctx)
+    }
+  )

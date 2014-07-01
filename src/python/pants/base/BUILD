@@ -20,7 +20,7 @@ python_library(
   sources = ['build_configuration.py'],
   dependencies = [
     pants('3rdparty/python/twitter/commons:twitter.common.collections'),
-    pants(':macro_context'),
+    pants(':parse_context'),
     pants(':target'),
     pants(':target_proxy'),
   ]
@@ -166,16 +166,16 @@ python_library(
 )
 
 python_library(
-  name = 'macro_context',
-  sources = ['macro_context.py'],
-)
-
-python_library(
   name = 'mustache',
   sources = ['mustache.py'],
   dependencies = [
     pants('3rdparty/python:pystache'),
   ]
+)
+
+python_library(
+  name = 'parse_context',
+  sources = ['parse_context.py'],
 )
 
 python_library(
@@ -227,7 +227,7 @@ python_library(
   dependencies = [
     pants(':build_environment'),
     pants(':exceptions'),
-    pants(':macro_context'),
+    pants(':parse_context'),
     pants('3rdparty/python/twitter/commons:twitter.common.collections'),
   ],
 )

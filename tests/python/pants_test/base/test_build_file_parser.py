@@ -222,48 +222,53 @@ class BuildFileParserExposedObjectTest(BaseTest):
       self.assertEqual(len(registered_proxies), 0)
 
 
-class BuildFileParserMacroTest(BaseTest):
+class BuildFileParserExposedContextAwareObjectFactoryTest(BaseTest):
   @staticmethod
-  def make_lib(org, name, rev, macro_context=None):
-    dep = macro_context.create_object('jar', org=org, name=name, rev=rev)
-    macro_context.create_object('jar_library', name=name, jars=[dep])
+  def make_lib(parse_context):
+    def real_make_lib(org, name, rev):
+      dep = parse_context.create_object('jar', org=org, name=name, rev=rev)
+      parse_context.create_object('jar_library', name=name, jars=[dep])
+    return real_make_lib
 
   @staticmethod
-  def create_java_libraries(base_name,
-                            org='com.twitter',
-                            provides_java_name=None,
-                            provides_scala_name=None,
-                            **kwargs):
+  def create_java_libraries(parse_context):
 
-    macro_context = kwargs['macro_context']
+    def real_create_java_libraries(base_name,
+                                   org='com.twitter',
+                                   provides_java_name=None,
+                                   provides_scala_name=None):
 
-    def provides_artifact(provides_name):
-      if provides_name is None:
-        return None
-      jvm_repo = 'pants-support/ivy:maven-central'
-      return macro_context.create_object('artifact',
-                                         org=org,
-                                         name=provides_name,
-                                         repo=jvm_repo)
+      def provides_artifact(provides_name):
+        if provides_name is None:
+          return None
+        jvm_repo = 'pants-support/ivy:maven-central'
+        return parse_context.create_object('artifact',
+                                           org=org,
+                                           name=provides_name,
+                                           repo=jvm_repo)
 
-    macro_context.create_object('java_library',
-                                name='%s-java' % base_name,
-                                sources=[],
-                                dependencies=[],
-                                provides=provides_artifact(provides_java_name))
+      parse_context.create_object('java_library',
+                                  name='%s-java' % base_name,
+                                  sources=[],
+                                  dependencies=[],
+                                  provides=provides_artifact(provides_java_name))
 
-    macro_context.create_object('scala_library',
-                                name='%s-scala' % base_name,
-                                sources=[],
-                                dependencies=[],
-                                provides=provides_artifact(provides_scala_name))
+      parse_context.create_object('scala_library',
+                                  name='%s-scala' % base_name,
+                                  sources=[],
+                                  dependencies=[],
+                                  provides=provides_artifact(provides_scala_name))
+
+    return real_create_java_libraries
 
   def setUp(self):
-    super(BuildFileParserMacroTest, self).setUp()
+    super(BuildFileParserExposedContextAwareObjectFactoryTest, self).setUp()
     self._paths = set()
 
-  def path_relative_util(self, path, macro_context):
-    self._paths.add(os.path.join(macro_context.rel_path, path))
+  def path_relative_util(self, parse_context):
+    def real_path_relative_util(path):
+      self._paths.add(os.path.join(parse_context.rel_path, path))
+    return real_path_relative_util
 
   @property
   def alias_groups(self):
@@ -273,7 +278,7 @@ class BuildFileParserMacroTest(BaseTest):
         'java_library': JavaLibrary,
         'scala_library': ScalaLibrary,
       },
-      macros={
+      context_aware_object_factories={
         'make_lib': self.make_lib,
         'create_java_libraries': self.create_java_libraries,
         'path_util': self.path_relative_util,
@@ -284,7 +289,7 @@ class BuildFileParserMacroTest(BaseTest):
       }
     )
 
-  def test_macros(self):
+  def test_context_aware_object_factories(self):
     contents = dedent('''
                  create_java_libraries(base_name="create-java-libraries",
                                        provides_java_name="test-java",

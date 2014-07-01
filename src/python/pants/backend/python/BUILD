@@ -140,9 +140,6 @@ python_library(
 python_library(
   name = 'python_requirements',
   sources = ['python_requirements.py'],
-  dependencies = [
-    pants('src/python/pants/base:macro_context'),
-  ],
 )
 
 python_library(

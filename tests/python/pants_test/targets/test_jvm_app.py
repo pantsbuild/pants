@@ -24,7 +24,7 @@ class BaseJvmAppTest(BaseTest):
         'jvm_app': JvmApp,
         'jvm_binary': JvmBinary,
       },
-      macros={
+      context_aware_object_factories={
         'bundle': Bundle,
         'globs': Globs,
       }

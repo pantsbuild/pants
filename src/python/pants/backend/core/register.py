@@ -34,15 +34,14 @@ from pants.backend.core.wrapped_globs import Globs, RGlobs, ZGlobs
 from pants.base.build_environment import get_buildroot, get_version, get_scm, set_scm
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.config import Config
-from pants.base.macro_context import MacroContext
 from pants.base.source_root import SourceRoot
 from pants.commands.goal import Goal
 from pants.goal import Goal as goal, Phase
 
 
 class BuildFilePath(object):
-  def __init__(self, macro_context):
-    self.rel_path = MacroContext.verify(macro_context).rel_path
+  def __init__(self, parse_context):
+    self.rel_path = parse_context.rel_path
 
   def __call__(self):
     return os.path.join(get_buildroot(), self.rel_path)
@@ -69,7 +68,7 @@ def build_file_aliases():
       'Time': Time,
        'wiki_artifact': WikiArtifact,
     },
-    macros={
+    context_aware_object_factories={
       'source_root': SourceRoot,
       'globs': Globs,
       'rglobs': RGlobs,

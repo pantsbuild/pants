@@ -22,7 +22,7 @@ class FilemapTest(ConsoleTaskTest):
       targets={
         'python_library': PythonLibrary,
       },
-      macros={
+      context_aware_object_factories={
         'source_root': SourceRoot,
       }
     )
