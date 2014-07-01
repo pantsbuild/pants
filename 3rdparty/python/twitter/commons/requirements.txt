@@ -4,18 +4,18 @@
 #--find-links https://pantsbuild.github.io/cheeseshop/third_party/twitter-commons/0da0aff8fc7cce4d2d3991e36bc13f021ec66133/index.html
 #--no-index
 
-twitter.common.collections==0.3.1
-twitter.common.config==0.3.1
-twitter.common.confluence==0.3.1
-twitter.common.contextutil==0.3.1
-twitter.common.decorators==0.3.1
-twitter.common.dirutil==0.3.1
-twitter.common.lang==0.3.1
-twitter.common.log==0.3.1
-twitter.common.options==0.3.1
-twitter.common.process==0.3.1
-twitter.common.python==0.5.8
-twitter.common.quantity==0.3.1
-twitter.common.string==0.3.1
-twitter.common.threading==0.3.1
-twitter.common.util==0.3.1
+twitter.common.collections>=0.3.1,<0.4
+twitter.common.config>=0.3.1,<0.4
+twitter.common.confluence>=0.3.1,<0.4
+twitter.common.contextutil>=0.3.1,<0.4
+twitter.common.decorators>=0.3.1,<0.4
+twitter.common.dirutil>=0.3.1,<0.4
+twitter.common.lang>=0.3.1,<0.4
+twitter.common.log>=0.3.1,<0.4
+twitter.common.options>=0.3.1,<0.4
+twitter.common.process>=0.3.1,<0.4
+twitter.common.python>=0.5.8,<0.6
+twitter.common.quantity>=0.3.1,<0.4
+twitter.common.string>=0.3.1,<0.4
+twitter.common.threading>=0.3.1,<0.4
+twitter.common.util>=0.3.1,<0.4
