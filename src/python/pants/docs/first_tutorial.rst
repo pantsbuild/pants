@@ -133,28 +133,28 @@ scrolling past and think it was running tests.
 Help
 ====
 
-To get help about a Pants goal, invoke ``./pants goal help`` *goalname*. This lists
+To get help about a Pants goal, invoke "./pants goal *goalname* -h". This lists
 the many command-line options you can pass for that goal. E.g., ::
 
-    $ ./pants goal help test
-    Usage: ./pants.pex goal test ([target]...)
-    
-    Options:
-      -h, --help            show this help message and exit
-      -t CONN_TIMEOUT, --timeout=CONN_TIMEOUT
-                            Number of seconds to wait for http connections.
-    ...
-        --test-specs-color, --no-test-specs-color
-                            [True] Emit test result with ANSI terminal color
-                            codes.
-    
-    Test compiled code.
+    $ ./pants goal test -h
 
+    test: Test compiled code.
+
+    test options:
+      --ng-daemons, --no-ng-daemons
+                              [True] Use nailgun daemons to execute java tasks.
+
+    gen:thrift options:
+    ...
+      --test-specs-color, --no-test-specs-color
+                              [True] Emit test result with ANSI terminal color
+                              codes.
+    
 For a list of available goals, ``./pants goal goals``.
 
-For help with things that aren't goals (Most Python operations aren't goals), use ::
+For help with things that aren't goals, use ::
 
-    ./pants help
+    ./pants -h
 
 If you want help diagnosing some strange Pants behavior, you might verbose output.
 To get this, instead of just invoking ``./pants``, set some environment variables:
