@@ -77,6 +77,14 @@ class CmdLineSpecParserTest(BaseTest):
     self.assert_parsed(cmdline_spec='a/b/:b', expected=['a/b'])
     self.assert_parsed(cmdline_spec='./a/b/:b', expected=['a/b'])
 
+  def test_cmd_line_spec_list(self):
+    self.assert_parsed_list(cmdline_spec_list=['a', 'a/b'], expected=['a', 'a/b'])
+    self.assert_parsed_list(cmdline_spec_list=['a', 'a/b', '^a/b'], expected=['a'])
+    self.assert_parsed_list(cmdline_spec_list=['^a/b', 'a', 'a/b'], expected=['a'])
+    self.assert_parsed_list(cmdline_spec_list=['::'], expected=[':root', 'a', 'a:b', 'a/b', 'a/b:c'])
+    self.assert_parsed_list(cmdline_spec_list=['::', '^a/b::'], expected=[':root', 'a', 'a:b'])
+    self.assert_parsed_list(cmdline_spec_list=['^a/b::', '::'], expected=[':root', 'a', 'a:b'])
+
   def test_does_not_exist(self):
     with self.assertRaises(IOError):
       self.spec_parser.parse_addresses('c').next()
@@ -92,3 +100,10 @@ class CmdLineSpecParserTest(BaseTest):
 
     self.assertEqual(sort(SyntheticAddress.parse(addr) for addr in expected),
                      sort(self.spec_parser.parse_addresses(cmdline_spec)))
+
+  def assert_parsed_list(self, cmdline_spec_list, expected):
+    def sort(addresses):
+      return sorted(addresses, key=lambda address: address.spec)
+
+    self.assertEqual(sort(SyntheticAddress.parse(addr) for addr in expected),
+                     sort(self.spec_parser.parse_addresses(cmdline_spec_list)))
