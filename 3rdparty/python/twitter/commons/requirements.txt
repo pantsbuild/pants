@@ -1,21 +1,21 @@
-# To toggle to public releases, comment out these search override flags and optionally add version
-# constraints to the requirements below.
+# To toggle to private releases, un-comment these search override flags and remove version
+# constraints from the requirements below.
 
---find-links https://pantsbuild.github.io/cheeseshop/third_party/twitter-commons/0da0aff8fc7cce4d2d3991e36bc13f021ec66133/index.html
---no-index
+#--find-links https://pantsbuild.github.io/cheeseshop/third_party/twitter-commons/0da0aff8fc7cce4d2d3991e36bc13f021ec66133/index.html
+#--no-index
 
-twitter.common.collections
-twitter.common.config
-twitter.common.confluence
-twitter.common.contextutil
-twitter.common.decorators
-twitter.common.dirutil
-twitter.common.lang
-twitter.common.log
-twitter.common.options
-twitter.common.process
-twitter.common.python
-twitter.common.quantity
-twitter.common.string
-twitter.common.threading
-twitter.common.util
+twitter.common.collections==0.3.1
+twitter.common.config==0.3.1
+twitter.common.confluence==0.3.1
+twitter.common.contextutil==0.3.1
+twitter.common.decorators==0.3.1
+twitter.common.dirutil==0.3.1
+twitter.common.lang==0.3.1
+twitter.common.log==0.3.1
+twitter.common.options==0.3.1
+twitter.common.process==0.3.1
+twitter.common.python==0.5.8
+twitter.common.quantity==0.3.1
+twitter.common.string==0.3.1
+twitter.common.threading==0.3.1
+twitter.common.util==0.3.1
