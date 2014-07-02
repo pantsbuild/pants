@@ -14,6 +14,13 @@ from pants.base.exceptions import TaskError
 
 class JvmTask(Task):
 
+  def prepare(self, round_manager):
+    # TODO(John Sirois): this is a fake requirement on 'ivy_jar_products' in order to force
+    # resolve to run before this phase.  Require on a new 'compile_classpath' product produced by
+    # IvyResolve instead.
+    round_manager.require_data('ivy_jar_products')
+    round_manager.require_data('exclusives_groups')
+
   def get_base_classpath_for_target(self, target):
     """Returns the base classpath for the specified target.
 

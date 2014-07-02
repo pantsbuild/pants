@@ -54,9 +54,11 @@ class JvmRun(JvmTask):
     self.only_write_cmd_line = context.options.only_write_cmd_line
 
   def prepare(self, round_manager):
-    round_manager.require_data('exclusives_groups')
-    round_manager.require_data('java')
-    round_manager.require_data('scala')
+    # TODO(John Sirois): these are fake requirements in order to force compile run before this
+    # phase.  Introduce a RuntimeClasspath product for JvmCompile and PrepareResources to populate
+    # and depend on that.
+    round_manager.require_data('resources_by_target')
+    round_manager.require_data('classes_by_target')
 
   def execute(self):
     # The called binary may block for a while, allow concurrent pants activity during this pants
@@ -71,18 +73,15 @@ class JvmRun(JvmTask):
     # http://jira.local.twitter.com/browse/AWESOME-1317
     binary = self.require_single_root_target()
 
+    # We can't throw if binary isn't a JvmBinary, because perhaps we were called on a
+    # python_binary, in which case we have to no-op and let python_run do its thing.
+    # TODO(benjy): Some more elegant way to coordinate how tasks claim targets.
     if isinstance(binary, JvmBinary):
-      # We can't throw if binary isn't a JvmBinary, because perhaps we were called on a
-      # python_binary, in which case we have to no-op and let python_run do its thing.
-      # TODO(benjy): Some more elegant way to coordinate how tasks claim targets.
-      egroups = self.context.products.get_data('exclusives_groups')
-      group_key = egroups.get_group_key_for_target(binary)
-      group_classpath = egroups.get_classpath_for_group(group_key)
-
       executor = CommandLineGrabber() if self.only_write_cmd_line else None
       self.context.lock.release()
+      exclusives_classpath = self.get_base_classpath_for_target(binary)
       result = execute_java(
-        classpath=(self.classpath(confs=self.confs, exclusives_classpath=group_classpath)),
+        classpath=(self.classpath(confs=self.confs, exclusives_classpath=exclusives_classpath)),
         main=binary.main,
         executor=executor,
         jvm_options=self.jvm_args,

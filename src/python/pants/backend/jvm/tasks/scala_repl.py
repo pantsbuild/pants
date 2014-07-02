@@ -38,9 +38,11 @@ class ScalaRepl(JvmTask, JvmToolTaskMixin):
         self.args.extend(shlex.split(arg))
 
   def prepare(self, round_manager):
+    # TODO(John Sirois): these are fake requirements in order to force compile run before this
+    # phase.  Introduce a RuntimeClasspath product for JvmCompile and PrepareResources to populate
+    # and depend on that.
     round_manager.require_data('resources_by_target')
     round_manager.require_data('classes_by_target')
-    round_manager.require_data('classes_by_source')
 
   def execute(self):
     targets = self.require_homogeneous_root_targets(lambda t: t.is_jvm)
@@ -48,9 +50,10 @@ class ScalaRepl(JvmTask, JvmToolTaskMixin):
       tools_classpath = self.tool_classpath(self._bootstrap_key)
       self.context.lock.release()
       with preserve_stty_settings():
+        exclusives_classpath = self.get_base_classpath_for_target(targets[0])
         classpath = self.classpath(tools_classpath,
                                    confs=self.confs,
-                                   exclusives_classpath=self.get_base_classpath_for_target(targets[0]))
+                                   exclusives_classpath=exclusives_classpath)
 
         print('')  # Start REPL output on a new line.
         try:

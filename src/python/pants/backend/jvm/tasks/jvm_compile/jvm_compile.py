@@ -249,13 +249,19 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
     self._sources_by_target = None
 
   def prepare(self, round_manager):
-    # TODO(ity): this is essentially a fake requirement on 'ivy_jar_products' in order to force
-    # resolve to run before this phase, require on a new 'classpath' product (IvyResolve) instead.
-    # round_manager.require_data('classpath')
+    # TODO(John Sirois): this is a fake requirement on 'ivy_jar_products' in order to force
+    # resolve to run before this phase.  Require a new CompileClasspath product to be produced by
+    # IvyResolve instead.
     round_manager.require_data('ivy_jar_products')
+    round_manager.require_data('exclusives_groups')
+
+    # Require codegen we care about
+    # TODO(John Sirois): roll this up in Task - if the list of labels we care about for a target
+    # predicate to filter the full build graph is exposed, the requirement can be made automatic
+    # and in turn codegen tasks could denote the labels they produce automating wiring of the
+    # produce side
     round_manager.require_data('java')
     round_manager.require_data('scala')
-
 
   def move(self, src, dst):
     if self._delete_scratch:

@@ -77,10 +77,10 @@ class RoundEngineTest(EngineTestBase, BaseTest):
                       ['jvm_build_tools_classpath_callbacks', 'jvm_build_tools'])
     self.install_goal('protoc', 'classes_by_source', 'gen', False,
                       ['jvm_build_tools_classpath_callbacks', 'jvm_build_tools'])
-    self.install_goal('antlr',  'classes_by_source', 'gen', False,
+    self.install_goal('antlr', 'classes_by_source', 'gen', False,
                       ['jvm_build_tools_classpath_callbacks', 'jvm_build_tools'])
     self.install_goal('jvm', 'classes_by_target', 'compile', False, ['ivy_jar_products'])
-    self.install_goal('check-exclusives',  'exclusives_groups', 'check-exclusives', False,
+    self.install_goal('check-exclusives', 'exclusives_groups', 'check-exclusives', False,
                       ['classes_by_source'])
 
     phases = self.as_phases_without_namespace('test')

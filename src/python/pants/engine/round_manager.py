@@ -7,23 +7,26 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from collections import defaultdict
 
-from twitter.common.collections.orderedset import OrderedSet
-
 from pants.goal import Phase
 
 
-PANTS_WORKDIR = 'pants_workdir'
-
-
 class RoundManager(object):
-  def __init__(self, context):
-    self._schedule = OrderedSet()
-    self._context = context
-    self._phases_by_product = self._create_phases_by_product()
+  _phases_by_product = None
 
-  @property
-  def context(self):
-    return self._context
+  @classmethod
+  def _get_phases_by_product(cls, product):
+    if cls._phases_by_product is None:
+      phases_by_product = defaultdict(set)
+      for phase, goals in Phase.all():
+        for goal in goals:
+          for pt in goal.task_type.product_type():
+            phases_by_product[pt].add(phase)
+      cls._phases_by_product = phases_by_product
+    return cls._phases_by_product.get(product, [])
+
+  def __init__(self, context):
+    self._schedule = set()
+    self._context = context
 
   def require(self, product_type, predicate=None):
     self._schedule.add(product_type)
@@ -37,18 +40,8 @@ class RoundManager(object):
   def get_schedule(self):
     return self._schedule
 
-  @staticmethod
-  def _create_phases_by_product():
-    phases_by_product = defaultdict(OrderedSet)
-    for phase, goals in Phase.all():
-     for goal in goals:
-       for pt in goal.task_type.product_type():
-         phases_by_product[pt].add(phase)
-    return phases_by_product
-
   def lookup_phases_for_products(self, products):
-    phases = OrderedSet()
+    phases = set()
     for product in products:
-      for new_phase in self._phases_by_product.get(product, []):
-        phases.add(new_phase)
+      phases.update(self._get_phases_by_product(product))
     return phases
