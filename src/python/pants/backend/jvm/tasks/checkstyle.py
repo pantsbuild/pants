@@ -47,8 +47,9 @@ class Checkstyle(NailgunTask, JvmToolTaskMixin):
 
   def prepare(self, round_manager):
     # TODO(John Sirois): this is a fake requirement on 'ivy_jar_products' in order to force
-    # resolve to run before this phase.  Require a new CompileClasspath product to be produced by
+    # resolve to run before this phase. Require a new CompileClasspath product to be produced by
     # IvyResolve instead.
+    # See: https://github.com/pantsbuild/pants/issues/310
     round_manager.require_data('ivy_jar_products')
     round_manager.require_data('exclusives_groups')
 
