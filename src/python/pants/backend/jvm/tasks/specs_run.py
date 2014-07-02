@@ -61,6 +61,7 @@ class SpecsRun(JvmTask, JvmToolTaskMixin):
     self.tests = context.options.specs_run_tests
 
   def prepare(self, round_manager):
+    round_manager.require_data('resources_by_target')
     round_manager.require_data('classes_by_target')
     round_manager.require_data('classes_by_source')
 

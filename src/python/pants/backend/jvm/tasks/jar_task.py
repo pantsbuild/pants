@@ -235,8 +235,8 @@ class JarTask(NailgunTask):
     self.register_jvm_tool(self._JAR_TOOL_CLASSPATH_KEY, jar_bootstrap_tools)
 
   def prepare(self, round_manager):
-    round_manager.require_data('classes_by_target')
     round_manager.require_data('resources_by_target')
+    round_manager.require_data('classes_by_target')
 
   @contextmanager
   def open_jar(self, path, overwrite=False, compressed=True, jar_rules=None):

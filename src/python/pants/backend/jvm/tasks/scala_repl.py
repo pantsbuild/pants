@@ -38,6 +38,7 @@ class ScalaRepl(JvmTask, JvmToolTaskMixin):
         self.args.extend(shlex.split(arg))
 
   def prepare(self, round_manager):
+    round_manager.require_data('resources_by_target')
     round_manager.require_data('classes_by_target')
     round_manager.require_data('classes_by_source')
 

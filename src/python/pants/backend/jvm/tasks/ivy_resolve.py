@@ -88,7 +88,6 @@ class IvyResolve(NailgunTask, IvyTaskMixin, JvmToolTaskMixin):
     self.setup_artifact_cache_from_config(config_section='ivy-resolve')
 
   def prepare(self, round_manager):
-    round_manager.require_data('resources_by_target')
     round_manager.require_data('exclusives_groups')
 
   def invalidate_for(self):

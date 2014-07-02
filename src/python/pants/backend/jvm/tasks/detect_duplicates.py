@@ -46,8 +46,8 @@ class DuplicateDetector(JvmBinaryTask):
       self._excludes = EXCLUDED_FILES
 
   def prepare(self, round_manager):
-    round_manager.require_data('classes_by_target')
     round_manager.require_data('resources_by_target')
+    round_manager.require_data('classes_by_target')
 
   def execute(self):
     for binary_target in filter(self.is_binary, self.context.targets()):
