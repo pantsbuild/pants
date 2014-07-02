@@ -77,7 +77,6 @@ class Context(object):
     self._log = log or Context.Log(run_tracker)
     self._target_base = target_base or Target
 
-    self._state = {}
     self._products = Products()
     self._buildroot = get_buildroot()
     self._java_sysprops = None  # Computed lazily.
@@ -148,7 +147,7 @@ class Context(object):
 
   def __str__(self):
     ident = Target.identify(self.targets())
-    return 'Context(id:%s, state:%s, targets:%s)' % (ident, self.state, self.targets())
+    return 'Context(id:%s, targets:%s)' % (ident, self.targets())
 
   def submit_foreground_work_and_wait(self, work, workunit_parent=None):
     """Returns the pool to which tasks can submit foreground (blocking) work."""
@@ -258,9 +257,3 @@ class Context(object):
     """Returns an iterator over the target(s) the given address points to."""
     self.build_file_parser.inject_spec_closure_into_build_graph(spec, self.build_graph)
     return self.build_graph.transitive_subgraph_of_addresses([SyntheticAddress.parse(spec)])
-
-  @contextmanager
-  def state(self, key, default=None):
-    value = self._state.get(key, default)
-    yield value
-    self._state[key] = value
