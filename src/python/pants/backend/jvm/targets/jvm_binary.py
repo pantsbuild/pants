@@ -72,7 +72,7 @@ class Duplicate(JarRule):
   """Concatenates the contents of all duplicate entries encountered in the order encountered."""
 
   FAIL = object()
-  """Raises a :class:``twitter.pants.targets.jvm_binary.Duplicate.Error`` when a duplicate entry is
+  """Raises a :class:``Duplicate.Error`` when a duplicate entry is
   encountered.
   """
 
@@ -142,7 +142,7 @@ class JarRules(object):
     :param default_dup_action: An optional default action to take for duplicates.  Defaults to
       `Duplicate.SKIP` if not specified.
     :param additional_rules: Optionally one or more jar rules to add to those described above.
-    :returns: :class:`twitter.pants.targets.JarRules`
+    :returns: JarRules
     """
     default_dup_action = Duplicate.validate_action(default_dup_action or Duplicate.SKIP)
     additional_rules = maybe_list(additional_rules or [], expected_type=(Duplicate, Skip))
@@ -218,7 +218,7 @@ class JvmBinary(JvmTarget):
                **kwargs):
     """
     :param string name: The name of this target, which combined with this
-      build file defines the target :class:`pants.base.address.Address`.
+      build file defines the :doc:`target address <target_addresses>`.
     :param string main: The name of the ``main`` class, e.g.,
       ``'com.pants.examples.hello.main.HelloMain'``. This class may be
       present as the source of this target or depended-upon library.
@@ -227,17 +227,19 @@ class JvmBinary(JvmTarget):
     :param string source: Name of one ``.java`` or ``.scala`` file (a good
       place for a ``main``).
     :param resources: List of ``resource``\s to include in bundle.
-    :param dependencies: List of targets (probably ``java_library`` and
+    :param dependencies: Targets (probably ``java_library`` and
      ``scala_library`` targets) to "link" in.
-    :param excludes: List of ``exclude``\s to filter this target's transitive
-     dependencies against.
-    :param deploy_excludes: List of ``excludes`` to apply at deploy time.
+    :type dependencies: list of target specs
+    :param excludes: List of :ref:`exclude <bdict_exclude>`\s
+      to filter this target's transitive dependencies against.
+    :param deploy_excludes: List of :ref:`exclude <bdict_exclude>`\s to apply
+      at deploy time.
       If you, for example, deploy a java servlet that has one version of
       ``servlet.jar`` onto a Tomcat environment that provides another version,
       they might conflict. ``deploy_excludes`` gives you a way to build your
       code but exclude the conflicting ``jar`` when deploying.
     :param deploy_jar_rules: Rules for packaging this binary in a deploy jar.
-    :type deploy_jar_rules: A :class:`twitter.pants.targets.JarRules` specification.
+    :type deploy_jar_rules: A JarRules specification.
     :param configurations: Ivy configurations to resolve for this target.
       This parameter is not intended for general use.
     :type configurations: tuple of strings
@@ -368,10 +370,10 @@ class JvmApp(Target):
   def __init__(self, name=None, binary=None, bundles=None, basename=None, **kwargs):
     """
     :param string name: The name of this target, which combined with this
-      build file defines the target :class:`pants.base.address.Address`.
-    :param binary: A pointer to the :class:`pants.targets.jvm_binary.JvmBinary`. that contains the
+      build file defines the :doc:`target address <target_addresses>`.
+    :param string binary: Target spec of the ``jvm_binary`` that contains the
       app main.
-    :param bundles: One or more :class:`pants.targets.jvm_binary.Bundle`'s
+    :param bundles: One or more ``bundle``\s
       describing "extra files" that should be included with this app
       (e.g.: config files, startup scripts).
     :param string basename: Name of this application, if different from the

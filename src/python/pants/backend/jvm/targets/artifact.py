@@ -21,8 +21,7 @@ class Artifact(object):
     """
     :param string org: Organization of this artifact, or groupId in maven parlance.
     :param string name: Name of the artifact, or artifactId in maven parlance.
-    :param repo: :class:`pants.targets.repository.Repository`
-      this artifact is published to.
+    :param repo: The ``repo`` this artifact is published to.
     :param string description: Description of this artifact.
     """
     if not isinstance(org, Compatibility.string):

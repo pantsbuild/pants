@@ -41,7 +41,7 @@ class Wiki(Target):
   def __init__(self, name, url_builder, **kwargs):
     """
     :param string name: The name of this target, which combined with this
-      build file defines the target :class:`pants.base.address.Address`.
+      build file defines the :doc:`target address <target_addresses>`.
     :param url_builder: Function that accepts a page target and an optional wiki config dict.
     :returns: A tuple of (alias, fully qualified url).
     """
@@ -65,8 +65,8 @@ class Page(Target):
        ],
      )
 
-  Multiple :class:`pants.backend.core.targets.WikiArtifact` objects can be provided, to bind a page
-  to multiple wikis.
+  A ``page`` can have more than one ``wiki_artifact`` in its ``provides``
+  (there might be more than one place to publish it).
   """
 
   class PagePayload(SourcesPayload):
@@ -82,11 +82,10 @@ class Page(Target):
   def __init__(self, source, resources=None, provides=None, **kwargs):
     """
     :param string name: The name of this target, which combined with this
-      build file defines the target :class:`pants.base.address.Address`.
+      build file defines the :doc:`target address <target_addresses>`.
     :param source: Source of the page in markdown format.
-    :param dependencies: List of :class:`pants.base.target.Target` instances
-      this target depends on.
-    :type dependencies: list of targets
+    :param dependencies: Other targets that this target depends on.
+    :type dependencies: list of target specs
     :param resources: An optional list of Resources objects.
     """
 

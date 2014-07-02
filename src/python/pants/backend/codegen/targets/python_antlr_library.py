@@ -20,15 +20,14 @@ class PythonAntlrLibrary(PythonTarget):
     :param name: Name of library
     :param module: everything beneath module is relative to this module name, None if root namespace
     :param antlr_version:
-    :param sources: A list of filenames representing the source code
-      this library is compiled from.
-    :type sources: list of strings
+    :param sources: Source code files to compile. Paths are relative to the
+      BUILD file's directory.
+    :type sources: ``Fileset`` or list of strings
     :param resources: non-Python resources, e.g. templates, keys, other data (it is
         recommended that your application uses the pkgutil package to access these
         resources in a .zip-module friendly way.)
-    :param dependencies: List of :class:`pants.base.target.Target` instances
-      this target depends on.
-    :type dependencies: list of targets
+    :param dependencies: Other targets that this target depends on.
+    :type dependencies: list of target specs
     :param dict exclusives: An optional dict of exclusives tags. See CheckExclusives for details.
     """
 

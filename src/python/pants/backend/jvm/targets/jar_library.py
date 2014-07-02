@@ -17,12 +17,8 @@ class JarLibrary(Target):
   def __init__(self, jars=None, *args, **kwargs):
     """
     :param string name: The name of this target, which combined with this
-      build file defines the target :class:`pants.base.address.Address`.
-    :param jars: List of :class:`pants.base.target.Target` instances
-      this target depends on.
-    :param overrides: List of strings, each of which will be recursively resolved to
-      any targets that provide artifacts. Those artifacts will override corresponding
-      direct/transitive dependencies in the dependencies list.
+      build file defines the :doc:`target address <target_addresses>`.
+    :param jars: List of :ref:`jar <bdict_jar>`\s to depend upon.
     :param exclusives: An optional map of exclusives tags. See CheckExclusives for details.
     """
     payload = JarLibraryPayload(jars or [])

@@ -14,16 +14,15 @@ class ExportableJvmLibrary(JvmTarget):
   def __init__(self, *args, **kwargs):
     """
     :param string name: The name of this target, which combined with this
-      build file defines the target :class:`pants.base.address.Address`.
-    :param sources: A list of filenames representing the source code
-      this library is compiled from.
-    :type sources: list of strings
+      build file defines the :doc:`target address <target_addresses>`.
+    :param sources: Source code files to compile. Paths are relative to the
+      BUILD file's directory.
+    :type sources: ``Fileset`` or list of strings
     :param provides:
       An optional Dependency object indicating the The ivy artifact to export.
-    :param dependencies: List of :class:`pants.base.target.Target` instances
-      this target depends on.
-    :type dependencies: list of targets
-    :param excludes: List of :class:`pants.targets.exclude.Exclude` instances
+    :param dependencies: Other targets that this target depends on.
+    :type dependencies: list of target specs
+    :param excludes: List of :ref:`exclude <bdict_exclude>`\s
       to filter this target's transitive dependencies against.
     :param buildflags: Unused, and will be removed in a future release.
     """

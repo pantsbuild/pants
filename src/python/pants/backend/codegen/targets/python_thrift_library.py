@@ -18,12 +18,13 @@ class PythonThriftLibrary(PythonTarget):
     :param name: Name of library
     :param sources: thrift source files (If more than one tries to use the same
       namespace, beware https://issues.apache.org/jira/browse/THRIFT-515)
+    :type sources: ``Fileset`` or list of strings. Paths are relative to the
+      BUILD file's directory.
     :param resources: non-Python resources, e.g. templates, keys, other data (it is
       recommended that your application uses the pkgutil package to access these
       resources in a .zip-module friendly way.)
-    :param dependencies: List of :class:`pants.base.target.Target` instances
-      this target depends on.
-    :type dependencies: list of targets
+    :param dependencies: Other targets that this target depends on.
+    :type dependencies: list of target specs
     :param dict exclusives: An optional dict of exclusives tags. See CheckExclusives for details.
     """
 

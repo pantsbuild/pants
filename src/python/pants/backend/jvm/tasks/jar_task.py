@@ -240,7 +240,7 @@ class JarTask(NailgunTask):
 
   @contextmanager
   def open_jar(self, path, overwrite=False, compressed=True, jar_rules=None):
-    """Yields a :class:`twitter.pants.jvm.jar_task.Jar` that will be written when the context exits.
+    """Yields a Jar that will be written when the context exits.
 
     :param string path: the path to the jar file
     :param bool overwrite: overwrite the file at ``path`` if it exists; ``False`` by default; ie:

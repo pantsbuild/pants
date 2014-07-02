@@ -18,9 +18,10 @@ class Dependencies(Target):
 
   def __init__(self, *args, **kwargs):
     """
-    :param name: The name of this target, which combined with this
-      build file defines the target :class:`pants.base.address.Address`.
-    :param dependencies: List of target specs.
+    :param string name: The name of this target, which combined with this
+      build file defines the :doc:`target address <target_addresses>`.
+    :param dependencies: Other targets that this target depends on.
+    :type dependencies: list of target specs
     :param exclusives: An optional map of exclusives tags. See CheckExclusives
       for details.
     """

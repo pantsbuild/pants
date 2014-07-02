@@ -43,9 +43,8 @@ class PythonBinary(PythonTarget):
     :param name: target name
     :param source: the python source file that becomes this binary's __main__.
       If None specified, drops into an interpreter by default.
-    :param dependencies: List of :class:`pants.base.target.Target` instances
-      this target depends on.
-    :type dependencies: list of targets
+    :param dependencies: Other targets that this target depends on.
+    :type dependencies: list of target specs
     :param string entry_point: the default entry point for this binary.  if None, drops into the entry
       point that is defined by source. Something like
       "pants.bin.pants_exe:main", where "pants.bin.pants_exe" is the package

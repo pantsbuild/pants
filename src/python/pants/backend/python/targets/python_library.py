@@ -15,7 +15,8 @@ class PythonLibrary(PythonTarget):
 
   :param name: Name of library
   :param sources: A list of filenames representing the source code this
-     library is compiled from.
+     library is compiled from. Paths are relative to the
+     BUILD file's directory.
   :param resources: non-Python resources, e.g. templates, keys, other data
      (it is
      recommended that your application uses the pkgutil package to access these
@@ -25,7 +26,7 @@ class PythonLibrary(PythonTarget):
      be other ``python_library``-like targets (``python_library``,
      ``python_thrift_library``, ``python_antlr_library`` and so forth) or
      ``python_requirement_library`` targets.
-  :type dependencies: List of target specs.
+  :type dependencies: List of target specs
   :param provides:
     The :ref:`setup_py <bdict_setup_py>` to publish that represents this
     target outside the repo.

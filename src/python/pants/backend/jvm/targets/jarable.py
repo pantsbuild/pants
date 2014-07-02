@@ -21,7 +21,7 @@ class Jarable(AbstractClass):
 
   @property
   def provides(self):
-    """Returns an optional :class:`pants.targets.Artifact` if this target is exportable.
+    """Returns an optional :class:`pants.backend.jvm.targets.artifact.Artifact` if this target is exportable.
 
     Subclasses should override to provide an artifact descriptor when one applies, by default None
     is supplied.
@@ -29,7 +29,7 @@ class Jarable(AbstractClass):
     return None
 
   def get_artifact_info(self):
-    """Returns a triple composed of a :class:`pants.targets.jar_dependency.JarDependency`
+    """Returns a triple composed of a :class:`pants.backend.jvm.targets.jar_dependency.JarDependency`
     describing the jar for this target, this target's artifact identifier and a bool indicating if
     this target is exportable.
     """
