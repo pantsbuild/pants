@@ -5,6 +5,7 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+import logging
 import optparse
 import os
 import sys
@@ -91,6 +92,8 @@ def _run():
   [main]
   roots: ['src/python/pants_internal/test/',]
   """
+
+  logging.basicConfig()
   version = get_version()
   if len(sys.argv) == 2 and sys.argv[1] == _VERSION_OPTION:
     _do_exit(version)
