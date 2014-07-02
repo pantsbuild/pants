@@ -84,7 +84,7 @@ class BaseTest(unittest2.TestCase):
 
   def setUp(self):
     self.real_build_root = BuildRoot().path
-    self.build_root = mkdtemp(suffix='_BUILD_ROOT')
+    self.build_root = os.path.realpath(mkdtemp(suffix='_BUILD_ROOT'))
     BuildRoot().path = self.build_root
     self.create_file('pants.ini')
     self.build_file_parser = BuildFileParser(self.build_root)
