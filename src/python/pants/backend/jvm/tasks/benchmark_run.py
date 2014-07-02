@@ -69,6 +69,14 @@ class BenchmarkRun(JvmTask, JvmToolTaskMixin):
 
     self.caliper_args.extend(context.options.extra_caliper_args)
 
+  def prepare(self, round_manager):
+    # TODO(John Sirois): these are fake requirements in order to force compile run before this
+    # phase. Introduce a RuntimeClasspath product for JvmCompile and PrepareResources to populate
+    # and depend on that.
+    # See: https://github.com/pantsbuild/pants/issues/310
+    round_manager.require_data('resources_by_target')
+    round_manager.require_data('classes_by_target')
+
   def execute(self):
     # For rewriting JDK classes to work, the JAR file has to be listed specifically in
     # the JAR manifest as something that goes in the bootclasspath.

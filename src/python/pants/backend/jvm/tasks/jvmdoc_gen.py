@@ -110,10 +110,12 @@ class JvmdocGen(JvmTask):
     self.combined = self.open or getattr_options(parser_config.combined_opt)
     self.ignore_failure = getattr_options(parser_config.ignore_failure_opt)
 
-
   def prepare(self, round_manager):
+    # TODO(John Sirois): this is a fake requirement in order to force compile run before this
+    # phase. Introduce a RuntimeClasspath product for JvmCompile and PrepareResources to populate
+    # and depend on that.
+    # See: https://github.com/pantsbuild/pants/issues/310
     round_manager.require_data('classes_by_target')
-    round_manager.require_data('classes_by_source')
 
   def invalidate_for(self):
     return self.combined, self.transitive, self.workdir, self.confs, self._include_codegen
@@ -138,8 +140,9 @@ class JvmdocGen(JvmTask):
       targets = self.context.targets()
       with self.invalidated(filter(docable, targets)) as invalidation_check:
         safe_mkdir(self.workdir)
-        classpath = self.classpath(confs=self.confs,
-                                   exclusives_classpath=self.get_base_classpath_for_target(targets[0]))
+        exclusives_classpath = self.get_base_classpath_for_target(targets[0])
+        classpath = self.classpath(confs=self.confs, exclusives_classpath=exclusives_classpath)
+
         def find_jvmdoc_targets():
           invalid_targets = set()
           for vt in invalidation_check.invalid_vts:

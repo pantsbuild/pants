@@ -5,15 +5,14 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from collections import defaultdict
 import os
 import shutil
-from collections import defaultdict
 
 from twitter.common.dirutil import safe_mkdir
 
-from pants.base.build_environment import get_buildroot
-from pants.goal.products import MultipleRootedProducts
 from pants.backend.core.tasks.task import Task
+from pants.goal.products import MultipleRootedProducts
 
 
 class PrepareResources(Task):
@@ -25,6 +24,9 @@ class PrepareResources(Task):
   def __init__(self, context, workdir):
     super(PrepareResources, self).__init__(context, workdir)
     self.confs = context.config.getlist('prepare-resources', 'confs', default=['default'])
+
+  def prepare(self, round_manager):
+    round_manager.require_data('exclusives_groups')
 
   def execute(self):
     if self.context.products.is_required_data('resources_by_target'):
@@ -66,6 +68,8 @@ class PrepareResources(Task):
       for resources_tgt in all_resources_tgts:
         target_dir = compute_target_dir(resources_tgt)
         for conf in self.confs:
+          # TODO(John Sirois): Introduce the notion of RuntimeClasspath and populate that product
+          # instead of mutating exclusives_groups.
           egroups.update_compatible_classpaths(group_key, [(conf, target_dir)])
         if resources_by_target is not None:
           resources_by_target[resources_tgt].add_rel_paths(

@@ -278,6 +278,7 @@ class GroupTask(Task):
     """GroupTask must be sub-classed to provide a group name."""
 
   def prepare(self, round_manager):
+    round_manager.require_data('exclusives_groups')
     for member_type in self._member_types():
       group_member = member_type(self.context, os.path.join(self.workdir, member_type.name()))
       group_member.prepare(round_manager)

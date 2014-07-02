@@ -61,9 +61,14 @@ class SpecsRun(JvmTask, JvmToolTaskMixin):
     self.tests = context.options.specs_run_tests
 
   def prepare(self, round_manager):
+    super(SpecsRun, self).prepare(round_manager)
+
+    # TODO(John Sirois): these are fake requirements in order to force compile run before this
+    # phase. Introduce a RuntimeClasspath product for JvmCompile and PrepareResources to populate
+    # and depend on that.
+    # See: https://github.com/pantsbuild/pants/issues/310
     round_manager.require_data('resources_by_target')
     round_manager.require_data('classes_by_target')
-    round_manager.require_data('classes_by_source')
 
   def execute(self):
     if not self.skip:
