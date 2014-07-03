@@ -19,8 +19,7 @@ class manual(object):
     ignores methods. You want to decorate methods that are kosher for
     BUILD files.)
 
-    tags: E.g., tags=["python"] means This thingy should appear in the
-          Python section"
+    :param tags: E.g., tags=["python"] means "This thingy should appear in the Python section"
     """
     tags = tags or []
     def builddictdecorator(funcorclass):

@@ -75,26 +75,23 @@ class Build(Command):
     spec_parser = CmdLineSpecParser(self.root_dir, self.build_file_parser)
     self.top_level_addresses = set()
 
-    for spec in self.args[0:specs_end]:
+    specs = self.args[0:specs_end]
+    addresses = spec_parser.parse_addresses(specs)
+
+    for address in addresses:
+      self.top_level_addresses.add(address)
       try:
-        addresses = spec_parser.parse_addresses(spec)
+        self.build_file_parser.inject_address_closure_into_build_graph(address, self.build_graph)
+        target = self.build_graph.get_target(address)
       except:
-        self.error("Problem parsing spec %s: %s" % (spec, traceback.format_exc()))
+        self.error("Problem parsing BUILD target %s: %s" % (address, traceback.format_exc()))
 
-      for address in addresses:
-        self.top_level_addresses.add(address)
-        try:
-          self.build_file_parser.inject_address_closure_into_build_graph(address, self.build_graph)
-          target = self.build_graph.get_target(address)
-        except:
-          self.error("Problem parsing BUILD target %s: %s" % (address, traceback.format_exc()))
+      if not target:
+        self.error("Target %s does not exist" % address)
 
-        if not target:
-          self.error("Target %s does not exist" % address)
-
-        transitive_targets = self.build_graph.transitive_subgraph_of_addresses([target.address])
-        for transitive_target in transitive_targets:
-          self.targets.add(transitive_target)
+      transitive_targets = self.build_graph.transitive_subgraph_of_addresses([target.address])
+      for transitive_target in transitive_targets:
+        self.targets.add(transitive_target)
 
     self.targets = [target for target in self.targets if target.is_python]
 

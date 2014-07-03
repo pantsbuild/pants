@@ -112,6 +112,7 @@ python_tests(
   name = 'cmd_line_spec_parser',
   sources = ['test_cmd_line_spec_parser.py'],
   dependencies = [
+    pants('3rdparty/python/twitter/commons:twitter.common.collections'),
     pants('src/python/pants/base:cmd_line_spec_parser'),
     pants('tests/python/pants_test:base_test'),
   ]

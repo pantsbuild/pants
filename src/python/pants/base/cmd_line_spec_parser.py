@@ -7,6 +7,8 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import os
 
+from twitter.common.collections import OrderedSet
+
 from pants.base.address import BuildFileAddress, parse_spec
 from pants.base.build_file import BuildFile
 
@@ -23,13 +25,44 @@ class CmdLineSpecParser(object):
   Is a valid command line spec even though its not a valid BUILD file spec.  Its normalized to::
 
     src::
+
+  If you have a list of specs to consume, you can also indicate that some targets should be
+  subtracted from the set as follows::
+
+     src::  ^src/broken:test
+
+  The above expression would choose every target under src except for src/broken:test
   """
 
   def __init__(self, root_dir, build_file_parser):
     self._root_dir = root_dir
     self._build_file_parser = build_file_parser
 
-  def parse_addresses(self, spec):
+  def parse_addresses(self, specs):
+    """Process a list of command line specs and perform expansion.  This method can expand a list
+    of command line specs, some of which may be subtracted from the  return value if they include
+    the prefix '^'
+    :param spec_list: either a single spec string or a list of spec strings.
+    :return: a generator of specs parsed into addresses.
+    """
+
+    if isinstance(specs, basestring):
+      specs = [ specs ]
+
+    addresses = OrderedSet()
+    addresses_to_remove = set()
+
+    for spec in specs:
+      if spec.startswith('^'):
+        for address in self._parse_spec(spec.lstrip('^')):
+          addresses_to_remove.add(address)
+      else:
+        for address in self._parse_spec(spec):
+          addresses.add(address)
+    for result in addresses - addresses_to_remove:
+      yield result
+
+  def _parse_spec(self, spec):
     def normalize_spec_path(path):
       path = os.path.join(self._root_dir, path.lstrip('//'))
       normalized = os.path.relpath(os.path.realpath(path), self._root_dir)

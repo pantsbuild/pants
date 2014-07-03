@@ -95,3 +95,21 @@ location::
     tests/python/pants_test/tasks:targets_help
     tests/python/pants_test/tasks:what_changed
     tests/python/pants_test/testutils:testutils
+
+A leading caret specifies that this target or set of targets should be excluded from the
+list of targets::
+
+    $ ./pants goal list tests/python/pants_test/:: ^tests/python/pants_test/base::
+    tests/python/pants_test:base-test
+    tests/python/pants_test:test_maven_layout
+    tests/python/pants_test/BUILD:test_thrift_util
+    tests/python/pants_test:all
+    tests/python/pants_test/cache:cache
+    tests/python/pants_test/commands:commands
+    tests/python/pants_test/commands:test_goal
+    ...
+    tests/python/pants_test/tasks:sorttargets
+    tests/python/pants_test/tasks:targets_help
+    tests/python/pants_test/tasks:what_changed
+    tests/python/pants_test/testutils:testutils
+

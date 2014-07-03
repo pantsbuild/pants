@@ -177,11 +177,10 @@ class Goal(Command):
       # Bootstrap user goals by loading any BUILD files implied by targets.
       spec_parser = CmdLineSpecParser(self.root_dir, self.build_file_parser)
       with self.run_tracker.new_workunit(name='parse', labels=[WorkUnit.SETUP]):
-        for spec in specs:
-          for address in spec_parser.parse_addresses(spec):
-            self.build_file_parser.inject_spec_closure_into_build_graph(address.spec,
-                                                                        self.build_graph)
-            self.targets.append(self.build_graph.get_target(address))
+        for address in spec_parser.parse_addresses(specs):
+          self.build_file_parser.inject_spec_closure_into_build_graph(address.spec,
+                                                                      self.build_graph)
+          self.targets.append(self.build_graph.get_target(address))
     self.phases = [Phase(goal) for goal in goals]
 
     rcfiles = self.config.getdefault('rcfiles', type=list,
