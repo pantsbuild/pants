@@ -14,9 +14,9 @@ class AndroidDistribution(object):
   to bootstrap tools is reached.
 
   If we use the local Android SDK, it might make sense to refactor 'distribution'
-  out of the "java" package and put handling for Android SDK and JDK/JRE into subclasses.
+  out of the "java" package and subclass handling for Android SDK along with the JDK/JRE.
 
-  If we keep android distribution separate, then this can be fleshed out and error-caught.
+  If we keep android distribution separate, then this will be fleshed out and error-catched.
   """
   #TODO: Refactor cloned code from Distribution, in some way that is agreeable to upstream.
 
@@ -38,7 +38,6 @@ class AndroidDistribution(object):
 
   @classmethod
   def locate(cls):
-
     def sdk_path(sdk_env_var):
       sdk = os.environ.get(sdk_env_var)
       return os.path.abspath(sdk) if sdk else None
@@ -56,17 +55,16 @@ class AndroidDistribution(object):
         return dist
       except (ValueError, cls.Error):
         pass
-    raise cls.Error('Failed to locate and set %s' % ('SDK'))
+    raise cls.Error('Failed to locate and set %s. '
+                    'Please set ANDROID_HOME in your path' % ('Android SDK'))
 
 
   #create a distribution (aapt, all the rest of tools as needed)
   def __init__(self, sdk_path, minimum_sdk=None, target_sdk=None):
-    """TODO: Fill docstring"""
     if not os.path.isdir(sdk_path):
       raise ValueError('The specified android sdk path is invalid: %s' % sdk_path)
     self._sdk_path = sdk_path
-    # TODO: check this against current target. Does this make sense?
-    # Implement these min/target sdks in a thoughtful way.
+    # Implement these min/target sdks as I come to it. I need a manifest parser first.
     self._minimum_sdk = minimum_sdk
     self._validated_binaries = {}
 
@@ -75,7 +73,7 @@ class AndroidDistribution(object):
     if self._validated_binaries:
       return
     try:
-      self._validated_executable(self.android_tool())  # Calling purely for the check and cache side effects
+      self._validated_executable(self.android_tool())  # Calling purely for check/cache side effects
     except self.Error:
       raise
 
@@ -89,16 +87,13 @@ class AndroidDistribution(object):
   def _validate_executable(self, tool):
     if not self._is_executable(tool):
       raise self.Error('Failed to locate the %s executable, %s does not appear to be a'
-          ' valid %s' % (tool, self, 'Android SDK'))
+                       ' valid %s' % (tool, self, 'Android SDK'))
     return tool
 
   @staticmethod
   def _is_executable(path):
     return os.path.isfile(path) and os.access(path, os.X_OK)
 
-  #The android tool is used to manage the SDK itself
+  #The android tool is used to manage the SDK itself....staying here for now.
   def android_tool(self):
-    return (os.path.join(self._sdk_path, 'tools','android', '--no-ui'))
-
-
-
+    return (os.path.join(self._sdk_path, 'tools','android'))
