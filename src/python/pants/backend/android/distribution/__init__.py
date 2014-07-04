@@ -5,7 +5,7 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from pants.android.distribution.android_distribution import AndroidDistribution
+from pants.backend.android.distribution.android_distribution import AndroidDistribution
 
 
 __all__ = (
