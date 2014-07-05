@@ -27,8 +27,18 @@ class AndroidDistribution(object):
   _ANDROID_SDK = {}
 
   @classmethod
-  def cached(cls):
-    key = 'sdk'
+  def cached(cls, target_sdk=None, build_tools_version=None):
+    def scan_constraint_match():
+      for dist in cls._CACHE.values():
+        if target_sdk and dist.locate_target_sdk(target_sdk) == target_sdk:
+          continue
+        if maximum_version and dist.version > maximum_version:
+          continue
+        if jdk and not dist.jdk:
+          continue
+
+        return dist
+    key = target_sdk
     dist = cls._ANDROID_SDK.get(key)
     if not dist:
       dist = cls.locate()
@@ -60,14 +70,37 @@ class AndroidDistribution(object):
 
 
   #create a distribution (aapt, all the rest of tools as needed)
-  def __init__(self, sdk_path, minimum_sdk=None, target_sdk=None):
+  def __init__(self, sdk_path, target_sdk=None, build_tools_version=None):
     if not os.path.isdir(sdk_path):
       raise ValueError('The specified android sdk path is invalid: %s' % sdk_path)
     self._sdk_path = sdk_path
-    # Implement these min/target sdks as I come to it. I need a manifest parser first.
-    self._minimum_sdk = minimum_sdk
+    self._target_sdk = self.locate_target_sdk(target_sdk)
+    self._build_tools_version = self.locate_build_tools(build_tools_version)
+    self._validated_sdk = None
+    self._validated_build_tools = None
     self._validated_binaries = {}
+    self._installed_build_tools = {}
 
+  @property
+  def target_sdk(self):
+    return self.locate_target_sdk()
+
+
+  def locate_target_sdk(self, target_sdk):
+    if not self._validated_sdk:
+    #try
+    # args = self.android_tool, 'list', 'sdk', '|', 'grep', '"API level"', target_sdk
+    # if args
+      #return
+    #else exception
+    return self._validated_sdk
+
+  def locate_build_tools(self, build_tools_version):
+    if not self._validated_build_tools:
+      try:
+        # validated_binary(aapt) ? I don't think that is helpful, since we need a specific aapt.
+        # os. executable file exists at self._sdk_path/build-tools/build_tools_version/aapt (for checking purposes)
+    return self._validated_build_tools
 
   def validate(self):
     if self._validated_binaries:
