@@ -24,25 +24,25 @@ class AndroidDistribution(object):
   class Error(Exception):
     """Indicates an invalid java distribution."""
 
-  _ANDROID_SDK = {}
+  _CACHED_SDK = {}
 
   @classmethod
   def cached(cls, target_sdk=None, build_tools_version=None):
     def scan_constraint_match():
-      for dist in cls._CACHE.values():
-        if target_sdk and dist.locate_target_sdk(target_sdk) == target_sdk:
+      for dist in cls._CACHED_SDK.values():
+        if target_sdk and dist.locate_target_sdk(target_sdk): # == target_sdk: (?)
           continue
-        if maximum_version and dist.version > maximum_version:
+        if build_tools_version and dist.locate_build_tools(build_tools_version): # == build_tools_version:
           continue
-        if jdk and not dist.jdk:
-          continue
-
         return dist
-    key = target_sdk
-    dist = cls._ANDROID_SDK.get(key)
+
+    key = (target_sdk, build_tools_version) # tuple caching particular pair. not ideal.
+    dist = cls._CACHED_SDK.get(key)
     if not dist:
-      dist = cls.locate()
-    cls._ANDROID_SDK[key] = dist
+      dist = scan_constraint_match()
+      if not dist:
+        dist = cls.locate()
+      cls._CACHED_SDK[key] = dist
     return dist
 
 
@@ -74,12 +74,12 @@ class AndroidDistribution(object):
     if not os.path.isdir(sdk_path):
       raise ValueError('The specified android sdk path is invalid: %s' % sdk_path)
     self._sdk_path = sdk_path
-    self._target_sdk = self.locate_target_sdk(target_sdk)
-    self._build_tools_version = self.locate_build_tools(build_tools_version)
-    self._validated_sdk = None
-    self._validated_build_tools = None
+    #self._target_sdk = self.locate_target_sdk(target_sdk)
+    #self._build_tools_version = self.locate_build_tools(build_tools_version)
+    self._validated_sdks = set()
+    self._validated_build_tools = set()
     self._validated_binaries = {}
-    self._installed_build_tools = {}
+    self._installed_build_tools = {}         # do I still need this?
 
   @property
   def target_sdk(self):
@@ -87,19 +87,25 @@ class AndroidDistribution(object):
 
 
   def locate_target_sdk(self, target_sdk):
-    if not self._validated_sdk:
-    #try
-    # args = self.android_tool, 'list', 'sdk', '|', 'grep', '"API level"', target_sdk
-    # if args
-      #return
-    #else exception
-    return self._validated_sdk
+    if target_sdk not in self._validated_sdks:
+      try:
+      # args = self.android_tool, 'list', 'sdk', '|', 'grep', '"API level"', target_sdk
+      # if args
+        #return
+      #else exception ("Need to update SDK and download SDK %s", target_sdk)
+        self._validated_sdks.add(target_sdk)
+      except self.Error:
+        raise
+    return True # TODO something better than this I bet.
 
   def locate_build_tools(self, build_tools_version):
-    if not self._validated_build_tools:
+    if build_tools_version not in self._validated_build_tools:
       try:
         # validated_binary(aapt) ? I don't think that is helpful, since we need a specific aapt.
         # os. executable file exists at self._sdk_path/build-tools/build_tools_version/aapt (for checking purposes)
+        self._validated_build_tools.add(build_tools_version)
+      except self.Error:
+        raise
     return self._validated_build_tools
 
   def validate(self):
