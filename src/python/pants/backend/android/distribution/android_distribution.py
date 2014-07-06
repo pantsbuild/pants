@@ -8,6 +8,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import os
 from twitter.common import log
 
+
 class AndroidDistribution(object):
   """
   TODO: (Update docstring for class and methods)
@@ -19,48 +20,35 @@ class AndroidDistribution(object):
 
   If we keep android distribution separate, then this will be fleshed out and error-catched.
   """
-  #TODO: Refactor cloned code from Distribution, in some way that is agreeable to upstream.
-
 
   class Error(Exception):
     """Indicates an invalid java distribution."""
 
   _CACHED_SDK = {}
-  _CACHED_COUNT = 0 #debug
 
   @classmethod
   def cached(cls, target_sdk=None, build_tools_version=None):
     def scan_constraint_match():
       for dist in cls._CACHED_SDK.values():
-        print ("doing scan_target")
-        print ('target sdk is %s' % (target_sdk))
-        if target_sdk and not dist.locate_target_sdk(target_sdk): # == target_sdk: (?)
-          print ("we had both as True")
+        if target_sdk and not dist.locate_target_sdk(target_sdk):
           continue
-        print ('build_tools_version is %s' % (build_tools_version))
-        print ("doing scan_build")
-        if build_tools_version and not dist.locate_build_tools(build_tools_version): # == build_tools_version:
+        if build_tools_version and not dist.locate_build_tools(build_tools_version):
           continue
         return dist
 
-
-    # this could be more efficient by far
-    key = (target_sdk, build_tools_version) # tuple caching particular pair. not ideal.
+    # this tuple just  used for quick lookup. If no match we check the validated sets in locate()
+    key = (target_sdk, build_tools_version)
     dist = cls._CACHED_SDK.get(key)
     if not dist:
       dist = scan_constraint_match()
       if not dist:
-        # This locate call is the only place that makes new Dists
         dist = cls.locate(target_sdk=target_sdk, build_tools_version=build_tools_version)
-        cls._CACHED_COUNT += 1 #debug
-    # All that happens here is caching a new key, not certainly making a new dist.
     cls._CACHED_SDK[key] = dist
     return dist
 
 
   @classmethod
   def locate(cls, target_sdk=None, build_tools_version=None):
-    print ("locating")
     def sdk_path(sdk_env_var):
       sdk = os.environ.get(sdk_env_var)
       return os.path.abspath(sdk) if sdk else None
@@ -80,9 +68,14 @@ class AndroidDistribution(object):
         pass
     raise cls.Error('Failed to locate %s. Please set ANDROID_HOME in your path' % ('Android SDK'))
 
-
-  #create a distribution (aapt, all the rest of tools as needed)
   def __init__(self, sdk_path, target_sdk=None, build_tools_version=None):
+    """Creates a distribution wrapping the given bin_path.
+
+    :param _sdk_path: the path to the installed SDK
+    :param set _installed_sdks: verified API levels installed in the _sdk_path
+    :param set _installed_build_tools: verified build-tools versions installed in _sdk_path
+    """
+
     if not os.path.isdir(sdk_path):
       raise ValueError('The specified android sdk path is invalid: %s' % sdk_path)
     self._sdk_path = sdk_path
@@ -90,13 +83,22 @@ class AndroidDistribution(object):
     self._installed_build_tools = set()
     self._validated_binaries = set()
 
+  def validate(self, target_sdk, build_tools_version):
+    if target_sdk and not self.locate_target_sdk(target_sdk):
+      raise self.Error('The Android SDK at %s does not have the %s API installed and '
+                       'must be updated to build this target' % (self._sdk_path, target_sdk))
+    if build_tools_version and not self.locate_build_tools(build_tools_version):
+      raise self.Error('The Android SDK at %s does not have build tools version %s and must be '
+                       'updated to build this target' % (self._sdk_path, build_tools_version))
+
   def locate_target_sdk(self, target_sdk):
-    print ("here is locate_target")
+    """Checks to see if the requested API is installed in Android SDK.
+
+    NB: This can be done from the CLI with "$ANDROID_TOOL list targets | grep "API level $TARGET"
+    But that $ANDROID_TOOL is simply checking for the physical presence of a few files. I am open
+    to adding additional checks for a couple other SDK and Build-tools binaries. """
     if target_sdk not in self._installed_sdks:
       try:
-      # args = self.android_tool, 'list', 'sdk', '|', 'grep', '"API level"', target_sdk
-      # if args
-        #return
       #else exception ("Need to update SDK and download SDK %s", target_sdk)
         self._installed_sdks.add(target_sdk)
       except self.Error:
@@ -120,16 +122,6 @@ class AndroidDistribution(object):
     self._installed_build_tools.add(build_tools_version)
     return True
 
-  def validate(self, target_sdk, build_tools_version):
-    if target_sdk and not self.locate_target_sdk(target_sdk):
-      print ("error validating target_sdk")
-      raise self.Error('The Android SDK at %s does not have the %s API installed and '
-                       'must be updated to build this target' % (self._sdk_path, target_sdk))
-    if build_tools_version and not self.locate_build_tools(build_tools_version):
-      print ("error validating build_tools")
-      raise self.Error('The Android SDK at %s does not have build tools version %s and must be '
-                       'updated to build this target' % (self._sdk_path, build_tools_version))
-
   def _validated_executable(self, tool):
     if tool not in self._validated_binaries:
       self._validate_executable(tool)
@@ -146,8 +138,8 @@ class AndroidDistribution(object):
   def _is_executable(path):
     return os.path.isfile(path) and os.access(path, os.X_OK)
 
-  #The android tool is used to manage the SDK itself....staying here for now.
   def android_tool(self):
+    """The android tool is used to manage the SDK itself """
     return (os.path.join(self._sdk_path, 'tools','android'))
 
   def aapt_tool(self, build_tools_version):
@@ -156,4 +148,3 @@ class AndroidDistribution(object):
   def __repr__(self):
     return ('AndroidDistribution(%r, installed_sdks=%r, installed_build_tools=%r)'
             % (self._sdk_path, list(self._installed_sdks), list(self._installed_build_tools)))
-  
