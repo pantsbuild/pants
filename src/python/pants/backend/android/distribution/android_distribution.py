@@ -10,6 +10,7 @@ from twitter.common import log
 
 class AndroidDistribution(object):
   """
+  TODO: (Update docstring for class and methods)
   Placeholder class for finding ANDROID_SDK_HOME, until a decision on whether/how
   to bootstrap tools is reached.
 
@@ -72,7 +73,7 @@ class AndroidDistribution(object):
     for path in filter(None, search_path()):
       try:
         dist = cls(path, target_sdk=target_sdk, build_tools_version=build_tools_version)
-        dist.validate()
+        dist.validate(target_sdk, build_tools_version)
         log.debug('Located %s' % ('SDK'))
         return dist
       except (ValueError, cls.Error):
@@ -85,60 +86,49 @@ class AndroidDistribution(object):
     if not os.path.isdir(sdk_path):
       raise ValueError('The specified android sdk path is invalid: %s' % sdk_path)
     self._sdk_path = sdk_path
-    self._target_sdk = target_sdk
-    self._build_tools_version = build_tools_version
-    self._validated_sdks = set()
-    self._validated_build_tools = set()
+    self._installed_sdks = set()
+    self._installed_build_tools = set()
     self._validated_binaries = {}
-    self._installed_build_tools = {}         # do I still need this?
-
-  @property
-  def target_sdk(self):
-    return self.locate_target_sdk()
-
 
   def locate_target_sdk(self, target_sdk):
     print ("here is locate_target")
-    if target_sdk not in self._validated_sdks:  #TODO do I need to check for empty here and at the scan_constraint_match
+    if target_sdk not in self._installed_sdks:
       try:
       # args = self.android_tool, 'list', 'sdk', '|', 'grep', '"API level"', target_sdk
       # if args
         #return
       #else exception ("Need to update SDK and download SDK %s", target_sdk)
-        self._validated_sdks.add(target_sdk)
-        return True
+        self._installed_sdks.add(target_sdk)
       except self.Error:
         raise
-    print ("we are about to return True in locate_target")
-    return True # TODO something better than this I bet.
-
-  def locate_build_tools(self, build_tools_version):
-    print ("here is locate_build_tools")
-    if build_tools_version not in self._validated_build_tools:
-      try:
-        # validated_binary(aapt) ? I don't think that is helpful, since we need a specific aapt.
-        # os. executable file exists at self._sdk_path/build-tools/build_tools_version/aapt (for checking purposes)
-        self._validated_build_tools.add(build_tools_version)
-        return True
-      except self.Error:
-        raise
-    print ("we are about to return True in locate_target")
     return True
 
-  def validate(self):
+  def locate_build_tools(self, build_tools_version):
+    """This looks to see if the requested version of the Android build tools are installed
+    AndroidTargets default to the latest stable release of the build tools. But this can be
+    overriden in the BUILD file.
 
-    if self._target_sdk:
-      target = self._target_sdk
-      if target and not self.locate_target_sdk(target):
-        print ("error validating target_sdk")
-        raise self.Error('The Android SDK at %s does not have the %s API installed and'
-                         ' must be updated to build this target' % (self._sdk_path, target))
-    if self._build_tools_version:
-      build_tools = self._build_tools_version
-      if build_tools and not self.locate_build_tools(build_tools):
-        print ("error validating build_tools")
-        raise self.Error('The Android SDK at %s does not have build tools version %s and must be '
-                         'updated to build this target' % (self._sdk_path, self._build_tools_version))
+    There is no decent way to check installed build tools, we must be content with verifying the
+    presence of a representative executable (aapt).
+    """
+    if build_tools_version not in self._installed_build_tools:
+      try:
+        aapt = self.aapt_tool(build_tools_version)
+        self._validated_executable(aapt)
+      except self.Error:
+        raise
+    self._installed_build_tools.add(build_tools_version)
+    return True
+
+  def validate(self, target_sdk, build_tools_version):
+    if target_sdk and not self.locate_target_sdk(target_sdk):
+      print ("error validating target_sdk")
+      raise self.Error('The Android SDK at %s does not have the %s API installed and '
+                       'must be updated to build this target' % (self._sdk_path, target_sdk))
+    if build_tools_version and not self.locate_build_tools(build_tools_version):
+      print ("error validating build_tools")
+      raise self.Error('The Android SDK at %s does not have build tools version %s and must be '
+                       'updated to build this target' % (self._sdk_path, build_tools_version))
 
   def _validated_executable(self, tool):
     exe = self._validated_binaries.get(tool)
@@ -149,8 +139,8 @@ class AndroidDistribution(object):
 
   def _validate_executable(self, tool):
     if not self._is_executable(tool):
-      raise self.Error('Failed to locate the %s executable, %s does not appear to be a'
-                       ' valid %s' % (tool, self, 'Android SDK'))
+      raise self.Error('Failed to locate the %s executable. It does not appear to be an'
+                       ' installed portion of this %s' % (tool, 'Android SDK'))
     return tool
 
   @staticmethod
@@ -161,6 +151,9 @@ class AndroidDistribution(object):
   def android_tool(self):
     return (os.path.join(self._sdk_path, 'tools','android'))
 
+  def aapt_tool(self, build_tools_version):
+    return (os.path.join(self._sdk_path, 'build-tools', build_tools_version, 'aapt'))
+
   def __repr__(self):
-    return ('AndroidDistribution(%r, target_sdk=%r, build_tools_version=%r)'
-            % (self._sdk_path, self._target_sdk, self._build_tools_version))
+    return ('AndroidDistribution(%r, installed_sdks=%r, installed_build_tools=%r)'
+            % (self._sdk_path, self._installed_sdks, self._installed_build_tools))
