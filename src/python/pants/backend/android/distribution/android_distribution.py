@@ -118,8 +118,8 @@ class AndroidDistribution(object):
       try:
         aapt = self.aapt_tool(build_tools_version)
         self._validated_executable(aapt)
-      except self.Error:
-        pass
+      except:
+        return False
     self._installed_build_tools.add(build_tools_version)
     return True
 
