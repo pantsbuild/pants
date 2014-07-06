@@ -155,4 +155,5 @@ class AndroidDistribution(object):
 
   def __repr__(self):
     return ('AndroidDistribution(%r, installed_sdks=%r, installed_build_tools=%r)'
-            % (self._sdk_path, self._installed_sdks, self._installed_build_tools))
+            % (self._sdk_path, list(self._installed_sdks), list(self._installed_build_tools)))
+  
