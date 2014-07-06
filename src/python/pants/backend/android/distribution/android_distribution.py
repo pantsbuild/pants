@@ -32,23 +32,27 @@ class AndroidDistribution(object):
     def scan_constraint_match():
       for dist in cls._CACHED_SDK.values():
         print ("doing scan_target")
-        if target_sdk and dist.locate_target_sdk(target_sdk): # == target_sdk: (?)
+        print ('target sdk is %s' % (target_sdk))
+        if target_sdk and not dist.locate_target_sdk(target_sdk): # == target_sdk: (?)
+          print ("we had both as True")
           continue
+        print ('build_tools_version is %s' % (build_tools_version))
         print ("doing scan_build")
-        if build_tools_version and dist.locate_build_tools(build_tools_version): # == build_tools_version:
+        if build_tools_version and not dist.locate_build_tools(build_tools_version): # == build_tools_version:
           continue
         return dist
 
 
     # this could be more efficient by far
     key = (target_sdk, build_tools_version) # tuple caching particular pair. not ideal.
-    # ALl that happens here is caching a new key, not necessarily making a new dist.
     dist = cls._CACHED_SDK.get(key)
     if not dist:
       dist = scan_constraint_match()
       if not dist:
+        # This locate call is the only place that makes new Dists
         dist = cls.locate(target_sdk=target_sdk, build_tools_version=build_tools_version)
         cls._CACHED_COUNT += 1 #debug
+    # All that happens here is caching a new key, not certainly making a new dist.
     cls._CACHED_SDK[key] = dist
     return dist
 
@@ -73,8 +77,7 @@ class AndroidDistribution(object):
         return dist
       except (ValueError, cls.Error):
         pass
-    raise cls.Error('Failed to locate and set %s. '
-                    'Please set ANDROID_HOME in your path' % ('Android SDK'))
+    raise cls.Error('Failed to locate %s. Please set ANDROID_HOME in your path' % ('Android SDK'))
 
 
   #create a distribution (aapt, all the rest of tools as needed)
@@ -96,16 +99,17 @@ class AndroidDistribution(object):
 
   def locate_target_sdk(self, target_sdk):
     print ("here is locate_target")
-    if target_sdk not in self._validated_sdks:
+    if target_sdk not in self._validated_sdks:  #TODO do I need to check for empty here and at the scan_constraint_match
       try:
       # args = self.android_tool, 'list', 'sdk', '|', 'grep', '"API level"', target_sdk
       # if args
         #return
       #else exception ("Need to update SDK and download SDK %s", target_sdk)
         self._validated_sdks.add(target_sdk)
-        return False
+        return True
       except self.Error:
         raise
+    print ("we are about to return True in locate_target")
     return True # TODO something better than this I bet.
 
   def locate_build_tools(self, build_tools_version):
@@ -115,18 +119,26 @@ class AndroidDistribution(object):
         # validated_binary(aapt) ? I don't think that is helpful, since we need a specific aapt.
         # os. executable file exists at self._sdk_path/build-tools/build_tools_version/aapt (for checking purposes)
         self._validated_build_tools.add(build_tools_version)
-        return False
+        return True
       except self.Error:
         raise
-    return self._validated_build_tools
+    print ("we are about to return True in locate_target")
+    return True
 
   def validate(self):
-    if self._validated_binaries:
-      return
-    try:
-      self._validated_executable(self.android_tool())  # Calling purely for check/cache side effects
-    except self.Error:
-      raise
+
+    if self._target_sdk:
+      target = self._target_sdk
+      if target and not self.locate_target_sdk(target):
+        print ("error validating target_sdk")
+        raise self.Error('The Android SDK at %s does not have the %s API installed and'
+                         ' must be updated to build this target' % (self._sdk_path, target))
+    if self._build_tools_version:
+      build_tools = self._build_tools_version
+      if build_tools and not self.locate_build_tools(build_tools):
+        print ("error validating build_tools")
+        raise self.Error('The Android SDK at %s does not have build tools version %s and must be '
+                         'updated to build this target' % (self._sdk_path, self._build_tools_version))
 
   def _validated_executable(self, tool):
     exe = self._validated_binaries.get(tool)
