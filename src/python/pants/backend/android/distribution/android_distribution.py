@@ -66,7 +66,7 @@ class AndroidDistribution(object):
         log.debug('Located %s' % ('SDK'))
         return dist
       except (ValueError, cls.Error):
-        pass
+        raise
 
     raise cls.Error('Failed to locate %s. Please set install SDK and '
                     'set ANDROID_HOME in your path' % ('Android SDK'))
@@ -87,11 +87,11 @@ class AndroidDistribution(object):
 
   def validate(self, target_sdk, build_tools_version):
     if target_sdk and not self.locate_target_sdk(target_sdk):
-      raise self.Error('The Android SDK at %s does not have the %s API installed and '
-                       'must be updated' % (self._sdk_path, target_sdk))
+      raise self.Error('There is no Android SDK at %s with API level %s installed. It may need '
+                       'to be updated' % (self._sdk_path, target_sdk))
     if build_tools_version and not self.locate_build_tools(build_tools_version):
-      raise self.Error('The Android SDK at %s does not have build tools version %s and must be '
-                       'updated' % (self._sdk_path, build_tools_version))
+      raise self.Error('There is no Android SDK at %s with build-tools version %s installed. '
+                       'It may need to be updated' % (self._sdk_path, build_tools_version))
 
   def locate_target_sdk(self, target_sdk):
     """Checks to see if the requested API is installed in Android SDK.
@@ -119,7 +119,7 @@ class AndroidDistribution(object):
         aapt = self.aapt_tool(build_tools_version)
         self._validated_executable(aapt)
       except self.Error:
-        raise
+        pass
     self._installed_build_tools.add(build_tools_version)
     return True
 
