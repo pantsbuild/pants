@@ -11,14 +11,15 @@ from twitter.common import log
 
 class AndroidDistribution(object):
   """
-  TODO: (Update docstring for class and methods)
-  Placeholder class for finding ANDROID_SDK_HOME, until a decision on whether/how
-  to bootstrap tools is reached.
+  This class looks for Android SDks installed on the machine's path. It then verifies that that
+  SDK has the needed build-tools and API levels installed. There is caching of most lookups.
 
-  If we use the local Android SDK, it might make sense to refactor 'distribution'
-  out of the "java" package and subclass handling for Android SDK along with the JDK/JRE.
+  As of now, missing API or build-tools raises an exception. The SDK can be updated from
+  within this class, it just depends what state we want to leave the host machine. There
+  is probably a discussion to be had about bootstrapping as well.
 
-  If we keep android distribution separate, then this will be fleshed out and error-catched.
+  Good portions of this are inspired by pants.java.distribution. The two distributions could perhaps
+  benefit from a refactor that makes some of the validation process common instead of redundant.
   """
 
   class Error(Exception):
@@ -36,7 +37,7 @@ class AndroidDistribution(object):
           continue
         return dist
 
-    # this tuple just  used for quick lookup. If no match we check the validated sets in locate()
+    # this tuple just  used for quick lookup. If no match we check within validated sets w/ locate()
     key = (target_sdk, build_tools_version)
     dist = cls._CACHED_SDK.get(key)
     if not dist:
@@ -66,12 +67,13 @@ class AndroidDistribution(object):
         return dist
       except (ValueError, cls.Error):
         pass
-    raise cls.Error('Failed to locate %s. Please set ANDROID_HOME in your path' % ('Android SDK'))
+
+    raise cls.Error('Failed to locate %s. Please set install SDK and '
+                    'set ANDROID_HOME in your path' % ('Android SDK'))
 
   def __init__(self, sdk_path, target_sdk=None, build_tools_version=None):
-    """Creates a distribution wrapping the given bin_path.
+    """Creates an Android distribution wrapping the given sdk_path.
 
-    :param _sdk_path: the path to the installed SDK
     :param set _installed_sdks: verified API levels installed in the _sdk_path
     :param set _installed_build_tools: verified build-tools versions installed in _sdk_path
     """
@@ -86,10 +88,10 @@ class AndroidDistribution(object):
   def validate(self, target_sdk, build_tools_version):
     if target_sdk and not self.locate_target_sdk(target_sdk):
       raise self.Error('The Android SDK at %s does not have the %s API installed and '
-                       'must be updated to build this target' % (self._sdk_path, target_sdk))
+                       'must be updated' % (self._sdk_path, target_sdk))
     if build_tools_version and not self.locate_build_tools(build_tools_version):
       raise self.Error('The Android SDK at %s does not have build tools version %s and must be '
-                       'updated to build this target' % (self._sdk_path, build_tools_version))
+                       'updated' % (self._sdk_path, build_tools_version))
 
   def locate_target_sdk(self, target_sdk):
     """Checks to see if the requested API is installed in Android SDK.
@@ -98,11 +100,10 @@ class AndroidDistribution(object):
     But that $ANDROID_TOOL is simply checking for the physical presence of a few files. I am open
     to adding additional checks for a couple other SDK and Build-tools binaries. """
     if target_sdk not in self._installed_sdks:
-      try:
-      #else exception ("Need to update SDK and download SDK %s", target_sdk)
-        self._installed_sdks.add(target_sdk)
-      except self.Error:
-        raise
+      android_jar = self.android_jar_tool(target_sdk)
+      if not os.path.isfile(android_jar):
+        return False
+      self._installed_sdks.add(target_sdk)
     return True
 
   def locate_build_tools(self, build_tools_version):
@@ -138,11 +139,16 @@ class AndroidDistribution(object):
   def _is_executable(path):
     return os.path.isfile(path) and os.access(path, os.X_OK)
 
+  def android_jar_tool(self, target_sdk):
+    """The android.jar holds the class files with the Android APIs, unique per platform"""
+    return (os.path.join(self._sdk_path, 'platforms','android-' + target_sdk, 'android.jar'))
+
   def android_tool(self):
-    """The android tool is used to manage the SDK itself """
+    """The android script is used to manage the Android SDK, common to the entire distribution"""
     return (os.path.join(self._sdk_path, 'tools','android'))
 
   def aapt_tool(self, build_tools_version):
+    """returns aapt tool for each unique build-tools version. Used to validate build-tools path"""
     return (os.path.join(self._sdk_path, 'build-tools', build_tools_version, 'aapt'))
 
   def __repr__(self):
