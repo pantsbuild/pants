@@ -88,7 +88,7 @@ class AndroidDistribution(object):
     self._sdk_path = sdk_path
     self._installed_sdks = set()
     self._installed_build_tools = set()
-    self._validated_binaries = {}
+    self._validated_binaries = set()
 
   def locate_target_sdk(self, target_sdk):
     print ("here is locate_target")
@@ -131,11 +131,10 @@ class AndroidDistribution(object):
                        'updated to build this target' % (self._sdk_path, build_tools_version))
 
   def _validated_executable(self, tool):
-    exe = self._validated_binaries.get(tool)
-    if not exe:
-      exe = self._validate_executable(tool)
-      self._validated_binaries[tool] = exe
-    return exe
+    if tool not in self._validated_binaries:
+      self._validate_executable(tool)
+      self._validated_binaries.add(tool)
+    return tool
 
   def _validate_executable(self, tool):
     if not self._is_executable(tool):
