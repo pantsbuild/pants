@@ -14,7 +14,7 @@ from contextlib import contextmanager
 import pytest
 from twitter.common.collections import maybe_list
 from twitter.common.contextutil import environment_as, temporary_dir
-from twitter.common.dirutil import chmod_plus_x, safe_open, touch
+from twitter.common.dirutil import chmod_plus_x, safe_mkdir, safe_open, touch
 
 from pants.backend.android.distribution import AndroidDistribution
 
@@ -28,15 +28,17 @@ class TestAndroidDistributionTest(unittest.TestCase):
     return cls.EXE(name, contents=contents)
 
   @contextmanager
-  def distribution(self, files=None, executables=None):
+  def distribution(self, installed_sdks=[], installed_build_tools=[],
+                   files='android.jar', executables='aapt'):
     with temporary_dir() as sdk:
-      for f in maybe_list(files or ()):
-        touch(os.path.join(sdk, f))
-      for exe in maybe_list(executables or ()):
-        path = os.path.join(path, exe.name)
-        with safe_open(path, 'w') as fp:
-          fp.write(exe.contents or '')
-        chmod_plus_x(path)
+      for sdks in installed_sdks:
+        test_aapt = touch(os.path.join(sdk, 'platforms', 'android-' + sdks, files))
+      for build in installed_build_tools:
+        for exe in maybe_list(executables or ()):
+          path = os.path.join(sdk, 'build-tools', build, exe)
+          with safe_open(path, 'w') as fp:
+            fp.write('')
+          chmod_plus_x(path)
       yield sdk
 
   def test_args(self):
@@ -48,6 +50,6 @@ class TestAndroidDistributionTest(unittest.TestCase):
       with self.distribution() as sdk:
         AndroidDistribution(sdk_path=sdk).validate(build_tools_version='19.1.0')
 
-    with self.distribution(files='platforms/android-18/android.jar') as jdk:
+    with self.distribution(installed_sdks=["18", "19"], installed_build_tools=["19.1.0"]) as sdk:
       AndroidDistribution(sdk_path=sdk).validate(target_sdk="18", build_tools_version='19.1.0')
         # assertEquals aapt_tool and os.path.join ETC
