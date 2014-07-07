@@ -63,7 +63,6 @@ class AndroidDistribution(object):
     for path in filter(None, search_path()):
       try:
         dist = cls(path, target_sdk=target_sdk, build_tools_version=build_tools_version)
-        dist.validate(target_sdk, build_tools_version)
         log.debug('Validated %s' % ('Android SDK'))
         return dist
       except (ValueError, cls.Error):
@@ -72,7 +71,7 @@ class AndroidDistribution(object):
     raise cls.Error('Failed to locate %s. Please set install SDK and '
                     'set ANDROID_HOME in your path' % ('Android SDK'))
 
-  def __init__(self, sdk_path=None):
+  def __init__(self, sdk_path=None, target_sdk=None, build_tools_version=None):
     """Creates an Android distribution wrapping the given sdk_path.
     """
     if not os.path.isdir(sdk_path):
@@ -81,6 +80,7 @@ class AndroidDistribution(object):
     self._installed_sdks = set()
     self._installed_build_tools = set()
     self._validated_binaries = set()
+    self.validate(target_sdk, build_tools_version)
 
   def validate(self, target_sdk, build_tools_version):
     if target_sdk and not self.locate_target_sdk(target_sdk):
