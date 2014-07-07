@@ -72,7 +72,7 @@ class AndroidDistribution(object):
     raise cls.Error('Failed to locate %s. Please set install SDK and '
                     'set ANDROID_HOME in your path' % ('Android SDK'))
 
-  def __init__(self, sdk_path):
+  def __init__(self, sdk_path=None):
     """Creates an Android distribution wrapping the given sdk_path.
     """
     if not os.path.isdir(sdk_path):
