@@ -5,8 +5,6 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from pants.goal import Goal as goal
-
 from pants.backend.core.tasks.group_task import GroupTask
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.artifact import Artifact
@@ -47,6 +45,7 @@ from pants.backend.jvm.tasks.provides import Provides
 from pants.backend.jvm.tasks.scala_repl import ScalaRepl
 from pants.backend.jvm.tasks.scaladoc_gen import ScaladocGen
 from pants.backend.jvm.tasks.specs_run import SpecsRun
+from pants.goal import Goal as goal, Phase
 
 
 def target_aliases():
@@ -95,9 +94,12 @@ def register_commands():
 
 
 def register_goals():
-  goal(name='ng-killall', action=NailgunKillall
-  ).install().with_description('Kill running nailgun servers.')
+  ng_killall = goal(name='ng-killall', action=NailgunKillall)
+  ng_killall.install().with_description('Kill running nailgun servers.')
 
+  Phase('invalidate').install(ng_killall, first=True)
+  Phase('clean-all').install(ng_killall, first=True)
+  Phase('clean-all-async').install(ng_killall, first=True)
 
   goal(name='bootstrap-jvm-tools', action=BootstrapJvmTools
   ).install('bootstrap').with_description('Bootstrap tools needed for building.')
