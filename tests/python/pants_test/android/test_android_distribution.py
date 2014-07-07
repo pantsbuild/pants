@@ -39,14 +39,15 @@ class TestAndroidDistributionTest(unittest.TestCase):
         chmod_plus_x(path)
       yield sdk
 
-  def test_validate_basic(self):
-    with pytest.raises(AndroidDistribution.Error):
+  def test_args(self):
+    with pytest.raises(TypeError):
       with self.distribution() as sdk:
-        AndroidDistribution(sdk_path=sdk).validate(target_sdk='19', build_tools_version='19.1.0')
+        AndroidDistribution(sdk_path=sdk).validate(target_sdk='19')
 
-    with pytest.raises(AndroidDistribution.Error):
-      with self.distribution(files='') as sdk:
-        AndroidDistribution(sdk_path=sdk).validate(target_sdk='19', build_tools_version='19.1.0')
+    with pytest.raises(TypeError):
+      with self.distribution() as sdk:
+        AndroidDistribution(sdk_path=sdk).validate(build_tools_version='19.1.0')
 
-
+    with self.distribution(files='platforms/android-18/android.jar') as jdk:
+      AndroidDistribution(sdk_path=sdk).validate(target_sdk="18", build_tools_version='19.1.0')
         # assertEquals aapt_tool and os.path.join ETC
