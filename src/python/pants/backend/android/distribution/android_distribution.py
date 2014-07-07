@@ -91,11 +91,11 @@ class AndroidDistribution(object):
                        'It may need to be updated' % (self._sdk_path, build_tools_version))
 
   def locate_target_sdk(self, target_sdk):
-    """Checks to see if the requested API is installed in Android SDK.
+    """Checks to see if the requested API is installed in Android SDK."""
 
-    NB: This can be done from the CLI with "$ANDROID_TOOL list targets | grep "API level $TARGET"
-    But that $ANDROID_TOOL is simply checking for the physical presence of a few files. I am open
-    to adding additional checks for a couple other SDK and Build-tools binaries. """
+    # NB: This can be done from the CLI with "$ANDROID_TOOL list targets | grep "API level $TARGET"
+    # But that $ANDROID_TOOL is simply checking for the physical presence of a few files. I am open
+    # to adding additional checks for a couple other SDK and Build-tools binaries.
     if target_sdk not in self._installed_sdks:
       android_jar = self.android_jar_tool(target_sdk)
       if not os.path.isfile(android_jar):
@@ -104,11 +104,11 @@ class AndroidDistribution(object):
     return True
 
   def locate_build_tools(self, build_tools_version):
-    """This looks to see if the requested version of the Android build tools are installed
-    AndroidTargets default to the latest stable release of the build tools. But this can be
+    """This looks to see if the requested version of the Android build tools are installed.
+    AndroidTargets default to the latest stable release of the build tools, but that can be
     overriden in the BUILD file.
 
-    There is no decent way to check installed build tools, we must be content with verifying the
+    I found no decent way to check installed build tools, we must be content with verifying the
     presence of a representative executable (aapt in this case).
     """
     if build_tools_version not in self._installed_build_tools:
@@ -135,10 +135,6 @@ class AndroidDistribution(object):
   @staticmethod
   def _is_executable(path):
     return os.path.isfile(path) and os.access(path, os.X_OK)
-
-  def android_tool(self):
-    """The android script is used to manage the Android SDK, common to the entire distribution"""
-    return (os.path.join(self._sdk_path, 'tools','android'))
 
   def android_jar_tool(self, target_sdk):
     """The android.jar holds the class files with the Android APIs, unique per platform"""
