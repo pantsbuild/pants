@@ -8,6 +8,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 from collections import namedtuple
 import os
 
+from twitter.common.collections.orderedset import OrderedSet
 from twitter.common.collections.ordereddict import OrderedDict
 
 from pants.base.exceptions import TaskError
@@ -48,6 +49,10 @@ class PhaseExecutor(object):
 
 
 class RoundEngine(Engine):
+
+  class DependencyError(ValueError):
+    """Indicates a Task has an unsatisfiable data dependency."""
+
   PhaseInfo = namedtuple('PhaseInfo', ['phase', 'tasks_by_name', 'phase_dependencies'])
 
   def _topological_sort(self, phase_info_by_phase):
@@ -58,8 +63,7 @@ class RoundEngine(Engine):
       if dependees is None:
         dependees = set()
         dependees_by_phase[phase] = dependees
-      # TODO(ity): Fix this check, this should never be called with the phase == dependee
-      if dependee and dependee is not phase:
+      if dependee:
         dependees.add(dependee)
 
     for phase, phase_info in phase_info_by_phase.items():
@@ -82,27 +86,58 @@ class RoundEngine(Engine):
           dependees.difference_update(satisfied)
         # TODO(John Sirois): Do a better job here and actually collect and print cycle paths
         # between Goals/Tasks.  The developer can most directly address that data.
-        raise ValueError('Cycle detected in phase dependencies:\n\t{0}'
-                         .format('\n\t'.join('{0} <- {1}'.format(phase, list(dependees))
-                                             for phase, dependees in dependees_by_phase.items())))
+        raise self.DependencyError('Cycle detected in phase dependencies:\n\t{0}'
+                                   .format('\n\t'.join('{0} <- {1}'.format(phase, list(dependees))
+                                                       for phase, dependees
+                                                       in dependees_by_phase.items())))
 
   def _visit_phase(self, phase, context, phase_info_by_phase):
     if phase in phase_info_by_phase:
       return
 
     tasks_by_name = OrderedDict()
+    phase_dependencies = set()
+    visited_task_types = set()
+    phase_goals = phase.goals()
+    for goal in reversed(phase_goals):
+      task_type = goal.task_type
+      visited_task_types.add(task_type)
 
-    round_manager = RoundManager(context)
-    for goal in reversed(phase.goals()):
       task_workdir = os.path.join(context.config.getdefault('pants_workdir'),
                                   phase.name,
                                   goal.name)
-      task = goal.task_type(context, task_workdir)
-      task.prepare(round_manager)
+      task = task_type(context, task_workdir)
       tasks_by_name[goal.name] = task
 
-    products = round_manager.get_schedule()
-    phase_dependencies = round_manager.lookup_phases_for_products(products)
+      round_manager = RoundManager(context)
+      task.prepare(round_manager)
+      try:
+        dependencies = round_manager.get_dependencies()
+        for producer_info in dependencies:
+          producer_phase = producer_info.phase
+          if producer_phase == phase:
+            if producer_info.task_type in visited_task_types:
+              ordering = '\n\t'.join("[{0}] '{1}' {2}".format(i, goal.name, goal.task_type.__name__)
+                                     for i, goal in enumerate(phase_goals))
+              raise self.DependencyError("Goal '{name}' with action {consumer_task} depends on"
+                                         " {data} from task {producer_task} which is ordered after"
+                                         " it in the '{phase}' phase:\n\t{ordering}"
+                                         .format(name=goal.name,
+                                                 consumer_task=task_type.__name__,
+                                                 data=producer_info.product_type,
+                                                 producer_task=producer_info.task_type.__name__,
+                                                 phase=phase.name,
+                                                 ordering=ordering))
+            else:
+              # We don't express dependencies on downstream tasks in this same phase.
+              pass
+          else:
+            phase_dependencies.add(producer_phase)
+      except round_manager.MissingProductError as e:
+        raise self.DependencyError("Could not satisfy data dependencies for goal '{name}' with "
+                                   "action {action}: {error}"
+                                   .format(name=goal.name, action=task_type.__name__, error=e))
+
     phase_info = self.PhaseInfo(phase, tasks_by_name, phase_dependencies)
     phase_info_by_phase[phase] = phase_info
 
@@ -114,7 +149,7 @@ class RoundEngine(Engine):
       raise TaskError('No phases to prepare')
 
     phase_info_by_phase = OrderedDict()
-    for phase in reversed(phases):
+    for phase in reversed(OrderedSet(phases)):
       self._visit_phase(phase, context, phase_info_by_phase)
 
     for phase_info in reversed(list(self._topological_sort(phase_info_by_phase))):
@@ -142,5 +177,5 @@ class RoundEngine(Engine):
           context.release_lock()
           outer_lock_holder = None
     finally:
-     if outer_lock_holder:
-       context.release_lock()
+      if outer_lock_holder:
+        context.release_lock()

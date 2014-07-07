@@ -11,15 +11,17 @@ from pants_test.base.context_utils import create_context
 from pants_test.engine.base_engine_test import EngineTestBase
 
 
+# TODO(John Sirois): Kill this test - the core Engine should unlearn dependencies ordering
+# and leave this to subclasses that can form a strategy for this like RoundEngine.
 class ExecutionOrderTest(EngineTestBase):
   def test_execution_order(self):
-    self.installed_goal('invalidate')
-    self.installed_goal('clean-all', dependencies=['invalidate'])
+    self.install_goal('invalidate')
+    self.install_goal('clean-all', dependencies=['invalidate'])
 
-    self.installed_goal('resolve')
-    self.installed_goal('javac', dependencies=['resolve'], phase='compile')
-    self.installed_goal('scalac', dependencies=['resolve'], phase='compile')
-    self.installed_goal('junit', dependencies=['compile'], phase='test')
+    self.install_goal('resolve')
+    self.install_goal('javac', dependencies=['resolve'], phase='compile')
+    self.install_goal('scalac', dependencies=['resolve'], phase='compile')
+    self.install_goal('junit', dependencies=['compile'], phase='test')
 
     self.assertEqual(self.as_phases('invalidate', 'clean-all', 'resolve', 'compile', 'test'),
                      list(Engine.execution_order(self.as_phases('clean-all', 'test'))))

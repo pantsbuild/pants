@@ -5,9 +5,10 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+import itertools
+
 from pants.backend.core.tasks.task import Task
 from pants.engine.round_engine import RoundEngine
-
 from pants_test.base_test import BaseTest
 from pants_test.engine.base_engine_test import EngineTestBase
 
@@ -20,9 +21,7 @@ class RoundEngineTest(EngineTestBase, BaseTest):
     self.assertTrue(self._context.is_unlocked())
 
     self.engine = RoundEngine()
-    self.construct_actions = []
-    self.prepare_actions = []
-    self.execute_actions = []
+    self.actions = []
 
   def tearDown(self):
     self.assertTrue(self._context.is_unlocked())
@@ -37,62 +36,138 @@ class RoundEngineTest(EngineTestBase, BaseTest):
   def execute_action(self, tag):
     return 'execute', tag, self._context
 
-  def record(self, tag, product_type=None, prepare=None):
+  def record(self, tag, product_types=None, required_data=None):
     class RecordingTask(Task):
       def __init__(me, context, workdir):
         super(RecordingTask, me).__init__(context, workdir)
-        self.construct_actions.append(self.construct_action(tag))
+        self.actions.append(self.construct_action(tag))
 
       @classmethod
       def product_type(cls):
-        if product_type:
-          return [product_type]
+        return product_types or []
 
       def prepare(me, round_manager):
-        if prepare and round_manager:
-          for p in prepare:
-            round_manager.require_data(p)
-        self.prepare_actions.append(self.prepare_action(tag))
+        for requirement in (required_data or ()):
+          round_manager.require_data(requirement)
+        self.actions.append(self.prepare_action(tag))
 
       def execute(me):
-        self.execute_actions.append(self.execute_action(tag))
+        self.actions.append(self.execute_action(tag))
 
     return RecordingTask
 
-  def install_goal(self, name, product_type=None, phase=None, test_namespace=None, prepare=None):
-    return self.installed_goal(name=name,
-                               action=self.record(name, product_type, prepare),
-                               dependencies=None,
-                               phase=phase,
-                               test_namespace=test_namespace)
+  def install_goal(self, name, product_types=None, phase=None, required_data=None):
+    task = self.record(name, product_types, required_data)
+    return super(RoundEngineTest, self).install_goal(name=name, action=task, phase=phase)
 
-  def test_round_engine(self):
-    self.install_goal('prepare', 'resources_by_target', 'resources', False, ['exclusives_groups'])
-    self.install_goal('bootstrap-jvm-tools', 'jvm_build_tools', 'bootstrap', False)
-    self.install_goal('junit', 'junit_products', 'test', False, ['classes_by_target'])
-    self.install_goal('thrift', 'classes_by_source', 'gen', False,
-                      ['jvm_build_tools_classpath_callbacks', 'jvm_build_tools'])
-    self.install_goal('ivy', 'ivy_jar_products', 'resolve', False, ['resources_by_target'])
-    self.install_goal('scrooge', 'classes_by_source', 'gen', False,
-                      ['jvm_build_tools_classpath_callbacks', 'jvm_build_tools'])
-    self.install_goal('protoc', 'classes_by_source', 'gen', False,
-                      ['jvm_build_tools_classpath_callbacks', 'jvm_build_tools'])
-    self.install_goal('antlr', 'classes_by_source', 'gen', False,
-                      ['jvm_build_tools_classpath_callbacks', 'jvm_build_tools'])
-    self.install_goal('jvm', 'classes_by_target', 'compile', False, ['ivy_jar_products'])
-    self.install_goal('check-exclusives', 'exclusives_groups', 'check-exclusives', False,
-                      ['classes_by_source'])
+  def assert_actions(self, *expected_execute_ordering):
+    expected_pre_execute_actions = set()
+    expected_execute_actions = []
+    for action in expected_execute_ordering:
+      expected_pre_execute_actions.add(self.construct_action(action))
+      expected_pre_execute_actions.add(self.prepare_action(action))
+      expected_execute_actions.append(self.execute_action(action))
 
-    phases = self.as_phases_without_namespace('test')
-    self.engine.attempt(self._context, phases)
+    self.assertEqual(expected_pre_execute_actions,
+                     set(self.actions[:-len(expected_execute_ordering)]))
+    self.assertEqual(expected_execute_actions, self.actions[-len(expected_execute_ordering):])
 
-    actions = [
-      'bootstrap-jvm-tools', 'thrift', 'scrooge', 'protoc', 'antlr', 'check-exclusives',
-      'prepare', 'ivy', 'jvm', 'junit']
-    expected_construct_actions = [self.construct_action(action) for action in actions]
-    expected_prepare_actions = [self.prepare_action(action) for action in reversed(actions)]
-    expected_execute_actions = [self.execute_action(action) for action in actions]
+  def test_lifecycle_ordering(self):
+    self.install_goal('task1', phase='phase1', product_types=['1'])
+    self.install_goal('task2', phase='phase1', product_types=['2'], required_data=['1'])
+    self.install_goal('task3', phase='phase3', product_types=['3'], required_data=['2'])
+    self.install_goal('task4', phase='phase4', required_data=['1', '2', '3'])
 
-    self.assertEqual(sorted(expected_construct_actions), sorted(set(self.construct_actions)))
-    self.assertEqual(expected_prepare_actions, self.prepare_actions)
-    self.assertEqual(expected_execute_actions, self.execute_actions)
+    self.engine.attempt(self._context, self.as_phases('phase4'))
+
+    self.assert_actions('task1', 'task2', 'task3', 'task4')
+
+  def test_inter_phase_dep(self):
+    self.install_goal('task1', phase='phase1', product_types=['1'])
+    self.install_goal('task2', phase='phase1', required_data=['1'])
+
+    self.engine.attempt(self._context, self.as_phases('phase1'))
+
+    self.assert_actions('task1', 'task2')
+
+  def test_inter_phase_dep_self_cycle(self):
+    self.install_goal('task1', phase='phase1', product_types=['1'], required_data=['1'])
+
+    with self.assertRaises(self.engine.DependencyError):
+      self.engine.attempt(self._context, self.as_phases('phase1'))
+
+  def test_inter_phase_dep_downstream(self):
+    self.install_goal('task1', phase='phase1', required_data=['1'])
+    self.install_goal('task2', phase='phase1', product_types=['1'])
+
+    with self.assertRaises(self.engine.DependencyError):
+      self.engine.attempt(self._context, self.as_phases('phase1'))
+
+  def test_missing_product(self):
+    self.install_goal('task1', phase='phase1', required_data=['1'])
+
+    with self.assertRaises(self.engine.DependencyError):
+      self.engine.attempt(self._context, self.as_phases('phase1'))
+
+  def test_phase_cycle_direct(self):
+    self.install_goal('task1', phase='phase1', required_data=['2'], product_types=['1'])
+    self.install_goal('task2', phase='phase2', required_data=['1'], product_types=['2'])
+
+    for phase in ('phase1', 'phase2'):
+      with self.assertRaises(self.engine.DependencyError):
+        self.engine.attempt(self._context, self.as_phases(phase))
+
+  def test_phase_cycle_indirect(self):
+    self.install_goal('task1', phase='phase1', required_data=['2'], product_types=['1'])
+    self.install_goal('task2', phase='phase2', required_data=['3'], product_types=['2'])
+    self.install_goal('task3', phase='phase3', required_data=['1'], product_types=['3'])
+
+    for phase in ('phase1', 'phase2', 'phase3'):
+      with self.assertRaises(self.engine.DependencyError):
+        self.engine.attempt(self._context, self.as_phases(phase))
+
+  def test_phase_ordering_unconstrained_respects_cli_order(self):
+    self.install_goal('task1', phase='phase1')
+    self.install_goal('task2', phase='phase2')
+    self.install_goal('task3', phase='phase3')
+
+    for permutation in itertools.permutations([('task1', 'phase1'),
+                                               ('task2', 'phase2'),
+                                               ('task3', 'phase3')]):
+      self.actions = []
+      self.engine.attempt(self._context, self.as_phases(*[phase for task, phase in permutation]))
+
+      expected_execute_actions = [task for task, phase in permutation]
+      self.assert_actions(*expected_execute_actions)
+
+  def test_phase_ordering_constrained_conflicts_cli_order(self):
+    self.install_goal('task1', phase='phase1', required_data=['2'])
+    self.install_goal('task2', phase='phase2', product_types=['2'])
+
+    self.engine.attempt(self._context, self.as_phases('phase1', 'phase2'))
+
+    self.assert_actions('task2', 'task1')
+
+  def test_phase_ordering_mixed_constraints_and_cli_order(self):
+    self.install_goal('task1', phase='phase1')
+    self.install_goal('task2', phase='phase2')
+    self.install_goal('task3', phase='phase3')
+    self.install_goal('task4', phase='phase4', required_data=['5'])
+    self.install_goal('task5', phase='phase5', product_types=['5'])
+
+    self.engine.attempt(self._context,
+                        self.as_phases('phase1', 'phase2', 'phase4', 'phase5', 'phase3'))
+
+    self.assert_actions('task1', 'task2', 'task5', 'task4', 'task3')
+
+  def test_cli_phases_deduped(self):
+    self.install_goal('task1', phase='phase1')
+    self.install_goal('task2', phase='phase2')
+    self.install_goal('task3', phase='phase3')
+
+    self.engine.attempt(self._context,
+                        self.as_phases('phase1', 'phase2', 'phase1', 'phase3', 'phase2'))
+
+    self.assert_actions('task1', 'task2', 'task3')
+
+
