@@ -8,6 +8,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import os
 import subprocess
 import unittest
+from collections import namedtuple
 from contextlib import contextmanager
 
 import pytest
@@ -19,6 +20,7 @@ from pants.backend.android.distribution import AndroidDistribution
 
 
 class TestAndroidDistributionTest(unittest.TestCase):
+  EXE = namedtuple('Exe', ['name', 'contents'])
 
   @classmethod
   def exe(cls, name):
@@ -27,9 +29,9 @@ class TestAndroidDistributionTest(unittest.TestCase):
 
   @contextmanager
   def distribution(self, files=None, executables=None):
-    with temporary_dir as sdk:
-      for file in maybe_list(files or ()):
-        touch(os.path.join(sdk, file))
+    with temporary_dir() as sdk:
+      for f in maybe_list(files or ()):
+        touch(os.path.join(sdk, f))
       for exe in maybe_list(executables or ()):
         path = os.path.join(path, exe.name)
         with safe_open(path, 'w') as fp:
@@ -37,6 +39,14 @@ class TestAndroidDistributionTest(unittest.TestCase):
         chmod_plus_x(path)
       yield sdk
 
+  def test_validate_basic(self):
+    with pytest.raises(AndroidDistribution.Error):
+      with self.distribution() as sdk:
+        AndroidDistribution(sdk_path=sdk).validate(target_sdk='19', build_tools_version='19.1.0')
+
+    with pytest.raises(AndroidDistribution.Error):
+      with self.distribution(files='') as sdk:
+        AndroidDistribution(sdk_path=sdk).validate(target_sdk='19', build_tools_version='19.1.0')
 
 
         # assertEquals aapt_tool and os.path.join ETC
