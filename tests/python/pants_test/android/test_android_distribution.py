@@ -23,12 +23,13 @@ class TestAndroidDistributionTest(unittest.TestCase):
   EXE = namedtuple('Exe', ['name', 'contents'])
 
   @classmethod
-  def exe(cls, name):
+  def exe(cls, name):  #TODO(mateor) unused right now--use or delete
     contents = None
     return cls.EXE(name, contents=contents)
 
   @contextmanager
-  def distribution(self, installed_sdks=[], installed_build_tools=[],
+  # default for testing purposes being sdk 18 and 19, with latest build-tools 19.1.0
+  def distribution(self, installed_sdks=["18", "19"], installed_build_tools=["19.1.0"],
                    files='android.jar', executables='aapt'):
     with temporary_dir() as sdk:
       for sdks in installed_sdks:
@@ -50,6 +51,8 @@ class TestAndroidDistributionTest(unittest.TestCase):
       with self.distribution() as sdk:
         AndroidDistribution(sdk_path=sdk).validate(build_tools_version='19.1.0')
 
-    with self.distribution(installed_sdks=["18", "19"], installed_build_tools=["19.1.0"]) as sdk:
+    with self.distribution() as sdk:
       AndroidDistribution(sdk_path=sdk).validate(target_sdk="18", build_tools_version='19.1.0')
+
+
         # assertEquals aapt_tool and os.path.join ETC
