@@ -54,7 +54,7 @@ def register_commands():
 def register_goals():
   goal(name='thrift', action=ApacheThriftGen).install('gen').with_description('Generate code.')
 
-  goal(name='scrooge', action=ScroogeGen).install('gen')
+  goal(name='scrooge', dependencies=['bootstrap'], action=ScroogeGen).install('gen')
 
   goal(name='protoc', action=ProtobufGen).install('gen')
 
