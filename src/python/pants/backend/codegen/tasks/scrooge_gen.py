@@ -93,6 +93,10 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
                             action='callback', callback=mkflag.set_bool, default=None,
                             help='[%default] Suppress output, overrides verbose flag in pants.ini.')
 
+  @classmethod
+  def product_type(cls):
+    return ['java', 'scala']
+
   def __init__(self, context, workdir):
     super(ScroogeGen, self).__init__(context, workdir)
     self.compiler_for_name = dict((name, Compiler.from_config(context, config))
