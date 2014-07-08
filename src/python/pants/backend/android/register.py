@@ -5,9 +5,11 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from pants.goal import Goal as goal
+
 from pants.backend.android.targets.android_binary import AndroidBinary
 from pants.backend.android.targets.android_resources import AndroidResources
-
+from pants.backend.android.tasks.aapt_gen import AaptGen
 
 def target_aliases():
   return {
@@ -37,4 +39,4 @@ def register_commands():
 
 
 def register_goals():
-  pass
+  goal(name='aapt', action=AaptGen).install('gen')
