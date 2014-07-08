@@ -38,7 +38,7 @@ class TestAndroidDistributionTest(unittest2.TestCase):
           chmod_plus_x(path)
       yield sdk
 
-  def test_validate_function(self):
+  def test_validate(self):
     with pytest.raises(TypeError):
       with self.distribution() as sdk:
         AndroidDistribution(sdk_path=sdk).validate(target_sdk='19')
@@ -47,29 +47,20 @@ class TestAndroidDistributionTest(unittest2.TestCase):
       with self.distribution() as sdk:
         AndroidDistribution(sdk_path=sdk).validate(build_tools_version='19.1.0')
 
-    with self.distribution() as sdk:
-      AndroidDistribution(sdk_path=sdk).validate(target_sdk="18", build_tools_version='19.1.0')
-
-  def validate__installed_versions(self):
-    with pytest.raises(AndroidDistribution.Error):
-      with self.distribution() as sdk:
-        AndroidDistribution(sdk_path=sdk).validate(target_sdk="20")
-
-    with pytest.raises(AndroidDistribution.Error):
-      with self.distribution() as sdk:
-        AndroidDistribution(sdk_path=sdk).validate(build_tools_version="1.1.1")
-
-    with pytest.raises(AndroidDistribution.Error):
+    with pytest.raises(TypeError):
       with self.distribution() as sdk:
         AndroidDistribution(sdk_path=sdk).validate(sdk_path="18", build_tools_version="1.1.1")
 
     with pytest.raises(AndroidDistribution.Error):
       with self.distribution() as sdk:
-        AndroidDistribution(sdk_path=sdk).validate(sdk_path="20", build_tools_version="19.1.0")
+        AndroidDistribution(sdk_path=sdk).validate(target_sdk="9999", build_tools_version="19.1.0")
+
+    with pytest.raises(AndroidDistribution.Error):
+      with self.distribution() as sdk:
+        AndroidDistribution(sdk_path=sdk).validate(target_sdk="18", build_tools_version="999.1.0")
 
     with self.distribution() as sdk:
-      AndroidDistribution(sdk_path=sdk).validate(sdk_path="18", build_tools_version="19.1.0")
-
+      AndroidDistribution(sdk_path=sdk).validate(target_sdk="18", build_tools_version="19.1.0")
 
   def test_locate_tools(self):
     with self.distribution() as sdk:
