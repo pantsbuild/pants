@@ -16,6 +16,6 @@ python_tests(
     pants('3rdparty/python/twitter/commons:twitter.common.collections'),
     pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
-    pants('src/python/pants/backend/android:distribution'),
+    pants('src/python/pants/backend/android:android_distribution'),
   ]
 )
