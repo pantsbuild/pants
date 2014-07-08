@@ -42,7 +42,7 @@ class TestAndroidDistributionTest(unittest.TestCase):
           chmod_plus_x(path)
       yield sdk
 
-  def test_args(self):
+  def test_validate_function(self):
     with pytest.raises(TypeError):
       with self.distribution() as sdk:
         AndroidDistribution(sdk_path=sdk).validate(target_sdk='19')
@@ -54,5 +54,51 @@ class TestAndroidDistributionTest(unittest.TestCase):
     with self.distribution() as sdk:
       AndroidDistribution(sdk_path=sdk).validate(target_sdk="18", build_tools_version='19.1.0')
 
+  def validate__installed_versions(self):
+    with pytest.raises(AndroidDistribution.Error):
+      with self.distribution() as sdk:
+        AndroidDistribution(sdk_path=sdk).validate(target_sdk="20")
 
-        # assertEquals aapt_tool and os.path.join ETC
+    with pytest.raises(AndroidDistribution.Error):
+      with self.distribution() as sdk:
+        AndroidDistribution(sdk_path=sdk).validate(build_tools_version="1.1.1")
+
+    with pytest.raises(AndroidDistribution.Error):
+      with self.distribution() as sdk:
+        AndroidDistribution(sdk_path=sdk).validate(sdk_path="18", build_tools_version="1.1.1")
+
+    with pytest.raises(AndroidDistribution.Error):
+      with self.distribution() as sdk:
+        AndroidDistribution(sdk_path=sdk).validate(sdk_path="20", build_tools_version="19.1.0")
+
+    with self.distribution() as sdk:
+      AndroidDistribution(sdk_path=sdk).validate(sdk_path="18", build_tools_version="19.1.0")
+
+
+  def test_locate_tools(self):
+    with self.distribution() as sdk:
+      self.assertEquals(False, AndroidDistribution(sdk_path=sdk).locate_build_tools(build_tools_version="20"))
+
+    with self.distribution() as sdk:
+      self.assertEquals(False, AndroidDistribution(sdk_path=sdk).locate_build_tools(build_tools_version=""))
+
+    with pytest.raises(TypeError):
+      with self.distribution() as sdk:
+        AndroidDistribution(sdk_path=sdk).locate_build_tools(target_sdk="19.1.0")
+
+    with self.distribution() as sdk:
+      self.assertEquals(True, AndroidDistribution(sdk_path=sdk).locate_build_tools(build_tools_version="19.1.0"))
+
+  def test_locate_sdk(self):
+    with self.distribution() as sdk:
+      self.assertEquals(False, AndroidDistribution(sdk_path=sdk).locate_target_sdk(target_sdk="22"))
+
+    with self.distribution() as sdk:
+      self.assertEquals(False, AndroidDistribution(sdk_path=sdk).locate_target_sdk(target_sdk="1"))
+
+    with self.distribution() as sdk:
+      self.assertEquals(False, AndroidDistribution(sdk_path=sdk).locate_target_sdk(target_sdk=""))
+
+    with self.distribution() as sdk:
+      self.assertEquals(True, AndroidDistribution(sdk_path=sdk).locate_target_sdk(target_sdk="18"))
+
