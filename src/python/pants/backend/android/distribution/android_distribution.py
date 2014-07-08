@@ -68,8 +68,8 @@ class AndroidDistribution(object):
                     'set ANDROID_HOME in your path' % ('Android SDK'))
 
   def __init__(self, sdk_path=None, target_sdk=None, build_tools_version=None):
-    """Creates an Android distribution wrapping the given sdk_path.
-    """
+    """Creates an Android distribution wrapping the given sdk_path."""
+
     if not os.path.isdir(sdk_path):
       raise ValueError('The specified android sdk path is invalid: %s' % sdk_path)
     self._sdk_path = sdk_path
