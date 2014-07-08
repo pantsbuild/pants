@@ -61,6 +61,7 @@ python_test_suite(
     pants(':jar_publish_integration'),
     pants(':jvm_bundle_integration'),
     pants(':scala_repl_integration'),
+    pants(':protobuf_integration'),
   ],
 )
 
@@ -336,6 +337,14 @@ python_tests(
     pants(':base'),
     pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('src/python/pants/backend/codegen/tasks:protobuf_gen'),
+  ],
+)
+
+python_tests(
+  name = 'protobuf_integration',
+  sources = ['test_protobuf_integration.py'],
+  dependencies = [
+    pants('tests/python/pants_test:int-test'),
   ],
 )
 
