@@ -5,20 +5,21 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-import os
-import pytest
-import unittest
 from collections import namedtuple
 from contextlib import contextmanager
+import os
+import pytest
+import unittest2
+
 
 from twitter.common.collections import maybe_list
 from twitter.common.contextutil import environment_as, temporary_dir
 from twitter.common.dirutil import chmod_plus_x, safe_mkdir, safe_open, touch
 
-from pants.backend.android.distribution import AndroidDistribution
+from pants.backend.android.distribution.android_distribution import AndroidDistribution
 
 
-class TestAndroidDistributionTest(unittest.TestCase):
+class TestAndroidDistributionTest(unittest2.TestCase):
 
   @contextmanager
   # default for testing purposes being sdk 18 and 19, with latest build-tools 19.1.0
@@ -37,7 +38,7 @@ class TestAndroidDistributionTest(unittest.TestCase):
           chmod_plus_x(path)
       yield sdk
 
-  def test_validate_function(self):
+  def test_validate(self):
     with pytest.raises(TypeError):
       with self.distribution() as sdk:
         AndroidDistribution(sdk_path=sdk).validate(target_sdk='19')
@@ -46,43 +47,37 @@ class TestAndroidDistributionTest(unittest.TestCase):
       with self.distribution() as sdk:
         AndroidDistribution(sdk_path=sdk).validate(build_tools_version='19.1.0')
 
-    with self.distribution() as sdk:
-      AndroidDistribution(sdk_path=sdk).validate(target_sdk="18", build_tools_version='19.1.0')
-
-  def validate__installed_versions(self):
-    with pytest.raises(AndroidDistribution.Error):
-      with self.distribution() as sdk:
-        AndroidDistribution(sdk_path=sdk).validate(target_sdk="20")
-
-    with pytest.raises(AndroidDistribution.Error):
-      with self.distribution() as sdk:
-        AndroidDistribution(sdk_path=sdk).validate(build_tools_version="1.1.1")
-
-    with pytest.raises(AndroidDistribution.Error):
+    with pytest.raises(TypeError):
       with self.distribution() as sdk:
         AndroidDistribution(sdk_path=sdk).validate(sdk_path="18", build_tools_version="1.1.1")
 
     with pytest.raises(AndroidDistribution.Error):
       with self.distribution() as sdk:
-        AndroidDistribution(sdk_path=sdk).validate(sdk_path="20", build_tools_version="19.1.0")
+        AndroidDistribution(sdk_path=sdk).validate(target_sdk="9999", build_tools_version="19.1.0")
+
+    with pytest.raises(AndroidDistribution.Error):
+      with self.distribution() as sdk:
+        AndroidDistribution(sdk_path=sdk).validate(target_sdk="18", build_tools_version="999.1.0")
 
     with self.distribution() as sdk:
-      AndroidDistribution(sdk_path=sdk).validate(sdk_path="18", build_tools_version="19.1.0")
-
+      AndroidDistribution(sdk_path=sdk).validate(target_sdk="18", build_tools_version="19.1.0")
 
   def test_locate_tools(self):
     with self.distribution() as sdk:
-      self.assertEquals(False, AndroidDistribution(sdk_path=sdk).locate_build_tools(build_tools_version="20"))
+      self.assertEquals(False, AndroidDistribution(sdk_path=sdk)
+                        .locate_build_tools(build_tools_version="20"))
 
     with self.distribution() as sdk:
-      self.assertEquals(False, AndroidDistribution(sdk_path=sdk).locate_build_tools(build_tools_version=""))
+      self.assertEquals(False, AndroidDistribution(sdk_path=sdk)
+                        .locate_build_tools(build_tools_version=""))
 
     with pytest.raises(TypeError):
       with self.distribution() as sdk:
         AndroidDistribution(sdk_path=sdk).locate_build_tools(target_sdk="19.1.0")
 
     with self.distribution() as sdk:
-      self.assertEquals(True, AndroidDistribution(sdk_path=sdk).locate_build_tools(build_tools_version="19.1.0"))
+      self.assertEquals(True, AndroidDistribution(sdk_path=sdk)
+                        .locate_build_tools(build_tools_version="19.1.0"))
 
   def test_locate_sdk(self):
     with self.distribution() as sdk:

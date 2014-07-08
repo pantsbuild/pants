@@ -17,8 +17,8 @@ class AndroidDistribution(object):
   """
 
   # As of now, missing API or build-tools only raises an exception. The SDK could be updated from
-  # within this class, it just depends what state we want to leave the host machine afterwards. There
-  # is probably a discussion to be had about bootstrapping as well.
+  # within this class, it just depends what state we want to leave the host machine afterwards.
+  # There is probably a discussion to be had about bootstrapping as well.
 
   # Good portions of this are inspired by pants.java.distribution. The two distributions could
   # perhaps benefit from a refactor that makes some of the validation process common.
@@ -38,7 +38,7 @@ class AndroidDistribution(object):
           continue
         return dist
 
-    # this tuple just  used for quick lookup. If no match we check within validated sets w/ locate()
+    # tuple just used for quick lookup. If no match, check within validated sets w/ locate()
     key = (target_sdk, build_tools_version)
     dist = cls._CACHED_SDK.get(key)
     if not dist:
@@ -61,19 +61,15 @@ class AndroidDistribution(object):
       yield sdk_path('ANDROID_SDK')
 
     for path in filter(None, search_path()):
-      try:
-        dist = cls(path, target_sdk=target_sdk, build_tools_version=build_tools_version)
-        log.debug('Validated %s' % ('Android SDK'))
-        return dist
-      except (ValueError, cls.Error):
-        raise
-
+      dist = cls(path, target_sdk=target_sdk, build_tools_version=build_tools_version)
+      log.debug('Validated %s' % ('Android SDK'))
+      return dist
     raise cls.Error('Failed to locate %s. Please set install SDK and '
                     'set ANDROID_HOME in your path' % ('Android SDK'))
 
   def __init__(self, sdk_path=None, target_sdk=None, build_tools_version=None):
-    """Creates an Android distribution wrapping the given sdk_path.
-    """
+    """Creates an Android distribution wrapping the given sdk_path."""
+
     if not os.path.isdir(sdk_path):
       raise ValueError('The specified android sdk path is invalid: %s' % sdk_path)
     self._sdk_path = sdk_path
@@ -93,9 +89,8 @@ class AndroidDistribution(object):
   def locate_target_sdk(self, target_sdk):
     """Checks to see if the requested API is installed in Android SDK."""
 
-    # NB: This can be done from the CLI with "$ANDROID_TOOL list targets | grep "API level $TARGET"
-    # But that $ANDROID_TOOL is simply checking for the physical presence of a few files. I am open
-    # to adding additional checks for a couple other SDK and Build-tools binaries.
+    # NB: Can be done from CLI with "$ANDROID_TOOL list targets | grep "API level $TARGET"
+    # But that $ANDROID_TOOL is simply checking for the physical presence of a few files.
     if target_sdk not in self._installed_sdks:
       android_jar = self.android_jar_tool(target_sdk)
       if not os.path.isfile(android_jar):
@@ -107,10 +102,10 @@ class AndroidDistribution(object):
     """This looks to see if the requested version of the Android build tools are installed.
     AndroidTargets default to the latest stable release of the build tools, but that can be
     overriden in the BUILD file.
-
-    I found no decent way to check installed build tools, we must be content with verifying the
-    presence of a representative executable (aapt in this case).
     """
+    #I found no decent way to check installed build tools, we must be content with verifying
+    #the presence of a representative executable (aapt in this case).
+
     if build_tools_version not in self._installed_build_tools:
       try:
         aapt = self.aapt_tool(build_tools_version)
@@ -138,12 +133,12 @@ class AndroidDistribution(object):
 
   def android_jar_tool(self, target_sdk):
     """The android.jar holds the class files with the Android APIs, unique per platform"""
-    return (os.path.join(self._sdk_path, 'platforms','android-' + target_sdk, 'android.jar'))
+    return os.path.join(self._sdk_path, 'platforms', 'android-' + target_sdk, 'android.jar')
 
   def aapt_tool(self, build_tools_version):
     """returns aapt tool for each unique build-tools version. Used to validate build-tools path"""
-    return (os.path.join(self._sdk_path, 'build-tools', build_tools_version, 'aapt'))
+    return os.path.join(self._sdk_path, 'build-tools', build_tools_version, 'aapt')
 
   def __repr__(self):
-    return ('AndroidDistribution(%r, installed_sdks=%r, installed_build_tools=%r)'
-            % (self._sdk_path, list(self._installed_sdks), list(self._installed_build_tools)))
+    return ('AndroidDistribution({0!r}, installed_sdks={1!r}, installed_build_tools={2!r})'.format
+            (self._sdk_path, list(self._installed_sdks), list(self._installed_build_tools)))
