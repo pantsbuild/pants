@@ -222,7 +222,7 @@ class RunTracker(object):
     """Send timing results to URL specified in pants.ini"""
     def error(msg):
       # Report aleady closed, so just print error.
-      print("WARNING: Failed to upload stats to %s due to %s" % (self.stats_url, msg))
+      print("WARNING: Failed to upload stats to %s due to %s" % (self.stats_url, msg), file=sys.stderr)
 
     if self.stats_url:
       params = {
