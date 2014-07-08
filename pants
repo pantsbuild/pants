@@ -88,7 +88,7 @@ if [ ! -z "${PANTS_DEV}" ]; then
   if [[ ! -z "${WRAPPER_SRCPATH}" ]]; then
     log "***   with extra sources ${WRAPPER_SRCPATH} ***"
   fi
-  exec_pants_bare "$@"
+  exec_pants_bare "$@" "--print-exception-stacktrace"
 else
   if [ ! -e "${PANTS_PEX}" ]; then
     if [ -f ${FAILED_BOOTSTRAP_SENTINEL} ] ; then
