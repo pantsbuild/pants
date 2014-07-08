@@ -9,3 +9,11 @@ python_library(
     pants('src/python/pants/backend/android/targets:android'),
   ]
 )
+
+python_library(
+  name = 'android_distribution',
+  sources = globs('distribution/*.py'),
+  dependencies = [
+    pants('3rdparty/python/twitter/commons:twitter.common.log'),
+  ]
+)

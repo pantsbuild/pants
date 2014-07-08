@@ -88,6 +88,7 @@ python_test_suite(
     pants(':test_thrift_util'),
     pants(':test_utf8_header'),
     pants('tests/python/example_test/hello/greet'),
+    pants('tests/python/pants_test/android'),
     pants('tests/python/pants_test/authentication:netrc'),
     pants('tests/python/pants_test/base'),
     pants('tests/python/pants_test/cache'),
