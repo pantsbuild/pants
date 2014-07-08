@@ -581,8 +581,8 @@ class JarPublish(Task, ScmPublish):
         pushdb.set_version(target, newver, head_sha, newfingerprint)
 
         confs = set(repo['confs'])
-        if self.context.options.jar_create_sources:
-          confs.add(IvyWriter.SOURCES_CONFIG)
+        confs.add(IvyWriter.SOURCES_CONFIG)
+        # TODO(John Sirois): Fix this hack reach into JarCreate options!
         if self.context.options.jar_create_javadoc:
           confs.add(IvyWriter.JAVADOC_CONFIG)
         ivyxml = stage_artifacts(target, jar, newver.version(), changelog, confs=list(confs))
