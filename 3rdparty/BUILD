@@ -14,28 +14,6 @@ def add_log4j_excludes(jar):
             .exclude(org='com.sun.jdmk', name='jmxtools')
             .exclude(org='com.sun.jmx', name='jmxri'))
 
-''
-# TODO(John Sirois): XXX only antlr2 is directly referenced by BUILDs
-jar_library(name='antlr2',
-            jars = [ jar(org='antlr', name='antlr', rev='2.7.7') ])
-
-jar_library(name='antlr3',
-            jars = [ jar(org='antlr', name='antlr', rev='3.1.3') ])
-
-jar_library(name='antlr-3.4',
-            jars = [
-                jar(org='org.antlr', name='antlr', rev='3.4'),
-                jar(org='org.antlr', name='antlr-runtime', rev='3.4')
-             ]
-           )
-
-jar_library(name='antlr4',
-            jars=[
-                jar(org='org.antlr', name='antlr4', rev='4.2.2').with_sources(),
-                jar(org='org.antlr', name='antlr4-runtime', rev='4.2.2').with_sources()
-             ]
-           )
-
 jar_library(name='checkstyle',
             jars = [
               jar(org='com.puppycrawl.tools', name='checkstyle', rev='5.5')
