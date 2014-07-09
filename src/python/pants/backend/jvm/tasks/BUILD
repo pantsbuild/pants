@@ -140,6 +140,7 @@ python_library(
     pants(':common'),
     pants('src/python/pants/backend/core/tasks:console_task'),
     pants('src/python/pants/backend/jvm/targets:jvm'),
+    pants('src/python/pants/base:build_environment'),
   ],
 )
 
