@@ -82,6 +82,19 @@ class RoundEngineTest(EngineTestBase, BaseTest):
 
     self.assert_actions('task1', 'task2', 'task3', 'task4')
 
+  def test_lifecycle_ordering_install_order_invariant(self):
+    # Here we swap the order of phase3 and phase4 task installation from the order in
+    # `test_lifecycle_ordering` above.  We can't swap task1 and task2 since they purposefully
+    # do have an implicit order dependence with a dep inside the same phase.
+    self.install_goal('task1', phase='phase1', product_types=['1'])
+    self.install_goal('task2', phase='phase1', product_types=['2'], required_data=['1'])
+    self.install_goal('task4', phase='phase4', required_data=['1', '2', '3'])
+    self.install_goal('task3', phase='phase3', product_types=['3'], required_data=['2'])
+
+    self.engine.attempt(self._context, self.as_phases('phase4'))
+
+    self.assert_actions('task1', 'task2', 'task3', 'task4')
+
   def test_inter_phase_dep(self):
     self.install_goal('task1', phase='phase1', product_types=['1'])
     self.install_goal('task2', phase='phase1', required_data=['1'])
@@ -93,20 +106,20 @@ class RoundEngineTest(EngineTestBase, BaseTest):
   def test_inter_phase_dep_self_cycle(self):
     self.install_goal('task1', phase='phase1', product_types=['1'], required_data=['1'])
 
-    with self.assertRaises(self.engine.DependencyError):
+    with self.assertRaises(self.engine.TaskOrderError):
       self.engine.attempt(self._context, self.as_phases('phase1'))
 
   def test_inter_phase_dep_downstream(self):
     self.install_goal('task1', phase='phase1', required_data=['1'])
     self.install_goal('task2', phase='phase1', product_types=['1'])
 
-    with self.assertRaises(self.engine.DependencyError):
+    with self.assertRaises(self.engine.TaskOrderError):
       self.engine.attempt(self._context, self.as_phases('phase1'))
 
   def test_missing_product(self):
     self.install_goal('task1', phase='phase1', required_data=['1'])
 
-    with self.assertRaises(self.engine.DependencyError):
+    with self.assertRaises(self.engine.MissingProductError):
       self.engine.attempt(self._context, self.as_phases('phase1'))
 
   def test_phase_cycle_direct(self):
@@ -114,7 +127,7 @@ class RoundEngineTest(EngineTestBase, BaseTest):
     self.install_goal('task2', phase='phase2', required_data=['1'], product_types=['2'])
 
     for phase in ('phase1', 'phase2'):
-      with self.assertRaises(self.engine.DependencyError):
+      with self.assertRaises(self.engine.PhaseCycleError):
         self.engine.attempt(self._context, self.as_phases(phase))
 
   def test_phase_cycle_indirect(self):
@@ -123,7 +136,7 @@ class RoundEngineTest(EngineTestBase, BaseTest):
     self.install_goal('task3', phase='phase3', required_data=['1'], product_types=['3'])
 
     for phase in ('phase1', 'phase2', 'phase3'):
-      with self.assertRaises(self.engine.DependencyError):
+      with self.assertRaises(self.engine.PhaseCycleError):
         self.engine.attempt(self._context, self.as_phases(phase))
 
   def test_phase_ordering_unconstrained_respects_cli_order(self):

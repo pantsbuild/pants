@@ -53,6 +53,17 @@ class RoundEngine(Engine):
   class DependencyError(ValueError):
     """Indicates a Task has an unsatisfiable data dependency."""
 
+  class PhaseCycleError(DependencyError):
+    """Indicates there is a cycle in the phase dependency graph."""
+
+  class TaskOrderError(DependencyError):
+    """Indicates a task depends on data produced by another task in the same phase that is
+    scheduled to runs after it.
+    """
+
+  class MissingProductError(DependencyError):
+    """Indicates an expressed data dependency if not provided by any installed task."""
+
   PhaseInfo = namedtuple('PhaseInfo', ['phase', 'tasks_by_name', 'phase_dependencies'])
 
   def _topological_sort(self, phase_info_by_phase):
@@ -86,7 +97,7 @@ class RoundEngine(Engine):
           dependees.difference_update(satisfied)
         # TODO(John Sirois): Do a better job here and actually collect and print cycle paths
         # between Goals/Tasks.  The developer can most directly address that data.
-        raise self.DependencyError('Cycle detected in phase dependencies:\n\t{0}'
+        raise self.PhaseCycleError('Cycle detected in phase dependencies:\n\t{0}'
                                    .format('\n\t'.join('{0} <- {1}'.format(phase, list(dependees))
                                                        for phase, dependees
                                                        in dependees_by_phase.items())))
@@ -119,24 +130,24 @@ class RoundEngine(Engine):
             if producer_info.task_type in visited_task_types:
               ordering = '\n\t'.join("[{0}] '{1}' {2}".format(i, goal.name, goal.task_type.__name__)
                                      for i, goal in enumerate(phase_goals))
-              raise self.DependencyError("Goal '{name}' with action {consumer_task} depends on"
-                                         " {data} from task {producer_task} which is ordered after"
-                                         " it in the '{phase}' phase:\n\t{ordering}"
-                                         .format(name=goal.name,
-                                                 consumer_task=task_type.__name__,
-                                                 data=producer_info.product_type,
-                                                 producer_task=producer_info.task_type.__name__,
-                                                 phase=phase.name,
-                                                 ordering=ordering))
+              raise self.TaskOrderError(
+                  "Goal '{name}' with action {consumer_task} depends on {data} from task "
+                  "{producer_task} which is ordered after it in the '{phase}' phase:\n\t{ordering}"
+                  .format(name=goal.name,
+                          consumer_task=task_type.__name__,
+                          data=producer_info.product_type,
+                          producer_task=producer_info.task_type.__name__,
+                          phase=phase.name,
+                          ordering=ordering))
             else:
               # We don't express dependencies on downstream tasks in this same phase.
               pass
           else:
             phase_dependencies.add(producer_phase)
       except round_manager.MissingProductError as e:
-        raise self.DependencyError("Could not satisfy data dependencies for goal '{name}' with "
-                                   "action {action}: {error}"
-                                   .format(name=goal.name, action=task_type.__name__, error=e))
+        raise self.MissingProductError(
+            "Could not satisfy data dependencies for goal '{name}' with action {action}: {error}"
+            .format(name=goal.name, action=task_type.__name__, error=e))
 
     phase_info = self.PhaseInfo(phase, tasks_by_name, phase_dependencies)
     phase_info_by_phase[phase] = phase_info
