@@ -25,7 +25,7 @@ python_library(
   dependencies = [
     pants(':common'),
     pants('src/python/pants/base:exceptions'),
-    pants('src/python/pants/backend/android:distribution'),
+    pants('src/python/pants/backend/android:android_distribution'),
   ],
 )
 

@@ -21,6 +21,6 @@ class AndroidResources(AndroidTarget):
     :param dependencies: Other targets that this target depends on.
     :type dependencies: list of target specs
     """
-
     super(AndroidResources, self).__init__(package=package, **kwargs)
     self.package = package
+

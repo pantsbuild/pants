@@ -35,6 +35,8 @@ class AaptGen(AndroidTask, CodeGen):
     #define the params needed in the BUILD file {name, sources, dependencies, etc.}
     super(AaptGen, self).__init__(context, workdir)
     lang = 'java'
+    self.gen_langs=set()
+    self.gen_langs.add(lang)
 
   def is_gentarget(self, target):
     return isinstance(target, AndroidResources)
@@ -42,14 +44,18 @@ class AaptGen(AndroidTask, CodeGen):
   def genlangs(self):
     return dict(java=lambda t: t.is_jvm)
 
-  def genlang(self, lang, targets):
+  def is_forced(self, lang):
+    return lang in self.gen_langs
 
+  def genlang(self, lang, targets):
     """aapt must override and generate code in :lang for the given targets.
 
     May return a list of pairs (target, files) where files is a list of files
     to be cached against the target.
     """
-    #TODO:Investigate.Each invocation of aapt creates a package, I don't think it can batch for each aapt binary used
+    print ("genlang going going")
+
+  #TODO:Investigate.Each invocation of aapt creates a package, I don't think it can batch for each aapt binary used
     # somewhere in an aapt class we will need to handle "crunch" command for release builds.
     for target in targets:
       if lang != 'java':
@@ -71,6 +77,7 @@ class AaptGen(AndroidTask, CodeGen):
     """from: CodeGen: aapt class must override and create a synthetic target.
     The target must contain the sources generated for the given gentarget.
     """
+    print ("aapt createtarget")
     #This method creates the new target to replace the acted upon resources in the target graph
     # create the path and sources
     aapt_gen_file = os.path.join(gentarget.target_base, self._aapt_out(gentarget), gentarget.package, 'R.java')
@@ -101,12 +108,10 @@ class AaptGen(AndroidTask, CodeGen):
 
   # resolve the tools on a per-target basis
   def aapt_tool(self, target):
-    return (os.path.join(self._dist._sdk_path, ('build-tools/' + target.build_tools_version), 'aapt'))
+    return os.path.join(self._dist._sdk_path, ('build-tools/' + target.build_tools_version), 'aapt')
 
   def android_jar_tool(self, target):
-    return (os.path.join(self._dist._sdk_path, 'platforms', ('android-' + target.target_sdk_version), 'android.jar'))
+    return os.path.join(self._dist._sdk_path, 'platforms', ('android-' + target.target_sdk_version), 'android.jar')
 
-  #TODO: Tests. UTF-coding headers
-  #todo: Publish and improve docs for Android files
-  #todo: debate merits of AaptClassMixin class
-  #TODO: check BUILD file imports once more
+
+  #todo (mateor): debate merits of AaptClassMixin class

@@ -5,6 +5,9 @@
 android_binary(
   name='hello',
   sources='HelloWorld.java',
+  dependencies = [
+    pants('src/android/example/res:hello'),
+  ],
   package='com.pants.examples.hello',
   resources=[
     pants('src/android/example/res')
