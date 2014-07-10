@@ -13,19 +13,18 @@ from twitter.common.contextutil import temporary_dir
 
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
+
 def is_exe(name):
-  process = subprocess.Popen(['which', name], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-  stdout, _ = process.communicate()
-  if process.returncode == 0:
-    return True
-  return False
+  result = subprocess.call(['which', name], stdout=open(os.devnull, 'w'), stderr=subprocess.STDOUT)
+  return result == 0
 
 
 class JarPublishIntegrationTest(PantsRunIntegrationTest):
   SCALADOC = is_exe('scaladoc')
   JAVADOC = is_exe('javadoc')
 
-  @pytest.mark.skipif('not JarPublishIntegrationTest.SCALADOC', reason='No scaladoc binary on the PATH.')
+  @pytest.mark.skipif('not JarPublishIntegrationTest.SCALADOC',
+                      reason='No scaladoc binary on the PATH.')
   def test_scala_publish(self):
     self.publish_test('src/scala/com/pants/example:jvm-run-example-lib',
                       'com/pants/example/jvm-example-lib/0.0.1-SNAPSHOT',
@@ -35,8 +34,8 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
                        'jvm-example-lib-0.0.1-SNAPSHOT-sources.jar'],
                       extra_options=['--doc-scaladoc-skip'])
 
-
-  @pytest.mark.skipif('not JarPublishIntegrationTest.JAVADOC', reason='No javadoc binary on the PATH.')
+  @pytest.mark.skipif('not JarPublishIntegrationTest.JAVADOC',
+                      reason='No javadoc binary on the PATH.')
   def test_java_publish(self):
     self.publish_test('src/java/com/pants/examples/hello/greet',
                       'com/pants/examples/hello-greet/0.0.1-SNAPSHOT/',
