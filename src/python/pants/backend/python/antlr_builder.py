@@ -21,6 +21,8 @@ class PythonAntlrBuilder(CodeGenerator):
     Antlr builder.
   """
   def run_antlrs(self, output_dir):
+    # TODO(John Sirois): graduate to a JvmToolTask and/or merge with the java code gen AntlrGen
+    # task.
     args = [
       '-dependency', 'org.antlr', 'antlr', self.target.antlr_version,
       '-types', 'jar',

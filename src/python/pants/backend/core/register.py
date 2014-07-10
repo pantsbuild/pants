@@ -106,16 +106,16 @@ def register_goals():
 
 
   # Cleaning.
+  invalidate = goal(name='invalidate', action=Invalidator, dependencies=['ng-killall'])
+  invalidate.install().with_description('Invalidate all targets.')
 
-  goal(name='invalidate', action=Invalidator, dependencies=['ng-killall']
-  ).install().with_description('Invalidate all targets.')
+  clean_all = goal(name='clean-all', action=Cleaner, dependencies=['invalidate']).install()
+  clean_all.with_description('Clean all build output.')
+  clean_all.install(invalidate, first=True)
 
-  goal(name='clean-all', action=Cleaner, dependencies=['invalidate']
-  ).install().with_description('Clean all build output.')
-
-  goal(name='clean-all-async', action=AsyncCleaner, dependencies=['invalidate']
+  clean_all_async = goal(name='clean-all-async', action=AsyncCleaner, dependencies=['invalidate']
   ).install().with_description('Clean all build output in a background process.')
-
+  clean_all_async.install(invalidate, first=True)
 
   # Reporting.
 

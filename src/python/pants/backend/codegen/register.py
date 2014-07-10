@@ -18,6 +18,7 @@ from pants.backend.codegen.tasks.apache_thrift_gen import ApacheThriftGen
 from pants.backend.codegen.tasks.jaxb_gen import JaxbGen
 from pants.backend.codegen.tasks.protobuf_gen import ProtobufGen
 from pants.backend.codegen.tasks.scrooge_gen import ScroogeGen
+from pants.backend.jvm.tasks.ivy_imports import IvyImports
 
 
 def target_aliases():
@@ -56,7 +57,11 @@ def register_goals():
 
   goal(name='scrooge', dependencies=['bootstrap'], action=ScroogeGen).install('gen')
 
-  goal(name='protoc', action=ProtobufGen).install('gen')
+  # TODO(Garrett Malmquist): 'protoc' depends on a nonlocal phase (imports is in the jvm register).
+  # This should be cleaned up, with protobuf stuff moved to its own backend. (See John's comment on
+  # RB 592).
+  goal(name='protoc', dependencies=['imports'], action=ProtobufGen
+  ).install('gen')
 
   goal(name='antlr', dependencies=['bootstrap'], action=AntlrGen
   ).install('gen')

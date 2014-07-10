@@ -43,6 +43,7 @@ class BuildLint(Task):
       self.actions.add('diff')
 
   def prepare(self, round_manager):
+    # TODO(John Sirois): This is broken - the product is not populated by any task.
     round_manager.require('missing_deps')
 
   def execute(self):

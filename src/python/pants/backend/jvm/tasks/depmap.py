@@ -4,12 +4,17 @@
 
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
+from collections import defaultdict
+import json
+import os
 
 from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.backend.jvm.targets.jar_dependency import JarDependency
+from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 
-
+# Changing the behavior of this task may affect the IntelliJ Pants plugin
+# Please add fkorotkov or ajohnson to reviews for this file
 # XXX(pl): JVM hairball violator
 class Depmap(ConsoleTask):
   """Generates either a textual dependency tree or a graphviz digraph dot file for the dependency
@@ -19,6 +24,21 @@ class Depmap(ConsoleTask):
   @staticmethod
   def _is_jvm(dep):
     return dep.is_jvm or dep.is_jvm_app
+
+  @staticmethod
+  def _jar_id(jar):
+    #return '{0}:{1}:{2}'.format(jar.org, jar.name, jar.rev) if jar.rev else '{0}:{1}'.format(jar.org, jar.name)
+    if jar.rev:
+      return '{0}:{1}:{2}'.format(jar.org, jar.name, jar.rev)
+    else:
+      return '{0}:{1}'.format(jar.org, jar.name)
+
+  @staticmethod
+  def _address(address):
+    """
+    :type address: pants.base.address.SyntheticAddress
+    """
+    return '{0}:{1}'.format(address.spec_path, address.target_name)
 
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
@@ -37,7 +57,7 @@ class Depmap(ConsoleTask):
                             dest="depmap_is_external_only",
                             default=False,
                             help='Specifies that only external dependencies should'
-                                 ' be included in the graph output (only external jars).')
+                            ' be included in the graph output (only external jars).')
     option_group.add_option(mkflag("minimal"),
                             action="store_true",
                             dest="depmap_is_minimal",
@@ -55,6 +75,19 @@ class Depmap(ConsoleTask):
                             default=False,
                             help='Specifies the internal dependency graph should be'
                                  ' output in the dot digraph format')
+    option_group.add_option(mkflag("project-info"),
+                            action="store_true",
+                            dest="depmap_is_project_info",
+                            default=False,
+                            help='Produces a json object with info about the target,'
+                                 ' including source roots, dependencies, and paths to'
+                                 ' libraries for their targets and dependencies.')
+    option_group.add_option(mkflag("project-info-formatted"),
+                            action="store_false",
+                            dest="depmap_is_formatted",
+                            default=True,
+                            help='Causes project-info output to be a single line of JSON')
+
 
   def __init__(self, context, workdir):
     super(Depmap, self).__init__(context, workdir)
@@ -63,7 +96,7 @@ class Depmap(ConsoleTask):
         and self.context.options.depmap_is_external_only):
       cls = self.__class__
       error_str = "At most one of %s or %s can be selected." % (cls.internal_only_flag,
-                                                                cls.external_only_flag)
+                                                                      cls.external_only_flag)
       raise TaskError(error_str)
 
     self.is_internal_only = self.context.options.depmap_is_internal_only
@@ -71,11 +104,19 @@ class Depmap(ConsoleTask):
     self.is_minimal = self.context.options.depmap_is_minimal
     self.is_graph = self.context.options.depmap_is_graph
     self.separator = self.context.options.depmap_separator
+    self.project_info = self.context.options.depmap_is_project_info
+    self.format = self.context.options.depmap_is_formatted
 
   def console_output(self, targets):
     if len(self.context.target_roots) == 0:
       raise TaskError("One or more target addresses are required.")
-
+    if self.project_info and self.is_graph:
+      raise TaskError('-graph and -project-info are mutually exclusive; please choose one.')
+    if self.project_info:
+      output = self.project_info_output(targets)
+      for line in output:
+        yield line
+      return
     for target in self.context.target_roots:
       if self._is_jvm(target):
         if self.is_graph:
@@ -139,8 +180,8 @@ class Depmap(ConsoleTask):
 
     def output_candidate(internal):
       return ((self.is_internal_only and internal)
-              or (self.is_external_only and not internal)
-              or (not self.is_internal_only and not self.is_external_only))
+               or (self.is_external_only and not internal)
+               or (not self.is_internal_only and not self.is_external_only))
 
     def output_dep(dep):
       dep_id, internal = self._dep_id(dep)
@@ -186,3 +227,58 @@ class Depmap(ConsoleTask):
     header = ['digraph "%s" {' % target.id]
     graph_attr = ['  node [shape=rectangle, colorscheme=set312;];', '  rankdir=LR;']
     return header + graph_attr + output_deps(set(), target) + ['}']
+
+  def project_info_output(self, targets):
+    targets_map = {}
+
+    def process_target(current_target):
+      """
+      :type current_target:pants.base.target.Target
+      """
+
+      info = {
+        'targets': [],
+        'libraries': [],
+        'roots': [],
+        'test_target': current_target.is_test
+      }
+
+      for dep in current_target.dependencies:
+        if dep.is_java or dep.is_jar_library or dep.is_jvm or dep.is_scala or dep.is_scalac_plugin:
+          info['targets'].append(self._address(dep.address))
+
+        if dep.is_jar_library:
+          for jar in dep.jar_dependencies:
+            info['libraries'].append(self._jar_id(jar))
+
+      roots = list(set(
+        [os.path.dirname(source) for source in current_target.sources_relative_to_source_root()]
+      ))
+      info['roots'] = map(lambda source: {
+        'source_root': os.path.join(get_buildroot(), current_target.target_base, source),
+        'package_prefix': source.replace(os.sep, '.')
+      }, roots)
+      targets_map[self._address(current_target.address)] = info
+
+    for target in targets:
+      process_target(target)
+
+    graph_info = {
+      'targets': targets_map,
+      'libraries': self._resolve_jars_info()
+    }
+    if self.format:
+      return json.dumps(graph_info, indent=4, separators=(',', ': ')).splitlines()
+    else:
+      return [json.dumps(graph_info)]
+
+  def _resolve_jars_info(self):
+    mapping = defaultdict(list)
+    jar_data = self.context.products.get_data('ivy_ar_products')
+    if not jar_data:
+      return mapping
+    for dep in jar_data['default']:
+      for module in dep.modules_by_ref.values():
+        mapping[self._jar_id(module.ref)] = [artifact.path for artifact in module.artifacts]
+    return mapping
+

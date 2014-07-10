@@ -5,8 +5,6 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from pants.goal import Goal as goal
-
 from pants.backend.core.tasks.group_task import GroupTask
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.artifact import Artifact
@@ -30,10 +28,11 @@ from pants.backend.jvm.tasks.bundle_create import BundleCreate
 from pants.backend.jvm.tasks.check_published_deps import CheckPublishedDeps
 from pants.backend.jvm.tasks.dependencies import Dependencies
 from pants.backend.jvm.tasks.depmap import Depmap
-from pants.backend.jvm.tasks.filedeps import FileDeps
 from pants.backend.jvm.tasks.detect_duplicates import DuplicateDetector
 from pants.backend.jvm.tasks.eclipse_gen import EclipseGen
+from pants.backend.jvm.tasks.filedeps import FileDeps
 from pants.backend.jvm.tasks.idea_gen import IdeaGen
+from pants.backend.jvm.tasks.ivy_imports import IvyImports
 from pants.backend.jvm.tasks.ivy_resolve import IvyResolve
 from pants.backend.jvm.tasks.jar_create import JarCreate
 from pants.backend.jvm.tasks.jar_publish import JarPublish
@@ -47,6 +46,7 @@ from pants.backend.jvm.tasks.provides import Provides
 from pants.backend.jvm.tasks.scala_repl import ScalaRepl
 from pants.backend.jvm.tasks.scaladoc_gen import ScaladocGen
 from pants.backend.jvm.tasks.specs_run import SpecsRun
+from pants.goal import Goal as goal, Phase
 
 
 def target_aliases():
@@ -95,9 +95,12 @@ def register_commands():
 
 
 def register_goals():
-  goal(name='ng-killall', action=NailgunKillall
-  ).install().with_description('Kill running nailgun servers.')
+  ng_killall = goal(name='ng-killall', action=NailgunKillall)
+  ng_killall.install().with_description('Kill running nailgun servers.')
 
+  Phase('invalidate').install(ng_killall, first=True)
+  Phase('clean-all').install(ng_killall, first=True)
+  Phase('clean-all-async').install(ng_killall, first=True)
 
   goal(name='bootstrap-jvm-tools', action=BootstrapJvmTools
   ).install('bootstrap').with_description('Bootstrap tools needed for building.')
@@ -105,6 +108,9 @@ def register_goals():
   # Dependency resolution.
   goal(name='ivy', action=IvyResolve, dependencies=['gen', 'check-exclusives', 'bootstrap']
   ).install('resolve').with_description('Resolve dependencies and produce dependency reports.')
+
+  goal(name='ivy-imports', action=IvyImports, dependencies=['bootstrap']
+  ).install('imports')
 
   # Compilation.
 
@@ -127,11 +133,11 @@ def register_goals():
     product_type=['classes_by_target', 'classes_by_source'],
     flag_namespace=['compile'])
 
-  # At some point ScalaLibrary targets will be able to won mixed scala and java source sets.
-  # At that point, the ScalaCompile group member will still only select targets via
-  # has_sources('*.scala'); however if the JavaCompile group member were registered earlier, it
-  # would claim the ScalaLibrary targets with mixed source sets leaving those targets un-compiled
-  # by scalac and resulting in systemic compile errors.
+  # At some point ScalaLibrary targets will be able to won mixed scala and java source sets. At that
+  # point, the ScalaCompile group member will still only select targets via has_sources('*.scala');
+  # however if the JavaCompile group member were registered earlier, it would claim the ScalaLibrary
+  # targets with mixed source sets leaving those targets un-compiled by scalac and resulting in
+  # systemic compile errors.
   jvm_compile.add_member(ScalaCompile)
 
   # Its important we add AptCompile before JavaCompile since it 1st selector wins and apt code is a
