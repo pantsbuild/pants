@@ -5,24 +5,15 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-import unittest
+import unittest2
 
 from pants.goal import Goal, Phase
 
 
-class EngineTestBase(unittest.TestCase):
-
-  @classmethod
-  def _namespace(cls, identifier):
-    return '__%s.%s__%s__' % (cls.__module__, cls.__name__, identifier)
+class EngineTestBase(unittest2.TestCase):
 
   @classmethod
   def as_phase(cls, phase_name):
-    """Returns a ``Phase`` object of the given name"""
-    return Phase(cls._namespace(phase_name))
-
-  @classmethod
-  def as_phase_without_namespace(cls, phase_name):
     """Returns a ``Phase`` object of the given name"""
     return Phase(phase_name)
 
@@ -32,12 +23,7 @@ class EngineTestBase(unittest.TestCase):
     return map(cls.as_phase, phase_names)
 
   @classmethod
-  def as_phases_without_namespace(cls, *phase_names):
-    """Returns a ``Phase`` object of the given name"""
-    return map(cls.as_phase_without_namespace, phase_names)
-
-  @classmethod
-  def installed_goal(cls, name, action=None, dependencies=None, phase=None, test_namespace=True):
+  def install_goal(cls, name, action=None, dependencies=None, phase=None):
     """Creates and installs a goal with the given name.
 
     :param string name: The goal name.
@@ -45,14 +31,21 @@ class EngineTestBase(unittest.TestCase):
     :param list dependencies: The list of phase names the goal depends on, if any.
     :param string phase: The name of the phase to install the goal in if different from the goal
       name.
-    :param bool namespace: Prepend the goal and phase name with cls._namespace(), if True.
     :returns The installed ``Goal`` object.
     """
-    if test_namespace:
-      name = cls._namespace(name)
-      phase = cls._namespace(phase) if phase is not None else None
-    goal = Goal(name,
-                action=action or (lambda: None),
-                dependencies=map(cls._namespace, dependencies or []))
+    goal = Goal(name, action=action or (lambda: None), dependencies=dependencies or [])
     goal.install(phase if phase is not None else None)
     return goal
+
+  def setUp(self):
+    super(EngineTestBase, self).setUp()
+
+    # TODO(John Sirois): Now that the BuildFileParser controls goal registration by iterating
+    # over plugin callbacks a PhaseRegistry can be constructed by it and handed to all these
+    # callbacks in place of having a global Phase registry.  Remove the Phase static cling.
+    Phase.clear()
+
+  def tearDown(self):
+    Phase.clear()
+
+    super(EngineTestBase, self).tearDown()
