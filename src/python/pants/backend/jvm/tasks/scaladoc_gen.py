@@ -17,14 +17,11 @@ def is_scala(target):
 
 class ScaladocGen(JvmdocGen):
   @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    cls.generate_setup_parser(option_group, args, mkflag, scaladoc)
-
-  def __init__(self, context, workdir, confs=None, active=True):
-    super(ScaladocGen, self).__init__(context, workdir, scaladoc, confs, active)
+  def jvmdoc(cls):
+    return scaladoc
 
   def execute(self):
-    self.generate_execute(lambda t: t.is_scala, create_scaladoc_command)
+    self.generate_doc(lambda t: t.is_scala, create_scaladoc_command)
 
 
 def create_scaladoc_command(classpath, gendir, *targets):

@@ -33,7 +33,7 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
                        'jvm-example-lib-0.0.1-SNAPSHOT.jar',
                        'jvm-example-lib-0.0.1-SNAPSHOT.pom',
                        'jvm-example-lib-0.0.1-SNAPSHOT-sources.jar'],
-                      extra_options=['--no-publish-jar_create_publish-javadoc'])
+                      extra_options=['--doc-scaladoc-skip'])
 
 
   @pytest.mark.skipif('not JarPublishIntegrationTest.JAVADOC', reason='No javadoc binary on the PATH.')
@@ -52,8 +52,7 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
     with temporary_dir() as publish_dir:
       options = ['--publish-local=%s' % publish_dir,
                  '--no-publish-dryrun',
-                 '--publish-force',
-                 '--publish-jar_create_publish-sources']
+                 '--publish-force']
       if extra_options:
         options.extend(extra_options)
 

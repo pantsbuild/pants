@@ -17,15 +17,14 @@ import sys
 
 from twitter.common.collections import OrderedDict, OrderedSet
 from twitter.common.config import Properties
-from twitter.common.dirutil import safe_open, safe_rmtree
+from twitter.common.dirutil import safe_mkdir, safe_open, safe_rmtree
 from twitter.common.log.options import LogOptions
 
-from pants.backend.core.targets.resources import Resources
 from pants.backend.core.tasks.scm_publish import ScmPublish, Semver
-from pants.backend.core.tasks.task import Task
 from pants.backend.jvm.ivy_utils import IvyUtils
 from pants.backend.jvm.targets.jarable import Jarable
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
+from pants.backend.jvm.tasks.jar_task import JarTask
 from pants.base.address import Address
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.build_graph import sort_targets
@@ -230,7 +229,7 @@ def target_internal_dependencies(target):
   return filter(lambda tgt: isinstance(tgt, Jarable), target.dependencies)
 
 
-class JarPublish(Task, ScmPublish):
+class JarPublish(JarTask, ScmPublish):
   """Publish jars to a maven repository.
 
   At a high-level, pants uses `Apache Ivy <http://ant.apache.org/ivy/>`_ to
@@ -292,6 +291,8 @@ class JarPublish(Task, ScmPublish):
 
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
+    super(JarTask, cls).setup_parser(option_group, args, mkflag)
+
     # TODO(John Sirois): Support a preview mode that outputs a file with entries like:
     # artifact id:
     # revision:
@@ -299,7 +300,7 @@ class JarPublish(Task, ScmPublish):
     # changelog:
     #
     # Allow re-running this goal with the file as input to support forcing an arbitrary set of
-    # revisions and supply of hand endited changelogs.
+    # revisions and supply of hand edited changelogs.
 
     option_group.add_option(mkflag("dryrun"), mkflag("dryrun", negate=True),
                             dest="jar_publish_dryrun", default=True,
@@ -444,8 +445,8 @@ class JarPublish(Task, ScmPublish):
 
   def prepare(self, round_manager):
     round_manager.require('jars')
-    round_manager.require('javadoc_jars')
-    round_manager.require('source_jars')
+    round_manager.require('javadoc')
+    round_manager.require('scaladoc')
 
   def execute(self):
     self.check_clean_master(commit=(not self.dryrun and self.commit))
@@ -476,18 +477,10 @@ class JarPublish(Task, ScmPublish):
       _, _, _, fingerprint = pushdb.as_jar_with_version(tgt)
       return fingerprint or '0.0.0'
 
-    def artifact_path(jar, version, name=None, suffix='', extension='jar', artifact_ext=''):
-      return os.path.join(self.workdir, jar.org, jar.name + artifact_ext,
-                          '%s%s-%s%s.%s' % ((name or jar.name),
-                                            artifact_ext if name != 'ivy' else '',
-                                            version,
-                                            suffix,
-                                            extension))
-
     def stage_artifact(tgt, jar, version, changelog, confs=None, artifact_ext=''):
       def path(name=None, suffix='', extension='jar'):
-        return artifact_path(jar, version, name=name, suffix=suffix, extension=extension,
-                             artifact_ext=artifact_ext)
+        return self.artifact_path(jar, version, name=name, suffix=suffix, extension=extension,
+                                  artifact_ext=artifact_ext)
 
       with safe_open(path(suffix='-CHANGELOG', extension='txt'), 'w') as changelog_file:
         changelog_file.write(changelog)
@@ -498,23 +491,24 @@ class JarPublish(Task, ScmPublish):
 
       return ivyxml
 
-    def copy_artifact(tgt, version, typename, suffix='', artifact_ext=''):
+    def copy_artifact(tgt, jar, version, typename, suffix='', artifact_ext=''):
       genmap = self.context.products.get(typename)
       for basedir, jars in genmap.get(tgt).items():
         for artifact in jars:
-          path = artifact_path(jar, version, suffix=suffix, artifact_ext=artifact_ext)
+          path = self.artifact_path(jar, version, suffix=suffix, artifact_ext=artifact_ext)
+          safe_mkdir(os.path.dirname(path))
           shutil.copy(os.path.join(basedir, artifact), path)
 
-    def stage_artifacts(tgt, jar, version, changelog, confs=None):
-      ivyxml_path = stage_artifact(tgt, jar, version, changelog, confs)
-      copy_artifact(tgt, version, typename='jars')
-      copy_artifact(tgt, version, typename='source_jars', suffix='-sources')
+    def stage_artifacts(tgt, jar, version, changelog):
+      copy_artifact(tgt, jar, version, typename='jars')
+      self.create_source_jar(tgt, jar, version)
+      doc_jar = self.create_doc_jar(tgt, jar, version)
 
-      jarmap = self.context.products.get('javadoc_jars')
-      if not jarmap.empty() and (tgt.is_java or tgt.is_scala):
-        copy_artifact(tgt, version, typename='javadoc_jars', suffix='-javadoc')
-
-      return ivyxml_path
+      confs = set(repo['confs'])
+      confs.add(IvyWriter.SOURCES_CONFIG)
+      if doc_jar:
+        confs.add(IvyWriter.JAVADOC_CONFIG)
+      return stage_artifact(tgt, jar, version, changelog, confs)
 
     if self.overrides:
       print('Publishing with revision overrides:\n  %s' % '\n  '.join(
@@ -579,13 +573,7 @@ class JarPublish(Task, ScmPublish):
               raise TaskError('User aborted push')
 
         pushdb.set_version(target, newver, head_sha, newfingerprint)
-
-        confs = set(repo['confs'])
-        if self.context.options.jar_create_sources:
-          confs.add(IvyWriter.SOURCES_CONFIG)
-        if self.context.options.jar_create_javadoc:
-          confs.add(IvyWriter.JAVADOC_CONFIG)
-        ivyxml = stage_artifacts(target, jar, newver.version(), changelog, confs=list(confs))
+        ivyxml = stage_artifacts(target, jar, newver.version(), changelog)
 
         if self.dryrun:
           print('Skipping publish of %s in test mode.' % jar_coordinate(jar, newver.version()))
@@ -652,6 +640,14 @@ class JarPublish(Task, ScmPublish):
             self.scm.refresh()
             self.scm.tag('%(org)s-%(name)s-%(rev)s' % args,
                          message='Publish of %(coordinate)s initiated by %(user)s %(cause)s' % args)
+
+  def artifact_path(self, jar, version, name=None, suffix='', extension='jar', artifact_ext=''):
+    return os.path.join(self.workdir, jar.org, jar.name + artifact_ext,
+                        '%s%s-%s%s.%s' % ((name or jar.name),
+                                          artifact_ext if name != 'ivy' else '',
+                                          version,
+                                          suffix,
+                                          extension))
 
   def check_targets(self, targets):
     invalid = defaultdict(lambda: defaultdict(set))
@@ -760,3 +756,46 @@ class JarPublish(Task, ScmPublish):
                             publish_local=publish_local)
       generator.write(wrapper)
       return wrapper.name
+
+  def create_source_jar(self, target, open_jar, version):
+    # TODO(Tejal Desai) pantsbuild/pants/65: Avoid creating 2 jars with java sources for a
+    # scala_library with java_sources. Currently publish fails fast if scala_library owning
+    # java sources pointed by java_library target also provides an artifact. However, jar_create
+    # ends up creating 2 jars one scala and other java both including the java_sources.
+
+    def abs_and_relative_sources(target):
+      abs_source_root = os.path.join(get_buildroot(), target.target_base)
+      for source in target.sources_relative_to_source_root():
+        yield os.path.join(abs_source_root, source), source
+
+    jar_path = self.artifact_path(open_jar, version, suffix='-sources')
+    with self.open_jar(jar_path, overwrite=True, compressed=True) as open_jar:
+      for abs_source, rel_source in abs_and_relative_sources(target):
+        open_jar.write(abs_source, rel_source)
+
+      # TODO(Tejal Desai): pantsbuild/pants/65 Remove java_sources attribute for ScalaLibrary
+      if isinstance(target, ScalaLibrary):
+        for java_source_target in target.java_sources:
+          for abs_source, rel_source in abs_and_relative_sources(java_source_target):
+            open_jar.write(abs_source, rel_source)
+
+      if target.has_resources:
+        for resource_target in target.resources:
+          for abs_source, rel_source in abs_and_relative_sources(resource_target):
+            open_jar.write(abs_source, rel_source)
+
+  def create_doc_jar(self, target, open_jar, version):
+    javadoc = self.context.products.get('javadoc').get(target)
+    scaladoc = self.context.products.get('scaladoc').get(target)
+    if javadoc or scaladoc:
+      jar_path = self.artifact_path(open_jar, version, suffix='-javadoc')
+      with self.open_jar(jar_path, overwrite=True, compressed=True) as open_jar:
+        def add_docs(docs):
+          if docs:
+            for basedir, doc_files in docs.items():
+              for doc_file in doc_files:
+                open_jar.write(os.path.join(basedir, doc_file), doc_file)
+
+        add_docs(javadoc)
+        add_docs(scaladoc)
+      return jar_path

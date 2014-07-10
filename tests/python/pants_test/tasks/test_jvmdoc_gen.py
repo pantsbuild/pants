@@ -5,8 +5,6 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-import pytest
-
 from twitter.common.dirutil import safe_mkdtemp, safe_rmtree
 
 from pants.backend.core.tasks.check_exclusives import ExclusivesMapping
@@ -19,14 +17,11 @@ dummydoc = Jvmdoc(tool_name='dummydoc', product_type='dummydoc')
 
 class DummyJvmdocGen(JvmdocGen):
   @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    cls.generate_setup_parser(option_group, args, mkflag, dummydoc)
-
-  def __init__(self, context, workdir):
-    super(DummyJvmdocGen, self).__init__(context, workdir, dummydoc, None, True)
+  def jvmdoc(cls):
+    return dummydoc
 
   def execute(self):
-    self.generate_execute(lambda t: True, create_dummydoc_command)
+    self.generate_doc(lambda t: True, create_dummydoc_command)
 
 
 def create_dummydoc_command(classpath, gendir, *targets):
@@ -40,7 +35,9 @@ options = {
   'DummyJvmdocGen_include_codegen_opt': None,
   'DummyJvmdocGen_open_opt': None,
   'DummyJvmdocGen_transitive_opt': None,
+  'DummyJvmdocGen_skip_opt': None,
 }
+
 
 class JvmdocGenTest(BaseTest):
   """Test some base functionality in JvmdocGen."""
