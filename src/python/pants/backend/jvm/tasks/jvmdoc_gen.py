@@ -22,18 +22,28 @@ Jvmdoc = collections.namedtuple('Jvmdoc', ['tool_name', 'product_type'])
 
 ParserConfig = collections.namedtuple('JvmdocGenParserConfig',
                                       ['include_codegen_opt', 'transitive_opt', 'open_opt',
-                                       'combined_opt', 'ignore_failure_opt'])
+                                       'combined_opt', 'ignore_failure_opt', 'skip_opt'])
 
 
 class JvmdocGen(JvmTask):
   @classmethod
-  def setup_parser_config(cls):
-    opts = ['%s_%s' % (cls.__name__, opt) for opt in ParserConfig._fields]
-    return ParserConfig(*opts)
+  def jvmdoc(cls):
+    """Subclasses should return their Jvmdoc configuration."""
+    raise NotImplementedError()
 
   @classmethod
-  def generate_setup_parser(cls, option_group, args, mkflag, jvmdoc):
+  def product_type(cls):
+    return [cls.jvmdoc().product_type]
+
+  @classmethod
+  def setup_parser_config(cls):
+    return ParserConfig(*['%s_%s' % (cls.__name__, opt) for opt in ParserConfig._fields])
+
+  @classmethod
+  def setup_parser(cls, option_group, args, mkflag):
     parser_config = cls.setup_parser_config()
+    tool_name = cls.jvmdoc().tool_name
+
     option_group.add_option(
       mkflag('include-codegen'),
       mkflag('include-codegen', negate=True),
@@ -41,7 +51,7 @@ class JvmdocGen(JvmTask):
       default=None,
       action='callback',
       callback=mkflag.set_bool,
-      help='[%%default] Create %s for generated code.' % jvmdoc.tool_name)
+      help='[%%default] Create %s for generated code.' % tool_name)
 
     option_group.add_option(
       mkflag('transitive'),
@@ -51,8 +61,7 @@ class JvmdocGen(JvmTask):
       action='callback',
       callback=mkflag.set_bool,
       help='[%%default] Create %s for the transitive closure of internal '
-           'targets reachable from the roots specified on the command line.'
-           % jvmdoc.tool_name)
+           'targets reachable from the roots specified on the command line.' % tool_name)
 
     combined_flag = mkflag('combined')
     option_group.add_option(
@@ -63,8 +72,7 @@ class JvmdocGen(JvmTask):
       action='callback',
       callback=mkflag.set_bool,
       help='[%%default] Generate %s for all targets combined instead of '
-           'each target individually.'
-           % jvmdoc.tool_name)
+           'each target individually.' % tool_name)
 
     option_group.add_option(
       mkflag('open'),
@@ -74,7 +82,7 @@ class JvmdocGen(JvmTask):
       action='callback',
       callback=mkflag.set_bool,
       help='[%%default] Attempt to open the generated %s in a browser '
-           '(implies %s).' % (jvmdoc.tool_name, combined_flag))
+           '(implies %s).' % (tool_name, combined_flag))
 
     option_group.add_option(
       mkflag('ignore-failure'),
@@ -83,20 +91,33 @@ class JvmdocGen(JvmTask):
       default=False,
       action='callback',
       callback=mkflag.set_bool,
-      help='Specifies that %s errors should not cause build errors'
-           % jvmdoc.tool_name)
+      help='Specifies that %s errors should not cause build errors' % tool_name)
 
-  def __init__(self, context, workdir, jvmdoc, confs, active):
-    def getattr_options(option):
-      return getattr(context.options, option)
 
+    # TODO(John Sirois): This supports the JarPublish task and is an abstraction leak.
+    # It allows folks doing a local-publish to skip an expensive and un-needed step.
+    # Remove this flag and instead support conditional requirements being registered against
+    # the round manager.  This may require incremental or windowed flag parsing that happens bit by
+    # bit as tasks are recursively prepared vs. the current all-at once style.
+    option_group.add_option(
+      mkflag('skip'),
+      mkflag('skip', negate=True),
+      dest=parser_config.skip_opt,
+      default=False,
+      action='callback',
+      callback=mkflag.set_bool,
+      help='[%%default] Can be used to skip %s generation' % tool_name)
+
+  def __init__(self, context, workdir):
     super(JvmdocGen, self).__init__(context, workdir)
 
-    self._jvmdoc = jvmdoc
-    jvmdoc_tool_name = self._jvmdoc.tool_name
+    jvmdoc_tool_name = self.jvmdoc().tool_name
 
     config_section = '%s-gen' % jvmdoc_tool_name
     parser_config = self.setup_parser_config()
+
+    def getattr_options(option):
+      return getattr(context.options, option)
 
     flagged_codegen = getattr_options(parser_config.include_codegen_opt)
     self._include_codegen = (flagged_codegen if flagged_codegen is not None
@@ -104,11 +125,11 @@ class JvmdocGen(JvmTask):
                                                          default=False))
 
     self.transitive = getattr_options(parser_config.transitive_opt)
-    self.confs = confs or context.config.getlist(config_section, 'confs', default=['default'])
-    self.active = active
+    self.confs = context.config.getlist(config_section, 'confs', default=['default'])
     self.open = getattr_options(parser_config.open_opt)
     self.combined = self.open or getattr_options(parser_config.combined_opt)
     self.ignore_failure = getattr_options(parser_config.ignore_failure_opt)
+    self.skip = getattr_options(parser_config.skip_opt)
 
   def prepare(self, round_manager):
     # TODO(John Sirois): this is a fake requirement in order to force compile run before this
@@ -120,7 +141,7 @@ class JvmdocGen(JvmTask):
   def invalidate_for(self):
     return self.combined, self.transitive, self.workdir, self.confs, self._include_codegen
 
-  def generate_execute(self, language_predicate, create_jvmdoc_command):
+  def generate_doc(self, language_predicate, create_jvmdoc_command):
     """
     Generate an execute method given a language predicate and command to create documentation
 
@@ -129,43 +150,46 @@ class JvmdocGen(JvmTask):
     create_jvmdoc_command: (classpath, directory, *targets) -> command (string) that will generate
                            documentation documentation for targets
     """
-    catalog = self.context.products.isrequired(self._jvmdoc.product_type)
+    if self.skip:
+      return
+
+    catalog = self.context.products.isrequired(self.jvmdoc().product_type)
     if catalog and self.combined:
       raise TaskError(
-          'Cannot provide %s target mappings for combined output' % self._jvmdoc.product_type)
-    elif catalog or self.active:
-      def docable(target):
-        return language_predicate(target) and (self._include_codegen or not target.is_codegen)
+          'Cannot provide %s target mappings for combined output' % self.jvmdoc().product_type)
 
-      targets = self.context.targets()
-      with self.invalidated(filter(docable, targets)) as invalidation_check:
-        safe_mkdir(self.workdir)
-        exclusives_classpath = self.get_base_classpath_for_target(targets[0])
-        classpath = self.classpath(confs=self.confs, exclusives_classpath=exclusives_classpath)
+    def docable(tgt):
+      return language_predicate(tgt) and (self._include_codegen or not tgt.is_codegen)
 
-        def find_jvmdoc_targets():
-          invalid_targets = set()
-          for vt in invalidation_check.invalid_vts:
-            invalid_targets.update(vt.targets)
+    targets = self.context.targets()
+    with self.invalidated(filter(docable, targets)) as invalidation_check:
+      safe_mkdir(self.workdir)
+      exclusives_classpath = self.get_base_classpath_for_target(targets[0])
+      classpath = self.classpath(confs=self.confs, exclusives_classpath=exclusives_classpath)
 
-          if self.transitive:
-            return invalid_targets
-          else:
-            return set(invalid_targets).intersection(set(self.context.target_roots))
+      def find_jvmdoc_targets():
+        invalid_targets = set()
+        for vt in invalidation_check.invalid_vts:
+          invalid_targets.update(vt.targets)
 
-        jvmdoc_targets = list(filter(docable, find_jvmdoc_targets()))
-        if self.combined:
-          self._generate_combined(classpath, jvmdoc_targets, create_jvmdoc_command)
+        if self.transitive:
+          return invalid_targets
         else:
-          self._generate_individual(classpath, jvmdoc_targets, create_jvmdoc_command)
+          return set(invalid_targets).intersection(set(self.context.target_roots))
 
-      if catalog:
-        for target in targets:
-          gendir = self._gendir(target)
-          jvmdocs = []
-          for root, dirs, files in os.walk(gendir):
-            jvmdocs.extend(os.path.relpath(os.path.join(root, f), gendir) for f in files)
-          self.context.products.get(self._jvmdoc.product_type).add(target, gendir, jvmdocs)
+      jvmdoc_targets = list(filter(docable, find_jvmdoc_targets()))
+      if self.combined:
+        self._generate_combined(classpath, jvmdoc_targets, create_jvmdoc_command)
+      else:
+        self._generate_individual(classpath, jvmdoc_targets, create_jvmdoc_command)
+
+    if catalog:
+      for target in targets:
+        gendir = self._gendir(target)
+        jvmdocs = []
+        for root, dirs, files in os.walk(gendir):
+          jvmdocs.extend(os.path.relpath(os.path.join(root, f), gendir) for f in files)
+        self.context.products.get(self.jvmdoc().product_type).add(target, gendir, jvmdocs)
 
   def _generate_combined(self, classpath, targets, create_jvmdoc_command):
     gendir = os.path.join(self.workdir, 'combined')
@@ -206,7 +230,7 @@ class JvmdocGen(JvmTask):
           target, command = jobs[gendir]
           if result != 0:
             message = 'Failed to process %s for %s [%d]: %s' % (
-                      self._jvmdoc.tool_name, target, result, command)
+                      self.jvmdoc().tool_name, target, result, command)
             if self.ignore_failure:
               self.context.log.warn(message)
             else:
