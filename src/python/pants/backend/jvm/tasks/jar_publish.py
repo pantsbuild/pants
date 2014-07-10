@@ -784,6 +784,8 @@ class JarPublish(JarTask, ScmPublish):
           for abs_source, rel_source in abs_and_relative_sources(resource_target):
             open_jar.write(abs_source, rel_source)
 
+    return jar_path
+
   def create_doc_jar(self, target, open_jar, version):
     javadoc = self.context.products.get('javadoc').get(target)
     scaladoc = self.context.products.get('scaladoc').get(target)
@@ -799,3 +801,5 @@ class JarPublish(JarTask, ScmPublish):
         add_docs(javadoc)
         add_docs(scaladoc)
       return jar_path
+    else:
+      return None
