@@ -63,11 +63,11 @@ class AaptGen(AndroidTask, CodeGen):
       safe_mkdir(output_dir)
       print ("output_dir is %s" % output_dir)
       # instead of ignore assets, we could move the BUILD def up a level. May need to later anyway.
-      manifest = os.path.join(target.address.spec_path, '..', 'AndroidManifest.xml')
+      manifest = os.path.join(target.manifest)
       print (manifest)
       ignored_assets='!.svn:!.git:!.ds_store:!*.scc:.*:<dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~:BUILD*'
       args = [self.aapt_tool(target), 'package', '-m',  '-J', output_dir, '-M', manifest,
-              '-S', target.address.spec_path, "-I", self.android_jar_tool(target),
+              '-S', target.resource_dir, "-I", self.android_jar_tool(target),
               '--ignore-assets', ignored_assets]
       print ("args are %s" % args)
       log.debug('Executing: %s' % ' '.join(args))
@@ -114,7 +114,7 @@ class AaptGen(AndroidTask, CodeGen):
 
   def _aapt_out(self, target):
     # This is going in the wrong dir, one above where it is wanted.
-    return os.path.join(target.address.spec_path, '..', 'bin')
+    return os.path.join(target.address.spec_path, 'bin')
 
   # resolve the tools on a per-target basis
   def aapt_tool(self, target):
