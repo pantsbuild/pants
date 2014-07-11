@@ -20,8 +20,6 @@ class AndroidResources(AndroidTarget):
                resource_dir='res',
                **kwargs):
     """
-    :param manifest: path/to/manifest of target (required file name 'AndroidManifest.xml')
-    :type manifest: string.
     :param resource_dir: path/to/directory containing Android target's resource files.
       Set to 'res' by default.
     :type resource_dir: string.

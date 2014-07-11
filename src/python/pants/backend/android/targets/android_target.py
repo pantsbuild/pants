@@ -27,7 +27,6 @@ class AndroidTarget(Target):
                sources_rel_path=None,
                excludes=None,
                provides=None,
-               manifest='AndroidManifest.xml',
                # most recent build_tools_version should be defined elsewhere
                build_tools_version="19.1.0",
                release_type="debug",
@@ -40,8 +39,6 @@ class AndroidTarget(Target):
     :type sources: ``Fileset`` or list of strings.
     :param excludes: List of :ref:`exclude <bdict_exclude>`\s
       to filter this target's transitive dependencies against.
-    :param manifest: path/to/manifest of target (required file name AndroidManifest.xml)
-    :type manifest: string
     :param build_tools_version: API for the Build Tools (separate from SDK version).
       Defaults to the latest full release.
     :param release_type: Which keystore is used to sign target: 'debug' or 'release'.
@@ -58,7 +55,7 @@ class AndroidTarget(Target):
 
     self.add_labels('android')
     self.build_tools_version = build_tools_version
-    self.manifest = os.path.join(self.address.spec_path, manifest)
+    self.manifest = os.path.join(self.address.spec_path, "AndroidManifest.xml")
     self.release_type = release_type
 
     self.package = self.get_package_name()
