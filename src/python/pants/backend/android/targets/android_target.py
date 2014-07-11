@@ -14,6 +14,12 @@ from pants.base.target import Target
 class AndroidTarget(Target):
   """A base class for all Android targets"""
 
+  # Missing attributes from the AndroidManifest would eventually error in the compilation process.
+  # But since the error would raise here in the target definition, we are catching the exception
+  class BadManifestError(Exception):
+    """Indicates an invalid android manifest."""
+
+
   def __init__(self,
                address=None,
                sources=None,
@@ -54,20 +60,22 @@ class AndroidTarget(Target):
     self.manifest = manifest
     self.release_type = release_type
 
-    self.package = self.get_package_name(manifest)
-    self.target_sdk = self.get_target_sdk(manifest)
+    self.package = self.get_package_name()
+    self.target_sdk = self.get_target_sdk()
 
   # parsing as done in Donut testrunner
-  def get_package_name(self, manifest):
-    """returns name of Android package, or None if undefined in AndroidManifest.xml"""
-    manifests = parse(self.manifest).getElementsByTagName('manifest')
-    if not manifests or not manifests[0].getAttribute('package'):
-      return None
-    return (manifests[0].getAttribute('package'))
+  def get_package_name(self):
+    """returns name of Android package"""
+    tgt_manifest = parse(self.manifest).getElementsByTagName('manifest')
+    if not tgt_manifest or not tgt_manifest[0].getAttribute('package'):
+      raise self.BadManifestError('There is no \'package\' attribute in manifest at: %s'
+                                  % self.manifest)
+    return (tgt_manifest[0].getAttribute('package'))
 
-  def get_target_sdk(self, manifest):
-    """returns name of Android package's target SDK, or None if undefined in AndroidManifest.xml"""
-    manifests = parse(self.manifest).getElementsByTagName('uses-sdk')
-    if not manifests or not manifests[0].getAttribute('android:targetSdkVersion'):
-      return None
-    return (manifests[0].getAttribute('android:targetSdkVersion'))
+  def get_target_sdk(self):
+    """returns name of Android package's target SDK"""
+    tgt_manifest = parse(self.manifest).getElementsByTagName('uses-sdk')
+    if not tgt_manifest or not tgt_manifest[0].getAttribute('android:targetSdkVersion'):
+      raise self.BadManifestError('There is no \'targetSdkVersion\' attribute in manifest at'': %s'
+                                  % self.manifest)
+    return (tgt_manifest[0].getAttribute('android:targetSdkVersion'))
