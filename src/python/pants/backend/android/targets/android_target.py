@@ -5,6 +5,8 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from xml.dom.minidom import parse
+
 from pants.base.payload import JvmTargetPayload
 from pants.base.target import Target
 
@@ -18,12 +20,9 @@ class AndroidTarget(Target):
                sources_rel_path=None,
                excludes=None,
                provides=None,
-               package=None,
-               resources="res",
+               manifest=None,
                # most recent build_tools_version should be defined elsewhere
                build_tools_version="19.1.0",
-               target_sdk_version=None,
-               min_sdk_version=None,
                release_type="debug",
                **kwargs):
     """
@@ -34,13 +33,10 @@ class AndroidTarget(Target):
     :type sources: ``Fileset`` or list of strings.
     :param excludes: List of :ref:`exclude <bdict_exclude>`\s
       to filter this target's transitive dependencies against.
-    :param package: Package name of app, e.g. 'com.pants.examples.hello'
-    :type package: string
-    :param resources: name of directory containing the android resources. Set as 'res' by default.
+    :param manifest: path/to/manifest of target (required file name AndroidManifest.xml)
+    :type manifest: string
     :param build_tools_version: API for the Build Tools (separate from SDK version).
       Defaults to the latest full release.
-    :param target_sdk_version: Version of the Android SDK the android target is built for
-    :param min_sdk_version:  Earliest supported SDK by the android target
     :param release_type: Which keystore is used to sign target: 'debug' or 'release'.
       Set as 'debug' by default.
     """
@@ -55,8 +51,23 @@ class AndroidTarget(Target):
 
     self.add_labels('android')
     self.build_tools_version = build_tools_version
-    self.min_sdk_version = min_sdk_version
-    self.package = package
+    self.manifest = manifest
     self.release_type = release_type
-    self.resources = resources
-    self.target_sdk_version = target_sdk_version
+
+    self.package = self.get_package_name(manifest)
+    self.target_sdk = self.get_target_sdk(manifest)
+
+  # parsing as done in Donut testrunner
+  def get_package_name(self, manifest):
+    """returns name of Android package, or None if undefined in AndroidManifest.xml"""
+    manifests = parse(self.manifest).getElementsByTagName('manifest')
+    if not manifests or not manifests[0].getAttribute('package'):
+      return None
+    return (manifests[0].getAttribute('package'))
+
+  def get_target_sdk(self, manifest):
+    """returns name of Android package's target SDK, or None if undefined in AndroidManifest.xml"""
+    manifests = parse(self.manifest).getElementsByTagName('uses-sdk')
+    if not manifests or not manifests[0].getAttribute('android:targetSdkVersion'):
+      return None
+    return (manifests[0].getAttribute('android:targetSdkVersion'))

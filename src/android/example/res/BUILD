@@ -3,6 +3,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 android_resources(name='hello',
-  package='com.pants.examples.hello',
+  manifest=pants('src/android/example/AndroidManifest.xml'),
 )
 

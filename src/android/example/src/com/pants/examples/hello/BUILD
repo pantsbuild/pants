@@ -5,7 +5,10 @@
 android_binary(
   name='hello',
   sources='HelloWorld.java',
-  package='com.pants.examples.hello',
+  manifest=pants('src/android/example/AndroidManifest.xml'),
+  dependencies = [
+    pants('src/android/example/res:hello'),
+  ],
   resources=[
     pants('src/android/example/res')
   ],
