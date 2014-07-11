@@ -9,7 +9,4 @@ android_binary(
   dependencies = [
     pants('src/android/example/res:hello'),
   ],
-  resources=[
-    pants('src/android/example/res')
-  ],
 )
