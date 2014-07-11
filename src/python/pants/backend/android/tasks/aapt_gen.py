@@ -55,12 +55,11 @@ class AaptGen(AndroidTask, CodeGen):
     """
     print ("genlang going going")
 
-  #TODO:Investigate.Each invocation of aapt creates a package, I don't think it can batch for each aapt binary used
     # somewhere in an aapt class we will need to handle "crunch" command for release builds.
     for target in targets:
       if lang != 'java':
         raise TaskError('Unrecognized android gen lang: %s' % lang)
-      output_dir = os.path.join(target.address.spec_path, '..', 'bin')
+      output_dir = self.aapt_out(target)
       safe_mkdir(output_dir)
       print ("output_dir is %s" % output_dir)
       # instead of ignore assets, we could move the BUILD def up a level. May need to later anyway.
@@ -74,6 +73,7 @@ class AaptGen(AndroidTask, CodeGen):
       log.debug('Executing: %s' % ' '.join(args))
       process = subprocess.Popen(args)
       result = process.wait()
+      # TODO(mateor) refine/check this error catch
       if result != 0:
         raise TaskError('Android %s ... exited non-zero (%i)' % (self.aapt_tool(target), result))
 
@@ -85,33 +85,36 @@ class AaptGen(AndroidTask, CodeGen):
     print ("aapt createtarget")
     #This method creates the new target to replace the acted upon resources in the target graph
     # create the path and sources
-    aapt_gen_file = os.path.join(gentarget.target_base, self._aapt_out(gentarget), gentarget.package, 'R.java')
+    aapt_gen_file = os.path.join(self._aapt_out(gentarget), self.package_path(gentarget.package))
+    print ("AAPT_GEN_FILE: %s" % aapt_gen_file)
     #Use the address to create a syntheticTarget address
     address = SyntheticAddress(spec_path=aapt_gen_file, target_name = gentarget.id)
     # create new JavaLibraryTarget
+    print (gentarget.id, gentarget)
     tgt = self.context.add_new_target(address,
                                       JavaLibrary,
-                                      name=gentarget.id,
+                                      derived_from=gentarget,
                                       #TODO:are sources full path? Address seem to be
-                                      sources=aapt_gen_file,
+                                      sources=['R.java'],
                                       #provides=gentarget.provides,
                                       dependencies=[])
                                       # excludes=gentarget.excludes)
     # update (or inject?) deps
     #print (dependees)
+    print ("TARGET_ADDDRESS: %s" % tgt.address)
     for dependee in dependees:
-      dependee.update_dependencies([tgt])
+      dependee.inject_dependency(tgt.address)
     return tgt
 
-  def package_path(self, target):
+  def package_path(self, package):
     #TODO test this
     #needs to convert the package name (com.foo.bar) into a package path (com/foo/bar)
-    return target.package.replace('.', os.sep)
+    return package.replace('.', os.sep)
 
 
   def _aapt_out(self, target):
     # This is going in the wrong dir, one above where it is wanted.
-    return os.path.join(target.target_base, 'bin')
+    return os.path.join(target.address.spec_path, '..', 'bin')
 
   # resolve the tools on a per-target basis
   def aapt_tool(self, target):
