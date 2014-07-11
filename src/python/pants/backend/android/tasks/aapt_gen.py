@@ -60,12 +60,17 @@ class AaptGen(AndroidTask, CodeGen):
     for target in targets:
       if lang != 'java':
         raise TaskError('Unrecognized android gen lang: %s' % lang)
-      output_dir = safe_mkdir(self._aapt_out(target))
-      # instead of ignore assets, we could move the BUILD dict up a level. May need it later anyway.
+      output_dir = os.path.join(target.address.spec_path, '..', 'bin')
+      safe_mkdir(output_dir)
+      print ("output_dir is %s" % output_dir)
+      # instead of ignore assets, we could move the BUILD def up a level. May need to later anyway.
+      manifest = os.path.join(target.address.spec_path, '..', 'AndroidManifest.xml')
+      print (manifest)
       ignored_assets='!.svn:!.git:!.ds_store:!*.scc:.*:<dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~:BUILD*'
-      args = [self.aapt_tool(target), 'package', '-m',  '-J', output_dir, '-M', target.manifest,
-              '-S', target.resources, "-I", self.android_jar_tool(target),
+      args = [self.aapt_tool(target), 'package', '-m',  '-J', output_dir, '-M', manifest,
+              '-S', target.address.spec_path, "-I", self.android_jar_tool(target),
               '--ignore-assets', ignored_assets]
+      print (args)
       log.debug('Executing: %s' % ' '.join(args))
       process = subprocess.Popen(args)
       result = process.wait()
@@ -82,17 +87,18 @@ class AaptGen(AndroidTask, CodeGen):
     # create the path and sources
     aapt_gen_file = os.path.join(gentarget.target_base, self._aapt_out(gentarget), gentarget.package, 'R.java')
     #Use the address to create a syntheticTarget address
-    address = SyntheticAddress.parse(spec_path=aapt_gen_file, target_name = gentarget.id)
+    address = SyntheticAddress(spec_path=aapt_gen_file, target_name = gentarget.id)
     # create new JavaLibraryTarget
     tgt = self.context.add_new_target(address,
                                       JavaLibrary,
                                       name=gentarget.id,
                                       #TODO:are sources full path? Address seem to be
                                       sources=aapt_gen_file,
-                                      provides=gentarget.provides,
-                                      dependencies=[],
-                                      excludes=gentarget.excludes)
+                                      #provides=gentarget.provides,
+                                      dependencies=[])
+                                      # excludes=gentarget.excludes)
     # update (or inject?) deps
+    #print (dependees)
     for dependee in dependees:
       dependee.update_dependencies([tgt])
     return tgt
@@ -104,6 +110,7 @@ class AaptGen(AndroidTask, CodeGen):
 
 
   def _aapt_out(self, target):
+    # This is going in the wrong dir, one above where it is wanted.
     return os.path.join(target.target_base, 'bin')
 
   # resolve the tools on a per-target basis
@@ -111,7 +118,8 @@ class AaptGen(AndroidTask, CodeGen):
     return os.path.join(self._dist._sdk_path, ('build-tools/' + target.build_tools_version), 'aapt')
 
   def android_jar_tool(self, target):
-    return os.path.join(self._dist._sdk_path, 'platforms', ('android-' + target.target_sdk_version), 'android.jar')
+    # TODO (mateor) this need to precisely interact with AndroidDistribution
+    return os.path.join(self._dist._sdk_path, 'platforms', ('android-' + '18'), 'android.jar')
 
 
   #todo (mateor): debate merits of AaptClassMixin class

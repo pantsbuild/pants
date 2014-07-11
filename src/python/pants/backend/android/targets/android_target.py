@@ -6,6 +6,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 from pants.base.payload import JvmTargetPayload
+from pants.base.source_root import SourceRoot
 from pants.base.target import Target
 
 
