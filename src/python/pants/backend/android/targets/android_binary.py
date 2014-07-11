@@ -22,13 +22,10 @@ class AndroidBinary(AndroidTarget):
     :type sources: ``Fileset`` or list of strings.
     :param excludes: List of :ref:`exclude <bdict_exclude>`\s
       to filter this target's transitive dependencies against.
-    :param package: Package name of app, e.g. 'com.pants.examples.hello'
-    :type package: string
-    :param resources: name of directory containing the android resources. Set as 'res' by default.
+    :param manifest: path/to/manifest of target (required file name AndroidManifest.xml)
+    :type manifest: string
     :param build_tools_version: API for the Build Tools (separate from SDK version).
       Defaults to the latest full release.
-    :param target_sdk_version: Version of the Android SDK the android target is built for
-    :param min_sdk_version:  Earliest supported SDK by the android target
     :param release_type: Which keystore is used to sign target: 'debug' or 'release'.
       Set as 'debug' by default.
     """
