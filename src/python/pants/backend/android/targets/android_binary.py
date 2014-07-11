@@ -22,8 +22,6 @@ class AndroidBinary(AndroidTarget):
     :type sources: ``Fileset`` or list of strings.
     :param excludes: List of :ref:`exclude <bdict_exclude>`\s
       to filter this target's transitive dependencies against.
-    :param manifest: path/to/manifest of target (required file name AndroidManifest.xml)
-    :type manifest: string
     :param build_tools_version: API for the Build Tools (separate from SDK version).
       Defaults to the latest full release.
     :param release_type: Which keystore is used to sign target: 'debug' or 'release'.
