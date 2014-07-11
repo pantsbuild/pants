@@ -12,7 +12,7 @@ from pants.base.target import Target
 
 
 class AndroidTarget(Target):
-  """A base class for all Android targets"""
+  """A base class for all Android targets."""
 
   # Missing attributes from the AndroidManifest would eventually error in the compilation process.
   # But since the error would raise here in the target definition, we are catching the exception
@@ -65,17 +65,17 @@ class AndroidTarget(Target):
 
   # parsing as done in Donut testrunner
   def get_package_name(self):
-    """returns name of Android package"""
+    """Returns the package name of the Android target."""
     tgt_manifest = parse(self.manifest).getElementsByTagName('manifest')
     if not tgt_manifest or not tgt_manifest[0].getAttribute('package'):
-      raise self.BadManifestError('There is no \'package\' attribute in manifest at: %s'
-                                  % self.manifest)
-    return (tgt_manifest[0].getAttribute('package'))
+      raise self.BadManifestError('There is no \'package\' attribute in manifest at: {0!r}'
+                                  .format(self.manifest))
+    return tgt_manifest[0].getAttribute('package')
 
   def get_target_sdk(self):
-    """returns name of Android package's target SDK"""
+    """Returns a string with the Android package's target SDK."""
     tgt_manifest = parse(self.manifest).getElementsByTagName('uses-sdk')
     if not tgt_manifest or not tgt_manifest[0].getAttribute('android:targetSdkVersion'):
-      raise self.BadManifestError('There is no \'targetSdkVersion\' attribute in manifest at'': %s'
-                                  % self.manifest)
-    return (tgt_manifest[0].getAttribute('android:targetSdkVersion'))
+      raise self.BadManifestError('There is no \'targetSdkVersion\' attribute in manifest at: {0!r}'
+                                  .format(self.manifest))
+    return tgt_manifest[0].getAttribute('android:targetSdkVersion')
