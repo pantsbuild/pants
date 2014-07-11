@@ -53,13 +53,13 @@ class AaptGen(AndroidTask, CodeGen):
     May return a list of pairs (target, files) where files is a list of files
     to be cached against the target.
     """
-    print ("genlang going going")
+    print ("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
 
     # somewhere in an aapt class we will need to handle "crunch" command for release builds.
     for target in targets:
       if lang != 'java':
         raise TaskError('Unrecognized android gen lang: %s' % lang)
-      output_dir = self.aapt_out(target)
+      output_dir = self._aapt_out(target)
       safe_mkdir(output_dir)
       print ("output_dir is %s" % output_dir)
       # instead of ignore assets, we could move the BUILD def up a level. May need to later anyway.
@@ -69,7 +69,7 @@ class AaptGen(AndroidTask, CodeGen):
       args = [self.aapt_tool(target), 'package', '-m',  '-J', output_dir, '-M', manifest,
               '-S', target.address.spec_path, "-I", self.android_jar_tool(target),
               '--ignore-assets', ignored_assets]
-      print (args)
+      print ("args are %s" % args)
       log.debug('Executing: %s' % ' '.join(args))
       process = subprocess.Popen(args)
       result = process.wait()
@@ -118,11 +118,15 @@ class AaptGen(AndroidTask, CodeGen):
 
   # resolve the tools on a per-target basis
   def aapt_tool(self, target):
-    return os.path.join(self._dist._sdk_path, ('build-tools/' + target.build_tools_version), 'aapt')
+    aapt = os.path.join(self._dist._sdk_path, ('build-tools/' + target.build_tools_version), 'aapt')
+    print ("aapt_tool: %s" % aapt)
+    # this only works because there is a default build_tools_version. How to get this info?
+    # I guess two options only: add it to BUILD file or parse the manifest already.
+    return aapt
 
   def android_jar_tool(self, target):
     # TODO (mateor) this need to precisely interact with AndroidDistribution
-    return os.path.join(self._dist._sdk_path, 'platforms', ('android-' + '18'), 'android.jar')
+    return os.path.join(self._dist._sdk_path, 'platforms', ('android-' + target.target_sdk), 'android.jar')
 
 
   #todo (mateor): debate merits of AaptClassMixin class
