@@ -5,6 +5,7 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+import os
 from xml.dom.minidom import parse
 
 from pants.base.payload import JvmTargetPayload
@@ -26,7 +27,7 @@ class AndroidTarget(Target):
                sources_rel_path=None,
                excludes=None,
                provides=None,
-               manifest=None,
+               manifest='AndroidManifest.xml',
                # most recent build_tools_version should be defined elsewhere
                build_tools_version="19.1.0",
                release_type="debug",
@@ -57,7 +58,7 @@ class AndroidTarget(Target):
 
     self.add_labels('android')
     self.build_tools_version = build_tools_version
-    self.manifest = manifest
+    self.manifest = os.path.join(self.address.spec_path, manifest)
     self.release_type = release_type
 
     self.package = self.get_package_name()
