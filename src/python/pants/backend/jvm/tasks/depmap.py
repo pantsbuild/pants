@@ -118,7 +118,7 @@ class Depmap(ConsoleTask):
         yield line
       return
     for target in self.context.target_roots:
-      if self._is_jvm(target):
+      if self._is_jvm(target) or target.is_delegate:
         if self.is_graph:
           for line in self._output_digraph(target):
             yield line
@@ -159,7 +159,7 @@ class Depmap(ConsoleTask):
           outputted.add(dep_id)
           indent += 1
 
-        if self._is_jvm(dep):
+        if self._is_jvm(dep) or dep.is_delegate:
           for internal_dep in dep.dependencies:
             output += output_deps(internal_dep, indent, outputted)
 
