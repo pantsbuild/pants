@@ -67,6 +67,7 @@ python_tests(name = 'test_thrift_builder',
     pants('3rdparty/python:mock'),
     pants('src/python/pants/backend/codegen/targets:python'),
     pants('src/python/pants/backend/python:thrift_builder'),
+    pants('src/python/pants/base:build_file_aliases'),
     pants('tests/python/pants_test/base:context_utils'),
     pants('tests/python/pants_test:base_test'),
   ]

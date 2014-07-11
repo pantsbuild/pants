@@ -11,6 +11,7 @@ import pytest
 
 from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
+from pants.base.build_file_aliases import BuildFileAliases
 from pants_test.base.context_utils import create_config
 from pants_test.base_test import BaseTest
 
@@ -18,12 +19,12 @@ from pants_test.base_test import BaseTest
 class JavaThriftLibraryDefaultsTest(BaseTest):
   @property
   def alias_groups(self):
-    return {
-      'target_aliases': {
+    return BuildFileAliases.create(
+      targets={
         'java_thrift_library': JavaThriftLibrary,
         'java_library': JavaLibrary,
-      },
-    }
+      }
+    )
 
   def setUp(self):
     super(JavaThriftLibraryDefaultsTest, self).setUp()

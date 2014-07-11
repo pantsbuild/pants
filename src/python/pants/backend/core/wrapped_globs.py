@@ -13,8 +13,8 @@ from pants.base.build_environment import get_buildroot
 
 
 class FilesetRelPathWrapper(object):
-  def __init__(self, rel_path):
-    self.rel_path = rel_path
+  def __init__(self, parse_context):
+    self.rel_path = parse_context.rel_path
 
   def __call__(self, *args, **kwargs):
     root = os.path.join(get_buildroot(), self.rel_path)

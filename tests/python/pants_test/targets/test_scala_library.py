@@ -11,22 +11,23 @@ from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
+from pants.base.build_file_aliases import BuildFileAliases
 from pants_test.base_test import BaseTest
 
 
 class ScalaLibraryTest(BaseTest):
   @property
   def alias_groups(self):
-    return {
-      'target_aliases': {
+    return BuildFileAliases.create(
+      targets={
         'scala_library': ScalaLibrary,
         'java_library': JavaLibrary,
         'jar_library': JarLibrary,
       },
-      'exposed_objects': {
+      objects={
         'jar': JarDependency,
       }
-    }
+    )
 
   def setUp(self):
     super(ScalaLibraryTest, self).setUp()

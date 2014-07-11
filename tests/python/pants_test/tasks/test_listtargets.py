@@ -13,6 +13,7 @@ from pants.backend.core.tasks.listtargets import ListTargets
 from pants.backend.jvm.targets.artifact import Artifact
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.repository import Repository
+from pants.base.build_file_aliases import BuildFileAliases
 from pants_test.tasks.test_base import ConsoleTaskTest
 
 
@@ -32,17 +33,17 @@ class ListTargetsTestEmpty(BaseListTargetsTest):
 class ListTargetsTest(BaseListTargetsTest):
   @property
   def alias_groups(self):
-    return {
-      'target_aliases': {
+    return BuildFileAliases.create(
+      targets={
         'dependencies': Dependencies,
         'java_library': JavaLibrary,
         'repo': Repository,
       },
-      'exposed_objects': {
+      objects={
         'pants': lambda x: x,
         'artifact': Artifact,
-      },
-    }
+      }
+    )
 
   def setUp(self):
     super(ListTargetsTest, self).setUp()

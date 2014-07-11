@@ -8,6 +8,7 @@ python_library(
   dependencies = [
     'src/python/pants/backend/core/targets:all',
     'src/python/pants/backend/core/tasks:all',
+    'src/python/pants/base:build_file_aliases',
     ':core',
   ]
 )
@@ -19,5 +20,6 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
     'src/python/pants/backend/core/targets:all',
     'src/python/pants/backend/core/tasks:all',
+    'src/python/pants/base:build_environment',
   ]
 )

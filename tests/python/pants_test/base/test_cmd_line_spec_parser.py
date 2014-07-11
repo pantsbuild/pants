@@ -6,8 +6,8 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 from pants.base.address import SyntheticAddress
+from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
-
 from pants.base.target import Target
 from pants_test.base_test import BaseTest
 
@@ -15,11 +15,11 @@ from pants_test.base_test import BaseTest
 class CmdLineSpecParserTest(BaseTest):
   @property
   def alias_groups(self):
-    return {
-      'target_aliases': {
+    return BuildFileAliases.create(
+      targets={
         'generic': Target
       }
-    }
+    )
 
   def setUp(self):
     super(CmdLineSpecParserTest, self).setUp()

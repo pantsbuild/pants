@@ -10,21 +10,22 @@ from textwrap import dedent
 from pants.backend.core.targets.doc import Wiki, WikiArtifact, Page
 from pants.base.address import SyntheticAddress
 from pants.base.build_environment import get_buildroot
+from pants.base.build_file_aliases import BuildFileAliases
 from pants_test.base_test import BaseTest
 
 
 class WikiPageTest(BaseTest):
   @property
   def alias_groups(self):
-    return {
-      'target_aliases': {
+    return BuildFileAliases.create(
+      targets={
         'page': Page,
         'wiki': Wiki,
-        },
-      'exposed_objects': {
+      },
+      objects={
         'wiki_artifact': WikiArtifact,
-        }
-    }
+      }
+    )
 
   def setUp(self):
     super(WikiPageTest, self).setUp()

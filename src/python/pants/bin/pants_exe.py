@@ -17,8 +17,8 @@ from twitter.common.dirutil import Lock
 from pants.base.build_environment import get_buildroot, get_version
 from pants.base.build_file_parser import BuildFileParser
 from pants.base.build_graph import BuildGraph
-from pants.base.dev_backend_loader import load_backends_from_source
 from pants.base.config import Config
+from pants.base.dev_backend_loader import load_build_configuration_from_source
 from pants.base.rcfile import RcFile
 from pants.base.workunit import WorkUnit
 from pants.commands.command import Command
@@ -120,7 +120,7 @@ def _run():
 
   config = Config.load()
 
-  # XXX(wickman) This should be in the command goal, not un pants_exe.py!
+  # XXX(wickman) This should be in the command goal, not in pants_exe.py!
   run_tracker = RunTracker.from_config(config)
   report = initial_reporting(config, run_tracker)
   run_tracker.start(report)
@@ -131,11 +131,12 @@ def _run():
   else:
     run_tracker.log(Report.INFO, '(To run a reporting server: ./pants goal server)')
 
-  build_file_parser = BuildFileParser(root_dir=root_dir, run_tracker=run_tracker)
+  backend_packages = config.getlist('backends', 'packages')
+  build_configuration = load_build_configuration_from_source(additional_backends=backend_packages)
+  build_file_parser = BuildFileParser(build_configuration=build_configuration,
+                                      root_dir=root_dir,
+                                      run_tracker=run_tracker)
   build_graph = BuildGraph(run_tracker=run_tracker)
-
-  additional_backends = config.getlist('backends', 'packages')
-  load_backends_from_source(build_file_parser, additional_backends=additional_backends)
 
   command_class, command_args = _parse_command(root_dir, argv)
   command = command_class(run_tracker,

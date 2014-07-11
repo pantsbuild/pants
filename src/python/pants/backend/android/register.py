@@ -7,29 +7,16 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from pants.backend.android.targets.android_binary import AndroidBinary
 from pants.backend.android.targets.android_resources import AndroidResources
+from pants.base.build_file_aliases import BuildFileAliases
 
 
-def target_aliases():
-  return {
-    'android_binary': AndroidBinary,
-    'android_resources': AndroidResources,
-  }
-
-
-def object_aliases():
-  return {}
-
-
-def partial_path_relative_util_aliases():
-  return {}
-
-
-def applicative_path_relative_util_aliases():
-  return {}
-
-
-def target_creation_utils():
-  return {}
+def build_file_aliases():
+  return BuildFileAliases.create(
+    targets={
+      'android_binary': AndroidBinary,
+      'android_resources': AndroidResources,
+    }
+  )
 
 
 def register_commands():

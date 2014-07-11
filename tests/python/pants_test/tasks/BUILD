@@ -140,6 +140,7 @@ python_tests(
     pants('src/python/pants/backend/jvm/targets:java'),
     pants('src/python/pants/backend/jvm/targets:jvm'),
     pants('src/python/pants/backend/jvm/tasks:check_published_deps'),
+    pants('src/python/pants/base:build_file_aliases'),
   ]
 )
 
@@ -178,7 +179,6 @@ python_tests(
   name = 'dependees',
   sources = ['test_dependees.py'],
   dependencies = [
-    pants('3rdparty/python:mox'),
     pants(':base'),
     pants('src/python/pants/backend/codegen/targets:java'),
     pants('src/python/pants/backend/core/targets:common'),
@@ -187,6 +187,7 @@ python_tests(
     pants('src/python/pants/backend/jvm/targets:scala'),
     pants('src/python/pants/backend/python/targets:python'),
     pants('src/python/pants/base:build_environment'),
+    pants('src/python/pants/base:build_file_aliases'),
   ]
 )
 
@@ -216,6 +217,7 @@ python_tests(
     pants('src/python/pants/backend/jvm/targets:scala'),
     pants('src/python/pants/backend/jvm/tasks:depmap'),
     pants('src/python/pants/backend/python/targets:python'),
+    pants('src/python/pants/base:build_file_aliases'),
   ]
 )
 
@@ -239,6 +241,7 @@ python_tests(
     pants('src/python/pants/backend/core/tasks:filemap'),
     pants('src/python/pants/base:source_root'),
     pants('src/python/pants/backend/python/targets:python'),
+    pants('src/python/pants/base:build_file_aliases'),
   ],
 )
 
@@ -251,6 +254,7 @@ python_tests(
     pants('src/python/pants/backend/python/targets:python'),
     pants('src/python/pants/backend/core/tasks:filter'),
     pants('src/python/pants/backend/core/targets:common'),
+    pants('src/python/pants/base:build_file_aliases'),
   ],
 )
 
@@ -269,6 +273,7 @@ python_tests(
     pants('src/python/pants/backend/jvm/targets:scala'),
     pants('src/python/pants/backend/jvm/tasks:jar_create'),
     pants('src/python/pants/base:build_environment'),
+    pants('src/python/pants/base:build_file_aliases'),
     pants('src/python/pants/base:source_root'),
     pants('src/python/pants/goal:products'),
     pants('src/python/pants/java:jar'),
@@ -316,6 +321,7 @@ python_tests(
     pants('src/python/pants/backend/core/tasks:listtargets'),
     pants('src/python/pants/backend/jvm/targets:java'),
     pants('src/python/pants/backend/jvm/targets:jvm'),
+    pants('src/python/pants/base:build_file_aliases'),
     pants('src/python/pants/base:target'),
   ],
 )
@@ -327,6 +333,7 @@ python_tests(
     pants(':base'),
     pants('src/python/pants/backend/core/tasks:minimal_cover'),
     pants('src/python/pants/backend/python/targets:python'),
+    pants('src/python/pants/base:build_file_aliases'),
   ],
 )
 
@@ -380,6 +387,7 @@ python_tests(
     pants('src/python/pants/backend/codegen/targets:java'),
     pants('src/python/pants/backend/codegen/tasks:scrooge_gen'),
     pants('src/python/pants/backend/jvm/targets:java'),
+    pants('src/python/pants/base:build_file_aliases'),
     pants('src/python/pants/base:exceptions'),
   ],
 )
@@ -391,6 +399,7 @@ python_tests(
     pants(':base'),
     pants('src/python/pants/backend/python/targets:python'),
     pants('src/python/pants/backend/core/tasks:sorttargets'),
+    pants('src/python/pants/base:build_file_aliases'),
   ],
 )
 
@@ -415,11 +424,12 @@ python_tests(
     pants('src/python/pants/backend/codegen/targets:python'),
     pants('src/python/pants/backend/core/targets:common'),
     pants('src/python/pants/backend/core/tasks:what_changed'),
-    pants('src/python/pants/base:source_root'),
-    pants('src/python/pants/base:target'),
     pants('src/python/pants/backend/jvm/targets:java'),
     pants('src/python/pants/backend/jvm/targets:jvm'),
     pants('src/python/pants/backend/python/targets:python'),
+    pants('src/python/pants/base:build_file_aliases'),
+    pants('src/python/pants/base:source_root'),
+    pants('src/python/pants/base:target'),
   ],
 )
 
@@ -431,6 +441,7 @@ python_tests(
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('src/python/pants/backend/jvm/targets:jvm'),
     pants('src/python/pants/backend/jvm/tasks:jar_task'),
+    pants('src/python/pants/base:build_file_aliases'),
     pants('src/python/pants/base:source_root'),
     pants('tests/python/pants_test/jvm:jvm_tool_task_test_base'),
   ]

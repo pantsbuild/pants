@@ -7,12 +7,8 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import os
 
-from pants.backend.python.python_requirement import PythonRequirement
 
-
-def python_requirements(rel_path=None,
-                        target_type=None,
-                        requirements_relpath='requirements.txt'):
+def python_requirements(parse_context, requirements_relpath='requirements.txt'):
   """Translates a pip requirements file into an equivalent set of PythonRequirement targets.
 
   NB that there are some requirements files that can't be unambiguously translated; ie: multiple
@@ -27,7 +23,7 @@ def python_requirements(rel_path=None,
   requirements = []
   repository = None
 
-  requirements_path = os.path.join(rel_path, requirements_relpath)
+  requirements_path = os.path.join(parse_context.rel_path, requirements_relpath)
   with open(requirements_path) as fp:
     for line in fp:
       line = line.strip()
@@ -46,5 +42,7 @@ def python_requirements(rel_path=None,
               repository = value
 
   for requirement in requirements:
-    req = PythonRequirement(requirement, repository=repository)
-    target_type(name=req.project_name, requirements=[req])
+    req = parse_context.create_object('python_requirement', requirement, repository=repository)
+    parse_context.create_object('python_requirement_library',
+                                name=req.project_name,
+                                requirements=[req])

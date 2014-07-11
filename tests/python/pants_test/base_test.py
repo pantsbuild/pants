@@ -5,18 +5,19 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-import os
-import unittest2
-
 from contextlib import contextmanager
+import os
 from tempfile import mkdtemp
 from textwrap import dedent
+import unittest2
 
 from twitter.common.contextutil import environment_as, pushd, temporary_dir, temporary_file
 from twitter.common.dirutil import safe_mkdir, safe_open, safe_rmtree, touch
 
 from pants.backend.core.targets.dependencies import Dependencies
 from pants.base.address import SyntheticAddress
+from pants.base.build_configuration import BuildConfiguration
+from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.build_graph import BuildGraph
 from pants.base.build_root import BuildRoot
 from pants.base.build_file_parser import BuildFileCache, BuildFileParser
@@ -80,15 +81,19 @@ class BaseTest(unittest2.TestCase):
 
   @property
   def alias_groups(self):
-    return {'target_aliases': {'dependencies': Dependencies}}
+    return BuildFileAliases.create(targets={'dependencies': Dependencies})
 
   def setUp(self):
     self.real_build_root = BuildRoot().path
     self.build_root = os.path.realpath(mkdtemp(suffix='_BUILD_ROOT'))
     BuildRoot().path = self.build_root
+
     self.create_file('pants.ini')
-    self.build_file_parser = BuildFileParser(self.build_root)
-    self.build_file_parser.register_alias_groups(self.alias_groups)
+
+    build_configuration = BuildConfiguration()
+    build_configuration.register_aliases(self.alias_groups)
+    self.build_file_parser = BuildFileParser(build_configuration, self.build_root)
+
     self.build_graph = BuildGraph()
 
   def config(self, overrides=''):
@@ -118,7 +123,6 @@ class BaseTest(unittest2.TestCase):
     SourceRoot.reset()
     safe_rmtree(self.build_root)
     BuildFileCache.clear()
-    self.build_file_parser.clear_registered_context()
 
   def target(self, spec):
     """Resolves the given target address to a Target object.

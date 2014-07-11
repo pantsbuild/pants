@@ -48,6 +48,7 @@ python_tests(
     pants(':base'),
     pants('src/python/pants/backend/core'),
     pants('src/python/pants/backend/jvm/targets:jvm'),
+    pants('src/python/pants/base:build_file_aliases'),
     pants('src/python/pants/base:exceptions'),
   ]
 )
@@ -93,6 +94,7 @@ python_tests(
     pants(':base'),
     pants('src/python/pants/backend/codegen/targets:java'),
     pants('src/python/pants/backend/jvm/targets:java'),
+    pants('src/python/pants/base:build_file_aliases'),
     pants('tests/python/pants_test/base:context_utils'),
   ]
 )
@@ -115,6 +117,7 @@ python_tests(
     pants('src/python/pants/backend/jvm/targets:java'),
     pants('src/python/pants/backend/jvm/targets:jvm'),
     pants('src/python/pants/backend/jvm/targets:scala'),
+    pants('src/python/pants/base:build_file_aliases'),
   ]
 )
 

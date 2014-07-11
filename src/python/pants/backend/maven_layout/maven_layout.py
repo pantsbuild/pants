@@ -14,7 +14,6 @@ from pants.backend.codegen.targets.python_antlr_library import PythonAntlrLibrar
 from pants.backend.codegen.targets.python_thrift_library import PythonThriftLibrary
 from pants.backend.core.targets.doc import Page
 from pants.backend.core.targets.resources import Resources
-from pants.base.source_root import SourceRoot
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.java_agent import JavaAgent
 from pants.backend.jvm.targets.java_library import JavaLibrary
@@ -25,9 +24,10 @@ from pants.backend.jvm.targets.scala_tests import ScalaTests
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_tests import PythonTests
+from pants.base.source_root import SourceRoot
 
 
-def maven_layout(basedir='', rel_path=None):
+def maven_layout(parse_context, basedir=''):
   """Sets up typical maven project source roots for all built-in pants target types.
 
   Shortcut for ``source_root('src/main/java', *java targets*)``,
@@ -38,9 +38,8 @@ def maven_layout(basedir='', rel_path=None):
     expecting to find java files in ``src/main/java``, expect them in
     ``**basedir**/src/main/java``.
   """
-
   def root(path, *types):
-    SourceRoot.register(os.path.join(rel_path, basedir, path), *types)
+    SourceRoot.register(os.path.join(parse_context.rel_path, basedir, path), *types)
 
   root('src/main/antlr', JavaAntlrLibrary, Page, PythonAntlrLibrary)
   root('src/main/java', AnnotationProcessor, JavaAgent, JavaLibrary, JvmBinary, Page)

@@ -20,8 +20,8 @@ from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.depmap import Depmap
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
+from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.exceptions import TaskError
-
 from pants_test.tasks.test_base import ConsoleTaskTest
 
 
@@ -34,8 +34,8 @@ class BaseDepmapTest(ConsoleTaskTest):
 class DepmapTest(BaseDepmapTest):
   @property
   def alias_groups(self):
-    return {
-      'target_aliases': {
+    return BuildFileAliases.create(
+      targets={
         'dependencies': Dependencies,
         'jar_library': JarLibrary,
         'java_library': JavaLibrary,
@@ -45,13 +45,13 @@ class DepmapTest(BaseDepmapTest):
         'python_library': PythonLibrary,
         'resources': Resources,
       },
-      'exposed_objects': {
+      objects={
         'pants': lambda x: x,
       },
-      'partial_path_relative_utils': {
+      context_aware_object_factories={
         'bundle': Bundle,
-      },
-    }
+      }
+    )
 
   def setUp(self):
     super(DepmapTest, self).setUp()

@@ -308,7 +308,12 @@ class Bundle(object):
     ]
   """
 
-  def __init__(self, rel_path=None, mapper=None, relative_to=None):
+  def __init__(self, parse_context):
+    self._rel_path = parse_context.rel_path
+    self.filemap = {}
+    self.mapper = None
+
+  def __call__(self, rel_path=None, mapper=None, relative_to=None):
     """
     :param rel_path: Base path of the "source" file paths. By default, path of the
       BUILD file. Useful for assets that don't live in the source code repo.
@@ -321,7 +326,7 @@ class Bundle(object):
     if mapper and relative_to:
       raise ValueError("Must specify exactly one of 'mapper' or 'relative_to'")
 
-    self._rel_path = rel_path
+    self._rel_path = rel_path or self._rel_path
 
     if relative_to:
       base = os.path.join(get_buildroot(), self._rel_path, relative_to)
@@ -331,14 +336,13 @@ class Bundle(object):
     else:
       self.mapper = mapper or RelativeToMapper(os.path.join(get_buildroot(), self._rel_path))
 
-    self.filemap = {}
+    return self
 
   @manual.builddict()
   def add(self, *filesets):
     """Add files to the bundle, where ``filesets`` is a filename, ``globs``, or ``rglobs``.
     Note this is a variable length param and may be specified any number of times.
     """
-
     for fileset in filesets:
       paths = fileset() if isinstance(fileset, Fileset) \
                         else fileset if hasattr(fileset, '__iter__') \

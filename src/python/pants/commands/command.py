@@ -5,11 +5,8 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from twitter.common.collections import OrderedSet
-
 from pants.base.build_file import BuildFile
 from pants.base.config import Config
-from pants.base.target import Target
 from pants.base.workunit import WorkUnit
 
 
@@ -32,17 +29,6 @@ class Command(object):
     command_name = cls.__dict__.get('__command__', None)
     if command_name:
       Command._commands[command_name] = cls
-
-  @staticmethod
-  def scan_addresses(root_dir, base_path=None):
-    """Parses all targets available in BUILD files under base_path and
-    returns their addresses.  If no base_path is specified, root_dir is
-    assumed to be the base_path"""
-
-    addresses = OrderedSet()
-    for buildfile in BuildFile.scan_buildfiles(root_dir, base_path):
-      addresses.update(Target.get_all_addresses(buildfile))
-    return addresses
 
   @classmethod
   def serialized(cls):

@@ -9,8 +9,9 @@ python_library(
     pants('src/python/pants/backend/core/tasks:group_task'),
     pants('src/python/pants/backend/jvm/targets:all'),
     pants('src/python/pants/backend/jvm/tasks:all'),
-    ':ivy_utils',
-    ':jvm_tool_bootstrapper',
+    pants('src/python/pants/base:build_file_aliases'),
+    pants(':ivy_utils'),
+    pants(':jvm_tool_bootstrapper'),
   ],
 )
 

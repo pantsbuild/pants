@@ -27,6 +27,7 @@ python_test_suite(
   dependencies = [
     pants(':abbreviate_target_ids'),
     pants(':address'),
+    pants(':build_configuration'),
     pants(':build_file'),
     pants(':build_file_parser'),
     pants(':build_invalidator'),
@@ -59,6 +60,20 @@ python_tests(
     pants('src/python/pants/base:address'),
     pants('src/python/pants/base:build_root'),
     pants('tests/python/pants_test:base_test'),
+  ]
+)
+
+python_tests(
+  name = 'build_configuration',
+  sources = ['test_build_configuration.py'],
+  dependencies = [
+    pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
+    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
+    pants('src/python/pants/base:address'),
+    pants('src/python/pants/base:build_configuration'),
+    pants('src/python/pants/base:build_file'),
+    pants('src/python/pants/base:build_graph'),
+    pants('src/python/pants/base:target'),
   ]
 )
 
@@ -113,6 +128,7 @@ python_tests(
   sources = ['test_cmd_line_spec_parser.py'],
   dependencies = [
     pants('3rdparty/python/twitter/commons:twitter.common.collections'),
+    pants('src/python/pants/base:build_file_aliases'),
     pants('src/python/pants/base:cmd_line_spec_parser'),
     pants('tests/python/pants_test:base_test'),
   ]
@@ -154,6 +170,7 @@ python_tests(
   sources = ['test_payload.py'],
   dependencies = [
     pants('src/python/pants/backend/core'),
+    pants('src/python/pants/base:build_file_aliases'),
     pants('src/python/pants/base:payload'),
     pants('tests/python/pants_test:base_test'),
   ]

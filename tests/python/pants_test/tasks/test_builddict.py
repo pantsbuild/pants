@@ -5,12 +5,12 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from StringIO import StringIO
 from contextlib import closing
+from StringIO import StringIO
 
-from pants.base.build_environment import get_buildroot
-from pants.base.build_file_parser import BuildFileParser
 from pants.backend.core.tasks.builddictionary import BuildBuildDictionary, assemble
+from pants.base.build_configuration import BuildConfiguration
+from pants.base.build_file_parser import BuildFileParser
 from pants_test.tasks.test_base import TaskTest, prepare_task
 
 
@@ -23,7 +23,6 @@ outdir: %s
 
 
 class BaseBuildBuildDictionaryTest(TaskTest):
-
   def execute_task(self, config=sample_ini_test_1):
     with closing(StringIO()) as output:
       task = prepare_task(BuildBuildDictionary, config=config)
@@ -32,7 +31,6 @@ class BaseBuildBuildDictionaryTest(TaskTest):
 
 
 class BuildBuildDictionaryTestEmpty(BaseBuildBuildDictionaryTest):
-
   def test_builddict_empty(self):
     """Execution should be silent."""
     # We don't care _that_ much that execution be silent. Nice if at least
@@ -42,7 +40,7 @@ class BuildBuildDictionaryTestEmpty(BaseBuildBuildDictionaryTest):
 
 class ExtractedContentSanityTests(BaseBuildBuildDictionaryTest):
   def test_invoke_assemble(self):
-    bfp = BuildFileParser('.', '')
+    bfp = BuildFileParser(BuildConfiguration(), '.')
     # we get our doc'able symbols from a BuildFileParser.
     # Invoke that functionality without blowing up:
     syms = assemble(build_file_parser=bfp)
