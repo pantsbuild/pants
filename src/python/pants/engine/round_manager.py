@@ -5,43 +5,57 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from collections import defaultdict
+from collections import namedtuple, defaultdict
 
 from pants.goal import Phase
 
 
-class RoundManager(object):
-  _phases_by_product = None
+class ProducerInfo(namedtuple('ProducerInfo', ['product_type', 'task_type', 'phase'])):
+  """Describes the producer of a given product type."""
 
-  @classmethod
-  def _get_phases_by_product(cls, product):
-    if cls._phases_by_product is None:
-      phases_by_product = defaultdict(set)
-      for phase, goals in Phase.all():
-        for goal in goals:
-          for pt in goal.task_type.product_type():
-            phases_by_product[pt].add(phase)
-      cls._phases_by_product = phases_by_product
-    return cls._phases_by_product.get(product, [])
+
+class RoundManager(object):
+
+  class MissingProductError(KeyError):
+    """Indicates a required product type is provided by non-one."""
+
+  @staticmethod
+  def _index_products():
+    producer_info_by_product_type = defaultdict(set)
+    for phase, goals in Phase.all():
+      for goal in goals:
+        for product_type in goal.task_type.product_type():
+          producer_info = ProducerInfo(product_type, goal.task_type, phase)
+          producer_info_by_product_type[product_type].add(producer_info)
+    return producer_info_by_product_type
 
   def __init__(self, context):
-    self._schedule = set()
+    self._dependencies = set()
     self._context = context
+    self._producer_infos_by_product_type = None
 
   def require(self, product_type, predicate=None):
-    self._schedule.add(product_type)
+    """Schedules the tasks that produce product_type to be executed before the requesting task."""
+    self._dependencies.add(product_type)
     self._context.products.require(product_type, predicate)
 
   def require_data(self, product_type):
-    """ Schedules the product_type in invocation order over the target graph."""
-    self._schedule.add(product_type)
+    """Schedules the tasks that produce product_type to be executed before the requesting task."""
+    self._dependencies.add(product_type)
     self._context.products.require_data(product_type)
 
-  def get_schedule(self):
-    return self._schedule
+  def get_dependencies(self):
+    """Returns the set of data dependencies as producer infos corresponding to data requirements."""
+    producer_infos = set()
+    for product_type in self._dependencies:
+      producer_infos.update(self._get_producer_infos_by_product_type(product_type))
+    return producer_infos
 
-  def lookup_phases_for_products(self, products):
-    phases = set()
-    for product in products:
-      phases.update(self._get_phases_by_product(product))
-    return phases
+  def _get_producer_infos_by_product_type(self, product_type):
+    if self._producer_infos_by_product_type is None:
+      self._producer_infos_by_product_type = self._index_products()
+
+    producer_infos = self._producer_infos_by_product_type[product_type]
+    if not producer_infos:
+      raise self.MissingProductError("No producers registered for '{0}'".format(product_type))
+    return producer_infos

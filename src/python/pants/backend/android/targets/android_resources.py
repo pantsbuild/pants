@@ -22,7 +22,7 @@ class AndroidResources(AndroidTarget):
     :param dependencies: Other targets that this target depends on.
     :type dependencies: list of target specs
     """
-    self.package = package
+
     self.manifest = manifest
     super(AndroidResources, self).__init__(manifest=manifest, **kwargs)
 

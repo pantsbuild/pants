@@ -17,14 +17,11 @@ def is_java(target):
 
 class JavadocGen(JvmdocGen):
   @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    cls.generate_setup_parser(option_group, args, mkflag, javadoc)
-
-  def __init__(self, context, workdir, confs=None, active=True):
-    super(JavadocGen, self).__init__(context, workdir, javadoc, confs, active)
+  def jvmdoc(cls):
+    return javadoc
 
   def execute(self):
-    self.generate_execute(is_java, create_javadoc_command)
+    self.generate_doc(is_java, create_javadoc_command)
 
 
 def create_javadoc_command(classpath, gendir, *targets):

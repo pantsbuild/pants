@@ -106,10 +106,12 @@ def register_goals():
   ).install('bootstrap').with_description('Bootstrap tools needed for building.')
 
   # Dependency resolution.
-  goal(name='ivy', action=IvyResolve, dependencies=['gen', 'check-exclusives', 'bootstrap']
+  goal(name='ivy', action=IvyResolve,
+       dependencies=['gen', 'check-exclusives', 'bootstrap']
   ).install('resolve').with_description('Resolve dependencies and produce dependency reports.')
 
-  goal(name='ivy-imports', action=IvyImports, dependencies=['bootstrap']
+  goal(name='ivy-imports', action=IvyImports,
+       dependencies=['bootstrap']
   ).install('imports')
 
   # Compilation.
@@ -133,7 +135,8 @@ def register_goals():
     product_type=['classes_by_target', 'classes_by_source'],
     flag_namespace=['compile'])
 
-  # At some point ScalaLibrary targets will be able to won mixed scala and java source sets. At that
+  # Here we register the ScalaCompile group member before the java group members very deliberately.
+  # At some point ScalaLibrary targets will be able to own mixed scala and java source sets. At that
   # point, the ScalaCompile group member will still only select targets via has_sources('*.scala');
   # however if the JavaCompile group member were registered earlier, it would claim the ScalaLibrary
   # targets with mixed source sets leaving those targets un-compiled by scalac and resulting in
@@ -146,99 +149,100 @@ def register_goals():
 
   jvm_compile.add_member(JavaCompile)
 
-  goal(name='jvm', action=jvm_compile, dependencies=['gen', 'resolve', 'check-exclusives', 'bootstrap']
+  goal(name='jvm', action=jvm_compile,
+       dependencies=['gen', 'resolve', 'check-exclusives', 'bootstrap']
   ).install('compile').with_description('Compile source code.')
 
   # Generate documentation.
 
-  class ScaladocJarShim(ScaladocGen):
-    def __init__(self, context, workdir, confs=None):
-      super(ScaladocJarShim, self).__init__(context, workdir, confs=confs, active=False)
-
-  class JavadocJarShim(JavadocGen):
-    def __init__(self, context, workdir, confs=None):
-      super(JavadocJarShim, self).__init__(context, workdir, confs=confs, active=False)
-
-  goal(name='javadoc', action=JavadocGen, dependencies=['compile', 'bootstrap']
+  goal(name='javadoc', action=JavadocGen,
+       dependencies=['compile', 'bootstrap']
   ).install('doc').with_description('Create documentation.')
 
-  goal(name='scaladoc', action=ScaladocGen, dependencies=['compile', 'bootstrap']
+  goal(name='scaladoc', action=ScaladocGen,
+       dependencies=['compile', 'bootstrap']
   ).install('doc')
 
-  goal(name='javadoc_publish', action=JavadocJarShim
-  ).install('publish')
+  # Bundling.
 
-  goal(name='scaladoc_publish', action=ScaladocJarShim
-  ).install('publish')
-
-
-  # Bundling and publishing.
-
-  goal(name='jar', action=JarCreate, dependencies=['compile', 'resources', 'bootstrap']
+  goal(name='jar', action=JarCreate,
+       dependencies=['compile', 'resources', 'bootstrap']
   ).install('jar')
 
-  detect_duplicates = goal(name='dup', action=DuplicateDetector)
+  detect_duplicates = goal(name='dup', action=DuplicateDetector,
+                           dependencies=['compile', 'resources'])
 
-  goal(name='binary', action=BinaryCreate, dependencies=['compile', 'resources', 'bootstrap']
+  goal(name='binary', action=BinaryCreate,
+       dependencies=['compile', 'resources', 'bootstrap']
   ).install().with_description('Create a jvm binary jar.')
 
   detect_duplicates.install('binary')
 
-  goal(name='bundle', action=BundleCreate, dependencies=['compile', 'resources', 'bootstrap']
+  goal(name='bundle', action=BundleCreate,
+       dependencies=['compile', 'resources', 'bootstrap']
   ).install().with_description('Create an application bundle from binary targets.')
 
   detect_duplicates.install('bundle')
 
+  goal(name='detect-duplicates', action=DuplicateDetector,
+       dependencies=['compile', 'resources'],
+  ).install().with_description('Detect duplicate classes and resources on the classpath.')
+
+ # Publishing.
+
   goal(name='check_published_deps', action=CheckPublishedDeps
   ).install('check_published_deps').with_description('Find references to outdated artifacts.')
 
-  goal(name='jar_create_publish', action=JarCreate, dependencies=['compile', 'resources']
-  ).install('publish')
-
-  goal(name='publish', action=JarPublish
+  goal(name='publish', action=JarPublish,
+       dependencies=['jar', 'doc']
   ).install('publish').with_description('Publish artifacts.')
-
-  goal(name='detect-duplicates', action=DuplicateDetector, dependencies=['jar']
-  ).install().with_description('Detect duplicate classes and resources on the classpath.')
 
   # Testing.
 
-  goal(name='junit', action=JUnitRun, dependencies=['compile', 'resources', 'bootstrap']
+  goal(name='junit', action=JUnitRun,
+       dependencies=['compile', 'resources', 'bootstrap']
   ).install('test').with_description('Test compiled code.')
 
-  goal(name='specs', action=SpecsRun, dependencies=['compile', 'resources', 'bootstrap']
+  goal(name='specs', action=SpecsRun,
+       dependencies=['compile', 'resources', 'bootstrap']
   ).install('test')
 
-  goal(name='bench', action=BenchmarkRun, dependencies=['compile', 'resources', 'bootstrap']
+  goal(name='bench', action=BenchmarkRun,
+       dependencies=['compile', 'resources', 'bootstrap']
   ).install('bench')
-
 
   # Running.
 
-  goal(name='jvm-run', action=JvmRun, dependencies=['compile', 'resources', 'bootstrap'], serialize=False
+  goal(name='jvm-run', action=JvmRun,
+       dependencies=['compile', 'resources', 'bootstrap'], serialize=False
   ).install('run').with_description('Run a binary target.')
 
-  goal(name='jvm-run-dirty', action=JvmRun, serialize=False
+  goal(name='jvm-run-dirty', action=JvmRun,
+       serialize=False
   ).install('run-dirty').with_description('Run a binary target, skipping compilation.')
 
-  goal(name='scala-repl', action=ScalaRepl, dependencies=['compile', 'resources', 'bootstrap'], serialize=False
+  goal(name='scala-repl', action=ScalaRepl,
+       dependencies=['compile', 'resources', 'bootstrap'], serialize=False
   ).install('repl').with_description('Run a REPL.')
 
-  goal(name='scala-repl-dirty', action=ScalaRepl, serialize=False
+  goal(name='scala-repl-dirty', action=ScalaRepl,
+       serialize=False
   ).install('repl-dirty').with_description('Run a REPL, skipping compilation.')
 
   # IDE support.
 
-  goal(name='idea', action=IdeaGen, dependencies=['jar', 'bootstrap']
+  goal(name='idea', action=IdeaGen,
+       dependencies=['jar', 'bootstrap']
   ).install().with_description('Create an IntelliJ IDEA project from the given targets.')
 
-  goal(name='eclipse', action=EclipseGen, dependencies=['jar', 'bootstrap']
+  goal(name='eclipse', action=EclipseGen,
+       dependencies=['jar', 'bootstrap']
   ).install().with_description('Create an Eclipse project from the given targets.')
-
 
   # Build graph information.
 
-  goal(name='provides', action=Provides, dependencies=['jar', 'bootstrap']
+  goal(name='provides', action=Provides,
+       dependencies=['jar', 'bootstrap']
   ).install().with_description('Print the symbols provided by the given targets.')
 
   # XXX(pl): These should be core, but they have dependencies on JVM
@@ -249,4 +253,5 @@ def register_goals():
   ).install().with_description("Print the target's dependencies.")
 
   goal(name='filedeps', action=FileDeps
-  ).install('filedeps').with_description('Print out the source and BUILD files the target depends on.')
+  ).install('filedeps').with_description(
+      'Print out the source and BUILD files the target depends on.')

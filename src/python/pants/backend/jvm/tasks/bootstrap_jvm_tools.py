@@ -23,7 +23,18 @@ class BootstrapJvmTools(Task, IvyTaskMixin):
     super(BootstrapJvmTools, self).__init__(context, workdir)
 
   def prepare(self, round_manager):
-    round_manager.require_data('jvm_build_tools')
+    # TODO(John Sirois): This is the sole use of data dependencies that does not follow the phase
+    # lifecycle.  The BootstrapJvmTools task must execute before all JVM tool using tasks but
+    # the 'jvm_build_tools' "data" must be produced by each JVM tool using task before it executes.
+    # Normally data dependencies flow between task executions. Untangle this data dependency abuse.
+    # One idea is to leverage rounds and have each JVM tool using task require a 'runtime_classpath'
+    # for a restricted target graph which is just comprised of the tool dependency specs.  This
+    # should allow killing BootstrapJvmTools outright - IvyResolve will do the job in the sub-round
+    # and all standard caching will apply.
+
+    # NB: commented out because this is an unsatisfiable dep under strict checks of proper ordering.
+    #round_manager.require_data('jvm_build_tools')
+    pass
 
   def execute(self):
     context = self.context
