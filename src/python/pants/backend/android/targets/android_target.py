@@ -29,6 +29,7 @@ class AndroidTarget(Target):
                provides=None,
                # most recent build_tools_version should be defined elsewhere
                build_tools_version="19.1.0",
+               manifest='AndroidManifest.xml',
                release_type="debug",
                **kwargs):
     """
@@ -41,6 +42,8 @@ class AndroidTarget(Target):
       to filter this target's transitive dependencies against.
     :param build_tools_version: API for the Build Tools (separate from SDK version).
       Defaults to the latest full release.
+    :param manifest: path/to/file of 'AndroidManifest.xml' (required name). Paths are relative
+      to the BUILD file's directory.
     :param release_type: Which keystore is used to sign target: 'debug' or 'release'.
       Set as 'debug' by default.
     """
@@ -55,8 +58,13 @@ class AndroidTarget(Target):
 
     self.add_labels('android')
     self.build_tools_version = build_tools_version
-    self.manifest = os.path.join(self.address.spec_path, "AndroidManifest.xml")
     self.release_type = release_type
+
+    self.manifest = os.path.join(self.address.spec_path, manifest)
+    if not os.path.isfile(self.manifest):
+      raise self.BadManifestError('Missing manifest at: {0!r}. Android targets require an '
+                                  '\'AndroidManifest.xml\''.format(self.manifest))
+    # TODO (mateor): varying manifest location means we should support variable manifest names
 
     self.package = self.get_package_name()
     self.target_sdk = self.get_target_sdk()
