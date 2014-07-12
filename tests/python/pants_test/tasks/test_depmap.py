@@ -20,8 +20,8 @@ from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.depmap import Depmap
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
+from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.exceptions import TaskError
-
 from pants_test.tasks.test_base import ConsoleTaskTest
 
 
@@ -34,8 +34,8 @@ class BaseDepmapTest(ConsoleTaskTest):
 class DepmapTest(BaseDepmapTest):
   @property
   def alias_groups(self):
-    return {
-      'target_aliases': {
+    return BuildFileAliases.create(
+      targets={
         'dependencies': Dependencies,
         'jar_library': JarLibrary,
         'java_library': JavaLibrary,
@@ -45,13 +45,13 @@ class DepmapTest(BaseDepmapTest):
         'python_library': PythonLibrary,
         'resources': Resources,
       },
-      'exposed_objects': {
+      objects={
         'pants': lambda x: x,
       },
-      'partial_path_relative_utils': {
+      context_aware_object_factories={
         'bundle': Bundle,
-      },
-    }
+      }
+    )
 
   def setUp(self):
     super(DepmapTest, self).setUp()
@@ -131,10 +131,31 @@ class DepmapTest(BaseDepmapTest):
         resources=[pants('resources/a:a_resources')]
       )
     '''))
+    self.add_to_build_file('src/java/a', dedent('''
+      dependencies(
+        name='a_dep',
+        dependencies=[pants(':a_java')]
+      )
+    '''))
+
+    self.add_to_build_file('src/java/b', dedent('''
+      java_library(
+        name='b_java',
+        dependencies=[':b_dep']
+      )
+      dependencies(
+        name='b_dep',
+        dependencies=[':b_lib']
+      )
+      java_library(
+        name='b_lib',
+        sources=[],
+      )
+    '''))
 
   def test_empty(self):
-    self.assert_console_raises(
-      TaskError,
+    self.assert_console_output(
+      'internal-common.a.a',
       targets=[self.target('common/a')]
     )
 
@@ -244,7 +265,21 @@ class DepmapTest(BaseDepmapTest):
       targets=[self.target('src/java/a:a_java')]
     )
 
+  def test_resources_dep(self):
+    self.assert_console_output(
+      'internal-src.java.a.a_dep',
+      '  internal-src.java.a.a_java',
+      '    internal-resources.a.a_resources',
+      targets=[self.target('src/java/a:a_dep')]
+    )
 
+  def test_intermediate_dep(self):
+    self.assert_console_output(
+      'internal-src.java.b.b_java',
+      '  internal-src.java.b.b_dep',
+      '    internal-src.java.b.b_lib',
+      targets=[self.target('src/java/b:b_java')]
+    )
 class ProjectInfoTest(ConsoleTaskTest):
   @classmethod
   def task_type(cls):
@@ -296,6 +331,12 @@ class ProjectInfoTest(ConsoleTaskTest):
       dependencies=[second],
     )
 
+    top_dependency = self.make_target(
+      'project_info:top_dependency',
+      target_type=Dependencies,
+      dependencies=[jvm_binary]
+    )
+
   def test_without_dependencies(self):
     result = get_json(self.execute_console_task(
       args=['--test-project-info'],
@@ -340,6 +381,16 @@ class ProjectInfoTest(ConsoleTaskTest):
       targets=[self.target('project_info:jvm_binary')]
     ))
     self.assertEqual(['org.apache:apache-jar:12.12.2012'], result['targets']['project_info:jvm_binary']['libraries'])
+
+  def test_top_dependency(self):
+    result = get_json(self.execute_console_task(
+      args=['--test-project-info'],
+      targets=[self.target('project_info:top_dependency')]
+    ))
+    print ("RESULT is {result}".format(result=result))
+
+    self.assertEqual([], result['targets']['project_info:top_dependency']['libraries'])
+    self.assertEqual(['project_info:jvm_binary'], result['targets']['project_info:top_dependency']['targets'])
 
   def test_format_flag(self):
     result = self.execute_console_task(

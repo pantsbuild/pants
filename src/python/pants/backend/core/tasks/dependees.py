@@ -6,6 +6,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 from collections import defaultdict
+import os
 
 from twitter.common.collections import OrderedSet
 
@@ -60,17 +61,25 @@ class ReverseDepmap(ConsoleTask):
           target_type = getattr(module, type_name)
         except (ImportError, ValueError):
           # Fall back on pants provided target types.
-          if dependees_type not in self.context.build_file_parser.report_target_aliases():
+          registered_aliases = self.context.build_file_parser.registered_aliases()
+          if dependees_type not in registered_aliases.targets:
             raise TaskError('Invalid type name: %s' % dependees_type)
-          target_type = self.context.build_file_parser.report_target_aliases()[dependees_type]
-        # Find the SourceRoot for the given input type
-        base_paths.update(SourceRoot.roots(target_type))
+          target_type = registered_aliases.targets[dependees_type]
+
+        # Try to find the SourceRoot for the given input type
+        try:
+          roots = SourceRoot.roots(target_type)
+          base_paths.update(roots)
+        except KeyError:
+          pass
+
       if not base_paths:
         raise TaskError('No SourceRoot set for any target type in %s.' % self._dependees_type +
                         '\nPlease define a source root in BUILD file as:' +
                         '\n\tsource_root(\'<src-folder>\', %s)' % ', '.join(self._dependees_type))
       for base_path in base_paths:
-        buildfiles.update(BuildFile.scan_buildfiles(get_buildroot(), base_path))
+        buildfiles.update(BuildFile.scan_buildfiles(get_buildroot(),
+                                                    os.path.join(get_buildroot(), base_path)))
     else:
       buildfiles = BuildFile.scan_buildfiles(get_buildroot())
 

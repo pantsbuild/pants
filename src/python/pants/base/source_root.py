@@ -32,8 +32,8 @@ class SourceRoot(object):
   _TYPES_BY_ROOT = {}
   _SEARCHED = set()
 
-  def __init__(self, rel_path):
-    self.rel_path = rel_path
+  def __init__(self, parse_context):
+    self.rel_path = parse_context.rel_path
 
   def __call__(self, basedir, *allowed_target_types):
     allowed_target_types = [proxy._target_type for proxy in allowed_target_types]

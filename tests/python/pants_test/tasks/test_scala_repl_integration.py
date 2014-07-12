@@ -10,7 +10,7 @@ from textwrap import dedent
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class PythonReplIntegrationTest(PantsRunIntegrationTest):
+class ScalaReplIntegrationTest(PantsRunIntegrationTest):
 
   def test_run_repl(self):
     # Run a repl on a library target. Avoid some known-to-choke-on interpreters.

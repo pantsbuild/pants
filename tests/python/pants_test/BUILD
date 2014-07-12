@@ -9,6 +9,8 @@ python_library(
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('src/python/pants/backend/core/targets:common'),
     pants('src/python/pants/base:address'),
+    pants('src/python/pants/base:build_configuration'),
+    pants('src/python/pants/base:build_file_aliases'),
     pants('src/python/pants/base:build_file_parser'),
     pants('src/python/pants/base:build_graph'),
     pants('src/python/pants/base:build_root'),
@@ -45,6 +47,7 @@ python_tests(
   dependencies = [
     pants(':base_test'),
     pants('src/python/pants/backend/maven_layout'),
+    pants('src/python/pants/base:build_file_aliases'),
   ]
 )
 

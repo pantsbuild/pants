@@ -11,7 +11,7 @@ import unittest2 as unittest
 
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file_parser import BuildFileParser
-from pants.base.dev_backend_loader import load_backends_from_source
+from pants.base.dev_backend_loader import load_build_configuration_from_source
 
 
 class Utf8HeaderTest(unittest.TestCase):
@@ -20,8 +20,8 @@ class Utf8HeaderTest(unittest.TestCase):
     """
     Look through all .py files and ensure they start with the line '# coding=utf8'
     """
-    build_file_parser = BuildFileParser(get_buildroot())
-    load_backends_from_source(build_file_parser)
+    build_configuration = load_build_configuration_from_source()
+    build_file_parser = BuildFileParser(build_configuration, get_buildroot())
 
     def has_hand_coded_python_files(tgt):
       return (not tgt.is_synthetic) and tgt.is_original and tgt.has_sources('.py')

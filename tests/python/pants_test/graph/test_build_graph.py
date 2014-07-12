@@ -14,6 +14,7 @@ from twitter.common.contextutil import pushd, temporary_dir
 from twitter.common.dirutil import touch
 
 from pants.base.address import SyntheticAddress
+from pants.base.build_configuration import BuildConfiguration
 from pants.base.build_file_parser import BuildFileParser
 from pants.base.build_graph import BuildGraph
 from pants.base.build_root import BuildRoot
@@ -53,8 +54,9 @@ class BuildGraphTest(unittest.TestCase):
           fake(name="bat")
         '''))
 
-      parser = BuildFileParser(root_dir=root_dir)
-      parser.register_target_alias('fake', Target)
+      build_configuration = BuildConfiguration()
+      build_configuration.register_target_alias('fake', Target)
+      parser = BuildFileParser(build_configuration, root_dir=root_dir)
       build_graph = BuildGraph()
       parser.inject_spec_closure_into_build_graph(':foo', build_graph)
       self.assertEqual(len(build_graph.dependencies_of(SyntheticAddress.parse(':foo'))), 1)

@@ -5,31 +5,30 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-import pytest
 from textwrap import dedent
+
+import pytest
 
 from pants.backend.core.wrapped_globs import Globs
 from pants.backend.jvm.targets.jvm_binary import Bundle, JvmApp, JvmBinary
+from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.exceptions import TargetDefinitionException
-
 from pants_test.base_test import BaseTest
 
 
 class BaseJvmAppTest(BaseTest):
   @property
   def alias_groups(self):
-    return {
-      'target_aliases': {
+    return BuildFileAliases.create(
+      targets={
         'jvm_app': JvmApp,
         'jvm_binary': JvmBinary,
       },
-      'partial_path_relative_utils': {
+      context_aware_object_factories={
         'bundle': Bundle,
-      },
-      'applicative_path_relative_utils': {
         'globs': Globs,
-      },
-    }
+      }
+    )
 
 
 class BinaryTest(BaseJvmAppTest):

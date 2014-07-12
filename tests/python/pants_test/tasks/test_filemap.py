@@ -9,22 +9,23 @@ import os
 from textwrap import dedent
 
 from pants.backend.core.tasks.filemap import Filemap
-from pants.base.source_root import SourceRoot
 from pants.backend.python.targets.python_library import PythonLibrary
+from pants.base.build_file_aliases import BuildFileAliases
+from pants.base.source_root import SourceRoot
 from pants_test.tasks.test_base import ConsoleTaskTest
 
 
 class FilemapTest(ConsoleTaskTest):
   @property
   def alias_groups(self):
-    return {
-      'target_aliases': {
+    return BuildFileAliases.create(
+      targets={
         'python_library': PythonLibrary,
       },
-      'applicative_path_relative_utils': {
+      context_aware_object_factories={
         'source_root': SourceRoot,
-      },
-    }
+      }
+    )
 
   @classmethod
   def task_type(cls):

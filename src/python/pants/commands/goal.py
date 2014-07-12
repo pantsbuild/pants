@@ -81,7 +81,6 @@ class Goal(Command):
       except IOError: pass # Awesome, it's unambiguous.
       return False
 
-
     for i, arg in enumerate(args):
       if not arg.startswith('-'):
         specs.add(arg) if is_spec(arg) else goals.add(arg)

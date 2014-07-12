@@ -12,20 +12,21 @@ from pants.backend.core.tasks.filter import Filter
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
+from pants.base.build_file_aliases import BuildFileAliases
 from pants_test.tasks.test_base import ConsoleTaskTest
 
 
 class BaseFilterTest(ConsoleTaskTest):
   @property
   def alias_groups(self):
-    return {
-      'target_aliases': {
+    return BuildFileAliases.create(
+      targets={
         'java_library': JavaLibrary,
         'page': Page,
         'python_library': PythonLibrary,
         'python_requirement_library': PythonRequirementLibrary,
-      },
-    }
+      }
+    )
 
   @classmethod
   def task_type(cls):

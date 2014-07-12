@@ -8,6 +8,7 @@ python_library(
   dependencies = [
     pants('src/python/pants/backend/android/targets:android'),
     pants('src/python/pants/backend/android/tasks:all'),
+    pants('src/python/pants/base:build_file_aliases'),
   ]
 )
 

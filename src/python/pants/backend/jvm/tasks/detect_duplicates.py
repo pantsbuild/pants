@@ -35,15 +35,22 @@ class DuplicateDetector(JvmBinaryTask):
                             help="[%default] Fail fast if duplicate classes/resources are found.")
     option_group.add_option(mkflag("excludes"),
                             dest="excludes", default=EXCLUDED_FILES,
-                            help="A comma separated list of files to exclude from duplicate check, "
+                            help="A comma separated list of case insensitive filenames (without "
+                                 "directory) to exclude from duplicate check, "
+                                 "defaults to: [%default]")
+    option_group.add_option(mkflag("max-dups"),
+                            dest="max_dups", default=10,
+                            help="Maximum number of duplicate classes to display per artifact"
                                  "defaults to: [%default]")
 
   def __init__(self, context, workdir):
     super(DuplicateDetector, self).__init__(context, workdir)
     self._fail_fast = context.options.fail_fast
-    self._excludes = context.options.excludes
-    if not self._excludes:
-      self._excludes = EXCLUDED_FILES
+    excludes = context.options.excludes
+    if not excludes:
+      excludes = EXCLUDED_FILES
+    self._excludes = set([x.lower() for x in excludes.split(',')])
+    self._max_dups = int(context.options.max_dups)
 
   def prepare(self, round_manager):
     round_manager.require_data('resources_by_target')
@@ -108,7 +115,7 @@ class DuplicateDetector(JvmBinaryTask):
           if file_name.decode('utf-8').lower() in self._excludes:
             continue
           jar_name = os.path.basename(external_dep)
-          if (not self._isdir(qualified_file_name)) and Manifest.PATH != qualified_file_name:
+          if (not self._isdir(qualified_file_name)) and Manifest.PATH != qualified_file_name.decode('utf-8'):
             artifacts_by_file_name[qualified_file_name].add(jar_name)
     return artifacts_by_file_name
 
@@ -125,5 +132,9 @@ class DuplicateDetector(JvmBinaryTask):
       if len(artifacts) < 2: continue
       self.context.log.warn(
         'Duplicate classes and/or resources detected in artifacts: %s' % str(artifacts))
-      for duplicate_file in list(duplicate_files)[:10]:
+      dup_list = list(duplicate_files)
+      for duplicate_file in dup_list[:self._max_dups]:
         self.context.log.warn('     %s' % duplicate_file)
+      if len(dup_list) > self._max_dups:
+        self.context.log.warn('     ... {remaining} more ...'
+                              .format(remaining=(len(dup_list)-self._max_dups)))

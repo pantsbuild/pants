@@ -93,7 +93,7 @@ class BuildFile(object):
     self.parent_path = os.path.dirname(self.full_path)
 
     self._bytecode_path = os.path.join(self.parent_path, '.%s.%s.pyc' % (
-      self.name, PythonIdentity.get()))
+        self.name, PythonIdentity.get()))
 
     self.relpath = os.path.relpath(self.full_path, self.root_dir)
     self.spec_path = os.path.dirname(self.relpath)
