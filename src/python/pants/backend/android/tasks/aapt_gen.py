@@ -37,6 +37,7 @@ class AaptGen(AndroidTask, CodeGen):
     lang = 'java'
     self.gen_langs=set()
     self.gen_langs.add(lang)
+    self.dist = self._dist
 
   def is_gentarget(self, target):
     return isinstance(target, AndroidResources)
@@ -62,9 +63,9 @@ class AaptGen(AndroidTask, CodeGen):
       output_dir = self._aapt_out(target)
       safe_mkdir(output_dir)
       print ("output_dir is %s" % output_dir)
-      # instead of ignore assets, we could move the BUILD def up a level. May need to later anyway.
       manifest = os.path.join(target.manifest)
       print (manifest)
+      # BUILD files in the resource folder chokes aapt. This is a defensive measure.
       ignored_assets='!.svn:!.git:!.ds_store:!*.scc:.*:<dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~:BUILD*'
       args = [self.aapt_tool(target), 'package', '-m',  '-J', output_dir, '-M', manifest,
               '-S', target.resource_dir, "-I", self.android_jar_tool(target),
@@ -118,15 +119,16 @@ class AaptGen(AndroidTask, CodeGen):
 
   # resolve the tools on a per-target basis
   def aapt_tool(self, target):
-    aapt = os.path.join(self._dist._sdk_path, ('build-tools/' + target.build_tools_version), 'aapt')
+    aapt = self.dist.aapt_tool(target.build_tools_version)
     print ("aapt_tool: %s" % aapt)
     # this only works because there is a default build_tools_version. How to get this info?
     # I guess two options only: add it to BUILD file or parse the manifest already.
     return aapt
 
   def android_jar_tool(self, target):
-    # TODO (mateor) this need to precisely interact with AndroidDistribution
-    return os.path.join(self._dist._sdk_path, 'platforms', ('android-' + target.target_sdk), 'android.jar')
 
-
+    #return os.path.join(self._dist._sdk_path, 'platforms', ('android-' + target.target_sdk), 'android.jar')
+    android_jar = self.dist.android_jar_tool(target.target_sdk)
+    print ("android_jar_tool: %s" % android_jar)
+    return android_jar
   #todo (mateor): debate merits of AaptClassMixin class
