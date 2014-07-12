@@ -24,6 +24,8 @@ class AndroidBinary(AndroidTarget):
       to filter this target's transitive dependencies against.
     :param build_tools_version: API for the Build Tools (separate from SDK version).
       Defaults to the latest full release.
+    :param manifest: path/to/file of 'AndroidManifest.xml' (required name). Paths are relative
+      to the BUILD file's directory.
     :param release_type: Which keystore is used to sign target: 'debug' or 'release'.
       Set as 'debug' by default.
     """
