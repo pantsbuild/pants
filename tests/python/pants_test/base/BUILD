@@ -33,6 +33,7 @@ python_test_suite(
     pants(':build_invalidator'),
     pants(':build_root'),
     pants(':cmd_line_spec_parser'),
+    pants(':dev_backend_loader'),
     pants(':double_dag'),
     pants(':generator'),
     pants(':hash_utils'),
@@ -131,6 +132,20 @@ python_tests(
     pants('src/python/pants/base:build_file_aliases'),
     pants('src/python/pants/base:cmd_line_spec_parser'),
     pants('tests/python/pants_test:base_test'),
+  ]
+)
+
+python_tests(
+  name = 'dev_backend_loader',
+  sources = ['test_dev_backend_loader.py'],
+  dependencies = [
+    pants('src/python/pants/base:build_configuration'),
+    pants('src/python/pants/base:build_file_aliases'),
+    pants('src/python/pants/base:dev_backend_loader'),
+    pants('src/python/pants/base:exceptions'),
+    pants('src/python/pants/base:target'),
+    pants('src/python/pants/goal'),
+    pants('src/python/pants/goal:phase'),
   ]
 )
 
