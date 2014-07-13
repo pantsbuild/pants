@@ -22,14 +22,27 @@ from pants.base.exceptions import TaskError
 class AaptGen(AndroidTask, CodeGen):
   """
   CodeGen for Android app building with the Android Asset Packaging Tool.
-  There may be an aapt superclass or mixin, as aapt binary has future packaging functions besides codegen.
+  There may be an aapt superclass or mixin, as aapt binary has future packaging functions
+  besides codegen.
 
   aapt supports 6 major commands: {dump, list, add, remove, crunch, package}
-  For right now, pants is only supporting 'package'. More to come as we support Release builds (crunch, at minimum).
+  For right now, pants is only supporting 'package'. More to come as we support Release builds
+  (crunch, at minimum).
 
   Commands and flags for aapt can be seen here:
   https://android.googlesource.com/platform/frameworks/base/+/master/tools/aapt/Command.cpp
   """
+  @classmethod
+  def setup_parser(cls, option_group, args, mkflag):
+    super(AaptGen, cls).setup_parser(option_group, args, mkflag)
+
+    option_group.add_option(mkflag("target-sdk"), dest="target_sdk",
+                            help="[%default] Specifies the target Android SDK. "
+                                 "Overrides AndroidManifest.xml.")
+
+    option_group.add_option(mkflag("build-tools-version"), dest="build_tools_version",
+                            help="[%default] Specifies the Android build-tools version with which "
+                                 "to compile the target.")
 
   def __init__(self, context, workdir):
     #define the params needed in the BUILD file {name, sources, dependencies, etc.}
@@ -38,6 +51,9 @@ class AaptGen(AndroidTask, CodeGen):
     self.gen_langs=set()
     self.gen_langs.add(lang)
     self.dist = self._dist
+    self.forced_target_sdk = context.options.target_sdk
+    self.forced_build_tools_version = context.options.build_tools_version
+
 
   def is_gentarget(self, target):
     return isinstance(target, AndroidResources)
@@ -62,14 +78,25 @@ class AaptGen(AndroidTask, CodeGen):
         raise TaskError('Unrecognized android gen lang: %s' % lang)
       output_dir = self._aapt_out(target)
       safe_mkdir(output_dir)
+      args = []
+
+      if self.forced_build_tools_version:
+        args.append(self.aapt_tool(self.forced_build_tools_version))
+      else:
+        args.append(self.aapt_tool(target.build_tools_version))
+
+      args.extend(['package', '-m', '-J', output_dir, '-M', target.manifest,
+               '-S', target.resource_dir, '-I'])
+      print ("self.forced_target_sdk is %s" % self.forced_target_sdk)
+      if self.forced_target_sdk:
+        args.append(self.android_jar_tool(self.forced_target_sdk))
+      else:
+        args.append(self.android_jar_tool(target.target_sdk))
       print ("output_dir is %s" % output_dir)
-      manifest = os.path.join(target.manifest)
-      print (manifest)
+      #manifest = os.path.join(target.manifest)
       # BUILD files in the resource folder chokes aapt. This is a defensive measure.
       ignored_assets='!.svn:!.git:!.ds_store:!*.scc:.*:<dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~:BUILD*'
-      args = [self.aapt_tool(target), 'package', '-m',  '-J', output_dir, '-M', manifest,
-              '-S', target.resource_dir, "-I", self.android_jar_tool(target),
-              '--ignore-assets', ignored_assets]
+      args.extend(['--ignore-assets', ignored_assets])
       print ("args are %s" % args)
       log.debug('Executing: %s' % ' '.join(args))
       process = subprocess.Popen(args)
@@ -114,21 +141,21 @@ class AaptGen(AndroidTask, CodeGen):
 
 
   def _aapt_out(self, target):
-    # This is going in the wrong dir, one above where it is wanted.
     return os.path.join(target.address.spec_path, 'bin')
 
   # resolve the tools on a per-target basis
-  def aapt_tool(self, target):
-    aapt = self.dist.aapt_tool(target.build_tools_version)
+  def aapt_tool(self, build_tools_version):
+    """This fetches the appropriate aapt tool.
+    The build_tools_version argument is a string(e.g. "19.1.")."""
+    aapt = self.dist.aapt_tool(build_tools_version)
     print ("aapt_tool: %s" % aapt)
-    # this only works because there is a default build_tools_version. How to get this info?
-    # I guess two options only: add it to BUILD file or parse the manifest already.
     return aapt
 
-  def android_jar_tool(self, target):
-
-    #return os.path.join(self._dist._sdk_path, 'platforms', ('android-' + target.target_sdk), 'android.jar')
-    android_jar = self.dist.android_jar_tool(target.target_sdk)
+  def android_jar_tool(self, target_sdk):
+    """This fetches the appropriate android.jar. The target_sdk argument is a string (e.g. "18")."""
+    android_jar = self.dist.android_jar_tool(target_sdk)
     print ("android_jar_tool: %s" % android_jar)
     return android_jar
   #todo (mateor): debate merits of AaptClassMixin class
+
+  # .aar library files output R.txt with a flag of '--output-text-symbols

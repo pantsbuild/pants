@@ -21,7 +21,6 @@ def build_file_aliases():
     }
   )
 
-
 def register_commands():
   pass
 
