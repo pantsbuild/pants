@@ -62,32 +62,35 @@ class AaptGen(AndroidTask, CodeGen):
   def is_forced(self, lang):
     return lang in self.gen_langs
 
+  def render_args(self, target):
+    output_dir = self._aapt_out(target)
+    safe_mkdir(output_dir)
+
+    args = []
+    if self.forced_build_tools_version:
+      args.append(self.aapt_tool(self.forced_build_tools_version))
+    else:
+      args.append(self.aapt_tool(target.build_tools_version))
+
+    args.extend(['package', '-m', '-J', output_dir, '-M', target.manifest,
+                 '-S', target.resource_dir, '-I'])
+    if self.forced_target_sdk:
+      args.append(self.android_jar_tool(self.forced_target_sdk))
+    else:
+      args.append(self.android_jar_tool(target.target_sdk))
+      # BUILD files in the resource folder chokes aapt. This is a defensive measure.
+    ignored_assets='!.svn:!.git:!.ds_store:!*.scc:.*:<dir>_*:!CVS:' \
+                   '!thumbs.db:!picasa.ini:!*~:BUILD*'
+    args.extend(['--ignore-assets', ignored_assets])
+    log.debug('Executing: %s' % ' '.join(args))
+    return args
+
+
   def genlang(self, lang, targets):
     for target in targets:
       if lang != 'java':
         raise TaskError('Unrecognized android gen lang: %s' % lang)
-      output_dir = self._aapt_out(target)
-      safe_mkdir(output_dir)
-
-      args = []
-      if self.forced_build_tools_version:
-        args.append(self.aapt_tool(self.forced_build_tools_version))
-      else:
-        args.append(self.aapt_tool(target.build_tools_version))
-
-      args.extend(['package', '-m', '-J', output_dir, '-M', target.manifest,
-               '-S', target.resource_dir, '-I'])
-      if self.forced_target_sdk:
-        args.append(self.android_jar_tool(self.forced_target_sdk))
-      else:
-        args.append(self.android_jar_tool(target.target_sdk))
-
-      # BUILD files in the resource folder chokes aapt. This is a defensive measure.
-      ignored_assets='!.svn:!.git:!.ds_store:!*.scc:.*:<dir>_*:!CVS:' \
-                     '!thumbs.db:!picasa.ini:!*~:BUILD*'
-      args.extend(['--ignore-assets', ignored_assets])
-      log.debug('Executing: %s' % ' '.join(args))
-      process = subprocess.Popen(args)
+      process = subprocess.Popen(self.render_args(target))
       result = process.wait()
       if result != 0:
         raise TaskError('Android aapt exited non-zero ({code})'.format(code=result))
@@ -109,11 +112,12 @@ class AaptGen(AndroidTask, CodeGen):
     return package.replace('.', os.sep)
 
   def _aapt_out(self, target):
+    # This mimics the Eclipse layout. We may switch to gradle style sometime in the future.
     return os.path.join(target.address.spec_path, 'bin')
 
   def aapt_tool(self, build_tools_version):
-    """Fetches the appropriate aapt tool.The build_tools_version argument
-    is a string (e.g. "19.1.")."""
+    """Fetches the appropriate aapt tool.
+    The build_tools_version argument is a string (e.g. "19.1.0")."""
     aapt = self.dist.aapt_tool(build_tools_version)
     return aapt
 
