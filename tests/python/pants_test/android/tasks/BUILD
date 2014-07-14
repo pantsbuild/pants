@@ -9,14 +9,9 @@ python_test_suite(
   ],
 )
 
-python_test_suite(
-  name = 'integration',
-  dependencies = [],
-)
-
 python_tests(
   name = 'aapt_gen',
-  sources = ['test_aapt_gen.py'],
+  sources = 'test_aapt_gen.py',
   dependencies = [
     pants('src/python/pants/backend/android/tasks:all'),
   ],
