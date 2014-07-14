@@ -30,22 +30,12 @@ class AndroidDistribution(object):
 
   @classmethod
   def cached(cls, target_sdk=None, build_tools_version=None):
-    def scan_constraint_match():
-      for dist in cls._CACHED_SDK.values():
-        if target_sdk and not dist.locate_target_sdk(target_sdk):
-          continue
-        if build_tools_version and not dist.locate_build_tools(build_tools_version):
-          continue
-        return dist
-
-    # tuple just used for quick lookup. If no match, check within validated sets w/ locate()
-    #  (this includes caching a (None, None) key for empty or unverified invocations
+    # Tuple just used for quick lookup. This method will generally be passed no params, and will
+    # always cache the key(None, None). But it stops us from crawling the user path each invocation.
     key = (target_sdk, build_tools_version)
     dist = cls._CACHED_SDK.get(key)
     if not dist:
-      dist = scan_constraint_match()
-      if not dist:
-        dist = cls.locate()
+      dist = cls.locate()
     cls._CACHED_SDK[key] = dist
     return dist
 
@@ -63,7 +53,6 @@ class AndroidDistribution(object):
 
     for path in filter(None, search_path()):
       dist = cls(path)
-      #log.debug('Validated %s' % ('Android SDK'))
       return dist
     dist = cls(None)
     return dist
@@ -72,47 +61,7 @@ class AndroidDistribution(object):
     """Creates an Android distribution wrapping the given sdk_path."""
 
     self._sdk_path = sdk_path
-    self._installed_sdks = set()
-    self._installed_build_tools = set()
     self._validated_tools = set()
-    self.validate(target_sdk, build_tools_version)
-
-  def validate(self, target_sdk, build_tools_version):
-    if target_sdk and not self.locate_target_sdk(target_sdk):
-      raise self.Error('There is no Android SDK at %s with API level %s installed. It may need '
-                       'to be updated' % (self._sdk_path, target_sdk))
-    if build_tools_version and not self.locate_build_tools(build_tools_version):
-      raise self.Error('There is no Android SDK at %s with build-tools version %s installed. '
-                       'It may need to be updated' % (self._sdk_path, build_tools_version))
-
-  def locate_target_sdk(self, target_sdk):
-    """Checks to see if the requested API is installed in Android SDK."""
-
-    # NB: Can be done from CLI with "$ANDROID_TOOL list targets | grep "API level $TARGET"
-    # But that $ANDROID_TOOL is simply checking for the physical presence of a few files.
-    if target_sdk not in self._installed_sdks:
-      android_jar = self.android_jar_tool(target_sdk)
-      if not os.path.isfile(android_jar):
-        return False
-      self._installed_sdks.add(target_sdk)
-    return True
-
-  def locate_build_tools(self, build_tools_version):
-    """This looks to see if the requested version of the Android build tools are installed.
-    AndroidTargets default to the latest stable release of the build tools, but that can be
-    overriden in the BUILD file.
-    """
-    #I found no decent way to check installed build tools, we must be content with verifying
-    #the presence of a representative executable (aapt in this case).
-
-    if build_tools_version not in self._installed_build_tools:
-      try:
-        aapt = self.aapt_tool(build_tools_version)
-        self._validated_executable(aapt)
-      except:
-        return False
-    self._installed_build_tools.add(build_tools_version)
-    return True
 
   def _validated_executable(self, tool):
     if tool not in self._validated_tools:
@@ -159,5 +108,4 @@ class AndroidDistribution(object):
     return self._validated_executable(aapt)
 
   def __repr__(self):
-    return ('AndroidDistribution({0!r}, installed_sdks={1!r}, installed_build_tools={2!r})'.format
-            (self._sdk_path, list(self._installed_sdks), list(self._installed_build_tools)))
+    return ('AndroidDistribution({0!r})'.format(self._sdk_path))
