@@ -5,7 +5,6 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from collections import namedtuple
 from contextlib import contextmanager
 import os
 import pytest
@@ -38,81 +37,25 @@ class TestAndroidDistributionTest(unittest2.TestCase):
           chmod_plus_x(path)
       yield sdk
 
-  def test_validate(self):
-    with pytest.raises(TypeError):
-      with self.distribution() as sdk:
-        AndroidDistribution(sdk_path=sdk).validate(target_sdk='19')
+  def test_tool_retrieval(self):
+    with self.distribution() as sdk:
+      AndroidDistribution(sdk_path=sdk).aapt_tool('19.1.0')
 
-    with pytest.raises(TypeError):
-      with self.distribution() as sdk:
-        AndroidDistribution(sdk_path=sdk).validate(build_tools_version='19.1.0')
-
-    with pytest.raises(TypeError):
-      with self.distribution() as sdk:
-        AndroidDistribution(sdk_path=sdk).validate(sdk_path="18", build_tools_version="1.1.1")
+    with self.distribution() as sdk:
+      AndroidDistribution(sdk_path=sdk).android_jar_tool('18')
 
     with pytest.raises(AndroidDistribution.Error):
       with self.distribution() as sdk:
-        AndroidDistribution(sdk_path=sdk).validate(target_sdk="9999", build_tools_version="19.1.0")
+        AndroidDistribution(sdk_path=sdk).aapt_tool('99.9.9')
 
     with pytest.raises(AndroidDistribution.Error):
       with self.distribution() as sdk:
-        AndroidDistribution(sdk_path=sdk).validate(target_sdk="18", build_tools_version="999.1.0")
-
-    with self.distribution() as sdk:
-      AndroidDistribution(sdk_path=sdk).validate(target_sdk="18", build_tools_version="19.1.0")
-
-  def test_locate_tools(self):
-    with self.distribution() as sdk:
-      self.assertEquals(False, AndroidDistribution(sdk_path=sdk)
-                        .locate_build_tools(build_tools_version="20"))
-
-    with self.distribution() as sdk:
-      self.assertEquals(False, AndroidDistribution(sdk_path=sdk)
-                        .locate_build_tools(build_tools_version=""))
-
-    with pytest.raises(TypeError):
-      with self.distribution() as sdk:
-        AndroidDistribution(sdk_path=sdk).locate_build_tools(target_sdk="19.1.0")
-
-    with self.distribution() as sdk:
-      self.assertEquals(True, AndroidDistribution(sdk_path=sdk)
-                        .locate_build_tools(build_tools_version="19.1.0"))
-
-  def test_locate_sdk(self):
-    with self.distribution() as sdk:
-      self.assertEquals(False, AndroidDistribution(sdk_path=sdk).locate_target_sdk(target_sdk="22"))
-
-    with self.distribution() as sdk:
-      self.assertEquals(False, AndroidDistribution(sdk_path=sdk).locate_target_sdk(target_sdk="1"))
-
-    with self.distribution() as sdk:
-      self.assertEquals(False, AndroidDistribution(sdk_path=sdk).locate_target_sdk(target_sdk=""))
-
-    with self.distribution() as sdk:
-      self.assertEquals(True, AndroidDistribution(sdk_path=sdk).locate_target_sdk(target_sdk="18"))
+        AndroidDistribution(sdk_path=sdk).android_jar_tool('99')
 
 
-  def test_tools(self):
-    with self.distribution() as sdk:
-      self.assertEquals(os.path.join(sdk, 'build-tools', '19.1.0', 'aapt'),
-                        AndroidDistribution(sdk_path=sdk).aapt_tool('19.1.0'))
+  def test_set_sdk_path(self, path=None):
+    # We can set good/bad paths alike. No checks until tools are called.
 
-    with self.distribution() as sdk:
-      self.assertEquals(os.path.join(sdk, 'platforms', 'android-18', 'android.jar'),
-                        AndroidDistribution(sdk_path=sdk).android_jar_tool('18'))
-
-    with pytest.raises(AssertionError):
-      with self.distribution() as sdk:
-        self.assertEquals(os.path.join(sdk, 'build-tools', '19.1.0', 'aapt'),
-                        AndroidDistribution(sdk_path=sdk).aapt_tool('99.9.9'))
-
-    with pytest.raises(AssertionError):
-      with self.distribution() as sdk:
-        self.assertEquals(os.path.join(sdk, 'platforms', 'android-18', 'android.jar'),
-                          AndroidDistribution(sdk_path=sdk).android_jar_tool('99'))
-
-  def test_locate(self):
     @contextmanager
     def env(**kwargs):
       environment = dict(ANDROID_HOME=None, ANDROID_SDK_HOME=None, ANDROID_SDK=None)
@@ -120,46 +63,13 @@ class TestAndroidDistributionTest(unittest2.TestCase):
       with environment_as(**environment):
         yield
 
-    with pytest.raises(AndroidDistribution.Error):
-      with env():
-        AndroidDistribution.locate()
-
-    with pytest.raises(AndroidDistribution.Error):
-      with self.distribution(files='android.jar') as sdk:
-        with env(PATH=sdk):
-          AndroidDistribution.locate()
-
-    with pytest.raises(AndroidDistribution.Error):
-      with self.distribution() as sdk:
-        with env(PATH=sdk):
-          AndroidDistribution.locate(target_sdk='99')
-      with self.distribution() as sdk:
-        with env(PATH=sdk):
-          AndroidDistribution.locate(build_tools_version='99.1.0')
-
-    with pytest.raises(AndroidDistribution.Error):
-      with self.distribution() as sdk:
-        with env(ANDROooooD_HOME=sdk):
-          AndroidDistribution.locate()
+    with self.distribution() as sdk:
+      with env(ANDROooooD_HOME=sdk):
+        AndroidDistribution.set_sdk_path(path)
 
     with self.distribution() as sdk:
       with env(ANDROID_HOME=sdk):
-        AndroidDistribution.locate()
+        AndroidDistribution.set_sdk_path(path)
 
-    with self.distribution() as sdk:
-      with env(ANDROID_SDK=sdk):
-        AndroidDistribution.locate()
-
-    with self.distribution() as sdk:
-      with env(ANDROID_SDK_HOME=sdk):
-        AndroidDistribution.locate()
-
-    with self.distribution() as sdk:
-      with env(ANDROID_HOME=sdk):
-        AndroidDistribution.locate(target_sdk='18')
-      with env(ANDROID_HOME=sdk):
-        AndroidDistribution.locate(build_tools_version='19.1.0')
-      with env(ANDROID_HOME=sdk):
-        AndroidDistribution.locate(target_sdk='18', build_tools_version='19.1.0')
 
 # No live test for now, the varying installed platforms make that unpredictable.
