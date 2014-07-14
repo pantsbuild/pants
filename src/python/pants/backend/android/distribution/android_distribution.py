@@ -75,7 +75,7 @@ class AndroidDistribution(object):
     self._sdk_path = sdk_path
     self._installed_sdks = set()
     self._installed_build_tools = set()
-    self._validated_binaries = set()
+    self._validated_tools = set()
     self.validate(target_sdk, build_tools_version)
 
   def validate(self, target_sdk, build_tools_version):
@@ -116,14 +116,26 @@ class AndroidDistribution(object):
     return True
 
   def _validated_executable(self, tool):
-    if tool not in self._validated_binaries:
+    if tool not in self._validated_tools:
       self._validate_executable(tool)
-      self._validated_binaries.add(tool)
+      self._validated_tools.add(tool)
+    return tool
+
+  def _validated_tool(self, tool):
+    if tool not in self._validated_tools:
+      self._validate_file(tool)
+      self._validated_tools.add(tool)
     return tool
 
   def _validate_executable(self, tool):
     if not self._is_executable(tool):
       raise self.Error('Failed to locate the %s executable. It does not appear to be an'
+                       ' installed portion of this %s' % (tool, 'Android SDK'))
+    return tool
+
+  def _validate_file(self, tool):
+    if not os.path.isfile(tool):
+      raise self.Error('Failed to locate the %s file. It does not appear to be an'
                        ' installed portion of this %s' % (tool, 'Android SDK'))
     return tool
 
@@ -133,11 +145,13 @@ class AndroidDistribution(object):
 
   def android_jar_tool(self, target_sdk):
     """The android.jar holds the class files with the Android APIs, unique per platform"""
-    return os.path.join(self._sdk_path, 'platforms', 'android-' + target_sdk, 'android.jar')
+    android_jar = os.path.join(self._sdk_path, 'platforms', 'android-' + target_sdk, 'android.jar')
+    return self._validated_tool(android_jar)
 
   def aapt_tool(self, build_tools_version):
     """returns aapt tool for each unique build-tools version. Used to validate build-tools path"""
-    return os.path.join(self._sdk_path, 'build-tools', build_tools_version, 'aapt')
+    aapt = os.path.join(self._sdk_path, 'build-tools', build_tools_version, 'aapt')
+    return self._validated_executable(aapt)
 
   def __repr__(self):
     return ('AndroidDistribution({0!r}, installed_sdks={1!r}, installed_build_tools={2!r})'.format
