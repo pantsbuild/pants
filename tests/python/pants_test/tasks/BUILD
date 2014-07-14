@@ -66,6 +66,18 @@ python_test_suite(
 )
 
 python_tests(
+  name = 'aapt_gen',
+  sources = ['test_aapt_gen.py'],
+  dependencies = [
+    pants(':base'),
+    pants('src/python/pants/backend/android/targets:android'),
+    pants('src/python/pants/backend/android/tasks:all'),
+    pants('src/python/pants/base:build_file_aliases'),
+    pants('src/python/pants/base:exceptions'),
+  ],
+)
+
+python_tests(
   name = 'binary_create',
   sources = ['test_binary_create.py'],
   dependencies = [

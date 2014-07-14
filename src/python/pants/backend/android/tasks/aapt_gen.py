@@ -65,19 +65,19 @@ class AaptGen(AndroidTask, CodeGen):
   def render_args(self, target):
     output_dir = self._aapt_out(target)
     safe_mkdir(output_dir)
-
     args = []
+
     if self.forced_build_tools_version:
       args.append(self.aapt_tool(self.forced_build_tools_version))
     else:
       args.append(self.aapt_tool(target.build_tools_version))
-
     args.extend(['package', '-m', '-J', output_dir, '-M', target.manifest,
                  '-S', target.resource_dir, '-I'])
     if self.forced_target_sdk:
       args.append(self.android_jar_tool(self.forced_target_sdk))
     else:
       args.append(self.android_jar_tool(target.target_sdk))
+
       # BUILD files in the resource folder chokes aapt. This is a defensive measure.
     ignored_assets='!.svn:!.git:!.ds_store:!*.scc:.*:<dir>_*:!CVS:' \
                    '!thumbs.db:!picasa.ini:!*~:BUILD*'
@@ -96,7 +96,8 @@ class AaptGen(AndroidTask, CodeGen):
         raise TaskError('Android aapt exited non-zero ({code})'.format(code=result))
 
   def createtarget(self, lang, gentarget, dependees):
-    aapt_gen_file = os.path.join(self._aapt_out(gentarget), self.package_path(gentarget.package))
+    aapt_gen_file = self._calculate_genfile(self._aapt_out(gentarget),gentarget.package)
+    print ("genfile is %s" % aapt_gen_file)
     address = SyntheticAddress(spec_path=aapt_gen_file, target_name = gentarget.id)
     tgt = self.context.add_new_target(address,
                                       JavaLibrary,
@@ -108,8 +109,13 @@ class AaptGen(AndroidTask, CodeGen):
       dependee.inject_dependency(tgt.address)
     return tgt
 
+  @classmethod
   def package_path(self, package):
     return package.replace('.', os.sep)
+
+  @classmethod
+  def _calculate_genfile(self, path, package):
+    return os.path.join(path, self.package_path(package))
 
   def _aapt_out(self, target):
     # This mimics the Eclipse layout. We may switch to gradle style sometime in the future.
