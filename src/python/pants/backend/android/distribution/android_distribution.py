@@ -65,8 +65,8 @@ class AndroidDistribution(object):
       dist = cls(path)
       #log.debug('Validated %s' % ('Android SDK'))
       return dist
-    # This returns None if no SDK found on path
-    return None
+    dist = cls(None)
+    return dist
 
   def __init__(self, sdk_path=None, target_sdk=None, build_tools_version=None):
     """Creates an Android distribution wrapping the given sdk_path."""
@@ -75,7 +75,7 @@ class AndroidDistribution(object):
     self._installed_sdks = set()
     self._installed_build_tools = set()
     self._validated_tools = set()
-    #self.validate(target_sdk, build_tools_version)
+    self.validate(target_sdk, build_tools_version)
 
   def validate(self, target_sdk, build_tools_version):
     if target_sdk and not self.locate_target_sdk(target_sdk):
@@ -144,11 +144,17 @@ class AndroidDistribution(object):
 
   def android_jar_tool(self, target_sdk):
     """The android.jar holds the class files with the Android APIs, unique per platform"""
+    if not self._sdk_path:
+      raise AndroidDistribution.Error('Failed to locate Android SDK. Please install SDK and '
+                                      'set ANDROID_HOME in your path')
     android_jar = os.path.join(self._sdk_path, 'platforms', 'android-' + target_sdk, 'android.jar')
     return self._validated_file(android_jar)
 
   def aapt_tool(self, build_tools_version):
     """returns aapt tool for each unique build-tools version. Used to validate build-tools path"""
+    if not self._sdk_path:
+      raise AndroidDistribution.Error('Failed to locate Android SDK. Please install SDK and '
+                      'set ANDROID_HOME in your path')
     aapt = os.path.join(self._sdk_path, 'build-tools', build_tools_version, 'aapt')
     return self._validated_executable(aapt)
 
