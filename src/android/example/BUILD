@@ -4,9 +4,13 @@
 
 android_binary(
   name='hello',
-  sources='HelloWorld.java',
-  package='com.pants.examples.hello',
-  resources=[
-    pants('src/android/example/res')
+  sources=rglobs('src/*.java'),
+  dependencies = [
+    ':resources',
   ],
 )
+
+android_resources(
+  name='resources',
+)
+
