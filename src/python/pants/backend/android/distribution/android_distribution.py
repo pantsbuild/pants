@@ -12,16 +12,13 @@ from twitter.common import log
 
 class AndroidDistribution(object):
   """
-  This class looks for Android SDks installed on the machine's path. It then verifies that that
-  SDK has the needed build-tools and API levels installed. There is caching of most lookups.
+  This class looks for Android SDks installed on the machine's path. The SDK path will not
+  be verified until an Android task requests a tool.
   """
 
-  # As of now, missing API or build-tools only raises an exception. The SDK could be updated from
+  # As of now, missing tools simply raise an exception. The SDK could be updated from
   # within this class, it just depends what state we want to leave the host machine afterwards.
   # There is probably a discussion to be had about bootstrapping as well.
-
-  # Good portions of this are inspired by pants.java.distribution. The two distributions could
-  # perhaps benefit from a refactor that makes some of the validation process common.
 
   class Error(Exception):
     """Indicates an invalid android distribution."""

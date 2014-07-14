@@ -78,18 +78,18 @@ class AaptGen(AndroidTask, CodeGen):
     else:
       args.append(self.android_jar_tool(target.target_sdk))
 
-      # BUILD files in the resource folder chokes aapt. This is a defensive measure.
+    # BUILD files in the resource folder chokes aapt. This is a defensive measure.
     ignored_assets='!.svn:!.git:!.ds_store:!*.scc:.*:<dir>_*:!CVS:' \
                    '!thumbs.db:!picasa.ini:!*~:BUILD*'
     args.extend(['--ignore-assets', ignored_assets])
-    log.debug('Executing: %s' % ' '.join(args))
+    log.debug('Executing: {0}'.format(args))
     return args
 
 
   def genlang(self, lang, targets):
     for target in targets:
       if lang != 'java':
-        raise TaskError('Unrecognized android gen lang: %s' % lang)
+        raise TaskError('Unrecognized android gen lang: {0!r}'.format(lang))
       process = subprocess.Popen(self.render_args(target))
       result = process.wait()
       if result != 0:
