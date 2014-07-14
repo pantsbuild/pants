@@ -106,6 +106,8 @@ class JvmTarget(Target, Jarable):
 
   @property
   def resources(self):
+    # TODO(John Sirois): Consider removing this convenience:
+    #   https://github.com/pantsbuild/pants/issues/346
     # TODO(John Sirois): Introduce a label and replace the type test?
     return [dependency for dependency in self.dependencies if isinstance(dependency, Resources)]
 
