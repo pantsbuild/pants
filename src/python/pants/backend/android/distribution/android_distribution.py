@@ -29,37 +29,38 @@ class AndroidDistribution(object):
   _CACHED_SDK = {}
 
   @classmethod
-  def cached(cls, target_sdk=None, build_tools_version=None):
+  def cached(cls, path=None):
     # Tuple just used for quick lookup. This method will generally be passed no params, and will
-    # always cache the key(None, None). But it stops us from crawling the user path each invocation.
-    key = (target_sdk, build_tools_version)
+    # always cache the key(None). But a user can pass a specific sdk on the CLI through AndroidTask.
+    key = (path)
     dist = cls._CACHED_SDK.get(key)
     if not dist:
-      dist = cls.locate()
+      dist = cls.locate(path)
     cls._CACHED_SDK[key] = dist
     return dist
 
-
   @classmethod
-  def locate(cls):
+  def locate(cls, path):
     def sdk_path(sdk_env_var):
       sdk = os.environ.get(sdk_env_var)
       return os.path.abspath(sdk) if sdk else None
 
-    def search_path():
+    def search_path(path):
+      # Check path if one is passed at instantiation, then check environmental variables
+      if path:
+        yield os.path.abspath(path)
       yield sdk_path('ANDROID_HOME')
       yield sdk_path('ANDROID_SDK_HOME')
       yield sdk_path('ANDROID_SDK')
 
-    for path in filter(None, search_path()):
+    for path in filter(None, search_path(path)):
       dist = cls(path)
       return dist
     dist = cls(None)
     return dist
 
   def __init__(self, sdk_path=None, target_sdk=None, build_tools_version=None):
-    """Creates an Android distribution wrapping the given sdk_path."""
-
+    """Creates an Android distribution and caches tools for quick retrieval."""
     self._sdk_path = sdk_path
     self._validated_tools = set()
 
