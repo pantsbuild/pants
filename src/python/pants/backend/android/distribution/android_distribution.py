@@ -7,12 +7,10 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import os
 
-from twitter.common import log
-
 
 class AndroidDistribution(object):
   """
-  This class looks for Android SDks installed on the machine's path. The SDK path will not
+  This class looks for Android SDKs installed on the machine's path. The SDK path will not
   be verified until an Android task requests a tool.
   """
 
@@ -90,7 +88,7 @@ class AndroidDistribution(object):
     return os.path.isfile(path) and os.access(path, os.X_OK)
 
   def android_jar_tool(self, target_sdk):
-    """The android.jar holds the class files with the Android APIs, unique per platform"""
+    """The android.jar holds the class files with the Android APIs, unique per platform."""
     if not self._sdk_path:
       raise AndroidDistribution.Error('Failed to locate Android SDK. Please install SDK and '
                                       'set ANDROID_HOME in your path')
@@ -98,7 +96,7 @@ class AndroidDistribution(object):
     return self._validated_file(android_jar)
 
   def aapt_tool(self, build_tools_version):
-    """returns aapt tool for each unique build-tools version. Used to validate build-tools path"""
+    """Returns aapt tool for each unique build-tools version."""
     if not self._sdk_path:
       raise AndroidDistribution.Error('Failed to locate Android SDK. Please install SDK and '
                       'set ANDROID_HOME in your path')
