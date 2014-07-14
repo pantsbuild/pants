@@ -12,6 +12,12 @@ from pants.base.payload import PythonRequirementLibraryPayload
 
 @manual.builddict(tags=["python"])
 class PythonRequirementLibrary(Target):
+  """Named target for some pip requirements."""
   def __init__(self, requirements=None, *args, **kwargs):
+    """
+    :param string name: The target name.
+    :param requirements: pip requirements
+    :type requirements: List of :ref:`python_requirement <bdict_python_requirement>`\s
+    """
     payload = PythonRequirementLibraryPayload(requirements)
     super(PythonRequirementLibrary, self).__init__(*args, payload=payload, **kwargs)

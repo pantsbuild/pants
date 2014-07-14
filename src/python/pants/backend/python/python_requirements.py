@@ -7,15 +7,28 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import os
 
+from pants.base.build_manual import manual
 
+@manual.builddict(tags=["python"])
 def python_requirements(parse_context, requirements_relpath='requirements.txt'):
-  """Translates a pip requirements file into an equivalent set of PythonRequirement targets.
+  """Translates a pip requirements file into an equivalent set of python_requirements
 
-  NB that there are some requirements files that can't be unambiguously translated; ie: multiple
+  If the ``requirements.txt`` file has lines ``foo>=3.14`` and ``bar>=2.7``,
+  then this is roughly like::
+
+    python_requirement_library(name="foo", requirements=[
+      python_requirement("foo>=3.14"),
+    ])
+    python_requirement_library(name="bar", requirements=[
+      python_requirement("bar>=2.7"),
+    ])
+
+  NB some requirements files can't be unambiguously translated; ie: multiple
   find links.  For these files a ValueError will be raised that points out the issue.
 
   See the requirements file spec here: http://www.pip-installer.org/en/1.1/requirements.html
 
+  :param parse_context: (Don't specify this in a BUILD file; it's set automatically)
   :param string requirements_relpath: The relative path from the parent dir of the BUILD file using
       this function to the requirements file.  By default a `requirements.txt` file sibling to the
       BUILD file is assumed.

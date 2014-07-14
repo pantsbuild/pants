@@ -58,6 +58,7 @@ python_library(
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('src/python/pants/backend/core/tasks:task'),
     pants('src/python/pants/backend/maven_layout'),
+    pants('src/python/pants/backend/python:python_requirements'),
     pants('src/python/pants/base:build_environment'),
     pants('src/python/pants/base:build_file_parser'),
     pants('src/python/pants/base:build_manual'),

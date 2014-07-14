@@ -15,6 +15,7 @@ from twitter.common.dirutil import Fileset, safe_open
 
 from pants.backend.core.tasks.task import Task
 from pants.backend.maven_layout.maven_layout import maven_layout
+from pants.backend.python.python_requirements import python_requirements
 from pants.base.build_environment import get_buildroot
 from pants.base.build_manual import get_builddict_info
 from pants.base.config import ConfigOption
@@ -178,6 +179,7 @@ PREDEFS = {  # some hardwired entries
             "tags": ["anylang"]},
   "maven_layout": {"defn": entry_for_one("maven_layout", maven_layout)},
   "python_artifact": {"suppress": True},  # unused alias for PythonArtifact
+  "python_requirements": {"defn": entry_for_one("python_requirements", python_requirements)},
   "python_test_suite": {"defn": msg_entry("python_test_suite",
                                           """Deprecated way to group Python tests; use `dependencies`_""")},
   "rglobs": {"defn": entry_for_one("rglobs", Fileset.rglobs)},
