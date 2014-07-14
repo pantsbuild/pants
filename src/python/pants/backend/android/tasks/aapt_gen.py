@@ -97,7 +97,6 @@ class AaptGen(AndroidTask, CodeGen):
 
   def createtarget(self, lang, gentarget, dependees):
     aapt_gen_file = self._calculate_genfile(self._aapt_out(gentarget),gentarget.package)
-    print ("genfile is %s" % aapt_gen_file)
     address = SyntheticAddress(spec_path=aapt_gen_file, target_name = gentarget.id)
     tgt = self.context.add_new_target(address,
                                       JavaLibrary,
