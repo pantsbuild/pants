@@ -35,12 +35,12 @@ class AndroidDistribution(object):
     key = (path)
     dist = cls._CACHED_SDK.get(key)
     if not dist:
-      dist = cls.locate(path)
+      dist = cls.set_sdk_path(path)
     cls._CACHED_SDK[key] = dist
     return dist
 
   @classmethod
-  def locate(cls, path):
+  def set_sdk_path(cls, path):
     def sdk_path(sdk_env_var):
       sdk = os.environ.get(sdk_env_var)
       return os.path.abspath(sdk) if sdk else None
@@ -78,14 +78,14 @@ class AndroidDistribution(object):
 
   def _validate_executable(self, tool):
     if not self._is_executable(tool):
-      raise self.Error('There is no Android SDK at %s with %s installed. The SDK may need '
-                       'to be updated' % (self._sdk_path, tool))
+      raise self.Error('There is no {0!r} installed. The Android SDK may need to be updated'
+                       .format(tool))
     return tool
 
   def _validate_file(self, tool):
     if not os.path.isfile(tool):
-      raise self.Error('There is no Android SDK at %s with %s installed. '
-                       'The SDK may need to be updated' % (self._sdk_path, tool))
+      raise self.Error('There is no {0!r} installed.The Android SDK may need to be updated'
+                       .format(tool))
     return tool
 
   @staticmethod
