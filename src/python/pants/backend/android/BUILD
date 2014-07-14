@@ -7,6 +7,7 @@ python_library(
   sources = ['__init__.py', 'register.py'],
   dependencies = [
     pants('src/python/pants/backend/android/targets:android'),
+    pants('src/python/pants/backend/android/tasks:all'),
     pants('src/python/pants/base:build_file_aliases'),
   ]
 )
