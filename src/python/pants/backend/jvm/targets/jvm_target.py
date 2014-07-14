@@ -7,6 +7,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from twitter.common.lang import Compatibility
 
+from pants.backend.core.targets.resources import Resources
 from pants.base.address import SyntheticAddress
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import JvmTargetPayload
@@ -105,14 +106,8 @@ class JvmTarget(Target, Jarable):
 
   @property
   def resources(self):
-    resources = []
-    for spec in self._resource_specs:
-      address = SyntheticAddress.parse(spec, relative_to=self.address.spec_path)
-      target = self._build_graph.get_target(address)
-      if target is None:
-        raise TargetDefinitionException(self, 'No such resource target: %s' % spec)
-      resources.append(target)
-    return resources
+    # TODO(John Sirois): Introduce a label and replace the type test?
+    return [dependency for dependency in self.dependencies if isinstance(dependency, Resources)]
 
   @property
   def excludes(self):
