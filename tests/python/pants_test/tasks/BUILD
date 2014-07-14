@@ -59,6 +59,7 @@ python_test_suite(
 python_test_suite(
   name = 'integration',
   dependencies = [
+    pants(':idea_integration'),
     pants(':jar_publish_integration'),
     pants(':jvm_bundle_integration'),
     pants(':scala_repl_integration'),
@@ -268,6 +269,14 @@ python_tests(
     pants('src/python/pants/backend/core/tasks:filter'),
     pants('src/python/pants/backend/core/targets:common'),
     pants('src/python/pants/base:build_file_aliases'),
+  ],
+)
+
+python_tests(
+  name = 'idea_integration',
+  sources = ['test_idea_integration.py'],
+  dependencies = [
+    pants('tests/python/pants_test:int-test'),
   ],
 )
 

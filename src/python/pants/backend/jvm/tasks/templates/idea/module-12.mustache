@@ -49,14 +49,16 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
       <excludeFolder url="file://{{module.root_dir}}/{{.}}"/>
       {{/exclude_paths}}
     {{/module.content_roots}}
-      <!-- TODO(John Sirois): Kill this exclude hack - its valid to map generated sources under
-           .pants.d as generated sources for example - which IDEA 13+ understands. -->
-      <excludeFolder url="file://${module.root_dir}/.pants.d" />
-
       <excludeFolder url="file://$MODULE_DIR$/external-libs" />
       <excludeFolder url="file://$MODULE_DIR$/external-libsources" />
       <excludeFolder url="file://$MODULE_DIR$/internal-libs" />
       <excludeFolder url="file://$MODULE_DIR$/internal-libsources" />
+      # TODO(Garrett Malmquist): Do this in a generic way, rather than hard-coding particular
+      # directories.
+      <excludeFolder url="file://${module.root_dir}/.pants.d/compile" />
+      <excludeFolder url="file://${module.root_dir}/.pants.d/ivy" />
+      <excludeFolder url="file://${module.root_dir}/.pants.d/python" />
+      <excludeFolder url="file://${module.root_dir}/.pants.d/resources" />
     </content>
 
     <orderEntry type="inheritedJdk"/>

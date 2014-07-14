@@ -221,8 +221,7 @@ def register_goals():
 
   # IDE support.
 
-  goal(name='idea', action=IdeaGen,
-       dependencies=['jar', 'bootstrap']
+  goal(name='idea', action=IdeaGen, dependencies=['bootstrap', 'resolve']
   ).install().with_description('Create an IntelliJ IDEA project from the given targets.')
 
   goal(name='eclipse', action=EclipseGen,
