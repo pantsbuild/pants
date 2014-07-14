@@ -16,7 +16,7 @@ class AndroidDistribution(object):
   be verified until an Android task requests a tool.
   """
 
-  # As of now, missing tools simply raises an exception. The SDK could be updated from
+  # As of now, missing tools simply raise an exception. The SDK could be updated from
   # within this class, it just depends what state we want to leave the host machine afterwards.
   # There is probably a discussion to be had about bootstrapping as well.
 
@@ -67,7 +67,7 @@ class AndroidDistribution(object):
       self._validated_tools.add(tool)
     return tool
 
-  def _validated_tool(self, tool):
+  def _validated_file(self, tool):
     if tool not in self._validated_tools:
       self._validate_file(tool)
       self._validated_tools.add(tool)
@@ -95,7 +95,7 @@ class AndroidDistribution(object):
       raise AndroidDistribution.Error('Failed to locate Android SDK. Please install SDK and '
                                       'set ANDROID_HOME in your path')
     android_jar = os.path.join(self._sdk_path, 'platforms', 'android-' + target_sdk, 'android.jar')
-    return self._validated_tool(android_jar)
+    return self._validated_file(android_jar)
 
   def aapt_tool(self, build_tools_version):
     """returns aapt tool for each unique build-tools version. Used to validate build-tools path"""
