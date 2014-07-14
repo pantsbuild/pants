@@ -5,12 +5,21 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+import os
+from xml.dom.minidom import parse
+
 from pants.base.payload import JvmTargetPayload
 from pants.base.target import Target
 
 
 class AndroidTarget(Target):
-  """A base class for all Android targets"""
+  """A base class for all Android targets."""
+
+  # Missing attributes from the AndroidManifest would eventually error in the compilation process.
+  # But since the error would raise here in the target definition, we are catching the exception
+  class BadManifestError(Exception):
+    """Indicates an invalid android manifest."""
+
 
   def __init__(self,
                address=None,
@@ -18,12 +27,9 @@ class AndroidTarget(Target):
                sources_rel_path=None,
                excludes=None,
                provides=None,
-               package=None,
-               resources="res",
                # most recent build_tools_version should be defined elsewhere
                build_tools_version="19.1.0",
-               target_sdk_version=None,
-               min_sdk_version=None,
+               manifest='AndroidManifest.xml',
                release_type="debug",
                **kwargs):
     """
@@ -34,13 +40,10 @@ class AndroidTarget(Target):
     :type sources: ``Fileset`` or list of strings.
     :param excludes: List of :ref:`exclude <bdict_exclude>`\s
       to filter this target's transitive dependencies against.
-    :param package: Package name of app, e.g. 'com.pants.examples.hello'
-    :type package: string
-    :param resources: name of directory containing the android resources. Set as 'res' by default.
     :param build_tools_version: API for the Build Tools (separate from SDK version).
       Defaults to the latest full release.
-    :param target_sdk_version: Version of the Android SDK the android target is built for
-    :param min_sdk_version:  Earliest supported SDK by the android target
+    :param manifest: path/to/file of 'AndroidManifest.xml' (required name). Paths are relative
+      to the BUILD file's directory.
     :param release_type: Which keystore is used to sign target: 'debug' or 'release'.
       Set as 'debug' by default.
     """
@@ -55,8 +58,30 @@ class AndroidTarget(Target):
 
     self.add_labels('android')
     self.build_tools_version = build_tools_version
-    self.min_sdk_version = min_sdk_version
-    self.package = package
     self.release_type = release_type
-    self.resources = resources
-    self.target_sdk_version = target_sdk_version
+
+    self.manifest = os.path.join(self.address.spec_path, manifest)
+    if not os.path.isfile(self.manifest):
+      raise self.BadManifestError('Missing manifest at: {0!r}. Android targets require an '
+                                  '\'AndroidManifest.xml\''.format(self.manifest))
+    # TODO (mateor): varying manifest location means we should support variable manifest names
+
+    self.package = self.get_package_name()
+    self.target_sdk = self.get_target_sdk()
+
+  # parsing as done in Donut testrunner
+  def get_package_name(self):
+    """Returns the package name of the Android target."""
+    tgt_manifest = parse(self.manifest).getElementsByTagName('manifest')
+    if not tgt_manifest or not tgt_manifest[0].getAttribute('package'):
+      raise self.BadManifestError('There is no \'package\' attribute in manifest at: {0!r}'
+                                  .format(self.manifest))
+    return tgt_manifest[0].getAttribute('package')
+
+  def get_target_sdk(self):
+    """Returns a string with the Android package's target SDK."""
+    tgt_manifest = parse(self.manifest).getElementsByTagName('uses-sdk')
+    if not tgt_manifest or not tgt_manifest[0].getAttribute('android:targetSdkVersion'):
+      raise self.BadManifestError('There is no \'targetSdkVersion\' attribute in manifest at: {0!r}'
+                                  .format(self.manifest))
+    return tgt_manifest[0].getAttribute('android:targetSdkVersion')
