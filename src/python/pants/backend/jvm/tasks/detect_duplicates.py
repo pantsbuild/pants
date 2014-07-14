@@ -10,6 +10,8 @@ from contextlib import closing
 import os
 from zipfile import ZipFile
 
+from twitter.common.python.compatibility import to_bytes
+
 from pants.backend.jvm.tasks.jvm_binary_task import JvmBinaryTask
 from pants.base.exceptions import TaskError
 from pants.java.jar.manifest import Manifest
@@ -111,7 +113,7 @@ class DuplicateDetector(JvmBinaryTask):
       self.context.log.debug('  scanning %s' % external_dep)
       with closing(ZipFile(external_dep)) as dep_zip:
         for qualified_file_name in dep_zip.namelist():
-          file_name = os.path.basename(qualified_file_name)
+          file_name = to_bytes(os.path.basename(qualified_file_name))
           if file_name.decode('utf-8').lower() in self._excludes:
             continue
           jar_name = os.path.basename(external_dep)
