@@ -118,15 +118,20 @@ class AaptGen(AndroidTask, CodeGen):
 
   def _aapt_out(self, target):
     # This mimics the Eclipse layout. We may switch to gradle style sometime in the future.
-    return os.path.join(target.address.spec_path, 'bin')
+    return os.path.join(self.workdir, 'bin')
 
   def aapt_tool(self, build_tools_version):
-    """Fetches the appropriate aapt tool.
-    The build_tools_version argument is a string (e.g. "19.1.0")."""
-    aapt = self.dist.aapt_tool(build_tools_version)
-    return aapt
+    """Return the appropriate aapt tool.
+
+    :param string build_tools_version: The version number of the Android build-tools.
+    """
+    aapt = os.path.join('build-tools', build_tools_version, 'aapt')
+    return self.dist.registered_android_tool(aapt)
 
   def android_jar_tool(self, target_sdk):
-    """Fetches the appropriate android.jar. The target_sdk argument is a string (e.g. "18")."""
-    android_jar = self.dist.android_jar_tool(target_sdk)
-    return android_jar
+    """Return the appropriate android.jar.
+
+    :param string target_sdk: The version number of the Android SDK.
+    """
+    android_jar = os.path.join('platforms', 'android-' + target_sdk, 'android.jar')
+    return self.dist.registered_android_tool(android_jar)

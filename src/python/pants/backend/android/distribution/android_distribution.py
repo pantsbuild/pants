@@ -25,7 +25,11 @@ class AndroidDistribution(object):
 
   @classmethod
   def cached(cls, path=None):
-    # Tuple just used for quick lookup. This method will generally be passed no params, and will
+    """
+    :param path:
+    :return:
+    """
+    # The key just used for quick lookup. This method will generally be passed no params, and will
     # always cache the key(None). But a user can pass a specific sdk on the CLI through AndroidTask.
     key = (path)
     dist = cls._CACHED_SDK.get(key)
@@ -35,12 +39,12 @@ class AndroidDistribution(object):
     return dist
 
   @classmethod
-  def set_sdk_path(cls, path):
+  def set_sdk_path(cls, path=None):
     def sdk_path(sdk_env_var):
       sdk = os.environ.get(sdk_env_var)
       return os.path.abspath(sdk) if sdk else None
 
-    def search_path(path):
+    def search_path(path=None):
       # Check path if one is passed at instantiation, then check environmental variables
       if path:
         yield os.path.abspath(path)
@@ -54,54 +58,27 @@ class AndroidDistribution(object):
     dist = cls(None)
     return dist
 
-  def __init__(self, sdk_path=None, target_sdk=None, build_tools_version=None):
+  def __init__(self, sdk_path=None):
     """Creates an Android distribution and caches tools for quick retrieval."""
     self._sdk_path = sdk_path
     self._validated_tools = set()
 
-  def _validated_executable(self, tool):
+  def _register_file(self, tool):
     if tool not in self._validated_tools:
-      self._validate_executable(tool)
+      if not os.path.isfile(tool):
+        raise self.Error('There is no {0!r} installed.The Android SDK may need to be updated'
+                         .format(tool))
       self._validated_tools.add(tool)
     return tool
 
-  def _validated_file(self, tool):
-    if tool not in self._validated_tools:
-      self._validate_file(tool)
-      self._validated_tools.add(tool)
-    return tool
-
-  def _validate_executable(self, tool):
-    if not self._is_executable(tool):
-      raise self.Error('There is no {0!r} installed. The Android SDK may need to be updated'
-                       .format(tool))
-    return tool
-
-  def _validate_file(self, tool):
-    if not os.path.isfile(tool):
-      raise self.Error('There is no {0!r} installed.The Android SDK may need to be updated'
-                       .format(tool))
-    return tool
-
-  @staticmethod
-  def _is_executable(path):
-    return os.path.isfile(path) and os.access(path, os.X_OK)
-
-  def android_jar_tool(self, target_sdk):
-    """The android.jar holds the class files with the Android APIs, unique per platform."""
-    if not self._sdk_path:
-      raise AndroidDistribution.Error('Failed to locate Android SDK. Please install SDK and '
-                                      'set ANDROID_HOME in your path')
-    android_jar = os.path.join(self._sdk_path, 'platforms', 'android-' + target_sdk, 'android.jar')
-    return self._validated_file(android_jar)
-
-  def aapt_tool(self, build_tools_version):
-    """Returns aapt tool for each unique build-tools version."""
-    if not self._sdk_path:
-      raise AndroidDistribution.Error('Failed to locate Android SDK. Please install SDK and '
-                      'set ANDROID_HOME in your path')
-    aapt = os.path.join(self._sdk_path, 'build-tools', build_tools_version, 'aapt')
-    return self._validated_executable(aapt)
+  def registered_android_tool(self, tool_path):
+    try:
+      android_tool = os.path.join(self._sdk_path, tool_path)
+    except:
+        raise AndroidDistribution.Error('Failed to locate Android SDK. Please install SDK and '
+                                    'set ANDROID_HOME in your path')
+    self._register_file(android_tool)
+    return android_tool
 
   def __repr__(self):
     return ('AndroidDistribution({0!r})'.format(self._sdk_path))
