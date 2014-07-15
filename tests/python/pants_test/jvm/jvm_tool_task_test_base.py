@@ -8,7 +8,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import errno
 import os
 
-from twitter.common.dirutil import safe_mkdir
+from twitter.common.dirutil import safe_mkdir, safe_mkdtemp, safe_rmtree
 
 from pants.backend.jvm.tasks.bootstrap_jvm_tools import BootstrapJvmTools
 from pants.base.dev_backend_loader import load_build_configuration_from_source
@@ -73,16 +73,21 @@ class JvmToolTaskTestBase(BaseTest):
     # TODO(John Sirois): This is emulating Engine behavior - construct reverse order, then execute;
     # instead it should probably just be using an Engine.
     task = task_type(context, workdir)
+    task.invalidate()
     BootstrapJvmTools(context, workdir).execute()
     return task
 
-  def execute(self, context, workdir, task_type):
+  def execute(self, context, task_type):
     """Executes the given task ensuring any required jvm tools are bootstrapped.
 
     NB: Other task pre-requisites will not be ensured and tests must instead setup their own product
     requirements if any.
+
+    :returns: The Task that was executed
     """
     # TODO(John Sirois): This is emulating Engine behavior - construct reverse order, then execute;
     # instead it should probably just be using an Engine.
+    workdir = safe_mkdtemp(dir=self.build_root)
     task = self.prepare_execute(context, workdir, task_type)
     task.execute()
+    return task

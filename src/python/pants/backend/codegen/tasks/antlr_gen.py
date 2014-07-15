@@ -43,7 +43,7 @@ class AntlrGen(CodeGen, NailgunTask, JvmToolTaskMixin):
     return isinstance(target, JavaAntlrLibrary)
 
   def is_forced(self, lang):
-    return lang is 'java'
+    return lang == 'java'
 
   def genlangs(self):
     return dict(java=lambda t: t.is_jvm)
@@ -71,7 +71,7 @@ class AntlrGen(CodeGen, NailgunTask, JvmToolTaskMixin):
       if target.compiler == 'antlr3':
         java_main = 'org.antlr.Tool'
       elif target.compiler == 'antlr4':
-        args.append('-visitor')  # Generate Parse Tree Vistor As Well
+        args.append('-visitor')  # Generate Parse Tree Visitor As Well
         # Note that this assumes that there is no package set in the antlr file itself,
         # which is considered an ANTLR best practice.
         args.append('-package')
@@ -132,7 +132,8 @@ class AntlrGen(CodeGen, NailgunTask, JvmToolTaskMixin):
 
     deps = self._resolve_java_deps(target)
 
-    spec_path = os.path.relpath(self._java_out(target), get_buildroot())
+    syn_target_sourceroot = os.path.join(self._java_out(target), target.target_base)
+    spec_path = os.path.relpath(syn_target_sourceroot, get_buildroot())
     address = SyntheticAddress(spec_path=spec_path, target_name=target.id)
     tgt = self.context.add_new_target(address,
                                       JavaLibrary,

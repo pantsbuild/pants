@@ -152,13 +152,12 @@ class JarCreateExecuteTest(JarCreateTestBase):
           with self.add_data(context, 'resources_by_target', self.res, 'r.txt.transformed'):
             with self.add_data(context, 'classes_by_target', self.scala_lib, 'scala_foo.class',
                                'java_foo.class'):
-              with temporary_dir() as workdir:
-                self.execute(context, workdir, JarCreate)
+              self.execute(context, JarCreate)
 
-                self.assert_jar_contents(context, 'jars', self.jl,
-                                         'a.class', 'b.class', 'r.txt.transformed')
-                self.assert_jar_contents(context, 'jars', self.sl, 'c.class')
-                self.assert_jar_contents(context, 'jars', self.binary,
-                                         'b.class', 'r.txt.transformed')
-                self.assert_jar_contents(context, 'jars', self.scala_lib, 'scala_foo.class',
-                                         'java_foo.class')
+              self.assert_jar_contents(context, 'jars', self.jl,
+                                        'a.class', 'b.class', 'r.txt.transformed')
+              self.assert_jar_contents(context, 'jars', self.sl, 'c.class')
+              self.assert_jar_contents(context, 'jars', self.binary,
+                                        'b.class', 'r.txt.transformed')
+              self.assert_jar_contents(context, 'jars', self.scala_lib, 'scala_foo.class',
+                                        'java_foo.class')

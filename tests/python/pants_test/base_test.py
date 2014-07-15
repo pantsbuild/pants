@@ -42,7 +42,9 @@ class BaseTest(unittest2.TestCase):
 
     relpath: The relative path to the directory from the build root.
     """
-    safe_mkdir(os.path.join(self.build_root, relpath))
+    path = os.path.join(self.build_root, relpath)
+    safe_mkdir(path)
+    return path
 
   def create_file(self, relpath, contents='', mode='w'):
     """Writes to a file under the buildroot.
@@ -51,8 +53,10 @@ class BaseTest(unittest2.TestCase):
     contents: A string containing the contents of the file - '' by default..
     mode:     The mode to write to the file in - over-write by default.
     """
-    with safe_open(os.path.join(self.build_root, relpath), mode=mode) as fp:
+    path = os.path.join(self.build_root, relpath)
+    with safe_open(path, mode=mode) as fp:
       fp.write(contents)
+    return path
 
   def add_to_build_file(self, relpath, target):
     """Adds the given target specification to the BUILD file at relpath.

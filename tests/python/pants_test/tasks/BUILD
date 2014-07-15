@@ -20,6 +20,7 @@ python_library(
 python_test_suite(
   name = 'tasks',
   dependencies = [
+    pants(':antlr_gen'),
     pants(':binary_create'),
     pants(':builddict'),
     pants(':bundle_create'),
@@ -62,6 +63,18 @@ python_test_suite(
     pants(':jvm_bundle_integration'),
     pants(':scala_repl_integration'),
     pants(':protobuf_integration'),
+  ],
+)
+
+python_tests(
+  name = 'antlr_gen',
+  sources = ['test_antlr_gen.py'],
+  dependencies = [
+    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
+    pants(':base'),
+    pants('src/python/pants/backend/codegen/targets:java'),
+    pants('src/python/pants/backend/codegen/tasks:antlr_gen'),
+    pants('tests/python/pants_test/jvm:nailgun_task_test_base'),
   ],
 )
 

@@ -37,6 +37,8 @@ class JvmToolBootstrapper(object):
     We can later use this key to get a callback that will resolve these targets.
     Note: Not reentrant. We assume that all registration is done in the main thread.
     """
+    if not tools:
+      raise ValueError("No implementations were provided for tool '%s'" % key)
     self._products.require_data('jvm_build_tools_classpath_callbacks')
     tool_product_map = self._products.get_data('jvm_build_tools') or {}
     existing = tool_product_map.get(key)
