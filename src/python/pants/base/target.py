@@ -99,10 +99,6 @@ class AbstractTarget(object):
     """Returns True if the target is an android target."""
     return self.has_label('android')
 
-  @property
-  def is_delegate(self):
-    """Returns True if this target only delegates to other targets"""
-    return self.has_label('delegate')
 
 @manual.builddict()
 class Target(AbstractTarget):

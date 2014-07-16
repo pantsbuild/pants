@@ -387,8 +387,6 @@ class ProjectInfoTest(ConsoleTaskTest):
       args=['--test-project-info'],
       targets=[self.target('project_info:top_dependency')]
     ))
-    print ("RESULT is {result}".format(result=result))
-
     self.assertEqual([], result['targets']['project_info:top_dependency']['libraries'])
     self.assertEqual(['project_info:jvm_binary'], result['targets']['project_info:top_dependency']['targets'])
 
