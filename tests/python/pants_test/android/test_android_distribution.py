@@ -28,7 +28,7 @@ class TestAndroidDistributionTest(unittest2.TestCase):
                    executables='aapt'):
     with temporary_dir() as sdk:
       for sdks in installed_sdks:
-        test_aapt = touch(os.path.join(sdk, 'platforms', 'android-' + sdks, files))
+        touch(os.path.join(sdk, 'platforms', 'android-' + sdks, files))
       for build in installed_build_tools:
         for exe in maybe_list(executables or ()):
           path = os.path.join(sdk, 'build-tools', build, exe)
@@ -37,20 +37,22 @@ class TestAndroidDistributionTest(unittest2.TestCase):
           chmod_plus_x(path)
       yield sdk
 
-  def test_tool_retrieval(self):
+  def test_tool_registration(self):
     with self.distribution() as sdk:
-      AndroidDistribution(sdk_path=sdk).aapt_tool('19.1.0')
+      AndroidDistribution(sdk_path=sdk).register_android_tool(
+              os.path.join(sdk, 'build-tools', '19.1.0', 'aapt'))
 
     with self.distribution() as sdk:
-      AndroidDistribution(sdk_path=sdk).android_jar_tool('18')
+      AndroidDistribution(sdk_path=sdk).register_android_tool(
+        os.path.join(sdk, 'platforms', 'android-19', 'android.jar'))
 
     with pytest.raises(AndroidDistribution.Error):
-      with self.distribution() as sdk:
-        AndroidDistribution(sdk_path=sdk).aapt_tool('99.9.9')
+      AndroidDistribution(sdk_path=sdk).register_android_tool(
+        os.path.join(sdk, 'build-tools', 'bad-number', 'aapt'))
 
     with pytest.raises(AndroidDistribution.Error):
-      with self.distribution() as sdk:
-        AndroidDistribution(sdk_path=sdk).android_jar_tool('99')
+      AndroidDistribution(sdk_path=sdk).register_android_tool(
+        os.path.join(sdk, 'platforms', 'not-a-platform', 'android.jar'))
 
 
   def test_set_sdk_path(self, path=None):
@@ -70,6 +72,5 @@ class TestAndroidDistributionTest(unittest2.TestCase):
     with self.distribution() as sdk:
       with env(ANDROID_HOME=sdk):
         AndroidDistribution.set_sdk_path(path)
-
 
 # No live test for now, the varying installed platforms make that unpredictable.

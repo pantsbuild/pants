@@ -10,13 +10,8 @@ import os
 
 class AndroidDistribution(object):
   """
-  This class looks for Android SDKs installed on the machine's path. The SDK path will not
-  be verified until an Android task requests a tool.
+  Represents the Android SDK on the local system.
   """
-
-  # As of now, missing tools simply raise an exception. The SDK could be updated from
-  # within this class, it just depends what state we want to leave the host machine afterwards.
-  # There is probably a discussion to be had about bootstrapping as well.
 
   class Error(Exception):
     """Indicates an invalid android distribution."""
@@ -26,12 +21,12 @@ class AndroidDistribution(object):
   @classmethod
   def cached(cls, path=None):
     """
-    :param path:
-    :return:
+    Check for cached SDK. If not found, instantiate class and search for local SDK.
+
+    :param string path: Optional local address of an SDK, set by user in CLI invocation.
+    :returns: a new :class:``pants.backend.android.distribution.AndroidDistribution``.
     """
-    # The key just used for quick lookup. This method will generally be passed no params, and will
-    # always cache the key(None). But a user can pass a specific sdk on the CLI through AndroidTask.
-    key = (path)
+    key = path
     dist = cls._CACHED_SDK.get(key)
     if not dist:
       dist = cls.set_sdk_path(path)
@@ -40,6 +35,15 @@ class AndroidDistribution(object):
 
   @classmethod
   def set_sdk_path(cls, path=None):
+    """
+    Locate an Android SDK by checking for traditional environmental aliases.
+
+    This method returns an AndroidDistribution even if there is no valid SDK on the user's path.
+    There is no verification of valid SDK until an actual tool is requested by a task using
+    AndroidDistribution.register_android_tool()
+
+    :param string path: Optional local address of a SDK, set by user in CLI invocation.
+    """
     def sdk_path(sdk_env_var):
       sdk = os.environ.get(sdk_env_var)
       return os.path.abspath(sdk) if sdk else None
@@ -53,15 +57,32 @@ class AndroidDistribution(object):
       yield sdk_path('ANDROID_SDK')
 
     for path in filter(None, search_path(path)):
-      dist = cls(path)
+      dist = cls(sdk_path=path)
       return dist
-    dist = cls(None)
+    dist = cls(sdk_path=None)
     return dist
 
   def __init__(self, sdk_path=None):
-    """Creates an Android distribution and caches tools for quick retrieval."""
+    """Create an Android distribution and cache tools for quick retrieval."""
     self._sdk_path = sdk_path
     self._validated_tools = set()
+
+  def register_android_tool(self, tool_path):
+    """Check tool_path and see if it is installed in the local Android SDK.
+
+    All android tasks should request their tools using this method. Tools are validated
+    and cached for quick lookup. This is where the _sdk_path is validated.
+
+    :param string tool_path: Path to tool, relative to the Android SDK root, e.g
+      'platforms/android-19/android.jar'.
+    """
+    try:
+      android_tool = os.path.join(self._sdk_path, tool_path)
+    except:
+        raise AndroidDistribution.Error('Failed to locate Android SDK. Please install SDK and '
+                                    'set ANDROID_HOME in your path')
+    self._register_file(android_tool)
+    return android_tool
 
   def _register_file(self, tool):
     if tool not in self._validated_tools:
@@ -70,15 +91,6 @@ class AndroidDistribution(object):
                          .format(tool))
       self._validated_tools.add(tool)
     return tool
-
-  def registered_android_tool(self, tool_path):
-    try:
-      android_tool = os.path.join(self._sdk_path, tool_path)
-    except:
-        raise AndroidDistribution.Error('Failed to locate Android SDK. Please install SDK and '
-                                    'set ANDROID_HOME in your path')
-    self._register_file(android_tool)
-    return android_tool
 
   def __repr__(self):
     return ('AndroidDistribution({0!r})'.format(self._sdk_path))
