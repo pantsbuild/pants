@@ -66,7 +66,9 @@ jar_library(name = 'junit',
             jars = [
               jar(org = 'junit', name = 'junit-dep', rev = '4.10'),
               jar(org = 'org.hamcrest', name = 'hamcrest-core', rev = '1.2'),
-              jar(org = 'com.twitter.common', name = 'junit-runner', rev = '0.0.38')
+              jar(org = 'com.google.guava', name = 'guava', rev = '16.0'),
+              jar(org = 'com.twitter.common', name = 'junit-runner', rev = '0.0.41')
+                .exclude(org='com.google.guava', name='guava'),
             ])
 
 jar_library(name = 'scala-specs-2.9.3',
