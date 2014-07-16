@@ -51,7 +51,7 @@ jar_library(name='finagle-thrift',
             ])
 
 # common rev for all com.google.guava%guava* artifacts
-GUAVA_REV = '15.0'
+GUAVA_REV = '16.0'
 
 jar_library(name='guava',
             jars = [
