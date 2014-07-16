@@ -31,7 +31,7 @@ from pants.backend.core.tasks.roots import ListRoots
 from pants.backend.core.tasks.sorttargets import SortTargets
 from pants.backend.core.tasks.targets_help import TargetsHelp
 from pants.backend.core.wrapped_globs import Globs, RGlobs, ZGlobs
-from pants.base.build_environment import get_buildroot, get_version, get_scm, set_scm
+from pants.base.build_environment import get_buildroot, get_scm, pants_version, set_scm
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.config import Config
 from pants.base.source_root import SourceRoot
@@ -60,7 +60,7 @@ def build_file_aliases():
       'config': Config,
       'get_buildroot': get_buildroot,
       'get_scm': get_scm,
-      'get_version': get_version,
+      'pants_version': pants_version,
       'goal': goal,
       'pants': lambda x: x,
       'phase': Phase,

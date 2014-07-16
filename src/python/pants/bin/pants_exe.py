@@ -14,7 +14,7 @@ import traceback
 import psutil
 from twitter.common.dirutil import Lock
 
-from pants.base.build_environment import get_buildroot, get_version
+from pants.base.build_environment import get_buildroot, pants_version
 from pants.base.build_file_parser import BuildFileParser
 from pants.base.build_graph import BuildGraph
 from pants.base.config import Config
@@ -32,9 +32,10 @@ _BUILD_COMMAND = 'build'
 _LOG_EXIT_OPTION = '--log-exit'
 _VERSION_OPTION = '--version'
 
-def _do_exit(result=0, msg=None):
+
+def _do_exit(result=0, msg=None, out=sys.stderr):
   if msg:
-    print(msg, file=sys.stderr)
+    print(msg, file=out)
   if _LOG_EXIT_OPTION in sys.argv and result == 0:
     print("\nSUCCESS\n")
   sys.exit(result)
@@ -94,9 +95,9 @@ def _run():
   """
 
   logging.basicConfig()
-  version = get_version()
+  version = pants_version()
   if len(sys.argv) == 2 and sys.argv[1] == _VERSION_OPTION:
-    _do_exit(version)
+    _do_exit(msg=version, out=sys.stdout)
 
   root_dir = get_buildroot()
   if not os.path.exists(root_dir):
@@ -116,7 +117,7 @@ def _run():
                     action='store_true',
                     default=False,
                     dest='log_exit',
-                    help = 'Log an exit message on success or failure.')
+                    help='Log an exit message on success or failure.')
 
   config = Config.load()
 

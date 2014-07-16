@@ -10,11 +10,9 @@ dependencies(
 
 python_library(
   name = 'pants-packaged',
-
-  # TODO(wickman) This version should be automatically pulled in from pants.version
   provides=setup_py(
     name='pantsbuild.pants',
-    version='0.0.17',
+    version=pants_version(),
     description="Twitter's pants build tool.",
     url='https://github.com/pantsbuild/pants',
     license='Apache License, Version 2.0',
@@ -58,4 +56,9 @@ python_library(
   dependencies = [
     pants(':binary_util'),
   ],
+)
+
+python_library(
+  name = 'version',
+  sources = ['version.py'],
 )

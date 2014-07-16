@@ -4,51 +4,73 @@ Release Process
 
 This page describes how to make a versioned release of Pants.
 
-.. note:: As of March 2014 this process is being formalized. If doing releases,
-          please check back often as the process is evolving.
-
 At a high level, releasing pants involves:
 
 * Deciding what/when to release. At present this is ad-hoc, typically when
   a change has been made and the author wants to use a version incorporating
-  that change.
-* Publish to PyPi.
-* Announce the release on `pants-users`.
-
+  that change. Things are likely to remain this way pre 1.0.0.
+* Preparing the release.
+* (optional) Perform a release dry run.
+* Publishing the release to PyPi.
+* Announce the release on `pants-devel`.
 
 ***************
-Publish to PyPi
+Prepare Release
 ***************
 
 Pants and the common libraries are published to the
 `Python Package Index <https://pypi.python.org/pypi>`_ per the Python
 community convention.
 
-At this time version numbers are checked-into BUILD files. Send a review
-updating version numbers for the libraries you will be publishing. You can
-generate a list of libraries requiring publishing with: ::
+Although the build and publish are automated, the version bumping is not. You'll need to edit the
+version number in `src/python/pants/version.py
+<https://github.com/pantsbuild/pants/tree/master/src/python/pants/version.py>`_ and then send this
+out for review.
 
-   $ ./pants goal dependencies \
-       src/python/pants:_pants_transitional_publishable_library_ | sort -u | grep -v =
-   src/python/twitter/common/collections/BUILD:collections
-   src/python/twitter/common/config/BUILD:config
-   src/python/twitter/common/confluence/BUILD:confluence
-   <SNIP>
+*******
+Dry Run
+*******
 
-After updating the checked-in version numbers, publish locally and verify the release. ::
+In order to publish the prepared release you'll need to be a pantsbuild.pants package owner;
+otherwise you'll need to hand off to someone who is.  The list is on the
+`pantsbuild.pants package index page <https://pypi.python.org/pypi/pantsbuild.pants>`_ in the
+`Package Index Owner` field::
 
-   PANTS_DEV=1 ./pants setup_py --recursive src/python/pants:pants-packaged
-   VENV_DIR=$(mktemp -d -t pants.XXXXX)
-   virtualenv $VENV_DIR
-   source $VENV_DIR/bin/activate
-   pip install --find-links=file://$(pwd)/dist pants==0.0.17
-   pants goal list ::
-   deactivate
+   curl -s https://pypi.python.org/pypi/pantsbuild.pants | grep -A1 "Owner"
+   <strong>Package Index Owner:</strong>
+   <span>john.sirois, benjyw, traviscrawford, ericzundel</span>
 
-Now that we've smoke-tested this release, publish to PyPi. ::
+Releases should only be published from master, so get on master and ensure your version number
+commit is present. After confirming this, publish locally and verify the release. ::
 
-   PANTS_DEV=1 ./pants setup_py --recursive --run='sdist upload' \
-     src/python/pants:pants-packaged
+   ./build-support/bin/release.sh -n
 
-Check PyPi to ensure everything looks good. Finally, announce the release to
-`pants-users` and `pants-devel`.
+This will perform a dry run local build of the pantsbuild.pants sdist, install it in a virtualenv
+and then smoke test basic operation.
+
+Note that the release publish flow also performs a mandatory dry run so executing a dry run
+separately is not required.
+
+***************
+Publish to PyPi
+***************
+
+Now that we've smoke-tested this release, we can publish to PyPi::
+
+   ./build-support/bin/release.sh
+
+This also performs a dry run and then proceeds to upload the smoke tested sdist to PyPi.
+
+********
+Announce
+********
+
+Check PyPi to ensure everything looks good. The `pantsbuild.pants package index page
+<https://pypi.python.org/pypi/pantsbuild.pants>`_ should display the package version you just
+uploaded. To test the package is installable::
+
+  ./build-support/bin/release.sh -t
+
+This will attempt to install the just-published package from pypi and then smoke test it.
+
+Finally, announce the release to `pants-devel`.
