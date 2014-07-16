@@ -93,6 +93,7 @@ python_test_suite(
     pants('tests/python/example_test/hello/greet'),
     pants('tests/python/pants_test/android'),
     pants('tests/python/pants_test/authentication:netrc'),
+    pants('tests/python/pants_test/backend'),
     pants('tests/python/pants_test/base'),
     pants('tests/python/pants_test/cache'),
     pants('tests/python/pants_test/commands'),
