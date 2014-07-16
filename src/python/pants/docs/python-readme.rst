@@ -16,8 +16,8 @@ the dependencies.
 This page assumes that you've already read :doc:`first_tutorial`.
 
 Pants' Python support changed in 2014. Depending on how old your Pants is,
-Pants goals might not work with Python code. If you use older pants (e.g.,
-if you work in twitter/commons), please see :doc:`python_old`.
+Pants goals might not work with Python code. If you use older pants,
+please see :doc:`python_old`.
 
 Pants' Python support is still changing. Depending on what you're trying to
 do, your Pants command might start with ``goal`` or might start with something
