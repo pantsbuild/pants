@@ -9,6 +9,7 @@ import json
 import os
 
 from pants.backend.core.tasks.console_task import ConsoleTask
+from pants.backend.core.targets.dependencies import Dependencies
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
@@ -118,7 +119,7 @@ class Depmap(ConsoleTask):
         yield line
       return
     for target in self.context.target_roots:
-      if self._is_jvm(target) or target.is_delegate:
+      if self._is_jvm(target) or isinstance(target, Dependencies):
         if self.is_graph:
           for line in self._output_digraph(target):
             yield line
@@ -159,7 +160,7 @@ class Depmap(ConsoleTask):
           outputted.add(dep_id)
           indent += 1
 
-        if self._is_jvm(dep) or dep.is_delegate:
+        if self._is_jvm(dep) or isinstance(dep, Dependencies):
           for internal_dep in dep.dependencies:
             output += output_deps(internal_dep, indent, outputted)
 

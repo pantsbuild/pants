@@ -26,4 +26,3 @@ class Dependencies(Target):
       for details.
     """
     super(Dependencies, self).__init__(payload=EmptyPayload(), *args, **kwargs)
-    self.add_labels('delegate')
