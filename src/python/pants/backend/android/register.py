@@ -21,8 +21,5 @@ def build_file_aliases():
     }
   )
 
-def register_commands():
-  pass
-
 def register_goals():
   goal(name='aapt', action=AaptGen).install('gen')

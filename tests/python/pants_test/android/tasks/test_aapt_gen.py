@@ -15,21 +15,18 @@ from pants.backend.android.tasks.aapt_gen import AaptGen
 class AaptGenCalculateGenfilesTest(unittest.TestCase):
   """Test the package translation methods in pants.backend.android.aapt_gen."""
 
-  def assert_files(self, rel_path, package, expected_file):
-    self.assertEqual(expected_file, AaptGen._calculate_genfile(os.path.join(rel_path, 'bin'),
-                                                                       package))
+  def assert_files(self, package, expected_file):
+    self.assertEqual(AaptGen._calculate_genfile(package), expected_file)
 
   def test_calculate_genfile(self):
     self.assert_files(
-      'out',
       'com.pants.examples.hello',
-      os.path.join('out', 'bin', 'com', 'pants', 'examples', 'hello'))
+      os.path.join('bin', 'com', 'pants', 'examples', 'hello', 'R.java'))
 
     with self.assertRaises(AssertionError):
       self.assert_files(
-        'out',
         'com.pants.examples.hello',
-        os.path.join('out','com', 'pants', 'examples', 'hello'))
+        os.path.join('bin','com', 'pants', 'examples', 'hello'))
 
 
   def test_package_path(self):

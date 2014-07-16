@@ -6,7 +6,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 from pants.backend.core.tasks.task import Task
-from pants.base.exceptions import TaskError
 from pants.backend.android.distribution.android_distribution import AndroidDistribution
 
 class AndroidTask(Task):
@@ -18,8 +17,11 @@ class AndroidTask(Task):
 
   def __init__(self, context, workdir):
     super(AndroidTask, self).__init__(context, workdir)
+    self._android_sdk = None
     self.forced_sdk = self.context.options.sdk_path or None
-    try:
-      self._dist = AndroidDistribution.cached(self.forced_sdk)
-    except AndroidDistribution.Error as e:
-      raise TaskError(e)
+
+  @property
+  def android_sdk(self):
+    if self._android_sdk is None:
+      self._android_sdk = AndroidDistribution.cached(self.forced_sdk)
+    return self._android_sdk

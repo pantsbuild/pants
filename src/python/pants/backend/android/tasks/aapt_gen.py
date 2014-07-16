@@ -45,11 +45,7 @@ class AaptGen(AndroidTask, CodeGen):
 
   def __init__(self, context, workdir):
     super(AaptGen, self).__init__(context, workdir)
-    lang = 'java'
-    self.gen_langs=set()
-    self.gen_langs.add(lang)
-    # self._dist is an AndroidDistribution inherited from AndroidTask
-    self.dist = self._dist
+    self.android_dist = self.android_sdk
     self.forced_target_sdk = context.options.target_sdk
     self.forced_build_tools_version = context.options.build_tools_version
 
@@ -60,10 +56,10 @@ class AaptGen(AndroidTask, CodeGen):
     return dict(java=lambda t: t.is_jvm)
 
   def is_forced(self, lang):
-    return lang in self.gen_langs
+    return lang == 'java'
 
   def render_args(self, target):
-    output_dir = self._aapt_out(target)
+    output_dir = os.path.join(self.workdir, 'bin')
     safe_mkdir(output_dir)
     args = []
 
@@ -78,13 +74,12 @@ class AaptGen(AndroidTask, CodeGen):
     else:
       args.append(self.android_jar_tool(target.target_sdk))
 
-    # BUILD files in the resource folder chokes aapt. This is a defensive measure.
-    ignored_assets='!.svn:!.git:!.ds_store:!*.scc:.*:<dir>_*:!CVS:' \
-                   '!thumbs.db:!picasa.ini:!*~:BUILD*'
+    # TODO(mateor): Make ignored-assets configurable.
+    ignored_assets = '!.svn:!.git:!.ds_store:!*.scc:.*:<dir>_*:!CVS:'\
+                     '!thumbs.db:!picasa.ini:!*~:BUILD*'
     args.extend(['--ignore-assets', ignored_assets])
     log.debug('Executing: {0}'.format(args))
     return args
-
 
   def genlang(self, lang, targets):
     for target in targets:
@@ -96,12 +91,12 @@ class AaptGen(AndroidTask, CodeGen):
         raise TaskError('Android aapt exited non-zero ({code})'.format(code=result))
 
   def createtarget(self, lang, gentarget, dependees):
-    aapt_gen_file = self._calculate_genfile(self._aapt_out(gentarget),gentarget.package)
-    address = SyntheticAddress(spec_path=aapt_gen_file, target_name = gentarget.id)
+    aapt_gen_file = self._calculate_genfile(gentarget.package)
+    address = SyntheticAddress(spec_path=self.workdir, target_name=gentarget.id)
     tgt = self.context.add_new_target(address,
                                       JavaLibrary,
                                       derived_from=gentarget,
-                                      sources=['R.java'],
+                                      sources=aapt_gen_file,
                                       dependencies=[])
 
     for dependee in dependees:
@@ -109,29 +104,30 @@ class AaptGen(AndroidTask, CodeGen):
     return tgt
 
   @classmethod
-  def package_path(self, package):
+  def package_path(cls, package):
+    """Return the package name translated into a path"""
     return package.replace('.', os.sep)
 
   @classmethod
-  def _calculate_genfile(self, path, package):
-    return os.path.join(path, self.package_path(package))
+  def _calculate_genfile(cls, package):
+    return os.path.join('bin', cls.package_path(package), 'R.java')
 
-  def _aapt_out(self, target):
-    # This mimics the Eclipse layout. We may switch to gradle style sometime in the future.
+  def _aapt_out(self):
+    # TODO (mateor) Does this have potential for collision (chances of same package name?)
     return os.path.join(self.workdir, 'bin')
 
   def aapt_tool(self, build_tools_version):
     """Return the appropriate aapt tool.
 
-    :param string build_tools_version: The version number of the Android build-tools.
+    :param string build_tools_version: The Android build-tools version number (e.g. '19.1.0').
     """
     aapt = os.path.join('build-tools', build_tools_version, 'aapt')
-    return self.dist.registered_android_tool(aapt)
+    return self.android_dist.register_android_tool(aapt)
 
   def android_jar_tool(self, target_sdk):
     """Return the appropriate android.jar.
 
-    :param string target_sdk: The version number of the Android SDK.
+    :param string target_sdk: The Android SDK version number of the target (e.g. '18').
     """
     android_jar = os.path.join('platforms', 'android-' + target_sdk, 'android.jar')
-    return self.dist.registered_android_tool(android_jar)
+    return self.android_dist.register_android_tool(android_jar)
