@@ -10,7 +10,7 @@ At a high level, releasing pants involves:
   a change has been made and the author wants to use a version incorporating
   that change. Things are likely to remain this way pre 1.0.0.
 * Preparing the release.
-* Testing the release.
+* (optional) Perform a release dry run.
 * Publishing the release to PyPi.
 * Announce the release on `pants-devel`.
 
@@ -27,9 +27,9 @@ version number in `src/python/pants/version.py
 <https://github.com/pantsbuild/pants/tree/master/src/python/pants/version.py>`_ and then send this
 out for review.
 
-************
-Test Release
-************
+*******
+Dry Run
+*******
 
 In order to publish the prepared release you'll need to be a pantsbuild.pants package owner;
 otherwise you'll need to hand off to someone who is.  The list is on the
@@ -41,24 +41,15 @@ otherwise you'll need to hand off to someone who is.  The list is on the
    <span>john.sirois, benjyw, traviscrawford, ericzundel</span>
 
 Releases should only be published from master, so get on master and ensure your version number
-and CHANGELOG commit is present. After confirming this, publish locally and verify the release. ::
+commit is present. After confirming this, publish locally and verify the release. ::
 
-   PANTS_DEV=1 ./pants setup_py --recursive src/python/pants:pants-packaged
-   VENV_DIR=$(mktemp -d -t pants.XXXXX)
-   ./build-support/virtualenv $VENV_DIR
-   source $VENV_DIR/bin/activate
-   pip install --find-links=file://$(pwd)/dist \
-     pantsbuild.pants==$(PANTS_DEV=1 ./pants --version 2>/dev/null)
-   pants goal list :: && pants --version
-   deactivate
+   ./build-support/bin/release.sh -n
 
-You should get a listing of targets in the repo and finally the version number you expect to be
-releasing, for example::
+This will perform a dry run local build of the pantsbuild.pants sdist, install it in a virtualenv
+and then smoke test basic operation.
 
-   ...
-   tests/python/pants_test/testutils:testutils
-   tests/scala/com/pants/example/hello/welcome:welcome
-   0.0.18
+Note that the release publish flow also performs a mandatory dry run so executing a dry run
+separately is not required.
 
 ***************
 Publish to PyPi
@@ -66,11 +57,20 @@ Publish to PyPi
 
 Now that we've smoke-tested this release, we can publish to PyPi::
 
-   PANTS_DEV=1 ./pants setup_py --recursive --run='sdist upload' \
-     src/python/pants:pants-packaged
+   ./build-support/bin/release.sh
+
+This also performs a dry run and then proceeds to upload the smoke tested sdist to PyPi.
 
 ********
 Announce
 ********
 
-Check PyPi to ensure everything looks good. Finally, announce the release to `pants-devel`.
+Check PyPi to ensure everything looks good. The `pantsbuild.pants package index page
+<https://pypi.python.org/pypi/pantsbuild.pants>`_ should display the package version you just
+uploaded. To test the package is installable::
+
+  ./build-support/bin/release.sh -t
+
+This will attempt to install the just-published package from pypi and then smoke test it.
+
+Finally, announce the release to `pants-devel`.
