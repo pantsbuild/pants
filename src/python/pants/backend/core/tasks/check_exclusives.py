@@ -60,7 +60,7 @@ class CheckExclusives(Task):
   """
 
   @classmethod
-  def product_type(cls):
+  def product_types(cls):
     return ['exclusives_groups']
 
   @classmethod

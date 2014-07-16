@@ -32,7 +32,7 @@ class JvmdocGen(JvmTask):
     raise NotImplementedError()
 
   @classmethod
-  def product_type(cls):
+  def product_types(cls):
     return [cls.jvmdoc().product_type]
 
   @classmethod

@@ -94,7 +94,7 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
                             help='[%default] Suppress output, overrides verbose flag in pants.ini.')
 
   @classmethod
-  def product_type(cls):
+  def product_types(cls):
     return ['java', 'scala']
 
   def __init__(self, context, workdir):

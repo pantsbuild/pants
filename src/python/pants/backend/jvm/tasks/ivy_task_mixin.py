@@ -27,7 +27,7 @@ class IvyResolveFingerprintStrategy(FingerprintStrategy):
     return 'ivy_resolve'
 
   @classmethod
-  def product_type(cls):
+  def product_types(cls):
     return ['symlink_map']
 
   def compute_fingerprint(self, target):

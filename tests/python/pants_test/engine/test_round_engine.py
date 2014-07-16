@@ -43,7 +43,7 @@ class RoundEngineTest(EngineTestBase, BaseTest):
         self.actions.append(self.construct_action(tag))
 
       @classmethod
-      def product_type(cls):
+      def product_types(cls):
         return product_types or []
 
       def prepare(me, round_manager):

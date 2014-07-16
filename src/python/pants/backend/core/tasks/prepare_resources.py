@@ -18,7 +18,7 @@ from pants.goal.products import MultipleRootedProducts
 class PrepareResources(Task):
 
   @classmethod
-  def product_type(cls):
+  def product_types(cls):
     return ['resources_by_target']
 
   def __init__(self, context, workdir):

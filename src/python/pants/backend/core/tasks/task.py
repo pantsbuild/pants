@@ -133,7 +133,7 @@ class TaskBase(AbstractClass):
     return bool(self._write_artifact_cache_spec) and self.context.options.write_to_artifact_cache
 
   @classmethod
-  def product_type(self):
+  def product_types(self):
     """The list of products this Task produces. Set the product type(s) for this
     task i.e. the product type(s) this task creates e.g ['classes'].
 

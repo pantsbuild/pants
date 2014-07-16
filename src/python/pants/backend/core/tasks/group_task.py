@@ -226,7 +226,7 @@ class GroupTask(Task):
             member_type.setup_parser(option_group, args, mkflag)
 
         @classmethod
-        def product_type(cls):
+        def product_types(cls):
           return product_type
 
         @property
@@ -236,9 +236,9 @@ class GroupTask(Task):
       group_task = SingletonGroupTask
       cls._GROUPS[name] = group_task
 
-    if group_task.product_type() != product_type:
+    if group_task.product_types() != product_type:
       raise ValueError('The group %r was already registered with product type: %r - refusing to '
-                       'overwrite with new product type: %r' % (name, group_task.product_type(),
+                       'overwrite with new product type: %r' % (name, group_task.product_types(),
                                                                 product_type))
 
     return group_task
@@ -270,7 +270,7 @@ class GroupTask(Task):
     self._group_members = []
 
   @abstractmethod
-  def product_type(self):
+  def product_types(self):
     """GroupTask must be sub-classed to provide a product type."""
 
   @abstractproperty

@@ -108,7 +108,7 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
     return cls._language
 
   @classmethod
-  def product_type(cls):
+  def product_types(cls):
     return ['classes_by_target', 'classes_by_source']
 
   def select(self, target):

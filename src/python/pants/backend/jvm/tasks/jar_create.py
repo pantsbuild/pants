@@ -57,7 +57,7 @@ class JarCreate(JarTask):
                             help='[%default] Create compressed jars.')
 
   @classmethod
-  def product_type(cls):
+  def product_types(cls):
     return ['jars']
 
   def __init__(self, context, workdir):

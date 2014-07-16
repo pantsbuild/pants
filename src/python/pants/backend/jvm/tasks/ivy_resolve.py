@@ -61,7 +61,7 @@ class IvyResolve(NailgunTask, IvyTaskMixin, JvmToolTaskMixin):
                                  "marks mutable as False.")
 
   @classmethod
-  def product_type(cls):
+  def product_types(cls):
     return ['ivy_jar_products', 'jar_dependencies']
 
   def __init__(self, context, workdir, confs=None):

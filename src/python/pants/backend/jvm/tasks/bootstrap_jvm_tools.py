@@ -16,7 +16,7 @@ from pants.base.workunit import WorkUnit
 class BootstrapJvmTools(Task, IvyTaskMixin):
 
   @classmethod
-  def product_type(cls):
+  def product_types(cls):
     return ['jvm_build_tools_classpath_callbacks']
 
   def __init__(self, context, workdir):

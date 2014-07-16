@@ -20,7 +20,7 @@ class CodeGen(Task):
   """
 
   @classmethod
-  def product_type(cls):
+  def product_types(cls):
     return ['java', 'scala']
 
   def is_gentarget(self, target):

@@ -82,7 +82,7 @@ class MarkdownToHtml(Task):
                                    'whose source have these extensions instead.')
 
   @classmethod
-  def product_type(cls):
+  def product_types(cls):
     return ['markdown_html', 'wiki_html']
 
   def __init__(self, context, workdir):

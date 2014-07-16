@@ -28,7 +28,7 @@ class IvyImports(NailgunTask):
   """
 
   @classmethod
-  def product_type(cls):
+  def product_types(cls):
     return ['ivy_imports']
 
   def prepare(self, round_manager):
