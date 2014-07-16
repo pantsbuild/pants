@@ -7,7 +7,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from optparse import OptionParser
 
-from pants import version
+from pants.base.build_environment import pants_release
 from pants.goal.option_helpers import add_global_options
 from pants.goal.phase import Phase
 
@@ -24,7 +24,7 @@ def print_help(goals=None):
         print('\n%s: %s' % (phase.name, phase.description))
         _print_flags(parser, phase.name)
   else:
-    print('Pants %s' % version.VERSION)
+    print(pants_release())
     print('\nUsage:')
     print('  ./pants goal [option ...] [goal ...] [target...]  Attempt the specified goals.')
     print('  ./pants goal help                                 Get help.')

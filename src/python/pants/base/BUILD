@@ -31,7 +31,7 @@ python_library(
   sources = ['build_environment.py'],
   dependencies = [
     pants('3rdparty/python/twitter/commons:twitter.common.log'),
-    pants('src/python/pants/version'),
+    pants('src/python/pants:version'),
     pants('src/python/pants/scm:all'),
     pants(':build_root'),
   ]

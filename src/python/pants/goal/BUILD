@@ -58,7 +58,7 @@ python_library(
   dependencies = [
     ':option_helpers',
     ':phase',
-    'src/python/pants/version',
+    'src/python/pants/base:build_environment',
   ],
 )
 
