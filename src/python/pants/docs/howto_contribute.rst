@@ -176,7 +176,28 @@ Finally, ::
 The very last step is closing the review. The change is now complete. Huzzah!
 
 **If you're a committer committing someone else's review,** a handy way to
-patch a local branch with a diff from rbcommons where
-<RB_ID> is a review number like 123::
+patch a local branch is to follow the pattern ::
 
-   ./rbt patch -c <RB_ID>
+    git checkout master
+    git pull
+    ./rbt patch 123
+    # eyeball the diff, make sure everything made it in
+    (git add as necessary)
+    git commit --author='Mateo Rodriguez <mateorod9@gmail.com>' -F - << EOF
+    Erect megaphones.
+
+    This paves support for turning the volume up to 11.
+
+    Testing Done:
+    tesselated the megaphones
+
+    Bugs closed: 345
+
+    Reviewed at https://rbcommons.com/s/twitter/r/123/
+    EOF
+    git push origin master
+
+(You might reasonably think you could ``./rbt patch -c <RB_ID>``;
+but this
+`tickles a bug <https://code.google.com/p/reviewboard/issues/detail?id=3484>`_
+if the change author is not in the "twitter" reviewboard group.)
