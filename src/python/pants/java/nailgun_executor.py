@@ -230,6 +230,11 @@ class NailgunExecutor(Executor):
     with safe_open(self._ng_out, 'r') as ng_out:
       while not nailgun:
         started = ng_out.readline()
+        if started.find('Listening for transport dt_socket at address:') >= 0:
+          nailgun_timeout_seconds = 60
+          log.warn('Timeout extended to {timeout} seconds for debugger to attach to ng server.'
+                   .format(timeout=nailgun_timeout_seconds))
+          started = ng_out.readline()
         if started:
           port = self._parse_nailgun_port(started)
           nailgun = self._create_ngclient(port, stdout, stderr)

@@ -183,9 +183,31 @@ skipped by pants. To bring both jars in, use the ``.with_artifacts()`` method of
 
     jar_library(name = 'stanford-corenlp',
       jars = [
-        jar(org = 'edu.stanford.nlp', name = 'stanford-corenlp', rev = '3.3.1').with_sources().with_artifact(classifier='models').with_artifact(classifier=''),
+        jar(org = 'edu.stanford.nlp', name = 'stanford-corenlp', rev = '3.3.1')
+        .with_sources().with_artifact(classifier='models').with_artifact(classifier=''),
       ]
     )
 
 And as a result, both jars will now be brought into the target's classpath.
 
+
+*******************************
+Using a SNAPSHOT JVM Dependency
+*******************************
+
+.. _test_3rdparty_jvm_snapshot:
+
+Sometimes your code depends on a buggy external JVM dependency. You think you've fixed the
+external code, but want to test locally before uploading it to make sure.
+To do this, in the ``jar`` dependency for the artifact, specify the ``url`` attribute
+to point to the local file and change the ``rev``. If you are actively making changes
+to the dependency, you can also use the ``mutable`` jar attribute to re-import the file
+each time pants is run (otherwise, pants will cache it)::
+
+    jar_library(name='checkstyle',
+      jars = [
+        jar(org='com.puppycrawl.tools', name='checkstyle', rev='5.5-SNAPSHOT',
+            url='file:///Users/pantsdev/Src/checkstyle/checkstyle.jar',
+            mutable=True),
+      ],
+    )
