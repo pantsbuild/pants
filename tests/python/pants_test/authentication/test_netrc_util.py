@@ -11,7 +11,7 @@ import re
 import pytest
 from mock import MagicMock, mock_open, patch
 
-from pants.authentication.netrc_util import Netrc
+from pants.backend.authentication.netrc_util import Netrc
 
 
 @patch('os.path')
@@ -23,7 +23,7 @@ class TestNetrcUtil(object):
       self.exists.return_value = True
 
   def test_netrc_success(self, MockOsPath):
-    with patch('pants.authentication.netrc_util.NetrcDb') as mock_netrc:
+    with patch('pants.backend.authentication.netrc_util.NetrcDb') as mock_netrc:
       instance = mock_netrc.return_value
       instance.hosts = {'host': ('user', 'user', 'passw0rd')}
       instance.authenticators.return_value = ('user', 'user', 'passw0rd')

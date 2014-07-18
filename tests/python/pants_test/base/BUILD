@@ -73,6 +73,7 @@ python_tests(
     pants('src/python/pants/base:address'),
     pants('src/python/pants/base:build_configuration'),
     pants('src/python/pants/base:build_file'),
+    pants('src/python/pants/base:build_file_aliases'),
     pants('src/python/pants/base:build_graph'),
     pants('src/python/pants/base:target'),
   ]

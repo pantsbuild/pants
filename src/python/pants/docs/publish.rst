@@ -161,8 +161,7 @@ To make this work:
 * One of your top-level ``BUILD`` files needs a target that represents
   ``netrc`` auth::
 
-    from pants.authentication.netrc import Netrc
-    netrc = Netrc()
+    netrc = netrc()
 
     credentials(
       name = 'netrc',

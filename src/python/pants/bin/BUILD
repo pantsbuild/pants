@@ -7,7 +7,6 @@ python_library(
   dependencies = [
     pants('3rdparty/python:psutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
-    pants('src/python/pants/authentication:authentication'),
     pants('src/python/pants/base:address'),
     pants('src/python/pants/base:build_environment'),
     pants('src/python/pants/base:build_file_parser'),
@@ -17,6 +16,7 @@ python_library(
     pants('src/python/pants/commands:command'),
 
     pants('src/python/pants/backend/android:plugin'),
+    pants('src/python/pants/backend/authentication:authentication'),
     pants('src/python/pants/backend/codegen:plugin'),
     pants('src/python/pants/backend/core:plugin'),
     pants('src/python/pants/backend/jvm:plugin'),

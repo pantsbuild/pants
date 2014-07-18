@@ -21,7 +21,8 @@ def load_build_configuration_from_source(additional_backends=None):
     the build configuration.
   """
   build_configuration = BuildConfiguration()
-  backend_packages = ['pants.backend.core',
+  backend_packages = ['pants.backend.authentication',
+                      'pants.backend.core',
                       'pants.backend.python',
                       'pants.backend.jvm',
                       'pants.backend.codegen',

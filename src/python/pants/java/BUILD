@@ -22,6 +22,7 @@ python_library(
     pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.lang'),
     pants('3rdparty/python/twitter/commons:twitter.common.log'),
+    pants('src/python/pants/base:build_environment'),
   ]
 )
 
