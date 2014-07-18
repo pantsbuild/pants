@@ -27,9 +27,15 @@ class IvyImports(NailgunTask):
   JavaProtobufLibrary target).
   """
 
+  _CONFIG_SECTION = 'ivy-imports'
+
   @classmethod
   def product_types(cls):
     return ['ivy_imports']
+
+  @property
+  def config_section(self):
+    return self._CONFIG_SECTION
 
   def prepare(self, round_manager):
     super(IvyImports, self).prepare(round_manager)

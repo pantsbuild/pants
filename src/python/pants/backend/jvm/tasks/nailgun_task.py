@@ -5,6 +5,7 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from abc import abstractproperty
 import os
 
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
@@ -43,8 +44,8 @@ class NailgunTaskBase(TaskBase, JvmToolTaskMixin):
                                      help="[%default] Use nailgun daemons to execute java tasks.")
       NailgunTaskBase._DAEMON_OPTION_PRESENT = True
 
-  def __init__(self, context, workdir, minimum_version=None, maximum_version=None, jdk=False,
-               nailgun_name=None):
+  def __init__(self, context, workdir, minimum_version=None,
+               maximum_version=None, jdk=False, nailgun_name=None):
     super(NailgunTaskBase, self).__init__(context, workdir)
     self._executor_workdir = os.path.join(context.config.getdefault('pants_workdir'), 'ng',
                                           nailgun_name or self.__class__.__name__)
@@ -58,14 +59,20 @@ class NailgunTaskBase(TaskBase, JvmToolTaskMixin):
       except Distribution.Error as e:
         raise TaskError(e)
 
+  @abstractproperty
+  def config_section(self):
+    """NailgunTask must be sub-classed to provide a config section name"""
 
+  @property
+  def nailgun_is_enabled(self):
+    return self.context.config.getbool(self.config_section, 'use_nailgun', default=True)
 
   def create_java_executor(self):
     """Create java executor that uses this task's ng daemon, if allowed.
 
     Call only in execute() or later. TODO: Enforce this.
     """
-    if self.context.options.nailgun_daemon:
+    if self.nailgun_is_enabled and self.context.options.nailgun_daemon:
       classpath = os.pathsep.join(self.tool_classpath(self._nailgun_bootstrap_key))
       client = NailgunExecutor(self._executor_workdir, classpath, distribution=self._dist)
     else:

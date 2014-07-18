@@ -28,6 +28,8 @@ from pants.thrift_util import calculate_compile_sources
 CompilerConfig = namedtuple('CompilerConfig', ['name', 'config_section', 'profile',
                                                'main', 'calc_srcs', 'langs'])
 
+_CONFIG_SECTION = 'scrooge-gen'
+
 
 class Compiler(namedtuple('CompilerConfigWithContext', ('context',) + CompilerConfig._fields)):
   @classmethod
@@ -57,7 +59,7 @@ class Compiler(namedtuple('CompilerConfigWithContext', ('context',) + CompilerCo
 # See: https://github.com/pantsbuild/pants/issues/288
 _COMPILERS = [
     CompilerConfig(name='scrooge',
-                   config_section='scrooge-gen',
+                   config_section=_CONFIG_SECTION,
                    profile='scrooge-gen',
                    main='com.twitter.scrooge.Main',
                    calc_srcs=calculate_compile_sources,
@@ -108,6 +110,10 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
       self.register_jvm_tool(compiler.name, bootstrap_tools)
 
     self.defaults = JavaThriftLibrary.Defaults(context.config)
+
+  @property
+  def config_section(self):
+    return _CONFIG_SECTION
 
   # TODO(benjy): Use regular os-located tmpfiles, as we do everywhere else.
   def _tempname(self):

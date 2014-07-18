@@ -188,6 +188,9 @@ class JarTask(NailgunTask):
   invocations.
   """
 
+  _CONFIG_SECTION = 'jar-tool'
+  _JAR_TOOL_CLASSPATH_KEY = 'jar_tool'
+
   @staticmethod
   def _write_agent_manifest(agent, jar):
     # TODO(John Sirois): refactor an agent model to suport 'Boot-Class-Path' properly.
@@ -223,16 +226,20 @@ class JarTask(NailgunTask):
       raise ValueError('Unrecognized duplicate action: %s' % action)
     return name
 
-  _JAR_TOOL_CLASSPATH_KEY = 'jar_tool'
-
   def __init__(self, context, workdir):
     super(JarTask, self).__init__(context, workdir=workdir, jdk=True, nailgun_name='jar-tool')
 
     # TODO(John Sirois): Consider poking a hole for custom jar-tool jvm args - namely for Xmx
     # control.
 
-    jar_bootstrap_tools = context.config.getlist('jar-tool', 'bootstrap-tools', [':jar-tool'])
+    jar_bootstrap_tools = context.config.getlist(self._CONFIG_SECTION,
+                                                 'bootstrap-tools',
+                                                 [':jar-tool'])
     self.register_jvm_tool(self._JAR_TOOL_CLASSPATH_KEY, jar_bootstrap_tools)
+
+  @property
+  def config_section(self):
+    return self._CONFIG_SECTION
 
   def prepare(self, round_manager):
     round_manager.require_data('resources_by_target')

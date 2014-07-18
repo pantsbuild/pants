@@ -82,6 +82,10 @@ class JavaCompile(JvmCompile):
     else:
       self._javac_opts.extend(context.config.getlist('java-compile', 'javac_args', default=[]))
 
+  @property
+  def config_section(self):
+    return self._config_section
+
   def create_analysis_tools(self):
     return AnalysisTools(self.context, JMakeAnalysisParser(self._classes_dir), JMakeAnalysis)
 

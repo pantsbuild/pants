@@ -443,6 +443,10 @@ class JarPublish(JarTask, ScmPublish):
     if context.options.jar_publish_restart_at:
       self.restart_at = parse_jarcoordinate(context.options.jar_publish_restart_at)
 
+  @property
+  def config_section(self):
+    return JarPublish._CONFIG_SECTION
+
   def prepare(self, round_manager):
     round_manager.require('jars')
     round_manager.require('javadoc')

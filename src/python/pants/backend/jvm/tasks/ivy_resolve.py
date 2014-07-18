@@ -23,6 +23,7 @@ from pants.ivy.bootstrapper import Bootstrapper
 
 
 class IvyResolve(NailgunTask, IvyTaskMixin, JvmToolTaskMixin):
+  _CONFIG_SECTION = 'ivy-resolve'
 
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
@@ -69,7 +70,9 @@ class IvyResolve(NailgunTask, IvyTaskMixin, JvmToolTaskMixin):
 
     self._ivy_bootstrapper = Bootstrapper.instance()
     self._cachedir = self._ivy_bootstrapper.ivy_cache_dir
-    self._confs = confs or context.config.getlist('ivy-resolve', 'confs', default=['default'])
+    self._confs = confs or context.config.getlist(self._CONFIG_SECTION,
+                                                  'confs',
+                                                  default=['default'])
     self._classpath_dir = os.path.join(self.workdir, 'mapped')
 
     self._outdir = context.options.ivy_resolve_outdir or os.path.join(self.workdir, 'reports')
@@ -77,7 +80,7 @@ class IvyResolve(NailgunTask, IvyTaskMixin, JvmToolTaskMixin):
     self._report = self._open or context.options.ivy_resolve_report
 
     self._ivy_bootstrap_key = 'ivy'
-    ivy_bootstrap_tools = context.config.getlist('ivy-resolve', 'bootstrap-tools', ':xalan')
+    ivy_bootstrap_tools = context.config.getlist(self._CONFIG_SECTION, 'bootstrap-tools', ':xalan')
     self.register_jvm_tool(self._ivy_bootstrap_key, ivy_bootstrap_tools)
 
     self._ivy_utils = IvyUtils(config=context.config,
@@ -85,7 +88,11 @@ class IvyResolve(NailgunTask, IvyTaskMixin, JvmToolTaskMixin):
                                log=context.log)
 
     # Typically this should be a local cache only, since classpaths aren't portable.
-    self.setup_artifact_cache_from_config(config_section='ivy-resolve')
+    self.setup_artifact_cache_from_config(config_section=self._CONFIG_SECTION)
+
+  @property
+  def config_section(self):
+    return self._CONFIG_SECTION
 
   def prepare(self, round_manager):
     round_manager.require_data('exclusives_groups')

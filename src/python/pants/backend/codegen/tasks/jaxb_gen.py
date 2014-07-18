@@ -28,6 +28,8 @@ from pants.java.distribution import Distribution
 class JaxbGen(CodeGen, NailgunTask):
   """Generates java source files from jaxb schema (.xsd)."""
 
+  _CONFIG_SECTION = 'jaxb-gen'
+
   def __init__(self, context, workdir):
     """
     :param context: inherited parameter from Task
@@ -39,6 +41,10 @@ class JaxbGen(CodeGen, NailgunTask):
     if self.context.products.isrequired(lang):
       self.gen_langs.add(lang)
     self.jar_location = os.path.join(Distribution.cached().home, '..', 'lib', 'tools.jar')
+
+  @property
+  def config_section(self):
+    return self._CONFIG_SECTION
 
   def _compile_schema(self, args):
     classpath = [self.jar_location]
@@ -175,4 +181,3 @@ class JaxbGen(CodeGen, NailgunTask):
     names.append('ObjectFactory')
     outdir = package.replace('.', '/')
     return [os.path.join(outdir, '%s.java' % name) for name in names]
-

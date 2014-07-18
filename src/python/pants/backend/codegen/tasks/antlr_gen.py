@@ -28,6 +28,8 @@ class AntlrGen(CodeGen, NailgunTask, JvmToolTaskMixin):
     'antlr4': 'antlr4-gen',
   }
 
+  _GENERIC_CONFIG_SECTION = 'antlr'
+
   def __init__(self, context, workdir):
     super(AntlrGen, self).__init__(context, workdir)
 
@@ -38,6 +40,10 @@ class AntlrGen(CodeGen, NailgunTask, JvmToolTaskMixin):
     for compiler, tools in self._all_possible_antlr_bootstrap_tools():
       if compiler in active_compilers:
         self.register_jvm_tool(compiler, tools)
+
+  @property
+  def config_section(self):
+    return self._GENERIC_CONFIG_SECTION
 
   def is_gentarget(self, target):
     return isinstance(target, JavaAntlrLibrary)

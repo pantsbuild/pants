@@ -93,7 +93,6 @@ class JvmdocGen(JvmTask):
       callback=mkflag.set_bool,
       help='Specifies that %s errors should not cause build errors' % tool_name)
 
-
     # TODO(John Sirois): This supports the JarPublish task and is an abstraction leak.
     # It allows folks doing a local-publish to skip an expensive and un-needed step.
     # Remove this flag and instead support conditional requirements being registered against

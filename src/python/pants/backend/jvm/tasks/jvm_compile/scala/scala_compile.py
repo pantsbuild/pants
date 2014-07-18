@@ -24,7 +24,8 @@ class ScalaCompile(JvmCompile):
     super(ScalaCompile, cls).setup_parser(option_group, args, mkflag)
 
     option_group.add_option(mkflag('plugins'), dest='plugins', default=None,
-      action='append', help='Use these scalac plugins. Default is set in pants.ini.')
+                            action='append',
+                            help='Use these scalac plugins. Default is set in pants.ini.')
 
   def __init__(self, context, workdir):
     super(ScalaCompile, self).__init__(context, workdir, jdk=False)
@@ -35,6 +36,10 @@ class ScalaCompile(JvmCompile):
                                  nailgun_task=self,
                                  jvm_options=self._jvm_options,
                                  color=color)
+
+  @property
+  def config_section(self):
+    return self._config_section
 
   def create_analysis_tools(self):
     return AnalysisTools(self.context, ZincAnalysisParser(self._classes_dir), ZincAnalysis)
