@@ -31,5 +31,7 @@ python_library(
     pants('src/python/pants/backend/core/tasks:common'),
     pants('src/python/pants/backend/jvm/targets:java'),
     pants('src/python/pants/base:address'),
+    pants('src/python/pants/base:build_environment'),
+    pants('src/python/pants/base:exceptions'),
   ],
 )

@@ -16,6 +16,7 @@ from pants.backend.android.tasks.android_task import AndroidTask
 from pants.backend.codegen.tasks.code_gen import CodeGen
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.base.address import SyntheticAddress
+from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 
 
@@ -92,7 +93,8 @@ class AaptGen(AndroidTask, CodeGen):
 
   def createtarget(self, lang, gentarget, dependees):
     aapt_gen_file = self._calculate_genfile(gentarget.package)
-    address = SyntheticAddress(spec_path=self.workdir, target_name=gentarget.id)
+    spec_path = os.path.join(os.path.relpath(self.workdir, get_buildroot()), 'bin')
+    address = SyntheticAddress(spec_path=spec_path, target_name=gentarget.id)
     tgt = self.context.add_new_target(address,
                                       JavaLibrary,
                                       derived_from=gentarget,
