@@ -53,7 +53,7 @@ class BinaryUtil(object):
 
   class BinaryNotFound(TaskError):
     def __init__(self, binary, accumulated_errors):
-      super(BinaryNotFound, self).__init__(
+      super(BinaryUtil.BinaryNotFound, self).__init__(
           'Failed to fetch binary {binary} from any source: ({sources})'
           .format(binary=binary, sources=', '.join(accumulated_errors)))
 
