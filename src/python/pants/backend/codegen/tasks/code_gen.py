@@ -20,7 +20,12 @@ class CodeGen(Task):
   """
 
   @classmethod
-  def product_type(cls):
+  def package_path(cls, package):
+    """Return the package name translated into a path"""
+    return package.replace('.', os.sep)
+
+  @classmethod
+  def product_types(cls):
     return ['java', 'scala']
 
   def is_gentarget(self, target):

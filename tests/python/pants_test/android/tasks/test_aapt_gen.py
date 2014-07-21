@@ -30,13 +30,13 @@ class AaptGenCalculateGenfilesTest(unittest.TestCase):
 
 
   def test_package_path(self):
-     self.assertEqual(os.path.join('com', 'pants', 'example', 'tests'),
-                      AaptGen.package_path('com.pants.example.tests'))
+    self.assertEqual(os.path.join('com', 'pants', 'example', 'tests'),
+                     AaptGen.package_path('com.pants.example.tests'))
 
-     with self.assertRaises(AssertionError):
-       self.assertEqual(os.path.join('com', 'pants', 'example', 'tests'),
-                        AaptGen.package_path('com.pants-example.tests'))
+    with self.assertRaises(AssertionError):
+      self.assertEqual(os.path.join('com', 'pants', 'example', 'tests'),
+                       AaptGen.package_path('com.pants-example.tests'))
 
-     with self.assertRaises(AssertionError):
-       self.assertEqual(os.path.join('com', 'pants', 'example', 'tests'),
-                        AaptGen.package_path('com.pants.example'))
+    with self.assertRaises(AssertionError):
+      self.assertEqual(os.path.join('com', 'pants', 'example', 'tests'),
+                       AaptGen.package_path('com.pants.example'))
