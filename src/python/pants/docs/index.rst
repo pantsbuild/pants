@@ -69,7 +69,6 @@ Pants Reference Documentation
 
    build_dictionary
    goals_reference
-   pants_ini_reference
 
 
 Contributing to Pants

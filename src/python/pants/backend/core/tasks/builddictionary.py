@@ -346,7 +346,6 @@ class BuildBuildDictionary(Task):
 
   def execute(self):
     self._gen_goals_reference()
-    self._gen_config_reference()
     self._gen_build_dictionary()
 
   def _gen_build_dictionary(self):
@@ -378,19 +377,3 @@ class BuildBuildDictionary(Task):
       generator = Generator(template, phases=phases, glopts=glopts)
       generator.write(outfile)
 
-  def _gen_config_reference(self):
-    options_by_section = defaultdict(list)
-    for option in ConfigOption.all():
-      if isinstance(option.default, unicode):
-        option.default = option.default.replace(get_buildroot(), '%(buildroot)s')
-      options_by_section[option.section].append(option)
-    sections = list()
-    for section, options in options_by_section.items():
-      sections.append(TemplateData(section=section, options=options))
-    template = resource_string(__name__,
-                               os.path.join(self._templates_dir, 'pants_ini_reference.mustache'))
-    filename = os.path.join(self._outdir, 'pants_ini_reference.rst')
-    self.context.log.info('Generating %s' % filename)
-    with safe_open(filename, 'w') as outfile:
-      generator = Generator(template, sections=sections)
-      generator.write(outfile)

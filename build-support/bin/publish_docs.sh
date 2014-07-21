@@ -38,11 +38,11 @@ while getopts "hopd:" opt; do
 done
 
 ${HERE}/../../pants goal builddict || die "Failed to generate the 'BUILD Dictionary'."
+cp dist/builddict/*.rst src/python/pants/docs/
 
 (
   activate_pants_venv && \
   cd src/python/pants/docs && \
-  ./gen.py && \
   make clean html
 ) || die "Failed to generate the doc tree."
 
