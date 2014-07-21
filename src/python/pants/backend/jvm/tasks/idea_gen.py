@@ -13,10 +13,10 @@ from xml.dom import minidom
 
 from twitter.common.dirutil import safe_mkdir
 
+from pants.backend.jvm.tasks.ide_gen import IdeGen, Project, SourceSet
 from pants.base.build_environment import get_buildroot
 from pants.base.config import ConfigOption
 from pants.base.generator import Generator, TemplateData
-from pants.backend.jvm.tasks.ide_gen import IdeGen, Project, SourceSet
 
 
 _TEMPLATE_BASEDIR = 'templates/idea'
@@ -234,11 +234,11 @@ class IdeaGen(IdeGen):
       iml = self._generate_to_tempfile(Generator(pkgutil.get_data(__name__, self.module_template),
           module = configured_module.extend(extra_components = extra_module_components)))
 
+    self.context.log.info('Generated IntelliJ project in {directory}'
+                           .format(directory=self.gen_project_workdir))
+
     shutil.move(ipr, self.project_filename)
     shutil.move(iml, self.module_filename)
-
-    print('\nGenerated project at %s%s' % (self.gen_project_workdir, os.sep))
-
     return self.project_filename if self.open else None
 
   def _generate_to_tempfile(self, generator):
