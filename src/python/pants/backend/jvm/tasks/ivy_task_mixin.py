@@ -54,7 +54,8 @@ class IvyTaskMixin(object):
                   symlink_ivyxml=False,
                   silent=False,
                   workunit_name=None,
-                  workunit_labels=None):
+                  workunit_labels=None,
+                  confs=None):
     # NOTE: Always pass all the targets to exec_ivy, as they're used to calculate the name of
     # the generated module, which in turn determines the location of the XML report file
     # ivy generates. We recompute this name from targets later in order to find that file.
@@ -102,8 +103,8 @@ class IvyTaskMixin(object):
               ivy=ivy,
               workunit_name='ivy',
               workunit_factory=self.context.new_workunit,
-              symlink_ivyxml=symlink_ivyxml)
-
+              symlink_ivyxml=symlink_ivyxml,
+              confs=confs)
         if workunit_name:
           with self.context.new_workunit(name=workunit_name, labels=workunit_labels or []):
             exec_ivy()

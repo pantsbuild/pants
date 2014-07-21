@@ -22,7 +22,7 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
       {{#lib.configurations}}
       <conf name="{{.}}"/>
       {{/lib.configurations}}
-     </configurations>
+    </configurations>
   {{/lib.configurations?}}
 
   {{#lib.publications?}}
@@ -55,13 +55,18 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
       <conf name="{{.}}" mapped="{{.}}"/>
       {{/configurations}}
       {{#artifacts}}
+      <!--
+      The conf = ... in the block below is a hack around a bug John described on RB 716. The bug has
+      something to do with artifacts not being fetched unless .with_artifacts is called multiple
+      times.
+      -->
       <artifact
         {{#name}}name="{{.}}"{{/name}}
         {{#ext}}ext="{{.}}"{{/ext}}
         {{#url}}url="{{.}}"{{/url}}
         {{#type_}}type="{{.}}"{{/type_}}
         {{#classifier}}m:classifier="{{.}}"{{/classifier}}
-        {{#conf}}conf="{{.}}"{{/conf}}
+        conf="{{#configurations}}{{.}}->{{.}};{{/configurations}}"
       />
       {{/artifacts}}
       {{#excludes}}

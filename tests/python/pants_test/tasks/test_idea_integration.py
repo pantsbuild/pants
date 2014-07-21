@@ -6,14 +6,18 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import os
+import re
+import shutil
+import subprocess
 
+from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class IdeaIntegrationTest(PantsRunIntegrationTest):
 
-  def _idea_test(self, specs, project_dir=None):
+  def _idea_test(self, specs, project_dir=None, extra_files=None, extra_regexes=None):
     """Helper method that tests idea generation on the input spec list."""
     if project_dir is None:
       project_dir = os.path.join('.pants.d', 'tmp', 'test-idea')
@@ -32,10 +36,20 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
       # TODO(Garrett Malmquist): Actually validate the contents of the project files, rather than just
       # checking if they exist.
       expected_files = ('project.iml', 'project.ipr',)
+      if extra_files:
+        expected_files = set(expected_files) ^ set(extra_files)
       self.assertTrue(os.path.exists(path),
           'Failed to find project_dir at {dir}.'.format(dir=path))
       self.assertTrue(all(os.path.exists(os.path.join(path, name))
           for name in expected_files))
+      if extra_regexes:
+        file_list = []
+        for root, dirs, files in os.walk(path):
+          file_list.extend(os.path.join(root, name) for name in files)
+        for pattern in extra_regexes:
+          self.assertTrue(any((re.match(pattern, name) is not None) for name in file_list),
+              'Failed to find pattern {pattern} in {dir}:\n{files}'
+              .format(pattern=pattern, dir=path, files=('\n'.join(file_list))))
 
   # Testing IDEA integration on lots of different targets which require different functionalities to
   # make sure that everything that needs to happen for idea gen does happen.
@@ -70,3 +84,28 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
 
   def test_idea_on_scaladepsonboth(self):
     self._idea_test(['testprojects/src/scala/com/pants/testproject/scaladepsonboth::'])
+
+  def test_idea_on_java_sources(self):
+    self._idea_test(['examples/src/java::'])
+
+  def test_idea_missing_sources(self):
+    """Test what happens if we try to fetch sources from a jar that doesn't have any."""
+    self._idea_test(['testprojects/src/java/com/pants/testproject/missing_sources'])
+
+  # NOTE(Garrett Malmquist): The below two tests assume that the annotation example's dependency on
+  # guava will never be removed. If it ever is, these tests will need to be changed to check for a
+  # different 3rdparty jar library.
+  def test_idea_fetch_sources_and_javadocs(self):
+    self._idea_test(['examples/src/java/com/pants/examples/annotation::'], extra_regexes=[
+      r'.*?\bexternal[-]libsources\b.*guava.*?[-].*?sources[.]jar$',
+      r'.*?\bexternal[-]libjavadoc\b.*guava.*?[-].*?javadoc[.]jar$',
+      ])
+
+  def test_idea_fetch_sources_and_javadocs_in_alternate_project_dir(self):
+    alt_dir = os.path.join('.pants.d', 'tmp', 'some', 'arbitrary', 'folder',)
+    self._idea_test(['examples/src/java/com/pants/examples/annotation::'],
+                    project_dir=alt_dir,
+                    extra_regexes=[
+      r'.*?\bexternal[-]libsources\b.*guava.*?[-].*?sources[.]jar$',
+      r'.*?\bexternal[-]libjavadoc\b.*guava.*?[-].*?javadoc[.]jar$',
+      ])

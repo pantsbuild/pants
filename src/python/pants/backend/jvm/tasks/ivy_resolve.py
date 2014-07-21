@@ -9,6 +9,7 @@ from collections import defaultdict
 import os
 import shutil
 import time
+import xml
 
 from pants import binary_util
 from pants.backend.jvm.ivy_utils import IvyUtils
@@ -23,6 +24,9 @@ from pants.util.dirutil import safe_mkdir
 
 class IvyResolve(NailgunTask, IvyTaskMixin, JvmToolTaskMixin):
   _CONFIG_SECTION = 'ivy-resolve'
+
+  class Error(TaskError):
+    """Error in IvyResolve."""
 
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
@@ -62,7 +66,13 @@ class IvyResolve(NailgunTask, IvyTaskMixin, JvmToolTaskMixin):
 
   @classmethod
   def product_types(cls):
-    return ['ivy_jar_products', 'jar_dependencies']
+    return [
+        'ivy_jar_products',
+        'jar_dependencies',
+        'jar_map_default',
+        'jar_map_sources',
+        'jar_map_javadoc',
+      ]
 
   def __init__(self, *args, **kwargs):
     super(IvyResolve, self).__init__(*args, **kwargs)
@@ -103,6 +113,7 @@ class IvyResolve(NailgunTask, IvyTaskMixin, JvmToolTaskMixin):
     groups = self.context.products.get_data('exclusives_groups')
     executor = self.create_java_executor()
     targets = self.context.targets()
+    original_confs = set(self._confs)
 
     # Below, need to take the code that actually execs ivy, and invoke it once for each
     # group. Then after running ivy, we need to take the resulting classpath, and load it into
@@ -124,6 +135,7 @@ class IvyResolve(NailgunTask, IvyTaskMixin, JvmToolTaskMixin):
       # Narrow the groups target set to just the set of targets that we're supposed to build.
       # Normally, this shouldn't be different from the contents of the group.
       group_targets = groups.get_targets_for_group_key(group_key) & set(targets)
+      self._determine_configurations(original_confs, group_targets)
 
       # NOTE(pl): The symlinked ivy.xml (for IDEs, particularly IntelliJ) in the presence of
       # multiple exclusives groups will end up as the last exclusives group run.  I'd like to
@@ -132,9 +144,8 @@ class IvyResolve(NailgunTask, IvyTaskMixin, JvmToolTaskMixin):
       classpath = self.ivy_resolve(group_targets,
                                    executor=executor,
                                    symlink_ivyxml=True,
-                                   workunit_name='ivy-resolve')
-      if self.context.products.is_required_data('ivy_jar_products'):
-        self._populate_ivy_jar_products(group_targets)
+                                   workunit_name='ivy-resolve',
+                                   confs=self._confs)
       for conf in self._confs:
         # It's important we add the full classpath as an (ordered) unit for code that is classpath
         # order sensitive
@@ -143,6 +154,8 @@ class IvyResolve(NailgunTask, IvyTaskMixin, JvmToolTaskMixin):
 
       if self._report:
         self._generate_ivy_report(group_targets)
+      if self.context.products.is_required_data('ivy_jar_products'):
+        self._populate_ivy_jar_products(group_targets)
 
     # TODO(ity): populate a Classpath object instead of mutating exclusives_groups
     create_jardeps_for = self.context.products.isrequired('jar_dependencies')
@@ -158,11 +171,23 @@ class IvyResolve(NailgunTask, IvyTaskMixin, JvmToolTaskMixin):
     global_vts = VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
     return [global_vts]
 
+  def _determine_configurations(self, original_confs, group_targets):
+      # The confs we get from the constructor may be incomplete; make sure we map any jars that the
+      # targets we operate on request.
+      self._confs = set(original_confs) # Important not to modify the original reference.
+      for conf in ('default', 'sources', 'javadoc',):
+        if self.context.products.isrequired('jar_map_{conf}'.format(conf=conf)):
+          self._confs.add(conf)
+
   def _populate_ivy_jar_products(self, targets):
     """Populate the build products with an IvyInfo object for each generated ivy report."""
     ivy_products = self.context.products.get_data('ivy_jar_products') or defaultdict(list)
     for conf in self._confs:
-      ivyinfo = self._ivy_utils.parse_xml_report(targets, conf)
+      ivyinfo = None
+      try:
+        ivyinfo = self._ivy_utils.parse_xml_report(targets, conf)
+      except xml.etree.ElementTree.ParseError as e:
+        self.context.log.error('Error parsing ivy report: {error}'.format(error=str(e)))
       if ivyinfo:
         # Value is a list, to accommodate multiple exclusives groups.
         ivy_products[conf].append(ivyinfo)
@@ -199,7 +224,6 @@ class IvyResolve(NailgunTask, IvyTaskMixin, JvmToolTaskMixin):
     # Xalan needs this dir to exist - ensure that, but do no more - we have no clue where this
     # points.
     safe_mkdir(self._outdir, clean=False)
-
     for conf in self._confs:
       params = dict(org=org, name=name, conf=conf)
       xml = self._ivy_utils.xml_report_path(targets, conf)
@@ -209,7 +233,7 @@ class IvyResolve(NailgunTask, IvyTaskMixin, JvmToolTaskMixin):
       args = ['-IN', xml, '-XSL', xsl, '-OUT', out]
       if 0 != self.runjava(classpath=classpath, main='org.apache.xalan.xslt.Process',
                            args=args, workunit_name='report'):
-        raise TaskError
+        raise IvyResolve.Error('Failed to process generated ivy xml report.')
       reports.append(out)
 
     css = os.path.join(self._outdir, 'ivy-report.css')
