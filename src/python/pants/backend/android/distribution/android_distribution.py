@@ -29,12 +29,12 @@ class AndroidDistribution(object):
     key = path
     dist = cls._CACHED_SDK.get(key)
     if not dist:
-      dist = cls.set_sdk_path(path)
+      dist = cls.locate_sdk_path(path)
     cls._CACHED_SDK[key] = dist
     return dist
 
   @classmethod
-  def set_sdk_path(cls, path=None):
+  def locate_sdk_path(cls, path=None):
     """
     Locate an Android SDK by checking for traditional environmental aliases.
 
@@ -79,8 +79,8 @@ class AndroidDistribution(object):
     try:
       android_tool = os.path.join(self._sdk_path, tool_path)
     except:
-        raise AndroidDistribution.Error('Failed to locate Android SDK. Please install SDK and '
-                                    'set ANDROID_HOME in your path')
+      raise AndroidDistribution.Error('Failed to locate Android SDK. Please install SDK and '
+                                      'set ANDROID_HOME in your path')
     self._register_file(android_tool)
     return android_tool
 
