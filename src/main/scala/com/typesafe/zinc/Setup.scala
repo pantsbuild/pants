@@ -108,6 +108,17 @@ object Setup {
     forkJava
   )
 
+  @deprecated("Use variant that takes forkJava parameter instead.", "0.3.6")
+  def create(
+    scalaCompiler: File,
+    scalaLibrary: File,
+    scalaExtra: JList[File],
+    sbtInterface: File,
+    compilerInterfaceSrc: File,
+    javaHome: File): Setup =
+      create(scalaCompiler, scalaLibrary, scalaExtra, sbtInterface,
+        compilerInterfaceSrc, javaHome, false)
+
   /**
    * Java API for creating Setup with ScalaLocation and SbtJars.
    */
@@ -129,6 +140,12 @@ object Setup {
       forkJava
     )
   }
+
+  @deprecated("Use variant that takes forkJava parameter instead.", "0.3.6")
+  def create(
+    scalaLocation: ScalaLocation,
+    sbtJars: SbtJars,
+    javaHome: File): Setup = create(scalaLocation, sbtJars, javaHome, false)
 
   /**
    * Select the scala jars.
