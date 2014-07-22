@@ -107,5 +107,6 @@ python_test_suite(
     pants('tests/python/pants_test/scm'),
     pants('tests/python/pants_test/targets'),
     pants('tests/python/pants_test/tasks'),
+    pants('tests/python/pants_test/util'),
   ]
 )
