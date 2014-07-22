@@ -12,7 +12,7 @@ import re
 import subprocess
 
 from twitter.common import log
-from twitter.common.collections import OrderedSet, maybe_list
+from twitter.common.collections import OrderedDict, OrderedSet, maybe_list
 
 from pants.backend.codegen.targets.java_protobuf_library import JavaProtobufLibrary
 from pants.backend.codegen.tasks.code_gen import CodeGen
@@ -122,17 +122,58 @@ class ProtobufGen(CodeGen):
       outdir = os.path.join(self.workdir, 'extracted', sha1(f.read()).hexdigest())
     if not os.path.exists(outdir):
       ZIP.extract(jar_path, outdir)
-    self.context.log.debug('Extracting jar at {jar_path}.'.format(jar_path=jar_path))
+      self.context.log.debug('Extracting jar at {jar_path}.'.format(jar_path=jar_path))
+    else:
+      self.context.log.debug('Jar already extracted at {jar_path}.'.format(jar_path=jar_path))
     return outdir
 
   def _proto_path_imports(self, proto_targets):
     for target in proto_targets:
       for path in self._jars_to_directories(target):
-        yield path
+        yield os.path.relpath(path, get_buildroot())
+
+  def _same_contents(self, a, b):
+    with open(a, 'r') as f:
+      a_data = f.read()
+    with open(b, 'r') as f:
+      b_data = f.read()
+    return a_data == b_data
 
   def genlang(self, lang, targets):
-    bases, sources = self._calculate_sources(targets)
-    bases = bases.union(self._proto_path_imports(targets))
+    sources_by_base = self._calculate_sources(targets)
+    sources = reduce(lambda a,b: a^b, sources_by_base.values(), OrderedSet())
+    bases = OrderedSet(sources_by_base.keys())
+    bases.update(self._proto_path_imports(targets))
+
+    # Check for duplicate/conflicting protos.
+    sources_by_genfile = {}
+    for base in sources_by_base.keys(): # Need to iterate over /original/ bases.
+      for path in sources_by_base[base]:
+        if not path in sources:
+          continue # Check to make sure we haven't already removed it.
+        source = path[len(base):]
+        genfiles = calculate_genfiles(path, source)
+        for key in genfiles.keys():
+          for genfile in genfiles[key]:
+            if genfile in sources_by_genfile:
+              # Possible conflict!
+              prev = sources_by_genfile[genfile]
+              if not prev in sources:
+                # Must have been culled by an earlier pass.
+                continue
+              if not self._same_contents(path, prev):
+                self.context.log.error('Proto conflict detected (.proto files are different):')
+                self.context.log.error('  1: {prev}'.format(prev=prev))
+                self.context.log.error('  2: {curr}'.format(curr=path))
+              else:
+                self.context.log.warn('Proto duplication detected (.proto files are identical):')
+                self.context.log.warn('  1: {prev}'.format(prev=prev))
+                self.context.log.warn('  2: {curr}'.format(curr=path))
+              self.context.log.warn('  Arbitrarily favoring proto 1.')
+              if path in sources:
+                sources.remove(path) # Favor the first version.
+              continue
+            sources_by_genfile[genfile] = path
 
     if lang == 'java':
       output_dir = self.java_out
@@ -158,24 +199,25 @@ class ProtobufGen(CodeGen):
       args.append('--proto_path=%s' % base)
 
     args.extend(sources)
-    log.debug('Executing: %s' % ' '.join(args))
+    log.debug('Executing: %s' % '\\\n  '.join(args))
     process = subprocess.Popen(args)
     result = process.wait()
     if result != 0:
       raise TaskError('%s ... exited non-zero (%i)' % (self.protobuf_binary, result))
 
   def _calculate_sources(self, targets):
-    bases = set()
-    sources = set()
-
-    def collect_sources(target):
-      if self.is_gentarget(target):
-        bases.add(target.target_base)
-        sources.update(target.sources_relative_to_buildroot())
-
+    walked_targets = set()
     for target in targets:
-      target.walk(collect_sources)
-    return bases, sources
+      walked_targets.update(t for t in target.closure() if self.is_gentarget(t))
+
+    sources_by_base = OrderedDict()
+    for target in self.context.build_graph.targets():
+      if target in walked_targets:
+        base, sources = target.target_base, target.sources_relative_to_buildroot()
+        if base not in sources_by_base:
+          sources_by_base[base] = OrderedSet()
+        sources_by_base[base].update(sources)
+    return sources_by_base
 
   def createtarget(self, lang, gentarget, dependees):
     if lang == 'java':
