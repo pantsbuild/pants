@@ -10,45 +10,52 @@ import os
 import tempfile
 
 import mox
-import pytest
+import unittest2 as unittest
 
 from pants.util import dirutil
+from pants.util.dirutil import _mkdtemp_unregister_cleaner
 
 
-def test_mkdtemp_setup_teardown():
-  m = mox.Mox()
+class DirutilTest(unittest.TestCase):
 
-  def faux_cleaner():
-    pass
+  def setUp(self):
+    self._mox = mox.Mox()
+    # Ensure we start in a clean state.
+    _mkdtemp_unregister_cleaner()
 
-  DIR1, DIR2 = 'fake_dir1__does_not_exist', 'fake_dir2__does_not_exist'
-  m.StubOutWithMock(atexit, 'register')
-  m.StubOutWithMock(os, 'getpid')
-  m.StubOutWithMock(tempfile, 'mkdtemp')
-  m.StubOutWithMock(dirutil, 'safe_rmtree')
-  atexit.register(faux_cleaner) # ensure only called once
-  tempfile.mkdtemp(dir='1').AndReturn(DIR1)
-  tempfile.mkdtemp(dir='2').AndReturn(DIR2)
-  os.getpid().MultipleTimes().AndReturn('unicorn')
-  dirutil.safe_rmtree(DIR1)
-  dirutil.safe_rmtree(DIR2)
-  # make sure other "pids" are not cleaned
-  dirutil._MKDTEMP_DIRS['fluffypants'].add('yoyo')
+  def tearDown(self):
+    self._mox.UnsetStubs()
 
-  try:
-    m.ReplayAll()
-    assert dirutil.safe_mkdtemp(dir='1', cleaner=faux_cleaner) == DIR1
-    assert dirutil.safe_mkdtemp(dir='2', cleaner=faux_cleaner) == DIR2
-    assert 'unicorn' in dirutil._MKDTEMP_DIRS
-    assert dirutil._MKDTEMP_DIRS['unicorn'] == set([DIR1, DIR2])
-    dirutil._mkdtemp_atexit_cleaner()
-    assert 'unicorn' not in dirutil._MKDTEMP_DIRS
-    assert dirutil._MKDTEMP_DIRS['fluffypants'] == set(['yoyo'])
+  def test_mkdtemp_setup_teardown(self):
+    def faux_cleaner():
+      pass
 
-  finally:
-    dirutil._MKDTEMP_DIRS.pop('unicorn', None)
-    dirutil._MKDTEMP_DIRS.pop('fluffypants', None)
-    dirutil._mkdtemp_unregister_cleaner()
+    DIR1, DIR2 = 'fake_dir1__does_not_exist', 'fake_dir2__does_not_exist'
+    self._mox.StubOutWithMock(atexit, 'register')
+    self._mox.StubOutWithMock(os, 'getpid')
+    self._mox.StubOutWithMock(tempfile, 'mkdtemp')
+    self._mox.StubOutWithMock(dirutil, 'safe_rmtree')
+    atexit.register(faux_cleaner)  # Ensure only called once.
+    tempfile.mkdtemp(dir='1').AndReturn(DIR1)
+    tempfile.mkdtemp(dir='2').AndReturn(DIR2)
+    os.getpid().MultipleTimes().AndReturn('unicorn')
+    dirutil.safe_rmtree(DIR1)
+    dirutil.safe_rmtree(DIR2)
+    # Make sure other "pids" are not cleaned.
+    dirutil._MKDTEMP_DIRS['fluffypants'].add('yoyo')
 
-    m.UnsetStubs()
-    m.VerifyAll()
+    try:
+      self._mox.ReplayAll()
+      self.assertEquals(DIR1, dirutil.safe_mkdtemp(dir='1', cleaner=faux_cleaner))
+      self.assertEquals(DIR2, dirutil.safe_mkdtemp(dir='2', cleaner=faux_cleaner))
+      self.assertIn('unicorn', dirutil._MKDTEMP_DIRS)
+      self.assertEquals(set([DIR1, DIR2]), dirutil._MKDTEMP_DIRS['unicorn'])
+      dirutil._mkdtemp_atexit_cleaner()
+      self.assertNotIn('unicorn', dirutil._MKDTEMP_DIRS)
+      self.assertEquals(set(['yoyo']), dirutil._MKDTEMP_DIRS['fluffypants'])
+    finally:
+      dirutil._MKDTEMP_DIRS.pop('unicorn', None)
+      dirutil._MKDTEMP_DIRS.pop('fluffypants', None)
+      dirutil._mkdtemp_unregister_cleaner()
+
+    self._mox.VerifyAll()

@@ -62,19 +62,17 @@ def _mkdtemp_register_cleaner(cleaner):
 
 
 def safe_mkdtemp(cleaner=_mkdtemp_atexit_cleaner, **kw):
+  """Create a temporary directory that is cleaned up on process exit.
+
+  Arguments are as to tempfile.mkdtemp.
   """
-    Given the parameters to standard tempfile.mkdtemp, create a temporary directory
-    that is cleaned up on process exit.
-  """
-  # proper lock sanitation on fork [issue 6721] would be desirable here.
+  # Proper lock sanitation on fork [issue 6721] would be desirable here.
   with _MKDTEMP_LOCK:
     return register_rmtree(tempfile.mkdtemp(**kw), cleaner=cleaner)
 
 
 def register_rmtree(directory, cleaner=_mkdtemp_atexit_cleaner):
-  """
-    Register an existing directory to be cleaned up at process exit.
-  """
+  """Register an existing directory to be cleaned up at process exit."""
   with _MKDTEMP_LOCK:
     _mkdtemp_register_cleaner(cleaner)
     _MKDTEMP_DIRS[os.getpid()].add(directory)
