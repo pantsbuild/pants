@@ -8,9 +8,8 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import os
 import shutil
 
-from twitter.common.contextutil import temporary_dir
-
 from pants.base.build_environment import get_buildroot
+from pants.util.contextutil import temporary_dir
 
 
 class AnalysisTools(object):

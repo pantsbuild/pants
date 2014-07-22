@@ -62,7 +62,6 @@ python_library(
   name = 'binary_create',
   sources = ['binary_create.py'],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants(':common'),
     pants(':jvm_binary_task'),
     pants('src/python/pants/base:build_environment'),
@@ -87,7 +86,6 @@ python_library(
   sources = ['bundle_create.py'],
   dependencies = [
     pants('3rdparty/python/twitter/commons:twitter.common.collections'),
-    pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants(':common'),
     pants(':jvm_binary_task'),
     pants('src/python/pants/backend/jvm/targets:jvm'),
@@ -310,12 +308,12 @@ python_library(
   dependencies = [
     pants(':nailgun_task'),
     pants('3rdparty/python/twitter/commons:twitter.common.collections'),
-    pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.lang'),
     pants('src/python/pants/base:exceptions'),
     pants('src/python/pants/base:workunit'),
     pants('src/python/pants/java:jar'),
     pants('src/python/pants/backend/jvm/targets:jvm'),
+    pants('src/python/pants/util:contextutil'),
   ],
 )
 
@@ -417,9 +415,9 @@ python_library(
   dependencies = [
     pants(':common'),
     pants('3rdparty/python/twitter/commons:twitter.common.collections'),
-    pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('src/python/pants/backend/jvm:ivy_utils'),
     pants('src/python/pants/backend/jvm/targets:jvm'),
+    pants('src/python/pants/util:contextutil'),
   ],
 )
 

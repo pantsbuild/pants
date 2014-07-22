@@ -4,7 +4,16 @@
 dependencies(
   name = 'util',
   dependencies = [
+    pants(':contextutil'),
     pants(':dirutil'),
+  ]
+)
+
+python_tests(
+  name = 'contextutil',
+  sources = ['test_contextutil.py'],
+  dependencies = [
+    pants('src/python/pants/util:contextutil'),
   ]
 )
 

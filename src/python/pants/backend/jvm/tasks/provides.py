@@ -9,12 +9,11 @@ import os
 import sys
 
 from twitter.common.collections import OrderedSet
-from twitter.common.contextutil import open_zip as open_jar
 
 from pants.backend.jvm.targets.jar_dependency import JarDependency
-from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.core.tasks.task import Task
 from pants.backend.jvm.ivy_utils import IvyModuleRef, IvyUtils
+from pants.util.contextutil import open_zip as open_jar
 
 
 class Provides(Task):

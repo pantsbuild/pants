@@ -33,8 +33,8 @@ python_library(
   name = 'analysis_tools',
   sources = ['analysis_tools.py'],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('src/python/pants/base:build_environment'),
+    pants('src/python/pants/util:contextutil'),
   ]
 )
 
@@ -58,7 +58,6 @@ python_library(
   sources = ['jvm_compile.py'],
   dependencies = [
     pants(':jvm_dependency_analyzer'),
-    pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('src/python/pants/backend/core/tasks:group_task'),
     pants('src/python/pants/backend/core/tasks:task'),
     pants('src/python/pants/backend/jvm/tasks:jvm_tool_task_mixin'),
@@ -68,6 +67,7 @@ python_library(
     pants('src/python/pants/base:worker_pool'),
     pants('src/python/pants/goal:products'),
     pants('src/python/pants/reporting'),
+    pants('src/python/pants/util:contextutil'),
     pants('src/python/pants/util:dirutil'),
   ],
 )

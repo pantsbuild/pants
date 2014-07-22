@@ -2,8 +2,17 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-   name = 'dirutil',
-   sources = ['dirutil.py'],
+   name = 'contextutil',
+   sources = ['contextutil.py'],
    dependencies = [
+     '3rdparty/python/twitter/commons:twitter.common.lang',
+     ':dirutil',
    ],
+)
+
+python_library(
+  name = 'dirutil',
+  sources = ['dirutil.py'],
+  dependencies = [
+  ],
 )

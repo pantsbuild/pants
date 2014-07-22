@@ -12,7 +12,6 @@ import shutil
 import uuid
 
 from twitter.common.collections import OrderedSet
-from twitter.common.contextutil import open_zip, temporary_dir
 
 from pants.backend.core.tasks.group_task import GroupMember
 from pants.backend.jvm.tasks.jvm_compile.jvm_dependency_analyzer import JvmDependencyAnalyzer
@@ -24,6 +23,7 @@ from pants.base.target import Target
 from pants.base.worker_pool import Work
 from pants.goal.products import MultipleRootedProducts
 from pants.reporting.reporting_utils import items_to_report_element
+from pants.util.contextutil import open_zip, temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_rmtree
 
 

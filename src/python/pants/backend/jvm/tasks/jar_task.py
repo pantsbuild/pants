@@ -11,7 +11,6 @@ import os
 import tempfile
 
 from twitter.common.collections import maybe_list
-from twitter.common.contextutil import temporary_dir
 from twitter.common.lang import AbstractClass, Compatibility
 
 from pants.backend.jvm.targets.jvm_binary import Duplicate, Skip, JarRules
@@ -19,6 +18,7 @@ from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit
 from pants.java.jar.manifest import Manifest
+from pants.util.contextutil import temporary_dir
 
 
 class Jar(object):
