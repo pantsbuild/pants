@@ -3,6 +3,8 @@
 
 package com.pants.examples.hello.main;
 
+import java.io.IOException;
+
 import com.pants.examples.hello.greet.Greeting;
 
 public class HelloMain {

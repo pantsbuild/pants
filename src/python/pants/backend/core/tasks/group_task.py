@@ -104,7 +104,7 @@ class GroupIterator(object):
             for k in range(j, i, -1):
               previous_target = sorted_targets[k - 1]
               mismatching_types = current_type != discriminator(previous_target)
-              not_a_dependency = look_ahead_target not in previous_target.dependencies
+              not_a_dependency = look_ahead_target not in previous_target.closure()
               if mismatching_types and not_a_dependency:
                 sorted_targets[k] = sorted_targets[k - 1]
                 sorted_targets[k - 1] = look_ahead_target
