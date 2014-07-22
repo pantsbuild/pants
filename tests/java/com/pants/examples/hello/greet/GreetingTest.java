@@ -7,18 +7,25 @@ package com.pants.examples.hello.greet;
 
 import org.junit.Test;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 /* Ensure our greetings are polite */
 public class GreetingTest {
   @Test
   public void mentionGreetee() {
     String greetingForFoo = Greeting.greet("Foo");
-    assertEquals(true, greetingForFoo.contains("Foo"));
+    assertTrue(greetingForFoo.contains("Foo"));
   }
+
+  @Test
+  public void mentionGreeteeFromResource() throws Exception {
+    String greeting = Greeting.greetFromResource("com/pants/example/hello/world.txt");
+    assertTrue(greeting.contains("Resource World"));
+  }
+
   @Test
   public void shouldSayHello() {
     String greetingForFoo = Greeting.greet("Foo");
-    assertEquals(true, greetingForFoo.contains("Hello"));
+    assertTrue(greetingForFoo.contains("Hello"));
   }
 }

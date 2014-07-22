@@ -3,45 +3,18 @@
 
 package com.pants.examples.hello.main;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.InputStream;
-import java.util.Scanner;
-
 import com.pants.examples.hello.greet.Greeting;
 
 public class HelloMain {
 
-  public static void main(String[] args) throws FileNotFoundException {
+  public static void main(String[] args) throws IOException {
     // Target of greeting is config'd in greetee.txt file, so read that:
-    String greetee = "default world";
-    Scanner scanner = null;
-    try {
-	scanner = new Scanner(new File("greetee.txt")).useDelimiter("\\Z");
-	greetee = scanner.next();
-    } finally {
-	if (scanner != null) {
-	    scanner.close();
-	}
-    }
-
-    System.out.println(Greeting.greet(greetee));
+    System.out.println(Greeting.greetFromFile("greetee.txt"));
 
     // Target of other greeting is config'd in resource, so read that:
-    greetee = "default world";
-    try {
-	InputStream is = HelloMain.class.getClassLoader()
-	    .getResourceAsStream("com/pants/example/hello/world.txt");
-	scanner = new Scanner(is).useDelimiter("\\Z");
-	greetee = scanner.next();
-    } finally {
-	if (scanner != null) {
-	    scanner.close();
-	}
-    }
-
-    System.out.println(Greeting.greet(greetee));
+    System.out.println(Greeting.greetFromResource("com/pants/example/hello/world.txt"));
   }
+
   private HelloMain() {
     // not called. placates checkstyle
   }
