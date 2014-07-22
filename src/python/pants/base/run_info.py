@@ -11,9 +11,8 @@ import re
 import socket
 import time
 
-from twitter.common.dirutil import safe_mkdir_for
-
 from pants.base.build_environment import get_buildroot, get_scm
+from pants.util.dirutil import safe_mkdir_for
 
 
 class RunInfo(object):

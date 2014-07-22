@@ -10,9 +10,9 @@ import re
 import time
 import uuid
 
-from twitter.common.dirutil import safe_mkdir_for
 
 from pants.rwbuf.read_write_buffer import FileBackedRWBuf
+from pants.util.dirutil import safe_mkdir_for
 
 
 class WorkUnit(object):

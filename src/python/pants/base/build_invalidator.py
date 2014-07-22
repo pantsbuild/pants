@@ -11,11 +11,10 @@ import itertools
 import os
 from collections import namedtuple
 
-from twitter.common.dirutil import safe_mkdir
-
 from pants.base.hash_utils import hash_all
 from pants.base.target import Target
 from pants.fs.fs import safe_filename
+from pants.util.dirutil import safe_mkdir
 
 
 # A CacheKey represents some version of a set of targets.
