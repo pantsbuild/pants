@@ -17,7 +17,6 @@ python_library(
     'android_resources.py',
   ],
   dependencies = [
-    pants('src/python/pants/base:build_manual'),
     pants('src/python/pants/base:payload'),
     pants('src/python/pants/base:target'),
     pants('src/python/pants/backend/core/targets:common'),

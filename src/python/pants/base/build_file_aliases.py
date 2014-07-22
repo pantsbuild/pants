@@ -7,6 +7,8 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from collections import namedtuple
 
+import functools
+
 
 class BuildFileAliases(namedtuple('BuildFileAliases',
                                   ['targets', 'objects', 'context_aware_object_factories'])):
@@ -28,6 +30,23 @@ class BuildFileAliases(namedtuple('BuildFileAliases',
     def copy(orig):
       return orig.copy() if orig else {}
     return cls(copy(targets), copy(objects), copy(context_aware_object_factories))
+
+  @classmethod
+  def curry_context(cls, wrappee):
+    """Curry a function with a build file context.
+
+    Given a function foo(ctx, bar) that you want to expose in BUILD files
+    as foo(bar), use::
+
+        context_aware_object_factories={
+          'foo': BuildFileAliases.curry_context(foo),
+        }
+    """
+    # You might wonder: why not just use lambda and functools.partial?
+    # That loses the __doc__, thus messing up the BUILD dictionary.
+    wrapper = lambda ctx: functools.partial(wrappee, ctx)
+    wrapper.__doc__ = wrappee.__doc__
+    return wrapper
 
   def merge(self, other):
     """Merges a set of build file aliases and returns a new set of aliases containing both.

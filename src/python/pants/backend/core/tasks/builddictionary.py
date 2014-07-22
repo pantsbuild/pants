@@ -132,7 +132,7 @@ def entry_for_one_class(nom, cls):
     for attrname in dir(cls):
       attr = getattr(cls, attrname)
       attr_bdi = get_builddict_info(attr)
-      if not attr_bdi: continue
+      if attr_bdi is None: continue
       if inspect.ismethod(attr):
         methods.append(entry_for_one_method(attrname, attr))
         continue
@@ -163,35 +163,32 @@ def entry_for_one(nom, sym):
 
 
 PREDEFS = {  # some hardwired entries
-  "Amount": {"defn": msg_entry("Amount", """
-                                `Amount from twitter.commons.quantity <https://github.com/twitter/commons/blob/master/src/python/twitter/common/quantity/__init__.py>`_
-                                E.g., ``Amount(2, Time.MINUTES)``.""")},
-  "egg" : {"tags": ["python"],
-           "defn": msg_entry("egg",
+  # TODO: There's no docstring in twitter/commons, so hardwired this.
+  #       The legit fix: add a docstring in twitter/commons.
+  #       https://github.com/pantsbuild/pants/issues/372
+  "Amount": {"defn": msg_entry("Amount", """Used in some params,
+                                e.g., ``Amount(2, Time.MINUTES)``.
+                                From twitter.commons.""")},
+  "egg" : {"defn": msg_entry("egg",
                              "In older Pants, loads a pre-built Python egg "
                              "from file system. Undefined in newer Pants.")},
-  "__file__": {"defn": msg_entry("__file__", "Path to BUILD file (string).")},
-  "globs": {"defn": entry_for_one("globs", Fileset.globs)},
   "java_tests": {"defn": msg_entry("java_tests",
-                  """Old name for `junit_tests`_""")},
+                  """Old name for `junit_tests`_"""),},
   "pants": {"defn": msg_entry("pants",
-                  """In old Pants versions, a reference to a Pants targets. (In new Pants versions, just use strings.)"""),
-            "tags": ["anylang"]},
-  "maven_layout": {"defn": entry_for_one("maven_layout", maven_layout)},
+                  """In old Pants versions, a reference to a Pants targets.
+                  (In new Pants versions, just use strings.)""")},
   "python_artifact": {"suppress": True},  # unused alias for PythonArtifact
-  "python_requirements": {"defn": entry_for_one("python_requirements", python_requirements)},
   "python_test_suite": {"defn": msg_entry("python_test_suite",
                                           """Deprecated way to group Python tests; use `dependencies`_""")},
-  "rglobs": {"defn": entry_for_one("rglobs", Fileset.rglobs)},
-  "ROOT_DIR": {"defn": msg_entry("ROOT_DIR",
-                                  "Root directory of source code (string).")},
   "scala_tests": {"defn": msg_entry("scala_tests",
                   """Old name for `scala_specs`_""")},
-  "Time": {"defn": msg_entry("Time", """
-                             `Amount from twitter.commons.quantity <https://github.com/twitter/commons/blob/master/src/python/twitter/common/quantity/__init__.py>`_
-                             E.g., ``Amount(2, Time.MINUTES)``."""), },
+  # TODO: There's no docstring in twitter/commons, so hardwired this.
+  #       The legit fix: add a docstring in twitter/commons.
+  #       https://github.com/pantsbuild/pants/issues/372
+  "Time": {"defn": msg_entry("Time", """Used in some params,
+                             e.g., ``Amount(2, Time.MINUTES)``.
+                             From twitter.commons"""), },
 }
-
 
 # Report symbols defined in BUILD files (jvm_binary...)
 # Returns dict {"scala_library": ScalaLibrary, "Amount": commons.Amount, ...}
@@ -219,21 +216,24 @@ def tocl(d):
   return TemplateData(t="All The Things", e=[a for a in anchors])
 
 
-def tags_tocl(d, tag_list, title):
-  """Generate specialized TOC.
-  E.g., tags_tocl(d, ["python", "anylang"], "Python")
-  tag_list: if an entry's tags contains any of these, use it
-  title: pretty title
+def sub_tocl(d, substr_list, title):
+  """Generate specialized TOC. Generates the "JVM" and "Android" lists.
+
+  E.g., sub_tocl(d, ["backend.python", "backend.core"], "Python")
+  returns a list with things like "python_library" but not like "java_library"
+
+  Filters based on each thing's impl
+
+  :param substr_list: if an entry's impl contains any of these, use it
+  :param title: pretty title
   """
   filtered_anchors = []
   for anc in sorted(d.keys(), key=_lower):
-    entry = d[anc]
-    if not "tags" in entry: continue
-    found = [t for t in tag_list if t in entry["tags"]]
+    if not d[anc]["defn"]["impl"]: continue
+    found = [t for t in substr_list if t in d[anc]["defn"]["impl"]]
     if not found: continue
     filtered_anchors.append(anc)
   return TemplateData(t=title, e=filtered_anchors)
-
 
 def gen_goals_glopts_reference_data():
   global_option_parser = optparse.OptionParser(add_help_option=False)
@@ -328,11 +328,8 @@ def assemble(predefs=PREDEFS, build_file_parser=None):
   if build_file_parser:
     symbol_hash = get_syms(build_file_parser)
     for nom in symbol_hash:
-      bdi = get_builddict_info(symbol_hash[nom])
-      if bdi is None: continue
-      retval[nom] = bdi.copy()
-      if not "defn" in retval[nom]:
-        retval[nom]["defn"] = entry_for_one(nom, symbol_hash[nom])
+      v = symbol_hash[nom]
+      retval[nom] = {"defn": entry_for_one(nom, v)}
   return retval
 
 
@@ -353,8 +350,8 @@ class BuildBuildDictionary(Task):
     d = assemble(build_file_parser=self.context.build_file_parser)
     template = resource_string(__name__, os.path.join(self._templates_dir, 'page.mustache'))
     tocs = [tocl(d),
-            tags_tocl(d, ["java", "scala", "jvm", "anylang"], "JVM"),
-            tags_tocl(d, ["python", "anylang"], "Python")]
+            sub_tocl(d, ["android", "jvm", "backend.core", "java", "scala"], "JVM"),
+            sub_tocl(d, ["backend.python", "core"], "Python")]
     defns = [d[t]["defn"] for t in sorted(d.keys(), key=_lower)]
     filename = os.path.join(self._outdir, 'build_dictionary.rst')
     self.context.log.info('Generating %s' % filename)
@@ -376,4 +373,3 @@ class BuildBuildDictionary(Task):
     with safe_open(filename, 'w') as outfile:
       generator = Generator(template, phases=phases, glopts=glopts)
       generator.write(outfile)
-

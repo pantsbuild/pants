@@ -40,6 +40,7 @@ from pants.goal import Goal as goal, Phase
 
 
 class BuildFilePath(object):
+  """Returns path containing this ``BUILD`` file."""
   def __init__(self, parse_context):
     self.rel_path = parse_context.rel_path
 

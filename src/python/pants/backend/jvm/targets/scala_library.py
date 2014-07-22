@@ -8,11 +8,9 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 from pants.backend.jvm.scala.target_platform import TargetPlatform
 from pants.backend.jvm.targets.exportable_jvm_library import ExportableJvmLibrary
 from pants.base.address import SyntheticAddress
-from pants.base.build_manual import manual
 from pants.base.exceptions import TargetDefinitionException
 
 
-@manual.builddict(tags=['scala'])
 class ScalaLibrary(ExportableJvmLibrary):
   """A collection of Scala code.
 

@@ -47,7 +47,6 @@ class Artifact(object):
 
 
 
-@manual.builddict(tags=["jvm"])
 class JarDependency(object):
   """A pre-built Maven repository dependency."""
 

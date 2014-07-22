@@ -10,10 +10,7 @@ import os
 
 from netrc import netrc as NetrcDb, NetrcParseError
 
-from pants.base.build_manual import manual
 
-
-@manual.builddict()
 class Netrc(object):
   """Fecthes username and passfrom from  ~/.netrc for logged in user."""
 

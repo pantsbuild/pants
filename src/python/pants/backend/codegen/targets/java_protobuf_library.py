@@ -10,11 +10,9 @@ from twitter.common.lang import Compatibility
 from pants.backend.jvm.targets.exportable_jvm_library import ExportableJvmLibrary
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.base.address import SyntheticAddress
-from pants.base.build_manual import manual
 from pants.base.payload import JavaProtobufLibraryPayload
 
 
-@manual.builddict(tags=["java"])
 class JavaProtobufLibrary(ExportableJvmLibrary):
   """Generates a stub Java library from protobuf IDL files."""
 

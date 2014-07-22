@@ -11,12 +11,10 @@ from twitter.common.collections import maybe_list
 from twitter.common.lang import Compatibility
 from twitter.common.python.pex_info import PexInfo
 
-from pants.base.build_manual import manual
 from pants.base.exceptions import TargetDefinitionException
 from pants.backend.python.targets.python_target import PythonTarget
 
 
-@manual.builddict(tags=['python'])
 class PythonBinary(PythonTarget):
   """Produces a Python binary.
 

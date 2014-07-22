@@ -5,11 +5,9 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from pants.base.build_manual import manual
 from pants.backend.python.targets.python_target import PythonTarget
 
 
-@manual.builddict(tags=["python"])
 class PythonLibrary(PythonTarget):
   """Produces a Python library.
 

@@ -14,7 +14,6 @@ python_library(
     pants('3rdparty/python/twitter/commons:twitter.common.python'),
     pants('3rdparty/python/twitter/commons:twitter.common.quantity'),
     pants('3rdparty/python:setuptools'),
-    pants('src/python/pants/base:build_manual'),
     pants('src/python/pants/base:target'),
     pants('src/python/pants/backend/core/targets:common'),
     pants('src/python/pants/backend/python:python_artifact'),

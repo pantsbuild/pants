@@ -10,7 +10,6 @@ import inspect
 
 from optparse import OptionGroup
 
-from pants.base.build_manual import manual
 from pants.goal.context import Context
 from pants.goal.error import GoalError
 from pants.goal.phase import Phase
@@ -47,7 +46,6 @@ class Mkflag(object):
     setattr(parser.values, option.dest, not opt_str.startswith("--no"))
 
 
-@manual.builddict()
 class Goal(object):
   def __init__(self, name, action, dependencies=None, serialize=True):
     """

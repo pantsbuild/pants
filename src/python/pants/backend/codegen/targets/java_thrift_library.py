@@ -6,12 +6,10 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 from pants.backend.jvm.targets.jvm_target import JvmTarget
-from pants.base.build_manual import manual
 from pants.base.config import Config
 from pants.base.exceptions import TargetDefinitionException
 
 
-@manual.builddict(tags=['java'])
 class JavaThriftLibrary(JvmTarget):
   """Generates a stub Java or Scala library from thrift IDL files."""
 

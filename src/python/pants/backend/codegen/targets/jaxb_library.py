@@ -13,7 +13,6 @@ from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.build_environment import get_buildroot
-from pants.base.build_manual import manual
 from pants.base.payload import hash_sources, SourcesPayload
 
 
@@ -55,7 +54,6 @@ class JaxbPayload(SourcesPayload):
       hasher.update(bytes(self.package))
     return hasher.hexdigest()
 
-@manual.builddict(tags=["java"])
 class JaxbLibrary(JvmTarget):
   """Generates a stub Java library from jaxb xsd files."""
 

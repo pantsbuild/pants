@@ -8,7 +8,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 from pants.base.build_manual import manual
 
 
-@manual.builddict(tags=["python"])
 class PythonArtifact(object):
   """Represents a Python setup.py-based project."""
   class MissingArgument(Exception): pass

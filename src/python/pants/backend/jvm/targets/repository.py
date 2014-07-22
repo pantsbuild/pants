@@ -5,12 +5,10 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from pants.base.build_manual import manual
 from pants.base.payload import EmptyPayload
 from pants.base.target import Target
 
 
-@manual.builddict(tags=["jvm"])
 class Repository(Target):
   """An artifact repository, such as a maven repo."""
 

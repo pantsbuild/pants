@@ -9,7 +9,6 @@ python_library(
     pants(':context'),
     pants(':phase'),
     pants(':run_tracker'),
-    pants('src/python/pants/base:build_manual'),
     pants('src/python/pants/backend/core/tasks:task'),
   ],
 )
@@ -86,7 +85,6 @@ python_library(
   dependencies = [
     pants(':error'),
     pants(':option_helpers'),
-    pants('src/python/pants/base:build_manual'),
   ],
 )
 

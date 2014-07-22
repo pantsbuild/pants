@@ -7,7 +7,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from collections import defaultdict
 
-from pants.base.build_manual import manual
 from pants.goal.error import GoalError
 
 
@@ -35,7 +34,6 @@ class SingletonPhases(type):
 PhaseBase = SingletonPhases(str('PhaseBase'), (object,), {})
 
 
-@manual.builddict()
 class Phase(PhaseBase):
   _goals_by_phase = defaultdict(list)
   _phase_by_goal = dict()

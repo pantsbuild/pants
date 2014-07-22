@@ -5,10 +5,7 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from pants.base.build_manual import manual
 
-
-@manual.builddict()
 class TaskError(Exception):
   """Indicates a task has failed."""
 
@@ -22,7 +19,6 @@ class TaskError(Exception):
     return self._exit_code
 
 
-@manual.builddict()
 class TargetDefinitionException(Exception):
   """Indicates an invalid target definition."""
 
@@ -34,11 +30,9 @@ class TargetDefinitionException(Exception):
     super(Exception, self).__init__('Invalid target %s: %s' % (target, msg))
 
 
-@manual.builddict()
 class BuildConfigurationError(Exception):
   """Indicates an error in a pants installation's configuration."""
 
 
-@manual.builddict()
 class BackendConfigurationError(BuildConfigurationError):
   """Indicates a plugin backend with a missing or malformed register module."""

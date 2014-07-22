@@ -5,11 +5,9 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from pants.base.build_manual import manual
 from pants.backend.android.targets.android_target import AndroidTarget
 
 
-@manual.builddict(tags=['android'])
 class AndroidBinary(AndroidTarget):
   """Produces an Android binary."""
 

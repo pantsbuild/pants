@@ -100,7 +100,6 @@ class AbstractTarget(object):
     return self.has_label('android')
 
 
-@manual.builddict()
 class Target(AbstractTarget):
   """The baseclass for all pants targets.
 

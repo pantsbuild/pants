@@ -7,11 +7,9 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from twitter.common.collections import OrderedSet
 
-from pants.base.build_manual import manual
 from pants.backend.python.targets.python_target import PythonTarget
 
 
-@manual.builddict(tags=["python"])
 class PythonAntlrLibrary(PythonTarget):
   """Generates a stub Python library from Antlr grammar files."""
 

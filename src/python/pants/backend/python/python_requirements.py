@@ -7,9 +7,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import os
 
-from pants.base.build_manual import manual
 
-@manual.builddict(tags=["python"])
 def python_requirements(parse_context, requirements_relpath='requirements.txt'):
   """Translates a pip requirements file into an equivalent set of python_requirements
 

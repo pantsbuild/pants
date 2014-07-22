@@ -5,12 +5,10 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from pants.base.build_manual import manual
 from pants.base.payload import JarLibraryPayload
 from pants.base.target import Target
 
 
-@manual.builddict(tags=["jvm"])
 class JarLibrary(Target):
   """A set of jars that may be depended upon."""
 

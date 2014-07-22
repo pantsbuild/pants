@@ -37,12 +37,10 @@ class JarRule(AbstractClass):
     return self._apply_pattern
 
 
-@manual.builddict(tags=["jvm"])
 class Skip(JarRule):
   """A rule that skips adding matched entries to a jar."""
 
 
-@manual.builddict(tags=["jvm"])
 class Duplicate(JarRule):
   """A rule that indicates how duplicate entries should be handled when building a jar."""
 
@@ -108,7 +106,6 @@ class Duplicate(JarRule):
     return self._action
 
 
-@manual.builddict(tags=["jvm"])
 class JarRules(object):
   """A set of rules for packaging up a deploy jar.
 
@@ -196,7 +193,6 @@ class JarRules(object):
     return self._rules
 
 
-@manual.builddict(tags=["jvm"])
 class JvmBinary(JvmTarget):
   """Produces a JVM binary optionally identifying a launcher main class.
 
@@ -283,7 +279,6 @@ class RelativeToMapper(object):
     return hash(self.base)
 
 
-@manual.builddict(tags=["jvm"])
 class Bundle(object):
   """A set of files to include in an application bundle.
 
@@ -361,7 +356,6 @@ class Bundle(object):
     return 'Bundle(%s, %s)' % (self.mapper, self.filemap)
 
 
-@manual.builddict(tags=["jvm"])
 class JvmApp(Target):
   """A JVM-based application consisting of a binary plus "extra files".
 

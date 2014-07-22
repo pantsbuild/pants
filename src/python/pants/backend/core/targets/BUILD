@@ -20,7 +20,6 @@ python_library(
     pants('3rdparty/python/twitter/commons:twitter.common.lang'),
     pants('src/python/pants/base:address'),
     pants('src/python/pants/base:build_environment'),
-    pants('src/python/pants/base:build_manual'),
     pants('src/python/pants/base:payload'),
     pants('src/python/pants/base:target'),
   ],

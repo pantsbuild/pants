@@ -10,20 +10,10 @@ class manual(object):
   """Annotate things that should appear in generated documents"""
 
   @staticmethod
-  def builddict(tags=None):
-    """Decorator to mark something that belongs in the BUILD Dictionary doc.
-
-    Use it on a function to mention the function. Use it on a class to
-    mention the class; use it on a class' method to mention that method
-    within the class' doc. (Default behavior uses the constructor but
-    ignores methods. You want to decorate methods that are kosher for
-    BUILD files.)
-
-    :param tags: E.g., tags=["python"] means "This thingy should appear in the Python section"
-    """
-    tags = tags or []
+  def builddict():
+    """Decorator to mark a method that belongs in the BUILD Dictionary doc."""
     def builddictdecorator(funcorclass):
-      funcorclass.builddictdict = {"tags": tags}
+      funcorclass.builddictdict = {}
       return funcorclass
     return builddictdecorator
 

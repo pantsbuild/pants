@@ -11,13 +11,11 @@ from zipimport import zipimporter
 
 from pkg_resources import Distribution, EggMetadata, PathMetadata
 
-from pants.base.build_manual import manual
 from pants.backend.python.python_requirement import PythonRequirement
 
 
 # XXX(pl): This code is 100% broken.  I'm surprised it's even importable.
 # Delete, reimplement, or fix?
-@manual.builddict(tags=["python"])
 def PythonEgg(glob, name=None):
   """Refers to pre-built Python eggs in the file system. (To instead fetch
   eggs in a ``pip``/``easy_install`` way, use ``python_requirement``)

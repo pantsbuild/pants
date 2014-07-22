@@ -7,12 +7,10 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from twitter.common.lang import Compatibility
 
-from pants.base.build_manual import manual
 from pants.base.exceptions import TargetDefinitionException
 from pants.backend.jvm.targets.java_library import JavaLibrary
 
 
-@manual.builddict(tags=['jvm'])
 class JavaAgent(JavaLibrary):
   """Defines a java agent entrypoint."""
 

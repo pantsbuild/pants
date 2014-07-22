@@ -7,10 +7,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from pkg_resources import Requirement
 
-from pants.base.build_manual import manual
 
-
-@manual.builddict(tags=["python"])
 class PythonRequirement(object):
   """Pants wrapper around pkg_resources.Requirement
 

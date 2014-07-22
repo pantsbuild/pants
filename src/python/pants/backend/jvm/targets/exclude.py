@@ -5,10 +5,7 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from pants.base.build_manual import manual
 
-
-@manual.builddict(tags=["jvm"])
 class Exclude(object):
   """Represents a dependency exclude pattern to filter transitive dependencies against."""
 
