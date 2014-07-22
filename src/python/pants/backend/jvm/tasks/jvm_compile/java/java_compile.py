@@ -8,8 +8,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import os
 import shlex
 
-from twitter.common.dirutil import safe_open
-
 from pants.backend.jvm.tasks.jvm_compile.analysis_tools import AnalysisTools
 from pants.backend.jvm.tasks.jvm_compile.java.jmake_analysis import JMakeAnalysis
 from pants.backend.jvm.tasks.jvm_compile.java.jmake_analysis_parser import JMakeAnalysisParser
@@ -17,6 +15,7 @@ from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
 from pants.base.exceptions import TaskError
 from pants.base.target import Target
 from pants.base.workunit import WorkUnit
+from pants.util.dirutil import safe_open
 
 
 # From http://kenai.com/projects/jmake/sources/mercurial/content

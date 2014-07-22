@@ -27,7 +27,6 @@ python_library(
   sources = ['apache_thrift_gen.py'],
   dependencies = [
     pants('3rdparty/python/twitter/commons:twitter.common.collections'),
-    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.log'),
     pants(':code_gen'),
     pants(':common'),
@@ -36,6 +35,7 @@ python_library(
     pants('src/python/pants/backend/core/targets:common'),
     pants('src/python/pants/backend/python/targets:python'),
     pants('src/python/pants:thrift_util'),
+    pants('src/python/pants/util:dirutil'),
   ],
 )
 
@@ -44,12 +44,12 @@ python_library(
   sources = ['antlr_gen.py'],
   dependencies = [
     pants('3rdparty/python/twitter/commons:twitter.common.collections'),
-    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants(':code_gen'),
     pants(':common'),
     pants('src/python/pants/backend/jvm/targets:java'),
     pants('src/python/pants/backend/jvm/tasks:jvm_tool_task_mixin'),
     pants('src/python/pants/backend/jvm/tasks:nailgun_task'),
+    pants('src/python/pants/util:dirutil'),
   ],
 )
 
@@ -66,7 +66,6 @@ python_library(
   name = 'jaxb_gen',
   sources = ['jaxb_gen.py'],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants(':code_gen'),
     pants(':common'),
     pants('src/python/pants/backend/codegen/targets:java'),
@@ -77,6 +76,7 @@ python_library(
     pants('src/python/pants/java:distribution'),
     pants('src/python/pants/base:exceptions'),
     pants('src/python/pants/backend/jvm/tasks:nailgun_task'),
+    pants('src/python/pants/util:dirutil'),
   ],
 )
 
@@ -85,7 +85,6 @@ python_library(
   sources = ['protobuf_gen.py'],
   dependencies = [
     pants('3rdparty/python/twitter/commons:twitter.common.collections'),
-    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.log'),
     pants(':code_gen'),
     pants(':common'),
@@ -96,6 +95,7 @@ python_library(
     pants('src/python/pants/base:build_environment'),
     pants('src/python/pants/base:exceptions'),
     pants('src/python/pants:binary_util'),
+    pants('src/python/pants/util:dirutil'),
   ],
 )
 
@@ -104,7 +104,6 @@ python_library(
   sources = ['scrooge_gen.py'],
   dependencies = [
     pants('3rdparty/python/twitter/commons:twitter.common.collections'),
-    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants(':common'),
     pants('src/python/pants/base:build_environment'),
     pants('src/python/pants/backend/jvm/targets:java'),
@@ -113,5 +112,6 @@ python_library(
     pants('src/python/pants/backend/jvm/tasks:nailgun_task'),
     pants('src/python/pants/backend/core/targets:common'),
     pants('src/python/pants:thrift_util'),
+    pants('src/python/pants/util:dirutil'),
   ],
 )

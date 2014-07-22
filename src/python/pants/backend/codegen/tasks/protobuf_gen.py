@@ -13,7 +13,6 @@ import subprocess
 
 from twitter.common import log
 from twitter.common.collections import OrderedSet
-from twitter.common.dirutil import safe_mkdir
 
 from pants.backend.codegen.targets.java_protobuf_library import JavaProtobufLibrary
 from pants.backend.codegen.tasks.code_gen import CodeGen
@@ -25,6 +24,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.binary_util import BinaryUtil
 from pants.fs.archive import ZIP
+from pants.util.dirutil import safe_mkdir
 
 
 class ProtobufGen(CodeGen):

@@ -58,7 +58,7 @@ python_tests(
   sources = ['test_exclusive.py'],
   dependencies = [
     pants(':base'),
-    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
+    pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('src/python/pants/base:config'),
     pants('src/python/pants/goal:goal'),
     pants('src/python/pants/backend/core/tasks:check_exclusives'),

@@ -6,7 +6,7 @@ python_tests(
   sources = globs('*.py'),
   dependencies = [
     pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
-    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('src/python/pants/fs'),
+    pants('src/python/pants/util:dirutil'),
   ]
 )

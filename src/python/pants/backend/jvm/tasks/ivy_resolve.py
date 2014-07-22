@@ -10,8 +10,6 @@ import os
 import shutil
 import time
 
-from twitter.common.dirutil import safe_mkdir
-
 from pants import binary_util
 from pants.backend.jvm.ivy_utils import IvyUtils
 from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
@@ -20,6 +18,7 @@ from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.cache_manager import VersionedTargetSet
 from pants.base.exceptions import TaskError
 from pants.ivy.bootstrapper import Bootstrapper
+from pants.util.dirutil import safe_mkdir
 
 
 class IvyResolve(NailgunTask, IvyTaskMixin, JvmToolTaskMixin):

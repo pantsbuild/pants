@@ -11,18 +11,17 @@ import optparse
 import os
 from pkg_resources import resource_string
 
-from twitter.common.dirutil import Fileset, safe_open
+from twitter.common.dirutil.fileset import Fileset
 
 from pants.backend.core.tasks.task import Task
 from pants.backend.maven_layout.maven_layout import maven_layout
 from pants.backend.python.python_requirements import python_requirements
-from pants.base.build_environment import get_buildroot
 from pants.base.build_manual import get_builddict_info
-from pants.base.config import ConfigOption
 from pants.base.exceptions import TaskError
 from pants.base.generator import Generator, TemplateData
 from pants.goal.option_helpers import add_global_options
 from pants.goal.phase import Phase
+from pants.util.dirutil import safe_open
 
 
 def indent_docstring_by_n(s, n=1):

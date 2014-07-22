@@ -5,7 +5,7 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from .nailgun_task_test_base import NailgunTaskTestBase
+from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
 
 
 class JarTaskTestBase(NailgunTaskTestBase):

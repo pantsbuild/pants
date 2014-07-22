@@ -12,9 +12,9 @@ import subprocess
 import unittest
 
 from twitter.common.contextutil import temporary_dir
-from twitter.common.dirutil import safe_open, safe_mkdir
 
 from pants.base.build_environment import get_buildroot
+from pants.util.dirutil import safe_open, safe_mkdir
 
 
 PantsResult = namedtuple('PantsResult', ['returncode', 'stdout_data', 'stderr_data'])

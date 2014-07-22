@@ -9,7 +9,6 @@ import os
 import shutil
 
 from pkg_resources import Requirement
-from twitter.common.dirutil import safe_mkdir
 from twitter.common.python.installer import EggInstaller
 from twitter.common.python.interpreter import PythonCapability, PythonIdentity, PythonInterpreter
 from twitter.common.python.obtainer import Obtainer
@@ -17,6 +16,7 @@ from twitter.common.python.package import EggPackage, SourcePackage
 
 from pants.backend.python.python_setup import PythonSetup
 from pants.backend.python.resolver import crawler_from_config, fetchers_from_config
+from pants.util.dirutil import safe_mkdir
 
 
 # TODO(wickman) Create a safer version of this and add to twitter.common.dirutil

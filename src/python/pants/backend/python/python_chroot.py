@@ -12,7 +12,6 @@ import tempfile
 from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
-from twitter.common.dirutil import safe_mkdir, safe_rmtree
 from twitter.common.python.interpreter import PythonInterpreter
 from twitter.common.python.pex_builder import PEXBuilder
 from twitter.common.python.platforms import Platform
@@ -20,9 +19,6 @@ from twitter.common.python.platforms import Platform
 from pants.backend.codegen.targets.python_antlr_library import PythonAntlrLibrary
 from pants.backend.codegen.targets.python_thrift_library import PythonThriftLibrary
 from pants.backend.core.targets.dependencies import Dependencies
-from pants.base.build_environment import get_buildroot
-from pants.base.build_invalidator import BuildInvalidator, CacheKeyGenerator
-from pants.base.config import Config
 from pants.backend.python.antlr_builder import PythonAntlrBuilder
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.python_setup import PythonSetup
@@ -32,6 +28,10 @@ from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.thrift_builder import PythonThriftBuilder
+from pants.base.build_environment import get_buildroot
+from pants.base.build_invalidator import BuildInvalidator, CacheKeyGenerator
+from pants.base.config import Config
+from pants.util.dirutil import safe_mkdir, safe_rmtree
 
 
 class PythonChroot(object):

@@ -11,10 +11,8 @@ except ImportError:
   import ConfigParser as configparser
 import itertools
 import os
-import sys
 
 from twitter.common.contextutil import temporary_file
-from twitter.common.dirutil import safe_mkdir
 from twitter.common.lang import Compatibility
 from twitter.common.python.interpreter import PythonInterpreter
 from twitter.common.python.pex import PEX
@@ -25,6 +23,7 @@ from pants.base.target import Target
 from pants.backend.python.python_chroot import PythonChroot
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.targets.python_tests import PythonTests
+from pants.util.dirutil import safe_mkdir
 
 
 class PythonTestResult(object):

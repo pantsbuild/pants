@@ -11,7 +11,8 @@ import shutil
 import tarfile
 
 from twitter.common.contextutil import open_tar
-from twitter.common.dirutil import safe_mkdir, safe_mkdir_for
+
+from pants.util.dirutil import safe_mkdir, safe_mkdir_for
 
 
 class ArtifactError(Exception):

@@ -13,7 +13,6 @@ from xml.etree import ElementTree
 
 from twitter.common.collections import OrderedDict
 from twitter.common.contextutil import open_zip as open_jar
-from twitter.common.dirutil import safe_open
 
 from pants.backend.jvm.jvm_tool_bootstrapper import JvmToolBootstrapper
 from pants.backend.jvm.scala.target_platform import TargetPlatform
@@ -22,6 +21,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.hash_utils import hash_file
 from pants.base.workunit import WorkUnit
+from pants.util.dirutil import safe_open
 
 
 # Well known metadata file required to register scalac plugins with nsc.

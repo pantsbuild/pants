@@ -6,23 +6,20 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import os
-import unittest
 from contextlib import contextmanager
 
 from mock import MagicMock, Mock, call
-from twitter.common.collections import OrderedSet
+import pytest
 from twitter.common.collections import OrderedSet
 from twitter.common.contextutil import temporary_dir, temporary_file
-from twitter.common.dirutil import safe_mkdir, touch
 from twitter.common.dirutil.chroot import Chroot
-import pytest
 
 from pants.backend.python.commands.setup_py import SetupPy
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.base.exceptions import TargetDefinitionException
-from pants.base.target import Target
+from pants.util.dirutil import safe_mkdir
 from pants_test.base_test import BaseTest
 
 

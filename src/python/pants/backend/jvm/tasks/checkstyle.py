@@ -7,12 +7,11 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import os
 
-from twitter.common.dirutil import safe_open
-
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
 from pants.process.xargs import Xargs
+from pants.util.dirutil import safe_open
 
 
 CHECKSTYLE_MAIN = 'com.puppycrawl.tools.checkstyle.Main'

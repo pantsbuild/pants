@@ -8,7 +8,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import hashlib
 import os
 import re
-import sys
 import time
 
 from collections import namedtuple
@@ -19,13 +18,12 @@ import psutil
 #  some of the log.debug() below into log.info(). Right now it just looks wrong on the console.
 from twitter.common import log
 from twitter.common.collections import maybe_list
-from twitter.common.dirutil import safe_open
 from twitter.common.lang import Compatibility
 
 from pants.base.build_environment import get_buildroot
-
-from .executor import Executor, SubprocessExecutor
-from .nailgun_client import NailgunClient
+from pants.java.executor import Executor, SubprocessExecutor
+from pants.java.nailgun_client import NailgunClient
+from pants.util.dirutil import safe_open
 
 
 class NailgunExecutor(Executor):

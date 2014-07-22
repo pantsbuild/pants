@@ -41,6 +41,7 @@ python_tests(
     pants('src/python/pants/backend/python:python_artifact'),
     pants('src/python/pants/base:exceptions'),
     pants('src/python/pants/base:target'),
+    pants('src/python/pants/util:dirutil'),
     pants('tests/python/pants_test:base_test'),
   ]
 )

@@ -10,13 +10,13 @@ import os
 import unittest2
 
 from twitter.common.contextutil import temporary_dir
-from twitter.common.dirutil import touch
 
 from pants.base.address import SyntheticAddress
 from pants.base.build_configuration import BuildConfiguration
 from pants.base.build_file import BuildFile
 from pants.base.build_graph import BuildGraph
 from pants.base.target import Target
+from pants.util.dirutil import touch
 
 
 class BuildConfigurationTest(unittest2.TestCase):

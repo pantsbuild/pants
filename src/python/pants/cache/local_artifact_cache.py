@@ -9,10 +9,9 @@ import os
 import shutil
 import uuid
 
-from twitter.common.dirutil import safe_delete, safe_mkdir, safe_mkdir_for
-
-from pants.cache.artifact import ArtifactError, TarballArtifact
+from pants.cache.artifact import TarballArtifact
 from pants.cache.artifact_cache import ArtifactCache
+from pants.util.dirutil import safe_delete, safe_mkdir, safe_mkdir_for
 
 
 class LocalArtifactCache(ArtifactCache):

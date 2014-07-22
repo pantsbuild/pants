@@ -14,7 +14,6 @@ import traceback
 
 from twitter.common import log
 from twitter.common.collections import OrderedSet
-from twitter.common.dirutil import safe_mkdir
 from twitter.common.lang import Compatibility
 from twitter.common.log.options import LogOptions
 
@@ -34,6 +33,7 @@ from pants.goal import Context, GoalError, Phase
 from pants.goal.help import print_help
 from pants.goal.initialize_reporting import update_reporting
 from pants.goal.option_helpers import add_global_options
+from pants.util.dirutil import safe_mkdir
 
 
 StringIO = Compatibility.StringIO

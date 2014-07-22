@@ -26,7 +26,6 @@ python_library(
   dependencies = [
     pants(':command'),
     pants('3rdparty/python/twitter/commons:twitter.common.collections'),
-    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.lang'),
     pants('3rdparty/python/twitter/commons:twitter.common.log'),
     pants('src/python/pants/base:address'),
@@ -46,5 +45,6 @@ python_library(
     pants('src/python/pants/reporting'),
     pants('src/python/pants/backend/core/tasks:common'),
     pants('src/python/pants/backend/core/tasks:console_task'),
+    pants('src/python/pants/util:dirutil'),
   ],
 )

@@ -22,5 +22,6 @@ python_library(
     'src/python/pants/backend/core/targets:all',
     'src/python/pants/backend/core/tasks:all',
     'src/python/pants/base:build_environment',
+    'src/python/pants/util:dirutil',
   ]
 )

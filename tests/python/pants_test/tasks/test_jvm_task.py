@@ -7,11 +7,10 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import pytest
 
-from twitter.common.dirutil import safe_mkdtemp, safe_rmtree
-
 from pants.backend.core.tasks.check_exclusives import ExclusivesMapping
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.base.exceptions import TaskError
+from pants.util.dirutil import safe_mkdtemp, safe_rmtree
 from pants_test.base_test import BaseTest
 
 

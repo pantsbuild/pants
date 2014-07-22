@@ -8,7 +8,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import os
 
 from twitter.common.collections import OrderedSet
-from twitter.common.dirutil import safe_mkdir
 
 from pants.backend.codegen.targets.java_antlr_library import JavaAntlrLibrary
 from pants.backend.codegen.tasks.code_gen import CodeGen
@@ -18,6 +17,7 @@ from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.address import SyntheticAddress
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+from pants.util.dirutil import safe_mkdir
 
 
 class AntlrGen(CodeGen, NailgunTask, JvmToolTaskMixin):

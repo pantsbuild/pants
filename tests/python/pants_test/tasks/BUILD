@@ -138,10 +138,10 @@ python_tests(
   sources = ['test_check_exclusives.py'],
   dependencies = [
     pants(':base'),
-    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('src/python/pants/base:config'),
     pants('src/python/pants/goal:context'),
     pants('src/python/pants/backend/core/tasks:check_exclusives'),
+    pants('src/python/pants/util:dirutil'),
   ]
 )
 
@@ -240,9 +240,9 @@ python_tests(
   sources = ['test_detect_duplicates.py'],
   dependencies = [
     pants(':base'),
-    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('src/python/pants/base:exceptions'),
     pants('src/python/pants/backend/jvm/tasks:detect_duplicates'),
+    pants('src/python/pants/util:dirutil'),
     pants('tests/python/pants_test/base:context_utils'),
   ],
 )
@@ -285,7 +285,6 @@ python_tests(
   sources = ['test_jar_create.py'],
   dependencies = [
     pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
-    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants(':base'),
     pants('src/python/pants/backend/android/targets:android'),
     pants('src/python/pants/backend/codegen/targets:java'),
@@ -299,6 +298,7 @@ python_tests(
     pants('src/python/pants/base:source_root'),
     pants('src/python/pants/goal:products'),
     pants('src/python/pants/java:jar'),
+    pants('src/python/pants/util:dirutil'),
     pants('tests/python/pants_test/base:context_utils'),
     pants('tests/python/pants_test/jvm:jar_task_test_base'),
   ],
@@ -309,9 +309,9 @@ python_tests(
   sources = ['test_jar_publish.py'],
   dependencies = [
     pants('3rdparty/python:mock'),
-    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants(':base'),
     pants('src/python/pants/backend/jvm/tasks:jar_publish'),
+    pants('src/python/pants/util:dirutil'),
   ],
 )
 
@@ -460,11 +460,11 @@ python_tests(
   sources = ['test_jar_task.py'],
   dependencies = [
     pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
-    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('src/python/pants/backend/jvm/targets:jvm'),
     pants('src/python/pants/backend/jvm/tasks:jar_task'),
     pants('src/python/pants/base:build_file_aliases'),
     pants('src/python/pants/base:source_root'),
+    pants('src/python/pants/util:dirutil'),
     pants('tests/python/pants_test/jvm:jvm_tool_task_test_base'),
   ]
 )
@@ -487,9 +487,9 @@ python_tests(
   name = 'jvm_task',
   sources = ['test_jvm_task.py'],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('src/python/pants/backend/core/tasks:check_exclusives'),
     pants('src/python/pants/backend/jvm/tasks:jvm_task'),
+    pants('src/python/pants/util:dirutil'),
     pants('tests/python/pants_test:base_test'),
   ]
 )
@@ -498,9 +498,9 @@ python_tests(
   name = 'jvmdoc_gen',
   sources = ['test_jvmdoc_gen.py'],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('src/python/pants/backend/core/tasks:check_exclusives'),
     pants('src/python/pants/backend/jvm/tasks:jvmdoc_gen'),
+    pants('src/python/pants/util:dirutil'),
     pants('tests/python/pants_test:base_test'),
   ]
 )

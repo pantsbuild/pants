@@ -11,11 +11,11 @@ import multiprocessing
 import os
 import subprocess
 
-from twitter.common.dirutil import safe_mkdir
 
 from pants import binary_util
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.base.exceptions import TaskError
+from pants.util.dirutil import safe_mkdir
 
 
 Jvmdoc = collections.namedtuple('Jvmdoc', ['tool_name', 'product_type'])

@@ -11,9 +11,9 @@ import tempfile
 import unittest
 
 from twitter.common.collections import OrderedSet
-from twitter.common.dirutil import safe_mkdir, touch
 
 from pants.base.build_file import BuildFile
+from pants.util.dirutil import safe_mkdir, touch
 
 
 class BuildFileTest(unittest.TestCase):

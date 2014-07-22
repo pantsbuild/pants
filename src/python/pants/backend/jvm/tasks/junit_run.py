@@ -10,7 +10,6 @@ from collections import namedtuple
 import os
 import sys
 
-from twitter.common.dirutil import safe_mkdir, safe_open
 
 from pants import binary_util
 from pants.backend.jvm.targets.java_tests import JavaTests as junit_tests
@@ -20,6 +19,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit
 from pants.java.util import execute_java
+from pants.util.dirutil import safe_mkdir, safe_open
 
 
 # TODO(ji): Add unit tests.

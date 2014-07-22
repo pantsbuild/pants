@@ -12,10 +12,10 @@ import textwrap
 import unittest2
 
 from twitter.common.contextutil import temporary_dir, environment_as
-from twitter.common.dirutil import chmod_plus_x, safe_open
 
 from pants.java.distribution import Distribution
 from pants.java.executor import SubprocessExecutor
+from pants.util.dirutil import chmod_plus_x, safe_open
 
 
 class SubprocessExecutorTest(unittest2.TestCase):

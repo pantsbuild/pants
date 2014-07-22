@@ -7,7 +7,7 @@ python_library(
   dependencies = [
     pants('3rdparty/python:requests'),
     pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
-    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.quantity'),
+    pants('src/python/pants/util:dirutil'),
   ]
 )

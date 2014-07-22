@@ -15,10 +15,10 @@ from contextlib import contextmanager
 import pytest
 from twitter.common.collections import maybe_list
 from twitter.common.contextutil import environment_as, temporary_dir
-from twitter.common.dirutil import chmod_plus_x, safe_open, touch
 
 from pants.base.revision import Revision
 from pants.java.distribution import Distribution
+from pants.util.dirutil import chmod_plus_x, safe_open, touch
 
 
 class MockDistributionTest(unittest.TestCase):

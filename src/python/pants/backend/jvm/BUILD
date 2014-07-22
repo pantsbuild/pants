@@ -21,7 +21,6 @@ python_library(
   resources = globs('tasks/templates/ivy_resolve/*.mustache'),
   dependencies = [
     pants('3rdparty/python/twitter/commons:twitter.common.collections'),
-    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('src/python/pants/base:build_environment'),
     pants('src/python/pants/base:exceptions'),
     pants('src/python/pants/base:generator'),
@@ -29,6 +28,7 @@ python_library(
     pants('src/python/pants/base:target'),
     pants('src/python/pants/ivy'),
     pants('src/python/pants/java:util'),
+    pants('src/python/pants/util:dirutil'),
   ],
 )
 

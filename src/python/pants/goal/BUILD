@@ -17,7 +17,7 @@ python_library(
   name = 'aggregated_timings',
   sources = ['aggregated_timings.py'],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
+    pants('src/python/pants/util:dirutil'),
   ]
 )
 
@@ -26,7 +26,7 @@ python_library(
   name = 'artifact_cache_stats',
   sources = ['artifact_cache_stats.py'],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
+    pants('src/python/pants/util:dirutil'),
   ]
 )
 
@@ -65,9 +65,9 @@ python_library(
   name = 'initialize_reporting',  # XXX shouldn't this be in reporting?!
   sources = ['initialize_reporting.py'],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.lang'),
     pants('src/python/pants/reporting'),
+    pants('src/python/pants/util:dirutil'),
   ],
 )
 

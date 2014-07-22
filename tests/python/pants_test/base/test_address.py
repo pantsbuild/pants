@@ -10,11 +10,11 @@ import os
 import unittest2
 
 from twitter.common.contextutil import pushd, temporary_dir
-from twitter.common.dirutil import touch
 
 from pants.base.address import BuildFileAddress, SyntheticAddress, parse_spec
 from pants.base.build_file import BuildFile
 from pants.base.build_root import BuildRoot
+from pants.util.dirutil import touch
 
 
 class ParseSpecTest(unittest2.TestCase):

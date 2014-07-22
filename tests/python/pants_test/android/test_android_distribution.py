@@ -5,7 +5,6 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from collections import namedtuple
 from contextlib import contextmanager
 import os
 import pytest
@@ -14,7 +13,7 @@ import unittest2
 
 from twitter.common.collections import maybe_list
 from twitter.common.contextutil import environment_as, temporary_dir
-from twitter.common.dirutil import chmod_plus_x, safe_mkdir, safe_open, touch
+from pants.util.dirutil import chmod_plus_x, safe_open, touch
 
 from pants.backend.android.distribution.android_distribution import AndroidDistribution
 
@@ -23,8 +22,8 @@ class TestAndroidDistributionTest(unittest2.TestCase):
 
   @contextmanager
   # default for testing purposes being sdk 18 and 19, with latest build-tools 19.1.0
-  def distribution(self, installed_sdks=["18", "19"],
-                   installed_build_tools=["19.1.0"],
+  def distribution(self, installed_sdks=('18', '19'),
+                   installed_build_tools=('19.1.0', ),
                    files='android.jar',
                    executables='aapt'):
     with temporary_dir() as sdk:

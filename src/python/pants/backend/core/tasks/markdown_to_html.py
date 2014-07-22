@@ -14,14 +14,13 @@ import markdown
 from pygments.formatters.html import HtmlFormatter
 from pygments.styles import get_all_styles
 
-from twitter.common.dirutil import safe_mkdir, safe_open
-
 from pants import binary_util
 from pants.base.address import SyntheticAddress
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.backend.core.targets.doc import Page
 from pants.backend.core.tasks.task import Task
+from pants.util.dirutil import safe_mkdir, safe_open
 
 
 def configure_codehighlight_options(option_group, mkflag):

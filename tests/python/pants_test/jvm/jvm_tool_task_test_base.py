@@ -8,10 +8,9 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import errno
 import os
 
-from twitter.common.dirutil import safe_mkdir, safe_mkdtemp, safe_rmtree
-
 from pants.backend.jvm.tasks.bootstrap_jvm_tools import BootstrapJvmTools
 from pants.base.dev_backend_loader import load_build_configuration_from_source
+from pants.util.dirutil import safe_mkdir, safe_mkdtemp
 from pants_test.base_test import BaseTest
 
 

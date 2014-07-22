@@ -11,7 +11,6 @@ from contextlib import contextmanager
 from textwrap import dedent
 
 from twitter.common.contextutil import pushd, temporary_dir
-from twitter.common.dirutil import touch
 
 from pants.base.address import SyntheticAddress
 from pants.base.build_configuration import BuildConfiguration
@@ -19,6 +18,7 @@ from pants.base.build_file_parser import BuildFileParser
 from pants.base.build_graph import BuildGraph
 from pants.base.build_root import BuildRoot
 from pants.base.target import Target
+from pants.util.dirutil import touch
 
 
 class BuildGraphTest(unittest.TestCase):

@@ -42,11 +42,11 @@ python_library(
   dependencies = [
     pants('3rdparty/python/twitter/commons:twitter.common.collections'),
     pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
-    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.lang'),
     pants('3rdparty/python/twitter/commons:twitter.common.log'),
     pants('src/python/pants/base:config'),
     pants('src/python/pants/base:exceptions'),
+    pants('src/python/pants/util:dirutil'),
   ],
 )
 

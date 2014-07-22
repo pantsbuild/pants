@@ -9,8 +9,8 @@ import os
 import unittest
 
 from twitter.common.contextutil import temporary_dir
-from twitter.common.dirutil import safe_mkdir, touch
 
+from pants.util.dirutil import safe_mkdir, touch
 from pants.fs.archive import TAR, TBZ2, TGZ, ZIP
 
 

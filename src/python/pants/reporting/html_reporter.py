@@ -11,8 +11,6 @@ import os
 import re
 import uuid
 
-from twitter.common.dirutil import safe_mkdir
-
 from pants.base.build_environment import get_buildroot
 from pants.base.mustache import MustacheRenderer
 from pants.base.workunit import WorkUnit
@@ -20,6 +18,7 @@ from pants.reporting.linkify import linkify
 from pants.reporting.report import Report
 from pants.reporting.reporter import Reporter
 from pants.reporting.reporting_utils import items_to_report_element
+from pants.util.dirutil import safe_mkdir
 
 
 class HtmlReporter(Reporter):

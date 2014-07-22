@@ -13,9 +13,10 @@ import time
 from contextlib import closing, contextmanager
 
 import requests
-from twitter.common.dirutil import safe_open
 from twitter.common.lang import Compatibility
 from twitter.common.quantity import Amount, Data, Time
+
+from pants.util.dirutil import safe_open
 
 
 # TODO(John Sirois): Consider lifting this to twitter.common.http and consolidating with, for

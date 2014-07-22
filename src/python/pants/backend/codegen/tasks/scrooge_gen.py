@@ -12,7 +12,6 @@ import re
 import tempfile
 
 from twitter.common.collections import OrderedSet
-from twitter.common.dirutil import safe_mkdir, safe_open
 
 from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
@@ -23,6 +22,7 @@ from pants.base.address import SyntheticAddress
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.thrift_util import calculate_compile_sources
+from pants.util.dirutil import safe_mkdir, safe_open
 
 
 CompilerConfig = namedtuple('CompilerConfig', ['name', 'config_section', 'profile',

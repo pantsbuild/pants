@@ -13,7 +13,6 @@ import subprocess
 
 from twitter.common import log
 from twitter.common.collections import OrderedSet
-from twitter.common.dirutil import safe_mkdir
 
 from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
 from pants.backend.codegen.targets.python_thrift_library import PythonThriftLibrary
@@ -24,6 +23,7 @@ from pants.base.address import SyntheticAddress
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.thrift_util import calculate_compile_roots, select_thrift_binary
+from pants.util.dirutil import safe_mkdir
 
 
 def _copytree(from_base, to_base):

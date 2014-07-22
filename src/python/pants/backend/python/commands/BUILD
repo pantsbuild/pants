@@ -55,5 +55,6 @@ python_library(
     pants('src/python/pants/backend/python/targets:python'),
     pants('src/python/pants/backend/python:antlr_builder'),
     pants('src/python/pants/backend/python:thrift_builder'),
+    pants('src/python/pants/util:dirutil'),
   ]
 )

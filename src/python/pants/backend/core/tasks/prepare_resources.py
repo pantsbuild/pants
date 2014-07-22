@@ -9,11 +9,9 @@ from collections import defaultdict
 import os
 import shutil
 
-from twitter.common.dirutil import safe_mkdir
-
 from pants.backend.core.tasks.task import Task
 from pants.goal.products import MultipleRootedProducts
-
+from pants.util.dirutil import safe_mkdir
 
 class PrepareResources(Task):
 

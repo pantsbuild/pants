@@ -13,9 +13,11 @@ import posixpath
 from twitter.common import log
 from twitter.common.collections import OrderedSet
 from twitter.common.contextutil import temporary_file
-from twitter.common.dirutil import chmod_plus_x, safe_delete, safe_open
 from twitter.common.lang import Compatibility
 
+from pants.base.config import Config
+from pants.base.exceptions import TaskError
+from pants.util.dirutil import chmod_plus_x, safe_delete, safe_open
 
 if Compatibility.PY3:
   import urllib.request as urllib_request
@@ -23,9 +25,6 @@ if Compatibility.PY3:
 else:
   import urllib2 as urllib_request
   import urllib2 as urllib_error
-
-from pants.base.config import Config
-from pants.base.exceptions import TaskError
 
 
 _ID_BY_OS = {

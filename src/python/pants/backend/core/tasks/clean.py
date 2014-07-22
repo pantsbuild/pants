@@ -9,12 +9,12 @@ import os
 import time
 
 import daemon
-from twitter.common.dirutil import safe_rmtree
 
 from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.base.build_environment import get_buildroot
 from pants.base.config import Config
 from pants.base.exceptions import TaskError
+from pants.util.dirutil import safe_rmtree
 
 
 def _cautious_rmtree(root):

@@ -8,7 +8,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import os
 import sys
 
-from twitter.common.dirutil import safe_mkdir, safe_rmtree
 from twitter.common.lang import Compatibility
 
 from pants.base.config import Config
@@ -17,6 +16,7 @@ from pants.reporting.plaintext_reporter import PlainTextReporter
 from pants.reporting.quiet_reporter import QuietReporter
 from pants.reporting.report import Report, ReportingError
 from pants.reporting.reporting_server import ReportingServerManager
+from pants.util.dirutil import safe_mkdir, safe_rmtree
 
 
 StringIO = Compatibility.StringIO

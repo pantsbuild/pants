@@ -8,7 +8,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import os
 from collections import defaultdict, namedtuple
 
-from twitter.common.dirutil import safe_mkdir
+from pants.util.dirutil import safe_mkdir
 
 
 # Lists of target addresses.

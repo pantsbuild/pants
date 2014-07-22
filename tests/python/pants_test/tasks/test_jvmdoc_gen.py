@@ -5,11 +5,10 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from twitter.common.dirutil import safe_mkdtemp, safe_rmtree
-
 from pants.backend.core.tasks.check_exclusives import ExclusivesMapping
 from pants.backend.jvm.tasks.jvmdoc_gen import Jvmdoc, JvmdocGen
 from pants_test.base_test import BaseTest
+from pants.util.dirutil import safe_mkdtemp, safe_rmtree
 
 
 dummydoc = Jvmdoc(tool_name='dummydoc', product_type='dummydoc')

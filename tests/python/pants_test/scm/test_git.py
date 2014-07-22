@@ -13,10 +13,10 @@ from itertools import izip_longest
 
 import pytest
 from twitter.common.contextutil import environment_as, pushd, temporary_dir
-from twitter.common.dirutil import safe_mkdtemp, safe_open, safe_rmtree, touch
 
 from pants.scm import Scm
 from pants.scm.git import Git
+from pants.util.dirutil import safe_mkdtemp, safe_open, safe_rmtree, touch
 
 
 class Version(object):

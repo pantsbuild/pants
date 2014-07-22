@@ -55,8 +55,8 @@ python_library(
   dependencies = [
     pants(':code_generator'),
     pants('3rdparty/python:antlr-3.1.3'),
-    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('src/python/pants/ivy'),
+    pants('src/python/pants/util:dirutil'),
   ]
 )
 
@@ -87,10 +87,10 @@ python_library(
   sources = ['interpreter_cache.py'],
   dependencies = [
     pants('3rdparty/python:setuptools'),
+    pants('3rdparty/python/twitter/commons:twitter.common.python'),
     pants(':python_setup'),
     pants(':resolver'),
-    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
-    pants('3rdparty/python/twitter/commons:twitter.common.python'),
+    pants('src/python/pants/util:dirutil'),
   ]
 )
 
@@ -121,13 +121,13 @@ python_library(
     pants(':thrift_builder'),
     pants('3rdparty/python/twitter/commons:twitter.common.collections'),
     pants('3rdparty/python/twitter/commons:twitter.common.decorators'),
-    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.python'),
     pants('3rdparty/python/twitter/commons:twitter.common.quantity'),
+    pants('src/python/pants/backend/python/targets:python'),
     pants('src/python/pants/base:config'),
     pants('src/python/pants/base:target'),
     pants('src/python/pants/base:build_invalidator'),
-    pants('src/python/pants/backend/python/targets:python'),
+    pants('src/python/pants/util:dirutil')
   ],
 )
 
@@ -166,7 +166,6 @@ python_library(
   sources = ['test_builder.py'],
   dependencies = [
     pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
-    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.lang'),
     pants('3rdparty/python/twitter/commons:twitter.common.python'),
     pants('3rdparty/python:pytest'),
@@ -175,6 +174,7 @@ python_library(
     pants('src/python/pants/backend/python/targets:python'),
     pants('src/python/pants/base:config'),
     pants('src/python/pants/base:target'),
+    pants('src/python/pants/util:dirutil'),
   ],
 )
 
@@ -187,5 +187,6 @@ python_library(
     pants('src/python/pants/backend/python/targets:python'),
     pants('src/python/pants/base:build_environment'),
     pants('src/python/pants:thrift_util'),
+    pants('src/python/pants/util:dirutil'),
   ]
 )

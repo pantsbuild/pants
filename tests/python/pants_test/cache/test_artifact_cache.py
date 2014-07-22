@@ -12,13 +12,13 @@ from threading import Thread
 
 import SimpleHTTPServer
 from twitter.common.contextutil import pushd, temporary_dir, temporary_file
-from twitter.common.dirutil import safe_mkdir
 
 from pants.base.build_invalidator import CacheKey
 from pants.cache.cache_setup import create_artifact_cache, select_best_url
 from pants.cache.combined_artifact_cache import CombinedArtifactCache
 from pants.cache.local_artifact_cache import LocalArtifactCache
 from pants.cache.restful_artifact_cache import RESTfulArtifactCache
+from pants.util.dirutil import safe_mkdir
 from pants_test.testutils.mock_logger import MockLogger
 
 

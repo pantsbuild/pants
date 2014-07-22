@@ -12,22 +12,22 @@ from collections import defaultdict
 
 import ast
 from twitter.common.collections import OrderedSet
-from twitter.common.dirutil import safe_rmtree
 from twitter.common.dirutil.chroot import Chroot
 from twitter.common.python.compatibility import string, to_bytes
 from twitter.common.python.installer import InstallerBase, Packager
 
-from pants.backend.python.antlr_builder import PythonAntlrBuilder
-from pants.backend.python.thrift_builder import PythonThriftBuilder
 from pants.backend.codegen.targets.python_antlr_library import PythonAntlrLibrary
 from pants.backend.codegen.targets.python_thrift_library import PythonThriftLibrary
+from pants.backend.python.antlr_builder import PythonAntlrBuilder
+from pants.backend.python.targets.python_binary import PythonBinary
+from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
+from pants.backend.python.targets.python_target import PythonTarget
+from pants.backend.python.thrift_builder import PythonThriftBuilder
 from pants.base.build_environment import get_buildroot
 from pants.base.config import Config
 from pants.base.exceptions import TargetDefinitionException
 from pants.commands.command import Command
-from pants.backend.python.targets.python_binary import PythonBinary
-from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
-from pants.backend.python.targets.python_target import PythonTarget
+from pants.util.dirutil import safe_rmtree
 
 
 SETUP_BOILERPLATE = """

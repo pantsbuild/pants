@@ -5,14 +5,10 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from collections import defaultdict, namedtuple
 import os
 import re
-import subprocess
-
-# python documentations say xml parsing is insecure, but this should be safe usage because we're
+# python documentation says xml parsing is insecure, but this should be safe usage because we're
 # just running it on code in our repositories, not on externally acquired data.
-from twitter.common.dirutil import safe_mkdir
 from xml.dom.minidom import parse
 
 from pants.backend.codegen.targets.jaxb_library import JaxbLibrary
@@ -21,8 +17,8 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.address import SyntheticAddress
 from pants.base.build_environment import get_buildroot
-from pants.base.source_root import SourceRoot
 from pants.java.distribution import Distribution
+from pants.util.dirutil import safe_mkdir
 
 
 class JaxbGen(CodeGen, NailgunTask):

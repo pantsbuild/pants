@@ -10,11 +10,11 @@ import pkgutil
 from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
-from twitter.common.dirutil import safe_delete, safe_mkdir, safe_open
 
 from pants.base.build_environment import get_buildroot
 from pants.base.generator import Generator, TemplateData
 from pants.backend.jvm.tasks.ide_gen import IdeGen
+from pants.util.dirutil import safe_delete, safe_mkdir, safe_open
 
 
 _TEMPLATE_BASEDIR = os.path.join('templates', 'eclipse')

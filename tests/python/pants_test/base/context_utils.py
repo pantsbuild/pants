@@ -8,7 +8,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import io
 import sys
 from twitter.common.collections import maybe_list
-from twitter.common.dirutil import safe_mkdtemp
 from twitter.common.lang import Compatibility
 
 from pants.base.config import Config
@@ -16,6 +15,7 @@ from pants.base.target import Target
 from pants.goal import Context, RunTracker
 from pants.reporting.plaintext_reporter import PlainTextReporter
 from pants.reporting.report import Report
+from pants.util.dirutil import safe_mkdtemp
 
 
 def create_options(options_hash=None):

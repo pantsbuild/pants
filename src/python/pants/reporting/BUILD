@@ -6,7 +6,6 @@ python_library(
   sources = globs('*.py') - ['report.py', 'stty_utils.py'],
   resources = rglobs('assets/*') + globs('templates/*.mustache'),
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.threading'),
     pants('src/python/pants/base:build_environment'),
     pants('src/python/pants/base:build_file'),
@@ -16,6 +15,7 @@ python_library(
     pants('3rdparty/python:ansicolors'),
     pants('3rdparty/python:pystache'),
     pants(':report'),
+    pants('src/python/pants/util:dirutil'),
   ]
 )
 

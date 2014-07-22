@@ -10,10 +10,10 @@ import itertools
 import os
 import sys
 
-from twitter.common.dirutil import safe_mkdir
 
 from pants.backend.jvm.tasks.jvm_compile.anonymizer import Anonymizer
 from pants.backend.jvm.tasks.jvm_compile.scala.zinc_analysis_parser import ZincAnalysisParser
+from pants.util.dirutil import safe_mkdir
 
 
 def main():

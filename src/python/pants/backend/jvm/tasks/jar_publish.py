@@ -17,7 +17,6 @@ import sys
 
 from twitter.common.collections import OrderedDict, OrderedSet
 from twitter.common.config import Properties
-from twitter.common.dirutil import safe_mkdir, safe_open, safe_rmtree
 from twitter.common.log.options import LogOptions
 
 from pants.backend.core.tasks.scm_publish import ScmPublish, Semver
@@ -33,6 +32,7 @@ from pants.base.generator import Generator, TemplateData
 from pants.base.target import Target
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy import Ivy
+from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree
 
 
 class PushDb(object):

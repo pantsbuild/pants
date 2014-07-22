@@ -8,12 +8,12 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import os
 
 from twitter.common.collections import OrderedSet
-from twitter.common.dirutil import safe_mkdir
 
 from pants.backend.jvm.targets.jvm_binary import JvmApp, JvmBinary
 from pants.backend.jvm.tasks.jvm_binary_task import JvmBinaryTask
 from pants.base.build_environment import get_buildroot
 from pants.fs import archive
+from pants.util.dirutil import safe_mkdir
 
 
 class BundleCreate(JvmBinaryTask):

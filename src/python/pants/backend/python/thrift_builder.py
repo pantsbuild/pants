@@ -6,19 +6,18 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import functools
+import keyword
 import os
 import re
 import shutil
 import subprocess
 import sys
 
-import keyword
-from twitter.common.dirutil import safe_mkdir
-
-from pants.base.build_environment import get_buildroot
 from pants.backend.python.code_generator import CodeGenerator
 from pants.backend.codegen.targets.python_thrift_library import PythonThriftLibrary
+from pants.base.build_environment import get_buildroot
 from pants.thrift_util import select_thrift_binary
+from pants.util.dirutil import safe_mkdir
 
 
 class PythonThriftBuilder(CodeGenerator):

@@ -11,12 +11,12 @@ import shutil
 
 from twitter.common import log
 from twitter.common.contextutil import temporary_file
-from twitter.common.dirutil import safe_delete, touch
 from twitter.common.quantity import Amount, Time
 
 from pants.base.config import Config
 from pants.ivy.ivy import Ivy
 from pants.net.http.fetcher import Fetcher
+from pants.util.dirutil import safe_delete, touch
 
 
 class Bootstrapper(object):

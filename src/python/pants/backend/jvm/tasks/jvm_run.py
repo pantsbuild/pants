@@ -7,14 +7,13 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import shlex
 
-from twitter.common.dirutil import safe_open
-
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit
 from pants.java.executor import CommandLineGrabber
 from pants.java.util import execute_java
+from pants.util.dirutil import safe_open
 
 
 def is_binary(target):

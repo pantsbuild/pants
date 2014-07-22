@@ -8,12 +8,11 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import os
 import sys
 
-from twitter.common.dirutil import safe_mkdir
-
+from pants.backend.python.code_generator import CodeGenerator
 from pants.base.build_environment import get_buildroot
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy import Ivy
-from pants.backend.python.code_generator import CodeGenerator
+from pants.util.dirutil import safe_mkdir
 
 
 class PythonAntlrBuilder(CodeGenerator):

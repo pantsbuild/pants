@@ -11,12 +11,11 @@ import shutil
 import tempfile
 from xml.dom import minidom
 
-from twitter.common.dirutil import safe_mkdir
-
 from pants.backend.jvm.tasks.ide_gen import IdeGen, Project, SourceSet
 from pants.base.build_environment import get_buildroot
 from pants.base.config import ConfigOption
 from pants.base.generator import Generator, TemplateData
+from pants.util.dirutil import safe_mkdir
 
 
 _TEMPLATE_BASEDIR = 'templates/idea'

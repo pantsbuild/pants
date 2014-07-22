@@ -10,18 +10,16 @@ import os
 import shutil
 
 from twitter.common.collections.orderedset import OrderedSet
-from twitter.common.dirutil import safe_mkdir
 
 from pants import binary_util
-from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.tasks.checkstyle import Checkstyle
 from pants.backend.jvm.tasks.jvm_binary_task import JvmBinaryTask
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
-from pants.base.address import SyntheticAddress
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.target import Target
 from pants.goal.phase import Phase
+from pants.util.dirutil import safe_mkdir
 
 
 # We use custom checks for scala and java targets here for 2 reasons:

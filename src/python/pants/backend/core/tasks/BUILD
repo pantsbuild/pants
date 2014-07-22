@@ -55,6 +55,7 @@ python_library(
   resources = globs('templates/builddictionary/*.mustache'),
   dependencies = [
     pants(':common'),
+    pants('3rdparty/python:setuptools'),
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('src/python/pants/backend/core/tasks:task'),
     pants('src/python/pants/backend/maven_layout'),
@@ -67,7 +68,7 @@ python_library(
     pants('src/python/pants/base:generator'),
     pants('src/python/pants/goal:option_helpers'),
     pants('src/python/pants/goal:phase'),
-    pants('3rdparty/python:setuptools'),
+    pants('src/python/pants/util:dirutil'),
   ],
 )
 
@@ -88,9 +89,9 @@ python_library(
   dependencies = [
     pants(':console_task'),
     pants('3rdparty/python:python-daemon'),
-    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('src/python/pants/base:build_environment'),
     pants('src/python/pants/base:config'),
+    pants('src/python/pants/util:dirutil'),
   ],
 )
 
@@ -100,9 +101,10 @@ python_library(
   dependencies = [
     pants(':common'),
     pants('3rdparty/python/twitter/commons:twitter.common.confluence'),
-    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('src/python/pants/backend/core/targets:common'),
     pants('src/python/pants:binary_util'),
+    pants('src/python/pants/util:dirutil'),
+
   ],
 )
 
@@ -184,7 +186,6 @@ python_library(
   name = 'markdown_to_html',
   sources = ['markdown_to_html.py'],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('3rdparty/python:Markdown'),
     pants('3rdparty/python:Pygments'),
     pants(':common'),
@@ -193,6 +194,7 @@ python_library(
     pants('src/python/pants/base:target'),
     pants('src/python/pants/backend/core/targets:common'),
     pants('src/python/pants:binary_util'),
+    pants('src/python/pants/util:dirutil'),
   ],
 )
 
@@ -230,8 +232,8 @@ python_library(
   sources = ['prepare_resources.py'],
   dependencies = [
     pants(':common'),
-    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('src/python/pants/goal:products'),
+    pants('src/python/pants/util:dirutil'),
   ],
 )
 

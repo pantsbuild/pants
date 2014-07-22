@@ -8,7 +8,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import os
 from collections import defaultdict
 
-from twitter.common.dirutil import safe_mkdir_for
+from pants.util.dirutil import safe_mkdir_for
 
 
 class AggregatedTimings(object):
