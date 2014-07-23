@@ -6,4 +6,4 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 
-VERSION = '0.0.18'
+VERSION = '0.0.19'
