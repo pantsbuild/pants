@@ -5,22 +5,19 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 import json
-
 from textwrap import dedent
 
+from pants.backend.core.register import build_file_aliases as register_core
 from pants.backend.core.targets.dependencies import Dependencies
-from pants.backend.core.targets.resources import Resources
+from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
-from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.java_tests import JavaTests
-from pants.backend.jvm.targets.jvm_binary import Bundle, JvmApp, JvmBinary
+from pants.backend.jvm.targets.jvm_binary import JvmApp, JvmBinary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.depmap import Depmap
-from pants.backend.python.targets.python_binary import PythonBinary
-from pants.backend.python.targets.python_library import PythonLibrary
-from pants.base.build_file_aliases import BuildFileAliases
+from pants.backend.python.register import build_file_aliases as register_python
 from pants.base.exceptions import TaskError
 from pants_test.tasks.test_base import ConsoleTaskTest
 
@@ -34,24 +31,7 @@ class BaseDepmapTest(ConsoleTaskTest):
 class DepmapTest(BaseDepmapTest):
   @property
   def alias_groups(self):
-    return BuildFileAliases.create(
-      targets={
-        'dependencies': Dependencies,
-        'jar_library': JarLibrary,
-        'java_library': JavaLibrary,
-        'jvm_app': JvmApp,
-        'jvm_binary': JvmBinary,
-        'python_binary': PythonBinary,
-        'python_library': PythonLibrary,
-        'resources': Resources,
-      },
-      objects={
-        'pants': lambda x: x,
-      },
-      context_aware_object_factories={
-        'bundle': Bundle,
-      }
-    )
+    return register_core().merge(register_jvm()).merge(register_python())
 
   def setUp(self):
     super(DepmapTest, self).setUp()
@@ -288,7 +268,7 @@ class ProjectInfoTest(ConsoleTaskTest):
   def setUp(self):
     super(ProjectInfoTest, self).setUp()
 
-    first = self.make_target(
+    self.make_target(
       'project_info:first',
       target_type=JarLibrary,
     )
@@ -299,19 +279,19 @@ class ProjectInfoTest(ConsoleTaskTest):
       jars=[JarDependency('org.apache', 'apache-jar', '12.12.2012')],
     )
 
-    third = self.make_target(
+    self.make_target(
       'project_info:third',
       target_type=ScalaLibrary,
       dependencies=[second],
     )
 
-    jvm_app = self.make_target(
+    self.make_target(
       'project_info:jvm_app',
       target_type=JvmApp,
       dependencies=[second],
     )
 
-    jvm_target = self.make_target(
+    self.make_target(
       'project_info:jvm_target',
       target_type=JvmTarget,
       dependencies=[second],
@@ -319,7 +299,7 @@ class ProjectInfoTest(ConsoleTaskTest):
 
     )
 
-    java_tests = self.make_target(
+    self.make_target(
       'project_info:java_test',
       target_type=JavaTests,
       dependencies=[second],
@@ -331,7 +311,7 @@ class ProjectInfoTest(ConsoleTaskTest):
       dependencies=[second],
     )
 
-    top_dependency = self.make_target(
+    self.make_target(
       'project_info:top_dependency',
       target_type=Dependencies,
       dependencies=[jvm_binary]

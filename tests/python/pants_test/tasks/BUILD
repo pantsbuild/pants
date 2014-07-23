@@ -224,13 +224,14 @@ python_tests(
   sources = ['test_depmap.py'],
   dependencies = [
     pants(':base'),
+    pants('src/python/pants/backend/core:plugin'),
     pants('src/python/pants/backend/core/targets:common'),
-    pants('src/python/pants/backend/core/tasks:dependees'),
+    pants('src/python/pants/backend/jvm:plugin'),
     pants('src/python/pants/backend/jvm/targets:java'),
     pants('src/python/pants/backend/jvm/targets:jvm'),
     pants('src/python/pants/backend/jvm/targets:scala'),
     pants('src/python/pants/backend/jvm/tasks:depmap'),
-    pants('src/python/pants/backend/python/targets:python'),
+    pants('src/python/pants/backend/python:plugin'),
     pants('src/python/pants/base:build_file_aliases'),
   ]
 )
