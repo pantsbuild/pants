@@ -115,14 +115,14 @@ class JarRules(object):
   One issue is signed jars that must be included on the
   classpath.  These have a signature that depends on the jar contents and assembly of the deploy jar
   changes the content of the jar, breaking the signatures.  For cases like these the signed jars
-  must be verified and then the signature information thrown away.  The ``Skip`` rule supports this
-  sort of issue by allowing outright entry exclusion in the final deploy jar.
+  must be verified and then the signature information thrown away.  The :ref:`Skip <bdict_Skip>`
+  rule supports this sort of issue by allowing outright entry exclusion in the final deploy jar.
 
   Another issue is duplicate jar entries.  Although the underlying zip format supports these, the
   java jar tool and libraries do not.  As such some action must be taken for each duplicate entry
-  such that there are no duplicates in the final deploy jar.  The four ``Duplicate`` rules support
-  resolution of these cases by allowing 1st wins, last wins, concatenation of the duplicate entry
-  contents or raising an exception.
+  such that there are no duplicates in the final deploy jar.  The four
+  :ref:`Duplicate <bdict_Duplicate>` rules support resolution of these cases by allowing 1st wins,
+  last wins, concatenation of the duplicate entry contents or raising an exception.
   """
   @classmethod
   def skip_signatures_and_duplicates_concat_well_known_metadata(cls, default_dup_action=None,
@@ -234,8 +234,8 @@ class JvmBinary(JvmTarget):
       ``servlet.jar`` onto a Tomcat environment that provides another version,
       they might conflict. ``deploy_excludes`` gives you a way to build your
       code but exclude the conflicting ``jar`` when deploying.
-    :param deploy_jar_rules: Rules for packaging this binary in a deploy jar.
-    :type deploy_jar_rules: A JarRules specification.
+    :param deploy_jar_rules: :ref:`Jar rules <bdict_jar_rules>` for packaging this binary in a
+      deploy jar.
     :param configurations: Ivy configurations to resolve for this target.
       This parameter is not intended for general use.
     :type configurations: tuple of strings

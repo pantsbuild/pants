@@ -16,7 +16,13 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_agent import JavaAgent
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.java_tests import JavaTests
-from pants.backend.jvm.targets.jvm_binary import Bundle, JvmApp, JvmBinary
+from pants.backend.jvm.targets.jvm_binary import (
+    Bundle,
+    Duplicate,
+    JvmApp,
+    JvmBinary,
+    JarRules,
+    Skip)
 from pants.backend.jvm.targets.repository import Repository
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.targets.scala_tests import ScalaTests
@@ -71,8 +77,11 @@ def build_file_aliases():
     },
     objects={
       'artifact': Artifact,
-      'jar': JarDependency,
+      'Duplicate': Duplicate,
       'exclude': Exclude,
+      'jar': JarDependency,
+      'jar_rules': JarRules,
+      'Skip': Skip,
     },
     context_aware_object_factories={
       'bundle': Bundle.factory,
