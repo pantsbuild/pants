@@ -9,9 +9,8 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.core.wrapped_globs import Globs
-from pants.backend.jvm.targets.jvm_binary import Bundle, JvmApp, JvmBinary
-from pants.base.build_file_aliases import BuildFileAliases
+from pants.backend.core.register import build_file_aliases as register_core
+from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.base.exceptions import TargetDefinitionException
 from pants_test.base_test import BaseTest
 
@@ -19,16 +18,7 @@ from pants_test.base_test import BaseTest
 class BaseJvmAppTest(BaseTest):
   @property
   def alias_groups(self):
-    return BuildFileAliases.create(
-      targets={
-        'jvm_app': JvmApp,
-        'jvm_binary': JvmBinary,
-      },
-      context_aware_object_factories={
-        'bundle': Bundle,
-        'globs': Globs,
-      }
-    )
+    return register_core().merge(register_jvm())
 
 
 class BinaryTest(BaseJvmAppTest):
@@ -156,8 +146,7 @@ class BundleTest(BaseJvmAppTest):
       jvm_app(name='buoyancy',
         dependencies=[':unused'],
         bundles=[
-          bundle()
-            .add('config/densities.xml')
+          bundle().add('config/densities.xml')
         ]
       )
     '''))
@@ -177,8 +166,7 @@ class BundleTest(BaseJvmAppTest):
       jvm_app(name='tub',
         dependencies=[':unused'],
         bundles=[
-          bundle()
-            .add(globs('config/*.xml'))
+          bundle().add(globs('config/*.xml'))
         ]
       )
     '''))
@@ -199,8 +187,7 @@ class BundleTest(BaseJvmAppTest):
       jvm_app(name='crown',
         dependencies=[':unused'],
         bundles=[
-          bundle(relative_to='gold')
-            .add('gold/config/five.xml')
+          bundle(relative_to='gold').add('gold/config/five.xml')
         ]
       )
     '''))
@@ -235,3 +222,41 @@ class BundleTest(BaseJvmAppTest):
         stonexml_key = k
     self.assertEquals(app.bundles[0].filemap[stonexml_key],
                       'stone/dense.xml')
+
+  def test_multiple_bundles(self):
+    self.create_dir('src/java/org/archimedes/volume/config/stone')
+    self.create_file('src/java/org/archimedes/volume/config/stone/dense.xml')
+    self.create_dir('src/java/org/archimedes/volume/config')
+    self.create_file('src/java/org/archimedes/volume/config/metal/dense.xml')
+    self.add_to_build_file('src/java/org/archimedes/volume/BUILD', dedent('''
+      jvm_binary(name='unused')
+    '''))
+    self.add_to_build_file('src/java/org/archimedes/volume/BUILD', dedent('''
+      jvm_app(name='volume',
+        dependencies=[':unused'],
+        bundles=[
+          bundle(relative_to='config').add('config/stone/dense.xml')
+        ]
+      )
+
+      jvm_app(name='bathtub',
+        dependencies=[':unused'],
+        bundles=[
+          bundle().add('config/metal/dense.xml')
+        ]
+      )
+    '''))
+
+    app1 = self.target('src/java/org/archimedes/volume')
+    self.assertEquals(1, len(app1.bundles))
+    for k in app1.bundles[0].filemap.keys():
+      if k.endswith('archimedes/volume/config/stone/dense.xml'):
+        stonexml_key = k
+    self.assertEquals(app1.bundles[0].filemap[stonexml_key], 'stone/dense.xml')
+
+    app2 = self.target('src/java/org/archimedes/volume:bathtub')
+    self.assertEquals(1, len(app2.bundles))
+    for k in app2.bundles[0].filemap.keys():
+      if k.endswith('archimedes/volume/config/metal/dense.xml'):
+        stonexml_key = k
+    self.assertEquals(app2.bundles[0].filemap[stonexml_key], 'config/metal/dense.xml')

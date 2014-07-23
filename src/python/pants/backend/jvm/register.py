@@ -75,13 +75,9 @@ def build_file_aliases():
       'exclude': Exclude,
     },
     context_aware_object_factories={
-      'bundle': Bundle,
+      'bundle': Bundle.factory,
     }
   )
-
-
-def register_commands():
-  pass
 
 
 def register_goals():

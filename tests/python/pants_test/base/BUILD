@@ -29,6 +29,7 @@ python_test_suite(
     pants(':address'),
     pants(':build_configuration'),
     pants(':build_file'),
+    pants(':build_file_aliases'),
     pants(':build_file_parser'),
     pants(':build_invalidator'),
     pants(':build_root'),
@@ -89,6 +90,16 @@ python_tests(
     pants('src/python/pants/util:dirutil'),
   ]
 )
+
+python_tests(
+  name = 'build_file_aliases',
+  sources = ['test_build_file_aliases.py'],
+  dependencies = [
+    pants('src/python/pants/base:build_file_aliases'),
+    pants('src/python/pants/base:target'),
+  ]
+)
+
 
 python_tests(
   name = 'build_file_parser',
