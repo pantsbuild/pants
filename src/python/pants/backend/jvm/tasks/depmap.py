@@ -92,6 +92,8 @@ class Depmap(ConsoleTask):
 
   def __init__(self, context, workdir):
     super(Depmap, self).__init__(context, workdir)
+    # Require information about jars
+    self.context.products.require_data('ivy_jar_products')
 
     if (self.context.options.depmap_is_internal_only
         and self.context.options.depmap_is_external_only):
@@ -275,7 +277,7 @@ class Depmap(ConsoleTask):
 
   def _resolve_jars_info(self):
     mapping = defaultdict(list)
-    jar_data = self.context.products.get_data('ivy_ar_products')
+    jar_data = self.context.products.get_data('ivy_jar_products')
     if not jar_data:
       return mapping
     for dep in jar_data['default']:
