@@ -57,6 +57,6 @@ class BuildFileAliases(namedtuple('BuildFileAliases',
       raise TypeError('Can only merge other BuildFileAliases, given {0}'.format(other))
     all_aliases = self._asdict()
     other_aliases = other._asdict()
-    for field, map in all_aliases.items():
-      map.update(other_aliases[field])
+    for alias_type, alias_map in all_aliases.items():
+      alias_map.update(other_aliases[alias_type])
     return BuildFileAliases(**all_aliases)
