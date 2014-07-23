@@ -46,9 +46,8 @@ python_tests(
   sources = ['test_jvm_app.py'],
   dependencies = [
     pants(':base'),
-    pants('src/python/pants/backend/core'),
-    pants('src/python/pants/backend/jvm/targets:jvm'),
-    pants('src/python/pants/base:build_file_aliases'),
+    pants('src/python/pants/backend/core:plugin'),
+    pants('src/python/pants/backend/jvm:plugin'),
     pants('src/python/pants/base:exceptions'),
   ]
 )
