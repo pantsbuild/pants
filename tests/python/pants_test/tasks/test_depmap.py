@@ -17,6 +17,7 @@ from pants.backend.jvm.targets.jvm_binary import JvmApp, JvmBinary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.depmap import Depmap
+from pants.backend.python.register import build_file_aliases as register_python
 from pants.base.exceptions import TaskError
 from pants_test.tasks.test_base import ConsoleTaskTest
 
@@ -30,7 +31,7 @@ class BaseDepmapTest(ConsoleTaskTest):
 class DepmapTest(BaseDepmapTest):
   @property
   def alias_groups(self):
-    return register_core().merge(register_jvm())
+    return register_core().merge(register_jvm()).merge(register_python())
 
   def setUp(self):
     super(DepmapTest, self).setUp()
