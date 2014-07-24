@@ -29,7 +29,7 @@ class MavenLayoutTest(BaseTest):
     super(MavenLayoutTest, self).setUp()
 
     self.add_to_build_file('projectB/src/test/scala',
-                           'junit_tests(name="test", sources=[])')
+                           'junit_tests(name="test", sources=["a/source"])')
     self.create_file('projectB/BUILD', 'maven_layout()')
 
     self.add_to_build_file('projectA/subproject/src/main/java',
