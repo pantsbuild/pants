@@ -35,10 +35,11 @@ python_library(
   sources = ['context.py'],
   dependencies = [
     pants(':products'),
-    pants('3rdparty/python/twitter/commons:twitter.common.collections'),
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.process'),
+    pants('src/python/pants/base:address'),
     pants('src/python/pants/base:build_environment'),
+    pants('src/python/pants/base:source_root'),
     pants('src/python/pants/base:target'), # XXX(fixme)
     pants('src/python/pants/base:workunit'),
     pants('src/python/pants/java:distribution'),  # XXX(fixme)
@@ -84,7 +85,6 @@ python_library(
   sources = ['phase.py'],
   dependencies = [
     pants(':error'),
-    pants(':option_helpers'),
   ],
 )
 

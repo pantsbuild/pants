@@ -9,7 +9,9 @@ import logging
 from textwrap import dedent
 import xml.etree.ElementTree as ET
 
+from pants.backend.core.register import build_file_aliases as register_core
 from pants.backend.jvm.ivy_utils import IvyUtils
+from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.util.contextutil import temporary_file_path
 from pants_test.base_test import BaseTest
 from pants_test.base.context_utils import create_config
@@ -22,6 +24,10 @@ class IvyUtilsTestBase(BaseTest):
                    ivy_resolve_overrides=None)
     options.update(**kwargs)
     return options
+
+  @property
+  def alias_groups(self):
+    return register_core().merge(register_jvm())
 
 
 class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
@@ -37,7 +43,7 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
     super(IvyUtilsGenerateIvyTest, self).setUp()
 
     self.add_to_build_file('src/java/targets',
-        dedent('''
+        dedent("""
             jar_library(
               name='simple',
               jars=[
@@ -45,7 +51,7 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
                 jar('org2', 'name2', 'rev2', force=True),
               ]
             )
-        '''))
+        """))
 
     self.simple = self.target('src/java/targets:simple')
     self.ivy_utils = IvyUtils(create_config(), self.create_options(), logging.Logger('test'))
