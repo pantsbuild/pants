@@ -8,6 +8,7 @@ python_library(
     ':antlr_gen',
     ':code_gen',
     ':protobuf_gen',
+    ':ragel_gen',
     ':scrooge_gen',
     ':jaxb_gen',
   ],
@@ -96,6 +97,24 @@ python_library(
     pants('src/python/pants/base:exceptions'),
     pants('src/python/pants:binary_util'),
     pants('src/python/pants/util:dirutil'),
+  ],
+)
+
+python_library(
+  name = 'ragel_gen',
+  sources = ['ragel_gen.py'],
+  dependencies = [
+    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
+    pants(':code_gen'),
+    pants(':common'),
+    pants('src/python/pants/backend/codegen/targets:java'),
+    pants('src/python/pants/backend/jvm/targets:java'),
+    pants('src/python/pants/base:address'),
+    pants('src/python/pants/base:build_environment'),
+    pants('src/python/pants/base:source_root'),
+    pants('src/python/pants/java:distribution'),
+    pants('src/python/pants/base:exceptions'),
+    pants('src/python/pants:binary_util'),
   ],
 )
 

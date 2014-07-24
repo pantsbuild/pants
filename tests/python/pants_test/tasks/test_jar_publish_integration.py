@@ -6,18 +6,12 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import os
-import subprocess
 import pytest
 
 from twitter.common.contextutil import temporary_dir
 
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
-
-
-def is_exe(name):
-  result = subprocess.call(['which', name], stdout=open(os.devnull, 'w'), stderr=subprocess.STDOUT)
-  return result == 0
-
+from pants_test.tasks.test_base import is_exe
 
 class JarPublishIntegrationTest(PantsRunIntegrationTest):
   SCALADOC = is_exe('scaladoc')

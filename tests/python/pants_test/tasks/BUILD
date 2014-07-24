@@ -47,6 +47,7 @@ python_test_suite(
     pants(':listtargets'),
     pants(':minimal_cover'),
     pants(':protobuf_gen'),
+    pants(':ragel_gen'),
     pants(':roots'),
     pants(':scrooge_gen'),
     pants(':sorttargets'),
@@ -504,4 +505,17 @@ python_tests(
     pants('src/python/pants/util:dirutil'),
     pants('tests/python/pants_test:base_test'),
   ]
+)
+
+
+python_tests(
+  name = 'ragel_gen',
+  sources = ['test_ragel_gen.py'],
+  dependencies = [
+    pants(':base'),
+    pants('3rdparty/python:mock'),
+    pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
+    pants('src/python/pants/backend/codegen/tasks:ragel_gen'),
+    pants('src/python/pants/backend/codegen/targets:java'),
+  ],
 )

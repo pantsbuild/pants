@@ -7,6 +7,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import os
 import pytest
+import subprocess
 
 from contextlib import closing
 from optparse import OptionGroup, OptionParser
@@ -61,6 +62,11 @@ def prepare_task(task_type,
                     build_graph=build_graph,
                     build_file_parser=build_file_parser)
   return task_type(context, workdir, **kwargs)
+
+
+def is_exe(name):
+  result = subprocess.call(['which', name], stdout=open(os.devnull, 'w'), stderr=subprocess.STDOUT)
+  return result == 0
 
 
 class TaskTest(BaseTest):

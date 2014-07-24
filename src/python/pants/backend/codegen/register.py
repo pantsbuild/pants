@@ -7,6 +7,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from pants.backend.codegen.targets.java_antlr_library import JavaAntlrLibrary
 from pants.backend.codegen.targets.java_protobuf_library import JavaProtobufLibrary
+from pants.backend.codegen.targets.java_ragel_library import JavaRagelLibrary
 from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
 from pants.backend.codegen.targets.jaxb_library import JaxbLibrary
 from pants.backend.codegen.targets.python_antlr_library import PythonAntlrLibrary
@@ -15,6 +16,7 @@ from pants.backend.codegen.tasks.antlr_gen import AntlrGen
 from pants.backend.codegen.tasks.apache_thrift_gen import ApacheThriftGen
 from pants.backend.codegen.tasks.jaxb_gen import JaxbGen
 from pants.backend.codegen.tasks.protobuf_gen import ProtobufGen
+from pants.backend.codegen.tasks.ragel_gen import RagelGen
 from pants.backend.codegen.tasks.scrooge_gen import ScroogeGen
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.goal import Goal as goal
@@ -25,13 +27,13 @@ def build_file_aliases():
     targets={
       'java_antlr_library': JavaAntlrLibrary,
       'java_protobuf_library': JavaProtobufLibrary,
+      'java_ragel_library': JavaRagelLibrary,
       'java_thrift_library': JavaThriftLibrary,
       'python_antlr_library': PythonAntlrLibrary,
       'python_thrift_library': PythonThriftLibrary,
       'jaxb_library': JaxbLibrary,
-    }
-  )
-
+      }
+    )
 
 def register_commands():
   pass
@@ -50,5 +52,7 @@ def register_goals():
 
   goal(name='antlr', dependencies=['bootstrap'], action=AntlrGen
   ).install('gen')
+
+  goal(name='ragel', action=RagelGen).install('gen')
 
   goal(name='jaxb', action=JaxbGen).install('gen')
