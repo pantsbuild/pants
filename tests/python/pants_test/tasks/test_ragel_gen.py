@@ -7,25 +7,23 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import os
 import pytest
-
 from textwrap import dedent
 
+from mock import MagicMock
 from twitter.common.collections import OrderedSet
-from twitter.common.contextutil import temporary_file
 
-from mock import MagicMock, patch
 from pants.backend.codegen.targets.java_ragel_library import JavaRagelLibrary
 from pants.backend.codegen.tasks.ragel_gen import calculate_genfile, RagelGen
 from pants.base.address import SyntheticAddress
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file_aliases import BuildFileAliases
-from pants.base.exceptions import TaskError
 from pants.goal.context import Context
-
+from pants.util.contextutil import temporary_file
 from pants_test.base_test import BaseTest
 from pants_test.tasks.test_base import is_exe, prepare_task
 
-ragel_file_contents = dedent('''
+
+ragel_file_contents = dedent("""
 package com.example.atoi;
 %%{
   machine parser;
@@ -64,7 +62,7 @@ public class Parser {
       return val;
   }
 }
-''')
+""")
 
 
 class RagelGenTest(BaseTest):
@@ -78,12 +76,12 @@ class RagelGenTest(BaseTest):
                       reason='No ragel binary on the PATH.')
   def test_ragel_gen(self):
     self.create_file(relpath='test_ragel_gen/atoi.rl', contents=ragel_file_contents)
-    self.add_to_build_file('test_ragel_gen', dedent('''
+    self.add_to_build_file('test_ragel_gen', dedent("""
       java_ragel_library(name='atoi',
         sources=['atoi.rl'],
         dependencies=[]
       )
-    '''))
+    """))
     task_outdir = os.path.join(self.build_root, '.pants.d')
 
     task = prepare_task(RagelGen,

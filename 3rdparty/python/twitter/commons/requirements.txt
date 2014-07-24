@@ -7,7 +7,6 @@
 twitter.common.collections>=0.3.1,<0.4
 twitter.common.config>=0.3.1,<0.4
 twitter.common.confluence>=0.3.1,<0.4
-twitter.common.contextutil>=0.3.1,<0.4
 twitter.common.decorators>=0.3.1,<0.4
 twitter.common.dirutil>=0.3.1,<0.4
 twitter.common.lang>=0.3.1,<0.4
