@@ -16,6 +16,13 @@ python_test_suite(
   ]
 )
 
+python_test_suite(
+  name = 'integration',
+  dependencies = [
+    pants(':test_spec_exclude_integration'),
+  ]
+)
+
 python_tests(
   name = 'test_goal',
   sources = [ 'test_goal.py' ],
@@ -43,5 +50,13 @@ python_tests(
     pants('src/python/pants/util:contextutil'),
     pants('src/python/pants/util:dirutil'),
     pants('tests/python/pants_test:base_test'),
+  ]
+)
+
+python_tests(
+  name = 'test_spec_exclude_integration',
+  sources = [ 'test_spec_exclude_integration.py' ],
+  dependencies = [
+    pants('tests/python/pants_test:int-test'),
   ]
 )
