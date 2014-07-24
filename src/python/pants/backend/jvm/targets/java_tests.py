@@ -5,13 +5,19 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from twitter.common.collections import maybe_list
+from twitter.common.lang import Compatibility
+
 from pants.backend.jvm.targets.jvm_target import JvmTarget
+from pants.base.exceptions import TargetDefinitionException
 
 
 class JavaTests(JvmTarget):
   """Tests JVM sources with JUnit."""
 
-  def __init__(self, **kwargs):
+  def __init__(self,
+               sources=None,
+               **kwargs):
     """
     :param string name: The name of this target, which combined with this
       build file defines the :doc:`target address <target_addresses>`.
@@ -28,9 +34,12 @@ class JavaTests(JvmTarget):
       file resources to place in this module's jar.
     :param exclusives: An optional map of exclusives tags. See CheckExclusives for details.
    """
-    super(JavaTests, self).__init__(**kwargs)
+    _sources = maybe_list(sources or [], expected_type=Compatibility.string)
 
-    # self.resources = resources
+    super(JavaTests, self).__init__(sources=_sources, **kwargs)
+
+    if not _sources:
+      raise TargetDefinitionException(self, 'JavaTests must include a non-empty set of sources.')
 
     # TODO(John Sirois): These could be scala, clojure, etc.  'jvm' and 'tests' are the only truly
     # applicable labels - fixup the 'java' misnomer.

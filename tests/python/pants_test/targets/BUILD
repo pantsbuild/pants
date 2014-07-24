@@ -13,13 +13,14 @@ python_test_suite(
   dependencies = [
     pants(':artifact'),
     pants(':exclusive'),
-    pants(':sort_targets'),
     pants(':jar_library'),
+    pants(':java_tests'),
     pants(':java_thrift_library'),
     pants(':jvm_app'),
     pants(':python_binary'),
     pants(':python_target'),
     pants(':scala_library'),
+    pants(':sort_targets'),
     pants(':wiki_page')
   ]
 )
@@ -94,6 +95,17 @@ python_tests(
     pants('src/python/pants/backend/codegen/targets:java'),
     pants('src/python/pants/backend/jvm/targets:java'),
     pants('src/python/pants/base:build_file_aliases'),
+    pants('tests/python/pants_test/base:context_utils'),
+  ]
+)
+
+python_tests(
+  name = 'java_tests',
+  sources = ['test_java_tests.py'],
+  dependencies = [
+    pants(':base'),
+    pants('src/python/pants/backend/core'),
+    pants('src/python/pants/backend/jvm/targets:java'),
     pants('tests/python/pants_test/base:context_utils'),
   ]
 )
