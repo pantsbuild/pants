@@ -338,7 +338,7 @@ python_tests(
   sources = ['test_jar_publish_integration.py'],
   dependencies = [
     pants(':base'),
-    pants('src/python/pants/util:contextutil'),
+    pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('tests/python/pants_test:int-test'),
   ],
 )

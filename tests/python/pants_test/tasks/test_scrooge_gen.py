@@ -94,14 +94,18 @@ class ScroogeGenTest(BaseTest):
       sources = [os.path.join(task_outdir, 'com/pants/example/Example.scala')]
       task.gen.return_value = {'test_smoke/a.thrift': sources}
 
-      Context.add_new_target = MagicMock()
-      task.execute()
-      relative_task_outdir = os.path.relpath(task_outdir, get_buildroot())
-      spec = '{spec_path}:{name}'.format(spec_path=relative_task_outdir, name='test_smoke.a')
-      address = SyntheticAddress.parse(spec=spec)
-      Context.add_new_target.assert_called_once_with(address,
-                                                     ScalaLibrary,
-                                                     sources=sources,
-                                                     excludes=OrderedSet(),
-                                                     dependencies=OrderedSet(),
-                                                     provides=None)
+      try:
+        saved_add_new_target = Context.add_new_target
+        Context.add_new_target = MagicMock()
+        task.execute()
+        relative_task_outdir = os.path.relpath(task_outdir, get_buildroot())
+        spec = '{spec_path}:{name}'.format(spec_path=relative_task_outdir, name='test_smoke.a')
+        address = SyntheticAddress.parse(spec=spec)
+        Context.add_new_target.assert_called_once_with(address,
+                                                       ScalaLibrary,
+                                                       sources=sources,
+                                                       excludes=OrderedSet(),
+                                                       dependencies=OrderedSet(),
+                                                       provides=None)
+      finally:
+        Context.add_new_target = saved_add_new_target
