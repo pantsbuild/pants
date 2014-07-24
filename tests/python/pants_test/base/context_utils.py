@@ -12,7 +12,8 @@ from twitter.common.lang import Compatibility
 
 from pants.base.config import Config
 from pants.base.target import Target
-from pants.goal import Context, RunTracker
+from pants.goal.context import Context
+from pants.goal.run_tracker import RunTracker
 from pants.reporting.plaintext_reporter import PlainTextReporter
 from pants.reporting.report import Report
 from pants.util.dirutil import safe_mkdtemp

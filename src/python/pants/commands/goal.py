@@ -29,7 +29,9 @@ from pants.base.workunit import WorkUnit
 from pants.commands.command import Command
 from pants.engine.engine import Engine
 from pants.engine.round_engine import RoundEngine
-from pants.goal import Context, GoalError, Phase
+from pants.goal.context import Context
+from pants.goal.goal import GoalError
+from pants.goal.phase import Phase
 from pants.goal.help import print_help
 from pants.goal.initialize_reporting import update_reporting
 from pants.goal.option_helpers import add_global_options

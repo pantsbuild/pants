@@ -19,7 +19,7 @@ from pants.backend.codegen.tasks.protobuf_gen import ProtobufGen
 from pants.backend.codegen.tasks.ragel_gen import RagelGen
 from pants.backend.codegen.tasks.scrooge_gen import ScroogeGen
 from pants.base.build_file_aliases import BuildFileAliases
-from pants.goal import Goal as goal
+from pants.goal.goal import Goal as goal
 
 
 def build_file_aliases():

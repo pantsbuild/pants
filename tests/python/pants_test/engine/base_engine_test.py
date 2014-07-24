@@ -7,7 +7,8 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import unittest2
 
-from pants.goal import Goal, Phase
+from pants.goal.goal import Goal
+from pants.goal.phase import Phase
 
 
 class EngineTestBase(unittest2.TestCase):

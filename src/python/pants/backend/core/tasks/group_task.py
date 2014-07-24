@@ -13,7 +13,7 @@ from pants.backend.core.tasks.check_exclusives import ExclusivesMapping
 from pants.backend.core.tasks.task import TaskBase, Task
 from pants.base.build_graph import sort_targets
 from pants.base.workunit import WorkUnit
-from pants.goal import Mkflag
+from pants.goal.goal import Mkflag
 
 
 class GroupMember(TaskBase):

@@ -7,7 +7,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from collections import namedtuple, defaultdict
 
-from pants.goal import Phase
+from pants.goal.phase import Phase
 
 
 class ProducerInfo(namedtuple('ProducerInfo', ['product_type', 'task_type', 'phase'])):

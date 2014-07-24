@@ -53,7 +53,8 @@ from pants.backend.jvm.tasks.scala_repl import ScalaRepl
 from pants.backend.jvm.tasks.scaladoc_gen import ScaladocGen
 from pants.backend.jvm.tasks.specs_run import SpecsRun
 from pants.base.build_file_aliases import BuildFileAliases
-from pants.goal import Goal as goal, Phase
+from pants.goal.goal import Goal as goal
+from pants.goal.phase import Phase
 
 
 def build_file_aliases():
