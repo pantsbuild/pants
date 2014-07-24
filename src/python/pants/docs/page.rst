@@ -126,19 +126,9 @@ The target probably looks something like::
                       url_builder=confluence_url_builder)
 
 You need to install a goal to enable publishing a doc to confluence.
-It might look like::
+It might look like
 
-    class OurConfluence(ConfluencePublish):
-      def wiki(self):
-        return confluence # wiki target defined above
-      def api(self):
-        return 'confluence2' # Older confluence installations use older API
-
-    goal(
-      name='confluence',
-      action=OurConfluence,
-      dependencies=['markdown']
-    ).install().with_description('Publish one or more confluence pages.')
-
-
+.. literalinclude:: ../../../../tests/python/pants_test/backend/core/test_setup_confluence.py
+   :start-after: literalinclude this part
+   :end-before: stop including
 

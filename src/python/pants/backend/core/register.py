@@ -16,6 +16,7 @@ from pants.backend.core.tasks.build_lint import BuildLint
 from pants.backend.core.tasks.builddictionary import BuildBuildDictionary
 from pants.backend.core.tasks.check_exclusives import CheckExclusives
 from pants.backend.core.tasks.clean import Invalidator, Cleaner, AsyncCleaner
+from pants.backend.core.tasks.confluence_publish import ConfluencePublish
 from pants.backend.core.tasks.dependees import ReverseDepmap
 from pants.backend.core.tasks.filemap import Filemap
 from pants.backend.core.tasks.filter import Filter
@@ -59,6 +60,7 @@ def build_file_aliases():
     objects={
       'Amount': Amount,
       'config': Config,
+      'ConfluencePublish': ConfluencePublish,
       'get_buildroot': get_buildroot,
       'get_scm': get_scm,
       'pants_version': pants_version,
