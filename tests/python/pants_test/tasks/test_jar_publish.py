@@ -8,10 +8,9 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 from mock import Mock
 import pytest
 
-from twitter.common.contextutil import temporary_dir
 from pants.backend.jvm.tasks.jar_publish import JarPublish
 from pants.base.exceptions import TaskError
-
+from pants.util.contextutil import temporary_dir
 from pants_test.base_test import BaseTest
 from pants_test.tasks.test_base import prepare_task
 

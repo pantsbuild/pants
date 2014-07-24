@@ -5,12 +5,10 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-import os
-import unittest
 from contextlib import contextmanager
+import os
 from textwrap import dedent
-
-from twitter.common.contextutil import pushd, temporary_dir
+import unittest
 
 from pants.base.address import SyntheticAddress
 from pants.base.build_configuration import BuildConfiguration
@@ -18,6 +16,7 @@ from pants.base.build_file_parser import BuildFileParser
 from pants.base.build_graph import BuildGraph
 from pants.base.build_root import BuildRoot
 from pants.base.target import Target
+from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import touch
 
 

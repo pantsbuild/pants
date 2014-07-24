@@ -5,17 +5,17 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-import os
 from contextlib import closing
+import os
 
 import mox
 import pytest
 import requests
-from twitter.common.contextutil import temporary_file
 from twitter.common.lang import Compatibility
 from twitter.common.quantity import Amount, Data, Time
 
 from pants.net.http.fetcher import Fetcher
+from pants.util.contextutil import temporary_file
 
 
 class FetcherTest(mox.MoxTestBase):

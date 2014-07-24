@@ -5,19 +5,18 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+import SimpleHTTPServer
 import SocketServer
 import os
 import unittest
 from threading import Thread
-
-import SimpleHTTPServer
-from twitter.common.contextutil import pushd, temporary_dir, temporary_file
 
 from pants.base.build_invalidator import CacheKey
 from pants.cache.cache_setup import create_artifact_cache, select_best_url
 from pants.cache.combined_artifact_cache import CombinedArtifactCache
 from pants.cache.local_artifact_cache import LocalArtifactCache
 from pants.cache.restful_artifact_cache import RESTfulArtifactCache
+from pants.util.contextutil import pushd, temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir
 from pants_test.testutils.mock_logger import MockLogger
 

@@ -8,9 +8,8 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import unittest
 import pytest
 
-from twitter.common.contextutil import temporary_file
-
 from pants.backend.codegen.tasks.protobuf_gen import calculate_genfiles
+from pants.util.contextutil import temporary_file
 
 
 class ProtobufGenCalculateGenfilesTestBase(unittest.TestCase):

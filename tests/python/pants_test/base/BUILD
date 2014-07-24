@@ -57,10 +57,10 @@ python_tests(
   name = 'address',
   sources = ['test_address.py'],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('src/python/pants/base:address'),
     pants('src/python/pants/base:build_root'),
     pants('tests/python/pants_test:base_test'),
+    pants('src/python/pants/util:contextutil'),
     pants('src/python/pants/util:dirutil'),
   ]
 )
@@ -69,13 +69,13 @@ python_tests(
   name = 'build_configuration',
   sources = ['test_build_configuration.py'],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('src/python/pants/base:address'),
     pants('src/python/pants/base:build_configuration'),
     pants('src/python/pants/base:build_file'),
     pants('src/python/pants/base:build_file_aliases'),
     pants('src/python/pants/base:build_graph'),
     pants('src/python/pants/base:target'),
+    pants('src/python/pants/util:contextutil'),
     pants('src/python/pants/util:dirutil'),
   ]
 )
@@ -119,8 +119,8 @@ python_tests(
   name = 'build_invalidator',
   sources = ['test_build_invalidator.py'],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('src/python/pants/base:build_invalidator'),
+    pants('src/python/pants/util:contextutil'),
     pants('tests/python/pants_test:base_test'),
   ]
 )
@@ -129,9 +129,9 @@ python_tests(
   name = 'build_root',
   sources = ['test_build_root.py'],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('src/python/pants/base:build_root'),
     pants('tests/python/pants_test:base_test'),
+    pants('src/python/pants/util:contextutil'),
     pants('src/python/pants/util:dirutil'),
   ]
 )
@@ -186,8 +186,8 @@ python_tests(
   sources = ['test_hash_utils.py'],
   dependencies = [
     pants('3rdparty/python:mox'),
-    pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('src/python/pants/base:hash_utils'),
+    pants('src/python/pants/util:contextutil'),
     pants('tests/python/pants_test:base_test'),
   ]
 )
@@ -216,8 +216,8 @@ python_tests(
   name = 'run_info',
   sources = ['test_run_info.py'],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('src/python/pants/base:run_info'),
+    pants('src/python/pants/util:contextutil'),
     pants('tests/python/pants_test:base_test'),
   ]
 )

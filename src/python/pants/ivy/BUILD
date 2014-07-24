@@ -6,7 +6,6 @@ python_library(
   sources = globs('*.py'),
   dependencies = [
     pants('3rdparty/python/twitter/commons:twitter.common.collections'),
-    pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.lang'),
     pants('3rdparty/python/twitter/commons:twitter.common.log'),
     pants('3rdparty/python/twitter/commons:twitter.common.quantity'),
@@ -14,6 +13,7 @@ python_library(
     pants('src/python/pants/java:executor'),
     pants('src/python/pants/java:util'),
     pants('src/python/pants/net'),
+    pants('src/python/pants/util:contextutil'),
     pants('src/python/pants/util:dirutil'),
   ]
 )

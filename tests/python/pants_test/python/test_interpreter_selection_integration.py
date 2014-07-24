@@ -6,11 +6,11 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import os
-import pytest
 import subprocess
 
-from twitter.common.contextutil import temporary_dir
+import pytest
 
+from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 

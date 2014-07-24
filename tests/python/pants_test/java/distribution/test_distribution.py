@@ -5,19 +5,19 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from collections import namedtuple
+from contextlib import contextmanager
 import os
 import subprocess
 import textwrap
 import unittest
-from collections import namedtuple
-from contextlib import contextmanager
 
 import pytest
 from twitter.common.collections import maybe_list
-from twitter.common.contextutil import environment_as, temporary_dir
 
 from pants.base.revision import Revision
 from pants.java.distribution import Distribution
+from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import chmod_plus_x, safe_open, touch
 
 

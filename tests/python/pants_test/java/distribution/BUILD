@@ -6,9 +6,9 @@ python_tests(
   sources = globs('*.py'),
   dependencies = [
     pants('3rdparty/python/twitter/commons:twitter.common.collections'),
-    pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('src/python/pants/base:revision'),
     pants('src/python/pants/java:distribution'),
+    pants('src/python/pants/util:contextutil'),
     pants('src/python/pants/util:dirutil'),
   ]
 )

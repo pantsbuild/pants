@@ -52,10 +52,10 @@ python_tests(
 python_tests(name = 'test_resolver',
   sources = ['test_resolver.py'],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.python'),
     pants('src/python/pants/base:config'),
     pants('src/python/pants/backend/python:resolver'),
+    pants('src/python/pants/util:contextutil'),
   ],
 )
 
@@ -85,7 +85,7 @@ python_tests(
   name = 'interpreter_selection_integration',
   sources = ['test_interpreter_selection_integration.py'],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
+    pants('src/python/pants/util:contextutil'),
     pants('tests/python/pants_test:int-test'),
   ],
 )

@@ -5,8 +5,8 @@ python_tests(
   name = 'fs',
   sources = globs('*.py'),
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('src/python/pants/fs'),
+    pants('src/python/pants/util:contextutil'),
     pants('src/python/pants/util:dirutil'),
   ]
 )

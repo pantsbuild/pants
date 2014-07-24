@@ -11,9 +11,8 @@ import os
 import subprocess
 import unittest
 
-from twitter.common.contextutil import temporary_dir
-
 from pants.base.build_environment import get_buildroot
+from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_open, safe_mkdir
 
 

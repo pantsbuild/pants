@@ -8,7 +8,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import httplib
 from multiprocessing.pool import ThreadPool
 
-from twitter.common.contextutil import Timer
+from pants.util.contextutil import Timer
 
 
 _global_pinger_memo = {}  # netloc -> rt time in secs.

@@ -13,9 +13,9 @@ python_tests(
   name = 'executor',
   sources = ['test_executor.py'],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('src/python/pants/java:distribution'),
     pants('src/python/pants/java:executor'),
+    pants('src/python/pants/util:contextutil'),
     pants('src/python/pants/util:dirutil'),
   ]
 )

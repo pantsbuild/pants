@@ -100,7 +100,6 @@ python_library(
     pants(':analysis_tools'),
     pants(':jvm_compile'),
     pants('3rdparty/python/twitter/commons:twitter.common.collections'),
-    pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.lang'),
     pants('src/python/pants/base:build_environment'),
     pants('src/python/pants/base:exceptions'),
@@ -109,6 +108,7 @@ python_library(
     pants('src/python/pants/backend/jvm:jvm_tool_bootstrapper'),
     pants('src/python/pants/backend/jvm/scala:target_platform'),
     pants('src/python/pants/backend/jvm/targets:scala'),
+    pants('src/python/pants/util:contextutil'),
     pants('src/python/pants/util:dirutil'),
   ],
 )

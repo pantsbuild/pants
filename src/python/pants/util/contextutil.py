@@ -163,7 +163,7 @@ class Timer(object):
   """Very basic with-context to time operations
 
   Example usage:
-    >>> from twitter.common.contextutil import Timer
+    >>> from pants.util.contextutil import Timer
     >>> with Timer() as timer:
     ...   time.sleep(2)
     ...

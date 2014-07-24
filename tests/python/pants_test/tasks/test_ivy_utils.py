@@ -6,14 +6,11 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import logging
+from textwrap import dedent
 import xml.etree.ElementTree as ET
 
-from textwrap import dedent
-
-from twitter.common.contextutil import temporary_file_path
-
 from pants.backend.jvm.ivy_utils import IvyUtils
-
+from pants.util.contextutil import temporary_file_path
 from pants_test.base_test import BaseTest
 from pants_test.base.context_utils import create_config
 

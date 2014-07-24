@@ -8,10 +8,9 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import os
 import unittest
 
-from twitter.common.contextutil import temporary_dir
-
-from pants.util.dirutil import safe_mkdir, touch
 from pants.fs.archive import TAR, TBZ2, TGZ, ZIP
+from pants.util.contextutil import temporary_dir
+from pants.util.dirutil import safe_mkdir, touch
 
 
 class ArchiveTest(unittest.TestCase):

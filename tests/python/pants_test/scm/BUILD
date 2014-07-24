@@ -12,9 +12,9 @@ python_tests(
   name = 'test_git',
   sources = ['test_git.py'],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('src/python/pants/scm'),
     pants('src/python/pants/scm:git'),
+    pants('src/python/pants/util:contextutil'),
     pants('src/python/pants/util:dirutil'),
   ]
 )

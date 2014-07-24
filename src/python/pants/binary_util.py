@@ -12,11 +12,11 @@ import subprocess
 import posixpath
 from twitter.common import log
 from twitter.common.collections import OrderedSet
-from twitter.common.contextutil import temporary_file
 from twitter.common.lang import Compatibility
 
 from pants.base.config import Config
 from pants.base.exceptions import TaskError
+from pants.util.contextutil import temporary_file
 from pants.util.dirutil import chmod_plus_x, safe_delete, safe_open
 
 if Compatibility.PY3:

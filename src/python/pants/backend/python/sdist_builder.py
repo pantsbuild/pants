@@ -5,12 +5,8 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-import glob
 import os
-import subprocess
-import sys
 
-from twitter.common.contextutil import pushd
 from twitter.common.python.installer import Packager
 
 

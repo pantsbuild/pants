@@ -6,9 +6,9 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import mox
-from twitter.common.contextutil import temporary_file
 
 from pants.base.hash_utils import hash_all, hash_file
+from pants.util.contextutil import temporary_file
 
 
 class TestHashUtils(mox.MoxTestBase):

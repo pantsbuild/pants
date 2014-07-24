@@ -5,12 +5,10 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-import pytest
 import unittest
 
-from twitter.common.contextutil import temporary_file
-
 from pants.backend.codegen.tasks.jaxb_gen import JaxbGen
+from pants.util.contextutil import temporary_file
 
 
 class JaxbGenTestBase(unittest.TestCase):

@@ -32,7 +32,6 @@ python_tests(
   sources = [ 'test_setup_py.py' ],
   dependencies = [
     pants('3rdparty/python/twitter/commons:twitter.common.collections'),
-    pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('3rdparty/python:mock'),
     pants('src/python/pants/backend/core/targets:common'),
@@ -41,6 +40,7 @@ python_tests(
     pants('src/python/pants/backend/python:python_artifact'),
     pants('src/python/pants/base:exceptions'),
     pants('src/python/pants/base:target'),
+    pants('src/python/pants/util:contextutil'),
     pants('src/python/pants/util:dirutil'),
     pants('tests/python/pants_test:base_test'),
   ]

@@ -8,9 +8,8 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 from contextlib import contextmanager
 import os
 
-from twitter.common.contextutil import open_zip, temporary_dir, temporary_file
-
 from pants.backend.jvm.tasks.jar_task import JarTask
+from pants.util.contextutil import open_zip, temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir, safe_mkdtemp, safe_rmtree
 from pants_test.jvm.jar_task_test_base import JarTaskTestBase
 

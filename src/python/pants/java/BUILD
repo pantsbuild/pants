@@ -6,10 +6,10 @@ python_library(
   sources = globs('distribution/*.py'),
   resources = globs('distribution/*.class'),
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.lang'),
     pants('3rdparty/python/twitter/commons:twitter.common.log'),
     pants('src/python/pants/base:revision'),
+    pants('src/python/pants/util:contextutil'),
   ]
 )
 
@@ -19,10 +19,10 @@ python_library(
   dependencies = [
     pants(':distribution'),
     pants('3rdparty/python/twitter/commons:twitter.common.collections'),
-    pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.lang'),
     pants('3rdparty/python/twitter/commons:twitter.common.log'),
     pants('src/python/pants/base:build_environment'),
+    pants('src/python/pants/util:contextutil'),
   ]
 )
 

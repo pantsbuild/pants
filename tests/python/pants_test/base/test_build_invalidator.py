@@ -10,9 +10,8 @@ import os
 import tempfile
 from contextlib import contextmanager
 
-from twitter.common.contextutil import temporary_dir
-
 from pants.base.build_invalidator import BuildInvalidator, CacheKeyGenerator
+from pants.util.contextutil import temporary_dir
 
 
 TEST_CONTENT = 'muppet'

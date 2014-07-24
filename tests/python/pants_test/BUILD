@@ -5,7 +5,6 @@ python_library(
   name = 'base_test',
   sources = ['base_test.py'],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('src/python/pants/backend/core/targets:common'),
     pants('src/python/pants/base:address'),
     pants('src/python/pants/base:build_configuration'),
@@ -16,6 +15,7 @@ python_library(
     pants('src/python/pants/base:config'),
     pants('src/python/pants/base:exceptions'),
     pants('src/python/pants/base:target'),
+    pants('src/python/pants/util:contextutil'),
     pants('src/python/pants/util:dirutil'),
     pants('tests/python/pants_test/base:context_utils'),
   ]
@@ -25,8 +25,8 @@ python_library(
   name = 'int-test',
   sources = ['pants_run_integration_test.py'],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('src/python/pants/base:build_environment'),
+    pants('src/python/pants/util:contextutil'),
     pants('src/python/pants/util:dirutil'),
   ]
 )
@@ -56,9 +56,9 @@ python_tests(
   sources = ['test_thrift_util.py'],
   dependencies = [
     pants(':base_test'),
-    pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.lang'),
     pants('src/python/pants:thrift_util'),
+    pants('src/python/pants/util:contextutil'),
     pants('src/python/pants/util:dirutil'),
   ]
 )

@@ -10,12 +10,11 @@ import os
 import pytest
 import unittest2
 
-
 from twitter.common.collections import maybe_list
-from twitter.common.contextutil import environment_as, temporary_dir
-from pants.util.dirutil import chmod_plus_x, safe_open, touch
 
 from pants.backend.android.distribution.android_distribution import AndroidDistribution
+from pants.util.contextutil import environment_as, temporary_dir
+from pants.util.dirutil import chmod_plus_x, safe_open, touch
 
 
 class TestAndroidDistributionTest(unittest2.TestCase):

@@ -11,8 +11,6 @@ from tempfile import mkdtemp
 from textwrap import dedent
 import unittest2
 
-from twitter.common.contextutil import environment_as, pushd, temporary_dir, temporary_file
-
 from pants.backend.core.targets.dependencies import Dependencies
 from pants.base.address import SyntheticAddress
 from pants.base.build_configuration import BuildConfiguration
@@ -23,6 +21,7 @@ from pants.base.build_file_parser import BuildFileCache, BuildFileParser
 from pants.base.config import Config
 from pants.base.source_root import SourceRoot
 from pants.base.target import Target
+from pants.util.contextutil import environment_as, pushd, temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree, touch
 from pants_test.base.context_utils import create_context
 

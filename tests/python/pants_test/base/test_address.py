@@ -9,11 +9,10 @@ from contextlib import contextmanager
 import os
 import unittest2
 
-from twitter.common.contextutil import pushd, temporary_dir
-
 from pants.base.address import BuildFileAddress, SyntheticAddress, parse_spec
 from pants.base.build_file import BuildFile
 from pants.base.build_root import BuildRoot
+from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import touch
 
 

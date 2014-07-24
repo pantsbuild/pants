@@ -7,11 +7,11 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import unittest
 
-from twitter.common.contextutil import temporary_file
 from twitter.common.python.platforms import Platform
 
 from pants.base.config import Config
 from pants.backend.python.resolver import get_platforms
+from pants.util.contextutil import temporary_file
 
 
 class ResolverTest(unittest.TestCase):

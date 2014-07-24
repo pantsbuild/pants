@@ -12,11 +12,11 @@ import subprocess
 
 from twitter.common import log
 from twitter.common.collections import maybe_list
-from twitter.common.contextutil import environment_as
 from twitter.common.lang import AbstractClass, Compatibility
 
 from pants.base.build_environment import get_buildroot
 from pants.java.distribution import Distribution
+from pants.util.contextutil import environment_as
 
 
 class Executor(AbstractClass):

@@ -10,8 +10,7 @@ import os
 import shutil
 import tarfile
 
-from twitter.common.contextutil import open_tar
-
+from pants.util.contextutil import open_tar
 from pants.util.dirutil import safe_mkdir, safe_mkdir_for
 
 

@@ -156,7 +156,6 @@ python_library(
   name = 'sdist_builder',
   sources = ['sdist_builder.py'],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.python'),
   ]
 )
@@ -165,7 +164,6 @@ python_library(
   name = 'test_builder',
   sources = ['test_builder.py'],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.lang'),
     pants('3rdparty/python/twitter/commons:twitter.common.python'),
     pants('3rdparty/python:pytest'),
@@ -174,6 +172,7 @@ python_library(
     pants('src/python/pants/backend/python/targets:python'),
     pants('src/python/pants/base:config'),
     pants('src/python/pants/base:target'),
+    pants('src/python/pants/util:contextutil'),
     pants('src/python/pants/util:dirutil'),
   ],
 )

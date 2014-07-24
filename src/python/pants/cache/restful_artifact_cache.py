@@ -11,11 +11,11 @@ import urlparse
 import requests
 from requests import RequestException
 
-from twitter.common.contextutil import temporary_file, temporary_file_path
 from twitter.common.quantity import Amount, Data
 
 from pants.cache.artifact import TarballArtifact
 from pants.cache.artifact_cache import ArtifactCache
+from pants.util.contextutil import temporary_file, temporary_file_path
 
 
 class RESTfulArtifactCache(ArtifactCache):

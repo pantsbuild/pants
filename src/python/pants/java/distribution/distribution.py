@@ -11,10 +11,10 @@ import subprocess
 from contextlib import contextmanager
 
 from twitter.common import log
-from twitter.common.contextutil import temporary_dir
 from twitter.common.lang import Compatibility
 
 from pants.base.revision import Revision
+from pants.util.contextutil import temporary_dir
 
 
 class Distribution(object):

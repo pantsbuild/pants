@@ -11,10 +11,9 @@ import subprocess
 import textwrap
 import unittest2
 
-from twitter.common.contextutil import temporary_dir, environment_as
-
 from pants.java.distribution import Distribution
 from pants.java.executor import SubprocessExecutor
+from pants.util.contextutil import temporary_dir, environment_as
 from pants.util.dirutil import chmod_plus_x, safe_open
 
 

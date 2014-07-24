@@ -14,8 +14,9 @@ from abc import abstractmethod
 from zipfile import ZIP_DEFLATED
 
 from twitter.common.collections.ordereddict import OrderedDict
-from twitter.common.contextutil import open_tar, open_zip
 from twitter.common.lang import AbstractClass
+
+from pants.util.contextutil import open_tar, open_zip
 
 
 class Archiver(AbstractClass):

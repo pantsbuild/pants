@@ -7,9 +7,8 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import unittest
 
-from twitter.common.contextutil import temporary_file
-
 from pants.base.config import Config
+from pants.util.contextutil import temporary_file
 
 
 class ConfigTest(unittest.TestCase):

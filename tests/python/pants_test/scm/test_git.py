@@ -5,17 +5,17 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from itertools import izip_longest
 import os
 import re
 import subprocess
 import unittest
-from itertools import izip_longest
 
 import pytest
-from twitter.common.contextutil import environment_as, pushd, temporary_dir
 
 from pants.scm import Scm
 from pants.scm.git import Git
+from pants.util.contextutil import environment_as, pushd, temporary_dir
 from pants.util.dirutil import safe_mkdtemp, safe_open, safe_rmtree, touch
 
 

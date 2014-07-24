@@ -6,9 +6,9 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import unittest2 as unittest
-from twitter.common.contextutil import temporary_file_path
 
 from pants.base.run_info import RunInfo
+from pants.util.contextutil import temporary_file_path
 
 
 class RunInfoTest(unittest.TestCase):

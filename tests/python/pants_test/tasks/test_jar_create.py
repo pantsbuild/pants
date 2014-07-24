@@ -10,8 +10,6 @@ from contextlib import closing, contextmanager
 import os
 from textwrap import dedent
 
-from twitter.common.contextutil import open_zip, temporary_dir
-
 from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
 from pants.backend.core.targets.resources import Resources
 from pants.backend.jvm.targets.java_library import JavaLibrary
@@ -20,6 +18,7 @@ from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.jar_create import JarCreate, is_jvm_library
 from pants.base.source_root import SourceRoot
 from pants.goal.products import MultipleRootedProducts
+from pants.util.contextutil import open_zip, temporary_dir
 from pants.util.dirutil import safe_open
 from pants_test.base.context_utils import create_context
 from pants_test.jvm.jar_task_test_base import JarTaskTestBase

@@ -6,8 +6,8 @@ python_library(
   sources = globs('*.py'),
   dependencies = [
     pants('3rdparty/python:requests'),
-    pants('3rdparty/python/twitter/commons:twitter.common.contextutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.quantity'),
+    pants('src/python/pants/util:contextutil'),
     pants('src/python/pants/util:dirutil'),
   ]
 )
