@@ -33,9 +33,9 @@ for a likely-looking ``BUILD`` file--in this example,
 In the appropriate ``BUILD`` file, you want to find a
 :ref:`bdict_jar_library` with the :ref:`bdict_jar`\s you want:
 
-.. literalinclude:: ../../../../3rdparty/jvm/com/sun/jersey/BUILD
-   :start-after: LICENSE
-   :end-before: jersey-server
+.. literalinclude:: ../../../../3rdparty/BUILD
+   :start-after: Test support
+   :end-before: specs
 
 
 Here, the

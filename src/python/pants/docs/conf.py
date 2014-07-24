@@ -193,8 +193,8 @@ latex_elements = {
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass [howto/manual]).
 latex_documents = [
-  ('index', 'pants.tex', u'pants Documentation',
-   u'Twitter', 'manual'),
+  ('index', 'pants.tex', u'Pants Documentation',
+   u'Pants Contributors', 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
@@ -224,7 +224,7 @@ latex_documents = [
 # (source start file, name, description, authors, manual section).
 man_pages = [
     ('index', 'pants', u'pants Documentation',
-     [u'Twitter'], 1)
+     [u'Pants Contributors'], 1)
 ]
 
 # If true, show URL addresses after external links.
@@ -237,8 +237,8 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-  ('index', 'pants', u'pants Documentation',
-   u'Twitter', 'pants', 'One line description of project.',
+  ('index', 'pants', u'Pants Documentation',
+   u'Pants Contributors', 'pants', 'One line description of project.',
    'Miscellaneous'),
 ]
 

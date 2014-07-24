@@ -52,7 +52,7 @@ class RGlobs(FilesetRelPathWrapper):
 
 
 class ZGlobs(FilesetRelPathWrapper):
-  """Returns a Fileset that matches zsh-style globs, including '**/' for recursive globbing.
+  """Returns a Fileset that matches zsh-style globs, including ``**/`` for recursive globbing.
 
   Uses ``BUILD`` file's directory as the "working directory".
   """

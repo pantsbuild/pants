@@ -51,7 +51,7 @@ Relevant Goals and Targets
   refer to the code.
   To use several several of these via a ``pip``-style
   ``requirements.txt`` file, use a
-  :ref:`python_requirements_library <bdict_python_requirements_library>`.
+  :ref:`python_requirements <bdict_python_requirements>`.
 
 **Tests**
 
@@ -355,7 +355,7 @@ To get code coverage data, set the `PANTS_PY_COVERAGE` environment variable::
     $ PANTS_PY_COVERAGE=1  ./pants tests/python/example_test/hello/greet:greet
 
 Interactive Debugging on Test Failure
-====================================
+=====================================
 
 You can invoke the Python debugger on a test failure by
 leaving out the ``goal test`` and passing ``--pdb``.

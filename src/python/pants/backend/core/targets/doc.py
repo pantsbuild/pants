@@ -24,10 +24,11 @@ class WikiArtifact(object):
     """
     :param wiki: target spec of a ``wiki``.
     :param kwargs: a dictionary that may contain configuration directives for your particular wiki.
-    For example, the following keys are supported for Atlassian's Confluence:
-    * `space` -- A wiki space in which to place the page (used in Confluence)
-    * `title` -- A title for the wiki page
-    * `parent` -- The title of a wiki page that will denote this page as a child.
+      For example, the following keys are supported for Atlassian's Confluence:
+
+      * ``space`` -- A wiki space in which to place the page (used in Confluence)
+      * ``title`` -- A title for the wiki page
+      * ``parent`` -- The title of a wiki page that will denote this page as a child.
     """
     self.wiki = wiki
     self.config = kwargs
