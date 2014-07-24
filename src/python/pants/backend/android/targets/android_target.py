@@ -8,6 +8,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import os
 from xml.dom.minidom import parse
 
+from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import JvmTargetPayload
 from pants.base.target import Target
 
@@ -29,7 +30,7 @@ class AndroidTarget(Target):
                provides=None,
                # most recent build_tools_version should be defined elsewhere
                build_tools_version="19.1.0",
-               manifest='AndroidManifest.xml',
+               manifest=None,
                release_type="debug",
                **kwargs):
     """
@@ -60,16 +61,15 @@ class AndroidTarget(Target):
     self.build_tools_version = build_tools_version
     self.release_type = release_type
 
+    if not os.path.isfile(os.path.join(address.spec_path, manifest)):
+      raise TargetDefinitionException(self, 'Android targets must specify a \'manifest\' '
+                                  'that points to the \'AndroidManifest.xml\'')
     self.manifest = os.path.join(self.address.spec_path, manifest)
-    if not os.path.isfile(self.manifest):
-      raise self.BadManifestError('Missing manifest at: {0!r}. Android targets require an '
-                                  '\'AndroidManifest.xml\''.format(self.manifest))
-    # TODO (mateor): varying manifest location means we should support variable manifest names
-
     self.package = self.get_package_name()
     self.target_sdk = self.get_target_sdk()
 
-  # parsing as done in Donut testrunner
+  # Parsing as in Android Donut's testrunner:
+  # https://github.com/android/platform_development/blob/master/testrunner/android_manifest.py
   def get_package_name(self):
     """Returns the package name of the Android target."""
     tgt_manifest = parse(self.manifest).getElementsByTagName('manifest')
@@ -85,3 +85,6 @@ class AndroidTarget(Target):
       raise self.BadManifestError('There is no \'targetSdkVersion\' attribute in manifest at: {0!r}'
                                   .format(self.manifest))
     return tgt_manifest[0].getAttribute('android:targetSdkVersion')
+
+  def is_android(self):
+    return True

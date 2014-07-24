@@ -5,6 +5,7 @@
 android_binary(
   name='hello',
   sources=rglobs('src/*.java'),
+  manifest='AndroidManifest.xml',
   dependencies = [
     ':resources',
   ],
@@ -12,5 +13,7 @@ android_binary(
 
 android_resources(
   name='resources',
+  manifest='AndroidManifest.xml',
+  resource_dir='res'
 )
 
