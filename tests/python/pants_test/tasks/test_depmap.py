@@ -296,13 +296,13 @@ class ProjectInfoTest(ConsoleTaskTest):
       target_type=JvmTarget,
       dependencies=[second],
       sources=['this/is/a/source/Foo.scala', 'this/is/a/source/Bar.scala'],
-
     )
 
     self.make_target(
       'project_info:java_test',
       target_type=JavaTests,
       dependencies=[second],
+      sources=['this/is/a/test/source/FooTest.scala']
     )
 
     jvm_binary = self.make_target(
