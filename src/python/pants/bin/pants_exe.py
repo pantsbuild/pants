@@ -31,6 +31,7 @@ from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 _BUILD_COMMAND = 'build'
 _LOG_EXIT_OPTION = '--log-exit'
 _VERSION_OPTION = '--version'
+_PRINT_EXCEPTION_STACKTRACE = '--print-exception-stacktrace'
 
 
 def _do_exit(result=0, msg=None, out=sys.stderr):
@@ -43,6 +44,18 @@ def _do_exit(result=0, msg=None, out=sys.stderr):
 
 def _exit_and_fail(msg=None):
   _do_exit(result=1, msg=msg)
+
+
+def _unhandled_exception_hook(exception_class, exception, tb):
+  msg = ''
+  if _PRINT_EXCEPTION_STACKTRACE in sys.argv:
+    msg = '\nException caught:\n' + ''.join(traceback.format_tb(tb))
+  if str(exception):
+    msg += '\nException message: %s\n' % str(exception)
+  else:
+    msg += '\nNo specific exception message.\n'
+  # TODO(Jin Feng) Always output the unhandled exception details into a log file.
+  _exit_and_fail(msg)
 
 
 def _find_all_commands():
@@ -86,8 +99,11 @@ def _process_info(pid):
   process = psutil.Process(pid)
   return '%d (%s)' % (pid, ' '.join(process.cmdline))
 
-
 def _run():
+  # place the registration of the unhandled exception hook
+  # as early as possible in the code
+  sys.excepthook = _unhandled_exception_hook
+
   """
   To add additional paths to sys.path, add a block to the config similar to the following:
   [main]
@@ -180,7 +196,6 @@ def main():
     _run()
   except KeyboardInterrupt:
     _exit_and_fail('Interrupted by user.')
-
 
 if __name__ == '__main__':
   main()

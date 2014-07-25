@@ -15,7 +15,7 @@ def _set_bool(option, opt_str, value, parser):
 
 
 GLOBAL_OPTIONS = [
-  Option('-h', '--help', action='store_true', dest='time', default=False,
+  Option('-h', '--help', action='store_true', dest='help', default=False,
          help='Show this help message.'),
   Option('-t', '--timeout', dest='conn_timeout', type='int',
          default=Config.load().getdefault('connection_timeout'),
@@ -48,6 +48,8 @@ GLOBAL_OPTIONS = [
   Option('--write-to-artifact-cache', '--no-write-to-artifact-cache', action='callback',
          callback=_set_bool, dest='write_to_artifact_cache', default=True,
          help='Write build artifacts to cache, if possible.'),
+  Option('--print-exception-stacktrace', dest='print_exception_stacktrace', action='store_true',
+         default=False, help='Print to console the full exception stack trace if encountered.'),
 ]
 
 
