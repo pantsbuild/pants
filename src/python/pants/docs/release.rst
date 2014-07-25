@@ -22,10 +22,10 @@ Pants and the common libraries are published to the
 `Python Package Index <https://pypi.python.org/pypi>`_ per the Python
 community convention.
 
-Although the build and publish are automated, the version bumping and CHANGELOG management is not.
+Although the build and publish are automated, the version bumping and CHANGELOG management are not.
 You'll need to edit the version number in `src/python/pants/version.py
 <https://github.com/pantsbuild/pants/tree/master/src/python/pants/version.py>`_ and add an entry in
-the CHANGELOG.rst at `src/python/pants/CHANGELOG.rst
+the CHANGELOG at `src/python/pants/CHANGELOG.rst
 <https://github.com/pantsbuild/pants/tree/master/src/python/pants/CHANGELOG.rst>`_ then send this
 out for review.
 
