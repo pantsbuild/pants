@@ -15,7 +15,7 @@ from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.build_file import BuildFile
 from pants.base.exceptions import TaskError
-from pants.scm import Scm
+from pants.scm.scm import Scm
 
 
 class WhatChanged(ConsoleTask):

@@ -11,7 +11,7 @@ import sys
 from twitter.common import log
 
 from pants.base.build_root import BuildRoot
-from pants.scm import Scm
+from pants.scm.scm import Scm
 from pants.version import VERSION as _VERSION
 
 

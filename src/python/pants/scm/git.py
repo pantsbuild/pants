@@ -8,7 +8,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import os
 import subprocess
 
-from pants.scm import Scm
+from pants.scm.scm import Scm
 
 
 class Git(Scm):

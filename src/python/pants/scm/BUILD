@@ -5,12 +5,13 @@ python_library(
   name = 'all',
   dependencies = [
     pants(':git'),
+    pants(':scm'),
   ]
 )
 
 python_library(
   name = 'scm',
-  sources = ['__init__.py'],
+  sources = ['scm.py'],
   dependencies = [
     pants('3rdparty/python/twitter/commons:twitter.common.lang'),
   ],

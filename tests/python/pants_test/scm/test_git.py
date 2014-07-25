@@ -13,7 +13,7 @@ import unittest
 
 import pytest
 
-from pants.scm import Scm
+from pants.scm.scm import Scm
 from pants.scm.git import Git
 from pants.util.contextutil import environment_as, pushd, temporary_dir
 from pants.util.dirutil import safe_mkdtemp, safe_open, safe_rmtree, touch
