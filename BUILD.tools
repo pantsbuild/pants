@@ -23,6 +23,14 @@ jar_library(name = 'nailgun-server',
 jar_library(name = 'emma',
             jars = [jar(org = 'emma', name = 'emma', rev = '2.1.5320')])
 
+jar_library(name = 'cobertura',
+            jars = [
+              jar(
+                org = 'net.sourceforge.cobertura',
+                name = 'cobertura',
+                rev = '2.0.4-twitter-02')
+            ])
+
 jar_library(name = 'benchmark-caliper-0.5',
             jars = [
               # TODO(Eric Ayers) Caliper is old and breaks with guava 16. Add jmh support?
