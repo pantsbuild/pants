@@ -38,6 +38,7 @@ python_library(
     pants('src/python/pants/base:workunit'),
     pants('src/python/pants/engine'),
     pants('src/python/pants/goal'),
+    pants('src/python/pants/goal:context'),
     pants('src/python/pants/goal:help'),
     pants('src/python/pants/goal:initialize_reporting'),
     pants('src/python/pants/goal:option_helpers'),
