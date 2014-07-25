@@ -9,7 +9,8 @@ python_library(
     pants('3rdparty/python/twitter/commons:twitter.common.lang'),
     pants('src/python/pants/base:config'),
     pants('src/python/pants/base:target'),
-    pants('src/python/pants/goal'),
+    pants('src/python/pants/goal:context'),
+    pants('src/python/pants/goal:run_tracker'),
     pants('src/python/pants/reporting'),
     pants('src/python/pants/util:dirutil'),
   ]
