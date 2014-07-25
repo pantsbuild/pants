@@ -19,6 +19,7 @@ python_library(
     pants('src/python/pants/backend/authentication:authentication'),
     pants('src/python/pants/backend/codegen:plugin'),
     pants('src/python/pants/backend/core:plugin'),
+    pants('src/python/pants/goal:run_tracker'),
     pants('src/python/pants/backend/jvm:plugin'),
     pants('src/python/pants/backend/python:plugin'),
     pants('src/python/pants/backend/maven_layout:plugin'),
