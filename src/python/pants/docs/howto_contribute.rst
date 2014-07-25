@@ -158,46 +158,19 @@ Commit Your Change
 
 At this point you've made a change, had it reviewed and are ready to
 complete things by getting your change in master. (If you're not a committer,
-please ask one do do this section for you.) ::
+please ask one to do this section for you.) ::
 
    cd /path/to/pants/repo
    ./build-support/bin/ci.sh
    git checkout master
    git pull
-   git merge --squash $FEATURE_BRANCH
-   git commit -a
+   ./rbt patch -c <RB_ID>
 
-Here, fix up the commit message: replace ``git``'s default message
-("Squashed commit of the following... <long list>") with a summary.
+Here, ensure that the commit message generated from the review summary is
+accurate, and that the resulting commit contains the changes you expect.
 Finally, ::
 
    git push origin master
 
-The very last step is closing the review. The change is now complete. Huzzah!
-
-**If you're a committer committing someone else's review,** a handy way to
-patch a local branch is to follow the pattern ::
-
-    git checkout master
-    git pull
-    ./rbt patch 123
-    # eyeball the diff, make sure everything made it in
-    (git add as necessary)
-    git commit --author='Mateo Rodriguez <mateorod9@gmail.com>' -F - << EOF
-    Erect megaphones.
-
-    This paves support for turning the volume up to 11.
-
-    Testing Done:
-    tesselated the megaphones
-
-    Bugs closed: 345
-
-    Reviewed at https://rbcommons.com/s/twitter/r/123/
-    EOF
-    git push origin master
-
-(You might reasonably think you could ``./rbt patch -c <RB_ID>``;
-but this
-`tickles a bug <https://code.google.com/p/reviewboard/issues/detail?id=3484>`_
-if the change author is not in the "twitter" reviewboard group.)
+The very last step is closing the review as "Submitted". The change is now
+complete. Huzzah!
