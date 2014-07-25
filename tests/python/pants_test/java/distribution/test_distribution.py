@@ -16,7 +16,7 @@ import pytest
 from twitter.common.collections import maybe_list
 
 from pants.base.revision import Revision
-from pants.java.distribution import Distribution
+from pants.java.distribution.distribution import Distribution
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import chmod_plus_x, safe_open, touch
 

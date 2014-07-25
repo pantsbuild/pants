@@ -13,7 +13,7 @@ from pants.backend.core.tasks.task import Task, TaskBase
 from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.base.exceptions import TaskError
 from pants.java import util
-from pants.java.distribution import Distribution
+from pants.java.distribution.distribution import Distribution
 from pants.java.executor import SubprocessExecutor
 from pants.java.nailgun_executor import NailgunExecutor
 

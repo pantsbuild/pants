@@ -17,7 +17,7 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.address import SyntheticAddress
 from pants.base.build_environment import get_buildroot
-from pants.java.distribution import Distribution
+from pants.java.distribution.distribution import Distribution
 from pants.util.dirutil import safe_mkdir
 
 
