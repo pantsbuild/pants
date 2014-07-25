@@ -93,16 +93,19 @@ For example, if the goal was set up with the name "confluence", you invoke ::
    confluence-specific
 
 To specify that a page should be published to a Confluence wiki page, set its
-``provides`` like so::
+``provides`` to something like::
 
     page(...
       provides=[
-        wiki_artifact(wiki=pants('BUILD:confluence'),
+        wiki_artifact(wiki=pants('//:confluence'),
           space='ENG',
           title='Pants Hello World Example',
           parent='Examples',
         )
       ],)
+
+...assuming your workspace is set up with a wiki target named ``confluence``
+in a top-level ``BUILD`` file (as described below).
 
 .. _page_setup_confluence:
 
@@ -112,12 +115,13 @@ That :ref:`wiki <bdict_wiki>` specifies some information about your wiki server.
 So far, the only kind of thing you can publish to is a Confluence wiki.
 You want to specify its target. Do this in one of the ``BUILD`` files
 that's always processed (probably a top-directory ``BUILD`` file).
-The target probably looks something like::
+If your Confluence server lived at wiki.archie.org, the target would
+probably look something like::
 
     import urllib
 
     def confluence_url_builder(page, config):
-      return config['title'], 'https://wiki.archie.org/display/%s%s' % (
+      return config['title'], 'https://wiki.archie.org/display/%s/%s' % (
         config['space'],
         urllib.quote_plus(config['title']))
 
@@ -131,4 +135,10 @@ It might look like
 .. literalinclude:: ../../../../tests/python/pants_test/backend/core/test_setup_confluence.py
    :start-after: literalinclude this part
    :end-before: stop including
+
+In your ``pants.ini`` file, add a section with the url of your wiki server.
+E.g., if your server is at wiki.archie.org, it would look like::
+
+    [confluence-publish]
+    url: https://wiki.archie.org
 
