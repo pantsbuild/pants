@@ -3,12 +3,10 @@
 
 python_library(
   name = 'goal',
-  sources = ['__init__.py'],
+  sources = ['goal.py'],
   dependencies = [
     pants(':error'),
-    pants(':context'),
     pants(':phase'),
-    pants(':run_tracker'),
     pants('src/python/pants/backend/core/tasks:task'),
   ],
 )

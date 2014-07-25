@@ -21,7 +21,7 @@ from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.base.build_file_aliases import BuildFileAliases
-from pants.goal import Goal as goal
+from pants.goal.goal import Goal as goal
 
 
 def build_file_aliases():

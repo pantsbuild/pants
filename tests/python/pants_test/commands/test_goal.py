@@ -5,11 +5,8 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-import unittest
-
 from pants.backend.jvm.register import register_goals
-from pants.commands.goal import Goal, GoalError
-from pants.goal import GoalError
+from pants.commands.goal import Goal
 from pants.goal.phase import Phase
 from pants_test.base_test import BaseTest
 
