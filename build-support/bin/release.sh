@@ -24,16 +24,12 @@ function run_local_pants() {
   PANTS_DEV=1 ${ROOT}/pants "$@"
 }
 
-function setup() {
-  run_local_pants setup_py --run="$@" --recursive //src/python/pants:pants-packaged
-}
-
 function package() {
-  setup "sdist"
+  run_local_pants setup_py --recursive //src/python/pants:pants-packaged
 }
 
 function publish() {
-  setup "sdist upload"
+  run_local_pants setup_py --run="sdist upload" --recursive //src/python/pants:pants-packaged
 }
 
 function local_version() {
