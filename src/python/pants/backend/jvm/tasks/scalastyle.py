@@ -43,13 +43,12 @@ class Scalastyle(NailgunTask, JvmToolTaskMixin):
 
   def __init__(self, context, workdir):
     super(Scalastyle, self).__init__(context, workdir)
-    self._scalastyle_config = self.context.config.get_required(
-      Scalastyle._CONFIG_SECTION, 'config')
+    self._scalastyle_config = self.context.config.get_required(self._CONFIG_SECTION, 'config')
     if not os.path.exists(self._scalastyle_config):
       raise Config.ConfigError(
           'Scalastyle config file does not exist: %s' % self._scalastyle_config)
 
-    excludes_file = self.context.config.get(Scalastyle._CONFIG_SECTION, 'excludes')
+    excludes_file = self.context.config.get(self._CONFIG_SECTION, 'excludes')
     self._excludes = set()
     if excludes_file:
       if not os.path.exists(excludes_file):
@@ -61,6 +60,10 @@ class Scalastyle(NailgunTask, JvmToolTaskMixin):
 
     self._scalastyle_bootstrap_key = 'scalastyle'
     self.register_jvm_tool(self._scalastyle_bootstrap_key, [':scalastyle'])
+
+  @property
+  def config_section(self):
+    return self._CONFIG_SECTION
 
   def execute(self):
     if self.context.options.scalastyle_skip:
@@ -92,7 +95,7 @@ class Scalastyle(NailgunTask, JvmToolTaskMixin):
       def call(srcs):
         cp = self.tool_classpath(self._scalastyle_bootstrap_key)
         return self.runjava(classpath=cp,
-                            main=Scalastyle._MAIN,
+                            main=self._MAIN,
                             args=['-c', self._scalastyle_config] + srcs)
       result = Xargs(call).execute(scala_sources)
       if result != 0:
