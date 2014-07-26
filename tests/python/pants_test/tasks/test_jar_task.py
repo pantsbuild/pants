@@ -4,30 +4,32 @@
 
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
-
+from collections import defaultdict
 from contextlib import contextmanager
 import os
+import re
+from textwrap import dedent
 
 from pants.backend.jvm.tasks.jar_task import JarTask
+from pants.goal.products import MultipleRootedProducts
 from pants.util.contextutil import open_zip, temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir, safe_mkdtemp, safe_rmtree
 from pants_test.jvm.jar_task_test_base import JarTaskTestBase
 
 
-class JarTaskTest(JarTaskTestBase):
-
+class BaseJarTaskTest(JarTaskTestBase):
   class TestJarTask(JarTask):
     def execute(self):
       pass
 
   def setUp(self):
-    super(JarTaskTest, self).setUp()
+    super(BaseJarTaskTest, self).setUp()
 
     self.workdir = safe_mkdtemp()
     self.jar_task = self.prepare_execute(self.context(), self.workdir, self.TestJarTask)
 
   def tearDown(self):
-    super(JarTaskTest, self).tearDown()
+    super(BaseJarTaskTest, self).tearDown()
 
     if self.workdir:
       safe_rmtree(self.workdir)
@@ -38,9 +40,19 @@ class JarTaskTest(JarTaskTestBase):
       fd.close()
       yield fd.name
 
+  def prepare_jar_task(self, context):
+    return self.prepare_execute(context, self.workdir, self.TestJarTask)
+
   def assert_listing(self, jar, *expected_items):
     self.assertEquals(set(['META-INF/', 'META-INF/MANIFEST.MF']) | set(expected_items),
                       set(jar.namelist()))
+
+
+class JarTaskTest(BaseJarTaskTest):
+  def setUp(self):
+    super(JarTaskTest, self).setUp()
+
+    self.jar_task = self.prepare_jar_task(self.context())
 
   def test_update_write(self):
     with temporary_dir() as chroot:
@@ -115,3 +127,52 @@ class JarTaskTest(JarTaskTestBase):
         self.assert_listing(jar, 'README')
         self.assertEquals('42', jar.read('README'))
         self.assertEquals(contents, jar.read('META-INF/MANIFEST.MF'))
+
+
+class JarBuilderTest(BaseJarTaskTest):
+  def test_agent_manifest(self):
+    self.add_to_build_file('src/java/pants/agents', dedent('''
+        java_agent(
+          name='fake_agent',
+          premain='bob',
+          agent_class='fred',
+          can_redefine=True,
+          can_retransform=True,
+          can_set_native_method_prefix=True
+        )''').strip())
+    java_agent = self.target('src/java/pants/agents:fake_agent')
+
+    context = self.context(target_roots=java_agent)
+    jar_task = self.prepare_jar_task(context)
+
+    class_products = context.products.get_data('classes_by_target',
+                                               lambda: defaultdict(MultipleRootedProducts))
+    java_agent_products = MultipleRootedProducts()
+    self.create_file('.pants.d/javac/classes/FakeAgent.class', '0xCAFEBABE')
+    java_agent_products.add_rel_paths(os.path.join(self.build_root, '.pants.d/javac/classes'),
+                                      ['FakeAgent.class'])
+    class_products[java_agent] = java_agent_products
+
+    context.products.safe_create_data('resources_by_target',
+                                      lambda: defaultdict(MultipleRootedProducts))
+
+    jar_builder = jar_task.prepare_jar_builder()
+    with self.jarfile() as existing_jarfile:
+      with jar_task.open_jar(existing_jarfile) as jar:
+        jar_builder.add_target(jar, java_agent)
+
+      with open_zip(existing_jarfile) as jar:
+        self.assert_listing(jar, 'FakeAgent.class')
+        self.assertEqual('0xCAFEBABE', jar.read('FakeAgent.class'))
+
+        manifest = jar.read('META-INF/MANIFEST.MF').strip()
+        all_entries = dict(tuple(re.split(r'\s*:\s*', line, 1)) for line in manifest.splitlines())
+        expected_entries = {
+            'Agent-Class': 'fred',
+            'Premain-Class': 'bob',
+            'Can-Redefine-Classes': 'true',
+            'Can-Retransform-Classes': 'true',
+            'Can-Set-Native-Method-Prefix': 'true',
+        }
+        self.assertEquals(set(expected_entries.items()),
+                          set(expected_entries.items()).intersection(set(all_entries.items())))
