@@ -18,6 +18,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.exceptions import TaskError
 from pants.goal.context import Context
+from pants.util.dirutil import safe_mkdtemp, safe_rmtree
 
 from pants_test.base_test import BaseTest
 from pants_test.tasks.test_base import prepare_task
@@ -31,6 +32,15 @@ class ScroogeGenTest(BaseTest):
   @property
   def alias_groups(self):
     return BuildFileAliases.create(targets={'java_thrift_library': JavaThriftLibrary})
+
+  def setUp(self):
+    super(ScroogeGenTest, self).setUp()
+    self.task_outdir =  os.path.join(self.build_root, 'scrooge', 'gen-java')
+
+
+  def tearDown(self):
+    super(ScroogeGenTest, self).tearDown()
+    safe_rmtree(self.task_outdir)
 
   def test_validate(self):
     defaults = JavaThriftLibrary.Defaults()
@@ -80,7 +90,7 @@ class ScroogeGenTest(BaseTest):
         rpc_style='finagle'
       )
     '''))
-    task_outdir = os.path.join(self.build_root, '.pants.d')
+
     task = prepare_task(ScroogeGen,
                         build_graph=self.build_graph,
                         targets=[self.target('test_smoke:a')],
@@ -88,17 +98,17 @@ class ScroogeGenTest(BaseTest):
 
     with patch('pants.backend.codegen.tasks.scrooge_gen.calculate_services'):
       task._outdir = MagicMock()
-      task._outdir.return_value = task_outdir
+      task._outdir.return_value = self.task_outdir
 
       task.gen = MagicMock()
-      sources = [os.path.join(task_outdir, 'com/pants/example/Example.scala')]
+      sources = [os.path.join(self.task_outdir, 'com/pants/example/Example.scala')]
       task.gen.return_value = {'test_smoke/a.thrift': sources}
 
       try:
         saved_add_new_target = Context.add_new_target
         Context.add_new_target = MagicMock()
         task.execute()
-        relative_task_outdir = os.path.relpath(task_outdir, get_buildroot())
+        relative_task_outdir = os.path.relpath(self.task_outdir, get_buildroot())
         spec = '{spec_path}:{name}'.format(spec_path=relative_task_outdir, name='test_smoke.a')
         address = SyntheticAddress.parse(spec=spec)
         Context.add_new_target.assert_called_once_with(address,

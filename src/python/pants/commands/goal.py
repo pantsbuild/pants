@@ -240,10 +240,10 @@ class Goal(Command):
     update_reporting(self.options, is_console_task() or is_explain, self.run_tracker)
 
     context = Context(
-      self.config,
-      self.options,
-      self.run_tracker,
-      self.targets,
+      config=self.config,
+      options=self.options,
+      run_tracker=self.run_tracker,
+      target_roots=self.targets,
       requested_goals=self.requested_goals,
       build_graph=self.build_graph,
       build_file_parser=self.build_file_parser,

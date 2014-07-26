@@ -21,6 +21,7 @@ from pants.goal.context import Context
 from pants.util.contextutil import temporary_file
 from pants_test.base_test import BaseTest
 from pants_test.tasks.test_base import is_exe, prepare_task
+from pants.util.dirutil import safe_rmtree
 
 
 ragel_file_contents = dedent("""
@@ -72,6 +73,15 @@ class RagelGenTest(BaseTest):
   def alias_groups(self):
     return BuildFileAliases.create(targets={'java_ragel_library': JavaRagelLibrary})
 
+  def setUp(self):
+    super(RagelGenTest, self).setUp()
+    self.task_outdir =  os.path.join(self.build_root, 'ragel', 'gen')
+
+
+  def tearDown(self):
+    super(RagelGenTest, self).tearDown()
+    safe_rmtree(self.task_outdir)
+
   @pytest.mark.skipif('not RagelGenTest.RAGEL',
                       reason='No ragel binary on the PATH.')
   def test_ragel_gen(self):
@@ -82,7 +92,6 @@ class RagelGenTest(BaseTest):
         dependencies=[]
       )
     """))
-    task_outdir = os.path.join(self.build_root, '.pants.d')
 
     task = prepare_task(RagelGen,
                         build_graph=self.build_graph,
@@ -91,15 +100,15 @@ class RagelGenTest(BaseTest):
 
     task._ragel_binary = 'ragel'
     task.invalidate_for_files = lambda: []
-    task._java_out = task_outdir
+    task._java_out = self.task_outdir
 
-    sources = [os.path.join(task_outdir, 'com/example/atoi/Parser.java')]
+    sources = [os.path.join(self.task_outdir, 'com/example/atoi/Parser.java')]
 
     try:
       saved_add_new_target = Context.add_new_target
       Context.add_new_target = MagicMock()
       task.execute()
-      relative_task_outdir = os.path.relpath(task_outdir, get_buildroot())
+      relative_task_outdir = os.path.relpath(self.task_outdir, get_buildroot())
       spec = '{spec_path}:{name}'.format(spec_path=relative_task_outdir, name='test_ragel_gen.atoi')
       address = SyntheticAddress.parse(spec=spec)
       Context.add_new_target.assert_called_once_with(address,
@@ -113,8 +122,8 @@ class RagelGenTest(BaseTest):
 
 
   def test_smoke(self):
-
     with temporary_file() as fp:
       fp.write(ragel_file_contents)
       fp.flush()
       self.assertEquals(calculate_genfile(fp.name), 'com/example/atoi/Parser.java')
+

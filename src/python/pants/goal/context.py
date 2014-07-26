@@ -237,8 +237,9 @@ class Context(object):
 
     If specified, the predicate will be used to narrow the scope of targets returned.
     """
-    target_root_addresses = [target.address for target in self._target_roots]
-    target_set = self.build_graph.transitive_subgraph_of_addresses(target_root_addresses)
+    target_set = set()
+    for target in self._target_roots:
+      target_set.update(target.closure())
     return list(filter(predicate, target_set))
 
   def dependents(self, on_predicate=None, from_predicate=None):

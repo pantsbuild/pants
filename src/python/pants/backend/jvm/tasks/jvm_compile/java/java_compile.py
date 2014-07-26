@@ -162,3 +162,4 @@ class JavaCompile(JvmCompile):
     with safe_open(processor_info_file, 'w') as f:
       for processor in processors:
         f.write('%s\n' % processor.strip())
+

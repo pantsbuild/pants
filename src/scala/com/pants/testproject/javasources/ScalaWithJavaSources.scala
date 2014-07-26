@@ -3,8 +3,11 @@
 
 package com.pants.testproject.javasources
 
+import com.pants.examples.hello.greet.Greeting
+
 class ScalaWithJavaSources {
   def example(): String = {
+    Greeting.greet("Scala Caller with no circular dependency")
     new JavaSource().doStuff()
   }
 }
