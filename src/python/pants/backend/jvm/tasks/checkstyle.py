@@ -18,6 +18,9 @@ CHECKSTYLE_MAIN = 'com.puppycrawl.tools.checkstyle.Main'
 
 
 class Checkstyle(NailgunTask, JvmToolTaskMixin):
+
+  _CONFIG_SECTION = 'checkstyle'
+
   @staticmethod
   def _is_checked(target):
     return target.is_java and not target.is_synthetic
@@ -39,10 +42,14 @@ class Checkstyle(NailgunTask, JvmToolTaskMixin):
                                              default=[':twitter-checkstyle'])
     self.register_jvm_tool(self._checkstyle_bootstrap_key, bootstrap_tools)
 
-    self._configuration_file = context.config.get('checkstyle', 'configuration')
+    self._configuration_file = context.config.get(self._CONFIG_SECTION, 'configuration')
 
-    self._properties = context.config.getdict('checkstyle', 'properties')
-    self._confs = context.config.getlist('checkstyle', 'confs', default=['default'])
+    self._properties = context.config.getdict(self._CONFIG_SECTION, 'properties', {})
+    self._confs = context.config.getlist(self._CONFIG_SECTION, 'confs', default=['default'])
+
+  @property
+  def config_section(self):
+    return self._CONFIG_SECTION
 
   def prepare(self, round_manager):
     # TODO(John Sirois): this is a fake requirement on 'ivy_jar_products' in order to force

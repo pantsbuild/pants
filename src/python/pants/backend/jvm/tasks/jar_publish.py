@@ -291,7 +291,7 @@ class JarPublish(JarTask, ScmPublish):
 
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
-    super(JarTask, cls).setup_parser(option_group, args, mkflag)
+    super(JarPublish, cls).setup_parser(option_group, args, mkflag)
 
     # TODO(John Sirois): Support a preview mode that outputs a file with entries like:
     # artifact id:
@@ -361,11 +361,10 @@ class JarPublish(JarTask, ScmPublish):
   def __init__(self, context, workdir, scm=None):
     super(JarPublish, self).__init__(context, workdir)
     ScmPublish.__init__(self, scm or get_scm(),
-                        self.context.config.getlist(
-                          JarPublish._CONFIG_SECTION, 'restrict_push_branches'))
+                        self.context.config.getlist(self._CONFIG_SECTION, 'restrict_push_branches'))
     self.cachedir = os.path.join(self.workdir, 'cache')
 
-    self._jvmargs = context.config.getlist(JarPublish._CONFIG_SECTION, 'ivy_jvmargs', default=[])
+    self._jvmargs = context.config.getlist(self._CONFIG_SECTION, 'ivy_jvmargs', default=[])
 
     if context.options.jar_publish_local:
       local_repo = dict(
@@ -378,7 +377,7 @@ class JarPublish(JarTask, ScmPublish):
       self.commit = False
       self.snapshot = context.options.jar_publish_local_snapshot
     else:
-      self.repos = context.config.getdict(JarPublish._CONFIG_SECTION, 'repos')
+      self.repos = context.config.getdict(self._CONFIG_SECTION, 'repos')
       if not self.repos:
         raise TaskError("This repo is not yet set for publishing to the world!"
                         "Please re-run with --publish-local")
@@ -395,7 +394,7 @@ class JarPublish(JarTask, ScmPublish):
       self.snapshot = False
 
     self.ivycp = context.config.getlist('ivy', 'classpath')
-    self.ivysettings = context.config.get('jar-publish', 'ivy_settings')
+    self.ivysettings = context.config.get(self._CONFIG_SECTION, 'ivy_settings')
 
     self.dryrun = context.options.jar_publish_dryrun
     self.transitive = context.options.jar_publish_transitive
@@ -445,7 +444,7 @@ class JarPublish(JarTask, ScmPublish):
 
   @property
   def config_section(self):
-    return JarPublish._CONFIG_SECTION
+    return self._CONFIG_SECTION
 
   def prepare(self, round_manager):
     round_manager.require('jars')

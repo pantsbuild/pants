@@ -1,6 +1,15 @@
 RELEASE HISTORY
 ===============
 
+0.0.21 (7/25/2014)
+------------------
+
+Bugfixes
+~~~~~~~~
+
+* Fixup NailgunTasks with missing config_section overrides
+  `RB # 762 <https://rbcommons.com/s/twitter/r/762/>`_
+
 0.0.20 (7/25/2014)
 ------------------
 
