@@ -9,14 +9,6 @@ from pants.backend.maven_layout.maven_layout import maven_layout
 from pants.base.build_file_aliases import BuildFileAliases
 
 
-def register_goals():
-  pass
-
-
-def register_commands():
-  pass
-
-
 def build_file_aliases():
   return BuildFileAliases.create(
     context_aware_object_factories={

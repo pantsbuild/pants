@@ -35,9 +35,6 @@ def build_file_aliases():
       }
     )
 
-def register_commands():
-  pass
-
 
 def register_goals():
   goal(name='thrift', action=ApacheThriftGen).install('gen').with_description('Generate code.')
