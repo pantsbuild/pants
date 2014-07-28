@@ -192,23 +192,6 @@ class JarTask(NailgunTask):
   _JAR_TOOL_CLASSPATH_KEY = 'jar_tool'
 
   @staticmethod
-  def _write_agent_manifest(agent, jar):
-    # TODO(John Sirois): refactor an agent model to suport 'Boot-Class-Path' properly.
-    manifest = Manifest()
-    manifest.addentry(Manifest.MANIFEST_VERSION, '1.0')
-    if agent.premain:
-      manifest.addentry('Premain-Class', agent.premain)
-    if agent.agent_class:
-      manifest.addentry('Agent-Class', agent.agent_class)
-    if agent.can_redefine:
-      manifest.addentry('Can-Redefine-Classes', 'true')
-    if agent.can_retransform:
-      manifest.addentry('Can-Retransform-Classes', 'true')
-    if agent.can_set_native_method_prefix:
-      manifest.addentry('Can-Set-Native-Method-Prefix', 'true')
-    jar.writestr(Manifest.PATH, manifest.contents())
-
-  @staticmethod
   def _flag(bool_value):
     return 'true' if bool_value else 'false'
 
@@ -299,6 +282,23 @@ class JarTask(NailgunTask):
 
   class JarBuilder(AbstractClass):
     """A utility to aid in adding the classes and resources associated with targets to a jar."""
+
+    @staticmethod
+    def _write_agent_manifest(agent, jar):
+      # TODO(John Sirois): refactor an agent model to support 'Boot-Class-Path' properly.
+      manifest = Manifest()
+      manifest.addentry(Manifest.MANIFEST_VERSION, '1.0')
+      if agent.premain:
+        manifest.addentry('Premain-Class', agent.premain)
+      if agent.agent_class:
+        manifest.addentry('Agent-Class', agent.agent_class)
+      if agent.can_redefine:
+        manifest.addentry('Can-Redefine-Classes', 'true')
+      if agent.can_retransform:
+        manifest.addentry('Can-Retransform-Classes', 'true')
+      if agent.can_set_native_method_prefix:
+        manifest.addentry('Can-Set-Native-Method-Prefix', 'true')
+      jar.writestr(Manifest.PATH, manifest.contents())
 
     @abstractproperty
     def _context(self):

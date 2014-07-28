@@ -62,7 +62,7 @@ class JavaAgent(JavaLibrary):
         exclusives=exclusives,
         **kwargs)
 
-    if not premain or agent_class:
+    if not (premain or agent_class):
       raise TargetDefinitionException(self, "Must have at least one of 'premain' or 'agent_class' "
                                             "defined.")
     if premain and not isinstance(premain, Compatibility.string):
