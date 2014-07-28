@@ -19,8 +19,8 @@ class BundleIntegrationTest(PantsRunIntegrationTest):
   def test_bundle_of_nonascii_classes(self):
     # TODO(John Sirois): We need a zip here to suck in external library classpath elements
     # pointed to by symlinks in the run_pants ephemeral tmpdir.  Switch run_pants to be a
-    # contextmanager that yield its results while the tmpdir chroot is still active and change this
-    # test back to using an un-archived bundle.
+    # contextmanager that yields its results while the tmpdir chroot is still active and change
+    # this test back to using an un-archived bundle.
     pants_run = self.run_pants(['goal', 'bundle', '--bundle-archive=zip',
                                 'src/java/com/pants/testproject/unicode/main'])
     self.assertEquals(pants_run.returncode, self.PANTS_SUCCESS_CODE,
