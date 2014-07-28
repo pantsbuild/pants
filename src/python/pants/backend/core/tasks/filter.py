@@ -81,7 +81,11 @@ class Filter(ConsoleTask):
         addresses = spec_parser.parse_addresses(spec)
       except (IOError, ValueError) as e:
         raise TaskError('Failed to parse spec: %s: %s' % (spec, e))
-      matches = set(self.context.build_graph.get_target(address) for address in addresses)
+      # filter specs may not have been parsed as part of the context: force parsing
+      matches = set()
+      for address in addresses:
+        self.context.build_file_parser.inject_address_into_build_graph(address, self.context.build_graph)
+        matches.add(self.context.build_graph.get_target(address))
       if not matches:
         raise TaskError('No matches for spec: %s' % spec)
       return matches

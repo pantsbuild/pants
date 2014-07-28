@@ -7,6 +7,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from textwrap import dedent
 
+from pants.backend.core.targets.dependencies import Dependencies
 from pants.backend.core.targets.doc import Page
 from pants.backend.core.tasks.filter import Filter
 from pants.backend.jvm.targets.java_library import JavaLibrary
@@ -21,6 +22,7 @@ class BaseFilterTest(ConsoleTaskTest):
   def alias_groups(self):
     return BuildFileAliases.create(
       targets={
+        'dependencies': Dependencies,
         'java_library': JavaLibrary,
         'page': Page,
         'python_library': PythonLibrary,
@@ -180,6 +182,25 @@ class FilterTest(BaseFilterTest):
       'overlaps:two',
       'overlaps:three',
       args=['--test-ancestor=-overlaps:one,overlaps:foo'],
+      targets=self.targets('::')
+    )
+
+  def test_filter_ancestor_out_of_context(self):
+    """Tests that targets outside of the context used as filters are parsed before use"""
+
+    # add an additional un-injected target, and then use it as a filter
+    self.add_to_build_file("blacklist", "dependencies(name='blacklist', dependencies=['common/a'])")
+
+    self.assert_console_output(
+      'common/b:b',
+      'common/b:foo',
+      'common/c:c',
+      'common/c:foo',
+      'overlaps:one',
+      'overlaps:two',
+      'overlaps:three',
+      'overlaps:foo',
+      args=['--test-ancestor=-blacklist'],
       targets=self.targets('::')
     )
 
