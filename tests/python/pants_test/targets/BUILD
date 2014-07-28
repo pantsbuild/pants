@@ -14,6 +14,7 @@ python_test_suite(
     pants(':artifact'),
     pants(':exclusive'),
     pants(':jar_library'),
+    pants(':java_agent'),
     pants(':java_tests'),
     pants(':java_thrift_library'),
     pants(':jvm_app'),
@@ -96,6 +97,17 @@ python_tests(
     pants('src/python/pants/backend/jvm/targets:java'),
     pants('src/python/pants/base:build_file_aliases'),
     pants('tests/python/pants_test/base:context_utils'),
+  ]
+)
+
+python_tests(
+  name = 'java_agent',
+  sources = ['test_java_agent.py'],
+  dependencies=[
+    pants('src/python/pants/backend/jvm/targets:java'),
+    pants('src/python/pants/base:build_file_aliases'),
+    pants('src/python/pants/base:exceptions'),
+    pants('tests/python/pants_test:base_test'),
   ]
 )
 
