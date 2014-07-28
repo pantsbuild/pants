@@ -113,12 +113,12 @@ class DuplicateDetector(JvmBinaryTask):
       self.context.log.debug('  scanning %s' % external_dep)
       with closing(ZipFile(external_dep)) as dep_zip:
         for qualified_file_name in dep_zip.namelist():
-          file_name = to_bytes(os.path.basename(qualified_file_name))
-          if file_name.decode('utf-8').lower() in self._excludes:
+          decoded_file_name = to_bytes(qualified_file_name).decode('utf-8')
+          if os.path.basename(decoded_file_name).lower() in self._excludes:
             continue
           jar_name = os.path.basename(external_dep)
-          if (not self._isdir(qualified_file_name)) and Manifest.PATH != qualified_file_name.decode('utf-8'):
-            artifacts_by_file_name[qualified_file_name].add(jar_name)
+          if (not self._isdir(decoded_file_name)) and Manifest.PATH != decoded_file_name:
+            artifacts_by_file_name[decoded_file_name].add(jar_name)
     return artifacts_by_file_name
 
   def _get_conflicts_by_artifacts(self, artifacts_by_file_name):
