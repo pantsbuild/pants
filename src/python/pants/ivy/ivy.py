@@ -42,7 +42,11 @@ class Ivy(object):
 
   @property
   def ivy_settings(self):
-    """Returns the ivysettings.xml path used by this `Ivy` instance."""
+    """Returns the ivysettings.xml path used by this `Ivy` instance.
+
+    May be None if ivy's built in default ivysettings.xml of standard public resolvers is being
+    used.
+    """
     return self._ivy_settings
 
   @property
