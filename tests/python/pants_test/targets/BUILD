@@ -104,9 +104,9 @@ python_tests(
   name = 'java_agent',
   sources = ['test_java_agent.py'],
   dependencies=[
+    pants('src/python/pants/backend/jvm/targets:java'),
     pants('src/python/pants/base:build_file_aliases'),
     pants('src/python/pants/base:exceptions'),
-    pants('src/python/pants/backend/jvm/targets:java'),
     pants('tests/python/pants_test:base_test'),
   ]
 )
