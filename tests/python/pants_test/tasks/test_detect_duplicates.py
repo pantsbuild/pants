@@ -10,8 +10,6 @@ import os
 import tempfile
 from zipfile import ZipFile
 
-import pytest
-
 from pants.backend.jvm.tasks.detect_duplicates import DuplicateDetector
 from pants.base.exceptions import TaskError
 from pants.util.dirutil import safe_rmtree, touch
@@ -82,5 +80,5 @@ class DuplicateDetectorTest(TaskTest):
   def test_fail_fast_error_raised(self):
     options = {'fail_fast': True, 'excludes': None, 'max_dups' : 10}
     task = DuplicateDetector(create_context(options=options), workdir=None)
-    with pytest.raises(TaskError):
+    with self.assertRaises(TaskError):
       task._is_conflicts(self.path_with_duplicates, binary_target=None)
