@@ -15,11 +15,3 @@ def build_file_aliases():
       'netrc': Netrc,
     },
   )
-
-
-def register_commands():
-  pass
-
-
-def register_goals():
-  pass
