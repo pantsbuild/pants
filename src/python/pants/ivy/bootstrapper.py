@@ -112,8 +112,8 @@ class Bootstrapper(object):
     """Returns the bootstrapped ivysettings.xml path.
 
     By default the ivy.ivy_settings value found in pants.ini but can be overridden by via the
-    PANTS_IVY_SETTINGS_XML environment variable.  If neither is specified defaults to ivy's built
-    in default ivysettings.xml of standard public resolvers.
+    PANTS_IVY_SETTINGS_XML environment variable.  If neither is specified returns ``None``
+    indicating ivy's built in default ivysettings.xml of standard public resolvers should be used.
     """
     return os.getenv('PANTS_IVY_SETTINGS_XML') or self._config.get('ivy', 'ivy_settings')
 

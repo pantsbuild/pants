@@ -394,7 +394,6 @@ class JarPublish(JarTask, ScmPublish):
       self.snapshot = False
 
     self.ivycp = context.config.getlist('ivy', 'classpath')
-    self.ivysettings = context.config.get(self._CONFIG_SECTION, 'ivy_settings')
 
     self.dryrun = context.options.jar_publish_dryrun
     self.transitive = context.options.jar_publish_transitive
@@ -598,7 +597,12 @@ class JarPublish(JarTask, ScmPublish):
 
           # Do the publish
           def publish(ivyxml_path):
-            ivysettings = self.generate_ivysettings(published, publish_local=path)
+            try:
+              ivy = Bootstrapper.default_ivy()
+            except Bootstrapper.Error as e:
+              raise TaskError('Failed to push %s! %s' % (jar_coordinate(jar, newver.version()), e))
+
+            ivysettings = self.generate_ivysettings(ivy, published, publish_local=path)
             args = [
               '-settings', ivysettings,
               '-ivy', ivyxml_path,
@@ -617,10 +621,9 @@ class JarPublish(JarTask, ScmPublish):
               args.append('-overwrite')
 
             try:
-              ivy = Bootstrapper.default_ivy()
               ivy.execute(jvm_options=jvm_args, args=args,
                           workunit_factory=self.context.new_workunit, workunit_name='jar-publish')
-            except (Bootstrapper.Error, Ivy.Error) as e:
+            except Ivy.Error as e:
               raise TaskError('Failed to push %s! %s' % (jar_coordinate(jar, newver.version()), e))
 
           publish(ivyxml)
@@ -746,12 +749,15 @@ class JarPublish(JarTask, ScmPublish):
     return self.scm.changelog(from_commit=sha,
                               files=target.sources_relative_to_buildroot())
 
-  def generate_ivysettings(self, publishedjars, publish_local=None):
+  def generate_ivysettings(self, ivy, publishedjars, publish_local=None):
+    if ivy.ivy_settings is None:
+      raise TaskError('A custom ivysettings.xml with writeable resolvers is required for'
+                      'publishing, but none was configured.')
     template_relpath = os.path.join('templates', 'jar_publish', 'ivysettings.mustache')
     template = pkgutil.get_data(__name__, template_relpath)
     with safe_open(os.path.join(self.workdir, 'ivysettings.xml'), 'w') as wrapper:
       generator = Generator(template,
-                            ivysettings=self.ivysettings,
+                            ivysettings=ivy.ivy_settings,
                             dir=self.workdir,
                             cachedir=self.cachedir,
                             published=[TemplateData(org=jar.org, name=jar.name)
