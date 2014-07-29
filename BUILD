@@ -7,7 +7,7 @@ source_root('src/java', annotation_processor, jvm_binary, java_library, page)
 source_root('src/protobuf', java_protobuf_library, page)
 source_root('src/python', page, python_binary, python_library, resources)
 source_root('src/resources', page, resources, jaxb_library)
-source_root('src/scala', jvm_binary, page, scala_library)
+source_root('src/scala', jvm_binary, page, scala_library, benchmark)
 source_root('src/thrift', java_thrift_library, page, python_thrift_library)
 
 source_root('tests/java', java_library, junit_tests, page)

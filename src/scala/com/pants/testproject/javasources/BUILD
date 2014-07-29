@@ -9,3 +9,9 @@ scala_library(
   ],
   sources = rglobs('*.scala')
 )
+
+benchmark(name='benchmark',
+  dependencies=[
+  ],
+  sources=rglobs('com/pants/testproject/javasources/*.scala')
+)

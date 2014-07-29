@@ -15,6 +15,7 @@ from pants.backend.codegen.targets.python_thrift_library import PythonThriftLibr
 from pants.backend.core.targets.doc import Page
 from pants.backend.core.targets.resources import Resources
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
+from pants.backend.jvm.targets.benchmark import Benchmark
 from pants.backend.jvm.targets.java_agent import JavaAgent
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.java_tests import JavaTests
@@ -42,15 +43,15 @@ def maven_layout(parse_context, basedir=''):
     SourceRoot.register(os.path.join(parse_context.rel_path, basedir, path), *types)
 
   root('src/main/antlr', JavaAntlrLibrary, Page, PythonAntlrLibrary)
-  root('src/main/java', AnnotationProcessor, JavaAgent, JavaLibrary, JvmBinary, Page)
+  root('src/main/java', AnnotationProcessor, JavaAgent, JavaLibrary, JvmBinary, Page, Benchmark)
   root('src/main/protobuf', JavaProtobufLibrary, Page)
   root('src/main/python', Page, PythonBinary, PythonLibrary)
   root('src/main/resources', Page, Resources)
-  root('src/main/scala', JvmBinary, Page, ScalaLibrary)
+  root('src/main/scala', JvmBinary, Page, ScalaLibrary, Benchmark)
   root('src/main/thrift', JavaThriftLibrary, Page, PythonThriftLibrary)
 
-  root('src/test/java', JavaLibrary, JavaTests, Page)
+  root('src/test/java', JavaLibrary, JavaTests, Page, Benchmark)
   root('src/test/python', Page, PythonLibrary, PythonTests)
   root('src/test/resources', Page, Resources)
-  root('src/test/scala', JavaTests, Page, ScalaLibrary, ScalaTests)
+  root('src/test/scala', JavaTests, Page, ScalaLibrary, ScalaTests, Benchmark)
 
