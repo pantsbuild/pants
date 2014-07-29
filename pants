@@ -102,9 +102,11 @@ else
     run_pants_bare build -v -i "CPython>=2.6,<3" -i "CPython>=3.3" ${PANTS_BINARY} && \
     mv -v ${HERE}/dist/pants.pex ${PANTS_PEX} && \
     chmod +x ${PANTS_PEX}
-    if [ $? != 0 ] ; then
+    exit_status=$?
+    if [ $exit_status != 0 ] ; then
       echo "*** Pants bootstrapping failed."
       echo "This file is left as a sentinel to record that bootstrapping pants failed." > ${FAILED_BOOTSTRAP_SENTINEL}
+      exit $exit_status
     fi
   fi
   if [ -e "${PANTS_PEX}" ]; then
