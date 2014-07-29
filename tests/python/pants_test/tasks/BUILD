@@ -112,6 +112,8 @@ python_tests(
   name = 'jvm_bundle_integration',
   sources = ['test_jvm_bundle_integration.py'],
   dependencies = [
+    pants('src/python/pants/fs'),
+    pants('src/python/pants/util:contextutil'),
     pants('tests/python/pants_test:int-test'),
   ],
 )

@@ -113,12 +113,16 @@ class DuplicateDetector(JvmBinaryTask):
       self.context.log.debug('  scanning %s' % external_dep)
       with closing(ZipFile(external_dep)) as dep_zip:
         for qualified_file_name in dep_zip.namelist():
-          file_name = to_bytes(os.path.basename(qualified_file_name))
-          if file_name.decode('utf-8').lower() in self._excludes:
+          # Zip entry names can come in any encoding and in practice we find some jars that have
+          # utf-8 encoded entry names, some not.  As a result we cannot simply decode in all cases
+          # and need to do this to_bytes(...).decode('utf-8') dance to stay safe across all entry
+          # name flavors and under all supported pythons.
+          decoded_file_name = to_bytes(qualified_file_name).decode('utf-8')
+          if os.path.basename(decoded_file_name).lower() in self._excludes:
             continue
           jar_name = os.path.basename(external_dep)
-          if (not self._isdir(qualified_file_name)) and Manifest.PATH != qualified_file_name.decode('utf-8'):
-            artifacts_by_file_name[qualified_file_name].add(jar_name)
+          if (not self._isdir(decoded_file_name)) and Manifest.PATH != decoded_file_name:
+            artifacts_by_file_name[decoded_file_name].add(jar_name)
     return artifacts_by_file_name
 
   def _get_conflicts_by_artifacts(self, artifacts_by_file_name):

@@ -6,7 +6,8 @@
 jvm_binary(name = 'main',
   basename = 'unicode',
   dependencies = [
-    'src/java/com/pants/testproject/unicode/cucumber'
+    'src/java/com/pants/testproject/unicode/cucumber',
+    'src/scala/com/pants/testproject/unicode/shapeless',
   ],
   source = 'CucumberMain.java',
   main = 'com.pants.testproject.unicode.main.CucumberMain',
