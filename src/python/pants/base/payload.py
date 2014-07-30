@@ -56,6 +56,7 @@ class SourcesPayload(Payload):
   def __init__(self, sources_rel_path, sources):
     self.sources_rel_path = sources_rel_path
     self.sources = maybe_list(sources or [], expected_type=Compatibility.string)
+    self.excludes = OrderedSet()
 
   @property
   def num_chunking_units(self):
