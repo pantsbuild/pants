@@ -18,6 +18,11 @@ class JavaLibrary(ExportableJvmLibrary):
   more sensible thing to bundle.
   """
 
+  @classmethod
+  def get_build_file_alias(cls):
+    """Specifies the BUILD file target alias 'java_library'."""
+    return 'java_library'
+
   def __init__(self, *args, **kwargs):
     """
     :param string name: The name of this target, which combined with this

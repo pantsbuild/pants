@@ -42,6 +42,7 @@ python_test_suite(
     pants(':payload'),
     pants(':revision'),
     pants(':run_info'),
+    pants(':target'),
   ]
 )
 
@@ -219,6 +220,15 @@ python_tests(
   dependencies = [
     pants('src/python/pants/base:run_info'),
     pants('src/python/pants/util:contextutil'),
+    pants('tests/python/pants_test:base_test'),
+  ]
+)
+
+python_tests(
+  name = 'target',
+  sources = ['test_target.py'],
+  dependencies = [
+    pants('src/python/pants/base:target'),
     pants('tests/python/pants_test:base_test'),
   ]
 )
