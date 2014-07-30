@@ -156,5 +156,32 @@ use the usual ``./pants py`` on a ``python_library`` target that builds
     >>> from pants.backend.core.targets import repository
     >>>
 
+********************
+Debugging a JVM Tool
+********************
+
+
+Some Pants tools are imported as external JVM dependencies.  If you need to debug
+one of these tools and change code, see  :ref:`Using a SNAPSHOT JVM Dependency <test_3rdparty_jvm_snapshot>`
+which describes how to specify the ``url`` and ``mutable`` attributes of a ``jar``
+dependency found on the local filesystem::
+
+   jar_library(name='jmake',
+       jars=[
+         jar(org='com.sun.tools', name='jmake', rev='1.3.8-4-SNAPSHOT',
+             url='file://squarepants/lib/jmake.jar', mutable=True),
+     ],
+   )
+
+Append JVM args to turn on the debugger for the appropriate tool in ``pants.ini``::
+
+    [jar-tool]
+    jvm_args: ['-Xmx300m', '-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=%(debug_port)s']
+
+Note that some tools run under nailgun by default.  The easiest way to debug them is
+to disable nailgun by specifying the command line option ``--no-ng-daemons``.
+If you need to debug the tool under nailgun, make sure you run ``pants goal ng-killall`` or
+``pants goal clean-all`` so that any running nailgun servers are restarted.
+
 .. Writing Tests section
 .. Documenting section
