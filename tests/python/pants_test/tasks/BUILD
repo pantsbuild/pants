@@ -494,12 +494,13 @@ python_tests(
   name = 'group_task',
   sources = ['test_group_task.py'],
   dependencies = [
+    pants('src/python/pants/base:target'),
     pants('src/python/pants/backend/core/tasks:check_exclusives'),
     pants('src/python/pants/backend/core/tasks:group_task'),
-    pants('src/python/pants/engine:engine'),
     pants('src/python/pants/backend/jvm/targets:java'),
     pants('src/python/pants/backend/jvm/targets:scala'),
     pants('src/python/pants/backend/python/targets:python'),
+    pants('src/python/pants/engine:engine'),
     pants('tests/python/pants_test:base_test'),
   ]
 )

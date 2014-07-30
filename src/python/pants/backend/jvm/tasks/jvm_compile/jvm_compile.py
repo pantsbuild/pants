@@ -268,6 +268,13 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
     else:
       shutil.copy(src, dst)
 
+  def pre_execute(self):
+    # TODO(John Sirois): Ensuring requested product maps are available - if empty - should probably
+    # be lifted to Task infra.
+
+    # In case we have no relevant targets and return early create the requested product maps.
+    self._create_empty_products()
+
   def prepare_execute(self, chunks):
     all_targets = list(itertools.chain(*chunks))
 
@@ -326,9 +333,6 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
   def execute_chunk(self, relevant_targets):
     # TODO(benjy): Add a pre-execute phase for injecting deps into targets, so e.g.,
     # we can inject a dep on the scala runtime library and still have it ivy-resolve.
-
-    # In case we have no relevant targets and return early.
-    self._create_empty_products()
 
     if not relevant_targets:
       return
