@@ -45,6 +45,10 @@ GLOBAL_OPTIONS = [
   Option('--read-from-artifact-cache', '--no-read-from-artifact-cache', action='callback',
          callback=_set_bool, dest='read_from_artifact_cache', default=True,
          help='Read build artifacts from cache, if available.'),
+  Option('--exclude-target-regexp', dest='target_excludes', type='str',
+         default=[], action='append',
+         help='Regex pattern to exclude from the target list (useful in conjunction with ::). '
+              'Multiple patterns may be specified by setting this flag multiple times.'),
   Option('--write-to-artifact-cache', '--no-write-to-artifact-cache', action='callback',
          callback=_set_bool, dest='write_to_artifact_cache', default=True,
          help='Write build artifacts to cache, if possible.'),

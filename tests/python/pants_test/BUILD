@@ -77,6 +77,7 @@ python_tests(
 dependencies(
   name = 'integration',
   dependencies = [
+    pants('tests/python/pants_test/commands:integration'),
     pants('tests/python/pants_test/targets:integration'),
     pants('tests/python/pants_test/tasks:integration'),
     pants('tests/python/pants_test/python:integration'),
