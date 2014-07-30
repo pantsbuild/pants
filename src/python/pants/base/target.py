@@ -112,6 +112,17 @@ class Target(AbstractTarget):
     return SourceRoot.find(self)
 
   @classmethod
+  def get_build_file_alias(cls):
+    """Specifies the BUILD file target alias for the actual target type.
+
+    For example, backend/jvm/targets/java_library.py JavaLibrary should override
+    this class method and return 'java_library'
+    """
+    raise NotImplementedError(
+      "The derived class '%s' must implement 'get_build_file_alias' method."
+      % cls.__name__)
+
+  @classmethod
   def identify(cls, targets):
     """Generates an id for a set of targets."""
     return cls.combine_ids(target.id for target in targets)
