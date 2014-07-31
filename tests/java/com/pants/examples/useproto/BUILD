@@ -3,10 +3,13 @@
 
 # Tests functionality of protoc generating java code.
 
-junit_tests(name='useproto',
-  sources=['UseProtoTest.java',],
-  dependencies=[
-    pants('3rdparty:junit'),
-    pants('src/java/com/pants/examples/protobuf'),
+junit_tests(
+  name = 'useproto',
+  sources = [
+    'UseProtoTest.java',
+  ],
+  dependencies = [
+    '3rdparty/jvm/junit',
+    'src/java/com/pants/examples/protobuf',
   ],
 )

@@ -3,11 +3,14 @@
 
 # Shows java working with jaxb generations.
 
-junit_tests(name='usejaxb',
-  sources=['UseJaxbTest.java',],
-  dependencies=[
-    pants('3rdparty:junit'),
-    pants('src/java/com/pants/examples/jaxb/reader'),
-    pants('src/resources/com/pants/example/names'),
+junit_tests(
+  name = 'usejaxb',
+  sources = [
+    'UseJaxbTest.java',
+  ],
+  dependencies = [
+    '3rdparty/jvm/junit',
+    'src/java/com/pants/examples/jaxb/reader',
+    'src/resources/com/pants/example/names',
   ],
 )

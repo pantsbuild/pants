@@ -149,7 +149,7 @@ the many command-line options you can pass for that goal. E.g., ::
       --test-specs-color, --no-test-specs-color
                               [True] Emit test result with ANSI terminal color
                               codes.
-    
+
 For a list of available goals, ``./pants goal goals``.
 
 For help with things that aren't goals, use ::
@@ -199,12 +199,14 @@ Anatomy of a ``BUILD`` Target
 A target definition in a ``BUILD`` file looks something like ::
 
     scala_library(
-      name='util',
-      dependencies = [pants('3rdparty:commons-math'),
-                      pants('3rdparty:thrift'),
-                      pants('src/main/scala/com/foursquare/auth'),
-                      pants(':base')],
-      sources=globs('*.scala'),
+      name = 'util',
+      dependencies = [
+        '3rdparty/jvm/commons-lang',
+        '3rdparty/jvm/org/apache/thrift',
+        'src/main/scala/com/foursquare/auth',
+        ':base',
+      ],
+      sources = globs('*.scala'),
     )
 
 Here, ``scala_library`` is the target's *type*. Different target types support

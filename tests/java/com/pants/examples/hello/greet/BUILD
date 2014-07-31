@@ -3,13 +3,14 @@
 
 # Test the Hello World example's "greet" library
 
-junit_tests(name='greet',
-  sources=globs('*.java'),
-  dependencies=[
-    pants('3rdparty:junit'),
-    pants('src/java/com/pants/examples/hello/greet'),
+junit_tests(
+  name = 'greet',
+  sources = globs('*.java'),
+  dependencies = [
+    '3rdparty/jvm/junit',
+    'src/java/com/pants/examples/hello/greet',
   ],
-  resources=[
-    pants('src/resources/com/pants/example/hello'),
+  resources = [
+    'src/resources/com/pants/example/hello',
   ],
 )

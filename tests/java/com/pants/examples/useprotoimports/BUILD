@@ -3,10 +3,13 @@
 
 # Tests functionality of protoc generating java code, using 'imports' parameter.
 
-junit_tests(name='useprotoimports',
-  sources=['UseImportsTest.java',],
-  dependencies=[
-    pants('3rdparty:junit'),
-    pants('src/java/com/pants/examples/protobuf:protobuf-imports'),
+junit_tests(
+  name = 'useprotoimports',
+  sources = [
+    'UseImportsTest.java',
+  ],
+  dependencies = [
+    '3rdparty/jvm/junit',
+    'src/java/com/pants/examples/protobuf:protobuf-imports',
   ],
 )
