@@ -122,6 +122,21 @@ def chmod_plus_x(path):
   os.chmod(path, path_mode)
 
 
+def relativize_path(path, rootdir):
+  real_path = os.path.realpath(path)
+  relative_path = os.path.relpath(real_path, rootdir)
+  final_path = relative_path if len(relative_path) < len(real_path) else real_path
+  return final_path
+
+
+# When running pants under mesos/aurora, the sandbox pathname can be very long. Since it gets
+# prepended to most components in the classpath (some from ivy, the rest from the build),
+# in some runs the classpath gets too big and exceeds ARG_MAX.
+# We prevent this by using paths relative to the current working directory.
+def relativize_paths(paths, rootdir):
+  return [relativize_path(path, rootdir) for path in paths]
+
+
 def touch(path, times=None):
   """Equivalent of unix `touch path`.
 

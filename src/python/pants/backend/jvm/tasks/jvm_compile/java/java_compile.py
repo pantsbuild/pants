@@ -12,10 +12,11 @@ from pants.backend.jvm.tasks.jvm_compile.analysis_tools import AnalysisTools
 from pants.backend.jvm.tasks.jvm_compile.java.jmake_analysis import JMakeAnalysis
 from pants.backend.jvm.tasks.jvm_compile.java.jmake_analysis_parser import JMakeAnalysisParser
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
+from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.target import Target
 from pants.base.workunit import WorkUnit
-from pants.util.dirutil import safe_open
+from pants.util.dirutil import relativize_paths, safe_open
 
 
 # From http://kenai.com/projects/jmake/sources/mercurial/content
@@ -61,6 +62,8 @@ class JavaCompile(JvmCompile):
 
   def __init__(self, context, workdir):
     super(JavaCompile, self).__init__(context, workdir, jdk=True)
+
+    self._buildroot = get_buildroot()
 
     self._depfile = os.path.join(self._analysis_dir, 'global_depfile')
 
@@ -115,9 +118,10 @@ class JavaCompile(JvmCompile):
     return ret
 
   def compile(self, args, classpath, sources, classes_output_dir, analysis_file):
+    relative_classpath = relativize_paths(classpath, self._buildroot)
     jmake_classpath = self.tool_classpath(self._jmake_bootstrap_key)
     args = [
-      '-classpath', ':'.join(classpath + [self._classes_dir]),
+      '-classpath', ':'.join(relative_classpath + [self._classes_dir]),
       '-d', self._classes_dir,
       '-pdb', analysis_file,
       '-pdb-text-format',

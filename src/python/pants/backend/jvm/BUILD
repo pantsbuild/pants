@@ -32,7 +32,6 @@ python_library(
   ],
 )
 
-
 python_library(
   name = 'jvm_tool_bootstrapper',
   sources = ['jvm_tool_bootstrapper.py'],
@@ -40,4 +39,3 @@ python_library(
     pants('src/python/pants/base:exceptions'),
   ],
 )
-

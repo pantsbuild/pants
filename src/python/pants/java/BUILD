@@ -23,6 +23,7 @@ python_library(
     pants('3rdparty/python/twitter/commons:twitter.common.log'),
     pants('src/python/pants/base:build_environment'),
     pants('src/python/pants/util:contextutil'),
+    pants('src/python/pants/util:dirutil'),
   ]
 )
 
@@ -43,8 +44,8 @@ python_library(
   name = 'nailgun_executor',
   sources = ['nailgun_executor.py'],
   dependencies = [
-    pants('3rdparty/python:psutil'),
     pants(':nailgun_client'),
+    pants('3rdparty/python:psutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.collections'),
     pants('3rdparty/python/twitter/commons:twitter.common.lang'),
     pants('3rdparty/python/twitter/commons:twitter.common.log'),

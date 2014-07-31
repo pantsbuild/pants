@@ -17,6 +17,7 @@ from twitter.common.lang import AbstractClass, Compatibility
 from pants.base.build_environment import get_buildroot
 from pants.java.distribution.distribution import Distribution
 from pants.util.contextutil import environment_as
+from pants.util.dirutil import relativize_paths
 
 
 class Executor(AbstractClass):
@@ -158,21 +159,11 @@ class SubprocessExecutor(Executor):
     self._buildroot = get_buildroot()
 
   def _create_command(self, classpath, main, jvm_options, args):
+    relative_classpath = relativize_paths(classpath, self._buildroot)
 
-    # When running pants under mesos/aurora, the sandbox pathname can be very long. Since it gets
-    # prepended to most components in the classpath (some from ivy, the rest from the build),
-    # in some runs the classpath gets too big and exceeds ARG_MAX.
-    # We prevent this by using paths relative to the current working directory.
-    def make_relative_path(path):
-      path = os.path.realpath(path)
-      relative_path = os.path.relpath(path, self._buildroot)
-      final_path = relative_path if len(relative_path) < len(path) else path
-      return final_path
-
-    classpath = [make_relative_path(p) for p in classpath]
-
-    log.debug('The length of the the classpath is: %s' % len(classpath))
-    return super(SubprocessExecutor, self)._create_command(classpath, main, jvm_options, args)
+    log.debug('The length of the the classpath is: %s' % len(relative_classpath))
+    return super(SubprocessExecutor, self)._create_command(relative_classpath, main, jvm_options,
+                                                           args)
 
   def _runner(self, classpath, main, jvm_options, args):
     command = self._create_command(classpath, main, jvm_options, args)
