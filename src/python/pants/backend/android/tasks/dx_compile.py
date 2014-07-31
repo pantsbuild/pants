@@ -5,6 +5,7 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from pants.backend.android.targets.android_dex import AndroidDex
 from pants.backend.android.tasks.android_task import AndroidTask
 from pants.backend.android.distribution.android_distribution import AndroidDistribution
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
@@ -30,5 +31,10 @@ class DxCompile(NailgunTask, AndroidTask):
     return self._CONFIG_SECTION
 
 
+  def execute(self, targets):
+    dx_targets = set()
+    for target in targets:
+      target.walk(lambda t: dx_targets.add(t),
+                  lambda t: isinstance(t, AndroidDex))
 
     #TODO check for empty class files there is no valid empty dex file.
