@@ -4,11 +4,14 @@
 #  Example of annotation_processor() target
 
 annotation_processor(name='processor',
-  sources=['ExampleProcessor.java'],
-  processors=['com.pants.examples.annotation.processor.ExampleProcessor'],
-  dependencies=[
-    pants('src/java/com/pants/examples/annotation/example'),
-    pants('3rdparty:guava'),
+  sources = [
+    'ExampleProcessor.java',
+  ],
+  processors = [
+    'com.pants.examples.annotation.processor.ExampleProcessor',
+  ],
+  dependencies = [
+    '3rdparty/jvm/guava',
+    'src/java/com/pants/examples/annotation/example',
   ],
 )
-
