@@ -2,8 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 jar_library(
-  name = 'hamcrest-core',
-  jars = [
-    jar(org='org.hamcrest', name='hamcrest-core', rev='1.3')
+  name='commons-lang',
+  jars=[
+    jar(org='commons-lang', name='commons-lang', rev='2.5').with_sources(),
   ],
 )

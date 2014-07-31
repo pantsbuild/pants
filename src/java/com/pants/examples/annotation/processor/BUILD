@@ -11,7 +11,7 @@ annotation_processor(name='processor',
     'com.pants.examples.annotation.processor.ExampleProcessor',
   ],
   dependencies = [
-    '3rdparty/jvm/guava',
+    '3rdparty/jvm/com/google/guava',
     'src/java/com/pants/examples/annotation/example',
   ],
 )

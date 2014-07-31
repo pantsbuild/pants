@@ -3,14 +3,14 @@
 
 jar_library(
   name='specs_2.9',
-  jars = [
+  jars=[
     jar(org='org.scala-tools.testing', name='specs_2.9.3', rev='1.6.9')
   ]
 )
 
 jar_library(
   name='specs',
-  dependencies = [
-    ':specs_2.9'
+  dependencies=[
+    ':specs_2.9',
   ]
 )

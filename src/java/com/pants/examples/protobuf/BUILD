@@ -12,7 +12,7 @@ jvm_binary(
 jvm_binary(
   name = 'protobuf',
   dependencies = [
-    '3rdparty/jvm/protobuf:protobuf-java',
+    '3rdparty/jvm/com/google/protobuf:protobuf-java',
     'src/protobuf/com/pants/examples/distance',
   ],
   source = 'ExampleProtobuf.java',
@@ -22,7 +22,7 @@ jvm_binary(
 jvm_binary(
   name = 'protobuf-imports',
   dependencies = [
-    '3rdparty/jvm/protobuf:protobuf-java',
+    '3rdparty/jvm/com/google/protobuf:protobuf-java',
     'src/protobuf/com/pants/examples/imports',
   ],
   source = 'imports/ExampleProtobufImports.java',

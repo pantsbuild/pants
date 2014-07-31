@@ -201,8 +201,8 @@ A target definition in a ``BUILD`` file looks something like ::
     scala_library(
       name = 'util',
       dependencies = [
-        '3rdparty/jvm/commons:commons-math',
-        '3rdparty/jvm/thrift',
+        '3rdparty/jvm/commons-lang',
+        '3rdparty/jvm/org/apache/thrift',
         'src/main/scala/com/foursquare/auth',
         ':base',
       ],

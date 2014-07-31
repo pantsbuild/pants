@@ -6,17 +6,17 @@ FINAGLE_REV = '6.8.1'
 
 jar_library(
   name='finagle-core',
-  jars = [
+  jars=[
     jar(org='com.twitter', name='finagle-core_2.9.2', rev=FINAGLE_REV).with_sources(),
   ],
-  dependencies = [
-    pants('3rdparty/jvm/util:util-core')
+  dependencies=[
+    '3rdparty/jvm/com/twitter/util:util-core',
   ],
 )
 
 jar_library(
-  name = 'finagle-thrift',
-  jars = [
+  name='finagle-thrift',
+  jars=[
     jar(org='com.twitter', name='finagle-thrift_2.9.2', rev=FINAGLE_REV)
   ],
 )
