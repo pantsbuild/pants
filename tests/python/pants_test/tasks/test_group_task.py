@@ -212,8 +212,8 @@ class GroupTaskTest(BaseGroupTaskTest):
     actual_prepare_actions = list(itertools.islice(recorded_iter, len(expected_prepare_actions)))
     self.assertEqual(expected_prepare_actions, actual_prepare_actions)
 
-    # Next, we slice off the number of prepare execute actions from the array, store them separately,
-    # sort both the recorded elements and the expected elements, and compare.
+    # Next, we slice off the number of prepare execute actions from the array, store them
+    # separately, sort both the recorded elements and the expected elements, and compare.
     actual_prepare_execute_actions = list(itertools.islice(recorded_iter,
                                                            len(expected_prepare_execute_actions)))
     self.assertEqual(sorted(expected_prepare_execute_actions),
