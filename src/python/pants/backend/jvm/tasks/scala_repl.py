@@ -10,6 +10,7 @@ import shlex
 from pants.java.util import execute_java
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.backend.jvm.tasks.jvm_task import JvmTask
+from pants.base.target import Target
 from pants.console.stty_utils import preserve_stty_settings
 
 
@@ -46,7 +47,8 @@ class ScalaRepl(JvmTask, JvmToolTaskMixin):
     round_manager.require_data('classes_by_target')
 
   def execute(self):
-    targets = self.require_homogeneous_root_targets(lambda t: t.is_jvm)
+    (accept_predicate, reject_predicate) = Target.lang_discriminator('java')
+    targets = self.require_homogeneous_targets(accept_predicate, reject_predicate)
     if targets:
       tools_classpath = self.tool_classpath(self._bootstrap_key)
       self.context.lock.release()

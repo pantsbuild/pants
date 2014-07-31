@@ -159,6 +159,7 @@ class ResourcesPayload(SourcesPayload):
 class JarLibraryPayload(Payload):
   def __init__(self, jars):
     self.jars = sorted(jars)
+    self.excludes = OrderedSet()
 
   def has_sources(self, extension):
     return False

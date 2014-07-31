@@ -22,6 +22,7 @@ from pants.backend.python.targets.python_library import PythonLibrary
 from pants.base.address import SyntheticAddress
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+from pants.base.target import Target
 from pants.thrift_util import calculate_compile_roots, select_thrift_binary
 from pants.util.dirutil import safe_mkdir
 
@@ -125,7 +126,7 @@ class ApacheThriftGen(CodeGen):
     return lang in self.gen_langs
 
   def genlangs(self):
-    return dict(java=lambda t: t.is_jvm, python=lambda t: t.is_python)
+    return Target.LANG_DISCRIMINATORS
 
   def genlang(self, lang, targets):
     bases, sources = calculate_compile_roots(targets, self.is_gentarget)

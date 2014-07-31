@@ -22,6 +22,7 @@ from pants.backend.python.targets.python_library import PythonLibrary
 from pants.base.address import SyntheticAddress
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+from pants.base.target import Target
 from pants.binary_util import BinaryUtil
 from pants.fs.archive import ZIP
 from pants.util.dirutil import safe_mkdir
@@ -86,7 +87,7 @@ class ProtobufGen(CodeGen):
     return lang in self.gen_langs
 
   def genlangs(self):
-    return dict(java=lambda t: t.is_jvm, python=lambda t: t.is_python)
+    return Target.LANG_DISCRIMINATORS
 
   def _jars_to_directories(self, target):
     """Extracts and maps jars to directories containing their contents.

@@ -21,8 +21,12 @@ class JarLibrary(Target):
     """
     payload = JarLibraryPayload(jars or [])
     super(JarLibrary, self).__init__(payload=payload, *args, **kwargs)
-    self.add_labels('jars')
+    self.add_labels('jars', 'jvm')
 
   @property
   def jar_dependencies(self):
     return self.payload.jars
+
+  @property
+  def excludes(self):
+    return self.payload.excludes

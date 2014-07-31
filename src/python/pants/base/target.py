@@ -107,6 +107,25 @@ class Target(AbstractTarget):
   parse context.
   """
 
+  LANG_DISCRIMINATORS = {
+    'java':   lambda t: t.is_jvm,
+    'python': lambda t: t.is_python,
+  }
+
+  @classmethod
+  def lang_discriminator(cls, lang):
+    """Returns a tuple of target predicates that select the given lang vs all other supported langs.
+
+       The left hand side accepts targets for the given language; the right hand side accepts
+       targets for all other supported languages.
+    """
+    def is_other_lang(target):
+      for name, discriminator in cls.LANG_DISCRIMINATORS.items():
+        if name != lang and discriminator(target):
+          return True
+      return False
+    return (cls.LANG_DISCRIMINATORS[lang], is_other_lang)
+
   @property
   def target_base(self):
     return SourceRoot.find(self)

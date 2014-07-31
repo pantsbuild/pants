@@ -140,8 +140,8 @@ class DepmapTest(BaseDepmapTest):
     )
 
   def test_jar_library(self):
-    self.assert_console_raises(
-      TaskError,
+    self.assert_console_output(
+      'internal-common.b.b',
       targets=[self.target('common/b')],
     )
 

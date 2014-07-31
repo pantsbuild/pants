@@ -383,23 +383,33 @@ class TaskBase(AbstractClass):
                       ', '.join([repr(t) for t in target_roots]))
     return target_roots[0]
 
-  def require_homogeneous_root_targets(self, predicate):
-    """If all targets specified on the cmd line satisfy the predicate, returns them.
+  def require_homogeneous_targets(self, accept_predicate, reject_predicate):
+    """Ensures that there is no ambiguity in the context according to the given predicates.
 
-    If none satisfy the predicate, returns None.
+    If any targets in the context satisfy the accept_predicate, and no targets satisfy the
+    reject_predicate, returns the accepted targets.
+
+    If no targets satisfy the accept_predicate, returns None.
 
     Otherwise throws TaskError.
     """
-    target_roots = self.context.target_roots
-    if len(target_roots) == 0:
+    if len(self.context.target_roots) == 0:
       raise TaskError('No target specified.')
-    elif all([predicate(t) for t in target_roots]):
-      return target_roots
-    elif all([not predicate(t) for t in target_roots]):
+
+    accepted = self.context.targets(accept_predicate)
+    rejected = self.context.targets(reject_predicate)
+    if len(accepted) == 0:
+      # no targets were accepted, regardless of rejects
       return None
+    elif len(rejected) == 0:
+      # we have at least one accepted target, and no rejected targets
+      return accepted
     else:
-      raise TaskError('Mutually incompatible targets specified: %s ' %
-                      ', '.join([repr(t) for t in target_roots]))
+      # both accepted and rejected targets
+      # TODO: once https://github.com/pantsbuild/pants/issues/425 lands, we should add
+      # language-specific flags that would resolve the ambiguity here
+      raise TaskError('Mutually incompatible targets specified: %s vs %s (and %d others)' %
+                      (accepted[0], rejected[0], len(accepted) + len(rejected) - 2))
 
 class Task(TaskBase):
   """An executable task.

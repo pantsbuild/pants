@@ -10,6 +10,7 @@ from twitter.common.python.pex import PEX
 from pants.backend.python.python_chroot import PythonChroot
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.tasks.python_task import PythonTask
+from pants.base.target import Target
 from pants.base.workunit import WorkUnit
 from pants.console import stty_utils
 
@@ -23,7 +24,8 @@ class PythonRepl(PythonTask):
                             help='Run an IPython REPL instead of the standard python one.')
 
   def execute(self):
-    targets = self.require_homogeneous_root_targets(lambda t: t.is_python)
+    (accept_predicate, reject_predicate) = Target.lang_discriminator('python')
+    targets = self.require_homogeneous_targets(accept_predicate, reject_predicate)
     if targets:
       # We can't throw if the target isn't a python target, because perhaps we were called on a
       # JVM target, in which case we have to no-op and let scala repl do its thing.
