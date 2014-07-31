@@ -32,9 +32,8 @@ dependencies(
   ]
 )
 
-python_library(
+dependencies(
   name = 'common',
-  sources = ['__init__.py'],
   dependencies = [
     ':task',
     'src/python/pants/base:exceptions',
@@ -87,7 +86,7 @@ python_library(
   name = 'clean',
   sources = ['clean.py'],
   dependencies = [
-    pants(':console_task'),
+    pants(':task'),
     pants('3rdparty/python:python-daemon'),
     pants('src/python/pants/base:build_environment'),
     pants('src/python/pants/base:config'),
@@ -241,7 +240,7 @@ python_library(
   name = 'reporting_server',
   sources = ['reporting_server.py'],
   dependencies = [
-    pants(':console_task'),
+    pants(':task'),
     pants('src/python/pants/base:build_environment'),
     pants('src/python/pants/base:run_info'),
     pants('src/python/pants/reporting'),

@@ -10,15 +10,16 @@ import os
 import re
 import signal
 import socket
+import sys
 
 from pants import binary_util
+from pants.backend.core.tasks.task import QuietTaskMixin, Task
 from pants.base.build_environment import get_buildroot
 from pants.base.run_info import RunInfo
 from pants.reporting.reporting_server import ReportingServer, ReportingServerManager
-from pants.backend.core.tasks.console_task import ConsoleTask
 
 
-class RunServer(ConsoleTask):
+class RunServer(Task, QuietTaskMixin):
   """Runs the reporting server."""
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
@@ -37,7 +38,7 @@ class RunServer(ConsoleTask):
                             action='callback', callback=mkflag.set_bool, default=False,
                             help='[%default] Attempt to open the server web ui in a browser.')
 
-  def console_output(self, targets):
+  def execute(self):
     DONE = '__done_reporting'
 
     def maybe_open(port):
@@ -47,7 +48,8 @@ class RunServer(ConsoleTask):
     port = ReportingServerManager.get_current_server_port()
     if port:
       maybe_open(port)
-      return ['Server already running at http://localhost:%d' % port]
+      print('Server already running at http://localhost:%d' % port, file=sys.stderr)
+      return
 
     def run_server(reporting_queue):
       def report_launch(actual_port):
@@ -90,25 +92,23 @@ class RunServer(ConsoleTask):
     proc.daemon = True
     proc.start()
     s = reporting_queue.get()
-    ret = []
     while s != DONE:
-      ret.append(s)
+      print(s, file=sys.stderr)
       s = reporting_queue.get()
     # The child process is done reporting, and is now in the server loop, so we can proceed.
     server_port = ReportingServerManager.get_current_server_port()
     maybe_open(server_port)
-    return ret
 
 
-class KillServer(ConsoleTask):
+class KillServer(Task, QuietTaskMixin):
   """Kills the reporting server."""
 
   pidfile_re = re.compile(r'port_(\d+)\.pid')
 
-  def console_output(self, targets):
+  def execute(self):
     pidfiles_and_ports = ReportingServerManager.get_current_server_pidfiles_and_ports()
     if not pidfiles_and_ports:
-      return ['No server found.']
+      print('No server found.', file=sys.stderr)
     # There should only be one pidfile, but in case there are many, we kill them all here.
     for pidfile, port in pidfiles_and_ports:
       with open(pidfile, 'r') as infile:
@@ -117,6 +117,6 @@ class KillServer(ConsoleTask):
         os.unlink(pidfile)
         pid = int(pidstr)
         os.kill(pid, signal.SIGKILL)
-        return ['Killed server with pid %d at http://localhost:%d' % (pid, port)]
+        print('Killed server with pid %d at http://localhost:%d' % (pid, port), file=sys.stderr)
       except (ValueError, OSError):
-        return []
+        pass

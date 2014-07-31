@@ -9,8 +9,7 @@ from abc import abstractproperty
 import os
 
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
-from pants.backend.core.tasks.task import Task, TaskBase
-from pants.backend.core.tasks.console_task import ConsoleTask
+from pants.backend.core.tasks.task import QuietTaskMixin, Task, TaskBase
 from pants.base.exceptions import TaskError
 from pants.java import util
 from pants.java.distribution.distribution import Distribution
@@ -115,7 +114,7 @@ class NailgunTask(NailgunTaskBase, Task):
   pass
 
 
-class NailgunKillall(ConsoleTask):
+class NailgunKillall(Task, QuietTaskMixin):
   """A task to manually kill nailguns."""
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):

@@ -9,10 +9,14 @@ import errno
 import sys
 from contextlib import contextmanager
 
-from pants.backend.core.tasks.task import Task
+from pants.backend.core.tasks.task import QuietTaskMixin, Task
 
 
-class ConsoleTask(Task):
+class ConsoleTask(Task, QuietTaskMixin):
+  """A task whose only job is to print information to the console.
+
+  ConsoleTasks are not intended to modify build state.
+  """
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
     option_group.add_option(mkflag("sep"), dest="console_%s_separator" % cls.__name__,

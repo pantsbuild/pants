@@ -405,7 +405,6 @@ python_library(
     pants('src/python/pants/java:util'),
     pants('src/python/pants/backend/jvm/tasks:jvm_tool_task_mixin'),
     pants('src/python/pants/backend/core/tasks:task'),
-    pants('src/python/pants/backend/core/tasks:console_task'),
   ],
 )
 

@@ -45,7 +45,7 @@ python_library(
     pants('src/python/pants/backend/jvm/tasks:nailgun_task'),
     pants('src/python/pants/reporting'),
     pants('src/python/pants/backend/core/tasks:common'),
-    pants('src/python/pants/backend/core/tasks:console_task'),
+    pants('src/python/pants/backend/core/tasks:task'),
     pants('src/python/pants/util:dirutil'),
   ],
 )

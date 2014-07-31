@@ -69,7 +69,7 @@ def initial_reporting(config, run_tracker):
 
   return report
 
-def update_reporting(options, is_console_task, run_tracker):
+def update_reporting(options, is_quiet_task, run_tracker):
   """Updates reporting config once we've parsed cmd-line flags."""
 
   # Get any output silently buffered in the old console reporter, and remove it.
@@ -85,7 +85,7 @@ def update_reporting(options, is_console_task, run_tracker):
   timing = options.time
   cache_stats = options.time  # TODO: Separate flag for this?
 
-  if options.quiet or is_console_task:
+  if options.quiet or is_quiet_task:
     console_reporter = QuietReporter(run_tracker,
                                      QuietReporter.Settings(log_level=log_level, color=color))
   else:
