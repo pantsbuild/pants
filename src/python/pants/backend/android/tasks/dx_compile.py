@@ -7,9 +7,9 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from pants.backend.android.targets.android_dex import AndroidDex
 from pants.backend.android.tasks.android_task import AndroidTask
-from pants.backend.android.distribution.android_distribution import AndroidDistribution
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
-
+from pants.base.exceptions import TaskError
+from pants.base.workunit import WorkUnit
 
 class DxCompile(NailgunTask, AndroidTask):
   """
@@ -31,10 +31,10 @@ class DxCompile(NailgunTask, AndroidTask):
     return self._CONFIG_SECTION
 
 
-  def execute(self, targets):
-    dx_targets = set()
-    for target in targets:
-      target.walk(lambda t: dx_targets.add(t),
-                  lambda t: isinstance(t, AndroidDex))
+  def execute(self):
+    safe_mkdir(self.workdir)
+
+    with self.context.new_workunit(name='jar-create', labels=[WorkUnit.MULTITOOL]):
+      for target in self.context.targets(is_jvm_library):
 
     #TODO check for empty class files there is no valid empty dex file.
