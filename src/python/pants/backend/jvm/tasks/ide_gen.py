@@ -141,14 +141,14 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
 
     self.checkstyle_bootstrap_key = 'checkstyle'
     checkstyle = context.config.getlist('checkstyle', 'bootstrap-tools',
-                                        default=[':twitter-checkstyle'])
+                                        default=['//:twitter-checkstyle'])
     self.register_jvm_tool(self.checkstyle_bootstrap_key, checkstyle)
 
     self.scalac_bootstrap_key = None
     if not self.skip_scala:
       self.scalac_bootstrap_key = 'scalac'
       scalac = context.config.getlist('scala-compile', 'compile-bootstrap-tools',
-                                      default=[':scala-compile-2.9.3'])
+                                      default=['//:scala-compiler-2.9.3'])
       self.register_jvm_tool(self.scalac_bootstrap_key, scalac)
 
   def prepare(self, round_manager):
