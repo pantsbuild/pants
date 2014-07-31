@@ -34,8 +34,16 @@ class GroupMember(TaskBase):
     and later execute over a chunk containing the target.
     """
 
+  def pre_execute(self):
+    """Called before preparing chunks for execution
+
+    Always called; even if no chunks are selected by this group member.
+    """
+
   def prepare_execute(self, chunks):
-    """Prepare to execute the group action across the given target chunks.
+    """Prepare to execute the group action across the given target chunks
+
+    Only called if chunks have been selected by this group member.
 
     Chunks are guaranteed to be presented in least dependent to most dependent order and to contain
     only directly or indirectly invalidated targets.
@@ -48,6 +56,8 @@ class GroupMember(TaskBase):
   def execute_chunk(self, targets):
     """Process the targets in this chunk.
 
+    Only called if chunks have been selected by this group member.
+
     This chunk or targets' dependencies are guaranteed to have been processed in a prior
     ``execute_chunk`` round by some group member - possibly this one.
 
@@ -55,7 +65,10 @@ class GroupMember(TaskBase):
     """
 
   def post_execute(self):
-    """Called when all invalid targets claimed by the group have been processed."""
+    """Called when all invalid targets claimed by the group have been processed.
+
+    Always called; even if no chunks are selected by this group member.
+    """
 
 
 class GroupIterator(object):
@@ -286,6 +299,9 @@ class GroupTask(Task):
 
   def execute(self):
     with self.context.new_workunit(name=self.group_name, labels=[WorkUnit.GROUP]):
+      for group_member in self._group_members:
+        group_member.pre_execute()
+
       # TODO(John Sirois): implement group-level invalidation? This might be able to be done in
       # prepare_execute though by members.
 

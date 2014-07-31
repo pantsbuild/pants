@@ -13,6 +13,7 @@ from pants.backend.core.targets.dependencies import Dependencies
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.python.targets.python_library import PythonLibrary
+from pants.base.target import Target
 from pants.engine.round_manager import RoundManager
 
 from pants_test.base_test import BaseTest
@@ -129,6 +130,9 @@ class BaseGroupTaskTest(BaseTest):
   def prepare_execute_action(self, tag, chunks):
     return 'prepare_execute', tag, chunks
 
+  def pre_execute_action(self, tag):
+    return 'pre_execute', tag
+
   def execute_chunk_action(self, tag, targets):
     return 'execute_chunk', tag, targets
 
@@ -149,6 +153,9 @@ class BaseGroupTaskTest(BaseTest):
 
       def prepare_execute(me, chunks):
         self.recorded_actions.append(self.prepare_execute_action(name, chunks))
+
+      def pre_execute(me):
+        self.recorded_actions.append(self.pre_execute_action(name))
 
       def execute_chunk(me, targets):
         self.recorded_actions.append(self.execute_chunk_action(name, targets))
@@ -171,7 +178,8 @@ class GroupTaskTest(BaseGroupTaskTest):
 
   def test_groups(self):
     # These items will be executed by GroupTask in order.
-    expected_prepare_actions = [self.construct_action('javac'),
+    expected_prepare_actions = [
+        self.construct_action('javac'),
         self.prepare_action('javac'),
         self.construct_action('scalac'),
         self.prepare_action('scalac')]
@@ -182,11 +190,13 @@ class GroupTaskTest(BaseGroupTaskTest):
     #
     # So we store these separately, to do a special comparison later on.
     expected_prepare_execute_actions = [
+        self.pre_execute_action('javac'),
+        self.pre_execute_action('scalac'),
         self.prepare_execute_action('javac', [[self.a], [self.c], [self.e]]),
-        self.prepare_execute_action('scalac', [[self.b], [self.d]])
-    ]
+        self.prepare_execute_action('scalac', [[self.b], [self.d]])]
 
-    expected_execute_actions = [self.execute_chunk_action('javac', targets=[self.a]),
+    expected_execute_actions = [
+        self.execute_chunk_action('javac', targets=[self.a]),
         self.execute_chunk_action('scalac', targets=[self.b]),
         self.execute_chunk_action('javac', targets=[self.c]),
         self.execute_chunk_action('scalac', targets=[self.d]),
@@ -197,18 +207,49 @@ class GroupTaskTest(BaseGroupTaskTest):
     recorded_iter = iter(self.recorded_actions)
 
     # Now, we compare the list of actions executed, with what we expected, in chunks. We first peel
-    # off the first 4 items from what was executed, and compare with the "expected_prepare_actions"
-    # list.
+    # off the expected number of prepare actions from what was executed, and compare with the
+    # "expected_prepare_actions" list.
     actual_prepare_actions = list(itertools.islice(recorded_iter, len(expected_prepare_actions)))
     self.assertEqual(expected_prepare_actions, actual_prepare_actions)
 
-    # Next, we slice off the next two elements from the array, store them separately, sort both the
-    # recorded elements and the expected elements, and compare.
-    actual_prepare_execute_actions = list(itertools.islice(recorded_iter, len(expected_prepare_execute_actions)))
-    self.assertEqual(sorted(expected_prepare_execute_actions), sorted(actual_prepare_execute_actions))
+    # Next, we slice off the number of prepare execute actions from the array, store them
+    # separately, sort both the recorded elements and the expected elements, and compare.
+    actual_prepare_execute_actions = list(itertools.islice(recorded_iter,
+                                                           len(expected_prepare_execute_actions)))
+    self.assertEqual(sorted(expected_prepare_execute_actions),
+                     sorted(actual_prepare_execute_actions))
 
     # Finally, compare the remaining items.
     self.assertEqual(expected_execute_actions, list(recorded_iter))
+
+
+class EmptyGroupTaskTest(BaseGroupTaskTest):
+  def create_targets(self):
+    self.a = self.make_target('src/java:a', Target)
+    self.b = self.make_target('src/scala:b', Target, dependencies=[self.a])
+    return [self.a]
+
+  def test_groups(self):
+    # These items will be executed by GroupTask in order.
+    expected_prepare_actions = [
+        self.construct_action('javac'),
+        self.prepare_action('javac'),
+        self.construct_action('scalac'),
+        self.prepare_action('scalac')]
+
+    # The ordering of the execution of these items isn't guaranteed.
+    expected_prepare_execute_actions = [
+        self.pre_execute_action('javac'),
+        self.pre_execute_action('scalac'),
+        self.post_execute_action('javac'),
+        self.post_execute_action('scalac')]
+
+    recorded_iter = iter(self.recorded_actions)
+
+    actual_prepare_actions = list(itertools.islice(recorded_iter, len(expected_prepare_actions)))
+    self.assertEqual(expected_prepare_actions, actual_prepare_actions)
+
+    self.assertEqual(sorted(expected_prepare_execute_actions), sorted(list(recorded_iter)))
 
 
 class TransitiveGroupTaskTest(BaseGroupTaskTest):
@@ -220,7 +261,8 @@ class TransitiveGroupTaskTest(BaseGroupTaskTest):
     return [self.d]
 
   def test_transitive_groups(self):
-    expected_execute_actions = [self.execute_chunk_action('scalac', targets=[self.a]),
+    expected_execute_actions = [
+        self.execute_chunk_action('scalac', targets=[self.a]),
         self.execute_chunk_action('javac', targets=[self.c]),
         self.execute_chunk_action('scalac', targets=[self.d]),
         self.post_execute_action('javac'),
@@ -228,6 +270,6 @@ class TransitiveGroupTaskTest(BaseGroupTaskTest):
 
     recorded = self.recorded_actions
 
-    # expecting construct/prepare for java/scalac, then prepare_execute for javac/scalac: ignore 6
-    # Finally, compare the remaining items.
-    self.assertEqual(expected_execute_actions, recorded[6:])
+    # expecting construct/prepare for java/scalac, then pre-execute/prepare_execute for
+    # javac/scalac: ignore 8 Finally, compare the remaining items.
+    self.assertEqual(expected_execute_actions, recorded[8:])
