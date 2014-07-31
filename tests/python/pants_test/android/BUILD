@@ -5,17 +5,19 @@
 python_test_suite(
   name = 'android',
   dependencies = [
-    pants(':android_distribution'),
+    ':android_distribution',
   ]
 )
 
 python_tests(
   name = 'android_distribution',
-  sources = 'test_android_distribution.py',
+  sources = [
+    'test_android_distribution.py',
+  ],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.collections'),
-    pants('src/python/pants/backend/android:android_distribution'),
-    pants('src/python/pants/util:contextutil'),
-    pants('src/python/pants/util:dirutil'),
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    'src/python/pants/backend/android:android_distribution',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
   ]
 )

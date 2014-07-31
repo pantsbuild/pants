@@ -10,6 +10,7 @@ from twitter.common.lang import Compatibility
 
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.exceptions import TargetDefinitionException
+from pants.base.validation import assert_list
 
 
 class JavaTests(JvmTarget):
@@ -34,7 +35,7 @@ class JavaTests(JvmTarget):
       file resources to place in this module's jar.
     :param exclusives: An optional map of exclusives tags. See CheckExclusives for details.
    """
-    _sources = maybe_list(sources or [], expected_type=Compatibility.string)
+    _sources = self.assert_list(sources)
 
     super(JavaTests, self).__init__(sources=_sources, **kwargs)
 

@@ -9,6 +9,7 @@ from pants.backend.jvm.scala.target_platform import TargetPlatform
 from pants.backend.jvm.targets.exportable_jvm_library import ExportableJvmLibrary
 from pants.base.address import SyntheticAddress
 from pants.base.exceptions import TargetDefinitionException
+from pants.base.validation import assert_list
 
 
 class ScalaLibrary(ExportableJvmLibrary):
@@ -46,7 +47,7 @@ class ScalaLibrary(ExportableJvmLibrary):
       targets containing resources that belong on this library's classpath.
     :param exclusives: An optional list of exclusives tags.
     """
-    self._java_sources_specs = java_sources or []
+    self._java_sources_specs = self.assert_list(java_sources)
     super(ScalaLibrary, self).__init__(**kwargs)
     self.add_labels('scala')
 

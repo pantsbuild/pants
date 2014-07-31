@@ -9,11 +9,11 @@ from abc import abstractmethod
 import os
 from hashlib import sha1
 
-from twitter.common.collections import maybe_list, OrderedSet
-from twitter.common.lang import AbstractClass, Compatibility
+from twitter.common.collections import OrderedSet
+from twitter.common.lang import AbstractClass
 
 from pants.base.build_environment import get_buildroot
-
+from pants.base.validation import assert_list
 
 def hash_sources(root_path, rel_path, sources):
   hasher = sha1()
@@ -55,7 +55,7 @@ class Payload(AbstractClass):
 class SourcesPayload(Payload):
   def __init__(self, sources_rel_path, sources):
     self.sources_rel_path = sources_rel_path
-    self.sources = maybe_list(sources or [], expected_type=Compatibility.string)
+    self.sources = assert_list(sources)
     self.excludes = OrderedSet()
 
   @property
@@ -102,7 +102,7 @@ class JvmTargetPayload(SourcesPayload):
                provides=None,
                excludes=None,
                configurations=None):
-    super(JvmTargetPayload, self).__init__(sources_rel_path, sources)
+    super(JvmTargetPayload, self).__init__(sources_rel_path, assert_list(sources))
     self.provides = provides
     self.excludes = OrderedSet(excludes)
     self.configurations = OrderedSet(configurations)
@@ -205,4 +205,3 @@ class PythonRequirementLibraryPayload(Payload):
     hasher = sha1()
     hasher.update(bytes(hash(tuple(self.requirements))))
     return hasher.hexdigest()
-

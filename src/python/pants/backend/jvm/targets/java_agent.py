@@ -8,6 +8,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 from twitter.common.lang import Compatibility
 
 from pants.base.exceptions import TargetDefinitionException
+from pants.base.validation import assert_list
 from pants.backend.jvm.targets.java_library import JavaLibrary
 
 
@@ -55,10 +56,10 @@ class JavaAgent(JavaLibrary):
 
     super(JavaAgent, self).__init__(
         name=name,
-        sources=sources,
+        sources=self.assert_list(sources),
         provides=None,
-        excludes=excludes,
-        resources=resources,
+        excludes=self.assert_list(excludes),
+        resources=self.assert_list(resources),
         exclusives=exclusives,
         **kwargs)
 
