@@ -33,17 +33,17 @@ class NailgunExecutor(Executor):
   re-used for the given jvm args and classpath on subsequent runs.
   """
 
-  class Endpoint(namedtuple('Endpoint', ['fingerprint', 'pid', 'port'])):
+  class Endpoint(namedtuple('Endpoint', ['exe', 'fingerprint', 'pid', 'port'])):
     """The coordinates for a nailgun server controlled by NailgunExecutor."""
 
     @classmethod
     def parse(cls, endpoint):
-      """Parses an endpoint from a string of the form fingerprint:pid:port"""
+      """Parses an endpoint from a string of the form exe:fingerprint:pid:port"""
       components = endpoint.split(':')
-      if len(components) != 3:
+      if len(components) != 4:
         raise ValueError('Invalid endpoint spec %s' % endpoint)
-      fingerprint, pid, port = components
-      return cls(fingerprint, int(pid), int(port))
+      exe, fingerprint, pid, port = components
+      return cls(exe, fingerprint, int(pid), int(port))
 
   # Used to identify we own a given java nailgun server
   _PANTS_NG_ARG_PREFIX = b'-Dpants.buildroot'
@@ -135,8 +135,9 @@ class NailgunExecutor(Executor):
         if owner_arg in proc.cmdline:
           fingerprint = cls.parse_fingerprint_arg(proc.cmdline)
           port = cls._find_ng_listen_port(proc)
+          exe = proc.cmdline[0]
           if fingerprint and port:
-            return cls.Endpoint(fingerprint, proc.pid, port)
+            return cls.Endpoint(exe, fingerprint, proc.pid, port)
       except (psutil.AccessDenied, psutil.NoSuchProcess):
         pass
     return None
@@ -145,7 +146,6 @@ class NailgunExecutor(Executor):
     super(NailgunExecutor, self).__init__(distribution=distribution)
 
     self._nailgun_classpath = maybe_list(nailgun_classpath)
-
     if not isinstance(workdir, Compatibility.string):
       raise ValueError('Workdir must be a path string, given %s' % workdir)
 
@@ -194,7 +194,7 @@ class NailgunExecutor(Executor):
   def _get_nailgun_endpoint(self):
     endpoint = self._find(self._workdir)
     if endpoint:
-      log.debug('Found ng server with fingerprint %s @ pid:%d port:%d' % endpoint)
+      log.debug('Found ng server launched with %s fingerprint %s @ pid:%d port:%d' % endpoint)
     return endpoint
 
   def _get_nailgun_client(self, jvm_args, classpath, stdout, stderr):
@@ -204,11 +204,12 @@ class NailgunExecutor(Executor):
     endpoint = self._get_nailgun_endpoint()
     running = endpoint and self._check_pid(endpoint.pid)
     updated = endpoint and endpoint.fingerprint != new_fingerprint
+    updated = updated or (endpoint and endpoint.exe != self._distribution.java)
     if running and not updated:
       return self._create_ngclient(endpoint.port, stdout, stderr)
     else:
       if running and updated:
-        log.debug('Killing ng server with fingerprint %s @ pid:%d port:%d' % endpoint)
+        log.debug('Killing ng server launched with %s fingerprint %s @ pid:%d port:%d' % endpoint)
         self.kill()
       return self._spawn_nailgun_server(new_fingerprint, jvm_args, classpath, stdout, stderr)
 
@@ -250,7 +251,7 @@ class NailgunExecutor(Executor):
         sock.close()
         endpoint = self._get_nailgun_endpoint()
         if endpoint:
-          log.debug('Connected to ng server with fingerprint %s pid: %d @ port: %d' % endpoint)
+          log.debug('Connected to ng server launched with %s fingerprint %s pid: %d @ port: %d' % endpoint)
         else:
           raise NailgunClient.NailgunError('Failed to connect to ng server.')
         return nailgun
