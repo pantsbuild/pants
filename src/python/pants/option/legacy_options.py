@@ -58,7 +58,7 @@ class LegacyOptions(object):
           if self._scope_prefix == '':
             optparse_args.append(arg)
           else:
-            raise LegacyOptionsError('Short legacy options only allowed at global scope.')
+            raise LegacyOptionsError('Short legacy options only allowed at global scope: %s' % arg)
 
       optparse_kwargs['dest'] = legacy_dest
 

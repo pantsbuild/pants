@@ -102,6 +102,7 @@ python_test_suite(
     pants('tests/python/pants_test/fs'),
     pants('tests/python/pants_test/java'),
     pants('tests/python/pants_test/net'),
+    pants('tests/python/pants_test/option'),
     pants('tests/python/pants_test/process'),
     pants('tests/python/pants_test/python'),
     pants('tests/python/pants_test/reporting'),

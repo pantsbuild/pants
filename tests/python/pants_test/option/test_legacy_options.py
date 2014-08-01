@@ -17,12 +17,12 @@ class LegacyOptionsTest(unittest.TestCase):
   def test_registration(self):
     optparser = optparse.OptionParser()
     legacy_options = LegacyOptions('compile.java', optparser)
-    legacy_options.register('--foo', { 'action': 'store_true' }, 'compile_java_foo')
-    legacy_options.register('--bar', { 'type': long }, 'compile_java_bar')
-    legacy_options.register('--baz', { 'choices': ['xx', 'yy', 'zz'] }, 'compile_java_baz')
-    legacy_options.register('--qux', { 'type': int, 'choices': [1, 2, 3], 'action': 'append' },
+    legacy_options.register(['--foo'], { 'action': 'store_true' }, 'compile_java_foo')
+    legacy_options.register(['--bar'], { 'type': long }, 'compile_java_bar')
+    legacy_options.register(['--baz'], { 'choices': ['xx', 'yy', 'zz'] }, 'compile_java_baz')
+    legacy_options.register(['--qux'], { 'type': int, 'choices': [1, 2, 3], 'action': 'append' },
                             'compile_java_qux')
-    legacy_options.register('--corge', { 'type': int, 'default': 55 } ,
+    legacy_options.register(['--corge'], { 'type': int, 'default': 55 } ,
                             'compile_java_corge')
 
     args = shlex.split(str('--compile-java-foo --compile-java-bar=33 --compile-java-baz=xx '
