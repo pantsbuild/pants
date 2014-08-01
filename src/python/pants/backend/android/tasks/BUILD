@@ -35,3 +35,18 @@ python_library(
     pants('src/python/pants/base:exceptions'),
   ],
 )
+
+python_library(
+  name = 'dx_compile',
+  sources = ['dx_compile.py'],
+  dependencies = [
+    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
+    pants('src/python/pants/backend/android/targets:android'),
+    pants('src/python/pants/backend/android/tasks:android_task'),
+    pants('src/python/pants/backend/core/tasks:common'),
+    pants('src/python/pants/backend/jvm/targets:java'),
+    pants('src/python/pants/base:address'),
+    pants('src/python/pants/base:exceptions'),
+    pants('src/python/pants/base:work_unit'),
+  ],
+)
