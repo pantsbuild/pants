@@ -118,6 +118,21 @@ case class IncOptions(
   recompileOnMacroDef: Boolean   = DefaultIncOptions.recompileOnMacroDef,
   nameHashing: Boolean           = DefaultIncOptions.nameHashing
 ) {
+  @deprecated("Use the primary constructor instead.", "0.3.5.2")
+  def this(
+    transitiveStep: Int,
+    recompileAllFraction: Double,
+    relationsDebug: Boolean,
+    apiDebug: Boolean,
+    apiDiffContextSize: Int,
+    apiDumpDirectory: Option[File],
+    transactional: Boolean,
+    backup: Option[File]
+  ) = {
+    this(transitiveStep, recompileAllFraction, relationsDebug, apiDebug, apiDiffContextSize,
+      apiDumpDirectory, transactional, backup, DefaultIncOptions.recompileOnMacroDef,
+      DefaultIncOptions.nameHashing)
+  }
   def options: sbt.inc.IncOptions = {
     sbt.inc.IncOptions(
       transitiveStep,
