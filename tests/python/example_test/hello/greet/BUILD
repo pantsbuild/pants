@@ -5,7 +5,7 @@
 
 python_tests(name='greet',
   dependencies=[
-    pants('src/python/example/hello/greet:greet'),
+    'src/python/example/hello/greet:greet',
   ],
   sources=globs('*.py'),
 )

@@ -4,6 +4,6 @@
 python_test_suite(
   name = 'backend',
   dependencies = [
-    pants('tests/python/pants_test/backend/core'),
+    'tests/python/pants_test/backend/core',
   ]
 )

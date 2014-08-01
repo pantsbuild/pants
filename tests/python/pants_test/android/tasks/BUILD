@@ -4,7 +4,7 @@
 python_test_suite(
   name = 'tasks',
   dependencies = [
-    pants(':aapt_gen'),
+    ':aapt_gen',
   ],
 )
 
@@ -12,6 +12,6 @@ python_tests(
   name = 'aapt_gen',
   sources = 'test_aapt_gen.py',
   dependencies = [
-    pants('src/python/pants/backend/android/tasks:all'),
+    'src/python/pants/backend/android/tasks:all',
   ],
 )

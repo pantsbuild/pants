@@ -6,6 +6,6 @@
 java_thrift_library(name='precipitation-java',
   sources=['precipitation.thrift'],
   dependencies=[
-    pants('src/thrift/com/pants/examples/distance:distance-java'),
+    'src/thrift/com/pants/examples/distance:distance-java',
   ],
 )

@@ -4,7 +4,7 @@
 python_test_suite(
   name = 'scm',
   dependencies = [
-    pants(':test_git'),
+    ':test_git',
   ]
 )
 
@@ -12,9 +12,9 @@ python_tests(
   name = 'test_git',
   sources = ['test_git.py'],
   dependencies = [
-    pants('src/python/pants/scm'),
-    pants('src/python/pants/scm:git'),
-    pants('src/python/pants/util:contextutil'),
-    pants('src/python/pants/util:dirutil'),
+    'src/python/pants/scm',
+    'src/python/pants/scm:git',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
   ]
 )

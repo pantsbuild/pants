@@ -5,7 +5,7 @@
 
 python_binary(name='main',
   dependencies=[
-    pants('src/python/example/hello/greet:greet'),
+    'src/python/example/hello/greet:greet',
   ],
   source='main.py',
 )

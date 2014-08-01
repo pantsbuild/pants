@@ -3,5 +3,5 @@
 
 java_library(name='javasources',
   sources=rglobs('*.java'),
-  dependencies=[pants('src/scala/com/pants/testproject/javasources')]
+  dependencies=['src/scala/com/pants/testproject/javasources']
 )

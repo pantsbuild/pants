@@ -7,8 +7,8 @@ annotation_processor(name='processor',
   sources=['ExampleProcessor.java'],
   processors=['com.pants.examples.annotation.processor.ExampleProcessor'],
   dependencies=[
-    pants('src/java/com/pants/examples/annotation/example'),
-    pants('3rdparty:guava'),
+    'src/java/com/pants/examples/annotation/example',
+    '3rdparty:guava',
   ],
 )
 

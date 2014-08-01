@@ -5,43 +5,43 @@ python_library(
   name = 'context_utils',
   sources = ['context_utils.py'],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.collections'),
-    pants('3rdparty/python/twitter/commons:twitter.common.lang'),
-    pants('src/python/pants/base:config'),
-    pants('src/python/pants/base:target'),
-    pants('src/python/pants/goal:context'),
-    pants('src/python/pants/goal:run_tracker'),
-    pants('src/python/pants/reporting'),
-    pants('src/python/pants/util:dirutil'),
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python/twitter/commons:twitter.common.lang',
+    'src/python/pants/base:config',
+    'src/python/pants/base:target',
+    'src/python/pants/goal:context',
+    'src/python/pants/goal:run_tracker',
+    'src/python/pants/reporting',
+    'src/python/pants/util:dirutil',
   ]
 )
 
 python_test_suite(
   name = 'all',
   dependencies = [
-    pants(':base'),
+    ':base',
   ],
 )
 
 python_test_suite(
   name = 'base',
   dependencies = [
-    pants(':abbreviate_target_ids'),
-    pants(':address'),
-    pants(':build_configuration'),
-    pants(':build_file'),
-    pants(':build_file_aliases'),
-    pants(':build_file_parser'),
-    pants(':build_invalidator'),
-    pants(':build_root'),
-    pants(':cmd_line_spec_parser'),
-    pants(':dev_backend_loader'),
-    pants(':double_dag'),
-    pants(':generator'),
-    pants(':hash_utils'),
-    pants(':payload'),
-    pants(':revision'),
-    pants(':run_info'),
+    ':abbreviate_target_ids',
+    ':address',
+    ':build_configuration',
+    ':build_file',
+    ':build_file_aliases',
+    ':build_file_parser',
+    ':build_invalidator',
+    ':build_root',
+    ':cmd_line_spec_parser',
+    ':dev_backend_loader',
+    ':double_dag',
+    ':generator',
+    ':hash_utils',
+    ':payload',
+    ':revision',
+    ':run_info',
   ]
 )
 
@@ -49,8 +49,8 @@ python_tests(
   name = 'abbreviate_target_ids',
   sources = ['test_abbreviate_target_ids.py'],
   dependencies = [
-    pants('src/python/pants/base:abbreviate_target_ids'),
-    pants('tests/python/pants_test:base_test'),
+    'src/python/pants/base:abbreviate_target_ids',
+    'tests/python/pants_test:base_test',
   ]
 )
 
@@ -58,11 +58,11 @@ python_tests(
   name = 'address',
   sources = ['test_address.py'],
   dependencies = [
-    pants('src/python/pants/base:address'),
-    pants('src/python/pants/base:build_root'),
-    pants('tests/python/pants_test:base_test'),
-    pants('src/python/pants/util:contextutil'),
-    pants('src/python/pants/util:dirutil'),
+    'src/python/pants/base:address',
+    'src/python/pants/base:build_root',
+    'tests/python/pants_test:base_test',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
   ]
 )
 
@@ -70,14 +70,14 @@ python_tests(
   name = 'build_configuration',
   sources = ['test_build_configuration.py'],
   dependencies = [
-    pants('src/python/pants/base:address'),
-    pants('src/python/pants/base:build_configuration'),
-    pants('src/python/pants/base:build_file'),
-    pants('src/python/pants/base:build_file_aliases'),
-    pants('src/python/pants/base:build_graph'),
-    pants('src/python/pants/base:target'),
-    pants('src/python/pants/util:contextutil'),
-    pants('src/python/pants/util:dirutil'),
+    'src/python/pants/base:address',
+    'src/python/pants/base:build_configuration',
+    'src/python/pants/base:build_file',
+    'src/python/pants/base:build_file_aliases',
+    'src/python/pants/base:build_graph',
+    'src/python/pants/base:target',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
   ]
 )
 
@@ -85,10 +85,10 @@ python_tests(
   name = 'build_file',
   sources = ['test_build_file.py'],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.collections'),
-    pants('src/python/pants/base:build_file'),
-    pants('tests/python/pants_test:base_test'),
-    pants('src/python/pants/util:dirutil'),
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    'src/python/pants/base:build_file',
+    'tests/python/pants_test:base_test',
+    'src/python/pants/util:dirutil',
   ]
 )
 
@@ -96,8 +96,8 @@ python_tests(
   name = 'build_file_aliases',
   sources = ['test_build_file_aliases.py'],
   dependencies = [
-    pants('src/python/pants/base:build_file_aliases'),
-    pants('src/python/pants/base:target'),
+    'src/python/pants/base:build_file_aliases',
+    'src/python/pants/base:target',
   ]
 )
 
@@ -106,13 +106,13 @@ python_tests(
   name = 'build_file_parser',
   sources = ['test_build_file_parser.py'],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.collections'),
-    pants('src/python/pants/base:build_file'),
-    pants('src/python/pants/backend/jvm/targets:java'),
-    pants('src/python/pants/backend/jvm/targets:jvm'),
-    pants('src/python/pants/backend/jvm/targets:scala'),
-    pants('tests/python/pants_test:base_test'),
-    pants('src/python/pants/util:dirutil'),
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    'src/python/pants/base:build_file',
+    'src/python/pants/backend/jvm/targets:java',
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/targets:scala',
+    'tests/python/pants_test:base_test',
+    'src/python/pants/util:dirutil',
   ]
 )
 
@@ -120,9 +120,9 @@ python_tests(
   name = 'build_invalidator',
   sources = ['test_build_invalidator.py'],
   dependencies = [
-    pants('src/python/pants/base:build_invalidator'),
-    pants('src/python/pants/util:contextutil'),
-    pants('tests/python/pants_test:base_test'),
+    'src/python/pants/base:build_invalidator',
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test:base_test',
   ]
 )
 
@@ -130,10 +130,10 @@ python_tests(
   name = 'build_root',
   sources = ['test_build_root.py'],
   dependencies = [
-    pants('src/python/pants/base:build_root'),
-    pants('tests/python/pants_test:base_test'),
-    pants('src/python/pants/util:contextutil'),
-    pants('src/python/pants/util:dirutil'),
+    'src/python/pants/base:build_root',
+    'tests/python/pants_test:base_test',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
   ]
 )
 
@@ -141,10 +141,10 @@ python_tests(
   name = 'cmd_line_spec_parser',
   sources = ['test_cmd_line_spec_parser.py'],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.collections'),
-    pants('src/python/pants/base:build_file_aliases'),
-    pants('src/python/pants/base:cmd_line_spec_parser'),
-    pants('tests/python/pants_test:base_test'),
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    'src/python/pants/base:build_file_aliases',
+    'src/python/pants/base:cmd_line_spec_parser',
+    'tests/python/pants_test:base_test',
   ]
 )
 
@@ -152,13 +152,13 @@ python_tests(
   name = 'dev_backend_loader',
   sources = ['test_dev_backend_loader.py'],
   dependencies = [
-    pants('src/python/pants/base:build_configuration'),
-    pants('src/python/pants/base:build_file_aliases'),
-    pants('src/python/pants/base:dev_backend_loader'),
-    pants('src/python/pants/base:exceptions'),
-    pants('src/python/pants/base:target'),
-    pants('src/python/pants/goal'),
-    pants('src/python/pants/goal:phase'),
+    'src/python/pants/base:build_configuration',
+    'src/python/pants/base:build_file_aliases',
+    'src/python/pants/base:dev_backend_loader',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/base:target',
+    'src/python/pants/goal',
+    'src/python/pants/goal:phase',
   ]
 )
 
@@ -166,10 +166,10 @@ python_tests(
   name = 'double_dag',
   sources = ['test_double_dag.py'],
   dependencies = [
-    pants('src/python/pants/base:double_dag'),
-    pants('src/python/pants/reporting'),
-    pants('tests/python/pants_test:base_test'),
-    pants('tests/python/pants_test/testutils'),
+    'src/python/pants/base:double_dag',
+    'src/python/pants/reporting',
+    'tests/python/pants_test:base_test',
+    'tests/python/pants_test/testutils',
   ]
 )
 
@@ -177,8 +177,8 @@ python_tests(
   name = 'generator',
   sources = ['test_generator.py'],
   dependencies = [
-    pants('src/python/pants/base:generator'),
-    pants('tests/python/pants_test:base_test'),
+    'src/python/pants/base:generator',
+    'tests/python/pants_test:base_test',
   ]
 )
 
@@ -186,10 +186,10 @@ python_tests(
   name = 'hash_utils',
   sources = ['test_hash_utils.py'],
   dependencies = [
-    pants('3rdparty/python:mox'),
-    pants('src/python/pants/base:hash_utils'),
-    pants('src/python/pants/util:contextutil'),
-    pants('tests/python/pants_test:base_test'),
+    '3rdparty/python:mox',
+    'src/python/pants/base:hash_utils',
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test:base_test',
   ]
 )
 
@@ -197,10 +197,10 @@ python_tests(
   name = 'payload',
   sources = ['test_payload.py'],
   dependencies = [
-    pants('src/python/pants/backend/core'),
-    pants('src/python/pants/base:build_file_aliases'),
-    pants('src/python/pants/base:payload'),
-    pants('tests/python/pants_test:base_test'),
+    'src/python/pants/backend/core',
+    'src/python/pants/base:build_file_aliases',
+    'src/python/pants/base:payload',
+    'tests/python/pants_test:base_test',
   ]
 )
 
@@ -208,8 +208,8 @@ python_tests(
   name = 'revision',
   sources = ['test_revision.py'],
   dependencies = [
-    pants('src/python/pants/base:revision'),
-    pants('tests/python/pants_test:base_test'),
+    'src/python/pants/base:revision',
+    'tests/python/pants_test:base_test',
   ]
 )
 
@@ -217,8 +217,8 @@ python_tests(
   name = 'run_info',
   sources = ['test_run_info.py'],
   dependencies = [
-    pants('src/python/pants/base:run_info'),
-    pants('src/python/pants/util:contextutil'),
-    pants('tests/python/pants_test:base_test'),
+    'src/python/pants/base:run_info',
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test:base_test',
   ]
 )

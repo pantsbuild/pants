@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 # This BUILD file defines common external library dependencies used across many modules.  Modules
-# can use these jar_library deps by specifying pants('3rdparty:[name]') in their dependencies list.
+# can use these jar_library deps by specifying '3rdparty:[name]' in their dependencies list.
 
 ###################
 # Production libs
@@ -22,7 +22,7 @@ jar_library(name='checkstyle',
             ],
             dependencies = [
               # Needs this as the replacement for the excluded google-collections.
-              pants(':guava'),
+              ':guava',
             ],
            )
 
@@ -48,7 +48,7 @@ jar_library(name='finagle-core',
                 .with_sources(),
             ],
             dependencies = [
-              pants(':util-core')
+              ':util-core'
             ])
 
 jar_library(name='finagle-thrift',
@@ -71,7 +71,7 @@ jar_library(name='guava',
               jar(org='javax.inject', name='javax.inject', rev='1').with_sources(),
             ],
             dependencies = [
-              pants(':jsr305'),
+              ':jsr305',
             ],
            )
 
@@ -94,7 +94,7 @@ jar_library(name='protobuf-2.4.1',
 
 jar_library(name='protobuf-java',
             dependencies = [
-              pants(':protobuf-2.4.1')
+              ':protobuf-2.4.1'
             ])
 
 jar_library(name='protobuf-test-import',
@@ -142,25 +142,25 @@ jar_library(name='libthrift-0.5.0',
 
 jar_library(name='thrift-0.5.0',
             dependencies = [
-              pants(':commons-lang'),
-              pants(':libthrift-0.5.0'),
-              pants(':slf4j-api'),
+              ':commons-lang',
+              ':libthrift-0.5.0',
+              ':slf4j-api',
             ]
            )
 
 jar_library(name='thrift-0.5.0-finagle',
             dependencies = [
-              pants(':thrift-0.5.0'),
+              ':thrift-0.5.0',
 
               # finagle thrift extra deps
-              pants(':finagle-core'),
-              pants(':finagle-thrift'),
-              pants(':util-core'),
+              ':finagle-core',
+              ':finagle-thrift',
+              ':util-core',
             ]
            )
 
 jar_library(name='thrift',
-            dependencies = [ pants(':thrift-0.5.0') ])
+            dependencies = [ ':thrift-0.5.0' ])
 
 # common rev for all com.twitter%util* artifacts
 UTIL_REV = '6.8.1'
@@ -182,7 +182,7 @@ jar_library(name='junit',
               jar(org='junit', name='junit-dep', rev='4.11').with_sources(),
             ],
             dependencies = [
-              pants(':hamcrest-core'),
+              ':hamcrest-core',
             ],
            )
 
@@ -192,4 +192,4 @@ jar_library(name='specs_2.9',
             ]
            )
 
-jar_library(name='specs', dependencies = [ pants(':specs_2.9') ])
+jar_library(name='specs', dependencies = [ ':specs_2.9' ])

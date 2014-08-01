@@ -5,7 +5,7 @@
 
 scala_library(name='welcome',
   dependencies=[
-    pants('src/java/com/pants/examples/hello/greet:greet'),
+    'src/java/com/pants/examples/hello/greet:greet',
   ],
   sources=globs('*.scala'),
   resources = [
