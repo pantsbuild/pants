@@ -46,6 +46,9 @@ class BuildFileAliases(namedtuple('BuildFileAliases',
     # That loses the __doc__, thus messing up the BUILD dictionary.
     wrapper = lambda ctx: functools.partial(wrappee, ctx)
     wrapper.__doc__ = wrappee.__doc__
+    wrapper.__name__ = str(".".join(["curry_context",
+                                     wrappee.__module__,
+                                     wrappee.__name__]))
     return wrapper
 
   def merge(self, other):

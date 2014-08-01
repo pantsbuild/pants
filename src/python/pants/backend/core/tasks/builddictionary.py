@@ -234,6 +234,15 @@ def sub_tocl(d, substr_list, title):
     filtered_anchors.append(anc)
   return TemplateData(t=title, e=filtered_anchors)
 
+
+def jvm_sub_tocl(d):
+  return sub_tocl(d, ["android", "jvm", "backend.core", "java", "scala"], "JVM")
+
+
+def python_sub_tocl(d):
+  return sub_tocl(d, ["backend.python", "core"], "Python")
+
+
 def gen_goals_glopts_reference_data():
   global_option_parser = optparse.OptionParser(add_help_option=False)
   add_global_options(global_option_parser)
@@ -348,9 +357,8 @@ class BuildBuildDictionary(Task):
     """Generate the BUILD dictionary reference rst doc."""
     d = assemble(build_file_parser=self.context.build_file_parser)
     template = resource_string(__name__, os.path.join(self._templates_dir, 'page.mustache'))
-    tocs = [tocl(d),
-            sub_tocl(d, ["android", "jvm", "backend.core", "java", "scala"], "JVM"),
-            sub_tocl(d, ["backend.python", "core"], "Python")]
+    tocs = [tocl(d), jvm_sub_tocl(d), python_sub_tocl(d)]
+
     defns = [d[t]["defn"] for t in sorted(d.keys(), key=_lower)]
     filename = os.path.join(self._outdir, 'build_dictionary.rst')
     self.context.log.info('Generating %s' % filename)
