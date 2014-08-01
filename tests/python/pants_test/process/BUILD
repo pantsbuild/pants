@@ -5,7 +5,7 @@ python_tests(
   name = 'process',
   sources = globs('*.py'),
   dependencies = [
-    pants('3rdparty/python:mox'),
-    pants('src/python/pants/process'),
+    '3rdparty/python:mox',
+    'src/python/pants/process',
   ]
 )

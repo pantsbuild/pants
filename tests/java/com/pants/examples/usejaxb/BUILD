@@ -6,8 +6,8 @@
 junit_tests(name='usejaxb',
   sources=['UseJaxbTest.java',],
   dependencies=[
-    pants('3rdparty:junit'),
-    pants('src/java/com/pants/examples/jaxb/reader'),
-    pants('src/resources/com/pants/example/names'),
+    '3rdparty:junit',
+    'src/java/com/pants/examples/jaxb/reader',
+    'src/resources/com/pants/example/names',
   ],
 )

@@ -16,10 +16,10 @@ jvm_app(name='main',
 
 jvm_binary(name = 'main-bin',
   dependencies = [
-    pants('src/java/com/pants/examples/hello/greet'),
+    'src/java/com/pants/examples/hello/greet',
   ],
   resources=[
-    pants('src/resources/com/pants/example/hello'),
+    'src/resources/com/pants/example/hello',
   ],
   source = 'HelloMain.java',
   main = 'com.pants.examples.hello.main.HelloMain',

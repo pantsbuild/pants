@@ -3,7 +3,7 @@
 
 java_library(name='javadepsonscala',
   dependencies = [
-    pants('src/scala/com/pants/testproject/javadepsonscala')
+    'src/scala/com/pants/testproject/javadepsonscala'
   ],
   sources=rglobs('*.java')
 )

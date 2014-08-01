@@ -5,31 +5,31 @@ python_library(
   name = 'plugin',
   sources = ['__init__.py', 'register.py'],
   dependencies = [
-    pants('src/python/pants/base:build_file_aliases'),
-    pants('src/python/pants/backend/python/commands:pants_old'),
-    pants('src/python/pants/backend/python/targets:python'),
-    pants('src/python/pants/backend/python/tasks:python'),
-    pants(':all_utils'),
+    'src/python/pants/base:build_file_aliases',
+    'src/python/pants/backend/python/commands:pants_old',
+    'src/python/pants/backend/python/targets:python',
+    'src/python/pants/backend/python/tasks:python',
+    ':all_utils',
   ]
 )
 
 python_library(
   name = 'all_utils',
   dependencies = [
-    pants(':python_setup'),
-    pants(':antlr_builder'),
-    pants(':binary_builder'),
-    pants(':code_generator'),
-    pants(':interpreter_cache'),
-    pants(':python_artifact'),
-    pants(':python_builder'),
-    pants(':python_chroot'),
-    pants(':python_requirement'),
-    pants(':python_requirements'),
-    pants(':resolver'),
-    pants(':sdist_builder'),
-    pants(':test_builder'),
-    pants(':thrift_builder'),
+    ':python_setup',
+    ':antlr_builder',
+    ':binary_builder',
+    ':code_generator',
+    ':interpreter_cache',
+    ':python_artifact',
+    ':python_builder',
+    ':python_chroot',
+    ':python_requirement',
+    ':python_requirements',
+    ':resolver',
+    ':sdist_builder',
+    ':test_builder',
+    ':thrift_builder',
   ]
 )
 
@@ -37,7 +37,7 @@ page(
   name = 'readme',
   source = 'README.md',
   dependencies = [
-    pants('src/python/pants:readme'),
+    'src/python/pants:readme',
   ]
 )
 
@@ -45,7 +45,7 @@ python_library(
   name = 'python_setup',
   sources = ['python_setup.py'],
   dependencies = [
-    pants('src/python/pants/base:config'),
+    'src/python/pants/base:config',
   ]
 )
 
@@ -53,10 +53,10 @@ python_library(
   name = 'antlr_builder',
   sources = ['antlr_builder.py'],
   dependencies = [
-    pants(':code_generator'),
-    pants('3rdparty/python:antlr-3.1.3'),
-    pants('src/python/pants/ivy'),
-    pants('src/python/pants/util:dirutil'),
+    ':code_generator',
+    '3rdparty/python:antlr-3.1.3',
+    'src/python/pants/ivy',
+    'src/python/pants/util:dirutil',
   ]
 )
 
@@ -64,11 +64,11 @@ python_library(
   name = 'binary_builder',
   sources = ['binary_builder.py'],
   dependencies = [
-    pants(':code_generator'),
-    pants(':python_chroot'),
-    pants('3rdparty/python/twitter/commons:twitter.common.python'),
-    pants('src/python/pants/base:config'),
-    pants('src/python/pants/backend/python/targets:python'),
+    ':code_generator',
+    ':python_chroot',
+    '3rdparty/python/twitter/commons:twitter.common.python',
+    'src/python/pants/base:config',
+    'src/python/pants/backend/python/targets:python',
   ]
 )
 
@@ -76,8 +76,8 @@ python_library(
   name = 'code_generator',
   sources = ['code_generator.py'],
   dependencies = [
-    pants(':sdist_builder'),
-    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
+    ':sdist_builder',
+    '3rdparty/python/twitter/commons:twitter.common.dirutil',
   ]
 )
 
@@ -86,11 +86,11 @@ python_library(
   name = 'interpreter_cache',
   sources = ['interpreter_cache.py'],
   dependencies = [
-    pants('3rdparty/python:setuptools'),
-    pants('3rdparty/python/twitter/commons:twitter.common.python'),
-    pants(':python_setup'),
-    pants(':resolver'),
-    pants('src/python/pants/util:dirutil'),
+    '3rdparty/python:setuptools',
+    '3rdparty/python/twitter/commons:twitter.common.python',
+    ':python_setup',
+    ':resolver',
+    'src/python/pants/util:dirutil',
   ]
 )
 
@@ -104,10 +104,10 @@ python_library(
   name = 'python_builder',
   sources = ['python_builder.py'],
   dependencies = [
-    pants(':binary_builder'),
-    pants(':python_chroot'),
-    pants(':test_builder'),
-    pants('src/python/pants/backend/python/targets:python'),
+    ':binary_builder',
+    ':python_chroot',
+    ':test_builder',
+    'src/python/pants/backend/python/targets:python',
   ],
 )
 
@@ -115,19 +115,19 @@ python_library(
   name = 'python_chroot',
   sources = ['python_chroot.py'],
   dependencies = [
-    pants(':antlr_builder'),
-    pants(':python_setup'),
-    pants(':resolver'),
-    pants(':thrift_builder'),
-    pants('3rdparty/python/twitter/commons:twitter.common.collections'),
-    pants('3rdparty/python/twitter/commons:twitter.common.decorators'),
-    pants('3rdparty/python/twitter/commons:twitter.common.python'),
-    pants('3rdparty/python/twitter/commons:twitter.common.quantity'),
-    pants('src/python/pants/backend/python/targets:python'),
-    pants('src/python/pants/base:config'),
-    pants('src/python/pants/base:target'),
-    pants('src/python/pants/base:build_invalidator'),
-    pants('src/python/pants/util:dirutil')
+    ':antlr_builder',
+    ':python_setup',
+    ':resolver',
+    ':thrift_builder',
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python/twitter/commons:twitter.common.decorators',
+    '3rdparty/python/twitter/commons:twitter.common.python',
+    '3rdparty/python/twitter/commons:twitter.common.quantity',
+    'src/python/pants/backend/python/targets:python',
+    'src/python/pants/base:config',
+    'src/python/pants/base:target',
+    'src/python/pants/base:build_invalidator',
+    'src/python/pants/util:dirutil'
   ],
 )
 
@@ -145,10 +145,10 @@ python_library(
   name = 'resolver',
   sources = ['resolver.py'],
   dependencies = [
-    pants(':python_setup'),
-    pants('3rdparty/python/twitter/commons:twitter.common.collections'),
-    pants('3rdparty/python/twitter/commons:twitter.common.python'),
-    pants('src/python/pants/backend/python/targets:python'),
+    ':python_setup',
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python/twitter/commons:twitter.common.python',
+    'src/python/pants/backend/python/targets:python',
   ],
 )
 
@@ -156,7 +156,7 @@ python_library(
   name = 'sdist_builder',
   sources = ['sdist_builder.py'],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.python'),
+    '3rdparty/python/twitter/commons:twitter.common.python',
   ]
 )
 
@@ -164,16 +164,16 @@ python_library(
   name = 'test_builder',
   sources = ['test_builder.py'],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.lang'),
-    pants('3rdparty/python/twitter/commons:twitter.common.python'),
-    pants('3rdparty/python:pytest'),
-    pants('3rdparty/python:pytest-cov'),
-    pants(':python_chroot'),
-    pants('src/python/pants/backend/python/targets:python'),
-    pants('src/python/pants/base:config'),
-    pants('src/python/pants/base:target'),
-    pants('src/python/pants/util:contextutil'),
-    pants('src/python/pants/util:dirutil'),
+    '3rdparty/python/twitter/commons:twitter.common.lang',
+    '3rdparty/python/twitter/commons:twitter.common.python',
+    '3rdparty/python:pytest',
+    '3rdparty/python:pytest-cov',
+    ':python_chroot',
+    'src/python/pants/backend/python/targets:python',
+    'src/python/pants/base:config',
+    'src/python/pants/base:target',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
   ],
 )
 
@@ -181,11 +181,11 @@ python_library(
   name = 'thrift_builder',
   sources = ['thrift_builder.py'],
   dependencies = [
-    pants(':code_generator'),
-    pants('src/python/pants/backend/codegen/targets:python'),
-    pants('src/python/pants/backend/python/targets:python'),
-    pants('src/python/pants/base:build_environment'),
-    pants('src/python/pants:thrift_util'),
-    pants('src/python/pants/util:dirutil'),
+    ':code_generator',
+    'src/python/pants/backend/codegen/targets:python',
+    'src/python/pants/backend/python/targets:python',
+    'src/python/pants/base:build_environment',
+    'src/python/pants:thrift_util',
+    'src/python/pants/util:dirutil',
   ]
 )

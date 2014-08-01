@@ -5,6 +5,6 @@ python_tests(
   name = 'reporting',
   sources = globs('*.py'),
   dependencies = [
-    pants('src/python/pants/reporting'),
+    'src/python/pants/reporting',
   ]
 )

@@ -3,6 +3,6 @@
 
 java_library(
   name = 'thriftdeptest',
-  dependencies = [pants('src/thrift/com/pants/testproject:thrift-java')],
+  dependencies = ['src/thrift/com/pants/testproject:thrift-java'],
   sources = rglobs('*.java')
 )

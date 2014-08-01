@@ -4,8 +4,8 @@
 dependencies(
   name = 'util',
   dependencies = [
-    pants(':contextutil'),
-    pants(':dirutil'),
+    ':contextutil',
+    ':dirutil',
   ]
 )
 
@@ -13,7 +13,7 @@ python_tests(
   name = 'contextutil',
   sources = ['test_contextutil.py'],
   dependencies = [
-    pants('src/python/pants/util:contextutil'),
+    'src/python/pants/util:contextutil',
   ]
 )
 
@@ -21,8 +21,8 @@ python_tests(
   name = 'dirutil',
   sources = ['test_dirutil.py'],
   dependencies = [
-    pants('3rdparty/python:mox'),
-    pants('3rdparty/python:pytest'),
-    pants('src/python/pants/util:dirutil'),
+    '3rdparty/python:mox',
+    '3rdparty/python:pytest',
+    'src/python/pants/util:dirutil',
   ]
 )

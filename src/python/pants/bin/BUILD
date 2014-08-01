@@ -5,42 +5,42 @@ python_library(
   name = 'pants_exe',
   sources = ['pants_exe.py'],
   dependencies = [
-    pants('3rdparty/python:psutil'),
-    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
-    pants('src/python/pants/base:address'),
-    pants('src/python/pants/base:build_environment'),
-    pants('src/python/pants/base:build_file_parser'),
-    pants('src/python/pants/base:config'),
-    pants('src/python/pants/base:dev_backend_loader'),
-    pants('src/python/pants/base:rcfile'),
-    pants('src/python/pants/commands:command'),
+    '3rdparty/python:psutil',
+    '3rdparty/python/twitter/commons:twitter.common.dirutil',
+    'src/python/pants/base:address',
+    'src/python/pants/base:build_environment',
+    'src/python/pants/base:build_file_parser',
+    'src/python/pants/base:config',
+    'src/python/pants/base:dev_backend_loader',
+    'src/python/pants/base:rcfile',
+    'src/python/pants/commands:command',
 
-    pants('src/python/pants/backend/android:plugin'),
-    pants('src/python/pants/backend/authentication:authentication'),
-    pants('src/python/pants/backend/codegen:plugin'),
-    pants('src/python/pants/backend/core:plugin'),
-    pants('src/python/pants/goal:run_tracker'),
-    pants('src/python/pants/backend/jvm:plugin'),
-    pants('src/python/pants/backend/python:plugin'),
-    pants('src/python/pants/backend/maven_layout:plugin'),
+    'src/python/pants/backend/android:plugin',
+    'src/python/pants/backend/authentication:authentication',
+    'src/python/pants/backend/codegen:plugin',
+    'src/python/pants/backend/core:plugin',
+    'src/python/pants/goal:run_tracker',
+    'src/python/pants/backend/jvm:plugin',
+    'src/python/pants/backend/python:plugin',
+    'src/python/pants/backend/maven_layout:plugin',
 
     # XXX these are necessary to parse BUILD.commons.  Should instead be
     # added as plugins to pants.ini
-    pants('src/python/pants/backend/python:python_chroot'),
-    pants('src/python/pants/scm:git'),
-    pants('src/python/pants/backend/jvm/targets:java'),
-    pants('src/python/pants/backend/jvm/targets:jvm'),
-    pants('src/python/pants/backend/jvm/targets:scala'),
-    pants('src/python/pants/backend/jvm/tasks:checkstyle'),
-    pants('src/python/pants/backend/core/tasks:what_changed'),
+    'src/python/pants/backend/python:python_chroot',
+    'src/python/pants/scm:git',
+    'src/python/pants/backend/jvm/targets:java',
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/targets:scala',
+    'src/python/pants/backend/jvm/tasks:checkstyle',
+    'src/python/pants/backend/core/tasks:what_changed',
 
     # XXX The remaining are clear abstraction leaks.
     # The goal target should be goal:run_tracker but it is inseparable from goal; also
     # an abstraction leak.
-    pants('src/python/pants/goal:initialize_reporting'),
-    pants('src/python/pants/goal'),
-    pants('src/python/pants/reporting'),
-    pants('src/python/pants/backend/jvm/tasks:nailgun_task'),
+    'src/python/pants/goal:initialize_reporting',
+    'src/python/pants/goal',
+    'src/python/pants/reporting',
+    'src/python/pants/backend/jvm/tasks:nailgun_task',
   ],
 )
 
@@ -57,9 +57,9 @@ python_binary(
   # Additionally we force a an ascii string for python 3.3.x here.
   compatibility='CPython>=2.6,<3,>=3.3',
   dependencies = [
-    pants(':pants_exe'),
-    pants('src/python/pants/backend/python/commands:pants_old'),
-    pants('src/python/pants/commands:pants_new'),
+    ':pants_exe',
+    'src/python/pants/backend/python/commands:pants_old',
+    'src/python/pants/commands:pants_new',
   ],
 )
 
@@ -67,8 +67,8 @@ python_binary(
   name = 'pants_new',
   entry_point = 'pants.bin.pants_exe:main',
   dependencies = [
-    pants(':pants_exe'),
-    pants('src/python/pants/commands:pants_new'),
+    ':pants_exe',
+    'src/python/pants/commands:pants_new',
   ],
 )
 
@@ -76,7 +76,7 @@ python_binary(
   name = 'pants_old',
   entry_point = 'pants.bin.pants_exe:main',
   dependencies = [
-    pants(':pants_exe'),
-    pants('src/python/pants/backend/python/commands:pants_old'),
+    ':pants_exe',
+    'src/python/pants/backend/python/commands:pants_old',
   ],
 )

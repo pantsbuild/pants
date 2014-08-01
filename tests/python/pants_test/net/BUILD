@@ -4,6 +4,6 @@
 python_test_suite(
   name = 'net',
   dependencies = [
-    pants('tests/python/pants_test/net/http'),
+    'tests/python/pants_test/net/http',
   ],
 )

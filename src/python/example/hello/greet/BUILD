@@ -5,7 +5,7 @@
 
 python_library(name='greet',
   dependencies=[
-    pants('3rdparty/python:ansicolors'),
+    '3rdparty/python:ansicolors',
   ],
   sources=globs('*.py'),
 )

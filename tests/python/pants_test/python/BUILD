@@ -4,26 +4,26 @@
 python_test_suite(
   name = 'all',
   dependencies = [
-    pants(':python'),
+    ':python',
   ],
 )
 
 python_test_suite(
   name = 'python',
   dependencies = [
-    pants(':test_antlr_builder'),
-    pants(':test_resolver'),
-    pants(':test_thrift_builder'),
-    pants(':test_thrift_namespace_packages'),
+    ':test_antlr_builder',
+    ':test_resolver',
+    ':test_thrift_builder',
+    ':test_thrift_namespace_packages',
   ]
 )
 
 python_test_suite(
   name = 'integration',
   dependencies = [
-    pants(':interpreter_selection_integration'),
-    pants(':python_repl_integration'),
-    pants(':python_run_integration'),
+    ':interpreter_selection_integration',
+    ':python_repl_integration',
+    ':python_run_integration',
   ]
 )
 
@@ -44,32 +44,32 @@ python_tests(
   name = 'test_thrift_namespace_packages',
   sources = ['test_thrift_namespace_packages.py'],
   dependencies = [
-    pants('src/thrift/com/pants/testing:duck-py'),
-    pants('src/thrift/com/pants/testing:goose-py'),
+    'src/thrift/com/pants/testing:duck-py',
+    'src/thrift/com/pants/testing:goose-py',
   ],
 )
 
 python_tests(name = 'test_resolver',
   sources = ['test_resolver.py'],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.python'),
-    pants('src/python/pants/base:config'),
-    pants('src/python/pants/backend/python:resolver'),
-    pants('src/python/pants/util:contextutil'),
+    '3rdparty/python/twitter/commons:twitter.common.python',
+    'src/python/pants/base:config',
+    'src/python/pants/backend/python:resolver',
+    'src/python/pants/util:contextutil',
   ],
 )
 
 python_tests(name = 'test_thrift_builder',
   sources = ['test_thrift_builder.py'],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.config'),
-    pants('3rdparty/python/twitter/commons:twitter.common.python'),
-    pants('3rdparty/python:mock'),
-    pants('src/python/pants/backend/codegen/targets:python'),
-    pants('src/python/pants/backend/python:thrift_builder'),
-    pants('src/python/pants/base:build_file_aliases'),
-    pants('tests/python/pants_test/base:context_utils'),
-    pants('tests/python/pants_test:base_test'),
+    '3rdparty/python/twitter/commons:twitter.common.config',
+    '3rdparty/python/twitter/commons:twitter.common.python',
+    '3rdparty/python:mock',
+    'src/python/pants/backend/codegen/targets:python',
+    'src/python/pants/backend/python:thrift_builder',
+    'src/python/pants/base:build_file_aliases',
+    'tests/python/pants_test/base:context_utils',
+    'tests/python/pants_test:base_test',
   ]
 )
 
@@ -85,8 +85,8 @@ python_tests(
   name = 'interpreter_selection_integration',
   sources = ['test_interpreter_selection_integration.py'],
   dependencies = [
-    pants('src/python/pants/util:contextutil'),
-    pants('tests/python/pants_test:int-test'),
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test:int-test',
   ],
 )
 
@@ -94,7 +94,7 @@ python_tests(
   name = 'python_run_integration',
   sources = ['test_python_run_integration.py'],
   dependencies = [
-    pants('tests/python/pants_test:int-test'),
+    'tests/python/pants_test:int-test',
   ],
 )
 
@@ -102,7 +102,7 @@ python_tests(
   name = 'python_repl_integration',
   sources = ['test_python_repl_integration.py'],
   dependencies = [
-    pants('tests/python/pants_test:int-test'),
+    'tests/python/pants_test:int-test',
   ],
 )
 
@@ -110,7 +110,7 @@ python_tests(
 python_binary(
   name = 'echo_interpreter_version_2.6',
   dependencies = [
-    pants(':echo_interpreter_version_lib'),
+    ':echo_interpreter_version_lib',
   ],
   entry_point = 'pants_test.python.echo_interpreter_version',
   compatibility = ['CPython>=2.6,<3']
@@ -120,7 +120,7 @@ python_binary(
 python_binary(
   name = 'echo_interpreter_version_2.7',
   dependencies = [
-    pants(':echo_interpreter_version_lib'),
+    ':echo_interpreter_version_lib',
   ],
   entry_point = 'pants_test.python.echo_interpreter_version',
   compatibility = ['CPython>=2.7,<3']
@@ -130,7 +130,7 @@ python_binary(
 python_binary(
   name = 'echo_interpreter_version',
   dependencies = [
-    pants(':echo_interpreter_version_lib'),
+    ':echo_interpreter_version_lib',
   ],
   entry_point = 'pants_test.python.echo_interpreter_version',
 )
@@ -139,7 +139,7 @@ python_binary(
 python_binary(
   name = 'deliberately_conficting_compatibility',
   dependencies = [
-    pants(':echo_interpreter_version_lib'),
+    ':echo_interpreter_version_lib',
   ],
   entry_point = 'pants_test.python.echo_interpreter_version',
   compatibility = ['CPython<2.6']
