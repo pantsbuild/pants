@@ -9,27 +9,23 @@ import pytest
 import shlex
 import unittest
 
-from twitter.common.lang import Compatibility
-
 from pants.option.arg_splitter import ArgSplitter, ArgSplitterError
 
 
 class ArgSplitterTest(unittest.TestCase):
   _known_scopes = ['compile', 'compile.java', 'compile.scala', 'test', 'test.junit']
 
-  def _split(self, args, expected_scope_to_flags, expected_target_specs, expected_help=False):
+  def _split(self, args_str, expected_scope_to_flags, expected_target_specs, expected_help=False):
     splitter = ArgSplitter(ArgSplitterTest._known_scopes)
-    if isinstance(args, Compatibility.string):
-      args = shlex.split(str(args))
+    args = shlex.split(str(args_str))
     scope_to_flags, target_specs = splitter.split_args(args)
     self.assertEquals(expected_scope_to_flags, scope_to_flags)
     self.assertEquals(expected_target_specs, target_specs)
     self.assertEquals(expected_help, splitter.is_help)
 
-  def _error_split(self, args):
+  def _error_split(self, args_str):
     parser = ArgSplitter(ArgSplitterTest._known_scopes)
-    if isinstance(args, Compatibility.string):
-      args = shlex.split(str(args))
+    args = shlex.split(str(args_str))
     with pytest.raises(ArgSplitterError):
       parser.split_args(args)
 

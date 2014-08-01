@@ -6,7 +6,6 @@ python_tests(
   sources = globs('*.py'),
   dependencies = [
     '3rdparty/python:pytest',
-    '3rdparty/python/twitter/commons:twitter.common.lang',
     'src/python/pants/option',
   ],
 )
