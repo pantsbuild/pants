@@ -130,7 +130,7 @@ Let's explore how to collect all targets of a particular type. ::
      interesting_targets = set()
      for target in targets:
        target.walk(lambda t: interesting_targets.add(t),
-                   lambda t: isinstance(t, FooLibrary)
+                   lambda t: isinstance(t, FooLibrary))
 
 First we need to iterate over ``targets``, which are the active concrete targets.
 Then we ``walk`` each concrete target, providing as the first parameter
