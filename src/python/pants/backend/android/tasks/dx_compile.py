@@ -5,6 +5,8 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+import os
+
 from pants.backend.android.targets.android_dex import AndroidDex
 from pants.backend.android.tasks.android_task import AndroidTask
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
@@ -46,8 +48,15 @@ class DxCompile(AndroidTask, NailgunTask):
 
   def execute(self):
     safe_mkdir(self.workdir)
-
     # with self.context.new_workunit(name='dex_compile', labels=[WorkUnit.MULTITOOL]):  #Which code?
     #   for target in self.context.targets(predicate=self.is_gentarget):
     #     pass
     #TODO check for empty class files there is no valid empty dex file.
+
+  def dx_jar_tool(self, build_tools_version):
+    """Return the appropriate dx.jar.
+
+    :param string build_tools_version: The Android build-tools version number (e.g. '19.1.0').
+    """
+    dx_jar = os.path.join('build-tools', build_tools_version, 'lib', 'dx.jar')
+    return self._android_dist.register_android_tool(dx_jar)
