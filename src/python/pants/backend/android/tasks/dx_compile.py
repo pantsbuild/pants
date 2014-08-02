@@ -23,7 +23,7 @@ class DxCompile(AndroidTask, NailgunTask):
 
   # @classmethod
   # def setup_parser(cls, option_group, args, mkflag):
-  #   # VM options go here
+  #   # VM options go here dx -J<options>
   #   pass
 
   @classmethod
@@ -48,6 +48,11 @@ class DxCompile(AndroidTask, NailgunTask):
   def config_section(self):
     return self._CONFIG_SECTION
 
+
+  def _compile_dex(self, args):
+    classpath = [self.jar_location]
+    java_main = 'com.sun.tools.internal.xjc.Driver'
+    return self.runjava(classpath=classpath, main=java_main, args=args, workunit_name='xjc')
 
   def execute(self):
     safe_mkdir(self.workdir)
