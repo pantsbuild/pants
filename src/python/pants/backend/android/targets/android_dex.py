@@ -13,4 +13,5 @@ class AndroidDex(AndroidTarget):
 
   def __init__(self,
                **kwargs):
+    print("TROLLLLLOLOLOLOLOLOLLOLOLLLLLLLLLOoooooooooooooooooo")
     super(AndroidDex, self).__init__(**kwargs)
