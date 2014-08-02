@@ -9,11 +9,15 @@ import os
 import subprocess
 
 from twitter.common import log
+from twitter.common.collections import OrderedSet
 from twitter.common.dirutil import safe_mkdir
+
 
 from pants.backend.android.targets.android_resources import AndroidResources
 from pants.backend.android.tasks.android_task import AndroidTask
 from pants.backend.codegen.tasks.code_gen import CodeGen
+from pants.backend.jvm.targets.jar_dependency import JarDependency
+from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.base.address import SyntheticAddress
 from pants.base.build_environment import get_buildroot
@@ -118,14 +122,21 @@ class AaptGen(AndroidTask, CodeGen):
 
   def createtarget(self, lang, gentarget, dependees):
     aapt_gen_file = self._calculate_genfile(gentarget.package)
-    spec_path = os.path.join(os.path.relpath(self.workdir, get_buildroot()), 'bin')
+    spec_path = os.path.join(os.path.relpath(self.workdir, get_buildroot()))
+    deps = OrderedSet()
+    jar_url='file://' + self.android_jar_tool(gentarget.target_sdk)
+    jars_tgt = self.context.add_new_target(SyntheticAddress(spec_path, gentarget.id + '-jars'),
+                                           JarLibrary,
+                                           jars=[ JarDependency(org='com.google', name='android',
+                                                                url=jar_url) ],
+                                           derived_from=gentarget)
+    deps.add(jars_tgt)
     address = SyntheticAddress(spec_path=spec_path, target_name=gentarget.id)
     tgt = self.context.add_new_target(address,
                                       JavaLibrary,
                                       derived_from=gentarget,
                                       sources=aapt_gen_file,
-                                      dependencies=[])
-
+                                      dependencies=deps)
     for dependee in dependees:
       dependee.inject_dependency(tgt.address)
     return tgt
