@@ -27,4 +27,4 @@ def register_goals():
   goal(name='aapt', action=AaptGen).install('gen')
 
   goal(name='dex', action=DxCompile,
-       dependencies=['aapt']).install('dex')
+       dependencies=['gen', 'compile']).install('dex')
