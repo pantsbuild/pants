@@ -81,6 +81,11 @@ class DxCompile(AndroidTask, NailgunTask):
         print("WE HAVE AN INTERESTING TARGET HERE!")
         classes_by_target = self.context.products.get_data('classes_by_target')
         print (classes_by_target)
+        target_classes = classes_by_target.get(target)
+        print (target_classes)
+        for root, products in target_classes.rel_paths():
+          for prod in products:
+            print (prod)
     #TODO check for empty class files there is no valid empty dex file.
 
   def dx_jar_tool(self, build_tools_version):
