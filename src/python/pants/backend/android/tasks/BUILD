@@ -7,6 +7,7 @@ python_library(
   dependencies = [
     ':android_task',
     ':aapt_gen',
+    ':dx_compile',
   ],
 )
 

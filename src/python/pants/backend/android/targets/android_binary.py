@@ -30,3 +30,5 @@ class AndroidBinary(AndroidTarget):
 
     # TODO (mateor): Add some Compatibility error checks.
     super(AndroidBinary, self).__init__(*args, **kwargs)
+    self.add_labels('dex')
+
