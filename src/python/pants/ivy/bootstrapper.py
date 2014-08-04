@@ -49,7 +49,7 @@ class Bootstrapper(object):
     """Indicates an error bootstrapping an ivy classpath."""
 
   _DEFAULT_VERSION = '2.3.0'
-  _DEFAULT_URL = ('http://repo1.maven.org/maven2/'
+  _DEFAULT_URL = ('https://repo1.maven.org/maven2/'
                   'org/apache/ivy/ivy/'
                   '%(version)s/ivy-%(version)s.jar' % {'version': _DEFAULT_VERSION})
 

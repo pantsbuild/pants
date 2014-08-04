@@ -16,18 +16,14 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
       <ibiblio name="maven2"
                m2compatible="true"
                usepoms="true"
-               root="http://repo1.maven.org/maven2/"/>
+               root="https://repo1.maven.org/maven2/"/>
 
+      <!-- This is just for twitter-hosted jvm tools - kill once they are published to maven
+           central. -->
       <ibiblio name="maven.twttr.com-maven"
                m2compatible="true"
                usepoms="true"
                root="http://maven.twttr.com/"/>
-
-      <!--  This is just for spy#spymemcached;2.8.1 -->
-      <ibiblio name="jboss-public"
-               m2compatible="true"
-               usepoms="true"
-               root="http://repository.jboss.org/nexus/content/groups/public/"/>
     </chain>
   </macrodef>
 
