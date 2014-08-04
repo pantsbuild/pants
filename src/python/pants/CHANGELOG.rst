@@ -8,7 +8,7 @@ API Changes
 ~~~~~~~~~~~
 
 * Upgrade pex dependency from twitter.common.python 0.6.0 to pex 0.7.0
-  `RB # XXX <https://rbcommons.com/s/twitter/r/XXX>`_
+  `RB #825 <https://rbcommons.com/s/twitter/r/825>`_
 
 * Added a --spec-exclude command line flag to exclude specs by regular expression
   `RB #747 <https://rbcommons.com/s/twitter/r/747>`_
