@@ -9,11 +9,15 @@ import os
 import subprocess
 
 from twitter.common import log
+from twitter.common.collections import OrderedSet
 from twitter.common.dirutil import safe_mkdir
+
 
 from pants.backend.android.targets.android_resources import AndroidResources
 from pants.backend.android.tasks.android_task import AndroidTask
 from pants.backend.codegen.tasks.code_gen import CodeGen
+from pants.backend.jvm.targets.jar_dependency import JarDependency
+from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.base.address import SyntheticAddress
 from pants.base.build_environment import get_buildroot
@@ -55,7 +59,7 @@ class AaptGen(AndroidTask, CodeGen):
 
   @classmethod
   def _calculate_genfile(cls, package):
-    return os.path.join('bin', cls.package_path(package), 'R.java')
+    return os.path.join(cls.package_path(package), 'R.java')
 
   def __init__(self, context, workdir):
     super(AaptGen, self).__init__(context, workdir)
@@ -63,6 +67,18 @@ class AaptGen(AndroidTask, CodeGen):
     self._forced_build_tools_version = context.options.build_tools_version
     self._forced_ignored_assets = context.options.ignored_assets
     self._forced_target_sdk = context.options.target_sdk
+    self._jar_library_by_sdk = {}
+
+  def prepare(self, round_manager):
+    super(AaptGen, self).prepare(round_manager)
+
+    # prepare exactly N android jar targets where N is the number of SDKs in-play
+    sdks = set(ar.target_sdk for ar in self.context.targets(predicate=self.is_gentarget))
+    for sdk in sdks:
+      jar_url = 'file://{0}'.format(self.android_jar_tool(sdk))
+      jar = JarDependency(org='com.google', name='android', rev=sdk, url=jar_url)
+      address = SyntheticAddress(self.workdir, '{0}-jars'.format(sdk))
+      self._jar_library_by_sdk[sdk] = self.context.add_new_target(address, JarLibrary, jars=[jar])
 
   def is_gentarget(self, target):
     return isinstance(target, AndroidResources)
@@ -117,22 +133,20 @@ class AaptGen(AndroidTask, CodeGen):
         raise TaskError('Android aapt tool exited non-zero ({code})'.format(code=result))
 
   def createtarget(self, lang, gentarget, dependees):
-    aapt_gen_file = self._calculate_genfile(gentarget.package)
     spec_path = os.path.join(os.path.relpath(self.workdir, get_buildroot()), 'bin')
     address = SyntheticAddress(spec_path=spec_path, target_name=gentarget.id)
+    aapt_gen_file = self._calculate_genfile(gentarget.package)
+    deps = OrderedSet([self._jar_library_by_sdk[gentarget.target_sdk]])
     tgt = self.context.add_new_target(address,
                                       JavaLibrary,
                                       derived_from=gentarget,
-                                      sources=aapt_gen_file,
-                                      dependencies=[])
-
+                                      sources=[aapt_gen_file],
+                                      dependencies=deps)
     for dependee in dependees:
       dependee.inject_dependency(tgt.address)
     return tgt
 
-
   def _aapt_out(self):
-    # TODO (mateor) Does this have potential for collision (chances of same package name?)
     return os.path.join(self.workdir, 'bin')
 
   def aapt_tool(self, build_tools_version):
