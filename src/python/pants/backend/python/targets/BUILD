@@ -11,7 +11,7 @@ python_library(
   dependencies = [
     pants('3rdparty/python/twitter/commons:twitter.common.collections'),
     pants('3rdparty/python/twitter/commons:twitter.common.lang'),
-    pants('3rdparty/python/twitter/commons:twitter.common.python'),
+    pants('3rdparty/python:pex'),
     pants('3rdparty/python:setuptools'),
     pants('src/python/pants/base:target'),
     pants('src/python/pants/backend/core/targets:common'),

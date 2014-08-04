@@ -19,7 +19,7 @@ from pants.util.dirutil import safe_open
 
 
 # TODO(John Sirois): Consider lifting this to twitter.common.http and consolidating with, for
-# example, twitter.common.python.http.Http
+# example, pex.http.Http
 class Fetcher(object):
   """A streaming URL fetcher that supports listeners."""
 

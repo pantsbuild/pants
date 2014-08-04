@@ -13,7 +13,6 @@ twitter.common.lang>=0.3.1,<0.4
 twitter.common.log>=0.3.1,<0.4
 twitter.common.options>=0.3.1,<0.4
 twitter.common.process>=0.3.1,<0.4
-twitter.common.python>=0.6.0,<0.7
 twitter.common.string>=0.3.1,<0.4
 twitter.common.threading>=0.3.1,<0.4
 twitter.common.util>=0.3.1,<0.4

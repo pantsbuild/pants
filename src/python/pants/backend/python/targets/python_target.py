@@ -8,7 +8,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from twitter.common.collections import maybe_list
 from twitter.common.lang import Compatibility
-from twitter.common.python.interpreter import PythonIdentity
+from pex.interpreter import PythonIdentity
 
 from pants.base.address import SyntheticAddress
 from pants.base.payload import PythonPayload

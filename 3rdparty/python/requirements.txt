@@ -18,3 +18,5 @@ requests>=2.3.0,<2.4
 setuptools==5.4.1
 thrift==0.9.1
 wheel==0.23.0
+pex>=0.7.0,<0.8
+

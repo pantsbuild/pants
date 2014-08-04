@@ -9,7 +9,7 @@ from contextlib import contextmanager
 import tempfile
 
 from twitter.common.collections import OrderedSet
-from twitter.common.python.pex_builder import PEXBuilder
+from pex.pex_builder import PEXBuilder
 
 from pants.backend.core.tasks.task import Task
 from pants.backend.python.interpreter_cache import PythonInterpreterCache

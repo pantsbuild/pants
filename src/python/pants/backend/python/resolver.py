@@ -5,13 +5,13 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from twitter.common.python.fetcher import Fetcher, PyPIFetcher
-from twitter.common.python.http import Crawler
-from twitter.common.python.interpreter import PythonInterpreter
-from twitter.common.python.obtainer import CachingObtainer
-from twitter.common.python.platforms import Platform
-from twitter.common.python.resolver import resolve
-from twitter.common.python.translator import Translator
+from pex.fetcher import Fetcher, PyPIFetcher
+from pex.http import Crawler
+from pex.interpreter import PythonInterpreter
+from pex.obtainer import CachingObtainer
+from pex.platforms import Platform
+from pex.resolver import resolve
+from pex.translator import Translator
 
 from pants.backend.python.python_setup import PythonSetup
 

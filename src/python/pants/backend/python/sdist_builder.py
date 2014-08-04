@@ -7,7 +7,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import os
 
-from twitter.common.python.installer import Packager
+from pex.installer import Packager
 
 
 class SdistBuilder(object):

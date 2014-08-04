@@ -13,9 +13,9 @@ import itertools
 import os
 
 from twitter.common.lang import Compatibility
-from twitter.common.python.interpreter import PythonInterpreter
-from twitter.common.python.pex import PEX
-from twitter.common.python.pex_builder import PEXBuilder
+from pex.interpreter import PythonInterpreter
+from pex.pex import PEX
+from pex.pex_builder import PEXBuilder
 
 from pants.base.config import Config
 from pants.base.target import Target
