@@ -51,14 +51,15 @@ class ScalaCompile(JvmCompile):
   # Invalidate caches if the toolchain changes.
   def invalidate_for(self):
     zinc_invalidation_key = self._zinc_utils.invalidate_for()
-    jvm_target_version = None
+    jvm_target_version = ''
 
     # Check scalac args for jvm target version.
     for arg in self._args:
       if arg.strip().startswith("-S-target:"):
         jvm_target_version = arg.strip()
 
-    return [jvm_target_version, zinc_invalidation_key]
+    zinc_invalidation_key.append(jvm_target_version)
+    return zinc_invalidation_key
 
   def extra_products(self, target):
     ret = []
