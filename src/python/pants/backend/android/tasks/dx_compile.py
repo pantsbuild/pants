@@ -11,6 +11,9 @@ import os
 
 from pants.backend.android.targets.android_dex import AndroidDex
 from pants.backend.android.targets.android_binary import AndroidBinary
+from pants.backend.android.targets.android_resources import AndroidResources
+from pants.backend.android.targets.android_target import AndroidTarget
+from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.android.tasks.android_task import AndroidTask
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
@@ -31,7 +34,8 @@ class DxCompile(AndroidTask, NailgunTask):
   @classmethod
   def is_dextarget(cls, target):
     """Return true if target has class files to be compiled into dex"""
-    return isinstance(target, AndroidBinary)
+    return (isinstance(target, JavaLibrary)
+           or isinstance(target, AndroidBinary))
 
   @classmethod
   def product_types(cls):
@@ -76,16 +80,45 @@ class DxCompile(AndroidTask, NailgunTask):
     #     data_by_target = self.context.products.get_data(target_products)
     #     print(data_by_target)
 
-    with self.context.new_workunit(name='dx-compile', labels=[WorkUnit.MULTITOOL]):
-      for target in self.context.targets(predicate=self.is_dextarget):
-        print("WE HAVE AN INTERESTING TARGET HERE!")
-        classes_by_target = self.context.products.get_data('classes_by_target')
-        print (classes_by_target)
-        target_classes = classes_by_target.get(target)
-        print (target_classes)
-        for root, products in target_classes.rel_paths():
-          for prod in products:
-            print (prod)
+  #for dict in defaultdict:
+  #  For Multi in MultiRooted:
+  #    check if task outputs are class files?
+  #    for target in Multi:
+  #      gather class files
+  #      dex them!
+
+
+
+    classes_by_target = self.context.products.get_data('classes_by_target')
+    print (classes_by_target)
+    #target_classes = classes_by_target.get(target)
+    #print (target_classes)
+    print ("hosanna")
+    for target in classes_by_target:
+      #gather 'products' class files.
+      print (target)
+      target_classes = classes_by_target[target] if classes_by_target is not None else None
+      for root, products in target_classes.rel_paths():
+        for prod in products:
+          print (prod)
+
+    # print("THE KING IS DEAD AND NO BACON!")
+    # with self.context.new_workunit(name='dx-compile', labels=[WorkUnit.MULTITOOL]):
+    #   for target in self.context.targets(predicate=self.is_dextarget):
+    #     print("WE HAVE AN INTERESTING TARGET HERE! %s" % target)
+    #     classes_by_target = self.context.products.get_data('classes_by_target')  # as seen in jvm_compile
+    #     print (classes_by_target)
+    #     target_classes = classes_by_target[target] if classes_by_target is not None else None
+    #     print (target_classes)
+    #     #print (target_classes._rooted_products_by_root)   # classes dir. Could be paired with package name info.
+    #     # This errors if target_classes is "None", so error catch, por favor.
+    #     #print (target.package)
+    #     for root, products in target_classes.rel_paths():
+    #       for prod in products:
+    #         print (prod)
+    #       # for roots in root:
+    #       #   print (target_classes._get_products_for_root(root).abs_paths())
+
     #TODO check for empty class files there is no valid empty dex file.
 
   def dx_jar_tool(self, build_tools_version):
