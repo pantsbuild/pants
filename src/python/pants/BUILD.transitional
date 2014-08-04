@@ -8,6 +8,7 @@ python_library(
     globs('java/distribution/*.class') +
     rglobs('reporting/assets/*') + globs('reporting/templates/*.mustache') +
     globs('backend/core/tasks/templates/builddictionary/*.mustache') +
+    globs('backend/jvm/tasks/templates/ensime/*.mustache') +
     globs('backend/jvm/tasks/templates/eclipse/*.mustache') +
     globs('backend/jvm/tasks/templates/idea/*.mustache') +
     globs('backend/jvm/tasks/templates/ivy_resolve/*.mustache') +

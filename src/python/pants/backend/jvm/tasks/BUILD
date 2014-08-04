@@ -23,6 +23,7 @@ python_library(
     ':depmap',
     ':detect_duplicates',
     ':eclipse_gen',
+    ':ensime_gen',
     ':filedeps',
     ':ide_gen',
     ':idea_gen',
@@ -168,6 +169,20 @@ python_library(
     pants('src/python/pants/base:build_environment'),
     pants('src/python/pants/base:generator'),
     pants('src/python/pants/util:dirutil'),
+  ],
+)
+
+python_library(
+  name = 'ensime_gen',
+  sources = ['ensime_gen.py'],
+  resources = globs('templates/ensime/*.mustache'),
+  dependencies = [
+    pants(':common'),
+    pants(':ide_gen'),
+    pants('3rdparty/python/twitter/commons:twitter.common.collections'),
+    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
+    pants('src/python/pants/base:build_environment'),
+    pants('src/python/pants/base:generator'),
   ],
 )
 

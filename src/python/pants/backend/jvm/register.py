@@ -36,6 +36,7 @@ from pants.backend.jvm.tasks.dependencies import Dependencies
 from pants.backend.jvm.tasks.depmap import Depmap
 from pants.backend.jvm.tasks.detect_duplicates import DuplicateDetector
 from pants.backend.jvm.tasks.eclipse_gen import EclipseGen
+from pants.backend.jvm.tasks.ensime_gen import EnsimeGen
 from pants.backend.jvm.tasks.filedeps import FileDeps
 from pants.backend.jvm.tasks.idea_gen import IdeaGen
 from pants.backend.jvm.tasks.ivy_imports import IvyImports
@@ -233,6 +234,10 @@ def register_goals():
   goal(name='eclipse', action=EclipseGen,
        dependencies=['jar', 'bootstrap']
   ).install().with_description('Create an Eclipse project from the given targets.')
+
+  goal(name='ensime', action=EnsimeGen,
+       dependencies=['jar', 'bootstrap']
+  ).install().with_description('Create an Ensime project from the given targets.')
 
   # Build graph information.
 
