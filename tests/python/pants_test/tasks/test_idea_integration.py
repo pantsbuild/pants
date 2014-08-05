@@ -22,7 +22,7 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
       os.makedirs(project_dir)
     with temporary_dir(root_dir=project_dir) as path:
       pants_run = self.run_pants(['goal', 'idea',] + specs
-          + ['--idea-project-dir={dir}'.format(dir=path), '--no-idea-open',])
+          + ['--no-pantsrc', '--idea-project-dir={dir}'.format(dir=path), '--no-idea-open',])
       self.assertEquals(pants_run.returncode, self.PANTS_SUCCESS_CODE,
                         "goal idea expected success, got {0}\n"
                         "got stderr:\n{1}\n"
