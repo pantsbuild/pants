@@ -56,16 +56,14 @@ class DxCompile(AndroidTask, NailgunTask):
     return self._CONFIG_SECTION
 
 
-  def _compile_dex(self, args):
-    for dex in args:
-      print (dex)
-    # classpath = [self.jar_location]
-    # java_main = 'com.sun.tools.internal.xjc.Driver'
-    # return self.runjava(classpath=classpath, main=java_main, args=args, workunit_name='xjc')
+  def _compile_dex(self, args, build_tools_version):
+    classpath = [self.dx_jar_tool(build_tools_version)]
+    java_main = 'com.android.dx.command.Main'
+    return self.runjava(classpath=classpath, main=java_main, args=args, workunit_name='dx')
 
 
   def execute(self):
-    safe_mkdir(self.workdir)
+    out = safe_mkdir(self.workdir)
     with self.context.new_workunit(name='dx-compile', labels=[WorkUnit.MULTITOOL]):
       for target in self.context.targets(predicate=self.is_dextarget):
         classes_by_target = self.context.products.get_data('classes_by_target')
@@ -76,14 +74,18 @@ class DxCompile(AndroidTask, NailgunTask):
           if target_classes:
 
             def add_classes(target_products):
-              for root, products in target_products.rel_paths():
+              # TODO (mateor) check and see if better with rel_paths
+              for root, products in target_products.abs_paths():
                 for prod in products:
                   dex_classes.append(prod)
 
             add_classes(target_classes)
 
         target.walk(add_to_dex)
-        self._compile_dex(dex_classes)
+        args = []
+        args.extend(['--dex', '--output=classes.dex'])
+        args.extend(dex_classes)
+        self._compile_dex(args, target.build_tools_version)
 
 
     #TODO check for empty class files there is no valid empty dex file.
