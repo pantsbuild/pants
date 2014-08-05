@@ -14,7 +14,6 @@ from contextlib import closing, contextmanager
 
 import requests
 from twitter.common.lang import Compatibility
-from twitter.common.quantity import Amount, Data, Time
 
 from pants.util.dirutil import safe_open
 
@@ -147,36 +146,27 @@ class Fetcher(object):
   class ProgressListener(Listener):
     """A Listener that logs progress to stdout."""
 
-    def __init__(self, width=None, chunk_size=None):
+    def __init__(self, width=None, chunk_size_bytes=None):
       """Creates a ProgressListener that logs progress for known size items with a progress bar of
       the given width in characters and otherwise logs a progress indicator every chunk_size.
 
-      :param int width: the width of the progress bar for known size downloads, 50 by default
-      :param chunk_size: a Data Amount indicating the size of data chunks to note progress for,
-        10 KB by default
+      :param int width: the width of the progress bar for known size downloads, 50 by default.
+      :param chunk_size_bytes: The size of data chunks to note progress for, 10 KB by default.
       """
       self._width = width or 50
       if not isinstance(self._width, Compatibility.integer):
         raise ValueError('The width must be an integer, given %s' % self._width)
-
-      self._chunk_size = chunk_size or Amount(10, Data.KB)
-      if not isinstance(self._chunk_size, Amount) or not isinstance(self._chunk_size.unit(), Data):
-        raise ValueError('The chunk_size must be a Data Amount, given %s' % self._chunk_size)
-
+      self._chunk_size_bytes = chunk_size_bytes or 10 * 1024
       self._start = time.time()
-
-    def _convert(self, amount, to_unit):
-      return Amount(int(amount.as_(to_unit)), to_unit)
 
     def status(self, code, content_length=None):
       self.size = content_length
 
       if content_length:
-        download_kb = int(Amount(content_length, Data.BYTES).as_(Data.KB))
-        self.download_size = Amount(download_kb, Data.KB)
+        self.download_size = int(content_length / 1024)
         self.chunk_size = content_length / self._width
       else:
-        self.chunk_size = self._chunk_size.as_(Data.BYTES)
+        self.chunk_size = self._chunk_size_bytes
 
       self.chunks = 0
       self.read = 0
@@ -192,9 +182,9 @@ class Fetcher(object):
         sys.stdout.write('.' * self.chunks)
         if self.size:
           size_width = len(str(self.download_size))
-          downloaded = self._convert(Amount(self.read, Data.BYTES), to_unit=Data.KB)
-          sys.stdout.write('%s %s' % (' ' * (self._width - self.chunks),
-                                      str(downloaded).rjust(size_width)))
+          downloaded = int(self.read / 1024)
+          sys.stdout.write('%s %s KB' % (' ' * (self._width - self.chunks),
+                                         str(downloaded).rjust(size_width)))
         sys.stdout.flush()
 
     def finished(self):
@@ -210,28 +200,23 @@ class Fetcher(object):
     """
     self._requests = requests_api or requests
 
-  def fetch(self, url, listener, chunk_size=None, timeout=None):
+  def fetch(self, url, listener, chunk_size_bytes=None, timeout_secs=None):
     """Fetches data from the given URL notifying listener of all lifecycle events.
 
     :param string url: the url to GET data from
     :param listener: the listener to notify of all download lifecycle events
-    :param chunk_size: the chunk size to use for buffering data, 10 KB by default
-    :param timeout: the maximum time to wait for data to be available, 1 second by default
+    :param chunk_size_bytes: the chunk size to use for buffering data, 10 KB by default
+    :param timeout_secs: the maximum time to wait for data to be available, 1 second by default
     :raises: Fetcher.Error if there was a problem fetching all data from the given url
     """
-    chunk_size = chunk_size or Amount(10, Data.KB)
-    if not isinstance(chunk_size, Amount) or not isinstance(chunk_size.unit(), Data):
-      raise ValueError('chunk_size must be a Data Amount, given %s' % chunk_size)
-
-    timeout = timeout or Amount(1, Time.SECONDS)
-    if not isinstance(timeout, Amount) or not isinstance(timeout.unit(), Time):
-      raise ValueError('chunk_size must be a Time Amount, given %s' % timeout)
+    chunk_size_bytes = chunk_size_bytes or 10 * 1024
+    timeout_secs = timeout_secs or 1.0
 
     if not isinstance(listener, self.Listener):
       raise ValueError('listener must be a Listener instance, given %s' % listener)
 
     try:
-      with closing(self._requests.get(url, stream=True, timeout=timeout.as_(Time.SECONDS))) as resp:
+      with closing(self._requests.get(url, stream=True, timeout=timeout_secs)) as resp:
         if resp.status_code != requests.codes.ok:
           listener.status(resp.status_code)
           raise self.PermanentError('GET request to %s failed with status code %d'
@@ -242,18 +227,18 @@ class Fetcher(object):
         listener.status(resp.status_code, content_length=int(size) if size else None)
 
         read_bytes = 0
-        for data in resp.iter_content(chunk_size=int(chunk_size.as_(Data.BYTES))):
+        for data in resp.iter_content(chunk_size=chunk_size_bytes):
           listener.recv_chunk(data)
           read_bytes += len(data)
         if size and read_bytes != int(size):
           raise self.Error('Expected %s bytes, read %d' % (size, read_bytes))
         listener.finished()
-    except requests.exceptions.RequestException as e:
+    except requests.RequestException as e:
       exception_factory = (self.TransientError if isinstance(e, self._TRANSIENT_EXCEPTION_TYPES)
                            else self.PermanentError)
       raise exception_factory('Problem GETing data from %s: %s' % (url, e))
 
-  def download(self, url, listener=None, path_or_fd=None, chunk_size=None, timeout=None):
+  def download(self, url, listener=None, path_or_fd=None, chunk_size_bytes=None, timeout_secs=None):
     """Downloads data from the given URL.
 
     By default data is downloaded to a temporary file.
@@ -261,8 +246,8 @@ class Fetcher(object):
     :param string url: the url to GET data from
     :param listener: an optional listener to notify of all download lifecycle events
     :param path_or_fd: an optional file path or open file descriptor to write data to
-    :param chunk_size: the chunk size to use for buffering data
-    :param timeout: the maximum time to wait for data to be available
+    :param chunk_size_bytes: the chunk size to use for buffering data
+    :param timeout_secs: the maximum time to wait for data to be available
     :returns: the path to the file data was downloaded to.
     :raises: Fetcher.Error if there was a problem downloading all data from the given url.
     """
@@ -279,5 +264,5 @@ class Fetcher(object):
 
     with download_fp(path_or_fd) as (fp, path):
       listener = self.DownloadListener(fp).wrap(listener)
-      self.fetch(url, listener, chunk_size=chunk_size, timeout=timeout)
+      self.fetch(url, listener, chunk_size_bytes=chunk_size_bytes, timeout_secs=timeout_secs)
       return path

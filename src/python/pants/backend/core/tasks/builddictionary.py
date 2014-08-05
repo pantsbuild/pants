@@ -162,12 +162,6 @@ def entry_for_one(nom, sym):
 
 
 PREDEFS = {  # some hardwired entries
-  # TODO: There's no docstring in twitter/commons, so hardwired this.
-  #       The legit fix: add a docstring in twitter/commons.
-  #       https://github.com/pantsbuild/pants/issues/372
-  "Amount": {"defn": msg_entry("Amount", """Used in some params,
-                                e.g., ``Amount(2, Time.MINUTES)``.
-                                From twitter.commons.""")},
   "egg" : {"defn": msg_entry("egg",
                              "In older Pants, loads a pre-built Python egg "
                              "from file system. Undefined in newer Pants.")},
@@ -181,16 +175,10 @@ PREDEFS = {  # some hardwired entries
                                           """Deprecated way to group Python tests; use `dependencies`_""")},
   "scala_tests": {"defn": msg_entry("scala_tests",
                   """Old name for `scala_specs`_""")},
-  # TODO: There's no docstring in twitter/commons, so hardwired this.
-  #       The legit fix: add a docstring in twitter/commons.
-  #       https://github.com/pantsbuild/pants/issues/372
-  "Time": {"defn": msg_entry("Time", """Used in some params,
-                             e.g., ``Amount(2, Time.MINUTES)``.
-                             From twitter.commons"""), },
 }
 
 # Report symbols defined in BUILD files (jvm_binary...)
-# Returns dict {"scala_library": ScalaLibrary, "Amount": commons.Amount, ...}
+# Returns dict {"scala_library": ScalaLibrary, ...}
 def get_syms(build_file_parser):
   syms = {}
 

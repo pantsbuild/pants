@@ -7,8 +7,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import os
 
-from twitter.common.quantity import Amount, Time
-
 from pants.backend.core.targets.dependencies import Dependencies
 from pants.backend.core.targets.doc import Page, Wiki, WikiArtifact
 from pants.backend.core.targets.resources import Resources
@@ -59,7 +57,6 @@ def build_file_aliases():
       'wiki': Wiki,
     },
     objects={
-      'Amount': Amount,
       'config': Config,
       'ConfluencePublish': ConfluencePublish,
       'get_buildroot': get_buildroot,
@@ -69,8 +66,7 @@ def build_file_aliases():
       'pants': lambda x: x,
       'phase': Phase,
       'set_scm': set_scm,
-      'Time': Time,
-       'wiki_artifact': WikiArtifact,
+      'wiki_artifact': WikiArtifact,
     },
     context_aware_object_factories={
       'source_root': SourceRoot,

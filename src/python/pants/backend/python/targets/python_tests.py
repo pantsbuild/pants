@@ -6,7 +6,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 from twitter.common.collections import maybe_list
-from twitter.common.quantity import Amount, Time
 
 from pants.backend.python.targets.python_target import PythonTarget
 
@@ -28,13 +27,8 @@ class PythonTests(PythonTarget):
     :param dict exclusives: An optional dict of exclusives tags. See CheckExclusives for details.
     """
     self._coverage = maybe_list(coverage) if coverage is not None else []
-    self._timeout = kwargs.pop('timeout', Amount(2, Time.MINUTES))
     super(PythonTests, self).__init__(**kwargs)
     self.add_labels('python', 'tests')
-
-  @property
-  def timeout(self):
-    return self._timeout
 
   @property
   def coverage(self):
