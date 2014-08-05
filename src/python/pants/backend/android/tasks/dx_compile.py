@@ -6,14 +6,9 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 
-from abc import abstractmethod, abstractproperty
 import os
 
-from pants.backend.android.targets.android_dex import AndroidDex
 from pants.backend.android.targets.android_binary import AndroidBinary
-from pants.backend.android.targets.android_resources import AndroidResources
-from pants.backend.android.targets.android_target import AndroidTarget
-from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.android.tasks.android_task import AndroidTask
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
@@ -34,15 +29,13 @@ class DxCompile(AndroidTask, NailgunTask):
   @classmethod
   def is_dextarget(cls, target):
     """Return true if target has class files to be compiled into dex"""
-    return (isinstance(target, JavaLibrary)
-           or isinstance(target, AndroidBinary))
+    return isinstance(target, AndroidBinary)
 
   @classmethod
   def product_types(cls):
     return ['dex']
 
   def __init__(self, context, workdir):
-    print("WE ARE AT DX_COMPILE")
     super(DxCompile, self).__init__(context, workdir)
     self._android_dist = self.android_sdk
 
@@ -64,61 +57,34 @@ class DxCompile(AndroidTask, NailgunTask):
 
 
   def _compile_dex(self, args):
-    classpath = [self.jar_location]
-    java_main = 'com.sun.tools.internal.xjc.Driver'
-    return self.runjava(classpath=classpath, main=java_main, args=args, workunit_name='xjc')
+    for dex in args:
+      print (dex)
+    # classpath = [self.jar_location]
+    # java_main = 'com.sun.tools.internal.xjc.Driver'
+    # return self.runjava(classpath=classpath, main=java_main, args=args, workunit_name='xjc')
 
 
   def execute(self):
     safe_mkdir(self.workdir)
-    # classes_by_target = self.context.products.get_data('classes_by_target')
-    # with self.context.new_workunit(name='dex_compile', labels=[WorkUnit.MULTITOOL]):  #TODO Which code?
-    #   for target in self.context.targets(predicate=self.is_dextarget):
-    #     print("WE HAVE AN INTERESTING TARGET HERE!")
-    #     target_products = classes_by_target[target] if classes_by_target is not None else None
-    #     print (target_products)
-    #     data_by_target = self.context.products.get_data(target_products)
-    #     print(data_by_target)
+    with self.context.new_workunit(name='dx-compile', labels=[WorkUnit.MULTITOOL]):
+      for target in self.context.targets(predicate=self.is_dextarget):
+        classes_by_target = self.context.products.get_data('classes_by_target')
+        dex_classes = []
 
-  #for dict in defaultdict:
-  #  For Multi in MultiRooted:
-  #    check if task outputs are class files?
-  #    for target in Multi:
-  #      gather class files
-  #      dex them!
+        def add_to_dex(tgt):
+          target_classes = classes_by_target.get(tgt)
+          if target_classes:
 
+            def add_classes(target_products):
+              for root, products in target_products.rel_paths():
+                for prod in products:
+                  dex_classes.append(prod)
 
+            add_classes(target_classes)
 
-    classes_by_target = self.context.products.get_data('classes_by_target')
-    print (classes_by_target)
-    #target_classes = classes_by_target.get(target)
-    #print (target_classes)
-    for target in classes_by_target:
-      dex_targets = set()
-      #gather 'products' class files.
-      #print (target)
-      target_classes = classes_by_target[target] if classes_by_target is not None else None
-      for root, products in target_classes.rel_paths():
-        for prod in products:
-          dex_targets.add(prod)
-      for x in dex_targets:
-        print (x)
-    # print("THE KING IS DEAD AND NO BACON!")
-    # with self.context.new_workunit(name='dx-compile', labels=[WorkUnit.MULTITOOL]):
-    #   for target in self.context.targets(predicate=self.is_dextarget):
-    #     print("WE HAVE AN INTERESTING TARGET HERE! %s" % target)
-    #     classes_by_target = self.context.products.get_data('classes_by_target')  # as seen in jvm_compile
-    #     print (classes_by_target)
-    #     target_classes = classes_by_target[target] if classes_by_target is not None else None
-    #     print (target_classes)
-    #     #print (target_classes._rooted_products_by_root)   # classes dir. Could be paired with package name info.
-    #     # This errors if target_classes is "None", so error catch, por favor.
-    #     #print (target.package)
-    #     for root, products in target_classes.rel_paths():
-    #       for prod in products:
-    #         print (prod)
-    #       # for roots in root:
-    #       #   print (target_classes._get_products_for_root(root).abs_paths())
+        target.walk(add_to_dex)
+        self._compile_dex(dex_classes)
+
 
     #TODO check for empty class files there is no valid empty dex file.
 
@@ -129,3 +95,4 @@ class DxCompile(AndroidTask, NailgunTask):
     """
     dx_jar = os.path.join('build-tools', build_tools_version, 'lib', 'dx.jar')
     return self._android_dist.register_android_tool(dx_jar)
+
