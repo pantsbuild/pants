@@ -269,6 +269,10 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
     else:
       shutil.copy(src, dst)
 
+  def _jvm_fingerprint_strategy(self):
+    # Use a fingerprint strategy that allows us to also include java/scala versions.
+    return JvmFingerprintStrategy(self.invalidate_for())
+
   def pre_execute(self):
     # TODO(John Sirois): Ensuring requested product maps are available - if empty - should probably
     # be lifted to Task infra.
@@ -295,7 +299,8 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
     self._sources_by_target = self._compute_current_sources_by_target(all_targets)
 
     # Split the global analysis file into valid and invalid parts.
-    cache_manager = self.create_cache_manager(invalidate_dependents=True)
+    cache_manager = self.create_cache_manager(invalidate_dependents=True,
+                                              fingerprint_strategy=self._jvm_fingerprint_strategy())
     invalidation_check = cache_manager.check(all_targets)
     if invalidation_check.invalid_vts:
       # The analysis for invalid and deleted sources is no longer valid.
@@ -365,16 +370,13 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
               len(locally_changed_targets) > self._locally_changed_targets_heuristic_limit:
         locally_changed_targets = None
 
-    # Use a fingerprint strategy that allows us to also include java/scala versions.
-    fingerprint_strategy = JvmFingerprintStrategy(self.invalidate_for())
-
     # Invalidation check. Everything inside the with block must succeed for the
     # invalid targets to become valid.
     with self.invalidated(relevant_targets,
                           invalidate_dependents=True,
                           partition_size_hint=self._partition_size_hint,
                           locally_changed_targets=locally_changed_targets,
-                          fingerprint_strategy=fingerprint_strategy) as invalidation_check:
+                          fingerprint_strategy=self._jvm_fingerprint_strategy()) as invalidation_check:
       if invalidation_check.invalid_vts:
         # Find the invalid sources for this chunk.
         invalid_targets = [vt.target for vt in invalidation_check.invalid_vts]
