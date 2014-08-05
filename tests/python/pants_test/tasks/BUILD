@@ -61,6 +61,7 @@ python_test_suite(
 python_test_suite(
   name = 'integration',
   dependencies = [
+    pants(':ensime_integration'),
     pants(':idea_integration'),
     pants(':jar_publish_integration'),
     pants(':jvm_bundle_integration'),
@@ -283,6 +284,15 @@ python_tests(
 python_tests(
   name = 'idea_integration',
   sources = ['test_idea_integration.py'],
+  dependencies = [
+    pants('src/python/pants/util:contextutil'),
+    pants('tests/python/pants_test:int-test'),
+  ],
+)
+
+python_tests(
+  name = 'ensime_integration',
+  sources = ['test_ensime_integration.py'],
   dependencies = [
     pants('src/python/pants/util:contextutil'),
     pants('tests/python/pants_test:int-test'),
