@@ -93,15 +93,16 @@ class DxCompile(AndroidTask, NailgunTask):
     print (classes_by_target)
     #target_classes = classes_by_target.get(target)
     #print (target_classes)
-    print ("hosanna")
     for target in classes_by_target:
+      dex_targets = set()
       #gather 'products' class files.
-      print (target)
+      #print (target)
       target_classes = classes_by_target[target] if classes_by_target is not None else None
       for root, products in target_classes.rel_paths():
         for prod in products:
-          print (prod)
-
+          dex_targets.add(prod)
+      for x in dex_targets:
+        print (x)
     # print("THE KING IS DEAD AND NO BACON!")
     # with self.context.new_workunit(name='dx-compile', labels=[WorkUnit.MULTITOOL]):
     #   for target in self.context.targets(predicate=self.is_dextarget):
