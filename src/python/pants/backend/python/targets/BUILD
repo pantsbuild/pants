@@ -9,12 +9,12 @@ python_library(
     'python_tests.py',
   ],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.collections'),
-    pants('3rdparty/python/twitter/commons:twitter.common.lang'),
     pants('3rdparty/python:pex'),
     pants('3rdparty/python:setuptools'),
-    pants('src/python/pants/base:target'),
+    pants('3rdparty/python/twitter/commons:twitter.common.collections'),
+    pants('3rdparty/python/twitter/commons:twitter.common.lang'),
     pants('src/python/pants/backend/core/targets:common'),
     pants('src/python/pants/backend/python:python_artifact'),
+    pants('src/python/pants/base:target'),
   ],
 )

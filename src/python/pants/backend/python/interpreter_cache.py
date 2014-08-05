@@ -6,9 +6,10 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import os
+from pkg_resources import Requirement
 import shutil
 
-from pkg_resources import Requirement
+
 from pex.installer import EggInstaller
 from pex.interpreter import PythonIdentity, PythonInterpreter
 from pex.obtainer import Obtainer

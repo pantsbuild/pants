@@ -11,8 +11,8 @@ import marshal
 import os
 import re
 
-from twitter.common.collections import OrderedSet
 from pex.interpreter import PythonIdentity
+from twitter.common.collections import OrderedSet
 
 
 logger = logging.getLogger(__name__)

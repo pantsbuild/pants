@@ -9,8 +9,8 @@ import unittest
 
 from pex.platforms import Platform
 
-from pants.base.config import Config
 from pants.backend.python.resolver import get_platforms
+from pants.base.config import Config
 from pants.util.contextutil import temporary_file
 
 
