@@ -10,6 +10,7 @@ import sys
 from collections import defaultdict
 from contextlib import contextmanager
 
+from twitter.common.collections import OrderedSet
 from twitter.common.dirutil import Lock
 from twitter.common.process import ProcessProviderFactory
 from twitter.common.process.process_provider import ProcessProvider
@@ -263,11 +264,13 @@ class Context(object):
     """Selects targets in-play in this run from the target roots and their transitive dependencies.
 
     If specified, the predicate will be used to narrow the scope of targets returned.
+
+    :return: a list of targets evaluated by the predicate in inorder traversal order.
     """
-    target_set = set()
+    target_set = OrderedSet()
     for target in self._target_roots:
       target_set.update(target.closure())
-    return list(filter(predicate, target_set))
+    return filter(predicate, target_set)
 
   def dependents(self, on_predicate=None, from_predicate=None):
     """Returns  a map from targets that satisfy the from_predicate to targets they depend on that

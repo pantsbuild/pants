@@ -1,7 +1,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-dependencies(
+target(
   name = 'all',
   dependencies = [
     ':build_lint',
@@ -55,7 +55,6 @@ python_library(
   dependencies = [
     ':common',
     '3rdparty/python:setuptools',
-    '3rdparty/python/twitter/commons:twitter.common.dirutil',
     'src/python/pants/backend/core/tasks:task',
     'src/python/pants/backend/maven_layout',
     'src/python/pants/backend/python:python_requirements',

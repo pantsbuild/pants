@@ -9,6 +9,8 @@ from collections import defaultdict
 import os
 import shutil
 
+from twitter.common.collections import OrderedSet
+
 from pants.backend.core.tasks.task import Task
 from pants.goal.products import MultipleRootedProducts
 from pants.util.dirutil import safe_mkdir
@@ -41,7 +43,7 @@ class PrepareResources(Task):
       return
     def extract_resources(target):
       return target.resources if target.has_resources else ()
-    all_resources_tgts = set()
+    all_resources_tgts = OrderedSet()
     for resources_tgts in map(extract_resources, targets):
       all_resources_tgts.update(resources_tgts)
 
@@ -68,7 +70,7 @@ class PrepareResources(Task):
       egroups = self.context.products.get_data('exclusives_groups')
       group_key = egroups.get_group_key_for_target(targets[0])
 
-      for resources_tgt in all_resources_tgts:
+      for resources_tgt in reversed(all_resources_tgts):
         target_dir = compute_target_dir(resources_tgt)
         for conf in self.confs:
           # TODO(John Sirois): Introduce the notion of RuntimeClasspath and populate that product
