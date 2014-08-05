@@ -8,8 +8,8 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 from contextlib import contextmanager
 import tempfile
 
+from pex.pex_builder import PEXBuilder
 from twitter.common.collections import OrderedSet
-from twitter.common.python.pex_builder import PEXBuilder
 
 from pants.backend.core.tasks.task import Task
 from pants.backend.python.interpreter_cache import PythonInterpreterCache

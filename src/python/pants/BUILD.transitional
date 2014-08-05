@@ -17,6 +17,7 @@ python_library(
   dependencies=[
     pants('3rdparty/python:ansicolors'),
     pants('3rdparty/python:Markdown'),
+    pants('3rdparty/python:pex'),
     pants('3rdparty/python:psutil'),
     pants('3rdparty/python:Pygments'),
     pants('3rdparty/python:pystache'),
@@ -32,7 +33,6 @@ python_library(
     pants('3rdparty/python/twitter/commons:twitter.common.lang'),
     pants('3rdparty/python/twitter/commons:twitter.common.log'),
     pants('3rdparty/python/twitter/commons:twitter.common.process'),
-    pants('3rdparty/python/twitter/commons:twitter.common.python'),
     pants('3rdparty/python/twitter/commons:twitter.common.threading'),
     pants('3rdparty/python/twitter/commons:twitter.common.util'),
   ]

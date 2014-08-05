@@ -10,8 +10,8 @@ import signal
 import sys
 import tempfile
 
-from twitter.common.python.pex import PEX
-from twitter.common.python.pex_builder import PEXBuilder
+from pex.pex import PEX
+from pex.pex_builder import PEXBuilder
 
 from pants.base.address import BuildFileAddress, parse_spec
 from pants.base.build_file import BuildFile

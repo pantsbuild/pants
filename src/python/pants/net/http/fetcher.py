@@ -5,12 +5,12 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from contextlib import closing, contextmanager
 import hashlib
 import os
 import sys
 import tempfile
 import time
-from contextlib import closing, contextmanager
 
 import requests
 from twitter.common.lang import Compatibility
@@ -18,8 +18,6 @@ from twitter.common.lang import Compatibility
 from pants.util.dirutil import safe_open
 
 
-# TODO(John Sirois): Consider lifting this to twitter.common.http and consolidating with, for
-# example, twitter.common.python.http.Http
 class Fetcher(object):
   """A streaming URL fetcher that supports listeners."""
 

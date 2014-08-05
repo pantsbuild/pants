@@ -5,16 +5,16 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+import ast
 import itertools
 import os
 import pprint
 from collections import defaultdict
 
-import ast
+from pex.compatibility import string, to_bytes
+from pex.installer import InstallerBase, Packager
 from twitter.common.collections import OrderedSet
 from twitter.common.dirutil.chroot import Chroot
-from twitter.common.python.compatibility import string, to_bytes
-from twitter.common.python.installer import InstallerBase, Packager
 
 from pants.backend.codegen.targets.python_antlr_library import PythonAntlrLibrary
 from pants.backend.codegen.targets.python_thrift_library import PythonThriftLibrary
@@ -112,7 +112,7 @@ class SetupPy(Command):
                   pants('src/python/twitter/common/python'),
                ]
             )
-          will result in only twitter.common.python being exported even if top-level sources
+          will result in only pex being exported even if top-level sources
           directly reference twitter.common.dirutil, which could be considered a leak.
     """
     depmap = defaultdict(OrderedSet)

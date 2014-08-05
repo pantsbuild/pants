@@ -7,12 +7,12 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import os
 
+from pex.pex_info import PexInfo
 from twitter.common.collections import maybe_list
 from twitter.common.lang import Compatibility
-from twitter.common.python.pex_info import PexInfo
 
-from pants.base.exceptions import TargetDefinitionException
 from pants.backend.python.targets.python_target import PythonTarget
+from pants.base.exceptions import TargetDefinitionException
 
 
 class PythonBinary(PythonTarget):

@@ -9,8 +9,8 @@ import os
 import tempfile
 import time
 
-from twitter.common.python.interpreter import PythonInterpreter
-from twitter.common.python.pex_builder import PEXBuilder
+from pex.interpreter import PythonInterpreter
+from pex.pex_builder import PEXBuilder
 
 from pants.base.config import Config
 from pants.backend.python.python_chroot import PythonChroot

@@ -5,16 +5,16 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from collections import defaultdict
 import os
 import shutil
 import sys
 import tempfile
-from collections import defaultdict
 
+from pex.interpreter import PythonInterpreter
+from pex.pex_builder import PEXBuilder
+from pex.platforms import Platform
 from twitter.common.collections import OrderedSet
-from twitter.common.python.interpreter import PythonInterpreter
-from twitter.common.python.pex_builder import PEXBuilder
-from twitter.common.python.platforms import Platform
 
 from pants.backend.codegen.targets.python_antlr_library import PythonAntlrLibrary
 from pants.backend.codegen.targets.python_thrift_library import PythonThriftLibrary
