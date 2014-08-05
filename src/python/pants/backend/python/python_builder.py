@@ -5,7 +5,7 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from twitter.common.python.interpreter import PythonInterpreter
+from pex.interpreter import PythonInterpreter
 
 from pants.backend.python.binary_builder import PythonBinaryBuilder
 from pants.backend.python.test_builder import PythonTestBuilder

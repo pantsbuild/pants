@@ -150,9 +150,8 @@ python_library(
     pants(':common'),
     pants(':jvm_binary_task'),
     # TODO(pl): Use twitter.common.lang instead, but for the to_bytes helper, twitter.commons
-    # needs to be updated so the standard compatibility helpers act like the ones in
-    # twitter.common.python
-    pants('3rdparty/python/twitter/commons:twitter.common.python'),
+    # needs to be updated so the standard compatibility helpers act like the ones in pex
+    pants('3rdparty/python:pex'),
     pants('src/python/pants/base:exceptions'),
     pants('src/python/pants/java:jar'),
   ],

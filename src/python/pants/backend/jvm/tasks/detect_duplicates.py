@@ -10,7 +10,7 @@ from contextlib import closing
 import os
 from zipfile import ZipFile
 
-from twitter.common.python.compatibility import to_bytes
+from pex.compatibility import to_bytes
 
 from pants.backend.jvm.tasks.jvm_binary_task import JvmBinaryTask
 from pants.base.exceptions import TaskError
