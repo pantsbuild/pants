@@ -8,6 +8,8 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import copy
 from optparse import OptionGroup
 
+from pants.option.arg_splitter import GLOBAL_SCOPE
+
 
 class LegacyOptionsError(Exception):
   pass
@@ -55,7 +57,7 @@ class LegacyOptions(object):
         elif arg.startswith('--'):
           optparse_args.append('--%s-%s' % (self._scope_prefix, arg[2:]))
         elif arg.startswith('-'):
-          if self._scope_prefix == '':
+          if self._scope_prefix == GLOBAL_SCOPE:
             optparse_args.append(arg)
           else:
             raise LegacyOptionsError('Short legacy options only allowed at global scope: %s' % arg)

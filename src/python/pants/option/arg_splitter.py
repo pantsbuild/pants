@@ -8,6 +8,9 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import sys
 
 
+GLOBAL_SCOPE = ''
+
+
 class ArgSplitterError(Exception):
   pass
 
@@ -53,7 +56,7 @@ class ArgSplitter(object):
       self._unconsumed_args.pop()
 
     global_flags = self._consume_flags()
-    scope_to_flags[''] = global_flags
+    scope_to_flags[GLOBAL_SCOPE] = global_flags
     scope, flags = self._consume_scope()
     while scope:
       scope_to_flags[scope] = flags
