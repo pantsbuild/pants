@@ -2,8 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  name = 'goal',
-  sources = ['goal.py'],
+  name = 'task_registrar',
+  sources = ['task_registrar.py'],
   dependencies = [
     pants(':error'),
     pants(':phase'),

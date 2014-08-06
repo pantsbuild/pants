@@ -131,7 +131,7 @@ class RoundEngine(Engine):
               ordering = '\n\t'.join("[{0}] '{1}' {2}".format(i, goal.name, goal.task_type.__name__)
                                      for i, goal in enumerate(phase_goals))
               raise self.TaskOrderError(
-                  "Goal '{name}' with action {consumer_task} depends on {data} from task "
+                  "TaskRegistrar '{name}' with action {consumer_task} depends on {data} from task "
                   "{producer_task} which is ordered after it in the '{phase}' phase:\n\t{ordering}"
                   .format(name=goal.name,
                           consumer_task=task_type.__name__,
@@ -174,7 +174,7 @@ class RoundEngine(Engine):
     explain = getattr(context.options, 'explain', False)
     if explain:
       print('Phase Execution Order:\n\n%s\n' % execution_phases)
-      print('Phase [Goal->Task] Order:\n')
+      print('Phase [TaskRegistrar->Task] Order:\n')
 
     serialized_phase_executors = [pe for pe in phase_executors if pe.phase.serialize]
     outer_lock_holder = serialized_phase_executors[-1] if serialized_phase_executors else None

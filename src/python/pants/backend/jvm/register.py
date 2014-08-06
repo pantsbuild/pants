@@ -54,7 +54,7 @@ from pants.backend.jvm.tasks.scala_repl import ScalaRepl
 from pants.backend.jvm.tasks.scaladoc_gen import ScaladocGen
 from pants.backend.jvm.tasks.specs_run import SpecsRun
 from pants.base.build_file_aliases import BuildFileAliases
-from pants.goal.goal import Goal as goal
+from pants.goal.task_registrar import TaskRegistrar as task
 from pants.goal.phase import Phase
 
 
@@ -92,22 +92,22 @@ def build_file_aliases():
 
 
 def register_goals():
-  ng_killall = goal(name='ng-killall', action=NailgunKillall)
+  ng_killall = task(name='ng-killall', action=NailgunKillall)
   ng_killall.install().with_description('Kill running nailgun servers.')
 
   Phase('invalidate').install(ng_killall, first=True)
   Phase('clean-all').install(ng_killall, first=True)
   Phase('clean-all-async').install(ng_killall, first=True)
 
-  goal(name='bootstrap-jvm-tools', action=BootstrapJvmTools
+  task(name='bootstrap-jvm-tools', action=BootstrapJvmTools
   ).install('bootstrap').with_description('Bootstrap tools needed for building.')
 
   # Dependency resolution.
-  goal(name='ivy', action=IvyResolve,
+  task(name='ivy', action=IvyResolve,
        dependencies=['gen', 'check-exclusives', 'bootstrap']
   ).install('resolve').with_description('Resolve dependencies and produce dependency reports.')
 
-  goal(name='ivy-imports', action=IvyImports,
+  task(name='ivy-imports', action=IvyImports,
        dependencies=['bootstrap']
   ).install('imports')
 
@@ -146,112 +146,112 @@ def register_goals():
 
   jvm_compile.add_member(JavaCompile)
 
-  goal(name='jvm', action=jvm_compile,
+  task(name='jvm', action=jvm_compile,
        dependencies=['gen', 'resolve', 'check-exclusives', 'bootstrap']
   ).install('compile').with_description('Compile source code.')
 
   # Generate documentation.
 
-  goal(name='javadoc', action=JavadocGen,
+  task(name='javadoc', action=JavadocGen,
        dependencies=['compile', 'bootstrap']
   ).install('doc').with_description('Create documentation.')
 
-  goal(name='scaladoc', action=ScaladocGen,
+  task(name='scaladoc', action=ScaladocGen,
        dependencies=['compile', 'bootstrap']
   ).install('doc')
 
   # Bundling.
 
-  goal(name='jar', action=JarCreate,
+  task(name='jar', action=JarCreate,
        dependencies=['compile', 'resources', 'bootstrap']
   ).install('jar')
 
-  detect_duplicates = goal(name='dup', action=DuplicateDetector,
+  detect_duplicates = task(name='dup', action=DuplicateDetector,
                            dependencies=['compile', 'resources'])
 
-  goal(name='binary', action=BinaryCreate,
+  task(name='binary', action=BinaryCreate,
        dependencies=['compile', 'resources', 'bootstrap']
   ).install().with_description('Create a jvm binary jar.')
 
   detect_duplicates.install('binary')
 
-  goal(name='bundle', action=BundleCreate,
+  task(name='bundle', action=BundleCreate,
        dependencies=['compile', 'resources', 'bootstrap']
   ).install().with_description('Create an application bundle from binary targets.')
 
   detect_duplicates.install('bundle')
 
-  goal(name='detect-duplicates', action=DuplicateDetector,
+  task(name='detect-duplicates', action=DuplicateDetector,
        dependencies=['compile', 'resources'],
   ).install().with_description('Detect duplicate classes and resources on the classpath.')
 
  # Publishing.
 
-  goal(name='check_published_deps', action=CheckPublishedDeps
+  task(name='check_published_deps', action=CheckPublishedDeps
   ).install('check_published_deps').with_description('Find references to outdated artifacts.')
 
-  goal(name='publish', action=JarPublish,
+  task(name='publish', action=JarPublish,
        dependencies=['jar', 'doc']
   ).install('publish').with_description('Publish artifacts.')
 
   # Testing.
 
-  goal(name='junit', action=JUnitRun,
+  task(name='junit', action=JUnitRun,
        dependencies=['compile', 'resources', 'bootstrap']
   ).install('test').with_description('Test compiled code.')
 
-  goal(name='specs', action=SpecsRun,
+  task(name='specs', action=SpecsRun,
        dependencies=['compile', 'resources', 'bootstrap']
   ).install('test')
 
-  goal(name='bench', action=BenchmarkRun,
+  task(name='bench', action=BenchmarkRun,
        dependencies=['compile', 'resources', 'bootstrap']
   ).install('bench')
 
   # Running.
 
-  goal(name='jvm-run', action=JvmRun,
+  task(name='jvm-run', action=JvmRun,
        dependencies=['compile', 'resources', 'bootstrap'], serialize=False
   ).install('run').with_description('Run a binary target.')
 
-  goal(name='jvm-run-dirty', action=JvmRun,
+  task(name='jvm-run-dirty', action=JvmRun,
        serialize=False
   ).install('run-dirty').with_description('Run a binary target, skipping compilation.')
 
-  goal(name='scala-repl', action=ScalaRepl,
+  task(name='scala-repl', action=ScalaRepl,
        dependencies=['compile', 'resources', 'bootstrap'], serialize=False
   ).install('repl').with_description('Run a REPL.')
 
-  goal(name='scala-repl-dirty', action=ScalaRepl,
+  task(name='scala-repl-dirty', action=ScalaRepl,
        serialize=False
   ).install('repl-dirty').with_description('Run a REPL, skipping compilation.')
 
   # IDE support.
 
-  goal(name='idea', action=IdeaGen, dependencies=['bootstrap', 'resolve']
+  task(name='idea', action=IdeaGen, dependencies=['bootstrap', 'resolve']
   ).install().with_description('Create an IntelliJ IDEA project from the given targets.')
 
-  goal(name='eclipse', action=EclipseGen,
+  task(name='eclipse', action=EclipseGen,
        dependencies=['jar', 'bootstrap']
   ).install().with_description('Create an Eclipse project from the given targets.')
 
-  goal(name='ensime', action=EnsimeGen,
+  task(name='ensime', action=EnsimeGen,
        dependencies=['jar', 'bootstrap']
   ).install().with_description('Create an Ensime project from the given targets.')
 
   # Build graph information.
 
-  goal(name='provides', action=Provides,
+  task(name='provides', action=Provides,
        dependencies=['jar', 'bootstrap']
   ).install().with_description('Print the symbols provided by the given targets.')
 
   # XXX(pl): These should be core, but they have dependencies on JVM
-  goal(name='depmap', action=Depmap
+  task(name='depmap', action=Depmap
   ).install().with_description("Depict the target's dependencies.")
 
-  goal(name='dependencies', action=Dependencies
+  task(name='dependencies', action=Dependencies
   ).install().with_description("Print the target's dependencies.")
 
-  goal(name='filedeps', action=FileDeps
+  task(name='filedeps', action=FileDeps
   ).install('filedeps').with_description(
       'Print out the source and BUILD files the target depends on.')

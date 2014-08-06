@@ -39,7 +39,7 @@ def _process_info(pid):
 class Context(object):
   """Contains the context for a single run of pants.
 
-  Goal implementations can access configuration data from pants.ini and any flags they have exposed
+  Task implementations can access configuration data from pants.ini and any flags they have exposed
   here as well as information about the targets involved in the run.
 
   Advanced uses of the context include adding new targets to it for upstream or downstream goals to

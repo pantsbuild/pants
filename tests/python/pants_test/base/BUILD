@@ -157,8 +157,8 @@ python_tests(
     pants('src/python/pants/base:dev_backend_loader'),
     pants('src/python/pants/base:exceptions'),
     pants('src/python/pants/base:target'),
-    pants('src/python/pants/goal'),
     pants('src/python/pants/goal:phase'),
+    pants('src/python/pants/goal:task_registrar'),
   ]
 )
 

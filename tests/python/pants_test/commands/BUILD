@@ -28,7 +28,7 @@ python_tests(
   sources = [ 'test_goal.py' ],
   dependencies = [
     pants('src/python/pants/backend/jvm:plugin'),
-    pants('src/python/pants/commands:goal'),
+    pants('src/python/pants/commands:goal_runner'),
     pants('src/python/pants/goal:phase'),
     pants('tests/python/pants_test:base_test'),
   ]

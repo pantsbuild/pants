@@ -168,7 +168,7 @@ python_library(
   sources = ['list_goals.py'],
   dependencies = [
     pants(':console_task'),
-    pants('src/python/pants/goal'),
+    pants('src/python/pants/goal:phase'),
   ],
 )
 

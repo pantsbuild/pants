@@ -15,13 +15,13 @@ from pants_test.engine.base_engine_test import EngineTestBase
 # and leave this to subclasses that can form a strategy for this like RoundEngine.
 class ExecutionOrderTest(EngineTestBase):
   def test_execution_order(self):
-    self.install_goal('invalidate')
-    self.install_goal('clean-all', dependencies=['invalidate'])
+    self.install_task('invalidate')
+    self.install_task('clean-all', dependencies=['invalidate'])
 
-    self.install_goal('resolve')
-    self.install_goal('javac', dependencies=['resolve'], phase='compile')
-    self.install_goal('scalac', dependencies=['resolve'], phase='compile')
-    self.install_goal('junit', dependencies=['compile'], phase='test')
+    self.install_task('resolve')
+    self.install_task('javac', dependencies=['resolve'], phase='compile')
+    self.install_task('scalac', dependencies=['resolve'], phase='compile')
+    self.install_task('junit', dependencies=['compile'], phase='test')
 
     self.assertEqual(self.as_phases('invalidate', 'clean-all', 'resolve', 'compile', 'test'),
                      list(Engine.execution_order(self.as_phases('clean-all', 'test'))))

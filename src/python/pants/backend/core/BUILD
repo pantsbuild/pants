@@ -4,13 +4,14 @@
 
 python_library(
   name = 'plugin',
-  sources = ['__init__.py', 'register.py'],
+  sources = ['register.py'],
   dependencies = [
     'src/python/pants/backend/core/targets:all',
     'src/python/pants/backend/core/tasks:all',
     'src/python/pants/base:build_file_aliases',
-    'src/python/pants/commands:goal',
-    'src/python/pants/goal',
+    'src/python/pants/commands:goal_runner',
+    'src/python/pants/goal:phase',
+    'src/python/pants/goal:task_registrar',
     ':core',
   ]
 )

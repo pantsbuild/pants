@@ -9,7 +9,6 @@ from abc import abstractmethod
 
 from twitter.common.lang import AbstractClass
 
-from pants.goal.goal import GoalError
 from pants.base.exceptions import TaskError
 
 
@@ -49,7 +48,7 @@ class Engine(AbstractClass):
     try:
       self.attempt(context, phases)
       return 0
-    except (TaskError, GoalError) as e:
+    except TaskError as e:
       message = '%s' % e
       if message:
         print('\nFAILURE: %s\n' % e)

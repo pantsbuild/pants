@@ -17,7 +17,7 @@ from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.dev_backend_loader import load_backend
 from pants.base.exceptions import BuildConfigurationError
 from pants.base.target import Target
-from pants.goal.goal import Goal
+from pants.goal.task_registrar import TaskRegistrar
 from pants.goal.phase import Phase
 
 
@@ -77,7 +77,7 @@ class LoaderTest(unittest2.TestCase):
 
   def test_load_valid_partial_goals(self):
     def register_goals():
-      Phase('jack').install(Goal('jill', lambda: 42))
+      Phase('jack').install(TaskRegistrar('jill', lambda: 42))
 
     with self.create_register(register_goals=register_goals) as backend_package:
       Phase.clear()

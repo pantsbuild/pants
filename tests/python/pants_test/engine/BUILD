@@ -7,7 +7,7 @@ python_library(
   dependencies = [
     pants('tests/python/pants_test:base_test'),
     pants('tests/python/pants_test/base:context_utils'),
-    pants('src/python/pants/goal'),
+    pants('src/python/pants/goal:phase'),
   ]
 )
 

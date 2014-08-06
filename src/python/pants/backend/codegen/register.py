@@ -19,7 +19,7 @@ from pants.backend.codegen.tasks.protobuf_gen import ProtobufGen
 from pants.backend.codegen.tasks.ragel_gen import RagelGen
 from pants.backend.codegen.tasks.scrooge_gen import ScroogeGen
 from pants.base.build_file_aliases import BuildFileAliases
-from pants.goal.goal import Goal as goal
+from pants.goal.task_registrar import TaskRegistrar as task
 
 
 def build_file_aliases():
@@ -37,19 +37,19 @@ def build_file_aliases():
 
 
 def register_goals():
-  goal(name='thrift', action=ApacheThriftGen).install('gen').with_description('Generate code.')
+  task(name='thrift', action=ApacheThriftGen).install('gen').with_description('Generate code.')
 
-  goal(name='scrooge', dependencies=['bootstrap'], action=ScroogeGen).install('gen')
+  task(name='scrooge', dependencies=['bootstrap'], action=ScroogeGen).install('gen')
 
   # TODO(Garrett Malmquist): 'protoc' depends on a nonlocal phase (imports is in the jvm register).
   # This should be cleaned up, with protobuf stuff moved to its own backend. (See John's comment on
   # RB 592).
-  goal(name='protoc', dependencies=['imports'], action=ProtobufGen
+  task(name='protoc', dependencies=['imports'], action=ProtobufGen
   ).install('gen')
 
-  goal(name='antlr', dependencies=['bootstrap'], action=AntlrGen
+  task(name='antlr', dependencies=['bootstrap'], action=AntlrGen
   ).install('gen')
 
-  goal(name='ragel', action=RagelGen).install('gen')
+  task(name='ragel', action=RagelGen).install('gen')
 
-  goal(name='jaxb', action=JaxbGen).install('gen')
+  task(name='jaxb', action=JaxbGen).install('gen')

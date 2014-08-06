@@ -10,8 +10,10 @@ python_library(
     pants('src/python/pants/backend/core/tasks:task'),
     pants('src/python/pants/base:cmd_line_spec_parser'),
     pants('src/python/pants/base:target'),
-    pants('src/python/pants/commands:goal'),
-    pants('src/python/pants/goal'),
+    pants('src/python/pants/commands:goal_runner'),
+    pants('src/python/pants/goal:context'),
+    pants('src/python/pants/goal:phase'),
+    pants('src/python/pants/goal:task_registrar'),
     pants('tests/python/pants_test/base:context_utils'),
     pants('tests/python/pants_test:base_test'),
   ]
@@ -365,7 +367,8 @@ python_tests(
     pants(':base'),
     pants('src/python/pants/backend/core/tasks:list_goals'),
     pants('src/python/pants/backend/core/tasks:common'),
-    pants('src/python/pants/goal'),
+    pants('src/python/pants/goal:phase'),
+    pants('src/python/pants/goal:task_registrar'),
   ],
 )
 
@@ -552,7 +555,7 @@ python_tests(
     pants('src/python/pants/base:address'),
     pants('src/python/pants/base:build_environment'),
     pants('src/python/pants/base:build_file_aliases'),
-    pants('src/python/pants/goal'),
+    pants('src/python/pants/goal:context'),
     pants('src/python/pants/util:contextutil'),
     pants('tests/python/pants_test:base_test'),
   ],

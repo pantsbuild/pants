@@ -38,7 +38,7 @@ python_library(
     # The goal target should be goal:run_tracker but it is inseparable from goal; also
     # an abstraction leak.
     pants('src/python/pants/goal:initialize_reporting'),
-    pants('src/python/pants/goal'),
+    pants('src/python/pants/goal:run_tracker'),
     pants('src/python/pants/reporting'),
     pants('src/python/pants/backend/jvm/tasks:nailgun_task'),
   ],

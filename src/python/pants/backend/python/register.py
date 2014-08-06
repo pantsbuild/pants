@@ -21,7 +21,7 @@ from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.base.build_file_aliases import BuildFileAliases
-from pants.goal.goal import Goal as goal
+from pants.goal.task_registrar import TaskRegistrar as task
 
 
 def build_file_aliases():
@@ -50,15 +50,15 @@ def register_commands():
 
 
 def register_goals():
-  goal(name='python-binary-create', action=PythonBinaryCreate, dependencies=['bootstrap', 'check-exclusives', 'resources']
+  task(name='python-binary-create', action=PythonBinaryCreate, dependencies=['bootstrap', 'check-exclusives', 'resources']
   ).install('binary')
 
-  goal(name='pytest', action=PytestRun, dependencies=['bootstrap', 'check-exclusives', 'resources']
+  task(name='pytest', action=PytestRun, dependencies=['bootstrap', 'check-exclusives', 'resources']
   ).install('test')
 
-  goal(name='python-run', action=PythonRun, dependencies=['bootstrap', 'check-exclusives', 'resources']
+  task(name='python-run', action=PythonRun, dependencies=['bootstrap', 'check-exclusives', 'resources']
   ).install('run')
 
-  goal(name='python-repl', action=PythonRepl, dependencies=['bootstrap', 'check-exclusives', 'resources']
+  task(name='python-repl', action=PythonRepl, dependencies=['bootstrap', 'check-exclusives', 'resources']
   ).install('repl')
 
