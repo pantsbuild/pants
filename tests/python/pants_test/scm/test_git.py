@@ -123,6 +123,17 @@ class GitTest(unittest.TestCase):
 
     self.assertTrue(tip_sha in self.git.changelog())
 
+    merge_base = self.git.merge_base
+    self.assertTrue(merge_base)
+
+    self.assertTrue(merge_base in self.git.changelog())
+
+    try:
+      self.git.origin_push_url
+      self.assertTrue(False)
+    except Scm.LocalException:
+      self.assertTrue(True)
+
     self.assertTrue(self.git.tag_name.startswith('first-'), msg='un-annotated tags should be found')
     self.assertEqual('master', self.git.branch_name)
 
