@@ -33,6 +33,7 @@ python_library(
     pants('src/python/pants/base:exceptions'),
     pants('src/python/pants/base:payload'),
     pants('src/python/pants/base:target'),
+    pants('src/python/pants/base:validation'),
   ],
 )
 
@@ -67,5 +68,6 @@ python_library(
     pants('src/python/pants/base:address'),
     pants('src/python/pants/base:exceptions'),
     pants('src/python/pants/base:target'),
+    pants('src/python/pants/base:validation'),
   ],
 )

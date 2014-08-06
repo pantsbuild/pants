@@ -9,12 +9,16 @@ import collections
 from hashlib import sha1
 import os
 
+from twitter.common.lang import Compatibility
+
 from pants.base.build_environment import get_buildroot
 from pants.base.build_manual import manual
+from pants.base.exceptions import TargetDefinitionException
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
 from pants.base.hash_utils import hash_all
 from pants.base.payload import EmptyPayload
 from pants.base.source_root import SourceRoot
+from pants.base.validation import assert_list
 
 
 class AbstractTarget(object):
@@ -173,6 +177,9 @@ class Target(AbstractTarget):
 
     self._cached_fingerprint_map = {}
     self._cached_transitive_fingerprint_map = {}
+
+  def assert_list(self, maybe_list, expected_type=Compatibility.string):
+    return assert_list(maybe_list, expected_type, raise_type=lambda msg: TargetDefinitionException(self, msg))
 
   def compute_invalidation_hash(self, fingerprint_strategy=None):
     fingerprint_strategy = fingerprint_strategy or DefaultFingerprintStrategy()
@@ -382,4 +389,5 @@ class Target(AbstractTarget):
     return not self.__eq__(other)
 
   def __repr__(self):
-    return "%s(%s)" % (type(self).__name__, self.address)
+    addr = self.address if hasattr(self, 'address') else 'address not yet set'
+    return "%s(%s)" % (type(self).__name__, addr)

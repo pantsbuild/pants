@@ -8,10 +8,12 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 from twitter.common.lang import Compatibility
 
 from pants.backend.core.targets.resources import Resources
+from pants.backend.jvm.targets.exclude import Exclude
 from pants.base.address import SyntheticAddress
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import JvmTargetPayload
 from pants.base.target import Target
+from pants.base.validation import assert_list
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jarable import Jarable
 
@@ -44,14 +46,14 @@ class JvmTarget(Target, Jarable):
     """
 
     sources_rel_path = sources_rel_path or address.spec_path
-    payload = JvmTargetPayload(sources=sources,
+    payload = JvmTargetPayload(sources=self.assert_list(sources),
                                sources_rel_path=sources_rel_path,
                                provides=provides,
-                               excludes=excludes,
-                               configurations=configurations)
+                               excludes=self.assert_list(excludes, expected_type=Exclude),
+                               configurations=self.assert_list(configurations))
     super(JvmTarget, self).__init__(address=address, payload=payload, **kwargs)
 
-    self._resource_specs = resources or []
+    self._resource_specs = self.assert_list(resources)
     self.add_labels('jvm')
 
   _jar_dependencies = None
