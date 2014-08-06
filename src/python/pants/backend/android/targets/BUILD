@@ -13,7 +13,6 @@ python_library(
   name = 'android',
   sources = [
     'android_binary.py',
-    'android_dex'
     'android_resources.py',
     'android_target.py',
   ],
