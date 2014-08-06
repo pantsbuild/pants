@@ -48,7 +48,6 @@ class AndroidTarget(JvmTarget):
     self.build_tools_version = build_tools_version
     self.release_type = release_type
 
-    # This needs a more robust error message. There is no hint to show where the path may be wrong
     if not os.path.isfile(os.path.join(address.spec_path, manifest)):
       raise TargetDefinitionException(self, 'Android targets must specify a \'manifest\' '
                                             'that points to the \'AndroidManifest.xml\'')
