@@ -34,7 +34,7 @@ class DxCompile(AndroidTask, NailgunTask):
 
     option_group.add_option(mkflag("VM-options"), dest="vm_options",
                             help="[%default] Pass VM-specific options to the virtual machine "
-                                 "that runs dx.")
+                                 "that runs dx (e.g. Xmx1024m).")
 
   @classmethod
   def is_dextarget(cls, target):
