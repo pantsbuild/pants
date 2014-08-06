@@ -48,6 +48,6 @@ python_library(
     pants('src/python/pants/backend/jvm/targets:java'),
     pants('src/python/pants/base:address'),
     pants('src/python/pants/base:exceptions'),
-    pants('src/python/pants/base:work_unit'),
+    pants('src/python/pants/base:workunit'),
   ],
 )
