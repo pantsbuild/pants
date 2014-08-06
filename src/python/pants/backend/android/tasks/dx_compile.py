@@ -56,9 +56,11 @@ class DxCompile(AndroidTask, NailgunTask):
 
 
   def execute(self):
-    safe_mkdir(self.workdir)
+    #safe_mkdir(self.workdir)
     with self.context.new_workunit(name='dx-compile', labels=[WorkUnit.MULTITOOL]):
       for target in self.context.targets(predicate=self.is_dextarget):
+        out_dir = os.path.join(self.workdir, target.id)
+        safe_mkdir(out_dir)
         classes_by_target = self.context.products.get_data('classes_by_target')
         dex_classes = []
 
@@ -74,12 +76,14 @@ class DxCompile(AndroidTask, NailgunTask):
             add_classes(target_classes)
         target.walk(add_to_dex)
 
+        #args = self.render_args(args)
         args = []
-        jar_name = 'classes.dex'
-        jar_path = os.path.join(self.workdir, jar_name)
+        dex_file = 'classes.dex'
+        jar_path = os.path.join(out_dir, dex_file)
         args.extend(['--dex', '--no-strict', '--output=' + jar_path])
         args.extend(dex_classes)
         self._compile_dex(args, target.build_tools_version)
+        self.context.products.get('dex').add(target, out_dir).append(dex_file)
 
 
     #TODO check for empty class files there is no valid empty dex file.
