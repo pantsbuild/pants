@@ -13,7 +13,8 @@ class AndroidTask(Task):
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
     option_group.add_option(mkflag('sdk-path'), dest='sdk_path', type='string',
-                            help='Specify a specific Android SDK to pass to tasks.')
+                            help='Specify a file location and force the Android SDK there to '
+                                 'be used during Android tasks.')
 
   def __init__(self, context, workdir):
     super(AndroidTask, self).__init__(context, workdir)
