@@ -11,15 +11,18 @@ import os
 from pants.backend.android.targets.android_binary import AndroidBinary
 from pants.backend.android.tasks.android_task import AndroidTask
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
-from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit
 from pants.util.dirutil import safe_mkdir
 
-class DxCompile(AndroidTask, NailgunTask):
+
+class DxCompile(NailgunTask, AndroidTask):
   """
   Compile java classes into dex files, Dalvik executables.
   """
+
   _CONFIG_SECTION = 'dx-tool'
+# name of output file. "Output name must end with one of: .dex .jar .zip .apk or be a directory."
+  classes_dex = 'classes.dex'
 
   # @classmethod
   # def setup_parser(cls, option_group, args, mkflag):
@@ -48,6 +51,20 @@ class DxCompile(AndroidTask, NailgunTask):
   def config_section(self):
     return self._CONFIG_SECTION
 
+  def _render_args(self, out, classes):
+    dex_file = os.path.join(out, self.classes_dex)
+    args = []
+    # Glossary of dx.jar flags.
+    #   : '--dex' to create a Dalvik executable.
+    #   : '--no-strict' allows the dx.jar to skip verifying the package path. This allows us to
+    #            pass a list of classes as opposed to a top-level dir.
+    #   : '--output' tells the dx.jar where to put and what to name the created file.
+    #            See comment on self.classes_dex for restrictions.
+    args.extend(['--dex', '--no-strict', '--output=' + dex_file])
+
+    # classes is a list of class files to be included in the created file.
+    args.extend(classes)
+    return args
 
   def _compile_dex(self, args, build_tools_version):
     classpath = [self.dx_jar_tool(build_tools_version)]
@@ -73,18 +90,11 @@ class DxCompile(AndroidTask, NailgunTask):
                   classes.append(prod)
 
             add_classes(target_classes)
+
         target.walk(add_to_dex)
-
-        args = []
-        classes_dex = 'classes.dex'
-        dex_file = os.path.join(out_dir, classes_dex)
-        args.extend(['--dex', '--no-strict', '--output=' + dex_file])
-        args.extend(classes)
+        args = self._render_args(out_dir, classes)
         self._compile_dex(args, target.build_tools_version)
-        self.context.products.get('dex').add(target, out_dir).append(classes_dex)
-
-
-    #TODO check for empty class files there is no valid empty dex file.
+        self.context.products.get('dex').add(target, out_dir).append(self.classes_dex)
 
   def dx_jar_tool(self, build_tools_version):
     """Return the appropriate dx.jar.
