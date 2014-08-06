@@ -38,6 +38,8 @@ class DxCompile(AndroidTask, NailgunTask):
   def __init__(self, context, workdir):
     super(DxCompile, self).__init__(context, workdir)
     self._android_dist = self.android_sdk
+    config_section = self.config_section
+    self.setup_artifact_cache_from_config(config_section=config_section)
 
   def prepare(self, round_manager):
     round_manager.require_data('classes_by_target')
