@@ -50,7 +50,9 @@ class AndroidTarget(JvmTarget):
 
     if not os.path.isfile(os.path.join(address.spec_path, manifest)):
       raise TargetDefinitionException(self, 'Android targets must specify a \'manifest\' '
-                                            'that points to the \'AndroidManifest.xml\'')
+                                            'that points to the \'AndroidManifest.xml\'. '
+                                            'No manifest was found at {0!r}'
+                                             .format(os.path.join(address.spec_path, manifest)))
     self.manifest = os.path.join(self.address.spec_path, manifest)
     self.package = self.get_package_name()
     self.target_sdk = self.get_target_sdk()
