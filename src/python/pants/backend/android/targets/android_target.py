@@ -8,11 +8,12 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import os
 from xml.dom.minidom import parse
 
-from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.exceptions import TargetDefinitionException
+from pants.base.payload import JvmTargetPayload
+from pants.base.target import Target
 
 
-class AndroidTarget(JvmTarget):
+class AndroidTarget(Target):
   """A base class for all Android targets."""
 
   # Missing attributes from the AndroidManifest would eventually error in the compilation process.
@@ -20,8 +21,13 @@ class AndroidTarget(JvmTarget):
   class BadManifestError(Exception):
     """Indicates an invalid android manifest."""
 
+
   def __init__(self,
                address=None,
+               sources=None,
+               sources_rel_path=None,
+               excludes=None,
+               provides=None,
                # most recent build_tools_version should be defined elsewhere
                build_tools_version="19.1.0",
                manifest=None,
@@ -42,7 +48,14 @@ class AndroidTarget(JvmTarget):
     :param release_type: Which keystore is used to sign target: 'debug' or 'release'.
       Set as 'debug' by default.
     """
-    super(AndroidTarget, self).__init__(address=address, **kwargs)
+
+    sources_rel_path = sources_rel_path or address.spec_path
+    # No reasons why we might need AndroidPayload have presented themselves yet
+    payload = JvmTargetPayload(sources=sources,
+                               sources_rel_path=sources_rel_path,
+                               provides=provides,
+                               excludes=excludes)
+    super(AndroidTarget, self).__init__(address=address, payload=payload, **kwargs)
 
     self.add_labels('android')
     self.build_tools_version = build_tools_version
@@ -51,7 +64,7 @@ class AndroidTarget(JvmTarget):
     # This needs a more robust error message. There is no hint to show where the path may be wrong
     if not os.path.isfile(os.path.join(address.spec_path, manifest)):
       raise TargetDefinitionException(self, 'Android targets must specify a \'manifest\' '
-                                            'that points to the \'AndroidManifest.xml\'')
+                                  'that points to the \'AndroidManifest.xml\'')
     self.manifest = os.path.join(self.address.spec_path, manifest)
     self.package = self.get_package_name()
     self.target_sdk = self.get_target_sdk()
