@@ -21,26 +21,25 @@ class DxCompileIntegrationTest(PantsRunIntegrationTest):
   not a guarantee that there is a dx.jar anywhere on the machine.
 
   """
-
   BUILD_TOOLS = '19.1.0'
-  DEX_FILE = 'classes.dex'
   TARGET_SDK = '19'
-  SDK_HOME = os.environ.get('ANDROID_HOME')
-  ANDROID_SDK = os.path.abspath(SDK_HOME) if SDK_HOME else None
+  ANDROID_SDK_LOCATION = 'ANDROID_HOME'
+  DEX_FILE = 'classes.dex'
 
-
-  # wrapped in an if block to avoid calling os.path.join on a None object.
   @classmethod
   def requirements(cls):
-    if cls.ANDROID_SDK:
-      if os.path.isfile(os.path.join(cls.ANDROID_SDK, 'build-tools', cls.BUILD_TOOLS, 'lib', 'dx.jar')):
-        if os.path.isfile(os.path.join(cls.ANDROID_SDK, 'platforms', 'android-' + cls.TARGET_SDK, 'android.jar')):
+    sdk_home = os.environ.get('ANDROID_HOME')
+    verified_sdk = os.path.abspath(sdk_home) if sdk_home else None
+    if verified_sdk:
+      if os.path.isfile(os.path.join(verified_sdk, 'build-tools', cls.BUILD_TOOLS, 'lib', 'dx.jar')):
+        if os.path.isfile(os.path.join(verified_sdk, 'platforms', 'android-' + cls.TARGET_SDK,
+                                       'android.jar')):
           return True
     return False
 
   @pytest.mark.skipif('not DxCompileIntegrationTest.requirements()',
-                      reason='This integration test requires Android build-tools {0!r} to be'
-                             'installed and ANDROID_HOME set in path.'.format(BUILD_TOOLS))
+                      reason='Dx integration test requires Android build-tools {0!r}, SDK {1!r}'
+                             ' and ANDROID_HOME set in path.'.format(BUILD_TOOLS, TARGET_SDK))
 
   def test_dx_compile(self):
     self.publish_test('src/android/example:hello')
