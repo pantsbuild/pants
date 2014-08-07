@@ -8,7 +8,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import os
 import pytest
 
-from pants.util.contextutil import temporary_dir
+from pants.base.build_environment import get_buildroot
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
@@ -21,27 +21,31 @@ class DxCompileIntegrationTest(PantsRunIntegrationTest):
   not a guarantee that there is a dx.jar anywhere on the machine.
 
   """
-  SDK_HOME = os.environ.get('ANDROID_HOME')
-  ANDROID_SDK = os.path.abspath(SDK_HOME) if SDK_HOME else None
+
   BUILD_TOOLS = '19.1.0'
   DEX_FILE = 'classes.dex'
+  TARGET_SDK = '19'
+  SDK_HOME = os.environ.get('ANDROID_HOME')
+  ANDROID_SDK = os.path.abspath(SDK_HOME) if SDK_HOME else None
+
 
   # wrapped in an if block to avoid calling os.path.join on a None object.
-  if ANDROID_SDK:
-    DEX_JAR = os.path.isfile(os.path.join(ANDROID_SDK, 'build-tools', BUILD_TOOLS, 'lib', 'dx.jar'))
-  else:
-    DEX_JAR = None
-  @pytest.mark.skipif('not DxCompileIntegrationTest.DEX_JAR',
+  @classmethod
+  def requirements(cls):
+    if cls.ANDROID_SDK:
+      if os.path.isfile(os.path.join(cls.ANDROID_SDK, 'build-tools', cls.BUILD_TOOLS, 'lib', 'dx.jar')):
+        if os.path.isfile(os.path.join(cls.ANDROID_SDK, 'platforms', 'android-' + cls.TARGET_SDK, 'android.jar')):
+          return True
+    return False
+
+  @pytest.mark.skipif('not DxCompileIntegrationTest.requirements()',
                       reason='This integration test requires Android build-tools {0!r} to be'
                              'installed and ANDROID_HOME set in path.'.format(BUILD_TOOLS))
 
   def test_dx_compile(self):
-    self.publish_test('src/android/example:hello', 'src.android.example.hello', self.DEX_FILE)
+    self.publish_test('src/android/example:hello')
 
-  def publish_test(self, target, package_namespace, artifact):
-
-    with temporary_dir() as publish_dir:
-
+  def publish_test(self, target):
       pants_run = self.run_pants(['goal', 'dex', target] )
       self.assertEquals(pants_run.returncode, self.PANTS_SUCCESS_CODE,
                         "goal publish expected success, got {0}\n"
@@ -49,6 +53,3 @@ class DxCompileIntegrationTest(PantsRunIntegrationTest):
                         "got stdout:\n{2}\n".format(pants_run.returncode,
                                                     pants_run.stderr_data,
                                                     pants_run.stdout_data))
-
-      artifact_path = os.path.join(publish_dir, package_namespace, artifact)
-      #self.assertTrue(os.path.isfile(artifact_path))

@@ -24,5 +24,6 @@ python_tests(
     pants('tests/python/pants_test:int-test'),
     pants('tests/python/pants_test/tasks:base'),
     pants('src/python/pants/backend/android/tasks:all'),
+    pants('src/python/pants/base:build_environment'),
   ],
 )
