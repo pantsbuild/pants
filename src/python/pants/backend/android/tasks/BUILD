@@ -7,6 +7,7 @@ python_library(
   dependencies = [
     ':android_task',
     ':aapt_gen',
+    ':aapt_task',
     ':dx_compile',
   ],
 )
@@ -17,6 +18,14 @@ python_library(
   dependencies = [
     pants('src/python/pants/backend/core/tasks:common'),
     pants('src/python/pants/backend/android:android_distribution'),
+  ],
+)
+
+python_library(
+  name = 'aapt_task',
+  sources = ['android_task.py'],
+  dependencies = [
+    pants('src/python/pants/backend/android/tasks:android_task'),
   ],
 )
 
