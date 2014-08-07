@@ -58,6 +58,7 @@ python_library(
   sources = ['jvm_compile.py'],
   dependencies = [
     pants(':jvm_dependency_analyzer'),
+    pants(':jvm_fingerprint_strategy'),
     pants('src/python/pants/backend/core/tasks:group_task'),
     pants('src/python/pants/backend/core/tasks:task'),
     pants('src/python/pants/backend/jvm/tasks:jvm_tool_task_mixin'),
@@ -69,6 +70,15 @@ python_library(
     pants('src/python/pants/reporting'),
     pants('src/python/pants/util:contextutil'),
     pants('src/python/pants/util:dirutil'),
+  ],
+)
+
+python_library(
+  name = 'jvm_fingerprint_strategy',
+  sources = ['jvm_fingerprint_strategy.py'],
+  dependencies = [
+    pants('src/python/pants/base:hash_utils'),
+    pants('src/python/pants/base:target'),
   ],
 )
 

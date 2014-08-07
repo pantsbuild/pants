@@ -58,11 +58,10 @@ python_tests(
   name = 'exclusive',
   sources = ['test_exclusive.py'],
   dependencies = [
-    pants(':base'),
     pants('src/python/pants/base:config'),
-    pants('src/python/pants/goal:goal'),
     pants('src/python/pants/backend/core/tasks:check_exclusives'),
     pants('src/python/pants/util:contextutil'),
+    pants('tests/python/pants_test:base_test'),
   ]
 )
 

@@ -168,7 +168,7 @@ python_library(
   sources = ['list_goals.py'],
   dependencies = [
     pants(':console_task'),
-    pants('src/python/pants/goal'),
+    pants('src/python/pants/goal:phase'),
   ],
 )
 
@@ -184,6 +184,7 @@ python_library(
 python_library(
   name = 'markdown_to_html',
   sources = ['markdown_to_html.py'],
+  resources = globs('templates/markdown/*.mustache'),
   dependencies = [
     pants('3rdparty/python:Markdown'),
     pants('3rdparty/python:Pygments'),

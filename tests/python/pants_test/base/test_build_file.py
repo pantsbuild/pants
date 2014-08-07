@@ -8,7 +8,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import os
 import shutil
 import tempfile
-import unittest
+import unittest2
 
 from twitter.common.collections import OrderedSet
 
@@ -16,7 +16,7 @@ from pants.base.build_file import BuildFile
 from pants.util.dirutil import safe_mkdir, touch
 
 
-class BuildFileTest(unittest.TestCase):
+class BuildFileTest(unittest2.TestCase):
 
   @classmethod
   def makedirs(cls, path):
@@ -51,6 +51,9 @@ class BuildFileTest(unittest.TestCase):
     BuildFileTest.touch('grandparent/parent/child2/child3/BUILD')
     BuildFileTest.makedirs('grandparent/parent/child2/BUILD')
     BuildFileTest.makedirs('grandparent/parent/child4')
+    BuildFileTest.makedirs('path-that-does-exist')
+    BuildFileTest.touch('path-that-does-exist/BUILD.invalid.suffix')
+
 
   @classmethod
   def tearDownClass(cls):
@@ -92,6 +95,14 @@ class BuildFileTest(unittest.TestCase):
   def testMustExistFalse(self):
     buildfile = BuildFile(BuildFileTest.root_dir, "path-that-does-not-exist/BUILD", must_exist=False)
     self.assertEquals(OrderedSet([buildfile]), buildfile.family())
+
+  def testMustExistTrue(self):
+    with self.assertRaises(BuildFile.MissingBuildFileError):
+      BuildFile(BuildFileTest.root_dir, "path-that-does-not-exist/BUILD", must_exist=True)
+    with self.assertRaises(BuildFile.MissingBuildFileError):
+      BuildFile(BuildFileTest.root_dir, "path-that-does-exist/BUILD", must_exist=True)
+    with self.assertRaises(BuildFile.MissingBuildFileError):
+      BuildFile(BuildFileTest.root_dir, "path-that-does-exist/BUILD.invalid.suffix", must_exist=True)
 
   def testSuffixOnly(self):
     BuildFileTest.makedirs('suffix-test')

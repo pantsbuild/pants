@@ -56,9 +56,9 @@ class RoundEngineTest(EngineTestBase, BaseTest):
 
     return RecordingTask
 
-  def install_goal(self, name, product_types=None, phase=None, required_data=None):
+  def install_task(self, name, product_types=None, phase=None, required_data=None):
     task = self.record(name, product_types, required_data)
-    return super(RoundEngineTest, self).install_goal(name=name, action=task, phase=phase)
+    return super(RoundEngineTest, self).install_task(name=name, action=task, phase=phase)
 
   def assert_actions(self, *expected_execute_ordering):
     expected_pre_execute_actions = set()
@@ -73,10 +73,10 @@ class RoundEngineTest(EngineTestBase, BaseTest):
     self.assertEqual(expected_execute_actions, self.actions[-len(expected_execute_ordering):])
 
   def test_lifecycle_ordering(self):
-    self.install_goal('task1', phase='phase1', product_types=['1'])
-    self.install_goal('task2', phase='phase1', product_types=['2'], required_data=['1'])
-    self.install_goal('task3', phase='phase3', product_types=['3'], required_data=['2'])
-    self.install_goal('task4', phase='phase4', required_data=['1', '2', '3'])
+    self.install_task('task1', phase='phase1', product_types=['1'])
+    self.install_task('task2', phase='phase1', product_types=['2'], required_data=['1'])
+    self.install_task('task3', phase='phase3', product_types=['3'], required_data=['2'])
+    self.install_task('task4', phase='phase4', required_data=['1', '2', '3'])
 
     self.engine.attempt(self._context, self.as_phases('phase4'))
 
@@ -86,63 +86,63 @@ class RoundEngineTest(EngineTestBase, BaseTest):
     # Here we swap the order of phase3 and phase4 task installation from the order in
     # `test_lifecycle_ordering` above.  We can't swap task1 and task2 since they purposefully
     # do have an implicit order dependence with a dep inside the same phase.
-    self.install_goal('task1', phase='phase1', product_types=['1'])
-    self.install_goal('task2', phase='phase1', product_types=['2'], required_data=['1'])
-    self.install_goal('task4', phase='phase4', required_data=['1', '2', '3'])
-    self.install_goal('task3', phase='phase3', product_types=['3'], required_data=['2'])
+    self.install_task('task1', phase='phase1', product_types=['1'])
+    self.install_task('task2', phase='phase1', product_types=['2'], required_data=['1'])
+    self.install_task('task4', phase='phase4', required_data=['1', '2', '3'])
+    self.install_task('task3', phase='phase3', product_types=['3'], required_data=['2'])
 
     self.engine.attempt(self._context, self.as_phases('phase4'))
 
     self.assert_actions('task1', 'task2', 'task3', 'task4')
 
   def test_inter_phase_dep(self):
-    self.install_goal('task1', phase='phase1', product_types=['1'])
-    self.install_goal('task2', phase='phase1', required_data=['1'])
+    self.install_task('task1', phase='phase1', product_types=['1'])
+    self.install_task('task2', phase='phase1', required_data=['1'])
 
     self.engine.attempt(self._context, self.as_phases('phase1'))
 
     self.assert_actions('task1', 'task2')
 
   def test_inter_phase_dep_self_cycle(self):
-    self.install_goal('task1', phase='phase1', product_types=['1'], required_data=['1'])
+    self.install_task('task1', phase='phase1', product_types=['1'], required_data=['1'])
 
     with self.assertRaises(self.engine.TaskOrderError):
       self.engine.attempt(self._context, self.as_phases('phase1'))
 
   def test_inter_phase_dep_downstream(self):
-    self.install_goal('task1', phase='phase1', required_data=['1'])
-    self.install_goal('task2', phase='phase1', product_types=['1'])
+    self.install_task('task1', phase='phase1', required_data=['1'])
+    self.install_task('task2', phase='phase1', product_types=['1'])
 
     with self.assertRaises(self.engine.TaskOrderError):
       self.engine.attempt(self._context, self.as_phases('phase1'))
 
   def test_missing_product(self):
-    self.install_goal('task1', phase='phase1', required_data=['1'])
+    self.install_task('task1', phase='phase1', required_data=['1'])
 
     with self.assertRaises(self.engine.MissingProductError):
       self.engine.attempt(self._context, self.as_phases('phase1'))
 
   def test_phase_cycle_direct(self):
-    self.install_goal('task1', phase='phase1', required_data=['2'], product_types=['1'])
-    self.install_goal('task2', phase='phase2', required_data=['1'], product_types=['2'])
+    self.install_task('task1', phase='phase1', required_data=['2'], product_types=['1'])
+    self.install_task('task2', phase='phase2', required_data=['1'], product_types=['2'])
 
     for phase in ('phase1', 'phase2'):
       with self.assertRaises(self.engine.PhaseCycleError):
         self.engine.attempt(self._context, self.as_phases(phase))
 
   def test_phase_cycle_indirect(self):
-    self.install_goal('task1', phase='phase1', required_data=['2'], product_types=['1'])
-    self.install_goal('task2', phase='phase2', required_data=['3'], product_types=['2'])
-    self.install_goal('task3', phase='phase3', required_data=['1'], product_types=['3'])
+    self.install_task('task1', phase='phase1', required_data=['2'], product_types=['1'])
+    self.install_task('task2', phase='phase2', required_data=['3'], product_types=['2'])
+    self.install_task('task3', phase='phase3', required_data=['1'], product_types=['3'])
 
     for phase in ('phase1', 'phase2', 'phase3'):
       with self.assertRaises(self.engine.PhaseCycleError):
         self.engine.attempt(self._context, self.as_phases(phase))
 
   def test_phase_ordering_unconstrained_respects_cli_order(self):
-    self.install_goal('task1', phase='phase1')
-    self.install_goal('task2', phase='phase2')
-    self.install_goal('task3', phase='phase3')
+    self.install_task('task1', phase='phase1')
+    self.install_task('task2', phase='phase2')
+    self.install_task('task3', phase='phase3')
 
     for permutation in itertools.permutations([('task1', 'phase1'),
                                                ('task2', 'phase2'),
@@ -154,19 +154,19 @@ class RoundEngineTest(EngineTestBase, BaseTest):
       self.assert_actions(*expected_execute_actions)
 
   def test_phase_ordering_constrained_conflicts_cli_order(self):
-    self.install_goal('task1', phase='phase1', required_data=['2'])
-    self.install_goal('task2', phase='phase2', product_types=['2'])
+    self.install_task('task1', phase='phase1', required_data=['2'])
+    self.install_task('task2', phase='phase2', product_types=['2'])
 
     self.engine.attempt(self._context, self.as_phases('phase1', 'phase2'))
 
     self.assert_actions('task2', 'task1')
 
   def test_phase_ordering_mixed_constraints_and_cli_order(self):
-    self.install_goal('task1', phase='phase1')
-    self.install_goal('task2', phase='phase2')
-    self.install_goal('task3', phase='phase3')
-    self.install_goal('task4', phase='phase4', required_data=['5'])
-    self.install_goal('task5', phase='phase5', product_types=['5'])
+    self.install_task('task1', phase='phase1')
+    self.install_task('task2', phase='phase2')
+    self.install_task('task3', phase='phase3')
+    self.install_task('task4', phase='phase4', required_data=['5'])
+    self.install_task('task5', phase='phase5', product_types=['5'])
 
     self.engine.attempt(self._context,
                         self.as_phases('phase1', 'phase2', 'phase4', 'phase5', 'phase3'))
@@ -174,9 +174,9 @@ class RoundEngineTest(EngineTestBase, BaseTest):
     self.assert_actions('task1', 'task2', 'task5', 'task4', 'task3')
 
   def test_cli_phases_deduped(self):
-    self.install_goal('task1', phase='phase1')
-    self.install_goal('task2', phase='phase2')
-    self.install_goal('task3', phase='phase3')
+    self.install_task('task1', phase='phase1')
+    self.install_task('task2', phase='phase2')
+    self.install_task('task3', phase='phase3')
 
     self.engine.attempt(self._context,
                         self.as_phases('phase1', 'phase2', 'phase1', 'phase3', 'phase2'))

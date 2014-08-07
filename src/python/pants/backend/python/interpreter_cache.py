@@ -6,13 +6,14 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import os
+from pkg_resources import Requirement
 import shutil
 
-from pkg_resources import Requirement
-from twitter.common.python.installer import EggInstaller
-from twitter.common.python.interpreter import PythonCapability, PythonIdentity, PythonInterpreter
-from twitter.common.python.obtainer import Obtainer
-from twitter.common.python.package import EggPackage, SourcePackage
+
+from pex.installer import EggInstaller
+from pex.interpreter import PythonIdentity, PythonInterpreter
+from pex.obtainer import Obtainer
+from pex.package import EggPackage, SourcePackage
 
 from pants.backend.python.python_setup import PythonSetup
 from pants.backend.python.resolver import crawler_from_config, fetchers_from_config
@@ -34,7 +35,7 @@ def _resolve_interpreter(config, interpreter, requirement, logger=print):
     ``None`` if it's not possible to install a suitable requirement."""
   interpreter_cache = PythonInterpreterCache._cache_dir(config)
   interpreter_dir = os.path.join(interpreter_cache, str(interpreter.identity))
-  if interpreter.satisfies(PythonCapability([requirement])):
+  if interpreter.satisfies([requirement]):
     return interpreter
 
   def installer_provider(sdist):

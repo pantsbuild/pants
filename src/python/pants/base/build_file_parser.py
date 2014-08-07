@@ -100,6 +100,7 @@ class BuildFileParser(object):
       return
 
     self._populate_target_proxy_transitive_closure_for_address(address)
+
     target_proxy = self._target_proxy_by_address[address]
 
     if not build_graph.contains_address(address):
@@ -237,10 +238,15 @@ class BuildFileParser(object):
     target_proxy = self._target_proxy_by_address[address]
     addresses_already_closed.add(address)
 
-    for dep_address in target_proxy.dependency_addresses(BuildFileCache.spec_path_to_build_file):
-      if dep_address not in addresses_already_closed:
-        self._populate_target_proxy_transitive_closure_for_address(dep_address,
+    try:
+      for dep_address in target_proxy.dependency_addresses(BuildFileCache.spec_path_to_build_file):
+        if dep_address not in addresses_already_closed:
+          self._populate_target_proxy_transitive_closure_for_address(dep_address,
                                                                    addresses_already_closed)
+    except BuildFile.MissingBuildFileError as e:
+      raise BuildFile.MissingBuildFileError("{message}\n  referenced from {spec}"
+                                        .format(message=e.message,
+                                                spec=address.spec))
 
   def parse_build_file_family(self, build_file):
     if build_file not in self._added_build_file_families:

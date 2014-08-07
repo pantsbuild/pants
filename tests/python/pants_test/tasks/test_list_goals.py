@@ -7,8 +7,8 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from pants.backend.core.tasks.list_goals import ListGoals
 from pants.backend.core.tasks.task import Task
-from pants.goal.goal import Goal
 from pants.goal.phase import Phase
+from pants.goal.task_registrar import TaskRegistrar
 from pants_test.tasks.test_base import ConsoleTaskTest
 
 
@@ -35,14 +35,14 @@ class ListGoalsTest(ConsoleTaskTest):
     Phase.clear()
     self.assert_console_output(self._INSTALLED_HEADER)
 
-    Goal(name=self._LIST_GOALS_NAME, action=ListGoals)\
+    TaskRegistrar(name=self._LIST_GOALS_NAME, action=ListGoals)\
       .install().with_description(self._LIST_GOALS_DESC)
     self.assert_console_output(
       self._INSTALLED_HEADER,
       '  %s: %s' % (self._LIST_GOALS_NAME, self._LIST_GOALS_DESC),
     )
 
-    Goal(name=self._LLAMA_NAME, action=ListGoalsTest.LlamaTask)\
+    TaskRegistrar(name=self._LLAMA_NAME, action=ListGoalsTest.LlamaTask)\
       .install().with_description(self._LLAMA_DESC)
     self.assert_console_output(
       self._INSTALLED_HEADER,
@@ -50,7 +50,7 @@ class ListGoalsTest(ConsoleTaskTest):
       '  %s: %s' % (self._LLAMA_NAME, self._LLAMA_DESC),
     )
 
-    Goal(name=self._ALPACA_NAME, action=ListGoalsTest.AlpacaTask, dependencies=[self._LLAMA_NAME])\
+    TaskRegistrar(name=self._ALPACA_NAME, action=ListGoalsTest.AlpacaTask, dependencies=[self._LLAMA_NAME])\
       .install()
     self.assert_console_output(
       self._INSTALLED_HEADER,
@@ -61,11 +61,11 @@ class ListGoalsTest(ConsoleTaskTest):
   def test_list_goals_all(self):
     Phase.clear()
 
-    Goal(name=self._LIST_GOALS_NAME, action=ListGoals)\
+    TaskRegistrar(name=self._LIST_GOALS_NAME, action=ListGoals)\
       .install().with_description(self._LIST_GOALS_DESC)
-    Goal(name=self._LLAMA_NAME, action=ListGoalsTest.LlamaTask)\
+    TaskRegistrar(name=self._LLAMA_NAME, action=ListGoalsTest.LlamaTask)\
       .install().with_description(self._LLAMA_DESC)
-    Goal(name=self._ALPACA_NAME, action=ListGoalsTest.AlpacaTask, dependencies=[self._LLAMA_NAME])\
+    TaskRegistrar(name=self._ALPACA_NAME, action=ListGoalsTest.AlpacaTask, dependencies=[self._LLAMA_NAME])\
       .install()
 
     self.assert_console_output(
@@ -81,11 +81,11 @@ class ListGoalsTest(ConsoleTaskTest):
   def test_list_goals_graph(self):
     Phase.clear()
 
-    Goal(name=self._LIST_GOALS_NAME, action=ListGoals)\
+    TaskRegistrar(name=self._LIST_GOALS_NAME, action=ListGoals)\
       .install().with_description(self._LIST_GOALS_DESC)
-    Goal(name=self._LLAMA_NAME, action=ListGoalsTest.LlamaTask)\
+    TaskRegistrar(name=self._LLAMA_NAME, action=ListGoalsTest.LlamaTask)\
       .install().with_description(self._LLAMA_DESC)
-    Goal(name=self._ALPACA_NAME, action=ListGoalsTest.AlpacaTask, dependencies=[self._LLAMA_NAME])\
+    TaskRegistrar(name=self._ALPACA_NAME, action=ListGoalsTest.AlpacaTask, dependencies=[self._LLAMA_NAME])\
       .install()
 
     self.assert_console_output(

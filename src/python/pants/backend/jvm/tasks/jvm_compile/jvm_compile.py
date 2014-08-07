@@ -15,6 +15,7 @@ from twitter.common.collections import OrderedSet
 
 from pants.backend.core.tasks.group_task import GroupMember
 from pants.backend.jvm.tasks.jvm_compile.jvm_dependency_analyzer import JvmDependencyAnalyzer
+from pants.backend.jvm.tasks.jvm_compile.jvm_fingerprint_strategy import JvmFingerprintStrategy
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
 from pants.base.build_environment import get_buildroot, get_scm
@@ -268,6 +269,10 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
     else:
       shutil.copy(src, dst)
 
+  def _jvm_fingerprint_strategy(self):
+    # Use a fingerprint strategy that allows us to also include java/scala versions.
+    return JvmFingerprintStrategy(self.invalidate_for())
+
   def pre_execute(self):
     # TODO(John Sirois): Ensuring requested product maps are available - if empty - should probably
     # be lifted to Task infra.
@@ -294,7 +299,8 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
     self._sources_by_target = self._compute_current_sources_by_target(all_targets)
 
     # Split the global analysis file into valid and invalid parts.
-    cache_manager = self.create_cache_manager(invalidate_dependents=True)
+    cache_manager = self.create_cache_manager(invalidate_dependents=True,
+                                              fingerprint_strategy=self._jvm_fingerprint_strategy())
     invalidation_check = cache_manager.check(all_targets)
     if invalidation_check.invalid_vts:
       # The analysis for invalid and deleted sources is no longer valid.
@@ -369,7 +375,8 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
     with self.invalidated(relevant_targets,
                           invalidate_dependents=True,
                           partition_size_hint=self._partition_size_hint,
-                          locally_changed_targets=locally_changed_targets) as invalidation_check:
+                          locally_changed_targets=locally_changed_targets,
+                          fingerprint_strategy=self._jvm_fingerprint_strategy()) as invalidation_check:
       if invalidation_check.invalid_vts:
         # Find the invalid sources for this chunk.
         invalid_targets = [vt.target for vt in invalidation_check.invalid_vts]

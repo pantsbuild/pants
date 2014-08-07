@@ -11,8 +11,6 @@ import urlparse
 import requests
 from requests import RequestException
 
-from twitter.common.quantity import Amount, Data
-
 from pants.cache.artifact import TarballArtifact
 from pants.cache.artifact_cache import ArtifactCache
 from pants.util.contextutil import temporary_file, temporary_file_path
@@ -21,7 +19,7 @@ from pants.util.contextutil import temporary_file, temporary_file_path
 class RESTfulArtifactCache(ArtifactCache):
   """An artifact cache that stores the artifacts on a RESTful service."""
 
-  READ_SIZE = int(Amount(4, Data.MB).as_(Data.BYTES))
+  READ_SIZE_BYTES = 4 * 1024 * 1024
 
   def __init__(self, log, artifact_root, url_base, compress=True):
     """
@@ -72,7 +70,7 @@ class RESTfulArtifactCache(ArtifactCache):
       with temporary_file() as outfile:
         total_bytes = 0
         # Read the data in a loop.
-        for chunk in response.iter_content(self.READ_SIZE):
+        for chunk in response.iter_content(self.READ_SIZE_BYTES):
           outfile.write(chunk)
           total_bytes += len(chunk)
 

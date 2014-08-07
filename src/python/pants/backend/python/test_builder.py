@@ -12,16 +12,16 @@ except ImportError:
 import itertools
 import os
 
+from pex.interpreter import PythonInterpreter
+from pex.pex import PEX
+from pex.pex_builder import PEXBuilder
 from twitter.common.lang import Compatibility
-from twitter.common.python.interpreter import PythonInterpreter
-from twitter.common.python.pex import PEX
-from twitter.common.python.pex_builder import PEXBuilder
 
-from pants.base.config import Config
-from pants.base.target import Target
 from pants.backend.python.python_chroot import PythonChroot
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.targets.python_tests import PythonTests
+from pants.base.config import Config
+from pants.base.target import Target
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import safe_mkdir
 

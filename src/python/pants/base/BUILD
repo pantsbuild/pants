@@ -42,9 +42,9 @@ python_library(
   name = 'build_file',
   sources = ['build_file.py'],
   dependencies = [
+    pants('3rdparty/python:pex'),
     pants('3rdparty/python/twitter/commons:twitter.common.collections'),
     pants('3rdparty/python/twitter/commons:twitter.common.lang'),
-    pants('3rdparty/python/twitter/commons:twitter.common.python'),
   ]
 )
 
@@ -185,6 +185,7 @@ python_library(
     pants('3rdparty/python/twitter/commons:twitter.common.collections'),
     pants('3rdparty/python/twitter/commons:twitter.common.lang'),
     pants(':build_environment'),
+    pants(':validation'),
   ]
 )
 
@@ -272,5 +273,14 @@ python_library(
   dependencies = [
     pants('src/python/pants/rwbuf'),
     pants('src/python/pants/util:dirutil'),
+  ],
+)
+
+python_library(
+  name='validation',
+  sources=['validation.py'],
+  dependencies=[
+    pants('3rdparty/python/twitter/commons:twitter.common.collections'),
+    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
   ],
 )

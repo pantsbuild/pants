@@ -43,7 +43,7 @@ class Mkflag(object):
     setattr(parser.values, option.dest, not opt_str.startswith("--no"))
 
 
-class Goal(object):
+class TaskRegistrar(object):
   def __init__(self, name, action, dependencies=None, serialize=True):
     """
     :param name: the name of the goal.
@@ -83,7 +83,7 @@ class Goal(object):
       self._task = FuncTask
 
   def __repr__(self):
-    return "Goal(%s; %s)" % (self.name, ','.join(map(str, self.dependencies)))
+    return "TaskRegistrar(%s; %s)" % (self.name, ','.join(map(str, self.dependencies)))
 
   @property
   def task_type(self):
@@ -111,7 +111,7 @@ class Goal(object):
     self._task.setup_parser(option_group, args, mkflag)
 
   def install(self, phase=None, first=False, replace=False, before=None, after=None):
-    """Install this goal in the specified phase (or a new phase with the same name as this Goal).
+    """Install the task in the specified phase (or a new phase with the same name as the task).
 
     The placement of the goal in the execution list of the phase defaults to the end but can be
     influence by specifying exactly one of the following arguments:

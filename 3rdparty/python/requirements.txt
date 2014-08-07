@@ -8,6 +8,7 @@ argparse==1.2.1
 Markdown==2.1.1
 mock==1.0.1
 mox==0.5.3
+pex>=0.7.0,<0.8
 psutil==1.1.3
 Pygments==1.4
 pystache==0.5.3

@@ -31,7 +31,7 @@ from pants.commands.command import Command
 from pants.engine.engine import Engine
 from pants.engine.round_engine import RoundEngine
 from pants.goal.context import Context
-from pants.goal.goal import GoalError
+from pants.goal.error import GoalError
 from pants.goal.help import print_help
 from pants.goal.initialize_reporting import update_reporting
 from pants.goal.option_helpers import add_global_options
@@ -42,7 +42,7 @@ from pants.util.dirutil import safe_mkdir
 StringIO = Compatibility.StringIO
 
 
-class Goal(Command):
+class GoalRunner(Command):
   """Lists installed goals or else executes a named goal."""
 
   class IntermixedArgumentsError(GoalError):
@@ -89,8 +89,8 @@ class Goal(Command):
         specs.add(arg) if is_spec(arg) else goals.add(arg)
       elif '--' == arg:
         if specs:
-          raise Goal.IntermixedArgumentsError('Cannot intermix targets with goals when using --. '
-                                              'Targets should appear on the right')
+          raise GoalRunner.IntermixedArgumentsError(
+            'Cannot intermix targets with goals when using --. Targets should appear on the right')
         explicit_multi = True
         del args[i]
         break
@@ -111,7 +111,7 @@ class Goal(Command):
   def __init__(self, *args, **kwargs):
     self.targets = []
     self.config = None
-    super(Goal, self).__init__(*args, **kwargs)
+    super(GoalRunner, self).__init__(*args, **kwargs)
 
   @contextmanager
   def check_errors(self, banner):
@@ -168,7 +168,7 @@ class Goal(Command):
     show_help = len(help_flags.intersection(args)) > 0
     non_help_args = filter(lambda f: f not in help_flags, args)
 
-    goals, specs = Goal.parse_args(non_help_args)
+    goals, specs = GoalRunner.parse_args(non_help_args)
     if show_help:
       print_help(goals)
       sys.exit(0)

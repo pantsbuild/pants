@@ -12,7 +12,6 @@ import mox
 import pytest
 import requests
 from twitter.common.lang import Compatibility
-from twitter.common.quantity import Amount, Data, Time
 
 from pants.net.http.fetcher import Fetcher
 from pants.util.contextutil import temporary_file
@@ -48,8 +47,8 @@ class FetcherTest(mox.MoxTestBase):
 
     self.fetcher.fetch('http://bar',
                        self.listener,
-                       chunk_size=Amount(1, Data.KB),
-                       timeout=Amount(1, Time.MINUTES))
+                       chunk_size_bytes=1024,
+                       timeout_secs=60)
 
   def test_checksum_listener(self):
     digest = self.mox.CreateMockAnything()
@@ -67,8 +66,8 @@ class FetcherTest(mox.MoxTestBase):
     checksum_listener = Fetcher.ChecksumListener(digest=digest)
     self.fetcher.fetch('http://baz',
                        checksum_listener.wrap(self.listener),
-                       chunk_size=Amount(1, Data.BYTES),
-                       timeout=Amount(37, Time.SECONDS))
+                       chunk_size_bytes=1,
+                       timeout_secs=37)
     self.assertEqual('42', checksum_listener.checksum)
 
   def test_download_listener(self):
@@ -85,8 +84,8 @@ class FetcherTest(mox.MoxTestBase):
     with closing(Compatibility.StringIO()) as fp:
       self.fetcher.fetch('http://foo',
                          Fetcher.DownloadListener(fp).wrap(self.listener),
-                         chunk_size=Amount(1, Data.MB),
-                         timeout=Amount(1, Time.HOURS))
+                         chunk_size_bytes=1024 * 1024,
+                         timeout_secs=60 * 60)
       self.assertEqual(downloaded, fp.getvalue())
 
   def test_size_mismatch(self):
@@ -106,8 +105,8 @@ class FetcherTest(mox.MoxTestBase):
     with pytest.raises(self.fetcher.Error):
       self.fetcher.fetch('http://foo',
                          self.listener,
-                         chunk_size=Amount(1, Data.KB),
-                         timeout=Amount(1, Time.MINUTES))
+                         chunk_size_bytes=1024,
+                         timeout_secs=60)
 
   def test_get_error_transient(self):
     self.requests.get('http://foo', stream=True, timeout=60).AndRaise(requests.ConnectionError)
@@ -117,8 +116,8 @@ class FetcherTest(mox.MoxTestBase):
     with pytest.raises(self.fetcher.TransientError):
       self.fetcher.fetch('http://foo',
                          self.listener,
-                         chunk_size=Amount(1, Data.KB),
-                         timeout=Amount(1, Time.MINUTES))
+                         chunk_size_bytes=1024,
+                         timeout_secs=60)
 
   def test_get_error_permanent(self):
     self.requests.get('http://foo', stream=True, timeout=60).AndRaise(requests.TooManyRedirects)
@@ -128,8 +127,8 @@ class FetcherTest(mox.MoxTestBase):
     with pytest.raises(self.fetcher.PermanentError) as e:
       self.fetcher.fetch('http://foo',
                          self.listener,
-                         chunk_size=Amount(1, Data.KB),
-                         timeout=Amount(1, Time.MINUTES))
+                         chunk_size_bytes=1024,
+                         timeout_secs=60)
     self.assertTrue(e.value.response_code is None)
 
   def test_http_error(self):
@@ -144,8 +143,8 @@ class FetcherTest(mox.MoxTestBase):
     with pytest.raises(self.fetcher.PermanentError) as e:
       self.fetcher.fetch('http://foo',
                          self.listener,
-                         chunk_size=Amount(1, Data.KB),
-                         timeout=Amount(1, Time.MINUTES))
+                         chunk_size_bytes=1024,
+                         timeout_secs=60)
     self.assertEqual(404, e.value.response_code)
 
   def test_iter_content_error(self):
@@ -162,8 +161,8 @@ class FetcherTest(mox.MoxTestBase):
     with pytest.raises(self.fetcher.TransientError):
       self.fetcher.fetch('http://foo',
                          self.listener,
-                         chunk_size=Amount(1, Data.KB),
-                         timeout=Amount(1, Time.MINUTES))
+                         chunk_size_bytes=1024,
+                         timeout_secs=60)
 
   def expect_download(self, path_or_fd=None):
     downloaded = ''
@@ -175,8 +174,8 @@ class FetcherTest(mox.MoxTestBase):
 
     path = self.fetcher.download('http://1',
                                  path_or_fd=path_or_fd,
-                                 chunk_size=Amount(13, Data.BYTES),
-                                 timeout=Amount(13, Time.SECONDS))
+                                 chunk_size_bytes=13,
+                                 timeout_secs=13)
     return downloaded, path
 
   def test_download(self):

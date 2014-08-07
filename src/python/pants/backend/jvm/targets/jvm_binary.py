@@ -8,7 +8,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import os
 import re
 
-from twitter.common.collections import maybe_list
 from twitter.common.dirutil import Fileset
 from twitter.common.lang import AbstractClass, Compatibility
 
@@ -19,6 +18,7 @@ from pants.base.build_manual import manual
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import BundlePayload
 from pants.base.target import Target
+from pants.base.validation import assert_list
 
 
 class JarRule(AbstractClass):
@@ -142,7 +142,7 @@ class JarRules(object):
     :returns: JarRules
     """
     default_dup_action = Duplicate.validate_action(default_dup_action or Duplicate.SKIP)
-    additional_rules = maybe_list(additional_rules or [], expected_type=(Duplicate, Skip))
+    additional_rules = assert_list(additional_rules, expected_type=(Duplicate, Skip))
 
     rules = [Skip(r'^META-INF/[^/]+\.SF$'),  # signature file
              Skip(r'^META-INF/[^/]+\.DSA$'),  # default signature alg. file
@@ -180,7 +180,7 @@ class JarRules(object):
       no explicit rules apply to the entry.
     """
     self._default_dup_action = Duplicate.validate_action(default_dup_action)
-    self._rules = maybe_list(rules, expected_type=JarRule) if rules else []
+    self._rules = assert_list(rules, expected_type=JarRule)
 
   @property
   def default_dup_action(self):
@@ -241,7 +241,7 @@ class JvmBinary(JvmTarget):
     :type configurations: tuple of strings
     """
     sources = [source] if source else None
-    super(JvmBinary, self).__init__(name=name, sources=sources, **kwargs)
+    super(JvmBinary, self).__init__(name=name, sources=self.assert_list(sources), **kwargs)
 
     if main and not isinstance(main, Compatibility.string):
       raise TargetDefinitionException(self, 'main must be a fully qualified classname')
@@ -258,7 +258,7 @@ class JvmBinary(JvmTarget):
 
     self.main = main
     self.basename = basename or name
-    self.deploy_excludes = maybe_list(deploy_excludes, Exclude) if deploy_excludes else []
+    self.deploy_excludes = self.assert_list(deploy_excludes, expected_type=Exclude)
     self.deploy_jar_rules = deploy_jar_rules or JarRules.default()
 
 

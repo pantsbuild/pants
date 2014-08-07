@@ -6,7 +6,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 from pants.backend.jvm.register import register_goals
-from pants.commands.goal import Goal
+from pants.commands.goal_runner import GoalRunner
 from pants.goal.phase import Phase
 from pants_test.base_test import BaseTest
 
@@ -25,7 +25,7 @@ class GoalTest(BaseTest):
     Phase.clear()
 
   def assert_result(self, goals, specs, args):
-    g, s = Goal.parse_args(args)
+    g, s = GoalRunner.parse_args(args)
     self.assertEquals((goals, specs), (list(g), list(s)))
 
   def test_top_level_dir(self):
@@ -45,7 +45,7 @@ class GoalTest(BaseTest):
       self.assert_result(goals=['compile'], specs=[], args=['compile', 'spec:', '--', 'compile'])
       self.fail('Expected mixed specs and goals to the left of an explicit multi-goal sep (--) to '
                 'be rejected.')
-    except Goal.IntermixedArgumentsError:
+    except GoalRunner.IntermixedArgumentsError:
       pass # expected
 
     self.assert_result(goals=['bundle', 'compile'], specs=['run'],
@@ -65,17 +65,17 @@ class GoalTest(BaseTest):
                                                                 '--ivy-open'])
 
     try:
-      Goal.parse_args(['test', 'lib:all', '--', 'resolve'])
+      GoalRunner.parse_args(['test', 'lib:all', '--', 'resolve'])
       self.fail('Expected mixed specs and goals to the left of an explicit '
                 'multi-goal sep (--) to be rejected.')
-    except Goal.IntermixedArgumentsError:
+    except GoalRunner.IntermixedArgumentsError:
       pass # expected
 
     try:
-      Goal.parse_args(['resolve', 'lib/all', 'test', '--'])
+      GoalRunner.parse_args(['resolve', 'lib/all', 'test', '--'])
       self.fail('Expected mixed specs and goals to the left of an explicit '
                 'multi-goal sep (--) to be rejected.')
-    except Goal.IntermixedArgumentsError:
+    except GoalRunner.IntermixedArgumentsError:
       pass # expected
 
     self.assert_result(goals=['test'], specs=['lib:all'], args=['lib:all', '-v', 'test'])

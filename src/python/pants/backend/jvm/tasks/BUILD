@@ -23,6 +23,7 @@ python_library(
     ':depmap',
     ':detect_duplicates',
     ':eclipse_gen',
+    ':ensime_gen',
     ':filedeps',
     ':ide_gen',
     ':idea_gen',
@@ -149,9 +150,8 @@ python_library(
     pants(':common'),
     pants(':jvm_binary_task'),
     # TODO(pl): Use twitter.common.lang instead, but for the to_bytes helper, twitter.commons
-    # needs to be updated so the standard compatibility helpers act like the ones in
-    # twitter.common.python
-    pants('3rdparty/python/twitter/commons:twitter.common.python'),
+    # needs to be updated so the standard compatibility helpers act like the ones in pex
+    pants('3rdparty/python:pex'),
     pants('src/python/pants/base:exceptions'),
     pants('src/python/pants/java:jar'),
   ],
@@ -168,6 +168,20 @@ python_library(
     pants('src/python/pants/base:build_environment'),
     pants('src/python/pants/base:generator'),
     pants('src/python/pants/util:dirutil'),
+  ],
+)
+
+python_library(
+  name = 'ensime_gen',
+  sources = ['ensime_gen.py'],
+  resources = globs('templates/ensime/*.mustache'),
+  dependencies = [
+    pants(':common'),
+    pants(':ide_gen'),
+    pants('3rdparty/python/twitter/commons:twitter.common.collections'),
+    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
+    pants('src/python/pants/base:build_environment'),
+    pants('src/python/pants/base:generator'),
   ],
 )
 

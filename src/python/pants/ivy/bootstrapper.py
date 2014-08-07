@@ -10,7 +10,6 @@ import os
 import shutil
 
 from twitter.common import log
-from twitter.common.quantity import Amount, Time
 
 from pants.base.config import Config
 from pants.ivy.ivy import Ivy
@@ -49,7 +48,7 @@ class Bootstrapper(object):
     """Indicates an error bootstrapping an ivy classpath."""
 
   _DEFAULT_VERSION = '2.3.0'
-  _DEFAULT_URL = ('http://repo1.maven.org/maven2/'
+  _DEFAULT_URL = ('https://repo1.maven.org/maven2/'
                   'org/apache/ivy/ivy/'
                   '%(version)s/ivy-%(version)s.jar' % {'version': _DEFAULT_VERSION})
 
@@ -81,8 +80,7 @@ class Bootstrapper(object):
     self._config = Config.load()
     self._bootstrap_jar_url = self._config.get('ivy', 'bootstrap_jar_url',
                                                default=self._DEFAULT_URL)
-    self._timeout = Amount(self._config.getint('ivy', 'bootstrap_fetch_timeout_secs', default=1),
-                           Time.SECONDS)
+    self._timeout_secs = self._config.getint('ivy', 'bootstrap_fetch_timeout_secs', default=1)
     self._version_or_ivyxml = self._config.get('ivy', 'ivy_profile', default=self._DEFAULT_VERSION)
     self._classpath = None
 
@@ -179,7 +177,7 @@ class Bootstrapper(object):
           fetcher.download(self._bootstrap_jar_url,
                            listener=fetcher.ProgressListener().wrap(checksummer),
                            path_or_fd=bootstrap_jar,
-                           timeout=self._timeout)
+                           timeout_secs=self._timeout_secs)
           log.info('sha1: %s' % checksummer.checksum)
           bootstrap_jar.close()
           touch(bootstrap_jar_path)

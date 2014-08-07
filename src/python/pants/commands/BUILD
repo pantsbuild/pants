@@ -16,13 +16,13 @@ python_library(
 python_library(
   name = 'pants_new',
   dependencies = [
-    pants(':goal'),
+    pants(':goal_runner'),
   ]
 )
 
 python_library(
-  name = 'goal',
-  sources = ['goal.py'],
+  name = 'goal_runner',
+  sources = ['goal_runner.py'],
   dependencies = [
     pants(':command'),
     pants('3rdparty/python/twitter/commons:twitter.common.collections'),
@@ -37,11 +37,12 @@ python_library(
     pants('src/python/pants/base:target'),
     pants('src/python/pants/base:workunit'),
     pants('src/python/pants/engine'),
-    pants('src/python/pants/goal'),
     pants('src/python/pants/goal:context'),
+    pants('src/python/pants/goal:error'),
     pants('src/python/pants/goal:help'),
     pants('src/python/pants/goal:initialize_reporting'),
     pants('src/python/pants/goal:option_helpers'),
+    pants('src/python/pants/goal:phase'),
     pants('src/python/pants/backend/jvm/tasks:nailgun_task'),
     pants('src/python/pants/reporting'),
     pants('src/python/pants/backend/core/tasks:common'),

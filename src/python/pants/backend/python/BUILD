@@ -66,7 +66,7 @@ python_library(
   dependencies = [
     pants(':code_generator'),
     pants(':python_chroot'),
-    pants('3rdparty/python/twitter/commons:twitter.common.python'),
+    pants('3rdparty/python:pex'),
     pants('src/python/pants/base:config'),
     pants('src/python/pants/backend/python/targets:python'),
   ]
@@ -86,10 +86,10 @@ python_library(
   name = 'interpreter_cache',
   sources = ['interpreter_cache.py'],
   dependencies = [
-    pants('3rdparty/python:setuptools'),
-    pants('3rdparty/python/twitter/commons:twitter.common.python'),
     pants(':python_setup'),
     pants(':resolver'),
+    pants('3rdparty/python:pex'),
+    pants('3rdparty/python:setuptools'),
     pants('src/python/pants/util:dirutil'),
   ]
 )
@@ -119,10 +119,9 @@ python_library(
     pants(':python_setup'),
     pants(':resolver'),
     pants(':thrift_builder'),
+    pants('3rdparty/python:pex'),
     pants('3rdparty/python/twitter/commons:twitter.common.collections'),
     pants('3rdparty/python/twitter/commons:twitter.common.decorators'),
-    pants('3rdparty/python/twitter/commons:twitter.common.python'),
-    pants('3rdparty/python/twitter/commons:twitter.common.quantity'),
     pants('src/python/pants/backend/python/targets:python'),
     pants('src/python/pants/base:config'),
     pants('src/python/pants/base:target'),
@@ -146,8 +145,8 @@ python_library(
   sources = ['resolver.py'],
   dependencies = [
     pants(':python_setup'),
+    pants('3rdparty/python:pex'),
     pants('3rdparty/python/twitter/commons:twitter.common.collections'),
-    pants('3rdparty/python/twitter/commons:twitter.common.python'),
     pants('src/python/pants/backend/python/targets:python'),
   ],
 )
@@ -156,7 +155,7 @@ python_library(
   name = 'sdist_builder',
   sources = ['sdist_builder.py'],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.python'),
+    pants('3rdparty/python:pex'),
   ]
 )
 
@@ -164,11 +163,11 @@ python_library(
   name = 'test_builder',
   sources = ['test_builder.py'],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.lang'),
-    pants('3rdparty/python/twitter/commons:twitter.common.python'),
+    pants(':python_chroot'),
+    pants('3rdparty/python:pex'),
     pants('3rdparty/python:pytest'),
     pants('3rdparty/python:pytest-cov'),
-    pants(':python_chroot'),
+    pants('3rdparty/python/twitter/commons:twitter.common.lang'),
     pants('src/python/pants/backend/python/targets:python'),
     pants('src/python/pants/base:config'),
     pants('src/python/pants/base:target'),

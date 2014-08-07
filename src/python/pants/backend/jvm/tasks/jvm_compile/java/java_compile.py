@@ -110,7 +110,8 @@ class JavaCompile(JvmCompile):
       # We only care about the target version for now.
       target_pos = opts.index('-target')
       if len(opts) >= target_pos + 2:
-        ret.append(opts[target_pos:target_pos + 2])
+        for t in opts[target_pos:target_pos + 2]:
+          ret.append(t)
     except ValueError:
       # No target in javac opts.
       pass

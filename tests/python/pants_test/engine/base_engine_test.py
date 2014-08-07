@@ -7,7 +7,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import unittest2
 
-from pants.goal.goal import Goal
+from pants.goal.task_registrar import TaskRegistrar
 from pants.goal.phase import Phase
 
 
@@ -24,7 +24,7 @@ class EngineTestBase(unittest2.TestCase):
     return map(cls.as_phase, phase_names)
 
   @classmethod
-  def install_goal(cls, name, action=None, dependencies=None, phase=None):
+  def install_task(cls, name, action=None, dependencies=None, phase=None):
     """Creates and installs a goal with the given name.
 
     :param string name: The goal name.
@@ -32,11 +32,10 @@ class EngineTestBase(unittest2.TestCase):
     :param list dependencies: The list of phase names the goal depends on, if any.
     :param string phase: The name of the phase to install the goal in if different from the goal
       name.
-    :returns The installed ``Goal`` object.
+    :returns The installed ``TaskRegistrar`` object.
     """
-    goal = Goal(name, action=action or (lambda: None), dependencies=dependencies or [])
-    goal.install(phase if phase is not None else None)
-    return goal
+    TaskRegistrar(name, action=action or (lambda: None),
+                  dependencies=dependencies or []).install(phase if phase is not None else None)
 
   def setUp(self):
     super(EngineTestBase, self).setUp()

@@ -1,0 +1,43 @@
+(
+  :subprojects (
+    (
+      :name "{{project.name}}"
+      :module-name "{{project.name}}"
+      :depends-on-modules (
+      )
+      :compile-deps (
+	  {{#project.scala.compiler_classpath}}
+	    "{{.}}"
+          {{/project.scala.compiler_classpath}}
+          {{#project.internal_jars}}
+            "{{.}}"
+          {{/project.internal_jars}}
+          {{#project.external_jars}}
+            "{{.}}"
+          {{/project.external_jars}}
+      )
+      :runtime-deps (
+          {{#project.scala.compiler_classpath}}
+            "{{.}}"
+          {{/project.scala.compiler_classpath}}
+         {{#project.internal_jars}}
+            "{{.}}"
+          {{/project.internal_jars}}
+          {{#project.external_jars}}
+            "{{.}}"
+          {{/project.external_jars}}
+      )
+      :source-roots (
+        {{#project.source_bases?}}
+	     {{#project.source_bases}}
+                "{{path}}"
+	     {{/project.source_bases}}
+	  {{/project.source_bases?}}
+      )
+      :scala-version "{{project.scala.language_level}}"
+      :reference-source-roots (
+      )
+      :target "{{project.outdir}}"
+    )
+  )
+)
