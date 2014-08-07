@@ -11,6 +11,7 @@ import os
 from pants.backend.android.targets.android_binary import AndroidBinary
 from pants.backend.android.tasks.android_task import AndroidTask
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
+from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit
 from pants.util.dirutil import safe_mkdir
 
@@ -21,7 +22,7 @@ class DxCompile(AndroidTask, NailgunTask):
   """
 
   # name of output file. "Output name must end with one of: .dex .jar .zip .apk or be a directory."
-  classes_dex = 'classes.dex'
+  DEX_NAME = 'classes.dex'
   _CONFIG_SECTION = 'dx-tool'
 
   @classmethod
@@ -62,7 +63,7 @@ class DxCompile(AndroidTask, NailgunTask):
     return self._CONFIG_SECTION
 
   def _render_args(self, out, classes):
-    dex_file = os.path.join(out, self.classes_dex)
+    dex_file = os.path.join(out, self.DEX_NAME)
     args = []
     # Glossary of dx.jar flags.
     #   : '--dex' to create a Dalvik executable.
@@ -107,9 +108,11 @@ class DxCompile(AndroidTask, NailgunTask):
             add_classes(target_classes)
 
         target.walk(add_to_dex)
+        if not classes:
+          raise TaskError("No classes were found for {0!r}.".format(target))
         args = self._render_args(out_dir, classes)
         self._compile_dex(args, target.build_tools_version)
-        self.context.products.get('dex').add(target, out_dir).append(self.classes_dex)
+        self.context.products.get('dex').add(target, out_dir).append(self.DEX_NAME)
 
   def dx_jar_tool(self, build_tools_version):
     """Return the appropriate dx.jar.
