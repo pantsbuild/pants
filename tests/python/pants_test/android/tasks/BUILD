@@ -5,6 +5,12 @@ python_test_suite(
   name = 'tasks',
   dependencies = [
     pants(':aapt_gen'),
+  ],
+)
+
+python_test_suite(
+  name = 'integration',
+  dependencies = [
     pants(':dx_compile_integration'),
   ],
 )
