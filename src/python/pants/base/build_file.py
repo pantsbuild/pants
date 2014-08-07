@@ -19,14 +19,18 @@ logger = logging.getLogger(__name__)
 
 
 class BuildFile(object):
+
+  class MissingBuildFileError(IOError):
+    pass
+
   _BUILD_FILE_PREFIX = 'BUILD'
-  _PATTERN = re.compile('^%s(\.[a-zA-Z0-9_-]+)?$' % _BUILD_FILE_PREFIX)
+  _PATTERN = re.compile('^{prefix}(\.[a-zA-Z0-9_-]+)?$'.format(prefix=_BUILD_FILE_PREFIX))
 
   @staticmethod
   def _get_all_build_files(path):
     """Returns all the BUILD files on a path"""
     results = []
-    for build in glob1(path, "%s*" % (BuildFile._BUILD_FILE_PREFIX)):
+    for build in glob1(path, '{prefix}*'.format(prefix=BuildFile._BUILD_FILE_PREFIX)):
       if BuildFile._is_buildfile_name(build):
         results.append(build)
     return sorted(results)
@@ -53,7 +57,8 @@ class BuildFile(object):
     relpath: The path relative to root_dir where the BUILD file is found - this can either point
         directly at the BUILD file or else to a directory which contains BUILD files
     must_exist: If True, the specified BUILD file must exist or else an IOError is thrown
-    raises IOError if the specified path does not house a BUILD file and must_exist is True
+    raises IOError if the path is not absolute
+    raises MissingBuildFileError if the path does not house a BUILD file and must_exist is True
     """
 
     if not os.path.isabs(root_dir):
@@ -65,12 +70,14 @@ class BuildFile(object):
     buildfile = os.path.join(path, self._build_basename) if os.path.isdir(path) else path
 
     if os.path.isdir(buildfile):
-      raise IOError('Path to buildfile ({buildfile}) is a directory, but it must be a file.'
-                    .format(buildfile=buildfile))
+      raise self.MissingBuildFileError(
+        'Path to buildfile ({buildfile}) is a directory, but it must be a file.'
+        .format(buildfile=buildfile))
 
     if must_exist:
       if not os.path.exists(os.path.dirname(buildfile)):
-        raise IOError("Path to BUILD file does not exist at: %s" % os.path.dirname(buildfile))
+        raise self.MissingBuildFileError('Path to BUILD file does not exist at: {path}'
+                                         .format(path=os.path.dirname(buildfile)))
 
     # There is no BUILD file without a prefix so select any viable sibling
     if not os.path.exists(buildfile):
@@ -81,10 +88,12 @@ class BuildFile(object):
 
     if must_exist:
       if not os.path.exists(buildfile):
-        raise IOError("BUILD file does not exist at: %s" % buildfile)
+        raise self.MissingBuildFileError('BUILD file does not exist at: {path}'
+                                         .format(path=buildfile))
 
       if not BuildFile._is_buildfile_name(os.path.basename(buildfile)):
-        raise IOError("%s is not a BUILD file" % buildfile)
+        raise self.MissingBuildFileError('{path} is not a BUILD file'
+                                         .format(path=buildfile))
 
     self.root_dir = os.path.realpath(root_dir)
     self.full_path = os.path.realpath(buildfile)
@@ -92,8 +101,9 @@ class BuildFile(object):
     self.name = os.path.basename(self.full_path)
     self.parent_path = os.path.dirname(self.full_path)
 
-    self._bytecode_path = os.path.join(self.parent_path, '.%s.%s.pyc' % (
-        self.name, PythonIdentity.get()))
+    self._bytecode_path = os.path.join(self.parent_path,
+                                       '.{name}.{ident}.pyc'.format(name=self.name,
+                                                                    ident=PythonIdentity.get()))
 
     self.relpath = os.path.relpath(self.full_path, self.root_dir)
     self.spec_path = os.path.dirname(self.relpath)
