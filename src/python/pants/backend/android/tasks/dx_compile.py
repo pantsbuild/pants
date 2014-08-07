@@ -90,29 +90,34 @@ class DxCompile(AndroidTask, NailgunTask):
 
   def execute(self):
     with self.context.new_workunit(name='dx-compile', labels=[WorkUnit.MULTITOOL]):
-      for target in self.context.targets(predicate=self.is_dextarget):
-        out_dir = os.path.join(self.workdir, target.id)
-        safe_mkdir(out_dir)
-        classes_by_target = self.context.products.get_data('classes_by_target')
-        classes = []
+      targets = self.context.targets(self.is_dextarget)
+      with self.invalidated(targets) as invalidation_check:
+        invalid_targets = []
+        for vt in invalidation_check.invalid_vts:
+          invalid_targets.extend(vt.targets)
+        for target in invalid_targets:
+          out_dir = os.path.join(self.workdir, target.id)
+          safe_mkdir(out_dir)
+          classes_by_target = self.context.products.get_data('classes_by_target')
+          classes = []
 
-        def add_to_dex(tgt):
-          target_classes = classes_by_target.get(tgt)
-          if target_classes:
+          def add_to_dex(tgt):
+            target_classes = classes_by_target.get(tgt)
+            if target_classes:
 
-            def add_classes(target_products):
-              for root, products in target_products.abs_paths():
-                for prod in products:
-                  classes.append(prod)
+              def add_classes(target_products):
+                for root, products in target_products.abs_paths():
+                  for prod in products:
+                    classes.append(prod)
 
-            add_classes(target_classes)
+              add_classes(target_classes)
 
-        target.walk(add_to_dex)
-        if not classes:
-          raise TaskError("No classes were found for {0!r}.".format(target))
-        args = self._render_args(out_dir, classes)
-        self._compile_dex(args, target.build_tools_version)
-        self.context.products.get('dex').add(target, out_dir).append(self.DEX_NAME)
+          target.walk(add_to_dex)
+          if not classes:
+            raise TaskError("No classes were found for {0!r}.".format(target))
+          args = self._render_args(out_dir, classes)
+          self._compile_dex(args, target.build_tools_version)
+          self.context.products.get('dex').add(target, out_dir).append(self.DEX_NAME)
 
   def dx_jar_tool(self, build_tools_version):
     """Return the appropriate dx.jar.
