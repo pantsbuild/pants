@@ -37,7 +37,6 @@ class CheckExclusives(Task):
      java_library(name='jliba',
        depedencies = ['slf4j-with-log4j-2.4'])
      java_library(name='jlibb',
-       dependencies=['log4j-1.9'])
      java_binary(name='javabin', dependencies=[':jliba', ':jlibb'])
 
   In this case, the binary target 'javabin' depends on both slf4j with its

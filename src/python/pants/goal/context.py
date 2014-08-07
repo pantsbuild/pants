@@ -25,6 +25,9 @@ from pants.java.distribution.distribution import Distribution
 from pants.reporting.report import Report
 
 
+# Override with ivy -> cache_dir
+_IVY_CACHE_DIR_DEFAULT=os.path.expanduser('~/.ivy2/pants')
+
 # Utility definition for grabbing process info for locking.
 def _process_info(pid):
   try:
@@ -165,7 +168,8 @@ class Context(object):
 
   @property
   def ivy_home(self):
-    return os.path.realpath(self.config.get('ivy', 'cache_dir'))
+    return os.path.realpath(self.config.get('ivy', 'cache_dir',
+                                            default=_IVY_CACHE_DIR_DEFAULT))
 
   def __str__(self):
     ident = Target.identify(self.targets())
