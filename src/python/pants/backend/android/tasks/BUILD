@@ -22,6 +22,14 @@ python_library(
 )
 
 python_library(
+  name = 'aapt_builder',
+  sources = ['android_builder.py'],
+  dependencies = [
+    pants('src/python/pants/backend/android/tasks:aapt_task'),
+  ],
+)
+
+python_library(
   name = 'aapt_task',
   sources = ['android_task.py'],
   dependencies = [
@@ -36,7 +44,7 @@ python_library(
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.log'),
     pants('src/python/pants/backend/android/targets:android'),
-    pants('src/python/pants/backend/android/tasks:android_task'),
+    pants('src/python/pants/backend/android/tasks:aapt_task'),
     pants('src/python/pants/backend/codegen/tasks:code_gen'),
     pants('src/python/pants/backend/core/tasks:common'),
     pants('src/python/pants/backend/jvm/targets:java'),
