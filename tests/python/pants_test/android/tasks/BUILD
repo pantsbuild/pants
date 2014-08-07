@@ -27,7 +27,9 @@ python_tests(
 
 python_tests(
   name = 'dx_compile_integration',
-  sources = 'test_dx_compile_integration.py',
+  sources = [
+    'test_dx_compile_integration.py',
+  ],
   dependencies = [
     pants('tests/python/pants_test:int-test'),
   ],
