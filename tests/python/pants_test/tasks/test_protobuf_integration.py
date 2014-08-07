@@ -15,15 +15,15 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 class ProtobufIntegrationTest(PantsRunIntegrationTest):
   def test_bundle_protobuf_normal(self):
     pants_run = self.run_pants(
-        ['goal', 'bundle', 'src/java/com/pants/examples/protobuf:protobuf', '--bundle-deployjar'])
+        ['goal', 'bundle', 'src/java/com/pants/examples/protobuf:protobuf-example', '--bundle-deployjar'])
     self.assertEquals(pants_run.returncode, self.PANTS_SUCCESS_CODE,
                       "goal bundle run expected success, got {0}\n"
                       "got stderr:\n{1}\n"
                       "got stdout:\n{2}\n".format(pants_run.returncode,
                                                   pants_run.stderr_data,
                                                   pants_run.stdout_data))
-    out_path = os.path.join(get_buildroot(), 'dist', 'protobuf-bundle')
-    java_run = subprocess.Popen(['java', '-cp', 'protobuf.jar',
+    out_path = os.path.join(get_buildroot(), 'dist', 'protobuf-example-bundle')
+    java_run = subprocess.Popen(['java', '-cp', 'protobuf-example.jar',
                                  'com.pants.examples.protobuf.ExampleProtobuf'],
                                 stdout=subprocess.PIPE,
                                 cwd=out_path)
@@ -34,7 +34,7 @@ class ProtobufIntegrationTest(PantsRunIntegrationTest):
 
   def test_bundle_protobuf_imports(self):
     pants_run = self.run_pants(
-        ['goal', 'bundle', 'src/java/com/pants/examples/protobuf:protobuf-imports',
+        ['goal', 'bundle', 'src/java/com/pants/examples/protobuf:protobuf-imports-example',
          '--bundle-deployjar'])
     self.assertEquals(pants_run.returncode, self.PANTS_SUCCESS_CODE,
                       "goal bundle run expected success, got {0}\n"
@@ -42,8 +42,8 @@ class ProtobufIntegrationTest(PantsRunIntegrationTest):
                       "got stdout:\n{2}\n".format(pants_run.returncode,
                                                   pants_run.stderr_data,
                                                   pants_run.stdout_data))
-    out_path = os.path.join(get_buildroot(), 'dist', 'protobuf-imports-bundle')
-    java_run = subprocess.Popen(['java', '-cp', 'protobuf-imports.jar',
+    out_path = os.path.join(get_buildroot(), 'dist', 'protobuf-imports-example-bundle')
+    java_run = subprocess.Popen(['java', '-cp', 'protobuf-imports-example.jar',
                                  'com.pants.examples.protobuf.imports.ExampleProtobufImports'],
                                 stdout=subprocess.PIPE,
                                 cwd=out_path)

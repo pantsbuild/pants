@@ -4,6 +4,7 @@
 # Like Hello World, but built with Pants.
 
 jvm_app(name='main',
+  basename = 'hello-example',
   dependencies = [
     ':main-bin'
   ],
@@ -23,6 +24,7 @@ jvm_binary(name = 'main-bin',
   ],
   source = 'HelloMain.java',
   main = 'com.pants.examples.hello.main.HelloMain',
+  basename = 'hello-example',
 )
 
 # README page:
