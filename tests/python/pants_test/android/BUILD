@@ -9,6 +9,13 @@ python_test_suite(
   ]
 )
 
+python_test_suite(
+  name = 'integration',
+  dependencies = [
+    pants('tests/python/pants_test/android/tasks:integration'),
+  ]
+)
+
 python_tests(
   name = 'android_distribution',
   sources = [

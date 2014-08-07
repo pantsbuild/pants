@@ -8,6 +8,13 @@ python_test_suite(
   ],
 )
 
+python_test_suite(
+  name = 'integration',
+  dependencies = [
+    pants(':dx_compile_integration'),
+  ],
+)
+
 python_tests(
   name='aapt_gen',
   sources=[
@@ -15,5 +22,13 @@ python_tests(
   ],
   dependencies=[
     pants('src/python/pants/backend/android/tasks:all'),
+  ],
+)
+
+python_tests(
+  name = 'dx_compile_integration',
+  sources = 'test_dx_compile_integration.py',
+  dependencies = [
+    pants('tests/python/pants_test:int-test'),
   ],
 )
