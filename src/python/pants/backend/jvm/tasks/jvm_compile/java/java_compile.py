@@ -61,7 +61,8 @@ class JavaCompile(JvmCompile):
                             help="Pass these extra args to javac.")
 
   def __init__(self, context, workdir):
-    super(JavaCompile, self).__init__(context, workdir, jdk=True)
+    super(JavaCompile, self).__init__(context, workdir)
+    self.set_distribution(jdk=True)
 
     self._buildroot = get_buildroot()
 

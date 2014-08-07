@@ -12,8 +12,6 @@ from pants.backend.core.tasks import builddictionary
 from pants.backend.core.register import build_file_aliases as register_core
 from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.python.register import build_file_aliases as register_python
-from pants.base.build_configuration import BuildConfiguration
-from pants.base.build_file_parser import BuildFileParser
 from pants_test.tasks.test_base import BaseTest, TaskTest, prepare_task
 
 OUTDIR = "/tmp/dist"

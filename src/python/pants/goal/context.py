@@ -15,11 +15,12 @@ from twitter.common.process import ProcessProviderFactory
 from twitter.common.process.process_provider import ProcessProvider
 
 from pants.base.address import SyntheticAddress
-from pants.base.build_environment import get_buildroot
+from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.source_root import SourceRoot
 from pants.base.target import Target
 from pants.base.workunit import WorkUnit
 from pants.goal.products import Products
+from pants.goal.workspace import ScmWorkspace
 from pants.java.distribution.distribution import Distribution
 from pants.reporting.report import Report
 
@@ -66,8 +67,11 @@ class Context(object):
     def fatal(self, *msg_elements):
       self._run_tracker.log(Report.FATAL, *msg_elements)
 
+  # TODO: Figure out a more structured way to construct and use context than this big flat
+  # repository of attributes?
   def __init__(self, config, options, run_tracker, target_roots, requested_goals=None,
-               lock=None, log=None, target_base=None, build_graph=None, build_file_parser=None):
+               lock=None, log=None, target_base=None, build_graph=None, build_file_parser=None,
+               console_outstream=None, scm=None, workspace=None):
     self._config = config
     self._options = options
     self.build_graph = build_graph
@@ -81,6 +85,9 @@ class Context(object):
     self._buildroot = get_buildroot()
     self._java_sysprops = None  # Computed lazily.
     self.requested_goals = requested_goals or []
+    self._console_outstream = console_outstream or sys.stdout
+    self._scm = scm or get_scm()
+    self._workspace = workspace or (ScmWorkspace(self._scm) if self._scm else None)
 
     self.replace_targets(target_roots)
 
@@ -118,6 +125,21 @@ class Context(object):
     globbed by the wildcards are considered to be target roots.
     """
     return self._target_roots
+
+  @property
+  def console_outstream(self):
+    """Returns the output stream to write console messages to."""
+    return self._console_outstream
+
+  @property
+  def scm(self):
+    """Returns the current workspace's scm, if any."""
+    return self._scm
+
+  @property
+  def workspace(self):
+    """Returns the current workspace, if any."""
+    return self._workspace
 
   @property
   def java_sysprops(self):

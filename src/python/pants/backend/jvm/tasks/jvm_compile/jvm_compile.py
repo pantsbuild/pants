@@ -161,9 +161,8 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
   def _portable_analysis_for_target(analysis_dir, target):
     return JvmCompile._analysis_for_target(analysis_dir, target) + '.portable'
 
-  def __init__(self, context, workdir, minimum_version=None, jdk=False):
-    # TODO(John Sirois): XXX plumb minimum_version via config or flags
-    super(JvmCompile, self).__init__(context, workdir, minimum_version=minimum_version, jdk=jdk)
+  def __init__(self, context, workdir):
+    super(JvmCompile, self).__init__(context, workdir)
     config_section = self.config_section
 
     def get_lang_specific_option(opt):

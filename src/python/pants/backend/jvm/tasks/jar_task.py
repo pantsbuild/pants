@@ -210,7 +210,8 @@ class JarTask(NailgunTask):
     return name
 
   def __init__(self, context, workdir):
-    super(JarTask, self).__init__(context, workdir=workdir, jdk=True, nailgun_name='jar-tool')
+    super(JarTask, self).__init__(context, workdir=workdir)
+    self.set_distribution(jdk=True)
 
     # TODO(John Sirois): Consider poking a hole for custom jar-tool jvm args - namely for Xmx
     # control.

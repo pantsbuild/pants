@@ -64,14 +64,12 @@ class IvyResolve(NailgunTask, IvyTaskMixin, JvmToolTaskMixin):
   def product_types(cls):
     return ['ivy_jar_products', 'jar_dependencies']
 
-  def __init__(self, context, workdir, confs=None):
+  def __init__(self, context, workdir):
     super(IvyResolve, self).__init__(context, workdir)
 
     self._ivy_bootstrapper = Bootstrapper.instance()
     self._cachedir = self._ivy_bootstrapper.ivy_cache_dir
-    self._confs = confs or context.config.getlist(self._CONFIG_SECTION,
-                                                  'confs',
-                                                  default=['default'])
+    self._confs = context.config.getlist(self._CONFIG_SECTION, 'confs', default=['default'])
     self._classpath_dir = os.path.join(self.workdir, 'mapped')
 
     self._outdir = context.options.ivy_resolve_outdir or os.path.join(self.workdir, 'reports')

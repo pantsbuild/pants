@@ -358,9 +358,9 @@ class JarPublish(JarTask, ScmPublish):
                             %(flag)s=src/java/com/twitter/common/base
                             ''' % dict(flag=flag))
 
-  def __init__(self, context, workdir, scm=None):
+  def __init__(self, context, workdir):
     super(JarPublish, self).__init__(context, workdir)
-    ScmPublish.__init__(self, scm or get_scm(),
+    ScmPublish.__init__(self, get_scm(),
                         self.context.config.getlist(self._CONFIG_SECTION, 'restrict_push_branches'))
     self.cachedir = os.path.join(self.workdir, 'cache')
 

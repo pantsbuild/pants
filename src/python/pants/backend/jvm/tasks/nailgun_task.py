@@ -43,20 +43,21 @@ class NailgunTaskBase(TaskBase, JvmToolTaskMixin):
                                      help="[%default] Use nailgun daemons to execute java tasks.")
       NailgunTaskBase._DAEMON_OPTION_PRESENT = True
 
-  def __init__(self, context, workdir, minimum_version=None,
-               maximum_version=None, jdk=False, nailgun_name=None):
+  def __init__(self, context, workdir):
     super(NailgunTaskBase, self).__init__(context, workdir)
     self._executor_workdir = os.path.join(context.config.getdefault('pants_workdir'), 'ng',
-                                          nailgun_name or self.__class__.__name__)
+                                          self.__class__.__name__)
     self._nailgun_bootstrap_key = 'nailgun'
     self.register_jvm_tool(self._nailgun_bootstrap_key, [':nailgun-server'])
+    self.set_distribution()  # Use default until told otherwise.
+    # TODO: Choose default distribution based on options.
 
-    with self.context.new_workunit(name='jvm-locate'):
-      try:
-        self._dist = Distribution.cached(minimum_version=minimum_version,
-                                         maximum_version=maximum_version, jdk=jdk)
-      except Distribution.Error as e:
-        raise TaskError(e)
+  def set_distribution(self, minimum_version=None, maximum_version=None, jdk=False):
+    try:
+      self._dist = Distribution.cached(minimum_version=minimum_version,
+                                       maximum_version=maximum_version, jdk=jdk)
+    except Distribution.Error as e:
+      raise TaskError(e)
 
   @abstractproperty
   def config_section(self):
