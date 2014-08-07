@@ -22,7 +22,7 @@ def build_file_aliases():
   )
 
 def register_goals():
-  goal(name='aapt', action=AaptGen).install('gen')
+  task(name='aapt', action=AaptGen).install('gen')
 
-  goal(name='dex', action=DxCompile,
+  task(name='dex', action=DxCompile,
        dependencies=['compile']).install('dex')
