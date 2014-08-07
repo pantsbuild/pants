@@ -5,18 +5,15 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from collections import defaultdict
 import os
 import re
 import subprocess
 
-from twitter.common import log
 from twitter.common.collections import OrderedSet
 from twitter.common.dirutil import safe_mkdir_for
 
 from pants.backend.codegen.targets.java_ragel_library import JavaRagelLibrary
 from pants.backend.codegen.tasks.code_gen import CodeGen
-from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.base.address import SyntheticAddress
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
@@ -24,8 +21,8 @@ from pants.binary_util import BinaryUtil
 
 
 class RagelGen(CodeGen):
-  def __init__(self, context, workdir):
-    super(RagelGen, self).__init__(context, workdir)
+  def __init__(self, *args, **kwargs):
+    super(RagelGen, self).__init__(*args, **kwargs)
 
     self._ragel_supportdir = self.context.config.get('ragel-gen', 'supportdir')
     self._ragel_version = self.context.config.get('ragel-gen', 'version', default='6.8')

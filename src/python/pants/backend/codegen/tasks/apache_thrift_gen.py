@@ -61,24 +61,24 @@ class ApacheThriftGen(CodeGen):
                             help='Force generation of thrift code for these languages.')
 
 
-  def __init__(self, context, workdir):
-    super(ApacheThriftGen, self).__init__(context, workdir)
+  def __init__(self, *args, **kwargs):
+    super(ApacheThriftGen, self).__init__(*args, **kwargs)
     self.combined_dir = os.path.join(self.workdir, 'combined')
     self.combined_relpath = os.path.relpath(self.combined_dir, get_buildroot())
     self.session_dir = os.path.join(self.workdir, 'sessions')
 
-    self.strict = context.config.getbool('thrift-gen', 'strict')
-    self.verbose = context.config.getbool('thrift-gen', 'verbose')
+    self.strict = self.context.config.getbool('thrift-gen', 'strict')
+    self.verbose = self.context.config.getbool('thrift-gen', 'verbose')
 
-    self.gen_langs = set(context.options.thrift_gen_langs)
+    self.gen_langs = set(self.context.options.thrift_gen_langs)
     for lang in ('java', 'python'):
       if self.context.products.isrequired(lang):
         self.gen_langs.add(lang)
 
-    self.thrift_binary = select_thrift_binary(context.config,
-                                              version=context.options.thrift_version)
+    self.thrift_binary = select_thrift_binary(self.context.config,
+                                              version=self.context.options.thrift_version)
 
-    self.defaults = JavaThriftLibrary.Defaults(context.config)
+    self.defaults = JavaThriftLibrary.Defaults(self.context.config)
 
     # TODO(pl): This is broken because of how __init__.py files are generated/cached
     # for combined python thrift packages.

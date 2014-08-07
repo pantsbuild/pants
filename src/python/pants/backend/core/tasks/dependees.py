@@ -40,12 +40,12 @@ class ReverseDepmap(ConsoleTask):
                                  "can be specified at once in a comma separated list or else by "
                                  "using multiple instances of this flag.")
 
-  def __init__(self, context, workdir):
-    super(ReverseDepmap, self).__init__(context, workdir)
+  def __init__(self, *args, **kwargs):
+    super(ReverseDepmap, self).__init__(*args, **kwargs)
 
-    self._transitive = context.options.reverse_depmap_transitive
-    self._closed = context.options.reverse_depmap_closed
-    self._dependees_type = context.options.dependees_type
+    self._transitive = self.context.options.reverse_depmap_transitive
+    self._closed = self.context.options.reverse_depmap_closed
+    self._dependees_type = self.context.options.dependees_type
 
   def console_output(self, _):
     buildfiles = OrderedSet()

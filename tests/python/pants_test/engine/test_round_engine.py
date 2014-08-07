@@ -38,8 +38,8 @@ class RoundEngineTest(EngineTestBase, BaseTest):
 
   def record(self, tag, product_types=None, required_data=None):
     class RecordingTask(Task):
-      def __init__(me, context, workdir):
-        super(RecordingTask, me).__init__(context, workdir)
+      def __init__(me, *args, **kwargs):
+        super(RecordingTask, me).__init__(*args, **kwargs)
         self.actions.append(self.construct_action(tag))
 
       @classmethod

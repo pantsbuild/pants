@@ -43,9 +43,9 @@ class NailgunTaskBase(TaskBase, JvmToolTaskMixin):
                                      help="[%default] Use nailgun daemons to execute java tasks.")
       NailgunTaskBase._DAEMON_OPTION_PRESENT = True
 
-  def __init__(self, context, workdir):
-    super(NailgunTaskBase, self).__init__(context, workdir)
-    self._executor_workdir = os.path.join(context.config.getdefault('pants_workdir'), 'ng',
+  def __init__(self, *args, **kwargs):
+    super(NailgunTaskBase, self).__init__(*args, **kwargs)
+    self._executor_workdir = os.path.join(self.context.config.getdefault('pants_workdir'), 'ng',
                                           self.__class__.__name__)
     self._nailgun_bootstrap_key = 'nailgun'
     self.register_jvm_tool(self._nailgun_bootstrap_key, [':nailgun-server'])

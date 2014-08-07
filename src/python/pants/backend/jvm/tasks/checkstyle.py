@@ -34,18 +34,18 @@ class Checkstyle(NailgunTask, JvmToolTaskMixin):
                             action="callback", callback=mkflag.set_bool,
                             help="[%default] Skip checkstyle.")
 
-  def __init__(self, context, workdir):
-    super(Checkstyle, self).__init__(context, workdir)
+  def __init__(self, *args, **kwargs):
+    super(Checkstyle, self).__init__(*args, **kwargs)
 
     self._checkstyle_bootstrap_key = 'checkstyle'
-    bootstrap_tools = context.config.getlist('checkstyle', 'bootstrap-tools',
+    bootstrap_tools = self.context.config.getlist('checkstyle', 'bootstrap-tools',
                                              default=[':twitter-checkstyle'])
     self.register_jvm_tool(self._checkstyle_bootstrap_key, bootstrap_tools)
 
-    self._configuration_file = context.config.get(self._CONFIG_SECTION, 'configuration')
+    self._configuration_file = self.context.config.get(self._CONFIG_SECTION, 'configuration')
 
-    self._properties = context.config.getdict(self._CONFIG_SECTION, 'properties', {})
-    self._confs = context.config.getlist(self._CONFIG_SECTION, 'confs', default=['default'])
+    self._properties = self.context.config.getdict(self._CONFIG_SECTION, 'properties', {})
+    self._confs = self.context.config.getlist(self._CONFIG_SECTION, 'confs', default=['default'])
 
   @property
   def config_section(self):

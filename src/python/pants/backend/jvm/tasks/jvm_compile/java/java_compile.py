@@ -60,8 +60,8 @@ class JavaCompile(JvmCompile):
     option_group.add_option(mkflag("args"), dest="java_compile_args", action="append",
                             help="Pass these extra args to javac.")
 
-  def __init__(self, context, workdir):
-    super(JavaCompile, self).__init__(context, workdir)
+  def __init__(self, *args, **kwargs):
+    super(JavaCompile, self).__init__(*args, **kwargs)
     self.set_distribution(jdk=True)
 
     self._buildroot = get_buildroot()
@@ -69,21 +69,24 @@ class JavaCompile(JvmCompile):
     self._depfile = os.path.join(self._analysis_dir, 'global_depfile')
 
     self._jmake_bootstrap_key = 'jmake'
-    external_tools = context.config.getlist('java-compile', 'jmake-bootstrap-tools',
-                                            default=[':jmake'])
+    external_tools = self.context.config.getlist('java-compile',
+                                                 'jmake-bootstrap-tools',
+                                                 default=[':jmake'])
     self.register_jvm_tool(self._jmake_bootstrap_key, external_tools)
 
     self._compiler_bootstrap_key = 'java-compiler'
-    compiler_bootstrap_tools = context.config.getlist('java-compile', 'compiler-bootstrap-tools',
-                                                      default=[':java-compiler'])
+    compiler_bootstrap_tools = self.context.config.getlist('java-compile',
+                                                           'compiler-bootstrap-tools',
+                                                           default=[':java-compiler'])
     self.register_jvm_tool(self._compiler_bootstrap_key, compiler_bootstrap_tools)
 
     self._javac_opts = []
-    if context.options.java_compile_args:
-      for arg in context.options.java_compile_args:
+    if self.context.options.java_compile_args:
+      for arg in self.context.options.java_compile_args:
         self._javac_opts.extend(shlex.split(arg))
     else:
-      self._javac_opts.extend(context.config.getlist('java-compile', 'javac_args', default=[]))
+      self._javac_opts.extend(self.context.config.getlist('java-compile',
+                                                          'javac_args', default=[]))
 
   @property
   def config_section(self):

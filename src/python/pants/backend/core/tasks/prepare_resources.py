@@ -19,9 +19,9 @@ class PrepareResources(Task):
   def product_types(cls):
     return ['resources_by_target']
 
-  def __init__(self, context, workdir):
-    super(PrepareResources, self).__init__(context, workdir)
-    self.confs = context.config.getlist('prepare-resources', 'confs', default=['default'])
+  def __init__(self, *args, **kwargs):
+    super(PrepareResources, self).__init__(*args, **kwargs)
+    self.confs = self.context.config.getlist('prepare-resources', 'confs', default=['default'])
 
   def prepare(self, round_manager):
     round_manager.require_data('exclusives_groups')

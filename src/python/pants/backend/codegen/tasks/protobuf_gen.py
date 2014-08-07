@@ -35,8 +35,8 @@ class ProtobufGen(CodeGen):
                             action='append', type='choice', choices=['python', 'java'],
                             help='Force generation of protobuf code for these languages.')
 
-  def __init__(self, context, workdir):
-    super(ProtobufGen, self).__init__(context, workdir)
+  def __init__(self, *args, **kwargs):
+    super(ProtobufGen, self).__init__(*args, **kwargs)
 
     self.protoc_supportdir = self.context.config.get('protobuf-gen', 'supportdir')
     self.protoc_version = self.context.config.get('protobuf-gen', 'version')
@@ -45,12 +45,12 @@ class ProtobufGen(CodeGen):
     self.java_out = os.path.join(self.workdir, 'gen-java')
     self.py_out = os.path.join(self.workdir, 'gen-py')
 
-    self.gen_langs = set(context.options.protobuf_gen_langs)
+    self.gen_langs = set(self.context.options.protobuf_gen_langs)
     for lang in ('java', 'python'):
       if self.context.products.isrequired(lang):
         self.gen_langs.add(lang)
 
-    self.protobuf_binary = BinaryUtil(config=context.config).select_binary(
+    self.protobuf_binary = BinaryUtil(config=self.context.config).select_binary(
       self.protoc_supportdir,
       self.protoc_version,
       'protoc'

@@ -8,7 +8,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import codecs
 import os
 import re
-import textwrap
 
 import markdown
 from pkg_resources import resource_string
@@ -92,23 +91,23 @@ class MarkdownToHtml(Task):
   def product_types(cls):
     return ['markdown_html', 'wiki_html']
 
-  def __init__(self, context, workdir):
-    super(MarkdownToHtml, self).__init__(context, workdir)
+  def __init__(self, *args, **kwargs):
+    super(MarkdownToHtml, self).__init__(*args, **kwargs)
 
     self._templates_dir = os.path.join('templates', 'markdown')
-    self.open = context.options.markdown_to_html_open
+    self.open = self.context.options.markdown_to_html_open
 
     self.extensions = set(
-      context.options.markdown_to_html_extensions
-      or context.config.getlist('markdown-to-html', 'extensions', default=['.md', '.markdown'])
+      self.context.options.markdown_to_html_extensions
+      or self.context.config.getlist('markdown-to-html', 'extensions', default=['.md', '.markdown'])
     )
 
-    self.fragment = context.options.markdown_to_html_fragment
+    self.fragment = self.context.options.markdown_to_html_fragment
 
-    self.code_style = context.config.get('markdown-to-html', 'code-style', default='friendly')
-    if hasattr(context.options, 'markdown_to_html_code_style'):
-      if context.options.markdown_to_html_code_style:
-        self.code_style = context.options.markdown_to_html_code_style
+    self.code_style = self.context.config.get('markdown-to-html', 'code-style', default='friendly')
+    if hasattr(self.context.options, 'markdown_to_html_code_style'):
+      if self.context.options.markdown_to_html_code_style:
+        self.code_style = self.context.options.markdown_to_html_code_style
 
   def execute(self):
     # TODO(John Sirois): consider adding change detection

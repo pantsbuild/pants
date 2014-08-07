@@ -27,12 +27,12 @@ class ScalaCompile(JvmCompile):
                             action='append',
                             help='Use these scalac plugins. Default is set in pants.ini.')
 
-  def __init__(self, context, workdir):
-    super(ScalaCompile, self).__init__(context, workdir)
+  def __init__(self, *args, **kwargs):
+    super(ScalaCompile, self).__init__(*args, **kwargs)
 
     # Set up the zinc utils.
-    color = not context.options.no_color
-    self._zinc_utils = ZincUtils(context=context,
+    color = not self.context.options.no_color
+    self._zinc_utils = ZincUtils(context=self.context,
                                  nailgun_task=self,
                                  jvm_options=self._jvm_options,
                                  color=color)

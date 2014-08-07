@@ -31,11 +31,11 @@ class WhatChanged(ConsoleTask):
                             help='[%default] Shows changed files instead of the targets that own '
                                  'them.')
 
-  def __init__(self, context, workdir):
-    super(WhatChanged, self).__init__(context, workdir)
-    self._parent = context.options.what_changed_create_prefix
-    self._show_files = context.options.what_changed_show_files
-    self._workspace = context.workspace
+  def __init__(self, *args, **kwargs):
+    super(WhatChanged, self).__init__(*args, **kwargs)
+    self._parent = self.context.options.what_changed_create_prefix
+    self._show_files = self.context.options.what_changed_show_files
+    self._workspace = self.context.workspace
     self._filemap = {}
 
   def console_output(self, _):

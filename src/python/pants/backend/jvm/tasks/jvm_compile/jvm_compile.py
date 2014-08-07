@@ -161,16 +161,16 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
   def _portable_analysis_for_target(analysis_dir, target):
     return JvmCompile._analysis_for_target(analysis_dir, target) + '.portable'
 
-  def __init__(self, context, workdir):
-    super(JvmCompile, self).__init__(context, workdir)
+  def __init__(self, *args, **kwargs):
+    super(JvmCompile, self).__init__(*args, **kwargs)
     config_section = self.config_section
 
     def get_lang_specific_option(opt):
       full_opt_name = self._language + '_' + opt
-      return getattr(context.options, full_opt_name, None)
+      return getattr(self.context.options, full_opt_name, None)
 
     # Global workdir.
-    self._pants_workdir = context.config.getdefault('pants_workdir')
+    self._pants_workdir = self.context.config.getdefault('pants_workdir')
 
     # Various working directories.
     self._classes_dir = os.path.join(self.workdir, 'classes')
@@ -196,23 +196,23 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
     self._lazy_analysis_tools = None
 
     # Compiler options.
-    self._args = context.config.getlist(config_section, 'args')
+    self._args = self.context.config.getlist(config_section, 'args')
     if get_lang_specific_option('compile_warnings'):
-      self._args.extend(context.config.getlist(config_section, 'warning_args'))
+      self._args.extend(self.context.config.getlist(config_section, 'warning_args'))
     else:
-      self._args.extend(context.config.getlist(config_section, 'no_warning_args'))
+      self._args.extend(self.context.config.getlist(config_section, 'no_warning_args'))
 
     # The rough number of source files to build in each compiler pass.
     self._partition_size_hint = get_lang_specific_option('partition_size_hint')
     if self._partition_size_hint == -1:
-      self._partition_size_hint = context.config.getint(config_section, 'partition_size_hint',
-                                                        default=1000)
+      self._partition_size_hint = self.context.config.getint(config_section, 'partition_size_hint',
+                                                             default=1000)
 
     # JVM options for running the compiler.
-    self._jvm_options = context.config.getlist(config_section, 'jvm_args')
+    self._jvm_options = self.context.config.getlist(config_section, 'jvm_args')
 
     # The ivy confs for which we're building.
-    self._confs = context.config.getlist(config_section, 'confs', default=['default'])
+    self._confs = self.context.config.getlist(config_section, 'confs', default=['default'])
 
     # Set up dep checking if needed.
     def munge_flag(flag):
@@ -233,7 +233,7 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
     # If non-zero, and we have fewer than this number of locally-changed targets,
     # then we partition them separately, to preserve stability in the face of repeated
     # compilations.
-    self._locally_changed_targets_heuristic_limit = context.config.getint(config_section,
+    self._locally_changed_targets_heuristic_limit = self.context.config.getint(config_section,
         'locally_changed_targets_heuristic_limit', 0)
 
     self._upstream_class_to_path = None  # Computed lazily as needed.

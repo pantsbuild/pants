@@ -358,46 +358,46 @@ class JarPublish(JarTask, ScmPublish):
                             %(flag)s=src/java/com/twitter/common/base
                             ''' % dict(flag=flag))
 
-  def __init__(self, context, workdir):
-    super(JarPublish, self).__init__(context, workdir)
+  def __init__(self, *args, **kwargs):
+    super(JarPublish, self).__init__(*args, **kwargs)
     ScmPublish.__init__(self, get_scm(),
                         self.context.config.getlist(self._CONFIG_SECTION, 'restrict_push_branches'))
     self.cachedir = os.path.join(self.workdir, 'cache')
 
-    self._jvmargs = context.config.getlist(self._CONFIG_SECTION, 'ivy_jvmargs', default=[])
+    self._jvmargs = self.context.config.getlist(self._CONFIG_SECTION, 'ivy_jvmargs', default=[])
 
-    if context.options.jar_publish_local:
+    if self.context.options.jar_publish_local:
       local_repo = dict(
         resolver='publish_local',
-        path=os.path.abspath(os.path.expanduser(context.options.jar_publish_local)),
+        path=os.path.abspath(os.path.expanduser(self.context.options.jar_publish_local)),
         confs=['default'],
         auth=None
       )
       self.repos = defaultdict(lambda: local_repo)
       self.commit = False
-      self.snapshot = context.options.jar_publish_local_snapshot
+      self.snapshot = self.context.options.jar_publish_local_snapshot
     else:
-      self.repos = context.config.getdict(self._CONFIG_SECTION, 'repos')
+      self.repos = self.context.config.getdict(self._CONFIG_SECTION, 'repos')
       if not self.repos:
         raise TaskError("This repo is not yet set for publishing to the world!"
                         "Please re-run with --publish-local")
       for repo, data in self.repos.items():
         auth = data.get('auth')
         if auth:
-          credentials = context.resolve(auth).next()
+          credentials = self.context.resolve(auth).next()
           user = credentials.username(data['resolver'])
           password = credentials.password(data['resolver'])
           self.context.log.debug('Found auth for repo=%s user=%s' % (repo, user))
           self.repos[repo]['username'] = user
           self.repos[repo]['password'] = password
-      self.commit = context.options.jar_publish_commit
+      self.commit = self.context.options.jar_publish_commit
       self.snapshot = False
 
-    self.ivycp = context.config.getlist('ivy', 'classpath')
+    self.ivycp = self.context.config.getlist('ivy', 'classpath')
 
-    self.dryrun = context.options.jar_publish_dryrun
-    self.transitive = context.options.jar_publish_transitive
-    self.force = context.options.jar_publish_force
+    self.dryrun = self.context.options.jar_publish_dryrun
+    self.transitive = self.context.options.jar_publish_transitive
+    self.force = self.context.options.jar_publish_force
 
     def parse_jarcoordinate(coordinate):
       components = coordinate.split('#', 1)
@@ -423,7 +423,7 @@ class JarPublish(JarTask, ScmPublish):
           raise TaskError('No BUILD file could be found at %s' % coordinate)
 
     self.overrides = {}
-    if context.options.jar_publish_override:
+    if self.context.options.jar_publish_override:
       def parse_override(override):
         try:
           coordinate, rev = override.split('=', 1)
@@ -435,11 +435,11 @@ class JarPublish(JarTask, ScmPublish):
         except ValueError:
           raise TaskError('Invalid override: %s' % override)
 
-      self.overrides.update(parse_override(o) for o in context.options.jar_publish_override)
+      self.overrides.update(parse_override(o) for o in self.context.options.jar_publish_override)
 
     self.restart_at = None
-    if context.options.jar_publish_restart_at:
-      self.restart_at = parse_jarcoordinate(context.options.jar_publish_restart_at)
+    if self.context.options.jar_publish_restart_at:
+      self.restart_at = parse_jarcoordinate(self.context.options.jar_publish_restart_at)
 
   @property
   def config_section(self):

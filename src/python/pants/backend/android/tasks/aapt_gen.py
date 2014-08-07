@@ -61,12 +61,12 @@ class AaptGen(AndroidTask, CodeGen):
   def _calculate_genfile(cls, package):
     return os.path.join(cls.package_path(package), 'R.java')
 
-  def __init__(self, context, workdir):
-    super(AaptGen, self).__init__(context, workdir)
+  def __init__(self, *args, **kwargs):
+    super(AaptGen, self).__init__(*args, **kwargs)
     self._android_dist = self.android_sdk
-    self._forced_build_tools_version = context.options.build_tools_version
-    self._forced_ignored_assets = context.options.ignored_assets
-    self._forced_target_sdk = context.options.target_sdk
+    self._forced_build_tools_version = self.context.options.build_tools_version
+    self._forced_ignored_assets = self.context.options.ignored_assets
+    self._forced_target_sdk = self.context.options.target_sdk
     self._jar_library_by_sdk = {}
 
   def prepare(self, round_manager):

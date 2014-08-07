@@ -26,24 +26,24 @@ class Provides(Task):
       action='store_true', dest='provides_also_write_to_stdout',
       help='If set, also outputs the provides information to stdout.')
 
-  def __init__(self, context, workdir):
-    super(Provides, self).__init__(context, workdir)
-    self.ivy_utils = IvyUtils(config=context.config,
-                              options=context.options,
-                              log=context.log)
-    self.confs = context.config.getlist('ivy', 'confs', default=['default'])
-    self.target_roots = context.target_roots
-    self.transitive = context.options.provides_transitive
-    self.also_write_to_stdout = context.options.provides_also_write_to_stdout or False
+  def __init__(self, *args, **kwargs):
+    super(Provides, self).__init__(*args, **kwargs)
+    self.ivy_utils = IvyUtils(config=self.context.config,
+                              options=self.context.options,
+                              log=self.context.log)
+    self.confs = self.context.config.getlist('ivy', 'confs', default=['default'])
+    self.target_roots = self.context.target_roots
+    self.transitive = self.context.options.provides_transitive
+    self.also_write_to_stdout = self.context.options.provides_also_write_to_stdout or False
     # Create a fake target, in case we were run directly on a JarLibrary containing nothing but JarDependencies.
     # TODO(benjy): Get rid of this special-casing of jar dependencies.
     # TODO(pl): Is this necessary?  Now JarLibrary only contains a payload of JarDependency
-    # context.add_new_target(self.workdir,
+    # self.context.add_new_target(self.workdir,
     #   JvmBinary,
     #   name='provides',
     #   dependencies=self.target_roots,
     #   configurations=self.confs)
-    # context.products.require('jars')
+    # self.context.products.require('jars')
 
   def execute(self):
     targets = self.context.targets()
