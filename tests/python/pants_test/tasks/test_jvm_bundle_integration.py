@@ -31,8 +31,8 @@ class BundleIntegrationTest(PantsRunIntegrationTest):
                                                   pants_run.stdout_data))
 
     with temporary_dir() as chroot:
-      ZIP.extract('dist/unicode.zip', chroot)
-      java_run = subprocess.Popen(['java', '-jar', 'unicode.jar'],
+      ZIP.extract('dist/unicode-testproject.zip', chroot)
+      java_run = subprocess.Popen(['java', '-jar', 'unicode-testproject.jar'],
                                   stdout=subprocess.PIPE,
                                   cwd=chroot)
       stdout, _ = java_run.communicate()

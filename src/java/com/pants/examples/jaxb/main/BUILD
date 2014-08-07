@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 jvm_binary(name='main',
+  basename='jaxb-example',
   dependencies=[
     'src/java/com/pants/examples/jaxb/reader',
     'src/resources/com/pants/example/names',
