@@ -5,13 +5,11 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from contextlib import contextmanager
 import os
 import pytest
 
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
-from pants_test.tasks.test_base import is_exe
 
 
 class DxCompileIntegrationTest(PantsRunIntegrationTest):
@@ -23,11 +21,10 @@ class DxCompileIntegrationTest(PantsRunIntegrationTest):
   not a guarantee that there is a dx.jar anywhere on the machine.
 
   """
-
-
   SDK_HOME = os.environ.get('ANDROID_HOME')
   ANDROID_SDK = os.path.abspath(SDK_HOME) if SDK_HOME else None
   BUILD_TOOLS = '19.1.0'
+  DEX_FILE = 'classes.dex'
 
   # wrapped in an if block to avoid calling os.path.join on a None object.
   if ANDROID_SDK:
@@ -38,10 +35,20 @@ class DxCompileIntegrationTest(PantsRunIntegrationTest):
                       reason='This integration test requires Android build-tools {0!r} to be'
                              'installed and ANDROID_HOME set in path.'.format(BUILD_TOOLS))
 
-  #@pytest.mark.skipif('not DxCompileIntegrationTest.ANDROID_SDK', reason='No Android SDK on the PATH.')
-  def test_tool_registration(self):
-      self.assertEquals(True, True)
+  def test_dx_compile(self):
+    self.publish_test('src/android/example:hello', 'src.android.example.hello', self.DEX_FILE)
 
+  def publish_test(self, target, package_namespace, artifact):
 
- # def test_live(self):
- #   self.assertEquals(True, True)
+    with temporary_dir() as publish_dir:
+
+      pants_run = self.run_pants(['goal', 'dex', target] )
+      self.assertEquals(pants_run.returncode, self.PANTS_SUCCESS_CODE,
+                        "goal publish expected success, got {0}\n"
+                        "got stderr:\n{1}\n"
+                        "got stdout:\n{2}\n".format(pants_run.returncode,
+                                                    pants_run.stderr_data,
+                                                    pants_run.stdout_data))
+
+      artifact_path = os.path.join(publish_dir, package_namespace, artifact)
+      #self.assertTrue(os.path.isfile(artifact_path))
