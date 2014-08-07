@@ -48,7 +48,7 @@ class NailgunTaskBase(TaskBase, JvmToolTaskMixin):
     self._executor_workdir = os.path.join(self.context.config.getdefault('pants_workdir'), 'ng',
                                           self.__class__.__name__)
     self._nailgun_bootstrap_key = 'nailgun'
-    self.register_jvm_tool(self._nailgun_bootstrap_key, [':nailgun-server'])
+    self.register_jvm_tool(self._nailgun_bootstrap_key, ['//:nailgun-server'])
     self.set_distribution()  # Use default until told otherwise.
     # TODO: Choose default distribution based on options.
 

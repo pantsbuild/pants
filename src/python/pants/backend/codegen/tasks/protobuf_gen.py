@@ -12,7 +12,7 @@ import re
 import subprocess
 
 from twitter.common import log
-from twitter.common.collections import OrderedSet
+from twitter.common.collections import OrderedSet, maybe_list
 
 from pants.backend.codegen.targets.java_protobuf_library import JavaProtobufLibrary
 from pants.backend.codegen.tasks.code_gen import CodeGen
@@ -27,6 +27,17 @@ from pants.binary_util import BinaryUtil
 from pants.fs.archive import ZIP
 from pants.util.dirutil import safe_mkdir
 
+# Override with protobuf-gen -> supportdir
+_PROTOBUF_GEN_SUPPORTDIR_DEFAULT='bin/protobuf'
+
+# Override with protobuf-gen -> version
+_PROTOBUF_VERSION_DEFAULT='2.4.1'
+
+# Override with protobuf-gen -> javadeps (Accepts a list)
+_PROTOBUF_GEN_JAVADEPS_DEFAULT='3rdparty:protobuf-{version}'
+
+# Override with in protobuf-gen -> pythondeps (Accepts a list)
+_PROTOBUF_GEN_PYTHONDEPS_DEFAULT = []
 
 class ProtobufGen(CodeGen):
   @classmethod
@@ -38,8 +49,10 @@ class ProtobufGen(CodeGen):
   def __init__(self, *args, **kwargs):
     super(ProtobufGen, self).__init__(*args, **kwargs)
 
-    self.protoc_supportdir = self.context.config.get('protobuf-gen', 'supportdir')
-    self.protoc_version = self.context.config.get('protobuf-gen', 'version')
+    self.protoc_supportdir = self.context.config.get('protobuf-gen', 'supportdir',
+                                                     default=_PROTOBUF_GEN_SUPPORTDIR_DEFAULT)
+    self.protoc_version = self.context.config.get('protobuf-gen', 'version',
+                                                  default=_PROTOBUF_VERSION_DEFAULT)
     self.plugins = self.context.config.getlist('protobuf-gen', 'plugins', default=[])
 
     self.java_out = os.path.join(self.workdir, 'gen-java')
@@ -60,19 +73,21 @@ class ProtobufGen(CodeGen):
     super(ProtobufGen, self).prepare(round_manager)
     round_manager.require_data('ivy_imports')
 
-  def resolve_deps(self, key):
+  def resolve_deps(self, key, default=[]):
     deps = OrderedSet()
-    for dep in self.context.config.getlist('protobuf-gen', key):
-      deps.update(self.context.resolve(dep))
+    for dep in self.context.config.getlist('protobuf-gen', key, default=maybe_list(default)):
+      if dep:
+        deps.update(self.context.resolve(dep))
     return deps
 
   @property
   def javadeps(self):
-    return self.resolve_deps('javadeps')
-
+    return self.resolve_deps('javadeps',
+                             default=_PROTOBUF_GEN_JAVADEPS_DEFAULT
+                             .format(version=self.protoc_version))
   @property
   def pythondeps(self):
-    return self.resolve_deps('pythondeps')
+    return self.resolve_deps('pythondeps', default=_PROTOBUF_GEN_PYTHONDEPS_DEFAULT)
 
   def invalidate_for(self):
     return self.gen_langs
