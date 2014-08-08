@@ -8,11 +8,11 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import os
 
 from twitter.common import log
-from twitter.common.dirutil import safe_mkdir
-
 
 from pants.backend.android.targets.android_binary import AndroidBinary
 from pants.backend.android.tasks.aapt_task import AaptTask
+from pants.base.workunit import WorkUnit
+from pants.util.dirutil import safe_mkdir
 
 class AaptBuilder(AaptTask):
 
@@ -21,9 +21,9 @@ class AaptBuilder(AaptTask):
   def product_types(cls):
     return ['apk']
 
-    @staticmethod
-    def is_app(target):
-      return isinstance(target, (AndroidBinary))
+  @staticmethod
+  def is_app(target):
+    return isinstance(target, AndroidBinary)
 
   def __init__(self, context, workdir):
     super(AaptBuilder, self).__init__(context, workdir)
@@ -40,6 +40,7 @@ class AaptBuilder(AaptTask):
     else:
       args.append(self.aapt_tool(target.build_tools_version))
 
+    #TODO (MATEOR) update for this subclass
     # Glossary of used aapt flags. Aapt handles a ton of action, this will continue to expand.
     #   : 'package' is the main aapt operation (see class docstring for more info).
     #   : '-m' is to "make" a package directory under location '-J'.
@@ -69,4 +70,11 @@ class AaptBuilder(AaptTask):
   def execute(self):
     print ("EXECUTING")
     safe_mkdir(self.workdir)
-    pass
+    with self.context.new_workunit(name='apk-bundle', labels=[WorkUnit.MULTITOOL]):
+      targets = self.context.targets(self.is_app)
+      #TODO (MATEOR) invalidation machinery
+      for target in targets:
+        mapping = self.context.products.get('dex')
+        for basedir in mapping.get(target):
+          dex_dir = basedir
+        print(dex_dir)

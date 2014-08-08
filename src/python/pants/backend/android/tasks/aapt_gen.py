@@ -10,7 +10,6 @@ import subprocess
 
 from twitter.common import log
 from twitter.common.collections import OrderedSet
-from twitter.common.dirutil import safe_mkdir
 
 
 from pants.backend.android.targets.android_resources import AndroidResources
@@ -22,6 +21,7 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.base.address import SyntheticAddress
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+from pants.util.dirutil import safe_mkdir
 
 
 class AaptGen(AaptTask, CodeGen):
