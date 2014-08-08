@@ -37,7 +37,7 @@ class AaptBuilder(AaptTask):
     round_manager.require_data('java')
     round_manager.require_data('dex')
 
-  def render_args(self, target, output_dir):
+  def render_args(self, target, output_dir, inputs):
     args = []
 
     if self._forced_build_tools_version:
@@ -68,28 +68,30 @@ class AaptBuilder(AaptTask):
       args.extend(['--ignore-assets', self.IGNORED_ASSETS])
 
     # extend -F bin/*apk $INPUT_DIRS
-
+    args.extend('-F', self.workdir)
+    for input in inputs:
+      args.extend(input)
     log.debug('Executing: {0}'.format(args))
     return args
 
   def execute(self):
-    print ("EXECUTING")
     safe_mkdir(self.workdir)
-    with self.context.new_workunit(name='apk-bundle', labels=[WorkUnit.MULTITOOL]):
+    with self.context.new_workunit(name='apk-bundle', labels=[WorkUnit.MULTITOOL]):  #TODO Check Label
       targets = self.context.targets(self.is_app)
       #TODO (MATEOR) invalidation machinery
       for target in targets:
+        input_dirs = []
         mapping = self.context.products.get('dex')
         for basedir in mapping.get(target):
-          dex_dir = basedir
-        print(dex_dir)
+          input_dirs.extend(basedir)
+
 
         def add_r_java(target):
           new_resources = self.context.products.get('android-gen')
           if new_resources.get(target) is not None:
             for basedir in new_resources.get(target):
-              greg = os.path.join(basedir, self.package_path(target.package))
-            print (greg)
-            print(os.path.isdir(greg))
+              input_dirs.extend(os.path.join(basedir, self.package_path(target.package)))
 
         target.walk(add_r_java)
+        args = self.render_args(target, self.workdir, input_dirs)
+        print (args)
