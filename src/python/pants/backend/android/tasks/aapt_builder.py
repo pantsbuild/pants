@@ -58,12 +58,13 @@ class AaptBuilder(AaptTask):
     #   : '-I' packages to add to base "include" set, here it is the android.jar of the target-sdk.
 
     args.extend(['package', '-v', '-f', '-M', target.manifest,
-                 '-S', resource_dir, '-I'])
+                 '-S'])
 
+    args.extend(resource_dir)
     if self._forced_target_sdk:
-      args.append(self.android_jar_tool(self._forced_target_sdk))
+      args.extend(['-I', self.android_jar_tool(self._forced_target_sdk)])
     else:
-      args.append(self.android_jar_tool(target.target_sdk))
+      args.extend(['-I', self.android_jar_tool(target.target_sdk)])
 
     if self._forced_ignored_assets:
       args.extend(['--ignore-assets', self._forced_ignored_assets])
@@ -71,10 +72,12 @@ class AaptBuilder(AaptTask):
       args.extend(['--ignore-assets', self.IGNORED_ASSETS])
 
     # extend -F bin/*apk $INPUT_DIRS
-    args.extend(['-F', os.path.join(self.workdir, target.name, '.apk')])
+    args.extend(['-F', os.path.join(self.workdir, target.name + '.apk')])
     args.extend(inputs)
     log.debug('Executing: {0}'.format(args))
     print (args)
+    for arg in args:
+      print("arg {0} is: {1}".format(arg, type(arg)))
     return args
 
   def execute(self):
@@ -100,6 +103,7 @@ class AaptBuilder(AaptTask):
               input_dirs.append(os.path.join(basedir, self.package_path(target.package)))
 
         target.walk(add_r_java)
+        print(type(resource_dir))
         process = subprocess.Popen(self.render_args(target, resource_dir, input_dirs))
         result = process.wait()
         if result != 0:
