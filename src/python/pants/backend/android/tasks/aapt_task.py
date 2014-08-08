@@ -5,6 +5,7 @@
 import os
 
 from pants.backend.android.tasks.android_task import AndroidTask
+from pants.base.exceptions import TaskError
 
 
 # These are hardcoded into aapt but we added 'BUILD*'. Changes clobber, so we need entire string
@@ -37,7 +38,11 @@ class AaptTask(AndroidTask):
     self._forced_target_sdk = context.options.target_sdk
     # TODO (mateor) add minSDK support
 
-  #def run_aapt(self, tool, command, args):
+  def run_aapt(self, tool_version, command, options, args):
+    args = []
+    args.extend(self.aapt_tool(tool_version), command, args)
+
+
 
 
   def aapt_tool(self, build_tools_version):

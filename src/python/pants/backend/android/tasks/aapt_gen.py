@@ -100,18 +100,17 @@ class AaptGen(AaptTask, CodeGen):
     return args
 
   def genlang(self, lang, targets):
-    aapt_out = os.path.join(self.workdir, 'bin')
-    safe_mkdir(aapt_out)
+    safe_mkdir(self.workdir)
     for target in targets:
       if lang != 'java':
         raise TaskError('Unrecognized android gen lang: {0!r}'.format(lang))
-      process = subprocess.Popen(self.render_args(target, aapt_out))
+      process = subprocess.Popen(self.render_args(target, self.workdir))
       result = process.wait()
       if result != 0:
         raise TaskError('Android aapt tool exited non-zero ({code})'.format(code=result))
 
   def createtarget(self, lang, gentarget, dependees):
-    spec_path = os.path.join(os.path.relpath(self.workdir, get_buildroot()), 'bin')
+    spec_path = os.path.join(os.path.relpath(self.workdir, get_buildroot()))
     address = SyntheticAddress(spec_path=spec_path, target_name=gentarget.id)
     aapt_gen_file = self._calculate_genfile(gentarget.package)
     deps = OrderedSet([self._jar_library_by_sdk[gentarget.target_sdk]])
@@ -123,8 +122,3 @@ class AaptGen(AaptTask, CodeGen):
     for dependee in dependees:
       dependee.inject_dependency(tgt.address)
     return tgt
-
-  def _aapt_out(self):
-    return os.path.join(self.workdir, 'bin')
-
-
