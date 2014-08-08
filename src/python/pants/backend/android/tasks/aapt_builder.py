@@ -80,20 +80,24 @@ class AaptBuilder(AaptTask):
       #TODO (MATEOR) invalidation machinery
       for target in targets:
         mapping = self.context.products.get('dex')
-        print(type(mapping))
+        print((mapping))
         print("THAT WAS A GOOD DRUM BREAK")
         for basedir in mapping.get(target):
           dex_dir = basedir
         print(dex_dir)
-      targets = self.context.targets(self.is_app)
+      targets = self.context.targets(self.is_android)
       for target in targets:
+        print(target)
         #resources = self.context.products.get('java')
         #resources_from_target = resources.get(target)
 
         new_resources = self.context.products.get('android-gen')
-        print (type(new_resources))
-        for basedir in new_resources.get(target):
-          greg = basedir
-        print (greg)
+        print ((new_resources))
+        if new_resources.get(target) is not None:
+          for basedir in new_resources.get(target):
+            greg = basedir
+          print (greg)
+        else:
+          print("JIMINIY CRICKET")
           #@for prod in products:
             #print(prod)
