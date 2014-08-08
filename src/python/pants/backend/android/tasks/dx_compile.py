@@ -46,11 +46,11 @@ class DxCompile(AndroidTask, NailgunTask):
   def product_types(cls):
     return ['dex']
 
-  def __init__(self, context, workdir):
-    super(DxCompile, self).__init__(context, workdir)
+  def __init__(self, *args, **kwargs):
+    super(DxCompile, self).__init__(*args, **kwargs)
     self._android_dist = self.android_sdk
-    self._forced_build_tools_version = context.options.build_tools_version
-    self._forced_vm_options = context.options.vm_options
+    self._forced_build_tools_version = self.context.options.build_tools_version
+    self._forced_vm_options = self.context.options.vm_options
 
     config_section = self.config_section
     self.setup_artifact_cache_from_config(config_section=config_section)
