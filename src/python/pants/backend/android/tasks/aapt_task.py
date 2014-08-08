@@ -30,6 +30,11 @@ class AaptTask(AndroidTask):
                             help="[%default] Specifies regex patterns the aapt tools should "
                                  "ignore as it spiders down the resource_dir.")
 
+  @classmethod
+  def package_path(cls, package):
+    """Return the package name translated into a path"""
+    return package.replace('.', os.sep)
+
   def __init__(self, context, workdir):
     super(AaptTask, self).__init__(context, workdir)
     self._android_dist = self.android_sdk
