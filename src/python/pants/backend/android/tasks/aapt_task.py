@@ -35,6 +35,10 @@ class AaptTask(AndroidTask):
     self._forced_build_tools_version = context.options.build_tools_version
     self._forced_ignored_assets = context.options.ignored_assets
     self._forced_target_sdk = context.options.target_sdk
+    # TODO (mateor) add minSDK support
+
+  #def run_aapt(self, tool, command, args):
+
 
   def aapt_tool(self, build_tools_version):
     """Return the appropriate aapt tool.

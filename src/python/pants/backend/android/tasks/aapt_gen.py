@@ -94,7 +94,7 @@ class AaptGen(AaptTask, CodeGen):
     if self._forced_ignored_assets:
       args.extend(['--ignore-assets', self._forced_ignored_assets])
     else:
-      args.extend(['--ignore-assets', IGNORED_ASSETS])
+      args.extend(['--ignore-assets', self.IGNORED_ASSETS])
 
     log.debug('Executing: {0}'.format(args))
     return args
