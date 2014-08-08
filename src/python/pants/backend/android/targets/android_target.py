@@ -22,6 +22,7 @@ class AndroidTarget(JvmTarget):
 
   def __init__(self,
                address=None,
+               # TODO (mateor) add support for minSDk
                # most recent build_tools_version should be defined elsewhere
                build_tools_version="19.1.0",
                manifest=None,

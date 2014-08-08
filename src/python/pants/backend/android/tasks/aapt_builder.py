@@ -10,6 +10,7 @@ import os
 from twitter.common import log
 
 from pants.backend.android.targets.android_binary import AndroidBinary
+from pants.backend.android.targets.android_target import AndroidTarget
 from pants.backend.android.tasks.aapt_task import AaptTask
 from pants.base.workunit import WorkUnit
 from pants.util.dirutil import safe_mkdir
@@ -24,6 +25,10 @@ class AaptBuilder(AaptTask):
   @staticmethod
   def is_app(target):
     return isinstance(target, AndroidBinary)
+
+  @staticmethod
+  def is_android(target):
+    return isinstance(target, AndroidTarget)
 
   def __init__(self, context, workdir):
     super(AaptBuilder, self).__init__(context, workdir)
@@ -75,6 +80,20 @@ class AaptBuilder(AaptTask):
       #TODO (MATEOR) invalidation machinery
       for target in targets:
         mapping = self.context.products.get('dex')
+        print(type(mapping))
+        print("THAT WAS A GOOD DRUM BREAK")
         for basedir in mapping.get(target):
           dex_dir = basedir
         print(dex_dir)
+      targets = self.context.targets(self.is_app)
+      for target in targets:
+        #resources = self.context.products.get('java')
+        #resources_from_target = resources.get(target)
+
+        new_resources = self.context.products.get('android-gen')
+        print (type(new_resources))
+        for basedir in new_resources.get(target):
+          greg = basedir
+        print (greg)
+          #@for prod in products:
+            #print(prod)

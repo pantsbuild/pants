@@ -119,6 +119,8 @@ class DxCompile(AndroidTask, NailgunTask):
           self._compile_dex(args, target.build_tools_version)
           self.context.products.get('dex').add(target, out_dir).append(self.DEX_NAME)
 
+          print (self.context.products.get('dex'))
+
   def dx_jar_tool(self, build_tools_version):
     """Return the appropriate dx.jar.
 
