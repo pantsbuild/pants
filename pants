@@ -48,6 +48,8 @@ PANTS_BINARY=src/python/pants/bin:pants
 PANTS_PEX="${HERE}/pants.pex"
 FAILED_BOOTSTRAP_SENTINEL="${HERE}/.pants.d/BOOTSTRAP_FAILED"
 
+# NB: This env var is used by the activate_pants_venv via
+# build-support/virtualenv
 PY=${PY:-$(which python)}
 
 if [[ ! -z "${WRAPPER_REQUIREMENTS}" ]]; then
