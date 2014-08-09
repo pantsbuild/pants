@@ -30,9 +30,9 @@ class DxCompileIntegrationTest(AndroidIntegrationTest):
                       reason='Android integration test requires tools {0!r} '
                              'and ANDROID_HOME set in path.'.format(TOOLS))
   def test_dx_compile(self):
-    self.publish_test('src/android/example:hello')
+    self.dx_test('src/android/example:hello')
 
-  def publish_test(self, target):
+  def dx_test(self, target):
       pants_run = self.run_pants(['goal', 'dex', target])
       self.assertEquals(pants_run.returncode, self.PANTS_SUCCESS_CODE,
                         "goal publish expected success, got {0}\n"
