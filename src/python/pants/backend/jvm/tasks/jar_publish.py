@@ -379,8 +379,9 @@ class JarPublish(JarTask, ScmPublish):
     else:
       self.repos = self.context.config.getdict(self._CONFIG_SECTION, 'repos')
       if not self.repos:
-        raise TaskError("This repo is not yet set for publishing to the world!"
-                        "Please re-run with --publish-local")
+        raise TaskError("This repo is not configured to publish externally! Please configure per\n"
+                        "http://pantsbuild.github.io/publish.html#authenticating-to-the-artifact-repository,\n"
+                        "or re-run with the '--publish-local' flag.")
       for repo, data in self.repos.items():
         auth = data.get('auth')
         if auth:
