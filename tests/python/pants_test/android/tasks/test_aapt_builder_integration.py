@@ -24,5 +24,15 @@ class AaptBuilderIntegrationTest(AndroidIntegrationTest):
   @pytest.mark.skipif('not AaptBuilderIntegrationTest.reqs',
                       reason='Android integration test requires tools {0!r} '
                              'and ANDROID_HOME set in path.'.format(TOOLS))
-  def test_check(self):
-    self.assertEquals(True, True)
+
+  def test_aapt_bundle(self):
+    self.bundle_test('src/android/example:hello')
+
+  def bundle_test(self, target):
+    pants_run = self.run_pants(['goal', 'bundle', target])
+    self.assertEquals(pants_run.returncode, self.PANTS_SUCCESS_CODE,
+                      "goal publish expected success, got {0}\n"
+                      "got stderr:\n{1}\n"
+                      "got stdout:\n{2}\n".format(pants_run.returncode,
+                                                  pants_run.stderr_data,
+                                                  pants_run.stdout_data))
