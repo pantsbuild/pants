@@ -6,6 +6,7 @@ python_test_suite(
   name = 'android',
   dependencies = [
     ':android_distribution',
+    pants('tests/python/pants_test/android/tasks:tasks'),
   ]
 )
 
