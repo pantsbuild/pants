@@ -107,8 +107,7 @@ class AaptGen(AaptTask, CodeGen):
       result = process.wait()
       if result != 0:
         raise TaskError('Android aapt tool exited non-zero ({code})'.format(code=result))
-      self.context.products.get('android-gen').add(target, self.workdir).append(self.package_path
-                                                                                (target.package))
+
   def createtarget(self, lang, gentarget, dependees):
     spec_path = os.path.join(os.path.relpath(self.workdir, get_buildroot()))
     address = SyntheticAddress(spec_path=spec_path, target_name=gentarget.id)

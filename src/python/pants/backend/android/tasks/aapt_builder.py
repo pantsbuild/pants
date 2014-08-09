@@ -11,6 +11,7 @@ import subprocess
 from twitter.common import log
 
 from pants.backend.android.targets.android_binary import AndroidBinary
+from pants.backend.android.targets.android_resources import AndroidResources
 from pants.backend.android.tasks.aapt_task import AaptTask
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
@@ -19,8 +20,11 @@ from pants.util.dirutil import safe_mkdir
 
 
 class AaptBuilder(AaptTask):
-  """Build an android bundle with compiled code and assets."""
+  """Build an android bundle with compiled code and assets.
 
+  This class gathers compiled classes (an Android dex archive) and packages it with the
+  target's resource files. The output is an unsigned .apk, an Android application package file.
+  """
   @classmethod
   def product_types(cls):
     return ['apk']
@@ -78,27 +82,18 @@ class AaptBuilder(AaptTask):
         for vt in invalidation_check.invalid_vts:
           invalid_targets.extend(vt.targets)
         for target in invalid_targets:
-          # 'input_dirs' holds the target's resource_dir (e.g. 'res') and dir containing classes.dex
+          # 'input_dirs' is the folder containing the Android dex file (e.g. 'classes.dex')
           input_dirs = []
-          # 'gen_out' holds the basedir containing the generated R.java
+          # 'gen_out' holds resource folders (e.g. 'res')
           gen_out = []
           mapping = self.context.products.get('dex')
           for basedir in mapping.get(target):
             input_dirs.append(basedir)
 
           def gather_resources(target):
-            """Check target deps for R.java and get its basedir and that target's resource_dir"""
-
-            #N.B. I tried to get this through AaptGen's 'java' product, but could not isolate
-            # the basedir from the synthetic target. So I added an 'android-gen' product to context
-            # graph and got it there.
-            android_codegen = self.context.products.get('android-gen')
-
-            # null check is needed as new_resources can contain null values.
-            if android_codegen.get(target) is not None:
+            """Gather the 'resource_dir' of the target"""
+            if isinstance(target, AndroidResources):
               gen_out.append(os.path.join(get_buildroot(), target.resource_dir))
-              for basedir in android_codegen.get(target):
-                input_dirs.append(os.path.join(basedir, self.package_path(target.package)))
 
           target.walk(gather_resources)
 
