@@ -15,18 +15,18 @@ class DxCompileIntegrationTest(AndroidIntegrationTest):
   """Integration test for DxCompile
 
   The Android SDK is modular, finding an SDK on the PATH is no guarantee that there is
-  a dx.jar anywhere on disk. In this test we look for a set of default tools that will get the
-  job done or the test is skipped. The TARGET_SDK version must match the targetSDK value in the
-  AndroidManifest.xml of the target while the BUILD_TOOLS version is arbitrary.
+  a dx.jar anywhere on disk. The TOOLS are the ones required by the target in 'test_dx_compile'
+  method. If you add a target, you may need to expand the TOOLS list and perhaps define new
+  BUILD_TOOLS or TARGET_SDK class variables.
   """
   TOOLS = [
     os.path.join('build-tools', AndroidIntegrationTest.BUILD_TOOLS, 'lib', 'dx.jar'),
     os.path.join('platforms', 'android-' + AndroidIntegrationTest.TARGET_SDK, 'android.jar')
   ]
 
-  reqs = AndroidIntegrationTest.requirements(TOOLS)
+  tools = AndroidIntegrationTest.requirements(TOOLS)
 
-  @pytest.mark.skipif('not DxCompileIntegrationTest.reqs',
+  @pytest.mark.skipif('not DxCompileIntegrationTest.tools',
                       reason='Android integration test requires tools {0!r} '
                              'and ANDROID_HOME set in path.'.format(TOOLS))
   def test_dx_compile(self):
@@ -40,5 +40,3 @@ class DxCompileIntegrationTest(AndroidIntegrationTest):
                         "got stdout:\n{2}\n".format(pants_run.returncode,
                                                     pants_run.stderr_data,
                                                     pants_run.stdout_data))
-
-  #TODO(mateor): if in the future DxCompile outputs to dist then we can verify the artifact here.

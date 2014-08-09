@@ -24,7 +24,6 @@ class AndroidIntegrationTest(PantsRunIntegrationTest):
   BUILD_TOOLS = '19.1.0'
   TARGET_SDK = '19'
   ANDROID_SDK_LOCATION = 'ANDROID_HOME'
-  DEX_FILE = 'classes.dex'
 
   @classmethod
   def requirements(cls, tools):
