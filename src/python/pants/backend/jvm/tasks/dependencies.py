@@ -40,8 +40,8 @@ class Dependencies(ConsoleTask):
                             help='Specifies that only external dependencies should'
                                  ' be included in the graph output (only external jars).')
 
-  def __init__(self, context, workdir, **kwargs):
-    super(Dependencies, self).__init__(context, workdir, **kwargs)
+  def __init__(self, *args, **kwargs):
+    super(Dependencies, self).__init__(*args, **kwargs)
 
     if (self.context.options.dependencies_is_internal_only and
         self.context.options.dependencies_is_external_only):

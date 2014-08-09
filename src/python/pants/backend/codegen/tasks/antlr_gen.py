@@ -30,13 +30,14 @@ class AntlrGen(CodeGen, NailgunTask, JvmToolTaskMixin):
 
   _GENERIC_CONFIG_SECTION = 'antlr'
 
-  def __init__(self, context, workdir):
-    super(AntlrGen, self).__init__(context, workdir)
+  def __init__(self, *args, **kwargs):
+    super(AntlrGen, self).__init__(*args, **kwargs)
 
     # TODO(John Sirois): kill if not needed by prepare_gen
     self._classpath_by_compiler = {}
 
-    active_compilers = set(map(lambda t: t.compiler, context.targets(predicate=self.is_gentarget)))
+    active_compilers = set(map(lambda t: t.compiler,
+                               self.context.targets(predicate=self.is_gentarget)))
     for compiler, tools in self._all_possible_antlr_bootstrap_tools():
       if compiler in active_compilers:
         self.register_jvm_tool(compiler, tools)

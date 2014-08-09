@@ -180,18 +180,4 @@ Restricting Publish to "Release Branch"
 Your organization might have a notion of a special "release branch": you want
 :doc:`artifact publishing <publish>`
 to happen on this source control branch, which you maintain
-extra-carefully. To configure this, set up a ``JarPublish``
-subclass in an always-used ``BUILD`` file (in most repos, this
-means a ``BUILD`` file in the top directory). This ``JarPublish``
-subclass should use ``restrict_push_branches``. Set up your repo's
-``publish`` goal to use this class::
-
-    # ./BUILD.myorg
-    class MyorgJarPublish(JarPublish):
-      def __init__(self, context, workdir):
-        super(MyorgJarPublish, self).__init__(context, workdir, restrict_push_branches=['master'])
-
-    goal(name='publish',
-         action=MyorgJarPublish).install('publish').with_description('Publish one or more artifacts.')
-
-If a user invokes ``goal publish`` from some other branch, Pants balks.
+extra-carefully. You can set this branch using the restrict_push_branches option.

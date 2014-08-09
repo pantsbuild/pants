@@ -32,14 +32,14 @@ def prepare_task(task_type,
                  targets=None,
                  build_graph=None,
                  build_file_parser=None,
-                 **kwargs):
+                 console_outstream=None,
+                 workspace=None):
   """Prepares a Task for execution.
 
   task_type: The class of the Task to create.
   config: An optional string representing the contents of a pants.ini config.
   args: optional list of command line flags, these should be prefixed with '--test-'.
   targets: optional list of Target objects passed on the command line.
-  **kwargs: Any additional args the Task subclass constructor takes beyond the required context.
 
   Returns a new Task ready to execute.
   """
@@ -62,8 +62,10 @@ def prepare_task(task_type,
                     run_tracker,
                     targets or [],
                     build_graph=build_graph,
-                    build_file_parser=build_file_parser)
-  return task_type(context, workdir, **kwargs)
+                    build_file_parser=build_file_parser,
+                    console_outstream=console_outstream,
+                    workspace=workspace)
+  return task_type(context, workdir)
 
 
 def is_exe(name):
@@ -130,22 +132,22 @@ class ConsoleTaskTest(TaskTest):
                           config=config,
                           args=args,
                           targets=targets,
-                          outstream=output,
                           build_graph=self.build_graph,
-                          build_file_parser=self.build_file_parser)
+                          build_file_parser=self.build_file_parser,
+                          console_outstream=output)
       task.execute()
       return output.getvalue()
 
   def execute_console_task(self, config=None, args=None, targets=None, extra_targets=None,
-                           **kwargs):
+                           workspace=None):
     """Creates a new task and executes it with the given config, command line args and targets.
 
     config:        an optional string representing the contents of a pants.ini config.
     args:          optional list of command line flags, these should be prefixed with '--test-'.
     targets:       optional list of Target objects passed on the command line.
     extra_targets: optional list of extra targets in the context in addition to those passed on the
-                   command line
-    **kwargs: additional kwargs are passed to the task constructor.
+                   command line.
+    workspace:     optional Workspace to pass into the context.
 
     Returns the list of items returned from invoking the console task's console_output method.
     """
@@ -155,7 +157,7 @@ class ConsoleTaskTest(TaskTest):
                         targets=targets,
                         build_graph=self.build_graph,
                         build_file_parser=self.build_file_parser,
-                        **kwargs)
+                        workspace=workspace)
     return list(task.console_output(list(targets or ()) + list(extra_targets or ())))
 
   def assert_entries(self, sep, *output, **kwargs):
@@ -165,8 +167,7 @@ class ConsoleTaskTest(TaskTest):
 
     sep:      the expected output separator.
     *output:  the output entries expected between the separators
-    **kwargs: additional kwargs are passed to the task constructor except for config args, targets
-              and extra_targets which are passed to execute_task.
+    **kwargs: additional kwargs passed to execute_task.
     """
     # We expect each output line to be suffixed with the separator, so for , and [1,2,3] we expect:
     # '1,2,3,' - splitting this by the separator we should get ['1', '2', '3', ''] - always an extra
@@ -180,16 +181,14 @@ class ConsoleTaskTest(TaskTest):
     NB: order of entries is not tested, just presence.
 
     *output:  the expected output entries
-    **kwargs: additional kwargs are passed to the task constructor except for config args, targets
-              and extra_targets which are passed to execute_console_task.
+    **kwargs: additional kwargs passed to execute_console_task.
     """
     self.assertEqual(sorted(output), sorted(self.execute_console_task(**kwargs)))
 
   def assert_console_raises(self, exception, **kwargs):
     """Verifies the expected exception is raised by the console task under test.
 
-    **kwargs: additional kwargs are passed to the task constructor except for config args, targets
-              and extra_targets which are passed to execute_console_task.
+    **kwargs: additional kwargs are passed to execute_console_task.
     """
     with pytest.raises(exception):
       self.execute_console_task(**kwargs)

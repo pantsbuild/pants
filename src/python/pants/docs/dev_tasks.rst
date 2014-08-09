@@ -203,8 +203,8 @@ example, including exemplary configuration and error handling (which your task w
 right :)  ::
 
    class Scalastyle(NailgunTask):
-     def __init__(self, context, workdir):
-       super(Scalastyle, self).__init__(context, workdir)
+     def __init__(self, *args, **kwargs):
+       super(Scalastyle, self).__init__(*args, **kwargs)
        self._scalastyle_config = self.context.config.get_required('scalastyle, 'config')
        self._scalastyle_bootstrap_key = 'scalastyle'
        self.register_jvm_tool(self._scalastyle_bootstrap_key, [':scalastyle'])

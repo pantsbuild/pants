@@ -59,6 +59,15 @@ class TaskBase(AbstractClass):
     """
 
   def __init__(self, context, workdir):
+    """Subclass __init__ methods, if defined, *must* follow this idiom:
+
+    class MyTask(Task):
+      def __init__(self, *args, **kwargs):
+        super(MyTask, self).__init__(*args, **kwargs)
+        ...
+
+    This allows us to change Task.__init__()'s arguments without changing every subclass.
+    """
     self.context = context
     self._workdir = workdir
     self._cache_key_generator = CacheKeyGenerator(

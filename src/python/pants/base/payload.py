@@ -190,7 +190,7 @@ class JavaProtobufLibraryPayload(JvmTargetPayload):
     for config in sorted(self.configurations):
       hasher.update(config)
     for jar in sorted(self.imports):
-      hasher.update(jar.id)
+      hasher.update(bytes(hash(jar)))
     return hasher.hexdigest()
 
 

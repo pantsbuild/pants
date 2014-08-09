@@ -22,20 +22,20 @@ class ScalaRepl(JvmTask, JvmToolTaskMixin):
     option_group.add_option(mkflag('args'), dest='run_args', action='append',
                             help='run the repl in a jvm with extra args.')
 
-  def __init__(self, context, workdir):
-    super(ScalaRepl, self).__init__(context, workdir)
-    self.jvm_args = context.config.getlist('scala-repl', 'jvm_args', default=[])
-    if context.options.run_jvmargs:
-      for arg in context.options.run_jvmargs:
+  def __init__(self, *args, **kwargs):
+    super(ScalaRepl, self).__init__(*args, **kwargs)
+    self.jvm_args = self.context.config.getlist('scala-repl', 'jvm_args', default=[])
+    if self.context.options.run_jvmargs:
+      for arg in self.context.options.run_jvmargs:
         self.jvm_args.extend(shlex.split(arg))
-    self.confs = context.config.getlist('scala-repl', 'confs', default=['default'])
+    self.confs = self.context.config.getlist('scala-repl', 'confs', default=['default'])
     self._bootstrap_key = 'scala-repl'
-    bootstrap_tools = context.config.getlist('scala-repl', 'bootstrap-tools')
+    bootstrap_tools = self.context.config.getlist('scala-repl', 'bootstrap-tools')
     self.register_jvm_tool(self._bootstrap_key, bootstrap_tools)
-    self.main = context.config.get('scala-repl', 'main')
-    self.args = context.config.getlist('scala-repl', 'args', default=[])
-    if context.options.run_args:
-      for arg in context.options.run_args:
+    self.main = self.context.config.get('scala-repl', 'main')
+    self.args = self.context.config.getlist('scala-repl', 'args', default=[])
+    if self.context.options.run_args:
+      for arg in self.context.options.run_args:
         self.args.extend(shlex.split(arg))
 
   def prepare(self, round_manager):

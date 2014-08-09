@@ -37,7 +37,6 @@ class CheckExclusives(Task):
      java_library(name='jliba',
        depedencies = ['slf4j-with-log4j-2.4'])
      java_library(name='jlibb',
-       dependencies=['log4j-1.9'])
      java_binary(name='javabin', dependencies=[':jliba', ':jlibb'])
 
   In this case, the binary target 'javabin' depends on both slf4j with its
@@ -71,11 +70,6 @@ class CheckExclusives(Task):
                             action='callback', callback=mkflag.set_bool,
                             help=("[%default] Signal an error and abort the build if an " +
                                   "exclusives collision is detected"))
-
-  def __init__(self, context, workdir, signal_error=None):
-    super(CheckExclusives, self).__init__(context, workdir)
-    self.signal_error = (context.options.exclusives_error_on_collision
-                         if signal_error is None else signal_error)
 
   def prepare(self, round_manager):
     round_manager.require_data('java')
@@ -118,7 +112,7 @@ class CheckExclusives(Task):
         if len(excl[key]) > 1:
           msg = 'target %s has more than one exclusives tag for key %s: %s' % \
                 (t.address.reference(), key, list(excl[key]))
-          if self.signal_error:
+          if self.context.options.exclusives_error_on_collision:
             raise TaskError(msg)
           else:
             print('Warning: %s' % msg)
@@ -186,14 +180,14 @@ class ExclusivesMapping(object):
     """
     def number_of_emptys(key):
       if key == "<none>":
-        return len(self.conflicting_keys)
+        return len(self.conflicting_exclusives)
       return key.count("<none>")
 
     if self.ordering is not None:
       return self.ordering
     # The correct order is from least exclusives to most exclusives - a target can only depend on
     # other targets with fewer exclusives than itself.
-    keys_by_empties = [ [] for l in range(len(self.key_to_targets)) ]
+    keys_by_empties = [ [] ] *  len(self.key_to_targets)
     # Flag to indicate whether there are any groups without any exclusives.
     no_exclusives = False
     for k in self.key_to_targets:

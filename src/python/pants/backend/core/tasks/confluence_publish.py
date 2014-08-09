@@ -41,12 +41,12 @@ class ConfluencePublish(Task):
     option_group.add_option(mkflag("user"), dest="confluence_user",
                             help="Confluence user name, defaults to unix user.")
 
-  def __init__(self, context, workdir):
-    super(ConfluencePublish, self).__init__(context, workdir)
+  def __init__(self, *args, **kwargs):
+    super(ConfluencePublish, self).__init__(*args, **kwargs)
 
     self.url = (
-      context.options.confluence_publish_url
-      or context.config.get('confluence-publish', 'url')
+      self.context.options.confluence_publish_url
+      or self.context.config.get('confluence-publish', 'url')
     )
 
     if not self.url:
@@ -54,10 +54,10 @@ class ConfluencePublish(Task):
                       "the 'confluence-publish' heading in pants.ini or using the %s command line "
                       "option." % self.url_option)
 
-    self.force = context.options.confluence_publish_force
-    self.open = context.options.confluence_publish_open
+    self.force = self.context.options.confluence_publish_force
+    self.open = self.context.options.confluence_publish_open
     self._wiki = None
-    self.user = context.options.confluence_user
+    self.user = self.context.options.confluence_user
 
   def prepare(self, round_manager):
     round_manager.require('wiki_html')

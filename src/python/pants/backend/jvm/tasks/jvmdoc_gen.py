@@ -107,8 +107,8 @@ class JvmdocGen(JvmTask):
       callback=mkflag.set_bool,
       help='[%%default] Can be used to skip %s generation' % tool_name)
 
-  def __init__(self, context, workdir):
-    super(JvmdocGen, self).__init__(context, workdir)
+  def __init__(self, *args, **kwargs):
+    super(JvmdocGen, self).__init__(*args, **kwargs)
 
     jvmdoc_tool_name = self.jvmdoc().tool_name
 
@@ -116,15 +116,15 @@ class JvmdocGen(JvmTask):
     parser_config = self.setup_parser_config()
 
     def getattr_options(option):
-      return getattr(context.options, option)
+      return getattr(self.context.options, option)
 
     flagged_codegen = getattr_options(parser_config.include_codegen_opt)
     self._include_codegen = (flagged_codegen if flagged_codegen is not None
-                             else context.config.getbool(config_section, 'include_codegen',
-                                                         default=False))
+                             else self.context.config.getbool(config_section, 'include_codegen',
+                                                              default=False))
 
     self.transitive = getattr_options(parser_config.transitive_opt)
-    self.confs = context.config.getlist(config_section, 'confs', default=['default'])
+    self.confs = self.context.config.getlist(config_section, 'confs', default=['default'])
     self.open = getattr_options(parser_config.open_opt)
     self.combined = self.open or getattr_options(parser_config.combined_opt)
     self.ignore_failure = getattr_options(parser_config.ignore_failure_opt)

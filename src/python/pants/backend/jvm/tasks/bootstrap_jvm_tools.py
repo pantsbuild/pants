@@ -19,8 +19,8 @@ class BootstrapJvmTools(Task, IvyTaskMixin):
   def product_types(cls):
     return ['jvm_build_tools_classpath_callbacks']
 
-  def __init__(self, context, workdir):
-    super(BootstrapJvmTools, self).__init__(context, workdir)
+  def __init__(self, *args, **kwargs):
+    super(BootstrapJvmTools, self).__init__(*args, **kwargs)
 
   def prepare(self, round_manager):
     # TODO(John Sirois): This is the sole use of data dependencies that does not follow the phase

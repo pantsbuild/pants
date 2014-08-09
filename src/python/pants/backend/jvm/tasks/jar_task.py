@@ -209,15 +209,16 @@ class JarTask(NailgunTask):
       raise ValueError('Unrecognized duplicate action: %s' % action)
     return name
 
-  def __init__(self, context, workdir):
-    super(JarTask, self).__init__(context, workdir=workdir, jdk=True, nailgun_name='jar-tool')
+  def __init__(self, *args, **kwargs):
+    super(JarTask, self).__init__(*args, **kwargs)
+    self.set_distribution(jdk=True)
 
     # TODO(John Sirois): Consider poking a hole for custom jar-tool jvm args - namely for Xmx
     # control.
 
-    jar_bootstrap_tools = context.config.getlist(self._CONFIG_SECTION,
-                                                 'bootstrap-tools',
-                                                 [':jar-tool'])
+    jar_bootstrap_tools = self.context.config.getlist(self._CONFIG_SECTION,
+                                                      'bootstrap-tools',
+                                                      [':jar-tool'])
     self.register_jvm_tool(self._JAR_TOOL_CLASSPATH_KEY, jar_bootstrap_tools)
 
   @property

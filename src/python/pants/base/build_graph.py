@@ -8,6 +8,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import logging
 from collections import defaultdict
 
+from twitter.common.collections import OrderedDict
 from twitter.common.collections import OrderedSet
 
 from pants.base.address import SyntheticAddress
@@ -26,7 +27,7 @@ class BuildGraph(object):
     self.reset()
 
   def reset(self):
-    self._target_by_address = {}
+    self._target_by_address = OrderedDict()
     self._target_dependencies_by_address = defaultdict(set)
     self._target_dependees_by_address = defaultdict(set)
     self._derived_from_by_derivative_address = {}

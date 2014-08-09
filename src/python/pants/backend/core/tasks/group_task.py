@@ -277,8 +277,8 @@ class GroupTask(Task):
 
     cls._member_types().append(group_member)
 
-  def __init__(self, context, workdir):
-    super(GroupTask, self).__init__(context, workdir)
+  def __init__(self, *args, **kwargs):
+    super(GroupTask, self).__init__(*args, **kwargs)
 
     self._group_members = []
 

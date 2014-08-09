@@ -37,10 +37,10 @@ class BenchmarkRun(JvmTask, JvmToolTaskMixin):
                                  "concatenated. Example use: --bench-caliper-args='-Dsize=10,20 "
                                  "-Dcomplex=true,false' --bench-caliper-args=-Dmem=1,2,3")
 
-  def __init__(self, context, workdir):
-    super(BenchmarkRun, self).__init__(context, workdir)
+  def __init__(self, *args, **kwargs):
+    super(BenchmarkRun, self).__init__(*args, **kwargs)
 
-    config = context.config
+    config = self.context.config
     self.confs = config.getlist('benchmark-run', 'confs', default=['default'])
     self.jvm_args = config.getlist('benchmark-run', 'jvm_args',
                                    default=['-Xmx1g', '-XX:MaxPermSize=256m'])
@@ -58,16 +58,16 @@ class BenchmarkRun(JvmTask, JvmToolTaskMixin):
     # TODO(Steve Gury):
     # Find all the target classes from the Benchmark target itself
     # https://jira.twitter.biz/browse/AWESOME-1938
-    self.caliper_args = context.options.target_class
+    self.caliper_args = self.context.options.target_class
 
-    if context.options.memory_profiling:
+    if self.context.options.memory_profiling:
       self.caliper_args += ['--measureMemory']
 
-    if context.options.debug:
-      self.jvm_args.extend(context.config.getlist('jvm', 'debug_args'))
+    if self.context.options.debug:
+      self.jvm_args.extend(self.context.config.getlist('jvm', 'debug_args'))
       self.caliper_args += ['--debug']
 
-    self.caliper_args.extend(context.options.extra_caliper_args)
+    self.caliper_args.extend(self.context.options.extra_caliper_args)
 
   def prepare(self, round_manager):
     # TODO(John Sirois): these are fake requirements in order to force compile run before this

@@ -14,6 +14,21 @@ from pants.backend.jvm.tasks.jvm_compile.scala.zinc_analysis_parser import ZincA
 from pants.backend.jvm.tasks.jvm_compile.scala.zinc_utils import ZincUtils
 
 
+# Overridden by parameter scala-compile -> args
+_SCALA_COMPILE_ARGS_DEFAULT = [
+  '-S-encoding', '-SUTF-8','-S-g:vars',
+]
+
+# Overridden by parameter scala-compile -> warning_args
+_SCALA_COMPILE_WARNING_ARGS_DEFAULT = [
+  '-S-deprecation', '-S-unchecked',
+]
+
+# Overridden by parameter scala-compile -> no_warning_args
+_SCALA_COMPILE_NO_WARNING_ARGS_DEFAULT = [
+  '-S-nowarn',
+]
+
 class ScalaCompile(JvmCompile):
   _language = 'scala'
   _file_suffix = '.scala'
@@ -27,15 +42,19 @@ class ScalaCompile(JvmCompile):
                             action='append',
                             help='Use these scalac plugins. Default is set in pants.ini.')
 
-  def __init__(self, context, workdir):
-    super(ScalaCompile, self).__init__(context, workdir, jdk=False)
+  def __init__(self, *args, **kwargs):
+    super(ScalaCompile, self).__init__(*args, **kwargs)
 
     # Set up the zinc utils.
-    color = not context.options.no_color
-    self._zinc_utils = ZincUtils(context=context,
+    color = not self.context.options.no_color
+    self._zinc_utils = ZincUtils(context=self.context,
                                  nailgun_task=self,
                                  jvm_options=self._jvm_options,
                                  color=color)
+
+    self.configure_args(args_defaults=_SCALA_COMPILE_ARGS_DEFAULT,
+                        warning_defaults=_SCALA_COMPILE_WARNING_ARGS_DEFAULT,
+                        no_warning_defaults=_SCALA_COMPILE_WARNING_ARGS_DEFAULT)
 
   @property
   def config_section(self):

@@ -313,9 +313,8 @@ python_library(
     pants('3rdparty/python/twitter/commons:twitter.common.lang'),
     pants(':common'),
     pants(':console_task'),
-    pants('src/python/pants/base:build_environment'),
     pants('src/python/pants/base:build_file'),
     pants('src/python/pants/base:target'),
-    pants('src/python/pants/scm'),
+    pants('src/python/pants/goal:workspace'),
   ],
 )

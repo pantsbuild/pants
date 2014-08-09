@@ -161,17 +161,16 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
   def _portable_analysis_for_target(analysis_dir, target):
     return JvmCompile._analysis_for_target(analysis_dir, target) + '.portable'
 
-  def __init__(self, context, workdir, minimum_version=None, jdk=False):
-    # TODO(John Sirois): XXX plumb minimum_version via config or flags
-    super(JvmCompile, self).__init__(context, workdir, minimum_version=minimum_version, jdk=jdk)
+  def _get_lang_specific_option(self, opt):
+    full_opt_name = self._language + '_' + opt
+    return getattr(self.context.options, full_opt_name, None)
+
+  def __init__(self, *args, **kwargs):
+    super(JvmCompile, self).__init__(*args, **kwargs)
     config_section = self.config_section
 
-    def get_lang_specific_option(opt):
-      full_opt_name = self._language + '_' + opt
-      return getattr(context.options, full_opt_name, None)
-
     # Global workdir.
-    self._pants_workdir = context.config.getdefault('pants_workdir')
+    self._pants_workdir = self.context.config.getdefault('pants_workdir')
 
     # Various working directories.
     self._classes_dir = os.path.join(self.workdir, 'classes')
@@ -179,7 +178,7 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
     self._analysis_dir = os.path.join(self.workdir, 'analysis')
     self._target_sources_dir = os.path.join(self.workdir, 'target_sources')
 
-    self._delete_scratch = get_lang_specific_option('delete_scratch')
+    self._delete_scratch = self._get_lang_specific_option('delete_scratch')
 
     safe_mkdir(self._classes_dir)
     safe_mkdir(self._analysis_dir)
@@ -196,31 +195,24 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
     # We can't create analysis tools until after construction.
     self._lazy_analysis_tools = None
 
-    # Compiler options.
-    self._args = context.config.getlist(config_section, 'args')
-    if get_lang_specific_option('compile_warnings'):
-      self._args.extend(context.config.getlist(config_section, 'warning_args'))
-    else:
-      self._args.extend(context.config.getlist(config_section, 'no_warning_args'))
-
     # The rough number of source files to build in each compiler pass.
-    self._partition_size_hint = get_lang_specific_option('partition_size_hint')
+    self._partition_size_hint = self._get_lang_specific_option('partition_size_hint')
     if self._partition_size_hint == -1:
-      self._partition_size_hint = context.config.getint(config_section, 'partition_size_hint',
-                                                        default=1000)
+      self._partition_size_hint = self.context.config.getint(config_section, 'partition_size_hint',
+                                                             default=1000)
 
     # JVM options for running the compiler.
-    self._jvm_options = context.config.getlist(config_section, 'jvm_args')
+    self._jvm_options = self.context.config.getlist(config_section, 'jvm_args')
 
     # The ivy confs for which we're building.
-    self._confs = context.config.getlist(config_section, 'confs', default=['default'])
+    self._confs = self.context.config.getlist(config_section, 'confs', default=['default'])
 
     # Set up dep checking if needed.
     def munge_flag(flag):
       return None if flag == 'off' else flag
-    check_missing_deps = munge_flag(get_lang_specific_option('missing_deps'))
-    check_missing_direct_deps = munge_flag(get_lang_specific_option('missing_direct_deps'))
-    check_unnecessary_deps = munge_flag(get_lang_specific_option('unnecessary_deps'))
+    check_missing_deps = munge_flag(self._get_lang_specific_option('missing_deps'))
+    check_missing_direct_deps = munge_flag(self._get_lang_specific_option('missing_direct_deps'))
+    check_unnecessary_deps = munge_flag(self._get_lang_specific_option('unnecessary_deps'))
 
     if check_missing_deps or check_missing_direct_deps or check_unnecessary_deps:
       # Must init it here, so it can set requirements on the context.
@@ -234,7 +226,7 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
     # If non-zero, and we have fewer than this number of locally-changed targets,
     # then we partition them separately, to preserve stability in the face of repeated
     # compilations.
-    self._locally_changed_targets_heuristic_limit = context.config.getint(config_section,
+    self._locally_changed_targets_heuristic_limit = self.context.config.getint(config_section,
         'locally_changed_targets_heuristic_limit', 0)
 
     self._upstream_class_to_path = None  # Computed lazily as needed.
@@ -248,6 +240,22 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
     # Populated in prepare_execute().
     self._sources_by_target = None
 
+  def configure_args(self, args_defaults=[], warning_defaults=[], no_warning_defaults=[]):
+   """
+   Setup the compiler command line arguments, optionally providing default values.  It is mandatory
+   to call this from __init__() of your subclass.
+   :param list args_default:  compiler flags that should be invoked for all invocations
+   :param list warning_defaults: compiler flags to turn on warnings
+   :param list no_warning_defaults:  compiler flags to turn off all warnings
+   """
+   self._args = self.context.config.getlist(self._config_section, 'args',
+                                       default=args_defaults)
+   if self._get_lang_specific_option('compile_warnings'):
+     self._args.extend(self.context.config.getlist(self._config_section, 'warning_args',
+                                              default=warning_defaults))
+   else:
+     self._args.extend(self.context.config.getlist(self._config_section, 'no_warning_args',
+                                              default=no_warning_defaults))
   def prepare(self, round_manager):
     # TODO(John Sirois): this is a fake requirement on 'ivy_jar_products' in order to force
     # resolve to run before this phase.  Require a new CompileClasspath product to be produced by

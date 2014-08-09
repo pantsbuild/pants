@@ -41,8 +41,8 @@ class Scalastyle(NailgunTask, JvmToolTaskMixin):
                             action="callback", callback=mkflag.set_bool,
                             help="[%default] Skip scalastyle.")
 
-  def __init__(self, context, workdir):
-    super(Scalastyle, self).__init__(context, workdir)
+  def __init__(self, *args, **kwargs):
+    super(Scalastyle, self).__init__(*args, **kwargs)
     self._scalastyle_config = self.context.config.get_required(self._CONFIG_SECTION, 'config')
     if not os.path.exists(self._scalastyle_config):
       raise Config.ConfigError(

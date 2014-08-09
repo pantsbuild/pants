@@ -67,8 +67,8 @@ class TaskRegistrar(object):
                         'Context object')
 
       class FuncTask(Task):
-        def __init__(self, context, workdir):
-          super(FuncTask, self).__init__(context, workdir)
+        def __init__(self, *args, **kwargs):
+          super(FuncTask, self).__init__(*args, **kwargs)
 
           if not args:
             self.action = action

@@ -5,16 +5,23 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from twitter.common.collections import OrderedSet
 from twitter.common.lang import Compatibility
 
 from pants.backend.jvm.targets.exportable_jvm_library import ExportableJvmLibrary
 from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.address import SyntheticAddress
 from pants.base.payload import JavaProtobufLibraryPayload
 
 
 class JavaProtobufLibrary(ExportableJvmLibrary):
   """Generates a stub Java library from protobuf IDL files."""
+
+  class PrematureImportPokeError(Exception):
+    """Thrown if something tries to access this target's imports before the build graph has been
+    generated.
+    """
 
   def __init__(self, buildflags=None, imports=None, **kwargs):
     """
@@ -39,7 +46,7 @@ class JavaProtobufLibrary(ExportableJvmLibrary):
     self.add_labels('codegen')
     if imports:
       self.add_labels('has_imports')
-    self.raw_imports = set(imports or [])
+    self.raw_imports = OrderedSet(imports or [])
     self._imports = None
     self.payload = JavaProtobufLibraryPayload(
         sources_rel_path=kwargs.get('sources_rel_path') or self.address.spec_path,
@@ -47,7 +54,7 @@ class JavaProtobufLibrary(ExportableJvmLibrary):
         provides=kwargs.get('provides'),
         excludes=kwargs.get('excludes'),
         configurations=kwargs.get('configurations'),
-        imports=set(self.imports),
+        imports=OrderedSet(self.raw_imports),
       )
 
   @property
@@ -66,17 +73,18 @@ class JavaProtobufLibrary(ExportableJvmLibrary):
   @property
   def imports(self):
     """Returns the set of JarDependencys to be included when compiling this target."""
-    if self._imports:
-      return self._imports
-
-    libraries = set(self._library_imports)
-    import_jars = list(self.raw_imports - libraries)
-    def add_jars(jar_library):
-      import_jars.extend(jar_library.jar_dependencies)
-    for spec in libraries:
-      address = SyntheticAddress.parse(spec, relative_to=self.address.spec_path)
-      target = self._build_graph.get_target(address)
-      if target:
-        target.walk(add_jars, predicate=lambda tgt: tgt.is_jar_library)
-    self._imports = set(import_jars)
+    if self._imports is None:
+      libraries = OrderedSet(self._library_imports)
+      import_jars = self.raw_imports - libraries
+      for spec in libraries:
+        address = SyntheticAddress.parse(spec, relative_to=self.address.spec_path)
+        target = self._build_graph.get_target(address)
+        if isinstance(target, (JarLibrary, JvmTarget)):
+          import_jars.update(target.jar_dependencies)
+        else:
+          raise self.PrematureImportPokeError(
+              "{address}: Failed to resolve import '{spec}'.".format(
+                  address=self.address.spec,
+                  spec=address.spec))
+      self._imports = import_jars
     return self._imports

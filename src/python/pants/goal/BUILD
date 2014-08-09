@@ -33,6 +33,7 @@ python_library(
   sources = ['context.py'],
   dependencies = [
     pants(':products'),
+    pants(':workspace'),
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
     pants('3rdparty/python/twitter/commons:twitter.common.process'),
     pants('src/python/pants/base:address'),
@@ -108,3 +109,12 @@ python_library(
   ],
 )
 
+python_library(
+  name = 'workspace',
+  sources = ['workspace.py'],
+  dependencies = [
+    pants('3rdparty/python/twitter/commons:twitter.common.lang'),
+    pants('src/python/pants/base:build_environment'),
+    pants('src/python/pants/scm'),
+  ],
+)

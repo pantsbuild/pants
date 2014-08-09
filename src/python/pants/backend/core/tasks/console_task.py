@@ -6,7 +6,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import errno
-import sys
 from contextlib import contextmanager
 
 from pants.backend.core.tasks.task import QuietTaskMixin, Task
@@ -22,11 +21,12 @@ class ConsoleTask(Task, QuietTaskMixin):
     option_group.add_option(mkflag("sep"), dest="console_%s_separator" % cls.__name__,
                             default='\\n', help="String to use to separate results.")
 
-  def __init__(self, context, workdir, outstream=sys.stdout):
-    super(ConsoleTask, self).__init__(context, workdir)
+  def __init__(self, *args, **kwargs):
+    super(ConsoleTask, self).__init__(*args, **kwargs)
     separator_option = "console_%s_separator" % self.__class__.__name__
-    self._console_separator = getattr(context.options, separator_option).decode('string-escape')
-    self._outstream = outstream
+    self._console_separator = getattr(self.context.options,
+                                      separator_option).decode('string-escape')
+    self._outstream = self.context.console_outstream
 
   @contextmanager
   def _guard_sigpipe(self):

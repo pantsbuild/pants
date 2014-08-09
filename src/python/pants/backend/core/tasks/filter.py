@@ -7,7 +7,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import operator
 import re
-import sys
 
 from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.base.build_environment import get_buildroot
@@ -70,9 +69,8 @@ class Filter(ConsoleTask):
                                  "inclusions or exclusions can be specified at once in a comma "
                                  "separated list or else by using multiple instances of this flag.")
 
-  def __init__(self, context, workdir, outstream=sys.stdout):
-    super(Filter, self).__init__(context, workdir, outstream)
-
+  def __init__(self, *args, **kwargs):
+    super(Filter, self).__init__(*args, **kwargs)
     self._filters = []
 
     def _get_targets(spec):
@@ -93,7 +91,7 @@ class Filter(ConsoleTask):
     def filter_for_address(spec):
       matches = _get_targets(spec)
       return lambda target: target in matches
-    self._filters.extend(_create_filters(context.options.filter_target, filter_for_address))
+    self._filters.extend(_create_filters(self.context.options.filter_target, filter_for_address))
 
     def filter_for_type(name):
       # FIXME(pl): This should be a standard function provided by the plugin/BuildFileParser
@@ -112,7 +110,7 @@ class Filter(ConsoleTask):
       if not issubclass(target_type, Target):
         raise TaskError('Not a Target type: %s' % name)
       return lambda target: isinstance(target, target_type)
-    self._filters.extend(_create_filters(context.options.filter_type, filter_for_type))
+    self._filters.extend(_create_filters(self.context.options.filter_type, filter_for_type))
 
     def filter_for_ancestor(spec):
       ancestors = _get_targets(spec)
@@ -120,12 +118,12 @@ class Filter(ConsoleTask):
       for ancestor in ancestors:
         ancestor.walk(children.add)
       return lambda target: target in children
-    self._filters.extend(_create_filters(context.options.filter_ancestor, filter_for_ancestor))
+    self._filters.extend(_create_filters(self.context.options.filter_ancestor, filter_for_ancestor))
 
     def filter_for_regex(regex):
       parser = re.compile(regex)
       return lambda target: parser.search(str(target.address.spec))
-    self._filters.extend(_create_filters(context.options.filter_regex, filter_for_regex))
+    self._filters.extend(_create_filters(self.context.options.filter_regex, filter_for_regex))
 
   def console_output(self, _):
     filtered = set()

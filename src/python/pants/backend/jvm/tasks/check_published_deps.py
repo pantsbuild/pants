@@ -22,11 +22,11 @@ class CheckPublishedDeps(ConsoleTask):
                             action='callback', callback=mkflag.set_bool,
                             help='[%default] Also print up-to-date dependencies.')
 
-  def __init__(self, context, workdir):
-    super(CheckPublishedDeps, self).__init__(context, workdir)
+  def __init__(self, *args, **kwargs):
+    super(CheckPublishedDeps, self).__init__(*args, **kwargs)
 
-    self._print_uptodate = context.options.check_deps_print_uptodate
-    self.repos = context.config.getdict('jar-publish', 'repos')
+    self._print_uptodate = self.context.options.check_deps_print_uptodate
+    self.repos = self.context.config.getdict('jar-publish', 'repos')
     self._artifacts_to_targets = {}
 
     def is_published(tgt):
