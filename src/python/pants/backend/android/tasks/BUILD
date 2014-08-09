@@ -6,6 +6,7 @@ python_library(
   name = 'all',
   dependencies = [
     ':android_task',
+    ':aapt_builder',
     ':aapt_gen',
     ':aapt_task',
     ':dx_compile',
@@ -25,7 +26,13 @@ python_library(
   name = 'aapt_builder',
   sources = ['android_builder.py'],
   dependencies = [
+    pants('3rdparty/python/twitter/commons:twitter.common.log'),
+    pants('src/python/pants/backend/android/targets:android'),
     pants('src/python/pants/backend/android/tasks:aapt_task'),
+    pants('src/python/pants/base:build_environment'),
+    pants('src/python/pants/base:exceptions'),
+    pants('src/python/pants/base:workunit'),
+    pants('src/python/pants/util:dirutil'),
   ],
 )
 
@@ -41,7 +48,7 @@ python_library(
   name = 'aapt_gen',
   sources = ['aapt_gen.py'],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
+    pants('3rdparty/python/twitter/commons:twitter.common.collections'),
     pants('3rdparty/python/twitter/commons:twitter.common.log'),
     pants('src/python/pants/backend/android/targets:android'),
     pants('src/python/pants/backend/android/tasks:aapt_task'),
@@ -51,6 +58,7 @@ python_library(
     pants('src/python/pants/base:address'),
     pants('src/python/pants/base:build_environment'),
     pants('src/python/pants/base:exceptions'),
+    pants('src/python/pants/util:dirutil'),
   ],
 )
 

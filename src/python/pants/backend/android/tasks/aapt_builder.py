@@ -19,6 +19,7 @@ from pants.util.dirutil import safe_mkdir
 
 
 class AaptBuilder(AaptTask):
+  """Build an android bundle with compiled code and assets."""
 
   @classmethod
   def product_types(cls):
@@ -28,8 +29,8 @@ class AaptBuilder(AaptTask):
   def is_app(target):
     return isinstance(target, AndroidBinary)
 
-  def __init__(self, context, workdir):
-    super(AaptBuilder, self).__init__(context, workdir)
+  def __init__(self, *args, **kwargs):
+    super(AaptBuilder, self).__init__(*args, **kwargs)
 
   def prepare(self, round_manager):
     round_manager.require_data('dex')

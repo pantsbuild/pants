@@ -5,7 +5,6 @@
 import os
 
 from pants.backend.android.tasks.android_task import AndroidTask
-from pants.base.exceptions import TaskError
 
 
 # These are hardcoded into aapt but we added 'BUILD*'. Changes clobber, so we need entire string
@@ -16,6 +15,7 @@ class AaptTask(AndroidTask):
   """ Base class for tasks performed by the Android aapt tool"""
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
+    #TODO(mateor) Ensure a change of target-sdk or build-tools rebuilds product w/o clean
     super(AaptTask, cls).setup_parser(option_group, args, mkflag)
 
     option_group.add_option(mkflag("target-sdk"), dest="target_sdk",
@@ -35,13 +35,12 @@ class AaptTask(AndroidTask):
     """Return the package name translated into a path"""
     return package.replace('.', os.sep)
 
-  def __init__(self, context, workdir):
-    super(AaptTask, self).__init__(context, workdir)
+  def __init__(self, *args, **kwargs):
+    super(AaptTask, self).__init__(*args, **kwargs)
     self._android_dist = self.android_sdk
-    self._forced_build_tools_version = context.options.build_tools_version
-    self._forced_ignored_assets = context.options.ignored_assets
-    self._forced_target_sdk = context.options.target_sdk
-    # TODO (mateor) add minSDK support
+    self._forced_build_tools_version = self.context.options.build_tools_version
+    self._forced_ignored_assets = self.context.options.ignored_assets
+    self._forced_target_sdk = self.context.options.target_sdk
 
   def aapt_tool(self, build_tools_version):
     """Return the appropriate aapt tool.
