@@ -36,7 +36,6 @@ class AaptBuilder(AaptTask):
 
   def render_args(self, target, resource_dir, inputs):
     args = []
-
     if self._forced_build_tools_version:
       args.append(self.aapt_tool(self._forced_build_tools_version))
     else:
@@ -50,7 +49,6 @@ class AaptBuilder(AaptTask):
     #   : '--ignored-assets' patterns for the aapt to skip. This is the default w/ 'BUILD*' added.
     #   : '-F' The name and location of the .apk file to output
     #   : additional positional arguments are treated as input directories to gather files from.
-
     args.extend(['package', '-M', target.manifest,
                  '-S'])
     args.extend(resource_dir)
@@ -64,24 +62,25 @@ class AaptBuilder(AaptTask):
     else:
       args.extend(['--ignore-assets', self.IGNORED_ASSETS])
 
-    args.extend(['-F', os.path.join(self.workdir, target.name + '.apk')])
+    app_name = target.app_name if target.app_name else target.name
+    args.extend(['-F', os.path.join(self.workdir, app_name + '-unsigned.apk')])
     args.extend(inputs)
     log.debug('Executing: {0}'.format(args))
     return args
 
   def execute(self):
     safe_mkdir(self.workdir)
-    with self.context.new_workunit(name='apk-bundle', labels=[WorkUnit.MULTITOOL]):  #TODO Check Label
+    with self.context.new_workunit(name='apk-bundle', labels=[WorkUnit.MULTITOOL]):
       targets = self.context.targets(self.is_app)
       with self.invalidated(targets) as invalidation_check:
         invalid_targets = []
         for vt in invalidation_check.invalid_vts:
           invalid_targets.extend(vt.targets)
         for target in invalid_targets:
-          # to hold the Android target's resource_dir (e.g. 'res') and dir containing classes.dex
+          # 'input_dirs' holds the target's resource_dir (e.g. 'res') and dir containing classes.dex
           input_dirs = []
-          # to hold the basedir containing an R.java
-          resource_dir = []
+          # 'gen_out' holds the basedir containing the generated R.java
+          gen_out = []
           mapping = self.context.products.get('dex')
           for basedir in mapping.get(target):
             input_dirs.append(basedir)
@@ -89,19 +88,20 @@ class AaptBuilder(AaptTask):
           def gather_resources(target):
             """Check target deps for R.java and get its basedir and that target's resource_dir"""
 
-            #N.B. I tried to handle this through AaptGen's 'java' product, but could not isolate
-            # the basedir. So I added a product to the context graph and got it from there.
+            #N.B. I tried to get this through AaptGen's 'java' product, but could not isolate
+            # the basedir from the synthetic target. So I added an 'android-gen' product to context
+            # graph and got it there.
             android_codegen = self.context.products.get('android-gen')
 
             # null check is needed as new_resources can contain null values.
             if android_codegen.get(target) is not None:
-              resource_dir.append(os.path.join(get_buildroot(), target.resource_dir))
+              gen_out.append(os.path.join(get_buildroot(), target.resource_dir))
               for basedir in android_codegen.get(target):
                 input_dirs.append(os.path.join(basedir, self.package_path(target.package)))
 
           target.walk(gather_resources)
 
-          process = subprocess.Popen(self.render_args(target, resource_dir, input_dirs))
+          process = subprocess.Popen(self.render_args(target, gen_out, input_dirs))
           result = process.wait()
           if result != 0:
             raise TaskError('Android aapt tool exited non-zero ({code})'.format(code=result))
