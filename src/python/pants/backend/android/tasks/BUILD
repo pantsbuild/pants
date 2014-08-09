@@ -38,7 +38,7 @@ python_library(
 
 python_library(
   name = 'aapt_task',
-  sources = ['android_task.py'],
+  sources = ['aapt_task.py'],
   dependencies = [
     pants('src/python/pants/backend/android/tasks:android_task'),
   ],
