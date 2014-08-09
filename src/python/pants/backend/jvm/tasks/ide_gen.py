@@ -109,46 +109,46 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
     def get(self, address):
       return self.build_file_parser._target_proxy_by_address[address].to_target(self.build_graph)
 
-  def __init__(self, context, workdir):
-    super(IdeGen, self).__init__(context, workdir)
+  def __init__(self, *args, **kwargs):
+    super(IdeGen, self).__init__(*args, **kwargs)
 
-    self.project_name = context.options.ide_gen_project_name
-    self.python = context.options.ide_gen_python
-    self.skip_java = not context.options.ide_gen_java
-    self.skip_scala = not context.options.ide_gen_scala
+    self.project_name = self.context.options.ide_gen_project_name
+    self.python = self.context.options.ide_gen_python
+    self.skip_java = not self.context.options.ide_gen_java
+    self.skip_scala = not self.context.options.ide_gen_scala
 
-    self.java_language_level = context.options.ide_gen_java_language_level
-    if context.options.ide_gen_java_jdk:
-      self.java_jdk = context.options.ide_gen_java_jdk
+    self.java_language_level = self.context.options.ide_gen_java_language_level
+    if self.context.options.ide_gen_java_jdk:
+      self.java_jdk = self.context.options.ide_gen_java_jdk
     else:
       self.java_jdk = '1.%d' % self.java_language_level
 
     self.gen_project_workdir = os.path.abspath(
-      context.options.ide_gen_project_dir or
+      self.context.options.ide_gen_project_dir or
       os.path.join(self.workdir, self.__class__.__name__, self.project_name)
     )
     self.cwd = (
-      os.path.abspath(context.options.ide_gen_project_cwd) if context.options.ide_gen_project_cwd
-      else self.gen_project_workdir
+      os.path.abspath(self.context.options.ide_gen_project_cwd) if
+      self.context.options.ide_gen_project_cwd else self.gen_project_workdir
     )
 
-    self.intransitive = context.options.ide_gen_intransitive
+    self.intransitive = self.context.options.ide_gen_intransitive
 
-    self.checkstyle_suppression_files = context.config.getdefault(
+    self.checkstyle_suppression_files = self.context.config.getdefault(
       'checkstyle_suppression_files', type=list, default=[]
     )
-    self.debug_port = context.config.getint('ide', 'debug_port')
+    self.debug_port = self.context.config.getint('ide', 'debug_port')
 
     self.checkstyle_bootstrap_key = 'checkstyle'
-    checkstyle = context.config.getlist('checkstyle', 'bootstrap-tools',
-                                        default=['//:twitter-checkstyle'])
+    checkstyle = self.context.config.getlist('checkstyle', 'bootstrap-tools',
+                                             default=['//:twitter-checkstyle'])
     self.register_jvm_tool(self.checkstyle_bootstrap_key, checkstyle)
 
     self.scalac_bootstrap_key = None
     if not self.skip_scala:
       self.scalac_bootstrap_key = 'scalac'
-      scalac = context.config.getlist('scala-compile', 'compile-bootstrap-tools',
-                                      default=['//:scala-compiler-2.9.3'])
+      scalac = self.context.config.getlist('scala-compile', 'compile-bootstrap-tools',
+                                           default=['//:scala-compiler-2.9.3'])
       self.register_jvm_tool(self.scalac_bootstrap_key, scalac)
 
   def prepare(self, round_manager):

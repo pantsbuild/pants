@@ -59,10 +59,10 @@ class JarCreate(JarTask):
   def product_types(cls):
     return ['jars']
 
-  def __init__(self, context, workdir):
-    super(JarCreate, self).__init__(context, workdir)
+  def __init__(self, *args, **kwargs):
+    super(JarCreate, self).__init__(*args, **kwargs)
 
-    self.compressed = context.options.jar_create_compressed
+    self.compressed = self.context.options.jar_create_compressed
     self._jar_builder = self.prepare_jar_builder()
     self._jars = {}
 

@@ -24,7 +24,7 @@ python_library(
 
 python_library(
   name = 'aapt_builder',
-  sources = ['android_builder.py'],
+  sources = ['aapt_builder.py'],
   dependencies = [
     pants('3rdparty/python/twitter/commons:twitter.common.log'),
     pants('src/python/pants/backend/android/targets:android'),

@@ -90,8 +90,8 @@ class Depmap(ConsoleTask):
                             help='Causes project-info output to be a single line of JSON')
 
 
-  def __init__(self, context, workdir):
-    super(Depmap, self).__init__(context, workdir)
+  def __init__(self, *args, **kwargs):
+    super(Depmap, self).__init__(*args, **kwargs)
     # Require information about jars
     self.context.products.require_data('ivy_jar_products')
 

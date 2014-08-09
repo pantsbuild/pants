@@ -39,26 +39,26 @@ class SpecsRun(JvmTask, JvmToolTaskMixin):
                             action='callback', callback=mkflag.set_bool,
                             help='[%default] Emit test result with ANSI terminal color codes.')
 
-  def __init__(self, context, workdir):
-    super(SpecsRun, self).__init__(context, workdir)
+  def __init__(self, *args, **kwargs):
+    super(SpecsRun, self).__init__(*args, **kwargs)
 
     self._specs_bootstrap_key = 'specs'
-    bootstrap_tools = context.config.getlist('specs-run', 'bootstrap-tools',
-                                             default=[':scala-specs-2.9.3'])
+    bootstrap_tools = self.context.config.getlist('specs-run', 'bootstrap-tools',
+                                                  default=[':scala-specs-2.9.3'])
     self.register_jvm_tool(self._specs_bootstrap_key, bootstrap_tools)
 
-    self.confs = context.config.getlist('specs-run', 'confs', default=['default'])
+    self.confs = self.context.config.getlist('specs-run', 'confs', default=['default'])
 
-    self._jvm_options = context.config.getlist('specs-run', 'jvm_args', default=[])
-    if context.options.specs_run_jvm_options:
-      self._jvm_options.extend(context.options.specs_run_jvm_options)
-    if context.options.specs_run_debug:
-      self._jvm_options.extend(context.config.getlist('jvm', 'debug_args'))
+    self._jvm_options = self.context.config.getlist('specs-run', 'jvm_args', default=[])
+    if self.context.options.specs_run_jvm_options:
+      self._jvm_options.extend(self.context.options.specs_run_jvm_options)
+    if self.context.options.specs_run_debug:
+      self._jvm_options.extend(self.context.config.getlist('jvm', 'debug_args'))
 
-    self.skip = context.options.specs_run_skip
-    self.color = context.options.specs_run_color
+    self.skip = self.context.options.specs_run_skip
+    self.color = self.context.options.specs_run_color
 
-    self.tests = context.options.specs_run_tests
+    self.tests = self.context.options.specs_run_tests
 
   def prepare(self, round_manager):
     super(SpecsRun, self).prepare(round_manager)

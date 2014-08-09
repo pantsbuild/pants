@@ -42,6 +42,29 @@ _JMAKE_ERROR_CODES = {
 # When executed via a subprocess return codes will be treated as unsigned
 _JMAKE_ERROR_CODES.update((256 + code, msg) for code, msg in _JMAKE_ERROR_CODES.items())
 
+# Overridden by parameter java-compile -> args
+_JAVA_COMPILE_ARGS_DEFAULT = [
+  '-C-encoding', '-CUTF-8',
+  '-C-g',
+  '-C-Tcolor',
+
+  # Don't warn for generated code.
+  '-C-Tnowarnprefixes', '-C%(pants_workdir)s/gen',
+
+  # Suppress the warning for annotations with no processor - we know there are many of these!
+  '-C-Tnowarnregex', '-C^(warning: )?No processor claimed any of these annotations: .*'
+]
+
+# Overridden by parameter java-compile -> warning_args
+_JAVA_COMPILE_WARNING_ARGS_DEFAULT = [
+  '-C-Xlint:all',   '-C-Xlint:-serial',
+  '-C-Xlint:-path', '-C-deprecation',
+]
+
+# Overridden by parameter java-compile ->no_warning_args
+_JAVA_COMPILE_NO_WARNING_ARGS_DEFAULT = [
+  '-C-Xlint:none', '-C-nowarn',
+]
 
 class JavaCompile(JvmCompile):
   _language = 'java'
@@ -60,29 +83,37 @@ class JavaCompile(JvmCompile):
     option_group.add_option(mkflag("args"), dest="java_compile_args", action="append",
                             help="Pass these extra args to javac.")
 
-  def __init__(self, context, workdir):
-    super(JavaCompile, self).__init__(context, workdir, jdk=True)
+  def __init__(self, *args, **kwargs):
+    super(JavaCompile, self).__init__(*args, **kwargs)
+    self.set_distribution(jdk=True)
 
     self._buildroot = get_buildroot()
 
     self._depfile = os.path.join(self._analysis_dir, 'global_depfile')
 
     self._jmake_bootstrap_key = 'jmake'
-    external_tools = context.config.getlist('java-compile', 'jmake-bootstrap-tools',
-                                            default=[':jmake'])
+    external_tools = self.context.config.getlist('java-compile',
+                                                 'jmake-bootstrap-tools',
+                                                 default=[':jmake'])
     self.register_jvm_tool(self._jmake_bootstrap_key, external_tools)
 
     self._compiler_bootstrap_key = 'java-compiler'
-    compiler_bootstrap_tools = context.config.getlist('java-compile', 'compiler-bootstrap-tools',
-                                                      default=[':java-compiler'])
+    compiler_bootstrap_tools = self.context.config.getlist('java-compile',
+                                                           'compiler-bootstrap-tools',
+                                                           default=[':java-compiler'])
     self.register_jvm_tool(self._compiler_bootstrap_key, compiler_bootstrap_tools)
 
+    self.configure_args(args_defaults=_JAVA_COMPILE_ARGS_DEFAULT,
+                        warning_defaults=_JAVA_COMPILE_WARNING_ARGS_DEFAULT,
+                        no_warning_defaults=_JAVA_COMPILE_WARNING_ARGS_DEFAULT)
+
     self._javac_opts = []
-    if context.options.java_compile_args:
-      for arg in context.options.java_compile_args:
+    if self.context.options.java_compile_args:
+      for arg in self.context.options.java_compile_args:
         self._javac_opts.extend(shlex.split(arg))
     else:
-      self._javac_opts.extend(context.config.getlist('java-compile', 'javac_args', default=[]))
+      self._javac_opts.extend(self.context.config.getlist('java-compile',
+                                                          'javac_args', default=[]))
 
   @property
   def config_section(self):

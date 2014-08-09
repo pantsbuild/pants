@@ -45,14 +45,14 @@ class DuplicateDetector(JvmBinaryTask):
                             help="Maximum number of duplicate classes to display per artifact"
                                  "defaults to: [%default]")
 
-  def __init__(self, context, workdir):
-    super(DuplicateDetector, self).__init__(context, workdir)
-    self._fail_fast = context.options.fail_fast
-    excludes = context.options.excludes
+  def __init__(self, *args, **kwargs):
+    super(DuplicateDetector, self).__init__(*args, **kwargs)
+    self._fail_fast = self.context.options.fail_fast
+    excludes = self.context.options.excludes
     if not excludes:
       excludes = EXCLUDED_FILES
     self._excludes = set([x.lower() for x in excludes.split(',')])
-    self._max_dups = int(context.options.max_dups)
+    self._max_dups = int(self.context.options.max_dups)
 
   def prepare(self, round_manager):
     round_manager.require_data('resources_by_target')

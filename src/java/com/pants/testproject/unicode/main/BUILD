@@ -4,7 +4,7 @@
 # Demonstrates compiling code with a unicode classes
 
 jvm_binary(name = 'main',
-  basename = 'unicode',
+  basename = 'unicode-testproject',
   dependencies = [
     'src/java/com/pants/testproject/unicode/cucumber',
     'src/scala/com/pants/testproject/unicode/shapeless',

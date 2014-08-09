@@ -42,9 +42,8 @@ class AaptGen(AaptTask, CodeGen):
   def _calculate_genfile(cls, package):
     return os.path.join(cls.package_path(package), 'R.java')
 
-  def __init__(self, context, workdir):
-    super(AaptGen, self).__init__(context, workdir)
-
+  def __init__(self, *args, **kwargs):
+    super(AaptGen, self).__init__(*args, **kwargs)
     self._jar_library_by_sdk = {}
 
   def prepare(self, round_manager):

@@ -22,8 +22,8 @@ class PythonTask(Task):
     option_group.add_option(mkflag('timeout'), dest='python_conn_timeout', type='int',
                             default=0, help='Number of seconds to wait for http connections.')
 
-  def __init__(self, context, workdir):
-    super(PythonTask, self).__init__(context, workdir)
+  def __init__(self, *args, **kwargs):
+    super(PythonTask, self).__init__(*args, **kwargs)
     self.conn_timeout = (self.context.options.python_conn_timeout or
                          self.context.config.getdefault('connection_timeout'))
     compatibilities = self.context.options.interpreter or [b'']

@@ -16,8 +16,8 @@ class AndroidTask(Task):
                             help='Specify a file location and force the Android SDK there to '
                                  'be used during Android tasks.')
 
-  def __init__(self, context, workdir):
-    super(AndroidTask, self).__init__(context, workdir)
+  def __init__(self, *args, **kwargs):
+    super(AndroidTask, self).__init__(*args, **kwargs)
     self.forced_sdk = self.context.options.sdk_path or None
     self._android_sdk = None
 

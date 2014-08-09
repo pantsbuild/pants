@@ -30,8 +30,8 @@ class JvmBinaryTask(JarTask):
     main = binary.main or '*** java -jar not supported, please use -cp and pick a main ***'
     jar.main(main)
 
-  def __init__(self, context, workdir):
-    super(JvmBinaryTask, self).__init__(context, workdir)
+  def __init__(self, *args, **kwargs):
+    super(JvmBinaryTask, self).__init__(*args, **kwargs)
     self._jar_builder = self.prepare_jar_builder()
 
   def prepare(self, round_manager):

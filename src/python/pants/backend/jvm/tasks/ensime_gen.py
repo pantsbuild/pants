@@ -13,12 +13,12 @@ import pkgutil
 from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
-from twitter.common.dirutil import safe_delete, safe_mkdir, safe_open
-
+from twitter.common.dirutil import safe_open
 
 from pants.base.build_environment import get_buildroot
 from pants.base.generator import Generator, TemplateData
 from pants.backend.jvm.tasks.ide_gen import IdeGen
+
 
 _TEMPLATE_BASEDIR = os.path.join('templates', 'ensime')
 _DEFAULT_PROJECT_DIR = './.pants.d/ensime/project'
@@ -48,10 +48,11 @@ class EnsimeGen(IdeGen):
                             help="[%default] Sets the file encoding for java files in this "
                                    "project.")
 
-  def __init__(self, context, workdir):
-    super(EnsimeGen, self).__init__(context, workdir)
+  def __init__(self, *args, **kwargs):
+    super(EnsimeGen, self).__init__(*args, **kwargs)
 
-    self.scala_language_level = _SCALA_VERSIONS.get(context.options.ensime_scala_language_level, None)
+    self.scala_language_level = _SCALA_VERSIONS.get(
+      self.context.options.ensime_scala_language_level, None)
     self.project_template = os.path.join(_TEMPLATE_BASEDIR, 'ensime.mustache')
     self.project_filename = os.path.join(self.cwd, '.ensime')
     self.ensime_output_dir = os.path.join(self.gen_project_workdir, 'out')

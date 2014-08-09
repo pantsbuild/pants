@@ -5,17 +5,13 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from abc import abstractmethod
 import os
-import sys
-
-from twitter.common.lang import AbstractClass
 
 from pants.backend.core.tasks.console_task import ConsoleTask
-from pants.base.build_environment import get_buildroot, get_scm
+from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
 from pants.base.exceptions import TaskError
-from pants.scm.scm import Scm
+from pants.goal.workspace import Workspace
 
 
 class WhatChanged(ConsoleTask):
@@ -35,20 +31,17 @@ class WhatChanged(ConsoleTask):
                             help='[%default] Shows changed files instead of the targets that own '
                                  'them.')
 
-  def __init__(self, context, workdir, workspace, outstream=sys.stdout):
-    super(WhatChanged, self).__init__(context, workdir, outstream)
-
-    if not isinstance(workspace, Workspace):
-      raise ValueError('WhatChanged requires a Workspace, given %s' % workspace)
-
-    self._workspace = workspace
-
-    self._parent = context.options.what_changed_create_prefix
-    self._show_files = context.options.what_changed_show_files
-
+  def __init__(self, *args, **kwargs):
+    super(WhatChanged, self).__init__(*args, **kwargs)
+    self._parent = self.context.options.what_changed_create_prefix
+    self._show_files = self.context.options.what_changed_show_files
+    self._workspace = self.context.workspace
     self._filemap = {}
 
   def console_output(self, _):
+    if not self._workspace:
+      raise TaskError('No workspace provided.')
+
     touched_files = self._get_touched_files()
     if self._show_files:
       for path in touched_files:
@@ -103,48 +96,3 @@ class WhatChanged(ConsoleTask):
     if target not in self._filemap:
       self._filemap[target] = set(target.sources_relative_to_buildroot())
     return path in self._filemap[target]
-
-
-class Workspace(AbstractClass):
-  """Tracks the state of the current workspace."""
-
-  class WorkspaceError(Exception):
-    """Indicates a problem reading the local workspace."""
-
-  @abstractmethod
-  def touched_files(self, parent):
-    """Returns the set of paths modified between the given parent commit and the current local
-    workspace state.
-    """
-
-
-class ScmWorkspace(Workspace):
-  """A workspace that uses an Scm to determine the touched files."""
-
-  def __init__(self, scm):
-    super(ScmWorkspace, self).__init__()
-
-    self._scm = scm or get_scm()
-
-    if self._scm is None:
-      raise self.WorkspaceError('Cannot figure out what changed without a configured '
-                                'source-control system.')
-
-  def touched_files(self, parent):
-    try:
-      return self._scm.changed_files(from_commit=parent, include_untracked=True)
-    except Scm.ScmException as e:
-      raise self.WorkspaceError("Problem detecting changed files.", e)
-
-
-class ScmWhatChanged(WhatChanged):
-  def __init__(self, context, workdir, scm=None, outstream=sys.stdout):
-    """Creates a WhatChanged task that uses an Scm to determine changed files.
-
-    context:    The pants execution context.
-    workdir:    The directory to work in.
-    scm:        The scm to use, taken from the globally configured scm if None.
-    outstream:  The stream to write changed files or targets to.
-    """
-    super(ScmWhatChanged, self).__init__(context, workdir, ScmWorkspace(scm or get_scm()),
-                                         outstream)

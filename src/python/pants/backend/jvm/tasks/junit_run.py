@@ -10,11 +10,10 @@ from collections import defaultdict, namedtuple
 import fnmatch
 import os
 import sys
-import tempfile
 
 from twitter.common.collections import OrderedSet
 from twitter.common.contextutil import temporary_file
-from twitter.common.dirutil import safe_delete, safe_mkdir, safe_mkdir_for, safe_open, safe_rmtree
+from twitter.common.dirutil import safe_delete, safe_rmtree
 
 from pants import binary_util
 from pants.backend.jvm.targets.java_tests import JavaTests as junit_tests
@@ -25,6 +24,7 @@ from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit
 from pants.java.util import execute_java
 from pants.util.dirutil import safe_mkdir, safe_open
+
 
 
 # TODO(ji): Add unit tests.
@@ -638,26 +638,26 @@ class JUnitRun(JvmTask, JvmToolTaskMixin):
                             default='emma',
                             help='[%default] Which coverage subsystem to use')
 
-  def __init__(self, context, workdir):
-    super(JUnitRun, self).__init__(context, workdir)
+  def __init__(self, *args, **kwargs):
+    super(JUnitRun, self).__init__(*args, **kwargs)
 
-    self._context = context
     task_exports = _TaskExports(classpath=self.classpath,
                                 get_base_classpath_for_target=self.get_base_classpath_for_target,
                                 register_jvm_tool=self.register_jvm_tool,
                                 tool_classpath=self.tool_classpath,
                                 workdir=self.workdir)
 
-    options = self._context.options
+    options = self.context.options
     if options.junit_run_coverage or options.junit_run_coverage_html_open:
       if options.junit_coverage_processor == 'emma':
-        self._runner = Emma(task_exports, self._context)
+        self._runner = Emma(task_exports, self.context)
       elif options.junit_coverage_processor == 'cobertura':
-        self._runner = Cobertura(task_exports, self._context)
+        self._runner = Cobertura(task_exports, self.context)
       else:
-        raise TaskError('unknown coverage processor %s' % context.options.junit_coverage_processor)
+        raise TaskError('unknown coverage processor %s' %
+                        self.context.options.junit_coverage_processor)
     else:
-      self._runner = _JUnitRunner(task_exports, self._context)
+      self._runner = _JUnitRunner(task_exports, self.context)
 
   def prepare(self, round_manager):
     super(JUnitRun, self).prepare(round_manager)
@@ -668,6 +668,6 @@ class JUnitRun(JvmTask, JvmToolTaskMixin):
     round_manager.require_data('classes_by_source')
 
   def execute(self):
-    if not self._context.options.junit_run_skip:
+    if not self.context.options.junit_run_skip:
       targets = self.context.targets()
       self._runner.execute(targets)

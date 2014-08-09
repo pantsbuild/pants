@@ -41,12 +41,12 @@ class BundleCreate(JvmBinaryTask):
                             help='[%%default] Used in conjunction with %s this packs the archive '
                                  'with its basename as the path prefix.' % archive_flag)
 
-  def __init__(self, context, workdir):
-    super(BundleCreate, self).__init__(context, workdir)
-    self._outdir = context.config.getdefault('pants_distdir')
-    self._prefix = context.options.bundle_create_prefix
-    self._archiver_type = context.options.bundle_create_archive
-    self._create_deployjar = context.options.bundle_create_deployjar
+  def __init__(self, *args, **kwargs):
+    super(BundleCreate, self).__init__(*args, **kwargs)
+    self._outdir = self.context.config.getdefault('pants_distdir')
+    self._prefix = self.context.options.bundle_create_prefix
+    self._archiver_type = self.context.options.bundle_create_archive
+    self._create_deployjar = self.context.options.bundle_create_deployjar
 
   class App(object):
     """A uniform interface to an app."""

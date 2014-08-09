@@ -99,17 +99,17 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
   def product_types(cls):
     return ['java', 'scala']
 
-  def __init__(self, context, workdir):
-    super(ScroogeGen, self).__init__(context, workdir)
-    self.compiler_for_name = dict((name, Compiler.from_config(context, config))
+  def __init__(self, *args, **kwargs):
+    super(ScroogeGen, self).__init__(*args, **kwargs)
+    self.compiler_for_name = dict((name, Compiler.from_config(self.context, config))
                                   for name, config in _CONFIG_FOR_COMPILER.items())
 
     for name, compiler in self.compiler_for_name.items():
-      bootstrap_tools = context.config.getlist(compiler.config_section, 'bootstrap-tools',
-                                               default=[':%s' % compiler.profile])
+      bootstrap_tools = self.context.config.getlist(compiler.config_section, 'bootstrap-tools',
+                                                    default=[':%s' % compiler.profile])
       self.register_jvm_tool(compiler.name, bootstrap_tools)
 
-    self.defaults = JavaThriftLibrary.Defaults(context.config)
+    self.defaults = JavaThriftLibrary.Defaults(self.context.config)
 
   @property
   def config_section(self):

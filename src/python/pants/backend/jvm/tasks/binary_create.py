@@ -15,9 +15,9 @@ from pants.util.dirutil import safe_mkdir
 class BinaryCreate(JvmBinaryTask):
   """Creates a runnable monolithic binary deploy jar."""
 
-  def __init__(self, context, workdir):
-    super(BinaryCreate, self).__init__(context, workdir)
-    self._outdir = context.config.getdefault('pants_distdir')
+  def __init__(self, *args, **kwargs):
+    super(BinaryCreate, self).__init__(*args, **kwargs)
+    self._outdir = self.context.config.getdefault('pants_distdir')
 
   def execute(self):
     for binary in self.context.targets(self.is_binary):

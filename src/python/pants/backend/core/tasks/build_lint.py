@@ -32,11 +32,11 @@ class BuildLint(Task):
       action="append", type="choice", choices=['diff', 'rewrite'],
       help="diff=print out diffs, rewrite=apply changes to BUILD files directly.")
 
-  def __init__(self, context, workdir):
-    super(BuildLint, self).__init__(context, workdir)
-    self.transitive = context.options.buildlint_transitive
-    self.actions = set(context.options.buildlint_actions)
-    self.include_intransitive = context.options.buildlint_include_intransitive
+  def __init__(self, *args, **kwargs):
+    super(BuildLint, self).__init__(*args, **kwargs)
+    self.transitive = self.context.options.buildlint_transitive
+    self.actions = set(self.context.options.buildlint_actions)
+    self.include_intransitive = self.context.options.buildlint_include_intransitive
     # Manually apply the default. Can't use flag default, because action is 'append', so
     # diffs would always be printed, even if we only wanted to rewrite.
     if not self.actions:

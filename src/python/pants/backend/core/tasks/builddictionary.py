@@ -9,13 +9,9 @@ from collections import defaultdict
 import inspect
 import optparse
 import os
+
 from pkg_resources import resource_string
-
-from twitter.common.dirutil.fileset import Fileset
-
 from pants.backend.core.tasks.task import Task
-from pants.backend.maven_layout.maven_layout import maven_layout
-from pants.backend.python.python_requirements import python_requirements
 from pants.base.build_manual import get_builddict_info
 from pants.base.exceptions import TaskError
 from pants.base.generator import Generator, TemplateData
@@ -332,8 +328,8 @@ def assemble(predefs=PREDEFS, build_file_parser=None):
 class BuildBuildDictionary(Task):
   """Generate documentation for the Sphinx site."""
 
-  def __init__(self, context, workdir):
-    super(BuildBuildDictionary, self).__init__(context, workdir)
+  def __init__(self, *args, **kwargs):
+    super(BuildBuildDictionary, self).__init__(*args, **kwargs)
     self._templates_dir = os.path.join('templates', 'builddictionary')
     self._outdir = os.path.join(self.context.config.getdefault("pants_distdir"), "builddict")
 

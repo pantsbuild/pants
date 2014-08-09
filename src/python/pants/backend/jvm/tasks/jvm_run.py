@@ -37,20 +37,20 @@ class JvmRun(JvmTask):
       action='store', default=None,
       help = '[%default] Instead of running, just write the cmd line to this file')
 
-  def __init__(self, context, workdir):
-    super(JvmRun, self).__init__(context, workdir)
-    self.jvm_args = context.config.getlist('jvm-run', 'jvm_args', default=[])
-    if context.options.run_jvmargs:
-      for arg in context.options.run_jvmargs:
+  def __init__(self, *args, **kwargs):
+    super(JvmRun, self).__init__(*args, **kwargs)
+    self.jvm_args = self.context.config.getlist('jvm-run', 'jvm_args', default=[])
+    if self.context.options.run_jvmargs:
+      for arg in self.context.options.run_jvmargs:
         self.jvm_args.extend(shlex.split(arg))
     self.args = []
-    if context.options.run_args:
-      for arg in context.options.run_args:
+    if self.context.options.run_args:
+      for arg in self.context.options.run_args:
         self.args.extend(shlex.split(arg))
-    if context.options.run_debug:
-      self.jvm_args.extend(context.config.getlist('jvm', 'debug_args'))
-    self.confs = context.config.getlist('jvm-run', 'confs', default=['default'])
-    self.only_write_cmd_line = context.options.only_write_cmd_line
+    if self.context.options.run_debug:
+      self.jvm_args.extend(self.context.config.getlist('jvm', 'debug_args'))
+    self.confs = self.context.config.getlist('jvm-run', 'confs', default=['default'])
+    self.only_write_cmd_line = self.context.options.only_write_cmd_line
 
   def prepare(self, round_manager):
     # TODO(John Sirois): these are fake requirements in order to force compile run before this

@@ -45,8 +45,8 @@ class EclipseGen(IdeGen):
                                    "configuration should be generated for; can be one of: "
                                    "%s" % supported_versions)
 
-  def __init__(self, context, workdir):
-    super(EclipseGen, self).__init__(context, workdir)
+  def __init__(self, *args, **kwargs):
+    super(EclipseGen, self).__init__(*args, **kwargs)
 
     version = _VERSIONS[context.options.eclipse_gen_version]
     self.project_template = os.path.join(_TEMPLATE_BASEDIR, 'project-%s.mustache' % version)

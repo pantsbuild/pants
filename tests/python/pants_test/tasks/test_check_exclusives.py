@@ -32,8 +32,8 @@ class CheckExclusivesTest(BaseTest):
     d = self.make_target(':d', dependencies=[a, b])
     e = self.make_target(':e', dependencies=[a, c], exclusives={'c': '1'})
 
-    context = self.context(target_roots=[d, e])
-    check_exclusives_task = CheckExclusives(context, self.workdir, signal_error=True)
+    context = self.context(target_roots=[d, e], options={'exclusives_error_on_collision': True})
+    check_exclusives_task = CheckExclusives(context, self.workdir)
     try:
       check_exclusives_task.execute()
       self.fail("Expected a conflicting exclusives exception to be thrown.")
@@ -49,7 +49,7 @@ class CheckExclusivesTest(BaseTest):
 
     context = self.context(target_roots=[a, b, c, d])
     context.products.require_data('exclusives_groups')
-    check_exclusives_task = CheckExclusives(context, self.workdir, signal_error=True)
+    check_exclusives_task = CheckExclusives(context, self.workdir)
     check_exclusives_task.execute()
     egroups = context.products.get_data('exclusives_groups')
     # Expected compatibility:
@@ -86,7 +86,7 @@ class CheckExclusivesTest(BaseTest):
 
     context = self.context(target_roots=[a, b, c, d])
     context.products.require_data('exclusives_groups')
-    check_exclusives_task = CheckExclusives(context, self.workdir, signal_error=True)
+    check_exclusives_task = CheckExclusives(context, self.workdir)
     check_exclusives_task.execute()
     egroups = context.products.get_data('exclusives_groups')
 

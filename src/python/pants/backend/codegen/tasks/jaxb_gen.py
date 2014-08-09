@@ -17,6 +17,7 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.address import SyntheticAddress
 from pants.base.build_environment import get_buildroot
+from pants.base.exceptions import TaskError
 from pants.java.distribution.distribution import Distribution
 from pants.util.dirutil import safe_mkdir
 
@@ -26,12 +27,12 @@ class JaxbGen(CodeGen, NailgunTask):
 
   _CONFIG_SECTION = 'jaxb-gen'
 
-  def __init__(self, context, workdir):
+  def __init__(self, *args, **kwargs):
     """
     :param context: inherited parameter from Task
     :param workdir: inherited parameter from Task
     """
-    super(JaxbGen, self).__init__(context, workdir)
+    super(JaxbGen, self).__init__(*args, **kwargs)
     self.gen_langs = set()
     lang = 'java'
     if self.context.products.isrequired(lang):

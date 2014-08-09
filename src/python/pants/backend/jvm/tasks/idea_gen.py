@@ -98,29 +98,30 @@ class IdeaGen(IdeGen):
                             dest="idea_gen_java_maximum_heap_size",
                             help="[%default] Sets the maximum heap size (in megabytes) for javac.")
 
-  def __init__(self, context, workdir):
-    super(IdeaGen, self).__init__(context, workdir)
+  def __init__(self, *args, **kwargs):
+    super(IdeaGen, self).__init__(*args, **kwargs)
 
 
     self.intellij_output_dir = os.path.join(self.gen_project_workdir, 'out')
-    self.nomerge = not context.options.idea_gen_merge
-    self.open = context.options.idea_gen_open
-    self.bash = context.options.idea_gen_bash
+    self.nomerge = not self.context.options.idea_gen_merge
+    self.open = self.context.options.idea_gen_open
+    self.bash = self.context.options.idea_gen_bash
 
-    self.scala_language_level = _SCALA_VERSIONS.get(context.options.idea_scala_language_level, None)
+    self.scala_language_level = _SCALA_VERSIONS.get(
+      self.context.options.idea_scala_language_level, None)
     self.scala_maximum_heap_size = (
-      context.options.idea_gen_scala_maximum_heap_size
-      or context.config.get_option(self._IDEA_SCALA_MAX_HEAP_MB)
+      self.context.options.idea_gen_scala_maximum_heap_size
+      or self.context.config.get_option(self._IDEA_SCALA_MAX_HEAP_MB)
     )
-    self.fsc = context.options.idea_gen_fsc
+    self.fsc = self.context.options.idea_gen_fsc
 
-    self.java_encoding = context.options.idea_gen_java_encoding
+    self.java_encoding = self.context.options.idea_gen_java_encoding
     self.java_maximum_heap_size = (
-      context.options.idea_gen_java_maximum_heap_size
-      or context.config.get_option(self._IDEA_JAVA_MAX_HEAP_MB)
+      self.context.options.idea_gen_java_maximum_heap_size
+      or self.context.config.get_option(self._IDEA_JAVA_MAX_HEAP_MB)
     )
 
-    idea_version = _VERSIONS[context.options.idea_gen_version]
+    idea_version = _VERSIONS[self.context.options.idea_gen_version]
     self.project_template = os.path.join(_TEMPLATE_BASEDIR, 'project-%s.mustache' % idea_version)
     self.module_template = os.path.join(_TEMPLATE_BASEDIR, 'module-%s.mustache' % idea_version)
 

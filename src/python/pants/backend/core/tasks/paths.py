@@ -13,14 +13,15 @@ from pants.base.exceptions import TaskError
 
 
 class PathFinder(ConsoleTask):
-  def __init__(self, context, workdir):
-    super(PathFinder, self).__init__(context, workdir)
-    self.log = context.log
-    self.target_roots = context.target_roots
+  def __init__(self, *args, **kwargs):
+    super(PathFinder, self).__init__(*args, **kwargs)
+    self.log = self.context.log
+    self.target_roots = self.context.target_roots
 
   @classmethod
   def _find_paths(cls, from_target, to_target, log):
-    log.debug('Looking for all paths from %s to %s' % (from_target.address.reference(), to_target.address.reference()))
+    log.debug('Looking for all paths from %s to %s' % (from_target.address.reference(),
+                                                       to_target.address.reference()))
 
     paths = cls._find_paths_rec(from_target, to_target)
     print('Found %d paths' % len(paths))

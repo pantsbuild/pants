@@ -64,27 +64,26 @@ class IvyResolve(NailgunTask, IvyTaskMixin, JvmToolTaskMixin):
   def product_types(cls):
     return ['ivy_jar_products', 'jar_dependencies']
 
-  def __init__(self, context, workdir, confs=None):
-    super(IvyResolve, self).__init__(context, workdir)
+  def __init__(self, *args, **kwargs):
+    super(IvyResolve, self).__init__(*args, **kwargs)
 
     self._ivy_bootstrapper = Bootstrapper.instance()
     self._cachedir = self._ivy_bootstrapper.ivy_cache_dir
-    self._confs = confs or context.config.getlist(self._CONFIG_SECTION,
-                                                  'confs',
-                                                  default=['default'])
+    self._confs = self.context.config.getlist(self._CONFIG_SECTION, 'confs', default=['default'])
     self._classpath_dir = os.path.join(self.workdir, 'mapped')
 
-    self._outdir = context.options.ivy_resolve_outdir or os.path.join(self.workdir, 'reports')
-    self._open = context.options.ivy_resolve_open
-    self._report = self._open or context.options.ivy_resolve_report
+    self._outdir = self.context.options.ivy_resolve_outdir or os.path.join(self.workdir, 'reports')
+    self._open = self.context.options.ivy_resolve_open
+    self._report = self._open or self.context.options.ivy_resolve_report
 
     self._ivy_bootstrap_key = 'ivy'
-    ivy_bootstrap_tools = context.config.getlist(self._CONFIG_SECTION, 'bootstrap-tools', ':xalan')
+    ivy_bootstrap_tools = self.context.config.getlist(self._CONFIG_SECTION,
+                                                      'bootstrap-tools', ':xalan')
     self.register_jvm_tool(self._ivy_bootstrap_key, ivy_bootstrap_tools)
 
-    self._ivy_utils = IvyUtils(config=context.config,
-                               options=context.options,
-                               log=context.log)
+    self._ivy_utils = IvyUtils(config=self.context.config,
+                               options=self.context.options,
+                               log=self.context.log)
 
     # Typically this should be a local cache only, since classpaths aren't portable.
     self.setup_artifact_cache_from_config(config_section=self._CONFIG_SECTION)

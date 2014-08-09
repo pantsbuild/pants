@@ -16,8 +16,8 @@ from pants.base.workunit import WorkUnit
 
 
 class PythonRun(PythonTask):
-  def __init__(self, context, workdir):
-    super(PythonRun, self).__init__(context, workdir)
+  def __init__(self, *args, **kwargs):
+    super(PythonRun, self).__init__(*args, **kwargs)
 
   def execute(self):
     binary = self.require_single_root_target()

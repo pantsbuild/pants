@@ -19,8 +19,8 @@ class PythonBinaryCreate(PythonTask):
   def is_binary(target):
     return isinstance(target, PythonBinary)
 
-  def __init__(self, context, workdir):
-    super(PythonBinaryCreate, self).__init__(context, workdir)
+  def __init__(self, *args, **kwargs):
+    super(PythonBinaryCreate, self).__init__(*args, **kwargs)
     self._distdir = self.context.config.getdefault('pants_distdir')
 
   def execute(self):

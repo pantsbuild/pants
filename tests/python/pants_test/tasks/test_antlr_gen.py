@@ -8,17 +8,12 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import os
 from textwrap import dedent
 
-from twitter.common.collections import OrderedSet
 from twitter.common.dirutil.fileset import Fileset
 
-from pants.backend.codegen.targets.java_antlr_library import JavaAntlrLibrary
 from pants.backend.codegen.tasks.antlr_gen import AntlrGen
-from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.base.address import SyntheticAddress
-from pants.base.exceptions import TaskError
-from pants.goal.context import Context
-
 from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
+
 
 class AntlrGenTest(NailgunTaskTestBase):
   def test_antlr4(self):

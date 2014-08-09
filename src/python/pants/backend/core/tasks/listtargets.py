@@ -42,12 +42,12 @@ class ListTargets(ConsoleTask):
         default=False,
         help='Prints only targets that are documented with a description.')
 
-  def __init__(self, context, workdir, **kwargs):
-    super(ListTargets, self).__init__(context, workdir, **kwargs)
+  def __init__(self, *args, **kwargs):
+    super(ListTargets, self).__init__(*args, **kwargs)
 
-    self._provides = context.options.list_provides
-    self._provides_columns = context.options.list_provides_columns
-    self._documented = context.options.list_documented
+    self._provides = self.context.options.list_provides
+    self._provides_columns = self.context.options.list_provides_columns
+    self._documented = self.context.options.list_documented
 
   def console_output(self, targets):
     if self._provides:

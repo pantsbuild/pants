@@ -6,6 +6,7 @@
 jvm_binary(name='main',
   source='Main.java',
   main='com.pants.examples.annotation.main.Main',
+  basename = 'annotation-example',
   dependencies=[
     'src/java/com/pants/examples/annotation/example',
     'src/java/com/pants/examples/annotation/processor',

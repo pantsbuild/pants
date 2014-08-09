@@ -6,10 +6,8 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import os
-import sys
-import threading
-
 from Queue import Empty, Queue
+import threading
 
 import pytest
 
@@ -20,8 +18,8 @@ from pants_test.tasks.test_base import prepare_task
 
 class ConsoleTaskTest(BaseTest):
   class Infinite(ConsoleTask):
-    def __init__(self, context, workdir, outstream=sys.stdout):
-      super(ConsoleTaskTest.Infinite, self).__init__(context, workdir, outstream)
+    def __init__(self, *args, **kwargs):
+      super(ConsoleTaskTest.Infinite, self).__init__(*args, **kwargs)
       self.halt = threading.Event()
 
     def console_output(self, _):
@@ -33,11 +31,11 @@ class ConsoleTaskTest(BaseTest):
 
   def test_sigpipe(self):
     r, w = os.pipe()
+    outstream = os.fdopen(w, 'w')
     task = prepare_task(task_type=self.Infinite,
-                        outstream=os.fdopen(w, 'w'),
                         build_graph=self.build_graph,
-                        build_file_parser=self.build_file_parser)
-
+                        build_file_parser=self.build_file_parser,
+                        console_outstream=outstream)
     raised = Queue(maxsize=1)
 
     def execute():
