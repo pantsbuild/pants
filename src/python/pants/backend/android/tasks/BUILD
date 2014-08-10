@@ -75,3 +75,11 @@ python_library(
     pants('src/python/pants/util:dirutil'),
   ],
 )
+
+python_library(
+  name = 'jarsigner_task',
+  sources = ['jarsigner_task.py'],
+  dependencies = [
+    pants('src/python/pants/backend/android/tasks:android_task'),
+  ],
+)
