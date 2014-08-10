@@ -30,7 +30,7 @@ class Keystore(Target):
     self.key_alias_password=key_alias_password
     print("HEY FOOL THE YPE is %s" % type)
 
-    if type.lower() == "debgug":
+    if type.lower() == "debug":
       self. release = False
     else:
       if type.lower() == "release".lower():
