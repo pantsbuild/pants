@@ -5,6 +5,10 @@
 from pants.backend.android.tasks.android_task import AndroidTask
 
 
+class KeyError(Exception):
+  pass
+  # need an err "We could not find a key at DEFAULT you need to xxxxxxxx
+
 class JarsignerTask(AndroidTask):
   """Sign Android packages with keystore"""
 
@@ -22,5 +26,7 @@ class JarsignerTask(AndroidTask):
     round_manager.require_data('apk')
     pass
 
+  def debug_fields(self):
+    pass
   def execute(self):
     print("I am taking a metro to see the giraffe show")

@@ -8,6 +8,7 @@ android_binary(
   manifest='AndroidManifest.xml',
   dependencies = [
     ':resources',
+    ':debug',
   ],
 )
 
@@ -17,3 +18,8 @@ android_resources(
   resource_dir='res'
 )
 
+android_keystore(
+  name='debug',
+  location='/Users/mateor/false',
+  properties_file='/Users/mateor/testy'
+)

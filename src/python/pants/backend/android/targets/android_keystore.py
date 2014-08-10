@@ -15,6 +15,11 @@ class AndroidKeystore(AndroidTarget):
   """Represents a keystore configuration"""
 
   def __init__(self,
-               resource_dir=None,
+               location=None,
+               properties_file=None,
                **kwargs):
-    pass
+    super(AndroidKeystore, self).__init__(**kwargs)
+    self.properties_file = properties_file
+    self.location = location
+    print (self.properties_file)
+    #print(os.path.join(self.properties_file))

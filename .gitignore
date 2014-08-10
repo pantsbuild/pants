@@ -31,6 +31,7 @@ build-support/phab/
 codegen/classes/
 dist/
 htmlcov/
+keystore_properties.release
 lib/
 out/
 arc.sh
