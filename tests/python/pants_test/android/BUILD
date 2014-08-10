@@ -18,6 +18,16 @@ python_test_suite(
 )
 
 python_tests(
+  name = 'android_integration_test',
+  sources = [
+    'android_integration_test.py',
+  ],
+  dependencies = [
+    pants('tests/python/pants_test:int-test'),
+  ],
+)
+
+python_tests(
   name = 'android_distribution',
   sources = [
     'test_android_distribution.py',

@@ -22,6 +22,7 @@ class AndroidTarget(JvmTarget):
 
   def __init__(self,
                address=None,
+               # TODO (mateor) add support for minSDk
                # most recent build_tools_version should be defined elsewhere
                build_tools_version="19.1.0",
                manifest=None,
@@ -56,11 +57,13 @@ class AndroidTarget(JvmTarget):
     self.manifest = os.path.join(self.address.spec_path, manifest)
     self.package = self.get_package_name()
     self.target_sdk = self.get_target_sdk()
+    # If unable to parse application name, silently falls back to target name.
+    self.app_name = self.get_app_name() if self.get_app_name() else None
 
   # Parsing as in Android Donut's testrunner:
   # https://github.com/android/platform_development/blob/master/testrunner/android_manifest.py
   def get_package_name(self):
-    """Returns the package name of the Android target."""
+    """Return the package name of the Android target."""
     tgt_manifest = parse(self.manifest).getElementsByTagName('manifest')
     if not tgt_manifest or not tgt_manifest[0].getAttribute('package'):
       raise self.BadManifestError('There is no \'package\' attribute in manifest at: {0!r}'
@@ -68,12 +71,18 @@ class AndroidTarget(JvmTarget):
     return tgt_manifest[0].getAttribute('package')
 
   def get_target_sdk(self):
-    """Returns a string with the Android package's target SDK."""
+    """Return a string with the Android package's target SDK."""
     tgt_manifest = parse(self.manifest).getElementsByTagName('uses-sdk')
     if not tgt_manifest or not tgt_manifest[0].getAttribute('android:targetSdkVersion'):
       raise self.BadManifestError('There is no \'targetSdkVersion\' attribute in manifest at: {0!r}'
                                   .format(self.manifest))
     return tgt_manifest[0].getAttribute('android:targetSdkVersion')
+
+  def get_app_name(self):
+    """Return a string with the application name of the package, return None if not found."""
+    tgt_manifest = parse(self.manifest).getElementsByTagName('activity')
+    package_name = tgt_manifest[0].getAttribute('android:name')
+    return package_name.split(".")[-1]
 
   def is_android(self):
     return True

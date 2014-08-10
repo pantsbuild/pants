@@ -10,11 +10,10 @@ import subprocess
 
 from twitter.common import log
 from twitter.common.collections import OrderedSet
-from twitter.common.dirutil import safe_mkdir
 
 
 from pants.backend.android.targets.android_resources import AndroidResources
-from pants.backend.android.tasks.android_task import AndroidTask
+from pants.backend.android.tasks.aapt_task import AaptTask
 from pants.backend.codegen.tasks.code_gen import CodeGen
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
@@ -22,14 +21,10 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.base.address import SyntheticAddress
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+from pants.util.dirutil import safe_mkdir
 
 
-# These are hardcoded into aapt but we added 'BUILD*'. Changes clobber, so we need entire string
-IGNORED_ASSETS = ('!.svn:!.git:!.ds_store:!*.scc:.*:<dir>_*:!CVS:'
-                  '!thumbs.db:!picasa.ini:!*~:BUILD*')
-
-
-class AaptGen(AndroidTask, CodeGen):
+class AaptGen(AaptTask, CodeGen):
   """
   Handle the processing of resources for Android targets with the
   Android Asset Packaging Tool (aapt).
@@ -41,21 +36,7 @@ class AaptGen(AndroidTask, CodeGen):
   Commands and flags for aapt can be seen here:
   https://android.googlesource.com/platform/frameworks/base/+/master/tools/aapt/Command.cpp
   """
-  @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    super(AaptGen, cls).setup_parser(option_group, args, mkflag)
 
-    option_group.add_option(mkflag("target-sdk"), dest="target_sdk",
-                            help="[%default] Specifies the target Android SDK used to compile "
-                                 "resources. Overrides AndroidManifest.xml.")
-
-    option_group.add_option(mkflag("build-tools-version"), dest="build_tools_version",
-                            help="[%default] Specifies the Android build-tools version used "
-                                 "to compile resources.")
-
-    option_group.add_option(mkflag("ignored-assets"), dest="ignored_assets", default=IGNORED_ASSETS,
-                            help="[%default] Specifies regex patterns the aapt tools should "
-                                 "ignore as it spiders down the resource_dir.")
 
   @classmethod
   def _calculate_genfile(cls, package):
@@ -63,10 +44,6 @@ class AaptGen(AndroidTask, CodeGen):
 
   def __init__(self, *args, **kwargs):
     super(AaptGen, self).__init__(*args, **kwargs)
-    self._android_dist = self.android_sdk
-    self._forced_build_tools_version = self.context.options.build_tools_version
-    self._forced_ignored_assets = self.context.options.ignored_assets
-    self._forced_target_sdk = self.context.options.target_sdk
     self._jar_library_by_sdk = {}
 
   def prepare(self, round_manager):
@@ -116,24 +93,23 @@ class AaptGen(AndroidTask, CodeGen):
     if self._forced_ignored_assets:
       args.extend(['--ignore-assets', self._forced_ignored_assets])
     else:
-      args.extend(['--ignore-assets', IGNORED_ASSETS])
+      args.extend(['--ignore-assets', self.IGNORED_ASSETS])
 
     log.debug('Executing: {0}'.format(args))
     return args
 
   def genlang(self, lang, targets):
-    aapt_out = os.path.join(self.workdir, 'bin')
-    safe_mkdir(aapt_out)
+    safe_mkdir(self.workdir)
     for target in targets:
       if lang != 'java':
         raise TaskError('Unrecognized android gen lang: {0!r}'.format(lang))
-      process = subprocess.Popen(self.render_args(target, aapt_out))
+      process = subprocess.Popen(self.render_args(target, self.workdir))
       result = process.wait()
       if result != 0:
         raise TaskError('Android aapt tool exited non-zero ({code})'.format(code=result))
 
   def createtarget(self, lang, gentarget, dependees):
-    spec_path = os.path.join(os.path.relpath(self.workdir, get_buildroot()), 'bin')
+    spec_path = os.path.join(os.path.relpath(self.workdir, get_buildroot()))
     address = SyntheticAddress(spec_path=spec_path, target_name=gentarget.id)
     aapt_gen_file = self._calculate_genfile(gentarget.package)
     deps = OrderedSet([self._jar_library_by_sdk[gentarget.target_sdk]])
@@ -145,22 +121,3 @@ class AaptGen(AndroidTask, CodeGen):
     for dependee in dependees:
       dependee.inject_dependency(tgt.address)
     return tgt
-
-  def _aapt_out(self):
-    return os.path.join(self.workdir, 'bin')
-
-  def aapt_tool(self, build_tools_version):
-    """Return the appropriate aapt tool.
-
-    :param string build_tools_version: The Android build-tools version number (e.g. '19.1.0').
-    """
-    aapt = os.path.join('build-tools', build_tools_version, 'aapt')
-    return self._android_dist.register_android_tool(aapt)
-
-  def android_jar_tool(self, target_sdk):
-    """Return the appropriate android.jar.
-
-    :param string target_sdk: The Android SDK version number of the target (e.g. '18').
-    """
-    android_jar = os.path.join('platforms', 'android-' + target_sdk, 'android.jar')
-    return self._android_dist.register_android_tool(android_jar)
