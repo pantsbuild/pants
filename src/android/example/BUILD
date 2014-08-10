@@ -8,7 +8,7 @@ android_binary(
   manifest='AndroidManifest.xml',
   dependencies = [
     ':resources',
-    ':debug',
+   pants('src/python/pants/backend/android/authentication:debug')
   ],
 )
 
@@ -16,10 +16,4 @@ android_resources(
   name='resources',
   manifest='AndroidManifest.xml',
   resource_dir='res'
-)
-
-android_keystore(
-  name='debug',
-  location='/Users/mateor/false',
-  properties_file='/Users/mateor/testy'
 )

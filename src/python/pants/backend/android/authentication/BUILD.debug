@@ -1,0 +1,14 @@
+# coding=utf-8
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+keystore(
+  name='debug',
+  type='debug',
+  keystore_alias='androiddebugkey',
+  key_store_password='android',
+  key_alias_password='android'
+)
+
+# Please do not put release keystore passwords in this file!
+# Create a BUILD.release file instead. BUILD.release will not be checked into vcs.

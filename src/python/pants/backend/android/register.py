@@ -7,7 +7,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from pants.backend.android.targets.android_binary import AndroidBinary
 from pants.backend.android.targets.android_resources import AndroidResources
-from pants.backend.android.targets.android_keystore import AndroidKeystore
+from pants.backend.android.targets.keystore import Keystore
 from pants.backend.android.tasks.aapt_gen import AaptGen
 from pants.backend.android.tasks.aapt_builder import AaptBuilder
 from pants.backend.android.tasks.dx_compile import DxCompile
@@ -21,7 +21,7 @@ def build_file_aliases():
     targets={
       'android_binary': AndroidBinary,
       'android_resources': AndroidResources,
-      'android_keystore': AndroidKeystore,
+      'keystore': Keystore,
     }
   )
 
