@@ -13,8 +13,8 @@ python_library(
   name = 'android',
   sources = [
     'android_binary.py',
-    'android_target.py',
     'android_resources.py',
+    'android_target.py',
   ],
   dependencies = [
     pants('src/python/pants/base:payload'),
