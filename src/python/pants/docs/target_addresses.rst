@@ -85,7 +85,6 @@ location::
     $ ./pants goal list tests/python/pants_test/::
     tests/python/pants_test:base-test
     tests/python/pants_test:test_maven_layout
-    tests/python/pants_test/BUILD:test_thrift_util
     tests/python/pants_test:all
     tests/python/pants_test/base:base-test
     tests/python/pants_test/base:all
@@ -102,7 +101,6 @@ list of targets::
     $ ./pants goal list tests/python/pants_test/:: ^tests/python/pants_test/base::
     tests/python/pants_test:base-test
     tests/python/pants_test:test_maven_layout
-    tests/python/pants_test/BUILD:test_thrift_util
     tests/python/pants_test:all
     tests/python/pants_test/cache:cache
     tests/python/pants_test/commands:commands

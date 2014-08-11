@@ -277,7 +277,7 @@ class JarPublish(JarTask, ScmPublish):
          # ivy configurations to publish
          'confs': ['default', 'sources', 'javadoc'],
          # address of a Credentials target to use when publishing
-         'auth': 'address/of/credentials/BUILD:target',
+         'auth': 'address/of/credentials:target',
          # help message if unable to initialize the Credentials target.
          'help': 'Please check your credentials and try again.',
        },
