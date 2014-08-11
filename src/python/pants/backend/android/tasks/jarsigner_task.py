@@ -7,37 +7,32 @@ import os
 from stat import *
 
 from pants.backend.android.tasks.android_task import AndroidTask
+from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.build_environment import get_buildroot
 
 GITIGNORE = '.gitignore'
+_CONFIG_SECTION = 'jarsigner-tool'
 
   # need an err "We could not find a key at DEFAULT you need to xxxxxxxx
 
-class JarsignerTask(AndroidTask):
+class JarsignerTask(AndroidTask, NailgunTask):
   """Sign Android packages with keystore"""
 
   # For debug releases, we are using the debug key created with an install
-  # of the Android SDK. This uses a keystore with a known passphrase and a key with a
-  # known passphrase. But there is
-  # no rule that is the debug key the org will want. I would like to include a debug key with
-  # pants that matches the one from the SDK.
-
+  # of the Android SDK. This uses a keystore and key with a known passphrase.
   def __init__(self, *args, **kwargs):
     super(JarsignerTask, self).__init__(*args, **kwargs)
-    self._android_dist = self.android_sdk
-    self.fred_read
-
-  def fred_read(self):
-    print("WE ATE A GRAPE GRAOE GRAOE")
-    fred = os.path.join('/Users/mateor/fred')
-    with open(fred) as f:
-      content = f.readlines()
-    print (content)
-
+    self.release = self.context.options.release_build or False
+    config_section = self.config_section
+    print ("release is %s" % self.release)
 
   def prepare(self, round_manager):
     round_manager.require_data('apk')
     pass
+
+  @property
+  def config_section(self):
+    return self._CONFIG_SECTION
 
   def debug_fields(self):
     pass
@@ -76,3 +71,6 @@ class JarsignerTask(AndroidTask):
     permissions = (oct(os.stat(fred)[ST_MODE]))
     if permissions is not '0100640':
       KeyError
+
+  def jarsigner_tool(self):
+    pass
