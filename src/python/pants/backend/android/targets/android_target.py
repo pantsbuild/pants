@@ -9,7 +9,6 @@ import os
 from xml.dom.minidom import parse
 
 from pants.backend.jvm.targets.jvm_target import JvmTarget
-from pants.base.exceptions import TargetDefinitionException
 
 
 class AndroidTarget(JvmTarget):
@@ -47,13 +46,12 @@ class AndroidTarget(JvmTarget):
     self.add_labels('android')
     self.build_tools_version = build_tools_version
     self.release_type = release_type
-
-    if not os.path.isfile(os.path.join(address.spec_path, manifest)):
-      raise TargetDefinitionException(self, 'Android targets must specify a \'manifest\' '
-                                            'that points to the \'AndroidManifest.xml\'. '
-                                            'No manifest was found at {0!r}'
-                                             .format(os.path.join(address.spec_path, manifest)))
-    self.manifest = os.path.join(self.address.spec_path, manifest)
+    try:
+      self.manifest = os.path.join(address.spec_path, manifest)
+      assert os.path.isfile(self.manifest) is True
+    except:
+      raise ValueError(self, ("BUILD files of Android targets must have a 'manifest' field "
+                              "with the relative location of the 'AndroidManifest.xml' file."))
     self.package = self.get_package_name()
     self.target_sdk = self.get_target_sdk()
 
