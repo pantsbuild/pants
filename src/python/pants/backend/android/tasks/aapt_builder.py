@@ -25,10 +25,6 @@ class AaptBuilder(AaptTask):
   This class gathers compiled classes (an Android dex archive) and packages it with the
   target's resource files. The output is an unsigned .apk, an Android application package file.
   """
-  @classmethod
-  def product_types(cls):
-    return ['apk']
-
   @staticmethod
   def is_app(target):
     return isinstance(target, AndroidBinary)
@@ -41,10 +37,6 @@ class AaptBuilder(AaptTask):
 
   def render_args(self, target, resource_dir, inputs):
     args = []
-    if self._forced_build_tools_version:
-      args.append(self.aapt_tool(self._forced_build_tools_version))
-    else:
-      args.append(self.aapt_tool(target.build_tools_version))
 
     # Glossary of used aapt flags. Aapt handles a ton of action, this will continue to expand.
     #   : 'package' is the main aapt operation (see class docstring for more info).
@@ -54,27 +46,19 @@ class AaptBuilder(AaptTask):
     #   : '--ignored-assets' patterns for the aapt to skip. This is the default w/ 'BUILD*' added.
     #   : '-F' The name and location of the .apk file to output
     #   : additional positional arguments are treated as input directories to gather files from.
-    args.extend(['package', '-M', target.manifest,
-                 '-S'])
+    args.extend([self.aapt_tool(target.build_tools_version), 'package', '-M',
+                 target.manifest, '-S'])
     args.extend(resource_dir)
-    if self._forced_target_sdk:
-      args.extend(['-I', self.android_jar_tool(self._forced_target_sdk)])
-    else:
-      args.extend(['-I', self.android_jar_tool(target.target_sdk)])
-
-    if self._forced_ignored_assets:
-      args.extend(['--ignore-assets', self._forced_ignored_assets])
-    else:
-      args.extend(['--ignore-assets', self.IGNORED_ASSETS])
-
-    app_name = target.app_name if target.app_name else target.name
-    args.extend(['-F', os.path.join(self.workdir, app_name + '-unsigned.apk')])
+    args.extend(['-I', self.android_jar_tool(target.target_sdk), '--ignore-assets',
+                 self.ignored_assets, '-F', os.path.join(self.workdir,
+                 target.app_name + '-unsigned.apk')])
     args.extend(inputs)
     log.debug('Executing: {0}'.format(args))
     return args
 
   def execute(self):
     safe_mkdir(self.workdir)
+    # TODO(mateor) map stderr and stdout to workunit streams (see CR 859)
     with self.context.new_workunit(name='apk-bundle', labels=[WorkUnit.MULTITOOL]):
       targets = self.context.targets(self.is_app)
       with self.invalidated(targets) as invalidation_check:

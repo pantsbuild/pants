@@ -39,14 +39,20 @@ class AaptTask(AndroidTask):
     super(AaptTask, self).__init__(*args, **kwargs)
     self._android_dist = self.android_sdk
     self._forced_build_tools_version = self.context.options.build_tools_version
-    self._forced_ignored_assets = self.context.options.ignored_assets
+    if self.context.options.ignored_assets:
+      self.ignored_assets = self.context.options.ignored_assets
+    else:
+      self.ignored_assets = IGNORED_ASSETS
     self._forced_target_sdk = self.context.options.target_sdk
 
+  #TODO (handle the _forced flag stuff here instead of in subclass render_args.
   def aapt_tool(self, build_tools_version):
     """Return the appropriate aapt tool.
 
     :param string build_tools_version: The Android build-tools version number (e.g. '19.1.0').
     """
+    if self._forced_build_tools_version:
+      build_tools_version = self._forced_build_tools_version
     aapt = os.path.join('build-tools', build_tools_version, 'aapt')
     return self._android_dist.register_android_tool(aapt)
 
@@ -55,6 +61,8 @@ class AaptTask(AndroidTask):
 
     :param string target_sdk: The Android SDK version number of the target (e.g. '18').
     """
+    if self._forced_target_sdk:
+      target_sdk = self._forced_target_sdk
     android_jar = os.path.join('platforms', 'android-' + target_sdk, 'android.jar')
     return self._android_dist.register_android_tool(android_jar)
 

@@ -69,11 +69,6 @@ class AaptGen(AaptTask, CodeGen):
   def render_args(self, target, output_dir):
     args = []
 
-    if self._forced_build_tools_version:
-      args.append(self.aapt_tool(self._forced_build_tools_version))
-    else:
-      args.append(self.aapt_tool(target.build_tools_version))
-
     # Glossary of used aapt flags. Aapt handles a ton of action, this will continue to expand.
     #   : 'package' is the main aapt operation (see class docstring for more info).
     #   : '-m' is to "make" a package directory under location '-J'.
@@ -81,20 +76,9 @@ class AaptGen(AaptTask, CodeGen):
     #   : '-M' is the AndroidManifest.xml of the project.
     #   : '-S' points to the resource_dir to "spider" down while collecting resources.
     #   : '-I' packages to add to base "include" set, here it is the android.jar of the target-sdk.
-
-    args.extend(['package', '-m', '-J', output_dir, '-M', target.manifest,
-                 '-S', target.resource_dir, '-I'])
-
-    if self._forced_target_sdk:
-      args.append(self.android_jar_tool(self._forced_target_sdk))
-    else:
-      args.append(self.android_jar_tool(target.target_sdk))
-
-    if self._forced_ignored_assets:
-      args.extend(['--ignore-assets', self._forced_ignored_assets])
-    else:
-      args.extend(['--ignore-assets', self.IGNORED_ASSETS])
-
+    args.extend([self.aapt_tool(target.build_tools_version), 'package', '-m', '-J', output_dir,
+                 '-M', target.manifest, '-S', target.resource_dir, '-I',
+                 self.android_jar_tool(target.target_sdk), '--ignore-assets', self.ignored_assets])
     log.debug('Executing: {0}'.format(args))
     return args
 

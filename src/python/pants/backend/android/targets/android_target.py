@@ -58,7 +58,7 @@ class AndroidTarget(JvmTarget):
     self.package = self.get_package_name()
     self.target_sdk = self.get_target_sdk()
     # If unable to parse application name, silently falls back to target name.
-    self.app_name = self.get_app_name() if self.get_app_name() else None
+    self.app_name = self.get_app_name() if self.get_app_name() else self.name
 
   # Parsing as in Android Donut's testrunner:
   # https://github.com/android/platform_development/blob/master/testrunner/android_manifest.py

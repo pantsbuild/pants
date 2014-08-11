@@ -37,4 +37,3 @@ class AndroidIntegrationTest(PantsRunIntegrationTest):
     else:
       return False
     return True
-
