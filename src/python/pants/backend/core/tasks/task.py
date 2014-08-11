@@ -151,15 +151,6 @@ class TaskBase(AbstractClass):
     """
     return []
 
-  def invalidate_for(self):
-    """Provides extra objects that participate in invalidation.
-
-    Subclasses can override and return an object that should be checked for changes when
-    managing target invalidation.  If the pickled form of returned object changes
-    between runs all targets will be invalidated.
-    """
-    return None
-
   def invalidate_for_files(self):
     """Provides extra files that participate in invalidation.
 
@@ -183,15 +174,10 @@ class TaskBase(AbstractClass):
     fingerprint_strategy:    A FingerprintStrategy instance, which can do per task, finer grained
                              fingerprinting of a given Target.
     """
-    extra_data = [self.invalidate_for()]
-
-    for f in self.invalidate_for_files():
-      extra_data.append(hash_file(f))
 
     return InvalidationCacheManager(self._cache_key_generator,
                                     self._build_invalidator_dir,
                                     invalidate_dependents,
-                                    extra_data,
                                     fingerprint_strategy=fingerprint_strategy)
 
   @contextmanager

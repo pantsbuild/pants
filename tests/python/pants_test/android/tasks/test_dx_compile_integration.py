@@ -8,8 +8,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import os
 import pytest
 
-from pants_test.android.android_integration_test import AndroidIntegrationTest
-
 
 class DxCompileIntegrationTest(AndroidIntegrationTest):
   """Integration test for DxCompile
@@ -29,6 +27,7 @@ class DxCompileIntegrationTest(AndroidIntegrationTest):
   @pytest.mark.skipif('not DxCompileIntegrationTest.tools',
                       reason='Android integration test requires tools {0!r} '
                              'and ANDROID_HOME set in path.'.format(TOOLS))
+
   def test_dx_compile(self):
     self.dx_test('src/android/example:hello')
 

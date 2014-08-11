@@ -184,11 +184,9 @@ class InvalidationCacheManager(object):
                cache_key_generator,
                build_invalidator_dir,
                invalidate_dependents,
-               extra_data,
                fingerprint_strategy=None):
     self._cache_key_generator = cache_key_generator
     self._invalidate_dependents = invalidate_dependents
-    self._extra_data = pickle.dumps(extra_data)  # extra_data may be None.
     self._invalidator = BuildInvalidator(build_invalidator_dir)
     self._fingerprint_strategy = fingerprint_strategy
 

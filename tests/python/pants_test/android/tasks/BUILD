@@ -11,8 +11,8 @@ python_test_suite(
 python_test_suite(
   name = 'integration',
   dependencies = [
-    pants(':dx_compile_integration'),
-    pants(':aapt_builder_integration'),
+    ':dx_compile_integration',
+    ':aapt_builder_integration',
   ],
 )
 
@@ -22,7 +22,7 @@ python_tests(
     'test_aapt_gen.py',
   ],
   dependencies=[
-    pants('src/python/pants/backend/android/tasks:all'),
+    'src/python/pants/backend/android/tasks:all',
   ],
 )
 
@@ -32,7 +32,7 @@ python_tests(
     'test_dx_compile_integration.py',
   ],
   dependencies = [
-    pants('tests/python/pants_test/android:android_integration_test'),
+    'tests/python/pants_test/android:android_integration_test',
   ],
 )
 
@@ -42,6 +42,6 @@ python_tests(
     'test_aapt_builder_integration.py',
   ],
   dependencies = [
-    pants('tests/python/pants_test/android:android_integration_test'),
+    'tests/python/pants_test/android:android_integration_test',
   ],
 )

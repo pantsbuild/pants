@@ -109,9 +109,6 @@ class ApacheThriftGen(CodeGen):
       self._gen_python = self.create_geninfo('python')
     return self._gen_python
 
-  def invalidate_for(self):
-    return self.gen_langs
-
   def invalidate_for_files(self):
     # TODO: This will prevent artifact caching across platforms.
     # Find some cross-platform way to assert the thrift binary version.

@@ -162,9 +162,9 @@ as a convenient way to send many many tests to the fleet ::
     # (unless you want to wait a few hours for results)
     junit_tests(name='many-many',
     dependencies = [
-      'bar/BUILD:all',
-      'baz/BUILD:all',
-      'garply/BUILD:all',
+      'bar:all',
+      'baz:all',
+      'garply:all',
     ],)
 
 If you don't want to make this test definition available to the public (lest

@@ -33,7 +33,7 @@ goals can be especially helpful:
 ``list`` Did I define the targets I meant to? ::
 
     $ ./pants goal list src/java/com/pants/examples/hello/greet
-    src/java/com/pants/examples/hello/greet/BUILD:greet
+    src/java/com/pants/examples/hello/greet:greet
 
 ``list ::`` List **every** target to find out:
 Did a change in one ``BUILD`` file break others? ::
@@ -104,7 +104,7 @@ Default targets are more convenient to reference on the command line and less
 verbose as build dependencies. For example, consider the following names for the
 same target::
 
-    src/java/com/twitter/tugboat/BUILD:tugboat  # absolute target name
+    src/java/com/twitter/tugboat:tugboat  # absolute target name
     src/java/com/twitter/tugboat/BUILD          # references default target "tugboat"
     src/java/com/twitter/tugboat   # references default build file "BUILD" and default target "tugboat"
     src/java/com/twitter/tugboat/  # trailing slashes are ignored - useful for command-line completion

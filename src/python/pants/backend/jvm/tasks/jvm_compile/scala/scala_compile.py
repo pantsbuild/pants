@@ -68,8 +68,8 @@ class ScalaCompile(JvmCompile):
     return self._zinc_utils.plugin_jars()
 
   # Invalidate caches if the toolchain changes.
-  def invalidate_for(self):
-    zinc_invalidation_key = self._zinc_utils.invalidate_for()
+  def platform_version_info(self):
+    zinc_invalidation_key = self._zinc_utils.platform_version_info()
     jvm_target_version = ''
 
     # Check scalac args for jvm target version.
