@@ -89,9 +89,6 @@ class ProtobufGen(CodeGen):
   def pythondeps(self):
     return self.resolve_deps('pythondeps', default=_PROTOBUF_GEN_PYTHONDEPS_DEFAULT)
 
-  def invalidate_for(self):
-    return self.gen_langs
-
   def invalidate_for_files(self):
     return [self.protobuf_binary]
 

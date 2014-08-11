@@ -95,9 +95,6 @@ class IvyResolve(NailgunTask, IvyTaskMixin, JvmToolTaskMixin):
   def prepare(self, round_manager):
     round_manager.require_data('exclusives_groups')
 
-  def invalidate_for(self):
-    return self.context.options.ivy_resolve_overrides
-
   def execute(self):
     """Resolves the specified confs for the configured targets and returns an iterator over
     tuples of (conf, jar path).

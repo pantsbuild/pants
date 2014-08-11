@@ -279,7 +279,17 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
 
   def _jvm_fingerprint_strategy(self):
     # Use a fingerprint strategy that allows us to also include java/scala versions.
-    return JvmFingerprintStrategy(self.invalidate_for())
+    return JvmFingerprintStrategy(self.platform_version_info())
+
+  def platform_version_info(self):
+    """
+    Provides extra platform information such as java version that will be used
+    in the fingerprinter. This in turn ensures different platform versions create different
+    cache artifacts.
+
+    Sublclasses should override this and return a list of version info.
+    """
+    return None
 
   def pre_execute(self):
     # TODO(John Sirois): Ensuring requested product maps are available - if empty - should probably

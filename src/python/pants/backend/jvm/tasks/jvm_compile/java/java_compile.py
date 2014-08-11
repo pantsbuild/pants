@@ -133,7 +133,7 @@ class JavaCompile(JvmCompile):
 
   # Make the java target language version part of the cache key hash,
   # this ensures we invalidate if someone builds against a different version.
-  def invalidate_for(self):
+  def platform_version_info(self):
     ret = []
     opts = self._javac_opts
 

@@ -137,9 +137,6 @@ class JvmdocGen(JvmTask):
     # See: https://github.com/pantsbuild/pants/issues/310
     round_manager.require_data('classes_by_target')
 
-  def invalidate_for(self):
-    return self.combined, self.transitive, self.workdir, self.confs, self._include_codegen
-
   def generate_doc(self, language_predicate, create_jvmdoc_command):
     """
     Generate an execute method given a language predicate and command to create documentation

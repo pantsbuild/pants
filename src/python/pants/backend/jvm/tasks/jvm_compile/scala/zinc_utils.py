@@ -124,7 +124,7 @@ class ZincUtils(object):
                                       workunit_name=workunit_name,
                                       workunit_labels=workunit_labels)
 
-  def invalidate_for(self):
+  def platform_version_info(self):
     ret = []
 
     # Go through all the bootstrap tools required to compile.
