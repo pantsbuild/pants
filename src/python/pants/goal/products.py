@@ -59,12 +59,7 @@ class MultipleRootedProducts(object):
       yield root, products.abs_paths()
 
   def _get_products_for_root(self, root):
-    if root in self._rooted_products_by_root:
-      ret = self._rooted_products_by_root[root]
-    else:
-      ret = RootedProducts(root)
-      self._rooted_products_by_root[root] = ret
-    return ret
+    return self._rooted_products_by_root.setdefault(root, RootedProducts(root))
 
 
 class Products(object):
