@@ -4,6 +4,7 @@
 
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
+import os
 
 from pants.base.address import SyntheticAddress
 from pants.base.build_file_aliases import BuildFileAliases
@@ -66,16 +67,36 @@ class CmdLineSpecParserTest(BaseTest):
     self.assert_parsed(cmdline_spec='a/b::', expected=['a/b', 'a/b:c'])
     self.assert_parsed(cmdline_spec='//a/b::', expected=['a/b', 'a/b:c'])
 
+  def test_absolute(self):
+    self.assert_parsed(cmdline_spec=os.path.join(self.build_root, 'a'), expected=['a'])
+    self.assert_parsed(cmdline_spec=os.path.join(self.build_root, 'a:a'), expected=['a'])
+    self.assert_parsed(cmdline_spec=os.path.join(self.build_root, 'a:'), expected=['a', 'a:b'])
+    self.assert_parsed(cmdline_spec=os.path.join(self.build_root, 'a::'),
+                       expected=['a', 'a:b', 'a/b', 'a/b:c'])
+
+    with self.assertRaises(IOError):
+      double_absolute = os.sep + os.path.join(self.build_root, 'a')
+      self.assertEquals('//', double_absolute[:2],
+                        'A sanity check we have a leading-// absolute spec')
+      self.spec_parser.parse_addresses(double_absolute).next()
+
+    with self.assertRaises(ValueError):
+      self.spec_parser.parse_addresses('/not/the/buildroot/a').next()
+
   def test_cmd_line_affordances(self):
     self.assert_parsed(cmdline_spec='./:root', expected=[':root'])
     self.assert_parsed(cmdline_spec='//./:root', expected=[':root'])
     self.assert_parsed(cmdline_spec='//./a/../:root', expected=[':root'])
+    self.assert_parsed(cmdline_spec=os.path.join(self.build_root, './a/../:root'),
+                       expected=[':root'])
 
     self.assert_parsed(cmdline_spec='a/', expected=['a'])
     self.assert_parsed(cmdline_spec='./a/', expected=['a'])
+    self.assert_parsed(cmdline_spec=os.path.join(self.build_root, './a/'), expected=['a'])
 
     self.assert_parsed(cmdline_spec='a/b/:b', expected=['a/b'])
     self.assert_parsed(cmdline_spec='./a/b/:b', expected=['a/b'])
+    self.assert_parsed(cmdline_spec=os.path.join(self.build_root, './a/b/:b'), expected=['a/b'])
 
   def test_cmd_line_spec_list(self):
     self.assert_parsed_list(cmdline_spec_list=['a', 'a/b'], expected=['a', 'a/b'])
