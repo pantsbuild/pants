@@ -70,27 +70,29 @@ class JarsignerTask(AndroidTask, NailgunTask):
       targets = self.context.targets(self.is_signtarget)
       print("I am taking a metro to see the giraffe show")
       for target in targets:
+        build_type=target.build_type
         print(target)
         safe_mkdir(self.workdir)
-        keys_by_target = self.context.targets(self.is_keytarget)
+        unsigned_apk = self.context.products.get('apk')
+        print(unsigned_apk)
+        #
+        # #for key in keys_by_target:
+        #  # print("Dems da keys: ")
+        #  # print(key)
+        #
+        # def add_to_dex(tgt):
+        #   target_keys = keys_by_target.get(tgt)
+        #   if target_keys:
+        #     print("WE shhould see th sea from thee")
+        #     print(target_keys)
+        #     # def add_classes(target_products):
+        #     #   for root, products in target_products.abs_paths():
+        #     #     for prod in products:
+        #     #       classes.append(prod)
+        #     #
+        #     # add_classes(target_classes)
 
-        for key in keys_by_target:
-          print("Dems da keys: ")
-          print(key)
-
-          def add_to_dex(tgt):
-            target_keys = keys_by_target.get(tgt)
-            if target_keys:
-              print("WE shhould see th sea from thee")
-              print(target_keys)
-              # def add_classes(target_products):
-              #   for root, products in target_products.abs_paths():
-              #     for prod in products:
-              #       classes.append(prod)
-              #
-              # add_classes(target_classes)
-
-        target.walk(add_to_dex)
+      #target.walk(add_to_dex)
 
     #if debug
     #  if no config

@@ -89,3 +89,6 @@ class AaptBuilder(AaptTask):
           result = process.wait()
           if result != 0:
             raise TaskError('Android aapt tool exited non-zero ({code})'.format(code=result))
+    for target in targets:
+      self.context.products.get('apk').add(target, self.workdir).append(target.app_name + "-unsigned.apk")
+
