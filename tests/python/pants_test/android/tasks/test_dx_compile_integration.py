@@ -8,6 +8,8 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import os
 import pytest
 
+from pants_test.android.android_integration_test import AndroidIntegrationTest
+
 
 class DxCompileIntegrationTest(AndroidIntegrationTest):
   """Integration test for DxCompile

@@ -11,6 +11,7 @@ from xml.dom.minidom import parse
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.exceptions import TargetDefinitionException
 
+
 class AndroidTarget(JvmTarget):
   """A base class for all Android targets."""
 

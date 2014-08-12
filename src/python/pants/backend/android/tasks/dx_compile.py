@@ -122,6 +122,7 @@ class DxCompile(AndroidTask, NailgunTask):
 
   def dx_jar_tool(self, build_tools_version):
     """Return the appropriate dx.jar.
+
     :param string build_tools_version: The Android build-tools version number (e.g. '19.1.0').
     """
     dx_jar = os.path.join('build-tools', build_tools_version, 'lib', 'dx.jar')
