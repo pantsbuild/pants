@@ -44,6 +44,9 @@ class AndroidTarget(JvmTarget):
     """
     super(AndroidTarget, self).__init__(address=address, **kwargs)
 
+    # TODO(mateor) support for 'release' builds
+    # For now Pants only supports 'debug'. Release builds require handling through the whole stack
+    self.build_type = 'debug'
     self.add_labels('android')
     self.build_tools_version = build_tools_version
 

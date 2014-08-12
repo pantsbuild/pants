@@ -6,12 +6,11 @@ import sys, io
 import os
 from stat import *
 
+from pants.backend.android.targets.android_binary import AndroidBinary
 from pants.backend.android.tasks.android_task import AndroidTask
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.build_environment import get_buildroot
 
-GITIGNORE = '.gitignore'
-_CONFIG_SECTION = 'jarsigner-tool'
 
   # need an err "We could not find a key at DEFAULT you need to xxxxxxxx
 
@@ -20,19 +19,25 @@ class JarsignerTask(AndroidTask, NailgunTask):
 
   # For debug releases, we are using the debug key created with an install
   # of the Android SDK. This uses a keystore and key with a known passphrase.
+
+  GITIGNORE = '.gitignore'
+  _CONFIG_SECTION = 'jarsigner-tool'
+
   def __init__(self, *args, **kwargs):
     super(JarsignerTask, self).__init__(*args, **kwargs)
-    self.release = self.context.options.release_build or False
+    #self.release = self.context.options.release_build or False
     config_section = self.config_section
-    print ("release is %s" % self.release)
+    #print ("release is %s" % self.release)
 
   def prepare(self, round_manager):
     round_manager.require_data('apk')
-    pass
 
   @property
   def config_section(self):
     return self._CONFIG_SECTION
+
+  def _is_signtarget(self, target):
+    isinstance(target, AndroidBinary)
 
   def debug_fields(self):
     pass

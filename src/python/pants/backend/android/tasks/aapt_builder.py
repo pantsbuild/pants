@@ -35,6 +35,10 @@ class AaptBuilder(AaptTask):
   def prepare(self, round_manager):
     round_manager.require_data('dex')
 
+  @classmethod
+  def product_types(cls):
+    return ['apk']
+
   def render_args(self, target, resource_dir, inputs):
     args = []
 
