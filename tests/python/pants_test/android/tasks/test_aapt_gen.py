@@ -28,7 +28,6 @@ class AaptGenCalculateGenfilesTest(unittest.TestCase):
         'com.pants.examples.hello',
         os.path.join('bin', 'com', 'pants', 'examples', 'hello'))
 
-
   def test_package_path(self):
     self.assertEqual(os.path.join('com', 'pants', 'example', 'tests'),
                      AaptGen.package_path('com.pants.example.tests'))
