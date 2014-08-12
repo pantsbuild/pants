@@ -6,15 +6,25 @@ python_test_suite(
   name = 'android',
   dependencies = [
     ':android_distribution',
-    pants('tests/python/pants_test/android/tasks:tasks'),
+    'tests/python/pants_test/android/tasks',
   ]
 )
 
 python_test_suite(
   name = 'integration',
   dependencies = [
-    pants('tests/python/pants_test/android/tasks:integration'),
+    'tests/python/pants_test/android/tasks:integration',
   ]
+)
+
+python_tests(
+  name = 'android_integration_test',
+  sources = [
+    'android_integration_test.py',
+  ],
+  dependencies = [
+    'tests/python/pants_test:int-test',
+  ],
 )
 
 python_tests(
