@@ -7,9 +7,12 @@ import os
 from stat import *
 
 from pants.backend.android.targets.android_binary import AndroidBinary
+from pants.backend.android.targets.keystore import Keystore
 from pants.backend.android.tasks.android_task import AndroidTask
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.build_environment import get_buildroot
+from pants.base.workunit import WorkUnit
+from pants.util.dirutil import safe_mkdir
 
 
   # need an err "We could not find a key at DEFAULT you need to xxxxxxxx
@@ -36,13 +39,58 @@ class JarsignerTask(AndroidTask, NailgunTask):
   def config_section(self):
     return self._CONFIG_SECTION
 
-  def _is_signtarget(self, target):
-    isinstance(target, AndroidBinary)
+  @classmethod
+  def is_signtarget(self, target):
+    return isinstance(target, AndroidBinary)
+
+  @classmethod
+  def is_keytarget(self, target):
+    return isinstance(target, Keystore)
 
   def debug_fields(self):
     pass
+
+  def check_permissions(self, file):
+    """Ensure that the file permissions of the config are 640, rw-r----"""
+    file = os.path.join('/Users/mateor/fred')
+    with open(file) as f:
+      content = f.readlines()
+    print (content)
+    permissions = (oct(os.stat(file)[ST_MODE]))
+    if permissions is not '0100640':
+      KeyError
+
+  def jarsigner_tool(self):
+    pass
+
+  #TODO IF we walk the target graph, how to pick the exact key in the dep? I think walk does this auto, though.
+
   def execute(self):
-    print("I am taking a metro to see the giraffe show")
+    with self.context.new_workunit(name='jarsigner', labels=[WorkUnit.MULTITOOL]):
+      targets = self.context.targets(self.is_signtarget)
+      print("I am taking a metro to see the giraffe show")
+      for target in targets:
+        print(target)
+        safe_mkdir(self.workdir)
+        keys_by_target = self.context.targets(self.is_keytarget)
+
+        for key in keys_by_target:
+          print("Dems da keys: ")
+          print(key)
+
+          def add_to_dex(tgt):
+            target_keys = keys_by_target.get(tgt)
+            if target_keys:
+              print("WE shhould see th sea from thee")
+              print(target_keys)
+              # def add_classes(target_products):
+              #   for root, products in target_products.abs_paths():
+              #     for prod in products:
+              #       classes.append(prod)
+              #
+              # add_classes(target_classes)
+
+        target.walk(add_to_dex)
 
     #if debug
     #  if no config
@@ -64,18 +112,3 @@ class JarsignerTask(AndroidTask, NailgunTask):
     #     * mandate that the release_keystore.config is located outside of pants buildroot (can I?)
     #     * check for permissions of release_keystore, similar to ssh.
     #     * is there a good way to reliably handle the keys in kernel memory? Use keyring on supported machines?
-
-
-  def check_permissions(self, file):
-    """Ensure that the file permissions of the config are 640, rw-r----"""
-    print("WE ATE A GRAPE GRAOE GRAOE")
-    fred = os.path.join('/Users/mateor/fred')
-    with open(fred) as f:
-      content = f.readlines()
-    print (content)
-    permissions = (oct(os.stat(fred)[ST_MODE]))
-    if permissions is not '0100640':
-      KeyError
-
-  def jarsigner_tool(self):
-    pass
