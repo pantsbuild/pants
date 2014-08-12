@@ -40,7 +40,7 @@ class JavaAgent(JavaLibrary):
     :param resources: An optional list of file paths (DEPRECATED) or
       ``resources`` targets (which in turn point to file paths). The paths
       indicate text file resources to place in this module's jar.
-    :param exclusives: An optional map of exclusives tags. See CheckExclusives for details.
+    :param exclusives: An optional map of exclusives tags. See :ref:`howto_check_exclusives` for details.
     :param string premain: When an agent is specified at JVM launch time this attribute specifies
       the agent class. Exactly one of ``premain`` or ``agent_class`` must be specified.
     :param string agent_class: If an implementation supports a mechanism to start agents sometime

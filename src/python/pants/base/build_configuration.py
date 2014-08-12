@@ -9,11 +9,10 @@ from collections import namedtuple
 import inspect
 import logging
 
+from pants.base.addressable import AddressableCallProxy
 from pants.base.build_file_aliases import BuildFileAliases
-
 from pants.base.parse_context import ParseContext
 from pants.base.target import Target
-from pants.base.target_proxy import TargetCallProxy
 
 
 logger = logging.getLogger(__name__)
@@ -24,7 +23,7 @@ class BuildConfiguration(object):
   that can operate on the targets defined in them.
   """
 
-  ParseState = namedtuple('ParseState', ['registered_target_proxies', 'parse_globals'])
+  ParseState = namedtuple('ParseState', ['registered_addressable_instances', 'parse_globals'])
 
   @staticmethod
   def _is_target_type(obj):
@@ -32,6 +31,7 @@ class BuildConfiguration(object):
 
   def __init__(self):
     self._target_aliases = {}
+    self._addressable_alias_map = {}
     self._exposed_objects = {}
     self._exposed_context_aware_object_factories = {}
 
@@ -45,6 +45,7 @@ class BuildConfiguration(object):
     return BuildFileAliases.create(
         targets=self._target_aliases,
         objects=self._exposed_objects,
+        addressables=self._addressable_alias_map,
         context_aware_object_factories=self._exposed_context_aware_object_factories)
 
   def register_aliases(self, aliases):
@@ -68,6 +69,7 @@ class BuildConfiguration(object):
       logger.warn('Target alias {alias} has already been registered.  Overwriting!'
                   .format(alias=alias))
     self._target_aliases[alias] = target
+    self.register_addressable_alias(alias, target.get_addressable_type())
 
   def register_exposed_object(self, alias, obj):
     """Registers the given object under the given alias.
@@ -83,6 +85,23 @@ class BuildConfiguration(object):
       logger.warn('Object alias {alias} has already been registered.  Overwriting!'
                   .format(alias=alias))
     self._exposed_objects[alias] = obj
+
+  def register_addressable_alias(self, alias, addressable_type):
+    """Registers a general Addressable type under the given alias.
+
+    Addressables are the general mechanism for capturing the name and value of objects instantiated
+    in BUILD files.  Most notably, TargetAddressable is a subclass of Addressable, and
+    `register_target_alias` delegates to this method after noting the alias mapping for
+    other purposes.
+
+    Any Addressable with the appropriate `addressable_name` implementation which is registered
+    here and instantiated in a BUILD file will be accessible from the AddressMapper, regardless
+    of the type of instance it yields.
+    """
+    if alias in self._addressable_alias_map:
+      logger.warn('Addressable alias {alias} has already been registered.  Overwriting!'
+                  .format(alias=alias))
+    self._addressable_alias_map[alias] = addressable_type
 
   def register_exposed_context_aware_object_factory(self, alias, context_aware_object_factory):
     """Registers the given context aware object factory under the given alias.
@@ -109,12 +128,15 @@ class BuildConfiguration(object):
     """Creates a fresh parse state for the given build file."""
     type_aliases = self._exposed_objects.copy()
 
-    registered_target_proxies = set()
-    for alias, target_type in self._target_aliases.items():
-      target_call_proxy = TargetCallProxy(target_type=target_type,
-                                          build_file=build_file,
-                                          registered_target_proxies=registered_target_proxies)
-      type_aliases[alias] = target_call_proxy
+    registered_addressable_instances = []
+    def registration_callback(address, addressable):
+      registered_addressable_instances.append((address, addressable))
+
+    for alias, addressable_type in self._addressable_alias_map.items():
+      call_proxy =  AddressableCallProxy(addressable_type=addressable_type,
+                                         build_file=build_file,
+                                         registration_callback=registration_callback)
+      type_aliases[alias] = call_proxy
 
     parse_context = ParseContext(rel_path=build_file.spec_path, type_aliases=type_aliases)
 
@@ -124,7 +146,7 @@ class BuildConfiguration(object):
     # of their location on the filesystem.
     parse_globals['__file__'] = build_file.full_path
 
-    for alias, context_aware_object_factory in self._exposed_context_aware_object_factories.items():
-      parse_globals[alias] = context_aware_object_factory(parse_context)
+    for alias, object_factory in self._exposed_context_aware_object_factories.items():
+      parse_globals[alias] = object_factory(parse_context)
 
-    return self.ParseState(registered_target_proxies, parse_globals)
+    return self.ParseState(registered_addressable_instances, parse_globals)

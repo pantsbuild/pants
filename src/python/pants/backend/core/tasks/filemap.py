@@ -28,4 +28,4 @@ class Filemap(ConsoleTask):
     if len(self.context.target_roots) > 0:
       return self.context.target_roots
     else:
-      return self.context.build_file_parser.scan().targets()
+      return self.context.scan().targets()

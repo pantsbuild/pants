@@ -24,7 +24,7 @@ class PythonTests(PythonTarget):
     :type dependencies: list of target specs
     :param coverage: the module(s) whose coverage should be generated, e.g.
       'twitter.common.log' or ['twitter.common.log', 'twitter.common.http']
-    :param dict exclusives: An optional dict of exclusives tags. See CheckExclusives for details.
+    :param dict exclusives: An optional dict of exclusives tags. See :ref:`howto_check_exclusives` for details.
     """
     self._coverage = maybe_list(coverage) if coverage is not None else []
     super(PythonTests, self).__init__(**kwargs)

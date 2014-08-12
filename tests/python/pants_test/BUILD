@@ -8,6 +8,7 @@ python_library(
     pants('src/python/pants/backend/core/targets:common'),
     pants('src/python/pants/base:address'),
     pants('src/python/pants/base:build_configuration'),
+    pants('src/python/pants/base:build_file_address_mapper'),
     pants('src/python/pants/base:build_file_aliases'),
     pants('src/python/pants/base:build_file_parser'),
     pants('src/python/pants/base:build_graph'),
@@ -69,7 +70,9 @@ python_tests(
   dependencies = [
     pants('3rdparty/python/twitter/commons:twitter.common.lang'),
     pants('src/python/pants/base:build_environment'),
+    pants('src/python/pants/base:build_file_address_mapper'),
     pants('src/python/pants/base:build_file_parser'),
+    pants('src/python/pants/base:build_graph'),
     pants('src/python/pants/base:dev_backend_loader'),
   ]
 )

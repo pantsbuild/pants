@@ -35,7 +35,7 @@ class JavaLibrary(ExportableJvmLibrary):
     :param resources: An optional list of file paths (DEPRECATED) or
       ``resources`` targets (which in turn point to file paths). The paths
       indicate text file resources to place in this module's jar.
-    :param exclusives: An optional map of exclusives tags. See CheckExclusives for details.
+    :param exclusives: An optional map of exclusives tags. See :ref:`howto_check_exclusives` for details.
     """
     super(JavaLibrary, self).__init__(*args, **kwargs)
     self.add_labels('java')

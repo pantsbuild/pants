@@ -33,7 +33,7 @@ class ScalacPlugin(ScalaLibrary):
       to filter this target's transitive dependencies against.
     :param resources: An optional list of paths (DEPRECATED) or ``resources``
       targets containing resources that belong on this library's classpath.
-    :param exclusives: An optional map of exclusives tags. See CheckExclusives for details.
+    :param exclusives: An optional map of exclusives tags. See :ref:`howto_check_exclusives` for details.
     """
 
     super(ScalacPlugin, self).__init__(*args, **kwargs)

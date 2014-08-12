@@ -53,20 +53,8 @@ class Py(Command):
                       help='Show verbose output.')
     parser.epilog = """Interact with the chroot of the specified target."""
 
-  def __init__(self,
-               run_tracker,
-               root_dir,
-               parser,
-               argv,
-               build_file_parser,
-               build_graph):
-    Command.__init__(self,
-                     run_tracker,
-                     root_dir,
-                     parser,
-                     argv,
-                     build_file_parser,
-                     build_graph)
+  def __init__(self, *args, **kwargs):
+    super(Py, self).__init__(*args, **kwargs)
 
     self.binary = None
     self.targets = []
@@ -104,10 +92,10 @@ class Py(Command):
         self.args.insert(0, arg)
 
       try:
-        print(root_dir, arg)
-        self.build_file_parser.inject_spec_closure_into_build_graph(arg, self.build_graph)
+        print(self.root_dir, arg)
+        self.build_graph.inject_spec_closure(arg)
         spec_path, target_name = parse_spec(arg)
-        build_file = BuildFile(root_dir, spec_path)
+        build_file = BuildFile(self.root_dir, spec_path)
         address = BuildFileAddress(build_file, target_name)
         target = self.build_graph.get_target(address)
         if target is None:

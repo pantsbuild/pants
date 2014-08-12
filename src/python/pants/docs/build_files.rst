@@ -33,7 +33,7 @@ goals can be especially helpful:
 ``list`` Did I define the targets I meant to? ::
 
     $ ./pants goal list src/java/com/pants/examples/hello/greet
-    src/java/com/pants/examples/hello/greet/BUILD:greet
+    src/java/com/pants/examples/hello/greet:greet
 
 ``list ::`` List **every** target to find out:
 Did a change in one ``BUILD`` file break others? ::
@@ -104,7 +104,7 @@ Default targets are more convenient to reference on the command line and less
 verbose as build dependencies. For example, consider the following names for the
 same target::
 
-    src/java/com/twitter/tugboat/BUILD:tugboat  # absolute target name
+    src/java/com/twitter/tugboat:tugboat  # absolute target name
     src/java/com/twitter/tugboat/BUILD          # references default target "tugboat"
     src/java/com/twitter/tugboat   # references default build file "BUILD" and default target "tugboat"
     src/java/com/twitter/tugboat/  # trailing slashes are ignored - useful for command-line completion
@@ -368,3 +368,37 @@ that only makes sense behind your organization's firewall.
 A build target defined in ``BUILD.foo`` can't have the same ``name`` as
 a build target defined in the same directory's ``BUILD`` file; they share
 a namespace.
+
+.. _howto_check_exclusives:
+
+Tag Incompatibilities with exclusives
+*************************************
+
+A big code workspace might contain some parts that aren't compatible
+with each other. To make sure that no target tries to use targets
+that don't work together, you can tag those targets with ``exclusives``.
+
+For example, suppose that we had two java targets, jliba and jlibb. jliba uses
+``slf4j``, which includes in its jar package an implementation of ``log4j``. jlibb uses
+``log4j`` directly. But the version of log4j that's packaged inside of ``slf4j`` is
+different from the version used by jlibb. ::
+
+   java_library(name='jliba',
+     dependencies = ['3rdparty/jvm/org/slf4j:slf4j-with-log4j-2.4'])
+   java_library(name='jlibb',
+     dependencies=['3rdparty/jvm/log4j:log4j-1.9'])
+   java_binary(name='javabin', dependencies=[':jliba', ':jlibb'])
+
+In this case, the binary target ``javabin`` depends on both ``slf4j`` with its
+packaged ``log4j`` version 2.4, and on ``log4j-1.9``.
+Pants doesn't know that the slf4j and log4j ``jar_dependencies`` contain
+incompatible versions of the same library, and so it can't detect the error.
+
+With exclusives, the ``jar_library`` target for the joda libraries would declare
+exclusives tags: ::
+
+   jar_library(name='slf4j-with-log4j-2.4', exclusives={'log4j': '2.4'}, jars=[...])
+   jar_library(name='joda-2.1', exclusives={'log4j': '1.9'}, jars=[...])
+
+With the exclusives declared, pants can recognize that 'javabin' has conflicting
+dependencies, and can generate an appropriate error message.

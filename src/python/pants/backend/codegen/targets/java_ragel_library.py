@@ -28,7 +28,7 @@ class JavaRagelLibrary(JvmTarget):
     :type dependencies: list of target specs
     :param excludes: List of :ref:`exclude <bdict_exclude>`\s
       to filter this target's transitive dependencies against.
-    :param exclusives: An optional map of exclusives tags. See CheckExclusives for details.
+    :param exclusives: An optional map of exclusives tags. See :ref:`howto_check_exclusives` for details.
     """
 
     super(JavaRagelLibrary, self).__init__(**kwargs)

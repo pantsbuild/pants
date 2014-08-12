@@ -20,7 +20,7 @@ class Dependencies(Target):
       build file defines the :doc:`target address <target_addresses>`.
     :param dependencies: Other targets that this target depends on.
     :type dependencies: list of target specs
-    :param exclusives: An optional map of exclusives tags. See CheckExclusives
+    :param exclusives: An optional map of exclusives tags. See :ref:`howto_check_exclusives`
       for details.
     """
     super(Dependencies, self).__init__(payload=EmptyPayload(), *args, **kwargs)

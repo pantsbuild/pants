@@ -11,7 +11,10 @@ from pants.backend.android.targets.keystore import Keystore
 from pants.backend.android.tasks.aapt_gen import AaptGen
 from pants.backend.android.tasks.aapt_builder import AaptBuilder
 from pants.backend.android.tasks.dx_compile import DxCompile
+<<<<<<< HEAD
 from pants.backend.android.tasks.jarsigner_task import JarsignerTask
+=======
+>>>>>>> master
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.goal.task_registrar import TaskRegistrar as task
 

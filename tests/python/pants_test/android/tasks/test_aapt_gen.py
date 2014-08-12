@@ -20,12 +20,11 @@ class AaptGenCalculateGenfilesTest(unittest.TestCase):
 
   def test_calculate_genfile(self):
     self.assert_files('com.pants.examples.hello',
-                      os.path.join('com', 'pants', 'examples', 'hello', 'R.java'))
+      os.path.join('com', 'pants', 'examples', 'hello', 'R.java'))
 
     with self.assertRaises(AssertionError):
       self.assert_files('com.pants.examples.hello',
-                        os.path.join('bin', 'com', 'pants', 'examples', 'hello'))
-
+        os.path.join('bin', 'com', 'pants', 'examples', 'hello'))
 
   def test_package_path(self):
     self.assertEqual(os.path.join('com', 'pants', 'example', 'tests'),

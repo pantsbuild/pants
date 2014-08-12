@@ -91,23 +91,21 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
   class Error(TaskError):
     """IdeGen Error."""
 
+  # XXX(pl): What is up with this subclassing?  It seems completely wrong.
   class TargetUtil(Target):
     def __init__(self, context):
       self.context = context
-
-    @property
-    def build_file_parser(self):
-      return self.context.build_file_parser
 
     @property
     def build_graph(self):
       return self.context.build_graph
 
     def get_all_addresses(self, buildfile):
-      return self.build_file_parser.addresses_by_build_file[buildfile]
+      return set(self.context.address_mapper.addresses_in_spec_path(buildfile.spec_path))
 
     def get(self, address):
-      return self.build_file_parser._target_proxy_by_address[address].to_target(self.build_graph)
+      self.context.build_graph.inject_address(address)
+      return self.context.build_graph.get_target(address)
 
   def __init__(self, *args, **kwargs):
     super(IdeGen, self).__init__(*args, **kwargs)

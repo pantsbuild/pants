@@ -64,9 +64,9 @@ class WhatChanged(ConsoleTask):
     for build_file in self._candidate_owners(path):
       build_graph = self.context.build_graph
       build_file_parser = self.context.build_file_parser
-      build_file_parser.parse_build_file(build_file)
-      for address in build_file_parser.addresses_by_build_file[build_file]:
-        build_file_parser.inject_spec_closure_into_build_graph(address.spec, build_graph)
+      address_map = build_file_parser.parse_build_file(build_file)
+      for address, _ in address_map.items():
+        build_graph.inject_address_closure(address)
       is_build_file = (build_file.full_path == os.path.join(get_buildroot(), path))
 
       for target in build_graph.sorted_targets():

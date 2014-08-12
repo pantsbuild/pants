@@ -14,7 +14,10 @@ import traceback
 import psutil
 from twitter.common.dirutil import Lock
 
+from pants.backend.jvm.tasks.nailgun_task import NailgunTask
+from pants.base.address import Address
 from pants.base.build_environment import get_buildroot, pants_version
+from pants.base.build_file_address_mapper import BuildFileAddressMapper
 from pants.base.build_file_parser import BuildFileParser
 from pants.base.build_graph import BuildGraph
 from pants.base.config import Config
@@ -25,7 +28,6 @@ from pants.commands.command import Command
 from pants.goal.initialize_reporting import initial_reporting
 from pants.goal.run_tracker import RunTracker
 from pants.reporting.report import Report
-from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 
 
 _BUILD_COMMAND = 'build'
@@ -153,7 +155,8 @@ def _run():
   build_file_parser = BuildFileParser(build_configuration=build_configuration,
                                       root_dir=root_dir,
                                       run_tracker=run_tracker)
-  build_graph = BuildGraph(run_tracker=run_tracker)
+  address_mapper = BuildFileAddressMapper(build_file_parser)
+  build_graph = BuildGraph(run_tracker=run_tracker, address_mapper=address_mapper)
 
   command_class, command_args = _parse_command(root_dir, argv)
   command = command_class(run_tracker,
@@ -161,6 +164,7 @@ def _run():
                           parser,
                           command_args,
                           build_file_parser,
+                          address_mapper,
                           build_graph)
   try:
     if command.serialized():

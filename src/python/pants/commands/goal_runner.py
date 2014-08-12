@@ -177,12 +177,12 @@ class GoalRunner(Command):
 
     with self.run_tracker.new_workunit(name='setup', labels=[WorkUnit.SETUP]):
       # Bootstrap user goals by loading any BUILD files implied by targets.
-      spec_parser = CmdLineSpecParser(self.root_dir, self.build_file_parser)
+      spec_parser = CmdLineSpecParser(self.root_dir, self.address_mapper)
       with self.run_tracker.new_workunit(name='parse', labels=[WorkUnit.SETUP]):
-        for address in spec_parser.parse_addresses(specs):
-          self.build_file_parser.inject_spec_closure_into_build_graph(address.spec,
-                                                                      self.build_graph)
-          self.targets.append(self.build_graph.get_target(address))
+        for spec in specs:
+          for address in spec_parser.parse_addresses(spec):
+            self.build_graph.inject_address_closure(address)
+            self.targets.append(self.build_graph.get_target(address))
     self.phases = [Phase(goal) for goal in goals]
 
     rcfiles = self.config.getdefault('rcfiles', type=list,
@@ -282,6 +282,7 @@ class GoalRunner(Command):
       requested_goals=self.requested_goals,
       build_graph=self.build_graph,
       build_file_parser=self.build_file_parser,
+      address_mapper=self.address_mapper,
       lock=lock)
 
     unknown = []

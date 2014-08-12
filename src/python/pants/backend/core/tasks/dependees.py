@@ -52,20 +52,10 @@ class ReverseDepmap(ConsoleTask):
     if self._dependees_type:
       base_paths = OrderedSet()
       for dependees_type in self._dependees_type:
-        # FIXME(pl): This should be a standard function provided by the plugin/BuildFileParser
-        # machinery
-        try:
-          # Try to do a fully qualified import 1st for filtering on custom types.
-          from_list, module, type_name = dependees_type.rsplit('.', 2)
-          module = __import__('%s.%s' % (from_list, module), fromlist=[from_list])
-          target_type = getattr(module, type_name)
-        except (ImportError, ValueError):
-          # Fall back on pants provided target types.
-          registered_aliases = self.context.build_file_parser.registered_aliases()
-          if dependees_type not in registered_aliases.targets:
-            raise TaskError('Invalid type name: %s' % dependees_type)
-          target_type = registered_aliases.targets[dependees_type]
-
+        target_aliases = self.context.build_file_parser.registered_aliases().targets
+        if dependees_type not in target_aliases:
+          raise TaskError('Invalid type name: %s' % dependees_type)
+        target_type = target_aliases[dependees_type]
         # Try to find the SourceRoot for the given input type
         try:
           roots = SourceRoot.roots(target_type)
@@ -85,13 +75,14 @@ class ReverseDepmap(ConsoleTask):
 
     build_graph = self.context.build_graph
     build_file_parser = self.context.build_file_parser
+    address_mapper = self.context.address_mapper
 
     dependees_by_target = defaultdict(set)
     for build_file in buildfiles:
-      build_file_parser.parse_build_file(build_file)
-      for address in build_file_parser.addresses_by_build_file[build_file]:
-        build_file_parser.inject_spec_closure_into_build_graph(address.spec, build_graph)
-      for address in build_file_parser.addresses_by_build_file[build_file]:
+      address_map = build_file_parser.parse_build_file(build_file)
+      for address in address_map.keys():
+        build_graph.inject_address_closure(address)
+      for address in address_map.keys():
         target = build_graph.get_target(address)
         # TODO(John Sirois): tighten up the notion of targets written down in a BUILD by a
         # user vs. targets created by pants at runtime.

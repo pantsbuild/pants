@@ -72,7 +72,7 @@ class Build(Command):
       self.build_args = self.args[1:] if len(self.args) > 1 else []
 
     self.targets = OrderedSet()
-    spec_parser = CmdLineSpecParser(self.root_dir, self.build_file_parser)
+    spec_parser = CmdLineSpecParser(self.root_dir, self.address_mapper)
     self.top_level_addresses = set()
 
     specs = self.args[0:specs_end]
@@ -81,7 +81,7 @@ class Build(Command):
     for address in addresses:
       self.top_level_addresses.add(address)
       try:
-        self.build_file_parser.inject_address_closure_into_build_graph(address, self.build_graph)
+        self.build_graph.inject_address_closure(address)
         target = self.build_graph.get_target(address)
       except:
         self.error("Problem parsing BUILD target %s: %s" % (address, traceback.format_exc()))

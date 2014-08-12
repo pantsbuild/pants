@@ -96,7 +96,7 @@ class DxCompile(AndroidTask, NailgunTask):
         for vt in invalidation_check.invalid_vts:
           invalid_targets.extend(vt.targets)
         for target in invalid_targets:
-          out_dir = os.path.join(self.workdir, target.id)
+          out_dir = self.dx_out(target)
           safe_mkdir(out_dir)
           classes_by_target = self.context.products.get_data('classes_by_target')
           classes = []
@@ -117,7 +117,8 @@ class DxCompile(AndroidTask, NailgunTask):
             raise TaskError("No classes were found for {0!r}.".format(target))
           args = self._render_args(out_dir, classes)
           self._compile_dex(args, target.build_tools_version)
-          self.context.products.get('dex').add(target, out_dir).append(self.DEX_NAME)
+      for target in targets:
+        self.context.products.get('dex').add(target, self.dx_out(target)).append(self.DEX_NAME)
 
   def dx_jar_tool(self, build_tools_version):
     """Return the appropriate dx.jar.
@@ -127,3 +128,5 @@ class DxCompile(AndroidTask, NailgunTask):
     dx_jar = os.path.join('build-tools', build_tools_version, 'lib', 'dx.jar')
     return self._android_dist.register_android_tool(dx_jar)
 
+  def dx_out(self, target):
+    return os.path.join(self.workdir, target.id)

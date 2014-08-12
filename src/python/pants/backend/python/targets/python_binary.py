@@ -59,7 +59,7 @@ class PythonBinary(PythonTarget):
     :param compatibility: either a string or list of strings that represents
       interpreter compatibility for this target, using the Requirement-style format,
       e.g. ``'CPython>=3', or just ['>=2.7','<3']`` for requirements agnostic to interpreter class.
-    :param dict exclusives: An optional dict of exclusives tags. See CheckExclusives for details.
+    :param dict exclusives: An optional dict of exclusives tags. See :ref:`howto_check_exclusives` for details.
     """
 
     sources = [] if source is None else [source]

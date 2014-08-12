@@ -35,8 +35,7 @@ class BuildConfigurationTest(unittest2.TestCase):
     build_file = BuildFile('/tmp', 'fred', must_exist=False)
     parse_state = self.build_configuration.initialize_parse_state(build_file)
 
-    self.assertEqual(0, len(parse_state.registered_target_proxies))
-
+    self.assertEqual(0, len(parse_state.registered_addressable_instances))
     self.assertEqual(2, len(parse_state.parse_globals))
 
     self.assertEqual(parse_state.parse_globals['__file__'],
@@ -44,17 +43,16 @@ class BuildConfigurationTest(unittest2.TestCase):
 
     target_call_proxy = parse_state.parse_globals['fred']
     target_call_proxy(name='jake')
-    self.assertEqual(1, len(parse_state.registered_target_proxies))
-    target_proxy = parse_state.registered_target_proxies.pop()
+    self.assertEqual(1, len(parse_state.registered_addressable_instances))
+    name, target_proxy = parse_state.registered_addressable_instances.pop()
     self.assertEqual('jake', target_proxy.name)
     self.assertEqual(Fred, target_proxy.target_type)
-    self.assertEqual(build_file, target_proxy.build_file)
 
   def test_register_bad_target_alias(self):
     with self.assertRaises(TypeError):
       self.build_configuration.register_target_alias('fred', object())
 
-    target = Target('fred', SyntheticAddress.parse('a:b'), BuildGraph())
+    target = Target('fred', SyntheticAddress.parse('a:b'), BuildGraph(address_mapper=None))
     with self.assertRaises(TypeError):
       self.build_configuration.register_target_alias('fred', target)
 
@@ -69,8 +67,7 @@ class BuildConfigurationTest(unittest2.TestCase):
     build_file = BuildFile('/tmp', 'jane', must_exist=False)
     parse_state = self.build_configuration.initialize_parse_state(build_file)
 
-    self.assertEqual(0, len(parse_state.registered_target_proxies))
-
+    self.assertEqual(0, len(parse_state.registered_addressable_instances))
     self.assertEqual(2, len(parse_state.parse_globals))
     self.assertEqual(parse_state.parse_globals['__file__'],
                      os.path.realpath('/tmp/jane'))
@@ -136,8 +133,7 @@ class BuildConfigurationTest(unittest2.TestCase):
       build_file = BuildFile(root, 'george')
       parse_state = self.build_configuration.initialize_parse_state(build_file)
 
-      self.assertEqual(0, len(parse_state.registered_target_proxies))
-
+      self.assertEqual(0, len(parse_state.registered_addressable_instances))
       self.assertEqual(2, len(parse_state.parse_globals))
       self.assertEqual(os.path.realpath(build_file_path),
                        parse_state.parse_globals['__file__'])

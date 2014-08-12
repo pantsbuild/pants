@@ -33,7 +33,7 @@ class JavaTests(JvmTarget):
       to filter this target's transitive dependencies against.
     :param resources: An optional list of ``resources`` targets containing text
       file resources to place in this module's jar.
-    :param exclusives: An optional map of exclusives tags. See CheckExclusives for details.
+    :param exclusives: An optional map of exclusives tags. See :ref:`howto_check_exclusives` for details.
    """
     _sources = self.assert_list(sources)
 

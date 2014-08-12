@@ -30,6 +30,7 @@ python_test_suite(
     pants(':address'),
     pants(':build_configuration'),
     pants(':build_file'),
+    pants(':build_file_address_mapper'),
     pants(':build_file_aliases'),
     pants(':build_file_parser'),
     pants(':build_invalidator'),
@@ -93,6 +94,14 @@ python_tests(
 )
 
 python_tests(
+  name = 'build_file_address_mapper',
+  sources = ['test_build_file_address_mapper.py'],
+  dependencies = [
+    pants('tests/python/pants_test:base_test'),
+  ]
+)
+
+python_tests(
   name = 'build_file_aliases',
   sources = ['test_build_file_aliases.py'],
   dependencies = [
@@ -111,6 +120,9 @@ python_tests(
     pants('src/python/pants/backend/jvm/targets:java'),
     pants('src/python/pants/backend/jvm/targets:jvm'),
     pants('src/python/pants/backend/jvm/targets:scala'),
+    pants('src/python/pants/base:build_file'),
+    pants('src/python/pants/base:build_file_parser'),
+    pants('src/python/pants/base:target'),
     pants('tests/python/pants_test:base_test'),
     pants('src/python/pants/util:dirutil'),
   ]

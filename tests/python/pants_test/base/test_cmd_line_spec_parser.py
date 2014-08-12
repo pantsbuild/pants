@@ -33,7 +33,7 @@ class CmdLineSpecParserTest(BaseTest):
     add_target('a/b', 'b')
     add_target('a/b', 'c')
 
-    self.spec_parser = CmdLineSpecParser(self.build_root, self.build_file_parser)
+    self.spec_parser = CmdLineSpecParser(self.build_root, self.address_mapper)
 
   def test_normal(self):
     self.assert_parsed(cmdline_spec=':root', expected=[':root'])

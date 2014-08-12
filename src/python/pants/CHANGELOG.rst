@@ -1,6 +1,67 @@
 RELEASE HISTORY
 ===============
 
+0.0.23 (8/11/2014)
+------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Remove unused Task.invalidate_for method and unused extra_data variable
+  `RB #849 <https://rbcommons.com/s/twitter/r/849>`_
+
+* Add DxCompile task to android backend
+  `RB #840 <https://rbcommons.com/s/twitter/r/840>`_
+
+* Change all Task subclass constructor args to (\*args, \**kwargs)
+  `RB #846 <https://rbcommons.com/s/twitter/r/846>`_
+
+* The public API for the new options system
+  `Issue #425 <https://github.com/pantsbuild/pants/pull/425>`_
+  `RB #831 <https://rbcommons.com/s/twitter/r/831>`_
+  `RB #819 <https://rbcommons.com/s/twitter/r/819>`_
+
+* Rename pants.goal.goal.Goal to pants.goal.task_registrar.TaskRegistrar
+  `Issue #345 <https://github.com/pantsbuild/pants/pull/345>`_
+  `RB #843 <https://rbcommons.com/s/twitter/r/843>`_
+
+Bugfixes
+~~~~~~~~
+
+* Better validation for AndroidTarget manifest field
+  `RB #860 <https://rbcommons.com/s/twitter/r/860>`_
+
+* Remove more references to /BUILD:target notation in docs
+  `RB #855 <https://rbcommons.com/s/twitter/r/855>`_
+  `RB #853 <https://rbcommons.com/s/twitter/r/853>`_
+
+* Fix up the error message when attempting to publish without any configured repos
+  `RB #850 <https://rbcommons.com/s/twitter/r/850>`_
+
+* Miscellaneous fixes to protobuf codegen including handling collisions deterministically
+  `RB #720 <https://rbcommons.com/s/twitter/r/720>`_
+
+* Migrate some reasonable default values from pants.ini into 'defaults' in the pants source
+  `Issue #455 <https://github.com/pantsbuild/pants/pull/455>`_
+  `Issue #456 <https://github.com/pantsbuild/pants/pull/456>`_
+  `Issue #458 <https://github.com/pantsbuild/pants/pull/458>`_
+  `RB #852 <https://rbcommons.com/s/twitter/r/852>`_
+
+* Updated the basename and name of some targets to prevent colliding bundles in dist/
+  `RB #847 <https://rbcommons.com/s/twitter/r/847>`_
+
+* Provide a better error message when referencing the wrong path to a BUILD file
+  `RB #841 <https://rbcommons.com/s/twitter/r/841>`_
+
+* Add assert_list to ensure an argument is a list - use this to better validate many targets
+  `RB #811 <https://rbcommons.com/s/twitter/r/811>`_
+
+* Update front-facing help and error messages for Android targets/tasks
+  `RB #837 <https://rbcommons.com/s/twitter/r/837>`_
+
+* Use JvmFingerprintStrategy in cache manager
+  `RB #835 <https://rbcommons.com/s/twitter/r/835>`_
+
 0.0.22 (8/4/2014)
 -----------------
 

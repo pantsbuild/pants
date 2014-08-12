@@ -35,4 +35,4 @@ class SetupConfluenceTest(BaseTest):
 
   def test_confluence_setup_parses(self):
     self.add_to_build_file('BUILD', CONFLUENCE_SETUP_SNIPPET)
-    self.build_file_parser.scan(self.build_root)
+    self.context().scan(self.build_root)

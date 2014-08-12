@@ -25,33 +25,7 @@ class CheckExclusives(Task):
   any collisions where a single target contains multiple tag values for a single
   exclusives key, then it generates an error and the compilation will fail.
 
-  The syntax of the exclusives attribute is: ::
-
-     exclusives = {"id": "value", ...}
-
-  For example, suppose that we had two java targets, jliba and jlibb. jliba uses
-  slf4j, which includes in its jar package an implementation of log4j. jlibb uses
-  log4j directly. But the version of log4j that's packaged inside of slf4j is
-  different from the version used by jlibb. ::
-
-     java_library(name='jliba',
-       depedencies = ['slf4j-with-log4j-2.4'])
-     java_library(name='jlibb',
-     java_binary(name='javabin', dependencies=[':jliba', ':jlibb'])
-
-  In this case, the binary target 'javabin' depends on both slf4j with its
-  packaged log4j version 2.4, and on log4j-1.9.
-  Pants doesn't know that the slf4j and log4j jar_dependencies contain
-  incompatible versions of the same library, and so it can't detect the error.
-
-  With exclusives, the jar_library target for the joda libraries would declare
-  exclusives tags: ::
-
-     jar_library(name='slf4j-with-log4j-2.4', exclusives={'log4j': '2.4'})
-     jar_library(name='joda-2.1', exclusives={'log4j': '1.9'})
-
-  With the exclusives declared, pants can recognize that 'javabin' has conflicting
-  dependencies, and can generate an appropriate error message.
+  See :ref:`howto_check_exclusives` to see how folks use this.
 
   Data about exclusives is provided to other tasks via data build products.
   If the build data product 'exclusives_groups' is required, then an

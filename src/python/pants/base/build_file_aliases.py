@@ -11,13 +11,19 @@ import functools
 
 
 class BuildFileAliases(namedtuple('BuildFileAliases',
-                                  ['targets', 'objects', 'context_aware_object_factories'])):
+                                  ['targets',
+                                   'objects',
+                                   'context_aware_object_factories',
+                                   'addressables'])):
   """A structure containing set of symbols to be exposed in BUILD files.
 
   There are three types of symbols that can be exposed:
 
   - targets: These are Target subclasses.
   - objects: These are any python object, from constants to types.
+  - addressables: Exposed objects which optionally establish an alias via the AddressMapper
+    for themselves.  Notably all Target aliases in BUILD files are actually exposed as proxy
+    objects via Target.get_addressable_type.
   - context_aware_object_factories: These are object factories that are passed a ParseContext and
     produce some object that uses data from the context to enable some feature or utility.  Common
     uses include objects that must be aware of the current BUILD file path or functions that need
@@ -25,11 +31,18 @@ class BuildFileAliases(namedtuple('BuildFileAliases',
   """
 
   @classmethod
-  def create(cls, targets=None, objects=None, context_aware_object_factories=None):
+  def create(cls,
+             targets=None,
+             objects=None,
+             context_aware_object_factories=None,
+             addressables=None):
     """A convenience constructor that can accept zero to all alias types."""
     def copy(orig):
       return orig.copy() if orig else {}
-    return cls(copy(targets), copy(objects), copy(context_aware_object_factories))
+    return cls(copy(targets),
+               copy(objects),
+               copy(context_aware_object_factories),
+               copy(addressables))
 
   @classmethod
   def curry_context(cls, wrappee):
