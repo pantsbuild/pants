@@ -21,7 +21,7 @@ from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.target import Target
 from pants.goal.context import Context
 from pants.goal.phase import Phase
-from pants.goal.task_registrar import Mkflag
+from pants.goal.mkflag import Mkflag
 from pants_test.base_test import BaseTest
 from pants_test.base.context_utils import create_config, create_run_tracker
 

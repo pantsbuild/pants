@@ -85,6 +85,14 @@ python_library(
   sources = ['phase.py'],
   dependencies = [
     pants(':error'),
+    pants(':mkflag'),
+  ],
+)
+
+python_library(
+  name = 'mkflag',
+  sources = ['mkflag.py'],
+  dependencies = [
   ],
 )
 

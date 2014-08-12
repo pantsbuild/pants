@@ -7,40 +7,10 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import functools
 import inspect
-from optparse import OptionGroup
 
 from pants.goal.error import GoalError
 from pants.goal.phase import Phase
 from pants.backend.core.tasks.task import Task
-
-
-class Mkflag(object):
-  """A factory for namespaced flags."""
-
-  def __init__(self, *namespace):
-    """Creates a new Mkflag that will use the given namespace to prefix the flags it creates.
-
-    namespace: a sequence of names forming the namespace
-    """
-    self._namespace = namespace
-
-  @property
-  def namespace(self):
-    return list(self._namespace)
-
-  def __call__(self, name, negate=False):
-    """Creates a prefixed flag with an optional negated prefix.
-
-    name: The simple flag name to be prefixed.
-    negate: True to prefix the flag with '--no-'.
-    """
-    return '--{negate}{namespace}-{name}'.format(negate='no-' if negate else '',
-                                                 namespace='-'.join(self._namespace),
-                                                 name=name)
-
-  def set_bool(self, option, opt_str, _, parser):
-    """An Option callback to parse bool flags that recognizes the --no- negation prefix."""
-    setattr(parser.values, option.dest, not opt_str.startswith("--no"))
 
 
 class TaskRegistrar(object):
@@ -54,7 +24,7 @@ class TaskRegistrar(object):
     """
     self.serialize = serialize
     self.name = name
-    self.dependencies = [Phase(d) for d in dependencies] if dependencies else []
+    self.dependencies = [Phase.by_name(d) for d in dependencies] if dependencies else []
 
     if isinstance(type(action), type) and issubclass(action, Task):
       self._task = action
@@ -89,27 +59,6 @@ class TaskRegistrar(object):
   def task_type(self):
     return self._task
 
-  def _namespace_for_parser(self, phase):
-    phase_leader = phase.goals() == [self] or self.name == phase.name
-    return [self.name] if phase_leader else [phase.name, self.name]
-
-  def title_for_option_group(self, phase):
-    return ':'.join(self._namespace_for_parser(phase))
-
-  def setup_parser(self, phase, parser, args):
-    """Allows a task to add its command line args to the global specification."""
-    namespace = self._namespace_for_parser(phase)
-    mkflag = Mkflag(*namespace)
-    option_group = OptionGroup(parser, title=':'.join(namespace))
-    self.task_setup_parser(option_group, args, mkflag)
-    if option_group.option_list:
-      parser.add_option_group(option_group)
-
-  def task_setup_parser(self, option_group, args, mkflag):
-    """Allows a task to setup a parser.
-    Override this method if you want to initialize the task with more goal data."""
-    self._task.setup_parser(option_group, args, mkflag)
-
   def install(self, phase=None, first=False, replace=False, before=None, after=None):
     """Install the task in the specified phase (or a new phase with the same name as the task).
 
@@ -121,6 +70,6 @@ class TaskRegistrar(object):
     :param before: Places this goal before the named goal in the phase's execution list
     :param after: Places this goal after the named goal in the phase's execution list
     """
-    phase = Phase(phase or self.name)
+    phase = Phase.by_name(phase or self.name)
     phase.install(self, first, replace, before, after)
     return phase

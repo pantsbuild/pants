@@ -267,7 +267,7 @@ def gen_goals_phases_reference_data():
   """Generate the template data for the goals reference rst doc."""
   phase_dict = {}
   phase_names = []
-  for phase, raw_goals in Phase.all():
+  for phase in Phase.all():
     parser = optparse.OptionParser(add_help_option=False)
     phase.setup_parser(parser, [], [phase])
     options_by_title = defaultdict(lambda: None)
@@ -275,13 +275,13 @@ def gen_goals_phases_reference_data():
       options_by_title[group.title] = group
     found_option_groups = set()
     goals = []
-    for goal in sorted(raw_goals, key=(lambda x: x.name.lower())):
-      doc = indent_docstring_by_n(goal.task_type.__doc__ or "", 2)
-      options_title = goal.title_for_option_group(phase)
+    for task_type in sorted(phase.task_types(), key=(lambda x: x.name.lower())):
+      doc = indent_docstring_by_n(task_type.__doc__ or "", 2)
+      options_title = '{0}.{1}'.format(phase.name, task_type.name)
       og = options_by_title[options_title]
       if og:
         found_option_groups.add(options_title)
-      impl = "{0}.{1}".format(goal.task_type.__module__, goal.task_type.__name__)
+      impl = '{0}.{1}'.format(task_type.__module__, task_type.__name__)
       goals.append(TemplateData(
           impl=impl,
           doc=doc,

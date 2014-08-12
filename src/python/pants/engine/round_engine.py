@@ -109,16 +109,13 @@ class RoundEngine(Engine):
     tasks_by_name = OrderedDict()
     phase_dependencies = set()
     visited_task_types = set()
-    phase_goals = phase.goals()
-    for goal in reversed(phase_goals):
-      task_type = goal.task_type
+    for task_name in reversed(phase.ordered_task_names()):
+      task_type = phase.task_type_by_name(task_name)
       visited_task_types.add(task_type)
 
-      task_workdir = os.path.join(context.config.getdefault('pants_workdir'),
-                                  phase.name,
-                                  goal.name)
+      task_workdir = os.path.join(context.config.getdefault('pants_workdir'), phase.name, task_name)
       task = task_type(context, task_workdir)
-      tasks_by_name[goal.name] = task
+      tasks_by_name[task_name] = task
 
       round_manager = RoundManager(context)
       task.prepare(round_manager)
@@ -128,12 +125,13 @@ class RoundEngine(Engine):
           producer_phase = producer_info.phase
           if producer_phase == phase:
             if producer_info.task_type in visited_task_types:
-              ordering = '\n\t'.join("[{0}] '{1}' {2}".format(i, goal.name, goal.task_type.__name__)
-                                     for i, goal in enumerate(phase_goals))
+              ordering = '\n\t'.join("[{0}] '{1}' {2}".format(i, tn,
+                                                              phase.task_type_by_name(tn).__name__)
+                                     for i, tn in enumerate(phase.ordered_task_names()))
               raise self.TaskOrderError(
                   "TaskRegistrar '{name}' with action {consumer_task} depends on {data} from task "
                   "{producer_task} which is ordered after it in the '{phase}' phase:\n\t{ordering}"
-                  .format(name=goal.name,
+                  .format(name=task_name,
                           consumer_task=task_type.__name__,
                           data=producer_info.product_type,
                           producer_task=producer_info.task_type.__name__,
@@ -147,7 +145,7 @@ class RoundEngine(Engine):
       except round_manager.MissingProductError as e:
         raise self.MissingProductError(
             "Could not satisfy data dependencies for goal '{name}' with action {action}: {error}"
-            .format(name=goal.name, action=task_type.__name__, error=e))
+            .format(name=task_name, action=task_type.__name__, error=e))
 
     phase_info = self.PhaseInfo(phase, tasks_by_name, phase_dependencies)
     phase_info_by_phase[phase] = phase_info

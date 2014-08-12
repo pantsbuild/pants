@@ -12,8 +12,8 @@ python_library(
     pants('src/python/pants/base:target'),
     pants('src/python/pants/commands:goal_runner'),
     pants('src/python/pants/goal:context'),
+    pants('src/python/pants/goal:mkflag'),
     pants('src/python/pants/goal:phase'),
-    pants('src/python/pants/goal:task_registrar'),
     pants('tests/python/pants_test/base:context_utils'),
     pants('tests/python/pants_test:base_test'),
   ]

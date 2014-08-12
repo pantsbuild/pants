@@ -15,8 +15,8 @@ from pants.goal.phase import Phase
 def print_help(goals=None):
   if goals:
     for goal in goals:
-      phase = Phase(goal)
-      if not phase.goals():
+      phase = Phase.by_name(goal)
+      if not phase.ordered_task_names():
         print('\nUnknown goal: %s' % goal)
       else:
         parser = OptionParser(add_help_option=False)

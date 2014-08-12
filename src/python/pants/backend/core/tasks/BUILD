@@ -160,6 +160,7 @@ python_library(
     pants('3rdparty/python/twitter/commons:twitter.common.collections'),
     pants('src/python/pants/base:build_graph'),
     pants('src/python/pants/base:workunit'),
+    pants('src/python/pants/goal:mkflag'),
   ],
 )
 

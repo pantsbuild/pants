@@ -16,7 +16,7 @@ class EngineTestBase(unittest2.TestCase):
   @classmethod
   def as_phase(cls, phase_name):
     """Returns a ``Phase`` object of the given name"""
-    return Phase(phase_name)
+    return Phase.by_name(phase_name)
 
   @classmethod
   def as_phases(cls, *phase_names):

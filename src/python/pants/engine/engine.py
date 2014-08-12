@@ -29,9 +29,8 @@ class Engine(AbstractClass):
       for phase in _phases:
         if phase not in processed:
           processed.add(phase)
-          for goal in phase.goals():
-            for dep in order(goal.dependencies):
-              yield dep
+          for dep in order(phase.dependencies):
+            yield dep
           yield phase
 
     for ordered in order(phases):
