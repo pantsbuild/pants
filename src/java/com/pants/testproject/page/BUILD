@@ -3,5 +3,5 @@
 
 page(name="readme",
      source="README.md",
-     dependencies=['src/java/com/pants/examples/hello/main:readme']
+     dependencies=['examples/src/java/com/pants/examples/hello/main:readme']
 )

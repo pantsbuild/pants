@@ -69,7 +69,7 @@ and add ``import`` statements in your Java code.
 
 For example, your ``BUILD`` file might have
 
-.. literalinclude:: ../../../../tests/java/com/pants/examples/hello/greet/BUILD
+.. literalinclude:: ../../../../examples/tests/java/com/pants/examples/hello/greet/BUILD
    :start-after: sources
    :end-before: src/java
 
@@ -111,7 +111,7 @@ different versions of some package, you can dump your dependency "tree"
 with versions with an Ivy resolve report. To generate a report for
 a target such as the ``hello/main`` example::
 
-    $ ./pants goal resolve src/java/com/pants/examples/hello/main --ivy-open
+    $ ./pants goal resolve examples/src/java/com/pants/examples/hello/main --ivy-open
 
 Ivy's report shows which things depend on which versions. You can see which
 package is pulling in the package-version you didn't expect. (It might not

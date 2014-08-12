@@ -19,9 +19,9 @@ Now you're ready to invoke pants for more useful things.
 
 You invoke pants with *goals* (like ``test`` or ``bundle``) and the
 *build targets* to use (like
-``tests/java/com/pants/examples/hello/greet:greet``). For example, ::
+``examples/tests/java/com/pants/examples/hello/greet:greet``). For example, ::
 
-    ./pants goal test tests/java/com/pants/examples/hello/greet:greet
+    ./pants goal test examples/tests/java/com/pants/examples/hello/greet:greet
 
 Goals (the "verbs" of Pants) produce new files from Targets (the "nouns").
 
@@ -40,7 +40,7 @@ Pants knows about goals ("verbs" like ``bundle`` and ``test``) and targets
 (build-able things in your source code). A typical pants command-line
 invocation looks like ::
 
-    ./pants goal test tests/java/com/pants/examples/hello/greet:greet
+    ./pants goal test examples/tests/java/com/pants/examples/hello/greet:greet
 
 Looking at the pieces of this we see
 
@@ -73,7 +73,7 @@ Looking at the pieces of this we see
     You can specify more than one goal on a command line. E.g., to generate an
     Eclipse project *and* run tests, we could have said ``eclipse tests``.
 
-``tests/java/com/pants/examples/hello/greet:greet``
+``examples/tests/java/com/pants/examples/hello/greet:greet``
     This is a *build target*, a "build-able" thing in your source code. To define
     these, you set up configuration files named ``BUILD`` in your source code file
     tree. (You'll see more about these later.)
@@ -172,7 +172,7 @@ the app we ran and the binary that contains its code.
 These targets are named ``main`` (of type ``jvm_app``)
 and and ``main-bin`` (of type ``jvm_binary``):
 
-.. literalinclude:: ../../../java/com/pants/examples/hello/main/BUILD
+.. literalinclude:: ../../../../examples/src/java/com/pants/examples/hello/main/BUILD
    :start-after: Like Hello World
    :end-before: README page
 
@@ -180,12 +180,12 @@ That ``dependencies`` is interesting. The ``main-bin`` build target depends on
 other build targets; its ``dependencies`` lists those.
 To build a runnable Java binary, we need to first compile its dependencies.
 The ``main-bin`` binary has two dependencies,
-``pants('src/java/com/pants/examples/hello/greet')``
+``pants('examples/src/java/com/pants/examples/hello/greet')``
 is the *address* of another target. Addresses look,
 roughly, like ``path/to/dir:targetname``.
 We can see this build target in the ``.../hello/greet/BUILD`` file:
 
-.. literalinclude:: ../../../java/com/pants/examples/hello/greet/BUILD
+.. literalinclude:: ../../../../examples/src/java/com/pants/examples/hello/greet/BUILD
    :start-after: see LICENSE
 
 Pants uses dependency information to figure out how to build your code.

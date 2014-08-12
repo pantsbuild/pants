@@ -30,7 +30,7 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
   @pytest.mark.skipif('not JarPublishIntegrationTest.JAVADOC',
                       reason='No javadoc binary on the PATH.')
   def test_java_publish(self):
-    self.publish_test('src/java/com/pants/examples/hello/greet',
+    self.publish_test('examples/src/java/com/pants/examples/hello/greet',
                       'com/pants/examples/hello-greet/0.0.1-SNAPSHOT/',
                       ['ivy-0.0.1-SNAPSHOT.xml',
                        'hello-greet-0.0.1-SNAPSHOT.jar',

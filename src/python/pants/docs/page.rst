@@ -20,18 +20,18 @@ and ``toc`` extensions.
 To tell Pants about your Markdown file, use a
 :ref:`page <bdict_page>` target in a ``BUILD`` file
 as in this excerpt from
-`src/java/com/pants/examples/hello/main/BUILD
-<https://github.com/pantsbuild/pants/blob/master/src/java/com/pants/examples/hello/main/BUILD>`_:
+`examples/src/java/com/pants/examples/hello/main/BUILD
+<https://github.com/pantsbuild/pants/blob/master/examples/src/java/com/pants/examples/hello/main/BUILD>`_:
 
-.. literalinclude:: ../../../../src/java/com/pants/examples/hello/main/BUILD
+.. literalinclude:: ../../../../examples/src/java/com/pants/examples/hello/main/BUILD
    :start-after: README page
 
 To render the page as HTML, use the :ref:`markdown goal <gref_phase_markdown>`.
 For example, to
-view ``src/java/com/pants/examples/hello/main/README.md`` as HTML in
+view ``examples/src/java/com/pants/examples/hello/main/README.md`` as HTML in
 your browser, ::
 
-    ./pants goal markdown --markdown-open src/java/com/pants/examples/hello/main:readme
+    ./pants goal markdown --markdown-open examples/src/java/com/pants/examples/hello/main:readme
 
 Link to Another ``page``
 ************************
@@ -86,7 +86,7 @@ Once you've done this, you can publish the page by invoking the goal
 :ref:`set up in your workspace <page_setup_confluence>`.
 For example, if the goal was set up with the name "confluence", you invoke ::
 
-    ./pants goal confluence src/java/com/pants/examples/hello/main:readme
+    ./pants goal confluence examples/src/java/com/pants/examples/hello/main:readme
 
 .. so far, we only support confluence; if that changes, this would be
    a good place for a section header: the stuff that follows is
