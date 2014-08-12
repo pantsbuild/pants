@@ -27,6 +27,10 @@ class Scm(AbstractClass):
     """Returns the id of the current commit."""
 
   @abstractproperty
+  def server_url(self):
+    """Returns the url of the remote server."""
+
+  @abstractproperty
   def tag_name(self):
     """Returns the name of the current tag if any."""
 
