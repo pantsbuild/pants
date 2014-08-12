@@ -4,6 +4,7 @@
 
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
+
 import os
 
 from pants.base.address import SyntheticAddress
@@ -74,10 +75,10 @@ class CmdLineSpecParserTest(BaseTest):
     self.assert_parsed(cmdline_spec=os.path.join(self.build_root, 'a::'),
                        expected=['a', 'a:b', 'a/b', 'a/b:c'])
 
+    double_absolute = '/' + os.path.join(self.build_root, 'a')
+    self.assertEquals('//', double_absolute[:2],
+                      'A sanity check we have a leading-// absolute spec')
     with self.assertRaises(IOError):
-      double_absolute = os.sep + os.path.join(self.build_root, 'a')
-      self.assertEquals('//', double_absolute[:2],
-                        'A sanity check we have a leading-// absolute spec')
       self.spec_parser.parse_addresses(double_absolute).next()
 
     with self.assertRaises(ValueError):
