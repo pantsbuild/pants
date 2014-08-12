@@ -40,7 +40,7 @@ class JavaProtobufLibrary(ExportableJvmLibrary):
     :param imports: List of external :class:`pants.backend.jvm.targets.jar_dependency.JarDependency`
       objects and addresses of :class:`pants.backend.jvm.targets.jar_library.JarLibrary` targets
       which contain .proto definitions.
-    :param exclusives: An optional map of exclusives tags. See CheckExclusives for details.
+    :param exclusives: An optional map of exclusives tags. See :ref:`howto_check_exclusives` for details.
     """
     super(JavaProtobufLibrary, self).__init__(**kwargs)
     self.add_labels('codegen')

@@ -30,7 +30,7 @@ class AnnotationProcessor(ExportableJvmLibrary):
       indicate text file resources to place in this module's jar.
     :param processors: A list of the fully qualified class names of the
       annotation processors this library exports.
-    :param exclusives: An optional map of exclusives tags. See CheckExclusives for details.
+    :param exclusives: An optional map of exclusives tags. See :ref:`howto_check_exclusives` for details.
     """
     super(AnnotationProcessor, self).__init__(*args, **kwargs)
 

@@ -23,7 +23,7 @@ class PythonThriftLibrary(PythonTarget):
       resources in a .zip-module friendly way.)
     :param dependencies: Other targets that this target depends on.
     :type dependencies: list of target specs
-    :param dict exclusives: An optional dict of exclusives tags. See CheckExclusives for details.
+    :param dict exclusives: An optional dict of exclusives tags. See :ref:`howto_check_exclusives` for details.
     """
 
     super(PythonThriftLibrary, self).__init__(**kwargs)

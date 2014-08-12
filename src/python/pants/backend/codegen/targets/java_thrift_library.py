@@ -69,7 +69,7 @@ class JavaThriftLibrary(JvmTarget):
     :param language: The language used to generate the output files; defaults to 'java'.
     :param rpc_style: An optional rpc style to generate service stubs with.
     :param namespace_map: An optional dictionary of namespaces to remap {old: new}
-    :param exclusives: An optional map of exclusives tags. See CheckExclusives for details.
+    :param exclusives: An optional map of exclusives tags. See :ref:`howto_check_exclusives` for details.
     """
 
     # It's critical that provides is set 1st since _provides() is called elsewhere in the
