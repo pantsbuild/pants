@@ -42,25 +42,25 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
 
   def test_idea_on_alternate_project_dir(self):
     alt_dir = os.path.join('.pants.d', 'tmp', 'some', 'random', 'directory', 'for', 'idea', 'stuff')
-    self._idea_test(['src/java/com/pants/examples/testproject/hello::'], project_dir=alt_dir)
+    self._idea_test(['examples/src/java/com/pants/examples/testproject/hello::'], project_dir=alt_dir)
 
   def test_idea_on_protobuf(self):
-    self._idea_test(['src/java/com/pants/examples/protobuf::'])
+    self._idea_test(['examples/src/java/com/pants/examples/protobuf::'])
 
   def test_idea_on_jaxb(self): # Make sure it works without ::, pulling deps as necessary.
-    self._idea_test(['src/java/com/pants/examples/jaxb/main'])
+    self._idea_test(['examples/src/java/com/pants/examples/jaxb/main'])
 
   def test_idea_on_unicode(self):
-    self._idea_test(['src/java/com/pants/testproject/unicode::'])
+    self._idea_test(['examples/src/java/com/pants/testproject/unicode::'])
 
   def test_idea_on_hello(self):
-    self._idea_test(['src/java/com/pants/examples/hello::'])
+    self._idea_test(['examples/src/java/com/pants/examples/hello::'])
 
   def test_idea_on_annotations(self):
-    self._idea_test(['src/java/com/pants/examples/annotation::'])
+    self._idea_test(['examples/src/java/com/pants/examples/annotation::'])
 
   def test_idea_on_all_examples(self):
-    self._idea_test(['src/java/com/pants/examples::'])
+    self._idea_test(['examples/src/java/com/pants/examples::'])
 
   def test_idea_on_java_sources(self):
     self._idea_test(['src/scala/com/pants/testproject/javasources::'])

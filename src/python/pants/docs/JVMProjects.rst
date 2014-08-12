@@ -84,10 +84,10 @@ BUILD for a Simple Binary
 *************************
 
 The `Pants Build Java hello world sample
-<https://github.com/pantsbuild/pants/tree/master/src/java/com/pants/examples/hello>`_
+<https://github.com/pantsbuild/pants/tree/master/examples/src/java/com/pants/examples/hello>`_
 code shows the BUILD file for a simple Java binary (in the ``main/`` directory):
 
-.. literalinclude:: ../../../java/com/pants/examples/hello/main/BUILD
+.. literalinclude:: ../../../../examples/src/java/com/pants/examples/hello/main/BUILD
    :start-after: runnable
    :end-before: README page
 
@@ -107,7 +107,7 @@ you probably also want to set up a ``BUILD` file with a ``java_library``
 (or ``scala_library``) target. Here we see the library target which
 ``main-bin`` depends on. This library target lives in ``hello/greet/BUILD``:
 
-.. literalinclude:: ../../../java/com/pants/examples/hello/greet/BUILD
+.. literalinclude:: ../../../../examples/src/java/com/pants/examples/hello/greet/BUILD
    :start-after: LICENSE
 
 This library could depend on other build targets and artifacts;
@@ -118,11 +118,11 @@ A Test Target
 =============
 
 The `Pants Java Hello World example tests
-<https://github.com/pantsbuild/pants/tree/master/tests/java/com/pants/examples/hello>`_
+<https://github.com/pantsbuild/pants/tree/master/examples/tests/java/com/pants/examples/hello>`_
 are normal JUnit tests. To run them with Pants, we
 need a target for them:
 
-.. literalinclude:: ../../../../tests/java/com/pants/examples/hello/greet/BUILD
+.. literalinclude:: ../../../../examples/tests/java/com/pants/examples/hello/greet/BUILD
    :start-after: Test the
 
 As with other targets, this one depends on code that it imports. Thus, a typical
@@ -137,7 +137,7 @@ of version conflicts, we use the :doc:`3rdparty` idiom: we keep references
 to these "third-party" jars together in ``BUILD`` files under the
 ``3rdparty/`` directory. Thus, the test has a ``3rdparty:`` dependency:
 
-.. literalinclude:: ../../../../tests/java/com/pants/examples/hello/greet/BUILD
+.. literalinclude:: ../../../../examples/tests/java/com/pants/examples/hello/greet/BUILD
    :start-after: Test the
 
 The ``BUILD`` files in ``3rdparty/`` have targets like::
@@ -162,7 +162,7 @@ The Usual Commands: JVM
   test targets, Pants runs the tests. If they aren't test targets, Pants will
   still compile them since it knows it must compile before it can test.
 
-  ``./pants goal test src/java/com/pants/examples/hello/:: tests/java/com/pants/examples/hello/::``
+  ``./pants goal test examples/src/java/com/pants/examples/hello/:: examples/tests/java/com/pants/examples/hello/::``
 
   Output from the test run is written to ``.pants.d/test/junit/``; you
   can see it on the console with ``--no-test-junit-suppress-output``.
@@ -170,18 +170,18 @@ The Usual Commands: JVM
   **Run just that one troublesome test class:** (assuming a JUnit test; other
   frameworks use other flags)
 
-  ``./pants goal test tests/java/com/pants/examples/hello/:: --test-junit-test=com.pants.examples.hello.greet.GreetingTest``
+  ``./pants goal test examples/tests/java/com/pants/examples/hello/:: --test-junit-test=com.pants.examples.hello.greet.GreetingTest``
 
 **Packaging Binaries**
   To create a jar containing just the code built by a JVM target, use the
   `jar` goal::
 
-      ./pants goal jar src/java/com/pants/examples/hello/greet
+      ./pants goal jar examples/src/java/com/pants/examples/hello/greet
 
   To create :ref:`bundle <jvm_bundles>` (a runnable thing and its
   dependencies, perhaps including helper files)::
 
-      ./pants goal bundle src/java/com/pants/examples/hello/main --bundle-archive=zip
+      ./pants goal bundle examples/src/java/com/pants/examples/hello/main --bundle-archive=zip
 
   If your bundle is JVM, it's a zipfile which can run by means of an
   ``unzip`` and setting your ``CLASSPATH`` to ``$BASEDIR/my_service.jar``
@@ -259,7 +259,7 @@ correctly. (You can try to run without the configuration file, but the
 program crashes immediately.) We define a ``jvm_app`` that represents
 a runnable binary and "bundles" of extra files:
 
-.. literalinclude:: ../../../java/com/pants/examples/hello/main/BUILD
+.. literalinclude:: ../../../../examples/src/java/com/pants/examples/hello/main/BUILD
    :start-after: Like Hello World
    :end-before: The binary
 
@@ -279,7 +279,7 @@ the files you want (along with a couple of not-so-useful stub ``.jar`` files).)
 
 Invoke ``./pants goal bundle`` on a JVM app or JVM binary target::
 
-  ./pants goal bundle src/java/com/pants/examples/hello/main:main
+  ./pants goal bundle examples/src/java/com/pants/examples/hello/main:main
 
 **Contents of a Bundle**
 

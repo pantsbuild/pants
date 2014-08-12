@@ -32,8 +32,8 @@ goals can be especially helpful:
 
 ``list`` Did I define the targets I meant to? ::
 
-    $ ./pants goal list src/java/com/pants/examples/hello/greet
-    src/java/com/pants/examples/hello/greet:greet
+    $ ./pants goal list examples/src/com/pants/examples/hello/greet
+    examples/src/com/pants/examples/hello/greet:greet
 
 ``list ::`` List **every** target to find out:
 Did a change in one ``BUILD`` file break others? ::
@@ -53,7 +53,7 @@ dependencies pulled in from 3rdparty ``.jars``. For example, here it shows
 that ``main-bin`` depends on the 3rdparty ``log4j`` jar, but not that
 ``log4j`` depends on ``javax.mail``::
 
-    $ ./pants goal depmap src/java/com/pants/examples/hello/main
+    $ ./pants goal depmap examples/src/com/pants/examples/hello/main
     internal-src.java.com.pants.examples.hello.main.main
       internal-src.java.com.pants.examples.hello.main.main-bin
         internal-src.java.com.pants.examples.hello.greet.greet
@@ -61,12 +61,12 @@ that ``main-bin`` depends on the 3rdparty ``log4j`` jar, but not that
 
 ``filedeps`` What source files do I depend on? ::
 
-    $ ./pants goal filedeps src/java/com/pants/examples/hello/main
-    ~archie/workspace/pants/src/java/com/pants/examples/hello/greet/BUILD
-    ~archie/workspace/pants/src/java/com/pants/examples/hello/greet/Greeting.java
-    ~archie/workspace/pants/src/java/com/pants/examples/hello/main/BUILD
-    ~archie/workspace/pants/src/java/com/pants/examples/hello/main/config/log4j.properties
-    ~archie/workspace/pants/src/java/com/pants/examples/hello/main/HelloMain.java
+    $ ./pants goal filedeps examples/src/com/pants/examples/hello/main
+    ~archie/workspace/pants/examples/src/com/pants/examples/hello/greet/BUILD
+    ~archie/workspace/pants/examples/src/com/pants/examples/hello/greet/Greeting.java
+    ~archie/workspace/pants/examples/src/com/pants/examples/hello/main/BUILD
+    ~archie/workspace/pants/examples/src/com/pants/examples/hello/main/config/log4j.properties
+    ~archie/workspace/pants/examples/src/com/pants/examples/hello/main/HelloMain.java
 
 .. _usage-default-target:
 
@@ -342,10 +342,10 @@ targets and register those targets in a Pants data structure.
 Though your repo might contain many ``BUILD`` files, Pants might not execute all
 of them. If you invoke::
 
-    ./pants goal test tests/java/com/pants/examples/hello/greet:greet
+    ./pants goal test examples/tests/java/com/pants/examples/hello/greet:greet
 
 Pants executes the source tree's top-level ``BUILD`` file (executed on every Pants run) and
-``tests/java/com/pants/examples/hello/greet/BUILD``. The ``greet`` target
+``examples/tests/java/com/pants/examples/hello/greet/BUILD``. The ``greet`` target
 depends on targets from other ``BUILD`` files, so Pants executes those ``BUILD``
 files, too; it iterates over the dependency tree, executing ``BUILD`` files as it
 goes. It does *not* execute ``BUILD`` files that don't contain targets in that

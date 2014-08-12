@@ -26,6 +26,7 @@ function usage() {
   echo " -j           skip jvm tests"
   echo " -p           skip python tests"
   echo " -c           skip pants integration tests"
+  echo " -e           skip example tests"
   if (( $# > 0 )); then
     die "$@"
   else
@@ -44,6 +45,7 @@ while getopts "hbsdjpc" opt; do
     j) skip_java="true" ;;
     p) skip_python="true" ;;
     c) skip_integration="true" ;;
+    e) skip_examples="true" ;;
     *) usage "Invalid option: -${OPTARG}" ;;
   esac
 done
@@ -113,6 +115,13 @@ if [[ "${skip_python:-false}" == "false" ]]; then
     PANTS_PYTHON_TEST_FAILSOFT=1 ./pants.pex goal test tests/python/pants_test:all \
       ${INTERPRETER_ARGS[@]}
   ) || die "Python test failure"
+fi
+
+if [[ "${skip_examples:-false}" == "false" ]]; then
+  banner "Running example tests"
+  (
+    ./pants.pex goal test examples:: $daemons
+  ) || die "Examples test failure"
 fi
 
 if [[ "${skip_integration:-false}" == "false" ]]; then
