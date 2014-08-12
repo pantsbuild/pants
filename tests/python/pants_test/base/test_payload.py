@@ -33,13 +33,13 @@ class PayloadTest(BaseTest):
     # nesting no longer allowed
     self.add_to_build_file('z/BUILD', 'java_library(name="z", sources=[globs("*")])')
     with pytest.raises(TargetDefinitionException):
-      self.build_file_parser.scan(self.build_root)
+      self.context().scan(self.build_root)
 
   def test_flat_globs_list(self):
     # flattened allowed
     self.add_to_build_file('y/BUILD', 'java_library(name="y", sources=globs("*"))')
-    self.build_file_parser.scan(self.build_root)
+    self.context().scan(self.build_root)
 
   def test_single_source(self):
     self.add_to_build_file('y/BUILD', 'java_library(name="y", sources=["Source.scala"])')
-    self.build_file_parser.scan(self.build_root)
+    self.context().scan(self.build_root)

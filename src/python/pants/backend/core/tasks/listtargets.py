@@ -94,4 +94,4 @@ class ListTargets(ConsoleTask):
     if self.context.target_roots:
       return self.context.target_roots
     else:
-      return self.context.build_file_parser.scan().targets()
+      return self.context.scan().targets()

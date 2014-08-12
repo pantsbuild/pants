@@ -6,11 +6,12 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import os
-
 import unittest2 as unittest
 
+from pants.base.build_file_address_mapper import BuildFileAddressMapper
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file_parser import BuildFileParser
+from pants.base.build_graph import BuildGraph
 from pants.base.dev_backend_loader import load_build_configuration_from_source
 
 
@@ -20,14 +21,22 @@ class Utf8HeaderTest(unittest.TestCase):
     """
     Look through all .py files and ensure they start with the line '# coding=utf8'
     """
+
     build_configuration = load_build_configuration_from_source()
-    build_file_parser = BuildFileParser(build_configuration, get_buildroot())
+    build_file_parser = BuildFileParser(root_dir=get_buildroot(),
+                                        build_configuration=build_configuration)
+    address_mapper = BuildFileAddressMapper(build_file_parser)
+    build_graph = BuildGraph(address_mapper=address_mapper)
+
+    for address in address_mapper.scan_addresses(get_buildroot()):
+      build_graph.inject_address_closure(address)
 
     def has_hand_coded_python_files(tgt):
       return (not tgt.is_synthetic) and tgt.is_original and tgt.has_sources('.py')
 
     nonconforming_files = []
-    for target in build_file_parser.scan().targets(has_hand_coded_python_files):
+
+    for target in build_graph.targets(has_hand_coded_python_files):
       for src in target.sources_relative_to_buildroot():
         with open(os.path.join(get_buildroot(), src), 'r') as python_file:
           coding_line = python_file.readline()

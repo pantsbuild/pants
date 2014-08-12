@@ -28,56 +28,56 @@ class FilesetRelPathWrapperTest(BaseTest):
 
   def test_no_dir_glob(self):
     self.add_to_build_file('y/BUILD', 'java_library(name="y", sources=globs("*"))')
-    self.build_file_parser.scan(self.build_root)
+    self.context().scan(self.build_root)
 
   def test_no_dir_glob_question(self):
     self.add_to_build_file('y/BUILD', 'java_library(name="y", sources=globs("?"))')
-    self.build_file_parser.scan(self.build_root)
+    self.context().scan(self.build_root)
 
   def test_subdir_glob(self):
     self.add_to_build_file('y/BUILD', 'java_library(name="y", sources=globs("dir/*.scala"))')
-    self.build_file_parser.scan(self.build_root)
+    self.context().scan(self.build_root)
 
   def test_subdir_glob_question(self):
     self.add_to_build_file('y/BUILD', 'java_library(name="y", sources=globs("dir/?.scala"))')
-    self.build_file_parser.scan(self.build_root)
+    self.context().scan(self.build_root)
 
   def test_subdir_bracket_glob(self):
     self.add_to_build_file('y/BUILD', 'java_library(name="y", sources=globs("dir/[dir1, dir2]/*.scala"))')
-    self.build_file_parser.scan(self.build_root)
+    self.context().scan(self.build_root)
 
   def test_subdir_with_dir_glob(self):
     self.add_to_build_file('y/BUILD', 'java_library(name="y", sources=globs("dir/**/*.scala"))')
-    self.build_file_parser.scan(self.build_root)
+    self.context().scan(self.build_root)
 
 
     # This is no longer allowed.
   def test_parent_dir_glob(self):
     self.add_to_build_file('y/BUILD', 'java_library(name="y", sources=globs("../*.scala"))')
     with self.assertRaises(ValueError):
-      self.build_file_parser.scan(self.build_root)
+      self.context().scan(self.build_root)
 
   def test_parent_dir_glob_question(self):
     self.add_to_build_file('y/BUILD', 'java_library(name="y", sources=globs("../?.scala"))')
     with self.assertRaises(ValueError):
-      self.build_file_parser.scan(self.build_root)
+      self.context().scan(self.build_root)
 
   def test_parent_dir_bracket_glob_question(self):
     self.add_to_build_file('y/BUILD', 'java_library(name="y", sources=globs("../[dir1, dir2]/?.scala"))')
     with self.assertRaises(ValueError):
-      self.build_file_parser.scan(self.build_root)
+      self.context().scan(self.build_root)
 
   def test_parent_dir_bracket(self):
     self.add_to_build_file('y/BUILD', 'java_library(name="y", sources=globs("../[dir1, dir2]/File.scala"))')
     with self.assertRaises(ValueError):
-      self.build_file_parser.scan(self.build_root)
+      self.context().scan(self.build_root)
 
   def test_absolute_dir_glob(self):
     self.add_to_build_file('y/BUILD', 'java_library(name="y", sources=globs("/root/*.scala"))')
     with self.assertRaises(ValueError):
-      self.build_file_parser.scan(self.build_root)
+      self.context().scan(self.build_root)
 
   def test_absolute_dir_glob_question(self):
     self.add_to_build_file('y/BUILD', 'java_library(name="y", sources=globs("/root/?.scala"))')
     with self.assertRaises(ValueError):
-      self.build_file_parser.scan(self.build_root)
+      self.context().scan(self.build_root)

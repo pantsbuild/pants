@@ -18,6 +18,7 @@ from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
 from pants.base.hash_utils import hash_all
 from pants.base.payload import EmptyPayload
 from pants.base.source_root import SourceRoot
+from pants.base.target_addressable import TargetAddressable
 from pants.base.validation import assert_list
 
 
@@ -129,6 +130,14 @@ class Target(AbstractTarget):
           return True
       return False
     return (cls.LANG_DISCRIMINATORS[lang], is_other_lang)
+
+  @classmethod
+  def get_addressable_type(target_cls):
+    class ConcreteTargetAddressable(TargetAddressable):
+      @classmethod
+      def get_target_type(cls):
+        return target_cls
+    return ConcreteTargetAddressable
 
   @property
   def target_base(self):

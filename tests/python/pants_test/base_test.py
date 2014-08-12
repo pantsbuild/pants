@@ -13,11 +13,13 @@ import unittest2
 
 from pants.backend.core.targets.dependencies import Dependencies
 from pants.base.address import SyntheticAddress
+from pants.base.build_file_address_mapper import BuildFileAddressMapper
 from pants.base.build_configuration import BuildConfiguration
+from pants.base.build_file import BuildFile
 from pants.base.build_file_aliases import BuildFileAliases
+from pants.base.build_file_parser import BuildFileParser
 from pants.base.build_graph import BuildGraph
 from pants.base.build_root import BuildRoot
-from pants.base.build_file_parser import BuildFileCache, BuildFileParser
 from pants.base.config import Config
 from pants.base.source_root import SourceRoot
 from pants.base.target import Target
@@ -65,6 +67,7 @@ class BaseTest(unittest2.TestCase):
     target:  A string containing the target definition as it would appear in a BUILD file.
     """
     self.create_file(self.build_path(relpath), target, mode='a')
+    return BuildFile(root_dir=self.build_root, relpath=self.build_path(relpath))
 
   def make_target(self,
                   spec='',
@@ -94,12 +97,11 @@ class BaseTest(unittest2.TestCase):
     BuildRoot().path = self.build_root
 
     self.create_file('pants.ini')
-
     build_configuration = BuildConfiguration()
     build_configuration.register_aliases(self.alias_groups)
     self.build_file_parser = BuildFileParser(build_configuration, self.build_root)
-
-    self.build_graph = BuildGraph()
+    self.address_mapper = BuildFileAddressMapper(self.build_file_parser)
+    self.build_graph = BuildGraph(address_mapper=self.address_mapper)
 
   def config(self, overrides=''):
     """Returns a config valid for the test build root."""
@@ -121,13 +123,14 @@ class BaseTest(unittest2.TestCase):
                           target_roots=target_roots,
                           build_graph=self.build_graph,
                           build_file_parser=self.build_file_parser,
+                          address_mapper=self.address_mapper,
                           **kwargs)
 
   def tearDown(self):
     BuildRoot().reset()
     SourceRoot.reset()
     safe_rmtree(self.build_root)
-    BuildFileCache.clear()
+    BuildFile.clear_cache()
 
   def target(self, spec):
     """Resolves the given target address to a Target object.
@@ -137,7 +140,7 @@ class BaseTest(unittest2.TestCase):
     Returns the corresponding Target or else None if the address does not point to a defined Target.
     """
     if self.build_graph.get_target_from_spec(spec) is None:
-      self.build_file_parser.inject_spec_closure_into_build_graph(spec, self.build_graph)
+      self.build_graph.inject_spec_closure(spec)
     return self.build_graph.get_target_from_spec(spec)
 
   def create_files(self, path, files):

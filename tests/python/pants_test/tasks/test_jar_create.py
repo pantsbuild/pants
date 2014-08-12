@@ -45,7 +45,8 @@ class JarCreateMiscTest(JarCreateTestBase):
     JarCreate(create_context(config=ini,
                              options=self.create_options(),
                              build_graph=self.build_graph,
-                             build_file_parser=self.build_file_parser),
+                             build_file_parser=self.build_file_parser,
+                             address_mapper=self.address_mapper),
               '/tmp/workdir')
 
   def test_resources_with_scala_java_files(self):
@@ -105,6 +106,7 @@ class JarCreateExecuteTest(JarCreateTestBase):
                           options=self.create_options(**options),
                           build_graph=self.build_graph,
                           build_file_parser=self.build_file_parser,
+                          address_mapper=self.address_mapper,
                           target_roots=[self.jl, self.sl, self.binary, self.jtl, self.scala_lib])
 
   @contextmanager

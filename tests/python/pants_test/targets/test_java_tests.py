@@ -27,14 +27,14 @@ class JavaTestsTest(BaseTest):
   def test_none(self):
     self.add_to_build_file('default', '''junit_tests(name='default', sources=None)''')
     with self.assertRaises(TargetDefinitionException):
-      self.build_file_parser.scan(self.build_root)
+      self.context().scan(self.build_root)
 
   def test_empty_list(self):
     self.add_to_build_file('default', '''junit_tests(name='default', sources=[])''')
     with self.assertRaises(TargetDefinitionException):
-      self.build_file_parser.scan(self.build_root)
+      self.context().scan(self.build_root)
 
   def test_empty_glob(self):
     self.add_to_build_file('default', '''junit_tests(name='default', sources=globs('nothing'))''')
     with self.assertRaises(TargetDefinitionException):
-      self.build_file_parser.scan(self.build_root)
+      self.context().scan(self.build_root)
