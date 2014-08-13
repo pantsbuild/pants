@@ -74,33 +74,30 @@ class JarsignerTask(NailgunTask):
     with self.context.new_workunit(name='jarsigner', labels=[WorkUnit.MULTITOOL]):
       targets = self.context.targets(self.is_signtarget)
       for target in targets:
-        build_type=target.build_type
+        build_type = target.build_type
+        apk = []
+        key = []
 
         # get the unsigned apk
         unsigned_apks = self.context.products.get('apk')
-        apk = unsigned_apks.get(target)
-        if apk:
-          target_apk = apk
-        print(target_apk)
-
-        build_type = target.build_type
-        print ("POPEYE the build_type is %s" % build_type)
-        key = []
+        target_apk = unsigned_apks.get(target)
+        if target_apk:
+          for tgt, prod in target_apk.iteritems():
+            apk.append(prod)
+        else:
+          raise ValueError(self, "There was no apk built that can be signed")
 
         # match the keystore in the target graph to the type of build ordered.
         # gradle produces both release and debug every run. My gut is against it, as of now.
         def get_key(tgt):
-          print(tgt)
           if isinstance(tgt, Keystore):
-            print ("OLIVE OYL the tgt.type is %s" % tgt.type)
             if tgt.type == build_type:
-              print ("SWEA'PEA we FOUND a match!")
               key.append(tgt)
-
+          #TODO (mateor) raise an exception if no type match here!
 
         target.walk(get_key, predicate=isinstance(target,Keystore))
         if key:
-          self.render_args(target_apk, key)
+          self.render_args(apk, key)
 
     #if debug
     #  if no config
