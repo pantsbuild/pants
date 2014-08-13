@@ -18,10 +18,11 @@ function die() {
 function usage() {
   echo "Runs commons tests for local or hosted CI."
   echo
-  echo "Usage: $0 (-h|-bsdjp)"
+  echo "Usage: $0 (-h|-bsrdjpce)"
   echo " -h           print out this help message"
   echo " -b           skip bootstraping pants from local sources"
   echo " -s           skip self-distribution tests"
+  echo " -r           skip doc generation tests"
   echo " -d           if running jvm tests, don't use nailgun daemons"
   echo " -j           skip jvm tests"
   echo " -p           skip python tests"
@@ -36,11 +37,12 @@ function usage() {
 
 daemons="--ng-daemons"
 
-while getopts "hbsdjpc" opt; do
+while getopts "hbsrdjpce" opt; do
   case ${opt} in
     h) usage ;;
     b) skip_bootstrap="true" ;;
     s) skip_distribution="true" ;;
+    r) skip_docs="true" ;;
     d) daemons="--no-ng-daemons" ;;
     j) skip_java="true" ;;
     p) skip_python="true" ;;
@@ -100,6 +102,11 @@ if [[ "${skip_distribution:-false}" == "false" ]]; then
       src/python/pants:_pants_transitional_publishable_binary_ && \
     ./dist/self.pex setup_py --recursive src/python/pants:pants-packaged
   ) || die "Failed to create pants distributions."
+fi
+
+if [[ "${skip_docs:-false}" == "false" ]]; then
+  banner "Running site doc generation test"
+  ./build-support/bin/ci.sh || die "Failed to generate site docs."
 fi
 
 if [[ "${skip_java:-false}" == "false" ]]; then
