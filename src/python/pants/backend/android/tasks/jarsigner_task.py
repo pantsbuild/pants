@@ -4,13 +4,14 @@
 
 import sys, io
 import os
+import subprocess
 from stat import *
 
 from pants.backend.android.targets.android_binary import AndroidBinary
 from pants.backend.android.targets.keystore import Keystore
 from pants.backend.android.tasks.android_task import AndroidTask
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
-from pants.base.build_environment import get_buildroot
+from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit
 from pants.util.dirutil import safe_mkdir
 
@@ -28,6 +29,7 @@ class JarsignerTask(NailgunTask):
 
   def __init__(self, *args, **kwargs):
     super(JarsignerTask, self).__init__(*args, **kwargs)
+    self._java_dist = self._dist
     #self.release = self.context.options.release_build or False
     #config_section = self.config_section
     #print ("release is %s" % self.release)
@@ -50,8 +52,9 @@ class JarsignerTask(NailgunTask):
   def render_args(self, target, apk, key):
     # required flags for JDK 7+
     args = []
+    args.extend([self._java_dist.binary('jarsigner')])
     args.extend(['-sigalg', 'SHA1withRSA'])
-    args.extend(['-digestalg', ' SHA1'])
+    args.extend(['-digestalg', 'SHA1'])
     args.extend(['-keystore', key.location])
     args.extend(['-storepass', key.keystore_password])
     args.extend(['-keypass', key.key_alias_password])
@@ -89,9 +92,12 @@ class JarsignerTask(NailgunTask):
         unsigned_apks = self.context.products.get('apk')
         target_apk = unsigned_apks.get(target)
         if target_apk:
+          print target_apk
           for tgts, prods in target_apk.iteritems():
+            unsigned_path = os.path.join(tgts)
             for prod in prods:
-              apk = prod
+              unsigned_apk = os.path.join(unsigned_path, prod)
+              print unsigned_apk
         else:
           raise ValueError(self, "There was no apk built that can be signed")
 
@@ -106,8 +112,13 @@ class JarsignerTask(NailgunTask):
         target.walk(get_key, predicate=isinstance(target,Keystore))
         if keys:
           for key in keys:
-            args = self.render_args(target, apk, key)
-            self._execute_jarsigner(args)
+            # TODO create Nailgun for other java tools
+            args = self.render_args(target, unsigned_apk, key)
+            print args  # DEBUGBUDE
+            process = subprocess.Popen(self.render_args(target, unsigned_apk, key))
+            result = process.wait()
+            if result != 0:
+              raise TaskError('Android aapt tool exited non-zero ({code})'.format(code=result))
 
   def jarsigner_out(self, target):
     return os.path.join(self.workdir, target.app_name)

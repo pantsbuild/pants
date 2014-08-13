@@ -9,6 +9,8 @@ import os
 
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.target import Target
+from pants.base.build_environment import get_buildroot
+
 
 class KeyError(Exception):
   pass
@@ -34,7 +36,7 @@ class Keystore(Target):
         raise TargetDefinitionException(self, "The keystore must provide a 'sources' attribute "
                                               "with path to the keystore file")
       else:
-        self.location = os.path.join(self.address.spec_path, source)
+        self.location = os.path.join(get_buildroot(), self.address.spec_path, source)
 
     self.keystore_alias = keystore_alias
     self.keystore_password = keystore_password

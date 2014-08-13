@@ -6,4 +6,4 @@
 
 # When supported, release key instructions will go here.
 
-Neither the BUILD.release nor new 3rdparty/android/authentication/release will be added to git.
+Neither the BUILD.release nor 3rdparty/android/authentication/release files will be added to git.
