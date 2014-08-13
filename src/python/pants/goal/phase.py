@@ -59,6 +59,8 @@ class Phase(object):
           mkflag = Mkflag(*namespace)
           option_group = OptionGroup(parser, title=':'.join(namespace))
           task_type.setup_parser(option_group, args, mkflag)
+          if option_group.option_list:
+            parser.add_option_group(option_group)
 
     for phase in phases:
       do_setup_parser(phase)
