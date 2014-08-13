@@ -79,16 +79,19 @@ class JarsignerTask(NailgunTask):
           if isinstance(tgt, Keystore):
             if tgt.type == build_type:
               keys.append(tgt)
-          #TODO (mateor) raise an exception if no type match here!
 
         target.walk(get_key, predicate=isinstance(target,Keystore))
         if keys:
-          for key in keys:
+          # Perhaps we will soon allow depending pn multiple keys per type and match by name.
+          if len(keys) > 1:
+            raise TaskError(self, "This target {0} depends on more than one key of the same"
+                                  "build type {1}. Please pick the key you wish to "
+                                  "sign with".format(target, target.build_type))
             # TODO(mateor?)create Nailgun pipeline for other java tools, handling stderr/out, etc.
-            process = subprocess.Popen(self.render_args(target, unsigned_apk, key))
-            result = process.wait()
-            if result != 0:
-              raise TaskError('Android aapt tool exited non-zero ({code})'.format(code=result))
+          process = subprocess.Popen(self.render_args(target, unsigned_apk, keys[0]))
+          result = process.wait()
+          if result != 0:
+            raise TaskError('Android aapt tool exited non-zero ({code})'.format(code=result))
         else:
           raise TaskError(self, "No key matched the {0} target's build type "
                                 "[release, debug]".format(target))
@@ -97,7 +100,3 @@ class JarsignerTask(NailgunTask):
     return os.path.join(self.workdir, target.app_name)
 
   # TODO (mateor) verify sig (jarsigner -verify -verbose -certs my_application.apk)
-
-    # securing local passphrases
-
-
