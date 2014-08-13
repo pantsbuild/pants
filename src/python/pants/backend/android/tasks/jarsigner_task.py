@@ -52,13 +52,13 @@ class JarsignerTask(NailgunTask):
     args = []
     args.extend(['-sigalg', 'SHA1withRSA'])
     args.extend(['-digestalg', ' SHA1'])
-    args.extend(['-keystore', key.sources])
+    args.extend(['-keystore', key.location])
     args.extend(['-storepass', key.keystore_password])
     args.extend(['-keypass', key.key_alias_password])
     args.extend(['-signedjar', (os.path.join(self.jarsigner_out(target), target.app_name + '-signed.apk'))])
     args.append(apk)
     args.append(key.keystore_alias)
-    print(args)
+    return args
 
   def check_permissions(self, file):
     """Ensure that the file permissions of the config are 640, rw-r----"""
@@ -71,7 +71,6 @@ class JarsignerTask(NailgunTask):
       KeyError
 
   def _execute_jarsigner(self, args):
-
     classpath = ['jarsigner']
     java_main = 'sun.security.tools.jarsigner.Main'
     return self.runjava(classpath=classpath, main=java_main,
@@ -107,7 +106,8 @@ class JarsignerTask(NailgunTask):
         target.walk(get_key, predicate=isinstance(target,Keystore))
         if keys:
           for key in keys:
-            self.render_args(target, apk, key)
+            args = self.render_args(target, apk, key)
+            self._execute_jarsigner(args)
 
   def jarsigner_out(self, target):
     return os.path.join(self.workdir, target.app_name)

@@ -28,13 +28,14 @@ class Keystore(Target):
     self.sources = sources
     if len(self.sources) > 1:
       raise TargetDefinitionException(self, "The 'sources' field points only to the keystore file")
+    # We have verified there is just one 'sources' file, we can now set the location.
+    for source in self.sources:
+      if source is None:
+        raise TargetDefinitionException(self, "The keystore must provide a 'sources' attribute "
+                                              "with path to the keystore file")
+      else:
+        self.location = os.path.join(self.address.spec_path, source)
 
-
-    # TODO --get a full path for key.sources
-
-
-    #self.keystore_location = os.path.join(self.address.spec_path, self.sources)
-    # TODO(mateor) catch if os is NONE here ^^^
     self.keystore_alias = keystore_alias
     self.keystore_password = keystore_password
     self.key_alias_password=key_alias_password
