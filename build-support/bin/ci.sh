@@ -58,7 +58,9 @@ if [[ "${skip_bootstrap:-false}" == "false" ]]; then
   banner "Bootstrapping pants"
   (
     ./build-support/python/clean.sh && \
-    PANTS_VERBOSE=1 PEX_VERBOSE=1 PYTHON_VERBOSE=1 ./pants;
+    PANTS_DEV=1 PANTS_VERBOSE=1 PEX_VERBOSE=1 PYTHON_VERBOSE=1 \
+      ./pants goal binary src/python/pants/bin:pants && \
+    mv dist/pants.pex ./pants.pex && \
     ./pants.pex goal goals
   ) || die "Failed to bootstrap pants."
 fi
@@ -106,7 +108,7 @@ fi
 
 if [[ "${skip_docs:-false}" == "false" ]]; then
   banner "Running site doc generation test"
-  ./build-support/bin/ci.sh || die "Failed to generate site docs."
+  ./build-support/bin/publish_docs.sh || die "Failed to generate site docs."
 fi
 
 if [[ "${skip_java:-false}" == "false" ]]; then
