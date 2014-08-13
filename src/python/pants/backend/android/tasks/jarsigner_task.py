@@ -57,7 +57,7 @@ class JarsignerTask(NailgunTask):
     args.extend(['-digestalg', 'SHA1'])
     args.extend(['-keystore', key.location])
     args.extend(['-storepass', key.keystore_password])
-    args.extend(['-keypass', key.key_alias_password])
+    args.extend(['-keypass', key.key_password])
     args.extend(['-signedjar', (os.path.join(self.jarsigner_out(target), target.app_name + '-signed.apk'))])
     args.append(apk)
     args.append(key.keystore_alias)

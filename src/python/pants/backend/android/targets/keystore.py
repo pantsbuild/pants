@@ -23,10 +23,19 @@ class Keystore(Target):
                sources=None,
                keystore_alias=None,
                keystore_password=None,
-               key_alias_password=None,
+               key_password=None,
                **kwargs):
+    """
+    :param string type: What type of package the keystore signs. Either 'debug' or 'release'.
+    :param sources: path/to/keystore
+    :type sources: ``Fileset`` or list of strings.
+    :param string keystore_alias: The alias of this keystore.
+    :param string keystore_password: The password for the keystore.
+    :param string key_password: The password for the key.
+    """
     super(Keystore, self).__init__(**kwargs)
 
+    # TODO (mateor) if debug location is empty, create a debug.keystore with keytool.
     self.sources = sources
     if len(self.sources) > 1:
       raise TargetDefinitionException(self, "The 'sources' field points only to the keystore file")
@@ -40,7 +49,7 @@ class Keystore(Target):
 
     self.keystore_alias = keystore_alias
     self.keystore_password = keystore_password
-    self.key_alias_password=key_alias_password
+    self.key_password=key_password
 
 
   # TODO(mateor) update docstring of Android targets.
