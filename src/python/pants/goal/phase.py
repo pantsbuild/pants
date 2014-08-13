@@ -125,6 +125,23 @@ class _Phase(object):
     self.description = description
     return self
 
+  def uninstall_task(self, name):
+    """Removes the named task from this phase.
+
+    Allows external plugins to modify the execution plan. Use with caution.
+
+    Note: Does not remove phase dependencies or relax a serialization requirement that originated
+    from the uninstalled task's install() call.
+    TODO(benjy): Should it? We're moving away from explicit phase deps towards a
+                 product consumption-production model anyway.
+    """
+    if name in self._task_type_by_name:
+      del self._task_type_by_name[name]
+      self._ordered_task_names = [x for x in self._ordered_task_names if x != name]
+    else:
+      raise GoalError('Cannot uninstall unknown task: {0}'.format(name))
+
+
   def ordered_task_names(self):
     """The task names in this phase, in registration order."""
     return self._ordered_task_names
