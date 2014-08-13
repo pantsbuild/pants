@@ -16,23 +16,19 @@ from pants.base.workunit import WorkUnit
 from pants.util.dirutil import safe_mkdir
 
 
-  # need an err "We could not find a key at DEFAULT you need to xxxxxxxx
-
 class JarsignerTask(NailgunTask):
   """Sign Android packages with keystore"""
-
-  # For debug releases, we are using the debug key created with an install
-  # of the Android SDK. This uses a keystore and key with a known passphrase.
 
   GITIGNORE = '.gitignore'
   _CONFIG_SECTION = 'jarsigner-tool'
 
+  @classmethod
+  def is_signtarget(self, target):
+    return isinstance(target, AndroidBinary)
+
   def __init__(self, *args, **kwargs):
     super(JarsignerTask, self).__init__(*args, **kwargs)
     self._java_dist = self._dist
-    #self.release = self.context.options.release_build or False
-    #config_section = self.config_section
-    #print ("release is %s" % self.release)
 
   def prepare(self, round_manager):
     round_manager.require_data('apk')
@@ -41,45 +37,24 @@ class JarsignerTask(NailgunTask):
   def config_section(self):
     return self._CONFIG_SECTION
 
-  @classmethod
-  def is_signtarget(self, target):
-    return isinstance(target, AndroidBinary)
-
-  @classmethod
-  def is_keytarget(self, target):
-    return isinstance(target, Keystore)
-
-  def render_args(self, target, apk, key):
-    # required flags for JDK 7+
+  def render_args(self, target, unsigned_apk, key):
+    # With JDK 1.7.0_51, jars without timestamps print a warning. This causes jars to stop working
+    # pas their validity date. But Android purposefully passes 30 years validity. More research
+    # is needed before passing a -tsa flag indiscriminately.
+    # http://bugs.java.com/view_bug.do?bug_id=8023338
     args = []
     args.extend([self._java_dist.binary('jarsigner')])
+    # first two are required flags for JDK 7+
     args.extend(['-sigalg', 'SHA1withRSA'])
     args.extend(['-digestalg', 'SHA1'])
     args.extend(['-keystore', key.location])
     args.extend(['-storepass', key.keystore_password])
     args.extend(['-keypass', key.key_password])
-    args.extend(['-signedjar', (os.path.join(self.jarsigner_out(target), target.app_name + '-signed.apk'))])
-    args.append(apk)
+    args.extend(['-signedjar', (os.path.join(self.jarsigner_out(target), target.app_name
+                                             + '-' + key.type + '-signed.apk')) ])
+    args.append(unsigned_apk)
     args.append(key.keystore_alias)
     return args
-
-  def check_permissions(self, file):
-    """Ensure that the file permissions of the config are 640, rw-r----"""
-    file = os.path.join('/Users/mateor/fred')
-    with open(file) as f:
-      content = f.readlines()
-    print (content)
-    permissions = (oct(os.stat(file)[ST_MODE]))
-    if permissions is not '0100640':
-      KeyError
-
-  def _execute_jarsigner(self, args):
-    classpath = ['jarsigner']
-    java_main = 'sun.security.tools.jarsigner.Main'
-    return self.runjava(classpath=classpath, main=java_main,
-                        args=args, workunit_name='jarsigner')
-
-  #TODO IF we walk the target graph, how to pick the exact key in the dep? I think walk does this auto, though.
 
   def execute(self):
     with self.context.new_workunit(name='jarsigner', labels=[WorkUnit.MULTITOOL]):
@@ -92,17 +67,14 @@ class JarsignerTask(NailgunTask):
         unsigned_apks = self.context.products.get('apk')
         target_apk = unsigned_apks.get(target)
         if target_apk:
-          print target_apk
           for tgts, prods in target_apk.iteritems():
             unsigned_path = os.path.join(tgts)
             for prod in prods:
               unsigned_apk = os.path.join(unsigned_path, prod)
-              print unsigned_apk
         else:
-          raise ValueError(self, "There was no apk built that can be signed")
-
+          raise ValueError(self, "This target {0} did not have an apk built that can be "
+                                 "signed".format(target))
         # match the keystore in the target graph to the type of build ordered.
-        # gradle produces both release and debug every run. My gut is against it, as of now.
         def get_key(tgt):
           if isinstance(tgt, Keystore):
             if tgt.type == build_type:
@@ -112,35 +84,20 @@ class JarsignerTask(NailgunTask):
         target.walk(get_key, predicate=isinstance(target,Keystore))
         if keys:
           for key in keys:
-            # TODO create Nailgun for other java tools
-            args = self.render_args(target, unsigned_apk, key)
-            print args  # DEBUGBUDE
+            # TODO(mateor?)create Nailgun pipeline for other java tools, handling stderr/out, etc.
             process = subprocess.Popen(self.render_args(target, unsigned_apk, key))
             result = process.wait()
             if result != 0:
               raise TaskError('Android aapt tool exited non-zero ({code})'.format(code=result))
+        else:
+          raise TaskError(self, "No key matched the {0} target's build type "
+                                "[release, debug]".format(target))
 
   def jarsigner_out(self, target):
     return os.path.join(self.workdir, target.app_name)
 
-        # TODO (mateor) verify sig (jarsigner -verify -verbose -certs my_application.apk
-    #if debug
-    #  if no config
-    #    default to using the Android SDK's
-    #    instantiate a Keystore object with default config in authentication.
-    #  else:
-    #     use keystore object from BUILD
-    #else (is release):
-    #   use release config (prop file permissions checked, name checked, and maybe location outside pants.
-
+  # TODO (mateor) verify sig (jarsigner -verify -verbose -certs my_application.apk)
 
     # securing local passphrases
 
-    # Storing in plaintext is not ideal. git, Maven and Gradle use cleartext config files as well.
-    # As this is local only, we should at least not be worse than those existing implementations.
-    # The protections I am using are
-    #     * keystore_configs are separate from the BUILD file and the keystore_config.release is in .gitignore
-    #     * mandating that the release_keystore matches RELEASE_KEYSTORE name and that RELEASE_KEYSTORE is present in gitconfig
-    #     * mandate that the release_keystore.config is located outside of pants buildroot (can I?)
-    #     * check for permissions of release_keystore, similar to ssh.
-    #     * is there a good way to reliably handle the keys in kernel memory? Use keyring on supported machines?
+

@@ -46,11 +46,10 @@ class AndroidTarget(JvmTarget):
     super(AndroidTarget, self).__init__(address=address, **kwargs)
 
     # TODO(mateor) support for 'release' builds
-    self.build_type = build_type
-    if self.build_type is None:
-      self.build_type = 'debug'
-    else:
-      raise TargetDefinitionException(self, 'Pants currently only supports debug build type.')
+    self.build_type = 'debug'
+    if self.build_type is not 'debug':
+      if self.build_type is not 'release':
+        raise TargetDefinitionException(self, 'Pants currently only supports debug build type.')
     self.add_labels('android')
     self.build_tools_version = build_tools_version
 
