@@ -47,8 +47,18 @@ class JarsignerTask(NailgunTask):
   def is_keytarget(self, target):
     return isinstance(target, Keystore)
 
-  def render_args(self, apk, key):
-    print("APK: {0}, KEY: {1}".format(apk,key))
+  def render_args(self, target, apk, key):
+    # required flags for JDK 7+
+    args = []
+    args.extend(['-sigalg', 'SHA1withRSA'])
+    args.extend(['-digestalg', ' SHA1'])
+    args.extend(['-keystore', key.sources])
+    args.extend(['-storepass', key.keystore_password])
+    args.extend(['-keypass', key.key_alias_password])
+    args.extend(['-signedjar', (os.path.join(self.jarsigner_out(target), target.app_name + '-signed.apk'))])
+    args.append(apk)
+    args.append(key.keystore_alias)
+    print(args)
 
   def check_permissions(self, file):
     """Ensure that the file permissions of the config are 640, rw-r----"""
@@ -65,25 +75,24 @@ class JarsignerTask(NailgunTask):
     classpath = ['jarsigner']
     java_main = 'sun.security.tools.jarsigner.Main'
     return self.runjava(classpath=classpath, main=java_main,
-                        args=args, workunit_name='dx')
+                        args=args, workunit_name='jarsigner')
 
   #TODO IF we walk the target graph, how to pick the exact key in the dep? I think walk does this auto, though.
 
   def execute(self):
-    safe_mkdir(self.workdir)
     with self.context.new_workunit(name='jarsigner', labels=[WorkUnit.MULTITOOL]):
       targets = self.context.targets(self.is_signtarget)
       for target in targets:
+        safe_mkdir(self.jarsigner_out(target))
         build_type = target.build_type
-        apk = []
-        key = []
-
+        keys = []
         # get the unsigned apk
         unsigned_apks = self.context.products.get('apk')
         target_apk = unsigned_apks.get(target)
         if target_apk:
-          for tgt, prod in target_apk.iteritems():
-            apk.append(prod)
+          for tgts, prods in target_apk.iteritems():
+            for prod in prods:
+              apk = prod
         else:
           raise ValueError(self, "There was no apk built that can be signed")
 
@@ -92,13 +101,18 @@ class JarsignerTask(NailgunTask):
         def get_key(tgt):
           if isinstance(tgt, Keystore):
             if tgt.type == build_type:
-              key.append(tgt)
+              keys.append(tgt)
           #TODO (mateor) raise an exception if no type match here!
 
         target.walk(get_key, predicate=isinstance(target,Keystore))
-        if key:
-          self.render_args(apk, key)
+        if keys:
+          for key in keys:
+            self.render_args(target, apk, key)
 
+  def jarsigner_out(self, target):
+    return os.path.join(self.workdir, target.app_name)
+
+        # TODO (mateor) verify sig (jarsigner -verify -verbose -certs my_application.apk
     #if debug
     #  if no config
     #    default to using the Android SDK's

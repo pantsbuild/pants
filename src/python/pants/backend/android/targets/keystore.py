@@ -25,9 +25,16 @@ class Keystore(Target):
                **kwargs):
     super(Keystore, self).__init__(**kwargs)
 
-    self.key = sources
-    if len(self.key) > 1:
+    self.sources = sources
+    if len(self.sources) > 1:
       raise TargetDefinitionException(self, "The 'sources' field points only to the keystore file")
+
+
+    # TODO --get a full path for key.sources
+
+
+    #self.keystore_location = os.path.join(self.address.spec_path, self.sources)
+    # TODO(mateor) catch if os is NONE here ^^^
     self.keystore_alias = keystore_alias
     self.keystore_password = keystore_password
     self.key_alias_password=key_alias_password
