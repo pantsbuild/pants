@@ -33,8 +33,8 @@ python_tests(
   sources = ['test_antlr_builder.py'],
   dependencies = [
     '3rdparty/python:antlr-3.1.3',
-    'src/antlr/pants/backend/python/test:csv',
-    'src/antlr/pants/backend/python/test:eval',
+    'testprojects/src/antlr/pants/backend/python/test:csv',
+    'testprojects/src/antlr/pants/backend/python/test:eval',
     'src/python/pants/backend/python:python_setup',
   ],
 )
@@ -44,8 +44,8 @@ python_tests(
   name = 'test_thrift_namespace_packages',
   sources = ['test_thrift_namespace_packages.py'],
   dependencies = [
-    pants('src/thrift/com/pants/testing:duck-py'),
-    pants('src/thrift/com/pants/testing:goose-py'),
+    pants('testprojects/src/thrift/com/pants/testing:duck-py'),
+    pants('testprojects/src/thrift/com/pants/testing:goose-py'),
   ],
 )
 

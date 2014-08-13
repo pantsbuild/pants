@@ -18,7 +18,7 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 class Bundles(object):
   """Container class to hold test bundle specifications."""
 
-  phrase_path = 'src/java/com/pants/testproject/phrases'
+  phrase_path = 'testprojects/src/java/com/pants/testproject/phrases'
 
   class Bundle(object):
     def __init__(self, spec, text):

@@ -22,7 +22,7 @@ class BundleIntegrationTest(PantsRunIntegrationTest):
     # contextmanager that yields its results while the tmpdir chroot is still active and change
     # this test back to using an un-archived bundle.
     pants_run = self.run_pants(['goal', 'bundle', '--bundle-archive=zip',
-                                'src/java/com/pants/testproject/unicode/main'])
+                                'testprojects/src/java/com/pants/testproject/unicode/main'])
     self.assertEquals(pants_run.returncode, self.PANTS_SUCCESS_CODE,
                       "goal bundle expected success, got {0}\n"
                       "got stderr:\n{1}\n"
