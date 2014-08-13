@@ -102,6 +102,8 @@ python_tests(
     pants('src/python/pants/backend/core/tasks:builddictionary'),
     pants('src/python/pants/backend/jvm:plugin'),
     pants('src/python/pants/backend/python:plugin'),
+    pants('src/python/pants/goal:phase'),
+    pants('src/python/pants/goal:task_registrar'),
   ]
 )
 
