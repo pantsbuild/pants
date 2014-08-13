@@ -63,29 +63,31 @@ class JarsignerTask(NailgunTask):
         build_type = target.build_type
         keys = []
 
-        # get the unsigned apk
-        unsigned_apks = self.context.products.get('apk')
-        target_apk = unsigned_apks.get(target)
-        if target_apk:
-          for tgts, prods in target_apk.iteritems():
-            unsigned_path = os.path.join(tgts)
-            for prod in prods:
-              unsigned_apk = os.path.join(unsigned_path, prod)
-        else:
-          raise ValueError(self, "This target {0} did not have an apk built that can be "
-                                 "signed".format(target))
+        def get_apk(target):
+          """Return the unsigned.apk product from AaptBuilder."""
+          unsigned_apks = self.context.products.get('apk')
+          target_apk = unsigned_apks.get(target)
+          if target_apk:
+            for tgts, prods in target_apk.iteritems():
+              unsigned_path = os.path.join(tgts)
+              for prod in prods:
+                return os.path.join(unsigned_path, prod)
+          else:
+            raise ValueError(self, "This target {0} did not have an apk built that can be "
+                                   "signed".format(target))
 
-        # match the keystore in the target graph to the type of build ordered.
-        def get_key(tgt):
-          if isinstance(tgt, Keystore):
-            if tgt.type == build_type:
-              keys.append(tgt)
+        def get_key(key):
+          """Return Keystore objects that match the target's build_type."""
+          if isinstance(key, Keystore):
+            if key.type == build_type:
+              keys.append(key)
 
-        target.walk(get_key, predicate=isinstance(target, Keystore))
+        unsigned_apk = get_apk(target)
+        target.walk(get_key)
 
         # Ensure there is only one key that matches the requested config.
+        # Perhaps we will soon allow depending on multiple keys per type and match by name.
         if keys:
-          # Perhaps we will soon allow depending on multiple keys per type and match by name.
           if len(keys) > 1:
             raise TaskError(self, "This target: {0} depends on more than one key of the same "
                                   "build type [{1}]. Please pick just one key of each build type "
