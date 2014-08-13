@@ -171,6 +171,9 @@ class GitTest(unittest.TestCase):
       edit_readme()
 
     self.git.commit('''API '"' " Changes.''')
+    # HEAD is merged into master
+    self.assertEqual(self.git.commit_date(self.git.merge_base), self.git.commit_date('HEAD'))
+    self.assertEqual(self.git.commit_date('HEAD'), self.git.commit_date('HEAD'))
     self.git.tag('second', message='''Tagged ' " Changes''')
 
     with temporary_dir() as clone:

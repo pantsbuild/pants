@@ -39,6 +39,10 @@ class Scm(AbstractClass):
     """Returns the name of the current branch if any."""
 
   @abstractmethod
+  def commit_date(self, commit_reference):
+    """Returns the commit date of the referenced commit."""
+
+  @abstractmethod
   def changed_files(self, from_commit=None, include_untracked=False):
     """Returns a list of files with uncommitted changes or else files changed since from_commit.
 
