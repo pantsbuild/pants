@@ -39,8 +39,6 @@ class JarsignerTask(NailgunTask):
   def config_section(self):
     return self._CONFIG_SECTION
 
-  #TODO (mateor) if we are going to keep a debug key in repo, it should go in 3rdparty/android
-
   @classmethod
   def is_signtarget(self, target):
     return isinstance(target, AndroidBinary)
@@ -49,8 +47,8 @@ class JarsignerTask(NailgunTask):
   def is_keytarget(self, target):
     return isinstance(target, Keystore)
 
-  def debug_fields(self):
-    pass
+  def render_args(self, apk, key):
+    print("APK: {0}, KEY: {1}".format(apk,key))
 
   def check_permissions(self, file):
     """Ensure that the file permissions of the config are 640, rw-r----"""
@@ -62,57 +60,47 @@ class JarsignerTask(NailgunTask):
     if permissions is not '0100640':
       KeyError
 
-  def jarsigner_tool(self):
-    pass
+  def _execute_jarsigner(self, args):
+
+    classpath = ['jarsigner']
+    java_main = 'sun.security.tools.jarsigner.Main'
+    return self.runjava(classpath=classpath, main=java_main,
+                        args=args, workunit_name='dx')
 
   #TODO IF we walk the target graph, how to pick the exact key in the dep? I think walk does this auto, though.
 
   def execute(self):
+    safe_mkdir(self.workdir)
     with self.context.new_workunit(name='jarsigner', labels=[WorkUnit.MULTITOOL]):
       targets = self.context.targets(self.is_signtarget)
-      print("I am taking a metro to see the giraffe show")
       for target in targets:
         build_type=target.build_type
-        print(target)
-        safe_mkdir(self.workdir)
+
+        # get the unsigned apk
         unsigned_apks = self.context.products.get('apk')
-        print(unsigned_apks)
         apk = unsigned_apks.get(target)
         if apk:
           target_apk = apk
         print(target_apk)
+
         build_type = target.build_type
         print ("POPEYE the build_type is %s" % build_type)
         key = []
-        #
-        # #for key in keys_by_target:
-        #  # print("Dems da keys: ")
-        #  # print(key)
-        #
+
+        # match the keystore in the target graph to the type of build ordered.
+        # gradle produces both release and debug every run. My gut is against it, as of now.
         def get_key(tgt):
           print(tgt)
           if isinstance(tgt, Keystore):
             print ("OLIVE OYL the tgt.type is %s" % tgt.type)
             if tgt.type == build_type:
-              print ("Swee'pea we FOUND a match!")
+              print ("SWEA'PEA we FOUND a match!")
               key.append(tgt)
-              return tgt
 
-          # if target_apk:
-          #   # This does comes back None, you need the protection here.
-          #   print("WE shhould see th sea from thee")
-          #   return target_apk
-        #     # def add_classes(target_products):
-        #     #   for root, products in target_products.abs_paths():
-        #     #     for prod in products:
-        #     #       classes.append(prod)
-        #     #
-        #     # add_classes(target_classes)
 
-      keystore = target.walk(get_key, predicate=isinstance(target,Keystore))
-      print ("Here we are again on the keystore")
-      print(keystore)
-      print(key)
+        target.walk(get_key, predicate=isinstance(target,Keystore))
+        if key:
+          self.render_args(target_apk, key)
 
     #if debug
     #  if no config
