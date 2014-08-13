@@ -2,14 +2,11 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import sys, io
 import os
 import subprocess
-from stat import *
 
 from pants.backend.android.targets.android_binary import AndroidBinary
 from pants.backend.android.targets.keystore import Keystore
-from pants.backend.android.tasks.android_task import AndroidTask
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit
@@ -17,7 +14,7 @@ from pants.util.dirutil import safe_mkdir
 
 
 class JarsignerTask(NailgunTask):
-  """Sign Android packages with keystore"""
+  """Sign Android packages with keystore."""
 
   GITIGNORE = '.gitignore'
   _CONFIG_SECTION = 'jarsigner-tool'
@@ -38,15 +35,17 @@ class JarsignerTask(NailgunTask):
     return self._CONFIG_SECTION
 
   def render_args(self, target, unsigned_apk, key):
-    # With JDK 1.7.0_51, jars without timestamps print a warning. This causes jars to stop working
-    # pas their validity date. But Android purposefully passes 30 years validity. More research
+    # After JDK 1.7.0_51, jars without timestamps print a warning. This causes jars to stop working
+    # past their validity date. But Android purposefully passes 30 years validity. More research
     # is needed before passing a -tsa flag indiscriminately.
     # http://bugs.java.com/view_bug.do?bug_id=8023338
     args = []
     args.extend([self._java_dist.binary('jarsigner')])
+
     # first two are required flags for JDK 7+
     args.extend(['-sigalg', 'SHA1withRSA'])
     args.extend(['-digestalg', 'SHA1'])
+
     args.extend(['-keystore', key.location])
     args.extend(['-storepass', key.keystore_password])
     args.extend(['-keypass', key.key_password])
@@ -63,6 +62,7 @@ class JarsignerTask(NailgunTask):
         safe_mkdir(self.jarsigner_out(target))
         build_type = target.build_type
         keys = []
+
         # get the unsigned apk
         unsigned_apks = self.context.products.get('apk')
         target_apk = unsigned_apks.get(target)
@@ -74,6 +74,7 @@ class JarsignerTask(NailgunTask):
         else:
           raise ValueError(self, "This target {0} did not have an apk built that can be "
                                  "signed".format(target))
+
         # match the keystore in the target graph to the type of build ordered.
         def get_key(tgt):
           if isinstance(tgt, Keystore):
@@ -81,13 +82,15 @@ class JarsignerTask(NailgunTask):
               keys.append(tgt)
 
         target.walk(get_key, predicate=isinstance(target,Keystore))
+
+        # Ensure there is only one key that matches the requested config.
         if keys:
-          # Perhaps we will soon allow depending pn multiple keys per type and match by name.
+          # Perhaps we will soon allow depending on multiple keys per type and match by name.
           if len(keys) > 1:
-            raise TaskError(self, "This target {0} depends on more than one key of the same"
-                                  "build type {1}. Please pick the key you wish to "
-                                  "sign with".format(target, target.build_type))
-            # TODO(mateor?)create Nailgun pipeline for other java tools, handling stderr/out, etc.
+            raise TaskError(self, "This target: {0} depends on more than one key of the same "
+                                  "build type [{1}]. Please pick just one key of each build type "
+                                  "['debug', 'release']".format(target, target.build_type))
+          # TODO(mateor?)create Nailgun pipeline for other java tools, handling stderr/out, etc.
           process = subprocess.Popen(self.render_args(target, unsigned_apk, keys[0]))
           result = process.wait()
           if result != 0:

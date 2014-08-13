@@ -10,6 +10,7 @@ python_library(
     ':aapt_gen',
     ':aapt_task',
     ':dx_compile',
+    ':jarsigner',
   ],
 )
 
@@ -80,7 +81,12 @@ python_library(
   name = 'jarsigner_task',
   sources = ['jarsigner_task.py'],
   dependencies = [
+    'src/python/pants/backend/android/targets:android',
     'src/python/pants/backend/android/tasks:android_task',
+    'src/python/pants/backend/jvm/tasks:nailgun_task',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/base:workunit',
+    'src/python/pants/util:dirutil',
   ],
 )
 

@@ -51,8 +51,6 @@ class Keystore(Target):
     self.keystore_password = keystore_password
     self.key_password=key_password
 
-  # TODO(mateor) update docstring of Android targets.
-
     if type.lower() == "debug":
       self.type = 'debug'
     else:
@@ -61,5 +59,3 @@ class Keystore(Target):
       else:
         raise KeyError("A Keystore target: {0!r} needs a 'type' field that is set to "
                        "either 'debug' or 'release'.".format(self.address))
-
-    #print(os.path.join(self.properties_file))
