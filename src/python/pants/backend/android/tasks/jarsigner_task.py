@@ -29,7 +29,7 @@ class JarsignerTask(AndroidTask, NailgunTask):
   def __init__(self, *args, **kwargs):
     super(JarsignerTask, self).__init__(*args, **kwargs)
     #self.release = self.context.options.release_build or False
-    config_section = self.config_section
+    #config_section = self.config_section
     #print ("release is %s" % self.release)
 
   def prepare(self, round_manager):
@@ -73,18 +73,19 @@ class JarsignerTask(AndroidTask, NailgunTask):
         build_type=target.build_type
         print(target)
         safe_mkdir(self.workdir)
-        unsigned_apk = self.context.products.get('apk')
-        print(unsigned_apk)
+        unsigned_apks = self.context.products.get('apk')
+        print(unsigned_apks)
         #
         # #for key in keys_by_target:
         #  # print("Dems da keys: ")
         #  # print(key)
         #
-        # def add_to_dex(tgt):
-        #   target_keys = keys_by_target.get(tgt)
-        #   if target_keys:
-        #     print("WE shhould see th sea from thee")
-        #     print(target_keys)
+        def grab_apk(tgt):
+          target_apk = unsigned_apks.get(tgt)
+          print(target_apk)
+          if target_apk:
+            print("WE shhould see th sea from thee")
+            #print(target_keys)
         #     # def add_classes(target_products):
         #     #   for root, products in target_products.abs_paths():
         #     #     for prod in products:
@@ -92,7 +93,7 @@ class JarsignerTask(AndroidTask, NailgunTask):
         #     #
         #     # add_classes(target_classes)
 
-      #target.walk(add_to_dex)
+      target.walk(grab_apk)
 
     #if debug
     #  if no config
