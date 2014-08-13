@@ -58,48 +58,52 @@ class JarsignerTask(NailgunTask):
   def execute(self):
     with self.context.new_workunit(name='jarsigner', labels=[WorkUnit.MULTITOOL]):
       targets = self.context.targets(self.is_signtarget)
-      for target in targets:
-        safe_mkdir(self.jarsigner_out(target))
-        build_type = target.build_type
-        keys = []
+      with self.invalidated(targets) as invalidation_check:
+        invalid_targets = []
+        for vt in invalidation_check.invalid_vts:
+          invalid_targets.extend(vt.targets)
+        for target in invalid_targets:
+          safe_mkdir(self.jarsigner_out(target))
+          build_type = target.build_type
+          keys = []
 
-        def get_apk(target):
-          """Return the unsigned.apk product from AaptBuilder."""
-          unsigned_apks = self.context.products.get('apk')
-          target_apk = unsigned_apks.get(target)
-          if target_apk:
-            for tgts, prods in target_apk.iteritems():
-              unsigned_path = os.path.join(tgts)
-              for prod in prods:
-                return os.path.join(unsigned_path, prod)
+          def get_apk(target):
+            """Return the unsigned.apk product from AaptBuilder."""
+            unsigned_apks = self.context.products.get('apk')
+            target_apk = unsigned_apks.get(target)
+            if target_apk:
+              for tgts, prods in target_apk.iteritems():
+                unsigned_path = os.path.join(tgts)
+                for prod in prods:
+                  return os.path.join(unsigned_path, prod)
+            else:
+              raise ValueError(self, "This target {0} did not have an apk built that can be "
+                                     "signed".format(target))
+
+          def get_key(key):
+            """Return Keystore objects that match the target's build_type."""
+            if isinstance(key, Keystore):
+              if key.type == build_type:
+                keys.append(key)
+
+          unsigned_apk = get_apk(target)
+          target.walk(get_key)
+
+          # Ensure there is only one key that matches the requested config.
+          # Perhaps we will soon allow depending on multiple keys per type and match by name.
+          if keys:
+            if len(keys) > 1:
+              raise TaskError(self, "This target: {0} depends on more than one key of the same "
+                                    "build type [{1}]. Please pick just one key of each build type "
+                                    "['debug', 'release']".format(target, target.build_type))
+            # TODO(mateor?)create Nailgun pipeline for other java tools, handling stderr/out, etc.
+            process = subprocess.Popen(self.render_args(target, unsigned_apk, keys[0]))
+            result = process.wait()
+            if result != 0:
+              raise TaskError('Android aapt tool exited non-zero ({code})'.format(code=result))
           else:
-            raise ValueError(self, "This target {0} did not have an apk built that can be "
-                                   "signed".format(target))
-
-        def get_key(key):
-          """Return Keystore objects that match the target's build_type."""
-          if isinstance(key, Keystore):
-            if key.type == build_type:
-              keys.append(key)
-
-        unsigned_apk = get_apk(target)
-        target.walk(get_key)
-
-        # Ensure there is only one key that matches the requested config.
-        # Perhaps we will soon allow depending on multiple keys per type and match by name.
-        if keys:
-          if len(keys) > 1:
-            raise TaskError(self, "This target: {0} depends on more than one key of the same "
-                                  "build type [{1}]. Please pick just one key of each build type "
-                                  "['debug', 'release']".format(target, target.build_type))
-          # TODO(mateor?)create Nailgun pipeline for other java tools, handling stderr/out, etc.
-          process = subprocess.Popen(self.render_args(target, unsigned_apk, keys[0]))
-          result = process.wait()
-          if result != 0:
-            raise TaskError('Android aapt tool exited non-zero ({code})'.format(code=result))
-        else:
-          raise TaskError(self, "No key matched the {0} target's build type "
-                                "[release, debug]".format(target))
+            raise TaskError(self, "No key matched the {0} target's build type "
+                                  "[release, debug]".format(target))
 
   def jarsigner_out(self, target):
     return os.path.join(self._distdir, target.app_name)

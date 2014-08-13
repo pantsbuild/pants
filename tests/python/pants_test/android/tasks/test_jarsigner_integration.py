@@ -13,11 +13,11 @@ from pants_test.tasks.test_base import is_exe
 
 
 class JarsignerIntegrationTest(AndroidIntegrationTest):
-  """Integration test for JarsignerTask
+  """Integration test for JarsignerTask.
 
-  The Android SDK is modular, finding an SDK on the PATH is no guarantee that there is
-  a dx.jar anywhere on disk. The TOOLS are the ones required by the target in 'test_dx_compile'
-  method. If you add a target, you may need to expand the TOOLS list and perhaps define new
+  The Android SDK is modular, finding an SDK on the PATH is no guarantee that the tools you
+  need are anywhere on disk. The TOOLS are the ones needed by the tasks jarsigner depends on.
+  If you add a target, you may need to expand the TOOLS list and perhaps define new
   BUILD_TOOLS or TARGET_SDK class variables.
   """
   TOOLS = [
