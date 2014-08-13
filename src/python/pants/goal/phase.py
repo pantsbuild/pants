@@ -18,8 +18,7 @@ class Phase(object):
   """
   _phase_by_name = dict()
 
-  @classmethod
-  def __new__(cls):
+  def __new__(cls, *args, **kwargs):
     raise TypeError('Do not instantiate {0}. Call by_name() instead.'.format(cls))
 
   @classmethod
