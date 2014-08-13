@@ -10,7 +10,6 @@ import os
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.target import Target
 
-
 class KeyError(Exception):
   pass
 
@@ -19,15 +18,23 @@ class Keystore(Target):
 
   def __init__(self,
                type=None,
+               sources=None,
                keystore_alias=None,
-               key_store_password=None,
+               keystore_password=None,
                key_alias_password=None,
                **kwargs):
     super(Keystore, self).__init__(**kwargs)
 
+    self.key = sources
+    if len(self.key) > 1:
+      raise TargetDefinitionException(self, "The 'sources' field points only to the keystore file")
     self.keystore_alias = keystore_alias
-    self.key_store_password = key_store_password
+    self.keystore_password = keystore_password
     self.key_alias_password=key_alias_password
+
+
+  # TODO(mateor) update docstring of Android targets.
+
 
     if type.lower() == "debug":
       self.type = 'debug'

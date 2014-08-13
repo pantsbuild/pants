@@ -17,7 +17,7 @@ from pants.util.dirutil import safe_mkdir
 
   # need an err "We could not find a key at DEFAULT you need to xxxxxxxx
 
-class JarsignerTask(AndroidTask, NailgunTask):
+class JarsignerTask(NailgunTask):
   """Sign Android packages with keystore"""
 
   # For debug releases, we are using the debug key created with an install
@@ -38,6 +38,8 @@ class JarsignerTask(AndroidTask, NailgunTask):
   @property
   def config_section(self):
     return self._CONFIG_SECTION
+
+  #TODO (mateor) if we are going to keep a debug key in repo, it should go in 3rdparty/android
 
   @classmethod
   def is_signtarget(self, target):

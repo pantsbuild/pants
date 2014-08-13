@@ -8,7 +8,7 @@ android_binary(
   manifest='AndroidManifest.xml',
   dependencies = [
     ':resources',
-   pants('src/python/pants/backend/android/authentication:debug')
+    '3rdparty/android/authentication:debug'
   ],
 )
 

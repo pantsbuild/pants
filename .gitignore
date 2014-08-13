@@ -22,6 +22,9 @@
 .factorypath
 .python
 .pydevproject
+3rdparty/android/authentication/keys/release/*
+# allow the readme only under 'release'
+!3rdparty/android/authentication/keys/release/readme.txt
 bin/
 build/
 build-support/*.pex
