@@ -77,6 +77,9 @@ API Changes
 * Upgrade requests, flip to a ranged requirement to help plugins
   `RB #771 <https://rbcommons.com/s/twitter/r/771>`_
 
+* New goal ``ensime`` to generate Ensime projects for Emacs users.
+  `RB #753 <https://rbcommons.com/s/twitter/r/753>`_
+
 Bugfixes
 ~~~~~~~~
 
@@ -117,6 +120,9 @@ Bugfixes
 
 * Plumb ivysettings.xml location to the publish template
   `RB #764 <https://rbcommons.com/s/twitter/r/764>`_
+
+* Fix goal markdown: README.html pages clobbered each other
+  `RB #750 <https://rbcommons.com/s/twitter/r/750>`_
 
 0.0.21 (7/25/2014)
 ------------------
