@@ -37,6 +37,13 @@ class Phase(object):
     cls._phase_by_name.clear()
 
   @staticmethod
+  def option_group_title(phase, task_name):
+    """Returns name to use for CLI flag OptionGroup."""
+    phase_leader = len(phase.ordered_task_names()) == 1 or task_name == phase.name
+    namespace = [task_name] if phase_leader else [phase.name, task_name]
+    return ':'.join(namespace)
+
+  @staticmethod
   def setup_parser(parser, args, phases):
     """Set up an OptionParser with options info for a phase and its deps.
 
@@ -56,7 +63,7 @@ class Phase(object):
           phase_leader = len(phase.ordered_task_names()) == 1 or task_name == phase.name
           namespace = [task_name] if phase_leader else [phase.name, task_name]
           mkflag = Mkflag(*namespace)
-          option_group = OptionGroup(parser, title=':'.join(namespace))
+          option_group = OptionGroup(parser, title=Phase.option_group_title(phase, task_name))
           task_type.setup_parser(option_group, args, mkflag)
           if option_group.option_list:
             parser.add_option_group(option_group)

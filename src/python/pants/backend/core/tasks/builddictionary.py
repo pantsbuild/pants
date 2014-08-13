@@ -275,10 +275,10 @@ def gen_goals_phases_reference_data():
       options_by_title[group.title] = group
     found_option_groups = set()
     goals = []
-    for task_name in sorted(phase.ordered_task_names()):
+    for task_name in phase.ordered_task_names():
       task_type = phase.task_type_by_name(task_name)
       doc = indent_docstring_by_n(task_type.__doc__ or "", 2)
-      options_title = '{0}.{1}'.format(phase.name, task_name)
+      options_title = Phase.option_group_title(phase, task_name)
       og = options_by_title[options_title]
       if og:
         found_option_groups.add(options_title)
