@@ -23,7 +23,7 @@
 .python
 .pydevproject
 3rdparty/android/authentication/keys/release/*
-# allow the readme only under 'release'
+# allow only the readme under 'release'
 !3rdparty/android/authentication/keys/release/readme.txt
 bin/
 build/

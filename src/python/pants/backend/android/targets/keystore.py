@@ -12,9 +12,6 @@ from pants.base.target import Target
 from pants.base.build_environment import get_buildroot
 
 
-class KeyError(Exception):
-  pass
-
 class Keystore(Target):
   """Represents a keystore configuration"""
 
@@ -49,7 +46,7 @@ class Keystore(Target):
 
     self.keystore_alias = keystore_alias
     self.keystore_password = keystore_password
-    self.key_password=key_password
+    self.key_password = key_password
 
     if type.lower() == "debug":
       self.type = 'debug'
@@ -57,5 +54,5 @@ class Keystore(Target):
       if type.lower() == "release":
         self.type = 'release'
       else:
-        raise KeyError("A Keystore target: {0!r} needs a 'type' field that is set to "
-                       "either 'debug' or 'release'.".format(self.address))
+        raise TargetDefinitionException("A Keystore target: {0!r} needs a 'type' field that "
+                       "is set to either 'debug' or 'release'.".format(self.address))

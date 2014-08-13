@@ -20,7 +20,7 @@ class JarsignerTask(NailgunTask):
   _CONFIG_SECTION = 'jarsigner-tool'
 
   @classmethod
-  def is_signtarget(self, target):
+  def is_signtarget(cls, target):
     return isinstance(target, AndroidBinary)
 
   def __init__(self, *args, **kwargs):
@@ -50,7 +50,7 @@ class JarsignerTask(NailgunTask):
     args.extend(['-storepass', key.keystore_password])
     args.extend(['-keypass', key.key_password])
     args.extend(['-signedjar', (os.path.join(self.jarsigner_out(target), target.app_name
-                                             + '-' + key.type + '-signed.apk')) ])
+                                             + '-' + key.type + '-signed.apk'))])
     args.append(unsigned_apk)
     args.append(key.keystore_alias)
     return args
@@ -81,7 +81,7 @@ class JarsignerTask(NailgunTask):
             if tgt.type == build_type:
               keys.append(tgt)
 
-        target.walk(get_key, predicate=isinstance(target,Keystore))
+        target.walk(get_key, predicate=isinstance(target, Keystore))
 
         # Ensure there is only one key that matches the requested config.
         if keys:
