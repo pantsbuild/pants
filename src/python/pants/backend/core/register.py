@@ -29,6 +29,7 @@ from pants.backend.core.tasks.reporting_server import RunServer, KillServer
 from pants.backend.core.tasks.roots import ListRoots
 from pants.backend.core.tasks.sorttargets import SortTargets
 from pants.backend.core.tasks.targets_help import TargetsHelp
+from pants.backend.core.tasks.what_changed import WhatChanged
 from pants.backend.core.wrapped_globs import Globs, RGlobs, ZGlobs
 from pants.base.build_environment import get_buildroot, get_scm, pants_version, set_scm
 from pants.base.build_file_aliases import BuildFileAliases
@@ -163,3 +164,6 @@ def register_goals():
 
   task(name='roots', action=ListRoots
   ).install('roots').with_description("Print the workspace's source roots and associated target types.")
+
+  task(name='changed', action=WhatChanged
+  ).install().with_description('Print the targets changed since some prior commit.')

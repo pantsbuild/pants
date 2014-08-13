@@ -141,3 +141,27 @@ class BuildFileTest(unittest2.TestCase):
         BuildFileTest.buildfile('BUILD'),
         BuildFileTest.buildfile('BUILD.twitter')]),
         buildfile.ancestors())
+
+  def test_buildfile_with_dir_must_exist_false(self):
+    # We should be able to create a BuildFile against a dir called BUILD if must_exist is false.
+    # This is used in what_changed for example.
+    buildfile = BuildFile(BuildFileTest.root_dir, 'grandparent/BUILD', must_exist=False)
+    self.assertFalse(buildfile.exists())
+
+  def test_buildfile_with_dir_must_exist_true(self):
+    # We should NOT be able to create a BuildFile instance against a dir called BUILD
+    # in the default case.
+    with self.assertRaises(BuildFile.MissingBuildFileError):
+      BuildFile(BuildFileTest.root_dir, 'grandparent/BUILD')
+
+  def test_directory_called_build_skipped(self):
+    # Ensure the buildfiles found do not include grandparent/BUILD since it is a dir.
+    buildfiles = BuildFile.scan_buildfiles(os.path.join(BuildFileTest.root_dir, 'grandparent'))
+
+    self.assertEquals(OrderedSet([
+      BuildFileTest.buildfile('grandparent/parent/BUILD'),
+      BuildFileTest.buildfile('grandparent/parent/BUILD.twitter'),
+      BuildFileTest.buildfile('grandparent/parent/child1/BUILD'),
+      BuildFileTest.buildfile('grandparent/parent/child1/BUILD.twitter'),
+      BuildFileTest.buildfile('grandparent/parent/child2/child3/BUILD'),
+      ]), buildfiles)

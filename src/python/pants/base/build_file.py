@@ -82,18 +82,21 @@ class BuildFile(object):
     self._build_basename = BuildFile._BUILD_FILE_PREFIX
     buildfile = os.path.join(path, self._build_basename) if os.path.isdir(path) else path
 
-    if os.path.isdir(buildfile):
-      raise self.MissingBuildFileError(
-        'Path to buildfile ({buildfile}) is a directory, but it must be a file.'
-        .format(buildfile=buildfile))
-
     if must_exist:
+      # If the build file must exist then we want to make sure it's not a dir.
+      # In other cases we are ok with it being a dir, for example someone might have
+      # repo/scripts/build/doit.sh.
+      if os.path.isdir(buildfile):
+        raise self.MissingBuildFileError(
+          'Path to buildfile ({buildfile}) is a directory, but it must be a file.'
+          .format(buildfile=buildfile))
+
       if not os.path.exists(os.path.dirname(buildfile)):
         raise self.MissingBuildFileError('Path to BUILD file does not exist at: {path}'
                                          .format(path=os.path.dirname(buildfile)))
 
     # There is no BUILD file without a prefix so select any viable sibling
-    if not os.path.exists(buildfile):
+    if not os.path.exists(buildfile) or os.path.isdir(buildfile):
       for build in BuildFile._get_all_build_files(os.path.dirname(buildfile)):
         self._build_basename = build
         buildfile = os.path.join(path, self._build_basename)
@@ -123,7 +126,7 @@ class BuildFile(object):
 
   def exists(self):
     """Returns True if this BuildFile corresponds to a real BUILD file on disk."""
-    return os.path.exists(self.full_path)
+    return os.path.exists(self.full_path) and not os.path.isdir(self.full_path)
 
   def descendants(self):
     """Returns all BUILD files in descendant directories of this BUILD file's parent directory."""
