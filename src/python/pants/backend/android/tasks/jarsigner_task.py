@@ -26,6 +26,7 @@ class JarsignerTask(NailgunTask):
   def __init__(self, *args, **kwargs):
     super(JarsignerTask, self).__init__(*args, **kwargs)
     self._java_dist = self._dist
+    self._distdir = self.context.config.getdefault('pants_distdir')
 
   def prepare(self, round_manager):
     round_manager.require_data('apk')
@@ -102,6 +103,6 @@ class JarsignerTask(NailgunTask):
                                 "[release, debug]".format(target))
 
   def jarsigner_out(self, target):
-    return os.path.join(self.workdir, target.app_name)
+    return os.path.join(self._distdir, target.app_name)
 
   # TODO (mateor) verify sig (jarsigner -verify -verbose -certs my_application.apk)
