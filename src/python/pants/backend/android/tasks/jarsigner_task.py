@@ -75,17 +75,31 @@ class JarsignerTask(AndroidTask, NailgunTask):
         safe_mkdir(self.workdir)
         unsigned_apks = self.context.products.get('apk')
         print(unsigned_apks)
+        apk = unsigned_apks.get(target)
+        if apk:
+          target_apk = apk
+        print(target_apk)
+        build_type = target.build_type
+        print ("POPEYE the build_type is %s" % build_type)
+        key = []
         #
         # #for key in keys_by_target:
         #  # print("Dems da keys: ")
         #  # print(key)
         #
-        def grab_apk(tgt):
-          target_apk = unsigned_apks.get(tgt)
-          print(target_apk)
-          if target_apk:
-            print("WE shhould see th sea from thee")
-            #print(target_keys)
+        def get_key(tgt):
+          print(tgt)
+          if isinstance(tgt, Keystore):
+            print ("OLIVE OYL the tgt.type is %s" % tgt.type)
+            if tgt.type == build_type:
+              print ("Swee'pea we FOUND a match!")
+              key.append(tgt)
+              return tgt
+
+          # if target_apk:
+          #   # This does comes back None, you need the protection here.
+          #   print("WE shhould see th sea from thee")
+          #   return target_apk
         #     # def add_classes(target_products):
         #     #   for root, products in target_products.abs_paths():
         #     #     for prod in products:
@@ -93,7 +107,10 @@ class JarsignerTask(AndroidTask, NailgunTask):
         #     #
         #     # add_classes(target_classes)
 
-      target.walk(grab_apk)
+      keystore = target.walk(get_key, predicate=isinstance(target,Keystore))
+      print ("Here we are again on the keystore")
+      print(keystore)
+      print(key)
 
     #if debug
     #  if no config

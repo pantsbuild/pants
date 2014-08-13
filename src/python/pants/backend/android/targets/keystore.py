@@ -30,10 +30,10 @@ class Keystore(Target):
     self.key_alias_password=key_alias_password
 
     if type.lower() == "debug":
-      self. release = False
+      self.type = 'debug'
     else:
-      if type.lower() == "release".lower():
-        self.release = True
+      if type.lower() == "release":
+        self.type = 'release'
       else:
         raise KeyError("A Keystore target: {0!r} needs a 'type' field that is set to "
                        "either 'debug' or 'release'.".format(self.address))

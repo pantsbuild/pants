@@ -23,6 +23,7 @@ class AndroidTarget(JvmTarget):
   def __init__(self,
                address=None,
                # TODO (mateor) add support for minSDk
+               build_type = None,
                # most recent build_tools_version should be defined elsewhere
                build_tools_version="19.1.0",
                manifest=None,
@@ -45,8 +46,11 @@ class AndroidTarget(JvmTarget):
     super(AndroidTarget, self).__init__(address=address, **kwargs)
 
     # TODO(mateor) support for 'release' builds
-    # For now Pants only supports 'debug'.
-    self.build_type = 'debug'
+    self.build_type = build_type
+    if self.build_type is None:
+      self.build_type = 'debug'
+    else:
+      raise TargetDefinitionException(self, 'Pants currently only supports debug build type.')
     self.add_labels('android')
     self.build_tools_version = build_tools_version
 
