@@ -110,7 +110,8 @@ class Git(Scm):
     self._push()
 
   def commit_date(self, commit_reference):
-    return self._check_output(['log', '-1', '--pretty=tformat:%ci', ref], raise_type=Scm.LocalException)
+    return self._check_output(['log', '-1', '--pretty=tformat:%ci', commit_reference],
+                              raise_type=Scm.LocalException)
 
   def _push(self, *refs):
     remote, merge = self._get_upstream()
