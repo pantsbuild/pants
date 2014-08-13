@@ -31,6 +31,7 @@ class Keystore(Target):
     :param string key_password: The password for the key.
     """
     super(Keystore, self).__init__(**kwargs)
+    address = kwargs['address']
 
     # TODO (mateor) if debug location is empty, create a debug.keystore with keytool.
     self.sources = sources
@@ -42,7 +43,7 @@ class Keystore(Target):
         raise TargetDefinitionException(self, "The keystore must provide a 'sources' attribute "
                                               "with path to the keystore file")
       else:
-        self.location = os.path.join(get_buildroot(), self.address.spec_path, source)
+        self.location = os.path.join(get_buildroot(), address.spec_path, source)
 
     self.keystore_alias = keystore_alias
     self.keystore_password = keystore_password

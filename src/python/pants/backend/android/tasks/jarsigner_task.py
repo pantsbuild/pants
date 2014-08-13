@@ -16,7 +16,6 @@ from pants.util.dirutil import safe_mkdir
 class JarsignerTask(NailgunTask):
   """Sign Android packages with keystore."""
 
-  GITIGNORE = '.gitignore'
   _CONFIG_SECTION = 'jarsigner-tool'
 
   @classmethod

@@ -10,7 +10,7 @@ python_library(
     ':aapt_gen',
     ':aapt_task',
     ':dx_compile',
-    ':jarsigner',
+    ':jarsigner_task',
   ],
 )
 
@@ -28,7 +28,7 @@ python_library(
   sources = ['aapt_builder.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.log',
-    src/python/pants/backend/android/targets:android',
+    'src/python/pants/backend/android/targets:android',
     'src/python/pants/backend/android/tasks:aapt_task',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
@@ -59,20 +59,6 @@ python_library(
     'src/python/pants/base:address',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
-    'src/python/pants/util:dirutil',
-  ],
-)
-
-python_library(
-  name = 'dx_compile',
-  sources = ['dx_compile.py'],
-  dependencies = [
-    'src/python/pants/backend/android/targets:android',
-    'src/python/pants/backend/android/tasks:android_task',
-    'src/python/pants/backend/core/tasks:common',
-    'src/python/pants/backend/jvm/tasks:nailgun_task',
-    'src/python/pants/base:exceptions',
-    'src/python/pants/base:workunit',
     'src/python/pants/util:dirutil',
   ],
 )
