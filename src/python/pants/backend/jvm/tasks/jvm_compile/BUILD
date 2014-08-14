@@ -1,18 +1,17 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-python_library(
+dependencies(
   name = 'all',
   dependencies = [
     ':analysis',
     ':analysis_parser',
     ':analysis_tools',
+    ':anonymizer',
     ':java',
     ':jvm_compile',
-    ':anonymizer',
     ':jvm_dependency_analyzer',
     ':scala',
-    ':anonymize_zinc_analysis',
   ],
 )
 
@@ -85,7 +84,6 @@ python_library(
 python_library(
   name = 'anonymizer',
   sources = ['anonymizer.py'],
-  dependencies = []
 )
 
 python_library(
