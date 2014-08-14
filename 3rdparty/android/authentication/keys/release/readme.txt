@@ -2,8 +2,21 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-!!! Please do not put release keystores or passwords into BUILD.debug or any 'debug' namespace !!!
+!!! Please do not put a release keystore or password into BUILD.debug or any 'debug' namespace !!!
 
-# When supported, release key instructions will go here.
+To safely keep release keystores and passwords out of vcs, create a BUILD.release file in
+this directory and fill out a build definition like below.
 
-Neither the BUILD.release nor 3rdparty/android/authentication/release files will be added to git.
+keystore(
+  name='release',
+  type='release',
+  sources=['my-release-key.keystore'],
+  keystore_alias='alias_name',
+  keystore_password='store_password',
+  key_password='key_password'
+)
+
+Then just add the keystore target as a dependency to your android target.
+
+Neither the BUILD.release nor any new 3rdparty/android/authentication/release files
+will be added to git.
