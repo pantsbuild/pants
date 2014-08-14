@@ -57,7 +57,7 @@ class Command(object):
     with self.run_tracker.new_workunit(name='bootstrap', labels=[WorkUnit.SETUP]):
       # construct base parameters to be filled in for BuildGraph
       for path in config.getlist('goals', 'bootstrap_buildfiles', default=[]):
-        build_file = BuildFile(root_dir=self.root_dir, relpath=path)
+        build_file = BuildFile.from_cache(root_dir=self.root_dir, relpath=path)
         # TODO(pl): This is an unfortunate interface leak, but I don't think
         # in the long run that we should be relying on "bootstrap" BUILD files
         # that do nothing except modify global state.  That type of behavior

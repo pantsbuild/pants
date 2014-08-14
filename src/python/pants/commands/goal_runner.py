@@ -76,7 +76,7 @@ class GoalRunner(Command):
       # priority to the goal, but give a warning if they might have meant the target (if the BUILD
       # file exists).
       try:
-        BuildFile(get_buildroot(), spec)
+        BuildFile.from_cache(get_buildroot(), spec)
         msg = (' Command-line argument "{spec}" is ambiguous, and was assumed to be a goal.'
                ' If this is incorrect, disambiguate it with the "--" argument to separate goals'
                ' from targets.')
