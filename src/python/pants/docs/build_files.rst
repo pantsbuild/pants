@@ -84,7 +84,7 @@ functionality::
     # depends on plain ol' tugboat
     java_library(name='theodore',
       dependencies=[
-        pants('src/java/com/twitter/tugboat'),
+        'src/java/com/twitter/tugboat',
       ],
       sources=globs('*.java'),
     )
@@ -95,7 +95,7 @@ non-default target::
     # depends on optional tugboat functionality
     java_library(name='hank',
       dependencies=[
-        pants('src/java/com/twitter/tugboat:hispeed'),
+        'src/java/com/twitter/tugboat:hispeed',
       ],
       sources=globs('*.java'),
     )
@@ -230,7 +230,7 @@ The risk of dependency conflicts increases greatly. For example::
     # DO NOT bundle interface and implementations - forces extra dependencies.
     java_library(name='from',
       dependencies=[
-        pants('3rdparty/jvm/org/apache/hbase'),
+        '3rdparty/jvm/org/apache/hbase',
       ],
       sources=globs('*.java'),
     )
@@ -258,7 +258,7 @@ many fellow travelers should be published as separate pants targets.** ::
     # pants target src/java/com/twitter/etl/from/hbase
     java_library(name='hbase',
       dependencies=[
-        pants('3rdparty/jvm/org/apache/hbase'),
+        '3rdparty/jvm/org/apache/hbase',
       ],
       sources=globs('*.java'),
     )
@@ -282,7 +282,7 @@ Existing code using a package for both an interface and implementations should s
     # Implementation with heavyweight dependencies exposed separately.
     java_library(name='hbase',
       dependencies=[
-        pants('3rdparty/jvm/org/apache/hbase'),
+        '3rdparty/jvm/org/apache/hbase',
       ],
       sources=['HBaseDataImporter.java'],
     )
@@ -298,13 +298,13 @@ Consider the following library target that depends on both `slf4j-api` and the s
     # Incorrect - forces a logging implementation on all library users.
     scala_library(name='mylib',
       dependencies=[
-        pants('3rdparty:slf4j-api'),
-        pants('3rdparty:slf4j-jdk14'),
+        '3rdparty:slf4j-api',
+        '3rdparty:slf4j-jdk14',
       ],
     )
-    
+
     jvm_binary(name='mybin',
-      dependencies=[pants(':mylib')],
+      dependencies=[':mylib'],
     )
 
 Structure these dependencies to only depending on the API in library code.
@@ -313,15 +313,15 @@ Allow binary targets to specify the logging implementation of their choosing. ::
     # Better approach - only depend on API in a library target.
     scala_library(name='mylib',
       dependencies=[
-        pants('3rdparty:slf4j-api'),
+        '3rdparty:slf4j-api',
       ],
     )
-    
+
     # Bring your own API implementation in the binary.
     jvm_binary(name='mybin',
       dependencies=[
-        pants('3rdparty:slf4j-jdk14'),
-        pants(':mylib'),
+        '3rdparty:slf4j-jdk14',
+        ':mylib',
       ],
     )
 
@@ -402,3 +402,72 @@ exclusives tags: ::
 
 With the exclusives declared, pants can recognize that 'javabin' has conflicting
 dependencies, and can generate an appropriate error message.
+
+.. _usage-pants-wrapper-gone:
+
+What happened to the pants() wrapper around targets?
+****************************************************
+
+If you have an existing project using Pants and have recently upgraded, you may encounter
+this warning ::
+
+   *** pants() wrapper is obsolete and will be removed in a future release.
+
+or the BUILD may fail an error. ::
+
+   NameError: name 'pants' is not defined
+
+In pre-release versions of Pants, targets declared in the ``dependencies`` attribute had
+to be wrapped in a call to the ``pants()`` method. ::
+
+   java_library(name='foo',
+       dependencies=[pants('bar')])
+
+The ``pants()`` method has since been replaced with a noop and as of Pants 0.0.24 is
+officially deprecated.  The above snippet should be re-written to use the target as a plain
+string. ::
+
+   java_library(name='foo',
+       dependencies=['bar'])
+
+You can use ``sed`` or a similar utility to quickly remove these references
+from your BUILD files with a regular expression. ::
+
+   # Run this command from the root of your repo.
+   sed -i "" -e 's/pants(\([^)]*\))/\1/g' `find . -name "BUILD*"`
+
+
+Using an older version of Pants?
+********************************
+
+If you are following along in these examples and are using a version of pants prior to the 2014 open source release you might see one of
+the following messages:
+
+From a ``python_*`` target dependencies attribute: ::
+
+   AttributeError: 'str' object has no attribute 'resolve'
+
+From a ``java_library`` dependencies attribute: ::
+
+   The following targets could not be loaded:
+     src/java/com/twitter/foo/bar/baz =>
+       TargetDefinitionException: Error with src/java/com/foo/bar/baz/BUILD:baz:
+          Expected elements of list to be (<class 'twitter.pants.targets.external_dependency.ExternalDependency'>, <class 'twitter.pants.targets.anonymous.AnonymousDeps'>,
+            <class 'twitter.pants.base.target.Target'>), got value 3rdparty:guava of type <type 'str'>
+
+From a ``java_library`` resources attribute: ::
+
+
+   IOError: [Errno 2] No such file or directory: '/Users/pantsaddict/workspace/src/resources/com/foo/bar'
+
+From a ``junit_tests`` resources attribute: ::
+
+   ValueError: Expected elements of list to be <class 'twitter.pants.base.target.Target'>, got value tests/scala/foo/bar/baz/resources of type <type 'str'>
+
+From a ``provides`` repo attribute: ::
+
+   ValueError: repo must be Repository or Pants but was foo/bar/baz:baz
+
+All of these errors likely mean  that you need to wrap the strings mentioned in the error message with the ``pants()`` wrapper
+function in your BUILD files.  The open source Pants release deprecated the use of this wrapper and thus examples in this
+documentation don't include it.  For more information, see the :ref:`pants wrapper <usage-pants-wrapper-gone>` notes above.

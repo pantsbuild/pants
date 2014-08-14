@@ -147,7 +147,7 @@ The ``BUILD`` files in ``3rdparty/`` have targets like::
                   jar(org='junit', name='junit-dep', rev='4.11').with_sources(),
                 ],
                 dependencies = [
-                  pants(':hamcrest-core'),
+                  ':hamcrest-core',
                 ],
                )
 

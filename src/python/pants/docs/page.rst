@@ -66,7 +66,7 @@ an anchor therein::
         For more information about this fascinating topic,
         please see [[Destinations|pants('path/to:dest')]],
         especially the
-        [[Addendum section|pants('path/to:dest')#addendum]],
+        [[Addendum section|pants('path/to:dest)'#addendum]],
 
 Pants replaces the ``pants('path/to:dest')`` with the appropriate link.
 
@@ -97,7 +97,7 @@ To specify that a page should be published to a Confluence wiki page, set its
 
     page(...
       provides=[
-        wiki_artifact(wiki=pants('//:confluence'),
+        wiki_artifact(wiki='//:confluence',
           space='ENG',
           title='Pants Hello World Example',
           parent='Examples',

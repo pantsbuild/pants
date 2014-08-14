@@ -41,7 +41,7 @@ As a convenience, targets can be referenced relatively within the same BUILD fil
 
     java_library(name='application', ...)
     java_library(name='mybird',
-      dependencies=[pants(':application')],
+      dependencies=[':application'],
     )
 
 To refer to a target in a top-level BUILD file, prefix the target name with ``//:``. (You can
@@ -50,7 +50,7 @@ is relative.) ::
 
     java_library(name='application', ...)
     java_library(name='mybird',
-      dependencies=[pants('//:application')],
+      dependencies=['//:application'],
     )
 
 Here `//:application` refers to the `application` target in the root level BUILD file and *not*
