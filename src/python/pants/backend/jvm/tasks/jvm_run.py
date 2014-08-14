@@ -7,7 +7,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import shlex
 
-from pants.backend.jvm.targets.jvm_binary import JvmBinary
+from pants.backend.jvm.targets.jvm_binary import JvmApp, JvmBinary
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit
@@ -71,7 +71,12 @@ class JvmRun(JvmTask):
     # Currently re-acquiring the lock requires a path argument that was set up by the goal
     # execution engine.  I do not want task code to learn the lock location.
     # http://jira.local.twitter.com/browse/AWESOME-1317
-    binary = self.require_single_root_target()
+    target = self.require_single_root_target()
+
+    if isinstance(target, JvmApp):
+      binary = target.binary
+    else:
+      binary = target
 
     # We can't throw if binary isn't a JvmBinary, because perhaps we were called on a
     # python_binary, in which case we have to no-op and let python_run do its thing.
