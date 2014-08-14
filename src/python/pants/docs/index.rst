@@ -49,6 +49,7 @@ Using Pants With...
 .. toctree::
    :maxdepth: 1
 
+   with_emacs
    with_intellij
 
 Advanced Documentation
