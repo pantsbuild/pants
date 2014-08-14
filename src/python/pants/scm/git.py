@@ -43,11 +43,6 @@ class Git(Scm):
     return self._check_output(['rev-parse', 'HEAD'], raise_type=Scm.LocalException)
 
   @property
-  def merge_base(self):
-    """Returns the merge-base of master and HEAD in bash: `git merge-base master HEAD`"""
-    return self._check_output(['merge-base', 'master', 'HEAD'], raise_type=Scm.LocalException)
-
-  @property
   def server_url(self):
     git_output = self._check_output(['remote', '--verbose'], raise_type=Scm.LocalException)
     origin_push_line = [line.split()[1] for line in git_output.splitlines()
@@ -92,6 +87,10 @@ class Git(Scm):
       args.append('--')
       args.extend(files)
     return self._check_output(args, raise_type=Scm.LocalException)
+
+  def merge_base(self, left='master', right='HEAD'):
+    """Returns the merge-base of master and HEAD in bash: `git merge-base left right`"""
+    return self._check_output(['merge-base', left, right], raise_type=Scm.LocalException)
 
   def refresh(self):
     remote, merge = self._get_upstream()

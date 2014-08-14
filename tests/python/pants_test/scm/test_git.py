@@ -134,7 +134,7 @@ class GitTest(unittest.TestCase):
 
     self.assertTrue(tip_sha in self.git.changelog())
 
-    merge_base = self.git.merge_base
+    merge_base = self.git.merge_base()
     self.assertTrue(merge_base)
 
     self.assertTrue(merge_base in self.git.changelog())
@@ -172,7 +172,7 @@ class GitTest(unittest.TestCase):
 
     self.git.commit('''API '"' " Changes.''')
     # HEAD is merged into master
-    self.assertEqual(self.git.commit_date(self.git.merge_base), self.git.commit_date('HEAD'))
+    self.assertEqual(self.git.commit_date(self.git.merge_base()), self.git.commit_date('HEAD'))
     self.assertEqual(self.git.commit_date('HEAD'), self.git.commit_date('HEAD'))
     self.git.tag('second', message='''Tagged ' " Changes''')
 
