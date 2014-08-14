@@ -12,7 +12,6 @@ class AndroidBinary(AndroidTarget):
   """Produces an Android binary."""
 
   def __init__(self,
-               build_type=None,
                *args,
                **kwargs):
     """
