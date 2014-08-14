@@ -28,7 +28,7 @@ class AndroidBinary(AndroidTarget):
       Defaults to the latest full release.
     :param manifest: path/to/file of 'AndroidManifest.xml' (required name). Paths are relative
       to the BUILD file's directory.
-    :param release_type: Which keystore is used to sign target: 'debug' or 'release'.
+    :param string build_type: One of [debug, release]. The keystore to sign the package with.
       Set as 'debug' by default.
     """
     super(AndroidBinary, self).__init__(*args, **kwargs)
@@ -36,9 +36,8 @@ class AndroidBinary(AndroidTarget):
       self.build_type = 'debug'
     else:
       build_type = build_type.lower()
-      if build_type is 'debug' or build_type is 'release':
+      if build_type == 'debug' or build_type == 'release':
         self.build_type = build_type
       else:
-        raise TargetDefinitionException(self, 'Pants currently only supports debug build type.')
-
-    super(AndroidBinary, self).__init__(*args, **kwargs)
+        raise TargetDefinitionException(self, "The 'build_type' must be either 'debug' or "
+                                              "'release' instead of {0}".format(build_type))

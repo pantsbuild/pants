@@ -40,7 +40,6 @@ class AndroidTarget(JvmTarget):
       Defaults to the latest full release.
     :param manifest: path/to/file of 'AndroidManifest.xml' (required name). Paths are relative
       to the BUILD file's directory.
-    :param release_type: Which keystore is used to sign target: 'debug' or 'release'.
       Set as 'debug' by default.
     """
     super(AndroidTarget, self).__init__(address=address, **kwargs)
