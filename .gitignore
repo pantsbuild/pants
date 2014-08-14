@@ -37,7 +37,7 @@ htmlcov/
 lib/
 out/
 arc.sh
-BUILD.release
+BUILD.release*
 pants.pex
 target
 *.class

@@ -8,7 +8,7 @@ android_binary(
   manifest='AndroidManifest.xml',
   dependencies = [
     ':resources',
-    '3rdparty/android/authentication:debug'
+    '3rdparty/android/authentication/keys/debug:debug',
   ],
 )
 
