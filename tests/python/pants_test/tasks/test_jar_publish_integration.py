@@ -19,7 +19,7 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
   @pytest.mark.skipif('not JarPublishIntegrationTest.SCALADOC',
                       reason='No scaladoc binary on the PATH.')
   def test_scala_publish(self):
-    self.publish_test('src/scala/com/pants/example:jvm-run-example-lib',
+    self.publish_test('examples/src/scala/com/pants/example:jvm-run-example-lib',
                       'com/pants/example/jvm-example-lib/0.0.1-SNAPSHOT',
                       ['ivy-0.0.1-SNAPSHOT.xml',
                        'jvm-example-lib-0.0.1-SNAPSHOT.jar',
