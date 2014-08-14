@@ -6,12 +6,14 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 from pants.backend.android.targets.android_target import AndroidTarget
+from pants.base.exceptions import TargetDefinitionException
 
 
 class AndroidBinary(AndroidTarget):
   """Produces an Android binary."""
 
   def __init__(self,
+               build_type=None,
                *args,
                **kwargs):
     """
@@ -29,6 +31,14 @@ class AndroidBinary(AndroidTarget):
     :param release_type: Which keystore is used to sign target: 'debug' or 'release'.
       Set as 'debug' by default.
     """
+    super(AndroidBinary, self).__init__(*args, **kwargs)
+    if build_type is None:
+      self.build_type = 'debug'
+    else:
+      build_type = build_type.lower()
+      if build_type is 'debug' or build_type is 'release':
+        self.build_type = build_type
+      else:
+        raise TargetDefinitionException(self, 'Pants currently only supports debug build type.')
 
-    # TODO (mateor): Add some Compatibility error checks.
     super(AndroidBinary, self).__init__(*args, **kwargs)
