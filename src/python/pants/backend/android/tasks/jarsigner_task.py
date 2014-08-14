@@ -16,6 +16,8 @@ from pants.util.dirutil import safe_mkdir
 class JarsignerTask(NailgunTask):
   """Sign Android packages with keystore."""
 
+  _CONFIG_SECTION = 'jarsigner-tool'
+
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
     #TODO(mateor) Ensure a change of target-sdk or build-tools rebuilds product w/o clean
@@ -24,8 +26,6 @@ class JarsignerTask(NailgunTask):
     option_group.add_option(mkflag("build-type"), dest="build_type", default="debug",
                             help="[%default] One of ['debug', 'release']. Specifies the build type "
                                  "and which keystore to sign the package.")
-
-  _CONFIG_SECTION = 'jarsigner-tool'
 
   @classmethod
   def is_signtarget(cls, target):
@@ -120,5 +120,3 @@ class JarsignerTask(NailgunTask):
 
   def jarsigner_out(self, target):
     return os.path.join(self._distdir, target.app_name)
-
-  # TODO (mateor) verify sig (jarsigner -verify -verbose -certs my_application.apk)
