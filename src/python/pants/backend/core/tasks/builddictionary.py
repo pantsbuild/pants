@@ -158,6 +158,8 @@ def entry_for_one(nom, sym):
 
 
 PREDEFS = {  # some hardwired entries
+  "dependencies" : {"defn": msg_entry("dependencies",
+                    """Old name for `target`_"""),},
   "egg" : {"defn": msg_entry("egg",
                              "In older Pants, loads a pre-built Python egg "
                              "from file system. Undefined in newer Pants.")},
@@ -267,21 +269,22 @@ def gen_goals_phases_reference_data():
   """Generate the template data for the goals reference rst doc."""
   phase_dict = {}
   phase_names = []
-  for phase, raw_goals in Phase.all():
+  for phase in Phase.all():
     parser = optparse.OptionParser(add_help_option=False)
-    phase.setup_parser(parser, [], [phase])
+    Phase.setup_parser(parser, [], [phase])
     options_by_title = defaultdict(lambda: None)
     for group in parser.option_groups:
       options_by_title[group.title] = group
     found_option_groups = set()
     goals = []
-    for goal in sorted(raw_goals, key=(lambda x: x.name.lower())):
-      doc = indent_docstring_by_n(goal.task_type.__doc__ or "", 2)
-      options_title = goal.title_for_option_group(phase)
+    for task_name in phase.ordered_task_names():
+      task_type = phase.task_type_by_name(task_name)
+      doc = indent_docstring_by_n(task_type.__doc__ or "", 2)
+      options_title = Phase.option_group_title(phase, task_name)
       og = options_by_title[options_title]
       if og:
         found_option_groups.add(options_title)
-      impl = "{0}.{1}".format(goal.task_type.__module__, goal.task_type.__name__)
+      impl = '{0}.{1}'.format(task_type.__module__, task_type.__name__)
       goals.append(TemplateData(
           impl=impl,
           doc=doc,

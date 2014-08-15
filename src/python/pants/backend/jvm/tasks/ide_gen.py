@@ -323,8 +323,14 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
   def execute(self):
     """Stages IDE project artifacts to a project directory and generates IDE configuration files."""
     self._prepare_project()
-    checkstyle_enabled = len(Phase.goals_of_type(Checkstyle)) > 0
-    if checkstyle_enabled:
+
+    def _checkstyle_enabled():
+      for phase in Phase.all():
+        if phase.has_task_of_type(Checkstyle):
+          return True
+      return False
+
+    if _checkstyle_enabled():
       checkstyle_classpath = self.tool_classpath(self.checkstyle_bootstrap_key)
     else:
       checkstyle_classpath = []

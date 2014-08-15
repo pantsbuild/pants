@@ -18,19 +18,19 @@ The following target addresses all specify the same single target.
 
 * Fully qualified target address is the BUILD file path plus target name::
 
-    $ ./pants goal list src/java/com/pants/examples/hello/main:main
-    src/java/com/pants/examples/hello/main:main
+    $ ./pants goal list examples/src/java/com/pants/examples/hello/main:main
+    examples/src/java/com/pants/examples/hello/main:main
 
 * Specify the default target, which matches the parent directory name::
 
-    $ ./pants goal list src/java/com/pants/examples/hello/main
-    src/java/com/pants/examples/hello/main:main
+    $ ./pants goal list examples/src/java/com/pants/examples/hello/main
+    examples/src/java/com/pants/examples/hello/main:main
 
 * Relative paths and trailing forward slashes are ignored on the command-line to accommodate tab
   completion::
 
-    $ ./pants goal list ./src/java/com/pants/examples/hello/main/
-    src/java/com/pants/examples/hello/main:main
+    $ ./pants goal list ./examples/src/java/com/pants/examples/hello/main/
+    examples/src/java/com/pants/examples/hello/main:main
 
   *NB: Neither the `./` or any other relative path form nor the trailing slash are not allowed in
   target addresses written down in BUILD files - these affordances are just for ease of command

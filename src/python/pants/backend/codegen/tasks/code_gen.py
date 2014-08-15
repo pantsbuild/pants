@@ -21,7 +21,7 @@ class CodeGen(Task):
 
   @classmethod
   def product_types(cls):
-    return ['java', 'scala']
+    return ['java', 'scala', 'python']
 
   def is_gentarget(self, target):
     """Subclass must return True if it handles generating for the target."""

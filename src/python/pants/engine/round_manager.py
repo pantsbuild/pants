@@ -22,10 +22,10 @@ class RoundManager(object):
   @staticmethod
   def _index_products():
     producer_info_by_product_type = defaultdict(set)
-    for phase, goals in Phase.all():
-      for goal in goals:
-        for product_type in goal.task_type.product_types():
-          producer_info = ProducerInfo(product_type, goal.task_type, phase)
+    for phase in Phase.all():
+      for task_type in phase.task_types():
+        for product_type in task_type.product_types():
+          producer_info = ProducerInfo(product_type, task_type, phase)
           producer_info_by_product_type[product_type].add(producer_info)
     return producer_info_by_product_type
 

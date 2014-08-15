@@ -16,7 +16,7 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 class ProtobufIntegrationTest(PantsRunIntegrationTest):
   def test_bundle_protobuf_normal(self):
     pants_run = self.run_pants(
-        ['goal', 'bundle', 'src/java/com/pants/examples/protobuf:protobuf-example',
+        ['goal', 'bundle', 'examples/src/java/com/pants/examples/protobuf:protobuf-example',
          '--bundle-deployjar', '--print-exception-stacktrace',])
     self.assertEquals(pants_run.returncode, self.PANTS_SUCCESS_CODE,
                       "goal bundle run expected success, got {0}\n"
@@ -36,7 +36,7 @@ class ProtobufIntegrationTest(PantsRunIntegrationTest):
 
   def test_bundle_protobuf_imports(self):
     pants_run = self.run_pants(
-        ['goal', 'bundle', 'src/java/com/pants/examples/protobuf:protobuf-imports-example',
+        ['goal', 'bundle', 'examples/src/java/com/pants/examples/protobuf:protobuf-imports-example',
          '--bundle-deployjar', '--print-exception-stacktrace',])
     self.assertEquals(pants_run.returncode, self.PANTS_SUCCESS_CODE,
                       "goal bundle run expected success, got {0}\n"

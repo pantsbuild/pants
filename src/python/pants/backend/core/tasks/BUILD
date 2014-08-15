@@ -1,7 +1,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-dependencies(
+target(
   name = 'all',
   dependencies = [
     ':build_lint',
@@ -32,7 +32,7 @@ dependencies(
   ]
 )
 
-dependencies(
+target(
   name = 'common',
   dependencies = [
     ':task',
@@ -160,6 +160,7 @@ python_library(
     pants('3rdparty/python/twitter/commons:twitter.common.collections'),
     pants('src/python/pants/base:build_graph'),
     pants('src/python/pants/base:workunit'),
+    pants('src/python/pants/goal:mkflag'),
   ],
 )
 

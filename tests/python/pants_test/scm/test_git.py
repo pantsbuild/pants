@@ -5,6 +5,7 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from contextlib import contextmanager
 from itertools import izip_longest
 import os
 import re
@@ -107,6 +108,16 @@ class GitTest(unittest.TestCase):
 
     cls.git = Git(gitdir=cls.gitdir, worktree=cls.worktree)
 
+  @staticmethod
+  @contextmanager
+  def mkremote(remote_name):
+    with temporary_dir() as remote_uri:
+      subprocess.check_call(['git', 'remote', 'add', remote_name, remote_uri])
+      try:
+        yield remote_uri
+      finally:
+        subprocess.check_call(['git', 'remote', 'remove', remote_name])
+
   @classmethod
   def tearDownClass(cls):
     safe_rmtree(cls.origin)
@@ -122,6 +133,19 @@ class GitTest(unittest.TestCase):
     self.assertTrue(tip_sha)
 
     self.assertTrue(tip_sha in self.git.changelog())
+
+    merge_base = self.git.merge_base()
+    self.assertTrue(merge_base)
+
+    self.assertTrue(merge_base in self.git.changelog())
+
+    with pytest.raises(Scm.LocalException):
+      self.git.server_url
+
+    with environment_as(GIT_DIR=self.gitdir, GIT_WORK_TREE=self.worktree):
+      with self.mkremote('origin') as origin_uri:
+        origin_url = self.git.server_url
+        self.assertEqual(origin_url, origin_uri)
 
     self.assertTrue(self.git.tag_name.startswith('first-'), msg='un-annotated tags should be found')
     self.assertEqual('master', self.git.branch_name)
@@ -147,6 +171,9 @@ class GitTest(unittest.TestCase):
       edit_readme()
 
     self.git.commit('''API '"' " Changes.''')
+    # HEAD is merged into master
+    self.assertEqual(self.git.commit_date(self.git.merge_base()), self.git.commit_date('HEAD'))
+    self.assertEqual(self.git.commit_date('HEAD'), self.git.commit_date('HEAD'))
     self.git.tag('second', message='''Tagged ' " Changes''')
 
     with temporary_dir() as clone:

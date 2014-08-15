@@ -165,14 +165,14 @@ class Options(object):
     phases = phases or self.phases
     if phases:
       for phase_name in phases:
-        phase = Phase(phase_name)
-        if not phase.goals():
+        phase = Phase.by_name(phase_name)
+        if not phase.ordered_task_names():
           print('\nUnknown goal: %s' % phase_name)
         else:
           _maybe_print(self.format_help('%s' % phase.name, legacy=legacy))
-          for goal in phase.goals():
-            if goal.name != phase.name:  # Otherwise we registered on the phase scope.
-              scope = '%s.%s' % (phase.name, goal.name)
+          for task_name in phase.ordered_task_names():
+            if task_name != phase.name:  # Otherwise we registered on the phase scope.
+              scope = '%s.%s' % (phase.name, task_name)
               _maybe_print(self.format_help(scope, legacy=legacy))
     else:
       print(pants_release())

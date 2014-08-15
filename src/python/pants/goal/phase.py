@@ -5,162 +5,167 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from collections import defaultdict
+from optparse import OptionGroup
 
 from pants.goal.error import GoalError
+from pants.goal.mkflag import Mkflag
 
 
-class SingletonPhases(type):
-  phases = dict()
-  renames = dict()
+class Phase(object):
+  """Factory for objects representing phases.
 
-  def rename(cls, phase, name):
-    """
-      Renames the given phase and ensures all future requests for the old name are mapped to the
-      given phase instance.
-    """
-    cls.phases.pop(phase.name)
-    cls.renames[phase.name] = name
-    phase.name = name
-    cls.phases[name] = phase
+  Ensures that we have exactly one instance per phase name.
+  """
+  _phase_by_name = dict()
 
-  def __call__(cls, name):
-    name = cls.renames.get(name, name)
-    if name not in cls.phases:
-      cls.phases[name] = super(SingletonPhases, cls).__call__(name)
-    return cls.phases[name]
+  def __new__(cls, *args, **kwargs):
+    raise TypeError('Do not instantiate {0}. Call by_name() instead.'.format(cls))
 
-# Python 2.x + 3.x wankery
-PhaseBase = SingletonPhases(str('PhaseBase'), (object,), {})
-
-
-class Phase(PhaseBase):
-  _goals_by_phase = defaultdict(list)
-  _phase_by_goal = dict()
+  @classmethod
+  def by_name(cls, name):
+    """Returns the unique object representing the phase of the specified name."""
+    if name not in cls._phase_by_name:
+      cls._phase_by_name[name] = _Phase(name)
+    return cls._phase_by_name[name]
 
   @classmethod
   def clear(cls):
-    """Remove all phases and goals.
+    """Remove all phases and tasks.
 
     This method is EXCLUSIVELY for use in tests.
     """
-    cls._goals_by_phase.clear()
-    cls._phase_by_goal.clear()
+    cls._phase_by_name.clear()
 
   @staticmethod
-  def of(goal):
-    return Phase._phase_by_goal[goal]
-
-  @staticmethod
-  def goals_of_type(goal_class):
-    """Returns all installed goals of the specified type."""
-    return [goal for goal in Phase._phase_by_goal.keys() if isinstance(goal, goal_class)]
+  def option_group_title(phase, task_name):
+    """Returns name to use for CLI flag OptionGroup."""
+    phase_leader = len(phase.ordered_task_names()) == 1 or task_name == phase.name
+    namespace = [task_name] if phase_leader else [phase.name, task_name]
+    return ':'.join(namespace)
 
   @staticmethod
   def setup_parser(parser, args, phases):
     """Set up an OptionParser with options info for a phase and its deps.
+
     This readies the parser to handle options for this phase and its deps.
     It does not set up everything you might want for displaying help.
     For that, you want setup_parser_for_help.
     """
-    def do_setup_parser(phase, setup):
-      for goal in phase.goals():
-        if goal not in setup:
-          setup.add(goal)
-          for dep in goal.dependencies:
-            do_setup_parser(dep, setup)
-          goal.setup_parser(phase, parser, args)
+    visited = set()
 
-    setup = set()
+    def do_setup_parser(phase):
+      if phase not in visited:
+        visited.add(phase)
+        for dep in phase.dependencies:
+          do_setup_parser(dep)
+        for task_name in phase.ordered_task_names():
+          task_type = phase.task_type_by_name(task_name)
+          phase_leader = len(phase.ordered_task_names()) == 1 or task_name == phase.name
+          namespace = [task_name] if phase_leader else [phase.name, task_name]
+          mkflag = Mkflag(*namespace)
+          option_group = OptionGroup(parser, title=Phase.option_group_title(phase, task_name))
+          task_type.setup_parser(option_group, args, mkflag)
+          if option_group.option_list:
+            parser.add_option_group(option_group)
+
     for phase in phases:
-      do_setup_parser(phase, setup)
+      do_setup_parser(phase)
 
   @staticmethod
   def all():
-    """Returns all registered goals as a sorted sequence of phase, goals tuples."""
-    return sorted(Phase._goals_by_phase.items(), key=lambda pair: pair[0].name)
+    """Returns all registered phases, sorted alphabetically by name."""
+    return [pair[1] for pair in sorted(Phase._phase_by_name.items())]
 
+
+class _Phase(object):
   def __init__(self, name):
+    """Don't call this directly.
+
+    Create phases only through the Phase.by_name() factory.
+    """
     self.name = name
     self.description = None
+    self.dependencies = set()  # The Phases this Phase depends on.
+    self.serialize = False
+    self._task_type_by_name = {}  # name -> Task subclass.
+    self._ordered_task_names = []  # The task names, in the order imposed by registration.
 
-  def with_description(self, description):
-    self.description = description
-    return self
+  def install(self, task_registrar, first=False, replace=False, before=None, after=None):
+    """Installs the given task in this phase.
 
-  def install(self, goal, first=False, replace=False, before=None, after=None):
+    The placement of the task in this phases' execution list defaults to the end but its position
+    can be influenced by specifying exactly one of the following arguments:
+
+    first: Places the task 1st in the execution list
+    replace: Removes all existing tasks in this phase and installs this goal
+    before: Places the task before the named task in the execution list
+    after: Places the task after the named task in the execution list
     """
-      Installs the given goal in this phase.  The placement of the goal in this phases' execution
-      list defaults to the end but its position can be influence by specifying exactly one of the
-      following arguments:
-
-      first: Places the goal 1st in the execution list
-      replace: Removes all existing goals in this phase and installs this goal
-      before: Places the goal before the named goal in the execution list
-      after: Places the goal after the named goal in the execution list
-    """
-
     if [bool(place) for place in [first, replace, before, after]].count(True) > 1:
       raise GoalError('Can only specify one of first, replace, before or after')
 
-    Phase._phase_by_goal[goal] = self
+    task_name = task_registrar.name
+    self._task_type_by_name[task_name] = task_registrar.task_type
 
-    g = self.goals()
+    otn = self._ordered_task_names
     if replace:
-      del g[:]
-    g_names = map(lambda goal: goal.name, g)
+      del otn[:]
     if first:
-      g.insert(0, goal)
-    elif before in g_names:
-      g.insert(g_names.index(before), goal)
-    elif after in g_names:
-      g.insert(g_names.index(after) + 1, goal)
+      otn.insert(0, task_name)
+    elif before in otn:
+      otn.insert(otn.index(before), task_name)
+    elif after in otn:
+      otn.insert(otn.index(after) + 1, task_name)
     else:
-      g.append(goal)
+      otn.append(task_name)
+
+    self.dependencies.update(task_registrar.dependencies)
+
+    if task_registrar.serialize:
+      self.serialize = True
+
     return self
 
-  def rename(self, name):
-    """Renames this goal."""
-    PhaseBase.rename(self, name)
+  def with_description(self, description):
+    """Add a description to this phase."""
+    self.description = description
     return self
 
-  def copy_to(self, name):
-    """Copies this phase to the new named phase carrying along goal dependencies and description."""
-    copy = Phase(name)
-    copy.goals().extend(self.goals())
-    copy.description = self.description
-    return copy
+  def uninstall_task(self, name):
+    """Removes the named task from this phase.
 
-  def remove(self, name):
-    """Removes the named goal from this phase's list of goals to attempt."""
-    goals = self.goals()
-    for goal in goals:
-      if goal.name == name:
-        goals.remove(goal)
-        return self
-    raise GoalError('Goal %s does not exist in this phase, members are: %s' % (name, goals))
+    Allows external plugins to modify the execution plan. Use with caution.
 
-  class UnsatisfiedDependencyError(GoalError):
-    """Raised when an operation cannot be completed due to an unsatisfied goal dependency."""
-
-  def uninstall(self):
+    Note: Does not remove phase dependencies or relax a serialization requirement that originated
+    from the uninstalled task's install() call.
+    TODO(benjy): Should it? We're moving away from explicit phase deps towards a
+                 product consumption-production model anyway.
     """
-      Removes the named phase and all its attached goals.  Raises Phase.UnsatisfiedDependencyError
-      if the removal cannot be completed due to a dependency.
-    """
-    for phase, goals in Phase._goals_by_phase.items():
-      for goal in goals:
-        for dependee_phase in goal.dependencies:
-          if self is dependee_phase:
-            raise Phase.UnsatisfiedDependencyError(
-              '%s is depended on by %s:%s' % (self.name, phase.name, goal.name))
-    del Phase._goals_by_phase[self]
+    if name in self._task_type_by_name:
+      del self._task_type_by_name[name]
+      self._ordered_task_names = [x for x in self._ordered_task_names if x != name]
+    else:
+      raise GoalError('Cannot uninstall unknown task: {0}'.format(name))
 
-  def goals(self):
-    return Phase._goals_by_phase[self]
 
-  def serialize(self):
-    return any([x.serialize for x in self.goals()])
+  def ordered_task_names(self):
+    """The task names in this phase, in registration order."""
+    return self._ordered_task_names
+
+  def task_type_by_name(self, name):
+    """The task type registered under the given name."""
+    return self._task_type_by_name[name]
+
+  def task_types(self):
+    """Returns the task types in this phase, unordered."""
+    return self._task_type_by_name.values()
+
+  def has_task_of_type(self, typ):
+    """Returns True if this phase has a task of the given type (or a subtype of it)."""
+    for task_type in self.task_types():
+      if issubclass(task_type, typ):
+        return True
+    return False
 
   def __repr__(self):
     return self.name

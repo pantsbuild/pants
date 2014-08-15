@@ -92,10 +92,10 @@ class Py(Command):
         self.args.insert(0, arg)
 
       try:
-        print(self.root_dir, arg)
+        print(self.root_dir, arg, file=sys.stderr)
         self.build_graph.inject_spec_closure(arg)
         spec_path, target_name = parse_spec(arg)
-        build_file = BuildFile(self.root_dir, spec_path)
+        build_file = BuildFile.from_cache(self.root_dir, spec_path)
         address = BuildFileAddress(build_file, target_name)
         target = self.build_graph.get_target(address)
         if target is None:

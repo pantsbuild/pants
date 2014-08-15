@@ -6,6 +6,13 @@ python_library(
   sources = ['pants_exe.py'],
   dependencies = [
     pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
+    pants('src/python/pants/backend/android:plugin'),
+    pants('src/python/pants/backend/authentication:authentication'),
+    pants('src/python/pants/backend/codegen:plugin'),
+    pants('src/python/pants/backend/core:plugin'),
+    pants('src/python/pants/backend/jvm:plugin'),
+    pants('src/python/pants/backend/maven_layout:plugin'),
+    pants('src/python/pants/backend/python:plugin'),
     pants('src/python/pants/base:address'),
     pants('src/python/pants/base:build_environment'),
     pants('src/python/pants/base:build_file_address_mapper'),
@@ -16,32 +23,23 @@ python_library(
     pants('src/python/pants/base:rcfile'),
     pants('src/python/pants/commands:command'),
 
-    pants('src/python/pants/backend/android:plugin'),
-    pants('src/python/pants/backend/authentication:authentication'),
-    pants('src/python/pants/backend/codegen:plugin'),
-    pants('src/python/pants/backend/core:plugin'),
-    pants('src/python/pants/goal:run_tracker'),
-    pants('src/python/pants/backend/jvm:plugin'),
-    pants('src/python/pants/backend/python:plugin'),
-    pants('src/python/pants/backend/maven_layout:plugin'),
-
     # XXX these are necessary to parse BUILD.commons.  Should instead be
     # added as plugins to pants.ini
-    pants('src/python/pants/backend/python:python_chroot'),
-    pants('src/python/pants/scm:git'),
+    pants('src/python/pants/backend/core/tasks:what_changed'),
     pants('src/python/pants/backend/jvm/targets:java'),
     pants('src/python/pants/backend/jvm/targets:jvm'),
     pants('src/python/pants/backend/jvm/targets:scala'),
     pants('src/python/pants/backend/jvm/tasks:checkstyle'),
-    pants('src/python/pants/backend/core/tasks:what_changed'),
+    pants('src/python/pants/backend/python:python_chroot'),
+    pants('src/python/pants/scm:git'),
 
     # XXX The remaining are clear abstraction leaks.
     # The goal target should be goal:run_tracker but it is inseparable from goal; also
     # an abstraction leak.
+    pants('src/python/pants/backend/jvm/tasks:nailgun_task'),
     pants('src/python/pants/goal:initialize_reporting'),
     pants('src/python/pants/goal:run_tracker'),
     pants('src/python/pants/reporting'),
-    pants('src/python/pants/backend/jvm/tasks:nailgun_task'),
   ],
 )
 

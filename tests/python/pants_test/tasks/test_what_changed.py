@@ -143,6 +143,17 @@ class WhatChangedTest(BaseWhatChangedTest):
         ])
     """))
 
+    # This is a directory that might confuse case insensitive file systems (on macs for example).
+    # It should not be treated as a BUILD file.
+    self.create_dir('root/scripts/a/build')
+
+    self.add_to_build_file('root/scripts/BUILD', dedent("""
+      java_library(
+        name='scripts',
+        sources=['a/build/scripts.java'],
+      )
+    """))
+
   def test_owned(self):
     self.assert_console_output(
       'root/src/py/a:alpha',
@@ -193,4 +204,11 @@ class WhatChangedTest(BaseWhatChangedTest):
     self.assert_console_raises(
       Exception,
       workspace=self.workspace(files=['root/resources/a1/a1.test'])
+    )
+
+  def test_build_directory(self):
+    # This should ensure that a directory named the same as build files does not cause an exception.
+    self.assert_console_output(
+      'root/scripts:scripts',
+      workspace=self.workspace(files=['root/scripts/a/build', 'root/scripts/a/build/scripts.java'])
     )

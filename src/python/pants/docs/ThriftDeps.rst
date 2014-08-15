@@ -99,21 +99,21 @@ Thrift IDL
 
 Our example uses two Thrift files, one of which ``include``\s the other.
 They look pretty ordinary. The include-d Thrift,
-``src/thrift/com/pants/examples/distance/distance.thrift``,
+``examples/src/thrift/com/pants/examples/distance/distance.thrift``,
 is regular Thrift (albeit with a ``#namespace`` comment used for Thrift
 that will be compiled with both Apache Thrift and Scrooge):
 
-.. include:: ../../../../src/thrift/com/pants/examples/distance/distance.thrift
+.. include:: ../../../../examples/src/thrift/com/pants/examples/distance/distance.thrift
    :code:
 
 The include-ing Thrift,
-``src/thrift/com/pants/examples/precipitation/precipitation.thrift``,
+``examples/src/thrift/com/pants/examples/precipitation/precipitation.thrift``,
 also looks ordinary. (The include path is a little tricky: it's based on
 source roots. Thus, if your source tree has more than one root
 ``foo`` and ``bar`` and has Thrift in both, code in foo can ``include``
 code from ``bar`` without mentioning ``bar`` in the include path.):
 
-.. include:: ../../../../src/thrift/com/pants/examples/precipitation/precipitation.thrift
+.. include:: ../../../../examples/src/thrift/com/pants/examples/precipitation/precipitation.thrift
    :code:
 
 BUILD Targets
@@ -124,7 +124,7 @@ In a ``BUILD`` file, we use a ``java_thrift_library`` or
 Our example just uses Java;
 thus, the ``BUILD`` file for ``distance.thrift`` looks like
 
-.. include:: ../../../../src/thrift/com/pants/examples/distance/BUILD
+.. include:: ../../../../examples/src/thrift/com/pants/examples/distance/BUILD
    :code: python
    :start-after: cd ../precipitation)
 
@@ -149,7 +149,7 @@ a target should have the other in its ``dependencies``. Thus, to allow
 ``precipitation.thrift`` to depend on ``distance.thrift``, we set up
 ``.../precipitation/BUILD`` like so:
 
-.. include:: ../../../../src/thrift/com/pants/examples/precipitation/BUILD
+.. include:: ../../../../examples/src/thrift/com/pants/examples/precipitation/BUILD
    :code: python
    :start-after: includes other thrift
 
@@ -160,7 +160,7 @@ We want to use the Thrift-generated interface from "regular" code. In this Java
 example, we want to ``import`` the generated code. In our Java, the ``import``
 statements use the names from the ``.thrift`` files' ``namespace``\s:
 
-.. include:: ../../../../tests/java/com/pants/examples/usethrift/UseThriftTest.java
+.. include:: ../../../../examples/tests/java/com/pants/examples/usethrift/UseThriftTest.java
    :code: java
    :start-after: from Java.
 
@@ -168,7 +168,7 @@ As usual, for code in one target to use code from another, one target needs to
 depend on the other. Thus, our Java code's target has the ``*_thrift_library``
 target whose code it uses in its dependencies:
 
-.. include:: ../../../../tests/java/com/pants/examples/usethrift/BUILD
+.. include:: ../../../../examples/tests/java/com/pants/examples/usethrift/BUILD
    :code: python
    :start-after: using Thrift from Java, though.
 

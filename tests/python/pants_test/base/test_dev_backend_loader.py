@@ -77,7 +77,7 @@ class LoaderTest(unittest2.TestCase):
 
   def test_load_valid_partial_goals(self):
     def register_goals():
-      Phase('jack').install(TaskRegistrar('jill', lambda: 42))
+      Phase.by_name('jack').install(TaskRegistrar('jill', lambda: 42))
 
     with self.create_register(register_goals=register_goals) as backend_package:
       Phase.clear()
@@ -87,11 +87,11 @@ class LoaderTest(unittest2.TestCase):
       self.assert_empty_aliases()
       self.assertEqual(1, len(Phase.all()))
 
-      goals = Phase('jack').goals()
-      self.assertEqual(1, len(goals))
+      task_names = Phase.by_name('jack').ordered_task_names()
+      self.assertEqual(1, len(task_names))
 
-      goal = goals[0]
-      self.assertEqual('jill', goal.name)
+      task_name = task_names[0]
+      self.assertEqual('jill', task_name)
 
   def test_load_invalid_entrypoint(self):
     def build_file_aliases(bad_arg):

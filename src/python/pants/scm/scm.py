@@ -27,12 +27,20 @@ class Scm(AbstractClass):
     """Returns the id of the current commit."""
 
   @abstractproperty
+  def server_url(self):
+    """Returns the url of the remote server."""
+
+  @abstractproperty
   def tag_name(self):
     """Returns the name of the current tag if any."""
 
   @abstractproperty
   def branch_name(self):
     """Returns the name of the current branch if any."""
+
+  @abstractmethod
+  def commit_date(self, commit_reference):
+    """Returns the commit date of the referenced commit."""
 
   @abstractmethod
   def changed_files(self, from_commit=None, include_untracked=False):

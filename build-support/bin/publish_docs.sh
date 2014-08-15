@@ -37,7 +37,8 @@ while getopts "hopd:" opt; do
   esac
 done
 
-${HERE}/../../pants goal builddict || die "Failed to generate the 'BUILD Dictionary'."
+${HERE}/../../pants goal builddict --print-exception-stacktrace || \
+  die "Failed to generate the 'BUILD Dictionary'."
 cp dist/builddict/*.rst src/python/pants/docs/
 
 (
