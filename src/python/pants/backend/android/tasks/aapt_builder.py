@@ -25,6 +25,10 @@ class AaptBuilder(AaptTask):
   This class gathers compiled classes (an Android dex archive) and packages it with the
   target's resource files. The output is an unsigned .apk, an Android application package file.
   """
+  @classmethod
+  def product_types(cls):
+    return ['apk']
+
   @staticmethod
   def is_app(target):
     return isinstance(target, AndroidBinary)
@@ -34,10 +38,6 @@ class AaptBuilder(AaptTask):
 
   def prepare(self, round_manager):
     round_manager.require_data('dex')
-
-  @classmethod
-  def product_types(cls):
-    return ['apk']
 
   def render_args(self, target, resource_dir, inputs):
     args = []
@@ -54,8 +54,8 @@ class AaptBuilder(AaptTask):
                  target.manifest, '-S'])
     args.extend(resource_dir)
     args.extend(['-I', self.android_jar_tool(target.target_sdk), '--ignore-assets',
-                 self.ignored_assets, '-F', os.path.join(self.workdir,
-                 target.app_name + '-unsigned.apk')])
+                 self.ignored_assets, '-F',
+                 os.path.join(self.workdir, target.app_name + '-unsigned.apk')])
     args.extend(inputs)
     log.debug('Executing: {0}'.format(args))
     return args

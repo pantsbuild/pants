@@ -45,6 +45,12 @@ class JarsignerTask(NailgunTask):
     return self._CONFIG_SECTION
 
   def render_args(self, target, unsigned_apk, key):
+    """Create arg list for the jarsigner process.
+
+    :param AndroidBinary target: Target to be signed
+    :param string unsigned_apk: Location of the apk product from the AaptBuilder task.
+    :param list key: List containing the Keystore object intended to sign the target.
+    """
     # After JDK 1.7.0_51, jars without timestamps print a warning. This causes jars to stop working
     # past their validity date. But Android purposefully passes 30 years validity. More research
     # is needed before passing a -tsa flag indiscriminately.
@@ -110,13 +116,14 @@ class JarsignerTask(NailgunTask):
                                     "build type [{1}]. Please pick just one key of each build type "
                                     "['debug', 'release']".format(target, target.build_type))
             # TODO(mateor?)create Nailgun pipeline for other java tools, handling stderr/out, etc.
-            process = subprocess.Popen(self.render_args(target, unsigned_apk, keys[0]))
-            result = process.wait()
-            if result != 0:
-              raise TaskError('Android aapt tool exited non-zero ({code})'.format(code=result))
+            for key in keys:
+              process = subprocess.Popen(self.render_args(target, unsigned_apk, key))
+              result = process.wait()
+              if result != 0:
+                raise TaskError('Android aapt tool exited non-zero ({code})'.format(code=result))
           else:
             raise TaskError(self, "No key matched the {0} target's build type "
-                                  "[release, debug]".format(target))
+                                    "[release, debug]".format(target))
 
   def jarsigner_out(self, target):
     return os.path.join(self._distdir, target.app_name)
