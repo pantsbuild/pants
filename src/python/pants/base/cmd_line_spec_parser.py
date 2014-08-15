@@ -38,7 +38,7 @@ class CmdLineSpecParser(object):
   """
 
   def __init__(self, root_dir, address_mapper):
-    self._root_dir = root_dir
+    self._root_dir = os.path.realpath(root_dir)
     self._address_mapper = address_mapper
 
   def parse_addresses(self, specs):
@@ -67,14 +67,17 @@ class CmdLineSpecParser(object):
   def _parse_spec(self, spec):
     def normalize_spec_path(path):
       is_abs = not path.startswith('//') and os.path.isabs(path)
-      if is_abs and os.path.commonprefix([self._root_dir, path]) != self._root_dir:
-        raise ValueError('Absolute spec path {0} does not share build root {1}'
-                         .format(path, self._root_dir))
-      if not is_abs:
+      if is_abs:
+        path = os.path.realpath(path)
+        if os.path.commonprefix([self._root_dir, path]) != self._root_dir:
+          raise ValueError('Absolute spec path {0} does not share build root {1}'
+                           .format(path, self._root_dir))
+      else:
         if path.startswith('//'):
           path = path[2:]
         path = os.path.join(self._root_dir, path)
-      normalized = os.path.relpath(os.path.realpath(path), self._root_dir)
+
+      normalized = os.path.relpath(path, self._root_dir)
       if normalized == '.':
         normalized = ''
       return normalized
