@@ -17,15 +17,14 @@ class Keystore(Target):
 
   def __init__(self,
                build_type=None,
-               sources=None,
+               source=None,
                keystore_alias=None,
                keystore_password=None,
                key_password=None,
                **kwargs):
     """
     :param string build_type: What type of package the keystore signs. Either 'debug' or 'release'.
-    :param sources: path/to/keystore
-    :type sources: ``Fileset`` or list of strings.
+    :param string source: path/to/keystore
     :param string keystore_alias: The alias of this keystore.
     :param string keystore_password: The password for the keystore.
     :param string key_password: The password for the key.
@@ -34,17 +33,13 @@ class Keystore(Target):
     address = kwargs['address']
 
     # TODO (mateor) if debug location is empty, create a debug.keystore with keytool.
-    self.sources = sources
-    if len(self.sources) > 1:
-      raise TargetDefinitionException(self, "The 'sources' field points only to the keystore file")
-    # We have verified there is just one 'sources' file, we can now set the location.
-    for source in self.sources:
-      if source is None:
-        raise TargetDefinitionException(self, "The keystore must provide a 'sources' attribute "
-                                              "with path to the keystore file")
-      else:
-        self.location = os.path.join(get_buildroot(), address.spec_path, source)
-
+    self.source = source
+    if source is None:
+        raise TargetDefinitionException(self, "The keystore must provide a 'source' attribute.")
+    self.location = os.path.join(get_buildroot(), address.spec_path, self.source)
+    if not os.path.isfile(self.location):
+      raise TargetDefinitionException(self, "The 'source' attribute: {0} must point to a "
+                                            "file".format(self.location))
     self.keystore_alias = keystore_alias
     self.keystore_password = keystore_password
     self.key_password = key_password
