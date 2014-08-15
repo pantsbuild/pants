@@ -9,7 +9,7 @@ from abc import abstractmethod
 
 from twitter.common.lang import AbstractClass
 
-from pants.base.build_environment import get_scm
+from pants.base.build_environment import get_buildroot, get_scm
 from pants.scm.scm import Scm
 
 
@@ -38,6 +38,8 @@ class ScmWorkspace(Workspace):
 
   def touched_files(self, parent):
     try:
-      return self._scm.changed_files(from_commit=parent, include_untracked=True)
+      return self._scm.changed_files(from_commit=parent,
+                                     include_untracked=True,
+                                     relative_to=get_buildroot())
     except Scm.ScmException as e:
       raise self.WorkspaceError("Problem detecting changed files.", e)

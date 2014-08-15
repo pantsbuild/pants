@@ -698,7 +698,7 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
     scm = get_scm()
     if not scm:
       return None
-    changed_files = scm.changed_files(include_untracked=True)
+    changed_files = scm.changed_files(include_untracked=True, relative_to=get_buildroot())
     for f in changed_files:
       ret.update(targets_by_source.get(f, []))
     return list(ret)

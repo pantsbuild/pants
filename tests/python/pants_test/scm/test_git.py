@@ -72,33 +72,33 @@ class GitTest(unittest.TestCase):
     subprocess.check_call(['git', 'remote', 'add', remote_name, remote])
 
   @classmethod
-  def setUpClass(cls):
-    cls.origin = safe_mkdtemp()
-    with pushd(cls.origin):
+  def setUp(self):
+    self.origin = safe_mkdtemp()
+    with pushd(self.origin):
       subprocess.check_call(['git', 'init', '--bare'])
 
-    cls.gitdir = safe_mkdtemp()
-    cls.worktree = safe_mkdtemp()
+    self.gitdir = safe_mkdtemp()
+    self.worktree = safe_mkdtemp()
 
-    cls.readme_file = os.path.join(cls.worktree, 'README')
+    self.readme_file = os.path.join(self.worktree, 'README')
 
-    with environment_as(GIT_DIR=cls.gitdir, GIT_WORK_TREE=cls.worktree):
-      cls.init_repo('depot', cls.origin)
+    with environment_as(GIT_DIR=self.gitdir, GIT_WORK_TREE=self.worktree):
+      self.init_repo('depot', self.origin)
 
-      touch(cls.readme_file)
+      touch(self.readme_file)
       subprocess.check_call(['git', 'add', 'README'])
       subprocess.check_call(['git', 'commit', '-am', 'initial commit with decode -> \x81b'])
       subprocess.check_call(['git', 'tag', 'first'])
       subprocess.check_call(['git', 'push', '--tags', 'depot', 'master'])
       subprocess.check_call(['git', 'branch', '--set-upstream', 'master', 'depot/master'])
 
-      with safe_open(cls.readme_file, 'w') as readme:
+      with safe_open(self.readme_file, 'w') as readme:
         readme.write('Hello World.')
       subprocess.check_call(['git', 'commit', '-am', 'Update README.'])
 
-    cls.clone2 = safe_mkdtemp()
-    with pushd(cls.clone2):
-      cls.init_repo('origin', cls.origin)
+    self.clone2 = safe_mkdtemp()
+    with pushd(self.clone2):
+      self.init_repo('origin', self.origin)
       subprocess.check_call(['git', 'pull', '--tags', 'origin', 'master:master'])
 
       with safe_open(os.path.realpath('README'), 'a') as readme:
@@ -106,7 +106,7 @@ class GitTest(unittest.TestCase):
       subprocess.check_call(['git', 'commit', '-am', 'Update README 2.'])
       subprocess.check_call(['git', 'push', '--tags', 'origin', 'master'])
 
-    cls.git = Git(gitdir=cls.gitdir, worktree=cls.worktree)
+    self.git = Git(gitdir=self.gitdir, worktree=self.worktree)
 
   @staticmethod
   @contextmanager
@@ -119,13 +119,13 @@ class GitTest(unittest.TestCase):
         subprocess.check_call(['git', 'remote', 'remove', remote_name])
 
   @classmethod
-  def tearDownClass(cls):
-    safe_rmtree(cls.origin)
-    safe_rmtree(cls.gitdir)
-    safe_rmtree(cls.worktree)
-    safe_rmtree(cls.clone2)
+  def tearDown(self):
+    safe_rmtree(self.origin)
+    safe_rmtree(self.gitdir)
+    safe_rmtree(self.worktree)
+    safe_rmtree(self.clone2)
 
-  def test(self):
+  def test_integration(self):
     self.assertEqual(set(), self.git.changed_files())
     self.assertEqual(set(['README']), self.git.changed_files(from_commit='HEAD^'))
 
@@ -159,6 +159,9 @@ class GitTest(unittest.TestCase):
       untracked.write('make install')
     self.assertEqual(set(['README']), self.git.changed_files())
     self.assertEqual(set(['README', 'INSTALL']), self.git.changed_files(include_untracked=True))
+
+    # confirm that files outside of a given relative_to path are ignored
+    self.assertEqual(set(), self.git.changed_files(relative_to='non-existent'))
 
     try:
       # These changes should be rejected because our branch point from origin is 1 commit behind
@@ -194,3 +197,30 @@ class GitTest(unittest.TestCase):
 
         self.assertEqual('master', git.branch_name)
         self.assertEqual('second', git.tag_name, msg='annotated tags should be found')
+
+  def test_detect_worktree(self):
+    with temporary_dir() as _clone:
+      with pushd(_clone):
+        clone = os.path.realpath(_clone)
+
+        self.init_repo('origin', self.origin)
+        subprocess.check_call(['git', 'pull', '--tags', 'origin', 'master:master'])
+
+        def worktree_relative_to(cwd, expected):
+          """Given a cwd relative to the worktree, tests that the worktree is detected as 'expected'."""
+          orig_cwd = os.getcwd()
+          try:
+            abs_cwd = os.path.join(clone, cwd)
+            if not os.path.isdir(abs_cwd):
+              os.mkdir(abs_cwd)
+            os.chdir(abs_cwd)
+            actual = Git.detect_worktree()
+            self.assertEqual(expected, actual)
+          finally:
+            os.chdir(orig_cwd)
+
+        worktree_relative_to('..', None)
+        worktree_relative_to('.', clone)
+        worktree_relative_to('is', clone)
+        worktree_relative_to('is/a', clone)
+        worktree_relative_to('is/a/dir', clone)
