@@ -72,7 +72,8 @@ class Build(Command):
       self.build_args = self.args[1:] if len(self.args) > 1 else []
 
     self.targets = OrderedSet()
-    spec_parser = CmdLineSpecParser(self.root_dir, self.address_mapper)
+    spec_parser = CmdLineSpecParser(self.root_dir, self.address_mapper,
+                                    target_excludes_opts=self.config.options.target_excludes)
     self.top_level_addresses = set()
 
     specs = self.args[0:specs_end]

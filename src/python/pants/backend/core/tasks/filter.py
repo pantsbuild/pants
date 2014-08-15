@@ -75,7 +75,8 @@ class Filter(ConsoleTask):
 
     def _get_targets(spec):
       try:
-        spec_parser = CmdLineSpecParser(get_buildroot(), self.context.address_mapper)
+        spec_parser = CmdLineSpecParser(get_buildroot(), self.context.address_mapper,
+                                        target_excludes_opts=self.context.config.options.target_excludes)
         addresses = spec_parser.parse_addresses(spec)
       except (IOError, ValueError) as e:
         raise TaskError('Failed to parse spec: %s: %s' % (spec, e))

@@ -62,6 +62,23 @@ else
   android_test_opts=""
 fi
 
+# TODO(Eric Ayers) find a better way to deal with tests that are known to fail.
+# right now, just split them into two categories and ignore them.
+
+# Targets that fail but shouldn't
+known_failing_targets=(
+  testprojects/maven_layout/resource_collision/example_a/src/test/java/com/pants/duplicateres/examplea:examplea
+  testprojects/maven_layout/resource_collision/example_b/src/test/java/com/pants/duplicateres/exampleb:exampleb
+)
+
+# Targets that are intended to fail
+negative_test_targets=(
+  testprojects/maven_layout/missing-build-file.*
+)
+targets_to_exclude=( "${known_failing_targets[@]}" "${negative_test_targets[@]}" )
+exclude_opts="${targets_to_exclude[@]/#/--exclude-target-regexp=}"
+echo "EXCLUDE_OPTS ARE: $exclude_opts"
+
 banner "CI BEGINS"
 
 # TODO(John sirois): Re-plumb build such that it grabs constraints from the built python_binary
@@ -100,7 +117,8 @@ fi
 # Sanity checks
 ./pants.pex goal clean-all || die "Failed to clean-all."
 ./pants.pex goal goals || die "Failed to list goals."
-./pants.pex goal list :: || die "Failed to list all targets."
+./pants.pex goal list :: $exclude_opts || die "Failed to list all targets."
+./pants.pex goal filter :: --filter-type=java_library $exclude_opts || die "Failed to filter all targets."
 ./pants.pex goal targets || die "Failed to show target help."
 
 if [[ "${skip_distribution:-false}" == "false" ]]; then
@@ -133,21 +151,6 @@ fi
 
 if [[ "${skip_testprojects:-false}" == "false" ]]; then
 
-  # TODO(Eric Ayers) find a better way to deal with tests that are known to fail.
-  # right now, just split them into two categories and ignore them.
-
-  # Targets that fail but shouldn't
-  known_failing_targets=(
-    testprojects/maven_layout/resource_collision/example_a/src/test/java/com/pants/duplicateres/examplea:examplea
-    testprojects/maven_layout/resource_collision/example_b/src/test/java/com/pants/duplicateres/exampleb:exampleb
-  )
-
-  # Targets that are intended to fail
-  negative_test_targets=(
-  )
-
-  targets_to_exclude=( "${known_failing_targets[@]}" "${negative_test_targets[@]}" )
-  exclude_opts="${targets_to_exclude[@]/#/--exclude-target-regexp=}"
 
   banner "Running tests in testprojects/ "
   (

@@ -5,12 +5,11 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from collections import defaultdict
 from contextlib import contextmanager
+import copy
 import inspect
 import logging
 import os
-import re
 import sys
 import traceback
 
@@ -23,6 +22,7 @@ from pants.backend.core.tasks.task import QuietTaskMixin, Task
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask  # XXX(pl)
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
+from pants.base.build_graph import MissingAddressError
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.config import Config
 from pants.base.rcfile import RcFile
@@ -81,7 +81,7 @@ class GoalRunner(Command):
                ' If this is incorrect, disambiguate it with the "--" argument to separate goals'
                ' from targets.')
         logger.warning(msg.format(spec=spec))
-      except IOError: pass # Awesome, it's unambiguous.
+      except MissingAddressError: pass # Awesome, it's unambiguous.
       return False
 
     for i, arg in enumerate(args):
@@ -175,12 +175,25 @@ class GoalRunner(Command):
 
     self.requested_goals = goals
 
+    # Bootstrap user goals by loading any BUILD files implied by targets.
     with self.run_tracker.new_workunit(name='setup', labels=[WorkUnit.SETUP]):
-      # Bootstrap user goals by loading any BUILD files implied by targets.
-      spec_parser = CmdLineSpecParser(self.root_dir, self.address_mapper)
+
+      # HACK: We need to parse the options now to get at the --exclude-targets-regexp option but the
+      # options haven't been parsed yet.  If we call parser.parse_args, we end up with duplicate
+      # option values later on. Makeing a copy of the parser object didn't work.
+      def _get_target_excludes(args):
+        results=[]
+        flag='--exclude-target-regexp='
+        for arg in args:
+          if arg.startswith(flag):
+            results.append(arg[len(flag):])
+        return results
+
+      self._spec_parser = CmdLineSpecParser(self.root_dir, self.address_mapper,
+                                            target_excludes_opts=_get_target_excludes(args))
       with self.run_tracker.new_workunit(name='parse', labels=[WorkUnit.SETUP]):
         for spec in specs:
-          for address in spec_parser.parse_addresses(spec):
+          for address in self._spec_parser.parse_addresses(spec):
             self.build_graph.inject_address_closure(address)
             self.targets.append(self.build_graph.get_target(address))
     self.goals = [Goal.by_name(goal) for goal in goals]
@@ -230,6 +243,9 @@ class GoalRunner(Command):
       else:
         log.init()
 
+    # Print some debugging that was waiting for the logger to be initialized.
+    self._spec_parser.log_excludes_info(log)
+
     # Update the reporting settings, now that we have flags etc.
     def is_quiet_task():
       for goal in self.goals:
@@ -237,42 +253,8 @@ class GoalRunner(Command):
           return True
       return False
 
-    # Target specs are mapped to the patterns which match them, if any. This variable is a key for
-    # specs which don't match any exclusion regexes. We know it won't already be in the list of
-    # patterns, because the asterisks in its name make it an invalid regex.
-    _UNMATCHED_KEY = '** unmatched **'
-
-    def targets_by_pattern(targets, patterns):
-      mapping = defaultdict(list)
-      for target in targets:
-        matched_pattern = None
-        for pattern in patterns:
-          if re.search(pattern, target.address.spec) is not None:
-            matched_pattern = pattern
-            break
-        if matched_pattern is None:
-          mapping[_UNMATCHED_KEY].append(target)
-        else:
-          mapping[matched_pattern].append(target)
-      return mapping
-
     is_explain = self.options.explain
     update_reporting(self.options, is_quiet_task() or is_explain, self.run_tracker)
-
-    if self.options.target_excludes:
-      excludes = self.options.target_excludes
-      log.debug('excludes:\n  {excludes}'.format(excludes='\n  '.join(excludes)))
-      by_pattern = targets_by_pattern(self.targets, excludes)
-      self.targets = by_pattern[_UNMATCHED_KEY]
-      # The rest of this if-statement is just for debug logging.
-      log.debug('Targets after excludes: {targets}'.format(
-          targets=', '.join(t.address.spec for t in self.targets)))
-      excluded_count = sum(len(by_pattern[p]) for p in excludes)
-      log.debug('Excluded {count} target{plural}.'.format(count=excluded_count,
-          plural=('s' if excluded_count != 1 else '')))
-      for pattern in excludes:
-        log.debug('Targets excluded by pattern {pattern}\n  {targets}'.format(pattern=pattern,
-            targets='\n  '.join(t.address.spec for t in by_pattern[pattern])))
 
     context = Context(
       config=self.config,

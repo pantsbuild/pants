@@ -5,7 +5,9 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from collections import defaultdict
 import os
+import re
 
 from twitter.common.collections import maybe_list, OrderedSet
 
@@ -37,15 +39,38 @@ class CmdLineSpecParser(object):
   The above expression would choose every target under src except for src/broken:test
   """
 
+  # Target specs are mapped to the patterns which match them, if any. This variable is a key for
+  # specs which don't match any exclusion regexes. We know it won't already be in the list of
+  # patterns, because the asterisks in its name make it an invalid regex.
+  _UNMATCHED_KEY = '** unmatched **'
+
   # TODO(John Sirois): Establish BuildFile And BuildFileAddressMapper exception discipline.  These
   # types should not be raising IOError.
 
   class BadSpecError(Exception):
     """Indicates an invalid command line address spec."""
 
-  def __init__(self, root_dir, address_mapper):
+  def __init__(self, root_dir, address_mapper, target_excludes_opts=[]):
+    def _setup_exclude_patterns():
+      patterns = []
+      for pattern in target_excludes_opts:
+        patterns.append(re.compile(pattern))
+      return patterns
+
     self._root_dir = os.path.realpath(root_dir)
     self._address_mapper = address_mapper
+    self._target_excludes_opts = target_excludes_opts
+    self._exclude_patterns = _setup_exclude_patterns()
+    self._excluded_target_map = defaultdict(set)  # pattern -> targets (for debugging)
+
+  def _not_excluded(self, address):
+    spec = address.spec
+    for pattern in self._exclude_patterns:
+      if pattern.search(spec) is not None:
+        self._excluded_target_map[pattern.pattern].add(spec)
+        return False
+    self._excluded_target_map[CmdLineSpecParser._UNMATCHED_KEY].add(spec)
+    return True
 
   def parse_addresses(self, specs):
     """Process a list of command line specs and perform expansion.  This method can expand a list
@@ -67,8 +92,26 @@ class CmdLineSpecParser(object):
       else:
         for address in self._parse_spec(spec):
           addresses.add(address)
-    for result in addresses - addresses_to_remove:
-      yield result
+
+    return filter(self._not_excluded,  addresses - addresses_to_remove)
+
+  def log_excludes_info(self, logger):
+    """ Print debug info for excluded specs"""
+    if self._exclude_patterns:
+      logger.debug('excludes:\n  {excludes}'
+                   .format(excludes='\n  '.join(self._target_excludes_opts)))
+      targets = ', '.join(self._excluded_target_map[CmdLineSpecParser._UNMATCHED_KEY])
+      logger.debug('Targets after excludes: {targets}'.format(targets=targets))
+      for pattern, targets in self._excluded_target_map.iteritems():
+        excluded_count = 0
+        if pattern != CmdLineSpecParser._UNMATCHED_KEY:
+          logger.debug('Targets excluded by pattern {pattern}\n  {targets}'
+                       .format(pattern=pattern,
+                               targets='\n  '.join(targets)))
+          excluded_count += len(targets)
+      logger.debug('Excluded {count} target{plural}.'
+                   .format(count=excluded_count,
+                           plural=('s' if excluded_count != 1 else '')))
 
   def _parse_spec(self, spec):
     def normalize_spec_path(path):

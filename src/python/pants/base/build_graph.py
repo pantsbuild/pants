@@ -16,6 +16,12 @@ from pants.base.address import SyntheticAddress
 
 logger = logging.getLogger(__name__)
 
+class MissingAddressError(Exception):
+  """Raised by other classes when an address can't be resolved so we can trap the error and
+     print a useful diagnostic.
+  """
+  pass
+
 
 class BuildGraph(object):
   """A directed acyclic graph of Targets and dependencies. Not necessarily connected.
@@ -298,8 +304,13 @@ class BuildGraph(object):
     self._addresses_already_closed.add(address)
     dep_addresses = list(mapper.specs_to_addresses(target_addressable.dependency_specs,
                                                    relative_to=address.spec_path))
-    for dep_address in dep_addresses:
-      self.inject_address_closure(dep_address)
+    try:
+      for dep_address in dep_addresses:
+        self.inject_address_closure(dep_address)
+    except MissingAddressError as e:
+      raise MissingAddressError("{message}\n  referenced from {address}"
+                                .format(message=e.message,
+                                        address=address.spec))
 
     if not self.contains_address(address):
       target = self.target_addressable_to_target(address, target_addressable)
