@@ -3,7 +3,7 @@
 
 # TODO(Eric Ayers): Invoking this target with goal 'bundle' doesn't actuall bundle its dependencies
 # like its supposed to.
-dependencies(name='protobuf',
+target(name='protobuf',
   dependencies=[
     ':protobuf-example',
     ':protobuf-imports-example',

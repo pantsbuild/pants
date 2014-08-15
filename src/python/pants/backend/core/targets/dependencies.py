@@ -5,13 +5,20 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+import logging
+
 from pants.base.payload import EmptyPayload
 from pants.base.target import Target
+
+
+logger = logging.getLogger(__name__)
 
 
 class Dependencies(Target):
   """A set of dependencies that may be depended upon,
   as if depending upon the set of dependencies directly.
+
+  NB: This class is commonly referred to by the alias 'target' in BUILD files.
   """
 
   def __init__(self, *args, **kwargs):
@@ -24,3 +31,10 @@ class Dependencies(Target):
       for details.
     """
     super(Dependencies, self).__init__(payload=EmptyPayload(), *args, **kwargs)
+
+
+class DeprecatedDependencies(Dependencies):
+  """A subclass for Dependencies that warns that the 'dependencies' alias is deprecated."""
+  def __init__(self, *args, **kwargs):
+    logger.warn("""For %s : The alias 'dependencies(..)' has been deprecated in favor of 'target(..)'""" % kwargs['address'].spec)
+    super(DeprecatedDependencies, self).__init__(*args, **kwargs)

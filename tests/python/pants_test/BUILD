@@ -77,7 +77,7 @@ python_tests(
   ]
 )
 
-dependencies(
+target(
   name = 'integration',
   dependencies = [
     pants('tests/python/pants_test/android:integration'),

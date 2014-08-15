@@ -7,7 +7,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import os
 
-from pants.backend.core.targets.dependencies import Dependencies
+from pants.backend.core.targets.dependencies import Dependencies, DeprecatedDependencies
 from pants.backend.core.targets.doc import Page, Wiki, WikiArtifact
 from pants.backend.core.targets.resources import Resources
 from pants.backend.core.tasks.build_lint import BuildLint
@@ -52,9 +52,11 @@ class BuildFilePath(object):
 def build_file_aliases():
   return BuildFileAliases.create(
     targets={
-      'dependencies': Dependencies,
+      # NB: the 'dependencies' alias is deprecated in favor of the 'target' alias
+      'dependencies': DeprecatedDependencies,
       'page': Page,
       'resources': Resources,
+      'target': Dependencies,
       'wiki': Wiki,
     },
     objects={
@@ -70,11 +72,11 @@ def build_file_aliases():
       'wiki_artifact': WikiArtifact,
     },
     context_aware_object_factories={
-      'source_root': SourceRoot,
+      'buildfile_path': BuildFilePath,
       'globs': Globs,
       'rglobs': RGlobs,
+      'source_root': SourceRoot,
       'zglobs': ZGlobs,
-      'buildfile_path': BuildFilePath,
     }
   )
 

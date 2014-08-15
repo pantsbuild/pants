@@ -158,6 +158,8 @@ def entry_for_one(nom, sym):
 
 
 PREDEFS = {  # some hardwired entries
+  "dependencies" : {"defn": msg_entry("dependencies",
+                    """Old name for `target`_"""),},
   "egg" : {"defn": msg_entry("egg",
                              "In older Pants, loads a pre-built Python egg "
                              "from file system. Undefined in newer Pants.")},
