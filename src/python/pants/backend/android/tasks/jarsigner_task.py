@@ -7,23 +7,22 @@ import subprocess
 
 from pants.backend.android.targets.android_binary import AndroidBinary
 from pants.backend.android.targets.keystore import Keystore
-from pants.backend.jvm.tasks.nailgun_task import NailgunTask
+from pants.backend.core.tasks.task import Task
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit
+from pants.java.distribution.distribution import Distribution
 from pants.util.dirutil import safe_mkdir
 
 
-class JarsignerTask(NailgunTask):
+class JarsignerTask(Task):
   """Sign Android packages with keystore."""
-
-  _CONFIG_SECTION = 'jarsigner-tool'
 
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
     #TODO(mateor) Ensure a change of target-sdk or build-tools rebuilds product w/o clean
     super(JarsignerTask, cls).setup_parser(option_group, args, mkflag)
 
-    option_group.add_option(mkflag("build-type"), dest="build_type", default="debug",
+    option_group.add_option(mkflag("build-type"), dest="build_type",
                             help="[%default] One of ['debug', 'release']. Specifies the build type "
                                  "and which keystore to sign the package.")
 
@@ -33,16 +32,13 @@ class JarsignerTask(NailgunTask):
 
   def __init__(self, *args, **kwargs):
     super(JarsignerTask, self).__init__(*args, **kwargs)
-    self._java_dist = self._dist
+    # No Java 8 for Android. I am considering max=1.7.0_50. See comment above render_args.
+    self._dist = Distribution.cached(maximum_version="1.7.0_99")
     self._distdir = self.context.config.getdefault('pants_distdir')
     self._build_type = self.context.options.build_type
 
   def prepare(self, round_manager):
     round_manager.require_data('apk')
-
-  @property
-  def config_section(self):
-    return self._CONFIG_SECTION
 
   def render_args(self, target, unsigned_apk, key):
     """Create arg list for the jarsigner process.
@@ -56,7 +52,7 @@ class JarsignerTask(NailgunTask):
     # is needed before passing a -tsa flag indiscriminately.
     # http://bugs.java.com/view_bug.do?bug_id=8023338
     args = []
-    args.extend([self._java_dist.binary('jarsigner')])
+    args.extend([self._dist.binary('jarsigner')])
 
     # first two are required flags for JDK 7+
     args.extend(['-sigalg', 'SHA1withRSA'])
@@ -89,15 +85,10 @@ class JarsignerTask(NailgunTask):
           def get_apk(target):
             """Return the unsigned.apk product from AaptBuilder."""
             unsigned_apks = self.context.products.get('apk')
-            target_apk = unsigned_apks.get(target)
-            if target_apk:
-              for tgts, prods in target_apk.iteritems():
-                unsigned_path = os.path.join(tgts)
-                for prod in prods:
-                  return os.path.join(unsigned_path, prod)
-            else:
-              raise ValueError(self, "This target {0} did not have an apk built that can be "
-                                     "signed".format(target))
+            for tgts, prods in unsigned_apks.get(target).items():
+              unsigned_path = os.path.join(tgts)
+              for prod in prods:
+                return os.path.join(unsigned_path, prod)
 
           def get_key(key):
             """Return Keystore objects that match the target's build_type."""
