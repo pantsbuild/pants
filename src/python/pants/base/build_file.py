@@ -20,7 +20,8 @@ logger = logging.getLogger(__name__)
 
 class BuildFile(object):
 
-  class MissingBuildFileError(IOError):
+  class MissingBuildFileError(Exception):
+    """Raised when a BUILD file cannot be found at the path in the spec."""
     pass
 
   _BUILD_FILE_PREFIX = 'BUILD'
@@ -66,12 +67,12 @@ class BuildFile(object):
   def __init__(self, root_dir, relpath=None, must_exist=True):
     """Creates a BuildFile object representing the BUILD file set at the specified path.
 
-    root_dir: The base directory of the project
-    relpath: The path relative to root_dir where the BUILD file is found - this can either point
+    :param string root_dir: The base directory of the project
+    :param string relpath: The path relative to root_dir where the BUILD file is found - this can either point
         directly at the BUILD file or else to a directory which contains BUILD files
-    must_exist: If True, the specified BUILD file must exist or else an IOError is thrown
-    raises IOError if the path is not absolute
-    raises MissingBuildFileError if the path does not house a BUILD file and must_exist is True
+    :param bool must_exist: If True, the specified BUILD file must exist or else an IOError is thrown
+    :raises IOError: if the root_dir path is not absolute
+    :raises MissingBuildFileError: if the path does not house a BUILD file and must_exist is True
     """
 
     if not os.path.isabs(root_dir):
