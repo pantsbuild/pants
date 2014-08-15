@@ -32,9 +32,14 @@ The following target addresses all specify the same single target.
     $ ./pants goal list ./examples/src/java/com/pants/examples/hello/main/
     examples/src/java/com/pants/examples/hello/main:main
 
-  *NB: Neither the `./` or any other relative path form nor the trailing slash are not allowed in
-  target addresses written down in BUILD files - these affordances are just for ease of command
-  line specification of target addresses.*
+  Absolute paths are also allowed to support flexibility in scripting and command line use::
+
+    $ pants goal list $REPO_ROOT/src/java/com/pants/examples/hello/main
+    src/java/com/pants/examples/hello/main:main
+
+  *NB: Neither the `./` or any other relative or absolute path forms nor the trailing slash are
+  allowed in target addresses written down in BUILD files - these affordances are just for ease of
+  command line specification of target addresses.*
 
 
 As a convenience, targets can be referenced relatively within the same BUILD file::
