@@ -18,6 +18,7 @@ from pants.backend.codegen.tasks.jaxb_gen import JaxbGen
 from pants.backend.codegen.tasks.protobuf_gen import ProtobufGen
 from pants.backend.codegen.tasks.ragel_gen import RagelGen
 from pants.backend.codegen.tasks.scrooge_gen import ScroogeGen
+from pants.backend.codegen.tasks.thrift_linter import ThriftLinter
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.goal.task_registrar import TaskRegistrar as task
 
@@ -39,7 +40,9 @@ def build_file_aliases():
 def register_goals():
   task(name='thrift', action=ApacheThriftGen).install('gen').with_description('Generate code.')
 
-  task(name='scrooge', dependencies=['bootstrap'], action=ScroogeGen).install('gen')
+  task(name='thrift-linter', action=ThriftLinter).install('gen')
+
+  task(name='scrooge', dependencies=['bootstrap', 'thrift-linter'], action=ScroogeGen).install('gen')
 
   # TODO(Garrett Malmquist): 'protoc' depends on a nonlocal phase (imports is in the jvm register).
   # This should be cleaned up, with protobuf stuff moved to its own backend. (See John's comment on

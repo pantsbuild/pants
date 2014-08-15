@@ -10,6 +10,7 @@ python_library(
     ':protobuf_gen',
     ':ragel_gen',
     ':scrooge_gen',
+    ':thrift_linter',
     ':jaxb_gen',
   ],
 )
@@ -121,6 +122,23 @@ python_library(
 python_library(
   name = 'scrooge_gen',
   sources = ['scrooge_gen.py'],
+  dependencies = [
+    pants('3rdparty/python/twitter/commons:twitter.common.collections'),
+    pants(':common'),
+    pants('src/python/pants/base:build_environment'),
+    pants('src/python/pants/backend/jvm/targets:java'),
+    pants('src/python/pants/backend/jvm/targets:scala'),
+    pants('src/python/pants/backend/jvm/tasks:jvm_tool_task_mixin'),
+    pants('src/python/pants/backend/jvm/tasks:nailgun_task'),
+    pants('src/python/pants/backend/core/targets:common'),
+    pants('src/python/pants:thrift_util'),
+    pants('src/python/pants/util:dirutil'),
+  ],
+)
+
+python_library(
+  name = 'thrift_linter',
+  sources = ['thrift_linter.py'],
   dependencies = [
     pants('3rdparty/python/twitter/commons:twitter.common.collections'),
     pants(':common'),
