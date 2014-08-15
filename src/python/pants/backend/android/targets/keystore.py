@@ -16,14 +16,14 @@ class Keystore(Target):
   """Represents a keystore configuration"""
 
   def __init__(self,
-               type=None,
+               build_type=None,
                sources=None,
                keystore_alias=None,
                keystore_password=None,
                key_password=None,
                **kwargs):
     """
-    :param string type: What type of package the keystore signs. Either 'debug' or 'release'.
+    :param string build_type: What type of package the keystore signs. Either 'debug' or 'release'.
     :param sources: path/to/keystore
     :type sources: ``Fileset`` or list of strings.
     :param string keystore_alias: The alias of this keystore.
@@ -49,11 +49,11 @@ class Keystore(Target):
     self.keystore_password = keystore_password
     self.key_password = key_password
 
-    if type.lower() == "debug":
-      self.type = 'debug'
+    if build_type.lower() == "debug":
+      self.build_type = 'debug'
     else:
-      if type.lower() == "release":
-        self.type = 'release'
+      if build_type.lower() == "release":
+        self.build_type = 'release'
       else:
         raise TargetDefinitionException("A Keystore target: {0!r} needs a 'type' field that "
                        "is set to either 'debug' or 'release'.".format(self.address))

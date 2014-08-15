@@ -9,7 +9,7 @@ this directory and fill out a build definition like below.
 
 keystore(
   name='release',
-  type='release',
+  build_type='release',
   sources=['my-release-key.keystore'],
   keystore_alias='alias_name',
   keystore_password='store_password',

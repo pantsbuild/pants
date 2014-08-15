@@ -4,7 +4,7 @@
 
 keystore(
   name='debug',
-  type='debug',
+  build_type='debug',
   sources=['debug.keystore'],
   keystore_alias='androiddebugkey',
   keystore_password='android',

@@ -32,10 +32,15 @@ class JarsignerTask(Task):
 
   def __init__(self, *args, **kwargs):
     super(JarsignerTask, self).__init__(*args, **kwargs)
-    # No Java 8 for Android. I am considering max=1.7.0_50. See comment above render_args.
-    self._dist = Distribution.cached(maximum_version="1.7.0_99")
     self._distdir = self.context.config.getdefault('pants_distdir')
     self._build_type = self.context.options.build_type
+    # No Java 8 for Android. I am considering max=1.7.0_50. See comment in render_args().
+    self._dist = Distribution.cached(maximum_version="1.7.0_99")
+
+  @property
+  def distribution(self):
+    return self._dist
+
 
   def prepare(self, round_manager):
     round_manager.require_data('apk')
@@ -52,7 +57,7 @@ class JarsignerTask(Task):
     # is needed before passing a -tsa flag indiscriminately.
     # http://bugs.java.com/view_bug.do?bug_id=8023338
     args = []
-    args.extend([self._dist.binary('jarsigner')])
+    args.extend([self.distribution.binary('jarsigner')])
 
     # first two are required flags for JDK 7+
     args.extend(['-sigalg', 'SHA1withRSA'])
@@ -62,7 +67,7 @@ class JarsignerTask(Task):
     args.extend(['-storepass', key.keystore_password])
     args.extend(['-keypass', key.key_password])
     args.extend(['-signedjar', (os.path.join(self.jarsigner_out(target), target.app_name
-                                             + '-' + key.type + '-signed.apk'))])
+                                             + '-' + key.build_type + '-signed.apk'))])
     args.append(unsigned_apk)
     args.append(key.keystore_alias)
     return args
@@ -93,7 +98,7 @@ class JarsignerTask(Task):
           def get_key(key):
             """Return Keystore objects that match the target's build_type."""
             if isinstance(key, Keystore):
-              if key.type == build_type:
+              if key.build_type == build_type:
                 keys.append(key)
 
           unsigned_apk = get_apk(target)
