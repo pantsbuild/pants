@@ -10,6 +10,7 @@ python_library(
     ':aapt_gen',
     ':aapt_task',
     ':dx_compile',
+    ':jarsigner_task',
   ],
 )
 
@@ -17,8 +18,8 @@ python_library(
   name = 'android_task',
   sources = ['android_task.py'],
   dependencies = [
-    pants('src/python/pants/backend/core/tasks:common'),
-    pants('src/python/pants/backend/android:android_distribution'),
+    'src/python/pants/backend/core/tasks:common',
+    'src/python/pants/backend/android:android_distribution',
   ],
 )
 
@@ -26,13 +27,13 @@ python_library(
   name = 'aapt_builder',
   sources = ['aapt_builder.py'],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.log'),
-    pants('src/python/pants/backend/android/targets:android'),
-    pants('src/python/pants/backend/android/tasks:aapt_task'),
-    pants('src/python/pants/base:build_environment'),
-    pants('src/python/pants/base:exceptions'),
-    pants('src/python/pants/base:workunit'),
-    pants('src/python/pants/util:dirutil'),
+    '3rdparty/python/twitter/commons:twitter.common.log',
+    'src/python/pants/backend/android/targets:android',
+    'src/python/pants/backend/android/tasks:aapt_task',
+    'src/python/pants/base:build_environment',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/base:workunit',
+    'src/python/pants/util:dirutil',
   ],
 )
 
@@ -40,7 +41,7 @@ python_library(
   name = 'aapt_task',
   sources = ['aapt_task.py'],
   dependencies = [
-    pants('src/python/pants/backend/android/tasks:android_task'),
+    'src/python/pants/backend/android/tasks:android_task',
   ],
 )
 
@@ -48,17 +49,30 @@ python_library(
   name = 'aapt_gen',
   sources = ['aapt_gen.py'],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.collections'),
-    pants('3rdparty/python/twitter/commons:twitter.common.log'),
-    pants('src/python/pants/backend/android/targets:android'),
-    pants('src/python/pants/backend/android/tasks:aapt_task'),
-    pants('src/python/pants/backend/codegen/tasks:code_gen'),
-    pants('src/python/pants/backend/core/tasks:common'),
-    pants('src/python/pants/backend/jvm/targets:java'),
-    pants('src/python/pants/base:address'),
-    pants('src/python/pants/base:build_environment'),
-    pants('src/python/pants/base:exceptions'),
-    pants('src/python/pants/util:dirutil'),
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python/twitter/commons:twitter.common.log',
+    'src/python/pants/backend/android/targets:android',
+    'src/python/pants/backend/android/tasks:aapt_task',
+    'src/python/pants/backend/codegen/tasks:code_gen',
+    'src/python/pants/backend/core/tasks:common',
+    'src/python/pants/backend/jvm/targets:java',
+    'src/python/pants/base:address',
+    'src/python/pants/base:build_environment',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/util:dirutil',
+  ],
+)
+
+python_library(
+  name = 'jarsigner_task',
+  sources = ['jarsigner_task.py'],
+  dependencies = [
+    'src/python/pants/backend/android/targets:android',
+    'src/python/pants/backend/android/tasks:android_task',
+    'src/python/pants/backend/jvm/tasks:nailgun_task',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/base:workunit',
+    'src/python/pants/util:dirutil',
   ],
 )
 
@@ -66,12 +80,12 @@ python_library(
   name = 'dx_compile',
   sources = ['dx_compile.py'],
   dependencies = [
-    pants('src/python/pants/backend/android/targets:android'),
-    pants('src/python/pants/backend/android/tasks:android_task'),
-    pants('src/python/pants/backend/core/tasks:common'),
-    pants('src/python/pants/backend/jvm/tasks:nailgun_task'),
-    pants('src/python/pants/base:exceptions'),
-    pants('src/python/pants/base:workunit'),
-    pants('src/python/pants/util:dirutil'),
+    'src/python/pants/backend/android/targets:android',
+    'src/python/pants/backend/android/tasks:android_task',
+    'src/python/pants/backend/core/tasks:common',
+    'src/python/pants/backend/jvm/tasks:nailgun_task',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/base:workunit',
+    'src/python/pants/util:dirutil',
   ],
 )
