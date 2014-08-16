@@ -34,7 +34,7 @@ target::
     python_binary(name = "scrape_html",
       source = "scrape_html.py",
       dependencies = [
-        pants('3rdparty/python:beautifulsoup'),
+        '3rdparty/python:beautifulsoup',
       ]
     )
 

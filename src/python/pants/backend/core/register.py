@@ -6,6 +6,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import os
+import sys
 
 from pants.backend.core.targets.dependencies import Dependencies, DeprecatedDependencies
 from pants.backend.core.targets.doc import Page, Wiki, WikiArtifact
@@ -49,6 +50,19 @@ class BuildFilePath(object):
     return os.path.join(get_buildroot(), self.rel_path)
 
 
+class PantsObsolete(object):
+  _warning_emitted = False
+
+  @classmethod
+  def pants(cls, target):
+    if not cls._warning_emitted:
+      cls._warning_emitted = True
+      print('*** pants() wrapper is obsolete and will be removed in a future release. '
+            'See http://pantsbuild.github.io/build_files.html ***',
+            file=sys.stderr)
+    return target
+
+
 def build_file_aliases():
   return BuildFileAliases.create(
     targets={
@@ -66,7 +80,8 @@ def build_file_aliases():
       'get_scm': get_scm,
       'pants_version': pants_version,
       'goal': task,
-      'pants': lambda x: x,
+      # TODO(Eric Ayers) pants() was officially deprecated in 0.0.24. Remove this function soon.
+      'pants': PantsObsolete.pants,
       'phase': Phase,
       'set_scm': set_scm,
       'wiki_artifact': WikiArtifact,

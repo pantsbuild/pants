@@ -98,7 +98,7 @@ When consuming such third-party artifacts, exclude dependencies that
       ]
       dependencies=[
         # and re-include local version of source manually:
-        pants('util/near'),
+        'util/near',
       ]
     )
 
@@ -125,7 +125,7 @@ sets ``force=True`` to *force* using that version::
   scala_library(
     name = "loadtest",
     dependencies = [
-      pants('3rdparty/bijection:bijection-scrooge'),
+      '3rdparty/bijection:bijection-scrooge',
       # our 3rdparty/BUILD still has 6.1.4 as the default version, but
       # finagle-[core|thrift] version 6.1.4 is superceded (evicted) by
       # version 6.4.1
@@ -148,7 +148,7 @@ hand-picked versions::
       dependencies=[
         # Don't use retro's expected (old, incompatible) common-logging
         # version, yipe; use the same version we use everywhere else:
-	pants('3rdparty/jvm/common-logging'),
+	'3rdparty/jvm/common-logging',
       ])
 
 **If you notice a small number of transitive dependencies to exclude**
@@ -157,7 +157,7 @@ transitive dependencies from JVM targets::
 
     java_library(name = 'loadtest',
       dependencies = [
-        pants('3rdparty/storm:storm'),
+        '3rdparty/storm:storm',
       ],
       sources = globs('*.java'),
       excludes = [

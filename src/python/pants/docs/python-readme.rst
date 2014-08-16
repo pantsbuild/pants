@@ -279,7 +279,7 @@ if we wanted to build an a la carte `fab` wrapper for fabric::
   python_binary(name = "fab",
     entry_point = "fabric.main:main",
     dependencies = [
-      pants("3rdparty/python:fabric"),
+      "3rdparty/python:fabric",
     ]
   )
 
@@ -374,8 +374,8 @@ can. Set the `entry_point` keyword argument when calling python_tests::
     name = 'tests',
     sources = [],
     dependencies = [
-      pants('src/python/twitter/infraops/supplybird:supplybird-lib'),
-      pants('3rdparty/python:mock')
+      'src/python/twitter/infraops/supplybird:supplybird-lib',
+      '3rdparty/python:mock'
     ],
     entry_point="twitter.infraops.supplybird.core.run_tests"
   )
