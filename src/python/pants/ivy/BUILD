@@ -5,14 +5,14 @@ python_library(
   name = 'ivy',
   sources = globs('*.py'),
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.collections'),
-    pants('3rdparty/python/twitter/commons:twitter.common.lang'),
-    pants('3rdparty/python/twitter/commons:twitter.common.log'),
-    pants('src/python/pants/base:config'),
-    pants('src/python/pants/java:executor'),
-    pants('src/python/pants/java:util'),
-    pants('src/python/pants/net'),
-    pants('src/python/pants/util:contextutil'),
-    pants('src/python/pants/util:dirutil'),
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python/twitter/commons:twitter.common.lang',
+    '3rdparty/python/twitter/commons:twitter.common.log',
+    'src/python/pants/base:config',
+    'src/python/pants/java:executor',
+    'src/python/pants/java:util',
+    'src/python/pants/net',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
   ]
 )

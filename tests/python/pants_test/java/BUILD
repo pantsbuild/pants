@@ -4,8 +4,8 @@
 python_test_suite(
   name = 'java',
   dependencies = [
-    pants(':executor'),
-    pants('tests/python/pants_test/java/distribution'),
+    ':executor',
+    'tests/python/pants_test/java/distribution',
   ]
 )
 
@@ -13,9 +13,9 @@ python_tests(
   name = 'executor',
   sources = ['test_executor.py'],
   dependencies = [
-    pants('src/python/pants/java:distribution'),
-    pants('src/python/pants/java:executor'),
-    pants('src/python/pants/util:contextutil'),
-    pants('src/python/pants/util:dirutil'),
+    'src/python/pants/java:distribution',
+    'src/python/pants/java:executor',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
   ]
 )

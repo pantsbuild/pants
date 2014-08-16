@@ -4,8 +4,8 @@
 python_test_suite(
   name = 'jvm_compile',
   dependencies = [
-    pants('tests/python/pants_test/tasks/jvm_compile/java'),
-    pants('tests/python/pants_test/tasks/jvm_compile/scala'),
+    'tests/python/pants_test/tasks/jvm_compile/java',
+    'tests/python/pants_test/tasks/jvm_compile/scala',
   ],
 )
 

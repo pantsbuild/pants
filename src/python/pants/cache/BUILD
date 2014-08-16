@@ -5,8 +5,8 @@ python_library(
   name = 'cache',
   sources = globs('*.py'),
   dependencies = [
-    pants('3rdparty/python:requests'),
-    pants('src/python/pants/util:contextutil'),
-    pants('src/python/pants/util:dirutil'),
+    '3rdparty/python:requests',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
   ]
 )

@@ -5,8 +5,8 @@ python_tests(
   name = 'fs',
   sources = globs('*.py'),
   dependencies = [
-    pants('src/python/pants/fs'),
-    pants('src/python/pants/util:contextutil'),
-    pants('src/python/pants/util:dirutil'),
+    'src/python/pants/fs',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
   ]
 )
