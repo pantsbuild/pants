@@ -6,12 +6,16 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 from pants.backend.android.targets.android_target import AndroidTarget
+from pants.backend.android.targets.build_type_mixin import BuildTypeMixin
 
 
-class AndroidBinary(AndroidTarget):
+class AndroidBinary(AndroidTarget, BuildTypeMixin):
   """Produces an Android binary."""
 
-  def __init__(self, *args, **kwargs):
+  def __init__(self,
+               build_type=None,
+               *args,
+               **kwargs):
     """
     :param string name: The name of this target, which combined with this
       build file defines the :doc:`target address <target_addresses>`.
@@ -24,9 +28,16 @@ class AndroidBinary(AndroidTarget):
       Defaults to the latest full release.
     :param manifest: path/to/file of 'AndroidManifest.xml' (required name). Paths are relative
       to the BUILD file's directory.
-    :param release_type: Which keystore is used to sign target: 'debug' or 'release'.
+    :param string build_type: One of [debug, release]. The keystore to sign the package with.
       Set as 'debug' by default.
     """
-
-    # TODO (mateor): Add some Compatibility error checks.
     super(AndroidBinary, self).__init__(*args, **kwargs)
+    self._build_type = None
+    # default to 'debug' builds for now.
+    self.keystore = build_type if build_type else 'debug'
+
+  @property
+  def build_type(self):
+    if self._build_type is None:
+      self._build_type = self.get_build_type(self.keystore)
+    return self._build_type

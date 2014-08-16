@@ -23,6 +23,7 @@ class AndroidTarget(JvmTarget):
   def __init__(self,
                address=None,
                # TODO (mateor) add support for minSDk
+               build_type = None,
                # most recent build_tools_version should be defined elsewhere
                build_tools_version="19.1.0",
                manifest=None,
@@ -39,7 +40,6 @@ class AndroidTarget(JvmTarget):
       Defaults to the latest full release.
     :param manifest: path/to/file of 'AndroidManifest.xml' (required name). Paths are relative
       to the BUILD file's directory.
-    :param release_type: Which keystore is used to sign target: 'debug' or 'release'.
       Set as 'debug' by default.
     """
     super(AndroidTarget, self).__init__(address=address, **kwargs)
@@ -60,7 +60,7 @@ class AndroidTarget(JvmTarget):
     # If unable to parse application name, silently falls back to target name.
     self.app_name = self.get_app_name() if self.get_app_name() else self.name
 
-  # TODO(mateor) Peel parsing into a ManifestParser class, to ensure it's robust against bad input
+  # TODO(mateor) Peel parsing into a ManifestParser class to ensure it's robust against bad input
   # Parsing as in Android Donut's testrunner:
   # https://github.com/android/platform_development/blob/master/testrunner/android_manifest.py
   def get_package_name(self):

@@ -15,8 +15,12 @@ python_library(
     'android_binary.py',
     'android_resources.py',
     'android_target.py',
+    'build_target_mixin.py',
+    'keystore.py',
   ],
   dependencies = [
+    pants('src/python/pants/base:build_environment'),
+    pants('src/python/pants/base:exceptions'),
     pants('src/python/pants/base:payload'),
     pants('src/python/pants/base:target'),
     pants('src/python/pants/backend/core/targets:common'),

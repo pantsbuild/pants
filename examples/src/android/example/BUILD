@@ -8,6 +8,7 @@ android_binary(
   manifest='AndroidManifest.xml',
   dependencies = [
     ':resources',
+    '3rdparty/android/authentication/keys/debug:debug'
   ],
 )
 
@@ -16,4 +17,3 @@ android_resources(
   manifest='AndroidManifest.xml',
   resource_dir='res'
 )
-
