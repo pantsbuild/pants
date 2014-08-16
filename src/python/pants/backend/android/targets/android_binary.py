@@ -6,10 +6,10 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 from pants.backend.android.targets.android_target import AndroidTarget
-from pants.base.exceptions import TargetDefinitionException
+from pants.backend.android.targets.build_type_mixin import BuildTypeMixin
 
 
-class AndroidBinary(AndroidTarget):
+class AndroidBinary(AndroidTarget, BuildTypeMixin):
   """Produces an Android binary."""
 
   def __init__(self,
@@ -32,12 +32,12 @@ class AndroidBinary(AndroidTarget):
       Set as 'debug' by default.
     """
     super(AndroidBinary, self).__init__(*args, **kwargs)
-    if build_type is None:
-      self.build_type = 'debug'
-    else:
-      build_type = build_type.lower()
-      if build_type == 'debug' or build_type == 'release':
-        self.build_type = build_type
-      else:
-        raise TargetDefinitionException(self, "The 'build_type' must be either 'debug' or "
-                                              "'release' instead of {0}".format(build_type))
+    self._build_type = None
+    # default to 'debug' builds for now.
+    self.keystore = build_type if build_type else 'debug'
+
+  @property
+  def build_type(self):
+    if self._build_type is None:
+      self._build_type = self.get_build_type(self.keystore)
+    return self._build_type

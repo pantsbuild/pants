@@ -7,12 +7,13 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import os
 
+from pants.backend.android.targets.build_type_mixin import BuildTypeMixin
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.target import Target
 from pants.base.build_environment import get_buildroot
 
 
-class Keystore(Target):
+class Keystore(Target, BuildTypeMixin):
   """Represents a keystore configuration"""
 
   def __init__(self,
@@ -43,12 +44,11 @@ class Keystore(Target):
     self.keystore_alias = keystore_alias
     self.keystore_password = keystore_password
     self.key_password = key_password
+    self._build_type = None
+    self.keystore = build_type
 
-    if build_type.lower() == "debug":
-      self.build_type = 'debug'
-    else:
-      if build_type.lower() == "release":
-        self.build_type = 'release'
-      else:
-        raise TargetDefinitionException("A Keystore target: {0!r} needs a 'type' field that "
-                       "is set to either 'debug' or 'release'.".format(self.address))
+  @property
+  def build_type(self):
+    if self._build_type is None:
+      self._build_type = self.get_build_type(self.keystore)
+    return self._build_type
