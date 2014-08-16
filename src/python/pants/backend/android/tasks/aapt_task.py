@@ -39,6 +39,7 @@ class AaptTask(AndroidTask):
     super(AaptTask, self).__init__(*args, **kwargs)
     self._android_dist = self.android_sdk
     self._forced_build_tools_version = self.context.options.build_tools_version
+
     if self.context.options.ignored_assets:
       self.ignored_assets = self.context.options.ignored_assets
     else:
