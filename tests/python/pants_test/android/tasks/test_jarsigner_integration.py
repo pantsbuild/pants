@@ -35,7 +35,7 @@ class JarsignerIntegrationTest(AndroidIntegrationTest):
                              'and ANDROID_HOME set in path.'.format(TOOLS))
 
   def test_jarsigner(self):
-    self.jarsigner_test('src/android/example:hello')
+    self.jarsigner_test(AndroidIntegrationTest.TEST_TARGET)
 
   def jarsigner_test(self, target):
     pants_run = self.run_pants(['goal', 'sign', target])

@@ -116,7 +116,7 @@ class JarsignerTask(Task):
               process = subprocess.Popen(self.render_args(target, unsigned_apk, key))
               result = process.wait()
               if result != 0:
-                raise TaskError('Android aapt tool exited non-zero ({code})'.format(code=result))
+                raise TaskError('Jarsigner tool exited non-zero ({code})'.format(code=result))
           else:
             raise TaskError(self, "No key matched the {0} target's build type "
                                     "[release, debug]".format(target))
