@@ -22,6 +22,9 @@
 .factorypath
 .python
 .pydevproject
+3rdparty/android/authentication/keys/release/*
+# allow only the readme under 'release'
+!3rdparty/android/authentication/keys/release/readme.txt
 bin/
 build/
 build-support/*.pex
@@ -34,6 +37,7 @@ htmlcov/
 lib/
 out/
 arc.sh
+BUILD.release*
 pants.pex
 target
 *.class
