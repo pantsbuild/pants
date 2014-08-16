@@ -9,14 +9,12 @@ this directory and fill out a build definition like below.
 
 keystore(
   name='release',
-  type='release',
-  sources=['my-release-key.keystore'],
+  build_type='release',
+  source='my-release-key.keystore',
   keystore_alias='alias_name',
   keystore_password='store_password',
   key_password='key_password'
 )
-
-Then just add the keystore target as a dependency to your android target.
 
 Neither the BUILD.release nor any new 3rdparty/android/authentication/release files
 will be added to git.

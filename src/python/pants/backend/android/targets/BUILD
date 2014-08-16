@@ -15,6 +15,7 @@ python_library(
     'android_binary.py',
     'android_resources.py',
     'android_target.py',
+    'build_target_mixin.py',
     'keystore.py',
   ],
   dependencies = [
