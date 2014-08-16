@@ -4,7 +4,7 @@
 python_library(
   name = 'all',
   dependencies = [
-    pants(':common'),
+    ':common',
   ],
 )
 
@@ -16,12 +16,12 @@ python_library(
     'resources.py',
   ],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.collections'),
-    pants('3rdparty/python/twitter/commons:twitter.common.lang'),
-    pants('3rdparty/python/twitter/commons:twitter.common.log'),
-    pants('src/python/pants/base:address'),
-    pants('src/python/pants/base:build_environment'),
-    pants('src/python/pants/base:payload'),
-    pants('src/python/pants/base:target'),
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python/twitter/commons:twitter.common.lang',
+    '3rdparty/python/twitter/commons:twitter.common.log',
+    'src/python/pants/base:address',
+    'src/python/pants/base:build_environment',
+    'src/python/pants/base:payload',
+    'src/python/pants/base:target',
   ],
 )

@@ -6,12 +6,12 @@ python_library(
   name = 'plugin',
   sources = ['__init__.py', 'register.py'],
   dependencies = [
-    pants('src/python/pants/backend/core/tasks:group_task'),
-    pants('src/python/pants/backend/jvm/targets:all'),
-    pants('src/python/pants/backend/jvm/tasks:all'),
-    pants('src/python/pants/base:build_file_aliases'),
-    pants(':ivy_utils'),
-    pants(':jvm_tool_bootstrapper'),
+    'src/python/pants/backend/core/tasks:group_task',
+    'src/python/pants/backend/jvm/targets:all',
+    'src/python/pants/backend/jvm/tasks:all',
+    'src/python/pants/base:build_file_aliases',
+    ':ivy_utils',
+    ':jvm_tool_bootstrapper',
   ],
 )
 
@@ -20,15 +20,15 @@ python_library(
   sources = ['ivy_utils.py'],
   resources = globs('tasks/templates/ivy_resolve/*.mustache'),
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.collections'),
-    pants('src/python/pants/base:build_environment'),
-    pants('src/python/pants/base:exceptions'),
-    pants('src/python/pants/base:generator'),
-    pants('src/python/pants/base:revision'),
-    pants('src/python/pants/base:target'),
-    pants('src/python/pants/ivy'),
-    pants('src/python/pants/java:util'),
-    pants('src/python/pants/util:dirutil'),
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    'src/python/pants/base:build_environment',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/base:generator',
+    'src/python/pants/base:revision',
+    'src/python/pants/base:target',
+    'src/python/pants/ivy',
+    'src/python/pants/java:util',
+    'src/python/pants/util:dirutil',
   ],
 )
 
@@ -36,6 +36,6 @@ python_library(
   name = 'jvm_tool_bootstrapper',
   sources = ['jvm_tool_bootstrapper.py'],
   dependencies = [
-    pants('src/python/pants/base:exceptions'),
+    'src/python/pants/base:exceptions',
   ],
 )

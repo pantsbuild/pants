@@ -5,10 +5,10 @@ python_tests(
   name = 'http',
   sources = globs('*.py'),
   dependencies = [
-    pants('3rdparty/python:mox'),
-    pants('3rdparty/python:requests'),
-    pants('3rdparty/python/twitter/commons:twitter.common.lang'),
-    pants('src/python/pants/net'),
-    pants('src/python/pants/util:contextutil'),
+    '3rdparty/python:mox',
+    '3rdparty/python:requests',
+    '3rdparty/python/twitter/commons:twitter.common.lang',
+    'src/python/pants/net',
+    'src/python/pants/util:contextutil',
   ]
 )

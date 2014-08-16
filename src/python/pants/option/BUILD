@@ -6,6 +6,6 @@ python_library(
   name = 'option',
   sources = globs('*.py'),
   dependencies = [
-    pants('3rdparty/python:argparse'),
+    '3rdparty/python:argparse',
   ]
 )

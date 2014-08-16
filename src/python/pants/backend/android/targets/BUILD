@@ -17,8 +17,8 @@ python_library(
     'android_target.py',
   ],
   dependencies = [
-    pants('src/python/pants/base:payload'),
-    pants('src/python/pants/base:target'),
-    pants('src/python/pants/backend/core/targets:common'),
+    'src/python/pants/base:payload',
+    'src/python/pants/base:target',
+    'src/python/pants/backend/core/targets:common',
   ],
 )

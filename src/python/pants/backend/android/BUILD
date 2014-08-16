@@ -6,9 +6,9 @@ python_library(
   name = 'plugin',
   sources = ['__init__.py', 'register.py'],
   dependencies = [
-    pants('src/python/pants/backend/android/targets:android'),
-    pants('src/python/pants/backend/android/tasks:all'),
-    pants('src/python/pants/base:build_file_aliases'),
+    'src/python/pants/backend/android/targets:android',
+    'src/python/pants/backend/android/tasks:all',
+    'src/python/pants/base:build_file_aliases',
   ]
 )
 
@@ -16,6 +16,6 @@ python_library(
   name = 'android_distribution',
   sources = globs('distribution/*.py'),
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.log'),
+    '3rdparty/python/twitter/commons:twitter.common.log',
   ]
 )

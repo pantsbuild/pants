@@ -9,11 +9,11 @@ python_library(
     'jaxb_library.py',
   ],
   dependencies = [
-    pants('src/python/pants/backend/jvm/targets:jvm'),
-    pants('3rdparty/python/twitter/commons:twitter.common.collections'),
-    pants('3rdparty/python/twitter/commons:twitter.common.lang'),
-    pants('src/python/pants/base:config'),
-    pants('src/python/pants/base:target'),
+    'src/python/pants/backend/jvm/targets:jvm',
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python/twitter/commons:twitter.common.lang',
+    'src/python/pants/base:config',
+    'src/python/pants/base:target',
   ],
 )
 
@@ -24,7 +24,7 @@ python_library(
     'python_thrift_library.py',
   ],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.collections'),
-    pants('src/python/pants/backend/python/targets:python'),
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    'src/python/pants/backend/python/targets:python',
   ],
 )
