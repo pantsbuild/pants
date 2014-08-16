@@ -4,7 +4,7 @@
 junit_tests(name='cucumber',
   sources=globs('*.java'),
   dependencies=[
-    pants('3rdparty:junit'),
-    pants('src/java/com/pants/testproject/unicode/cucumber'),
+    '3rdparty:junit',
+    'testprojects/src/java/com/pants/testproject/unicode/cucumber',
   ],
 )

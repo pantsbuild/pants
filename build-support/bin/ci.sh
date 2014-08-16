@@ -18,16 +18,18 @@ function die() {
 function usage() {
   echo "Runs commons tests for local or hosted CI."
   echo
-  echo "Usage: $0 (-h|-bsrdjpce)"
+  echo "Usage: $0 (-h|-bsrdjpceat)"
   echo " -h           print out this help message"
   echo " -b           skip bootstraping pants from local sources"
   echo " -s           skip self-distribution tests"
   echo " -r           skip doc generation tests"
   echo " -d           if running jvm tests, don't use nailgun daemons"
-  echo " -j           skip jvm tests"
-  echo " -p           skip python tests"
+  echo " -j           skip core jvm tests"
+  echo " -p           skip core python tests"
   echo " -c           skip pants integration tests"
   echo " -e           skip example tests"
+  echo " -a           skip android targets when running tests"
+  echo " -t           skip testprojects tests"
   if (( $# > 0 )); then
     die "$@"
   else
@@ -37,7 +39,7 @@ function usage() {
 
 daemons="--ng-daemons"
 
-while getopts "hbsrdjpce" opt; do
+while getopts "hbsrdjpceat" opt; do
   case ${opt} in
     h) usage ;;
     b) skip_bootstrap="true" ;;
@@ -48,9 +50,19 @@ while getopts "hbsrdjpce" opt; do
     p) skip_python="true" ;;
     c) skip_integration="true" ;;
     e) skip_examples="true" ;;
+    a) skip_android="true" ;;
+    t) skip_testprojects="true" ;;
     *) usage "Invalid option: -${OPTARG}" ;;
   esac
 done
+
+# Android testing requires the SDK to be installed and configured in Pants.
+# Skip if ANDROID_HOME isn't configured in the environment
+if [[ -z "${ANDROID_HOME}"  || "${skip_android:-false}" == "true" ]] ; then
+  android_test_opts="--exclude-target-regexp=.*android.*"
+else
+  android_test_opts=""
+fi
 
 banner "CI BEGINS"
 
@@ -112,26 +124,35 @@ if [[ "${skip_docs:-false}" == "false" ]]; then
 fi
 
 if [[ "${skip_java:-false}" == "false" ]]; then
-  banner "Running jvm tests"
+  banner "Running core jvm tests"
   (
     ./pants.pex goal test {src,tests}/{java,scala}:: $daemons
-  ) || die "Jvm test failure."
+  ) || die "Core jvm test failure."
 fi
 
 if [[ "${skip_python:-false}" == "false" ]]; then
-  banner "Running python tests"
+  banner "Running core python tests"
   (
+    # TODO(Eric Ayers): Substitute tests/python:: when all tests are working that way
     PANTS_PYTHON_TEST_FAILSOFT=1 ./pants.pex goal test tests/python/pants_test:all \
       ${INTERPRETER_ARGS[@]}
-  ) || die "Python test failure"
+  ) || die "Core python test failure"
+fi
+
+if [[ "${skip_testprojects:-false}" == "false" ]]; then
+  banner "Running tests in testprojects/ "
+  (
+    ./pants.pex goal test testprojects:: $daemons $android_test_opts
+  ) || die "test failure in testprojects/"
 fi
 
 if [[ "${skip_examples:-false}" == "false" ]]; then
   banner "Running example tests"
   (
-    ./pants.pex goal test examples:: $daemons
+    ./pants.pex goal test examples:: $daemons $android_test_opts
   ) || die "Examples test failure"
 fi
+
 
 if [[ "${skip_integration:-false}" == "false" ]]; then
   banner "Running Pants Integration tests"

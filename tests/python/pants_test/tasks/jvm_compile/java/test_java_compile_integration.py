@@ -28,7 +28,7 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
     # time the global_analysis.valid file would incorrectly be empty.
 
     pants_run = self.run_pants_with_workdir(
-      ['goal', 'compile', 'src/java/com/pants/testproject/unicode/main'],
+      ['goal', 'compile', 'testprojects/src/java/com/pants/testproject/unicode/main'],
       workdir)
     self._assert_run_success(pants_run)
 
@@ -53,11 +53,11 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
     # produces two different artifacts.
 
     with temporary_dir() as cache_dir:
-      artifact_dir = os.path.join(cache_dir, 'JavaCompile', 'src.java.com.pants.testproject.unicode.main.main')
+      artifact_dir = os.path.join(cache_dir, 'JavaCompile', 'testprojects.src.java.com.pants.testproject.unicode.main.main')
       config = {'java-compile': {'write_artifact_caches': [cache_dir]}}
 
       pants_run = self.run_pants(
-        ['goal', 'compile', 'src/java/com/pants/testproject/unicode/main'],
+        ['goal', 'compile', 'testprojects/src/java/com/pants/testproject/unicode/main'],
         config)
       self._assert_run_success(pants_run)
 
@@ -66,7 +66,7 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
 
       # Rerun for java 7
       pants_run = self.run_pants(
-        ['goal', 'compile', 'src/java/com/pants/testproject/unicode/main',
+        ['goal', 'compile', 'testprojects/src/java/com/pants/testproject/unicode/main',
          '--compile-java-args=\'-target 1.7\''],
         config)
       self._assert_run_success(pants_run)

@@ -17,7 +17,7 @@ from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
 
 class AntlrGenTest(NailgunTaskTestBase):
   def test_antlr4(self):
-    parts = {'srcroot': 'src/antlr',
+    parts = {'srcroot': 'testprojects/src/antlr',
              'dir': 'this/is/a/directory',
              'name': 'smoke',
              'package': 'this.is.a.package',
