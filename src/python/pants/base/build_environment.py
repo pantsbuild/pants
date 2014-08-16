@@ -43,16 +43,16 @@ def get_scm():
   # TODO(John Sirois): Extract a module/class to carry the bootstrap logic.
   global _SCM
   if not _SCM:
+    from pants.scm.git import Git
     # We know about git, so attempt an auto-configure
-    git_dir = os.path.join(get_buildroot(), '.git')
-    if os.path.isdir(git_dir):
-      from pants.scm.git import Git
-      git = Git(worktree=get_buildroot())
+    worktree = Git.detect_worktree()
+    if worktree and os.path.isdir(worktree):
+      git = Git(worktree=worktree)
       try:
-        log.info('Detected git repository on branch %s' % git.branch_name)
+        log.info('Detected git repository at %s on branch %s' % (worktree, git.branch_name))
         set_scm(git)
-      except git.LocalException:
-        pass
+      except git.LocalException as e:
+        log.info('Failed to load git repository at %s: %s' % (worktree, e))
   return _SCM
 
 

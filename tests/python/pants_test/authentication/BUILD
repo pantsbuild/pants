@@ -5,7 +5,7 @@ python_tests(
   name = 'netrc',
   sources = ['test_netrc_util.py'],
   dependencies = [
-    pants('3rdparty/python:mock'),
-    pants('src/python/pants/backend/authentication:authentication'),
+    '3rdparty/python:mock',
+    'src/python/pants/backend/authentication:authentication',
   ]
 )

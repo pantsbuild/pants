@@ -180,7 +180,7 @@ That ``dependencies`` is interesting. The ``main-bin`` build target depends on
 other build targets; its ``dependencies`` lists those.
 To build a runnable Java binary, we need to first compile its dependencies.
 The ``main-bin`` binary has two dependencies,
-``pants('examples/src/java/com/pants/examples/hello/greet')``
+``'examples/src/java/com/pants/examples/hello/greet'``
 is the *address* of another target. Addresses look,
 roughly, like ``path/to/dir:targetname``.
 We can see this build target in the ``.../hello/greet/BUILD`` file:
@@ -200,10 +200,10 @@ A target definition in a ``BUILD`` file looks something like ::
 
     scala_library(
       name='util',
-      dependencies = [pants('3rdparty:commons-math'),
-                      pants('3rdparty:thrift'),
-                      pants('src/main/scala/com/foursquare/auth'),
-                      pants(':base')],
+      dependencies = ['3rdparty:commons-math',
+                      '3rdparty:thrift',
+                      'src/main/scala/com/foursquare/auth',
+                      ':base'],
       sources=globs('*.scala'),
     )
 

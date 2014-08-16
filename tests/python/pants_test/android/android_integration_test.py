@@ -25,6 +25,8 @@ class AndroidIntegrationTest(PantsRunIntegrationTest):
   TARGET_SDK = '19'
   ANDROID_SDK_LOCATION = 'ANDROID_HOME'
 
+  TEST_TARGET = 'examples/src/android/example:hello'
+
   @classmethod
   def requirements(cls, tools):
     sdk_home = os.environ.get('ANDROID_HOME')

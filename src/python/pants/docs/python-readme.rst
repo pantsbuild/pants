@@ -76,51 +76,51 @@ The pantsbuild/pants repo has a simple "hello world" sample Python binary.
 You can use ``goal binary`` to build a PEX from it.
 You can then run the PEX::
 
-    $ ./pants goal binary src/python/example/hello/main
+    $ ./pants goal binary examples/src/python/example/hello/main
          ...much output...
     $ ./dist/main.pex # run the generated PEX
     Hello, world!
     $
 
-``src/python/example/hello/main/BUILD`` defines a ``python_binary`` target,
+``examples/src/python/example/hello/main/BUILD`` defines a ``python_binary`` target,
 a build-able thing that configures a runnable program made from Python code:
 
-.. literalinclude:: ../../../python/example/hello/main/BUILD
+.. literalinclude:: ../../../../examples/src/python/example/hello/main/BUILD
    :start-after: Like Hello
 
 This binary has a source file with its "main". A Python binary's "main" can be
 in a depended-upon ``python_library`` or in the ``python_binary``\'s
 ``source``.
 
-.. literalinclude:: ../../../python/example/hello/main/main.py
+.. literalinclude:: ../../../../examples/src/python/example/hello/main/main.py
    :start-after: Apache License
 
 This code imports code from another target.
 To make this work, the binary target has a dependency
-``src/python/example/hello/greet`` and the Python
+``examples/src/python/example/hello/greet`` and the Python
 code imports ``example/hello/greet``.
 
 You remember that libraries configure "importable" code;
 ``example/hello/greet/BUILD`` has a ``python_library``:
 
-.. literalinclude:: ../../../python/example/hello/greet/BUILD
+.. literalinclude:: ../../../../examples/src/python/example/hello/greet/BUILD
    :start-after: Like Hello
 
 This ``python_library`` pulls in ``greet.py``\'s Python code:
 
-.. literalinclude:: ../../../python/example/hello/greet/greet.py
+.. literalinclude:: ../../../../examples/src/python/example/hello/greet/greet.py
    :start-after: Apache
 
 To test the library's code, we set up
-``tests/python/example_test/hello/greet/BUILD`` with a ``python_tests``
+``examples/tests/python/example_test/hello/greet/BUILD`` with a ``python_tests``
 target. It depends on the library:
 
-.. literalinclude:: ../../../../tests/python/example_test/hello/greet/greet.py
+.. literalinclude:: ../../../../examples/tests/python/example_test/hello/greet/greet.py
    :start-after: Apache License
 
 Use ``goal test`` to run the tests::
 
-    $ ./pants goal test tests/python/example_test/hello/greet
+    $ ./pants goal test examples/tests/python/example_test/hello/greet
 
     13:29:28 00:00 [main]
                    (To run a reporting server: ./pants goal server)
@@ -136,7 +136,7 @@ Use ``goal test`` to run the tests::
                          plugins: cov, timeout
                          collected 1 items
 
-                         tests/python/example_test/hello/greet/greet.py .
+                         examples/tests/python/example_test/hello/greet/greet.py .
 
                          ============ 1 passed in 0.02 seconds ============
 
@@ -168,7 +168,7 @@ To build a PEX, invoke ``./pants goal binary`` on a ``python_binary`` target:
 
 .. code-block:: bash
 
-  $ ./pants goal binary src/python/example/hello/main
+  $ ./pants goal binary examples/src/python/example/hello/main
     ...
                    SUCCESS
   $ ./dist/main.pex
@@ -198,13 +198,13 @@ Note that's "py", **not** "goal py".
 3. For a combination of `python_binary` and `python_library` targets, builds
    the transitive closure of all targets and executes the first binary target.
 
-Let's drop into our library target ``src/python/example/hello/greet``
+Let's drop into our library target ``examples/src/python/example/hello/greet``
 with verbosity turn on to see what's going on in the background::
 
-    $ PANTS_VERBOSE=1 ./pants py src/python/example/hello/greet
-    /Users/lhosken/workspace/pants src/python/example/hello/greet
-    Building chroot for [PythonLibrary(BuildFileAddress(/Users/lhosken/workspace/pants/src/python/example/hello/greet/BUILD, greet))]:
-      Dumping library: PythonLibrary(BuildFileAddress(/Users/lhosken/workspace/pants/src/python/example/hello/greet/BUILD, greet))
+    $ PANTS_VERBOSE=1 ./pants py examples/src/python/example/hello/greet
+    /Users/lhosken/workspace/pants examples/src/python/example/hello/greet
+    Building chroot for [PythonLibrary(BuildFileAddress(/Users/lhosken/workspace/pants/examples/src/python/example/hello/greet/BUILD, greet))]:
+      Dumping library: PythonLibrary(BuildFileAddress(/Users/lhosken/workspace/pants/examples/src/python/example/hello/greet/BUILD, greet))
       Dumping requirement: ansicolors==1.0.2
       Dumping distribution: .../ansicolors-1.0.2-py2-none-any.whl
     Python 2.6.8 (unknown, Mar  9 2014, 22:16:00)
@@ -240,8 +240,8 @@ file from ``python_library`` targets with no
 specified, the resulting ``.pex`` file just behaves like a Python interpreter,
 but with the sys.path bootstrapped for you::
 
-    $ ./pants py --pex src/python/example/hello/greet
-    /Users/lhosken/workspace/pants src/python/example/hello/greet
+    $ ./pants py --pex examples/src/python/example/hello/greet
+    /Users/lhosken/workspace/pants examples/src/python/example/hello/greet
     Wrote /Users/lhosken/workspace/pants/dist/src.python.example.hello.greet.greet.pex
     $
 
@@ -261,7 +261,7 @@ no entry point, it drops you into an interpreter::
 It's like a single-file lightweight alternative to a virtualenv.
 We can even use it to run our `main.py` application::
 
-    $ dist/src.python.example.hello.greet.greet.pex src/python/example/hello/main/main.py
+    $ dist/src.python.example.hello.greet.greet.pex examples/src/python/example/hello/main/main.py
     Hello, world!
     $
 
@@ -279,7 +279,7 @@ if we wanted to build an a la carte `fab` wrapper for fabric::
   python_binary(name = "fab",
     entry_point = "fabric.main:main",
     dependencies = [
-      pants("3rdparty/python:fabric"),
+      "3rdparty/python:fabric",
     ]
   )
 
@@ -323,7 +323,7 @@ Pants runs Python tests with ``pytest``. You can pass CLI options to ``pytest``
 with ``--test-pytest-options``. For example, to only run tests whose names
 match the pattern \*foo\*, you could run ::
 
-    $ ./pants goal test tests/python/example_test/hello/greet --test-pytest-options='-k foo'
+    $ ./pants goal test examples/tests/python/example_test/hello/greet --test-pytest-options='-k foo'
     ...
                      ============== test session starts ===============
                      platform darwin -- Python 2.6.8 -- py-1.4.20 -- pytest-2.5.2
@@ -342,7 +342,7 @@ Code Coverage
 =============
 
 .. for me,
-   PANTS_PY_COVERAGE=1 ./pants tests/python/example_test/hello/greet
+   PANTS_PY_COVERAGE=1 ./pants examples/tests/python/example_test/hello/greet
    horks up
    Coverage.py warning: Module example_test.hello.greet was never imported.
    Coverage.py warning: No data was collected.
@@ -352,7 +352,7 @@ Code Coverage
 
 To get code coverage data, set the `PANTS_PY_COVERAGE` environment variable::
 
-    $ PANTS_PY_COVERAGE=1  ./pants tests/python/example_test/hello/greet:greet
+    $ PANTS_PY_COVERAGE=1  ./pants examples/tests/python/example_test/hello/greet:greet
 
 Interactive Debugging on Test Failure
 =====================================
@@ -374,8 +374,8 @@ can. Set the `entry_point` keyword argument when calling python_tests::
     name = 'tests',
     sources = [],
     dependencies = [
-      pants('src/python/twitter/infraops/supplybird:supplybird-lib'),
-      pants('3rdparty/python:mock')
+      'src/python/twitter/infraops/supplybird:supplybird-lib',
+      '3rdparty/python:mock'
     ],
     entry_point="twitter.infraops.supplybird.core.run_tests"
   )

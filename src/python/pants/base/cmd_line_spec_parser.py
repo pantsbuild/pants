@@ -18,11 +18,14 @@ class CmdLineSpecParser(object):
 
   Supports simple target addresses as well as sibling (:) and descendant (::) selector forms.
   Also supports some flexibility in the path portion of the spec to allow for more natural command
-  line use cases like tab completion leaving a trailing / for directories and relative paths, ie::
+  line use cases like tab completion leaving a trailing / for directories and relative paths, ie both
+  of these::
 
     ./src/::
+    /absolute/path/to/project/src/::
 
-  Is a valid command line spec even though its not a valid BUILD file spec.  Its normalized to::
+  Are valid command line specs even though they are not a valid BUILD file specs.  They're both
+  normalized to::
 
     src::
 
@@ -35,7 +38,7 @@ class CmdLineSpecParser(object):
   """
 
   def __init__(self, root_dir, address_mapper):
-    self._root_dir = root_dir
+    self._root_dir = os.path.realpath(root_dir)
     self._address_mapper = address_mapper
 
   def parse_addresses(self, specs):
@@ -63,8 +66,18 @@ class CmdLineSpecParser(object):
 
   def _parse_spec(self, spec):
     def normalize_spec_path(path):
-      path = os.path.join(self._root_dir, path.lstrip('//'))
-      normalized = os.path.relpath(os.path.realpath(path), self._root_dir)
+      is_abs = not path.startswith('//') and os.path.isabs(path)
+      if is_abs:
+        path = os.path.realpath(path)
+        if os.path.commonprefix([self._root_dir, path]) != self._root_dir:
+          raise ValueError('Absolute spec path {0} does not share build root {1}'
+                           .format(path, self._root_dir))
+      else:
+        if path.startswith('//'):
+          path = path[2:]
+        path = os.path.join(self._root_dir, path)
+
+      normalized = os.path.relpath(path, self._root_dir)
       if normalized == '.':
         normalized = ''
       return normalized
