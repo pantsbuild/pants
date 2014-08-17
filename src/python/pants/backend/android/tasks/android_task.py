@@ -10,6 +10,7 @@ from pants.backend.android.distribution.android_distribution import AndroidDistr
 
 class AndroidTask(Task):
 
+  # The flag for release/debug will eventually go here (as we build out the ops in other tasks)
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
     option_group.add_option(mkflag('sdk-path'), dest='sdk_path', type='string',

@@ -13,6 +13,17 @@ python_test_suite(
   dependencies = [
     ':dx_compile_integration',
     ':aapt_builder_integration',
+    ':jarsigner_integration',
+  ],
+)
+
+python_tests(
+  name = 'aapt_builder_integration',
+  sources = [
+    'test_aapt_builder_integration.py',
+  ],
+  dependencies = [
+    'tests/python/pants_test/android:android_integration_test',
   ],
 )
 
@@ -36,12 +47,14 @@ python_tests(
   ],
 )
 
+
 python_tests(
-  name = 'aapt_builder_integration',
+  name = 'jarsigner_integration',
   sources = [
-    'test_aapt_builder_integration.py',
+    'test_jarsigner_integration.py',
   ],
   dependencies = [
     'tests/python/pants_test/android:android_integration_test',
+    'tests/python/pants_test/tasks:base',
   ],
 )
