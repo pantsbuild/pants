@@ -38,7 +38,7 @@ class CmdLineSpecParser(object):
   """
 
   # TODO(John Sirois): Establish BuildFile And BuildFileAddressMapper exception discipline.  These
-  # type should not be raising IOError.
+  # types should not be raising IOError.
 
   class BadSpecError(Exception):
     """Indicates an invalid command line address spec."""
