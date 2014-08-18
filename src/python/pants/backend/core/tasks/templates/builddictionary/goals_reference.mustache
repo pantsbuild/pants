@@ -10,28 +10,28 @@ A goal depends on other goals that must happen first; for example, Pants must
 compile code before it can run tests.
 
 Each goal is implemented by one or more Tasks. For example, the
-``JavaCompile`` task compiles java code, and its installed in the ``compile``
+``JavaCompile`` task compiles Java code, and its installed in the ``compile``
 goal.
 
 
 **Goals and Tasks summary**
 
-{{#phases}}
-  * :ref:`gref_phase_{{phase.name}}` - {{phase.description}}
-{{/phases}}
-
-{{#phases}}
-
-.. _gref_phase_{{phase.name}}:
-
-{{phase.name}}
------------------------------------------------------------------------------
-
-{{#phase.description}}
-{{phase.description}}
-{{/phase.description}}
+{{#goals}}
+  * :ref:`gref_goal_{{goal.name}}` - {{goal.description}}
+{{/goals}}
 
 {{#goals}}
+
+.. _gref_goal_{{goal.name}}:
+
+{{goal.name}}
+-----------------------------------------------------------------------------
+
+{{#goal.description}}
+{{goal.description}}
+{{/goal.description}}
+
+{{#tasks}}
 
 {{#ogroup}}
 .. _gref_cli_{{ogroup.xref}}:
@@ -66,7 +66,7 @@ goal.
 {{/options}}
 {{/ogroup}}
 
-{{/goals}}
+{{/tasks}}
 
 
 **Other command-line options:**
@@ -77,7 +77,7 @@ goal.
 {{/leftover_ogs}}
 
 
-{{/phases}}
+{{/goals}}
 
 
 Common

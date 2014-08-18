@@ -25,7 +25,7 @@ How Some Base Classes Interrelate
 
     TODO: if there are one or more exemplary Target classes, link to them.
 
-**goal**
+**Goal**
     A build verb, such as `compile` or `test`.
     Internally, a goal is implemented as a set of Tasks.
 

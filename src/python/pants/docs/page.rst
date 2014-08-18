@@ -26,7 +26,7 @@ as in this excerpt from
 .. literalinclude:: ../../../../examples/src/java/com/pants/examples/hello/main/BUILD
    :start-after: README page
 
-To render the page as HTML, use the :ref:`markdown goal <gref_phase_markdown>`.
+To render the page as HTML, use the :ref:`markdown goal <gref_goal_markdown>`.
 For example, to
 view ``examples/src/java/com/pants/examples/hello/main/README.md`` as HTML in
 your browser, ::

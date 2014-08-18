@@ -145,7 +145,7 @@ def entry_for_one_class(nom, cls):
                argspec=argspec,
                funcdoc=funcdoc,
                methods=methods,
-               impl="{0}.{1}".format(cls.__module__, cls.__name__))
+               impl='{0}.{1}'.format(cls.__module__, cls.__name__))
 
 
 def entry_for_one(nom, sym):
@@ -158,20 +158,20 @@ def entry_for_one(nom, sym):
 
 
 PREDEFS = {  # some hardwired entries
-  "dependencies" : {"defn": msg_entry("dependencies",
+  'dependencies' : {'defn': msg_entry('dependencies',
                     """Old name for `target`_"""),},
-  "egg" : {"defn": msg_entry("egg",
-                             "In older Pants, loads a pre-built Python egg "
-                             "from file system. Undefined in newer Pants.")},
-  "java_tests": {"defn": msg_entry("java_tests",
+  'egg' : {'defn': msg_entry('egg',
+                             'In older Pants, loads a pre-built Python egg '
+                             'from file system. Undefined in newer Pants.')},
+  'java_tests': {'defn': msg_entry('java_tests',
                   """Old name for `junit_tests`_"""),},
-  "pants": {"defn": msg_entry("pants",
+  'pants': {'defn': msg_entry('pants',
                   """In old Pants versions, a reference to a Pants targets.
                   (In new Pants versions, just use strings.)""")},
-  "python_artifact": {"suppress": True},  # unused alias for PythonArtifact
-  "python_test_suite": {"defn": msg_entry("python_test_suite",
+  'python_artifact': {'suppress': True},  # unused alias for PythonArtifact
+  'python_test_suite': {'defn': msg_entry('python_test_suite',
                                           """Deprecated way to group Python tests; use `dependencies`_""")},
-  "scala_tests": {"defn": msg_entry("scala_tests",
+  'scala_tests': {'defn': msg_entry('scala_tests',
                   """Old name for `scala_specs`_""")},
 }
 
@@ -198,7 +198,7 @@ _lower = lambda x: x.lower()
 def tocl(d):
   """Generate TOC, in-page links to the IDs we're going to define below"""
   anchors = sorted(d.keys(), key=_lower)
-  return TemplateData(t="All The Things", e=[a for a in anchors])
+  return TemplateData(t='All The Things', e=[a for a in anchors])
 
 
 def sub_tocl(d, substr_list, title):
@@ -214,19 +214,19 @@ def sub_tocl(d, substr_list, title):
   """
   filtered_anchors = []
   for anc in sorted(d.keys(), key=_lower):
-    if not d[anc]["defn"]["impl"]: continue
-    found = [t for t in substr_list if t in d[anc]["defn"]["impl"]]
+    if not d[anc]['defn']['impl']: continue
+    found = [t for t in substr_list if t in d[anc]['defn']['impl']]
     if not found: continue
     filtered_anchors.append(anc)
   return TemplateData(t=title, e=filtered_anchors)
 
 
 def jvm_sub_tocl(d):
-  return sub_tocl(d, ["android", "jvm", "backend.core", "java", "scala"], "JVM")
+  return sub_tocl(d, ['android', 'jvm', 'backend.core', 'java', 'scala'], 'JVM')
 
 
 def python_sub_tocl(d):
-  return sub_tocl(d, ["backend.python", "core"], "Python")
+  return sub_tocl(d, ['backend.python', 'core'], 'Python')
 
 
 def gen_goals_glopts_reference_data():
@@ -236,7 +236,7 @@ def gen_goals_glopts_reference_data():
   for o in global_option_parser.option_list:
     hlp = None
     if o.help:
-      hlp = indent_docstring_by_n(o.help.replace("[%default]", "").strip(), 2)
+      hlp = indent_docstring_by_n(o.help.replace('[%default]', '').strip(), 2)
     glopts.append(TemplateData(st=str(o), hlp=hlp))
   return glopts
 
@@ -253,7 +253,7 @@ def gref_template_data_from_options(og):
       default = o.default
     hlp = None
     if o.help:
-      hlp = indent_docstring_by_n(o.help.replace("[%default]", "").strip(), 6)
+      hlp = indent_docstring_by_n(o.help.replace('[%default]', '').strip(), 6)
     option_l.append(TemplateData(
         st=str(o),
         default=default,
@@ -265,27 +265,27 @@ def gref_template_data_from_options(og):
     xref=xref)
 
 
-def gen_goals_phases_reference_data():
+def gen_tasks_goals_reference_data():
   """Generate the template data for the goals reference rst doc."""
-  phase_dict = {}
-  phase_names = []
-  for phase in Goal.all():
+  goal_dict = {}
+  goal_names = []
+  for goal in Goal.all():
     parser = optparse.OptionParser(add_help_option=False)
-    Goal.setup_parser(parser, [], [phase])
+    Goal.setup_parser(parser, [], [goal])
     options_by_title = defaultdict(lambda: None)
     for group in parser.option_groups:
       options_by_title[group.title] = group
     found_option_groups = set()
-    goals = []
-    for task_name in phase.ordered_task_names():
-      task_type = phase.task_type_by_name(task_name)
-      doc = indent_docstring_by_n(task_type.__doc__ or "", 2)
-      options_title = Goal.option_group_title(phase, task_name)
+    tasks = []
+    for task_name in goal.ordered_task_names():
+      task_type = goal.task_type_by_name(task_name)
+      doc = indent_docstring_by_n(task_type.__doc__ or '', 2)
+      options_title = Goal.option_group_title(goal, task_name)
       og = options_by_title[options_title]
       if og:
         found_option_groups.add(options_title)
       impl = '{0}.{1}'.format(task_type.__module__, task_type.__name__)
-      goals.append(TemplateData(
+      tasks.append(TemplateData(
           impl=impl,
           doc=doc,
           ogroup=gref_template_data_from_options(og)))
@@ -297,14 +297,14 @@ def gen_goals_phases_reference_data():
     leftover_options = []
     for option in parser.option_list:
       leftover_options.append(TemplateData(st=str(option)))
-    phase_dict[phase.name] = TemplateData(phase=phase,
-                                          goals=goals,
-                                          leftover_opts=leftover_options,
-                                          leftover_ogs=leftover_option_groups)
-    phase_names.append(phase.name)
+    goal_dict[goal.name] = TemplateData(goal=goal,
+                                        tasks=tasks,
+                                        leftover_opts=leftover_options,
+                                        leftover_ogs=leftover_option_groups)
+    goal_names.append(goal.name)
 
-  phases = [phase_dict[name] for name in sorted(phase_names, key=_lower)]
-  return phases
+  goals = [goal_dict[name] for name in sorted(goal_names, key=_lower)]
+  return goals
 
 
 def assemble(predefs=PREDEFS, build_file_parser=None):
@@ -318,13 +318,13 @@ def assemble(predefs=PREDEFS, build_file_parser=None):
   retval = {}
   for nom in predefs:
     val = predefs[nom]
-    if "suppress" in val and val["suppress"]: continue
+    if 'suppress' in val and val['suppress']: continue
     retval[nom] = val
   if build_file_parser:
     symbol_hash = get_syms(build_file_parser)
     for nom in symbol_hash:
       v = symbol_hash[nom]
-      retval[nom] = {"defn": entry_for_one(nom, v)}
+      retval[nom] = {'defn': entry_for_one(nom, v)}
   return retval
 
 
@@ -334,7 +334,7 @@ class BuildBuildDictionary(Task):
   def __init__(self, *args, **kwargs):
     super(BuildBuildDictionary, self).__init__(*args, **kwargs)
     self._templates_dir = os.path.join('templates', 'builddictionary')
-    self._outdir = os.path.join(self.context.config.getdefault("pants_distdir"), "builddict")
+    self._outdir = os.path.join(self.context.config.getdefault('pants_distdir'), 'builddict')
 
   def execute(self):
     self._gen_goals_reference()
@@ -346,7 +346,7 @@ class BuildBuildDictionary(Task):
     template = resource_string(__name__, os.path.join(self._templates_dir, 'page.mustache'))
     tocs = [tocl(d), jvm_sub_tocl(d), python_sub_tocl(d)]
 
-    defns = [d[t]["defn"] for t in sorted(d.keys(), key=_lower)]
+    defns = [d[t]['defn'] for t in sorted(d.keys(), key=_lower)]
     filename = os.path.join(self._outdir, 'build_dictionary.rst')
     self.context.log.info('Generating %s' % filename)
     with safe_open(filename, 'w') as outfile:
@@ -357,7 +357,7 @@ class BuildBuildDictionary(Task):
 
   def _gen_goals_reference(self):
     """Generate the goals reference rst doc."""
-    phases = gen_goals_phases_reference_data()
+    goals = gen_tasks_goals_reference_data()
     glopts = gen_goals_glopts_reference_data()
 
     template = resource_string(__name__,
@@ -365,5 +365,5 @@ class BuildBuildDictionary(Task):
     filename = os.path.join(self._outdir, 'goals_reference.rst')
     self.context.log.info('Generating %s' % filename)
     with safe_open(filename, 'w') as outfile:
-      generator = Generator(template, phases=phases, glopts=glopts)
+      generator = Generator(template, goals=goals, glopts=glopts)
       generator.write(outfile)

@@ -16,7 +16,7 @@ from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar
 from pants_test.tasks.test_base import BaseTest, TaskTest, prepare_task
 
-OUTDIR = "/tmp/dist"
+OUTDIR = '/tmp/dist'
 
 sample_ini_test_1 = """
 [DEFAULT]
@@ -52,27 +52,27 @@ class ExtractedContentSanityTests(BaseTest):
   def test_exclude_unuseful(self):
     # These symbols snuck into old dictionaries, make sure they don't again:
     for unexpected in ['__builtins__', 'Target']:
-      self.assertTrue(unexpected not in self._syms.keys(), "Found %s" % unexpected)
+      self.assertTrue(unexpected not in self._syms.keys(), 'Found %s' % unexpected)
 
   def test_sub_tocls(self):
     python_symbols = builddictionary.python_sub_tocl(self._syms).e
 
     # python_requirements goes through build_file_aliases.curry_context.
     # It's in the "Python" sub_tocl, but tenuously
-    self.assertTrue("python_requirements" in python_symbols)
+    self.assertTrue('python_requirements' in python_symbols)
 
     # Some less-tenuous sanity checks
-    for sym in ["python_library", "python_tests"]:
+    for sym in ['python_library', 'python_tests']:
       self.assertTrue(sym in python_symbols)
 
     jvm_symbols = builddictionary.jvm_sub_tocl(self._syms).e
-    for sym in ["java_library", "scala_library"]:
+    for sym in ['java_library', 'scala_library']:
       self.assertTrue(sym in jvm_symbols)
 
 
 class GoalReferenceTest(BaseTest):
-  def test_gen_goals_phases_reference_data(self):
+  def test_gen_tasks_goals_reference_data(self):
     # can we run our reflection-y goal code without crashing? would be nice
     Goal.by_name('jack').install(TaskRegistrar('jill', lambda: 42))
-    gref_data = builddictionary.gen_goals_phases_reference_data()
-    self.assertTrue(len(gref_data) > 0, "Tried to generate data for goals reference, got emptiness")
+    gref_data = builddictionary.gen_tasks_goals_reference_data()
+    self.assertTrue(len(gref_data) > 0, 'Tried to generate data for goals reference, got emptiness')

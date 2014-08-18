@@ -30,10 +30,10 @@ Relevant Goals and Targets
 **Runnable Binary**
 
   Pants can generate PEXes, executables built from Python.
-  Invoke the :ref:`binary goal <gref_phase_binary>`
+  Invoke the :ref:`binary goal <gref_goal_binary>`
   on a :ref:`python_binary <bdict_python_binary>`
   target to generate a ``.pex``. You can also invoke the
-  :ref:`run goal <gref_phase_run>`
+  :ref:`run goal <gref_goal_run>`
   on a ``python_binary`` to run its code "in place."
 
 **Importable Code**
@@ -58,7 +58,7 @@ Relevant Goals and Targets
   A :ref:`python_tests <bdict_python_tests>` BUILD target has some
   ``pytest`` tests. It normally
   depends on a ``python_library`` target so it can import and test
-  the library's code. Use the :ref:`test goal <gref_phase_test>`
+  the library's code. Use the :ref:`test goal <gref_goal_test>`
   to run these tests.
 
 **Generated Code**

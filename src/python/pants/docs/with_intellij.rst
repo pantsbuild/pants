@@ -20,7 +20,7 @@ Generating IDEA Project
 To generate an IDEA project for the code in
 ``src/java/com/archie/path/to:target`` and
 ``src/java/com/archie/another:target``, use
-the :ref:`idea goal <gref_phase_idea>`::
+the :ref:`idea goal <gref_goal_idea>`::
 
     goal idea src/java/com/archie/path/to:target src/java/com/archie/another:target
 
