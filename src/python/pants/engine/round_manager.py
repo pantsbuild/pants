@@ -7,10 +7,10 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from collections import namedtuple, defaultdict
 
-from pants.goal.phase import Phase
+from pants.goal.goal import Goal
 
 
-class ProducerInfo(namedtuple('ProducerInfo', ['product_type', 'task_type', 'phase'])):
+class ProducerInfo(namedtuple('ProducerInfo', ['product_type', 'task_type', 'goal'])):
   """Describes the producer of a given product type."""
 
 
@@ -22,10 +22,10 @@ class RoundManager(object):
   @staticmethod
   def _index_products():
     producer_info_by_product_type = defaultdict(set)
-    for phase in Phase.all():
-      for task_type in phase.task_types():
+    for goal in Goal.all():
+      for task_type in goal.task_types():
         for product_type in task_type.product_types():
-          producer_info = ProducerInfo(product_type, task_type, phase)
+          producer_info = ProducerInfo(product_type, task_type, goal)
           producer_info_by_product_type[product_type].add(producer_info)
     return producer_info_by_product_type
 

@@ -12,7 +12,7 @@ from pants.backend.core.tasks import builddictionary
 from pants.backend.core.register import build_file_aliases as register_core
 from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.python.register import build_file_aliases as register_python
-from pants.goal.phase import Phase
+from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar
 from pants_test.tasks.test_base import BaseTest, TaskTest, prepare_task
 
@@ -72,7 +72,7 @@ class ExtractedContentSanityTests(BaseTest):
 
 class GoalReferenceTest(BaseTest):
   def test_gen_goals_phases_reference_data(self):
-    # can we run our reflection-y phase code without crashing? would be nice
-    Phase.by_name('jack').install(TaskRegistrar('jill', lambda: 42))
+    # can we run our reflection-y goal code without crashing? would be nice
+    Goal.by_name('jack').install(TaskRegistrar('jill', lambda: 42))
     gref_data = builddictionary.gen_goals_phases_reference_data()
     self.assertTrue(len(gref_data) > 0, "Tried to generate data for goals reference, got emptiness")

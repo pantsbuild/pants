@@ -38,7 +38,7 @@ from pants.base.config import Config
 from pants.base.source_root import SourceRoot
 from pants.commands.goal_runner import GoalRunner
 from pants.goal.task_registrar import TaskRegistrar as task
-from pants.goal.phase import Phase
+from pants.goal.goal import Goal
 
 
 class BuildFilePath(object):
@@ -82,7 +82,7 @@ def build_file_aliases():
       'goal': task,
       # TODO(Eric Ayers) pants() was officially deprecated in 0.0.24. Remove this function soon.
       'pants': PantsObsolete.pants,
-      'phase': Phase,
+      'phase': Goal,
       'set_scm': set_scm,
       'wiki_artifact': WikiArtifact,
     },

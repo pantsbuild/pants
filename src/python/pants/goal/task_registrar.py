@@ -9,7 +9,7 @@ import functools
 import inspect
 
 from pants.goal.error import GoalError
-from pants.goal.phase import Phase
+from pants.goal.goal import Goal
 from pants.backend.core.tasks.task import Task
 
 
@@ -24,7 +24,7 @@ class TaskRegistrar(object):
     """
     self.serialize = serialize
     self.name = name
-    self.dependencies = [Phase.by_name(d) for d in dependencies] if dependencies else []
+    self.dependencies = [Goal.by_name(d) for d in dependencies] if dependencies else []
 
     if isinstance(type(action), type) and issubclass(action, Task):
       self._task = action
@@ -70,6 +70,6 @@ class TaskRegistrar(object):
     :param before: Places this goal before the named goal in the phase's execution list
     :param after: Places this goal after the named goal in the phase's execution list
     """
-    phase = Phase.by_name(phase or self.name)
+    phase = Goal.by_name(phase or self.name)
     phase.install(self, first, replace, before, after)
     return phase

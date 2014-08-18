@@ -23,7 +23,7 @@ from pants.base.build_root import BuildRoot
 from pants.base.config import Config
 from pants.base.source_root import SourceRoot
 from pants.base.target import Target
-from pants.goal.phase import Phase
+from pants.goal.goal import Goal
 from pants.util.contextutil import environment_as, pushd, temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree, touch
 from pants_test.base.context_utils import create_context
@@ -91,7 +91,7 @@ class BaseTest(unittest2.TestCase):
     return BuildFileAliases.create(targets={'dependencies': Dependencies})
 
   def setUp(self):
-    Phase.clear()
+    Goal.clear()
     self.real_build_root = BuildRoot().path
     self.build_root = os.path.realpath(mkdtemp(suffix='_BUILD_ROOT'))
     BuildRoot().path = self.build_root

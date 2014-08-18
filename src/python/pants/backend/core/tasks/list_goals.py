@@ -6,7 +6,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 from pants.backend.core.tasks.console_task import ConsoleTask
-from pants.goal.phase import Phase
+from pants.goal.goal import Goal
 
 
 class ListGoals(ConsoleTask):
@@ -29,7 +29,7 @@ class ListGoals(ConsoleTask):
       documented_rows = []
       undocumented = []
       max_width = 0
-      for phase in Phase.all():
+      for phase in Goal.all():
         if phase.description:
           documented_rows.append((phase.name, phase.description))
           max_width = max(max_width, len(phase.name))
@@ -55,7 +55,7 @@ class ListGoals(ConsoleTask):
         '  rankdir=LR;',
         '  graph [compound=true];',
         ])
-      for phase in Phase.all():
+      for phase in Goal.all():
         yield '\n'.join([
           '  subgraph %s {' % get_cluster_name(phase),
           '    node [style=filled];',
@@ -67,7 +67,7 @@ class ListGoals(ConsoleTask):
         yield '  }'
 
       edges = set()
-      for phase in Phase.all():
+      for phase in Goal.all():
         tail_task_name = phase.ordered_task_names()[-1]
         for dep in phase.dependencies:
           edge = 'ltail=%s lhead=%s' % (get_cluster_name(phase), get_cluster_name(dep))

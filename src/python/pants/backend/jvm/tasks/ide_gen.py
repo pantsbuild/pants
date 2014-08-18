@@ -18,7 +18,7 @@ from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.target import Target
-from pants.goal.phase import Phase
+from pants.goal.goal import Goal
 from pants.util.dirutil import safe_mkdir
 
 
@@ -325,7 +325,7 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
     self._prepare_project()
 
     def _checkstyle_enabled():
-      for phase in Phase.all():
+      for phase in Goal.all():
         if phase.has_task_of_type(Checkstyle):
           return True
       return False

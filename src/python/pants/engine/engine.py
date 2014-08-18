@@ -40,7 +40,7 @@ class Engine(AbstractClass):
     """Executes the supplied phases and their dependencies against the given context.
 
     :param context: The pants run context.
-    :param list phases: A list of ``Phase`` objects representing the command line goals explicitly
+    :param list phases: A list of ``Goal`` objects representing the command line goals explicitly
                         requested.
     :returns int: An exit code of 0 upon success and non-zero otherwise.
     """
@@ -61,6 +61,6 @@ class Engine(AbstractClass):
     goals.
 
     :param context: The pants run context.
-    :param list phases: A list of ``Phase`` objects representing the command line goals explicitly
+    :param list phases: A list of ``Goal`` objects representing the command line goals explicitly
                         requested.
     """

@@ -9,18 +9,18 @@ from optparse import OptionParser
 
 from pants.base.build_environment import pants_release
 from pants.goal.option_helpers import add_global_options
-from pants.goal.phase import Phase
+from pants.goal.goal import Goal
 
 
 def print_help(goals=None):
   if goals:
     for goal in goals:
-      phase = Phase.by_name(goal)
+      phase = Goal.by_name(goal)
       if not phase.ordered_task_names():
         print('\nUnknown goal: %s' % goal)
       else:
         parser = OptionParser(add_help_option=False)
-        Phase.setup_parser(parser, [], [phase])
+        Goal.setup_parser(parser, [], [phase])
         print('\n%s: %s' % (phase.name, phase.description))
         _print_flags(parser, phase.name)
   else:

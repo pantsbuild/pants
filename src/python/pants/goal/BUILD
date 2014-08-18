@@ -82,7 +82,7 @@ python_library(
 
 python_library(
   name = 'phase',
-  sources = ['phase.py'],
+  sources = ['goal.py'],
   dependencies = [
     ':error',
     ':mkflag',

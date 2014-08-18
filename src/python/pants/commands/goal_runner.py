@@ -35,7 +35,7 @@ from pants.goal.error import GoalError
 from pants.goal.help import print_help
 from pants.goal.initialize_reporting import update_reporting
 from pants.goal.option_helpers import add_global_options
-from pants.goal.phase import Phase
+from pants.goal.goal import Goal
 from pants.util.dirutil import safe_mkdir
 
 
@@ -58,10 +58,10 @@ class GoalRunner(Command):
     explicit_multi = False
     logger = logging.getLogger(__name__)
     has_double_dash = u'--' in args
-    goal_names = [phase.name for phase in Phase.all()]
+    goal_names = [phase.name for phase in Goal.all()]
     if not goal_names:
       raise GoalError(
-        'Arguments cannot be parsed before the list of goals from Phase.all() is populated.')
+        'Arguments cannot be parsed before the list of goals from Goal.all() is populated.')
 
     def is_spec(spec):
       if os.sep in spec or ':' in spec:
@@ -183,7 +183,7 @@ class GoalRunner(Command):
           for address in spec_parser.parse_addresses(spec):
             self.build_graph.inject_address_closure(address)
             self.targets.append(self.build_graph.get_target(address))
-    self.phases = [Phase.by_name(goal) for goal in goals]
+    self.phases = [Goal.by_name(goal) for goal in goals]
 
     rcfiles = self.config.getdefault('rcfiles', type=list,
                                      default=['/etc/pantsrc', '~/.pants.rc'])
@@ -213,7 +213,7 @@ class GoalRunner(Command):
         args.extend(augmented_args)
         sys.stderr.write("(using pantsrc expansion: pants goal %s)\n" % ' '.join(augmented_args))
 
-    Phase.setup_parser(parser, args, self.phases)
+    Goal.setup_parser(parser, args, self.phases)
 
   def run(self, lock):
     # TODO(John Sirois): Consider moving to straight python logging.  The divide between the

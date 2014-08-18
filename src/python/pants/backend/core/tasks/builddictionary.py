@@ -16,7 +16,7 @@ from pants.base.build_manual import get_builddict_info
 from pants.base.exceptions import TaskError
 from pants.base.generator import Generator, TemplateData
 from pants.goal.option_helpers import add_global_options
-from pants.goal.phase import Phase
+from pants.goal.goal import Goal
 from pants.util.dirutil import safe_open
 
 
@@ -269,9 +269,9 @@ def gen_goals_phases_reference_data():
   """Generate the template data for the goals reference rst doc."""
   phase_dict = {}
   phase_names = []
-  for phase in Phase.all():
+  for phase in Goal.all():
     parser = optparse.OptionParser(add_help_option=False)
-    Phase.setup_parser(parser, [], [phase])
+    Goal.setup_parser(parser, [], [phase])
     options_by_title = defaultdict(lambda: None)
     for group in parser.option_groups:
       options_by_title[group.title] = group

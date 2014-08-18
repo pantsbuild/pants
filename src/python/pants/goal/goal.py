@@ -11,30 +11,30 @@ from pants.goal.error import GoalError
 from pants.goal.mkflag import Mkflag
 
 
-class Phase(object):
-  """Factory for objects representing phases.
+class Goal(object):
+  """Factory for objects representing goals.
 
-  Ensures that we have exactly one instance per phase name.
+  Ensures that we have exactly one instance per goal name.
   """
-  _phase_by_name = dict()
+  _goal_by_name = dict()
 
   def __new__(cls, *args, **kwargs):
     raise TypeError('Do not instantiate {0}. Call by_name() instead.'.format(cls))
 
   @classmethod
   def by_name(cls, name):
-    """Returns the unique object representing the phase of the specified name."""
-    if name not in cls._phase_by_name:
-      cls._phase_by_name[name] = _Phase(name)
-    return cls._phase_by_name[name]
+    """Returns the unique object representing the goal of the specified name."""
+    if name not in cls._goal_by_name:
+      cls._goal_by_name[name] = _Goal(name)
+    return cls._goal_by_name[name]
 
   @classmethod
   def clear(cls):
-    """Remove all phases and tasks.
+    """Remove all goals and tasks.
 
     This method is EXCLUSIVELY for use in tests.
     """
-    cls._phase_by_name.clear()
+    cls._goal_by_name.clear()
 
   @staticmethod
   def option_group_title(phase, task_name):
@@ -44,62 +44,61 @@ class Phase(object):
     return ':'.join(namespace)
 
   @staticmethod
-  def setup_parser(parser, args, phases):
+  def setup_parser(parser, args, goals):
     """Set up an OptionParser with options info for a phase and its deps.
-
-    This readies the parser to handle options for this phase and its deps.
+    This readies the parser to handle options for this goal and its deps.
     It does not set up everything you might want for displaying help.
     For that, you want setup_parser_for_help.
     """
     visited = set()
 
-    def do_setup_parser(phase):
-      if phase not in visited:
-        visited.add(phase)
-        for dep in phase.dependencies:
+    def do_setup_parser(goal):
+      if goal not in visited:
+        visited.add(goal)
+        for dep in goal.dependencies:
           do_setup_parser(dep)
-        for task_name in phase.ordered_task_names():
-          task_type = phase.task_type_by_name(task_name)
-          phase_leader = len(phase.ordered_task_names()) == 1 or task_name == phase.name
-          namespace = [task_name] if phase_leader else [phase.name, task_name]
+        for task_name in goal.ordered_task_names():
+          task_type = goal.task_type_by_name(task_name)
+          goal_leader = len(goal.ordered_task_names()) == 1 or task_name == goal.name
+          namespace = [task_name] if goal_leader else [goal.name, task_name]
           mkflag = Mkflag(*namespace)
-          option_group = OptionGroup(parser, title=Phase.option_group_title(phase, task_name))
+          option_group = OptionGroup(parser, title=Goal.option_group_title(goal, task_name))
           task_type.setup_parser(option_group, args, mkflag)
           if option_group.option_list:
             parser.add_option_group(option_group)
 
-    for phase in phases:
-      do_setup_parser(phase)
+    for goal in goals:
+      do_setup_parser(goal)
 
   @staticmethod
   def all():
-    """Returns all registered phases, sorted alphabetically by name."""
-    return [pair[1] for pair in sorted(Phase._phase_by_name.items())]
+    """Returns all registered goals, sorted alphabetically by name."""
+    return [pair[1] for pair in sorted(Goal._goal_by_name.items())]
 
 
-class _Phase(object):
+class _Goal(object):
   def __init__(self, name):
     """Don't call this directly.
 
-    Create phases only through the Phase.by_name() factory.
+    Create goals only through the Goal.by_name() factory.
     """
     self.name = name
     self.description = None
-    self.dependencies = set()  # The Phases this Phase depends on.
+    self.dependencies = set()  # The Goals this Goal depends on.
     self.serialize = False
     self._task_type_by_name = {}  # name -> Task subclass.
     self._ordered_task_names = []  # The task names, in the order imposed by registration.
 
   def install(self, task_registrar, first=False, replace=False, before=None, after=None):
-    """Installs the given task in this phase.
+    """Installs the given task in this goal.
 
-    The placement of the task in this phases' execution list defaults to the end but its position
+    The placement of the task in this goal's execution list defaults to the end but its position
     can be influenced by specifying exactly one of the following arguments:
 
-    first: Places the task 1st in the execution list
-    replace: Removes all existing tasks in this phase and installs this goal
-    before: Places the task before the named task in the execution list
-    after: Places the task after the named task in the execution list
+    first: Places the task 1st in the execution list.
+    replace: Removes all existing tasks in this goal and installs this task.
+    before: Places the task before the named task in the execution list.
+    after: Places the task after the named task in the execution list.
     """
     if [bool(place) for place in [first, replace, before, after]].count(True) > 1:
       raise GoalError('Can only specify one of first, replace, before or after')
@@ -127,18 +126,18 @@ class _Phase(object):
     return self
 
   def with_description(self, description):
-    """Add a description to this phase."""
+    """Add a description to this goal."""
     self.description = description
     return self
 
   def uninstall_task(self, name):
-    """Removes the named task from this phase.
+    """Removes the named task from this goal.
 
     Allows external plugins to modify the execution plan. Use with caution.
 
-    Note: Does not remove phase dependencies or relax a serialization requirement that originated
+    Note: Does not remove goal dependencies or relax a serialization requirement that originated
     from the uninstalled task's install() call.
-    TODO(benjy): Should it? We're moving away from explicit phase deps towards a
+    TODO(benjy): Should it? We're moving away from explicit goal deps towards a
                  product consumption-production model anyway.
     """
     if name in self._task_type_by_name:
@@ -149,7 +148,7 @@ class _Phase(object):
 
 
   def ordered_task_names(self):
-    """The task names in this phase, in registration order."""
+    """The task names in this goal, in registration order."""
     return self._ordered_task_names
 
   def task_type_by_name(self, name):
@@ -157,11 +156,11 @@ class _Phase(object):
     return self._task_type_by_name[name]
 
   def task_types(self):
-    """Returns the task types in this phase, unordered."""
+    """Returns the task types in this goal, unordered."""
     return self._task_type_by_name.values()
 
   def has_task_of_type(self, typ):
-    """Returns True if this phase has a task of the given type (or a subtype of it)."""
+    """Returns True if this goal has a task of the given type (or a subtype of it)."""
     for task_type in self.task_types():
       if issubclass(task_type, typ):
         return True

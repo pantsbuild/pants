@@ -8,19 +8,19 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import unittest2
 
 from pants.goal.task_registrar import TaskRegistrar
-from pants.goal.phase import Phase
+from pants.goal.goal import Goal
 
 
 class EngineTestBase(unittest2.TestCase):
 
   @classmethod
   def as_phase(cls, phase_name):
-    """Returns a ``Phase`` object of the given name"""
-    return Phase.by_name(phase_name)
+    """Returns a ``Goal`` object of the given name"""
+    return Goal.by_name(phase_name)
 
   @classmethod
   def as_phases(cls, *phase_names):
-    """Converts the given phase names to a list of ``Phase`` objects."""
+    """Converts the given phase names to a list of ``Goal`` objects."""
     return map(cls.as_phase, phase_names)
 
   @classmethod
@@ -41,11 +41,11 @@ class EngineTestBase(unittest2.TestCase):
     super(EngineTestBase, self).setUp()
 
     # TODO(John Sirois): Now that the BuildFileParser controls goal registration by iterating
-    # over plugin callbacks a PhaseRegistry can be constructed by it and handed to all these
-    # callbacks in place of having a global Phase registry.  Remove the Phase static cling.
-    Phase.clear()
+    # over plugin callbacks a GoalRegistry can be constructed by it and handed to all these
+    # callbacks in place of having a global Goal registry.  Remove the Goal static cling.
+    Goal.clear()
 
   def tearDown(self):
-    Phase.clear()
+    Goal.clear()
 
     super(EngineTestBase, self).tearDown()

@@ -9,7 +9,7 @@ import copy
 import sys
 
 from pants.base.build_environment import pants_release
-from pants.goal.phase import Phase
+from pants.goal.goal import Goal
 from pants.option.arg_splitter import ArgSplitter, GLOBAL_SCOPE
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.parser import ParseError
@@ -165,7 +165,7 @@ class Options(object):
     phases = phases or self.phases
     if phases:
       for phase_name in phases:
-        phase = Phase.by_name(phase_name)
+        phase = Goal.by_name(phase_name)
         if not phase.ordered_task_names():
           print('\nUnknown goal: %s' % phase_name)
         else:

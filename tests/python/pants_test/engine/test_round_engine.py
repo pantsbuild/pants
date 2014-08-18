@@ -127,7 +127,7 @@ class RoundEngineTest(EngineTestBase, BaseTest):
     self.install_task('task2', phase='phase2', required_data=['1'], product_types=['2'])
 
     for phase in ('phase1', 'phase2'):
-      with self.assertRaises(self.engine.PhaseCycleError):
+      with self.assertRaises(self.engine.GoalCycleError):
         self.engine.attempt(self._context, self.as_phases(phase))
 
   def test_phase_cycle_indirect(self):
@@ -136,7 +136,7 @@ class RoundEngineTest(EngineTestBase, BaseTest):
     self.install_task('task3', phase='phase3', required_data=['1'], product_types=['3'])
 
     for phase in ('phase1', 'phase2', 'phase3'):
-      with self.assertRaises(self.engine.PhaseCycleError):
+      with self.assertRaises(self.engine.GoalCycleError):
         self.engine.attempt(self._context, self.as_phases(phase))
 
   def test_phase_ordering_unconstrained_respects_cli_order(self):
