@@ -12,6 +12,7 @@ import shutil
 from twitter.common.collections.orderedset import OrderedSet
 
 from pants import binary_util
+from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.checkstyle import Checkstyle
 from pants.backend.jvm.tasks.jvm_binary_task import JvmBinaryTask
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
@@ -496,6 +497,11 @@ class Project(object):
       if target not in analyzed:
         analyzed.add(target)
         self.has_scala = not self.skip_scala and (self.has_scala or is_scala(target))
+
+        # Hack for java_sources and Eclipse/IntelliJ: add java_sources to project
+        if isinstance(target, ScalaLibrary):
+          for java_source in target.java_sources:
+            configure_target(java_source)
 
         if target.has_resources:
           resources_by_basedir = defaultdict(set)
