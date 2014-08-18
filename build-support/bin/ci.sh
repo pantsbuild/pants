@@ -18,13 +18,12 @@ function die() {
 function usage() {
   echo "Runs commons tests for local or hosted CI."
   echo
-  echo "Usage: $0 (-h|-bsrdjpceat)"
+  echo "Usage: $0 (-h|-bsrdpceat)"
   echo " -h           print out this help message"
   echo " -b           skip bootstraping pants from local sources"
   echo " -s           skip self-distribution tests"
   echo " -r           skip doc generation tests"
   echo " -d           if running jvm tests, don't use nailgun daemons"
-  echo " -j           skip core jvm tests"
   echo " -p           skip core python tests"
   echo " -c           skip pants integration tests"
   echo " -e           skip example tests"
@@ -39,14 +38,13 @@ function usage() {
 
 daemons="--ng-daemons"
 
-while getopts "hbsrdjpceat" opt; do
+while getopts "hbsrdpceat" opt; do
   case ${opt} in
     h) usage ;;
     b) skip_bootstrap="true" ;;
     s) skip_distribution="true" ;;
     r) skip_docs="true" ;;
     d) daemons="--no-ng-daemons" ;;
-    j) skip_java="true" ;;
     p) skip_python="true" ;;
     c) skip_integration="true" ;;
     e) skip_examples="true" ;;
@@ -121,13 +119,6 @@ fi
 if [[ "${skip_docs:-false}" == "false" ]]; then
   banner "Running site doc generation test"
   ./build-support/bin/publish_docs.sh || die "Failed to generate site docs."
-fi
-
-if [[ "${skip_java:-false}" == "false" ]]; then
-  banner "Running core jvm tests"
-  (
-    ./pants.pex goal test {src,tests}/{java,scala}:: $daemons
-  ) || die "Core jvm test failure."
 fi
 
 if [[ "${skip_python:-false}" == "false" ]]; then
