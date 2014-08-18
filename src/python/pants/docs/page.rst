@@ -130,11 +130,9 @@ probably look something like::
                       url_builder=confluence_url_builder)
 
 You need to install a goal to enable publishing a doc to confluence.
-It might look like
+To do this, create a Pants plugin that installs a goal that subclasses ConfluencePublish.
 
-.. literalinclude:: ../../../../tests/python/pants_test/backend/core/test_setup_confluence.py
-   :start-after: literalinclude this part
-   :end-before: stop including
+.. TODO details of how Andy got this working.
 
 In your ``pants.ini`` file, add a section with the url of your wiki server.
 E.g., if your server is at wiki.archie.org, it would look like::

@@ -4,18 +4,10 @@
 target(
   name='core',
   dependencies=[
-    ':setup_confluence',
     ':wrapped_globs',
   ],
 )
-python_tests(
-  name = 'setup_confluence',
-  sources = ['test_setup_confluence.py'],
-  dependencies = [
-    'src/python/pants/backend/core',
-    'tests/python/pants_test:base_test',
-  ]
-)
+
 python_tests(
   name = 'wrapped_globs',
   sources = ['test_wrapped_globs.py'],

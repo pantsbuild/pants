@@ -32,13 +32,11 @@ from pants.backend.core.tasks.sorttargets import SortTargets
 from pants.backend.core.tasks.targets_help import TargetsHelp
 from pants.backend.core.tasks.what_changed import WhatChanged
 from pants.backend.core.wrapped_globs import Globs, RGlobs, ZGlobs
-from pants.base.build_environment import get_buildroot, get_scm, pants_version, set_scm
+from pants.base.build_environment import get_buildroot, pants_version
 from pants.base.build_file_aliases import BuildFileAliases
-from pants.base.config import Config
 from pants.base.source_root import SourceRoot
 from pants.commands.goal_runner import GoalRunner
 from pants.goal.task_registrar import TaskRegistrar as task
-from pants.goal.goal import Goal
 
 
 class BuildFilePath(object):
@@ -74,16 +72,11 @@ def build_file_aliases():
       'wiki': Wiki,
     },
     objects={
-      'config': Config,
       'ConfluencePublish': ConfluencePublish,
       'get_buildroot': get_buildroot,
-      'get_scm': get_scm,
       'pants_version': pants_version,
-      'goal': task,
       # TODO(Eric Ayers) pants() was officially deprecated in 0.0.24. Remove this function soon.
       'pants': PantsObsolete.pants,
-      'phase': Goal,
-      'set_scm': set_scm,
       'wiki_artifact': WikiArtifact,
     },
     context_aware_object_factories={
