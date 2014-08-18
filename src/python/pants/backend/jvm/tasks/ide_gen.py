@@ -325,8 +325,8 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
     self._prepare_project()
 
     def _checkstyle_enabled():
-      for phase in Goal.all():
-        if phase.has_task_of_type(Checkstyle):
+      for goal in Goal.all():
+        if goal.has_task_of_type(Checkstyle):
           return True
       return False
 

@@ -58,7 +58,7 @@ class GoalRunner(Command):
     explicit_multi = False
     logger = logging.getLogger(__name__)
     has_double_dash = u'--' in args
-    goal_names = [phase.name for phase in Goal.all()]
+    goal_names = [goal.name for goal in Goal.all()]
     if not goal_names:
       raise GoalError(
         'Arguments cannot be parsed before the list of goals from Goal.all() is populated.')
@@ -183,7 +183,7 @@ class GoalRunner(Command):
           for address in spec_parser.parse_addresses(spec):
             self.build_graph.inject_address_closure(address)
             self.targets.append(self.build_graph.get_target(address))
-    self.phases = [Goal.by_name(goal) for goal in goals]
+    self.goals = [Goal.by_name(goal) for goal in goals]
 
     rcfiles = self.config.getdefault('rcfiles', type=list,
                                      default=['/etc/pantsrc', '~/.pants.rc'])
@@ -196,10 +196,10 @@ class GoalRunner(Command):
       # baseclasses.
 
       sections = OrderedSet()
-      for phase in Engine.execution_order(self.phases):
-        for task_name in phase.ordered_task_names():
+      for goal in Engine.execution_order(self.goals):
+        for task_name in goal.ordered_task_names():
           sections.add(task_name)
-          task_type = phase.task_type_by_name(task_name)
+          task_type = goal.task_type_by_name(task_name)
           for clazz in task_type.mro():
             if clazz == Task:
               break
@@ -213,7 +213,7 @@ class GoalRunner(Command):
         args.extend(augmented_args)
         sys.stderr.write("(using pantsrc expansion: pants goal %s)\n" % ' '.join(augmented_args))
 
-    Goal.setup_parser(parser, args, self.phases)
+    Goal.setup_parser(parser, args, self.goals)
 
   def run(self, lock):
     # TODO(John Sirois): Consider moving to straight python logging.  The divide between the
@@ -232,8 +232,8 @@ class GoalRunner(Command):
 
     # Update the reporting settings, now that we have flags etc.
     def is_quiet_task():
-      for phase in self.phases:
-        if phase.has_task_of_type(QuietTaskMixin):
+      for goal in self.goals:
+        if goal.has_task_of_type(QuietTaskMixin):
           return True
       return False
 
@@ -286,16 +286,16 @@ class GoalRunner(Command):
       lock=lock)
 
     unknown = []
-    for phase in self.phases:
-      if not phase.ordered_task_names():
-        unknown.append(phase)
+    for goal in self.goals:
+      if not goal.ordered_task_names():
+        unknown.append(goal)
 
     if unknown:
-      context.log.error('Unknown goal(s): %s\n' % ' '.join(phase.name for phase in unknown))
+      context.log.error('Unknown goal(s): %s\n' % ' '.join(goal.name for goal in unknown))
       return 1
 
     engine = RoundEngine()
-    return engine.execute(context, self.phases)
+    return engine.execute(context, self.goals)
 
   def cleanup(self):
     # TODO: This is JVM-specific and really doesn't belong here.

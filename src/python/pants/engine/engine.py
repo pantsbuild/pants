@@ -16,36 +16,36 @@ class Engine(AbstractClass):
   """An engine for running a pants command line."""
 
   @staticmethod
-  def execution_order(phases):
-    """Yields all phases needed to attempt the given phases in proper phase execution order."""
+  def execution_order(goals):
+    """Yields all goals needed to attempt the given goals in proper goal execution order."""
 
-    # Its key that we process phase dependencies depth first to maintain initial phase ordering as
-    # passed in when phase graphs are dependency disjoint.  A breadth first sort could mix next
-    # order executions and violate the implied intent of the passed in phase ordering.
+    # Its key that we process goal dependencies depth first to maintain initial goal ordering as
+    # passed in when goal graphs are dependency disjoint.  A breadth first sort could mix next
+    # order executions and violate the implied intent of the passed in goal ordering.
 
     processed = set()
 
-    def order(_phases):
-      for phase in _phases:
-        if phase not in processed:
-          processed.add(phase)
-          for dep in order(phase.dependencies):
+    def order(_goals):
+      for goal in _goals:
+        if goal not in processed:
+          processed.add(goal)
+          for dep in order(goal.dependencies):
             yield dep
-          yield phase
+          yield goal
 
-    for ordered in order(phases):
+    for ordered in order(goals):
       yield ordered
 
-  def execute(self, context, phases):
-    """Executes the supplied phases and their dependencies against the given context.
+  def execute(self, context, goals):
+    """Executes the supplied goals and their dependencies against the given context.
 
     :param context: The pants run context.
-    :param list phases: A list of ``Goal`` objects representing the command line goals explicitly
-                        requested.
+    :param list goals: A list of ``Goal`` objects representing the command line goals explicitly
+                       requested.
     :returns int: An exit code of 0 upon success and non-zero otherwise.
     """
     try:
-      self.attempt(context, phases)
+      self.attempt(context, goals)
       return 0
     except TaskError as e:
       message = '%s' % e
@@ -56,11 +56,10 @@ class Engine(AbstractClass):
       return e.exit_code if isinstance(e, TaskError) else 1
 
   @abstractmethod
-  def attempt(self, context, phases):
-    """Given the target context and phases specified (command line goals), attempt to achieve all
-    goals.
+  def attempt(self, context, goals):
+    """Given the target context and command line goals, attempt to achieve all goals.
 
     :param context: The pants run context.
-    :param list phases: A list of ``Goal`` objects representing the command line goals explicitly
-                        requested.
+    :param list goals: A list of ``Goal`` objects representing the command line goals explicitly
+                       requested.
     """

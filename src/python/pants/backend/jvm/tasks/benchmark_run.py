@@ -70,8 +70,8 @@ class BenchmarkRun(JvmTask, JvmToolTaskMixin):
     self.caliper_args.extend(self.context.options.extra_caliper_args)
 
   def prepare(self, round_manager):
-    # TODO(John Sirois): these are fake requirements in order to force compile run before this
-    # phase. Introduce a RuntimeClasspath product for JvmCompile and PrepareResources to populate
+    # TODO(John Sirois): these are fake requirements in order to force compile to run before this
+    # goal. Introduce a RuntimeClasspath product for JvmCompile and PrepareResources to populate
     # and depend on that.
     # See: https://github.com/pantsbuild/pants/issues/310
     round_manager.require_data('resources_by_target')

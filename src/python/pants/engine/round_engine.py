@@ -33,9 +33,9 @@ class GoalExecutor(object):
     :param bool explain: If ``True`` then the goal plan will be explained instead of being
                          executed.
     """
-    with self._context.new_workunit(name=self._goal.name, labels=[WorkUnit.PHASE]):
+    with self._context.new_workunit(name=self._goal.name, labels=[WorkUnit.GOAL]):
       for name, task in reversed(self._tasks_by_name.items()):
-        with self._context.new_workunit(name=name, labels=[WorkUnit.GOAL]):
+        with self._context.new_workunit(name=name, labels=[WorkUnit.TASK]):
           if explain:
             self._context.log.debug('Skipping execution of %s in explain mode' % name)
           else:

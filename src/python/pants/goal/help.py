@@ -15,14 +15,14 @@ from pants.goal.goal import Goal
 def print_help(goals=None):
   if goals:
     for goal in goals:
-      phase = Goal.by_name(goal)
-      if not phase.ordered_task_names():
+      goal = Goal.by_name(goal)
+      if not goal.ordered_task_names():
         print('\nUnknown goal: %s' % goal)
       else:
         parser = OptionParser(add_help_option=False)
-        Goal.setup_parser(parser, [], [phase])
-        print('\n%s: %s' % (phase.name, phase.description))
-        _print_flags(parser, phase.name)
+        Goal.setup_parser(parser, [], [goal])
+        print('\n%s: %s' % (goal.name, goal.description))
+        _print_flags(parser, goal.name)
   else:
     print(pants_release())
     print('\nUsage:')

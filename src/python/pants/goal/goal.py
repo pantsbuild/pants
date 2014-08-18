@@ -37,15 +37,15 @@ class Goal(object):
     cls._goal_by_name.clear()
 
   @staticmethod
-  def option_group_title(phase, task_name):
+  def option_group_title(goal, task_name):
     """Returns name to use for CLI flag OptionGroup."""
-    phase_leader = len(phase.ordered_task_names()) == 1 or task_name == phase.name
-    namespace = [task_name] if phase_leader else [phase.name, task_name]
+    goal_leader = len(goal.ordered_task_names()) == 1 or task_name == goal.name
+    namespace = [task_name] if goal_leader else [goal.name, task_name]
     return ':'.join(namespace)
 
   @staticmethod
   def setup_parser(parser, args, goals):
-    """Set up an OptionParser with options info for a phase and its deps.
+    """Set up an OptionParser with options info for a goal and its deps.
     This readies the parser to handle options for this goal and its deps.
     It does not set up everything you might want for displaying help.
     For that, you want setup_parser_for_help.

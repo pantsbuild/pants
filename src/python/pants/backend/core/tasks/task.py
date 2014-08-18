@@ -19,7 +19,6 @@ from pants.base.build_invalidator import BuildInvalidator, CacheKeyGenerator
 from pants.base.cache_manager import (InvalidationCacheManager, InvalidationCheck)
 from pants.base.config import Config
 from pants.base.exceptions import TaskError
-from pants.base.hash_utils import hash_file
 from pants.base.worker_pool import Work
 from pants.base.workunit import WorkUnit
 from pants.cache.cache_setup import create_artifact_cache
@@ -35,7 +34,7 @@ class TaskBase(AbstractClass):
   tasks and the user.  The lifecycle is linear and run via the following sequence:
   1. setup_parser - expose command line flags
   2. __init__ - distill configuration into the information needed to execute
-  3. prepare - request any products needed from phase dependencies
+  3. prepare - request any products needed from goal dependencies
 
   Provides access to the current run context for scoping work.
 
@@ -89,7 +88,7 @@ class TaskBase(AbstractClass):
 
     Called before execution and prior to any tasks that may be (indirectly) depended upon.
 
-    Typically a task that requires products from other phases would register interest in those
+    Typically a task that requires products from other goals would register interest in those
     products here and then retrieve the requested product mappings when executed.
     """
 

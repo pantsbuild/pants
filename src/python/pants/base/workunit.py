@@ -19,9 +19,9 @@ class WorkUnit(object):
   """A hierarchical unit of work, for the purpose of timing and reporting.
 
   A WorkUnit can be subdivided into further WorkUnits. The WorkUnit concept is deliberately
-  decoupled from the phase/task hierarchy. This allows some flexibility in having, say,
+  decoupled from the goal/task hierarchy. This allows some flexibility in having, say,
   sub-units inside a task. E.g., there might be one WorkUnit representing an entire pants run,
-  and that can be subdivided into WorkUnits for each phase. Each of those can be subdivided into
+  and that can be subdivided into WorkUnits for each goal. Each of those can be subdivided into
   WorkUnits for each task, and a task can subdivide that into further work units, if finer-grained
   timing and reporting is needed.
   """
@@ -53,8 +53,8 @@ class WorkUnit(object):
   # Note that a workunit can have multiple labels where this makes sense, e.g., TOOL, COMPILER
   # and NAILGUN.
   SETUP = 0      # Parsing build files etc.
-  PHASE = 1      # Executing a phase.
-  GOAL = 2       # Executing a goal.
+  GOAL = 1       # Executing a goal.
+  TASK = 2       # Executing a task within a goal.
   GROUP = 3      # Executing a group.
 
   BOOTSTRAP = 4  # Invocation of code to fetch a tool.

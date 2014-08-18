@@ -258,7 +258,7 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
                                               default=no_warning_defaults))
   def prepare(self, round_manager):
     # TODO(John Sirois): this is a fake requirement on 'ivy_jar_products' in order to force
-    # resolve to run before this phase.  Require a new CompileClasspath product to be produced by
+    # resolve to run before this goal.  Require a new CompileClasspath product to be produced by
     # IvyResolve instead.
     round_manager.require_data('ivy_jar_products')
     round_manager.require_data('exclusives_groups')
@@ -355,7 +355,7 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
   # TODO(benjy): Break this monstrosity up? Previous attempts to do so
   #              turned out to be more trouble than it was worth.
   def execute_chunk(self, relevant_targets):
-    # TODO(benjy): Add a pre-execute phase for injecting deps into targets, so e.g.,
+    # TODO(benjy): Add a pre-execute goal for injecting deps into targets, so e.g.,
     # we can inject a dep on the scala runtime library and still have it ivy-resolve.
 
     if not relevant_targets:
