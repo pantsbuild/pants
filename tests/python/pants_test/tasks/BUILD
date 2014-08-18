@@ -44,6 +44,7 @@ python_test_suite(
     ':jar_publish',
     ':jar_task',
     ':jaxb_gen',
+    ':jvm_run',
     ':jvm_task',
     ':jvmdoc_gen',
     ':list_goals',
@@ -519,6 +520,20 @@ python_tests(
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/base:target',
     'src/python/pants/engine:engine',
+    'tests/python/pants_test:base_test',
+  ]
+)
+
+python_tests(
+  name = 'jvm_run',
+  sources = ['test_jvm_run.py'],
+  dependencies = [
+    ':base',
+    'src/python/pants/backend/core/tasks:check_exclusives',
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/tasks:jvm_run',
+    'src/python/pants/engine',
+    'src/python/pants/util:contextutil',
     'tests/python/pants_test:base_test',
   ]
 )
