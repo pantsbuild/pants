@@ -7,15 +7,15 @@ python_library(
   dependencies = [
     'tests/python/pants_test:base_test',
     'tests/python/pants_test/base:context_utils',
-    'src/python/pants/goal:phase',
+    'src/python/pants/goal',
   ]
 )
 
 python_test_suite(
   name = 'engine',
   dependencies = [
-    ':test_engine',
-    ':test_round_engine',
+    pants(':test_engine'),
+    pants(':test_round_engine'),
   ]
 )
 
@@ -23,9 +23,9 @@ python_tests(
   name = 'test_engine',
   sources = ['test_engine.py'],
   dependencies = [
-    ':engine_test_base',
-    '3rdparty/python:mox',
-    'src/python/pants/engine',
+    pants(':engine_test_base'),
+    pants('3rdparty/python:mox'),
+    pants('src/python/pants/engine'),
   ],
 )
 
@@ -33,8 +33,8 @@ python_tests(
   name = 'test_round_engine',
   sources = ['test_round_engine.py'],
   dependencies = [
-    ':engine_test_base',
-    'src/python/pants/engine',
-    'src/python/pants/backend/core/tasks:common',
+    pants(':engine_test_base'),
+    pants('src/python/pants/engine'),
+    pants('src/python/pants/backend/core/tasks:common'),
   ],
 )

@@ -29,7 +29,7 @@ python_tests(
   dependencies = [
     'src/python/pants/backend/jvm:plugin',
     'src/python/pants/commands:goal_runner',
-    'src/python/pants/goal:phase',
+    'src/python/pants/goal',
     'tests/python/pants_test:base_test',
   ]
 )

@@ -1,7 +1,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-target(
+dependencies(
   name = 'all',
   dependencies = [
     ':build_lint',
@@ -66,7 +66,7 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/base:generator',
     'src/python/pants/goal:option_helpers',
-    'src/python/pants/goal:phase',
+    'src/python/pants/goal',
     'src/python/pants/util:dirutil',
   ],
 )
@@ -169,7 +169,7 @@ python_library(
   sources = ['list_goals.py'],
   dependencies = [
     ':console_task',
-    'src/python/pants/goal:phase',
+    'src/python/pants/goal',
   ],
 )
 

@@ -6,7 +6,7 @@ python_library(
   sources = ['task_registrar.py'],
   dependencies = [
     ':error',
-    ':phase',
+    ':goal',
     'src/python/pants/backend/core/tasks:task',
   ],
 )
@@ -57,7 +57,7 @@ python_library(
   sources = ['help.py'],
   dependencies = [
     ':option_helpers',
-    ':phase',
+    ':goal',
     'src/python/pants/base:build_environment',
   ],
 )
@@ -80,8 +80,12 @@ python_library(
   ],
 )
 
+# TODO(benjy): As a result of a renaming, we ended up with this target owning only one source
+# file, whereas its name might indicate to the casual reader that it represents the entire package.
+# However the targets in this BUILD file (and elsewhere) are probably too fine-grained anyway, so
+# we may just solve this possible confusion by refactoring out some stuff and unifying the rest.
 python_library(
-  name = 'phase',
+  name = 'goal',
   sources = ['goal.py'],
   dependencies = [
     ':error',

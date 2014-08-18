@@ -42,7 +42,7 @@ python_library(
     'src/python/pants/goal:help',
     'src/python/pants/goal:initialize_reporting',
     'src/python/pants/goal:option_helpers',
-    'src/python/pants/goal:phase',
+    'src/python/pants/goal',
     'src/python/pants/backend/jvm/tasks:nailgun_task',
     'src/python/pants/reporting',
     'src/python/pants/backend/core/tasks:common',

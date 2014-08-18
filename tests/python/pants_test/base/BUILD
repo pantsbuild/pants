@@ -169,7 +169,7 @@ python_tests(
     'src/python/pants/base:dev_backend_loader',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:target',
-    'src/python/pants/goal:phase',
+    'src/python/pants/goal',
     'src/python/pants/goal:task_registrar',
   ]
 )
