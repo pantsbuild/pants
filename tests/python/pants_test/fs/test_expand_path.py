@@ -37,6 +37,7 @@ class ExpandPathTest(unittest2.TestCase):
   @contextmanager
   def root(self):
     with temporary_dir() as root:
-      real_root = os.path.realpath(root)  # Avoid OSX issues where tmp dirs are reported as symlinks
+      # Avoid OSX issues where tmp dirs are reported as symlinks.
+      real_root = os.path.realpath(root)
       with pushd(real_root):
         yield real_root
