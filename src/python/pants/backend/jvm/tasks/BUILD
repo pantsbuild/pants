@@ -372,10 +372,11 @@ python_library(
   dependencies = [
     ':common',
     ':jvm_task',
+    'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:workunit',
+    'src/python/pants/fs',
     'src/python/pants/java:executor',
     'src/python/pants/java:util',
-    'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/util:dirutil',
   ],
 )
