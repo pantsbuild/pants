@@ -9,7 +9,7 @@ from collections import namedtuple
 
 import os
 import subprocess
-import unittest
+import unittest2
 
 from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import temporary_dir
@@ -18,7 +18,7 @@ from pants.util.dirutil import safe_open, safe_mkdir
 
 PantsResult = namedtuple('PantsResult', ['returncode', 'stdout_data', 'stderr_data'])
 
-class PantsRunIntegrationTest(unittest.TestCase):
+class PantsRunIntegrationTest(unittest2.TestCase):
   """A base class useful for integration tests for targets in the same repo."""
 
   PANTS_SUCCESS_CODE = 0
