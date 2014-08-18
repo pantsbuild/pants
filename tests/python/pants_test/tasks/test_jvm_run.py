@@ -34,7 +34,8 @@ class JvmRunTest(BaseTest):
         self.assertTrue(os.path.exists(cmdline_file))
         with open(cmdline_file) as fp:
           contents = fp.read()
-          self.assertTrue('java ', contents.endswith('java -cp bob:fred com.pants.Binary'))
+          expected_suffix = 'java -cp bob:fred com.pants.Binary'
+          self.assertEquals(expected_suffix, contents[-len(expected_suffix):])
 
   def prepare_exclusives(self, context, key=None, classpath=None):
     # TODO(John Sirois): Push this prep up into a test helper - its too much detail to replicate
