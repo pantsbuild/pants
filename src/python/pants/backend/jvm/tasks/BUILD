@@ -160,7 +160,7 @@ python_library(
 python_library(
   name = 'eclipse_gen',
   sources = ['eclipse_gen.py'],
-  resources = globs('templates/eclipse/*.mustache'),
+  resources = globs('templates/eclipse/*.mustache', 'templates/eclipse/*.prefs'),
   dependencies = [
     ':common',
     ':ide_gen',
