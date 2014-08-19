@@ -63,6 +63,8 @@ class Dependencies(ConsoleTask):
         if not self.is_external_only:
           yield tgt.address.spec
         if not self.is_internal_only:
+          # TODO(John Sirois): We need an external payload abstraction at which point knowledge
+          # of jar and requirement payloads can go and this hairball will be untangled.
           if isinstance(tgt.payload, PythonRequirementLibraryPayload):
             for requirement in tgt.payload.requirements:
               yield str(requirement.requirement)

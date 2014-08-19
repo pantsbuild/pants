@@ -194,11 +194,11 @@ class DepmapTest(BaseDepmapTest):
   def test_overlaps_one(self):
     self.assert_console_output(
       'internal-overlaps.one',
+      '  internal-common.h.h',
+      '    internal-common.f.f',
       '  internal-common.i.i',
       '    internal-common.g.g',
-      '      internal-common.f.f',
-      '  internal-common.h.h',
-      '    *internal-common.f.f',
+      '      *internal-common.f.f',
       targets=[self.target('overlaps:one')]
     )
 
@@ -206,11 +206,11 @@ class DepmapTest(BaseDepmapTest):
     self.assert_console_output(
       'internal-overlaps.two',
       '  internal-overlaps.one',
+      '    internal-common.h.h',
+      '      internal-common.f.f',
       '    internal-common.i.i',
       '      internal-common.g.g',
-      '        internal-common.f.f',
-      '    internal-common.h.h',
-      '      *internal-common.f.f',
+      '        *internal-common.f.f',
       targets=[self.target('overlaps:two')]
     )
 
@@ -218,10 +218,10 @@ class DepmapTest(BaseDepmapTest):
     self.assert_console_output(
       'internal-overlaps.two',
       '  internal-overlaps.one',
+      '    internal-common.h.h',
+      '      internal-common.f.f',
       '    internal-common.i.i',
       '      internal-common.g.g',
-      '        internal-common.f.f',
-      '    internal-common.h.h',
       targets=[self.target('overlaps:two')],
       args=['--test-minimal']
     )

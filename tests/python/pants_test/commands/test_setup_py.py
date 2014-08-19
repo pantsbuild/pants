@@ -5,12 +5,12 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-import os
 from contextlib import contextmanager
+import os
 
 from mock import MagicMock, Mock, call
-import pytest
 from twitter.common.collections import OrderedSet
+from twitter.common.collections.ordereddict import OrderedDict
 from twitter.common.dirutil.chroot import Chroot
 
 from pants.backend.python.commands.setup_py import SetupPy
@@ -47,14 +47,16 @@ class TestSetupPy(BaseTest):
 
   def test_minified_dependencies_1(self):
     # foo -> bar -> baz
-    dep_map = {'foo': ['bar'], 'bar': ['baz'], 'baz': []}
+    dep_map = OrderedDict(foo=['bar'], bar=['baz'], baz=[])
     target_map = self.create_dependencies(dep_map)
-    assert SetupPy.minified_dependencies(target_map['foo']) == OrderedSet([target_map['bar']])
-    assert SetupPy.minified_dependencies(target_map['bar']) == OrderedSet([target_map['baz']])
-    assert SetupPy.minified_dependencies(target_map['baz']) == OrderedSet()
-    assert SetupPy.install_requires(target_map['foo']) == set(['bar==0.0.0'])
-    assert SetupPy.install_requires(target_map['bar']) == set(['baz==0.0.0'])
-    assert SetupPy.install_requires(target_map['baz']) == set([])
+    self.assertEqual(SetupPy.minified_dependencies(target_map['foo']),
+                     OrderedSet([target_map['bar']]))
+    self.assertEqual(SetupPy.minified_dependencies(target_map['bar']),
+                     OrderedSet([target_map['baz']]))
+    self.assertEqual(SetupPy.minified_dependencies(target_map['baz']), OrderedSet())
+    self.assertEqual(SetupPy.install_requires(target_map['foo']), set(['bar==0.0.0']))
+    self.assertEqual(SetupPy.install_requires(target_map['bar']), set(['baz==0.0.0']))
+    self.assertEqual(SetupPy.install_requires(target_map['baz']), set([]))
 
   @classmethod
   @contextmanager
@@ -68,7 +70,7 @@ class TestSetupPy(BaseTest):
     yield setup_py
 
   def test_execution_minified_dependencies_1(self):
-    dep_map = {'foo': ['bar'], 'bar': ['baz'], 'baz': []}
+    dep_map = OrderedDict(foo=['bar'], bar=['baz'], baz=[])
     target_map = self.create_dependencies(dep_map)
     with self.run_execute(target_map['foo'], recursive=False) as setup_py:
       setup_py.run_one.assert_called_with(target_map['foo'])
@@ -84,25 +86,29 @@ class TestSetupPy(BaseTest):
     #  |      ^
     #  v      |
     # bar ----'
-    dep_map = {'foo': ['bar', 'baz'], 'bar': ['baz'], 'baz': []}
+    dep_map = OrderedDict(foo=['bar', 'baz'], bar=['baz'], baz=[])
     target_map = self.create_dependencies(dep_map)
-    assert SetupPy.minified_dependencies(target_map['foo']) == OrderedSet([target_map['bar']])
-    assert SetupPy.minified_dependencies(target_map['bar']) == OrderedSet([target_map['baz']])
-    assert SetupPy.minified_dependencies(target_map['baz']) == OrderedSet()
+    self.assertEqual(SetupPy.minified_dependencies(target_map['foo']),
+                     OrderedSet([target_map['bar']]))
+    self.assertEqual(SetupPy.minified_dependencies(target_map['bar']),
+                     OrderedSet([target_map['baz']]))
+    self.assertEqual(SetupPy.minified_dependencies(target_map['baz']), OrderedSet())
 
   def test_minified_dependencies_diamond(self):
     #   bar <-- foo --> baz
     #    |               |
     #    `----> bak <----'
-    dep_map = {'foo': ['bar', 'baz'], 'bar': ['bak'], 'baz': ['bak'], 'bak': []}
+    dep_map = OrderedDict(foo=['bar', 'baz'], bar=['bak'], baz=['bak'], bak=[])
     target_map = self.create_dependencies(dep_map)
-    assert SetupPy.minified_dependencies(target_map['foo']) == OrderedSet(
-        [target_map['baz'], target_map['bar']])
-    assert SetupPy.minified_dependencies(target_map['bar']) == OrderedSet([target_map['bak']])
-    assert SetupPy.minified_dependencies(target_map['baz']) == OrderedSet([target_map['bak']])
-    assert SetupPy.install_requires(target_map['foo']) == set(['bar==0.0.0', 'baz==0.0.0'])
-    assert SetupPy.install_requires(target_map['bar']) == set(['bak==0.0.0'])
-    assert SetupPy.install_requires(target_map['baz']) == set(['bak==0.0.0'])
+    self.assertEqual(SetupPy.minified_dependencies(target_map['foo']),
+                     OrderedSet([target_map['bar'], target_map['baz']]))
+    self.assertEqual(SetupPy.minified_dependencies(target_map['bar']),
+                     OrderedSet([target_map['bak']]))
+    self.assertEqual(SetupPy.minified_dependencies(target_map['baz']),
+                     OrderedSet([target_map['bak']]))
+    self.assertEqual(SetupPy.install_requires(target_map['foo']), set(['bar==0.0.0', 'baz==0.0.0']))
+    self.assertEqual(SetupPy.install_requires(target_map['bar']), set(['bak==0.0.0']))
+    self.assertEqual(SetupPy.install_requires(target_map['baz']), set(['bak==0.0.0']))
 
   def test_binary_target_injected_into_minified_dependencies(self):
     foo_bin_dep = self.make_target(
@@ -130,9 +136,9 @@ class TestSetupPy(BaseTest):
       )
     )
 
-    assert SetupPy.minified_dependencies(foo) == OrderedSet([foo_bin, foo_bin_dep])
+    self.assertEqual(SetupPy.minified_dependencies(foo), OrderedSet([foo_bin, foo_bin_dep]))
     entry_points = dict(SetupPy.iter_entry_points(foo))
-    assert entry_points == {'foo_binary': 'foo.bin.foo'}
+    self.assertEqual(entry_points, {'foo_binary': 'foo.bin.foo'})
 
     with self.run_execute(foo, recursive=False) as setup_py_command:
       setup_py_command.run_one.assert_called_with(foo)
@@ -206,7 +212,7 @@ class TestSetupPy(BaseTest):
       ],
     )
 
-    with pytest.raises(TargetDefinitionException):
+    with self.assertRaises(TargetDefinitionException):
       SetupPy.minified_dependencies(foo)
 
 
