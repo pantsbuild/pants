@@ -5,7 +5,7 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-import unittest
+import unittest2 as unittest
 
 from pants.backend.jvm.tasks.binary_create import BinaryCreate
 from pants_test.base.context_utils import create_context

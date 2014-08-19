@@ -10,7 +10,7 @@ import uuid
 import sys
 import types
 
-import unittest2
+import unittest2 as unittest
 
 from pants.base.build_configuration import BuildConfiguration
 from pants.base.build_file_aliases import BuildFileAliases
@@ -21,7 +21,7 @@ from pants.goal.task_registrar import TaskRegistrar
 from pants.goal.goal import Goal
 
 
-class LoaderTest(unittest2.TestCase):
+class LoaderTest(unittest.TestCase):
   def setUp(self):
     self.build_configuration = BuildConfiguration()
 

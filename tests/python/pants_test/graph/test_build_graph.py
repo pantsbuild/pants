@@ -7,10 +7,9 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from contextlib import contextmanager
 import os
-import sys
-from textwrap import dedent
-
 import pytest
+from textwrap import dedent
+import unittest2 as unittest
 
 from pants.base.address import SyntheticAddress
 from pants.base.build_configuration import BuildConfiguration

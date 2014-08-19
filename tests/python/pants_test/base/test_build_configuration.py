@@ -7,7 +7,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from contextlib import contextmanager
 import os
-import unittest2
+import unittest2 as unittest
 
 from pants.base.address import SyntheticAddress
 from pants.base.build_configuration import BuildConfiguration
@@ -18,7 +18,7 @@ from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import touch
 
 
-class BuildConfigurationTest(unittest2.TestCase):
+class BuildConfigurationTest(unittest.TestCase):
   def setUp(self):
     self.build_configuration = BuildConfiguration()
 

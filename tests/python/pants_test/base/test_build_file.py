@@ -8,7 +8,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import os
 import shutil
 import tempfile
-import unittest2
+import unittest2 as unittest
 
 from twitter.common.collections import OrderedSet
 
@@ -16,7 +16,7 @@ from pants.base.build_file import BuildFile
 from pants.util.dirutil import safe_mkdir, touch
 
 
-class BuildFileTest(unittest2.TestCase):
+class BuildFileTest(unittest.TestCase):
 
   @classmethod
   def makedirs(cls, path):

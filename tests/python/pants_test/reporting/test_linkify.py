@@ -8,7 +8,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import os
 import shutil
 import tempfile
-import unittest
+import unittest2 as unittest
 
 from pants.reporting.linkify import linkify
 

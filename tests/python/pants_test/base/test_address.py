@@ -7,7 +7,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from contextlib import contextmanager
 import os
-import unittest2
+import unittest2 as unittest
 
 from pants.base.address import BuildFileAddress, SyntheticAddress, parse_spec
 from pants.base.build_file import BuildFile
@@ -16,7 +16,7 @@ from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import touch
 
 
-class ParseSpecTest(unittest2.TestCase):
+class ParseSpecTest(unittest.TestCase):
   def test_parse_spec(self):
     spec_path, target_name = parse_spec('a/b/c')
     self.assertEqual(spec_path, 'a/b/c')
@@ -91,7 +91,7 @@ class ParseSpecTest(unittest2.TestCase):
       parse_spec(spec)
 
 
-class BaseAddressTest(unittest2.TestCase):
+class BaseAddressTest(unittest.TestCase):
   @contextmanager
   def workspace(self, *buildfiles):
     with temporary_dir() as root_dir:

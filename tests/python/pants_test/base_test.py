@@ -9,7 +9,7 @@ from contextlib import contextmanager
 import os
 from tempfile import mkdtemp
 from textwrap import dedent
-import unittest2
+import unittest2 as unittest
 
 from pants.backend.core.targets.dependencies import Dependencies
 from pants.base.address import SyntheticAddress
@@ -29,7 +29,7 @@ from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree, touch
 from pants_test.base.context_utils import create_context
 
 
-class BaseTest(unittest2.TestCase):
+class BaseTest(unittest.TestCase):
   """A baseclass useful for tests requiring a temporary buildroot."""
 
   def build_path(self, relpath):
