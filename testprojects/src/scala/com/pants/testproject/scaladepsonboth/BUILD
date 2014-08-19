@@ -5,6 +5,6 @@ scala_library(
   name = 'scaladepsonboth',
   sources = rglobs('*.scala'),
   dependencies = [
-    pants('testprojects/src/scala/com/pants/testproject/javasources'),
+    'testprojects/src/scala/com/pants/testproject/javasources',
   ]
 )

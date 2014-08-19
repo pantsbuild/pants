@@ -99,13 +99,13 @@ python_tests(
   name = 'builddict',
   sources = ['test_builddict.py'],
   dependencies = [
-    pants(':base'),
-    pants('src/python/pants/backend/core:plugin'),
-    pants('src/python/pants/backend/core/tasks:builddictionary'),
-    pants('src/python/pants/backend/jvm:plugin'),
-    pants('src/python/pants/backend/python:plugin'),
-    pants('src/python/pants/goal'),
-    pants('src/python/pants/goal:task_registrar'),
+    ':base',
+    'src/python/pants/backend/core:plugin',
+    'src/python/pants/backend/core/tasks:builddictionary',
+    'src/python/pants/backend/jvm:plugin',
+    'src/python/pants/backend/python:plugin',
+    'src/python/pants/goal',
+    'src/python/pants/goal:task_registrar',
   ]
 )
 
@@ -377,11 +377,11 @@ python_tests(
   name = 'list_goals',
   sources = ['test_list_goals.py'],
   dependencies = [
-    pants(':base'),
-    pants('src/python/pants/backend/core/tasks:list_goals'),
-    pants('src/python/pants/backend/core/tasks:common'),
-    pants('src/python/pants/goal'),
-    pants('src/python/pants/goal:task_registrar'),
+    ':base',
+    'src/python/pants/backend/core/tasks:list_goals',
+    'src/python/pants/backend/core/tasks:common',
+    'src/python/pants/goal',
+    'src/python/pants/goal:task_registrar',
   ],
 )
 
