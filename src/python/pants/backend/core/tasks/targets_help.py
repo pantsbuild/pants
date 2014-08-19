@@ -54,7 +54,8 @@ class TargetsHelp(ConsoleTask):
     'Benchmark': 'benchmark',
     'Bundle': 'bundle',
     'Credentials': 'credentials',
-    'JarLibrary': 'dependencies',
+    'JarLibrary': 'target',
+    'Dependencies' : 'target',
     'PythonEgg': 'egg',
     'Exclude': 'exclude',
     'Pants': 'fancy_pants',
@@ -65,6 +66,7 @@ class TargetsHelp(ConsoleTask):
     'JavaTests': 'junit_tests',
     'JavaThriftLibrary': 'java_thrift_library',
     'JavaThriftstoreDMLLibrary': 'java_thriftstore_dml_library',
+    'JaxbLibrary': 'jaxb_library',
     'JvmBinary': 'jvm_binary',
     'JvmApp': 'jvm_app',
     # For testing. When targets define their own alias (or we use a template
@@ -109,10 +111,15 @@ class TargetsHelp(ConsoleTask):
     for target_type in SourceRoot._ROOTS_BY_TYPE.keys():
       target_types[target_type.__name__] = target_type
 
-    if self.context.options.goal_targets_details is None:
+    target_details = self.context.options.goal_targets_details
+    if target_details is None:
       return self._get_installed_targets(target_types)
-    else:
-      return self._get_details(target_types[self.ALIAS_TO_TARGET[self.context.options.goal_targets_details]])
+    if target_details not in self.ALIAS_TO_TARGET:
+      raise ValueError("Couldn't find target alias '{target_details}' in: {targets}"
+                       .format(target_details=target_details, targets=self.ALIAS_TO_TARGET))
+    target = self.ALIAS_TO_TARGET[target_details]
+    target_type = target_types[target]
+    return self._get_details(target_type)
 
   @staticmethod
   def _get_arg_help(docstring):
