@@ -5,14 +5,16 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from twitter.common.collections import OrderedSet
+
 from pants.backend.core.tasks.console_task import ConsoleTask
-from pants.backend.jvm.targets.jar_dependency import JarDependency
-from pants.backend.jvm.targets.jar_library import JarLibrary
-from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.base.exceptions import TaskError
 
 
 # XXX(pl): JVM/Python hairball violator
+from pants.base.payload import JarLibraryPayload, PythonRequirementLibraryPayload
+
+
 class Dependencies(ConsoleTask):
   """Generates a textual list (using the target format) for the dependency set of a target."""
 
@@ -55,66 +57,16 @@ class Dependencies(ConsoleTask):
 
   def console_output(self, unused_method_argument):
     for target in self.context.target_roots:
-      if self._is_jvm(target):
-        for line in self._jvm_dependencies_list(target):
-          yield line
-
-      elif target.is_python:
-        if self.is_internal_only:
-          raise TaskError('Unsupported option for Python target: is_internal_only: %s' %
-                          self.is_internal_only)
-        if self.is_external_only:
-          raise TaskError('Unsupported option for Python target: is_external_only: %s' %
-                          self.is_external_only)
-        for line in self._python_dependencies_list(target):
-          yield line
-
-  def _dep_id(self, dep):
-    if isinstance(dep, JarDependency):
-      jar = dep
-      if jar.rev:
-        return False, '%s:%s:%s' % (jar.org, jar.name, jar.rev)
-      else:
-        return True, '%s:%s' % (jar.org, jar.name)
-    else:
-      return True, dep.address.spec
-
-  def _python_dependencies_list(self, target):
-    if isinstance(target, PythonRequirementLibrary):
-      for req in target.payload.requirements:
-        yield str(req._requirement)
-
-    yield target.address.spec
-
-    for dep in target.dependencies:
-      for d in self._python_dependencies_list(dep):
-        yield d
-
-  def _jvm_dependencies_list(self, target):
-    def print_deps(visited, dep):
-      internal, address = self._dep_id(dep)
-
-      if not dep in visited:
-        if internal and (not self.is_external_only or self.is_internal_only):
-          yield address
-
-        visited.add(dep)
-
-        if self._is_jvm(dep):
-          for dep in dep.dependencies:
-            for line in print_deps(visited, dep):
-              yield line
-
+      ordered_closure = OrderedSet()
+      target.walk(ordered_closure.add)
+      for tgt in ordered_closure:
+        if not self.is_external_only:
+          yield tgt.address.spec
         if not self.is_internal_only:
-          if isinstance(dep, JarLibrary):
-            for jar_dep in dep.jar_dependencies:
-              internal, address  = self._dep_id(jar_dep)
-              if not internal:
-                if jar_dep not in visited:
-                  if self.is_external_only or not self.is_internal_only:
-                    yield address
-                  visited.add(jar_dep)
-
-    visited = set()
-    for dep in print_deps(visited, target):
-      yield dep
+          if isinstance(tgt.payload, PythonRequirementLibraryPayload):
+            for requirement in tgt.payload.requirements:
+              yield str(requirement.requirement)
+          elif isinstance(tgt.payload, JarLibraryPayload):
+            for jar in tgt.payload.jars:
+              data = dict(org=jar.org, name=jar.name, rev=jar.rev)
+              yield ('{org}:{name}:{rev}' if jar.rev else '{org}:{name}').format(**data)

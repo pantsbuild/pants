@@ -30,7 +30,7 @@ class BuildGraph(object):
     """Clear out the state of the BuildGraph, in particular Target mappings and dependencies."""
     self._addresses_already_closed = set()
     self._target_by_address = OrderedDict()
-    self._target_dependencies_by_address = defaultdict(set)
+    self._target_dependencies_by_address = defaultdict(OrderedSet)
     self._target_dependees_by_address = defaultdict(set)
     self._derived_from_by_derivative_address = {}
     self._derivative_by_derived_from_address = defaultdict(set)

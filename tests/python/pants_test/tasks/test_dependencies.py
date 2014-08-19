@@ -5,8 +5,7 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-import pytest
-
+from pants.backend.core.targets.dependencies import Dependencies as DepBag
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
@@ -14,13 +13,8 @@ from pants.backend.jvm.tasks.dependencies import Dependencies
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
-from pants.base.exceptions import TaskError
 
 from pants_test.tasks.test_base import ConsoleTaskTest
-
-
-def jar(org, name, rev):
-  return "jar('%s', '%s', '%s')" % (org, name, rev)
 
 
 class DependenciesEmptyTest(ConsoleTaskTest):
@@ -70,37 +64,57 @@ class NonPythonDependenciesTest(ConsoleTaskTest):
       ],
     )
 
+    self.make_target(
+      'project:dep-bag',
+      target_type=DepBag,
+      dependencies=[
+        second,
+        project
+      ]
+    )
+
   def test_without_dependencies(self):
-    self.assert_console_output(
+    self.assert_console_output_ordered(
       'dependencies:third',
       targets=[self.target('dependencies:third')]
     )
 
   def test_all_dependencies(self):
-    self.assert_console_output(
-      'dependencies:third',
-      'dependencies:first',
-      'dependencies:second',
+    self.assert_console_output_ordered(
       'project:project',
+      'dependencies:first',
+      'dependencies:third',
+      'dependencies:second',
       'org.apache:apache-jar:12.12.2012',
       targets=[self.target('project:project')]
     )
 
   def test_internal_dependencies(self):
-    self.assert_console_output(
-      'dependencies:third',
-      'dependencies:first',
-      'dependencies:second',
+    self.assert_console_output_ordered(
       'project:project',
+      'dependencies:first',
+      'dependencies:third',
+      'dependencies:second',
       args=['--test-internal-only'],
       targets=[self.target('project:project')]
     )
 
   def test_external_dependencies(self):
-    self.assert_console_output(
+    self.assert_console_output_ordered(
       'org.apache:apache-jar:12.12.2012',
       args=['--test-external-only'],
       targets=[self.target('project:project')]
+    )
+
+  def test_dep_bag(self):
+    self.assert_console_output_ordered(
+      'project:dep-bag',
+      'dependencies:second',
+      'org.apache:apache-jar:12.12.2012',
+      'project:project',
+      'dependencies:first',
+      'dependencies:third',
+      targets=[self.target('project:dep-bag')]
     )
 
 
@@ -143,25 +157,28 @@ class PythonDependenciesTests(ConsoleTaskTest):
     )
 
   def test_normal(self):
-    self.assert_console_output(
-      'antlr-python-runtime==3.1.3',
-      'dependencies:python_inner',
-      'dependencies:python_inner_with_external',
-      'dependencies:python_leaf',
+    self.assert_console_output_ordered(
       'dependencies:python_root',
+      'dependencies:python_inner',
+      'dependencies:python_leaf',
+      'dependencies:python_inner_with_external',
+      'antlr-python-runtime==3.1.3',
       targets=[self.target('dependencies:python_root')]
     )
 
   def test_internal_dependencies(self):
-    with pytest.raises(TaskError):
-      self.assert_console_output(
-        args=['--test-internal-only'],
-        targets=[self.target('dependencies:python_root')]
-      )
+    self.assert_console_output_ordered(
+      'dependencies:python_root',
+      'dependencies:python_inner',
+      'dependencies:python_leaf',
+      'dependencies:python_inner_with_external',
+      args=['--test-internal-only'],
+      targets=[self.target('dependencies:python_root')]
+    )
 
   def test_external_dependencies(self):
-    with pytest.raises(TaskError):
-      self.assert_console_output(
-        args=['--test-external-only'],
-        targets=[self.target('dependencies:python_root')]
-      )
+    self.assert_console_output_ordered(
+      'antlr-python-runtime==3.1.3',
+      args=['--test-external-only'],
+      targets=[self.target('dependencies:python_root')]
+    )
