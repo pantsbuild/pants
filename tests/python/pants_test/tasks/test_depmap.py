@@ -134,19 +134,19 @@ class DepmapTest(BaseDepmapTest):
     '''))
 
   def test_empty(self):
-    self.assert_console_output(
+    self.assert_console_output_ordered(
       'internal-common.a.a',
       targets=[self.target('common/a')]
     )
 
   def test_jar_library(self):
-    self.assert_console_output(
+    self.assert_console_output_ordered(
       'internal-common.b.b',
       targets=[self.target('common/b')],
     )
 
   def test_java_library(self):
-    self.assert_console_output(
+    self.assert_console_output_ordered(
       'internal-common.c.c',
       targets=[self.target('common/c')]
     )
@@ -164,27 +164,27 @@ class DepmapTest(BaseDepmapTest):
     )
 
   def test_jvm_binary1(self):
-    self.assert_console_output(
+    self.assert_console_output_ordered(
       'internal-common.f.f',
       targets=[self.target('common/f')]
     )
 
   def test_jvm_binary2(self):
-    self.assert_console_output(
+    self.assert_console_output_ordered(
       'internal-common.g.g',
       '  internal-common.f.f',
       targets=[self.target('common/g')]
     )
 
   def test_jvm_app1(self):
-    self.assert_console_output(
+    self.assert_console_output_ordered(
       'internal-common.h.h',
       '  internal-common.f.f',
       targets=[self.target('common/h')]
     )
 
   def test_jvm_app2(self):
-    self.assert_console_output(
+    self.assert_console_output_ordered(
       'internal-common.i.i',
       '  internal-common.g.g',
       '    internal-common.f.f',
@@ -192,42 +192,42 @@ class DepmapTest(BaseDepmapTest):
     )
 
   def test_overlaps_one(self):
-    self.assert_console_output(
+    self.assert_console_output_ordered(
       'internal-overlaps.one',
+      '  internal-common.h.h',
+      '    internal-common.f.f',
       '  internal-common.i.i',
       '    internal-common.g.g',
-      '      internal-common.f.f',
-      '  internal-common.h.h',
-      '    *internal-common.f.f',
+      '      *internal-common.f.f',
       targets=[self.target('overlaps:one')]
     )
 
   def test_overlaps_two(self):
-    self.assert_console_output(
+    self.assert_console_output_ordered(
       'internal-overlaps.two',
       '  internal-overlaps.one',
+      '    internal-common.h.h',
+      '      internal-common.f.f',
       '    internal-common.i.i',
       '      internal-common.g.g',
-      '        internal-common.f.f',
-      '    internal-common.h.h',
-      '      *internal-common.f.f',
+      '        *internal-common.f.f',
       targets=[self.target('overlaps:two')]
     )
 
   def test_overlaps_two_minimal(self):
-    self.assert_console_output(
+    self.assert_console_output_ordered(
       'internal-overlaps.two',
       '  internal-overlaps.one',
+      '    internal-common.h.h',
+      '      internal-common.f.f',
       '    internal-common.i.i',
       '      internal-common.g.g',
-      '        internal-common.f.f',
-      '    internal-common.h.h',
       targets=[self.target('overlaps:two')],
       args=['--test-minimal']
     )
 
   def test_multi(self):
-    self.assert_console_output(
+    self.assert_console_output_ordered(
       'internal-common.g.g',
       '  internal-common.f.f',
       'internal-common.h.h',
@@ -239,14 +239,14 @@ class DepmapTest(BaseDepmapTest):
     )
 
   def test_resources(self):
-    self.assert_console_output(
+    self.assert_console_output_ordered(
       'internal-src.java.a.a_java',
       '  internal-resources.a.a_resources',
       targets=[self.target('src/java/a:a_java')]
     )
 
   def test_resources_dep(self):
-    self.assert_console_output(
+    self.assert_console_output_ordered(
       'internal-src.java.a.a_dep',
       '  internal-src.java.a.a_java',
       '    internal-resources.a.a_resources',
@@ -254,12 +254,14 @@ class DepmapTest(BaseDepmapTest):
     )
 
   def test_intermediate_dep(self):
-    self.assert_console_output(
+    self.assert_console_output_ordered(
       'internal-src.java.b.b_java',
       '  internal-src.java.b.b_dep',
       '    internal-src.java.b.b_lib',
       targets=[self.target('src/java/b:b_java')]
     )
+
+
 class ProjectInfoTest(ConsoleTaskTest):
   @classmethod
   def task_type(cls):

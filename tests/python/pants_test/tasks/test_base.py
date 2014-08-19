@@ -6,7 +6,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import os
-import pytest
 import subprocess
 
 from contextlib import closing
@@ -190,10 +189,20 @@ class ConsoleTaskTest(TaskTest):
     """
     self.assertEqual(sorted(output), sorted(self.execute_console_task(**kwargs)))
 
+  def assert_console_output_ordered(self, *output, **kwargs):
+    """Verifies the expected output entries are emitted by the console task under test.
+
+    NB: order of entries is tested.
+
+    *output:  the expected output entries in expected order
+    **kwargs: additional kwargs passed to execute_console_task.
+    """
+    self.assertEqual(list(output), self.execute_console_task(**kwargs))
+
   def assert_console_raises(self, exception, **kwargs):
     """Verifies the expected exception is raised by the console task under test.
 
     **kwargs: additional kwargs are passed to execute_console_task.
     """
-    with pytest.raises(exception):
+    with self.assertRaises(exception):
       self.execute_console_task(**kwargs)
