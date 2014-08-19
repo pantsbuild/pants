@@ -8,6 +8,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import os
 
 from pants.base.address import SyntheticAddress
+from pants.base.build_file import BuildFile
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.target import Target
@@ -78,10 +79,10 @@ class CmdLineSpecParserTest(BaseTest):
     double_absolute = '/' + os.path.join(self.build_root, 'a')
     self.assertEquals('//', double_absolute[:2],
                       'A sanity check we have a leading-// absolute spec')
-    with self.assertRaises(IOError):
+    with self.assertRaises(self.spec_parser.BadSpecError):
       self.spec_parser.parse_addresses(double_absolute).next()
 
-    with self.assertRaises(ValueError):
+    with self.assertRaises(self.spec_parser.BadSpecError):
       self.spec_parser.parse_addresses('/not/the/buildroot/a').next()
 
   def test_cmd_line_affordances(self):
@@ -108,13 +109,14 @@ class CmdLineSpecParserTest(BaseTest):
     self.assert_parsed_list(cmdline_spec_list=['^a/b::', '::'], expected=[':root', 'a', 'a:b'])
 
   def test_does_not_exist(self):
-    with self.assertRaises(IOError):
+    with self.assertRaises(self.spec_parser.BadSpecError):
       self.spec_parser.parse_addresses('c').next()
 
-    with self.assertRaises(IOError):
+    with self.assertRaises(self.spec_parser.BadSpecError):
       self.spec_parser.parse_addresses('c:').next()
 
-    self.assert_parsed(cmdline_spec='c::', expected=[])
+    with self.assertRaises(self.spec_parser.BadSpecError):
+      self.spec_parser.parse_addresses('c::').next()
 
   def assert_parsed(self, cmdline_spec, expected):
     def sort(addresses):

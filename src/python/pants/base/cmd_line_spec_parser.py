@@ -37,6 +37,12 @@ class CmdLineSpecParser(object):
   The above expression would choose every target under src except for src/broken:test
   """
 
+  # TODO(John Sirois): Establish BuildFile And BuildFileAddressMapper exception discipline.  These
+  # types should not be raising IOError.
+
+  class BadSpecError(Exception):
+    """Indicates an invalid command line address spec."""
+
   def __init__(self, root_dir, address_mapper):
     self._root_dir = os.path.realpath(root_dir)
     self._address_mapper = address_mapper
@@ -45,10 +51,10 @@ class CmdLineSpecParser(object):
     """Process a list of command line specs and perform expansion.  This method can expand a list
     of command line specs, some of which may be subtracted from the  return value if they include
     the prefix '^'
-    :param spec_list: either a single spec string or a list of spec strings.
+    :param list specs: either a single spec string or a list of spec strings.
     :return: a generator of specs parsed into addresses.
+    :raises: CmdLineSpecParser.BadSpecError if any of the specs could not be parsed.
     """
-
     specs = maybe_list(specs)
 
     addresses = OrderedSet()
@@ -70,8 +76,8 @@ class CmdLineSpecParser(object):
       if is_abs:
         path = os.path.realpath(path)
         if os.path.commonprefix([self._root_dir, path]) != self._root_dir:
-          raise ValueError('Absolute spec path {0} does not share build root {1}'
-                           .format(path, self._root_dir))
+          raise self.BadSpecError('Absolute spec path {0} does not share build root {1}'
+                                  .format(path, self._root_dir))
       else:
         if path.startswith('//'):
           path = path[2:]
@@ -86,16 +92,28 @@ class CmdLineSpecParser(object):
       addresses = set()
       spec_path = spec[:-len('::')]
       spec_dir = normalize_spec_path(spec_path)
-      for build_file in BuildFile.scan_buildfiles(self._root_dir, spec_dir):
-        addresses.update(self._address_mapper.addresses_in_spec_path(build_file.spec_path))
-      return addresses
+      if not os.path.isdir(os.path.join(self._root_dir, spec_dir)):
+        raise self.BadSpecError('Can only recursive glob directories and {0} is not a valid dir'
+                                .format(spec_dir))
+      try:
+        for build_file in BuildFile.scan_buildfiles(self._root_dir, spec_dir):
+          addresses.update(self._address_mapper.addresses_in_spec_path(build_file.spec_path))
+        return addresses
+      except (IOError, BuildFile.MissingBuildFileError) as e:
+        raise self.BadSpecError(e)
     elif spec.endswith(':'):
       spec_path = spec[:-len(':')]
       spec_dir = normalize_spec_path(spec_path)
-      return set(self._address_mapper.addresses_in_spec_path(spec_dir))
+      try:
+        return set(self._address_mapper.addresses_in_spec_path(spec_dir))
+      except (IOError, BuildFile.MissingBuildFileError) as e:
+        raise self.BadSpecError(e)
     else:
       spec_parts = spec.rsplit(':', 1)
       spec_parts[0] = normalize_spec_path(spec_parts[0])
       spec_path, target_name = parse_spec(':'.join(spec_parts))
-      build_file = BuildFile.from_cache(self._root_dir, spec_path)
-      return set([BuildFileAddress(build_file, target_name)])
+      try:
+        build_file = BuildFile.from_cache(self._root_dir, spec_path)
+        return set([BuildFileAddress(build_file, target_name)])
+      except (IOError, BuildFile.MissingBuildFileError) as e:
+        raise self.BadSpecError(e)

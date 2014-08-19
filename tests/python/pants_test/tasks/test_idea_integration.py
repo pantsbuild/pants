@@ -63,10 +63,10 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
     self._idea_test(['examples/src/java/com/pants/examples::'])
 
   def test_idea_on_java_sources(self):
-    self._idea_test(['testproject/src/scala/com/pants/testproject/javasources::'])
+    self._idea_test(['testprojects/src/scala/com/pants/testproject/javasources::'])
 
   def test_idea_on_thriftdeptest(self):
-    self._idea_test(['testproject/src/java/com/pants/testproject/thriftdeptest::'])
+    self._idea_test(['testprojects/src/java/com/pants/testproject/thriftdeptest::'])
 
   def test_idea_on_scaladepsonboth(self):
-    self._idea_test(['testproject/src/scala/com/pants/testproject/scaladepsonboth::'])
+    self._idea_test(['testprojects/src/scala/com/pants/testproject/scaladepsonboth::'])
