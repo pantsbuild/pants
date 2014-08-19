@@ -224,6 +224,7 @@ python_tests(
   sources = ['test_dependencies.py'],
   dependencies = [
     ':base',
+    'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/backend/jvm/tasks:dependencies',

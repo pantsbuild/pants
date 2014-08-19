@@ -9,10 +9,10 @@ from twitter.common.collections import OrderedSet
 
 from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.base.exceptions import TaskError
+from pants.base.payload import JarLibraryPayload, PythonRequirementLibraryPayload
 
 
 # XXX(pl): JVM/Python hairball violator
-from pants.base.payload import JarLibraryPayload, PythonRequirementLibraryPayload
 
 
 class Dependencies(ConsoleTask):
