@@ -204,6 +204,21 @@ class FilterTest(BaseFilterTest):
       targets=self.targets('::')
     )
 
+  def test_filter_ancestor_not_passed_targets(self):
+    """Tests filtering targets based on an ancestor not in that list of targets"""
+
+    # add an additional un-injected target, and then use it as a filter
+    self.add_to_build_file("blacklist", "dependencies(name='blacklist', dependencies=['common/a'])")
+
+    self.assert_console_output(
+      'common/b:b',
+      'common/b:foo',
+      'common/c:c',
+      'common/c:foo',
+      args=['--test-ancestor=-blacklist'],
+      targets=self.targets('common/::') # blacklist is not in the list of targets
+    )
+
   def test_filter_regex(self):
     self.assert_console_output(
       'common/a:a',
