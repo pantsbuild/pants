@@ -219,6 +219,16 @@ class FilterTest(BaseFilterTest):
       targets=self.targets('common/::') # blacklist is not in the list of targets
     )
 
+    self.assert_console_output(
+      'common/a:a', # a: _should_ show up if we don't filter
+      'common/a:foo',
+      'common/b:b',
+      'common/b:foo',
+      'common/c:c',
+      'common/c:foo',
+      targets=self.targets('common/::')
+    )
+
   def test_filter_regex(self):
     self.assert_console_output(
       'common/a:a',
