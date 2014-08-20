@@ -69,6 +69,7 @@ python_test_suite(
     ':eclipse_integration',
     ':jar_publish_integration',
     ':jvm_bundle_integration',
+    ':jvm_run_integration',
     ':scala_repl_integration',
     ':protobuf_integration',
   ],
@@ -121,6 +122,16 @@ python_tests(
 python_tests(
   name = 'jvm_bundle_integration',
   sources = ['test_jvm_bundle_integration.py'],
+  dependencies = [
+    'src/python/pants/fs',
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test:int-test',
+  ],
+)
+
+python_tests(
+  name = 'jvm_run_integration',
+  sources = ['test_jvm_run_integration.py'],
   dependencies = [
     'src/python/pants/fs',
     'src/python/pants/util:contextutil',
