@@ -9,5 +9,4 @@ junit_tests(
     'testprojects/maven_layout/resource_collision/example_b/src/main/java/com/pants/duplicateres/exampleb:lib',
     'testprojects/maven_layout/resource_collision/lib/src/main/java/com/pants/duplicateres/lib',
   ],
-  exclusives={'resource_collision' : 'example_b'}
 )
