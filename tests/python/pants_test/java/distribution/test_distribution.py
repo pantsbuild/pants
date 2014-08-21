@@ -10,7 +10,7 @@ from contextlib import contextmanager
 import os
 import subprocess
 import textwrap
-import unittest
+import unittest2 as unittest
 
 import pytest
 from twitter.common.collections import maybe_list

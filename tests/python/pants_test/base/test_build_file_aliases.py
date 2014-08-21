@@ -5,7 +5,7 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-import unittest as unittest
+import unittest2 as unittest
 
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.target import Target

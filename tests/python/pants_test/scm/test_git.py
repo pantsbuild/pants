@@ -10,7 +10,7 @@ from itertools import izip_longest
 import os
 import re
 import subprocess
-import unittest
+import unittest2 as unittest
 
 import pytest
 

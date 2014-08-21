@@ -6,18 +6,10 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import os
-
-from twitter.common.lang import Compatibility
+import unittest2 as unittest
 
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_open
-
-
-if Compatibility.PY3:
-  import unittest
-else:
-  import unittest2 as unittest
-
 from pants.thrift_util import find_includes, find_root_thrifts
 
 

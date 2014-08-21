@@ -8,7 +8,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import optparse
 import pytest
 import shlex
-import unittest
+import unittest2 as unittest
 
 from pants.option.legacy_options import LegacyOptions
 

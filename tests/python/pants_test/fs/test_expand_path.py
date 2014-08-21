@@ -7,13 +7,13 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 from contextlib import contextmanager
 
 import os
-import unittest2
+import unittest2 as unittest
 
 from pants.fs.fs import expand_path
 from pants.util.contextutil import environment_as, pushd, temporary_dir
 
 
-class ExpandPathTest(unittest2.TestCase):
+class ExpandPathTest(unittest.TestCase):
   def test_pure_relative(self):
     with self.root() as root:
       self.assertEquals(os.path.join(root, 'a'), expand_path('a'))
