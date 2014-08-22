@@ -21,7 +21,7 @@ class BuildFileAddressMapperTest(BaseTest):
 
   def test_resolve(self):
     build_file = self.add_to_build_file('BUILD', dedent(
-      ''' dependencies(
+      ''' target(
         name = 'foo'
       )
       '''
@@ -35,11 +35,11 @@ class BuildFileAddressMapperTest(BaseTest):
   def test_resolve_spec(self):
     self.add_to_build_file('BUILD', dedent(
       '''
-      dependencies(
+      target(
         name = 'foozle'
       )
 
-      dependencies(
+      target(
         name = 'baz',
       )
       '''
@@ -61,7 +61,7 @@ class BuildFileAddressMapperTest(BaseTest):
 
     build_file = self.add_to_build_file('BUILD', dedent(
       '''
-      dependencies(
+      target(
         name = 'foo'
       )
       '''

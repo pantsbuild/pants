@@ -32,20 +32,20 @@ class ErrorTarget(Target):
 
 class BuildFileParserBasicsTest(BaseTest):
   def test_addressable_exceptions(self):
-    self.add_to_build_file('a/BUILD', 'dependencies()')
+    self.add_to_build_file('a/BUILD', 'target()')
     build_file_a = BuildFile(self.build_root, 'a/BUILD')
 
     with pytest.raises(Addressable.AddressableInitError):
       self.build_file_parser.parse_build_file(build_file_a)
 
-    self.add_to_build_file('b/BUILD', 'dependencies(name="foo", "bad_arg")')
+    self.add_to_build_file('b/BUILD', 'target(name="foo", "bad_arg")')
     build_file_b = BuildFile(self.build_root, 'b/BUILD')
     with pytest.raises(SyntaxError):
       self.build_file_parser.parse_build_file(build_file_b)
 
     self.add_to_build_file('d/BUILD', dedent(
       '''
-      dependencies(
+      target(
         name="foo",
         dependencies=[
           object(),

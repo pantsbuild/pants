@@ -22,7 +22,7 @@ class BaseFilterTest(ConsoleTaskTest):
   def alias_groups(self):
     return BuildFileAliases.create(
       targets={
-        'dependencies': Dependencies,
+        'target': Dependencies,
         'java_library': JavaLibrary,
         'page': Page,
         'python_library': PythonLibrary,
@@ -189,7 +189,7 @@ class FilterTest(BaseFilterTest):
     """Tests that targets outside of the context used as filters are parsed before use"""
 
     # add an additional un-injected target, and then use it as a filter
-    self.add_to_build_file("blacklist", "dependencies(name='blacklist', dependencies=['common/a'])")
+    self.add_to_build_file("blacklist", "target(name='blacklist', dependencies=['common/a'])")
 
     self.assert_console_output(
       'common/b:b',
@@ -208,7 +208,7 @@ class FilterTest(BaseFilterTest):
     """Tests filtering targets based on an ancestor not in that list of targets"""
 
     # add an additional un-injected target, and then use it as a filter
-    self.add_to_build_file("blacklist", "dependencies(name='blacklist', dependencies=['common/a'])")
+    self.add_to_build_file("blacklist", "target(name='blacklist', dependencies=['common/a'])")
 
     self.assert_console_output(
       'common/b:b',

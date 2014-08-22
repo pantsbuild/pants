@@ -88,7 +88,7 @@ class BaseTest(unittest.TestCase):
 
   @property
   def alias_groups(self):
-    return BuildFileAliases.create(targets={'dependencies': Dependencies})
+    return BuildFileAliases.create(targets={'target': Dependencies})
 
   def setUp(self):
     Goal.clear()
