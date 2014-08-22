@@ -385,7 +385,7 @@ class JarPublish(JarTask, ScmPublish):
       for repo, data in self.repos.items():
         auth = data.get('auth')
         if auth:
-          credentials = self.context.resolve(auth).next()
+          credentials = next(iter(context.resolve(auth)))
           user = credentials.username(data['resolver'])
           password = credentials.password(data['resolver'])
           self.context.log.debug('Found auth for repo=%s user=%s' % (repo, user))
