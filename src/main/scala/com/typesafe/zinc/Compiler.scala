@@ -177,7 +177,7 @@ class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler) {
   /**
    * Run a compile. The resulting analysis is also cached in memory.
    */
-  def compile(inputs: Inputs, cwd: Option[File], reporter: xsbti.Reporter)(log: Logger): Analysis = {
+  def compile(inputs: Inputs, cwd: Option[File], reporter: xsbti.Reporter, progress: Option[xsbti.compile.CompileProgress] = None)(log: Logger): Analysis = {
     import inputs._
     if (forceClean && Compiler.analysisIsEmpty(cacheFile)) Util.cleanAllClasses(classesDirectory)
     val getAnalysis: File => Option[Analysis] = analysisMap.get _
@@ -185,7 +185,6 @@ class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler) {
     val cp            = autoClasspath(classesDirectory, scalac.scalaInstance.allJars, javaOnly, classpath)
     val compileOutput = CompileOutput(classesDirectory)
     val globalsCache  = Compiler.residentCache
-    val progress      = None
     val skip          = false
     val incOpts       = incOptions.options
     val compileSetup  = new CompileSetup(compileOutput, new CompileOptions(scalacOptions, javacOptions), scalac.scalaInstance.actualVersion, compileOrder, incOpts.nameHashing)
