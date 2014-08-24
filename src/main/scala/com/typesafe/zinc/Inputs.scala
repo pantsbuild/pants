@@ -121,6 +121,20 @@ object Inputs {
     mirrorAnalysis = mirrorAnalysisCache
   )
 
+  @deprecated("Use the variant that takes `incOptions` parameter, instead.", "0.3.5.3")
+  def create(
+    classpath: JList[File],
+    sources: JList[File],
+    classesDirectory: File,
+    scalacOptions: JList[String],
+    javacOptions: JList[String],
+    analysisCache: File,
+    analysisMap: JMap[File, File],
+    compileOrder: String,
+    mirrorAnalysisCache: Boolean): Inputs =
+    create(classpath, sources, classesDirectory, scalacOptions, javacOptions,
+      analysisCache, analysisMap, compileOrder, IncOptions(), mirrorAnalysisCache)
+
   /**
    * By default the cache location is relative to the classes directory (for example, target/classes/../cache/classes).
    */
