@@ -26,7 +26,6 @@ from pants.java.util import execute_java
 from pants.util.dirutil import safe_mkdir, safe_open
 
 
-
 # TODO(ji): Add unit tests.
 # TODO(ji): Add coverage in ci.run (https://github.com/pantsbuild/pants/issues/83)
 
@@ -161,6 +160,9 @@ class _JUnitRunner(object):
       self._opts.extend(context.options.junit_run_arg)
 
   def execute(self, targets):
+    # filter out non-junit-test targets
+    targets = list(self._test_target_candidates(targets))
+
     tests = list(self._get_tests_to_run() if self._tests_to_run
                  else self._calculate_tests_from_targets(targets))
     if tests:
