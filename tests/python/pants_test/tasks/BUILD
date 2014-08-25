@@ -275,6 +275,20 @@ python_tests(
 )
 
 python_tests(
+  name = 'filedeps',
+  sources = ['test_filedeps.py'],
+  dependencies = [
+    ':base',
+    'src/python/pants/backend/core/targets:common',
+    'src/python/pants/backend/jvm/targets:java',
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/targets:scala',
+    'src/python/pants/backend/jvm/tasks:filedeps',
+    'src/python/pants/base:build_file_aliases',
+  ],
+)
+
+python_tests(
   name = 'filemap',
   sources = ['test_filemap.py'],
   dependencies = [
