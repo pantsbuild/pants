@@ -240,7 +240,7 @@ class IvyUtils(object):
         module=name,
         version='latest.integration',
         publications=None,
-        configurations=confs,
+        configurations=list(confs), # Mustache doesn't like sets.
         dependencies=dependencies,
         excludes=excludes,
         overrides=overrides)
@@ -327,7 +327,7 @@ class IvyUtils(object):
         excludes=[self._generate_exclude_template(exclude) for exclude in jar.excludes],
         transitive=jar.transitive,
         artifacts=jar.artifacts,
-        configurations=[conf for conf in jar.configurations if conf in confs])
+        configurations=list(confs))
     override = self._overrides.get((jar.org, jar.name))
     return override(template) if override else template
 
@@ -353,7 +353,7 @@ class IvyUtils(object):
     self.exec_ivy(mapdir,
                   [target],
                   ivyargs,
-                  confs=target.payload.configurations,
+                  confs=list(target.payload.configurations),
                   ivy=Bootstrapper.default_ivy(executor),
                   workunit_factory=workunit_factory,
                   workunit_name='map-jars',
@@ -406,9 +406,9 @@ class IvyUtils(object):
     ivy_args = ['-ivy', ivyxml]
 
     confs_to_resolve = confs or ['default']
+
     ivy_args.append('-confs')
     ivy_args.extend(confs_to_resolve)
-
     ivy_args.extend(args)
     if not self._transitive:
       ivy_args.append('-notransitive')
