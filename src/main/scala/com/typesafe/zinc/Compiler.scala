@@ -176,8 +176,17 @@ class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler) {
 
   /**
    * Run a compile. The resulting analysis is also cached in memory.
+   * 
+   *  Note: This variant does not report progress updates
    */
-  def compile(inputs: Inputs, cwd: Option[File], reporter: xsbti.Reporter, progress: Option[xsbti.compile.CompileProgress] = None)(log: Logger): Analysis = {
+  def compile(inputs: Inputs, cwd: Option[File], reporter: xsbti.Reporter)(log: Logger): Analysis = {
+    compile(inputs, cwd, reporter, progress = None)(log)
+  }
+
+  /**
+   * Run a compile. The resulting analysis is also cached in memory.
+   */
+  def compile(inputs: Inputs, cwd: Option[File], reporter: xsbti.Reporter, progress: Option[xsbti.compile.CompileProgress])(log: Logger): Analysis = {
     import inputs._
     if (forceClean && Compiler.analysisIsEmpty(cacheFile)) Util.cleanAllClasses(classesDirectory)
     val getAnalysis: File => Option[Analysis] = analysisMap.get _
