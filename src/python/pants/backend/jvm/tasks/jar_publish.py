@@ -25,6 +25,7 @@ from pants.backend.jvm.targets.jarable import Jarable
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.jar_task import JarTask
 from pants.base.address import Address
+from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.build_graph import sort_targets
 from pants.base.exceptions import TaskError
@@ -420,8 +421,9 @@ class JarPublish(JarTask, ScmPublish):
             return target.provides.org, target.provides.name
           except (ImportError, SyntaxError, TypeError):
             raise TaskError('Failed to parse %s' % address.build_file.relpath)
-        except IOError:
-          raise TaskError('No BUILD file could be found at %s' % coordinate)
+        except (IOError, AddressLookupError) as e:
+          raise TaskError('{message}\n  No BUILD file could be found at {coordinate}'
+          .format(message=e, coordinate=coordinate))
 
     self.overrides = {}
     if self.context.options.jar_publish_override:

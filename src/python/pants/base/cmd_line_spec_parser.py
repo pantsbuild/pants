@@ -10,6 +10,7 @@ import os
 from twitter.common.collections import maybe_list, OrderedSet
 
 from pants.base.address import BuildFileAddress, parse_spec
+from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_file import BuildFile
 
 
@@ -99,14 +100,14 @@ class CmdLineSpecParser(object):
         for build_file in BuildFile.scan_buildfiles(self._root_dir, spec_dir):
           addresses.update(self._address_mapper.addresses_in_spec_path(build_file.spec_path))
         return addresses
-      except (IOError, BuildFile.MissingBuildFileError) as e:
+      except (IOError, BuildFile.MissingBuildFileError, AddressLookupError) as e:
         raise self.BadSpecError(e)
     elif spec.endswith(':'):
       spec_path = spec[:-len(':')]
       spec_dir = normalize_spec_path(spec_path)
       try:
         return set(self._address_mapper.addresses_in_spec_path(spec_dir))
-      except (IOError, BuildFile.MissingBuildFileError) as e:
+      except (IOError,  BuildFile.MissingBuildFileError, AddressLookupError) as e:
         raise self.BadSpecError(e)
     else:
       spec_parts = spec.rsplit(':', 1)
