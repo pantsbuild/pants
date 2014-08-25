@@ -75,13 +75,10 @@ class GoalRunner(Command):
       # Here, it's possible we have a goal and target with the same name. For now, always give
       # priority to the goal, but give a warning if they might have meant the target (if the BUILD
       # file exists).
-      try:
-        BuildFile.from_cache(get_buildroot(), spec)
-        msg = (' Command-line argument "{spec}" is ambiguous, and was assumed to be a goal.'
-               ' If this is incorrect, disambiguate it with the "--" argument to separate goals'
-               ' from targets.')
-        logger.warning(msg.format(spec=spec))
-      except IOError: pass # Awesome, it's unambiguous.
+      if BuildFile.from_cache(get_buildroot(), spec, must_exist=False).exists():
+        logger.warning(' Command-line argument "{spec}" is ambiguous, and was assumed to be a '
+                       'goal.  If this is incorrect, disambiguate it with the "--" argument to '
+                       'separate goals from targets.'.format(spec=spec))
       return False
 
     for i, arg in enumerate(args):
