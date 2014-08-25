@@ -16,6 +16,11 @@ python_library(
 )
 
 python_library(
+  name = 'address_lookup_error',
+  sources = ['address_lookup_error.py'],
+)
+
+python_library(
   name = 'addressable',
   sources = ['addressable.py'],
   dependencies = [
@@ -54,6 +59,7 @@ python_library(
     '3rdparty/python:pex',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.lang',
+    ':address_lookup_error',
   ]
 )
 
@@ -62,6 +68,7 @@ python_library(
   sources = ['build_file_address_mapper.py'],
   dependencies = [
     ':address',
+    ':address_lookup_error',
     ':build_file',
     ':build_environment',
   ]
@@ -90,6 +97,7 @@ python_library(
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':address',
+    ':address_lookup_error',
   ]
 )
 

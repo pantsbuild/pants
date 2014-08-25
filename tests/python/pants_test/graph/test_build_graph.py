@@ -9,10 +9,11 @@ from contextlib import contextmanager
 import os
 import pytest
 from textwrap import dedent
-import unittest2 as unittest
 
-from pants.base.address import SyntheticAddress
+from pants.base.address import SyntheticAddress, BuildFileAddress
+from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_configuration import BuildConfiguration
+from pants.base.build_file import BuildFile
 from pants.base.build_file_parser import BuildFileParser
 from pants.base.build_graph import BuildGraph
 from pants.base.build_root import BuildRoot
@@ -200,4 +201,63 @@ class BuildGraphTest(BaseTest):
     assertWalk([c, b, a], c)
     d = self.make_target('d', dependencies=[a, c])
     assertWalk([d, a, c, b], d)
+
+  def test_lookup_exception(self):
+    """
+    There is code that depends on the fact that TransitiveLookupError is a subclass
+    of AddressLookupError
+    """
+    self.assertIsInstance(BuildGraph.TransitiveLookupError(), AddressLookupError)
+
+  def test_invalid_address(self):
+
+    with self.assertRaisesRegexp(AddressLookupError,
+                                 '^BUILD file does not exist at:.*/BUILD'):
+      self.build_graph.inject_spec_closure('//:a')
+
+    self.add_to_build_file('BUILD',
+                           'dependencies(name="a", '
+                           '  dependencies=["non-existent-path:b"],'
+                           ')')
+    with self.assertRaisesRegexp(BuildGraph.TransitiveLookupError,
+                                 '^BUILD file does not exist at:.*/non-existent-path/BUILD'
+                                 '\s+when translating spec non-existent-path:b'
+                                 '\s+referenced from :a$'):
+      self.build_graph.inject_spec_closure('//:a')
+
+  def test_invalid_address_two_hops(self):
+    self.add_to_build_file('BUILD',
+                           'dependencies(name="a", '
+                           '  dependencies=["goodpath:b"],'
+                           ')')
+    self.add_to_build_file('goodpath/BUILD',
+                           'dependencies(name="b", '
+                           '  dependencies=["non-existent-path:c"],'
+                           ')')
+    with self.assertRaisesRegexp(BuildGraph.TransitiveLookupError,
+                                 '^BUILD file does not exist at: .*/non-existent-path/BUILD'
+                                 '\s+when translating spec non-existent-path:c'
+                                 '\s+referenced from goodpath:b'
+                                 '\s+referenced from :a$'):
+      self.build_graph.inject_spec_closure('//:a')
+
+  def test_invalid_address_two_hops_same_file(self):
+    self.add_to_build_file('BUILD',
+                           'dependencies(name="a", '
+                           '  dependencies=["goodpath:b"],'
+                           ')')
+    self.add_to_build_file('goodpath/BUILD',
+                           'dependencies(name="b", '
+                           '  dependencies=[":c"],'
+                           ')\n'
+                           'dependencies(name="c", '
+                           '  dependencies=["non-existent-path:d"],'
+                           ')')
+    with self.assertRaisesRegexp(BuildGraph.TransitiveLookupError,
+                                 '^BUILD file does not exist at:.*/non-existent-path/BUILD'
+                                 '\s+when translating spec non-existent-path:d'
+                                 '\s+referenced from goodpath:c'
+                                 '\s+referenced from goodpath:b'
+                                 '\s+referenced from :a$'):
+      self.build_graph.inject_spec_closure('//:a')
 
