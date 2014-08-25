@@ -75,7 +75,7 @@ class DepmapTest(BaseDepmapTest):
         deps=deps)
       ))
 
-    add_to_build_file('common/a', 'a', 'dependencies')
+    add_to_build_file('common/a', 'a', 'target')
     add_to_build_file('common/b', 'b', 'jar_library')
     self.add_to_build_file('common/c', dedent('''
       java_library(name='c',
@@ -112,7 +112,7 @@ class DepmapTest(BaseDepmapTest):
       )
     '''))
     self.add_to_build_file('src/java/a', dedent('''
-      dependencies(
+      target(
         name='a_dep',
         dependencies=[pants(':a_java')]
       )
@@ -123,7 +123,7 @@ class DepmapTest(BaseDepmapTest):
         name='b_java',
         dependencies=[':b_dep']
       )
-      dependencies(
+      target(
         name='b_dep',
         dependencies=[':b_lib']
       )

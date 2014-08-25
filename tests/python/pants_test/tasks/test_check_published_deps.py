@@ -23,7 +23,7 @@ class CheckPublishedDepsTest(ConsoleTaskTest):
   def alias_groups(self):
     return BuildFileAliases.create(
       targets={
-        'dependencies': Dependencies,
+        'target': Dependencies,
         'jar_library': JarLibrary,
         'java_library': JavaLibrary,
         'repo': Repository,
@@ -83,7 +83,7 @@ class CheckPublishedDepsTest(ConsoleTaskTest):
         )
         '''))
     self.add_to_build_file('both/BUILD', dedent('''
-        dependencies(name='both',
+        target(name='both',
           dependencies=[
             'outdated',
             'uptodate',

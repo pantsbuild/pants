@@ -70,11 +70,11 @@ class BuildGraphTest(BaseTest):
   # TODO(Eric Ayers) This test broke during a refactoring and should be moved, removed or updated
   @pytest.mark.xfail
   def test_target_invalid(self):
-    self.add_to_build_file('a/BUILD', 'dependencies(name="a")')
+    self.add_to_build_file('a/BUILD', 'target(name="a")')
     with pytest.raises(BuildFileParser.InvalidTargetException):
       self.build_graph.inject_spec_closure('a:nope')
 
-    self.add_to_build_file('b/BUILD', 'dependencies(name="a")')
+    self.add_to_build_file('b/BUILD', 'target(name="a")')
     with pytest.raises(BuildFileParser.InvalidTargetException):
       self.build_graph.inject_spec_closure('b')
     with pytest.raises(BuildFileParser.InvalidTargetException):
@@ -216,7 +216,7 @@ class BuildGraphTest(BaseTest):
       self.build_graph.inject_spec_closure('//:a')
 
     self.add_to_build_file('BUILD',
-                           'dependencies(name="a", '
+                           'target(name="a", '
                            '  dependencies=["non-existent-path:b"],'
                            ')')
     with self.assertRaisesRegexp(BuildGraph.TransitiveLookupError,
@@ -227,11 +227,11 @@ class BuildGraphTest(BaseTest):
 
   def test_invalid_address_two_hops(self):
     self.add_to_build_file('BUILD',
-                           'dependencies(name="a", '
+                           'target(name="a", '
                            '  dependencies=["goodpath:b"],'
                            ')')
     self.add_to_build_file('goodpath/BUILD',
-                           'dependencies(name="b", '
+                           'target(name="b", '
                            '  dependencies=["non-existent-path:c"],'
                            ')')
     with self.assertRaisesRegexp(BuildGraph.TransitiveLookupError,
@@ -243,14 +243,14 @@ class BuildGraphTest(BaseTest):
 
   def test_invalid_address_two_hops_same_file(self):
     self.add_to_build_file('BUILD',
-                           'dependencies(name="a", '
+                           'target(name="a", '
                            '  dependencies=["goodpath:b"],'
                            ')')
     self.add_to_build_file('goodpath/BUILD',
-                           'dependencies(name="b", '
+                           'target(name="b", '
                            '  dependencies=[":c"],'
                            ')\n'
-                           'dependencies(name="c", '
+                           'target(name="c", '
                            '  dependencies=["non-existent-path:d"],'
                            ')')
     with self.assertRaisesRegexp(BuildGraph.TransitiveLookupError,

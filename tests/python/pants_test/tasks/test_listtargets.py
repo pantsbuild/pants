@@ -35,7 +35,7 @@ class ListTargetsTest(BaseListTargetsTest):
   def alias_groups(self):
     return BuildFileAliases.create(
       targets={
-        'dependencies': Dependencies,
+        'target': Dependencies,
         'java_library': JavaLibrary,
         'repo': Repository,
       },
@@ -82,7 +82,7 @@ class ListTargetsTest(BaseListTargetsTest):
     create_library('a/b/d')
     create_library('a/b/e', Lib('e1'))
     self.add_to_build_file('f', dedent('''
-        dependencies(
+        target(
           name='alias',
           dependencies=[
             pants('a/b/c:c3'),
