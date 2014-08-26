@@ -7,6 +7,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from pants.backend.core.wrapped_globs import Globs
 from pants.backend.jvm.targets.java_library import JavaLibrary
+from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_file_aliases import BuildFileAliases
 from pants_test.base_test import BaseTest
 
@@ -50,34 +51,33 @@ class FilesetRelPathWrapperTest(BaseTest):
     self.add_to_build_file('y/BUILD', 'java_library(name="y", sources=globs("dir/**/*.scala"))')
     self.context().scan(self.build_root)
 
-
-    # This is no longer allowed.
+  # This is no longer allowed.
   def test_parent_dir_glob(self):
     self.add_to_build_file('y/BUILD', 'java_library(name="y", sources=globs("../*.scala"))')
-    with self.assertRaises(ValueError):
+    with self.assertRaises(AddressLookupError):
       self.context().scan(self.build_root)
 
   def test_parent_dir_glob_question(self):
     self.add_to_build_file('y/BUILD', 'java_library(name="y", sources=globs("../?.scala"))')
-    with self.assertRaises(ValueError):
+    with self.assertRaises(AddressLookupError):
       self.context().scan(self.build_root)
 
   def test_parent_dir_bracket_glob_question(self):
     self.add_to_build_file('y/BUILD', 'java_library(name="y", sources=globs("../[dir1, dir2]/?.scala"))')
-    with self.assertRaises(ValueError):
+    with self.assertRaises(AddressLookupError):
       self.context().scan(self.build_root)
 
   def test_parent_dir_bracket(self):
     self.add_to_build_file('y/BUILD', 'java_library(name="y", sources=globs("../[dir1, dir2]/File.scala"))')
-    with self.assertRaises(ValueError):
+    with self.assertRaises(AddressLookupError):
       self.context().scan(self.build_root)
 
   def test_absolute_dir_glob(self):
     self.add_to_build_file('y/BUILD', 'java_library(name="y", sources=globs("/root/*.scala"))')
-    with self.assertRaises(ValueError):
+    with self.assertRaises(AddressLookupError):
       self.context().scan(self.build_root)
 
   def test_absolute_dir_glob_question(self):
     self.add_to_build_file('y/BUILD', 'java_library(name="y", sources=globs("/root/?.scala"))')
-    with self.assertRaises(ValueError):
+    with self.assertRaises(AddressLookupError):
       self.context().scan(self.build_root)
