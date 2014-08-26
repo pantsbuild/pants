@@ -70,7 +70,7 @@ class TaskBase(AbstractClass):
     self.context = context
     self._workdir = workdir
     self._cache_key_generator = CacheKeyGenerator(
-        context.config.getdefault('cache_key_gen_version', default=None))
+        context.config.getdefault('cache_key_gen_version', default='200'))
     self._read_artifact_cache_spec = None
     self._write_artifact_cache_spec = None
     self._artifact_cache = None

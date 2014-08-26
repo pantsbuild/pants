@@ -196,7 +196,7 @@ def safe_args(args,
   :param delete: If True deletes any arg files created upon exit from this context; defaults to
     True.
   """
-  max_args = max_args or (config or Config.load()).getdefault('max_subprocess_args', int, 10)
+  max_args = max_args or (config or Config.load()).getdefault('max_subprocess_args', int, 100)
   if len(args) > max_args:
     def create_argfile(fp):
       fp.write(delimiter.join(args))

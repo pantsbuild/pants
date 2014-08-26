@@ -136,7 +136,7 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
     self.checkstyle_suppression_files = self.context.config.getdefault(
       'checkstyle_suppression_files', type=list, default=[]
     )
-    self.debug_port = self.context.config.getint('ide', 'debug_port')
+    self.debug_port = self.context.config.getint('ide', 'debug_port', default=5005)
 
     self.checkstyle_bootstrap_key = 'checkstyle'
     checkstyle = self.context.config.getlist('checkstyle', 'bootstrap-tools',
