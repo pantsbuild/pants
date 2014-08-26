@@ -99,7 +99,7 @@ jar_library(name='protobuf-java',
 
 jar_library(name='protobuf-test-import',
   jars = [
-    jar(org='com.squareup.testing.protolib', name='protolib-test', rev='1.0'),
+    jar(org='com.squareup.testing.protolib', name='protolib-test', rev='1.0.1'),
   ],
 )
 
