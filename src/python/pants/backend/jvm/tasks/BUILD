@@ -190,13 +190,11 @@ python_library(
   name = 'filedeps',
   sources = ['filedeps.py'],
   dependencies = [
-    ':common',
-    'src/python/pants/base:address',
-    'src/python/pants/base:build_environment',
     'src/python/pants/backend/core/tasks:console_task',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/backend/core/targets:common',
+    'src/python/pants/base:build_environment',
   ],
 )
 

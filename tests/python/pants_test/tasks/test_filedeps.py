@@ -46,6 +46,8 @@ class FileDepsTest(ConsoleTaskTest):
   def setUp(self):
     super(FileDepsTest, self).setUp()
 
+    # TODO(John Sirois): Rationalize much of this target emission setup.  Lots of tests do similar
+    # things: https://github.com/pantsbuild/pants/issues/525
     def create_target(path, definition, sources=None):
       if sources:
         self.create_files(path, sources)

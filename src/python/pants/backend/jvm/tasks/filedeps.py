@@ -11,7 +11,6 @@ import os
 from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.backend.jvm.targets.jvm_binary import JvmApp
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
-from pants.base.address import BuildFileAddress
 from pants.base.build_environment import get_buildroot
 
 
@@ -24,7 +23,7 @@ class FileDeps(ConsoleTask):
   """
 
   def console_output(self, targets):
-    # TODO(John Sirois): This hacks around ScalaLibraries' psuedo-deps on JavaLibraries - we've
+    # TODO(John Sirois): This hacks around ScalaLibraries' psuedo-deps on JavaLibraries.  We've
     # already tried to tuck away this hack by subclassing closure() in ScalaLibrary - but in this
     # case that's not enough when a ScalaLibrary with java_sources is an interior node of the
     # active context graph.  This awkwardness should be eliminated when ScalaLibrary can point
@@ -38,8 +37,7 @@ class FileDeps(ConsoleTask):
     buildroot = get_buildroot()
     files = set()
     for target in all_targets:
-      if isinstance(target.address, BuildFileAddress):
-        files.add(target.address.build_file.full_path)
+      files.add(target.concrete_derived_from.address.build_file.full_path)
       if target.has_sources():
         files.update(os.path.join(buildroot, src)
                      for src in target.sources_relative_to_buildroot())
