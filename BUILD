@@ -2,13 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 # Pants source code
-source_root('src/java', jvm_binary, java_library, page)
 source_root('src/python', page, python_binary, python_library, resources)
 
 # Pants test code
-source_root('tests/java', java_library, junit_tests, page)
 source_root('tests/python', page, python_library, python_tests, python_test_suite, python_binary, resources)
-
 
 # TODO(Eric Ayers) Find a way to reduce  source_root() invocations.  The declarations in
 # 'testprojects' and 'examples' are repetitive.
