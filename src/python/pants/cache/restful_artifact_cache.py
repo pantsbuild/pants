@@ -40,6 +40,10 @@ class RESTfulArtifactCache(ArtifactCache):
     self._path_prefix = parsed_url.path.rstrip('/')
     self.compress = compress
 
+    # To enable connection reuse, all requests must be created from same session.
+    # TODO: Re-evaluate session's life-cycle if/when a longer-lived pants process exists.
+    self._session = requests.Session()
+
     # Reduce the somewhat verbose logging of requests.
     # TODO do this in a central place
     logging.getLogger('requests').setLevel(logging.WARNING)
@@ -109,13 +113,13 @@ class RESTfulArtifactCache(ArtifactCache):
     try:
       response = None
       if 'PUT' == method:
-        response = requests.put(url, data=body, timeout=self._timeout_secs)
+        response = self._session.put(url, data=body, timeout=self._timeout_secs)
       elif 'GET' == method:
-        response = requests.get(url, timeout=self._timeout_secs, stream=True)
+        response = self._session.get(url, timeout=self._timeout_secs, stream=True)
       elif 'HEAD' == method:
-        response = requests.head(url, timeout=self._timeout_secs)
+        response = self._session.head(url, timeout=self._timeout_secs)
       elif 'DELETE' == method:
-        response = requests.delete(url, timeout=self._timeout_secs)
+        response = self._session.delete(url, timeout=self._timeout_secs)
       else:
         raise ValueError('Unknown request method %s' % method)
 
