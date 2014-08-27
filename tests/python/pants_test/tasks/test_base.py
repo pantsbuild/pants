@@ -162,7 +162,7 @@ class ConsoleTaskTest(TaskTest):
                         build_file_parser=self.build_file_parser,
                         address_mapper=self.address_mapper,
                         workspace=workspace)
-    return list(task.console_output(list(targets or ()) + list(extra_targets or ())))
+    return list(task.console_output(list(task.context.targets()) + list(extra_targets or ())))
 
   def assert_entries(self, sep, *output, **kwargs):
     """Verifies the expected output text is flushed by the console task under test.
