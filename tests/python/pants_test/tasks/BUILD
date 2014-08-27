@@ -279,6 +279,7 @@ python_tests(
   sources = ['test_filedeps.py'],
   dependencies = [
     ':base',
+    'src/python/pants/backend/codegen/targets:java',
     'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',

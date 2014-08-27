@@ -23,24 +23,24 @@ class FileDeps(ConsoleTask):
   """
 
   def console_output(self, targets):
-    # TODO(John Sirois): This hacks around ScalaLibraries' psuedo-deps on JavaLibraries.  We've
-    # already tried to tuck away this hack by subclassing closure() in ScalaLibrary - but in this
-    # case that's not enough when a ScalaLibrary with java_sources is an interior node of the
-    # active context graph.  This awkwardness should be eliminated when ScalaLibrary can point
-    # to a java source set as part of its 1st class sources.
-    all_targets = set()
+    concrete_targets = set()
     for target in targets:
-      all_targets.add(target)
-      if isinstance(target, ScalaLibrary):
-        all_targets.update(target.java_sources)
+      concrete_target = target.concrete_derived_from
+      concrete_targets.add(concrete_target)
+      # TODO(John Sirois): This hacks around ScalaLibraries' psuedo-deps on JavaLibraries.  We've
+      # already tried to tuck away this hack by subclassing closure() in ScalaLibrary - but in this
+      # case that's not enough when a ScalaLibrary with java_sources is an interior node of the
+      # active context graph.  This awkwardness should be eliminated when ScalaLibrary can point
+      # to a java source set as part of its 1st class sources.
+      if isinstance(concrete_target, ScalaLibrary):
+        concrete_targets.update(concrete_target.java_sources)
 
     buildroot = get_buildroot()
     files = set()
-    for target in all_targets:
-      files.add(target.concrete_derived_from.address.build_file.full_path)
+    for target in concrete_targets:
+      files.add(target.address.build_file.full_path)
       if target.has_sources():
-        files.update(os.path.join(buildroot, src)
-                     for src in target.sources_relative_to_buildroot())
+        files.update(os.path.join(buildroot, src) for src in target.sources_relative_to_buildroot())
       # TODO(John Sirois): BundlePayload should expose its sources in a way uniform to
       # SourcesPayload to allow this special-casing to go away.
       if isinstance(target, JvmApp):

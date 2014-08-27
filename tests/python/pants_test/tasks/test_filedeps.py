@@ -8,6 +8,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import os
 from textwrap import dedent
 
+from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
 from pants.backend.core.targets.resources import Resources
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
@@ -32,6 +33,7 @@ class FileDepsTest(ConsoleTaskTest):
       targets={
         'jar_library': JarLibrary,
         'java_library': JavaLibrary,
+        'java_thrift_library': JavaThriftLibrary,
         'jvm_binary': JvmBinary,
         'jvm_app': JvmApp,
         'resources': Resources,
@@ -110,6 +112,17 @@ class FileDepsTest(ConsoleTaskTest):
                   '''),
                   sources=['data.json'])
 
+    create_target(path='src/thrift/storage',
+                  definition=dedent('''
+                    java_thrift_library(
+                      name='storage',
+                      sources=[
+                        'data_types.thrift'
+                      ]
+                    )
+                  '''),
+                  sources=['src/thrift/storage/data_types.thrift'])
+
     create_target(path='src/java/lib',
                   definition=dedent('''
                     java_library(
@@ -118,7 +131,8 @@ class FileDepsTest(ConsoleTaskTest):
                         'lib1.java'
                       ],
                       dependencies=[
-                        'src/scala/core'
+                        'src/scala/core',
+                        'src/thrift/storage'
                       ],
                       resources=[
                         'src/resources/lib'
@@ -126,6 +140,17 @@ class FileDepsTest(ConsoleTaskTest):
                     )
                   '''),
                   sources=['lib1.java'])
+
+    # Derive a synthetic target from the src/thrift/storage thrift target as-if doing code-gen.
+    self.create_file('.pants.d/gen/thrift/java/storage/Angle.java')
+    self.make_target(spec='.pants.d/gen/thrift/java/storage',
+                     target_type=JavaLibrary,
+                     derived_from=self.target('src/thrift/storage'),
+                     sources=['Angle.java'])
+    synthetic_java_lib = self.target('.pants.d/gen/thrift/java/storage')
+
+    java_lib = self.target('src/java/lib')
+    java_lib.inject_dependency(synthetic_java_lib.address)
 
     create_target(path='src/java/bin',
                   definition=dedent('''
@@ -151,6 +176,7 @@ class FileDepsTest(ConsoleTaskTest):
                     )
                   '''),
                   sources=['config/app.yaml'])
+
 
   def test_resources(self):
     self.assert_console_output(
@@ -181,6 +207,23 @@ class FileDepsTest(ConsoleTaskTest):
       targets=[self.target('src/java/core')]
     )
 
+  def test_concrete_only(self):
+    self.assert_console_output(
+      'tools/BUILD',
+      'src/java/lib/BUILD',
+      'src/java/lib/lib1.java',
+      'src/thrift/storage/BUILD',
+      'src/thrift/storage/data_types.thrift',
+      'src/resources/lib/BUILD',
+      'src/resources/lib/data.json',
+      'src/scala/core/BUILD',
+      'src/scala/core/core1.scala',
+      'src/java/core/BUILD',
+      'src/java/core/core1.java',
+      'src/java/core/core2.java',
+      targets=[self.target('src/java/lib')]
+    )
+
   def test_jvm_app(self):
     self.assert_console_output(
       'tools/BUILD',
@@ -190,6 +233,8 @@ class FileDepsTest(ConsoleTaskTest):
       'src/java/bin/main.java',
       'src/java/lib/BUILD',
       'src/java/lib/lib1.java',
+      'src/thrift/storage/BUILD',
+      'src/thrift/storage/data_types.thrift',
       'src/resources/lib/BUILD',
       'src/resources/lib/data.json',
       'src/scala/core/BUILD',
