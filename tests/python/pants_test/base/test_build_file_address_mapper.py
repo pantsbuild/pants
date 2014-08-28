@@ -51,14 +51,14 @@ class BuildFileAddressMapperTest(BaseTest):
     dependencies_addressable = self.address_mapper.resolve_spec('//:foozle')
     self.assertEqual(dependencies_addressable.target_type, Dependencies)
 
-  def test_raises_address_lookup_error(self):
+  def test_raises_invalid_build_file_reference(self):
     # reference a BUILD file that doesn't exist
-    self.assertIsInstance(BuildFileAddressMapper.InvalidBuildFileReference(), AddressLookupError)
     with self.assertRaisesRegexp(BuildFileAddressMapper.InvalidBuildFileReference,
                                  '^BUILD file does not exist at: .*/non-existent-path'
                                  '\s+when translating spec //non-existent-path:a'):
       self.address_mapper.spec_to_address('//non-existent-path:a')
 
+  def test_raises_address_not_in_build_file(self):
     build_file = self.add_to_build_file('BUILD', dedent(
       '''
       target(
@@ -68,8 +68,21 @@ class BuildFileAddressMapperTest(BaseTest):
     ))
 
     # Create an address that doesn't exist in an existing BUILD file
-    self.assertIsInstance(BuildFileAddressMapper.AddressNotInBuildFile(), AddressLookupError)
     address = BuildFileAddress(build_file, 'bar')
     with self.assertRaises(BuildFileAddressMapper.AddressNotInBuildFile):
       self.address_mapper.resolve(address)
 
+  def test_raises_address_invalid_address_error(self):
+    with self.assertRaises(BuildFileAddressMapper.InvalidAddressError):
+      self.address_mapper.resolve_spec("../foo")
+
+  def test_raises_empty_build_file_error(self):
+    self.add_to_build_file('BUILD', 'pass')
+    with self.assertRaises(BuildFileAddressMapper.EmptyBuildFileError):
+      self.address_mapper.resolve_spec('//:foo')
+
+  def test_address_lookup_error_hierarcy(self):
+    self.assertIsInstance(BuildFileAddressMapper.AddressNotInBuildFile(), AddressLookupError)
+    self.assertIsInstance(BuildFileAddressMapper.EmptyBuildFileError(), AddressLookupError)
+    self.assertIsInstance(BuildFileAddressMapper.InvalidBuildFileReference(), AddressLookupError)
+    self.assertIsInstance(BuildFileAddressMapper.InvalidAddressError(), AddressLookupError)
