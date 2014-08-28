@@ -11,6 +11,7 @@ from tempfile import mkdtemp
 from textwrap import dedent
 import unittest2 as unittest
 
+from pants.backend.core.tasks.check_exclusives import ExclusivesMapping
 from pants.backend.core.targets.dependencies import Dependencies
 from pants.base.address import SyntheticAddress
 from pants.base.build_file_address_mapper import BuildFileAddressMapper
@@ -192,3 +193,21 @@ class BaseTest(unittest.TestCase):
           for buildfile in buildfiles:
             touch(os.path.join(root_dir, buildfile))
           yield os.path.realpath(root_dir)
+
+  def populate_exclusive_groups(self, context, key=None, classpaths=None, target_predicate=None):
+    """
+    Helps actual test cases to populate the "exclusives_groups" products data mapping
+    in the context, which holds the classpath values for targets.
+
+    :param context: The execution context where the products data mapping lives.
+    :param key: key for list of classpaths in the "exclusives_groups" data mapping.
+      None is the default value for most common cases.
+    :param classpaths: a list of classpath strings. If not specified, ['none'] will be used.
+    :param target_predicate: filter predicate for the context.targets(). For most common test
+      cases, None value is good enough.
+    """
+    exclusives_mapping = ExclusivesMapping(context)
+    exclusives_mapping.set_base_classpath_for_group(
+      key or '<none>', [('default', entry) for entry in classpaths or ['none']])
+    exclusives_mapping._populate_target_maps(context.targets(target_predicate))
+    context.products.safe_create_data('exclusives_groups', lambda: exclusives_mapping)

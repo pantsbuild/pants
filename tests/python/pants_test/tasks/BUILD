@@ -566,7 +566,6 @@ python_tests(
   sources = ['test_jvm_run.py'],
   dependencies = [
     ':base',
-    'src/python/pants/backend/core/tasks:check_exclusives',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:jvm_run',
     'src/python/pants/engine',
