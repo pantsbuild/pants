@@ -41,6 +41,18 @@ ${HERE}/../../pants goal builddict --print-exception-stacktrace || \
   die "Failed to generate the 'BUILD Dictionary'."
 cp dist/builddict/*.rst src/python/pants/docs/
 
+# invoke newfangled docsite generator
+${HERE}/../../pants goal markdown :: || \
+  die "Failed to generate HTML from markdown'."
+
+(
+  activate_pants_venv && \
+  python src/python/pants/docs/docsitegen.py src/python/pants/docs/docsite.yaml
+) || die "Failed to generate the doc site."
+
+# TODO HEY BEGIN
+if [[ "false" = "true" ]]; then
+
 (
   activate_pants_venv && \
   cd src/python/pants/docs && \
@@ -72,4 +84,7 @@ continue."
     do_open ${url}/index.html
   ) || die "Publish to ${url} failed."
 fi
+
+fi
+# TODO HEY END
 
