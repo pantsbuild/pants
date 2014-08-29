@@ -9,22 +9,46 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 from pants.base.address import BuildFileAddress, parse_spec, SyntheticAddress
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_file import BuildFile
+from pants.base.build_file_parser import BuildFileParser
 from pants.base.build_environment import get_buildroot
 
+
+# Note: Significant effort has been made to keep the types BuildFile, BuildGraph, Address, and
+# Target separated appropriately.  The BuildFileAddressMapper is intended to have knowledge
+# of just BuildFile, BuildFileParser and Address.
+#
+# Here are some guidelines to help maintain this abstraction:
+#  - Use the terminology 'address' instead of 'target' in symbols and user messages
+#  - Wrap exceptions from BuildFile and BuildFileParser with a subclass of AddressLookupError
+#     so that callers do not have to reference those modules
+#
+# Note: 'spec' should not be a user visible term, substitute 'address' instead.
 
 class BuildFileAddressMapper(object):
   """Maps addresses in the pants virtual address space to corresponding BUILD file declarations.
   """
 
   class AddressNotInBuildFile(AddressLookupError):
-    """ Raised when a target name cannot be found in an existing BUILD file.
-    """
+    """ Raised when an address cannot be found in an existing BUILD file."""
     pass
 
-  class InvalidBuildFileReference(AddressLookupError):
-    """ Raised when a BUILD file does not exist at the address referenced.
-    """
+
+  class EmptyBuildFileError(AddressLookupError):
+    """Raised if no addresses are defined in a BUILD file."""
     pass
+
+
+  class InvalidBuildFileReference(AddressLookupError):
+    """ Raised when a BUILD file does not exist at the address referenced."""
+    pass
+
+
+  class InvalidAddressError(AddressLookupError):
+    """ Raised when an address cannot be parsed."""
+    pass
+
+  class BuildFileScanError(AddressLookupError):
+    """ Raised when a problem was encountered scanning a tree of BUILD files."""
 
   def __init__(self, build_file_parser):
     self._build_file_parser = build_file_parser
@@ -34,6 +58,54 @@ class BuildFileAddressMapper(object):
   def root_dir(self):
     return self._build_file_parser._root_dir
 
+  def _raise_incorrect_address_error(self, build_file, wrong_target_name, targets):
+    """Search through the list of targets and return those which originate from the same folder
+    which wrong_target_name resides in.
+
+    :raises: A helpful error message listing possible correct target addresses.
+    """
+    def path_parts(build):  # Gets a tuple of directory, filename.
+      build = str(build)
+      slash = build.rfind('/')
+      if slash < 0:
+        return '', build
+      return build[:slash], build[slash+1:]
+
+    def are_siblings(a, b):  # Are the targets in the same directory?
+      return path_parts(a)[0] == path_parts(b)[0]
+
+    valid_specs = []
+    all_same = True
+    # Iterate through all addresses, saving those which are similar to the wrong address.
+    for target in targets:
+      if are_siblings(target.build_file, build_file):
+        possibility = (path_parts(target.build_file)[1], target.spec[target.spec.rfind(':'):])
+        # Keep track of whether there are multiple BUILD files or just one.
+        if all_same and valid_specs and possibility[0] != valid_specs[0][0]:
+          all_same = False
+        valid_specs.append(possibility)
+
+    # Trim out BUILD extensions if there's only one anyway; no need to be redundant.
+    if all_same:
+      valid_specs = [('', tail) for head, tail in valid_specs]
+    # Might be neat to sort by edit distance or something, but for now alphabetical is fine.
+    valid_specs = [''.join(pair) for pair in sorted(valid_specs)]
+
+    # Give different error messages depending on whether BUILD file was empty.
+    if valid_specs:
+      one_of = ' one of' if len(valid_specs) > 1 else '' # Handle plurality, just for UX.
+      raise self.AddressNotInBuildFile(
+        '{target_name} was not found in BUILD file {build_file}. Perhaps you '
+        'meant{one_of}: \n  {specs}'.format(target_name=wrong_target_name,
+                                             build_file=build_file,
+                                             one_of=one_of,
+                                             specs='\n  '.join(valid_specs)))
+    # There were no targets in the BUILD file.
+    raise self.EmptyBuildFileError(
+      ':{target_name} was not found in BUILD file {build_file}, because that '
+      'BUILD file contains no addressable entities.'.format(target_name=wrong_target_name,
+                                                             build_file=build_file))
+
   def resolve(self, address):
     """Maps an address in the virtual address space to an object.
     :param Address address: the address to lookup in a BUILD file
@@ -42,15 +114,17 @@ class BuildFileAddressMapper(object):
     """
     address_map = self.address_map_from_spec_path(address.spec_path)
     if address not in address_map:
-      raise self.AddressNotInBuildFile(
-        "Target name '{target_name}' not found in BUILD file in {spec_path}"
-        .format(target_name=address.target_name, spec_path=address.spec_path))
+      build_file = BuildFile.from_cache(self.root_dir, address.spec_path, must_exist=False)
+      self._raise_incorrect_address_error(build_file, address.target_name, address_map)
     else:
       return address_map[address]
 
   def resolve_spec(self, spec):
     """Converts a spec to an address and maps it using `resolve`"""
-    address = SyntheticAddress.parse(spec)
+    try:
+      address = SyntheticAddress.parse(spec)
+    except ValueError as e:
+      raise self.InvalidAddressError(e)
     return self.resolve(address)
 
   def address_map_from_spec_path(self, spec_path):
@@ -59,7 +133,11 @@ class BuildFileAddressMapper(object):
     :returns {Address: <resolved Object>}:
     """
     if spec_path not in self._spec_path_to_address_map_map:
-      address_map = self._build_file_parser.address_map_from_spec_path(spec_path)
+      try:
+        address_map = self._build_file_parser.address_map_from_spec_path(spec_path)
+      except BuildFileParser.BuildFileParserError as e:
+        raise AddressLookupError("{message}\n Loading addresses from '{spec_path}' failed."
+                                  .format(message=e, spec_path=spec_path))
       self._spec_path_to_address_map_map[spec_path] = address_map
     return self._spec_path_to_address_map_map[spec_path]
 
@@ -76,7 +154,7 @@ class BuildFileAddressMapper(object):
     spec_path, name = parse_spec(spec, relative_to=relative_to)
     try:
       build_file = BuildFile.from_cache(self.root_dir, spec_path)
-    except BuildFile.MissingBuildFileError as e:
+    except BuildFile.BuildFileError as e:
       raise self.InvalidBuildFileReference('{message}\n  when translating spec {spec}'
                                            .format(message=e, spec=spec))
     return BuildFileAddress(build_file, name)
@@ -91,12 +169,17 @@ class BuildFileAddressMapper(object):
 
   def scan_addresses(self, root=None):
     """Recursively gathers all addresses visible under `root` of the virtual address space.
-
+    :raises AddressLookupError: if there is a problem parsing a BUILD file
     :param path root: defaults to the root directory of the pants project.
     """
     addresses = set()
-    for build_file in BuildFile.scan_buildfiles(root or get_buildroot()):
-      for address in self.addresses_in_spec_path(build_file.spec_path):
-        addresses.add(address)
+    root = root or get_buildroot()
+    try:
+      for build_file in BuildFile.scan_buildfiles(root):
+        for address in self.addresses_in_spec_path(build_file.spec_path):
+          addresses.add(address)
+    except BuildFile.BuildFileError as e:
+      # Handle exception from BuildFile out of paranoia.  Currently, there is no way to trigger it.
+      raise self.BuildFileScanError("{message}\n while scanning BUILD files in '{root}'."
+                                    .format(message=e, root=root))
     return addresses
-

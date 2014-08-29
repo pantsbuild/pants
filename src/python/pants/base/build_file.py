@@ -18,10 +18,21 @@ from twitter.common.collections import OrderedSet
 logger = logging.getLogger(__name__)
 
 
+# Note: Significant effort has been made to keep the types BuildFile, BuildGraph, Address, and
+# Target separated appropriately.  Don't add references to those other types to this module.
+
 class BuildFile(object):
 
-  class MissingBuildFileError(Exception):
+  class BuildFileError(Exception):
+    """Base class for all exceptions raised in BuildFile to make exception handling easier"""
+    pass
+
+  class MissingBuildFileError(BuildFileError):
     """Raised when a BUILD file cannot be found at the path in the spec."""
+    pass
+
+  class InvalidRootDirError(BuildFileError):
+    """Raised when the root_dir specified to a BUILD file is not valid."""
     pass
 
   _BUILD_FILE_PREFIX = 'BUILD'
@@ -76,8 +87,8 @@ class BuildFile(object):
     """
 
     if not os.path.isabs(root_dir):
-      raise IOError('BuildFile root_dir {root_dir} must be an absolute path.'
-                    .format(root_dir=root_dir))
+      raise self.InvalidRootDirError('BuildFile root_dir {root_dir} must be an absolute path.'
+                                     .format(root_dir=root_dir))
 
     path = os.path.join(root_dir, relpath) if relpath else root_dir
     self._build_basename = BuildFile._BUILD_FILE_PREFIX

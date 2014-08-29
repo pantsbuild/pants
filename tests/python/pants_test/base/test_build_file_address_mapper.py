@@ -5,6 +5,7 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+import os
 from textwrap import dedent
 
 from pants.backend.core.targets.dependencies import Dependencies
@@ -14,6 +15,10 @@ from pants.base.build_file_address_mapper import BuildFileAddressMapper
 
 from pants_test.base_test import BaseTest
 
+
+# TODO(Eric Ayers) There are methods in BuildFileAdressMapper that are missing
+# expicit unit tests: address_map_from_spec_path, addresses_in_spec_path,
+# spec_to_address, spec_to_addresses
 
 class BuildFileAddressMapperTest(BaseTest):
   def setUp(self):
@@ -51,14 +56,25 @@ class BuildFileAddressMapperTest(BaseTest):
     dependencies_addressable = self.address_mapper.resolve_spec('//:foozle')
     self.assertEqual(dependencies_addressable.target_type, Dependencies)
 
-  def test_raises_address_lookup_error(self):
+  def test_scan_addresses(self):
+    root_build_file = self.add_to_build_file('BUILD', 'target(name="foo")')
+    subdir_build_file = self.add_to_build_file('subdir/BUILD', 'target(name="bar")')
+    subdir_suffix_build_file = self.add_to_build_file('subdir/BUILD.suffix', 'target(name="baz")')
+    with open(os.path.join(self.build_root, 'BUILD.invalid.suffix'), 'w') as invalid_build_file:
+      invalid_build_file.write('target(name="foobar")')
+    self.assertEquals(set([BuildFileAddress(root_build_file, 'foo'),
+                           BuildFileAddress(subdir_build_file, 'bar'),
+                           BuildFileAddress(subdir_suffix_build_file, 'baz')]),
+                      self.address_mapper.scan_addresses(root=self.build_root))
+
+  def test_raises_invalid_build_file_reference(self):
     # reference a BUILD file that doesn't exist
-    self.assertIsInstance(BuildFileAddressMapper.InvalidBuildFileReference(), AddressLookupError)
     with self.assertRaisesRegexp(BuildFileAddressMapper.InvalidBuildFileReference,
                                  '^BUILD file does not exist at: .*/non-existent-path'
                                  '\s+when translating spec //non-existent-path:a'):
       self.address_mapper.spec_to_address('//non-existent-path:a')
 
+  def test_raises_address_not_in_build_file(self):
     build_file = self.add_to_build_file('BUILD', dedent(
       '''
       target(
@@ -68,8 +84,23 @@ class BuildFileAddressMapperTest(BaseTest):
     ))
 
     # Create an address that doesn't exist in an existing BUILD file
-    self.assertIsInstance(BuildFileAddressMapper.AddressNotInBuildFile(), AddressLookupError)
     address = BuildFileAddress(build_file, 'bar')
     with self.assertRaises(BuildFileAddressMapper.AddressNotInBuildFile):
       self.address_mapper.resolve(address)
+
+  def test_raises_address_invalid_address_error(self):
+    with self.assertRaises(BuildFileAddressMapper.InvalidAddressError):
+      self.address_mapper.resolve_spec("../foo")
+
+  def test_raises_empty_build_file_error(self):
+    self.add_to_build_file('BUILD', 'pass')
+    with self.assertRaises(BuildFileAddressMapper.EmptyBuildFileError):
+      self.address_mapper.resolve_spec('//:foo')
+
+  def test_address_lookup_error_hierarcy(self):
+    self.assertIsInstance(BuildFileAddressMapper.AddressNotInBuildFile(), AddressLookupError)
+    self.assertIsInstance(BuildFileAddressMapper.EmptyBuildFileError(), AddressLookupError)
+    self.assertIsInstance(BuildFileAddressMapper.InvalidBuildFileReference(), AddressLookupError)
+    self.assertIsInstance(BuildFileAddressMapper.InvalidAddressError(), AddressLookupError)
+    self.assertIsInstance(BuildFileAddressMapper.BuildFileScanError(), AddressLookupError)
 

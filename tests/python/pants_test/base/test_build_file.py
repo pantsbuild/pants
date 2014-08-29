@@ -165,3 +165,15 @@ class BuildFileTest(unittest.TestCase):
       BuildFileTest.buildfile('grandparent/parent/child1/BUILD.twitter'),
       BuildFileTest.buildfile('grandparent/parent/child2/child3/BUILD'),
       ]), buildfiles)
+
+  def test_invalid_root_dir_error(self):
+    BuildFileTest.touch('BUILD')
+    with self.assertRaises(BuildFile.InvalidRootDirError):
+      BuildFile('tmp', 'grandparent/BUILD')
+
+  def test_exception_class_hierarchy(self):
+    """Exception handling code depends on the fact that all exceptions from BuildFile are
+    subclassed from the BuildFileError base class.
+    """
+    self.assertIsInstance(BuildFile.InvalidRootDirError(), BuildFile.BuildFileError)
+    self.assertIsInstance(BuildFile.MissingBuildFileError(), BuildFile.BuildFileError)

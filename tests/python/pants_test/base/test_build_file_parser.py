@@ -16,14 +16,14 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.base.address import BuildFileAddress
-from pants.base.addressable import Addressable
 from pants.base.build_file import BuildFile
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.build_file_parser import BuildFileParser
-from pants.base.exceptions import TargetDefinitionException
 from pants.base.target import Target
 from pants_test.base_test import BaseTest
 
+# TODO(Eric Ayers) Explicit unit tests are missing for registered_alises, parse_spec,
+# parse_build_file_family
 
 class ErrorTarget(Target):
   def __init__(self, *args, **kwargs):
@@ -35,12 +35,12 @@ class BuildFileParserBasicsTest(BaseTest):
     self.add_to_build_file('a/BUILD', 'target()')
     build_file_a = BuildFile(self.build_root, 'a/BUILD')
 
-    with pytest.raises(Addressable.AddressableInitError):
+    with pytest.raises(BuildFileParser.ExecuteError):
       self.build_file_parser.parse_build_file(build_file_a)
 
     self.add_to_build_file('b/BUILD', 'target(name="foo", "bad_arg")')
     build_file_b = BuildFile(self.build_root, 'b/BUILD')
-    with pytest.raises(SyntaxError):
+    with pytest.raises(BuildFileParser.BuildFileParserError):
       self.build_file_parser.parse_build_file(build_file_b)
 
     self.add_to_build_file('d/BUILD', dedent(
@@ -54,7 +54,7 @@ class BuildFileParserBasicsTest(BaseTest):
       '''
     ))
     build_file_d = BuildFile(self.build_root, 'd/BUILD')
-    with pytest.raises(TargetDefinitionException):
+    with pytest.raises(BuildFileParser.BuildFileParserError):
       self.build_file_parser.parse_build_file(build_file_d)
 
   def test_noop_parse(self):
@@ -128,7 +128,7 @@ class BuildFileParserTargetTest(BaseTest):
     self.add_to_build_file('BUILD', 'fake(name="foo")\n')
     self.add_to_build_file('BUILD', 'fake(name="foo")\n')
 
-    with pytest.raises(BuildFileParser.TargetConflictException):
+    with pytest.raises(BuildFileParser.AddressableConflictException):
       base_build_file = BuildFile(self.build_root, 'BUILD')
       self.build_file_parser.parse_build_file(base_build_file)
 
@@ -268,3 +268,80 @@ class BuildFileParserExposedContextAwareObjectFactoryTest(BaseTest):
     self.assertEqual(targets_created['create-java-libraries-scala'], ScalaLibrary)
 
     self.assertEqual(set(['3rdparty/baz']), self._paths)
+
+  def test_raises_build_file_scan_error(self):
+    with self.assertRaises(BuildFileParser.BuildFileScanError):
+      self.build_file_parser.address_map_from_spec_path('non-existent-path')
+
+  def test_raises_parse_error(self):
+    self.add_to_build_file('BUILD', 'foo(name = = "baz")')
+    build_file = BuildFile(self.build_root, 'BUILD')
+    with self.assertRaises(BuildFileParser.ParseError):
+      self.build_file_parser.parse_build_file(build_file)
+
+    # Test some corner cases for the context printing
+
+    # Error at beginning of BUILD file
+    build_file = self.add_to_build_file('begin/BUILD', dedent('''
+      *?&INVALID! = 'foo'
+      target(
+        name='bar',
+        dependencies= [
+          ':baz',
+        ],
+      )
+      '''))
+    with self.assertRaises(BuildFileParser.ParseError):
+      self.build_file_parser.parse_build_file(build_file)
+
+    # Error at end of BUILD file
+    build_file = self.add_to_build_file('end/BUILD', dedent('''
+      target(
+        name='bar',
+        dependencies= [
+          ':baz',
+        ],
+      )
+      *?&INVALID! = 'foo'
+      '''))
+    with self.assertRaises(BuildFileParser.ParseError):
+      self.build_file_parser.parse_build_file(build_file)
+
+    # Error in the middle of BUILD file > 6 lines
+    build_file = self.add_to_build_file('middle/BUILD', dedent('''
+      target(
+        name='bar',
+
+              *?&INVALID! = 'foo'
+
+        dependencies = [
+          ':baz',
+        ],
+      )
+      '''))
+    with self.assertRaises(BuildFileParser.ParseError):
+      self.build_file_parser.parse_build_file(build_file)
+
+    # Error in very short build file.
+    build_file = self.add_to_build_file('short/BUILD', dedent('''
+      target(name='bar', dependencies = [':baz'],) *?&INVALID! = 'foo'
+      '''))
+    with self.assertRaises(BuildFileParser.ParseError):
+      self.build_file_parser.parse_build_file(build_file)
+
+  def test_raises_execute_error(self):
+    self.add_to_build_file('BUILD', 'undefined_alias(name="baz")')
+    build_file = BuildFile(self.build_root, 'BUILD')
+    with self.assertRaises(BuildFileParser.ExecuteError):
+      self.build_file_parser.parse_build_file(build_file)
+
+
+  def test_build_file_parser_error_hierarcy(self):
+    """Exception handling code depends on the fact that all explicit exceptions from BuildFileParser are
+   subclassed from the BuildFileParserError base class.
+   """
+    self.assertIsInstance(BuildFileParser.BuildFileScanError(), BuildFileParser.BuildFileParserError)
+    self.assertIsInstance(BuildFileParser.AddressableConflictException(), BuildFileParser.BuildFileParserError)
+    self.assertIsInstance(BuildFileParser.SiblingConflictException(), BuildFileParser.BuildFileParserError)
+    self.assertIsInstance(BuildFileParser.ParseError(), BuildFileParser.BuildFileParserError)
+    self.assertIsInstance(BuildFileParser.ExecuteError(), BuildFileParser.BuildFileParserError)

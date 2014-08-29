@@ -27,6 +27,8 @@ from pants.backend.jvm.tasks.jar_task import JarTask
 from pants.base.address import Address
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_environment import get_buildroot, get_scm
+from pants.base.build_file import BuildFile
+from pants.base.build_file_parser import BuildFileParser
 from pants.base.build_graph import sort_targets
 from pants.base.exceptions import TaskError
 from pants.base.generator import Generator, TemplateData
@@ -408,21 +410,20 @@ class JarPublish(JarTask, ScmPublish):
         return org, name
       else:
         try:
-          address = Address.parse(get_buildroot(), coordinate)  # TODO: This is broken.
-          try:
-            target = Target.get(address)
-            if not target:
-              siblings = Target.get_all_addresses(address.build_file)
-              prompt = 'did you mean' if len(siblings) == 1 else 'maybe you meant one of these'
-              raise TaskError('%s => %s?:\n    %s' % (address, prompt,
-                                                      '\n    '.join(str(a) for a in siblings)))
-            if not target.is_exported:
-              raise TaskError('%s is not an exported target' % coordinate)
-            return target.provides.org, target.provides.name
-          except (ImportError, SyntaxError, TypeError):
-            raise TaskError('Failed to parse %s' % address.build_file.relpath)
-        except (IOError, AddressLookupError) as e:
-          raise TaskError('{message}\n  No BUILD file could be found at {coordinate}'
+          # TODO(Eric Ayers) This code is suspect.  Target.get() is a very old method and almost certainly broken.
+          # Refactor to use methods from BuildGraph or BuildFileAddressMapper
+          address = Address.parse(get_buildroot(), coordinate)
+          target = Target.get(address)
+          if not target:
+            siblings = Target.get_all_addresses(address.build_file)
+            prompt = 'did you mean' if len(siblings) == 1 else 'maybe you meant one of these'
+            raise TaskError('%s => %s?:\n    %s' % (address, prompt,
+                                                    '\n    '.join(str(a) for a in siblings)))
+          if not target.is_exported:
+            raise TaskError('%s is not an exported target' % coordinate)
+          return target.provides.org, target.provides.name
+        except (BuildFile.BuildFileError, BuildFileParser.BuildFileParserError, AddressLookupError) as e:
+          raise TaskError('{message}\n  Problem with BUILD file  at {coordinate}'
           .format(message=e, coordinate=coordinate))
 
     self.overrides = {}
