@@ -10,9 +10,11 @@ import os
 
 from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.backend.core.targets.dependencies import Dependencies
+from pants.backend.core.targets.resources import Resources
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+
 
 # Changing the behavior of this task may affect the IntelliJ Pants plugin
 # Please add fkorotkov or ajohnson to reviews for this file
@@ -21,6 +23,18 @@ class Depmap(ConsoleTask):
   """Generates either a textual dependency tree or a graphviz digraph dot file for the dependency
   set of a target.
   """
+  class IntelliJConstants(object):
+    """Defines IntelliJ constand defined here
+    'http://grepcode.com/file_/repository.grepcode.com/java/ext/com.jetbrains/intellij-idea/13.0.0
+    /com/intellij/openapi/externalSystem/model/project/ExternalSystemSourceType.java/?v=source'
+    """
+    SOURCE = 'SOURCE'
+    TEST = 'TEST'
+    SOURCE_GENERATED = 'SOURCE_GENERATED'
+    TEST_GENERATED = 'TEST_GENERATED'
+    EXCLUDED = 'EXCLUDED'
+    RESOURCE = 'RESOURCE'
+    TEST_RESOURCE = 'TEST_RESOURCE'
 
   @staticmethod
   def _is_jvm(dep):
@@ -28,7 +42,6 @@ class Depmap(ConsoleTask):
 
   @staticmethod
   def _jar_id(jar):
-    #return '{0}:{1}:{2}'.format(jar.org, jar.name, jar.rev) if jar.rev else '{0}:{1}'.format(jar.org, jar.name)
     if jar.rev:
       return '{0}:{1}:{2}'.format(jar.org, jar.name, jar.rev)
     else:
@@ -88,7 +101,6 @@ class Depmap(ConsoleTask):
                             dest="depmap_is_formatted",
                             default=True,
                             help='Causes project-info output to be a single line of JSON')
-
 
   def __init__(self, *args, **kwargs):
     super(Depmap, self).__init__(*args, **kwargs)
@@ -192,7 +204,7 @@ class Depmap(ConsoleTask):
         fmt = '  "%(id)s" [style=filled, fillcolor="%(color)d"];'
       else:
         fmt = '  "%(id)s" [style=filled, fillcolor="%(color)d", shape=ellipse];'
-      if not color_by_type.has_key(type(dep)):
+      if type(dep) not in color_by_type:
         color_by_type[type(dep)] = len(color_by_type.keys()) + 1
       return fmt % {'id': dep_id, 'color': color_by_type[type(dep)]}
 
@@ -233,26 +245,39 @@ class Depmap(ConsoleTask):
 
   def project_info_output(self, targets):
     targets_map = {}
+    resource_target_map = {}
 
     def process_target(current_target):
       """
       :type current_target:pants.base.target.Target
       """
+      def get_target_type(target):
+        if target.is_test:
+          return Depmap.IntelliJConstants.TEST
+        else:
+          if isinstance(target, Resources) and resource_target_map[target].is_test:
+            return Depmap.IntelliJConstants.TEST_RESOURCE
+          elif isinstance(target, Resources):
+            return Depmap.IntelliJConstants.RESOURCE
+          else:
+            return Depmap.IntelliJConstants.SOURCE
 
       info = {
         'targets': [],
         'libraries': [],
         'roots': [],
-        'test_target': current_target.is_test
+        'target_type': get_target_type(current_target)
       }
 
       for dep in current_target.dependencies:
         if dep.is_java or dep.is_jar_library or dep.is_jvm or dep.is_scala or dep.is_scalac_plugin:
           info['targets'].append(self._address(dep.address))
-
         if dep.is_jar_library:
           for jar in dep.jar_dependencies:
             info['libraries'].append(self._jar_id(jar))
+        if isinstance(dep, Resources):
+          info['targets'].append(self._address(dep.address))
+          resource_target_map[dep] = current_target
 
       roots = list(set(
         [os.path.dirname(source) for source in current_target.sources_relative_to_source_root()]
@@ -284,4 +309,3 @@ class Depmap(ConsoleTask):
       for module in dep.modules_by_ref.values():
         mapping[self._jar_id(module.ref)] = [artifact.path for artifact in module.artifacts]
     return mapping
-

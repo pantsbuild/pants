@@ -74,6 +74,7 @@ class BaseTest(unittest.TestCase):
                   spec='',
                   target_type=Target,
                   dependencies=None,
+                  resources = None,
                   derived_from=None,
                   **kwargs):
     address = SyntheticAddress.parse(spec)
@@ -82,6 +83,8 @@ class BaseTest(unittest.TestCase):
                          build_graph=self.build_graph,
                          **kwargs)
     dependencies = dependencies or []
+    dependencies.extend(resources or [])
+
     self.build_graph.inject_target(target,
                                    dependencies=[dep.address for dep in dependencies],
                                    derived_from=derived_from)

@@ -9,6 +9,7 @@ from textwrap import dedent
 
 from pants.backend.core.register import build_file_aliases as register_core
 from pants.backend.core.targets.dependencies import Dependencies
+from pants.backend.core.targets.resources import Resources
 from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
@@ -300,11 +301,18 @@ class ProjectInfoTest(ConsoleTaskTest):
       sources=['this/is/a/source/Foo.scala', 'this/is/a/source/Bar.scala'],
     )
 
+    test_resource = self.make_target(
+      'project_info:test_resource',
+      target_type=Resources,
+      sources=['y_resource', 'z_resource'],
+    )
+
     self.make_target(
       'project_info:java_test',
       target_type=JavaTests,
       dependencies=[second],
-      sources=['this/is/a/test/source/FooTest.scala']
+      sources=['this/is/a/test/source/FooTest.scala'],
+      resources=[test_resource],
     )
 
     jvm_binary = self.make_target(
@@ -316,7 +324,20 @@ class ProjectInfoTest(ConsoleTaskTest):
     self.make_target(
       'project_info:top_dependency',
       target_type=Dependencies,
-      dependencies=[jvm_binary]
+      dependencies=[jvm_binary],
+    )
+
+    src_resource = self.make_target(
+      'project_info:resource',
+      target_type=Resources,
+      sources=['a_resource', 'b_resource'],
+    )
+
+    self.make_target(
+        'project_info:target_type',
+        target_type=ScalaLibrary,
+        dependencies=[jvm_binary],
+        resources=[src_resource],
     )
 
   def test_without_dependencies(self):
@@ -331,38 +352,47 @@ class ProjectInfoTest(ConsoleTaskTest):
       args=['--test-project-info'],
       targets=[self.target('project_info:third')]
     ))
-    self.assertEqual(['org.apache:apache-jar:12.12.2012'], result['targets']['project_info:third']['libraries'])
+    self.assertEqual(['org.apache:apache-jar:12.12.2012'],
+                     result['targets']['project_info:third']['libraries'])
 
   def test_jvm_app(self):
     result = get_json(self.execute_console_task(
       args=['--test-project-info'],
       targets=[self.target('project_info:jvm_app')]
     ))
-    self.assertEqual(['org.apache:apache-jar:12.12.2012'], result['targets']['project_info:jvm_app']['libraries'])
+    self.assertEqual(['org.apache:apache-jar:12.12.2012'],
+                     result['targets']['project_info:jvm_app']['libraries'])
 
   def test_jvm_target(self):
     result = get_json(self.execute_console_task(
       args=['--test-project-info'],
       targets=[self.target('project_info:jvm_target')]
     ))
-    self.assertIn('/this/is/a', result['targets']['project_info:jvm_target']['roots'][0]['source_root'])
-    self.assertEqual('this.is.a.source', result['targets']['project_info:jvm_target']['roots'][0]['package_prefix'])
-    self.assertEqual(['org.apache:apache-jar:12.12.2012'], result['targets']['project_info:jvm_target']['libraries'])
+    self.assertIn('/this/is/a',
+                  result['targets']['project_info:jvm_target']['roots'][0]['source_root'])
+    self.assertEqual('this.is.a.source',
+                     result['targets']['project_info:jvm_target']['roots'][0]['package_prefix'])
+    self.assertEqual(['org.apache:apache-jar:12.12.2012'],
+                     result['targets']['project_info:jvm_target']['libraries'])
 
   def test_java_test(self):
     result = get_json(self.execute_console_task(
       args=['--test-project-info'],
       targets=[self.target('project_info:java_test')]
     ))
-    self.assertEqual(True, result['targets']['project_info:java_test']['test_target'])
-    self.assertEqual(['org.apache:apache-jar:12.12.2012'], result['targets']['project_info:java_test']['libraries'])
+    self.assertEqual('TEST', result['targets']['project_info:java_test']['target_type'])
+    self.assertEqual(['org.apache:apache-jar:12.12.2012'],
+                     result['targets']['project_info:java_test']['libraries'])
+    self.assertEqual('TEST_RESOURCE',
+                     result['targets']['project_info:test_resource']['target_type'])
 
   def test_jvm_binary(self):
     result = get_json(self.execute_console_task(
       args=['--test-project-info'],
       targets=[self.target('project_info:jvm_binary')]
     ))
-    self.assertEqual(['org.apache:apache-jar:12.12.2012'], result['targets']['project_info:jvm_binary']['libraries'])
+    self.assertEqual(['org.apache:apache-jar:12.12.2012'],
+                     result['targets']['project_info:jvm_binary']['libraries'])
 
   def test_top_dependency(self):
     result = get_json(self.execute_console_task(
@@ -370,7 +400,8 @@ class ProjectInfoTest(ConsoleTaskTest):
       targets=[self.target('project_info:top_dependency')]
     ))
     self.assertEqual([], result['targets']['project_info:top_dependency']['libraries'])
-    self.assertEqual(['project_info:jvm_binary'], result['targets']['project_info:top_dependency']['targets'])
+    self.assertEqual(['project_info:jvm_binary'],
+                     result['targets']['project_info:top_dependency']['targets'])
 
   def test_format_flag(self):
     result = self.execute_console_task(
@@ -379,6 +410,15 @@ class ProjectInfoTest(ConsoleTaskTest):
     )
     # confirms only one line of output, which is what -format should produce
     self.assertEqual(1, len(result))
+
+  def test_target_types(self):
+    result = get_json(self.execute_console_task(
+      args=['--test-project-info'],
+      targets=[self.target('project_info:target_type')]
+    ))
+    self.assertEqual('SOURCE',
+                     result['targets']['project_info:target_type']['target_type'])
+    self.assertEqual('RESOURCE', result['targets']['project_info:resource']['target_type'])
 
 
 def get_json(lines):
