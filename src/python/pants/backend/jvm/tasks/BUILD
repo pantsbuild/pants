@@ -352,6 +352,7 @@ python_library(
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/tasks:jvm_tool_task_mixin',
     'src/python/pants:binary_util',
+    'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
   ],
 )

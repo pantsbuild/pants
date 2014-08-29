@@ -7,7 +7,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import os
 
-from pants.backend.core.tasks.check_exclusives import ExclusivesMapping
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.tasks.jvm_run import JvmRun
 from pants.engine.round_manager import RoundManager
@@ -24,7 +23,7 @@ class JvmRunTest(BaseTest):
     round_manager = RoundManager(jvm_run.context)
     jvm_run.prepare(round_manager)
 
-    self.prepare_exclusives(jvm_run.context, classpath=['bob', 'fred'])
+    self.populate_exclusive_groups(context=jvm_run.context, classpaths=['bob', 'fred'])
 
     with temporary_dir() as pwd:
       with pushd(pwd):
@@ -36,12 +35,3 @@ class JvmRunTest(BaseTest):
           contents = fp.read()
           expected_suffix = 'java -cp bob:fred com.pants.Binary'
           self.assertEquals(expected_suffix, contents[-len(expected_suffix):])
-
-  def prepare_exclusives(self, context, key=None, classpath=None):
-    # TODO(John Sirois): Push this prep up into a test helper - its too much detail to replicate
-    # in tasks needing a classpath.
-    exclusives_mapping = ExclusivesMapping(context)
-    exclusives_mapping.set_base_classpath_for_group(
-        key or '<none>', [('default', entry) for entry in classpath or ['none']])
-    exclusives_mapping._populate_target_maps(context.targets())
-    context.products.safe_create_data('exclusives_groups', lambda: exclusives_mapping)

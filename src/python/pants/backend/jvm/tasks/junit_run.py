@@ -12,7 +12,6 @@ import os
 import sys
 
 from twitter.common.collections import OrderedSet
-from twitter.common.contextutil import temporary_file
 from twitter.common.dirutil import safe_delete, safe_rmtree
 
 from pants import binary_util
@@ -23,6 +22,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit
 from pants.java.util import execute_java
+from pants.util.contextutil import temporary_file
 from pants.util.dirutil import safe_mkdir, safe_open
 
 
@@ -160,17 +160,24 @@ class _JUnitRunner(object):
       self._opts.extend(context.options.junit_run_arg)
 
   def execute(self, targets):
-    # filter out non-junit-test targets
-    targets = list(self._test_target_candidates(targets))
-
+    # For running the junit tests, we're only interested in
+    # java_tests/junit_tests targets.
+    #
+    # But if coverage options are specified, the original
+    # behavior is that in addition to the junit runs, the coverage
+    # tools would also look into additional targets such as sources.
+    #
+    # Thus, we filter out the non-java-tests targets first but
+    # keep the original targets set intact for coverages.
+    java_tests_targets = list(self._test_target_candidates(targets))
     tests = list(self._get_tests_to_run() if self._tests_to_run
-                 else self._calculate_tests_from_targets(targets))
+                 else self._calculate_tests_from_targets(java_tests_targets))
     if tests:
       bootstrapped_cp = self._task_exports.tool_classpath(self._junit_bootstrap_key)
       junit_classpath = self._task_exports.classpath(
         cp=bootstrapped_cp,
         confs=self._context.config.getlist('junit-run', 'confs', default=['default']),
-        exclusives_classpath=self._task_exports.get_base_classpath_for_target(targets[0]))
+        exclusives_classpath=self._task_exports.get_base_classpath_for_target(java_tests_targets[0]))
 
       self._context.lock.release()
       self.instrument(targets, tests, junit_classpath)
@@ -178,7 +185,7 @@ class _JUnitRunner(object):
       def report():
         self.report(targets, tests, junit_classpath)
       try:
-        self.run(targets, tests, junit_classpath)
+        self.run(tests, junit_classpath)
       except TaskError:
         report()
         raise
@@ -192,10 +199,16 @@ class _JUnitRunner(object):
 
     pass
 
-  def run(self, targets, tests, junit_classpath):
+  def run(self, tests, junit_classpath):
     """Run the tests in the appropriate environment.
 
-    Subclasses should override this if they need more work done."""
+    Subclasses should override this if they need more work done.
+
+    :param tests: an iterable that contains all the test class names
+      extracted from the testing targets.
+    :param junit_classpath: the collective classpath value under which
+      the junit will be executed.
+    """
 
     self._run_tests(tests, junit_classpath, JUnitRun._MAIN, jvm_args=None)
 
@@ -350,7 +363,7 @@ class _Coverage(_JUnitRunner):
     pass
 
   @abstractmethod
-  def run(self, targets, tests, junit_classpath):
+  def run(self, tests, junit_classpath):
     pass
 
   @abstractmethod
@@ -412,7 +425,7 @@ class Emma(_Coverage):
         raise TaskError("java %s ... exited non-zero (%i)"
                         " 'failed to instrument'" % (main, result))
 
-  def run(self, targets, tests, junit_classpath):
+  def run(self, tests, junit_classpath):
     self._run_tests(tests,
                     [self._coverage_instrument_dir] + junit_classpath + self._emma_classpath,
                     JUnitRun._MAIN,
@@ -531,7 +544,7 @@ class Cobertura(_Coverage):
         raise TaskError("java %s ... exited non-zero (%i)"
                         " 'failed to instrument'" % (main, result))
 
-  def run(self, targets, tests, junit_classpath):
+  def run(self, tests, junit_classpath):
     self._run_tests(tests,
                     self._cobertura_classpath + junit_classpath,
                     JUnitRun._MAIN,

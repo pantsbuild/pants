@@ -2,9 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_test_suite(
-  name = 'backend',
+  name = 'jvm',
   dependencies = [
-    'tests/python/pants_test/backend/core',
-    'tests/python/pants_test/backend/jvm',
+    'tests/python/pants_test/backend/jvm/tasks',
   ]
 )
