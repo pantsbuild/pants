@@ -1,0 +1,23 @@
+# sources: dict of html pages to generate, with source of each
+sources:
+  index: .pants.d/markdown/markdown/html/_.readme.html
+  hello: .pants.d/markdown/markdown/html/_examples.src.java.com.pants.examples.hello.main.readme.html
+  subdir/testproject: .pants.d/markdown/markdown/html/_testprojects.src.java.com.pants.testproject.page.readme.html
+
+# tree: site-wide outline. used for table of contents and "breadcrumbs"
+tree:
+- page: index
+  children:
+  - page: hello
+  - page: testproject
+
+# outdir: where to write out the site
+outdir: dist/docsite/
+
+# extras: dict of files to copy into site
+extras:
+  s.css: src/python/pants/docs/docsite.css
+  logo.ico: src/python/pants/docs/pants-logo.ico
+
+# template: applied to html pages
+template: src/python/pants/docs/docsite.mustache

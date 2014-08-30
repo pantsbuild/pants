@@ -42,7 +42,7 @@ ${HERE}/../../pants goal builddict --print-exception-stacktrace || \
 cp dist/builddict/*.rst src/python/pants/docs/
 
 # invoke newfangled docsite generator
-${HERE}/../../pants goal markdown :: || \
+${HERE}/../../pants goal markdown --markdown-fragment :: || \
   die "Failed to generate HTML from markdown'."
 
 (
