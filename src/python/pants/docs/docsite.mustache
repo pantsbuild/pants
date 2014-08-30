@@ -10,9 +10,21 @@
 </head>
 
 <body>
+
 <div class="mainflow">
-  {{{body_html}}}
-</div> <!-- mainflow -->
+<nav class="breadcrumbs">
+<ul>
+{{#breadcrumbs}}
+<li><a href="{{link}}">{{title}}</a>
+{{/breadcrumbs}}
+</ul>
+</nav>
+
+<!-- main content start -->
+{{{body_html}}}
+<!-- main content end -->
+
+</div> <!-- end of mainflow -->
 </body>
 </html>
 

@@ -58,17 +58,63 @@ def fixup_internal_links(config, soups):
 
 def transform_soups(config, soups):
   """Mutate our soups to be better when we write them out later."""
+  # TODO: plenty more to do here.
   fixup_internal_links(config, soups)
+
+
+def get_parentage(config):
+  """Returns a dictionary: the "parent" page of each page.
+
+  E.g. you'd expect parentage[subsection_2_3_4] to be section_2_3.
+  """
+  parentage = {}
+  def recurse(tree, parent):
+    for node in tree:
+      if 'page' in node and parent is not None:
+        parentage[node['page']] = parent
+      if 'children' in node:
+        if 'page' in node:
+          recurse(node['children'], node['page'])
+        else:
+          recurse(node['children'], parent)
+  recurse(config['tree'], None)
+  return parentage
+
 
 def get_title(soup):
   if soup.title: return soup.title.string
   if soup.h1: return soup.h1.string
   return ''
 
-def render_html(config, dst, soup):
+def get_breadcrumbs(src, config, soups):
+  """Return list of "breadcrumbs" for navigation.
+
+  E.g., if the "top page" is index.html and dst is subsection_2_3_4.html, you
+  might expect [index, chapter_2, section_2_3, subsection_2_3_4]
+  """
+  parentage = get_parentage(config)
+  breadcrumbs = []
+  node = src
+  src_dir = os.path.dirname(src)
+  while node != 'index':
+    soup = soups[node]
+    title = get_title(soup)
+    link = os.path.relpath(node + '.html', src_dir)
+    breadcrumbs.append({'link': link, 'title': title})
+    if not node in parentage: break
+    node = parentage[node]
+  breadcrumbs.append({'link': os.path.relpath('index.html', src_dir),
+                      'title': get_title(soups['index'])})
+  breadcrumbs.reverse()
+  return breadcrumbs
+
+
+def render_html(dst, config, soups):
+  soup = soups[dst]
   template = open(config['template']).read().encode('utf8')
   renderer = pystache.Renderer()
   title = get_title(soup) or dst
+  breadcrumbs = get_breadcrumbs(dst, config, soups)
   topdots = ('../' * dst.count('/'))
   if soup.body:
     body_html = soup.body.prettify()
@@ -76,18 +122,19 @@ def render_html(config, dst, soup):
     body_html = soup.prettify()
   html = renderer.render(template,
                          body_html=body_html,
+                         breadcrumbs=breadcrumbs,
                          title=title,
                          topdots=topdots)
   return html
 
 def write_en_pages(config, soups):
   outdir = config['outdir']
-  for dst, soup in soups.items():
+  for dst in soups:
     dst_path = os.path.join(outdir, dst + ".html")
     dst_dir = os.path.dirname(dst_path)
     if not os.path.isdir(dst_dir):
       os.makedirs(dst_dir)
-    html = render_html(config, dst, soup)
+    html = render_html(dst, config, soups)
     f = open(dst_path, 'w')
     f.write(html.encode('utf8'))
     f.close()

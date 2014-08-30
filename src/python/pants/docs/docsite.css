@@ -1,3 +1,34 @@
 body {
-  background: CornflowerBlue;
+  background-color: #eee;
+  color: #111;
+  font-family: sans-serif;
+}
+.mainflow {
+  margin: 64px 2% 40em 30%;
+}
+
+nav.breadcrumbs ul {
+  margin: 0px; padding: 0px;
+}
+
+nav.breadcrumbs ul li {
+  display: inline;
+  list-style-type: none;
+}
+
+nav.breadcrumbs ul li:before {
+  content: " ← ";
+}
+
+nav.breadcrumbs ul li:first-child:before {
+  content: none;
+}
+
+nav.breadcrumbs ul li a {
+  text-decoration: none;
+  background-color: #ddd;
+}
+
+nav.breadcrumbs ul li a:hover {
+  background-color: #fff;
 }
