@@ -15,12 +15,22 @@
     ga('create', 'UA-39101739-2', 'auto');
     ga('send', 'pageview');
 
-    // Show the travis-ci status graphic
+    // Show the travis-ci status graphic.
     $('.wy-breadcrumbs').append(
-      '<div style="float: right;">' +
-      '<a href="https://travis-ci.org/pantsbuild/pants">' +
-      '<img src="https://travis-ci.org/pantsbuild/pants.png?branch=master">' +
-      '</a></div>');
+      '<div style="float: right; padding: 1px;">' +
+        '<a href="https://travis-ci.org/pantsbuild/pants">' +
+          '<img src="https://travis-ci.org/pantsbuild/pants.png?branch=master">' +
+        '</a>' +
+      '</div>');
+
+    // Show the coveralls status graphic.
+    $('.wy-breadcrumbs').append(
+      '<div style="float: right; padding: 1px;">' +
+        '<a href="https://coveralls.io/r/pantsbuild/pants?branch=master">' +
+          '<img src="https://coveralls.io/repos/pantsbuild/pants/badge.png?branch=master"' +
+          '     alt="Coverage Status">' +
+        '</a>' +
+      '</div>');
   });
 </script>
 <style type="text/css">
