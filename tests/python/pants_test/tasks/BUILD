@@ -57,21 +57,22 @@ python_test_suite(
     ':sorttargets',
     ':targets_help',
     ':what_changed',
-    'tests/python/pants_test/tasks/jvm_compile'
+    'tests/python/pants_test/tasks/jvm_compile/scala'
   ],
 )
 
 python_test_suite(
   name = 'integration',
   dependencies = [
+    ':eclipse_integration',
     ':ensime_integration',
     ':idea_integration',
-    ':eclipse_integration',
     ':jar_publish_integration',
     ':jvm_bundle_integration',
     ':jvm_run_integration',
-    ':scala_repl_integration',
     ':protobuf_integration',
+    ':scala_repl_integration',
+    'tests/python/pants_test/tasks/jvm_compile/java',
   ],
 )
 
