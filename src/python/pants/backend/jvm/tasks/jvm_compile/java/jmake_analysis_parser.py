@@ -5,9 +5,9 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from collections import defaultdict
 import os
 import re
-from collections import defaultdict
 
 from pants.base.build_environment import get_buildroot
 from pants.backend.jvm.tasks.jvm_compile.analysis_parser import AnalysisParser, ParseError

@@ -42,6 +42,7 @@ python_library(
   sources = globs('java/*.py'),
   dependencies = [
     ':analysis',
+    ':analysis_parser',
     ':analysis_tools',
     ':jvm_compile',
     'src/python/pants/base:build_environment',
