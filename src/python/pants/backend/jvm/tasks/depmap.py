@@ -5,6 +5,7 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 from collections import defaultdict
+import itertools
 import json
 import os
 
@@ -12,6 +13,7 @@ from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.backend.core.targets.dependencies import Dependencies
 from pants.backend.core.targets.resources import Resources
 from pants.backend.jvm.targets.jar_dependency import JarDependency
+from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 
@@ -279,9 +281,15 @@ class Depmap(ConsoleTask):
           info['targets'].append(self._address(dep.address))
           resource_target_map[dep] = current_target
 
-      roots = list(set(
-        [os.path.dirname(source) for source in current_target.sources_relative_to_source_root()]
+      java_sources_targets = list(current_target.java_sources) if isinstance(current_target, ScalaLibrary) else list()
+      """
+      :type java_sources_targets:list[pants.base.target.Target]
+      """
+
+      roots = set(itertools.chain(
+        *[self._sources_for_target(t) for t in java_sources_targets + [current_target]]
       ))
+
       info['roots'] = map(lambda source: {
         'source_root': os.path.join(get_buildroot(), current_target.target_base, source),
         'package_prefix': source.replace(os.sep, '.')
@@ -309,3 +317,11 @@ class Depmap(ConsoleTask):
       for module in dep.modules_by_ref.values():
         mapping[self._jar_id(module.ref)] = [artifact.path for artifact in module.artifacts]
     return mapping
+
+  @staticmethod
+  def _sources_for_target(target):
+    """
+    :type target:pants.base.target.Target
+    """
+    return [os.path.dirname(source) for source in target.sources_relative_to_source_root()]
+
