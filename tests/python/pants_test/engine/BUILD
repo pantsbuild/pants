@@ -5,9 +5,8 @@ python_library(
   name = 'engine_test_base',
   sources = ['base_engine_test.py'],
   dependencies = [
-    'tests/python/pants_test:base_test',
-    'tests/python/pants_test/base:context_utils',
     'src/python/pants/goal',
+    'src/python/pants/goal:task_registrar',
   ]
 )
 
@@ -24,8 +23,9 @@ python_tests(
   sources = ['test_engine.py'],
   dependencies = [
     ':engine_test_base',
-    '3rdparty/python:mox',
+    'src/python/pants/base:exceptions',
     'src/python/pants/engine',
+    'tests/python/pants_test/base:context_utils',
   ],
 )
 
@@ -36,5 +36,6 @@ python_tests(
     ':engine_test_base',
     'src/python/pants/engine',
     'src/python/pants/backend/core/tasks:common',
+    'tests/python/pants_test:base_test',
   ],
 )
