@@ -52,6 +52,11 @@ DEFAULT_COVERAGE_CONFIG = b"""
 branch = True
 timid = True
 
+;NB: The debug config below is useful when debugging coverage issues.
+;debug =
+;  config
+;  trace
+
 [report]
 exclude_lines =
     def __repr__
@@ -59,6 +64,7 @@ exclude_lines =
 
 ignore_errors = True
 """
+
 
 def generate_coverage_config(targets):
   cp = configparser.ConfigParser()
@@ -135,7 +141,7 @@ class PythonTestBuilder(object):
     return args
 
   @staticmethod
-  def cov_setup(targets):
+  def cov_setup(targets, coverage_modules=None):
     cp = generate_coverage_config(targets)
     with temporary_file(cleanup=False) as fp:
       cp.write(fp)
@@ -145,15 +151,18 @@ class PythonTestBuilder(object):
       if target.coverage:
         return target.coverage
       else:
-        # This technically makes the assumption that tests/python/<target> will be testing
-        # src/python/<target>.  To change to honest measurements, do target.walk() here instead,
-        # however this results in very useless and noisy coverage reports.
-        # Note in particular that this doesn't work for pants's own tests, as those are under
+        # This makes the assumption that tests/python/<target> will be testing src/python/<target>.
+        # Note in particular that this doesn't work for pants' own tests, as those are under
         # the top level package 'pants_tests', rather than just 'pants'.
+        # TODO(John Sirois): consider failing fast if there is no explicit coverage scheme; but also
+        # consider supporting configuration of a global scheme whether that be parallel
+        # dirs/packages or some arbitrary function that can be registered that takes a test target
+        # and hands back the source packages or paths under test.
         return set(os.path.dirname(source).replace(os.sep, '.')
                    for source in target.sources_relative_to_source_root())
 
-    coverage_modules = set(itertools.chain(*[compute_coverage_modules(t) for t in targets]))
+    if coverage_modules is None:
+      coverage_modules = set(itertools.chain(*[compute_coverage_modules(t) for t in targets]))
     args = ['-p', 'pytest_cov',
             '--cov-config', filename,
             '--cov-report', 'html',
@@ -164,7 +173,6 @@ class PythonTestBuilder(object):
 
   def _run_python_tests(self, targets, stdout, stderr):
     coverage_rc = None
-    coverage_enabled = 'PANTS_PY_COVERAGE' in os.environ
 
     try:
       builder = PEXBuilder(interpreter=self.interpreter)
@@ -181,8 +189,39 @@ class PythonTestBuilder(object):
       test_args = []
       test_args.extend(PythonTestBuilder.generate_junit_args(targets))
       test_args.extend(self.args)
-      if coverage_enabled:
-        coverage_rc, args = self.cov_setup(targets)
+
+      coverage_modules = None
+      coverage = os.environ.get('PANTS_PY_COVERAGE')
+      if coverage is not None:
+        def read_coverage_list(prefix):
+          return coverage[len(prefix):].split(',')
+
+        if coverage.startswith('modules:'):
+          # NB: pytest-cov maps these modules to the `[run] sources` config.  So for
+          # `modules:pants.base,pants.util` the config emitted has:
+          # [run]
+          # source =
+          #   pants.base
+          #   pants.util
+          #
+          # Now even though these are not paths, coverage sees the dots and switches to a module
+          # prefix-matching mode.  Unfortunately, neither wildcards nor top-level module prefixes
+          # like `pants.` serve to engage this module prefix-matching as one might hope.  It appears
+          # that `pants.` is treated as a path and `pants.*` is treated as a literal module prefix
+          # name.
+          coverage_modules = read_coverage_list('modules:')
+        elif coverage.startswith('paths:'):
+          coverage_modules = []
+          for path in read_coverage_list('paths:'):
+            if os.path.isfile(path):
+              raise ValueError('Coverage paths cannot be files, they can only be dirs. '
+                               'Given file {0}'.format(path))
+            if not os.path.exists(path) and not os.path.isabs(path):
+              # Look for the source in the PEX chroot since its not available from CWD.
+              path = os.path.join(builder.path(), path)
+            coverage_modules.append(path)
+
+        coverage_rc, args = self.cov_setup(targets, coverage_modules=coverage_modules)
         test_args.extend(args)
 
       sources = list(itertools.chain(*[t.sources_relative_to_buildroot() for t in targets]))
