@@ -71,6 +71,46 @@ an anchor therein::
 Pants replaces the ``pants('path/to:dest')`` with the appropriate link.
 
 
+Include a File Snippet
+**********************
+
+Sometimes the best way to explain ``HelloWorld.java`` is to show an
+excerpt from ``HelloWorld.java``.
+You can use the ``!inc`` markdown to do this.
+Specify a file to include and (optionally) regexps at which to
+start copying or stop copying.
+For example, to include an excerpt from the file ``HelloMain.java``,
+starting with the first line matching the pattern ``void main`` and
+stopping before a subsequent line matching ``private HelloMain``::
+
+  !inc[start-at=void main&end-before=private HelloMain](HelloMain.java)
+
+To include *all* of ``HelloMain.java``::
+
+  !inc(HelloMain.java)
+
+To include most of ``HelloMain.java``, starting after license boilerplate::
+
+  !inc[start-after=Licensed under the Apache](HelloMain.java)
+
+It accepts the following optional parameters, separated by ampersands (&):
+
+start-at=\ *substring*
+  When excerpting the file to include, start at the first line containing
+  *substring*.
+
+start-after=\ *substring*
+  When excerpting the file to include, start after the first line containing
+  *substring*.
+
+end-before=\ *substring*
+  When excerpting the file to include, stop before a line containing
+  *substring*.
+
+end-at=\ *substring*
+  When excerpting the file to include, stop at a line containing
+  *substring*.
+
 Publishing
 **********
 

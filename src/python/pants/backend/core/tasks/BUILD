@@ -191,6 +191,7 @@ python_library(
     ':common',
     'src/python/pants/base:address',
     'src/python/pants/base:build_environment',
+    'src/python/pants/base:generator',
     'src/python/pants/base:target',
     'src/python/pants/backend/core/targets:common',
     'src/python/pants:binary_util',

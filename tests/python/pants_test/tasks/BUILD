@@ -49,6 +49,7 @@ python_test_suite(
     ':jvmdoc_gen',
     ':list_goals',
     ':listtargets',
+    ':markdown_to_html',
     ':minimal_cover',
     ':protobuf_gen',
     ':ragel_gen',
@@ -423,6 +424,15 @@ python_tests(
     'src/python/pants/base:build_file_aliases',
     'src/python/pants/base:target',
   ],
+)
+
+python_tests(
+  name = 'markdown_to_html',
+  sources = ['test_markdown_to_html.py'],
+  dependencies = [
+    ':base',
+    'src/python/pants/backend/core/tasks:markdown_to_html',
+  ]
 )
 
 python_tests(
