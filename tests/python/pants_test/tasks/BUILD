@@ -49,6 +49,7 @@ python_test_suite(
     ':jvmdoc_gen',
     ':list_goals',
     ':listtargets',
+    ':markdown_to_html',
     ':minimal_cover',
     ':protobuf_gen',
     ':ragel_gen',
@@ -57,21 +58,22 @@ python_test_suite(
     ':sorttargets',
     ':targets_help',
     ':what_changed',
-    'tests/python/pants_test/tasks/jvm_compile'
+    'tests/python/pants_test/tasks/jvm_compile/scala'
   ],
 )
 
 python_test_suite(
   name = 'integration',
   dependencies = [
+    ':eclipse_integration',
     ':ensime_integration',
     ':idea_integration',
-    ':eclipse_integration',
     ':jar_publish_integration',
     ':jvm_bundle_integration',
     ':jvm_run_integration',
-    ':scala_repl_integration',
     ':protobuf_integration',
+    ':scala_repl_integration',
+    'tests/python/pants_test/tasks/jvm_compile/java',
   ],
 )
 
@@ -423,6 +425,15 @@ python_tests(
     'src/python/pants/base:build_file_aliases',
     'src/python/pants/base:target',
   ],
+)
+
+python_tests(
+  name = 'markdown_to_html',
+  sources = ['test_markdown_to_html.py'],
+  dependencies = [
+    ':base',
+    'src/python/pants/backend/core/tasks:markdown_to_html',
+  ]
 )
 
 python_tests(

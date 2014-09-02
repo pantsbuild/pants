@@ -60,6 +60,114 @@ class WikilinksExtension(markdown.Extension):
   def extendMarkdown(self, md, md_globals):
     md.inlinePatterns['wikilinks'] = WikilinksPattern(self.build_url, md)
 
+# !inc[start-at=void main&end-before=private HelloMain](HelloMain.java)
+INCLUDE_PATTERN = r'!inc(\[(?P<params>[^]]*)\])?\((?P<path>[^' + '\n' + r']*)\)'
+
+
+def choose_include_lines(s, params, source_path):
+  """Given the contents of a file and !inc[these params], return matching lines
+
+  If there was a problem matching parameters, return empty list.
+
+  :param s: file's text
+  :param params: string like "start-at=foo&end-at=bar"
+  :param source_path: path to source .md. Useful in error messages
+  """
+  lines = s.splitlines()
+  start_after = None
+  start_at = None
+  end_before = None
+  end_at = None
+
+  for term in params.split("&"):
+    if '=' in term:
+      param, value = [p.strip() for p in term.split('=', 1)]
+    else:
+      param, value = term.strip(), ''
+    if not param: continue
+    if param == "start-after":
+      start_after = value
+    elif param == "start-at":
+      start_at = value
+    elif param == "end-before":
+      end_before = value
+    elif param == "end-at":
+      end_at = value
+    else:
+      raise TaskError('Invalid include directive "{0}"'
+                      ' in {1}'.format(params, source_path))
+
+  chosen_lines = []
+  # two loops, one waits to "start recording", one "records"
+  for line_ix in range(0, len(lines)):
+    line = lines[line_ix]
+    if (not start_at) and (not start_after):
+      # if we didn't set a start-* param, don't wait to start
+      break
+    if start_at is not None and start_at in line:
+      break
+    if start_after is not None and start_after in line:
+      line_ix += 1
+      break
+  else:
+    # never started recording:
+    return []
+  for line_ix in range(line_ix, len(lines)):
+    line = lines[line_ix]
+    if end_before is not None and end_before in line:
+      break
+    chosen_lines.append(line)
+    if end_at is not None and end_at in line:
+      break
+  else:
+    if (end_before or end_at):
+      # we had an end- filter, but never encountered it.
+      return []
+  return chosen_lines
+
+
+class IncludeExcerptPattern(markdown.inlinepatterns.Pattern):
+  def __init__(self, md=None, source_path=None):
+    '''
+    :param source_path: path to source .md file.
+    '''
+    markdown.inlinepatterns.Pattern.__init__(self, INCLUDE_PATTERN)
+    self.source_path = source_path
+
+  def handleMatch(self, match):
+    params = match.group('params') or ''
+    rel_include_path = match.group('path')
+    source_dir = os.path.dirname(self.source_path)
+    include_path = os.path.join(source_dir, rel_include_path)
+    try:
+      with open(include_path) as include_file:
+        include_text = include_file.read()
+    except IOError as e:
+      raise IOError('Markdown file {0} tried to include file {1}, got '
+                    '{2}'.format(self.source_path,
+                                 rel_include_path,
+                                 e.strerror))
+    include_lines = choose_include_lines(include_text, params, self.source_path)
+    if not include_lines:
+      raise TaskError('Markdown file {0} tried to include file {1} but '
+                      'filtered out everything'.format(self.source_path,
+                                                       rel_include_path))
+    el = markdown.util.etree.Element('pre')
+    el.text = markdown.util.AtomicString('\n'.join(include_lines))
+    return el
+
+
+class IncludeExcerptExtension(markdown.Extension):
+  def __init__(self, source_path, configs=None):
+    markdown.Extension.__init__(self, configs or {})
+    self.source_path = source_path
+
+  def extendMarkdown(self, md, md_globals):
+    md.inlinePatterns.add('excerpt',
+                          IncludeExcerptPattern(source_path=self.source_path),
+                          '_begin')
+
+
 
 def id_to_html_path(id):
   "Given a target id, give a nice path for an output .html path"
@@ -73,19 +181,20 @@ class MarkdownToHtml(Task):
     configure_codehighlight_options(option_group, mkflag)
 
     option_group.add_option(mkflag('open'), mkflag('open', negate=True),
-                            dest = 'markdown_to_html_open',
+                            dest='markdown_to_html_open',
                             action='callback', callback=mkflag.set_bool, default=False,
-                            help = '[%default] Open the generated documents in a browser.')
+                            help='[%default] Open the generated documents in a browser.')
 
     option_group.add_option(mkflag('fragment'), mkflag('fragment', negate=True),
                             dest = 'markdown_to_html_fragment',
                             action='callback', callback=mkflag.set_bool, default=False,
-                            help = '[%default] Generate a fragment of html to embed in a page.')
+                            help='[%default] Generate a fragment of html to embed in a page.')
 
-    option_group.add_option(mkflag('extension'), dest = 'markdown_to_html_extensions',
+    option_group.add_option(mkflag('extension'), dest='markdown_to_html_extensions',
                             action='append',
-                            help = 'Override the default markdown extensions and process pages '
-                                   'whose source have these extensions instead.')
+
+                            help='Override the default markdown extensions and process pages '
+                                 'whose source have these extensions instead.')
 
   @classmethod
   def product_types(cls):
@@ -211,10 +320,16 @@ class MarkdownToHtml(Task):
     output_path = os.path.join(outdir, id_to_html_path(targid))
     safe_mkdir(os.path.dirname(output_path))
     with codecs.open(output_path, 'w', 'utf-8') as output:
-      with codecs.open(os.path.join(get_buildroot(), source), 'r', 'utf-8') as input:
+      source_path = os.path.join(get_buildroot(), source)
+      with codecs.open(source_path, 'r', 'utf-8') as input:
         md_html = markdown.markdown(
           input.read(),
-          extensions=['codehilite(guess_lang=False)', 'extra', 'tables', 'toc', wikilinks],
+          extensions=['codehilite(guess_lang=False)',
+                      'extra',
+                      'tables',
+                      'toc',
+                      wikilinks,
+                      IncludeExcerptExtension(source_path)],
         )
         if fragmented:
           style_css = (HtmlFormatter(style=self.code_style)).get_style_defs('.codehilite')
