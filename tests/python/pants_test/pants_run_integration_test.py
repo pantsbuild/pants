@@ -6,7 +6,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 from collections import namedtuple
-
 import os
 import subprocess
 import unittest2 as unittest
@@ -18,14 +17,15 @@ from pants.util.dirutil import safe_open, safe_mkdir
 
 PantsResult = namedtuple('PantsResult', ['returncode', 'stdout_data', 'stderr_data'])
 
+
 class PantsRunIntegrationTest(unittest.TestCase):
   """A base class useful for integration tests for targets in the same repo."""
 
   PANTS_SUCCESS_CODE = 0
   PANTS_SCRIPT_NAME = 'pants'
 
-  @classmethod
-  def has_python_version(cls, version):
+  @staticmethod
+  def has_python_version(version):
     """Returns true if the current system has the specified version of python.
 
     :param version: A python version string, such as 2.6, 3.
@@ -36,7 +36,8 @@ class PantsRunIntegrationTest(unittest.TestCase):
     except OSError:
       return False
 
-  def workdir_root(self):
+  @staticmethod
+  def workdir_root():
     # We can hard-code '.pants.d' here because we know that will always be its value
     # in the pantsbuild/pants repo (e.g., that's what we .gitignore in that repo).
     # Grabbing the pants_workdir config would require this pants's config object,
@@ -45,7 +46,8 @@ class PantsRunIntegrationTest(unittest.TestCase):
     safe_mkdir(root)
     return root
 
-  def run_pants_with_workdir(self, command, workdir, config=None, stdin_data=None, **kwargs):
+  @classmethod
+  def run_pants_with_workdir(cls, command, workdir, config=None, stdin_data=None, **kwargs):
     config = config.copy() if config else {}
 
     # We add workdir to the DEFAULT section, and also ensure that it's emitted first.
@@ -62,16 +64,22 @@ class PantsRunIntegrationTest(unittest.TestCase):
     with safe_open(ini_file_name, mode='w') as fp:
       fp.write(ini)
     env = os.environ.copy()
+
+    if 'PANTS_PY_COVERAGE' in env:
+      # Forward the coverage bit to the pants.pex subprocess.  This will generate a coverage
+      # datafile which can be discovered by the coverage reporter in this process.
+      env['PEX_COVERAGE'] = '1'
+
     env['PANTS_CONFIG_OVERRIDE'] = ini_file_name
-    pants_command = ([os.path.join(get_buildroot(), self.PANTS_SCRIPT_NAME)] + command +
+    pants_command = ([os.path.join(get_buildroot(), cls.PANTS_SCRIPT_NAME)] + command +
                      ['--no-lock', '--kill-nailguns'])
     proc = subprocess.Popen(pants_command, env=env, stdin=subprocess.PIPE,
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
     (stdout_data, stderr_data) = proc.communicate(stdin_data)
     return PantsResult(proc.returncode, stdout_data, stderr_data)
 
-
-  def run_pants(self, command, config=None, stdin_data=None, **kwargs):
+  @classmethod
+  def run_pants(cls, command, config=None, stdin_data=None, **kwargs):
     """Runs pants in a subprocess.
 
     :param list command: A list of command line arguments coming after `./pants`.
@@ -85,5 +93,5 @@ class PantsRunIntegrationTest(unittest.TestCase):
     that the invoked pants doesn't interact badly with this one.
     """
 
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
-      return self.run_pants_with_workdir(command, workdir, config, stdin_data, **kwargs)
+    with temporary_dir(root_dir=cls.workdir_root()) as workdir:
+      return cls.run_pants_with_workdir(command, workdir, config, stdin_data, **kwargs)

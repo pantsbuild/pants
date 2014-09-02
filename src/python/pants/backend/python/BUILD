@@ -117,6 +117,7 @@ python_library(
   sources = ['python_chroot.py'],
   dependencies = [
     ':antlr_builder',
+    ':python_requirement',
     ':python_setup',
     ':resolver',
     ':thrift_builder',
