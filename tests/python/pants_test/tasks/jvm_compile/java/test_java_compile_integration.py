@@ -72,3 +72,44 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
 
       # One artifact for java 6 and one for 7
       self.assertEqual(len(os.listdir(artifact_dir)), 2)
+
+
+  def _whitelist_test(self, target, fatal_flag, whitelist):
+    # We want to ensure that a project missing dependencies can be
+    # whitelisted so that the missing deps do not break the build.
+
+    args = [
+      'goal',
+      'compile',
+      target,
+      fatal_flag
+    ]
+
+    # First check that without the whitelist we do break the build.
+    pants_run = self.run_pants(args, {})
+    self.assertNotEquals(pants_run.returncode, self.PANTS_SUCCESS_CODE)
+
+    # Now let's use the target whitelist, this should succeed.
+    config = {
+      'jvm': {'missing_deps_target_whitelist': [whitelist]}
+    }
+
+    pants_run = self.run_pants(args, config)
+
+    self._assert_run_success(pants_run)
+
+
+  def test_java_compile_missing_dep_analysis_whitelist(self):
+    self._whitelist_test(
+      'testprojects/src/java/com/pants/testproject/missingdepswhitelist',
+      '--compile-java-missing-deps=fatal',
+      'testprojects/src/java/com/pants/testproject/missingdepswhitelist2'
+    )
+
+
+  def test_java_compile_missing_direct_dep_analysis_whitelist(self):
+    self._whitelist_test(
+      'testprojects/src/java/com/pants/testproject/missingdirectdepswhitelist',
+      '--compile-java-missing-direct-deps=fatal',
+      'testprojects/src/java/com/pants/testproject/missingdirectdepswhitelist'
+    )
