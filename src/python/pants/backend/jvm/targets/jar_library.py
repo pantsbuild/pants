@@ -18,6 +18,8 @@ class JarLibrary(Target):
     :param string name: The name of this target, which combined with this
       build file defines the :doc:`target address <target_addresses>`.
     :param jars: List of :ref:`jar <bdict_jar>`\s to depend upon.
+    :param dependencies: Other targets that this target depends on. If your
+       code ``import``\s code from other places, it depends on them.
     :param exclusives: An optional map of exclusives tags. See :ref:`howto_check_exclusives` for details.
     """
     payload = JarLibraryPayload(self.assert_list(jars, expected_type=JarDependency))
