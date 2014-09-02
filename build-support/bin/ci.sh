@@ -36,6 +36,15 @@ function usage() {
   fi
 }
 
+function toplevel_python_src_modules_list() {
+  find src/python/pants -mindepth 1 -maxdepth 1 | \
+    grep -Ev "(BUILD.*|__init__\.pyc?|\.rst|\.gitignore|\.md)$" | \
+    sed -re "s|\.pyc?$||" | \
+    cut -d/ -f3- | \
+    tr / . | \
+    xargs | tr ' ' ,
+}
+
 daemons="--ng-daemons"
 
 while getopts "hbsrdpceat" opt; do
@@ -132,7 +141,7 @@ if [[ "${skip_python:-false}" == "false" ]]; then
   banner "Running core python tests"
   (
     # TODO(Eric Ayers): Substitute tests/python:: when all tests are working that way
-    PANTS_PY_COVERAGE=modules:src/python/pants/ PANTS_PYTHON_TEST_FAILSOFT=1 \
+    PANTS_PY_COVERAGE=modules:$(toplevel_python_src_modules_list) PANTS_PYTHON_TEST_FAILSOFT=1 \
       ./pants.pex goal test tests/python/pants_test:all \
         ${PANTS_ARGS[@]}
   ) || die "Core python test failure"
@@ -173,7 +182,7 @@ fi
 if [[ "${skip_integration:-false}" == "false" ]]; then
   banner "Running Pants Integration tests"
   (
-    PANTS_PY_COVERAGE=modules:src/python/pants/ PANTS_PYTHON_TEST_FAILSOFT=1
+    PANTS_PY_COVERAGE=modules:$(toplevel_python_src_modules_list) PANTS_PYTHON_TEST_FAILSOFT=1
       ./pants.pex goal test tests/python/pants_test:integration \
         ${PANTS_ARGS[@]}
   ) || die "Pants Integration test failure"
