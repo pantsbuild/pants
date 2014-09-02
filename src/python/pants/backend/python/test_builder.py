@@ -135,7 +135,7 @@ class PythonTestBuilder(object):
     return args
 
   @staticmethod
-  def cov_setup(targets):
+  def cov_setup(targets, coverage_modules=None):
     cp = generate_coverage_config(targets)
     with temporary_file(cleanup=False) as fp:
       cp.write(fp)
@@ -153,7 +153,8 @@ class PythonTestBuilder(object):
         return set(os.path.dirname(source).replace(os.sep, '.')
                    for source in target.sources_relative_to_source_root())
 
-    coverage_modules = set(itertools.chain(*[compute_coverage_modules(t) for t in targets]))
+    if coverage_modules is None:
+      coverage_modules = set(itertools.chain(*[compute_coverage_modules(t) for t in targets]))
     args = ['-p', 'pytest_cov',
             '--cov-config', filename,
             '--cov-report', 'html',
@@ -164,7 +165,7 @@ class PythonTestBuilder(object):
 
   def _run_python_tests(self, targets, stdout, stderr):
     coverage_rc = None
-    coverage_enabled = 'PANTS_PY_COVERAGE' in os.environ
+    coverage = os.environ.get('PANTS_PY_COVERAGE')
 
     try:
       builder = PEXBuilder(interpreter=self.interpreter)
@@ -181,8 +182,10 @@ class PythonTestBuilder(object):
       test_args = []
       test_args.extend(PythonTestBuilder.generate_junit_args(targets))
       test_args.extend(self.args)
-      if coverage_enabled:
-        coverage_rc, args = self.cov_setup(targets)
+      if coverage is not None:
+        coverage_modules = (coverage[len('modules:'):].split(',')
+                            if coverage.startswith('modules:') else None)
+        coverage_rc, args = self.cov_setup(targets, coverage_modules)
         test_args.extend(args)
 
       sources = list(itertools.chain(*[t.sources_relative_to_buildroot() for t in targets]))
