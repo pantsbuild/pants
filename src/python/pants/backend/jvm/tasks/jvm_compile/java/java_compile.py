@@ -94,13 +94,13 @@ class JavaCompile(JvmCompile):
     self._jmake_bootstrap_key = 'jmake'
     external_tools = self.context.config.getlist('java-compile',
                                                  'jmake-bootstrap-tools',
-                                                 default=[':jmake'])
+                                                 default=['//:jmake'])
     self.register_jvm_tool(self._jmake_bootstrap_key, external_tools)
 
     self._compiler_bootstrap_key = 'java-compiler'
     compiler_bootstrap_tools = self.context.config.getlist('java-compile',
                                                            'compiler-bootstrap-tools',
-                                                           default=[':java-compiler'])
+                                                           default=['//:java-compiler'])
     self.register_jvm_tool(self._compiler_bootstrap_key, compiler_bootstrap_tools)
 
     self.configure_args(args_defaults=_JAVA_COMPILE_ARGS_DEFAULT,

@@ -68,6 +68,7 @@ python_test_suite(
     ':eclipse_integration',
     ':ensime_integration',
     ':idea_integration',
+    ':ivy_resolve_integration',
     ':jar_publish_integration',
     ':jvm_bundle_integration',
     ':jvm_run_integration',
@@ -337,6 +338,15 @@ python_tests(
 python_tests(
   name = 'ensime_integration',
   sources = ['test_ensime_integration.py'],
+  dependencies = [
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test:int-test',
+  ],
+)
+
+python_tests(
+  name = 'ivy_resolve_integration',
+  sources = ['test_ivy_resolve_integration.py'],
   dependencies = [
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',

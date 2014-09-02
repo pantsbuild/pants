@@ -105,8 +105,9 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
                                   for name, config in _CONFIG_FOR_COMPILER.items())
 
     for name, compiler in self.compiler_for_name.items():
-      bootstrap_tools = self.context.config.getlist(compiler.config_section, 'bootstrap-tools',
-                                                    default=[':%s' % compiler.profile])
+      bootstrap_tools = self.context.config.getlist(
+        compiler.config_section, 'bootstrap-tools',
+        default=['//:{spec}'.format(spec=compiler.profile)])
       self.register_jvm_tool(compiler.name, bootstrap_tools)
 
     self.defaults = JavaThriftLibrary.Defaults(self.context.config)

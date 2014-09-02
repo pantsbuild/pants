@@ -47,7 +47,7 @@ class BenchmarkRun(JvmTask, JvmToolTaskMixin):
 
     self._benchmark_bootstrap_key = 'benchmark-tool'
     benchmark_bootstrap_tools = config.getlist('benchmark-run', 'bootstrap-tools',
-                                               default=[':benchmark-caliper-0.5'])
+                                               default=['//:benchmark-caliper-0.5'])
     self.register_jvm_tool(self._benchmark_bootstrap_key,
                                                   benchmark_bootstrap_tools)
     self._agent_bootstrap_key = 'benchmark-agent'
