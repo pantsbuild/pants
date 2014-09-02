@@ -2,40 +2,48 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  name = 'engine_test_base',
-  sources = ['base_engine_test.py'],
-  dependencies = [
+  name='engine_test_base',
+  sources=['base_engine_test.py'],
+  dependencies=[
+    'tests/python/pants_test:base_test',
+    'tests/python/pants_test/base:context_utils',
     'src/python/pants/goal',
     'src/python/pants/goal:task_registrar',
   ]
 )
 
-python_test_suite(
-  name = 'engine',
-  dependencies = [
+target(
+  name='engine',
+  dependencies=[
     ':test_engine',
     ':test_round_engine',
   ]
 )
 
 python_tests(
-  name = 'test_engine',
-  sources = ['test_engine.py'],
-  dependencies = [
+  name='test_engine',
+  sources=['test_engine.py'],
+  dependencies=[
     ':engine_test_base',
     'src/python/pants/base:exceptions',
     'src/python/pants/engine',
     'tests/python/pants_test/base:context_utils',
   ],
+  coverage=[
+    'pants.engine.engine',
+  ]
 )
 
 python_tests(
-  name = 'test_round_engine',
-  sources = ['test_round_engine.py'],
-  dependencies = [
+  name='test_round_engine',
+  sources=['test_round_engine.py'],
+  dependencies=[
     ':engine_test_base',
     'src/python/pants/engine',
     'src/python/pants/backend/core/tasks:common',
     'tests/python/pants_test:base_test',
   ],
+  coverage=[
+    'pants.engine.round_engine',
+  ]
 )

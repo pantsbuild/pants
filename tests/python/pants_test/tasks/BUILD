@@ -2,9 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  name = 'base',
-  sources = ['test_base.py'],
-  dependencies = [
+  name='base',
+  sources=['test_base.py'],
+  dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/core/tasks:console_task',
     'src/python/pants/backend/core/tasks:task',
@@ -19,9 +19,9 @@ python_library(
   ]
 )
 
-python_test_suite(
-  name = 'tasks',
-  dependencies = [
+target(
+  name='tasks',
+  dependencies=[
     ':antlr_gen',
     ':binary_create',
     ':builddict',
@@ -62,9 +62,9 @@ python_test_suite(
   ],
 )
 
-python_test_suite(
-  name = 'integration',
-  dependencies = [
+target(
+  name='integration',
+  dependencies=[
     ':eclipse_integration',
     ':ensime_integration',
     ':idea_integration',
@@ -78,30 +78,36 @@ python_test_suite(
 )
 
 python_tests(
-  name = 'antlr_gen',
-  sources = ['test_antlr_gen.py'],
-  dependencies = [
+  name='antlr_gen',
+  sources=['test_antlr_gen.py'],
+  dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
     ':base',
     'src/python/pants/backend/codegen/targets:java',
     'src/python/pants/backend/codegen/tasks:antlr_gen',
     'tests/python/pants_test/jvm:nailgun_task_test_base',
   ],
-)
-
-python_tests(
-  name = 'binary_create',
-  sources = ['test_binary_create.py'],
-  dependencies = [
-    ':base',
-    'src/python/pants/backend/jvm/tasks:binary_create',
+  coverage=[
+    'pants.backend.codegen.tasks.antlr_gen',
   ]
 )
 
 python_tests(
-  name = 'builddict',
-  sources = ['test_builddict.py'],
-  dependencies = [
+  name='binary_create',
+  sources=['test_binary_create.py'],
+  dependencies=[
+    ':base',
+    'src/python/pants/backend/jvm/tasks:binary_create',
+  ],
+  coverage=[
+    'pants.backend.jvm.tasks.binary_create',
+  ]
+)
+
+python_tests(
+  name='builddict',
+  sources=['test_builddict.py'],
+  dependencies=[
     ':base',
     'src/python/pants/backend/core:plugin',
     'src/python/pants/backend/core/tasks:builddictionary',
@@ -109,117 +115,151 @@ python_tests(
     'src/python/pants/backend/python:plugin',
     'src/python/pants/goal',
     'src/python/pants/goal:task_registrar',
+  ],
+  coverage=[
+    'pants.backend.core.tasks.builddictionary',
   ]
 )
 
 python_tests(
-  name = 'bundle_create',
-  sources = ['test_bundle_create.py'],
-  dependencies = [
+  name='bundle_create',
+  sources=['test_bundle_create.py'],
+  dependencies=[
     ':base',
     'src/python/pants/backend/jvm/tasks:bundle_create',
+  ],
+  coverage=[
+    'pants.backend.jvm.tasks.bundle_create',
   ]
 )
 
 python_tests(
-  name = 'jvm_bundle_integration',
-  sources = ['test_jvm_bundle_integration.py'],
-  dependencies = [
+  name='jvm_bundle_integration',
+  sources=['test_jvm_bundle_integration.py'],
+  dependencies=[
     'src/python/pants/fs',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
   ],
+  coverage=[
+    'pants.backend.jvm.tasks.bundle_create',
+  ]
 )
 
 python_tests(
-  name = 'jvm_run_integration',
-  sources = ['test_jvm_run_integration.py'],
-  dependencies = [
+  name='jvm_run_integration',
+  sources=['test_jvm_run_integration.py'],
+  dependencies=[
     'src/python/pants/fs',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
   ],
+  coverage=[
+    'pants.backend.jvm.tasks.jvm_run',
+  ]
 )
 
 python_tests(
-  name = 'scala_repl_integration',
-  sources = ['test_scala_repl_integration.py'],
-  dependencies = [
+  name='scala_repl_integration',
+  sources=['test_scala_repl_integration.py'],
+  dependencies=[
     'tests/python/pants_test:int-test',
   ],
+  coverage=[
+    'pants.backend.jvm.tasks.scala_repl',
+  ]
 )
 
+# TODO(John Sirois): re-locate, this tests pants.base.
 python_tests(
-  name = 'cache_manager',
-  sources = ['test_cache_manager.py'],
-  dependencies = [
+  name='cache_manager',
+  sources=['test_cache_manager.py'],
+  dependencies=[
     ':base',
     'tests/python/pants_test/testutils',
     'src/python/pants/base:build_invalidator',
     'src/python/pants/base:cache_manager',
+  ],
+  coverage=[
+    'pants.base.cache_manager',
   ]
 )
 
 python_tests(
-  name = 'check_exclusives',
-  sources = ['test_check_exclusives.py'],
-  dependencies = [
+  name='check_exclusives',
+  sources=['test_check_exclusives.py'],
+  dependencies=[
     ':base',
     'src/python/pants/base:config',
     'src/python/pants/goal:context',
     'src/python/pants/backend/core/tasks:check_exclusives',
     'src/python/pants/util:dirutil',
+  ],
+  coverage=[
+    'pants.backend.core.tasks.check_exclusives',
   ]
 )
 
 python_tests(
-  name = 'check_published_deps',
-  sources = ['test_check_published_deps.py'],
-  dependencies = [
+  name='check_published_deps',
+  sources=['test_check_published_deps.py'],
+  dependencies=[
     ':base',
     'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:check_published_deps',
     'src/python/pants/base:build_file_aliases',
+  ],
+  coverage=[
+    'pants.backend.jvm.tasks.check_published_deps',
   ]
 )
 
 # XXX Uh shouldn't this be in base?
 python_tests(
-  name = 'config',
-  sources = ['test_config.py'],
-  dependencies = [
+  name='config',
+  sources=['test_config.py'],
+  dependencies=[
     ':base',
     'src/python/pants/base:config',
     'src/python/pants/util:contextutil',
+  ],
+  coverage=[
+    'pants.base.config',
   ]
 )
 
 python_tests(
-  name = 'console_task',
-  sources = ['test_console_task.py'],
-  dependencies = [
+  name='console_task',
+  sources=['test_console_task.py'],
+  dependencies=[
     ':base',
     'src/python/pants/backend/core/tasks:console_task',
+  ],
+  coverage=[
+    'pants.backend.core.tasks.console_task',
   ]
 )
 
 # XXX this should be in goal
 python_tests(
-  name = 'context',
-  sources = ['test_context.py'],
-  dependencies = [
+  name='context',
+  sources=['test_context.py'],
+  dependencies=[
     ':base',
     'src/python/pants/base:config',
     'src/python/pants/goal:context',
+  ],
+  coverage=[
+    'pants.goal.context',
   ]
 )
 
 python_tests(
-  name = 'dependees',
-  sources = ['test_dependees.py'],
-  dependencies = [
+  name='dependees',
+  sources=['test_dependees.py'],
+  dependencies=[
     ':base',
     'src/python/pants/backend/codegen/targets:java',
     'src/python/pants/backend/core/targets:common',
@@ -229,13 +269,16 @@ python_tests(
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:build_file_aliases',
+  ],
+  coverage=[
+    'pants.backend.core.tasks.dependees',
   ]
 )
 
 python_tests(
-  name = 'dependencies',
-  sources = ['test_dependencies.py'],
-  dependencies = [
+  name='dependencies',
+  sources=['test_dependencies.py'],
+  dependencies=[
     ':base',
     'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/jvm/targets:jvm',
@@ -244,13 +287,16 @@ python_tests(
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/backend/python:python_requirement',
     'src/python/pants/base:exceptions',
+  ],
+  coverage=[
+    'pants.backend.jvm.tasks.dependencies',
   ]
 )
 
 python_tests(
-  name = 'depmap',
-  sources = ['test_depmap.py'],
-  dependencies = [
+  name='depmap',
+  sources=['test_depmap.py'],
+  dependencies=[
     ':base',
     'src/python/pants/backend/core:plugin',
     'src/python/pants/backend/core/targets:common',
@@ -261,25 +307,31 @@ python_tests(
     'src/python/pants/backend/jvm/tasks:depmap',
     'src/python/pants/backend/python:plugin',
     'src/python/pants/base:build_file_aliases',
+  ],
+  coverage=[
+    'pants.backend.jvm.tasks.depmap',
   ]
 )
 
 python_tests(
-  name = 'detect_duplicates',
-  sources = ['test_detect_duplicates.py'],
-  dependencies = [
+  name='detect_duplicates',
+  sources=['test_detect_duplicates.py'],
+  dependencies=[
     ':base',
     'src/python/pants/base:exceptions',
     'src/python/pants/backend/jvm/tasks:detect_duplicates',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/base:context_utils',
   ],
+  coverage=[
+    'pants.backend.jvm.tasks.detect_duplicates',
+  ]
 )
 
 python_tests(
-  name = 'filedeps',
-  sources = ['test_filedeps.py'],
-  dependencies = [
+  name='filedeps',
+  sources=['test_filedeps.py'],
+  dependencies=[
     ':base',
     'src/python/pants/backend/codegen/targets:java',
     'src/python/pants/backend/core/targets:common',
@@ -289,6 +341,9 @@ python_tests(
     'src/python/pants/backend/jvm/tasks:filedeps',
     'src/python/pants/base:build_file_aliases',
   ],
+  coverage=[
+    'pants.backend.jvm.tasks.filedeps',
+  ]
 )
 
 python_tests(
@@ -301,12 +356,15 @@ python_tests(
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/base:build_file_aliases',
   ],
+  coverage=[
+    'pants.backend.core.tasks.filemap',
+  ]
 )
 
 python_tests(
-  name = 'filter',
-  sources = ['test_filter.py'],
-  dependencies = [
+  name='filter',
+  sources=['test_filter.py'],
+  dependencies=[
     ':base',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/python/targets:python',
@@ -314,52 +372,67 @@ python_tests(
     'src/python/pants/backend/core/targets:common',
     'src/python/pants/base:build_file_aliases',
   ],
+  coverage=[
+    'pants.backend.core.tasks.filter',
+  ]
 )
 
 python_tests(
-  name = 'idea_integration',
-  sources = ['test_idea_integration.py'],
-  dependencies = [
+  name='idea_integration',
+  sources=['test_idea_integration.py'],
+  dependencies=[
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
   ],
+  coverage=[
+    'pants.backend.jvm.tasks.idea_gen',
+  ]
 )
 
 python_tests(
-  name = 'eclipse_integration',
-  sources = ['test_eclipse_integration.py'],
-  dependencies = [
+  name='eclipse_integration',
+  sources=['test_eclipse_integration.py'],
+  dependencies=[
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
   ],
+  coverage=[
+    'pants.backend.jvm.tasks.eclipse_gen',
+  ]
 )
 
 python_tests(
-  name = 'ensime_integration',
-  sources = ['test_ensime_integration.py'],
-  dependencies = [
+  name='ensime_integration',
+  sources=['test_ensime_integration.py'],
+  dependencies=[
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
   ],
+  coverage=[
+    'pants.backend.jvm.tasks.ensime_gen',
+  ]
 )
 
 python_tests(
-  name = 'ivy_utils',
-  sources = ['test_ivy_utils.py'],
-  dependencies = [
+  name='ivy_utils',
+  sources=['test_ivy_utils.py'],
+  dependencies=[
     'src/python/pants/backend/core:plugin',
     'src/python/pants/backend/jvm:plugin',
     'src/python/pants/backend/jvm:ivy_utils',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:base_test',
     'tests/python/pants_test/base:context_utils',
+  ],
+  coverage=[
+    'pants.backend.jvm.ivy_utils',
   ]
 )
 
 python_tests(
-  name = 'jar_create',
-  sources = ['test_jar_create.py'],
-  dependencies = [
+  name='jar_create',
+  sources=['test_jar_create.py'],
+  dependencies=[
     ':base',
     'src/python/pants/backend/android/targets:android',
     'src/python/pants/backend/codegen/targets:java',
@@ -378,46 +451,58 @@ python_tests(
     'tests/python/pants_test/base:context_utils',
     'tests/python/pants_test/jvm:jar_task_test_base',
   ],
+  coverage=[
+    'pants.backend.jvm.tasks.jar_create',
+  ]
 )
 
 python_tests(
-  name = 'jar_publish',
-  sources = ['test_jar_publish.py'],
-  dependencies = [
+  name='jar_publish',
+  sources=['test_jar_publish.py'],
+  dependencies=[
     '3rdparty/python:mock',
     ':base',
     'src/python/pants/backend/jvm/tasks:jar_publish',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
   ],
+  coverage=[
+    'pants.backend.jvm.tasks.jar_publish',
+  ]
 )
 
 python_tests(
-  name = 'jar_publish_integration',
-  sources = ['test_jar_publish_integration.py'],
-  dependencies = [
+  name='jar_publish_integration',
+  sources=['test_jar_publish_integration.py'],
+  dependencies=[
     ':base',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
   ],
+  coverage=[
+    'pants.backend.jvm.tasks.jar_publish',
+  ]
 )
 
 python_tests(
-  name = 'list_goals',
-  sources = ['test_list_goals.py'],
-  dependencies = [
+  name='list_goals',
+  sources=['test_list_goals.py'],
+  dependencies=[
     ':base',
     'src/python/pants/backend/core/tasks:list_goals',
     'src/python/pants/backend/core/tasks:common',
     'src/python/pants/goal',
     'src/python/pants/goal:task_registrar',
   ],
+  coverage=[
+    'pants.backend.core.tasks.list_goals',
+  ]
 )
 
 python_tests(
-  name = 'listtargets',
-  sources = ['test_listtargets.py'],
-  dependencies = [
+  name='listtargets',
+  sources=['test_listtargets.py'],
+  dependencies=[
     ':base',
     'src/python/pants/backend/core/tasks:listtargets',
     'src/python/pants/backend/jvm/targets:java',
@@ -425,73 +510,94 @@ python_tests(
     'src/python/pants/base:build_file_aliases',
     'src/python/pants/base:target',
   ],
-)
-
-python_tests(
-  name = 'markdown_to_html',
-  sources = ['test_markdown_to_html.py'],
-  dependencies = [
-    ':base',
-    'src/python/pants/backend/core/tasks:markdown_to_html',
+  coverage=[
+    'pants.backend.core.tasks.listtargets',
   ]
 )
 
 python_tests(
-  name = 'minimal_cover',
-  sources = ['test_minimal_cover.py'],
-  dependencies = [
+  name='markdown_to_html',
+  sources=['test_markdown_to_html.py'],
+  dependencies=[
+    ':base',
+    'src/python/pants/backend/core/tasks:markdown_to_html',
+  ],
+  coverage=[
+    'pants.backend.core.tasks.markdown_to_html',
+  ]
+)
+
+python_tests(
+  name='minimal_cover',
+  sources=['test_minimal_cover.py'],
+  dependencies=[
     ':base',
     'src/python/pants/backend/core/tasks:minimal_cover',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/base:build_file_aliases',
   ],
+  coverage=[
+    'pants.backend.core.tasks.minimal_cover',
+  ]
 )
 
 python_tests(
-  name = 'protobuf_gen',
-  sources = ['test_protobuf_gen.py'],
-  dependencies = [
+  name='protobuf_gen',
+  sources=['test_protobuf_gen.py'],
+  dependencies=[
     ':base',
     'src/python/pants/backend/codegen/tasks:protobuf_gen',
     'src/python/pants/util:contextutil',
   ],
+  coverage=[
+    'pants.backend.codegen.tasks.protobuf_gen',
+  ]
 )
 
 python_tests(
-  name = 'protobuf_integration',
-  sources = ['test_protobuf_integration.py'],
-  dependencies = [
+  name='protobuf_integration',
+  sources=['test_protobuf_integration.py'],
+  dependencies=[
     'tests/python/pants_test:int-test',
   ],
+  coverage=[
+    'pants.backend.codegen.tasks.protobuf_gen',
+  ]
 )
 
 python_tests(
-  name = 'jaxb_gen',
-  sources = ['test_jaxb_gen.py'],
-  dependencies = [
+  name='jaxb_gen',
+  sources=['test_jaxb_gen.py'],
+  dependencies=[
     ':base',
     'src/python/pants/backend/codegen/tasks:jaxb_gen',
     'src/python/pants/backend/codegen/targets:java',
     'src/python/pants/util:contextutil',
   ],
+  coverage=[
+    'pants.backend.codegen.tasks.jaxb_gen',
+  ]
 )
 
 python_tests(
-  name = 'roots',
-  sources = ['test_roots.py'],
-  dependencies = [
+  name='roots',
+  sources=['test_roots.py'],
+  dependencies=[
     ':base',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:target',
     'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/core/tasks:roots',
   ],
+  coverage=[
+    'pants.backend.core.tasks.roots',
+  ]
 )
 
 python_tests(
-  name = 'scrooge_gen',
-  sources = ['test_scrooge_gen.py'],
-  dependencies = [
+  name='scrooge_gen',
+  sources=['test_scrooge_gen.py'],
+  dependencies=[
     '3rdparty/python:mock',
     ':base',
     'src/python/pants/backend/codegen/targets:java',
@@ -500,35 +606,44 @@ python_tests(
     'src/python/pants/base:build_file_aliases',
     'src/python/pants/base:exceptions',
   ],
+  coverage=[
+    'pants.backend.codegen.tasks.scrooge_gen',
+  ]
 )
 
 python_tests(
-  name = 'sorttargets',
-  sources = ['test_sorttargets.py'],
-  dependencies = [
+  name='sorttargets',
+  sources=['test_sorttargets.py'],
+  dependencies=[
     ':base',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/backend/core/tasks:sorttargets',
     'src/python/pants/base:build_file_aliases',
   ],
+  coverage=[
+    'pants.backend.core.tasks.sorttargets',
+  ]
 )
 
 python_tests(
-  name = 'targets_help',
-  sources = ['test_targets_help.py'],
-  dependencies = [
+  name='targets_help',
+  sources=['test_targets_help.py'],
+  dependencies=[
     ':base',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:target',
     'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/core/tasks:targets_help',
   ],
+  coverage=[
+    'pants.backend.core.tasks.targets_help',
+  ]
 )
 
 python_tests(
-  name = 'what_changed',
-  sources = ['test_what_changed.py'],
-  dependencies = [
+  name='what_changed',
+  sources=['test_what_changed.py'],
+  dependencies=[
     ':base',
     'src/python/pants/backend/codegen/targets:java',
     'src/python/pants/backend/codegen/targets:python',
@@ -541,12 +656,15 @@ python_tests(
     'src/python/pants/base:source_root',
     'src/python/pants/base:target',
   ],
+  coverage=[
+    'pants.backend.core.tasks.what_changed',
+  ]
 )
 
 python_tests(
-  name = 'jar_task',
-  sources = ['test_jar_task.py'],
-  dependencies = [
+  name='jar_task',
+  sources=['test_jar_task.py'],
+  dependencies=[
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:jar_task',
     'src/python/pants/base:build_file_aliases',
@@ -554,13 +672,16 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/jvm:jvm_tool_task_test_base',
+  ],
+  coverage=[
+    'pants.backend.jvm.tasks.jar_task',
   ]
 )
 
 python_tests(
-  name = 'group_task',
-  sources = ['test_group_task.py'],
-  dependencies = [
+  name='group_task',
+  sources=['test_group_task.py'],
+  dependencies=[
     'src/python/pants/backend/core/tasks:check_exclusives',
     'src/python/pants/backend/core/tasks:group_task',
     'src/python/pants/backend/jvm/targets:java',
@@ -569,26 +690,32 @@ python_tests(
     'src/python/pants/base:target',
     'src/python/pants/engine:engine',
     'tests/python/pants_test:base_test',
+  ],
+  coverage=[
+    'pants.backend.core.tasks.group_task',
   ]
 )
 
 python_tests(
-  name = 'jvm_run',
-  sources = ['test_jvm_run.py'],
-  dependencies = [
+  name='jvm_run',
+  sources=['test_jvm_run.py'],
+  dependencies=[
     ':base',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:jvm_run',
     'src/python/pants/engine',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:base_test',
+  ],
+  coverage=[
+    'pants.backend.jvm.tasks.jvm_run',
   ]
 )
 
-python_tests(
-  name = 'jvm_task',
-  sources = ['test_jvm_task.py'],
-  dependencies = [
+python_library(
+  name='jvm_task',
+  sources=['test_jvm_task.py'],
+  dependencies=[
     'src/python/pants/backend/core/tasks:check_exclusives',
     'src/python/pants/backend/jvm/tasks:jvm_task',
     'src/python/pants/util:dirutil',
@@ -597,21 +724,23 @@ python_tests(
 )
 
 python_tests(
-  name = 'jvmdoc_gen',
-  sources = ['test_jvmdoc_gen.py'],
-  dependencies = [
+  name='jvmdoc_gen',
+  sources=['test_jvmdoc_gen.py'],
+  dependencies=[
     'src/python/pants/backend/core/tasks:check_exclusives',
     'src/python/pants/backend/jvm/tasks:jvmdoc_gen',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test:base_test',
+  ],
+  coverage=[
+    'pants.backend.jvm.tasks.jvmdoc_gen',
   ]
 )
 
-
 python_tests(
-  name = 'ragel_gen',
-  sources = ['test_ragel_gen.py'],
-  dependencies = [
+  name='ragel_gen',
+  sources=['test_ragel_gen.py'],
+  dependencies=[
     ':base',
     '3rdparty/python:mock',
     'src/python/pants/backend/codegen/targets:java',
@@ -623,4 +752,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:base_test',
   ],
+  coverage=[
+    'pants.backend.codegen.tasks.ragel_gen',
+  ]
 )

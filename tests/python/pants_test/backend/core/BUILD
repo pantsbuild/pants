@@ -9,10 +9,13 @@ target(
 )
 
 python_tests(
-  name = 'wrapped_globs',
-  sources = ['test_wrapped_globs.py'],
-  dependencies = [
+  name='wrapped_globs',
+  sources=['test_wrapped_globs.py'],
+  dependencies=[
     'src/python/pants/backend/core',
     'tests/python/pants_test:base_test',
+  ],
+  coverage=[
+    'pants.backend.core.wrapped_globs',
   ]
 )

@@ -2,10 +2,13 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_tests(
-  name = 'netrc',
-  sources = ['test_netrc_util.py'],
-  dependencies = [
+  name='netrc',
+  sources=['test_netrc_util.py'],
+  dependencies=[
     '3rdparty/python:mock',
     'src/python/pants/backend/authentication:authentication',
+  ],
+  coverage=[
+    'pants.backend.authentication.netrc_util',
   ]
 )

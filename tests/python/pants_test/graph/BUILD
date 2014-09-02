@@ -2,9 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_tests(
-  name = 'graph',
-  sources = ['test_build_graph.py'],
-  dependencies = [
+  name='graph',
+  sources=['test_build_graph.py'],
+  dependencies=[
     'src/python/pants/base:address',
     'src/python/pants/base:build_file_parser',
     'src/python/pants/base:build_graph',
@@ -14,4 +14,7 @@ python_tests(
     'src/python/pants/util:dirutil',
     'tests/python/pants_test:base_test'
   ],
+  coverage=[
+    'pants.base.build_graph',
+  ]
 )

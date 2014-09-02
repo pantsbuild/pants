@@ -8,8 +8,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import shlex
 import unittest2 as unittest
 
-import pytest
-
 from pants.option.options import Options
 
 

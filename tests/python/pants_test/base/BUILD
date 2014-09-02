@@ -2,9 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  name = 'context_utils',
-  sources = ['context_utils.py'],
-  dependencies = [
+  name='context_utils',
+  sources=['context_utils.py'],
+  dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.lang',
     'src/python/pants/base:config',
@@ -16,16 +16,16 @@ python_library(
   ]
 )
 
-python_test_suite(
-  name = 'all',
-  dependencies = [
+target(
+  name='all',
+  dependencies=[
     ':base',
   ],
 )
 
-python_test_suite(
-  name = 'base',
-  dependencies = [
+target(
+  name='base',
+  dependencies=[
     ':abbreviate_target_ids',
     ':address',
     ':build_configuration',
@@ -47,30 +47,36 @@ python_test_suite(
 )
 
 python_tests(
-  name = 'abbreviate_target_ids',
-  sources = ['test_abbreviate_target_ids.py'],
-  dependencies = [
+  name='abbreviate_target_ids',
+  sources=['test_abbreviate_target_ids.py'],
+  dependencies=[
     'src/python/pants/base:abbreviate_target_ids',
     'tests/python/pants_test:base_test',
+  ],
+  coverage=[
+    'pants.base.abbreviate_target_ids',
   ]
 )
 
 python_tests(
-  name = 'address',
-  sources = ['test_address.py'],
-  dependencies = [
+  name='address',
+  sources=['test_address.py'],
+  dependencies=[
     'src/python/pants/base:address',
     'src/python/pants/base:build_root',
     'tests/python/pants_test:base_test',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
+  ],
+  coverage=[
+    'pants.base.address',
   ]
 )
 
 python_tests(
-  name = 'build_configuration',
-  sources = ['test_build_configuration.py'],
-  dependencies = [
+  name='build_configuration',
+  sources=['test_build_configuration.py'],
+  dependencies=[
     'src/python/pants/base:address',
     'src/python/pants/base:build_configuration',
     'src/python/pants/base:build_file',
@@ -79,42 +85,54 @@ python_tests(
     'src/python/pants/base:target',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
+  ],
+  coverage=[
+    'pants.base.build_configuration',
   ]
 )
 
 python_tests(
-  name = 'build_file',
-  sources = ['test_build_file.py'],
-  dependencies = [
+  name='build_file',
+  sources=['test_build_file.py'],
+  dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:build_file',
     'tests/python/pants_test:base_test',
     'src/python/pants/util:dirutil',
+  ],
+  coverage=[
+    'pants.base.build_file',
   ]
 )
 
 python_tests(
-  name = 'build_file_address_mapper',
-  sources = ['test_build_file_address_mapper.py'],
-  dependencies = [
+  name='build_file_address_mapper',
+  sources=['test_build_file_address_mapper.py'],
+  dependencies=[
     'tests/python/pants_test:base_test',
+  ],
+  coverage=[
+    'pants.base.build_file_address_mapper',
   ]
 )
 
 python_tests(
-  name = 'build_file_aliases',
-  sources = ['test_build_file_aliases.py'],
-  dependencies = [
+  name='build_file_aliases',
+  sources=['test_build_file_aliases.py'],
+  dependencies=[
     'src/python/pants/base:build_file_aliases',
     'src/python/pants/base:target',
+  ],
+  coverage=[
+    'pants.base.build_file_aliases',
   ]
 )
 
 
 python_tests(
-  name = 'build_file_parser',
-  sources = ['test_build_file_parser.py'],
-  dependencies = [
+  name='build_file_parser',
+  sources=['test_build_file_parser.py'],
+  dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:build_file',
     'src/python/pants/backend/jvm/targets:java',
@@ -125,46 +143,57 @@ python_tests(
     'src/python/pants/base:target',
     'tests/python/pants_test:base_test',
     'src/python/pants/util:dirutil',
+  ],
+  coverage=[
+    'pants.base.build_file_parser',
   ]
 )
 
 python_tests(
-  name = 'build_invalidator',
-  sources = ['test_build_invalidator.py'],
-  dependencies = [
+  name='build_invalidator',
+  sources=['test_build_invalidator.py'],
+  dependencies=[
     'src/python/pants/base:build_invalidator',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:base_test',
+  ],
+  coverage=[
+    'pants.base.build_invalidator',
   ]
 )
 
 python_tests(
-  name = 'build_root',
-  sources = ['test_build_root.py'],
-  dependencies = [
+  name='build_root',
+  sources=['test_build_root.py'],
+  dependencies=[
     'src/python/pants/base:build_root',
     'tests/python/pants_test:base_test',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
+  ],
+  coverage=[
+    'pants.base.build_root',
   ]
 )
 
 python_tests(
-  name = 'cmd_line_spec_parser',
-  sources = ['test_cmd_line_spec_parser.py'],
-  dependencies = [
+  name='cmd_line_spec_parser',
+  sources=['test_cmd_line_spec_parser.py'],
+  dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    'src/python/pants/base:build_file',
     'src/python/pants/base:build_file_aliases',
     'src/python/pants/base:cmd_line_spec_parser',
     'tests/python/pants_test:base_test',
+  ],
+  coverage=[
+    'pants.base.cmd_line_spec_parser',
   ]
 )
 
 python_tests(
-  name = 'dev_backend_loader',
-  sources = ['test_dev_backend_loader.py'],
-  dependencies = [
+  name='dev_backend_loader',
+  sources=['test_dev_backend_loader.py'],
+  dependencies=[
     'src/python/pants/base:build_configuration',
     'src/python/pants/base:build_file_aliases',
     'src/python/pants/base:dev_backend_loader',
@@ -172,66 +201,87 @@ python_tests(
     'src/python/pants/base:target',
     'src/python/pants/goal',
     'src/python/pants/goal:task_registrar',
+  ],
+  coverage=[
+    '',
   ]
 )
 
 python_tests(
-  name = 'double_dag',
-  sources = ['test_double_dag.py'],
-  dependencies = [
+  name='double_dag',
+  sources=['test_double_dag.py'],
+  dependencies=[
     'src/python/pants/base:double_dag',
     'src/python/pants/reporting',
     'tests/python/pants_test:base_test',
     'tests/python/pants_test/testutils',
+  ],
+  coverage=[
+    'pants.base.dev_backend_loader',
   ]
 )
 
 python_tests(
-  name = 'generator',
-  sources = ['test_generator.py'],
-  dependencies = [
+  name='generator',
+  sources=['test_generator.py'],
+  dependencies=[
     'src/python/pants/base:generator',
     'tests/python/pants_test:base_test',
+  ],
+  coverage=[
+    'pants.base.generator',
   ]
 )
 
 python_tests(
-  name = 'hash_utils',
-  sources = ['test_hash_utils.py'],
-  dependencies = [
+  name='hash_utils',
+  sources=['test_hash_utils.py'],
+  dependencies=[
     '3rdparty/python:mox',
     'src/python/pants/base:hash_utils',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:base_test',
+  ],
+  coverage=[
+    'pants.base.hash_utils',
   ]
 )
 
 python_tests(
-  name = 'payload',
-  sources = ['test_payload.py'],
-  dependencies = [
+  name='payload',
+  sources=['test_payload.py'],
+  dependencies=[
     'src/python/pants/backend/core',
     'src/python/pants/base:build_file_aliases',
     'src/python/pants/base:payload',
     'tests/python/pants_test:base_test',
+  ],
+  coverage=[
+    'pants.base.payload',
   ]
 )
 
 python_tests(
-  name = 'revision',
-  sources = ['test_revision.py'],
-  dependencies = [
+  name='revision',
+  sources=['test_revision.py'],
+  dependencies=[
     'src/python/pants/base:revision',
     'tests/python/pants_test:base_test',
+  ],
+  coverage=[
+    'pants.base.revision',
   ]
 )
 
 python_tests(
-  name = 'run_info',
-  sources = ['test_run_info.py'],
-  dependencies = [
+  name='run_info',
+  sources=['test_run_info.py'],
+  dependencies=[
     'src/python/pants/base:run_info',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:base_test',
+  ],
+  coverage=[
+    'pants.base.run_info',
   ]
 )

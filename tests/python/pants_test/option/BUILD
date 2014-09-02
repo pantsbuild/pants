@@ -2,10 +2,13 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_tests(
-  name = 'option',
-  sources = globs('*.py'),
-  dependencies = [
+  name='option',
+  sources=globs('*.py'),
+  dependencies=[
     '3rdparty/python:pytest',
     'src/python/pants/option',
   ],
+  coverage=[
+    'pants.option',
+  ]
 )
