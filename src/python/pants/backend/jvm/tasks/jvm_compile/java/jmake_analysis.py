@@ -5,11 +5,11 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-import os
 from collections import defaultdict
+import os
 
-from pants.base.build_environment import get_buildroot
 from pants.backend.jvm.tasks.jvm_compile.analysis import Analysis
+from pants.base.build_environment import get_buildroot
 
 
 class JMakeAnalysis(Analysis):
