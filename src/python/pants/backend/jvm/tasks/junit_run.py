@@ -124,7 +124,7 @@ class _JUnitRunner(object):
     self._junit_bootstrap_key = 'junit'
     task_exports.register_jvm_tool(self._junit_bootstrap_key,
                              context.config.getlist('junit-run', 'junit-bootstrap-tools',
-                                                    default=[':junit']))
+                                                    default=['//:junit']))
     self._jvm_args = context.config.getlist('junit-run', 'jvm_args', default=[])
     if context.options.junit_run_jvmargs:
       self._jvm_args.extend(context.options.junit_run_jvmargs)
@@ -402,7 +402,7 @@ class Emma(_Coverage):
     self._emma_bootstrap_key = 'emma'
     task_exports.register_jvm_tool(self._emma_bootstrap_key,
                                    context.config.getlist('junit-run', 'emma-bootstrap-tools',
-                                                          default=[':emma']))
+                                                          default=['//:emma']))
 
   def instrument(self, targets, tests, junit_classpath):
     safe_mkdir(self._coverage_instrument_dir, clean=True)
@@ -483,7 +483,7 @@ class Cobertura(_Coverage):
     self._coverage_datafile = os.path.join(self._coverage_dir, 'cobertura.ser')
     task_exports.register_jvm_tool(self._cobertura_bootstrap_key,
                                    context.config.getlist('junit-run', 'cobertura-bootstrap-tools',
-                                                          default=[':cobertura']))
+                                                          default=['//:cobertura']))
     self._rootdirs = defaultdict(OrderedSet)
     self._include_filters = []
     self._exclude_filters = []

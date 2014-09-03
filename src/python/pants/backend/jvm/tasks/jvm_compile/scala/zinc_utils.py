@@ -51,7 +51,7 @@ class ZincUtils(object):
     # The zinc version (and the scala version it needs, which may differ from the target version).
     self._zinc_bootstrap_key = 'zinc'
     zinc_bootstrap_tools = context.config.getlist('scala-compile', 'zinc-bootstrap-tools',
-                                                  default=[':zinc'])
+                                                  default=['//:zinc'])
     self._jvm_tool_bootstrapper.register_jvm_tool(self._zinc_bootstrap_key, zinc_bootstrap_tools)
 
     # Compiler plugins.
