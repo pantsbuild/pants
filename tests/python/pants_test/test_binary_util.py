@@ -5,9 +5,6 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-import os
-
-from pants.base.config import Config
 from pants.binary_util import BinaryUtil
 from pants_test.base_test import BaseTest
 

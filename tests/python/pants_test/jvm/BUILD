@@ -2,9 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  name = 'jvm_tool_task_test_base',
-  sources = ['jvm_tool_task_test_base.py'],
-  dependencies = [
+  name='jvm_tool_task_test_base',
+  sources=['jvm_tool_task_test_base.py'],
+  dependencies=[
     'src/python/pants/backend/jvm/tasks:bootstrap_jvm_tools',
     'src/python/pants/base:dev_backend_loader',
     'src/python/pants/util:dirutil',
@@ -13,18 +13,18 @@ python_library(
 )
 
 python_library(
-  name = 'nailgun_task_test_base',
-  sources = ['nailgun_task_test_base.py'],
-  dependencies = [
+  name='nailgun_task_test_base',
+  sources=['nailgun_task_test_base.py'],
+  dependencies=[
     ':jvm_tool_task_test_base',
     'src/python/pants/backend/jvm/tasks:nailgun_task',
   ]
 )
 
 python_library(
-  name = 'jar_task_test_base',
-  sources = ['jar_task_test_base.py'],
-  dependencies = [
+  name='jar_task_test_base',
+  sources=['jar_task_test_base.py'],
+  dependencies=[
     ':nailgun_task_test_base',
   ]
 )

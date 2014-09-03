@@ -9,10 +9,13 @@ target(
 )
 
 python_tests(
-  name = 'jvm_fingerprint_strategy',
-  sources = ['test_jvm_fingerprint_strategy.py'],
-  dependencies = [
+  name='jvm_fingerprint_strategy',
+  sources=['test_jvm_fingerprint_strategy.py'],
+  dependencies=[
     'src/python/pants/backend/jvm/tasks/jvm_compile:jvm_fingerprint_strategy',
     'tests/python/pants_test:base_test',
+  ],
+  coverage=[
+    'pants.backend.jvm.tasks.jvm_compile.jvm_fingerprint_strategy',
   ]
 )

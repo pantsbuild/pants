@@ -2,9 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  name = 'base_test',
-  sources = ['base_test.py'],
-  dependencies = [
+  name='base_test',
+  sources=['base_test.py'],
+  dependencies=[
     'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/core/tasks:check_exclusives',
     'src/python/pants/base:address',
@@ -25,9 +25,9 @@ python_library(
 )
 
 python_library(
-  name = 'int-test',
-  sources = ['pants_run_integration_test.py'],
-  dependencies = [
+  name='int-test',
+  sources=['pants_run_integration_test.py'],
+  dependencies=[
     'src/python/pants/base:build_environment',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
@@ -35,41 +35,51 @@ python_library(
 )
 
 python_tests(
-  name = 'test_binary_util',
-  sources = ['test_binary_util.py',],
-  dependencies = [
+  name='test_binary_util',
+  sources=['test_binary_util.py',],
+  dependencies=[
     ':base_test',
     'src/python/pants:binary_util',
-    'src/python/pants/base:exceptions'
+  ],
+  coverage=[
+    'pants.binary_util',
   ]
 )
 
+# TODO(John Sirois): re-locate, this tests the jvm backend.
 python_tests(
-  name = 'test_maven_layout',
-  sources = ['test_maven_layout.py'],
-  dependencies = [
+  name='test_maven_layout',
+  sources=['test_maven_layout.py'],
+  dependencies=[
     ':base_test',
+    'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/maven_layout',
     'src/python/pants/base:build_file_aliases',
+  ],
+  coverage=[
+    'pants.backend.maven_layout',
   ]
 )
 
 python_tests(
-  name = 'test_thrift_util',
-  sources = ['test_thrift_util.py'],
-  dependencies = [
+  name='test_thrift_util',
+  sources=['test_thrift_util.py'],
+  dependencies=[
     ':base_test',
     '3rdparty/python/twitter/commons:twitter.common.lang',
     'src/python/pants:thrift_util',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
+  ],
+  coverage=[
+    'pants.thrift_util',
   ]
 )
 
 python_tests(
-  name = 'test_utf8_header',
-  sources = ['test_utf8_header.py'],
-  dependencies = [
+  name='test_utf8_header',
+  sources=['test_utf8_header.py'],
+  dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.lang',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:build_file_address_mapper',
@@ -80,8 +90,8 @@ python_tests(
 )
 
 target(
-  name = 'integration',
-  dependencies = [
+  name='integration',
+  dependencies=[
     'tests/python/pants_test/android:integration',
     'tests/python/pants_test/commands:integration',
     'tests/python/pants_test/targets:integration',
@@ -90,9 +100,9 @@ target(
   ]
 )
 
-python_test_suite(
-  name = 'all',
-  dependencies = [
+target(
+  name='all',
+  dependencies=[
     ':test_binary_util',
     ':test_maven_layout',
     ':test_thrift_util',

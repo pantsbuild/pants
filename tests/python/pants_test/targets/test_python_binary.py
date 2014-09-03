@@ -7,7 +7,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import pytest
 
-from pants.base.address import SyntheticAddress
 from pants.base.exceptions import TargetDefinitionException
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants_test.base_test import BaseTest
