@@ -14,10 +14,12 @@ Suggested use:
 
 import os
 import sys
-import bs4
 import pystache
 import shutil
+
+import bs4
 import yaml
+
 
 def load_config(yaml_path):
   config = yaml.load(file(yaml_path).read().decode('utf8'))
@@ -25,16 +27,19 @@ def load_config(yaml_path):
   assert(config['tree'][0]['page'] == 'index')
   return config
 
+
 def load_soups(config):
   """Generate BeautifulSoup AST for each page"""
   soups = {}
   for page, path in config['sources'].items():
-    soups[page] = bs4.BeautifulSoup(open(path).read().decode('utf8'))
+    with open(path) as orig_file:
+      soups[page] = bs4.BeautifulSoup(orig_file.read().decode('utf8'))
   return soups
 
 
 class Precomputed(object):
   """Some info we compute before we mutate things."""
+
   def __init__(self, page):
     """
     :param page: dictionary of per-page precomputed info
@@ -44,6 +49,7 @@ class Precomputed(object):
 
 class PrecomputedPageInfo(object):
   """Some info we compute for each page before we mutate things."""
+
   def __init__(self, title):
     """
     :param title: Page title
@@ -84,9 +90,9 @@ def fixup_internal_links(config, soups):
       # string replace instead of assign to not loose anchor in foo.html#anchor
       tag['href'] = tag['href'].replace(old_rel_path, new_rel_path, 1)
 
+
 def transform_soups(config, soups, precomputed):
   """Mutate our soups to be better when we write them out later."""
-  # TODO: plenty more to do here.
   fixup_internal_links(config, soups)
 
 
@@ -98,7 +104,6 @@ def get_title(soup):
 
 def render_html(dst, config, soups, precomputed):
   soup = soups[dst]
-  template = open(config['template']).read().encode('utf8')
   renderer = pystache.Renderer()
   title = precomputed.page[dst].title
   topdots = ('../' * dst.count('/'))
@@ -106,11 +111,15 @@ def render_html(dst, config, soups, precomputed):
     body_html = soup.body.prettify()
   else:
     body_html = soup.prettify()
+  with open(config['template']) as template_file:
+    template = template_file.read().encode('utf8')
+    template_file.close()
   html = renderer.render(template,
                          body_html=body_html,
                          title=title,
                          topdots=topdots)
   return html
+
 
 def write_en_pages(config, soups, precomputed):
   outdir = config['outdir']
@@ -120,9 +129,10 @@ def write_en_pages(config, soups, precomputed):
     if not os.path.isdir(dst_dir):
       os.makedirs(dst_dir)
     html = render_html(dst, config, soups, precomputed)
-    f = open(dst_path, 'w')
-    f.write(html.encode('utf8'))
-    f.close()
+    with open(dst_path, 'w') as f:
+      f.write(html.encode('utf8'))
+      f.close()
+
 
 def copy_extras(config):
   """copy over "extra" files named in config yaml: stylesheets, logos, ..."""
@@ -133,6 +143,7 @@ def copy_extras(config):
     if not os.path.isdir(dst_dir):
       os.makedirs(dst_dir)
     shutil.copy(src, dst_path)
+
 
 def main():
   config = load_config(sys.argv[1])

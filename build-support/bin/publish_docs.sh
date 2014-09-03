@@ -50,9 +50,6 @@ ${HERE}/../../pants goal markdown --markdown-fragment :: || \
   python build-support/bin/docsitegen.py src/python/pants/docs/docsite.yaml
 ) || die "Failed to generate the doc site."
 
-# TODO HEY BEGIN
-if [[ "false" = "true" ]]; then
-
 (
   activate_pants_venv && \
   cd src/python/pants/docs && \
@@ -84,7 +81,4 @@ continue."
     do_open ${url}/index.html
   ) || die "Publish to ${url} failed."
 fi
-
-fi
-# TODO HEY END
 
