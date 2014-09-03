@@ -33,6 +33,8 @@ your browser, ::
 
     ./pants goal markdown --markdown-open examples/src/java/com/pants/examples/hello/main:readme
 
+Pants generates the HTML files in the ``dist/markdown/`` directory tree.
+
 Link to Another ``page``
 ************************
 

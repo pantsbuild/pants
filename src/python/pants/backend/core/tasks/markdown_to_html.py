@@ -168,11 +168,10 @@ class IncludeExcerptExtension(markdown.Extension):
                           '_begin')
 
 
-
-def id_to_html_path(id):
-  "Given a target id, give a nice path for an output .html path"
-  # _ prefix is because //readme gets an id .readme: whoops, hidden file
-  return "_" + str(id) + ".html"
+def page_to_html_path(page):
+  "Given a page target, return partial path for an output .html"
+  source_path = page.sources_relative_to_buildroot()[0]
+  return os.path.splitext(source_path)[0] + ".html"
 
 
 class MarkdownToHtml(Task):
@@ -221,8 +220,10 @@ class MarkdownToHtml(Task):
   def execute(self):
     # TODO(John Sirois): consider adding change detection
 
-    css_relpath = os.path.join('css', 'codehighlight.css')
-    css = emit_codehighlight_css(os.path.join(self.workdir, css_relpath), self.code_style)
+    outdir = os.path.join(self.context.config.getdefault('pants_distdir'),
+                          'markdown')
+    css_path = os.path.join(outdir, 'css', 'codehighlight.css')
+    css = emit_codehighlight_css(css_path, self.code_style)
     if css:
       self.context.log.info('Emitted %s' % css)
 
@@ -250,12 +251,11 @@ class MarkdownToHtml(Task):
       if ext in self.extensions:
         def process_page(key, outdir, url_builder, config, genmap, fragment=False):
           html_path = self.process(
-            outdir,
+            os.path.join(outdir, page_to_html_path(page)),
             os.path.join(page.payload.sources_rel_path, page.source),
             self.fragment or fragment,
             url_builder,
             config,
-            page.identifier,
             css=css
           )
           self.context.log.info('Processed %s to %s' % (page.source, html_path))
@@ -264,14 +264,14 @@ class MarkdownToHtml(Task):
           return html_path
 
         def url_builder(linked_page, config=None):
-          dest = id_to_html_path(linked_page.identifier)
-          src_dir = os.path.dirname(id_to_html_path(page.identifier))
+          dest = page_to_html_path(linked_page)
+          src_dir = os.path.dirname(page_to_html_path(page))
           return linked_page.name, os.path.relpath(dest, src_dir)
 
-        page_path = os.path.join(self.workdir, 'html')
+        page_path = os.path.join(outdir, 'html')
         html = process_page(page, page_path, url_builder, lambda p: None, plaingenmap)
         if css and not self.fragment:
-          plaingenmap.add(page, self.workdir, list(css_relpath))
+          plaingenmap.add(page, self.workdir, list(css_path))
         if self.open and page in roots:
           show.append(html)
 
@@ -291,7 +291,7 @@ class MarkdownToHtml(Task):
 
   PANTS_LINK = re.compile(r'''pants\(['"]([^)]+)['"]\)(#.*)?''')
 
-  def process(self, outdir, source, fragmented, url_builder, get_config, targid, css=None):
+  def process(self, output_path, source, fragmented, url_builder, get_config, css=None):
     def parse_url(spec):
       match = MarkdownToHtml.PANTS_LINK.match(spec)
       if match:
@@ -317,7 +317,6 @@ class MarkdownToHtml(Task):
 
     wikilinks = WikilinksExtension(build_url)
 
-    output_path = os.path.join(outdir, id_to_html_path(targid))
     safe_mkdir(os.path.dirname(output_path))
     with codecs.open(output_path, 'w', 'utf-8') as output:
       source_path = os.path.join(get_buildroot(), source)

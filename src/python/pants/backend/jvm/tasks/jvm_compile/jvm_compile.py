@@ -19,6 +19,7 @@ from pants.backend.jvm.tasks.jvm_compile.jvm_fingerprint_strategy import JvmFing
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
 from pants.base.build_environment import get_buildroot, get_scm
+from pants.base.config import Config
 from pants.base.exceptions import TaskError
 from pants.base.target import Target
 from pants.base.worker_pool import Work
@@ -215,11 +216,14 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
     check_unnecessary_deps = munge_flag(self._get_lang_specific_option('unnecessary_deps'))
 
     if check_missing_deps or check_missing_direct_deps or check_unnecessary_deps:
+      target_whitelist = self.context.config.getlist('jvm', 'missing_deps_target_whitelist', default=[])
+
       # Must init it here, so it can set requirements on the context.
       self._dep_analyzer = JvmDependencyAnalyzer(self.context,
                                                  check_missing_deps,
                                                  check_missing_direct_deps,
-                                                 check_unnecessary_deps)
+                                                 check_unnecessary_deps,
+                                                 target_whitelist)
     else:
       self._dep_analyzer = None
 

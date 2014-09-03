@@ -68,9 +68,11 @@ python_test_suite(
     ':eclipse_integration',
     ':ensime_integration',
     ':idea_integration',
+    ':ivy_resolve_integration',
     ':jar_publish_integration',
     ':jvm_bundle_integration',
     ':jvm_run_integration',
+    ':markdown_to_html_integration',
     ':protobuf_integration',
     ':scala_repl_integration',
     'tests/python/pants_test/tasks/jvm_compile/java',
@@ -344,6 +346,15 @@ python_tests(
 )
 
 python_tests(
+  name = 'ivy_resolve_integration',
+  sources = ['test_ivy_resolve_integration.py'],
+  dependencies = [
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test:int-test',
+  ],
+)
+
+python_tests(
   name = 'ivy_utils',
   sources = ['test_ivy_utils.py'],
   dependencies = [
@@ -433,6 +444,20 @@ python_tests(
   dependencies = [
     ':base',
     'src/python/pants/backend/core/tasks:markdown_to_html',
+  ]
+)
+
+python_tests(
+  name='markdown_to_html_integration',
+  sources=['test_markdown_to_html_integration.py'],
+  dependencies=[
+    'src/python/pants/backend/core/tasks:markdown_to_html',
+    'src/python/pants/base:build_environment',
+    'src/python/pants/util:dirutil',
+    'tests/python/pants_test:int-test',
+  ],
+  coverage=[
+    'pants.backend.core.tasks.markdown_to_html',
   ]
 )
 

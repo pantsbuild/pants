@@ -5,6 +5,7 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 from collections import defaultdict
+import itertools
 import json
 import os
 
@@ -12,29 +13,26 @@ from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.backend.core.targets.dependencies import Dependencies
 from pants.backend.core.targets.resources import Resources
 from pants.backend.jvm.targets.jar_dependency import JarDependency
+from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 
 
 # Changing the behavior of this task may affect the IntelliJ Pants plugin
-# Please add fkorotkov or ajohnson to reviews for this file
+# Please add fkorotkov, jconvey, tdesai to reviews for this file
 # XXX(pl): JVM hairball violator
 class Depmap(ConsoleTask):
   """Generates either a textual dependency tree or a graphviz digraph dot file for the dependency
   set of a target.
   """
-  class IntelliJConstants(object):
-    """Defines IntelliJ constand defined here
-    'http://grepcode.com/file_/repository.grepcode.com/java/ext/com.jetbrains/intellij-idea/13.0.0
-    /com/intellij/openapi/externalSystem/model/project/ExternalSystemSourceType.java/?v=source'
-    """
-    SOURCE = 'SOURCE'
-    TEST = 'TEST'
-    SOURCE_GENERATED = 'SOURCE_GENERATED'
-    TEST_GENERATED = 'TEST_GENERATED'
-    EXCLUDED = 'EXCLUDED'
-    RESOURCE = 'RESOURCE'
-    TEST_RESOURCE = 'TEST_RESOURCE'
+  class SourceRootTypes(object):
+    """Defines SourceRoot Types Constants"""
+    SOURCE = 'SOURCE'  # Source Target
+    TEST = 'TEST'  # Test Target
+    SOURCE_GENERATED = 'SOURCE_GENERATED'  # Code Gen Source Targets
+    EXCLUDED = 'EXCLUDED'  # Excluded Target
+    RESOURCE = 'RESOURCE'  # Resource belonging to Source Target
+    TEST_RESOURCE = 'TEST_RESOURCE'  # Resource belonging to Test Target
 
   @staticmethod
   def _is_jvm(dep):
@@ -253,14 +251,14 @@ class Depmap(ConsoleTask):
       """
       def get_target_type(target):
         if target.is_test:
-          return Depmap.IntelliJConstants.TEST
+          return Depmap.SourceRootTypes.TEST
         else:
           if isinstance(target, Resources) and resource_target_map[target].is_test:
-            return Depmap.IntelliJConstants.TEST_RESOURCE
+            return Depmap.SourceRootTypes.TEST_RESOURCE
           elif isinstance(target, Resources):
-            return Depmap.IntelliJConstants.RESOURCE
+            return Depmap.SourceRootTypes.RESOURCE
           else:
-            return Depmap.IntelliJConstants.SOURCE
+            return Depmap.SourceRootTypes.SOURCE
 
       info = {
         'targets': [],
@@ -279,9 +277,15 @@ class Depmap(ConsoleTask):
           info['targets'].append(self._address(dep.address))
           resource_target_map[dep] = current_target
 
-      roots = list(set(
-        [os.path.dirname(source) for source in current_target.sources_relative_to_source_root()]
+      java_sources_targets = list(current_target.java_sources) if isinstance(current_target, ScalaLibrary) else list()
+      """
+      :type java_sources_targets:list[pants.base.target.Target]
+      """
+
+      roots = set(itertools.chain(
+        *[self._sources_for_target(t) for t in java_sources_targets + [current_target]]
       ))
+
       info['roots'] = map(lambda source: {
         'source_root': os.path.join(get_buildroot(), current_target.target_base, source),
         'package_prefix': source.replace(os.sep, '.')
@@ -309,3 +313,11 @@ class Depmap(ConsoleTask):
       for module in dep.modules_by_ref.values():
         mapping[self._jar_id(module.ref)] = [artifact.path for artifact in module.artifacts]
     return mapping
+
+  @staticmethod
+  def _sources_for_target(target):
+    """
+    :type target:pants.base.target.Target
+    """
+    return [os.path.dirname(source) for source in target.sources_relative_to_source_root()]
+

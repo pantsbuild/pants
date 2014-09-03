@@ -7,6 +7,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from collections import defaultdict
 from hashlib import sha1
+import logging
 import os
 import shutil
 import threading
@@ -19,6 +20,8 @@ from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import FingerprintStrategy
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.java.executor import Executor
+
+logger = logging.getLogger(__name__)
 
 
 class IvyResolveFingerprintStrategy(FingerprintStrategy):
@@ -114,6 +117,7 @@ class IvyTaskMixin(object):
           raise TaskError('Ivy failed to create classpath file at %s'
                           % raw_target_classpath_file_tmp)
         shutil.move(raw_target_classpath_file_tmp, raw_target_classpath_file)
+        logger.debug('Copied ivy classfile file to {dest}'.format(dest=raw_target_classpath_file))
 
         if self.artifact_cache_writes_enabled():
           self.update_artifact_cache([(global_vts, [raw_target_classpath_file])])

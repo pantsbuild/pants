@@ -39,7 +39,7 @@ class Checkstyle(NailgunTask, JvmToolTaskMixin):
 
     self._checkstyle_bootstrap_key = 'checkstyle'
     bootstrap_tools = self.context.config.getlist('checkstyle', 'bootstrap-tools',
-                                             default=[':twitter-checkstyle'])
+                                                  default=['//:twitter-checkstyle'])
     self.register_jvm_tool(self._checkstyle_bootstrap_key, bootstrap_tools)
 
     self._configuration_file = self.context.config.get(self._CONFIG_SECTION, 'configuration')
