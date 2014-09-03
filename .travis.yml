@@ -5,8 +5,10 @@ python:
   - "2.7"
 
 jdk:
-  - openjdk6
   - openjdk7
+
+install:
+  - pip install coveralls
 
 script: |
   java -version; ./build-support/bin/ci.sh -d
@@ -18,4 +20,7 @@ notifications:
       - zundel@squareup.com
       - benjyw@gmail.com
       - areitz@twitter.com
+
+after_success:
+  coveralls
 
