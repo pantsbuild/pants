@@ -16,8 +16,9 @@ outdir: dist/docsite/
 
 # extras: dict of files to copy into site
 extras:
-  s.css: src/python/pants/docs/docsite.css
   logo.ico: src/python/pants/docs/pants-logo.ico
+  s.css: src/python/pants/docs/docsite.css
+  s.js: src/python/pants/docs/docsite.js
 
 # template: applied to html pages
 template: src/python/pants/docs/docsite.mustache
