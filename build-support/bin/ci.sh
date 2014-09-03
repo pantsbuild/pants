@@ -132,7 +132,9 @@ if [[ "${skip_python:-false}" == "false" ]]; then
   banner "Running core python tests"
   (
     # TODO(Eric Ayers): Substitute tests/python:: when all tests are working that way
-    PANTS_PY_COVERAGE=paths:pants/ PANTS_PYTHON_TEST_FAILSOFT=1 \
+    # NB: We need to leave the pants.pex extracted chroot for coveralls to find the sources that
+    # were covered for upload.
+    PANTS_LEAVE_CHROOT=1 PANTS_PY_COVERAGE=paths:pants/ PANTS_PYTHON_TEST_FAILSOFT=1 \
       ./pants.pex goal test tests/python/pants_test:all \
         ${PANTS_ARGS[@]}
   ) || die "Core python test failure"
