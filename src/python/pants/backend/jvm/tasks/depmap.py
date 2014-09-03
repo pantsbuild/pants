@@ -19,24 +19,20 @@ from pants.base.exceptions import TaskError
 
 
 # Changing the behavior of this task may affect the IntelliJ Pants plugin
-# Please add fkorotkov or ajohnson to reviews for this file
+# Please add fkorotkov, jconvey, tdesai to reviews for this file
 # XXX(pl): JVM hairball violator
 class Depmap(ConsoleTask):
   """Generates either a textual dependency tree or a graphviz digraph dot file for the dependency
   set of a target.
   """
-  class IntelliJConstants(object):
-    """Defines IntelliJ constand defined here
-    'http://grepcode.com/file_/repository.grepcode.com/java/ext/com.jetbrains/intellij-idea/13.0.0
-    /com/intellij/openapi/externalSystem/model/project/ExternalSystemSourceType.java/?v=source'
-    """
-    SOURCE = 'SOURCE'
-    TEST = 'TEST'
-    SOURCE_GENERATED = 'SOURCE_GENERATED'
-    TEST_GENERATED = 'TEST_GENERATED'
-    EXCLUDED = 'EXCLUDED'
-    RESOURCE = 'RESOURCE'
-    TEST_RESOURCE = 'TEST_RESOURCE'
+  class SourceRootTypes(object):
+    """Defines SourceRoot Types Constants"""
+    SOURCE = 'SOURCE'  # Source Target
+    TEST = 'TEST'  # Test Target
+    SOURCE_GENERATED = 'SOURCE_GENERATED'  # Code Gen Source Targets
+    EXCLUDED = 'EXCLUDED'  # Excluded Target
+    RESOURCE = 'RESOURCE'  # Resource belonging to Source Target
+    TEST_RESOURCE = 'TEST_RESOURCE'  # Resource belonging to Test Target
 
   @staticmethod
   def _is_jvm(dep):
@@ -255,14 +251,14 @@ class Depmap(ConsoleTask):
       """
       def get_target_type(target):
         if target.is_test:
-          return Depmap.IntelliJConstants.TEST
+          return Depmap.SourceRootTypes.TEST
         else:
           if isinstance(target, Resources) and resource_target_map[target].is_test:
-            return Depmap.IntelliJConstants.TEST_RESOURCE
+            return Depmap.SourceRootTypes.TEST_RESOURCE
           elif isinstance(target, Resources):
-            return Depmap.IntelliJConstants.RESOURCE
+            return Depmap.SourceRootTypes.RESOURCE
           else:
-            return Depmap.IntelliJConstants.SOURCE
+            return Depmap.SourceRootTypes.SOURCE
 
       info = {
         'targets': [],
