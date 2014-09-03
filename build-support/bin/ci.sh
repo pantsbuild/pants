@@ -173,7 +173,7 @@ fi
 if [[ "${skip_integration:-false}" == "false" ]]; then
   banner "Running Pants Integration tests"
   (
-    PANTS_PY_COVERAGE=paths:pants/ PANTS_PYTHON_TEST_FAILSOFT=1 \
+    PANTS_PYTHON_TEST_FAILSOFT=1 \
       ./pants.pex goal test tests/python/pants_test:integration \
         ${PANTS_ARGS[@]}
   ) || die "Pants Integration test failure"
