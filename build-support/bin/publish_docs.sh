@@ -47,7 +47,7 @@ ${HERE}/../../pants goal markdown --markdown-fragment :: || \
 
 (
   activate_pants_venv && \
-  python src/python/pants/docs/docsitegen.py src/python/pants/docs/docsite.yaml
+  python build-support/bin/docsitegen.py src/python/pants/docs/docsite.yaml
 ) || die "Failed to generate the doc site."
 
 # TODO HEY BEGIN
