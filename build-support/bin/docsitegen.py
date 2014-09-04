@@ -14,18 +14,18 @@ Suggested use:
 
 import os
 import sys
-import pystache
 import shutil
+import pystache
 
 import bs4
 import yaml
 
 
 def load_config(yaml_path):
+  '''Load config info from a .yaml file and return it'''
   with open(yaml_path) as yaml_file:
-    config = yaml.load(yaml_file.read().decode('utf8'))
-    yaml_file.close()
-  # do some sanity-testing on the config:
+    config = yaml.safe_load(yaml_file.read().decode('utf8'))
+  # sanity-test the config:
   assert(config['tree'][0]['page'] == 'index')
   return config
 
@@ -36,7 +36,6 @@ def load_soups(config):
   for page, path in config['sources'].items():
     with open(path) as orig_file:
       soups[page] = bs4.BeautifulSoup(orig_file.read().decode('utf8'))
-      orig_file.close()
   return soups
 
 
@@ -97,6 +96,7 @@ def fixup_internal_links(config, soups):
 def transform_soups(config, soups, precomputed):
   '''Mutate our soups to be better when we write them out later.'''
   fixup_internal_links(config, soups)
+  # TODO: more to come here
 
 
 def get_title(soup):
@@ -132,7 +132,6 @@ def write_en_pages(config, soups, precomputed, template):
       os.makedirs(dst_dir)
     with open(dst_path, 'w') as f:
       f.write(html.encode('utf8'))
-      f.close()
 
 
 def copy_extras(config):
@@ -150,7 +149,6 @@ def load_template(config):
   '''Return text of template file specified in config'''
   with open(config['template']) as template_file:
     template = template_file.read().encode('utf8')
-    template_file.close()
   return template
 
 
