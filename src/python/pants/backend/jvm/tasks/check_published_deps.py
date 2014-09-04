@@ -41,11 +41,12 @@ class CheckPublishedDeps(ConsoleTask):
   def console_output(self, targets):
     push_dbs = {}
 
-    def get_jar_with_version(target):
+    def get_version_and_sha(target):
       db = target.provides.repo.push_db
       if db not in push_dbs:
         push_dbs[db] = PushDb.load(db)
-      return push_dbs[db].as_jar_with_version(target)
+      pushdb_entry = push_dbs[db].get_entry(target)
+      return pushdb_entry.sem_ver, pushdb_entry.sha
 
     visited = set()
     for target in self.context.targets():
@@ -55,7 +56,7 @@ class CheckPublishedDeps(ConsoleTask):
           if artifact in self._artifacts_to_targets and not artifact in visited:
             visited.add(artifact)
             artifact_target = self._artifacts_to_targets[artifact]
-            _, semver, sha, _ = get_jar_with_version(artifact_target)
+            semver, sha = get_version_and_sha(artifact_target)
             if semver.version() != dep.rev:
               yield 'outdated %s#%s %s latest %s' % (dep.org, dep.name, dep.rev, semver.version())
             elif self._print_uptodate:
