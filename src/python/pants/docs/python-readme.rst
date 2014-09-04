@@ -289,8 +289,7 @@ We build:
 .. code-block:: bash
 
   $ ./pants src/python/fabwrap:fab
-  Build operating on targets: OrderedSet([PythonBinary(src/python/fabwrap/BUILD:fab)])
-  Building PythonBinary PythonBinary(src/python/fabwrap/BUILD:fab):
+  ...
   Wrote /private/tmp/wickman-pants/dist/fab.pex
 
 And now `dist/fab.pex` behaves like a standalone `fab` binary:
@@ -361,28 +360,6 @@ You can invoke the Python debugger on a test failure by
 leaving out the ``goal test`` and passing ``--pdb``.
 This can be useful for
 inspecting the state of objects especially if you are mocking interfaces.
-
-Other Testing Frameworks
-========================
-
-.. https://github.com/pantsbuild/pants/issues/276 TODO Did this go away?
-
-Although most tests can run under `pytest`, if you need to use a different testing framework, you
-can. Set the `entry_point` keyword argument when calling python_tests::
-
-  python_tests(
-    name = 'tests',
-    sources = [],
-    dependencies = [
-      'src/python/twitter/infraops/supplybird:supplybird-lib',
-      '3rdparty/python:mock'
-    ],
-    entry_point="twitter.infraops.supplybird.core.run_tests"
-  )
-
-The `entry_point` exits with a non-zero status if there are test failures.
-
-Keep in mind, however, that much of the above documentation assumes you are using `pytest`.
 
 ****************************************************
 Manipulating PEX behavior with environment variables
