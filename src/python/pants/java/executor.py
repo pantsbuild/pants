@@ -161,7 +161,6 @@ class SubprocessExecutor(Executor):
   def _create_command(self, classpath, main, jvm_options, args):
     relative_classpath = relativize_paths(classpath, self._buildroot)
 
-    log.debug('The length of the the classpath is: %s' % len(relative_classpath))
     return super(SubprocessExecutor, self)._create_command(relative_classpath, main, jvm_options,
                                                            args)
 

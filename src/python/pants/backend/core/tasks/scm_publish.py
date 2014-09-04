@@ -5,10 +5,58 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from abc import abstractmethod
+import re
+
 from pants.base.exceptions import TaskError
 
+class Version(object):
+  @staticmethod
+  def parse(version):
+    """Attempts to parse the given string as Semver, then falls back to Namedver."""
+    try:
+      return Semver.parse(version)
+    except ValueError:
+      return Namedver.parse(version)
 
-class Semver(object):
+  @abstractmethod
+  def version(self):
+    """Returns the string representation of this Version."""
+
+
+class Namedver(Version):
+  _VALID_NAME = re.compile('^[-_A-Za-z0-9]+$')
+
+  @classmethod
+  def parse(cls, version):
+    # must not contain whitespace
+    if not cls._VALID_NAME.match(version):
+      raise ValueError("Named versions must be alphanumeric: '{0}'".format(version))
+    # must not be valid semver
+    try:
+      Semver.parse(version)
+    except ValueError:
+      return Namedver(version)
+    else:
+      raise ValueError("Named versions must not be valid semantic versions: '{0}'".format(version))
+
+  def __init__(self, version):
+    self._version = version
+
+  def version(self):
+    return self._version
+
+  def __eq__(self, other):
+    return self._version == other._version
+
+  def __cmp__(self, other):
+    raise ValueError("{0} is not comparable to {1}".format(self, other))
+
+  def __repr__(self):
+    return 'Namedver({0})'.format(self.version())
+
+
+class Semver(Version):
   @staticmethod
   def parse(version):
     components = version.split('.', 3)
