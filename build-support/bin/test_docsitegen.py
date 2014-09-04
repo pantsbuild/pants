@@ -12,12 +12,12 @@ import yaml
 CONFIG_YAML = '''
 sources:
   index: fake0/README.html
-  page1: fake1/p1.html
+  subdir/page1: fake1/p1.html
 
 tree:
   page: index
   children:
-  - page: page1
+  - page: subdir/page1
 
 # outdir: dist/test_docsite/ # maybe we don't want tests to write...?
 
@@ -45,8 +45,10 @@ TEMPLATE_MUSTACHE = '''
 class AllTheThingsTestCase(unittest.TestCase):
   def setUp(self):
     self.config = yaml.load(CONFIG_YAML)
-    self.orig_soups = dict(index=bs4.BeautifulSoup(INDEX_HTML),
-                           page1=bs4.BeautifulSoup(P1_HTML))
+    self.orig_soups = {
+      'index': bs4.BeautifulSoup(INDEX_HTML),
+      'subdir/page1': bs4.BeautifulSoup(P1_HTML)
+      }
     self.precomputed = docsitegen.precompute(self.config, self.orig_soups)
 
   def test_fixup_internal_links(self):
@@ -57,5 +59,5 @@ class AllTheThingsTestCase(unittest.TestCase):
                                   soups,
                                   self.precomputed,
                                   TEMPLATE_MUSTACHE)
-    self.assertTrue('"page1.html"' in html,
+    self.assertTrue('subdir/page1.html' in html,
                     'p1.html link did not get fixed up to page1.html')
