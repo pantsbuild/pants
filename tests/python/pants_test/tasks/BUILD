@@ -19,6 +19,14 @@ python_library(
   ]
 )
 
+python_library(
+  name = 'jvm_binary_test_base',
+  sources = ['jvm_binary_test_base.py'],
+  dependencies = [
+    'tests/python/pants_test/jvm:jar_task_test_base',
+  ]
+)
+
 python_test_suite(
   name = 'tasks',
   dependencies = [
