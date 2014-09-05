@@ -6,6 +6,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 from collections import defaultdict
+import logging
 import os
 import shutil
 
@@ -22,6 +23,7 @@ from pants.base.target import Target
 from pants.goal.goal import Goal
 from pants.util.dirutil import safe_mkdir
 
+logger = logging.getLogger(__name__)
 
 # We use custom checks for scala and java targets here for 2 reasons:
 # 1.) jvm_binary could have either a scala or java source file attached so we can't do a pure
@@ -390,8 +392,19 @@ class SourceSet(object):
 
     return self._excludes
 
+  @property
+  def _key_tuple(self):
+    """Creates a tuple from the attributes used as a key to uniquely identify a SourceSet"""
+    return (self.root_dir, self.source_base, self.path)
+
   def __str__(self):
-    return str((self.root_dir, self.source_base, self.path))
+    return str(self._key_tuple)
+
+  def __eq__(self, other):
+    return self._key_tuple == other._key_tuple
+
+  def __cmp__(self, other):
+    return cmp(self._key_tuple, other._key_tuple)
 
 
 class Project(object):
@@ -456,7 +469,6 @@ class Project(object):
 
     analyzed = OrderedSet()
     targeted = set()
-    targeted_tuples = {}
 
     def relative_sources(target):
       sources = target.payload.sources_relative_to_buildroot()
@@ -474,16 +486,10 @@ class Project(object):
       paths = set([os.path.dirname(source) for source in sources])
       for path in paths:
         absolute_path = os.path.join(absolute_base, path)
-        pieces = (relative_base, path)
-        # Previously this if-statement was testing against absolute_path's presence in targeted.
-        # This broke in the (very weird) edge-case where two different sources have the same
-        # absolute path, but choose the split between relative_base and path differently. It's
-        # really important that we distinguish between them still, because the package name changes.
-        # TODO(Garrett Malmquist): Fix the underlying bugs in pants that make this necessary.
-        if pieces not in targeted_tuples:
-          targeted.add(absolute_path)
-          targeted_tuples[pieces] = sources
-          self.sources.append(SourceSet(self.root_dir, relative_base, path, is_test))
+        # Note, this can add duplicate source paths to self.sources().  We'll de-dup them later,
+        # because we want to prefer test paths.
+        targeted.add(absolute_path)
+        self.sources.append(SourceSet(self.root_dir, relative_base, path, is_test))
 
     def find_source_basedirs(target):
       dirs = set()
@@ -509,7 +515,7 @@ class Project(object):
             resources_by_basedir[target.target_base].update(relative_sources(resources))
           for basedir, resources in resources_by_basedir.items():
             self.resource_extensions.update(Project.extract_resource_extensions(resources))
-            configure_source_sets(basedir, resources, is_test=False)
+            configure_source_sets(basedir, resources, is_test=target.is_test)
 
         if target.has_sources():
           test = target.is_test
@@ -542,6 +548,18 @@ class Project(object):
     def full_path(source_set):
       return os.path.join(source_set.root_dir, source_set.source_base, source_set.path)
 
+    def dedup_sources(source_set_list):
+      """Sometimes two targets with the same path are added to the source set. One is a target where
+       is_test evaluates to True and the other were it evaluates to False.  When this happens,
+       make sure we prefer the SourceSet with is_test set to True.
+      """
+      deduped_sources = set(filter(lambda source_set: source_set.is_test, source_set_list))
+      for source_set in source_set_list:
+        if not source_set.is_test and source_set not in deduped_sources:
+          deduped_sources.add(source_set)
+      # re-sort the list, makes the generated project easier to read.
+      return sorted(list(deduped_sources))
+
     # Check if there are any overlapping source_sets, and output an error message if so.
     # Overlapping source_sets cause serious problems with package name inference.
     overlap_error = ('SourceSets {current} and {previous} evaluate to the same full path.'
@@ -555,7 +573,7 @@ class Project(object):
       full = full_path(source_set)
       if full in source_full_paths:
         previous_set = source_full_paths[full]
-        self.context.log.error(overlap_error.format(current=source_set, previous=previous_set))
+        logger.debug(overlap_error.format(current=source_set, previous=previous_set))
       source_full_paths[full] = source_set
 
     # We need to figure out excludes, in doing so there are 2 cases we should not exclude:
@@ -599,6 +617,7 @@ class Project(object):
     targets.update(analyzed - targets)
     self.sources.extend(SourceSet(get_buildroot(), p, None, False) for p in extra_source_paths)
     self.sources.extend(SourceSet(get_buildroot(), p, None, True) for p in extra_test_paths)
+    self.sources = dedup_sources(self.sources)
 
     return targets
 
