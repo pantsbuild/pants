@@ -5,6 +5,7 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+import os
 import unittest2 as unittest
 
 from twitter.common.collections import OrderedSet
@@ -83,6 +84,20 @@ class SourceRootTest(unittest.TestCase):
     with self.assertRaises(TargetDefinitionException):
       SourceRoot.find(NotTestTarget("//tests/foo/foobar:qux"))
 
+  def test_find_by_path(self):
+    # No source_root is registered yet
+    query = "tests/foo/bar:baz"
+    self.assertIsNone(SourceRoot.find_by_path(query),
+                      msg="Query {query} Failed for tree: {dump}"
+                      .format(query=query, dump=SourceRoot._dump()))
+    SourceRoot.register("tests/foo", TestTarget)
+    self.assertEquals("tests/foo", SourceRoot.find_by_path(query),
+                      msg="Query {query} Failed for tree: {dump}"
+                      .format(query=query, dump=SourceRoot._dump()))
+    self.assertIsNone(SourceRoot.find_by_path("tests/bar/foobar:qux"),
+                                              msg="Failed for tree: {dump}"
+                                              .format(dump=SourceRoot._dump()))
+
   def test_source_root_tree_node(self):
     root = SourceRootTree.Node("ROOT")
     self.assertIsNone(root.get("child1"))
@@ -104,6 +119,7 @@ class SourceRootTest(unittest.TestCase):
     self.assertEquals((None, None), tree.get_root_and_types("tests/language/foo"))
     self.assertEquals((None, None), tree.get_root_and_types("src/language"))
     self.assertEquals((None, None), tree.get_root_and_types("src"))
+
     tree.add_root("tests/language", set([NotTestTarget, TestTarget]))
     self.assertEquals(("tests/language", OrderedSet([NotTestTarget, TestTarget])),
                       tree.get_root_and_types("tests/language"),
@@ -117,6 +133,7 @@ class SourceRootTest(unittest.TestCase):
                       msg="Failed for tree: {dump}".format(dump=tree._dump()))
     self.assertEquals((None, None), tree.get_root_and_types("s"),
                       msg="Failed for tree: {dump}".format(dump=tree._dump()))
+
     tree.add_root("src/language", set([NotTestTarget]))
     self.assertEquals(("tests/language", OrderedSet([NotTestTarget, TestTarget])),
                       tree.get_root_and_types("tests/language"),
@@ -136,3 +153,41 @@ class SourceRootTest(unittest.TestCase):
       tree.add_root("tests/language", set([NotTestTarget]))
     with self.assertRaises(SourceRootTree.NestedSourceRootError):
       tree.add_root("tests", set([NotTestTarget]))
+
+  def _add_siblings1(self, tree, common_root):
+    tree.add_root(os.path.join(common_root, 'src/java'),[NotTestTarget])
+    tree.add_root(os.path.join(common_root, 'src/resources'), [NotTestTarget])
+    tree.add_root(os.path.join(common_root, 'tests/java'), [NotTestTarget, TestTarget])
+    tree.add_root(os.path.join(common_root, 'tests/resources'), [NotTestTarget])
+
+  def test_get_root_siblings(self):
+    tree = SourceRootTree()
+
+    self._add_siblings1(tree, "")
+    self.assertEquals([], tree.get_root_siblings("foo/bar/baz"))
+    self.assertEquals([], tree.get_root_siblings("src"))
+    self.assertEquals(["src/java", "src/resources"],
+                      tree.get_root_siblings("src/java"))
+    self.assertEquals(["src/java", "src/resources"],
+                      tree.get_root_siblings("src/resources"))
+    self.assertEquals(["src/java", "src/resources"],
+                      tree.get_root_siblings("src/java/com/pants/foo"))
+    self.assertEquals(["src/java", "src/resources"],
+                      tree.get_root_siblings("src/resources/com/pants/foo"))
+    self.assertEquals([], tree.get_root_siblings("src/foo/bar/baz"))
+    self.assertEquals(["tests/java", "tests/resources"],
+                      tree.get_root_siblings("tests/java/com/pants/foo"))
+    self.assertEquals(["tests/java", "tests/resources"],
+                      tree.get_root_siblings("tests/resources/com/pants/foo"))
+    self.assertEquals([], tree.get_root_siblings("tests/foo/bar/baz"))
+
+    self._add_siblings1(tree, "examples")
+    self.assertEquals([], tree.get_root_siblings("foo/bar/baz"))
+    self.assertEquals(["src/java", "src/resources"],
+                      tree.get_root_siblings("src/java/com/pants/foo"))
+    self.assertEquals(["tests/java", "tests/resources"],
+                      tree.get_root_siblings("tests/resources/com/pants/foo"))
+    self.assertEquals(["examples/src/java", "examples/src/resources"],
+                      tree.get_root_siblings("examples/src/java/com/pants/foo"))
+    self.assertEquals(["examples/tests/java", "examples/tests/resources"],
+                      tree.get_root_siblings("examples/tests/resources/com/pants/foo"))
