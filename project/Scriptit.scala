@@ -21,7 +21,7 @@ object Scriptit {
     scriptitBase := sourceDirectory.value / "scriptit",
     scriptitTestName := "test",
     scriptitCommands := Commands.defaultCommands,
-    scriptitCommands += Commands.zincCommand((Dist.create in ZincBuild.dist).value),
+    scriptitCommands += Commands.zincCommand(Dist.create.value),
     scriptitScalaVersions := Seq("2.9.3", "2.10.3", "2.11.0-RC3"),
     scriptitProperties := scalaProperties(appConfiguration.value, scriptitScalaVersions.value),
     scriptitProperties ++= javaProperties,
@@ -56,7 +56,7 @@ object Scriptit {
     Defaults.distinctParser(scriptitTests(scriptitBase, script).toSet, raw = false)
 
   def scriptitTests(scriptitBase: File, script: String): Seq[String] =
-    (scriptitBase ** script).get map (_.getParentFile) x relativeTo(scriptitBase) map (_._2)
+    (scriptitBase ** script).get map (_.getParentFile) pair relativeTo(scriptitBase) map (_._2)
 
   def runTest(name: String, path: String, script: Seq[Line], commands: Seq[Command], properties: Map[String, String], log: Logger)(dir: File): Result = {
     val runner = new ScriptRunner(name, path, script)

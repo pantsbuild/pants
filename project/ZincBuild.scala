@@ -20,7 +20,7 @@ object ZincBuild extends Build {
   lazy val zinc = Project(
     "zinc",
     file("."),
-    settings = buildSettings ++ Version.settings ++ Publish.settings ++ Scriptit.settings ++ Seq(
+    settings = buildSettings ++ Version.settings ++ Publish.settings ++ Dist.settings ++ Scriptit.settings ++ Seq(
       resolveSbtLocally := false,
       resolvers += (if (resolveSbtLocally.value) Resolver.mavenLocal else Opts.resolver.sonatypeSnapshots),
       libraryDependencies ++= Seq(
@@ -30,11 +30,5 @@ object ZincBuild extends Build {
       ),
       scalacOptions ++= Seq("-feature", "-deprecation", "-Xlint")
     )
-  )
-
-  lazy val dist = Project(
-    id = "dist",
-    base = file("dist"),
-    settings = buildSettings ++ Dist.settings
   )
 }
