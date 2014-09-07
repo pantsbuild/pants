@@ -8,10 +8,10 @@ import sbt.inc.Analysis
 import sbt.Keys._
 
 object Version {
-  val currentCommit = TaskKey[String]("current-commit")
+  val currentCommit = taskKey[String]("current-commit")
 
   lazy val settings: Seq[Setting[_]]  = Seq(
-    currentCommit <<= (baseDirectory, streams) map gitCommitHash,
+    currentCommit := gitCommitHash(baseDirectory.value, streams.value),
     resourceGenerators in Compile <+= (version, currentCommit, resourceManaged, compile in Compile, streams) map generateFile
   )
 

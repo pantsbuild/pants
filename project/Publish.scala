@@ -6,16 +6,15 @@ import sbt._
 import sbt.Keys._
 
 object Publish {
-  val publishLocally = SettingKey[Boolean]("publish-locally")
+  val publishLocally = settingKey[Boolean]("publish-locally")
 
   lazy val settings: Seq[Setting[_]] = Seq(
     publishMavenStyle := true,
     publishLocally := false,
-    publishTo <<= (version, publishLocally) { (v, local) =>
-      if (local) Some(Opts.resolver.mavenLocalFile)
-      else if (v.endsWith("SNAPSHOT")) Some(Opts.resolver.sonatypeSnapshots)
-      else Some(Opts.resolver.sonatypeStaging)
-    },
+    publishTo := Some(
+      if (publishLocally.value) Opts.resolver.mavenLocalFile
+      else if (isSnapshot.value) Opts.resolver.sonatypeSnapshots
+      else Opts.resolver.sonatypeStaging),
     credentials += Credentials(Path.userHome / ".ivy2" / "sonatype-credentials"),
     publishArtifact in Test := false,
     homepage := Some(url("https://github.com/typesafehub/zinc")),

@@ -8,9 +8,9 @@ import sbt.Keys._
 object ZincBuild extends Build {
   val sbtVersion = "0.13.5"
 
-  val resolveSbtLocally = SettingKey[Boolean]("resolve-sbt-locally")
+  val resolveSbtLocally = settingKey[Boolean]("resolve-sbt-locally")
 
-  lazy val buildSettings = Defaults.defaultSettings ++ Seq(
+  lazy val buildSettings = Seq(
     organization := "com.typesafe.zinc",
     version := "0.3.5-SNAPSHOT",
     scalaVersion := "2.10.4",
@@ -22,7 +22,7 @@ object ZincBuild extends Build {
     file("."),
     settings = buildSettings ++ Version.settings ++ Publish.settings ++ Scriptit.settings ++ Seq(
       resolveSbtLocally := false,
-      resolvers <+= resolveSbtLocally { local => if (local) Resolver.mavenLocal else Opts.resolver.sonatypeSnapshots },
+      resolvers += (if (resolveSbtLocally.value) Resolver.mavenLocal else Opts.resolver.sonatypeSnapshots),
       libraryDependencies ++= Seq(
         "com.typesafe.sbt" % "incremental-compiler" % sbtVersion,
         "com.typesafe.sbt" % "compiler-interface" % sbtVersion classifier "sources",
