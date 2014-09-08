@@ -141,6 +141,7 @@ class Target(AbstractTarget):
 
   @property
   def target_base(self):
+    """:returns: the source root path for this target."""
     return SourceRoot.find(self)
 
   @classmethod
