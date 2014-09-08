@@ -111,6 +111,7 @@ python_library(
   sources = ['console_task.py'],
   dependencies = [
     ':common',
+    'src/python/pants/util:dirutil',
   ],
 )
 
