@@ -141,6 +141,7 @@ class Target(AbstractTarget):
 
   @property
   def target_base(self):
+    """:returns: the source root path for this target."""
     return SourceRoot.find(self)
 
   @classmethod
@@ -347,7 +348,8 @@ class Target(AbstractTarget):
     return self.id
 
   def walk(self, work, predicate=None):
-    """Walk of this target's dependency graph, in DFS order, visiting each node exactly once.
+    """Walk of this target's dependency graph, DFS inorder traversal, visiting each node exactly
+    once.
 
     If a predicate is supplied it will be used to test each target before handing the target to
     work and descending. Work can return targets in which case these will be added to the walk
@@ -365,7 +367,7 @@ class Target(AbstractTarget):
     self._build_graph.walk_transitive_dependency_graph([self.address], work, predicate)
 
   def closure(self):
-    """Returns this target's transitive dependencies, in DFS order."""
+    """Returns this target's transitive dependencies, in DFS inorder traversal."""
     return self._build_graph.transitive_subgraph_of_addresses([self.address])
 
   @manual.builddict()

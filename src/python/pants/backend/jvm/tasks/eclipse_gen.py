@@ -48,7 +48,7 @@ class EclipseGen(IdeGen):
   def __init__(self, *args, **kwargs):
     super(EclipseGen, self).__init__(*args, **kwargs)
 
-    version = _VERSIONS[context.options.eclipse_gen_version]
+    version = _VERSIONS[self.context.options.eclipse_gen_version]
     self.project_template = os.path.join(_TEMPLATE_BASEDIR, 'project-%s.mustache' % version)
     self.classpath_template = os.path.join(_TEMPLATE_BASEDIR, 'classpath-%s.mustache' % version)
     self.apt_template = os.path.join(_TEMPLATE_BASEDIR, 'factorypath-%s.mustache' % version)
@@ -130,14 +130,8 @@ class EclipseGen(IdeGen):
       source_sets[linked_folder_id(source_set)].add(source_set)
     sourcepaths = [create_sourcepath(base_id, sources) for base_id, sources in source_sets.items()]
 
-    libs = []
-
-    def add_jarlibs(classpath_entries):
-      for classpath_entry in classpath_entries:
-        # TODO(John Sirois): Plumb javadoc jars
-        libs.append((classpath_entry.jar, classpath_entry.source_jar))
-    add_jarlibs(project.internal_jars)
-    add_jarlibs(project.external_jars)
+    libs = list(project.internal_jars)
+    libs.extend(project.external_jars)
 
     configured_classpath = TemplateData(
       sourcepaths=sourcepaths,
@@ -162,7 +156,7 @@ class EclipseGen(IdeGen):
 
     for resource in _SETTINGS:
       with safe_open(os.path.join(self.cwd, '.settings', resource), 'w') as prefs:
-        prefs.write(pkgutil.get_data(__name__, os.path.join('files', 'eclipse', resource)))
+        prefs.write(pkgutil.get_data(__name__, os.path.join(_TEMPLATE_BASEDIR, resource)))
 
     factorypath = TemplateData(
       project_name=self.project_name,

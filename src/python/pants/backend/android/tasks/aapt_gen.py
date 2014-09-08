@@ -76,9 +76,12 @@ class AaptGen(AaptTask, CodeGen):
     #   : '-M' is the AndroidManifest.xml of the project.
     #   : '-S' points to the resource_dir to "spider" down while collecting resources.
     #   : '-I' packages to add to base "include" set, here it is the android.jar of the target-sdk.
-    args.extend([self.aapt_tool(target.build_tools_version), 'package', '-m', '-J', output_dir,
-                 '-M', target.manifest, '-S', target.resource_dir, '-I',
-                 self.android_jar_tool(target.target_sdk), '--ignore-assets', self.ignored_assets])
+    args.extend([self.aapt_tool(target.build_tools_version)])
+    args.extend(['package', '-m', '-J', output_dir])
+    args.extend(['-M', target.manifest])
+    args.extend(['-S', target.resource_dir])
+    args.extend(['-I', self.android_jar_tool(target.target_sdk)])
+    args.extend(['--ignore-assets', self.ignored_assets])
     log.debug('Executing: {0}'.format(args))
     return args
 

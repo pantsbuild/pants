@@ -6,7 +6,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 from pants.backend.core.tasks.console_task import ConsoleTask
-from pants.goal.phase import Phase
+from pants.goal.goal import Goal
 
 
 class ListGoals(ConsoleTask):
@@ -29,12 +29,12 @@ class ListGoals(ConsoleTask):
       documented_rows = []
       undocumented = []
       max_width = 0
-      for phase in Phase.all():
-        if phase.description:
-          documented_rows.append((phase.name, phase.description))
-          max_width = max(max_width, len(phase.name))
+      for goal in Goal.all():
+        if goal.description:
+          documented_rows.append((goal.name, goal.description))
+          max_width = max(max_width, len(goal.name))
         elif self.context.options.goal_list_all:
-          undocumented.append(phase.name)
+          undocumented.append(goal.name)
       for name, description in documented_rows:
         yield '  %s: %s' % (name.rjust(max_width), description)
       if undocumented:
@@ -43,11 +43,11 @@ class ListGoals(ConsoleTask):
         yield '  %s' % ' '.join(undocumented)
 
     def graph():
-      def get_cluster_name(phase):
-        return 'cluster_%s' % phase.name.replace('-', '_')
+      def get_cluster_name(goal):
+        return 'cluster_%s' % goal.name.replace('-', '_')
 
-      def get_node_name(phase, task_name):
-        name = '%s_%s' % (phase.name, task_name)
+      def get_node_name(goal, task_name):
+        name = '%s_%s' % (goal.name, task_name)
         return name.replace('-', '_')
 
       yield '\n'.join([
@@ -55,28 +55,28 @@ class ListGoals(ConsoleTask):
         '  rankdir=LR;',
         '  graph [compound=true];',
         ])
-      for phase in Phase.all():
+      for goal in Goal.all():
         yield '\n'.join([
-          '  subgraph %s {' % get_cluster_name(phase),
+          '  subgraph %s {' % get_cluster_name(goal),
           '    node [style=filled];',
           '    color = blue;',
-          '    label = "%s";' % phase.name,
+          '    label = "%s";' % goal.name,
         ])
-        for name in phase.ordered_task_names():
-          yield '    %s [label="%s"];' % (get_node_name(phase, name), name)
+        for name in goal.ordered_task_names():
+          yield '    %s [label="%s"];' % (get_node_name(goal, name), name)
         yield '  }'
 
       edges = set()
-      for phase in Phase.all():
-        tail_task_name = phase.ordered_task_names()[-1]
-        for dep in phase.dependencies:
-          edge = 'ltail=%s lhead=%s' % (get_cluster_name(phase), get_cluster_name(dep))
+      for goal in Goal.all():
+        tail_task_name = goal.ordered_task_names()[-1]
+        for dep in goal.dependencies:
+          edge = 'ltail=%s lhead=%s' % (get_cluster_name(goal), get_cluster_name(dep))
           if edge not in edges:
-            # We display edges between clusters (representing phases), but dot still requires
+            # We display edges between clusters (representing goals), but dot still requires
             # us to specify them between nodes (representing tasks) and then add ltail, lhead
             # annotations.  We connect the last task in the dependee to the first task in
             # the dependency, as this leads to the neatest-looking graph.
-            yield '  %s -> %s [%s];' % (get_node_name(phase, tail_task_name),
+            yield '  %s -> %s [%s];' % (get_node_name(goal, tail_task_name),
                                         get_node_name(dep, dep.ordered_task_names()[0]), edge)
           edges.add(edge)
       yield '}'

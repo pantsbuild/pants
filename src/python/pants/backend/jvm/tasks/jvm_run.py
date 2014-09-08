@@ -11,6 +11,7 @@ from pants.backend.jvm.targets.jvm_binary import JvmApp, JvmBinary
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit
+from pants.fs.fs import expand_path
 from pants.java.executor import CommandLineGrabber
 from pants.java.util import execute_java
 from pants.util.dirutil import safe_open
@@ -23,19 +24,19 @@ def is_binary(target):
 class JvmRun(JvmTask):
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
-    option_group.add_option(mkflag("jvmargs"), dest = "run_jvmargs", action="append",
-      help = "Run binary in a jvm with these extra jvm args.")
+    option_group.add_option(mkflag('jvmargs'), dest='run_jvmargs', action='append',
+      help='Run binary in a jvm with these extra jvm args.')
 
-    option_group.add_option(mkflag("args"), dest = "run_args", action="append",
-      help = "Run binary with these main() args.")
+    option_group.add_option(mkflag('args'), dest='run_args', action='append',
+      help='Run binary with these main() args.')
 
-    option_group.add_option(mkflag("debug"), mkflag("debug", negate=True), dest = "run_debug",
-      action="callback", callback=mkflag.set_bool, default=False,
-      help = "[%default] Run binary with a debugger")
+    option_group.add_option(mkflag('debug'), mkflag('debug', negate=True), dest='run_debug',
+      action='callback', callback=mkflag.set_bool, default=False,
+      help='[%default] Run binary with a debugger')
 
-    option_group.add_option(mkflag('only-write-cmd-line'), dest = 'only_write_cmd_line',
+    option_group.add_option(mkflag('only-write-cmd-line'), dest='only_write_cmd_line',
       action='store', default=None,
-      help = '[%default] Instead of running, just write the cmd line to this file')
+      help='[%default] Instead of running, just write the cmd line to this file')
 
   def __init__(self, *args, **kwargs):
     super(JvmRun, self).__init__(*args, **kwargs)
@@ -54,7 +55,7 @@ class JvmRun(JvmTask):
 
   def prepare(self, round_manager):
     # TODO(John Sirois): these are fake requirements in order to force compile run before this
-    # phase. Introduce a RuntimeClasspath product for JvmCompile and PrepareResources to populate
+    # goal. Introduce a RuntimeClasspath product for JvmCompile and PrepareResources to populate
     # and depend on that.
     # See: https://github.com/pantsbuild/pants/issues/310
     round_manager.require_data('resources_by_target')
@@ -97,7 +98,7 @@ class JvmRun(JvmTask):
       )
 
       if self.only_write_cmd_line:
-        with safe_open(self.only_write_cmd_line, 'w') as outfile:
+        with safe_open(expand_path(self.only_write_cmd_line), 'w') as outfile:
           outfile.write(' '.join(executor.cmd))
       elif result != 0:
         raise TaskError('java %s ... exited non-zero (%i)' % (binary.main, result),

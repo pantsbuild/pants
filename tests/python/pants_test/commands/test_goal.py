@@ -7,7 +7,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from pants.backend.jvm.register import register_goals
 from pants.commands.goal_runner import GoalRunner
-from pants.goal.phase import Phase
+from pants.goal.goal import Goal
 from pants_test.base_test import BaseTest
 
 
@@ -15,14 +15,14 @@ class GoalTest(BaseTest):
 
   def setUp(self):
     super(GoalTest, self).setUp()
-    # Have to load in goals, because parse_args requires Phase.all() now.
+    # Have to load in goals, because parse_args requires Goal.all() now.
     # Fortunately, we only have to load in the goals we're actually using below, so the goals in the
     # core register are sufficient.
     register_goals()
 
   def tearDown(self):
     super(GoalTest, self).tearDown()
-    Phase.clear()
+    Goal.clear()
 
   def assert_result(self, goals, specs, args):
     g, s = GoalRunner.parse_args(args)

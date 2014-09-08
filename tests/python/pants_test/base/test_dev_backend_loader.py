@@ -10,7 +10,7 @@ import uuid
 import sys
 import types
 
-import unittest2
+import unittest2 as unittest
 
 from pants.base.build_configuration import BuildConfiguration
 from pants.base.build_file_aliases import BuildFileAliases
@@ -18,15 +18,15 @@ from pants.base.dev_backend_loader import load_backend
 from pants.base.exceptions import BuildConfigurationError
 from pants.base.target import Target
 from pants.goal.task_registrar import TaskRegistrar
-from pants.goal.phase import Phase
+from pants.goal.goal import Goal
 
 
-class LoaderTest(unittest2.TestCase):
+class LoaderTest(unittest.TestCase):
   def setUp(self):
     self.build_configuration = BuildConfiguration()
 
   def tearDown(self):
-    Phase.clear()
+    Goal.clear()
 
   @contextmanager
   def create_register(self, build_file_aliases=None, register_commands=None, register_goals=None,
@@ -77,17 +77,17 @@ class LoaderTest(unittest2.TestCase):
 
   def test_load_valid_partial_goals(self):
     def register_goals():
-      Phase.by_name('jack').install(TaskRegistrar('jill', lambda: 42))
+      Goal.by_name('jack').install(TaskRegistrar('jill', lambda: 42))
 
     with self.create_register(register_goals=register_goals) as backend_package:
-      Phase.clear()
-      self.assertEqual(0, len(Phase.all()))
+      Goal.clear()
+      self.assertEqual(0, len(Goal.all()))
 
       load_backend(self.build_configuration, backend_package)
       self.assert_empty_aliases()
-      self.assertEqual(1, len(Phase.all()))
+      self.assertEqual(1, len(Goal.all()))
 
-      task_names = Phase.by_name('jack').ordered_task_names()
+      task_names = Goal.by_name('jack').ordered_task_names()
       self.assertEqual(1, len(task_names))
 
       task_name = task_names[0]

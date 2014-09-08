@@ -25,6 +25,10 @@ class AaptBuilder(AaptTask):
   This class gathers compiled classes (an Android dex archive) and packages it with the
   target's resource files. The output is an unsigned .apk, an Android application package file.
   """
+  @classmethod
+  def product_types(cls):
+    return ['apk']
+
   @staticmethod
   def is_app(target):
     return isinstance(target, AndroidBinary)
@@ -46,12 +50,13 @@ class AaptBuilder(AaptTask):
     #   : '--ignored-assets' patterns for the aapt to skip. This is the default w/ 'BUILD*' added.
     #   : '-F' The name and location of the .apk file to output
     #   : additional positional arguments are treated as input directories to gather files from.
-    args.extend([self.aapt_tool(target.build_tools_version), 'package', '-M',
-                 target.manifest, '-S'])
+    args.extend([self.aapt_tool(target.build_tools_version)])
+    args.extend(['package', '-M', target.manifest])
+    args.extend(['-S'])
     args.extend(resource_dir)
-    args.extend(['-I', self.android_jar_tool(target.target_sdk), '--ignore-assets',
-                 self.ignored_assets, '-F', os.path.join(self.workdir,
-                 target.app_name + '-unsigned.apk')])
+    args.extend(['-I', self.android_jar_tool(target.target_sdk)])
+    args.extend(['--ignore-assets', self.ignored_assets])
+    args.extend(['-F', os.path.join(self.workdir, target.app_name + '-unsigned.apk')])
     args.extend(inputs)
     log.debug('Executing: {0}'.format(args))
     return args
@@ -66,7 +71,7 @@ class AaptBuilder(AaptTask):
         for vt in invalidation_check.invalid_vts:
           invalid_targets.extend(vt.targets)
         for target in invalid_targets:
-          # 'input_dirs' is the folder containing the Android dex file (e.g. 'classes.dex')
+          # 'input_dirs' is the folder containing the Android dex file
           input_dirs = []
           # 'gen_out' holds resource folders (e.g. 'res')
           gen_out = []
@@ -85,3 +90,6 @@ class AaptBuilder(AaptTask):
           result = process.wait()
           if result != 0:
             raise TaskError('Android aapt tool exited non-zero ({code})'.format(code=result))
+    for target in targets:
+      self.context.products.get('apk').add(target, self.workdir).append(target.app_name + "-unsigned.apk")
+

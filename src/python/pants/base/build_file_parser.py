@@ -5,36 +5,52 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from collections import defaultdict
 import logging
-import traceback
-import sys
 
 from twitter.common.lang import Compatibility
 
-from pants.base.address import BuildFileAddress, parse_spec, SyntheticAddress
-from pants.base.build_environment import get_buildroot, pants_version
 from pants.base.build_file import BuildFile
-from pants.base.build_graph import BuildGraph
 
 
 logger = logging.getLogger(__name__)
 
+# Note: Significant effort has been made to keep the types BuildFile, BuildGraph, Address, and
+# Target separated appropriately.  The BulidFileParser is intended to have knowledge of just
+# BuildFile and Address.
+#
+# Here are some guidelines to help maintain this abstraction:
+#  - Use the terminology 'address' instead of 'target' in symbols and user messages
+#  - Wrap exceptions from BuildFile with a subclass of BuildFileParserError
+#     so that callers do not have to reference the BuildFile module
+#
+# Note: In general, 'spec' should not be a user visible term, it is usually appropriate to
+# substitute 'address' instead.
 
 class BuildFileParser(object):
   """Parses BUILD files for a given repo build configuration."""
 
-  class TargetConflictException(Exception):
-    """Thrown if the same target is redefined in a BUILD file"""
+  class BuildFileParserError(Exception):
+    """Base class for all exceptions raised in BuildFileParser to make exception handling easier"""
+    pass
 
-  class SiblingConflictException(Exception):
-    """Thrown if the same target is redefined in another BUILD file in the same directory"""
+  class BuildFileScanError(BuildFileParserError):
+    """Raised if there was a problem when gathering all addresses in a BUILD file """
+    pass
 
-  class InvalidTargetException(Exception):
-    """Thrown if the user called for a target not present in a BUILD file."""
+  class AddressableConflictException(BuildFileParserError):
+    """Raised if the same address is redefined in a BUILD file"""
+    pass
 
-  class EmptyBuildFileException(Exception):
-    """Thrown if the user called for a target when none are present in a BUILD file."""
+  class SiblingConflictException(BuildFileParserError):
+    """Raised if the same address is redefined in another BUILD file in the same directory"""
+    pass
+
+  class ParseError(BuildFileParserError):
+    """An exception was encountered in the python parser"""
+
+
+  class ExecuteError(BuildFileParserError):
+    """An exception was encountered executing code in the BUILD file"""
 
   def __init__(self, build_configuration, root_dir, run_tracker=None):
     self._build_configuration = build_configuration
@@ -50,64 +66,19 @@ class BuildFileParser(object):
       return parse_spec(spec, relative_to=relative_to)
     except ValueError as e:
       if context:
-        msg = ('Invalid spec {spec} found while '
+        msg = ('Invalid address {spec} found while '
                'parsing {context}: {exc}').format(spec=spec, context=context, exc=e)
       else:
-        msg = 'Invalid spec {spec}: {exc}'.format(spec=spec, exc=e)
-      raise self.InvalidTargetException(msg)
-
-  def _raise_incorrect_target_error(self, wrong_target, targets):
-    """Search through the list of targets and return those which originate from the same folder
-    which wrong_target resides in.
-
-    :raises: A helpful error message listing possible correct target addresses.
-    """
-    def path_parts(build):  # Gets a tuple of directory, filename.
-        build = str(build)
-        slash = build.rfind('/')
-        if slash < 0:
-          return '', build
-        return build[:slash], build[slash+1:]
-
-    def are_siblings(a, b):  # Are the targets in the same directory?
-      return path_parts(a)[0] == path_parts(b)[0]
-
-    valid_specs = []
-    all_same = True
-    # Iterate through all addresses, saving those which are similar to the wrong address.
-    for target in targets:
-      if are_siblings(target.build_file, wrong_target.build_file):
-        possibility = (path_parts(target.build_file)[1], target.spec[target.spec.rfind(':'):])
-        # Keep track of whether there are multiple BUILD files or just one.
-        if all_same and valid_specs and possibility[0] != valid_specs[0][0]:
-          all_same = False
-        valid_specs.append(possibility)
-
-    # Trim out BUILD extensions if there's only one anyway; no need to be redundant.
-    if all_same:
-      valid_specs = [('', tail) for head, tail in valid_specs]
-    # Might be neat to sort by edit distance or something, but for now alphabetical is fine.
-    valid_specs = [''.join(pair) for pair in sorted(valid_specs)]
-
-    # Give different error messages depending on whether BUILD file was empty.
-    if valid_specs:
-      one_of = ' one of' if len(valid_specs) > 1 else '' # Handle plurality, just for UX.
-      raise self.InvalidTargetException((
-          ':{address} from spec {spec} was not found in BUILD file {build_file}. Perhaps you '
-          'meant{one_of}: \n  {specs}').format(address=wrong_target.target_name,
-                                               spec=wrong_target.spec,
-                                               build_file=wrong_target.build_file,
-                                               one_of=one_of,
-                                               specs='\n  '.join(valid_specs)))
-    # There were no targets in the BUILD file.
-    raise self.EmptyBuildFileException((
-        ':{address} from spec {spec} was not found in BUILD file {build_file}, because that '
-        'BUILD file contains no targets.').format(address=wrong_target.target_name,
-                                                  spec=wrong_target.spec,
-                                                  build_file=wrong_target.build_file))
+        msg = 'Invalid address {spec}: {exc}'.format(spec=spec, exc=e)
+      raise self.InvalidAddressException(msg)
 
   def address_map_from_spec_path(self, spec_path):
-    build_file = BuildFile.from_cache(self._root_dir, spec_path)
+    try:
+      build_file = BuildFile.from_cache(self._root_dir, spec_path)
+    except BuildFile.BuildFileError as e:
+      raise self.BuildFileScanError("{message}\n searching {spec_path}"
+                                    .format(message=e,
+                                            spec_path=spec_path))
     family_address_map_by_build_file = self.parse_build_file_family(build_file)
     address_map = {}
     for build_file, sibling_address_map in family_address_map_by_build_file.items():
@@ -121,7 +92,7 @@ class BuildFileParser(object):
       for address, addressable in bf_address_map.items():
         for sibling_build_file, sibling_address_map in family_address_map_by_build_file.items():
           if address in sibling_address_map:
-            raise BuildFileParser.SiblingConflictException(
+            raise self.SiblingConflictException(
               "Both {conflicting_file} and {addressable_file} define the same address: "
               "'{target_name}'"
               .format(conflicting_file=sibling_build_file,
@@ -136,23 +107,46 @@ class BuildFileParser(object):
     Addressable instances generated by executing the code.
     """
 
+    def _format_context_msg(lineno, offset, error_type, message):
+      """Show the line of the BUILD file that has the error along with a few line of context"""
+      with open(build_file.full_path, "r") as build_contents:
+        context = "Error parsing {path}:\n".format(path=build_file.full_path)
+        curr_lineno = 0
+        for line in build_contents.readlines():
+          curr_lineno += 1
+          if curr_lineno == lineno:
+            highlight = '*'
+          else:
+            highlight = ' '
+          if curr_lineno >= lineno - 3:
+            context += "{highlight}{curr_lineno:4d}: {line}".format(
+              highlight=highlight, line=line, curr_lineno=curr_lineno)
+            if offset and lineno == curr_lineno:
+              context += "       {caret:>{width}} {error_type}: {message}\n\n" \
+                .format(caret="^", width=int(offset), error_type=error_type,
+                        message=message)
+          if curr_lineno > lineno + 3:
+            break
+        return context
+
     logger.debug("Parsing BUILD file {build_file}."
                  .format(build_file=build_file))
 
     try:
       build_file_code = build_file.code()
-    except Exception:
-      logger.exception("Error parsing {build_file}.".format(build_file=build_file))
-      traceback.print_exc()
-      raise
+    except SyntaxError as e:
+      raise self.ParseError(_format_context_msg(e.lineno, e.offset, e.__class__.__name__, e))
+    except Exception as e:
+        raise self.ParseError("{error_type}: {message}\n while parsing BUILD file {build_file}"
+                              .format(error_type=e.__class__.__name__,
+                                      message=e, build_file=build_file))
 
     parse_state = self._build_configuration.initialize_parse_state(build_file)
     try:
       Compatibility.exec_function(build_file_code, parse_state.parse_globals)
-    except Exception:
-      logger.exception("Error parsing {build_file}.".format(build_file=build_file))
-      traceback.print_exc()
-      raise
+    except Exception as e:
+      raise self.ExecuteError("{message}\n while executing BUILD file {build_file}"
+                              .format(message=e, build_file=build_file))
 
     address_map = {}
     for address, addressable in parse_state.registered_addressable_instances:
@@ -160,8 +154,7 @@ class BuildFileParser(object):
                    .format(addressable=addressable,
                            address=address))
       if address in address_map:
-        conflicting_addressable = address_map[address]
-        raise BuildFileParser.TargetConflictException(
+        raise self.AddressableConflictException(
           "File {conflicting_file} defines address '{target_name}' more than once."
           .format(conflicting_file=address.build_file,
                   target_name=address.target_name))

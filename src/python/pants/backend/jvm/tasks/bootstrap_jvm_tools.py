@@ -23,7 +23,7 @@ class BootstrapJvmTools(Task, IvyTaskMixin):
     super(BootstrapJvmTools, self).__init__(*args, **kwargs)
 
   def prepare(self, round_manager):
-    # TODO(John Sirois): This is the sole use of data dependencies that does not follow the phase
+    # TODO(John Sirois): This is the sole use of data dependencies that does not follow the goal
     # lifecycle.  The BootstrapJvmTools task must execute before all JVM tool using tasks but
     # the 'jvm_build_tools' "data" must be produced by each JVM tool using task before it executes.
     # Normally data dependencies flow between task executions. Untangle this data dependency abuse.

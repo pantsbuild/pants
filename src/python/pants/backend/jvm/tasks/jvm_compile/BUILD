@@ -24,7 +24,7 @@ python_library(
   name = 'analysis_parser',
   sources = ['analysis_parser.py'],
   dependencies = [
-    pants('src/python/pants/base:exceptions'),
+    'src/python/pants/base:exceptions',
   ]
 )
 
@@ -32,8 +32,8 @@ python_library(
   name = 'analysis_tools',
   sources = ['analysis_tools.py'],
   dependencies = [
-    pants('src/python/pants/base:build_environment'),
-    pants('src/python/pants/util:contextutil'),
+    'src/python/pants/base:build_environment',
+    'src/python/pants/util:contextutil',
   ]
 )
 
@@ -41,14 +41,15 @@ python_library(
   name = 'java',
   sources = globs('java/*.py'),
   dependencies = [
-    pants(':analysis'),
-    pants(':analysis_tools'),
-    pants(':jvm_compile'),
-    pants('src/python/pants/base:build_environment'),
-    pants('src/python/pants/base:exceptions'),
-    pants('src/python/pants/base:target'),
-    pants('src/python/pants/base:workunit'),
-    pants('src/python/pants/util:dirutil'),
+    ':analysis',
+    ':analysis_parser',
+    ':analysis_tools',
+    ':jvm_compile',
+    'src/python/pants/base:build_environment',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/base:target',
+    'src/python/pants/base:workunit',
+    'src/python/pants/util:dirutil',
   ],
 )
 
@@ -56,19 +57,19 @@ python_library(
   name = 'jvm_compile',
   sources = ['jvm_compile.py'],
   dependencies = [
-    pants(':jvm_dependency_analyzer'),
-    pants(':jvm_fingerprint_strategy'),
-    pants('src/python/pants/backend/core/tasks:group_task'),
-    pants('src/python/pants/backend/core/tasks:task'),
-    pants('src/python/pants/backend/jvm/tasks:jvm_tool_task_mixin'),
-    pants('src/python/pants/backend/jvm/tasks:nailgun_task'),
-    pants('src/python/pants/base:build_environment'),
-    pants('src/python/pants/base:target'),
-    pants('src/python/pants/base:worker_pool'),
-    pants('src/python/pants/goal:products'),
-    pants('src/python/pants/reporting'),
-    pants('src/python/pants/util:contextutil'),
-    pants('src/python/pants/util:dirutil'),
+    ':jvm_dependency_analyzer',
+    ':jvm_fingerprint_strategy',
+    'src/python/pants/backend/core/tasks:group_task',
+    'src/python/pants/backend/core/tasks:task',
+    'src/python/pants/backend/jvm/tasks:jvm_tool_task_mixin',
+    'src/python/pants/backend/jvm/tasks:nailgun_task',
+    'src/python/pants/base:build_environment',
+    'src/python/pants/base:target',
+    'src/python/pants/base:worker_pool',
+    'src/python/pants/goal:products',
+    'src/python/pants/reporting',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
   ],
 )
 
@@ -76,8 +77,8 @@ python_library(
   name = 'jvm_fingerprint_strategy',
   sources = ['jvm_fingerprint_strategy.py'],
   dependencies = [
-    pants('src/python/pants/base:hash_utils'),
-    pants('src/python/pants/base:target'),
+    'src/python/pants/base:hash_utils',
+    'src/python/pants/base:target',
   ],
 )
 
@@ -90,12 +91,12 @@ python_library(
   name = 'jvm_dependency_analyzer',
   sources = ['jvm_dependency_analyzer.py'],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.collections'),
-    pants('src/python/pants/base:build_environment'),
-    pants('src/python/pants/backend/jvm/tasks:ivy_task_mixin'),
-    pants('src/python/pants/backend/core/targets:common'),
-    pants('src/python/pants/backend/jvm/targets:jvm'),
-    pants('src/python/pants/backend/core/tasks:common'),
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    'src/python/pants/base:build_environment',
+    'src/python/pants/backend/jvm/tasks:ivy_task_mixin',
+    'src/python/pants/backend/core/targets:common',
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/core/tasks:common',
   ],
 )
 
@@ -103,21 +104,21 @@ python_library(
   name = 'scala',
   sources = globs('scala/*.py') - ['anonymize.py'],
   dependencies = [
-    pants(':analysis'),
-    pants(':analysis_parser'),
-    pants(':analysis_tools'),
-    pants(':jvm_compile'),
-    pants('3rdparty/python/twitter/commons:twitter.common.collections'),
-    pants('3rdparty/python/twitter/commons:twitter.common.lang'),
-    pants('src/python/pants/base:build_environment'),
-    pants('src/python/pants/base:exceptions'),
-    pants('src/python/pants/base:hash_utils'),
-    pants('src/python/pants/base:workunit'),
-    pants('src/python/pants/backend/jvm:jvm_tool_bootstrapper'),
-    pants('src/python/pants/backend/jvm/scala:target_platform'),
-    pants('src/python/pants/backend/jvm/targets:scala'),
-    pants('src/python/pants/util:contextutil'),
-    pants('src/python/pants/util:dirutil'),
+    ':analysis',
+    ':analysis_parser',
+    ':analysis_tools',
+    ':jvm_compile',
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python/twitter/commons:twitter.common.lang',
+    'src/python/pants/base:build_environment',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/base:hash_utils',
+    'src/python/pants/base:workunit',
+    'src/python/pants/backend/jvm:jvm_tool_bootstrapper',
+    'src/python/pants/backend/jvm/scala:target_platform',
+    'src/python/pants/backend/jvm/targets:scala',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
   ],
 )
 
@@ -125,8 +126,8 @@ python_binary(
   name = 'anonymize_zinc_analysis',
   entry_point = 'pants.tasks.jvm_compile.scala.anonymize_analysis:main',
   dependencies = [
-    pants(':anonymizer'),
-    pants(':scala'),
-    pants('src/python/pants/util:dirutil'),
+    ':anonymizer',
+    ':scala',
+    'src/python/pants/util:dirutil',
   ],
 )

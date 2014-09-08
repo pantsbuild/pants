@@ -38,7 +38,7 @@ class ReverseDepmapTest(BaseReverseDepmapTest):
   def alias_groups(self):
     return BuildFileAliases.create(
       targets={
-        'dependencies': Dependencies,
+        'target': Dependencies,
         'jar_library': JarLibrary,
         'java_library': JavaLibrary,
         'java_thrift_library': JavaThriftLibrary,
@@ -60,7 +60,7 @@ class ReverseDepmapTest(BaseReverseDepmapTest):
             dependencies=[%(deps)s]
           )
           ''' % dict(
-        type='dependencies' if alias else 'python_library',
+        type='target' if alias else 'python_library',
         name=name,
         deps=','.join("'%s'" % dep for dep in list(deps)))
       ))
@@ -217,7 +217,7 @@ class ReverseDepmapTest(BaseReverseDepmapTest):
   def test_empty_dependees_type(self):
     self.assert_console_raises(
       TaskError,
-      args=['--test-type=dependencies'],
+      args=['--test-type=target'],
       targets=[self.target('common/d')]
     )
 

@@ -167,7 +167,7 @@ class RunTracker(object):
 
     Use like this:
 
-    with run_tracker.new_workunit(name='compile', labels=[WorkUnit.GOAL]) as workunit:
+    with run_tracker.new_workunit(name='compile', labels=[WorkUnit.TASK]) as workunit:
       <do scoped work here>
       <set the outcome on workunit if necessary>
 

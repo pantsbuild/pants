@@ -9,7 +9,7 @@ from contextlib import contextmanager
 import os
 import subprocess
 import textwrap
-import unittest2
+import unittest2 as unittest
 
 from pants.java.distribution.distribution import Distribution
 from pants.java.executor import SubprocessExecutor
@@ -17,7 +17,7 @@ from pants.util.contextutil import temporary_dir, environment_as
 from pants.util.dirutil import chmod_plus_x, safe_open
 
 
-class SubprocessExecutorTest(unittest2.TestCase):
+class SubprocessExecutorTest(unittest.TestCase):
   @contextmanager
   def jre(self, env_var):
     with temporary_dir() as jre:

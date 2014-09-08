@@ -8,7 +8,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import SimpleHTTPServer
 import SocketServer
 import os
-import unittest
+import unittest2 as unittest
 from threading import Thread
 
 from pants.base.build_invalidator import CacheKey

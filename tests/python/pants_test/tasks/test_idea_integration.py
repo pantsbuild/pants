@@ -42,7 +42,7 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
 
   def test_idea_on_alternate_project_dir(self):
     alt_dir = os.path.join('.pants.d', 'tmp', 'some', 'random', 'directory', 'for', 'idea', 'stuff')
-    self._idea_test(['examples/src/java/com/pants/examples/testproject/hello::'], project_dir=alt_dir)
+    self._idea_test(['examples/src/java/com/pants/examples/hello::'], project_dir=alt_dir)
 
   def test_idea_on_protobuf(self):
     self._idea_test(['examples/src/java/com/pants/examples/protobuf::'])
@@ -51,7 +51,7 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
     self._idea_test(['examples/src/java/com/pants/examples/jaxb/main'])
 
   def test_idea_on_unicode(self):
-    self._idea_test(['examples/src/java/com/pants/testproject/unicode::'])
+    self._idea_test(['testprojects/src/java/com/pants/testproject/unicode::'])
 
   def test_idea_on_hello(self):
     self._idea_test(['examples/src/java/com/pants/examples/hello::'])
@@ -63,7 +63,10 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
     self._idea_test(['examples/src/java/com/pants/examples::'])
 
   def test_idea_on_java_sources(self):
-    self._idea_test(['src/scala/com/pants/testproject/javasources::'])
+    self._idea_test(['testprojects/src/scala/com/pants/testproject/javasources::'])
 
   def test_idea_on_thriftdeptest(self):
-     self._idea_test(['src/java/com/pants/testproject/thriftdeptest::'])
+    self._idea_test(['testprojects/src/java/com/pants/testproject/thriftdeptest::'])
+
+  def test_idea_on_scaladepsonboth(self):
+    self._idea_test(['testprojects/src/scala/com/pants/testproject/scaladepsonboth::'])

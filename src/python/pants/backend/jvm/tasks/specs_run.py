@@ -44,7 +44,7 @@ class SpecsRun(JvmTask, JvmToolTaskMixin):
 
     self._specs_bootstrap_key = 'specs'
     bootstrap_tools = self.context.config.getlist('specs-run', 'bootstrap-tools',
-                                                  default=[':scala-specs-2.9.3'])
+                                                  default=['//:scala-specs-2.9.3'])
     self.register_jvm_tool(self._specs_bootstrap_key, bootstrap_tools)
 
     self.confs = self.context.config.getlist('specs-run', 'confs', default=['default'])
@@ -64,7 +64,7 @@ class SpecsRun(JvmTask, JvmToolTaskMixin):
     super(SpecsRun, self).prepare(round_manager)
 
     # TODO(John Sirois): these are fake requirements in order to force compile run before this
-    # phase. Introduce a RuntimeClasspath product for JvmCompile and PrepareResources to populate
+    # goal. Introduce a RuntimeClasspath product for JvmCompile and PrepareResources to populate
     # and depend on that.
     # See: https://github.com/pantsbuild/pants/issues/310
     round_manager.require_data('resources_by_target')

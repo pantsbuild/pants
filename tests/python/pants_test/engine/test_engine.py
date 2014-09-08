@@ -19,15 +19,15 @@ class ExecutionOrderTest(EngineTestBase):
     self.install_task('clean-all', dependencies=['invalidate'])
 
     self.install_task('resolve')
-    self.install_task('javac', dependencies=['resolve'], phase='compile')
-    self.install_task('scalac', dependencies=['resolve'], phase='compile')
-    self.install_task('junit', dependencies=['compile'], phase='test')
+    self.install_task('javac', dependencies=['resolve'], goal='compile')
+    self.install_task('scalac', dependencies=['resolve'], goal='compile')
+    self.install_task('junit', dependencies=['compile'], goal='test')
 
-    self.assertEqual(self.as_phases('invalidate', 'clean-all', 'resolve', 'compile', 'test'),
-                     list(Engine.execution_order(self.as_phases('clean-all', 'test'))))
+    self.assertEqual(self.as_goals('invalidate', 'clean-all', 'resolve', 'compile', 'test'),
+                     list(Engine.execution_order(self.as_goals('clean-all', 'test'))))
 
-    self.assertEqual(self.as_phases('resolve', 'compile', 'test', 'invalidate', 'clean-all'),
-                     list(Engine.execution_order(self.as_phases('test', 'clean-all'))))
+    self.assertEqual(self.as_goals('resolve', 'compile', 'test', 'invalidate', 'clean-all'),
+                     list(Engine.execution_order(self.as_goals('test', 'clean-all'))))
 
 
 class EngineTest(EngineTestBase):
@@ -41,24 +41,24 @@ class EngineTest(EngineTestBase):
     def attempts(self):
       return self._attempts
 
-    def attempt(self, context, phases):
-      self._attempts.append((context, phases))
+    def attempt(self, context, goals):
+      self._attempts.append((context, goals))
       if self._action:
         self._action()
 
   def setUp(self):
     self.context = create_context()
 
-  def assert_attempt(self, engine, *phase_names):
+  def assert_attempt(self, engine, *goal_names):
     self.assertEqual(1, len(engine.attempts))
 
-    context, phases = engine.attempts[0]
+    context, goals = engine.attempts[0]
     self.assertEqual(self.context, context)
-    self.assertEqual(self.as_phases(*phase_names), phases)
+    self.assertEqual(self.as_goals(*goal_names), goals)
 
   def test_execute_success(self):
     engine = self.RecordingEngine()
-    result = engine.execute(self.context, self.as_phases('one', 'two'))
+    result = engine.execute(self.context, self.as_goals('one', 'two'))
     self.assertEqual(0, result)
     self.assert_attempt(engine, 'one', 'two')
 
@@ -69,12 +69,12 @@ class EngineTest(EngineTestBase):
 
   def test_execute_raise(self):
     engine = self.RecordingEngine(action=self._throw(TaskError()))
-    result = engine.execute(self.context, self.as_phases('three'))
+    result = engine.execute(self.context, self.as_goals('three'))
     self.assertEqual(1, result)
     self.assert_attempt(engine, 'three')
 
   def test_execute_code(self):
     engine = self.RecordingEngine(action=self._throw(TaskError(exit_code=42)))
-    result = engine.execute(self.context, self.as_phases('four', 'five', 'six'))
+    result = engine.execute(self.context, self.as_goals('four', 'five', 'six'))
     self.assertEqual(42, result)
     self.assert_attempt(engine, 'four', 'five', 'six')

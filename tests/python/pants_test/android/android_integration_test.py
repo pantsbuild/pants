@@ -25,11 +25,12 @@ class AndroidIntegrationTest(PantsRunIntegrationTest):
   TARGET_SDK = '19'
   ANDROID_SDK_LOCATION = 'ANDROID_HOME'
 
+  TEST_TARGET = 'examples/src/android/example:hello'
+
   @classmethod
   def requirements(cls, tools):
     sdk_home = os.environ.get('ANDROID_HOME')
     android_sdk = os.path.abspath(sdk_home) if sdk_home else None
-
     if android_sdk:
       for tool in tools:
         if not os.path.isfile(os.path.join(android_sdk, tool)):

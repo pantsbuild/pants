@@ -124,24 +124,6 @@ distribute code to different organizations, and want different configuration
 for them, you might put the relevant config code in `./BUILD.something`.
 You can give that file to some people and not-give it to others.
 
-For example, you might work at the Foo Corporation, which maintains a fleet
-of machines to run big test jobs. You might define a new `goal` type to
-express sending a test job to the fleet::
-
-    goal(name='test_on_fleet',
-         action=SendTestToFleet,
-         dependencies=[]).install().with_description('Send test to Foo fleet')
-
-If the testing fleet is only available on Foo's internal network and you
-open-source this code, you don't want to expose `test_on_fleet` to the world.
-You'd just get complaints about `Host testfleet.intranet.foo.com not found`
-errors.
-
-You might put this code in a `./BUILD.foo` in the top-level directory of the
-internal version of the source tree; then hold back this file when mirroring for
-the public version. Thus, the foo-internal-only rules will be available
-inside Foo, but not to the world.
-
 **********************************************
 BUILD.* in the source tree for special targets
 **********************************************

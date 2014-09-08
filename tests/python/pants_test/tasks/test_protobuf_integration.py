@@ -56,7 +56,7 @@ class ProtobufIntegrationTest(PantsRunIntegrationTest):
 
   def test_source_ordering(self):
     pants_run = self.run_pants([
-        'goal', 'gen', 'src/java/com/pants/testproject/proto-ordering', '--level=debug',
+        'goal', 'gen', 'testprojects/src/java/com/pants/testproject/proto-ordering', '--level=debug',
          '--print-exception-stacktrace', '--gen-protoc-lang=java',
     ])
     self.assertEquals(pants_run.returncode, self.PANTS_SUCCESS_CODE,

@@ -218,7 +218,7 @@ class JarTask(NailgunTask):
 
     jar_bootstrap_tools = self.context.config.getlist(self._CONFIG_SECTION,
                                                       'bootstrap-tools',
-                                                      [':jar-tool'])
+                                                      default=['//:jar-tool'])
     self.register_jvm_tool(self._JAR_TOOL_CLASSPATH_KEY, jar_bootstrap_tools)
 
   @property

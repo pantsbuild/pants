@@ -25,30 +25,23 @@ How Some Base Classes Interrelate
 
     TODO: if there are one or more exemplary Target classes, link to them.
 
-**goal** a.k.a. **Phase**
-    From the users' point of view, when they invoke
-    `pants test binary src/python/mach_turtle` the "goals" are `test` and `binary`,
-    the actions requested. Internally, these are implemented in terms of
-    Goals, Phases, and Tasks. Confusingly (and hopefully to be changed), the
-    things that the user calls "goals" are actually Phases. A Phase has one or
-    more Goals:
-
 **Goal**
-    The glue that binds Phases and Tasks together. A Phase has one or
-    more Goals. A Goal has a Task, which does the actual work of invoking tools.
-    A `compile` Phase, for example, could contain a Goal for Python
-    compilation, a Goal for Java compilation, etc.; each of those Goals has
-    one Task. If you want an existing Phase to do something new, instead of
-    cramming your code into an existing Goal, you probably want to define a new
-    Goal and `install` it in the existing Phase. A Goal can depend on Phases,
-    expressing that Pants should carry out those Phases before carrying out the
-    Goal. For example, the java-test Goal depends on the `compile` Phase because
-    testing uncompiled code is hard.
+    A build verb, such as `compile` or `test`.
+    Internally, a goal is implemented as a set of Tasks.
 
 **Task**
-    The thing that does the actual work for some Goal. It looks
-    at the environment and Targets, invokes some tool, generates things, and reports
-    success/failure. It can define command-line flags to check.
+    A Goal has one or more Tasks, which do the actual work of invoking tools.
+    A `compile` Goal, for example, could contain a Task for Java
+    compilation, a Task for Scala compilation, etc. If you want an existing Goal
+    to do something new (e.g., compile FooLang), instead of cramming your code
+    into an existing Task, you probably want to define a new Task and `install`
+    it in the existing Goal. When installing a Task in a Goal, you can specify
+    that it depends on other Goals, expressing that Pants should carry out those Goals
+    before carrying out this Goal. For example, the java-test Task depends on the
+    `compile` Goal because testing uncompiled Java code is hard.
+
+    A Task looks at the environment and Targets, invokes some tool, generates
+    things, and reports success/failure. It can define command-line flags to check.
     If you're giving Pants the ability to do something new, you're probably
     adding a Task. See :doc:`dev_tasks`.
 
@@ -74,44 +67,43 @@ How Some Base Classes Interrelate
     and the state of the build cache. The task uses `context.products` to
     communicate results and requests for build results.
 
-*********************************
-Examining a Phase-Goal-Task Chain
-*********************************
+***************************
+Examining a Goal-Task Chain
+***************************
 
-It's not so easy to figure out in your head which Goals+Tasks are
-invoked for some command line command.  The dependency relationships
-between Phases, Goals, and Tasks can get complex.  The `--explain`
-flag helps here. Instead of building something, it echoes a summary of
-the phases, goals, and tasks it would use to build something. For
-example, you can find out what happens on a `compile`::
+It's not so easy to figure out in your head which Goals+Tasks are invoked for
+some command line.  The dependency relationships between Goals and Tasks can
+get complex.  The `--explain` flag helps here. Instead of building something,
+it echoes a summary of the goals and tasks it would use to build something.
+For example, you can find out what happens on a `compile`::
 
     $./pants goal compile --explain
-    Phase Execution Order:
-    
-    resolve-idl -> thriftstore-codegen -> gen -> resolve -> compile
-    
-    Phase [Goal->Task] Order:
-    
-    resolve-idl [idl->IdlResolve, extract->Extract]
-    thriftstore-codegen [thriftstore-codegen->ThriftstoreCodeGen]
-    gen [thrift->ThriftGen, scrooge->ScroogeGen, protoc->ProtobufGen, antlr->AntlrGen
+    Goal Execution Order:
+
+    bootstrap -> imports -> gen -> check-exclusives -> resolve -> compile
+
+    Goal [TaskRegistrar->Task] Order:
+
+    bootstrap [bootstrap-jvm-tools->BootstrapJvmTools]
+    imports [ivy-imports->IvyImports]
+    gen [thrift->ApacheThriftGen, scrooge->ScroogeGen, protoc->ProtobufGen, antlr->AntlrGen, ragel->RagelGen, jaxb->JaxbGen, aapt->AaptGen]
+    check-exclusives [check-exclusives->CheckExclusives]
     resolve [ivy->IvyResolve]
-    compile [checkstyle->Checkstyle]
+    compile [jvm->SingletonGroupTask]
     $
 
-This tells you that the `resolve` phase comes before the `compile` phase, the
-`gen` phase comes before that, etc. There is more than one Goal registered for
-the `gen` phase. In the `gen [thrift->ThriftGen,...` text, `thrift` is
-the name of a Goal and `ThriftGen` is the name of its Task class.
+This tells you that the `resolve` goal comes before the `compile` goal, the
+`gen` goal comes before that, etc. There is more than one Task registered for
+the `gen` goal. In the `gen [thrift->ApacheThriftGen,...` text, `thrift` is the
+name of a task and `ApacheThriftGen` is the name of the class that implements it.
 
-********************
-Defining a Goal/Task
-********************
+***************
+Defining a Task
+***************
 
-Defining a new Goal (meant here in the glue-that-binds-Phases-and-Tasks sense)
-tells Pants of some new action it can take. This might
-be a new phase or adding new meaning for an old phase (e.g., telling
-the "gen" code-generation phase about some new way to generate code).
+Defining a new Task tells Pants of some new action it can take. This might
+be a new goal or adding new functionality in an existing goal (e.g., telling
+the "gen" code-generation goal about some new way to generate code).
 
 A task can mutate the target graph. If it, say, generates some Java code
 from some other language, it can create a Java target and make things that
@@ -125,7 +117,7 @@ Java target.
 Basic Task
 ==========
 
-A Goal's ``Task`` is the class that does the "work".
+A ``Task`` is the class that does the "work".
 When you define a new ``Task`` class, you'll want to have at least
 
 * ``setup_parser(cls, option_group, args, mkflag)``
@@ -139,7 +131,7 @@ When you define a new ``Task`` class, you'll want to have at least
   Actually do something; perhaps generate some products from some sources.
 
 There are some base ``Task`` classes to help you get started. E.g., if your
-goal just outputs information to the console, subclass ``ConsoleTask``.
+task just outputs information to the console, subclass ``ConsoleTask``.
 
 The user's source code is organized by :ref:`source roots <setup_source_root>`.
 If a task needs to know the path from "the root" to a source file (perhaps
@@ -149,38 +141,23 @@ build root. The absolute paths to a target's source files are::
 
     abspaths = [os.path.join(get_buildroot(), target.target_base, rel_path) for rel_path in target.sources_relative_to_source_root()]
 
-Group
-=====
+GroupTask
+=========
 
-A few ``Goal``\s have group parameters. Specifically, the JVM compile goals::
+Some ``Task``\s are grouped together under a parent ``GroupTask``. Specifically, the JVM compile tasks::
 
-  goal(name='scalac',
-       action=ScalaCompile,
-       group=group('jvm', is_scala),
-       dependencies=['gen', 'resolve']).install('compile').with_description(
-         'Compile both generated and checked in code.'
-       )
-  goal(name='apt',
-       action=JavaCompile,
-       group=group('jvm', is_apt),
-       dependencies=['gen', 'resolve']).install('compile')
-  goal(name='javac',
-       action=JavaCompile,
-       group=group('jvm', is_java),
-       dependencies=['gen', 'resolve']).install('compile')
+    jvm_compile = GroupTask.named(
+    'jvm-compilers',
+    product_type=['classes_by_target', 'classes_by_source'],
+    flag_namespace=['compile'])
 
-A goal normally operates on one target at a time.
-But some tools, e.g., ``javac`` can operate on many many inputs with one
-invocation. Such tools might be more efficient used that way.
-Perhaps there's a lot of overhead starting up the tool, but it takes
-about as long to compile 10 source files as to compile one.
-A ``goal`` with a ``group`` will try to operate on more than one target at
-a time.
+    jvm_compile.add_member(ScalaCompile)
+    jvm_compile.add_member(AptCompile)
+    jvm_compile.add_member(JavaCompile)
 
-For a design discussion of a big Group refactor, see the
-`RFC: GroupEngine / Task Lifecycle change proposal
-<https://groups.google.com/forum/#!msg/pants-devel/glCHuLC9JF4/T6nbPcDVKk0J>`_
-``pants-devel`` thread.
+A ``GroupTask`` allows its constituent tasks to 'claim' targets for processing, and can iterate
+between those tasks until all work is done. This allows, e.g., Java code to depend on Scala code
+which itself depends on some other Java code.
 
 ***********
 Code Layout
@@ -207,16 +184,15 @@ Code Layout
 
 `commands <https://github.com/pantsbuild/pants/tree/master/src/python/pants/commands/>`_
   Before we had goals we had commands, and they lived here.  
-  **goal.py** Many Goals and Phases are defined here.
+  **goal.py** Many Goals and Tasks are defined here.
 
 `docs <https://github.com/pantsbuild/pants/tree/master/src/python/pants/docs/>`_
   Documentation. The source of this very document you're reading now lives here.
 
 `goal <https://github.com/pantsbuild/pants/tree/master/src/python/pants/goal/>`_
-  The source of `Context`, `Goal`, and `Phase` (some
-  important classes) lives here. If you extend pants to work with other
-  tools/languages, hopefully you won't need to edit these; but you'll
-  probably look at them to see the flow of control.
+  The source of `Context` and `Goal` (some important classes) lives here.
+  If you extend pants to work with other tools/languages, hopefully you won't need to
+  edit these; but you'll probably look at them to see the flow of control.
 
 `java <https://github.com/pantsbuild/pants/tree/master/src/python/pants/java/>`_
   (TODO OMG bluffing) Utility classes useful to many things that work

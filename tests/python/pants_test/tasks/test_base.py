@@ -6,7 +6,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import os
-import pytest
 import subprocess
 
 from contextlib import closing
@@ -20,7 +19,7 @@ from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.target import Target
 from pants.goal.context import Context
-from pants.goal.phase import Phase
+from pants.goal.goal import Goal
 from pants.goal.mkflag import Mkflag
 from pants_test.base_test import BaseTest
 from pants_test.base.context_utils import create_config, create_run_tracker
@@ -110,7 +109,7 @@ class ConsoleTaskTest(TaskTest):
   """A baseclass useful for testing ConsoleTasks."""
 
   def setUp(self):
-    Phase.clear()
+    Goal.clear()
     super(ConsoleTaskTest, self).setUp()
 
     task_type = self.task_type()
@@ -163,7 +162,7 @@ class ConsoleTaskTest(TaskTest):
                         build_file_parser=self.build_file_parser,
                         address_mapper=self.address_mapper,
                         workspace=workspace)
-    return list(task.console_output(list(targets or ()) + list(extra_targets or ())))
+    return list(task.console_output(list(task.context.targets()) + list(extra_targets or ())))
 
   def assert_entries(self, sep, *output, **kwargs):
     """Verifies the expected output text is flushed by the console task under test.
@@ -190,10 +189,20 @@ class ConsoleTaskTest(TaskTest):
     """
     self.assertEqual(sorted(output), sorted(self.execute_console_task(**kwargs)))
 
+  def assert_console_output_ordered(self, *output, **kwargs):
+    """Verifies the expected output entries are emitted by the console task under test.
+
+    NB: order of entries is tested.
+
+    *output:  the expected output entries in expected order
+    **kwargs: additional kwargs passed to execute_console_task.
+    """
+    self.assertEqual(list(output), self.execute_console_task(**kwargs))
+
   def assert_console_raises(self, exception, **kwargs):
     """Verifies the expected exception is raised by the console task under test.
 
     **kwargs: additional kwargs are passed to execute_console_task.
     """
-    with pytest.raises(exception):
+    with self.assertRaises(exception):
       self.execute_console_task(**kwargs)

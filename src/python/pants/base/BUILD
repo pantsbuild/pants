@@ -10,17 +10,22 @@ python_library(
   name = 'address',
   sources = ['address.py'],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.lang'),
-    pants(':build_file'),
+    '3rdparty/python/twitter/commons:twitter.common.lang',
+    ':build_file',
   ]
+)
+
+python_library(
+  name = 'address_lookup_error',
+  sources = ['address_lookup_error.py'],
 )
 
 python_library(
   name = 'addressable',
   sources = ['addressable.py'],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.lang'),
-    pants(':address'),
+    '3rdparty/python/twitter/commons:twitter.common.lang',
+    ':address',
   ]
 )
 
@@ -28,11 +33,11 @@ python_library(
   name = 'build_configuration',
   sources = ['build_configuration.py'],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.collections'),
-    pants(':addressable'),
-    pants(':build_file_aliases'),
-    pants(':parse_context'),
-    pants(':target'),
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    ':addressable',
+    ':build_file_aliases',
+    ':parse_context',
+    ':target',
   ],
 )
 
@@ -40,10 +45,10 @@ python_library(
   name = 'build_environment',
   sources = ['build_environment.py'],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.log'),
-    pants('src/python/pants:version'),
-    pants('src/python/pants/scm:all'),
-    pants(':build_root'),
+    '3rdparty/python/twitter/commons:twitter.common.log',
+    'src/python/pants:version',
+    'src/python/pants/scm:all',
+    ':build_root',
   ]
 )
 
@@ -51,9 +56,10 @@ python_library(
   name = 'build_file',
   sources = ['build_file.py'],
   dependencies = [
-    pants('3rdparty/python:pex'),
-    pants('3rdparty/python/twitter/commons:twitter.common.collections'),
-    pants('3rdparty/python/twitter/commons:twitter.common.lang'),
+    '3rdparty/python:pex',
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python/twitter/commons:twitter.common.lang',
+    ':address_lookup_error',
   ]
 )
 
@@ -61,9 +67,10 @@ python_library(
   name = 'build_file_address_mapper',
   sources = ['build_file_address_mapper.py'],
   dependencies = [
-    pants(':address'),
-    pants(':build_file'),
-    pants(':build_environment'),
+    ':address',
+    ':address_lookup_error',
+    ':build_file',
+    ':build_environment',
   ]
 )
 
@@ -76,11 +83,11 @@ python_library(
   name = 'build_file_parser',
   sources = ['build_file_parser.py'],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.lang'),
-    pants(':address'),
-    pants(':build_environment'),
-    pants(':build_file'),
-    pants(':build_graph'),
+    '3rdparty/python/twitter/commons:twitter.common.lang',
+    ':address',
+    ':build_environment',
+    ':build_file',
+    ':build_graph',
   ]
 )
 
@@ -88,8 +95,9 @@ python_library(
   name = 'build_graph',
   sources = ['build_graph.py'],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.collections'),
-    pants(':address'),
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    ':address',
+    ':address_lookup_error',
   ]
 )
 
@@ -97,10 +105,10 @@ python_library(
   name = 'build_invalidator',
   sources = ['build_invalidator.py'],
   dependencies = [
-    pants(':hash_utils'),
-    pants(':target'), # XXX(fixme)
-    pants('src/python/pants/fs'),
-    pants('src/python/pants/util:dirutil'),
+    ':hash_utils',
+    ':target', # XXX(fixme)
+    'src/python/pants/fs',
+    'src/python/pants/util:dirutil',
   ]
 )
 
@@ -113,7 +121,7 @@ python_library(
   name = 'build_root',
   sources = ['build_root.py'],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.lang'),
+    '3rdparty/python/twitter/commons:twitter.common.lang',
   ],
 )
 
@@ -121,9 +129,9 @@ python_library(
   name = 'cache_manager',
   sources = ['cache_manager.py'],
   dependencies = [
-    pants(':build_graph'),
-    pants(':build_invalidator'),
-    pants(':target'),
+    ':build_graph',
+    ':build_invalidator',
+    ':target',
   ],
 )
 
@@ -131,7 +139,7 @@ python_library(
   name = 'config',
   sources = ['config.py'],
   dependencies = [
-    pants(':build_environment'),
+    ':build_environment',
   ]
 )
 
@@ -139,16 +147,16 @@ python_library(
   name = 'dev_backend_loader',
   sources = ['dev_backend_loader.py'],
   dependencies = [
-    pants(':exceptions'),
-    pants('3rdparty/python/twitter/commons:twitter.common.collections'),
-    pants('src/python/pants/backend/android:plugin'),
-    pants('src/python/pants/backend/authentication:authentication'),
-    pants('src/python/pants/backend/codegen:plugin'),
-    pants('src/python/pants/backend/core:plugin'),
-    pants('src/python/pants/backend/jvm:plugin'),
-    pants('src/python/pants/backend/maven_layout:plugin'),
-    pants('src/python/pants/backend/python:plugin'),
-    pants('src/python/pants/base:build_configuration'),
+    ':exceptions',
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    'src/python/pants/backend/android:plugin',
+    'src/python/pants/backend/authentication:authentication',
+    'src/python/pants/backend/codegen:plugin',
+    'src/python/pants/backend/core:plugin',
+    'src/python/pants/backend/jvm:plugin',
+    'src/python/pants/backend/maven_layout:plugin',
+    'src/python/pants/backend/python:plugin',
+    'src/python/pants/base:build_configuration',
   ]
 )
 
@@ -156,7 +164,7 @@ python_library(
   name = 'double_dag',
   sources = ['double_dag.py'],
   dependencies = [
-    pants(':abbreviate_target_ids'),
+    ':abbreviate_target_ids',
   ]
 )
 
@@ -174,8 +182,8 @@ python_library(
   name = 'generator',
   sources = ['generator.py'],
   dependencies = [
-    pants(':mustache'),
-    pants('3rdparty/python/twitter/commons:twitter.common.lang'),
+    ':mustache',
+    '3rdparty/python/twitter/commons:twitter.common.lang',
   ]
 )
 
@@ -188,7 +196,7 @@ python_library(
   name = 'mustache',
   sources = ['mustache.py'],
   dependencies = [
-    pants('3rdparty/python:pystache'),
+    '3rdparty/python:pystache',
   ]
 )
 
@@ -201,10 +209,10 @@ python_library(
   name = 'payload',
   sources = ['payload.py'],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.collections'),
-    pants('3rdparty/python/twitter/commons:twitter.common.lang'),
-    pants(':build_environment'),
-    pants(':validation'),
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python/twitter/commons:twitter.common.lang',
+    ':build_environment',
+    ':validation',
   ]
 )
 
@@ -212,9 +220,9 @@ python_library(
   name = 'rcfile',
   sources = ['rcfile.py'],
   dependencies = [
-    pants(':config'),
-    pants('3rdparty/python/twitter/commons:twitter.common.lang'),
-    pants('3rdparty/python/twitter/commons:twitter.common.log'),
+    ':config',
+    '3rdparty/python/twitter/commons:twitter.common.lang',
+    '3rdparty/python/twitter/commons:twitter.common.log',
   ]
 )
 
@@ -227,8 +235,8 @@ python_library(
   name = 'run_info',
   sources = ['run_info.py'],
   dependencies = [
-    pants(':build_environment'),
-    pants('src/python/pants/util:dirutil'),
+    ':build_environment',
+    'src/python/pants/util:dirutil',
   ],
 )
 
@@ -236,8 +244,8 @@ python_library(
   name = 'cmd_line_spec_parser',
   sources = ['cmd_line_spec_parser.py'],
   dependencies = [
-    pants(':address'),
-    pants(':build_file'),
+    ':address',
+    ':build_file',
   ],
 )
 
@@ -245,10 +253,10 @@ python_library(
   name = 'source_root',
   sources = ['source_root.py'],
   dependencies = [
-    pants(':build_environment'),
-    pants(':exceptions'),
-    pants(':parse_context'),
-    pants('3rdparty/python/twitter/commons:twitter.common.collections'),
+    ':build_environment',
+    ':exceptions',
+    ':parse_context',
+    '3rdparty/python/twitter/commons:twitter.common.collections',
   ],
 )
 
@@ -256,16 +264,16 @@ python_library(
   name = 'target',
   sources = ['target.py'],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.collections'),
-    pants('3rdparty/python/twitter/commons:twitter.common.lang'),
-    pants(':address'),
-    pants(':build_environment'),
-    pants(':build_manual'),
-    pants(':fingerprint_strategy'),
-    pants(':hash_utils'),
-    pants(':payload'),
-    pants(':source_root'),
-    pants(':target_addressable'),
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python/twitter/commons:twitter.common.lang',
+    ':address',
+    ':build_environment',
+    ':build_manual',
+    ':fingerprint_strategy',
+    ':hash_utils',
+    ':payload',
+    ':source_root',
+    ':target_addressable',
   ],
 )
 
@@ -273,9 +281,9 @@ python_library(
   name = 'target_addressable',
   sources = ['target_addressable.py'],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.lang'),
-    pants(':addressable'),
-    pants(':exceptions'),
+    '3rdparty/python/twitter/commons:twitter.common.lang',
+    ':addressable',
+    ':exceptions',
   ],
 )
 
@@ -283,7 +291,7 @@ python_library(
   name = 'worker_pool',
   sources = ['worker_pool.py'],
   dependencies = [
-    pants('src/python/pants/reporting:report'), # TODO(pl): Bust this out
+    'src/python/pants/reporting:report', # TODO(pl): Bust this out
   ],
 )
 
@@ -291,8 +299,8 @@ python_library(
   name = 'workunit',
   sources = ['workunit.py'],
   dependencies = [
-    pants('src/python/pants/rwbuf'),
-    pants('src/python/pants/util:dirutil'),
+    'src/python/pants/rwbuf',
+    'src/python/pants/util:dirutil',
   ],
 )
 
@@ -300,7 +308,7 @@ python_library(
   name='validation',
   sources=['validation.py'],
   dependencies=[
-    pants('3rdparty/python/twitter/commons:twitter.common.collections'),
-    pants('3rdparty/python/twitter/commons:twitter.common.dirutil'),
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python/twitter/commons:twitter.common.dirutil',
   ],
 )

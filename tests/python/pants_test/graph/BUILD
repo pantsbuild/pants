@@ -3,14 +3,15 @@
 
 python_tests(
   name = 'graph',
-  sources = globs('*.py'),
+  sources = ['test_build_graph.py'],
   dependencies = [
-    pants('src/python/pants/base:address'),
-    pants('src/python/pants/base:build_file_parser'),
-    pants('src/python/pants/base:build_graph'),
-    pants('src/python/pants/base:build_root'),
-    pants('src/python/pants/base:target'),
-    pants('src/python/pants/util:contextutil'),
-    pants('src/python/pants/util:dirutil'),
+    'src/python/pants/base:address',
+    'src/python/pants/base:build_file_parser',
+    'src/python/pants/base:build_graph',
+    'src/python/pants/base:build_root',
+    'src/python/pants/base:target',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
+    'tests/python/pants_test:base_test'
   ],
 )

@@ -7,7 +7,7 @@ python_library(
   sources = ['__init__.py', 'register.py'],
   dependencies = [
     ':maven_layout',
-    pants('src/python/pants/base:build_file_aliases'),
+    'src/python/pants/base:build_file_aliases',
   ]
 )
 
@@ -15,13 +15,13 @@ python_library(
   name = 'maven_layout',
   sources = ['maven_layout.py'],
   dependencies = [
-    pants('src/python/pants/backend/codegen/targets:java'),
-    pants('src/python/pants/backend/codegen/targets:python'),
-    pants('src/python/pants/backend/core/targets:all'),
-    pants('src/python/pants/backend/jvm/targets:jvm'),
-    pants('src/python/pants/backend/jvm/targets:java'),
-    pants('src/python/pants/backend/jvm/targets:scala'),
-    pants('src/python/pants/backend/python/targets:python'),
-    pants('src/python/pants/base:source_root'),
+    'src/python/pants/backend/codegen/targets:java',
+    'src/python/pants/backend/codegen/targets:python',
+    'src/python/pants/backend/core/targets:all',
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/targets:java',
+    'src/python/pants/backend/jvm/targets:scala',
+    'src/python/pants/backend/python/targets:python',
+    'src/python/pants/base:source_root',
   ],
 )

@@ -22,7 +22,7 @@ class BaseFilterTest(ConsoleTaskTest):
   def alias_groups(self):
     return BuildFileAliases.create(
       targets={
-        'dependencies': Dependencies,
+        'target': Dependencies,
         'java_library': JavaLibrary,
         'page': Page,
         'python_library': PythonLibrary,
@@ -189,7 +189,7 @@ class FilterTest(BaseFilterTest):
     """Tests that targets outside of the context used as filters are parsed before use"""
 
     # add an additional un-injected target, and then use it as a filter
-    self.add_to_build_file("blacklist", "dependencies(name='blacklist', dependencies=['common/a'])")
+    self.add_to_build_file("blacklist", "target(name='blacklist', dependencies=['common/a'])")
 
     self.assert_console_output(
       'common/b:b',
@@ -202,6 +202,31 @@ class FilterTest(BaseFilterTest):
       'overlaps:foo',
       args=['--test-ancestor=-blacklist'],
       targets=self.targets('::')
+    )
+
+  def test_filter_ancestor_not_passed_targets(self):
+    """Tests filtering targets based on an ancestor not in that list of targets"""
+
+    # add an additional un-injected target, and then use it as a filter
+    self.add_to_build_file("blacklist", "target(name='blacklist', dependencies=['common/a'])")
+
+    self.assert_console_output(
+      'common/b:b',
+      'common/b:foo',
+      'common/c:c',
+      'common/c:foo',
+      args=['--test-ancestor=-blacklist'],
+      targets=self.targets('common/::') # blacklist is not in the list of targets
+    )
+
+    self.assert_console_output(
+      'common/a:a', # a: _should_ show up if we don't filter
+      'common/a:foo',
+      'common/b:b',
+      'common/b:foo',
+      'common/c:c',
+      'common/c:foo',
+      targets=self.targets('common/::')
     )
 
   def test_filter_regex(self):

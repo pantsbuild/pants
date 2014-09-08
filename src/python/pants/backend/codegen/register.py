@@ -44,7 +44,7 @@ def register_goals():
 
   task(name='scrooge', dependencies=['bootstrap', 'thrift-linter'], action=ScroogeGen).install('gen')
 
-  # TODO(Garrett Malmquist): 'protoc' depends on a nonlocal phase (imports is in the jvm register).
+  # TODO(Garrett Malmquist): 'protoc' depends on a nonlocal goal (imports is in the jvm register).
   # This should be cleaned up, with protobuf stuff moved to its own backend. (See John's comment on
   # RB 592).
   task(name='protoc', dependencies=['imports'], action=ProtobufGen

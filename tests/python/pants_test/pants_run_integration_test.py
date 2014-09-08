@@ -9,7 +9,7 @@ from collections import namedtuple
 
 import os
 import subprocess
-import unittest
+import unittest2 as unittest
 
 from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import temporary_dir

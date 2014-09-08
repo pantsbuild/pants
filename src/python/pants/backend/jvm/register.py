@@ -55,7 +55,7 @@ from pants.backend.jvm.tasks.scaladoc_gen import ScaladocGen
 from pants.backend.jvm.tasks.specs_run import SpecsRun
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.goal.task_registrar import TaskRegistrar as task
-from pants.goal.phase import Phase
+from pants.goal.goal import Goal
 
 
 def build_file_aliases():
@@ -95,9 +95,9 @@ def register_goals():
   ng_killall = task(name='ng-killall', action=NailgunKillall)
   ng_killall.install().with_description('Kill running nailgun servers.')
 
-  Phase.by_name('invalidate').install(ng_killall, first=True)
-  Phase.by_name('clean-all').install(ng_killall, first=True)
-  Phase.by_name('clean-all-async').install(ng_killall, first=True)
+  Goal.by_name('invalidate').install(ng_killall, first=True)
+  Goal.by_name('clean-all').install(ng_killall, first=True)
+  Goal.by_name('clean-all-async').install(ng_killall, first=True)
 
   task(name='bootstrap-jvm-tools', action=BootstrapJvmTools
   ).install('bootstrap').with_description('Bootstrap tools needed for building.')

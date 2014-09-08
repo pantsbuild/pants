@@ -5,20 +5,22 @@ python_library(
   name = 'base_test',
   sources = ['base_test.py'],
   dependencies = [
-    pants('src/python/pants/backend/core/targets:common'),
-    pants('src/python/pants/base:address'),
-    pants('src/python/pants/base:build_configuration'),
-    pants('src/python/pants/base:build_file_address_mapper'),
-    pants('src/python/pants/base:build_file_aliases'),
-    pants('src/python/pants/base:build_file_parser'),
-    pants('src/python/pants/base:build_graph'),
-    pants('src/python/pants/base:build_root'),
-    pants('src/python/pants/base:config'),
-    pants('src/python/pants/base:exceptions'),
-    pants('src/python/pants/base:target'),
-    pants('src/python/pants/util:contextutil'),
-    pants('src/python/pants/util:dirutil'),
-    pants('tests/python/pants_test/base:context_utils'),
+    'src/python/pants/backend/core/targets:common',
+    'src/python/pants/backend/core/tasks:check_exclusives',
+    'src/python/pants/base:address',
+    'src/python/pants/base:build_configuration',
+    'src/python/pants/base:build_file_address_mapper',
+    'src/python/pants/base:build_file_aliases',
+    'src/python/pants/base:build_file_parser',
+    'src/python/pants/base:build_graph',
+    'src/python/pants/base:build_root',
+    'src/python/pants/base:config',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/base:target',
+    'src/python/pants/goal:goal',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
+    'tests/python/pants_test/base:context_utils',
   ]
 )
 
@@ -26,9 +28,9 @@ python_library(
   name = 'int-test',
   sources = ['pants_run_integration_test.py'],
   dependencies = [
-    pants('src/python/pants/base:build_environment'),
-    pants('src/python/pants/util:contextutil'),
-    pants('src/python/pants/util:dirutil'),
+    'src/python/pants/base:build_environment',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
   ]
 )
 
@@ -36,9 +38,9 @@ python_tests(
   name = 'test_binary_util',
   sources = ['test_binary_util.py',],
   dependencies = [
-    pants(':base_test'),
-    pants('src/python/pants:binary_util'),
-    pants('src/python/pants/base:exceptions')
+    ':base_test',
+    'src/python/pants:binary_util',
+    'src/python/pants/base:exceptions'
   ]
 )
 
@@ -46,9 +48,9 @@ python_tests(
   name = 'test_maven_layout',
   sources = ['test_maven_layout.py'],
   dependencies = [
-    pants(':base_test'),
-    pants('src/python/pants/backend/maven_layout'),
-    pants('src/python/pants/base:build_file_aliases'),
+    ':base_test',
+    'src/python/pants/backend/maven_layout',
+    'src/python/pants/base:build_file_aliases',
   ]
 )
 
@@ -56,11 +58,11 @@ python_tests(
   name = 'test_thrift_util',
   sources = ['test_thrift_util.py'],
   dependencies = [
-    pants(':base_test'),
-    pants('3rdparty/python/twitter/commons:twitter.common.lang'),
-    pants('src/python/pants:thrift_util'),
-    pants('src/python/pants/util:contextutil'),
-    pants('src/python/pants/util:dirutil'),
+    ':base_test',
+    '3rdparty/python/twitter/commons:twitter.common.lang',
+    'src/python/pants:thrift_util',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
   ]
 )
 
@@ -68,51 +70,51 @@ python_tests(
   name = 'test_utf8_header',
   sources = ['test_utf8_header.py'],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.lang'),
-    pants('src/python/pants/base:build_environment'),
-    pants('src/python/pants/base:build_file_address_mapper'),
-    pants('src/python/pants/base:build_file_parser'),
-    pants('src/python/pants/base:build_graph'),
-    pants('src/python/pants/base:dev_backend_loader'),
+    '3rdparty/python/twitter/commons:twitter.common.lang',
+    'src/python/pants/base:build_environment',
+    'src/python/pants/base:build_file_address_mapper',
+    'src/python/pants/base:build_file_parser',
+    'src/python/pants/base:build_graph',
+    'src/python/pants/base:dev_backend_loader',
   ]
 )
 
 target(
   name = 'integration',
   dependencies = [
-    pants('tests/python/pants_test/android:integration'),
-    pants('tests/python/pants_test/commands:integration'),
-    pants('tests/python/pants_test/targets:integration'),
-    pants('tests/python/pants_test/tasks:integration'),
-    pants('tests/python/pants_test/python:integration'),
+    'tests/python/pants_test/android:integration',
+    'tests/python/pants_test/commands:integration',
+    'tests/python/pants_test/targets:integration',
+    'tests/python/pants_test/tasks:integration',
+    'tests/python/pants_test/python:integration',
   ]
 )
 
 python_test_suite(
   name = 'all',
   dependencies = [
-    pants(':test_binary_util'),
-    pants(':test_maven_layout'),
-    pants(':test_thrift_util'),
-    pants(':test_utf8_header'),
-    pants('tests/python/example_test/hello/greet'),
-    pants('tests/python/pants_test/android'),
-    pants('tests/python/pants_test/authentication:netrc'),
-    pants('tests/python/pants_test/backend'),
-    pants('tests/python/pants_test/base'),
-    pants('tests/python/pants_test/cache'),
-    pants('tests/python/pants_test/commands'),
-    pants('tests/python/pants_test/engine'),
-    pants('tests/python/pants_test/fs'),
-    pants('tests/python/pants_test/java'),
-    pants('tests/python/pants_test/net'),
-    pants('tests/python/pants_test/option'),
-    pants('tests/python/pants_test/process'),
-    pants('tests/python/pants_test/python'),
-    pants('tests/python/pants_test/reporting'),
-    pants('tests/python/pants_test/scm'),
-    pants('tests/python/pants_test/targets'),
-    pants('tests/python/pants_test/tasks'),
-    pants('tests/python/pants_test/util'),
+    ':test_binary_util',
+    ':test_maven_layout',
+    ':test_thrift_util',
+    ':test_utf8_header',
+    'tests/python/pants_test/android',
+    'tests/python/pants_test/authentication:netrc',
+    'tests/python/pants_test/backend',
+    'tests/python/pants_test/base',
+    'tests/python/pants_test/cache',
+    'tests/python/pants_test/commands',
+    'tests/python/pants_test/engine',
+    'tests/python/pants_test/fs',
+    'tests/python/pants_test/graph',
+    'tests/python/pants_test/java',
+    'tests/python/pants_test/net',
+    'tests/python/pants_test/option',
+    'tests/python/pants_test/process',
+    'tests/python/pants_test/python',
+    'tests/python/pants_test/reporting',
+    'tests/python/pants_test/scm',
+    'tests/python/pants_test/targets',
+    'tests/python/pants_test/tasks',
+    'tests/python/pants_test/util',
   ]
 )

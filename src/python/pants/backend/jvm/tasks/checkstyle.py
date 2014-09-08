@@ -39,7 +39,7 @@ class Checkstyle(NailgunTask, JvmToolTaskMixin):
 
     self._checkstyle_bootstrap_key = 'checkstyle'
     bootstrap_tools = self.context.config.getlist('checkstyle', 'bootstrap-tools',
-                                             default=[':twitter-checkstyle'])
+                                                  default=['//:twitter-checkstyle'])
     self.register_jvm_tool(self._checkstyle_bootstrap_key, bootstrap_tools)
 
     self._configuration_file = self.context.config.get(self._CONFIG_SECTION, 'configuration')
@@ -53,7 +53,7 @@ class Checkstyle(NailgunTask, JvmToolTaskMixin):
 
   def prepare(self, round_manager):
     # TODO(John Sirois): this is a fake requirement on 'ivy_jar_products' in order to force
-    # resolve to run before this phase. Require a new CompileClasspath product to be produced by
+    # resolve to run before this goal. Require a new CompileClasspath product to be produced by
     # IvyResolve instead.
     # See: https://github.com/pantsbuild/pants/issues/310
     round_manager.require_data('ivy_jar_products')

@@ -22,6 +22,7 @@ class AaptBuilderIntegrationTest(AndroidIntegrationTest):
 
   TOOLS = [
     os.path.join('build-tools', AndroidIntegrationTest.BUILD_TOOLS, 'aapt'),
+    os.path.join('build-tools', AndroidIntegrationTest.BUILD_TOOLS, 'lib', 'dx.jar'),
     os.path.join('platforms', 'android-' + AndroidIntegrationTest.TARGET_SDK, 'android.jar')
   ]
 
@@ -32,7 +33,7 @@ class AaptBuilderIntegrationTest(AndroidIntegrationTest):
                              'and ANDROID_HOME set in path.'.format(TOOLS))
 
   def test_aapt_bundle(self):
-    self.bundle_test('src/android/example:hello')
+    self.bundle_test(AndroidIntegrationTest.TEST_TARGET)
 
   def bundle_test(self, target):
     pants_run = self.run_pants(['goal', 'bundle', target])

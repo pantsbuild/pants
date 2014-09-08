@@ -21,7 +21,7 @@ GLOBAL_OPTIONS = [
          default=Config.load().getdefault('connection_timeout'),
          help='Number of seconds to wait for http connections.'),
   Option('-x', '--time', action='store_true', dest='time', default=False,
-         help='Times goal phases and outputs a report.'),
+         help='Times tasks and goals and outputs a report.'),
   Option('-e', '--explain', action='store_true', dest='explain', default=False,
          help='Explain the execution of goals.'),
   Option('-k', '--kill-nailguns', action='store_true', dest='cleanup_nailguns', default=False,

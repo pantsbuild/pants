@@ -47,3 +47,8 @@ def safe_filename(name, extension=None, digest=None, max_length=_MAX_FILENAME_LE
       raise ValueError('Digest %s failed to produce a filename <= %d '
                        'characters for %s - got %s' % (digest, max_length, filename, safe_name))
     return safe_name
+
+
+def expand_path(path):
+  """Returns ``path`` as an absolute path with ~user and env var expansion applied."""
+  return os.path.abspath(os.path.expandvars(os.path.expanduser(path)))

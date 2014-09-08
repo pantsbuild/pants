@@ -38,7 +38,7 @@ class JavaThriftLibrary(JvmTarget):
       return target.rpc_style or self._get_default('rpc_style', 'sync')
 
 
-  # TODO(John Sirois): Tasks should register the values they support in a plugin-registration phase.
+  # TODO(John Sirois): Tasks should register the values they support in a plugin-registration goal.
   # In general a plugin will contribute a target and a task, but in this case we have a shared
   # target that can be used by at least 2 tasks - ThriftGen and ScroogeGen.  This is likely not
   # uncommon (gcc & clang) so the arrangement needs to be cleaned up and supported well.

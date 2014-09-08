@@ -1,0 +1,3 @@
+/tests/
+
+Pants test targets.

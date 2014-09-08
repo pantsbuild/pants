@@ -8,7 +8,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import os
 import shutil
 import tempfile
-import unittest2
+import unittest2 as unittest
 
 from twitter.common.collections import OrderedSet
 
@@ -16,7 +16,7 @@ from pants.base.build_file import BuildFile
 from pants.util.dirutil import safe_mkdir, touch
 
 
-class BuildFileTest(unittest2.TestCase):
+class BuildFileTest(unittest.TestCase):
 
   @classmethod
   def makedirs(cls, path):
@@ -165,3 +165,15 @@ class BuildFileTest(unittest2.TestCase):
       BuildFileTest.buildfile('grandparent/parent/child1/BUILD.twitter'),
       BuildFileTest.buildfile('grandparent/parent/child2/child3/BUILD'),
       ]), buildfiles)
+
+  def test_invalid_root_dir_error(self):
+    BuildFileTest.touch('BUILD')
+    with self.assertRaises(BuildFile.InvalidRootDirError):
+      BuildFile('tmp', 'grandparent/BUILD')
+
+  def test_exception_class_hierarchy(self):
+    """Exception handling code depends on the fact that all exceptions from BuildFile are
+    subclassed from the BuildFileError base class.
+    """
+    self.assertIsInstance(BuildFile.InvalidRootDirError(), BuildFile.BuildFileError)
+    self.assertIsInstance(BuildFile.MissingBuildFileError(), BuildFile.BuildFileError)

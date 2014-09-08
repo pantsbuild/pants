@@ -12,6 +12,7 @@ import traceback
 from twitter.common.collections import OrderedDict, OrderedSet
 
 from pants.base.address import SyntheticAddress
+from pants.base.address_lookup_error import AddressLookupError
 
 
 logger = logging.getLogger(__name__)
@@ -20,6 +21,9 @@ logger = logging.getLogger(__name__)
 class BuildGraph(object):
   """A directed acyclic graph of Targets and dependencies. Not necessarily connected.
   """
+
+  class TransitiveLookupError(AddressLookupError):
+    """Used to append the current node to the error message from an AddressLookupError """
 
   def __init__(self, address_mapper, run_tracker=None):
     self._address_mapper = address_mapper
@@ -30,10 +34,9 @@ class BuildGraph(object):
     """Clear out the state of the BuildGraph, in particular Target mappings and dependencies."""
     self._addresses_already_closed = set()
     self._target_by_address = OrderedDict()
-    self._target_dependencies_by_address = defaultdict(set)
+    self._target_dependencies_by_address = defaultdict(OrderedSet)
     self._target_dependees_by_address = defaultdict(set)
     self._derived_from_by_derivative_address = {}
-    self._derivative_by_derived_from_address = defaultdict(set)
 
   def contains_address(self, address):
     return address in self._target_by_address
@@ -118,7 +121,6 @@ class BuildGraph(object):
                          .format(target=target,
                                  derived_from=derived_from))
       self._derived_from_by_derivative_address[target.address] = derived_from.address
-      self._derivative_by_derived_from_address[derived_from.address].add(target.address)
 
     self._target_by_address[address] = target
 
@@ -166,17 +168,21 @@ class BuildGraph(object):
     """Returns all the targets in the graph in no particular order.
 
     :param predicate: A target predicate that will be used to filter the targets returned.
+
+    :return: a list of targets evaluated in inorder traversal order.
     """
     return filter(predicate, self._target_by_address.values())
 
   def sorted_targets(self):
+    """:return: targets ordered from most dependent to least."""
     return sort_targets(self._target_by_address.values())
 
   def walk_transitive_dependency_graph(self, addresses, work, predicate=None):
     """Given a work function, walks the transitive dependency closure of `addresses`.
 
     :param list<Address> addresses: The closure of `addresses` will be walked.
-    :param function work: The function that will be called on every target in the closure.
+    :param function work: The function that will be called on every target in the closure using
+      inorder traversal order.
     :param function predicate: If this parameter is not given, no Targets will be filtered
       out of the closure.  If it is given, any Target which fails the predicate will not be
       walked, nor will its dependencies.  Thus predicate effectively trims out any subgraph
@@ -195,7 +201,7 @@ class BuildGraph(object):
       _walk_rec(address)
 
   def walk_transitive_dependee_graph(self, addresses, work, predicate=None):
-    """Identical to `walk_transitive_dependency_graph`, but walks dependees.
+    """Identical to `walk_transitive_dependency_graph`, but walks dependees inorder traversal order.
 
     This is identical to reversing the direction of every arrow in the DAG, then calling
     `walk_transitive_dependency_graph`.
@@ -222,7 +228,7 @@ class BuildGraph(object):
     :param list<Address> addresses: The root addresses to transitively close over.
     :param function predicate: The predicate passed through to `walk_transitive_dependee_graph`.
     """
-    ret = set()
+    ret = OrderedSet()
     self.walk_transitive_dependee_graph(addresses, ret.add, predicate=predicate)
     return ret
 
@@ -237,7 +243,7 @@ class BuildGraph(object):
     :param function predicate: The predicate passed through to
       `walk_transitive_dependencies_graph`.
     """
-    ret = set()
+    ret = OrderedSet()
     self.walk_transitive_dependency_graph(addresses, ret.add, predicate=predicate)
     return ret
 
@@ -294,29 +300,35 @@ class BuildGraph(object):
     target_addressable = mapper.resolve(address)
 
     self._addresses_already_closed.add(address)
-    dep_addresses = list(mapper.specs_to_addresses(target_addressable.dependency_specs,
-                                                   relative_to=address.spec_path))
-    for dep_address in dep_addresses:
-      self.inject_address_closure(dep_address)
+    try:
+      dep_addresses = list(mapper.specs_to_addresses(target_addressable.dependency_specs,
+                                                     relative_to=address.spec_path))
+      for dep_address in dep_addresses:
+        self.inject_address_closure(dep_address)
 
-    if not self.contains_address(address):
-      target = self.target_addressable_to_target(address, target_addressable)
-      self.inject_target(target, dependencies=dep_addresses)
-    else:
-      target = self.get_target(address)
+      if not self.contains_address(address):
+        target = self.target_addressable_to_target(address, target_addressable)
+        self.inject_target(target, dependencies=dep_addresses)
+      else:
+        target = self.get_target(address)
 
-    for traversable_spec in target.traversable_dependency_specs:
-      self.inject_spec_closure(spec=traversable_spec, relative_to=address.spec_path)
-      traversable_spec_target = self.get_target_from_spec(traversable_spec,
-                                                          relative_to=address.spec_path)
-      if traversable_spec_target not in target.dependencies:
-        self.inject_dependency(dependent=target.address,
-                               dependency=traversable_spec_target.address)
+      for traversable_spec in target.traversable_dependency_specs:
+        self.inject_spec_closure(spec=traversable_spec, relative_to=address.spec_path)
+        traversable_spec_target = self.get_target_from_spec(traversable_spec,
+                                                            relative_to=address.spec_path)
+        if traversable_spec_target not in target.dependencies:
+          self.inject_dependency(dependent=target.address,
+                                 dependency=traversable_spec_target.address)
+          target.mark_transitive_invalidation_hash_dirty()
+
+      for traversable_spec in target.traversable_specs:
+        self.inject_spec_closure(spec=traversable_spec, relative_to=address.spec_path)
         target.mark_transitive_invalidation_hash_dirty()
 
-    for traversable_spec in target.traversable_specs:
-      self.inject_spec_closure(spec=traversable_spec, relative_to=address.spec_path)
-      target.mark_transitive_invalidation_hash_dirty()
+    except AddressLookupError as e:
+      raise self.TransitiveLookupError("{message}\n  referenced from {spec}"
+                                       .format(message=e, spec=address.spec))
+
 
   def inject_spec_closure(self, spec, relative_to=''):
     """Constructs a SyntheticAddress from `spec` and calls `inject_address_closure`.
@@ -358,7 +370,7 @@ class CycleException(Exception):
 
 
 def sort_targets(targets):
-  """Returns the targets that targets depend on sorted from most dependent to least."""
+  """:return: the targets that targets depend on sorted from most dependent to least."""
   roots = OrderedSet()
   inverted_deps = defaultdict(OrderedSet)  # target -> dependent targets
   visited = set()

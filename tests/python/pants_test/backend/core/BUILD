@@ -4,23 +4,15 @@
 target(
   name='core',
   dependencies=[
-    pants(':setup_confluence'),
-    pants(':wrapped_globs'),
+    ':wrapped_globs',
   ],
 )
-python_tests(
-  name = 'setup_confluence',
-  sources = ['test_setup_confluence.py'],
-  dependencies = [
-    pants('src/python/pants/backend/core'),
-    pants('tests/python/pants_test:base_test'),
-  ]
-)
+
 python_tests(
   name = 'wrapped_globs',
   sources = ['test_wrapped_globs.py'],
   dependencies = [
-    pants('src/python/pants/backend/core'),
-    pants('tests/python/pants_test:base_test'),
+    'src/python/pants/backend/core',
+    'tests/python/pants_test:base_test',
   ]
 )

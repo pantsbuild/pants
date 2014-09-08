@@ -19,6 +19,7 @@ from pants.backend.jvm.tasks.jvm_compile.jvm_fingerprint_strategy import JvmFing
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
 from pants.base.build_environment import get_buildroot, get_scm
+from pants.base.config import Config
 from pants.base.exceptions import TaskError
 from pants.base.target import Target
 from pants.base.worker_pool import Work
@@ -215,11 +216,14 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
     check_unnecessary_deps = munge_flag(self._get_lang_specific_option('unnecessary_deps'))
 
     if check_missing_deps or check_missing_direct_deps or check_unnecessary_deps:
+      target_whitelist = self.context.config.getlist('jvm', 'missing_deps_target_whitelist', default=[])
+
       # Must init it here, so it can set requirements on the context.
       self._dep_analyzer = JvmDependencyAnalyzer(self.context,
                                                  check_missing_deps,
                                                  check_missing_direct_deps,
-                                                 check_unnecessary_deps)
+                                                 check_unnecessary_deps,
+                                                 target_whitelist)
     else:
       self._dep_analyzer = None
 
@@ -258,7 +262,7 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
                                               default=no_warning_defaults))
   def prepare(self, round_manager):
     # TODO(John Sirois): this is a fake requirement on 'ivy_jar_products' in order to force
-    # resolve to run before this phase.  Require a new CompileClasspath product to be produced by
+    # resolve to run before this goal.  Require a new CompileClasspath product to be produced by
     # IvyResolve instead.
     round_manager.require_data('ivy_jar_products')
     round_manager.require_data('exclusives_groups')
@@ -355,7 +359,7 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
   # TODO(benjy): Break this monstrosity up? Previous attempts to do so
   #              turned out to be more trouble than it was worth.
   def execute_chunk(self, relevant_targets):
-    # TODO(benjy): Add a pre-execute phase for injecting deps into targets, so e.g.,
+    # TODO(benjy): Add a pre-execute goal for injecting deps into targets, so e.g.,
     # we can inject a dep on the scala runtime library and still have it ivy-resolve.
 
     if not relevant_targets:
@@ -698,7 +702,7 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
     scm = get_scm()
     if not scm:
       return None
-    changed_files = scm.changed_files(include_untracked=True)
+    changed_files = scm.changed_files(include_untracked=True, relative_to=get_buildroot())
     for f in changed_files:
       ret.update(targets_by_source.get(f, []))
     return list(ret)

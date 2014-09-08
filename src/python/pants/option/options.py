@@ -9,7 +9,7 @@ import copy
 import sys
 
 from pants.base.build_environment import pants_release
-from pants.goal.phase import Phase
+from pants.goal.goal import Goal
 from pants.option.arg_splitter import ArgSplitter, GLOBAL_SCOPE
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.parser import ParseError
@@ -82,8 +82,8 @@ class Options(object):
     return self._target_specs
 
   @property
-  def phases(self):
-    """The requested phases."""
+  def goals(self):
+    """The requested goals."""
     # TODO: Order them in some way? We don't know anything about the topological
     # order here, but it would be nice to, e.g., display help in that order.
     return set([g.partition('.')[0] for g in self._scope_to_flags.keys() if g])
@@ -153,7 +153,7 @@ class Options(object):
     """Return the option values for the global scope."""
     return self.for_scope(GLOBAL_SCOPE)
 
-  def print_help(self, msg=None, phases=None, legacy=False):
+  def print_help(self, msg=None, goals=None, legacy=False):
     """Print a help screen, followed by an optional message.
 
     Note: Ony useful if called after options have been registered.
@@ -162,17 +162,17 @@ class Options(object):
       if s != '':  # Avoid superfluous blank lines for empty strings.
         print(s)
 
-    phases = phases or self.phases
-    if phases:
-      for phase_name in phases:
-        phase = Phase.by_name(phase_name)
-        if not phase.ordered_task_names():
-          print('\nUnknown goal: %s' % phase_name)
+    goals = goals or self.goals
+    if goals:
+      for goal_name in goals:
+        goal = Goal.by_name(goal_name)
+        if not goal.ordered_task_names():
+          print('\nUnknown goal: %s' % goal_name)
         else:
-          _maybe_print(self.format_help('%s' % phase.name, legacy=legacy))
-          for task_name in phase.ordered_task_names():
-            if task_name != phase.name:  # Otherwise we registered on the phase scope.
-              scope = '%s.%s' % (phase.name, task_name)
+          _maybe_print(self.format_help('%s' % goal.name, legacy=legacy))
+          for task_name in goal.ordered_task_names():
+            if task_name != goal.name:  # Otherwise we registered on the goal scope.
+              scope = '%s.%s' % (goal.name, task_name)
               _maybe_print(self.format_help(scope, legacy=legacy))
     else:
       print(pants_release())

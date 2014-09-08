@@ -5,11 +5,11 @@ python_tests(
   name = 'cache',
   sources = globs('*.py'),
   dependencies = [
-    pants('src/python/pants/base:build_invalidator'),
-    pants('src/python/pants/cache'),
-    pants('src/python/pants/util:contextutil'),
-    pants('src/python/pants/util:dirutil'),
-    pants('tests/python/pants_test:base_test'),
-    pants('tests/python/pants_test/testutils'),
+    'src/python/pants/base:build_invalidator',
+    'src/python/pants/cache',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
+    'tests/python/pants_test:base_test',
+    'tests/python/pants_test/testutils',
   ]
 )

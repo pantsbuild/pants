@@ -7,7 +7,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import pytest
 import shlex
-import unittest
+import unittest2 as unittest
 
 from pants.option.arg_splitter import ArgSplitter, ArgSplitterError
 

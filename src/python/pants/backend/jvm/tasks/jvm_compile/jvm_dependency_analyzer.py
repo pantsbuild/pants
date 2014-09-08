@@ -24,7 +24,8 @@ class JvmDependencyAnalyzer(object):
                context,
                check_missing_deps,
                check_missing_direct_deps,
-               check_unnecessary_deps):
+               check_unnecessary_deps,
+               target_whitelist):
 
     self._context = context
     self._context.products.require_data('classes_by_target')
@@ -33,6 +34,9 @@ class JvmDependencyAnalyzer(object):
     self._check_missing_deps = check_missing_deps
     self._check_missing_direct_deps = check_missing_direct_deps
     self._check_unnecessary_deps = check_unnecessary_deps
+
+    # These targets we will not report as having any dependency issues even if they do.
+    self._target_whitelist = OrderedSet(target_whitelist)
 
   def _compute_targets_by_file(self):
     """Returns a map from abs path of source, class or jar file to an OrderedSet of targets.
@@ -155,6 +159,13 @@ class JvmDependencyAnalyzer(object):
             return os.path.relpath(path, prefix)
         return path
 
+      def filter_whitelisted(missing_deps):
+        # Removing any targets that exist in the whitelist from the list of dependency issues.
+        return [(tgt_pair, evidence) for (tgt_pair, evidence) in missing_deps
+                            if tgt_pair[0].address.reference() not in self._target_whitelist]
+
+      missing_tgt_deps = filter_whitelisted(missing_tgt_deps)
+
       if self._check_missing_deps and (missing_file_deps or missing_tgt_deps):
         for (tgt_pair, evidence) in missing_tgt_deps:
           evidence_str = '\n'.join(['    %s uses %s' % (shorten(e[0]), shorten(e[1]))
@@ -168,7 +179,11 @@ class JvmDependencyAnalyzer(object):
         if self._check_missing_deps == 'fatal':
           raise TaskError('Missing deps.')
 
-      if self._check_missing_direct_deps:
+
+      missing_direct_tgt_deps = filter_whitelisted(missing_direct_tgt_deps)
+
+      if self._check_missing_direct_deps and missing_direct_tgt_deps:
+
         for (tgt_pair, evidence) in missing_direct_tgt_deps:
           evidence_str = '\n'.join(['    %s uses %s' % (shorten(e[0]), shorten(e[1]))
                                     for e in evidence])

@@ -4,7 +4,7 @@ python_library(
     'target_platform.py',
   ],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.lang'),
-    pants('src/python/pants/base:config'),
+    '3rdparty/python/twitter/commons:twitter.common.lang',
+    'src/python/pants/base:config',
   ],
 )

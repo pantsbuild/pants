@@ -9,6 +9,7 @@ import operator
 import re
 
 from pants.backend.core.tasks.console_task import ConsoleTask
+from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_environment import get_buildroot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.exceptions import TaskError
@@ -77,15 +78,15 @@ class Filter(ConsoleTask):
       try:
         spec_parser = CmdLineSpecParser(get_buildroot(), self.context.address_mapper)
         addresses = spec_parser.parse_addresses(spec)
-      except (IOError, ValueError) as e:
-        raise TaskError('Failed to parse spec: %s: %s' % (spec, e))
+      except AddressLookupError as e:
+        raise TaskError('Failed to parse address selector: {spec}\n {message}'.format(spec=spec, message=e))
       # filter specs may not have been parsed as part of the context: force parsing
       matches = set()
       for address in addresses:
-        self.context.build_graph.inject_address(address)
+        self.context.build_graph.inject_address_closure(address)
         matches.add(self.context.build_graph.get_target(address))
       if not matches:
-        raise TaskError('No matches for spec: %s' % spec)
+        raise TaskError('No matches for address selector: {spec}'.format(spec=spec))
       return matches
 
     def filter_for_address(spec):

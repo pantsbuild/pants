@@ -6,6 +6,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import os
+import sys
 
 from pants.backend.core.targets.dependencies import Dependencies, DeprecatedDependencies
 from pants.backend.core.targets.doc import Page, Wiki, WikiArtifact
@@ -31,13 +32,11 @@ from pants.backend.core.tasks.sorttargets import SortTargets
 from pants.backend.core.tasks.targets_help import TargetsHelp
 from pants.backend.core.tasks.what_changed import WhatChanged
 from pants.backend.core.wrapped_globs import Globs, RGlobs, ZGlobs
-from pants.base.build_environment import get_buildroot, get_scm, pants_version, set_scm
+from pants.base.build_environment import get_buildroot, pants_version
 from pants.base.build_file_aliases import BuildFileAliases
-from pants.base.config import Config
 from pants.base.source_root import SourceRoot
 from pants.commands.goal_runner import GoalRunner
 from pants.goal.task_registrar import TaskRegistrar as task
-from pants.goal.phase import Phase
 
 
 class BuildFilePath(object):
@@ -47,6 +46,19 @@ class BuildFilePath(object):
 
   def __call__(self):
     return os.path.join(get_buildroot(), self.rel_path)
+
+
+class PantsObsolete(object):
+  _warning_emitted = False
+
+  @classmethod
+  def pants(cls, target):
+    if not cls._warning_emitted:
+      cls._warning_emitted = True
+      print('*** pants() wrapper is obsolete and will be removed in a future release. '
+            'See http://pantsbuild.github.io/build_files.html ***',
+            file=sys.stderr)
+    return target
 
 
 def build_file_aliases():
@@ -60,15 +72,11 @@ def build_file_aliases():
       'wiki': Wiki,
     },
     objects={
-      'config': Config,
       'ConfluencePublish': ConfluencePublish,
       'get_buildroot': get_buildroot,
-      'get_scm': get_scm,
       'pants_version': pants_version,
-      'goal': task,
-      'pants': lambda x: x,
-      'phase': Phase,
-      'set_scm': set_scm,
+      # TODO(Eric Ayers) pants() was officially deprecated in 0.0.24. Remove this function soon.
+      'pants': PantsObsolete.pants,
       'wiki_artifact': WikiArtifact,
     },
     context_aware_object_factories={

@@ -1,6 +1,30 @@
 RELEASE HISTORY
 ===============
 
+0.0.24 or next (??/??/2014)
+---------------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Changed goal markdown: Writes output to ./dist/markdown/ . Pages can
+  `include snippets from source files
+  <http://pantsbuild.github.io/page.html#include-a-file-snippet>`_
+  `RB #949 <https://rbcommons.com/s/twitter/r/949>`_
+  `RB #961 <https://rbcommons.com/s/twitter/r/961>`_
+
+
+Bugfixes
+~~~~~~~~
+
+* The goal filter's --filter-ancestor parameter works better now
+  `Issue #506 <https://github.com/pantsbuild/pants/issues/506>`_
+  `RB #925 <https://rbcommons.com/s/twitter/r/925/>`_
+
+* Fix: goal markdown failed to load page.mustache
+  `Issue #498 <https://github.com/pantsbuild/pants/issues/498>`_
+  `RB #918 <https://rbcommons.com/s/twitter/r/918>`_
+
 0.0.23 (8/11/2014)
 ------------------
 

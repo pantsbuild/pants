@@ -8,33 +8,35 @@ python_library(
     globs('java/distribution/*.class') +
     rglobs('reporting/assets/*') + globs('reporting/templates/*.mustache') +
     globs('backend/core/tasks/templates/builddictionary/*.mustache') +
-    globs('backend/jvm/tasks/templates/ensime/*.mustache') +
     globs('backend/jvm/tasks/templates/eclipse/*.mustache') +
+    globs('backend/jvm/tasks/templates/eclipse/*.prefs') +
+    globs('backend/jvm/tasks/templates/ensime/*.mustache') +
     globs('backend/jvm/tasks/templates/idea/*.mustache') +
     globs('backend/jvm/tasks/templates/ivy_resolve/*.mustache') +
-    globs('backend/jvm/tasks/templates/jar_publish/*.mustache')
+    globs('backend/jvm/tasks/templates/jar_publish/*.mustache') +
+    globs('backend/core/tasks/templates/markdown/*.mustache')
   ),
   dependencies=[
-    pants('3rdparty/python:ansicolors'),
-    pants('3rdparty/python:Markdown'),
-    pants('3rdparty/python:pex'),
-    pants('3rdparty/python:psutil'),
-    pants('3rdparty/python:Pygments'),
-    pants('3rdparty/python:pystache'),
-    pants('3rdparty/python:pytest'),
-    pants('3rdparty/python:pytest-cov'),
-    pants('3rdparty/python:python-daemon'),
-    pants('3rdparty/python:requests'),
-    pants('3rdparty/python:setuptools'),
-    pants('3rdparty/python/twitter/commons:twitter.common.collections'),
-    pants('3rdparty/python/twitter/commons:twitter.common.config'),
-    pants('3rdparty/python/twitter/commons:twitter.common.confluence'),
-    pants('3rdparty/python/twitter/commons:twitter.common.decorators'),
-    pants('3rdparty/python/twitter/commons:twitter.common.lang'),
-    pants('3rdparty/python/twitter/commons:twitter.common.log'),
-    pants('3rdparty/python/twitter/commons:twitter.common.process'),
-    pants('3rdparty/python/twitter/commons:twitter.common.threading'),
-    pants('3rdparty/python/twitter/commons:twitter.common.util'),
+    '3rdparty/python:ansicolors',
+    '3rdparty/python:Markdown',
+    '3rdparty/python:pex',
+    '3rdparty/python:psutil',
+    '3rdparty/python:Pygments',
+    '3rdparty/python:pystache',
+    '3rdparty/python:pytest',
+    '3rdparty/python:pytest-cov',
+    '3rdparty/python:python-daemon',
+    '3rdparty/python:requests',
+    '3rdparty/python:setuptools',
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python/twitter/commons:twitter.common.config',
+    '3rdparty/python/twitter/commons:twitter.common.confluence',
+    '3rdparty/python/twitter/commons:twitter.common.decorators',
+    '3rdparty/python/twitter/commons:twitter.common.lang',
+    '3rdparty/python/twitter/commons:twitter.common.log',
+    '3rdparty/python/twitter/commons:twitter.common.process',
+    '3rdparty/python/twitter/commons:twitter.common.threading',
+    '3rdparty/python/twitter/commons:twitter.common.util',
   ]
 )
 
@@ -42,6 +44,6 @@ python_binary(
   name='_pants_transitional_publishable_binary_',
   entry_point = 'pants.bin.pants_exe:main',
   dependencies=[
-    pants(':_pants_transitional_publishable_library_')
+    ':_pants_transitional_publishable_library_'
   ]
 )

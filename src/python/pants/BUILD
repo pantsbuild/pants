@@ -4,7 +4,7 @@
 target(
   name = 'pants',
   dependencies = [
-    pants('src/python/pants/bin:pants'),
+    'src/python/pants/bin:pants',
   ],
 ).with_description('An alias for the pants binary target.')
 
@@ -37,8 +37,36 @@ python_library(
     ]
   ).with_binaries(
     # TODO(John Sirois): Switch back when target cycles have been sorted out.
-    # pants=pants('src/python/pants/bin:pants'),
-    pants=pants(':_pants_transitional_publishable_binary_'),
+    # pants='src/python/pants/bin:pants',
+    pants=':_pants_transitional_publishable_binary_',
+  )
+)
+
+python_library(
+  name='test_infra',
+  dependencies=[
+    'tests/python/pants_test:base_test',
+    'tests/python/pants_test/jvm:jar_task_test_base',
+    'tests/python/pants_test/jvm:nailgun_task_test_base',
+    'tests/python/pants_test/jvm:jvm_tool_task_test_base',
+    'tests/python/pants_test/engine:engine_test_base',
+    'tests/python/pants_test/tasks:jvm_binary_test_base',
+  ],
+  provides=setup_py(
+    name='pantsbuild.pants.testinfra',
+    version=pants_version(),
+    description='Test support for writing pants plugins.',
+    long_description=read_contents('ABOUT.rst') + read_contents('CHANGELOG.rst'),
+    url='https://github.com/pantsbuild/pants',
+    license='Apache License, Version 2.0',
+    zip_safe=True,
+    namespace_packages=['pants_tests'],
+    classifiers=[
+      'Intended Audience :: Developers',
+      'License :: OSI Approved :: Apache Software License',
+      'Operating System :: OS Independent',
+      'Programming Language :: Python',
+    ]
   )
 )
 
@@ -51,13 +79,13 @@ python_library(
   name = 'binary_util',
   sources = ['binary_util.py'],
   dependencies = [
-    pants('3rdparty/python/twitter/commons:twitter.common.collections'),
-    pants('3rdparty/python/twitter/commons:twitter.common.lang'),
-    pants('3rdparty/python/twitter/commons:twitter.common.log'),
-    pants('src/python/pants/base:config'),
-    pants('src/python/pants/base:exceptions'),
-    pants('src/python/pants/util:contextutil'),
-    pants('src/python/pants/util:dirutil'),
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python/twitter/commons:twitter.common.lang',
+    '3rdparty/python/twitter/commons:twitter.common.log',
+    'src/python/pants/base:config',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
   ],
 )
 
@@ -65,7 +93,7 @@ python_library(
   name = 'thrift_util',
   sources = ['thrift_util.py'],
   dependencies = [
-    pants(':binary_util'),
+    ':binary_util',
   ],
 )
 

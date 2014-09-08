@@ -7,7 +7,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from pants.backend.core.tasks.list_goals import ListGoals
 from pants.backend.core.tasks.task import Task
-from pants.goal.phase import Phase
+from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar
 from pants_test.tasks.test_base import ConsoleTaskTest
 
@@ -32,7 +32,7 @@ class ListGoalsTest(ConsoleTaskTest):
     pass
 
   def test_list_goals(self):
-    Phase.clear()
+    Goal.clear()
     self.assert_console_output(self._INSTALLED_HEADER)
 
     TaskRegistrar(name=self._LIST_GOALS_NAME, action=ListGoals)\
@@ -59,7 +59,7 @@ class ListGoalsTest(ConsoleTaskTest):
     )
 
   def test_list_goals_all(self):
-    Phase.clear()
+    Goal.clear()
 
     TaskRegistrar(name=self._LIST_GOALS_NAME, action=ListGoals)\
       .install().with_description(self._LIST_GOALS_DESC)
@@ -79,7 +79,7 @@ class ListGoalsTest(ConsoleTaskTest):
     )
 
   def test_list_goals_graph(self):
-    Phase.clear()
+    Goal.clear()
 
     TaskRegistrar(name=self._LIST_GOALS_NAME, action=ListGoals)\
       .install().with_description(self._LIST_GOALS_DESC)

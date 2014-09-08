@@ -40,7 +40,7 @@ is Thrift; it generates Java. ::
     java_thrift_library(name='mybird',
       # Specify dependencies for thrift IDL file includes.
       dependencies=[
-        pants('src/thrift/com/twitter/otherbird'),
+        'src/thrift/com/twitter/otherbird',
       ],
       sources=globs('*.thrift')
     )
@@ -48,7 +48,7 @@ is Thrift; it generates Java. ::
 Pants knows that before it compiles such a target, it must first generate Java
 code from the Thrift IDL files. Users can
 depend on this target like any other internal target. In this case, users would
-add a dependency on ``pants('src/thrift/com/twitter/mybird')``.
+add a dependency on ``'src/thrift/com/twitter/mybird'``.
 
 One *lang*\_thrift_library can depend on another; use this if one of your
 Thrift files ``include``\s a Thrift file that lives in another target.
@@ -185,24 +185,24 @@ The targets use ``provides`` parameters. It might look something like::
   java_thrift_library(name='eureka-java',
     sources=['eureka.thrift'],
     dependencies=[
-      pants('src/thrift/org/archimedes/volume:volume-java'),
+      'src/thrift/org/archimedes/volume:volume-java',
     ],
     language='java',
     provides=artifact(
       org='org.archimedes',
       name='eureka-java',
-      repo=pants('BUILD.archimedes:jar-public'),
+      repo='BUILD.archimedes:jar-public',
   ))
 
   java_thrift_library(name='eureka-scala',
     sources=['eureka.thrift'],
     dependencies=[
-      pants('src/thrift/org/archimedes/volume:volume-scala'),
+      'src/thrift/org/archimedes/volume:volume-scala',
     ],
     compiler='scrooge',
     language='scala',
     provides=artifact(
       org='org.archimedes',
       name='eureka-scala',
-      repo=pants('BUILD.archimedes:jar-public'),
+      repo='BUILD.archimedes:jar-public',
     ))

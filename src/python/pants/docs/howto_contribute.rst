@@ -84,11 +84,22 @@ After deciding on the change you'd like to make we'll need to get the code. ::
 
    git clone https://github.com/pantsbuild/pants
 
-After getting the code, you may want to familiarize yourself with the
-:doc:`internals` or :doc:`howto_develop`. We'll create a new branch off master
-and make our changes. ::
+
+Making the Change
+=================
+
+You might want to familiarize yourself with the
+:doc:`internals` or :doc:`howto_develop`.
+
+Create a new branch off master and make changes. ::
 
    git checkout -b $FEATURE_BRANCH
+
+Does your change alter Pants' behavior in a way users will notice?
+If so, then along with changing code...
+
+   * Update ``src/python/pants/CHANGELOG.rst``.
+   * Consider updating the :doc:`user documentation <docs>`.
 
 Run the CI Tests
 ================

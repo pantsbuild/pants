@@ -31,7 +31,7 @@ class DxCompileIntegrationTest(AndroidIntegrationTest):
                              'and ANDROID_HOME set in path.'.format(TOOLS))
 
   def test_dx_compile(self):
-    self.dx_test('src/android/example:hello')
+    self.dx_test(AndroidIntegrationTest.TEST_TARGET)
 
   def dx_test(self, target):
       pants_run = self.run_pants(['goal', 'dex', target])

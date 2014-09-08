@@ -30,7 +30,8 @@ class ScalaRepl(JvmTask, JvmToolTaskMixin):
         self.jvm_args.extend(shlex.split(arg))
     self.confs = self.context.config.getlist('scala-repl', 'confs', default=['default'])
     self._bootstrap_key = 'scala-repl'
-    bootstrap_tools = self.context.config.getlist('scala-repl', 'bootstrap-tools')
+    bootstrap_tools = self.context.config.getlist('scala-repl', 'bootstrap-tools',
+                                                  default=['//:scala-repl-2.9.3'])
     self.register_jvm_tool(self._bootstrap_key, bootstrap_tools)
     self.main = self.context.config.get('scala-repl', 'main')
     self.args = self.context.config.getlist('scala-repl', 'args', default=[])
@@ -40,7 +41,7 @@ class ScalaRepl(JvmTask, JvmToolTaskMixin):
 
   def prepare(self, round_manager):
     # TODO(John Sirois): these are fake requirements in order to force compile run before this
-    # phase. Introduce a RuntimeClasspath product for JvmCompile and PrepareResources to populate
+    # goal. Introduce a RuntimeClasspath product for JvmCompile and PrepareResources to populate
     # and depend on that.
     # See: https://github.com/pantsbuild/pants/issues/310
     round_manager.require_data('resources_by_target')

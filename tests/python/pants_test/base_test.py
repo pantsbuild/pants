@@ -9,8 +9,9 @@ from contextlib import contextmanager
 import os
 from tempfile import mkdtemp
 from textwrap import dedent
-import unittest2
+import unittest2 as unittest
 
+from pants.backend.core.tasks.check_exclusives import ExclusivesMapping
 from pants.backend.core.targets.dependencies import Dependencies
 from pants.base.address import SyntheticAddress
 from pants.base.build_file_address_mapper import BuildFileAddressMapper
@@ -23,13 +24,13 @@ from pants.base.build_root import BuildRoot
 from pants.base.config import Config
 from pants.base.source_root import SourceRoot
 from pants.base.target import Target
-from pants.goal.phase import Phase
+from pants.goal.goal import Goal
 from pants.util.contextutil import environment_as, pushd, temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree, touch
 from pants_test.base.context_utils import create_context
 
 
-class BaseTest(unittest2.TestCase):
+class BaseTest(unittest.TestCase):
   """A baseclass useful for tests requiring a temporary buildroot."""
 
   def build_path(self, relpath):
@@ -73,6 +74,7 @@ class BaseTest(unittest2.TestCase):
                   spec='',
                   target_type=Target,
                   dependencies=None,
+                  resources = None,
                   derived_from=None,
                   **kwargs):
     address = SyntheticAddress.parse(spec)
@@ -81,6 +83,8 @@ class BaseTest(unittest2.TestCase):
                          build_graph=self.build_graph,
                          **kwargs)
     dependencies = dependencies or []
+    dependencies.extend(resources or [])
+
     self.build_graph.inject_target(target,
                                    dependencies=[dep.address for dep in dependencies],
                                    derived_from=derived_from)
@@ -88,10 +92,10 @@ class BaseTest(unittest2.TestCase):
 
   @property
   def alias_groups(self):
-    return BuildFileAliases.create(targets={'dependencies': Dependencies})
+    return BuildFileAliases.create(targets={'target': Dependencies})
 
   def setUp(self):
-    Phase.clear()
+    Goal.clear()
     self.real_build_root = BuildRoot().path
     self.build_root = os.path.realpath(mkdtemp(suffix='_BUILD_ROOT'))
     BuildRoot().path = self.build_root
@@ -192,3 +196,21 @@ class BaseTest(unittest2.TestCase):
           for buildfile in buildfiles:
             touch(os.path.join(root_dir, buildfile))
           yield os.path.realpath(root_dir)
+
+  def populate_exclusive_groups(self, context, key=None, classpaths=None, target_predicate=None):
+    """
+    Helps actual test cases to populate the "exclusives_groups" products data mapping
+    in the context, which holds the classpath values for targets.
+
+    :param context: The execution context where the products data mapping lives.
+    :param key: key for list of classpaths in the "exclusives_groups" data mapping.
+      None is the default value for most common cases.
+    :param classpaths: a list of classpath strings. If not specified, ['none'] will be used.
+    :param target_predicate: filter predicate for the context.targets(). For most common test
+      cases, None value is good enough.
+    """
+    exclusives_mapping = ExclusivesMapping(context)
+    exclusives_mapping.set_base_classpath_for_group(
+      key or '<none>', [('default', entry) for entry in classpaths or ['none']])
+    exclusives_mapping._populate_target_maps(context.targets(target_predicate))
+    context.products.safe_create_data('exclusives_groups', lambda: exclusives_mapping)

@@ -5,7 +5,7 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-import unittest
+import unittest2 as unittest
 
 from pants.base.config import Config
 from pants.util.contextutil import temporary_file

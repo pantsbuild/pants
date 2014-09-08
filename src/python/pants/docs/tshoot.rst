@@ -18,7 +18,7 @@ To run a Pants command so that it outputs much much more information to stdout,
 you can set some environment variables and pass the ``-ldebug`` flag (along
 with the parameters you meant to pass)::
 
-    PEX_VERBOSE=1 PANTS_VERBOSE=1 PYTHON_VERBOSE=1 ./pants -ldebug ...
+    PEX_VERBOSE=1 PANTS_VERBOSE=1 PYTHON_VERBOSE=1 ./pants goal -ldebug ...
 
 This can be especially useful if you're trying to figure out what Pants
 was "looking at" when it crashed.

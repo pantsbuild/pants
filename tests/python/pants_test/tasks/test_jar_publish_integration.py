@@ -19,7 +19,7 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
   @pytest.mark.skipif('not JarPublishIntegrationTest.SCALADOC',
                       reason='No scaladoc binary on the PATH.')
   def test_scala_publish(self):
-    self.publish_test('src/scala/com/pants/example:jvm-run-example-lib',
+    self.publish_test('examples/src/scala/com/pants/example:jvm-run-example-lib',
                       'com/pants/example/jvm-example-lib/0.0.1-SNAPSHOT',
                       ['ivy-0.0.1-SNAPSHOT.xml',
                        'jvm-example-lib-0.0.1-SNAPSHOT.jar',
@@ -37,6 +37,17 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
                        'hello-greet-0.0.1-SNAPSHOT.pom',
                        'hello-greet-0.0.1-SNAPSHOT-javadoc.jar',
                        'hello-greet-0.0.1-SNAPSHOT-sources.jar'])
+
+  def test_named_snapshot(self):
+    name = "abcdef0123456789"
+    self.publish_test('examples/src/java/com/pants/examples/hello/greet',
+                      'com/pants/examples/hello-greet/%s/' % name,
+                      ['ivy-%s.xml' % name,
+                       'hello-greet-%s.jar' % name,
+                       'hello-greet-%s.pom' % name,
+                       'hello-greet-%s-javadoc.jar' % name,
+                       'hello-greet-%s-sources.jar' % name],
+                      extra_options=['--publish-named-snapshot=%s' % name])
 
   def publish_test(self, target, package_namespace, artifacts, extra_options=None,
                    expected_primary_artifact_count=1):

@@ -26,12 +26,14 @@ as in this excerpt from
 .. literalinclude:: ../../../../examples/src/java/com/pants/examples/hello/main/BUILD
    :start-after: README page
 
-To render the page as HTML, use the :ref:`markdown goal <gref_phase_markdown>`.
+To render the page as HTML, use the :ref:`markdown goal <gref_goal_markdown>`.
 For example, to
 view ``examples/src/java/com/pants/examples/hello/main/README.md`` as HTML in
 your browser, ::
 
     ./pants goal markdown --markdown-open examples/src/java/com/pants/examples/hello/main:readme
+
+Pants generates the HTML files in the ``dist/markdown/`` directory tree.
 
 Link to Another ``page``
 ************************
@@ -66,10 +68,50 @@ an anchor therein::
         For more information about this fascinating topic,
         please see [[Destinations|pants('path/to:dest')]],
         especially the
-        [[Addendum section|pants('path/to:dest')#addendum]],
+        [[Addendum section|pants('path/to:dest)'#addendum]],
 
 Pants replaces the ``pants('path/to:dest')`` with the appropriate link.
 
+
+Include a File Snippet
+**********************
+
+Sometimes the best way to explain ``HelloWorld.java`` is to show an
+excerpt from ``HelloWorld.java``.
+You can use the ``!inc`` markdown to do this.
+Specify a file to include and (optionally) regexps at which to
+start copying or stop copying.
+For example, to include an excerpt from the file ``HelloMain.java``,
+starting with the first line matching the pattern ``void main`` and
+stopping before a subsequent line matching ``private HelloMain``::
+
+  !inc[start-at=void main&end-before=private HelloMain](HelloMain.java)
+
+To include *all* of ``HelloMain.java``::
+
+  !inc(HelloMain.java)
+
+To include most of ``HelloMain.java``, starting after license boilerplate::
+
+  !inc[start-after=Licensed under the Apache](HelloMain.java)
+
+It accepts the following optional parameters, separated by ampersands (&):
+
+start-at=\ *substring*
+  When excerpting the file to include, start at the first line containing
+  *substring*.
+
+start-after=\ *substring*
+  When excerpting the file to include, start after the first line containing
+  *substring*.
+
+end-before=\ *substring*
+  When excerpting the file to include, stop before a line containing
+  *substring*.
+
+end-at=\ *substring*
+  When excerpting the file to include, stop at a line containing
+  *substring*.
 
 Publishing
 **********
@@ -97,7 +139,7 @@ To specify that a page should be published to a Confluence wiki page, set its
 
     page(...
       provides=[
-        wiki_artifact(wiki=pants('//:confluence'),
+        wiki_artifact(wiki='//:confluence',
           space='ENG',
           title='Pants Hello World Example',
           parent='Examples',
@@ -130,11 +172,9 @@ probably look something like::
                       url_builder=confluence_url_builder)
 
 You need to install a goal to enable publishing a doc to confluence.
-It might look like
+To do this, create a Pants plugin that installs a goal that subclasses ConfluencePublish.
 
-.. literalinclude:: ../../../../tests/python/pants_test/backend/core/test_setup_confluence.py
-   :start-after: literalinclude this part
-   :end-before: stop including
+.. TODO details of how Andy got this working.
 
 In your ``pants.ini`` file, add a section with the url of your wiki server.
 E.g., if your server is at wiki.archie.org, it would look like::

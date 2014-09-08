@@ -14,12 +14,43 @@ from pants.scm.scm import Scm
 class Git(Scm):
   """An Scm implementation backed by git."""
 
+  @classmethod
+  def detect_worktree(cls):
+    """Detect the git working tree above cwd and return it; else, return None."""
+    cmd = ['git', 'rev-parse', '--show-toplevel']
+    process, out = cls._invoke(cmd)
+    try:
+      cls._check_result(cmd, process.returncode, raise_type=Scm.ScmException)
+    except Scm.ScmException:
+      return None
+    return cls._cleanse(out)
+
+  @classmethod
+  def _invoke(cls, cmd):
+    """Invoke the given command, and return a tuple of process and raw binary output.
+
+    stderr flows to wherever its currently mapped for the parent process - generally to
+    the terminal where the user can see the error.
+    """
+    process = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+    out, _ = process.communicate()
+    return (process, out)
+
+  @classmethod
+  def _cleanse(cls, output):
+    return output.strip().decode('utf-8')
+
+  @classmethod
+  def _check_result(cls, cmd, result, failure_msg=None, raise_type=Scm.ScmException):
+    if result != 0:
+      raise raise_type(failure_msg or '%s failed with exit code %d' % (' '.join(cmd), result))
+
   def __init__(self, binary='git', gitdir=None, worktree=None, remote=None, branch=None, log=None):
     """Creates a git scm proxy that assumes the git repository is in the cwd by default.
 
     binary:    The path to the git binary to use, 'git' by default.
     gitdir:    The path to the repository's git metadata directory (typically '.git').
-    workspace: The path to the git repository working tree directory (typically '.').
+    worktree:  The path to the git repository working tree directory (typically '.').
     remote:    The default remote to use.
     branch:    The default remote branch to use.
     log:       A log object that supports debug, info, and warn methods.
@@ -62,22 +93,29 @@ class Git(Scm):
                                 raise_type=Scm.LocalException)
     return None if branch == 'HEAD' else branch
 
-  def changed_files(self, from_commit=None, include_untracked=False):
-    uncommitted_changes = self._check_output(['diff', '--name-only', 'HEAD'],
+  def changed_files(self, from_commit=None, include_untracked=False, relative_to=None):
+    relative_to = relative_to or self._worktree
+    rel_suffix = ['--', relative_to]
+    uncommitted_changes = self._check_output(['diff', '--name-only', 'HEAD'] + rel_suffix,
                                              raise_type=Scm.LocalException)
 
     files = set(uncommitted_changes.split())
     if from_commit:
       # Grab the diff from the merge-base to HEAD using ... syntax.  This ensures we have just
       # the changes that have occurred on the current branch.
-      committed_changes = self._check_output(['diff', '--name-only', '%s...HEAD' % from_commit],
+      committed_cmd = ['diff', '--name-only', '%s...HEAD' % from_commit] + rel_suffix
+      committed_changes = self._check_output(committed_cmd,
                                              raise_type=Scm.LocalException)
       files.update(committed_changes.split())
     if include_untracked:
-      untracked = self._check_output(['ls-files', '--other', '--exclude-standard'],
+      untracked_cmd = ['ls-files', '--other', '--exclude-standard'] + rel_suffix
+      untracked = self._check_output(untracked_cmd,
                                      raise_type=Scm.LocalException)
       files.update(untracked.split())
-    return files
+    # git will report changed files relative to the worktree: re-relativize to relative_to
+    def fix_git_relative_path(worktree_path):
+      return os.path.relpath(os.path.join(self._worktree, worktree_path), relative_to)
+    return set(fix_git_relative_path(f) for f in files)
 
   def changelog(self, from_commit=None, files=None):
     args = ['whatchanged', '--stat', '--find-renames', '--find-copies']
@@ -141,10 +179,7 @@ class Git(Scm):
     cmd = self._create_git_cmdline(args)
     self._log_call(cmd)
 
-    # We let stderr flow to wherever its currently mapped for this process - generally to the
-    # terminal where the user can see the error.
-    process = subprocess.Popen(cmd, stdout=subprocess.PIPE)
-    out, _ = process.communicate()
+    process, out = self._invoke(cmd)
 
     self._check_result(cmd, process.returncode, failure_msg, raise_type)
     return self._cleanse(out)
@@ -154,10 +189,3 @@ class Git(Scm):
 
   def _log_call(self, cmd):
     self._log.debug('Executing: %s' % ' '.join(cmd))
-
-  def _check_result(self, cmd, result, failure_msg=None, raise_type=Scm.ScmException):
-    if result != 0:
-      raise raise_type(failure_msg or '%s failed with exit code %d' % (' '.join(cmd), result))
-
-  def _cleanse(self, output):
-    return output.strip().decode('utf-8')

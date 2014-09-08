@@ -24,8 +24,8 @@ class Credentials(Target):
     :type password: string or callable
     """
     super(Credentials, self).__init__(**kwargs)
-    self._username = username if callable(username) else lambda: username
-    self._password = password if callable(password) else lambda: password
+    self._username = username if callable(username) else lambda _: username
+    self._password = password if callable(password) else lambda _: password
 
   def username(self, repository):
     """Returns the username in java system property argument form."""

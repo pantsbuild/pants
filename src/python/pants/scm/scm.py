@@ -43,11 +43,14 @@ class Scm(AbstractClass):
     """Returns the commit date of the referenced commit."""
 
   @abstractmethod
-  def changed_files(self, from_commit=None, include_untracked=False):
+  def changed_files(self, from_commit=None, include_untracked=False, relative_to=None):
     """Returns a list of files with uncommitted changes or else files changed since from_commit.
 
     If include_untracked=True then any workspace files that are un-tracked by the scm and not
     ignored will be included as well.
+
+    If relative_to is None, then the paths will be relative to the working tree of the SCM
+    implementation (which might NOT match the buildroot.)
     """
 
   @abstractmethod

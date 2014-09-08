@@ -19,13 +19,16 @@ from twitter.common.collections import OrderedDict, OrderedSet
 from twitter.common.config import Properties
 from twitter.common.log.options import LogOptions
 
-from pants.backend.core.tasks.scm_publish import ScmPublish, Semver
+from pants.backend.core.tasks.scm_publish import Namedver, ScmPublish, Semver, Version
 from pants.backend.jvm.ivy_utils import IvyUtils
 from pants.backend.jvm.targets.jarable import Jarable
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.jar_task import JarTask
 from pants.base.address import Address
+from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_environment import get_buildroot, get_scm
+from pants.base.build_file import BuildFile
+from pants.base.build_file_parser import BuildFileParser
 from pants.base.build_graph import sort_targets
 from pants.base.exceptions import TaskError
 from pants.base.generator import Generator, TemplateData
@@ -43,34 +46,71 @@ class PushDb(object):
       properties = Properties.load(props)
       return PushDb(properties)
 
+  class Entry(object):
+    def __init__(self, sem_ver, named_ver, named_is_latest, sha, fingerprint):
+      """Records the most recent push/release of an artifact.
+
+      :param Semver sem_ver: The last semantically versioned release (or Semver(0.0.0))
+      :param Namedver named_ver: The last named release of this entry (or None)
+      :param boolean named_is_latest: True if named_ver is the latest, false if sem_ver is
+      :param string sha: The last Git SHA (or None)
+      :param string fingerprint: A unique hash for the most recent version of the target.
+      """
+      self.sem_ver = sem_ver
+      self.named_ver = named_ver
+      self.named_is_latest = named_is_latest
+      self.sha = sha
+      self.fingerprint = fingerprint
+
+    def version(self):
+      if self.named_is_latest:
+        return self.named_ver
+      else:
+        return self.sem_ver
+
+    def with_sem_ver(self, sem_ver):
+      """Returns a clone of this entry with the given sem_ver marked as the latest."""
+      return PushDb.Entry(sem_ver, self.named_ver, False, self.sha, self.fingerprint)
+
+    def with_named_ver(self, named_ver):
+      """Returns a clone of this entry with the given name_ver marked as the latest."""
+      return PushDb.Entry(self.sem_ver, named_ver, True, self.sha, self.fingerprint)
+
+    def with_sha_and_fingerprint(self, sha, fingerprint):
+      """Returns a clone of this entry with the given sha and fingerprint."""
+      return PushDb.Entry(self.sem_ver, self.named_ver, self.named_is_latest, sha, fingerprint)
+
   def __init__(self, props):
     self._props = props
 
-  def as_jar_with_version(self, target):
-    """
-      Given an internal target, return a JarDependency with the last published revision filled in.
-    """
-    jar_dep, db_get, _ = self._accessors_for_target(target)
+  def get_entry(self, target):
+    """Given an internal target, return a PushDb.Entry, which might contain defaults."""
+    db_get, _ = self._accessors_for_target(target)
 
     major = int(db_get('revision.major', '0'))
     minor = int(db_get('revision.minor', '0'))
     patch = int(db_get('revision.patch', '0'))
     snapshot = db_get('revision.snapshot', 'false').lower() == 'true'
+    named_version = db_get('revision.named_version', None)
+    named_is_latest = db_get('revision.named_is_latest', False)
     sha = db_get('revision.sha', None)
     fingerprint = db_get('revision.fingerprint', None)
-    semver = Semver(major, minor, patch, snapshot=snapshot)
-    jar_dep.rev = semver.version()
-    return jar_dep, semver, sha, fingerprint
+    sem_ver = Semver(major, minor, patch, snapshot=snapshot)
+    named_ver = Namedver(named_version) if named_version else None
+    return self.Entry(sem_ver, named_ver, named_is_latest, sha, fingerprint)
 
-  def set_version(self, target, version, sha, fingerprint):
-    version = version if isinstance(version, Semver) else Semver.parse(version)
-    _, _, db_set = self._accessors_for_target(target)
-    db_set('revision.major', version.major)
-    db_set('revision.minor', version.minor)
-    db_set('revision.patch', version.patch)
-    db_set('revision.snapshot', str(version.snapshot).lower())
-    db_set('revision.sha', sha)
-    db_set('revision.fingerprint', fingerprint)
+  def set_entry(self, target, pushdb_entry):
+    pe = pushdb_entry
+    _, db_set = self._accessors_for_target(target)
+    db_set('revision.major', pe.sem_ver.major)
+    db_set('revision.minor', pe.sem_ver.minor)
+    db_set('revision.patch', pe.sem_ver.patch)
+    db_set('revision.snapshot', str(pe.sem_ver.snapshot).lower())
+    if pe.named_ver:
+      db_set('revision.named_version', pe.named_ver.version())
+    db_set('revision.named_is_latest', pe.named_is_latest)
+    db_set('revision.sha', pe.sha)
+    db_set('revision.fingerprint', pe.fingerprint)
 
   def _accessors_for_target(self, target):
     jar_dep, _, exported = target.get_artifact_info()
@@ -86,7 +126,7 @@ class PushDb(object):
     def setter(prefix, value):
       self._props[key(prefix)] = value
 
-    return jar_dep, getter, setter
+    return getter, setter
 
   def dump(self, path):
     """Saves the pushdb as a properties file to the given path."""
@@ -110,10 +150,6 @@ class DependencyWriter(object):
     self.template_relpath = template_relpath
 
   def write(self, target, path, confs=None):
-    def as_jar(internal_target):
-      jar, _, _, _ = self.get_db(internal_target).as_jar_with_version(internal_target)
-      return jar
-
     # TODO(John Sirois): a dict is used here to de-dup codegen targets which have both the original
     # codegen target - say java_thrift_library - and the synthetic generated target (java_library)
     # Consider reworking codegen tasks to add removal of the original codegen targets when rewriting
@@ -122,7 +158,7 @@ class DependencyWriter(object):
     internal_codegen = {}
     configurations = set(confs or [])
     for dep in target_internal_dependencies(target):
-      jar = as_jar(dep)
+      jar = _as_versioned_jar(dep)
       dependencies[(jar.org, jar.name)] = self.internaldep(jar, dep)
       if dep.is_codegen:
         internal_codegen[jar.name] = jar.name
@@ -131,9 +167,9 @@ class DependencyWriter(object):
         dependencies[(jar.org, jar.name)] = self.jardep(jar)
         configurations |= set(jar._configurations)
 
-    target_jar = self.internaldep(
-                     as_jar(target),
-                     configurations=list(configurations)).extend(dependencies=dependencies.values())
+    target_jar = self.internaldep(self._as_versioned_jar(target),
+                                  configurations=list(configurations))
+    target_jar = target_jar.extend(dependencies=dependencies.values())
 
     template_kwargs = self.templateargs(target_jar, confs)
     with safe_open(path, 'w') as output:
@@ -153,6 +189,13 @@ class DependencyWriter(object):
       dependency form).
     """
     raise NotImplementedError()
+
+  def _as_versioned_jar(self, internal_target):
+    """Fetches the jar representation of the given target, and applies the latest pushdb version."""
+    jar, _, _ = internal_target.get_artifact_info()
+    pushdb_entry = self.get_db(internal_target).get_entry(internal_target)
+    jar.rev = pushdb_entry.version().version()
+    return jar
 
   def jardep(self, jar_dependency):
     """Subclasses must return a template data for the given external jar dependency."""
@@ -318,11 +361,20 @@ class JarPublish(JarTask, ScmPublish):
                             help="Publishes jars to a maven repository on the local filesystem at "
                                  "the specified path.")
 
-    option_group.add_option(mkflag("local-snapshot"), mkflag("local-snapshot", negate=True),
+    local_snapshot_flag = mkflag("local-snapshot")
+    option_group.add_option(local_snapshot_flag, mkflag("local-snapshot", negate=True),
                             dest="jar_publish_local_snapshot", default=True,
                             action="callback", callback=mkflag.set_bool,
-                            help="[%%default] If %s is specified, publishes jars with '-SNAPSHOT' "
-                                 "revisions." % local_flag)
+                            help="[%default] Iff {0} is specified, publishes jars with '-SNAPSHOT' "
+                                 "revision suffixes.".format(local_flag))
+
+    named_snapshot_flag = mkflag("named-snapshot")
+    option_group.add_option(named_snapshot_flag,
+                            dest="jar_publish_named_snapshot",
+                            default=None,
+                            help="Publishes all artifacts with the given snapshot name replacing "
+                                 "their version. This is not Semantic Versioning compatible, but "
+                                 "is easier to consume in cases where many artifacts must align.")
 
     option_group.add_option(mkflag("transitive"), mkflag("transitive", negate=True),
                             dest="jar_publish_transitive", default=True,
@@ -336,15 +388,15 @@ class JarPublish(JarTask, ScmPublish):
                             help="[%default] Forces pushing jars even if there have been no "
                                  "changes since the last push.")
 
-    flag = mkflag('override')
-    option_group.add_option(flag, action='append', dest='jar_publish_override',
+    override_flag = mkflag('override')
+    option_group.add_option(override_flag, action='append', dest='jar_publish_override',
                             help='''Specifies a published jar revision override in the form:
                             ([org]#[name]|[target spec])=[new revision]
 
                             For example, to specify 2 overrides:
-                            %(flag)s=com.twitter.common#quantity=0.1.2 \\
-                            %(flag)s=src/java/com/twitter/common/base=1.0.0 \\
-                            ''' % dict(flag=flag))
+                            {flag}=com.twitter.common#quantity=0.1.2 \\
+                            {flag}=src/java/com/twitter/common/base=1.0.0 \\
+                            '''.format(flag=override_flag))
 
     flag = mkflag("restart-at")
     option_group.add_option(flag, dest="jar_publish_restart_at",
@@ -375,7 +427,7 @@ class JarPublish(JarTask, ScmPublish):
       )
       self.repos = defaultdict(lambda: local_repo)
       self.commit = False
-      self.snapshot = self.context.options.jar_publish_local_snapshot
+      self.local_snapshot = self.context.options.jar_publish_local_snapshot
     else:
       self.repos = self.context.config.getdict(self._CONFIG_SECTION, 'repos')
       if not self.repos:
@@ -385,14 +437,18 @@ class JarPublish(JarTask, ScmPublish):
       for repo, data in self.repos.items():
         auth = data.get('auth')
         if auth:
-          credentials = self.context.resolve(auth).next()
+          credentials = next(iter(self.context.resolve(auth)))
           user = credentials.username(data['resolver'])
           password = credentials.password(data['resolver'])
           self.context.log.debug('Found auth for repo=%s user=%s' % (repo, user))
           self.repos[repo]['username'] = user
           self.repos[repo]['password'] = password
       self.commit = self.context.options.jar_publish_commit
-      self.snapshot = False
+      self.local_snapshot = False
+
+    self.named_snapshot = self.context.options.jar_publish_named_snapshot
+    if self.named_snapshot:
+      self.named_snapshot = Namedver.parse(self.named_snapshot)
 
     self.ivycp = self.context.config.getlist('ivy', 'classpath')
 
@@ -407,28 +463,33 @@ class JarPublish(JarTask, ScmPublish):
         return org, name
       else:
         try:
-          address = Address.parse(get_buildroot(), coordinate)  # TODO: This is broken.
-          try:
-            target = Target.get(address)
-            if not target:
-              siblings = Target.get_all_addresses(address.build_file)
-              prompt = 'did you mean' if len(siblings) == 1 else 'maybe you meant one of these'
-              raise TaskError('%s => %s?:\n    %s' % (address, prompt,
-                                                      '\n    '.join(str(a) for a in siblings)))
-            if not target.is_exported:
-              raise TaskError('%s is not an exported target' % coordinate)
-            return target.provides.org, target.provides.name
-          except (ImportError, SyntaxError, TypeError):
-            raise TaskError('Failed to parse %s' % address.build_file.relpath)
-        except IOError:
-          raise TaskError('No BUILD file could be found at %s' % coordinate)
+          # TODO(Eric Ayers) This code is suspect.  Target.get() is a very old method and almost certainly broken.
+          # Refactor to use methods from BuildGraph or BuildFileAddressMapper
+          address = Address.parse(get_buildroot(), coordinate)
+          target = Target.get(address)
+          if not target:
+            siblings = Target.get_all_addresses(address.build_file)
+            prompt = 'did you mean' if len(siblings) == 1 else 'maybe you meant one of these'
+            raise TaskError('%s => %s?:\n    %s' % (address, prompt,
+                                                    '\n    '.join(str(a) for a in siblings)))
+          if not target.is_exported:
+            raise TaskError('%s is not an exported target' % coordinate)
+          return target.provides.org, target.provides.name
+        except (BuildFile.BuildFileError, BuildFileParser.BuildFileParserError, AddressLookupError) as e:
+          raise TaskError('{message}\n  Problem with BUILD file  at {coordinate}'
+          .format(message=e, coordinate=coordinate))
 
     self.overrides = {}
     if self.context.options.jar_publish_override:
+      if self.named_snapshot:
+        raise TaskError('Flags {0} and {1} are mutually exclusive!'.format(named_snapshot_flag,
+                                                                           override_flag))
+
       def parse_override(override):
         try:
           coordinate, rev = override.split('=', 1)
           try:
+            # overrides imply semantic versioning
             rev = Semver.parse(rev)
           except ValueError as e:
             raise TaskError('Invalid version %s: %s' % (rev, e))
@@ -477,8 +538,8 @@ class JarPublish(JarTask, ScmPublish):
 
     def fingerprint_internal(tgt):
       pushdb, _, _ = get_db(tgt)
-      _, _, _, fingerprint = pushdb.as_jar_with_version(tgt)
-      return fingerprint or '0.0.0'
+      entry = pushdb.get_entry(tgt)
+      return entry.fingerprint or '0.0.0'
 
     def stage_artifact(tgt, jar, version, changelog, confs=None, artifact_ext=''):
       def path(name=None, suffix='', extension='jar'):
@@ -525,39 +586,48 @@ class JarPublish(JarTask, ScmPublish):
     skip = (self.restart_at is not None)
     for target in exported_targets:
       pushdb, dbfile, repo = get_db(target)
-      jar, semver, sha, fingerprint = pushdb.as_jar_with_version(target)
+      oldentry = pushdb.get_entry(target)
 
+      # the jar version is ignored here, since it is overridden below with the new entry
+      jar, _, _ = target.get_artifact_info()
       published.append(jar)
 
       if skip and (jar.org, jar.name) == self.restart_at:
         skip = False
 
-      newver = self.overrides.get((jar.org, jar.name)) or semver.bump()
-      if self.snapshot:
-        newver = newver.make_snapshot()
+      # select the next version: either a named version, or semver via the pushdb/overrides
+      if self.named_snapshot:
+        newentry = oldentry.with_named_ver(self.named_snapshot)
+      else:
+        override = self.overrides.get((jar.org, jar.name))
+        sem_ver = Semver.parse(override) if override else oldentry.sem_ver.bump()
+        if self.local_snapshot:
+          sem_ver = sem_ver.make_snapshot()
 
-      if newver <= semver:
-        raise TaskError('Requested version %s must be greater than the current version %s' % (
-          newver.version(), semver.version()
-        ))
+        if sem_ver <= oldentry.sem_ver:
+          raise TaskError('Requested version %s must be greater than the current version %s' % (
+            sem_ver, oldentry.sem_ver
+          ))
+        newentry = oldentry.with_sem_ver(sem_ver)
 
       newfingerprint = self.fingerprint(target, fingerprint_internal)
-      no_changes = newfingerprint == fingerprint
+      newentry = newentry.with_sha_and_fingerprint(head_sha, newfingerprint)
+      no_changes = newentry.fingerprint == oldentry.fingerprint
 
       if no_changes:
-        changelog = 'No changes for %s - forced push.\n' % jar_coordinate(jar, semver.version())
+        changelog = 'No changes for %s - forced push.\n' % jar_coordinate(jar, oldentry.version())
       else:
-        changelog = self.changelog(target, sha) or 'Direct dependencies changed.\n'
+        changelog = self.changelog(target, oldentry.sha) or 'Direct dependencies changed.\n'
 
       if no_changes and not self.force:
-        print('No changes for %s' % jar_coordinate(jar, semver.version()))
-        stage_artifacts(target, jar, (newver if self.force else semver).version(), changelog)
+        print('No changes for %s' % jar_coordinate(jar, oldentry.version()))
+        stage_artifacts(target, jar, (newentry.version() if self.force else oldentry.version()).version(), changelog)
       elif skip:
         print('Skipping %s to resume at %s' % (
-          jar_coordinate(jar, (newver if self.force else semver).version()),
+          jar_coordinate(jar, (newentry.version() if self.force else oldentry.version()).version()),
           coordinate(self.restart_at[0], self.restart_at[1])
         ))
-        stage_artifacts(target, jar, semver.version(), changelog)
+        stage_artifacts(target, jar, oldver.version(), changelog)
       else:
         if not self.dryrun:
           # Confirm push looks good
@@ -565,21 +635,21 @@ class JarPublish(JarTask, ScmPublish):
             print(changelog)
           else:
             print('\nChanges for %s since %s @ %s:\n\n%s' % (
-              coordinate(jar.org, jar.name), semver.version(), sha, changelog
+              coordinate(jar.org, jar.name), oldentry.version(), oldentry.sha, changelog
             ))
           if os.isatty(sys.stdin.fileno()):
             push = raw_input('Publish %s with revision %s ? [y|N] ' % (
-              coordinate(jar.org, jar.name), newver.version()
+              coordinate(jar.org, jar.name), newentry.version()
             ))
             print('\n')
             if push.strip().lower() != 'y':
               raise TaskError('User aborted push')
 
-        pushdb.set_version(target, newver, head_sha, newfingerprint)
-        ivyxml = stage_artifacts(target, jar, newver.version(), changelog)
+        pushdb.set_entry(target, newentry)
+        ivyxml = stage_artifacts(target, jar, newentry.version().version(), changelog)
 
         if self.dryrun:
-          print('Skipping publish of %s in test mode.' % jar_coordinate(jar, newver.version()))
+          print('Skipping publish of %s in test mode.' % jar_coordinate(jar, newentry.version()))
         else:
           resolver = repo['resolver']
           path = repo.get('path')
@@ -601,7 +671,7 @@ class JarPublish(JarTask, ScmPublish):
             try:
               ivy = Bootstrapper.default_ivy()
             except Bootstrapper.Error as e:
-              raise TaskError('Failed to push %s! %s' % (jar_coordinate(jar, newver.version()), e))
+              raise TaskError('Failed to push %s! %s' % (jar_coordinate(jar, newentry.version()), e))
 
             ivysettings = self.generate_ivysettings(ivy, published, publish_local=path)
             args = [
@@ -611,28 +681,28 @@ class JarPublish(JarTask, ScmPublish):
               '-publish', resolver,
               '-publishpattern', '%s/[organisation]/[module]/'
                                  '[artifact]-[revision](-[classifier]).[ext]' % self.workdir,
-              '-revision', newver.version(),
+              '-revision', newentry.version().version(),
               '-m2compatible',
             ]
 
             if LogOptions.stderr_log_level() == logging.DEBUG:
               args.append('-verbose')
 
-            if self.snapshot:
+            if self.local_snapshot:
               args.append('-overwrite')
 
             try:
               ivy.execute(jvm_options=jvm_args, args=args,
                           workunit_factory=self.context.new_workunit, workunit_name='jar-publish')
             except Ivy.Error as e:
-              raise TaskError('Failed to push %s! %s' % (jar_coordinate(jar, newver.version()), e))
+              raise TaskError('Failed to push %s! %s' % (jar_coordinate(jar, newentry.version()), e))
 
           publish(ivyxml)
 
           if self.commit:
             org = jar.org
             name = jar.name
-            rev = newver.version()
+            rev = newentry.version().version()
             args = dict(
               org=org,
               name=name,
