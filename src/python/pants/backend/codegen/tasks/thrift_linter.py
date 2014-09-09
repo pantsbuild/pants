@@ -43,9 +43,10 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
   def config_section(self):
     return self._CONFIG_SECTION
 
-  # def prepare(self, round_manager):
-  #   # This is needed to resolve jars before running.
-  #   round_manager.require_data('ivy_jar_products')
+  def prepare(self, round_manager):
+    # This is needed to resolve jars before running.
+    round_manager.require_data('ivy_jar_products')
+    round_manager.require_data('exclusives_groups')
 
   def lint(self, path):
     self.context.log.debug("Linting %s" % path)
