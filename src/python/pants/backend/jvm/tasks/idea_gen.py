@@ -11,10 +11,14 @@ import shutil
 import tempfile
 from xml.dom import minidom
 
-from pants.backend.jvm.tasks.ide_gen import IdeGen, Project, SourceSet
+from pants.backend.jvm.tasks.ide_gen import IdeGen, Project
+from pants.backend.jvm.targets.java_tests import JavaTests
+from pants.backend.jvm.targets.scala_tests import ScalaTests
+from pants.backend.python.targets.python_tests import PythonTests
 from pants.base.build_environment import get_buildroot
 from pants.base.config import ConfigOption
 from pants.base.generator import Generator, TemplateData
+from pants.base.source_root import SourceRoot
 from pants.util.dirutil import safe_mkdir
 
 
@@ -101,7 +105,6 @@ class IdeaGen(IdeGen):
   def __init__(self, *args, **kwargs):
     super(IdeaGen, self).__init__(*args, **kwargs)
 
-
     self.intellij_output_dir = os.path.join(self.gen_project_workdir, 'out')
     self.nomerge = not self.context.options.idea_gen_merge
     self.open = self.context.options.idea_gen_open
@@ -128,21 +131,46 @@ class IdeaGen(IdeGen):
     self.project_filename = os.path.join(self.cwd, '%s.ipr' % self.project_name)
     self.module_filename = os.path.join(self.gen_project_workdir, '%s.iml' % self.project_name)
 
-  def generate_project(self, project):
-    def is_test(source_set):
-      # Non test targets that otherwise live in test target roots (say a java_library), must
-      # be marked as test for IDEA to correctly link the targets with the test code that uses
-      # them. Therefore we check the base instead of the is_test flag.
-      return source_set.source_base in SourceSet.TEST_BASES
+  @staticmethod
+  def _sibling_is_test(source_set):
+    """Determine if a SourceSet represents a test path.
 
+    Non test targets that otherwise live in test target roots (say a java_library), must
+    be marked as test for IDEA to correctly link the targets with the test code that uses
+    them. Therefore we check to see if the source root registered to the path or any of its sibling
+    source roots are defined with a test type.
+
+    :param source_set: SourceSet to analyze
+    :returns: True if the SourceSet represents a path containing tests
+    """
+
+    def has_test_type(types):
+      for target_type in types:
+        # TODO(Eric Ayers) Find a way for a target to identify itself instead of a hard coded list
+        if target_type in [JavaTests, PythonTests, ScalaTests]:
+          return True
+      return False
+
+    sibling_paths = SourceRoot.find_siblings_by_path(os.path.join(source_set.source_base, source_set.path))
+    for sibling_path in sibling_paths:
+      if has_test_type(SourceRoot.types(sibling_path)):
+        return True
+    return False
+
+  def generate_project(self, project):
     def create_content_root(source_set):
       root_relative_path = os.path.join(source_set.source_base, source_set.path) \
                            if source_set.path else source_set.source_base
 
+      if self.context.options.ide_infer_test_from_siblings:
+        is_test = IdeaGen._sibling_is_test(source_set)
+      else:
+        is_test = source_set.is_test
+
       sources = TemplateData(
         path=root_relative_path,
         package_prefix=source_set.path.replace('/', '.') if source_set.path else None,
-        is_test=is_test(source_set)
+        is_test=is_test
       )
 
       return TemplateData(

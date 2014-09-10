@@ -78,13 +78,11 @@ class SourceRootTree(object):
                                        .format(source_root=source_root))
     curr_node.set_leaf(types)
 
-  def get_root_and_types(self, path):
-    """Finds the source root that matches the prefix of the given path.
-
-    This method is intended primariy for debugging.
-
-    :param string path: a source root path starting from the root of the repo.
-    :returns: the source_root, set of types valid along that path, or None if no SourceRoot has been registered.
+  def get(self, path):
+    """
+    :param string path: a source root path starting from the root of the repo
+    :return: a Node and the source_root as a list of subdirectories if a source root is found, or
+    None if no source root has been registered.
     """
     found = curr_node = self._root
     found_path = []
@@ -95,22 +93,60 @@ class SourceRootTree(object):
         break
       found = curr_node
       found_path.append(subdir)
-
     if found.is_leaf:
+      return found, found_path
+    return None, None
+
+  def get_root_and_types(self, path):
+    """Finds the source root that matches the prefix of the given path.
+
+    :param string path: a source root path starting from the root of the repo.
+    :returns: the source_root, set of types valid along that path, or None if no source root has
+    been registered.
+    """
+    found, found_path = self.get(path)
+    if found:
       return os.path.sep.join(found_path), found.types
     return None, None
+
+  def get_root_siblings(self, path):
+    """Find siblings to all source roots that are related to this path.
+
+     This method will first find the source root to the supplied path, then find the siblings to
+     that source root.  The siblings and the direct source root are returned.
+
+    :param path: A path containing source
+    :return: list of paths
+    """
+    found, dir_list = self.get(path)
+    if not found:
+      return []
+    # The dir_list will always contain at least one entry.  Remove the last item to get the
+    # parent of the source_root
+    dir_list = dir_list[:-1]
+    siblings = []
+    # Walk to the parent node in the tree
+    parent_node = self._root
+    for curr_dir in dir_list:
+      parent_node = parent_node.get(curr_dir)
+
+    parent_path = os.path.sep.join(dir_list)
+    for child_key in parent_node.children.keys():
+      if parent_node.get(child_key).is_leaf:
+        siblings.append(os.path.join(parent_path, child_key))
+    return siblings
 
   def _dump(self):
     """:returns: a text version of the tree for debugging"""
 
-    def do_dump(node, buf, level):
-      buf += "{pad}{key} leaf={is_leaf}\n".format(pad=''.rjust(level),
-                                                  key=node.key, is_leaf=node.is_leaf)
+    def do_dump(node, level):
+      buf = "{pad}{key} leaf={is_leaf}\n".format(pad=''.rjust(level),
+                                                 key=node.key, is_leaf=node.is_leaf)
       for child in node.children.values():
-        buf += do_dump(child, buf, level + 1)
+        buf += do_dump(child, level + 1)
       return buf
 
-    return do_dump(self._root, '', 0)
+    return do_dump(self._root, 0)
 
 
 class SourceRoot(object):
@@ -180,6 +216,25 @@ class SourceRoot(object):
     return found_source_root
 
   @classmethod
+  def find_by_path(cls, path):
+    """Finds a registered source root for a given path
+
+    :param string path: a path containing sources to query
+    :returns: the source_root that has been registered as a prefix of the specified path, or None if
+    no matching source root was registered.
+    """
+    found_source_root, _ = cls._SOURCE_ROOT_TREE.get_root_and_types(path)
+    return found_source_root
+
+  @classmethod
+  def find_siblings_by_path(cls, path):
+    """
+    :param path: path containing source
+    :return: all source root siblings for this path
+    """
+    return cls._SOURCE_ROOT_TREE.get_root_siblings(path)
+
+  @classmethod
   def types(cls, root):
     """:returns: the set of target types rooted at root."""
     return cls._TYPES_BY_ROOT[root]
@@ -237,4 +292,8 @@ class SourceRoot(object):
       roots.add(source_root_dir)
 
     cls._SOURCE_ROOT_TREE.add_root(source_root_dir, allowed_target_types)
+
+  @classmethod
+  def _dump(cls):
+    return cls._SOURCE_ROOT_TREE._dump()
 
