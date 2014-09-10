@@ -30,6 +30,12 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
                             action='callback', callback=mkflag.set_bool, default=False,
                             help='[%default] Ignore lint errors')
 
+  @classmethod
+  def product_types(cls):
+    # Fake product. The linter produces warnings and errors.
+    return ['thrift-linter']
+
+
   def __init__(self, context, workdir):
     super(ThriftLinter, self).__init__(context, workdir)
 
@@ -46,7 +52,7 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
   def prepare(self, round_manager):
     # This is needed to resolve jars before running.
     round_manager.require_data('ivy_jar_products')
-    round_manager.require_data('exclusives_groups')
+    # round_manager.require_data('exclusives_groups')
 
   def lint(self, path):
     self.context.log.debug("Linting %s" % path)

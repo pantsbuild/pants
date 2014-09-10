@@ -40,7 +40,7 @@ def build_file_aliases():
 def register_goals():
   task(name='thrift', action=ApacheThriftGen).install('gen').with_description('Generate code.')
 
-  task(name='thrift-linter', action=ThriftLinter).install().with_description('TODO: (the thrift linter lints thrift)')
+  task(name='thrift-linter', dependencies=['resolve'], action=ThriftLinter).install('thrift-linter').with_description('TODO: (the thrift linter lints thrift)')
 
   task(name='scrooge', dependencies=['bootstrap', 'thrift-linter'], action=ScroogeGen).install('gen')
 
