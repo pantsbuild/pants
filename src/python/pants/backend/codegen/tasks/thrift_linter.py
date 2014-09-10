@@ -18,31 +18,34 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
   # scrooge linter is the implementation detail.
   _CONFIG_SECTION = 'scrooge-linter'
 
+  IGNORE_ERRORS_DEFAULT = True
+
   @staticmethod
   def _is_thrift(target):
     return target.is_thrift
 
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
-    #super(ThriftLinter, cls).setup_parser(option_group, args, mkflag)
+    super(ThriftLinter, cls).setup_parser(option_group, args, mkflag)
 
     option_group.add_option(mkflag('ignore-errors'), dest='thrift_linter_ignore_errors',
-                            action='callback', callback=mkflag.set_bool, default=True,
+                            default=ThriftLinter.IGNORE_ERRORS_DEFAULT,
+                            action='callback', callback=mkflag.set_bool,
                             help='[%default] Ignore lint errors')
 
   @classmethod
   def product_types(cls):
-    # Fake product. The linter produces warnings and errors.
+    # Set dependency. Gen depends on linter.
     return ['thrift-linter']
 
 
-  def __init__(self, context, workdir):
-    super(ThriftLinter, self).__init__(context, workdir)
+  def __init__(self, *args, **kwargs):
+    super(ThriftLinter, self).__init__(*args, **kwargs)
 
     self._bootstrap_key = 'scrooge-linter'
 
-    bootstrap_tools = context.config.getlist('scrooge-linter', 'bootstrap-tools',
-                                             default=[':scrooge-linter'])
+    bootstrap_tools = self.context.config.getlist('scrooge-linter', 'bootstrap-tools',
+                                                  default=[':scrooge-linter'])
     self.register_jvm_tool(self._bootstrap_key, bootstrap_tools)
 
   @property
@@ -50,9 +53,13 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
     return self._CONFIG_SECTION
 
   def prepare(self, round_manager):
-    # This is needed to resolve jars before running.
+    # Linter depends on ivy running before it.
     round_manager.require_data('ivy_imports')
-    # round_manager.require_data('exclusives_groups')
+
+  def ignoreErrors(self):
+    # Sometimes options don't have the thrift_linter_ignore_errors attribute
+    # (when linter is called as a dependency. Not sure why/how to fix this).
+    return getattr(self.context.options, 'thrift_linter_ignore_errors', ThriftLinter.IGNORE_ERRORS_DEFAULT)
 
   def lint(self, path):
     self.context.log.debug("Linting %s" % path)
@@ -64,8 +71,7 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
                               workunit_labels=[WorkUnit.COMPILER],  # to let stdout/err through.
                               )
     if returncode != 0:
-      import pdb;pdb.set_trace()
-      if self.context.options.thrift_linter_ignore_errors:
+      if self.ignoreErrors():
         self.context.log.warn("Ignoring thrift linter errors in %s\n" % path)
       else:
         raise TaskError('Lint errors in %s.' % path)
@@ -76,4 +82,3 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
     for target in thrift_targets:
       for path in target.sources_relative_to_buildroot():
         self.lint(path)
-
