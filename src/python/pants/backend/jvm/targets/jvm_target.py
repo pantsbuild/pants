@@ -11,7 +11,9 @@ from pants.backend.core.targets.resources import Resources
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.base.address import SyntheticAddress
 from pants.base.exceptions import TargetDefinitionException
-from pants.base.payload import JvmTargetPayload
+from pants.base.payload_field import (ConfigurationsField,
+                                      ExcludesField,
+                                      SourcesField)
 from pants.base.target import Target
 from pants.base.validation import assert_list
 from pants.backend.jvm.targets.jar_library import JarLibrary
@@ -24,7 +26,6 @@ class JvmTarget(Target, Jarable):
   def __init__(self,
                address=None,
                sources=None,
-               sources_rel_path=None,
                provides=None,
                excludes=None,
                resources=None,
@@ -35,16 +36,15 @@ class JvmTarget(Target, Jarable):
       This parameter is not intended for general use.
     :type configurations: tuple of strings
     """
-
-    sources_rel_path = sources_rel_path or address.spec_path
-    payload = JvmTargetPayload(sources=self.assert_list(sources),
-                               sources_rel_path=sources_rel_path,
-                               provides=provides,
-                               excludes=self.assert_list(excludes, expected_type=Exclude),
-                               configurations=self.assert_list(configurations))
-    super(JvmTarget, self).__init__(address=address, payload=payload, **kwargs)
-
+    self.payload.add_fields({
+      'sources': SourcesField(sources=self.assert_list(sources),
+                              sources_rel_path=address.spec_path),
+      'provides': provides,
+      'excludes': ExcludesField(self.assert_list(excludes, expected_type=Exclude)),
+      'configurations': ConfigurationsField(self.assert_list(configurations)),
+    })
     self._resource_specs = self.assert_list(resources)
+    super(JvmTarget, self).__init__(address=address, **kwargs)
     self.add_labels('jvm')
 
   _jar_dependencies = None
@@ -78,23 +78,7 @@ class JvmTarget(Target, Jarable):
       yield resource_spec
 
   @property
-  def traversable_specs(self):
-    if self.payload.provides:
-      yield self.payload.provides.repo
-
-  @property
   def provides(self):
-    if not self.payload.provides:
-      return None
-
-    # TODO(pl): This is an awful hack
-    if isinstance(self.payload.provides.repo, Compatibility.string):
-      repo_spec = self.payload.provides.repo
-      address = SyntheticAddress.parse(repo_spec, relative_to=self.address.spec_path)
-      repo_target = self._build_graph.get_target(address)
-      if repo_target is None:
-        raise TargetDefinitionException(self, 'No such repo target: %s' % repo_spec)
-      self.payload.provides.repo = repo_target
     return self.payload.provides
 
   @property

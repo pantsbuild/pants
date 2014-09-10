@@ -39,4 +39,4 @@ class DefaultFingerprintStrategy(FingerprintStrategy):
     return 'default'
 
   def compute_fingerprint(self, target):
-    return target.payload.invalidation_hash()
+    return target.payload.fingerprint()

@@ -91,10 +91,10 @@ class DepmapTest(BaseDepmapTest):
     add_to_build_file('common/g', 'g', 'jvm_binary', deps=['common/f:f'])
     self.create_dir('common/h')
     self.create_file('common/h/common.f')
-    create_jvm_app('common/h', 'h', 'jvm_app', 'common/f:f', "bundle().add('common.f')")
+    create_jvm_app('common/h', 'h', 'jvm_app', 'common/f:f', "[bundle().add('common.f')]")
     self.create_dir('common/i')
     self.create_file('common/i/common.g')
-    create_jvm_app('common/i', 'i', 'jvm_app', 'common/g:g', "bundle().add('common.g')")
+    create_jvm_app('common/i', 'i', 'jvm_app', 'common/g:g', "[bundle().add('common.g')]")
     add_to_build_file('overlaps', 'one', 'jvm_binary', deps=['common/h', 'common/i'])
     self.add_to_build_file('overlaps', dedent('''
       java_library(name='two',

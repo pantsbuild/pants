@@ -5,6 +5,6 @@ java_library(name = 'greet',
   dependencies = [],
   sources = globs('*.java'),
   provides = artifact(org='com.pants.testproject.publish',
-                    name='hello-greet',
-                    repo='testprojects/ivy:testing',),
+                      name='hello-greet',
+                      repo=testing,),
 )

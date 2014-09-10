@@ -217,6 +217,18 @@ python_library(
 )
 
 python_library(
+  name = 'payload_field',
+  sources = ['payload_field.py'],
+  dependencies = [
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python/twitter/commons:twitter.common.lang',
+    '3rdparty/python:six',
+    ':build_environment',
+    ':validation',
+  ]
+)
+
+python_library(
   name = 'rcfile',
   sources = ['rcfile.py'],
   dependencies = [

@@ -37,6 +37,8 @@ class AndroidTarget(JvmTarget):
     super(AndroidTarget, self).__init__(address=address, **kwargs)
 
     self.add_labels('android')
+
+    # TODO(pl): These attributes should live in the payload
     self.build_tools_version = build_tools_version
 
     if manifest is None:
@@ -76,6 +78,3 @@ class AndroidTarget(JvmTarget):
     tgt_manifest = parse(self.manifest).getElementsByTagName('activity')
     package_name = tgt_manifest[0].getAttribute('android:name')
     return package_name.split(".")[-1]
-
-  def is_android(self):
-    return True

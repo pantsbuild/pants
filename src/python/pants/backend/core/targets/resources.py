@@ -5,7 +5,7 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from pants.base.payload import ResourcesPayload
+from pants.base.payload_field import SourcesField
 from pants.base.target import Target
 
 
@@ -24,8 +24,11 @@ class Resources(Target):
       BUILD file's directory.
     :type sources: ``Fileset`` or list of strings
     """
-    payload = ResourcesPayload(sources_rel_path=address.spec_path, sources=sources)
-    super(Resources, self).__init__(address=address, payload=payload, **kwargs)
+    self.payload.add_fields({
+      'sources': SourcesField(sources=self.assert_list(sources),
+                              sources_rel_path=address.spec_path),
+    })
+    super(Resources, self).__init__(address=address, **kwargs)
 
   def has_sources(self, extension=None):
     """``Resources`` never own sources of any particular native type, like for example

@@ -76,8 +76,8 @@ class Checkstyle(NailgunTask, JvmToolTaskMixin):
   def calculate_sources(self, targets):
     sources = set()
     for target in targets:
-      sources.update([os.path.join(target.payload.sources_rel_path, source)
-                      for source in target.payload.sources if source.endswith('.java')])
+      sources.update(source for source in target.sources_relative_to_buildroot()
+                     if source.endswith('.java'))
     return sources
 
   def checkstyle(self, sources, targets):

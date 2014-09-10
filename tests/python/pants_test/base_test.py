@@ -49,7 +49,7 @@ class BaseTest(unittest.TestCase):
     safe_mkdir(path)
     return path
 
-  def create_file(self, relpath, contents='', mode='w'):
+  def create_file(self, relpath, contents='', mode='wb'):
     """Writes to a file under the buildroot.
 
     relpath:  The relative path to the file from the build root.
