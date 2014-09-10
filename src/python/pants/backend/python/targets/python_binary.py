@@ -111,8 +111,8 @@ class PythonBinary(PythonTarget):
   def entry_point(self):
     if self._entry_point:
       return self._entry_point
-    elif self.payload.sources:
-      assert len(self.payload.sources) == 1
+    elif self.payload.sources.source_paths:
+      assert len(self.payload.sources.source_paths) == 1
       entry_source = list(self.sources_relative_to_source_root())[0]
       return self._translate_to_entry_point(entry_source)
     else:

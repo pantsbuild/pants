@@ -41,6 +41,7 @@ python_test_suite(
     ':generator',
     ':hash_utils',
     ':payload',
+    ':payload_field',
     ':revision',
     ':run_info',
     ':source_root',
@@ -120,11 +121,13 @@ python_tests(
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
+    'src/python/pants/backend/jvm:artifact',
+    'src/python/pants/backend/jvm:repository',
     'src/python/pants/base:build_file',
     'src/python/pants/base:build_file_parser',
     'src/python/pants/base:target',
-    'tests/python/pants_test:base_test',
     'src/python/pants/util:dirutil',
+    'tests/python/pants_test:base_test',
   ]
 )
 
@@ -213,6 +216,20 @@ python_tests(
     'src/python/pants/backend/core',
     'src/python/pants/base:build_file_aliases',
     'src/python/pants/base:payload',
+    'src/python/pants/base:payload_field',
+    'tests/python/pants_test:base_test',
+  ]
+)
+
+python_tests(
+  name = 'payload_field',
+  sources = ['test_payload_field.py'],
+  dependencies = [
+    'src/python/pants/backend/core',
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/python:python_requirement',
+    'src/python/pants/base:payload',
+    'src/python/pants/base:payload_field',
     'tests/python/pants_test:base_test',
   ]
 )

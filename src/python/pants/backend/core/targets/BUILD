@@ -21,7 +21,7 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.log',
     'src/python/pants/base:address',
     'src/python/pants/base:build_environment',
-    'src/python/pants/base:payload',
+    'src/python/pants/base:payload_field',
     'src/python/pants/base:target',
   ],
 )

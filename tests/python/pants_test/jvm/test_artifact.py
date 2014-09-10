@@ -5,10 +5,8 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-import pytest
-
-from pants.backend.jvm.targets.artifact import Artifact
-from pants.backend.jvm.targets.repository import Repository
+from pants.backend.jvm.artifact import Artifact
+from pants.backend.jvm.repository import Repository
 
 from pants_test.base_test import BaseTest
 
@@ -16,21 +14,19 @@ from pants_test.base_test import BaseTest
 class ArtifactTest(BaseTest):
 
   def test_validation(self):
-    repo = self.make_target(target_type=Repository,
-                            spec=":myRepo",
-                            url="myUrl",
-                            push_db_basedir="myPushDb")
+    repo = Repository(name="myRepo",
+                      url="myUrl",
+                      push_db_basedir="myPushDb")
     Artifact(org="testOrg", name="testName", repo=repo, description="Test")
-    with pytest.raises(ValueError):
+
+    with self.assertRaises(ValueError):
       Artifact(org=1, name="testName", repo=repo, description="Test")
 
-    with pytest.raises(ValueError):
+    with self.assertRaises(ValueError):
       Artifact(org="testOrg", name=1, repo=repo, description="Test")
 
-    # This fails right now because of the horrible hack to make Respository
-    # addressable
-    # self.assertRaises(ValueError, Artifact,
-    #                   org="testOrg", name="testName", repo=1, description="Test")
+    with self.assertRaises(ValueError):
+      Artifact(org="testOrg", name="testName", repo=1, description="Test")
 
-    with pytest.raises(ValueError):
+    with self.assertRaises(ValueError):
       Artifact(org="testOrg", name="testName", repo=repo, description=1)

@@ -64,8 +64,8 @@ class SetupPy(Command):
   @classmethod
   def _combined_dependencies(cls, target):
     dependencies = OrderedSet(target.dependencies)
-    if isinstance(target, PythonTarget) and target.provides:
-      return dependencies | OrderedSet(target.provides.binaries.values())
+    if isinstance(target, PythonTarget):
+      return dependencies | OrderedSet(target.provided_binaries.values())
     else:
       return dependencies
 
@@ -136,7 +136,7 @@ class SetupPy(Command):
   @classmethod
   def iter_entry_points(cls, target):
     """Yields the name, entry_point pairs of binary targets in this PythonArtifact."""
-    for name, binary_target in target.provides.binaries.items():
+    for name, binary_target in target.provided_binaries.items():
       concrete_target = binary_target
       if not isinstance(concrete_target, PythonBinary) or concrete_target.entry_point is None:
         raise TargetDefinitionException(target,
@@ -300,8 +300,10 @@ class SetupPy(Command):
         for relpath, abspath in self.iter_generated_sources(target, self._root, self._config):
           write_codegen_source(relpath, abspath)
       else:
-        for source in list(target.payload.sources) + list(target.payload.resources):
-          abs_source_path = os.path.join(get_buildroot(), target.payload.sources_rel_path, source)
+        sources_and_resources = (list(target.payload.sources.relative_to_buildroot()) +
+                                 list(target.payload.resources.relative_to_buildroot()))
+        for rel_source in sources_and_resources:
+          abs_source_path = os.path.join(get_buildroot(), rel_source)
           abs_source_root_path = os.path.join(get_buildroot(), target.target_base)
           source_root_relative_path = os.path.relpath(abs_source_path, abs_source_root_path)
           write_target_source(target, source_root_relative_path)
@@ -409,7 +411,7 @@ class SetupPy(Command):
       def add_providing_target(target):
         if isinstance(target, PythonTarget) and target.provides:
           setup_targets.add(target)
-          return OrderedSet(target.provides.binaries.values())
+          return OrderedSet(target.provided_binaries.values())
       self.target.walk(add_providing_target)
     else:
       setup_targets = [self.target]

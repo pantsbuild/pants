@@ -9,7 +9,7 @@ from twitter.common.lang import Compatibility
 
 from pants.base.address import SyntheticAddress
 from pants.base.build_environment import get_buildroot
-from pants.base.payload import SourcesPayload, hash_sources
+from pants.base.payload_field import combine_hashes, PayloadField, SourcesField
 from pants.base.target import Target
 
 
@@ -34,14 +34,14 @@ class WikiArtifact(object):
     self.config = kwargs
 
 
-class Wiki(Target):
-  """Target that identifies a wiki where pages can be published."""
+class Wiki(object):
+  """Identifies a wiki where pages can be published."""
 
-  def __init__(self, name, url_builder, **kwargs):
+  def __init__(self, name, url_builder):
     """
     :param url_builder: Function that accepts a page target and an optional wiki config dict.
     """
-    super(Wiki, self).__init__(name, **kwargs)
+    self.name = name
     self.url_builder = url_builder
 
 
@@ -54,7 +54,7 @@ class Page(Target):
      page(name='mypage',
        source='mypage.md',
        provides=[
-         wiki_artifact(wiki='address/of/my/wiki/target',
+         wiki_artifact(wiki=Wiki('foozle', <url builder>),
                        space='my_space',
                        title='my_page',
                        parent='my_parent'),
@@ -65,62 +65,43 @@ class Page(Target):
   (there might be more than one place to publish it).
   """
 
-  class PagePayload(SourcesPayload):
-    def __init__(self, sources_rel_path, source, resources=None, provides=None):
-      super(Page.PagePayload, self).__init__(sources_rel_path, [source])
-      self.resources = list(resources or [])
-      self.provides = list(provides or [])
+  class ProvidesTupleField(tuple, PayloadField):
+    def _compute_fingerprint(self):
+      return combine_hashes(artifact.fingerprint() for artifact in self)
 
-    def invalidation_hash(self):
-      return hash_sources(get_buildroot(), self.sources_rel_path, self.sources)
-
-
-  def __init__(self, source, resources=None, provides=None, **kwargs):
+  def __init__(self, address=None, source=None, resources=None, provides=None, **kwargs):
     """
     :param source: Source of the page in markdown format.
     :param resources: An optional list of Resources objects.
     """
+    self.payload.add_fields({
+      'sources': SourcesField(sources=[source],
+                              sources_rel_path=address.spec_path),
+      'provides': self.ProvidesTupleField(provides or []),
+    })
+    self._resource_specs = resources or []
+    super(Page, self).__init__(address=address, **kwargs)
 
-    payload = self.PagePayload(sources_rel_path=kwargs.get('address').spec_path,
-                               source=source,
-                               resources=resources,
-                               provides=provides)
-    super(Page, self).__init__(payload=payload, **kwargs)
-
-    if provides and len(provides)>0 and not isinstance(provides[0], WikiArtifact):
+    if provides and not isinstance(provides[0], WikiArtifact):
       raise ValueError('Page must provide a wiki_artifact. Found instead: %s' % provides)
 
   @property
   def source(self):
-    return list(self.payload.sources)[0]
+    """The first (and only) source listed by this Page."""
+    return list(self.payload.sources.source_paths)[0]
 
-  # This callback needs to yield every 'pants(...)' pointer that we need to have resolved into the
-  # build graph. This includes wiki objects in the provided WikiArtifact objects, and any 'pants()'
-  # pointers inside of the documents themselves (yes, this can happen).
   @property
-  def traversable_specs(self):
-    if self.payload.provides:
-      for wiki_artifact in self.payload.provides:
-        yield wiki_artifact.wiki
+  def traversable_dependency_specs(self):
+    for spec in super(Page, self).traversable_specs:
+      yield spec
+    for resource_spec in self._resource_specs:
+      yield resource_spec
 
-  # This callback is used to link up the provided WikiArtifact objects to Wiki objects. In the build
-  # file, a 'pants(...)' pointer is specified to the Wiki object. In this method, this string
-  # pointer is resolved in the build graph, and an actual Wiki object is swapped in place of the
-  # string.
   @property
   def provides(self):
-    if not self.payload.provides:
-      return None
+    """A tuple of WikiArtifact instances provided by this Page.
 
-    for p in self.payload.provides:
-      if isinstance(p.wiki, Wiki):
-        # We have already resolved this string into an object, so skip it.
-        continue
-      if isinstance(p.wiki, Compatibility.string):
-        address = SyntheticAddress.parse(p.wiki, relative_to=self.address.spec_path)
-        repo_target = self._build_graph.get_target(address)
-        p.wiki = repo_target
-      else:
-        raise ValueError('A WikiArtifact must depend on a string pointer to a Wiki. Found %s instead.'
-                         % p.wiki)
+    Notably different from JvmTarget.provides, which has only a single Artifact rather than a
+    list.
+    """
     return self.payload.provides

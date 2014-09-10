@@ -38,4 +38,4 @@ class Exclude(object):
     return not self.__eq__(other)
 
   def __repr__(self):
-    return "Exclude(org='%s', name=%s)" % (self.org, ('%s' % self.name) if self.name else None)
+    return "Exclude(org='{0}', name='{1}')".format(self.org, self.name)
