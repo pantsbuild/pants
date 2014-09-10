@@ -30,10 +30,10 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
                             action='callback', callback=mkflag.set_bool, default=False,
                             help='[%default] Ignore lint errors')
 
-  @classmethod
-  def product_types(cls):
-    # Fake product. The linter produces warnings and errors.
-    return ['thrift-linter']
+  # @classmethod
+  # def product_types(cls):
+  #   # Fake product. The linter produces warnings and errors.
+  #   return ['thrift-linter']
 
 
   def __init__(self, context, workdir):

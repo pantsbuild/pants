@@ -42,7 +42,7 @@ def register_goals():
 
   task(name='thrift-linter', dependencies=['resolve'], action=ThriftLinter).install('thrift-linter').with_description('TODO: (the thrift linter lints thrift)')
 
-  task(name='scrooge', dependencies=['bootstrap', 'thrift-linter'], action=ScroogeGen).install('gen')
+  task(name='scrooge', dependencies=['bootstrap'], action=ScroogeGen).install('gen')
 
   # TODO(Garrett Malmquist): 'protoc' depends on a nonlocal goal (imports is in the jvm register).
   # This should be cleaned up, with protobuf stuff moved to its own backend. (See John's comment on
