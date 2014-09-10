@@ -24,16 +24,16 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
 
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
-    super(ThriftLinter, cls).setup_parser(option_group, args, mkflag)
+    #super(ThriftLinter, cls).setup_parser(option_group, args, mkflag)
 
     option_group.add_option(mkflag('ignore-errors'), dest='thrift_linter_ignore_errors',
-                            action='callback', callback=mkflag.set_bool, default=False,
+                            action='callback', callback=mkflag.set_bool, default=True,
                             help='[%default] Ignore lint errors')
 
-  # @classmethod
-  # def product_types(cls):
-  #   # Fake product. The linter produces warnings and errors.
-  #   return ['thrift-linter']
+  @classmethod
+  def product_types(cls):
+    # Fake product. The linter produces warnings and errors.
+    return ['thrift-linter']
 
 
   def __init__(self, context, workdir):
@@ -51,7 +51,7 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
 
   def prepare(self, round_manager):
     # This is needed to resolve jars before running.
-    round_manager.require_data('ivy_jar_products')
+    round_manager.require_data('ivy_imports')
     # round_manager.require_data('exclusives_groups')
 
   def lint(self, path):
@@ -64,10 +64,12 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
                               workunit_labels=[WorkUnit.COMPILER],  # to let stdout/err through.
                               )
     if returncode != 0:
+      import pdb;pdb.set_trace()
       if self.context.options.thrift_linter_ignore_errors:
         self.context.log.warn("Ignoring thrift linter errors in %s\n" % path)
       else:
         raise TaskError('Lint errors in %s.' % path)
+    return 0
 
   def execute(self):
     thrift_targets = self.context.targets(self._is_thrift)
