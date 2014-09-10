@@ -71,6 +71,7 @@ class PythonBinary(PythonTarget):
     if not isinstance(platforms, (list, tuple)) and not isinstance(platforms, Compatibility.string):
       raise TargetDefinitionException(self, 'platforms must be a list, tuple or string.')
 
+    # TODO(pl): Most if not all of these should live in payload fields
     self._entry_point = entry_point
     self._inherit_path = bool(inherit_path)
     self._zip_safe = bool(zip_safe)
@@ -111,8 +112,8 @@ class PythonBinary(PythonTarget):
   def entry_point(self):
     if self._entry_point:
       return self._entry_point
-    elif self.payload.sources:
-      assert len(self.payload.sources) == 1
+    elif self.payload.sources.source_paths:
+      assert len(self.payload.sources.source_paths) == 1
       entry_source = list(self.sources_relative_to_source_root())[0]
       return self._translate_to_entry_point(entry_source)
     else:

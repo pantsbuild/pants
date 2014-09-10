@@ -33,6 +33,7 @@ def publish_extra_config(unique_config):
           'backends': {
             'packages': [
               'example.pants_publish_plugin',
+              'internal_backend.repositories',
               ],
             },
           }
@@ -42,7 +43,9 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
   JAVADOC = is_exe('javadoc')
 
   # This is where all pushdb properties files will end up.
-  pushdb_root = os.path.join(get_buildroot(), 'testprojects', 'ivy', 'pushdb')
+  @property
+  def pushdb_root(self):
+    return os.path.join(get_buildroot(), 'testprojects', 'ivy', 'pushdb')
 
   def setUp(self):
     safe_rmtree(self.pushdb_root)

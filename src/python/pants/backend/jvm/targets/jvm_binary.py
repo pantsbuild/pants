@@ -5,6 +5,7 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from hashlib import sha1
 import os
 import re
 
@@ -16,7 +17,8 @@ from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.build_environment import get_buildroot
 from pants.base.build_manual import manual
 from pants.base.exceptions import TargetDefinitionException
-from pants.base.payload import BundlePayload
+from pants.base.payload import Payload
+from pants.base.payload_field import BundleField
 from pants.base.target import Target
 from pants.base.validation import assert_list
 
@@ -253,6 +255,7 @@ class JvmBinary(JvmTarget):
     if deploy_jar_rules and not isinstance(deploy_jar_rules, JarRules):
       raise TargetDefinitionException(self, 'deploy_jar_rules must be a JarRules specification')
 
+    # TODO(pl): These should all live in payload fields
     self.main = main
     self.basename = basename or self.name
     self.deploy_excludes = self.assert_list(deploy_excludes, expected_type=Exclude)
@@ -364,7 +367,7 @@ class JvmApp(Target):
   extra files like config files, startup scripts, etc.
   """
 
-  def __init__(self, name=None, binary=None, bundles=None, basename=None, **kwargs):
+  def __init__(self, name=None, payload=None, binary=None, bundles=None, basename=None, **kwargs):
     """
     :param string name: The name of this target, which combined with this
       build file defines the :doc:`target address <target_addresses>`.
@@ -377,13 +380,15 @@ class JvmApp(Target):
       ``name``. Pants uses this in the ``bundle`` goal to name the distribution
       artifact. In most cases this parameter is not necessary.
     """
-    payload = BundlePayload(bundles)
+    payload = payload or Payload()
+    payload.add_fields({
+      'bundles': BundleField(bundles or []),
+    })
     super(JvmApp, self).__init__(name=name, payload=payload, **kwargs)
 
     if name == basename:
       raise TargetDefinitionException(self, 'basename must not equal name.')
     self._basename = basename or name
-
     self._binary = binary
 
   @property

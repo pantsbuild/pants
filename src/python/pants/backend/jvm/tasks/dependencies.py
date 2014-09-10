@@ -9,12 +9,10 @@ from twitter.common.collections import OrderedSet
 
 from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.base.exceptions import TaskError
-from pants.base.payload import JarLibraryPayload, PythonRequirementLibraryPayload
+from pants.base.payload_field import JarsField, PythonRequirementsField
 
 
 # XXX(pl): JVM/Python hairball violator
-
-
 class Dependencies(ConsoleTask):
   """Generates a textual list (using the target format) for the dependency set of a target."""
 
@@ -65,10 +63,10 @@ class Dependencies(ConsoleTask):
         if not self.is_internal_only:
           # TODO(John Sirois): We need an external payload abstraction at which point knowledge
           # of jar and requirement payloads can go and this hairball will be untangled.
-          if isinstance(tgt.payload, PythonRequirementLibraryPayload):
+          if isinstance(tgt.payload.get_field('requirements'), PythonRequirementsField):
             for requirement in tgt.payload.requirements:
               yield str(requirement.requirement)
-          elif isinstance(tgt.payload, JarLibraryPayload):
+          elif isinstance(tgt.payload.get_field('jars'), JarsField):
             for jar in tgt.payload.jars:
               data = dict(org=jar.org, name=jar.name, rev=jar.rev)
               yield ('{org}:{name}:{rev}' if jar.rev else '{org}:{name}').format(**data)
