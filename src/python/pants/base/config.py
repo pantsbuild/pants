@@ -117,6 +117,7 @@ class Config(object):
 
   # Cache the default config produced by load()
   DEFAULT_CONFIG = None
+  DEFAULT_CONFIG_SIG = None
 
   class ConfigError(Exception):
     pass
@@ -129,16 +130,19 @@ class Config(object):
       file's DEFAULT section.  The 'buildroot', invoking 'user' and invoking user's 'homedir' are
       automatically defaulted.
     """
+    default_configpath = os.path.join(get_buildroot(), 'pants.ini')
     is_default_config = configpath is None and defaults is None
-    if is_default_config and Config.DEFAULT_CONFIG is not None:
+    if (is_default_config and Config.DEFAULT_CONFIG is not None and
+        Config.DEFAULT_CONFIG_SIG == os.stat(default_configpath)):
       return Config.DEFAULT_CONFIG
-    configpath = configpath or os.path.join(get_buildroot(), 'pants.ini')
+    configpath = configpath or default_configpath
     parser = Config.create_parser(defaults=defaults)
     with open(configpath) as ini:
       parser.readfp(ini)
     config = Config(parser)
     if is_default_config:
       Config.DEFAULT_CONFIG = config
+      Config.DEFAULT_CONFIG_SIG = os.stat(default_configpath)
     return config
 
   @classmethod
