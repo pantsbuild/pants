@@ -60,7 +60,7 @@ python_library(
     url='https://github.com/pantsbuild/pants',
     license='Apache License, Version 2.0',
     zip_safe=True,
-    namespace_packages=['pants_tests'],
+    namespace_packages=['pants_test'],
     classifiers=[
       'Intended Audience :: Developers',
       'License :: OSI Approved :: Apache Software License',
