@@ -28,7 +28,7 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
   def setup_parser(cls, option_group, args, mkflag):
     super(ThriftLinter, cls).setup_parser(option_group, args, mkflag)
 
-    option_group.add_option(mkflag('ignore-errors'), dest='thrift_linter_ignore_errors',
+    option_group.add_option(mkflag('ignore-errors', negate=True), dest='thrift_linter_ignore_errors',
                             default=ThriftLinter.IGNORE_ERRORS_DEFAULT,
                             action='callback', callback=mkflag.set_bool,
                             help='[%default] Ignore lint errors')
@@ -59,23 +59,31 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
   def ignoreErrors(self):
     # Sometimes options don't have the thrift_linter_ignore_errors attribute
     # (when linter is called as a dependency. Not sure why/how to fix this).
+    print("IGNOREERRORS =", getattr(self.context.options, 'thrift_linter_ignore_errors', ThriftLinter.IGNORE_ERRORS_DEFAULT))
     return getattr(self.context.options, 'thrift_linter_ignore_errors', ThriftLinter.IGNORE_ERRORS_DEFAULT)
 
   def lint(self, path):
     self.context.log.debug("Linting %s" % path)
 
     classpath = self.tool_classpath(self._bootstrap_key)
+    args = [path, '--verbose']
+    if self.ignoreErrors():
+      args.append('--ignore-errors')
+
+    # If runjava returns non-zero, this marks the workunit as a
+    # FAILURE, and there is no way to wrap this here.
     returncode = self.runjava(classpath=classpath,
                               main='com.twitter.scrooge.linter.Main',
-                              args=[path],
+                              args=args,
                               workunit_labels=[WorkUnit.COMPILER],  # to let stdout/err through.
                               )
+
+    print('returncode=', returncode)
     if returncode != 0:
       if self.ignoreErrors():
         self.context.log.warn("Ignoring thrift linter errors in %s\n" % path)
       else:
         raise TaskError('Lint errors in %s.' % path)
-    return 0
 
   def execute(self):
     thrift_targets = self.context.targets(self._is_thrift)
