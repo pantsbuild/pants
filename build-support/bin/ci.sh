@@ -131,8 +131,10 @@ fi
 if [[ "${skip_python:-false}" == "false" ]]; then
   banner "Running core python tests"
   (
-    # TODO(Eric Ayers): Substitute tests/python:: when all tests are working that way
+    # TODO(Eric Ayers): Substitute tests/python/pants_test:: when all tests are working that way
     PANTS_PYTHON_TEST_FAILSOFT=1 ./pants.pex goal test tests/python/pants_test:all \
+      ${PANTS_ARGS[@]} && \
+    PANTS_PYTHON_TEST_FAILSOFT=1 ./pants.pex goal test tests/python/internal_backend_test:: \
       ${PANTS_ARGS[@]}
   ) || die "Core python test failure"
 fi
@@ -176,14 +178,5 @@ if [[ "${skip_integration:-false}" == "false" ]]; then
       ${PANTS_ARGS[@]}
   ) || die "Pants Integration test failure"
 fi
-
-source ./build-support/pants_venv
-
-(
-  activate_pants_venv && \
-  PANTS_DEV=1 PANTS_CONFIG_OVERRIDE=pants.ini.docgen PANTS_PYTHON_TEST_FAILSOFT=1 ./pants goal test ${PANTS_ARGS[@]} tests/python/internal_backend_test:: && \
-  deactivate
-) || die "Failed to generate the doc tree."
-
 
 banner "CI SUCCESS"
