@@ -181,7 +181,7 @@ source ./build-support/pants_venv
 
 (
   activate_pants_venv && \
-  PANTS_DEV=1 PANTS_CONFIG_OVERRIDE=pants.ini.docgen PANTS_PYTHON_TEST_FAILSOFT=1 ./pants goal test ${PANTS_ARGS[@]} tests/python/internal_backend_tests:: && \
+  PANTS_DEV=1 PANTS_CONFIG_OVERRIDE=pants.ini.docgen PANTS_PYTHON_TEST_FAILSOFT=1 ./pants goal test ${PANTS_ARGS[@]} tests/python/internal_backend_test:: && \
   deactivate
 ) || die "Failed to generate the doc tree."
 
