@@ -11,7 +11,7 @@ python_thrift_library(
 java_thrift_library(
   name = 'duck-sca',
   sources = ['duck.thrift'],
-  thrift_linter_strict = False,
+  thrift_linter_strict = True,
 )
 
 python_thrift_library(

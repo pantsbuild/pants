@@ -16,7 +16,7 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
   # Thrift linter vs scrooge linter:
   # thrift linter is the function.
   # scrooge linter is the implementation detail.
-  _CONFIG_SECTION = 'scrooge-linter'
+  _CONFIG_SECTION = 'thrift-linter'
 
   STRICT_DEFAULT = False
 
@@ -44,7 +44,7 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
 
     self._bootstrap_key = 'scrooge-linter'
 
-    bootstrap_tools = self.context.config.getlist('scrooge-linter', 'bootstrap-tools',
+    bootstrap_tools = self.context.config.getlist(self._CONFIG_SECTION, 'bootstrap-tools',
                                                   default=[':scrooge-linter'])
     self.register_jvm_tool(self._bootstrap_key, bootstrap_tools)
 
@@ -55,10 +55,6 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
   def prepare(self, round_manager):
     # Linter depends on ivy running before it.
     round_manager.require_data('ivy_imports')
-
-  # def getIgnoreErrorsConfigValue(self):
-  #   return self.context.config.get('scrooge-linter', 'ignore-errors',
-  #                                  default=ThriftLinter.STRICT_DEFAULT)
 
   def _toBool(self, value):
     # Converts boolean and string values to boolean.
@@ -79,7 +75,7 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
     if target.thrift_linter_strict != None:
       return self._toBool(target.thrift_linter_strict)
 
-    return self._toBool(self.context.config.get('scrooge-linter', 'strict',
+    return self._toBool(self.context.config.get(self._CONFIG_SECTION, 'strict',
                                                 default=ThriftLinter.STRICT_DEFAULT))
 
   def lint(self, target, path):
