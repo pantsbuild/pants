@@ -32,13 +32,12 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
                             dest='thrift_linter_strict',
                             default=None,
                             action="callback", callback=mkflag.set_bool,
-                            help='[%default] Ignore lint errors')
+                            help='[%default] Ignore thrift-linter errors')
 
   @classmethod
   def product_types(cls):
     # Set dependency. Gen depends on linter.
     return ['thrift-linter']
-
 
   def __init__(self, *args, **kwargs):
     super(ThriftLinter, self).__init__(*args, **kwargs)
@@ -48,9 +47,6 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
     bootstrap_tools = self.context.config.getlist('scrooge-linter', 'bootstrap-tools',
                                                   default=[':scrooge-linter'])
     self.register_jvm_tool(self._bootstrap_key, bootstrap_tools)
-
-    print('Testing config reading', self.context.config.get('scrooge-linter', 'ignore-errors',
-                                                            default=False))
 
   @property
   def config_section(self):
@@ -74,25 +70,20 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
     cmdlineStrict = getattr(self.context.options, 'thrift_linter_strict', None)
 
     if cmdlineStrict != None:
-      print(11, cmdlineStrict)
       return cmdlineStrict
 
     if target.thrift_linter_strict != None:
-      print(22, target.thrift_linter_strict)
       return target.thrift_linter_strict
 
-    print (33, self.context.config.get('scrooge-linter', 'strict', default=ThriftLinter.STRICT_DEFAULT))
     return self.context.config.get('scrooge-linter', 'strict',
                                    default=ThriftLinter.STRICT_DEFAULT)
 
   def lint(self, target, path):
     self.context.log.debug("Linting %s" % path)
 
-    # print(55, getattr(self.context.options, 'thrift_linter_strict', None))
-    # print(66, target.thrift_linter_strict)
-
     classpath = self.tool_classpath(self._bootstrap_key)
     args = [path, '--verbose']
+    strict = self.isStrict(target)
     if not self.isStrict(target):
       args.append('--ignore-errors')
 
@@ -101,15 +92,10 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
     returncode = self.runjava(classpath=classpath,
                               main='com.twitter.scrooge.linter.Main',
                               args=args,
-                              workunit_labels=[WorkUnit.COMPILER],  # to let stdout/err through.
-                              )
+                              workunit_labels=[WorkUnit.COMPILER])  # to let stdout/err through.
 
     if returncode != 0:
-      if self.isStrict(target):
-        # This never happens. If ignoreErrors=True, the java process always returns 0.
-        self.context.log.warn("Ignoring thrift linter errors in %s\n" % path)
-      else:
-        raise TaskError('Lint errors in %s.' % path)
+      raise TaskError('Lint errors in %s.' % path)
 
   def execute(self):
     thrift_targets = self.context.targets(self._is_thrift)
