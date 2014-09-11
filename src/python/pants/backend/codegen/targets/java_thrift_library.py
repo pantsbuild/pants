@@ -51,6 +51,7 @@ class JavaThriftLibrary(JvmTarget):
                language=None,
                rpc_style=None,
                namespace_map=None,
+               thrift_linter_strict=True,
                **kwargs):
     """
     :param string name: The name of this target, which combined with this

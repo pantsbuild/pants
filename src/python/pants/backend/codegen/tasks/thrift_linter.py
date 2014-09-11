@@ -28,9 +28,10 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
   def setup_parser(cls, option_group, args, mkflag):
     super(ThriftLinter, cls).setup_parser(option_group, args, mkflag)
 
-    option_group.add_option(mkflag('ignore-errors', negate=True), dest='thrift_linter_ignore_errors',
-                            default=ThriftLinter.IGNORE_ERRORS_DEFAULT,
-                            action='callback', callback=mkflag.set_bool,
+    option_group.add_option("--thrift-linter-strict", "--no-thrift-linter-strict",
+                            dest='thrift_linter_strict',
+                            default=None,
+                            action="callback", callback=mkflag.set_bool,
                             help='[%default] Ignore lint errors')
 
   @classmethod
@@ -49,7 +50,7 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
     self.register_jvm_tool(self._bootstrap_key, bootstrap_tools)
 
     print('Testing config reading', self.context.config.get('scrooge-linter', 'ignore-errors',
-                                                          default=False))
+                                                            default=False))
 
   @property
   def config_section(self):
@@ -59,13 +60,20 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
     # Linter depends on ivy running before it.
     round_manager.require_data('ivy_imports')
 
+  def getIgnoreErrorsConfigValue(self):
+    return self.context.config.get('scrooge-linter', 'ignore-errors',
+                                   default=ThriftLinter.IGNORE_ERRORS_DEFAULT)
+
   def ignoreErrors(self):
     # Sometimes options don't have the thrift_linter_ignore_errors attribute
     # (when linter is called as a dependency. Not sure why/how to fix this).
-    return getattr(self.context.options, 'thrift_linter_ignore_errors', ThriftLinter.IGNORE_ERRORS_DEFAULT)
+    return getattr(self.context.options, 'thrift_linter_ignore_errors',
+                   self.getIgnoreErrorsConfigValue())
 
   def lint(self, path):
     self.context.log.debug("Linting %s" % path)
+
+    print(55, getattr(self.context.options, 'thrift_linter_strict', None))
 
     classpath = self.tool_classpath(self._bootstrap_key)
     args = [path, '--verbose']
