@@ -12,9 +12,10 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class EclipseIntegrationTest(PantsRunIntegrationTest):
-  def _eclipse_test(self, specs):
+  def _eclipse_test(self, specs, project_dir=os.path.join('.pants.d', 'tmp', 'test-eclipse'),
+      project_name='project'):
     """Helper method that tests eclipse generation on the input spec list."""
-    project_dir = os.path.join('.pants.d', 'tmp', 'test-eclipse')
+
 
     if not os.path.exists(project_dir):
       os.makedirs(project_dir)
@@ -29,12 +30,13 @@ class EclipseIntegrationTest(PantsRunIntegrationTest):
                                                     pants_run.stdout_data))
 
       expected_files = ('.classpath', '.project',)
-      self.assertTrue(os.path.exists(path),
-          'Failed to find project_dir at {dir}.'.format(dir=path))
-      self.assertTrue(all(os.path.exists(os.path.join(path, name))
+      workdir = os.path.join(path, project_name)
+      self.assertTrue(os.path.exists(workdir),
+          'Failed to find project_dir at {dir}.'.format(dir=workdir))
+      self.assertTrue(all(os.path.exists(os.path.join(workdir, name))
           for name in expected_files))
       # return contents of .classpath so we can verify it
-      with open(os.path.join(path, '.classpath')) as classpath_f:
+      with open(os.path.join(workdir, '.classpath')) as classpath_f:
         classpath = classpath_f.read()
       # should be at least one input; if not we may have the wrong target path
       self.assertIn('<classpathentry kind="src"', classpath)
