@@ -13,9 +13,6 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
   """Print linter warnings for thrift files.
   """
 
-  # Thrift linter vs scrooge linter:
-  # thrift linter is the function.
-  # scrooge linter is the implementation detail.
   _CONFIG_SECTION = 'thrift-linter'
 
   STRICT_DEFAULT = False
