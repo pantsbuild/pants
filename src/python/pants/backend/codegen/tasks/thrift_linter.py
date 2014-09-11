@@ -60,6 +60,10 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
   #   return self.context.config.get('scrooge-linter', 'ignore-errors',
   #                                  default=ThriftLinter.STRICT_DEFAULT)
 
+  def _toBool(self, value):
+    # Converts boolean and string values to boolean.
+    return str(value) == 'True'
+
   def isStrict(self, target):
     # The strict value is read from the following, in order:
     # 1. command line, --[no-]thrift-linter-strict
@@ -70,13 +74,13 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
     cmdlineStrict = getattr(self.context.options, 'thrift_linter_strict', None)
 
     if cmdlineStrict != None:
-      return cmdlineStrict
+      return self._toBool(cmdlineStrict)
 
     if target.thrift_linter_strict != None:
-      return target.thrift_linter_strict
+      return self._toBool(target.thrift_linter_strict)
 
-    return self.context.config.get('scrooge-linter', 'strict',
-                                   default=ThriftLinter.STRICT_DEFAULT)
+    return self._toBool(self.context.config.get('scrooge-linter', 'strict',
+                                                default=ThriftLinter.STRICT_DEFAULT))
 
   def lint(self, target, path):
     self.context.log.debug("Linting %s" % path)
