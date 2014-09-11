@@ -2,11 +2,13 @@
 Installing Pants
 ################
 
-**As of May 2014, alas, Pants is not an install-able thing.**
-You can use it in a repo in which some Pants expert has set it up;
-you can use it to build things *in* that repo, but nothing else.
+**As of September 2014, alas, Pants is not something you can just install and use.**
+To be precise: you can install it, but unless you've also
+:doc:`Set up your code workspace to work with Pants <setup_repo>`,
+it won't work.
+You can use it in a workspace in which some Pants expert has set it up.
 
-We're fixing this this problem, but we're not done yet.
+We're fixing this problem, but we're not done yet.
 
 If want to try out Pants and no Pants expert has set it up for you,
 you might try https://github.com/twitter/commons\.
@@ -16,37 +18,39 @@ to be a lot of "churn".)
 If you're reading this in an organization that already uses Pants,
 ask your neighbor where your source code is.
 
-.. COMMENT
-   ************************
-   System-wide Installation
-   ************************
+There are a few ways to get a runnable version of Pants into a developer's
+workspace.
 
-   The simplest installation method is installing for all users on your system. ::
+*****************************
+Virtualenv-based Installation
+*****************************
 
-      pip install pantsbuild.pants
-
-   This installs pants (and its dependencies) into your Python distribution
-   site-packages, making it available to all users on your system. This
-   installation method requires root access and may cause dependency conflicts
-   with other pip-installed applications.
-
-
-   *****************************
-   Virtualenv-based Installation
-   *****************************
-
-   `Virtualenv <http://www.virtualenv.org/>`_ is a tool for creating isolated
-   Python environments. This is the recommended way of installing pants locally
-   as it does not modify the system Python libraries. ::
+`Virtualenv <http://www.virtualenv.org/>`_ is a tool for creating isolated
+Python environments. This is the recommended way of installing pants locally
+as it does not modify the system Python libraries. ::
 
       $ virtualenv /tmp/pants
       $ source /tmp/pants/bin/activate
       $ pip install pantsbuild.pants
       $ pants
 
-   To simplify a virtualenv-based installation, consider adding a wrapper script
-   to your repo. See https://github.com/pantsbuild/pants/blob/master/pants for an
-   example.
+To simplify a virtualenv-based installation, add a wrapper script
+to your repo. For an example, see the ``twitter/commons`` script ``./pants``,
+https://github.com/twitter/commons/blob/master/pants\, and its
+helper scripts.
+
+************************
+System-wide Installation
+************************
+
+To install pants for all users on your system::
+
+    pip install pantsbuild.pants
+
+This installs pants (and its dependencies) into your Python distribution
+site-packages, making it available to all users on your system. This
+installation method requires root access and may cause dependency conflicts
+with other pip-installed applications.
 
 
 **********************
@@ -58,4 +62,4 @@ To support hermetic builds and not depend on a local pants installation
 a pre-build `pants.pex` whose version is checked-into `pants.ini`. If your site
 uses such an installation, please ask around for details.
 
-.. TODO(travis): Should we provide an example fetcher script?
+
