@@ -112,7 +112,7 @@ class TestArtifactCache(unittest.TestCase):
 
 
   def do_test_artifact_cache(self, artifact_cache):
-    key = CacheKey('muppet_key', 'fake_hash', 42, [])
+    key = CacheKey('muppet_key', 'fake_hash', 42)
     with temporary_file(artifact_cache.artifact_root) as f:
       # Write the file.
       f.write(TEST_CONTENT1)

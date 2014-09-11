@@ -24,9 +24,8 @@ from pants.util.dirutil import safe_mkdir
 #  - num_chunking_units: The number of "units" of chunking the payloads together contribute
 #    to the chunking algorithm.  Right now this is used to count the number of source files
 #    in a scala target set for breaking up zinc invocations.
-#  - payloads is the list of Target Payloads used to compute this key
 
-CacheKey = namedtuple('CacheKey', ['id', 'hash', 'num_chunking_units', 'payloads'])
+CacheKey = namedtuple('CacheKey', ['id', 'hash', 'num_chunking_units'])
 
 
 # Bump this to invalidate all existing keys in artifact caches across all pants deployments in the
@@ -54,10 +53,8 @@ class CacheKeyGenerator(object):
     else:
       combined_id = Target.maybe_readable_combine_ids(cache_key.id for cache_key in cache_keys)
       combined_hash = hash_all(sorted(cache_key.hash for cache_key in cache_keys))
-      combined_payloads = sorted(list(itertools.chain(*[cache_key.payloads
-                                                        for cache_key in cache_keys])))
       summed_chunking_units = sum([cache_key.num_chunking_units for cache_key in cache_keys])
-      return CacheKey(combined_id, combined_hash, summed_chunking_units, combined_payloads)
+      return CacheKey(combined_id, combined_hash, summed_chunking_units)
 
   def __init__(self, cache_key_gen_version=None):
     """
@@ -88,7 +85,7 @@ class CacheKeyGenerator(object):
     else:
       target_key = target.invalidation_hash(fingerprint_strategy)
     full_key = '{target_key}_{key_suffix}'.format(target_key=target_key, key_suffix=key_suffix)
-    return CacheKey(target.id, full_key, target.num_chunking_units, (target.payload,))
+    return CacheKey(target.id, full_key, target.num_chunking_units)
 
 
 # A persistent map from target set to cache key, which is a fingerprint of all

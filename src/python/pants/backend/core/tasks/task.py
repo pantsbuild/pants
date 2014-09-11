@@ -283,11 +283,12 @@ class TaskBase(AbstractClass):
 
     if not silent:
       targets = []
-      payloads = []
       num_invalid_partitions = len(invalidation_check.invalid_vts_partitioned)
       for vt in invalidation_check.invalid_vts_partitioned:
         targets.extend(vt.targets)
-        payloads.extend(vt.cache_key.payloads)
+
+      payloads = [t.payload for t in targets]
+
       if len(targets):
         msg_elements = ['Invalidated ',
                         items_to_report_element([t.address.reference() for t in targets], 'target')]
