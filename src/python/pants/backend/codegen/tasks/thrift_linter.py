@@ -48,6 +48,9 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
                                                   default=[':scrooge-linter'])
     self.register_jvm_tool(self._bootstrap_key, bootstrap_tools)
 
+    print('Testing config reading', self.context.config.get('scrooge-linter', 'ignore-errors',
+                                                          default=False))
+
   @property
   def config_section(self):
     return self._CONFIG_SECTION
@@ -59,7 +62,6 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
   def ignoreErrors(self):
     # Sometimes options don't have the thrift_linter_ignore_errors attribute
     # (when linter is called as a dependency. Not sure why/how to fix this).
-    print("IGNOREERRORS =", getattr(self.context.options, 'thrift_linter_ignore_errors', ThriftLinter.IGNORE_ERRORS_DEFAULT))
     return getattr(self.context.options, 'thrift_linter_ignore_errors', ThriftLinter.IGNORE_ERRORS_DEFAULT)
 
   def lint(self, path):
@@ -78,7 +80,6 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
                               workunit_labels=[WorkUnit.COMPILER],  # to let stdout/err through.
                               )
 
-    print('returncode=', returncode)
     if returncode != 0:
       if self.ignoreErrors():
         self.context.log.warn("Ignoring thrift linter errors in %s\n" % path)
