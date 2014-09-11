@@ -253,7 +253,7 @@ class Depmap(ConsoleTask):
         if target.is_test:
           return Depmap.SourceRootTypes.TEST
         else:
-          if isinstance(target, Resources) and resource_target_map[target].is_test:
+          if isinstance(target, Resources) and target in resource_target_map and resource_target_map[target].is_test:
             return Depmap.SourceRootTypes.TEST_RESOURCE
           elif isinstance(target, Resources):
             return Depmap.SourceRootTypes.RESOURCE
