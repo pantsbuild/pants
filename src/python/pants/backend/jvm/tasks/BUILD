@@ -198,20 +198,23 @@ python_library(
   ],
 )
 
+# TODO(John Sirois): the src/python/pants/goal + :checkstyle deps are signs of an unholy coupling -
+# support IdeGen task plugins as a sane way to maintain boundaries.  Consider the model presented
+# by JarPublish plugins when looking into this.
 python_library(
   name = 'ide_gen',
   sources = ['ide_gen.py'],
   dependencies = [
     ':checkstyle',
-    ':common',
     ':jvm_binary_task',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:build_environment',
+    'src/python/pants/base:exceptions',
     'src/python/pants/base:source_root',
     'src/python/pants/base:target',
-    'src/python/pants/goal', # XXX?
+    'src/python/pants/goal',
     'src/python/pants/backend/jvm/tasks:jvm_tool_task_mixin',
-    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants:binary_util',
     'src/python/pants/util:dirutil',
   ],
@@ -229,6 +232,7 @@ python_library(
     'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:scala',
+    'src/python/pants/backend/python/targets:python',
     'src/python/pants/util:dirutil',
   ],
 )
@@ -294,13 +298,13 @@ python_library(
 python_library(
   name = 'jar_publish',
   sources = ['jar_publish.py'],
-  resources = globs('templates/jar_publish/*.mustache') +
-              globs('templates/ivy_resolve/*.mustache'),
+  resources = globs('templates/jar_publish/*.mustache', 'templates/ivy_resolve/*.mustache'),
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.config',
     '3rdparty/python/twitter/commons:twitter.common.log',
     ':common',
+    ':jar_task',
     'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/core/tasks:scm_publish',
     'src/python/pants/backend/core/tasks:task',
