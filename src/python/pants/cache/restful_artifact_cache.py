@@ -16,6 +16,10 @@ from pants.cache.artifact_cache import ArtifactCache
 from pants.util.contextutil import temporary_file, temporary_file_path
 
 
+# Reduce the somewhat verbose logging of requests.
+# TODO do this in a central place
+logging.getLogger('requests').setLevel(logging.WARNING)
+
 class RESTfulArtifactCache(ArtifactCache):
   """An artifact cache that stores the artifacts on a RESTful service."""
 
@@ -43,10 +47,6 @@ class RESTfulArtifactCache(ArtifactCache):
     # To enable connection reuse, all requests must be created from same session.
     # TODO: Re-evaluate session's life-cycle if/when a longer-lived pants process exists.
     self._session = requests.Session()
-
-    # Reduce the somewhat verbose logging of requests.
-    # TODO do this in a central place
-    logging.getLogger('requests').setLevel(logging.WARNING)
 
 
   def try_insert(self, cache_key, paths):
