@@ -9,6 +9,7 @@ python_library(
     'src/python/pants/backend/android/targets:android',
     'src/python/pants/backend/android/tasks:all',
     'src/python/pants/base:build_file_aliases',
+    'src/python/pants/goal:task_registrar',
   ]
 )
 

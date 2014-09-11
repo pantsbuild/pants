@@ -5,6 +5,7 @@ python_test_suite(
   name = 'tasks',
   dependencies = [
     ':ide_gen',
+    ':idea_gen',
     ':junit_run',
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile',
   ]
@@ -14,11 +15,24 @@ python_tests(
   name = 'ide_gen',
   sources = ['test_ide_gen.py'],
   dependencies = [
-    'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/jvm/tasks:ide_gen',
     'src/python/pants/backend/jvm/targets:java',
+    'src/python/pants/base:source_root',
     'tests/python/pants_test:base_test',
-    ]
+  ]
+)
+
+python_tests(
+  name = 'idea_gen',
+  sources = ['test_idea_gen.py'],
+  dependencies = [
+    'src/python/pants/backend/core/targets:common',
+    'src/python/pants/backend/jvm/tasks:ide_gen',
+    'src/python/pants/backend/jvm/tasks:idea_gen',
+    'src/python/pants/backend/jvm/targets:java',
+    'src/python/pants/base:source_root',
+    'tests/python/pants_test:base_test',
+  ]
 )
 
 python_tests(

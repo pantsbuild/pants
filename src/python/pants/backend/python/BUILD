@@ -9,6 +9,7 @@ python_library(
     'src/python/pants/backend/python/commands:pants_old',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/backend/python/tasks:python',
+    'src/python/pants/goal:task_registrar',
     ':all_utils',
   ]
 )

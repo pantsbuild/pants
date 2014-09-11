@@ -10,6 +10,8 @@ python_library(
     'src/python/pants/backend/jvm/targets:all',
     'src/python/pants/backend/jvm/tasks:all',
     'src/python/pants/base:build_file_aliases',
+    'src/python/pants/goal',
+    'src/python/pants/goal:task_registrar',
     ':ivy_utils',
     ':jvm_tool_bootstrapper',
   ],

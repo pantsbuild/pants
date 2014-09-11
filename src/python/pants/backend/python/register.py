@@ -50,15 +50,19 @@ def register_commands():
 
 
 def register_goals():
-  task(name='python-binary-create', action=PythonBinaryCreate, dependencies=['bootstrap', 'check-exclusives', 'resources']
+  task(name='python-binary-create', action=PythonBinaryCreate,
+       dependencies=['bootstrap', 'check-exclusives', 'resources']
   ).install('binary')
 
-  task(name='pytest', action=PytestRun, dependencies=['bootstrap', 'check-exclusives', 'resources']
+  task(name='pytest', action=PytestRun,
+       dependencies=['bootstrap', 'check-exclusives', 'resources']
   ).install('test')
 
-  task(name='python-run', action=PythonRun, dependencies=['bootstrap', 'check-exclusives', 'resources']
+  task(name='python-run', action=PythonRun,
+       dependencies=['bootstrap', 'check-exclusives', 'resources']
   ).install('run')
 
-  task(name='python-repl', action=PythonRepl, dependencies=['bootstrap', 'check-exclusives', 'resources']
+  task(name='python-repl', action=PythonRepl,
+       dependencies=['bootstrap', 'check-exclusives', 'resources']
   ).install('repl')
 
