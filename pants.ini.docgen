@@ -207,4 +207,6 @@ indices: ['https://pypi.python.org/simple/']
 entry_point: IPython:start_ipython
 requirements: ['ipython==1.0.0']
 
-
+[backends]
+packages: [
+    'internal_backend.docsite']

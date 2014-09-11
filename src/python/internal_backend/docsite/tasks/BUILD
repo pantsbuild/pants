@@ -9,6 +9,7 @@ python_library(
   name='docsitegen',
   sources=['docsitegen.py'],
   dependencies=[
+    'src/python/pants/base:exceptions',
     'src/python/pants/backend/core/tasks:task',
   ]
 )

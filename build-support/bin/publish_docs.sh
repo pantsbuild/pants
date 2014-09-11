@@ -45,10 +45,8 @@ cp dist/builddict/*.rst src/python/pants/docs/
 ${HERE}/../../pants goal markdown --markdown-fragment :: || \
   die "Failed to generate HTML from markdown'."
 
-(
-  activate_pants_venv && \
-  python build-support/bin/docsitegen.py src/python/pants/docs/docsite.yaml
-) || die "Failed to generate the doc site."
+PANTS_DEV=1 PANTS_CONFIG_OVERRIDE=pants.ini.docgen ${HERE}/../../pants goal docsitegen --docsitegen-config-path=src/python/pants/docs/docsite.yaml || \
+  die "Failed to generate doc site'."
 
 (
   activate_pants_venv && \

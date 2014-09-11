@@ -44,7 +44,7 @@ HERE=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
 source ${HERE}/build-support/pants_venv
 
 PANTS_EXE=${HERE}/src/python/pants/bin/pants_exe.py
-PANTS_BINARY=src/python:pantsplus
+PANTS_BINARY=src/python/pants/bin:pants
 PANTS_PEX="${HERE}/pants.pex"
 FAILED_BOOTSTRAP_SENTINEL="${HERE}/.pants.d/BOOTSTRAP_FAILED"
 
@@ -70,17 +70,12 @@ if [[ ! -z "${WRAPPER_SRCPATH}" ]]; then
 fi
 PANTS_SRCPATH="$(echo ${PANTS_SRCPATH[@]} | tr ' ' :)"
 
-echo path is $PANTS_SRCPATH
-
 function run_pants_bare() {
-  echo run_pants_bare
   activate_pants_venv
-  echo RUN_PANTS_BARE ARGS $@
   PYTHONPATH="${PANTS_SRCPATH}" python ${PANTS_EXE} "$@"
 }
 
 function exec_pants_bare() {
-  echo exec_pants_bare
   activate_pants_venv
   PYTHONPATH="${PANTS_SRCPATH}" exec python ${PANTS_EXE} "$@"
 }
@@ -104,10 +99,8 @@ else
     # TODO(John sirois): Re-plumb build such that it grabs constraints from the built python_binary
     # target(s).
     rm -rf ${PANTS_PEX} && \
-    log "about to run_pants_bare to generate pex"
     run_pants_bare build -v -i "CPython>=2.6,<3" -i "CPython>=3.3" ${PANTS_BINARY} && \
-    log "generated pex, will mv"
-    mv -v ${HERE}/dist/pantsplus.pex ${PANTS_PEX} && \
+    mv -v ${HERE}/dist/pants.pex ${PANTS_PEX} && \
     chmod +x ${PANTS_PEX}
     exit_status=$?
     if [ $exit_status != 0 ] ; then
@@ -116,7 +109,6 @@ else
       exit $exit_status
     fi
   fi
-  log "about to exec PEX"
   if [ -e "${PANTS_PEX}" ]; then
     exec "${PANTS_PEX}" "$@"
   fi
