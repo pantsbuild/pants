@@ -51,7 +51,7 @@ class JavaThriftLibrary(JvmTarget):
                language=None,
                rpc_style=None,
                namespace_map=None,
-               thrift_linter_strict=True,
+               thrift_linter_strict=None,
                **kwargs):
     """
     :param string name: The name of this target, which combined with this
@@ -93,6 +93,7 @@ class JavaThriftLibrary(JvmTarget):
     self.rpc_style = check_value_for_arg('rpc_style', rpc_style, self._RPC_STYLES)
 
     self.namespace_map = namespace_map
+    self.thrift_linter_strict = thrift_linter_strict
 
   @property
   def is_thrift(self):
