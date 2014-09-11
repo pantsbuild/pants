@@ -2,8 +2,12 @@
 Set up Your Source Tree for Pants
 #################################
 
+.. Removing this warning? Also remove warning from install.rst.
+
+**As of September 2014, this is only possible for Pants experts.**
+**The Pants community is actively working to improve it.**
 If you're setting up the Pants build tool to work in your source tree, you
-probably want to configure Pants' behavior.  (Once it's set up, most
+need to configure Pants' behavior.  (Once it's set up, most
 folks should be able to use the :doc:`first_concepts`
 and not worry about these things.)
 

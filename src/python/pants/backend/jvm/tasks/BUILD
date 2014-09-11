@@ -207,6 +207,7 @@ python_library(
     ':jvm_binary_task',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:build_environment',
+    'src/python/pants/base:source_root',
     'src/python/pants/base:target',
     'src/python/pants/goal', # XXX?
     'src/python/pants/backend/jvm/tasks:jvm_tool_task_mixin',

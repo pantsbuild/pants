@@ -42,6 +42,34 @@ python_library(
   )
 )
 
+python_library(
+  name='test_infra',
+  dependencies=[
+    'tests/python/pants_test:base_test',
+    'tests/python/pants_test/jvm:jar_task_test_base',
+    'tests/python/pants_test/jvm:nailgun_task_test_base',
+    'tests/python/pants_test/jvm:jvm_tool_task_test_base',
+    'tests/python/pants_test/engine:engine_test_base',
+    'tests/python/pants_test/tasks:jvm_binary_test_base',
+  ],
+  provides=setup_py(
+    name='pantsbuild.pants.testinfra',
+    version=pants_version(),
+    description='Test support for writing pants plugins.',
+    long_description=read_contents('ABOUT.rst') + read_contents('CHANGELOG.rst'),
+    url='https://github.com/pantsbuild/pants',
+    license='Apache License, Version 2.0',
+    zip_safe=True,
+    namespace_packages=['pants_test'],
+    classifiers=[
+      'Intended Audience :: Developers',
+      'License :: OSI Approved :: Apache Software License',
+      'Operating System :: OS Independent',
+      'Programming Language :: Python',
+    ]
+  )
+)
+
 page(name='readme',
   source='README.md',
 )

@@ -2,7 +2,7 @@
 Release Process
 ###############
 
-This page describes how to make a versioned release of Pants.
+This page describes how to make a versioned release of Pants and and other related packages to PyPi.
 
 At a high level, releasing pants involves:
 
@@ -13,6 +13,11 @@ At a high level, releasing pants involves:
 * (optional) Perform a release dry run.
 * Publishing the release to PyPi.
 * Announce the release on `pants-devel`.
+
+The current list of packages that are part of this release process:
+
+* pantsbuild.pants
+* pantsbuild.pants.testinfra
 
 ***************
 Prepare Release
@@ -38,17 +43,20 @@ otherwise you'll need to hand off to someone who is.  The list is on the
 `pantsbuild.pants package index page <https://pypi.python.org/pypi/pantsbuild.pants>`_ in the
 `Package Index Owner` field::
 
-   curl -s https://pypi.python.org/pypi/pantsbuild.pants | grep -A1 "Owner"
+   $ curl -s "https://pypi.python.org`(curl -s https://pypi.python.org/pypi/pantsbuild.pants | grep -oE  "/pypi/pantsbuild.pants/[0-9]*\.[0-9]*\.[0-9]*" | head -n1)`" | grep -A1 "Owner"
    <strong>Package Index Owner:</strong>
-   <span>john.sirois, benjyw, traviscrawford, ericzundel</span>
+   <span>john.sirois, benjyw, traviscrawford, ericzundel, ity</span>
+
+All the other packages that are part of this simultaneous release process must have the same owner
+list or the release script would break.
 
 Releases should only be published from master, so get on master and ensure your version number
 commit is present. After confirming this, publish locally and verify the release. ::
 
    ./build-support/bin/release.sh -n
 
-This will perform a dry run local build of the pantsbuild.pants sdist, install it in a virtualenv
-and then smoke test basic operation.
+This will perform a dry run local build of the pantsbuild.pants sdist and other related package
+sdists, install them in a virtualenv and then smoke test basic operations.
 
 Note that the release publish flow also performs a mandatory dry run so executing a dry run
 separately is not required.
@@ -61,7 +69,7 @@ Now that we've smoke-tested this release, we can publish to PyPi::
 
    ./build-support/bin/release.sh
 
-This also performs a dry run and then proceeds to upload the smoke tested sdist to PyPi.
+This also performs a dry run and then proceeds to upload the smoke tested sdists to PyPi.
 
 ********
 Announce
@@ -69,10 +77,12 @@ Announce
 
 Check PyPi to ensure everything looks good. The `pantsbuild.pants package index page
 <https://pypi.python.org/pypi/pantsbuild.pants>`_ should display the package version you just
-uploaded. To test the package is installable::
+uploaded. The same check applies to other related package PyPi pages.
+
+To test the packages are installable::
 
   ./build-support/bin/release.sh -t
 
-This will attempt to install the just-published package from pypi and then smoke test it.
+This will attempt to install the just-published packages from pypi and then smoke test them.
 
 Finally, announce the release to `pants-devel`.

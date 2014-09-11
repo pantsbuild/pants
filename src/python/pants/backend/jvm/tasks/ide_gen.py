@@ -6,6 +6,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 from collections import defaultdict
+import logging
 import os
 import shutil
 
@@ -18,10 +19,12 @@ from pants.backend.jvm.tasks.jvm_binary_task import JvmBinaryTask
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+from pants.base.source_root import SourceRoot
 from pants.base.target import Target
 from pants.goal.goal import Goal
 from pants.util.dirutil import safe_mkdir
 
+logger = logging.getLogger(__name__)
 
 # We use custom checks for scala and java targets here for 2 reasons:
 # 1.) jvm_binary could have either a scala or java source file attached so we can't do a pure
@@ -88,6 +91,22 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
                             help="[%default] Includes scala sources in the project; otherwise "
                                  "compiles them and adds them to the project classpath.")
 
+    option_group.add_option(mkflag("use-source-root"), mkflag("use-source-root", negate=True),
+                            default=False, action="callback", callback=mkflag.set_bool,
+                            dest='ide_gen_use_source_root',
+                            help="[%default] Use source_root() settings to collapse source"
+                                 "paths in project and determine which paths are used for "
+                                 "tests.  This is usually what you want if your repo uses "
+                                 "a maven style directory layout.")
+    option_group.add_option(mkflag("infer-test-from-siblings"),
+                            mkflag("infer-test-from-siblings", negate=True),
+                            default=True, action="callback", callback=mkflag.set_bool,
+                            dest='ide_infer_test_from_siblings',
+                            help="[%default] When determining if a path should be added to the "
+                                 "IDE, check to see if any of its sibling source_root() entries "
+                                 "define test targets.  This is usually what you want so that "
+                                 "resource directories under test source roots are picked up as "
+                                 "test paths.")
 
   class Error(TaskError):
     """IdeGen Error."""
@@ -115,6 +134,7 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
     self.python = self.context.options.ide_gen_python
     self.skip_java = not self.context.options.ide_gen_java
     self.skip_scala = not self.context.options.ide_gen_scala
+    self.use_source_root = self.context.options.ide_gen_use_source_root
 
     self.java_language_level = self.context.options.ide_gen_java_language_level
     if self.context.options.ide_gen_java_jdk:
@@ -176,6 +196,7 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
                       self.python,
                       self.skip_java,
                       self.skip_scala,
+                      self.use_source_root,
                       get_buildroot(),
                       checkstyle_suppression_files,
                       debug_port,
@@ -366,14 +387,12 @@ class ClasspathEntry(object):
 class SourceSet(object):
   """Models a set of source files."""
 
-  TEST_BASES = set()
-
   def __init__(self, root_dir, source_base, path, is_test):
     """
-      root_dir: the full path to the root directory of the project containing this source set
-      source_base: the relative path from root_dir to the base of this source set
-      path: the relative path from the source_base to the base of the sources in this set
-      is_test: true iff the sources contained by this set implement test cases
+    :param string root_dir: full path to the root of the project containing this source set
+    :param string source_base: the relative path from root_dir to the base of this source set
+    :param string path: relative path from the source_base to the base of the sources in this set
+    :param bool is_test: true iff the sources contained by this set implement test cases
     """
 
     self.root_dir = root_dir
@@ -381,17 +400,25 @@ class SourceSet(object):
     self.path = path
     self.is_test = is_test
     self._excludes = []
-    if is_test:
-      SourceSet.TEST_BASES.add(self.source_base)
 
   @property
   def excludes(self):
     """Paths relative to self.path that are excluded from this source set."""
-
     return self._excludes
 
+  @property
+  def _key_tuple(self):
+    """Creates a tuple from the attributes used as a key to uniquely identify a SourceSet"""
+    return (self.root_dir, self.source_base, self.path)
+
   def __str__(self):
-    return str((self.root_dir, self.source_base, self.path))
+    return str(self._key_tuple)
+
+  def __eq__(self, other):
+    return self._key_tuple == other._key_tuple
+
+  def __cmp__(self, other):
+    return cmp(self._key_tuple, other._key_tuple)
 
 
 class Project(object):
@@ -406,7 +433,31 @@ class Project(object):
         _, ext = os.path.splitext(resource)
         yield ext
 
-  def __init__(self, name, has_python, skip_java, skip_scala, root_dir,
+  @staticmethod
+  def _collapse_by_source_root(source_sets):
+    """Collapse SourceSets with common source roots into one SourceSet instance.
+
+    Use the registered source roots to collapse all source paths under a root.
+    If any test type of target is allowed under the root, the path is determined to be
+    a test path.  This method will give unpredictable results if source root entries overlap.
+
+    :param list source_sets: SourceSets to analyze
+    :returns: list of SourceSets collapsed to the source root paths.
+    """
+
+    roots_found = set()  # remember the roots we've already encountered
+    collapsed_source_sets = []
+    for source in source_sets:
+      query = os.path.join(source.source_base, source.path)
+      source_root = SourceRoot.find_by_path(query)
+      if not source_root:
+        collapsed_source_sets.append(source)
+      elif not source_root in roots_found:
+        roots_found.add(source_root)
+        collapsed_source_sets.append(SourceSet(source.root_dir, source_root, "", source.is_test))
+    return collapsed_source_sets
+
+  def __init__(self, name, has_python, skip_java, skip_scala, use_source_root, root_dir,
                checkstyle_suppression_files, debug_port, targets, transitive, workunit_factory,
                target_util):
     """Creates a new, unconfigured, Project based at root_dir and comprised of the sources visible
@@ -427,6 +478,7 @@ class Project(object):
     self.has_python = has_python
     self.skip_java = skip_java
     self.skip_scala = skip_scala
+    self.use_source_root = use_source_root
     self.has_scala = False
     self.has_tests = False
 
@@ -456,7 +508,6 @@ class Project(object):
 
     analyzed = OrderedSet()
     targeted = set()
-    targeted_tuples = {}
 
     def relative_sources(target):
       sources = target.payload.sources_relative_to_buildroot()
@@ -474,16 +525,10 @@ class Project(object):
       paths = set([os.path.dirname(source) for source in sources])
       for path in paths:
         absolute_path = os.path.join(absolute_base, path)
-        pieces = (relative_base, path)
-        # Previously this if-statement was testing against absolute_path's presence in targeted.
-        # This broke in the (very weird) edge-case where two different sources have the same
-        # absolute path, but choose the split between relative_base and path differently. It's
-        # really important that we distinguish between them still, because the package name changes.
-        # TODO(Garrett Malmquist): Fix the underlying bugs in pants that make this necessary.
-        if pieces not in targeted_tuples:
-          targeted.add(absolute_path)
-          targeted_tuples[pieces] = sources
-          self.sources.append(SourceSet(self.root_dir, relative_base, path, is_test))
+        # Note, this can add duplicate source paths to self.sources().  We'll de-dup them later,
+        # because we want to prefer test paths.
+        targeted.add(absolute_path)
+        self.sources.append(SourceSet(self.root_dir, relative_base, path, is_test))
 
     def find_source_basedirs(target):
       dirs = set()
@@ -509,7 +554,7 @@ class Project(object):
             resources_by_basedir[target.target_base].update(relative_sources(resources))
           for basedir, resources in resources_by_basedir.items():
             self.resource_extensions.update(Project.extract_resource_extensions(resources))
-            configure_source_sets(basedir, resources, is_test=False)
+            configure_source_sets(basedir, resources, is_test=target.is_test)
 
         if target.has_sources():
           test = target.is_test
@@ -542,6 +587,18 @@ class Project(object):
     def full_path(source_set):
       return os.path.join(source_set.root_dir, source_set.source_base, source_set.path)
 
+    def dedup_sources(source_set_list):
+      """Sometimes two targets with the same path are added to the source set. One is a target where
+       is_test evaluates to True and the other were it evaluates to False.  When this happens,
+       make sure we prefer the SourceSet with is_test set to True.
+      """
+      deduped_sources = set(filter(lambda source_set: source_set.is_test, source_set_list))
+      for source_set in source_set_list:
+        if not source_set.is_test and source_set not in deduped_sources:
+          deduped_sources.add(source_set)
+      # re-sort the list, makes the generated project easier to read.
+      return sorted(list(deduped_sources))
+
     # Check if there are any overlapping source_sets, and output an error message if so.
     # Overlapping source_sets cause serious problems with package name inference.
     overlap_error = ('SourceSets {current} and {previous} evaluate to the same full path.'
@@ -555,7 +612,7 @@ class Project(object):
       full = full_path(source_set)
       if full in source_full_paths:
         previous_set = source_full_paths[full]
-        self.context.log.error(overlap_error.format(current=source_set, previous=previous_set))
+        logger.debug(overlap_error.format(current=source_set, previous=previous_set))
       source_full_paths[full] = source_set
 
     # We need to figure out excludes, in doing so there are 2 cases we should not exclude:
@@ -599,6 +656,9 @@ class Project(object):
     targets.update(analyzed - targets)
     self.sources.extend(SourceSet(get_buildroot(), p, None, False) for p in extra_source_paths)
     self.sources.extend(SourceSet(get_buildroot(), p, None, True) for p in extra_test_paths)
+    if self.use_source_root:
+      self.sources = Project._collapse_by_source_root(self.sources)
+    self.sources = dedup_sources(self.sources)
 
     return targets
 
