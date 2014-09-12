@@ -5,6 +5,8 @@ python_tests(
   name = 'docsite',
   sources=['test_docsitegen.py'],
   dependencies = [
+    'src/python/internal_backend/docsite/tasks:beautifulsoup4',
+    'src/python/internal_backend/docsite/tasks:PyYAML',
     'src/python/internal_backend/docsite/tasks:docsitegen',
   ],
 )
