@@ -33,7 +33,7 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
 
   @classmethod
   def product_types(cls):
-    # Set dependency. Gen depends on linter.
+    # Declare the product of this goal. Gen depends on thrift-linter.
     return ['thrift-linter']
 
   def __init__(self, *args, **kwargs):
