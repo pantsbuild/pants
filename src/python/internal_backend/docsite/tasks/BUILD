@@ -5,14 +5,12 @@ target(
   ],
 )
 
-python_requirements()
-
 python_library(
   name='docsitegen',
   sources=['docsitegen.py'],
   dependencies=[
-    ':PyYAML',
-    ':beautifulsoup4',
+    'src/python/internal_backend/docsite:PyYAML',
+    'src/python/internal_backend/docsite:beautifulsoup4',
     'src/python/pants/base:exceptions',
     'src/python/pants/backend/core/tasks:task',
   ]

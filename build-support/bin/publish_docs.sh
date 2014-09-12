@@ -45,7 +45,7 @@ cp dist/builddict/*.rst src/python/pants/docs/
 ${HERE}/../../pants goal markdown --markdown-fragment :: || \
   die "Failed to generate HTML from markdown'."
 
-WRAPPER_REQUIREMENTS="src/python/internal_backend/docsite/tasks/requirements.txt" PANTS_CONFIG_OVERRIDE=pants.ini.docgen ${HERE}/../../pants goal docsitegen --docsitegen-config-path=src/python/pants/docs/docsite.yaml || \
+PANTS_DEV=1 WRAPPER_REQUIREMENTS="src/python/internal_backend/docsite/requirements.txt" PANTS_CONFIG_OVERRIDE=pants.ini.docgen ${HERE}/../../pants goal docsitegen --docsitegen-config-path=src/python/pants/docs/docsite.yaml || \
   die "Failed to generate doc site'."
 
 (
