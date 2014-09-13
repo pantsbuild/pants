@@ -116,8 +116,8 @@ class Config(object):
     default=os.path.join(get_buildroot(), '.pants.d'))
 
   # Cache the default config produced by load()
-  DEFAULT_CONFIG = None
-  DEFAULT_CONFIG_SIG = None
+  DEFAULT_CONFIG_PARSER = None
+  DEFAULT_CONFIG_PARSER_SIG = None
 
   class ConfigError(Exception):
     pass
@@ -132,18 +132,17 @@ class Config(object):
     """
     default_configpath = os.path.join(get_buildroot(), 'pants.ini')
     is_default_config = configpath is None and defaults is None
-    if (is_default_config and Config.DEFAULT_CONFIG is not None and
-        Config.DEFAULT_CONFIG_SIG == os.stat(default_configpath)):
-      return Config.DEFAULT_CONFIG
+    if (is_default_config and Config.DEFAULT_CONFIG_PARSER is not None and
+        Config.DEFAULT_CONFIG_PARSER_SIG == os.stat(default_configpath)):
+      return Config(Config.DEFAULT_CONFIG_PARSER)
     configpath = configpath or default_configpath
     parser = Config.create_parser(defaults=defaults)
     with open(configpath) as ini:
       parser.readfp(ini)
-    config = Config(parser)
     if is_default_config:
-      Config.DEFAULT_CONFIG = config
-      Config.DEFAULT_CONFIG_SIG = os.stat(default_configpath)
-    return config
+      Config.DEFAULT_CONFIG_PARSER = parser
+      Config.DEFAULT_CONFIG_PARSER_SIG = os.stat(default_configpath)
+    return Config(parser)
 
   @classmethod
   def create_parser(cls, defaults=None):
