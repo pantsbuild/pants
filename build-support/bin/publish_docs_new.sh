@@ -7,15 +7,13 @@ HERE=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
 # We have special developer mode requirements - namely sphinx deps.
 export PANTS_DEV=1
 
-source ${HERE}/../pants_venv
-
 function usage() {
   echo "Publishes the http://pantsbuild.github.io/ docs locally or remotely."
   echo
   echo "Usage: $0 (-h|-opd)"
   echo " -h           print out this help message"
   echo " -o           open the doc site locally"
-  echo " -p           publish the doc site remotely"
+  echo " -p           publish the doc site remotely DISABLED FOR NOW"
   echo " -d           publish the site to a subdir at this path (useful for public previews)"
 
   if (( $# > 0 )); then
@@ -31,7 +29,7 @@ while getopts "hopd:" opt; do
   case ${opt} in
     h) usage ;;
     o) preview="true" ;;
-    p) publish="true" ;;
+#   p) publish="true" ;;
     d) publish_path="${OPTARG}" ;;
     *) usage "Invalid option: -${OPTARG}" ;;
   esac
@@ -40,12 +38,6 @@ done
 ${HERE}/../../pants goal builddict --print-exception-stacktrace || \
   die "Failed to generate the 'BUILD Dictionary'."
 cp dist/builddict/*.rst src/python/pants/docs/
-
-(
-  activate_pants_venv && \
-  cd src/python/pants/docs && \
-  make clean html
-) || die "Failed to generate the doc tree."
 
 function do_open() {
   if [[ "${preview}" = "true" ]]; then
@@ -59,7 +51,21 @@ function do_open() {
   fi
 }
 
-do_open "${HERE}/../../src/python/pants/docs/_build/html/index.html"
+# generate some markdown as fodder for prototype doc site generator
+${HERE}/../../pants goal markdown --markdown-fragment :: || \
+  die "Failed to generate HTML from markdown'."
+
+# invoke doc site generator
+cp -f pants.ini pants.ini.sitegen
+cat >> pants.ini.sitegen <<EOF
+[backends]
+packages: [
+    'internal_backend.sitegen']
+EOF
+WRAPPER_REQUIREMENTS="src/python/internal_backend/sitegen/requirements.txt" PANTS_CONFIG_OVERRIDE=pants.ini.sitegen ${HERE}/../../pants goal sitegen --sitegen-config-path=src/python/pants/docs/docsite.yaml || \
+  die "Failed to generate doc site'."
+
+do_open "${HERE}/../../dist/docsite/index.html"
 
 if [[ "${publish}" = "true" ]]; then
   url="http://pantsbuild.github.io/${publish_path}"

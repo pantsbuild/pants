@@ -6,9 +6,10 @@ python_library(
   name = 'plugin',
   sources = ['__init__.py', 'register.py'],
   dependencies = [
-    'src/python/internal_backend/docsite/tasks:all',
+    'src/python/internal_backend/sitegen/tasks:all',
   ]
 )
 
+# Requires some things _not_ required by Pants itself:
 python_requirements()
 

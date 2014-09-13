@@ -9,7 +9,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 Suggested use:
   cd pants
-  ./build-support/bin/publish_docs.sh # invokes docsitegen.py
+  ./build-support/bin/publish_docs.sh  # invokes sitegen.py
 '''
 
 import os
@@ -24,19 +24,19 @@ import yaml
 from pants.backend.core.tasks.task import Task
 from pants.base.exceptions import TaskError
 
-class DocsiteGen(Task):
+class SiteGen(Task):
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
-    super(DocsiteGen, cls).setup_parser(option_group, args, mkflag)
+    super(SiteGen, cls).setup_parser(option_group, args, mkflag)
     option_group.add_option(mkflag('config-path'),
-                            dest='docsitegen_config_path',
+                            dest='sitegen_config_path',
                             action='append',
                             help='[%default] Path to YAML file describing site structure.')
 
   def execute(self):
-    if not self.context.options.docsitegen_config_path:
-      raise TaskError('Need to pass --docsitegen-config-path=src/python/pants/docs/docsite.yaml or something')
-    for config_path in self.context.options.docsitegen_config_path:
+    if not self.context.options.sitegen_config_path:
+      raise TaskError('Need to pass --sitegen-config-path=src/python/pants/docs/docsite.yaml or something')
+    for config_path in self.context.options.sitegen_config_path:
       config = load_config(config_path)
       soups = load_soups(config)
       precomputed = precompute(config, soups)

@@ -2,7 +2,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from internal_backend.docsite.tasks import docsitegen
+from internal_backend.sitegen.tasks import sitegen
 
 import unittest
 
@@ -19,7 +19,7 @@ tree:
   children:
   - page: subdir/page1
 
-# outdir: dist/test_docsite/ # maybe we don't want tests to write...?
+# outdir: dist/test_sitegen/ # omit for now...
 
 template: fake/fake.mustache
 '''
@@ -49,15 +49,15 @@ class AllTheThingsTestCase(unittest.TestCase):
       'index': bs4.BeautifulSoup(INDEX_HTML),
       'subdir/page1': bs4.BeautifulSoup(P1_HTML)
       }
-    self.precomputed = docsitegen.precompute(self.config, self.orig_soups)
+    self.precomputed = sitegen.precompute(self.config, self.orig_soups)
 
   def test_fixup_internal_links(self):
     soups = self.orig_soups.copy()
-    docsitegen.fixup_internal_links(self.config, soups)
-    html = docsitegen.render_html('index',
-                                  self.config,
-                                  soups,
-                                  self.precomputed,
-                                  TEMPLATE_MUSTACHE)
+    sitegen.fixup_internal_links(self.config, soups)
+    html = sitegen.render_html('index',
+                               self.config,
+                               soups,
+                               self.precomputed,
+                               TEMPLATE_MUSTACHE)
     self.assertTrue('subdir/page1.html' in html,
                     'p1.html link did not get fixed up to page1.html')

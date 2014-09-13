@@ -5,11 +5,10 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from internal_backend.docsite.tasks.docsitegen import DocsiteGen
+from internal_backend.sitegen.tasks.sitegen import SiteGen
 from pants.goal.task_registrar import TaskRegistrar as task
 
 def register_goals():
-  print("DSG.register", "register_goals") # TODO
   task(
-    name='docsitegen', action=DocsiteGen
-  ).install('docsitegen').with_description('')
+    name='sitegen', action=SiteGen
+  ).install('sitegen').with_description('Generate static web site.')
