@@ -80,41 +80,12 @@ class PythonTestBuilder(object):
   class ChrootBuildingException(Exception): pass
 
   _TESTING_TARGETS = [
-    PythonRequirement('argparse'), # TODO if I don't have this, then test pytest run fails. not sure if this is the right place for this...
     PythonRequirement('pytest'),
     PythonRequirement('pytest-timeout'),
     PythonRequirement('pytest-cov'),
     PythonRequirement('unittest2', version_filter=lambda py, pl: py.startswith('2')),
     PythonRequirement('unittest2py3k', version_filter=lambda py, pl: py.startswith('3'))
   ]
-
-  TODO_TRACEBACK_WAS= '''
-                     Traceback (most recent call last):
-                       File "/private/var/folders/0q/hcrr86js0t59yx9qpxhl4dcw0000gp/T/tmpFAHbiW/.bootstrap/_pex/pex.py", line 227, in execute
-                         self.execute_interpreter()
-                       File "/System/Library/Frameworks/Python.framework/Versions/2.6/lib/python2.6/contextlib.py", line 34, in __exit__
-                         self.gen.throw(type, value, traceback)
-                       File "/private/var/folders/0q/hcrr86js0t59yx9qpxhl4dcw0000gp/T/tmpFAHbiW/.bootstrap/_pex/pex.py", line 177, in patch_pkg_resources
-                         yield
-                       File "/private/var/folders/0q/hcrr86js0t59yx9qpxhl4dcw0000gp/T/tmpFAHbiW/.bootstrap/_pex/pex.py", line 225, in execute
-                         self.execute_entry(entry_point, args)
-                       File "/private/var/folders/0q/hcrr86js0t59yx9qpxhl4dcw0000gp/T/tmpFAHbiW/.bootstrap/_pex/pex.py", line 273, in execute_entry
-                         runner(entry_point)
-                       File "/private/var/folders/0q/hcrr86js0t59yx9qpxhl4dcw0000gp/T/tmpFAHbiW/.bootstrap/_pex/pex.py", line 290, in execute_module
-                         runpy.run_module(module_name, run_name='__main__')
-                       File "/System/Library/Frameworks/Python.framework/Versions/2.6/lib/python2.6/runpy.py", line 140, in run_module
-                         fname, loader, pkg_name)
-                       File "/System/Library/Frameworks/Python.framework/Versions/2.6/lib/python2.6/runpy.py", line 34, in _run_code
-                         exec code in run_globals
-                       File "/private/var/folders/0q/hcrr86js0t59yx9qpxhl4dcw0000gp/T/tmpFAHbiW/.deps/pytest-2.6.2-py2-none-any.whl/pytest.py", line 9, in <module>
-                         import pytest
-                       File "/private/var/folders/0q/hcrr86js0t59yx9qpxhl4dcw0000gp/T/tmpFAHbiW/.deps/pytest-2.6.2-py2-none-any.whl/pytest.py", line 14, in <module>
-                         from _pytest.config import main, UsageError, _preloadplugins, cmdline
-                       File "/private/var/folders/0q/hcrr86js0t59yx9qpxhl4dcw0000gp/T/tmpFAHbiW/.deps/pytest-2.6.2-py2-none-any.whl/_pytest/config.py", line 2, in <module>
-                         import argparse
-                     ImportError: No module named argparse
-
-  '''
 
   def __init__(self, targets, args, interpreter=None, conn_timeout=None, fast=False):
     self.targets = targets

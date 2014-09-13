@@ -2,12 +2,12 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from internal_backend.sitegen.tasks import sitegen
-
 import unittest
 
 import bs4
 import yaml
+
+from internal_backend.sitegen.tasks import sitegen
 
 CONFIG_YAML = '''
 sources:
@@ -48,7 +48,7 @@ class AllTheThingsTestCase(unittest.TestCase):
     self.orig_soups = {
       'index': bs4.BeautifulSoup(INDEX_HTML),
       'subdir/page1': bs4.BeautifulSoup(P1_HTML)
-      }
+    }
     self.precomputed = sitegen.precompute(self.config, self.orig_soups)
 
   def test_fixup_internal_links(self):

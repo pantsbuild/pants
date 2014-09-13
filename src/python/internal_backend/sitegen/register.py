@@ -8,6 +8,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 from internal_backend.sitegen.tasks.sitegen import SiteGen
 from pants.goal.task_registrar import TaskRegistrar as task
 
+
 def register_goals():
   task(
     name='sitegen', action=SiteGen

@@ -13,7 +13,6 @@ Suggested use:
 '''
 
 import os
-import sys
 import shutil
 import pystache
 
@@ -23,6 +22,7 @@ import yaml
 
 from pants.backend.core.tasks.task import Task
 from pants.base.exceptions import TaskError
+
 
 class SiteGen(Task):
   @classmethod
@@ -35,7 +35,9 @@ class SiteGen(Task):
 
   def execute(self):
     if not self.context.options.sitegen_config_path:
-      raise TaskError('Need to pass --sitegen-config-path=src/python/pants/docs/docsite.yaml or something')
+      raise TaskError('Need to pass '
+                      '--sitegen-config-path=src/python/pants/docs/docsite.yaml'
+                      ' or something.')
     for config_path in self.context.options.sitegen_config_path:
       config = load_config(config_path)
       soups = load_soups(config)
@@ -44,6 +46,7 @@ class SiteGen(Task):
       template = load_template(config)
       write_en_pages(config, soups, precomputed, template)
       copy_extras(config)
+
 
 def load_config(yaml_path):
   '''Load config info from a .yaml file and return it'''
@@ -174,7 +177,3 @@ def load_template(config):
   with open(config['template']) as template_file:
     template = template_file.read().encode('utf8')
   return template
-
-
-
-
