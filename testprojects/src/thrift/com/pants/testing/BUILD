@@ -8,7 +8,13 @@ python_thrift_library(
   sources = ['duck.thrift'],
 )
 
+java_thrift_library(
+  name = 'duck-sca',
+  sources = ['duck.thrift'],
+)
+
 python_thrift_library(
   name = 'goose-py',
   sources = ['goose.thrift'],
 )
+

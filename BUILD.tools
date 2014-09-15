@@ -115,6 +115,11 @@ jar_library(name = 'scrooge-gen',
               jar(org='com.twitter', name='scrooge-generator_2.9.2', rev='3.12.1')
             ])
 
+jar_library(name = 'scrooge-linter',
+            jars = [
+              jar(org='com.twitter', name='scrooge-linter_2.9.2', rev='3.16.1')
+            ])
+
 jar_library(name = 'jar-tool',
             jars = [
               jar(org = 'com.twitter.common', name = 'jar-tool', rev = '0.1.7')
