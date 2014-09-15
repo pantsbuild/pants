@@ -29,6 +29,25 @@ class PythonTarget(Target):
                provides=None,
                compatibility=None,
                **kwargs):
+    """
+    :param dependencies: Other targets that this target depends on.
+      These dependencies may
+      be ``python_library``-like targets (``python_library``,
+      ``python_thrift_library``, ``python_antlr_library`` and so forth) or
+      ``python_requirement_library`` targets.
+    :type dependencies: List of target specs
+    :param resources: non-Python resources, e.g. templates, keys, other data
+      (it is
+      recommended that your application uses the pkgutil package to access these
+      resources in a .zip-module friendly way.)
+    :param provides:
+      The :ref:`setup_py <bdict_setup_py>` to publish that represents this
+      target outside the repo.
+    :param compatibility: either a string or list of strings that represents
+      interpreter compatibility for this target, using the Requirement-style
+      format, e.g. ``'CPython>=3', or just ['>=2.7','<3']`` for requirements
+      agnostic to interpreter class.
+    """
     payload = PythonPayload(sources_rel_path=address.spec_path,
                             sources=sources or [],
                             resources=resources)

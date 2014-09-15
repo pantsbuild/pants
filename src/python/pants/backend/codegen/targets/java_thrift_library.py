@@ -53,23 +53,11 @@ class JavaThriftLibrary(JvmTarget):
                namespace_map=None,
                **kwargs):
     """
-    :param string name: The name of this target, which combined with this
-      build file defines the :doc:`target address <target_addresses>`.
-    :param sources: Source code files to compile. Paths are relative to the
-      BUILD file's directory.
-    :type sources: ``Fileset`` or list of strings
-    :param provides: The ``artifact``
-      to publish that represents this target outside the repo.
-    :param dependencies: Other targets that this target depends on.
-    :type dependencies: list of target specs
-    :param excludes: List of :ref:`exclude <bdict_exclude>`\s
-      to filter this target's transitive dependencies against.
     :param compiler: The compiler used to compile the thrift files; default is 'thrift'
       (The apache thrift compiler).
     :param language: The language used to generate the output files; defaults to 'java'.
     :param rpc_style: An optional rpc style to generate service stubs with.
     :param namespace_map: An optional dictionary of namespaces to remap {old: new}
-    :param exclusives: An optional map of exclusives tags. See :ref:`howto_check_exclusives` for details.
     """
 
     # It's critical that provides is set 1st since _provides() is called elsewhere in the
