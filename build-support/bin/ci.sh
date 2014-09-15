@@ -132,9 +132,8 @@ if [[ "${skip_python:-false}" == "false" ]]; then
   banner "Running core python tests"
   (
     # TODO(Eric Ayers): Substitute tests/python:: when all tests are working that way
-    PANTS_PY_COVERAGE=paths:pants/ PANTS_PYTHON_TEST_FAILSOFT=1 \
-      ./pants.pex goal test tests/python/pants_test:all \
-        ${PANTS_ARGS[@]}
+    PANTS_PYTHON_TEST_FAILSOFT=1 ./pants.pex goal test tests/python/pants_test:all \
+      ${PANTS_ARGS[@]}
   ) || die "Core python test failure"
 fi
 
@@ -173,9 +172,8 @@ fi
 if [[ "${skip_integration:-false}" == "false" ]]; then
   banner "Running Pants Integration tests"
   (
-    PANTS_PYTHON_TEST_FAILSOFT=1 \
-      ./pants.pex goal test tests/python/pants_test:integration \
-        ${PANTS_ARGS[@]}
+    PANTS_PYTHON_TEST_FAILSOFT=1 ./pants.pex goal test tests/python/pants_test:integration \
+      ${PANTS_ARGS[@]}
   ) || die "Pants Integration test failure"
 fi
 

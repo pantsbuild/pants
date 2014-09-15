@@ -12,6 +12,7 @@ python_tests(
   name='test_builder',
   sources=['test_test_builder.py'],
   dependencies=[
+    '3rdparty/python:coverage',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/backend/python:test_builder',
     'src/python/pants/base:build_file_aliases',
