@@ -80,6 +80,28 @@ class ThriftLinterTest(PantsRunIntegrationTest):
     self.assertFailure(pants_run)
     self.assertTrue('Lint errors found!' in pants_run.stdout_data)
 
+  def test_bad_pants_ini_strict(self):
+    # thrift-linter fails if pants.ini has a thrift-linter:strict=True setting
+    cmd = ['goal',
+           'thrift-linter',
+           'testprojects/src/thrift/com/pants/thrift_linter:bad-thrift-default',]
+    pants_ini_config = {'thrift-linter': {'strict': True}}
+    pants_run = self.run_pants(cmd, config = pants_ini_config)
+    self.assertFailure(pants_run)
+    self.assertTrue('Lint errors found!' in pants_run.stdout_data)
+
+  def test_bad_pants_ini_strict_overridden(self):
+    # thrift-linter passes if pants.ini has a thrift-linter:strict=True setting and
+    # a command line non-strict flag is passed.
+    cmd = ['goal',
+           'thrift-linter',
+           'testprojects/src/thrift/com/pants/thrift_linter:bad-thrift-default',
+           '--no-thrift-linter-strict']
+    pants_ini_config = {'thrift-linter': {'strict': True}}
+    pants_run = self.run_pants(cmd, config = pants_ini_config)
+    self.assertSuccess(pants_run)
+    self.assertTrue('Lint errors found!' in pants_run.stdout_data)
+
   def test_gen_depends_on_thrift_linter(self):
     # thrift-linter is a dependency of gen goal.
     cmd = ['goal',
