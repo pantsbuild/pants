@@ -162,13 +162,19 @@ class SourceRoot(object):
 
   It is illegal to have nested source roots.
   """
+
+  @classmethod
+  def factory(cls, parse_context):
+    """Creates a ``SourceRoot`` valid for the given ``ParseContext``."""
+    return cls(parse_context.rel_path)
+
   _ROOTS_BY_TYPE = {}
   _TYPES_BY_ROOT = {}
   _SEARCHED = set()
   _SOURCE_ROOT_TREE = SourceRootTree()
 
-  def __init__(self, parse_context):
-    self.rel_path = parse_context.rel_path
+  def __init__(self, rel_path):
+    self.rel_path = rel_path
 
   def __call__(self, basedir, *allowed_target_types):
     allowed_target_types = [proxy._addressable_type.get_target_type()

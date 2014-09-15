@@ -72,16 +72,12 @@ class SourceRootTest(unittest.TestCase):
     self._assert_source_root_empty()
 
   def test_here(self):
-
-    class MockParseContext(object):
-      def __init__(self):
-        self.rel_path = "mock/foo"
     target = TestTarget("//mock/foo/bar:baz")
     proxy = AddressableCallProxy(addressable_type=target.get_addressable_type(),
                                  build_file=None,
                                  registration_callback=None)
     self.assertEqual("mock/foo/bar", SourceRoot.find(target))
-    SourceRoot(MockParseContext()).here(proxy)
+    SourceRoot("mock/foo").here(proxy)
     self.assertEqual("mock/foo", SourceRoot.find(target))
 
   def test_find(self):
