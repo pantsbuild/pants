@@ -169,10 +169,16 @@ class Target(AbstractTarget):
 
   def __init__(self, name, address, build_graph, payload=None, exclusives=None):
     """
-    :param string name: The target name.
+    :param string name: The name of this target, which combined with this
+       build file defines the target address.
+    :param dependencies: Other targets that this target depends on.
+    :type dependencies: list of target specs
     :param Address address: The Address that maps to this Target in the BuildGraph
     :param BuildGraph build_graph: The BuildGraph that this Target lives within
+    :param exclusives: An optional map of exclusives tags.
+      See :ref:`howto_check_exclusives` for details.
     """
+    # dependencies is listed above; implementation hides in TargetAddressable
     self.name = name
     self.address = address
     self.payload = payload or EmptyPayload()

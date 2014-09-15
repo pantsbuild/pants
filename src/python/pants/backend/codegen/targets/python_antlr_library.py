@@ -15,18 +15,11 @@ class PythonAntlrLibrary(PythonTarget):
 
   def __init__(self, module=None, antlr_version='3.1.3', *args, **kwargs):
     """
-    :param name: Name of library
     :param module: everything beneath module is relative to this module name, None if root namespace
     :param antlr_version:
-    :param sources: Source code files to compile. Paths are relative to the
-      BUILD file's directory.
-    :type sources: ``Fileset`` or list of strings
     :param resources: non-Python resources, e.g. templates, keys, other data (it is
         recommended that your application uses the pkgutil package to access these
         resources in a .zip-module friendly way.)
-    :param dependencies: Other targets that this target depends on.
-    :type dependencies: list of target specs
-    :param dict exclusives: An optional dict of exclusives tags. See :ref:`howto_check_exclusives` for details.
     """
 
     super(PythonAntlrLibrary, self).__init__(*args, **kwargs)

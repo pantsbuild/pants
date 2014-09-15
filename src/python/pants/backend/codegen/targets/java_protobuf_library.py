@@ -25,22 +25,10 @@ class JavaProtobufLibrary(ExportableJvmLibrary):
 
   def __init__(self, buildflags=None, imports=None, **kwargs):
     """
-    :param string name: The name of this target, which combined with this
-      build file defines the :doc:`target address <target_addresses>`.
-    :param sources: Source code files to compile. Paths are relative to the
-      BUILD file's directory.
-    :type sources: ``Fileset`` or list of strings
-    :param provides: The ``artifact``
-      to publish that represents this target outside the repo.
-    :param dependencies: Other targets that this target depends on.
-    :type dependencies: list of target specs
-    :param excludes: List of :ref:`exclude <bdict_exclude>`\s
-      to filter this target's transitive dependencies against.
     :param buildflags: Unused, and will be removed in a future release.
     :param imports: List of external :class:`pants.backend.jvm.targets.jar_dependency.JarDependency`
       objects and addresses of :class:`pants.backend.jvm.targets.jar_library.JarLibrary` targets
       which contain .proto definitions.
-    :param exclusives: An optional map of exclusives tags. See :ref:`howto_check_exclusives` for details.
     """
     super(JavaProtobufLibrary, self).__init__(**kwargs)
     self.add_labels('codegen')

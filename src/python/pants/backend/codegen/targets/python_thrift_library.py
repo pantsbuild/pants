@@ -13,7 +13,6 @@ class PythonThriftLibrary(PythonTarget):
 
   def __init__(self, **kwargs):
     """
-    :param name: Name of library
     :param sources: thrift source files (If more than one tries to use the same
       namespace, beware https://issues.apache.org/jira/browse/THRIFT-515)
     :type sources: ``Fileset`` or list of strings. Paths are relative to the
@@ -21,9 +20,6 @@ class PythonThriftLibrary(PythonTarget):
     :param resources: non-Python resources, e.g. templates, keys, other data (it is
       recommended that your application uses the pkgutil package to access these
       resources in a .zip-module friendly way.)
-    :param dependencies: Other targets that this target depends on.
-    :type dependencies: list of target specs
-    :param dict exclusives: An optional dict of exclusives tags. See :ref:`howto_check_exclusives` for details.
     """
 
     super(PythonThriftLibrary, self).__init__(**kwargs)

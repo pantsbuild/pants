@@ -222,6 +222,8 @@ class JvmBinary(JvmTarget):
       ``'hello'``. (By default, uses ``name`` param)
     :param string source: Name of one ``.java`` or ``.scala`` file (a good
       place for a ``main``).
+    :param sources: Overridden by source. If you want more than one source
+      file, use a library and have the jvm_binary depend on that library.
     :param resources: List of ``resource``\s to include in bundle.
     :param dependencies: Targets (probably ``java_library`` and
      ``scala_library`` targets) to "link" in.
