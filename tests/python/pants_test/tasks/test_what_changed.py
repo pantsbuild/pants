@@ -33,7 +33,7 @@ class BaseWhatChangedTest(ConsoleTaskTest):
         'python_thrift_library': PythonThriftLibrary,
       },
       context_aware_object_factories={
-        'source_root': SourceRoot,
+        'source_root': SourceRoot.factory,
       },
       objects={
         'jar': JarDependency,
