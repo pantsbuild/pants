@@ -13,7 +13,7 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 from pants_test.tasks.test_base import is_exe
 
 def shared_artifacts(version):
-  return {'com/pants/examples/hello-greet/{0}/'.format(version):
+  return {'com/pants/testproject/publish/hello-greet/{0}/'.format(version):
           ['ivy-{0}.xml'.format(version),
             'hello-greet-{0}.jar'.format(version),
             'hello-greet-{0}.pom'.format(version),
@@ -27,17 +27,17 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
   @pytest.mark.skipif('not JarPublishIntegrationTest.SCALADOC',
                       reason='No scaladoc binary on the PATH.')
   def test_scala_publish(self):
-    unique_artifacts = {'com/pants/example/jvm-example-lib/0.0.1-SNAPSHOT':
+    unique_artifacts = {'com/pants/testproject/publish/jvm-example-lib/0.0.1-SNAPSHOT':
                         ['ivy-0.0.1-SNAPSHOT.xml',
                          'jvm-example-lib-0.0.1-SNAPSHOT.jar',
                          'jvm-example-lib-0.0.1-SNAPSHOT.pom',
                          'jvm-example-lib-0.0.1-SNAPSHOT-sources.jar'],
-                        'com/pants/example/hello/welcome/0.0.1-SNAPSHOT':
+                        'com/pants/testproject/publish/hello/welcome/0.0.1-SNAPSHOT':
                         ['ivy-0.0.1-SNAPSHOT.xml',
                          'welcome-0.0.1-SNAPSHOT.jar',
                          'welcome-0.0.1-SNAPSHOT.pom',
                          'welcome-0.0.1-SNAPSHOT-sources.jar'],}
-    self.publish_test('examples/src/scala/com/pants/example:jvm-run-example-lib',
+    self.publish_test('testprojects/src/scala/com/pants/testproject/publish:jvm-run-example-lib',
                       dict(unique_artifacts.items() + shared_artifacts('0.0.1-SNAPSHOT').items()),
                       extra_options=['--doc-scaladoc-skip'],
                       expected_primary_artifact_count=3)
@@ -45,12 +45,12 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
   @pytest.mark.skipif('not JarPublishIntegrationTest.JAVADOC',
                       reason='No javadoc binary on the PATH.')
   def test_java_publish(self):
-    self.publish_test('examples/src/java/com/pants/examples/hello/greet',
+    self.publish_test('testprojects/src/java/com/pants/testproject/publish/hello/greet',
                       shared_artifacts('0.0.1-SNAPSHOT'),)
 
   def test_named_snapshot(self):
     name = "abcdef0123456789"
-    self.publish_test('examples/src/java/com/pants/examples/hello/greet',
+    self.publish_test('testprojects/src/java/com/pants/testproject/publish/hello/greet',
                       shared_artifacts(name),
                       extra_options=['--publish-named-snapshot=%s' % name])
 
