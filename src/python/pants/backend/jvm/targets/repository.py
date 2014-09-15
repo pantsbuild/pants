@@ -5,6 +5,8 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+import os
+
 from pants.base.payload import EmptyPayload
 from pants.base.target import Target
 
@@ -12,17 +14,21 @@ from pants.base.target import Target
 class Repository(Target):
   """An artifact repository, such as a maven repo."""
 
-  def __init__(self, url=None, push_db=None, **kwargs):
+  def __init__(self, url=None, push_db_basedir=None, **kwargs):
     """
     :param string name: Name of the repository.
     :param string url: Optional URL of the repository.
-    :param string push_db: Path of the push history file.
+    :param string push_db_basedir: Push history file base directory.
     """
 
     super(Repository, self).__init__(payload=EmptyPayload(), **kwargs)
 
     self.url = url
-    self.push_db = push_db
+    self.push_db_basedir = push_db_basedir
+
+  def push_db(self, target):
+    return os.path.join(self.push_db_basedir, target.provides.org,
+                        target.provides.name, 'publish.properties')
 
   def __eq__(self, other):
     result = other and (
@@ -37,4 +43,4 @@ class Repository(Target):
     return not self.__eq__(other)
 
   def __repr__(self):
-    return "%s -> %s (%s)" % (self.name, self.url, self.push_db)
+    return "%s -> %s (%s)" % (self.name, self.url, self.push_db_basedir)

@@ -36,7 +36,7 @@ class PythonTargetTest(BaseTest):
     self.make_target(spec=':internal',
                      target_type=Repository,
                      url=None,
-                     push_db=None,
+                     push_db_basedir=None,
                      exclusives=None)
     # Adding a JVM Artifact as a provides on a PythonTarget doesn't make a lot of sense.
     # This test sets up that very scenario, and verifies that pants throws a
