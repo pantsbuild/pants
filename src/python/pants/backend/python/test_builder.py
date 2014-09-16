@@ -275,6 +275,7 @@ class PythonTestBuilder(object):
   @contextmanager
   def _test_runner(self, targets, stdout, stderr):
     builder = PEXBuilder(interpreter=self._interpreter)
+    builder.info.entry_point = 'pytest'
     # Cleans itself up via __del__ when the with scope is exited
     chroot = PythonChroot(
       targets=targets,
@@ -303,16 +304,15 @@ class PythonTestBuilder(object):
       return PythonTestResult.rc(0)
 
     with self._test_runner(targets, stdout, stderr) as (pex, test_args):
-      with environment_as(PEX_MODULE='pytest'):
-        args = ['-s'] if self._debug else []
-        args.extend(test_args)
-        args.extend(self._args)
-        args.extend(sources)
+      args = ['-s'] if self._debug else []
+      args.extend(test_args)
+      args.extend(self._args)
+      args.extend(sources)
 
-        try:
-          rc = pex.run(args=args, setsid=True, stdout=stdout, stderr=stderr)
-          return PythonTestResult.rc(rc)
-        except Exception:
-          print('Failed to run test!', file=stderr)
-          traceback.print_exc()
-          return PythonTestResult.exception()
+      try:
+        rc = pex.run(args=args, setsid=True, stdout=stdout, stderr=stderr)
+        return PythonTestResult.rc(rc)
+      except Exception:
+        print('Failed to run test!', file=stderr)
+        traceback.print_exc()
+        return PythonTestResult.exception()
