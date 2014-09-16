@@ -54,7 +54,7 @@ class ListTargetsTest(BaseListTargetsTest):
         repo(
           name='public',
           url='http://maven.twttr.com',
-          push_db='/tmp/publish.properties'
+          push_db_basedir='/tmp'
         )
         ''').strip()
     self.add_to_build_file('repos', repo_target)
@@ -158,11 +158,11 @@ class ListTargetsTest(BaseListTargetsTest):
 
   def test_list_provides_customcols(self):
     self.assert_console_output(
-        '/tmp/publish.properties a/b:b http://maven.twttr.com public com.twitter#b',
-        '/tmp/publish.properties a/b/c:c2 http://maven.twttr.com public com.twitter#c2',
+        '/tmp a/b:b http://maven.twttr.com public com.twitter#b',
+        '/tmp a/b/c:c2 http://maven.twttr.com public com.twitter#c2',
         args=[
             '--test-provides',
-            '--test-provides-columns=repo_db,address,repo_url,repo_name,artifact_id'
+            '--test-provides-columns=push_db_basedir,address,repo_url,repo_name,artifact_id'
         ])
 
   def test_list_dedups(self):

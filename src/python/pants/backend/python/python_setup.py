@@ -26,6 +26,11 @@ class PythonSetup(object):
         'cache_root',
         default=os.path.join(self._config.getdefault('pants_workdir'), 'python'))
 
+  @property
+  def interpreter_requirement(self):
+    """Returns the repo-wide interpreter requirement."""
+    return self._config.get(self._section, 'interpreter_requirement')
+
   def scratch_dir(self, key, default_name=None):
     """Returns a named scratch dir.
 

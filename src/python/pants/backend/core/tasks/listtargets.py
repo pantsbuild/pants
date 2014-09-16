@@ -60,7 +60,7 @@ class ListTargets(ConsoleTask):
           artifact_id=extract_artifact_id,
           repo_name=lambda target: target.provides.repo.name,
           repo_url=lambda target: target.provides.repo.url,
-          repo_db=lambda target: target.provides.repo.push_db,
+          push_db_basedir=lambda target: target.provides.repo.push_db_basedir,
       )
 
       def print_provides(column_extractors, target):

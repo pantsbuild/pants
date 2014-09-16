@@ -41,11 +41,13 @@ class CheckPublishedDepsTest(ConsoleTaskTest):
   def setUp(self):
     super(CheckPublishedDepsTest, self).setUp()
 
-    self.create_file('repo/pushdb/publish.properties', dedent('''
+    self.create_file('repo/org.name/lib1/publish.properties', dedent('''
         revision.major.org.name%lib1=2
         revision.minor.org.name%lib1=0
         revision.patch.org.name%lib1=0
         revision.sha.org.name%lib1=12345
+        '''))
+    self.create_file('repo/org.name/lib2/publish.properties', dedent('''
         revision.major.org.name%lib2=2
         revision.minor.org.name%lib2=0
         revision.patch.org.name%lib2=0
@@ -55,7 +57,7 @@ class CheckPublishedDepsTest(ConsoleTaskTest):
         import os
         repo(name='repo',
              url='http://www.www.com',
-             push_db=os.path.join(os.path.dirname(__file__), 'pushdb', 'publish.properties'))
+             push_db_basedir=os.path.dirname(__file__))
         '''))
 
     self.add_to_build_file('provider/BUILD', dedent('''

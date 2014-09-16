@@ -83,6 +83,13 @@ class BundleCreate(JvmBinaryTask):
     """
     assert(isinstance(app, BundleCreate.App))
 
+    def verbose_symlink(src, dst):
+      try:
+        os.symlink(src, dst)
+      except OSError as e:
+        self.context.log.error("Unable to create symlink: {0} -> {1}".format(src, dst))
+        raise e
+
     bundle_dir = os.path.join(self._outdir, '%s-bundle' % app.basename)
     self.context.log.info('creating %s' % os.path.relpath(bundle_dir, get_buildroot()))
 
@@ -103,7 +110,7 @@ class BundleCreate(JvmBinaryTask):
         if generated:
           for base_dir, internal_jars in generated.items():
             for internal_jar in internal_jars:
-              os.symlink(os.path.join(base_dir, internal_jar), os.path.join(lib_dir, internal_jar))
+              verbose_symlink(os.path.join(base_dir, internal_jar), os.path.join(lib_dir, internal_jar))
               classpath.add(internal_jar)
 
       app.binary.walk(add_jars, lambda t: t != app.binary)
@@ -111,7 +118,7 @@ class BundleCreate(JvmBinaryTask):
       # Add external dependencies to the bundle.
       for basedir, external_jar in self.list_external_jar_dependencies(app.binary):
         path = os.path.join(basedir, external_jar)
-        os.symlink(path, os.path.join(lib_dir, external_jar))
+        verbose_symlink(path, os.path.join(lib_dir, external_jar))
         classpath.add(external_jar)
 
     bundle_jar = os.path.join(bundle_dir, '%s.jar' % app.binary.basename)
@@ -126,6 +133,6 @@ class BundleCreate(JvmBinaryTask):
       for path, relpath in bundle.filemap.items():
         bundle_path = os.path.join(bundle_dir, relpath)
         safe_mkdir(os.path.dirname(bundle_path))
-        os.symlink(path, bundle_path)
+        verbose_symlink(path, bundle_path)
 
     return bundle_dir

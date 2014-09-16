@@ -42,7 +42,7 @@ class CheckPublishedDeps(ConsoleTask):
     push_dbs = {}
 
     def get_version_and_sha(target):
-      db = target.provides.repo.push_db
+      db = target.provides.repo.push_db(target)
       if db not in push_dbs:
         push_dbs[db] = PushDb.load(db)
       pushdb_entry = push_dbs[db].get_entry(target)
