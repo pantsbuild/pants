@@ -235,9 +235,6 @@ class PythonTestBuilder(object):
     elif coverage.startswith('paths:'):
       coverage_modules = []
       for path in read_coverage_list('paths:'):
-        if os.path.isfile(path):
-          raise ValueError('Coverage paths cannot be files, they can only be dirs. '
-                           'Given file {0}'.format(path))
         if not os.path.exists(path) and not os.path.isabs(path):
           # Look for the source in the PEX chroot since its not available from CWD.
           path = os.path.join(chroot, path)
