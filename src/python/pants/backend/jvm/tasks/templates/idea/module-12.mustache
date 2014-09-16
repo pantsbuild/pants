@@ -55,10 +55,13 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
       <excludeFolder url="file://$MODULE_DIR$/internal-libsources" />
       # TODO(Garrett Malmquist): Do this in a generic way, rather than hard-coding particular
       # directories.
-      <excludeFolder url="file://${module.root_dir}/.pants.d/compile" />
-      <excludeFolder url="file://${module.root_dir}/.pants.d/ivy" />
-      <excludeFolder url="file://${module.root_dir}/.pants.d/python" />
-      <excludeFolder url="file://${module.root_dir}/.pants.d/resources" />
+      <excludeFolder url="file://{{module.root_dir}}/.pants.d/compile" />
+      <excludeFolder url="file://{{module.root_dir}}/.pants.d/ivy" />
+      <excludeFolder url="file://{{module.root_dir}}/.pants.d/python" />
+      <excludeFolder url="file://{{module.root_dir}}/.pants.d/resources" />
+    {{#module.exclude_folders}}
+      <excludeFolder url="file://{{module.root_dir}}/{{.}}" />
+    {{/module.exclude_folders}}
     </content>
 
     <orderEntry type="inheritedJdk"/>

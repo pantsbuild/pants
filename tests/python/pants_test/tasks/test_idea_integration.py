@@ -59,15 +59,21 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
       if check_func:
         check_func(workdir)
 
-  def _get_sourceFolders(self, dom):
-    """Navigate the dom to return the list of all <sourceFolder> entries in the project file"""
+  def _get_new_module_root_manager(self, dom):
     module = dom.getElementsByTagName('module')[0]
     components = module.getElementsByTagName('component')
     for component in components:
       if component.getAttribute('name') == 'NewModuleRootManager':
-        content = module.getElementsByTagName('content')[0]
-        return content.getElementsByTagName('sourceFolder')
-    return []
+        return module.getElementsByTagName('content')[0]
+    return None
+
+  def _get_sourceFolders(self, dom):
+    """Navigate the dom to return the list of all <sourceFolder> entries in the project file"""
+    return self._get_new_module_root_manager(dom).getElementsByTagName('sourceFolder')
+
+  def _get_excludeFolders(self, dom):
+    """Navigate the dom to return the list of all <excludeFolder> entries in the project file"""
+    return self._get_new_module_root_manager(dom).getElementsByTagName('excludeFolder')
 
   # Testing IDEA integration on lots of different targets which require different functionalities to
   # make sure that everything that needs to happen for idea gen does happen.
@@ -93,7 +99,7 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
   def test_idea_on_hello(self):
     def do_check(path):
       """Check to see that the project contains the expected source folders."""
-      foundSourceContent = False
+      found_source_content = False
       iml_file = os.path.join(path, 'project.iml')
       self.assertTrue(os.path.exists(iml_file))
       dom = minidom.parse(iml_file)
@@ -105,14 +111,14 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
       ]]
       remaining = set(expected_paths)
       for sourceFolder in self._get_sourceFolders(dom):
-        foundSourceContent = True
+        found_source_content = True
         self.assertEquals("False", sourceFolder.getAttribute('isTestSource'))
         url = sourceFolder.getAttribute('url')
         self.assertIn(url, remaining,
                        msg="Couldn't find url={url} in {expected}".format(url=url,
                                                                           expected=expected_paths))
         remaining.remove(url)
-      self.assertTrue(foundSourceContent)
+      self.assertTrue(found_source_content)
 
     self._idea_test(['examples/src/java/com/pants/examples/hello::'], check_func=do_check)
 
@@ -141,12 +147,12 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
           <sourceFolder url=".../src/test/resources"  isTestSource="True"/>
           ...
       """
-      foundSourceContent = False
+      found_source_content = False
       iml_file = os.path.join(path, 'project.iml')
       self.assertTrue(os.path.exists(iml_file))
       dom = minidom.parse(iml_file)
       for sourceFolder in  self._get_sourceFolders(dom):
-        foundSourceContent = True
+        found_source_content = True
         url = sourceFolder.getAttribute('url')
         is_test_source = sourceFolder.getAttribute('isTestSource')
         if url.endswith("src/main/java") or url.endswith("src/main/resources"):
@@ -160,10 +166,47 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
         else:
           self.fail("Unexpected sourceContent tag: url={url} isTestSource={is_test_source}"
           .format(url=url, is_test_source=is_test_source))
-      self.assertTrue(foundSourceContent)
+      self.assertTrue(found_source_content)
 
     self._idea_test(['testprojects/maven_layout/resource_collision::', '--idea-use-source-root',
                      '--idea-infer-test-from-siblings',],
                     check_func=do_check)
 
+  def test_idea_exclude_maven_targets(self):
+    def do_check(path):
+      """Expect to see at least these two excludeFolder entries:
 
+       <excludeFolder url="file://.../testprojects/maven_layout/protolib-test/target" />
+       <excludeFolder url="file://.../testprojects/maven_layout/maven_and_pants/target" />
+
+       And this source entry:
+       <sourceFolder url="file://.../testprojects/maven_layout/maven_and_pants/src/main/java"
+         isTestSource="False" />
+      """
+      found_source_content = False
+      iml_file = os.path.join(path, 'project.iml')
+      self.assertTrue(os.path.exists(iml_file))
+      dom = minidom.parse(iml_file)
+      for sourceFolder in  self._get_sourceFolders(dom):
+        found_source_content = True
+        url = sourceFolder.getAttribute('url')
+        self.assertTrue(url.endswith("testprojects/maven_layout/maven_and_pants/src/main/java"),
+                        msg="Unexpected url={url}".format(url=url))
+        self.assertEquals("False", sourceFolder.getAttribute('isTestSource'))
+      self.assertTrue(found_source_content)
+
+      expected = ["testprojects/maven_layout/protolib-test/target",
+                  "testprojects/maven_layout/maven_and_pants/target"]
+      found_exclude_folders = [excludeFolder.getAttribute('url') for excludeFolder in self._get_excludeFolders(dom)]
+      for suffix in expected:
+        found = False
+        for url in found_exclude_folders:
+          if url.endswith(suffix):
+            found = True
+            break
+        self.assertTrue(found, msg="suffix {suffix} not found in {foundExcludeFolders}"
+                        .format(suffix=suffix, foundExcludeFolders=found_exclude_folders))
+    # Test together with --idea-use-source-root because that makes sense in a Maven environment
+    self._idea_test(['testprojects/maven_layout/maven_and_pants::', '--idea-exclude-maven-target',
+                     '--idea-use-source-root',],
+                    check_func=do_check)
