@@ -16,11 +16,12 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 class IdeaIntegrationTest(PantsRunIntegrationTest):
 
   def _idea_test(self, specs, project_dir=os.path.join('.pants.d', 'idea', 'idea', 'IdeaGen'),
-      project_name=None, check_func=None):
+      project_name=None, check_func=None, config=None):
     """Helper method that tests idea generation on the input spec list.
     :param project_dir: directory passed to --idea-project-dir
     :param project_name: name passed to --idea-project-name
     :param check_func: method to call back with the directory where project files are written.
+    :param dict config: pants.ini configuration parameters
     """
 
     project_dir = os.path.join(get_buildroot(), project_dir)
@@ -38,7 +39,7 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
 
       all_flags = ['goal', 'idea',] + specs + \
                   ['--no-pantsrc', '--no-idea-open', '--print-exception-stacktrace' ] + extra_flags
-      pants_run = self.run_pants(all_flags)
+      pants_run = self.run_pants(all_flags, config=config)
       self.assertEquals(pants_run.returncode, self.PANTS_SUCCESS_CODE,
                         "goal idea expected success, got {0}\n"
                         "got stderr:\n{1}\n"
@@ -197,7 +198,8 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
 
       expected = ["testprojects/maven_layout/protolib-test/target",
                   "testprojects/maven_layout/maven_and_pants/target"]
-      found_exclude_folders = [excludeFolder.getAttribute('url') for excludeFolder in self._get_excludeFolders(dom)]
+      found_exclude_folders = [excludeFolder.getAttribute('url')
+                               for excludeFolder in self._get_excludeFolders(dom)]
       for suffix in expected:
         found = False
         for url in found_exclude_folders:
@@ -210,3 +212,29 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
     self._idea_test(['testprojects/maven_layout/maven_and_pants::', '--idea-exclude-maven-target',
                      '--idea-use-source-root',],
                     check_func=do_check)
+
+  def test_idea_excludeFolders(self):
+    def assertExpectedInExcludeFolders(path, expected):
+      iml_file = os.path.join(path, 'project.iml')
+      self.assertTrue(os.path.exists(iml_file))
+      dom = minidom.parse(iml_file)
+      found_exclude_folders = [excludeFolder.getAttribute('url')
+                               for excludeFolder in self._get_excludeFolders(dom)]
+      for suffix in expected:
+        found = False
+      for url in found_exclude_folders:
+        if url.endswith(suffix):
+          found = True
+          break
+      self.assertTrue(found, msg="suffix {suffix} not found in {foundExcludeFolders}"
+                      .format(suffix=suffix, foundExcludeFolders=found_exclude_folders))
+    def do_check_default(path):
+      assertExpectedInExcludeFolders(path, ["/compile", "/ivy",  "/python", "/resources"])
+    def do_check_override(path):
+      assertExpectedInExcludeFolders(path, ["exclude-folder-sentinel"])
+
+    self._idea_test(['examples/src/java/com/pants/examples/hello::'], check_func=do_check_default)
+    self._idea_test(['examples/src/java/com/pants/examples/hello::'], check_func=do_check_override,
+                    config= {
+                      'idea': {'exclude_folders': ['exclude-folder-sentinel']}
+                    })
