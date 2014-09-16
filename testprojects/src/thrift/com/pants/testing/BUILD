@@ -17,4 +17,3 @@ python_thrift_library(
   name = 'goose-py',
   sources = ['goose.thrift'],
 )
-
