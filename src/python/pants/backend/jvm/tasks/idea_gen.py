@@ -92,7 +92,7 @@ class IdeaGen(IdeGen):
     option_group.add_option(mkflag("fsc"), mkflag("fsc", negate=True), default=False,
                             action="callback", callback=mkflag.set_bool, dest="idea_gen_fsc",
                             help="If the project contains any scala targets this specifies the "
-                                   "fsc compiler should be enabled.")
+                                 "fsc compiler should be enabled.")
 
     option_group.add_option(mkflag("java-encoding"), default="UTF-8",
                             dest="idea_gen_java_encoding",
@@ -101,6 +101,15 @@ class IdeaGen(IdeGen):
     option_group.add_option(mkflag("java-maximum-heap-size"),
                             dest="idea_gen_java_maximum_heap_size",
                             help="[%default] Sets the maximum heap size (in megabytes) for javac.")
+
+    option_group.add_option(mkflag("exclude-maven-target"),
+                            mkflag("exclude-maven-target", negate=True), default=False,
+                            action="callback", callback=mkflag.set_bool,
+                            dest="idea_exclude_maven_target",
+                            help="Exclude 'target' directories for directories containing "
+                                 "pom.xml files.  These directories contain generated code and"
+                                 "copies of files staged for deployment.")
+
 
   def __init__(self, *args, **kwargs):
     super(IdeaGen, self).__init__(*args, **kwargs)
@@ -130,6 +139,14 @@ class IdeaGen(IdeGen):
 
     self.project_filename = os.path.join(self.cwd, '%s.ipr' % self.project_name)
     self.module_filename = os.path.join(self.gen_project_workdir, '%s.iml' % self.project_name)
+
+  @staticmethod
+  def _maven_targets_excludes(repo_root):
+    excludes = []
+    for (dirpath, dirnames, filenames) in os.walk(repo_root):
+      if "pom.xml" in filenames:
+        excludes.append(os.path.join(os.path.relpath(dirpath, start=repo_root), "target"))
+    return excludes
 
   @staticmethod
   def _sibling_is_test(source_set):
@@ -192,6 +209,10 @@ class IdeaGen(IdeGen):
         compiler_classpath=project.scala_compiler_classpath
       )
 
+    exclude_folders = []
+    if self.context.options.idea_exclude_maven_target:
+      exclude_folders += IdeaGen._maven_targets_excludes(get_buildroot())
+
     configured_module = TemplateData(
       root_dir=get_buildroot(),
       path=self.module_filename,
@@ -208,6 +229,7 @@ class IdeaGen(IdeGen):
       external_source_jars=[cp_entry.source_jar for cp_entry in project.external_jars
                             if cp_entry.source_jar],
       extra_components=[],
+      exclude_folders=exclude_folders,
     )
 
     outdir = os.path.abspath(self.intellij_output_dir)
