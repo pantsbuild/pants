@@ -22,7 +22,7 @@ class ThriftLinterTest(PantsRunIntegrationTest):
     pants_run = self.run_pants(cmd)
     self.assertSuccess(pants_run)
     self.assertFalse('Lint errors found!' in pants_run.stdout_data)
- 
+
   def test_bad_default(self):
     # thrift-linter fails on linter errors.
     cmd = ['goal',
