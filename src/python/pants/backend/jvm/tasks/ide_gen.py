@@ -19,6 +19,7 @@ from pants.backend.jvm.tasks.jvm_binary_task import JvmBinaryTask
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+from pants.base.source_root import SourceRoot
 from pants.base.target import Target
 from pants.goal.goal import Goal
 from pants.util.dirutil import safe_mkdir
@@ -90,6 +91,22 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
                             help="[%default] Includes scala sources in the project; otherwise "
                                  "compiles them and adds them to the project classpath.")
 
+    option_group.add_option(mkflag("use-source-root"), mkflag("use-source-root", negate=True),
+                            default=False, action="callback", callback=mkflag.set_bool,
+                            dest='ide_gen_use_source_root',
+                            help="[%default] Use source_root() settings to collapse source"
+                                 "paths in project and determine which paths are used for "
+                                 "tests.  This is usually what you want if your repo uses "
+                                 "a maven style directory layout.")
+    option_group.add_option(mkflag("infer-test-from-siblings"),
+                            mkflag("infer-test-from-siblings", negate=True),
+                            default=True, action="callback", callback=mkflag.set_bool,
+                            dest='ide_infer_test_from_siblings',
+                            help="[%default] When determining if a path should be added to the "
+                                 "IDE, check to see if any of its sibling source_root() entries "
+                                 "define test targets.  This is usually what you want so that "
+                                 "resource directories under test source roots are picked up as "
+                                 "test paths.")
 
   class Error(TaskError):
     """IdeGen Error."""
@@ -117,6 +134,7 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
     self.python = self.context.options.ide_gen_python
     self.skip_java = not self.context.options.ide_gen_java
     self.skip_scala = not self.context.options.ide_gen_scala
+    self.use_source_root = self.context.options.ide_gen_use_source_root
 
     self.java_language_level = self.context.options.ide_gen_java_language_level
     if self.context.options.ide_gen_java_jdk:
@@ -124,10 +142,15 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
     else:
       self.java_jdk = '1.%d' % self.java_language_level
 
-    self.gen_project_workdir = os.path.abspath(
-      self.context.options.ide_gen_project_dir or
-      os.path.join(self.workdir, self.__class__.__name__, self.project_name)
-    )
+    # Always tack on the project name to the work dir so each project gets its own linked jars,
+    # etc. See https://github.com/pantsbuild/pants/issues/564
+    if self.context.options.ide_gen_project_dir:
+      self.gen_project_workdir = os.path.abspath(
+        os.path.join(self.context.options.ide_gen_project_dir, self.project_name))
+    else:
+      self.gen_project_workdir = os.path.abspath(
+        os.path.join(self.workdir, self.__class__.__name__, self.project_name))
+
     self.cwd = (
       os.path.abspath(self.context.options.ide_gen_project_cwd) if
       self.context.options.ide_gen_project_cwd else self.gen_project_workdir
@@ -178,6 +201,7 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
                       self.python,
                       self.skip_java,
                       self.skip_scala,
+                      self.use_source_root,
                       get_buildroot(),
                       checkstyle_suppression_files,
                       debug_port,
@@ -368,14 +392,12 @@ class ClasspathEntry(object):
 class SourceSet(object):
   """Models a set of source files."""
 
-  TEST_BASES = set()
-
   def __init__(self, root_dir, source_base, path, is_test):
     """
-      root_dir: the full path to the root directory of the project containing this source set
-      source_base: the relative path from root_dir to the base of this source set
-      path: the relative path from the source_base to the base of the sources in this set
-      is_test: true iff the sources contained by this set implement test cases
+    :param string root_dir: full path to the root of the project containing this source set
+    :param string source_base: the relative path from root_dir to the base of this source set
+    :param string path: relative path from the source_base to the base of the sources in this set
+    :param bool is_test: true iff the sources contained by this set implement test cases
     """
 
     self.root_dir = root_dir
@@ -383,13 +405,10 @@ class SourceSet(object):
     self.path = path
     self.is_test = is_test
     self._excludes = []
-    if is_test:
-      SourceSet.TEST_BASES.add(self.source_base)
 
   @property
   def excludes(self):
     """Paths relative to self.path that are excluded from this source set."""
-
     return self._excludes
 
   @property
@@ -419,7 +438,31 @@ class Project(object):
         _, ext = os.path.splitext(resource)
         yield ext
 
-  def __init__(self, name, has_python, skip_java, skip_scala, root_dir,
+  @staticmethod
+  def _collapse_by_source_root(source_sets):
+    """Collapse SourceSets with common source roots into one SourceSet instance.
+
+    Use the registered source roots to collapse all source paths under a root.
+    If any test type of target is allowed under the root, the path is determined to be
+    a test path.  This method will give unpredictable results if source root entries overlap.
+
+    :param list source_sets: SourceSets to analyze
+    :returns: list of SourceSets collapsed to the source root paths.
+    """
+
+    roots_found = set()  # remember the roots we've already encountered
+    collapsed_source_sets = []
+    for source in source_sets:
+      query = os.path.join(source.source_base, source.path)
+      source_root = SourceRoot.find_by_path(query)
+      if not source_root:
+        collapsed_source_sets.append(source)
+      elif not source_root in roots_found:
+        roots_found.add(source_root)
+        collapsed_source_sets.append(SourceSet(source.root_dir, source_root, "", source.is_test))
+    return collapsed_source_sets
+
+  def __init__(self, name, has_python, skip_java, skip_scala, use_source_root, root_dir,
                checkstyle_suppression_files, debug_port, targets, transitive, workunit_factory,
                target_util):
     """Creates a new, unconfigured, Project based at root_dir and comprised of the sources visible
@@ -440,6 +483,7 @@ class Project(object):
     self.has_python = has_python
     self.skip_java = skip_java
     self.skip_scala = skip_scala
+    self.use_source_root = use_source_root
     self.has_scala = False
     self.has_tests = False
 
@@ -617,6 +661,8 @@ class Project(object):
     targets.update(analyzed - targets)
     self.sources.extend(SourceSet(get_buildroot(), p, None, False) for p in extra_source_paths)
     self.sources.extend(SourceSet(get_buildroot(), p, None, True) for p in extra_test_paths)
+    if self.use_source_root:
+      self.sources = Project._collapse_by_source_root(self.sources)
     self.sources = dedup_sources(self.sources)
 
     return targets

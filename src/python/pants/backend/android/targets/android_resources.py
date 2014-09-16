@@ -21,8 +21,6 @@ class AndroidResources(AndroidTarget):
     """
     :param string resource_dir: path/to/directory containing Android resource files,
      often named 'res'.
-    :param dependencies: Other targets that this target depends on.
-    :type dependencies: list of target specs
     """
     super(AndroidResources, self).__init__(**kwargs)
     address = kwargs['address']

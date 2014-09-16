@@ -24,11 +24,6 @@ class ScalaLibrary(ExportableJvmLibrary):
 
   def __init__(self, java_sources=None, **kwargs):
     """
-    :param string name: The name of this target, which combined with this
-      build file defines the :doc:`target address <target_addresses>`.
-    :param sources: Source code files to compile. Paths are relative to the
-      BUILD file's directory.
-    :type sources: ``Fileset`` or list of strings
     :param java_sources: Java libraries this library has a *circular*
       dependency on.
       If you don't have the particular problem of circular dependencies
@@ -36,16 +31,8 @@ class ScalaLibrary(ExportableJvmLibrary):
       don't use this at all.
       Prefer using ``dependencies`` to express non-circular dependencies.
     :type java_sources: target spec or list of target specs
-    :param provides: The ``artifact``
-      to publish that represents this target outside the repo.
-    :param dependencies: Other targets that this target depends on. If your
-       code ``import``\s code from other places, it depends on them.
-    :type dependencies: list of target specs
-    :param excludes: List of :ref:`exclude <bdict_exclude>`\s
-      to filter this target's transitive dependencies against.
     :param resources: An optional list of paths (DEPRECATED) or ``resources``
       targets containing resources that belong on this library's classpath.
-    :param exclusives: An optional list of exclusives tags.
     """
     self._java_sources_specs = self.assert_list(java_sources)
     super(ScalaLibrary, self).__init__(**kwargs)

@@ -158,7 +158,7 @@ class DependencyWriter(object):
     internal_codegen = {}
     configurations = set(confs or [])
     for dep in target_internal_dependencies(target):
-      jar = _as_versioned_jar(dep)
+      jar = self._as_versioned_jar(dep)
       dependencies[(jar.org, jar.name)] = self.internaldep(jar, dep)
       if dep.is_codegen:
         internal_codegen[jar.name] = jar.name
@@ -266,6 +266,10 @@ def coordinate(org, name, rev=None):
 
 def jar_coordinate(jar, rev=None):
   return coordinate(jar.org, jar.name, rev or jar.rev)
+
+
+def pushdb_coordinate(jar, entry):
+  return jar_coordinate(jar, rev=entry.version().version())
 
 
 def target_internal_dependencies(target):
@@ -570,7 +574,10 @@ class JarPublish(JarTask, ScmPublish):
 
       confs = set(repo['confs'])
       confs.add(IvyWriter.SOURCES_CONFIG)
-      if doc_jar:
+      # don't request docs unless they are available for all transitive targets
+      # TODO: doc products should be checked by an independent jar'ing task, and
+      # conditionally enabled; see https://github.com/pantsbuild/pants/issues/568
+      if doc_jar and self._java_doc(target) and self._scala_doc(target):
         confs.add(IvyWriter.JAVADOC_CONFIG)
       return stage_artifact(tgt, jar, version, changelog, confs)
 
@@ -615,12 +622,12 @@ class JarPublish(JarTask, ScmPublish):
       no_changes = newentry.fingerprint == oldentry.fingerprint
 
       if no_changes:
-        changelog = 'No changes for %s - forced push.\n' % jar_coordinate(jar, oldentry.version())
+        changelog = 'No changes for {0} - forced push.\n'.format(pushdb_coordinate(jar, oldentry))
       else:
         changelog = self.changelog(target, oldentry.sha) or 'Direct dependencies changed.\n'
 
       if no_changes and not self.force:
-        print('No changes for %s' % jar_coordinate(jar, oldentry.version()))
+        print('No changes for {0}'.format(pushdb_coordinate(jar, oldentry)))
         stage_artifacts(target, jar, (newentry.version() if self.force else oldentry.version()).version(), changelog)
       elif skip:
         print('Skipping %s to resume at %s' % (
@@ -649,7 +656,7 @@ class JarPublish(JarTask, ScmPublish):
         ivyxml = stage_artifacts(target, jar, newentry.version().version(), changelog)
 
         if self.dryrun:
-          print('Skipping publish of %s in test mode.' % jar_coordinate(jar, newentry.version()))
+          print('Skipping publish of {0} in test mode.'.format(pushdb_coordinate(jar, newentry)))
         else:
           resolver = repo['resolver']
           path = repo.get('path')
@@ -671,7 +678,7 @@ class JarPublish(JarTask, ScmPublish):
             try:
               ivy = Bootstrapper.default_ivy()
             except Bootstrapper.Error as e:
-              raise TaskError('Failed to push %s! %s' % (jar_coordinate(jar, newentry.version()), e))
+              raise TaskError('Failed to push {0}! {1}'.format(pushdb_coordinate(jar, newentry), e))
 
             ivysettings = self.generate_ivysettings(ivy, published, publish_local=path)
             args = [
@@ -695,7 +702,7 @@ class JarPublish(JarTask, ScmPublish):
               ivy.execute(jvm_options=jvm_args, args=args,
                           workunit_factory=self.context.new_workunit, workunit_name='jar-publish')
             except Ivy.Error as e:
-              raise TaskError('Failed to push %s! %s' % (jar_coordinate(jar, newentry.version()), e))
+              raise TaskError('Failed to push {0}! {1}'.format(pushdb_coordinate(jar, newentry), e))
 
           publish(ivyxml)
 
@@ -866,9 +873,16 @@ class JarPublish(JarTask, ScmPublish):
 
     return jar_path
 
+  def _java_doc(self, target):
+    return self.context.products.get('javadoc').get(target)
+
+  def _scala_doc(self, target):
+    return self.context.products.get('scaladoc').get(target)
+
   def create_doc_jar(self, target, open_jar, version):
-    javadoc = self.context.products.get('javadoc').get(target)
-    scaladoc = self.context.products.get('scaladoc').get(target)
+    """Returns a doc jar if either scala or java docs are available for the given target."""
+    javadoc = self._java_doc(target)
+    scaladoc = self._scala_doc(target)
     if javadoc or scaladoc:
       jar_path = self.artifact_path(open_jar, version, suffix='-javadoc')
       with self.open_jar(jar_path, overwrite=True, compressed=True) as open_jar:

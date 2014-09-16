@@ -81,11 +81,3 @@ How to develop Pants itself and contribute your changes.
    :maxdepth: 1
 
    dev
-
-
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`

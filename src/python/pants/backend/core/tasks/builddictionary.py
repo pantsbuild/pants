@@ -6,18 +6,23 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 from collections import defaultdict
+from pkg_resources import resource_string
 import inspect
 import optparse
 import os
+import re
 
-from pkg_resources import resource_string
+from twitter.common.collections.ordereddict import OrderedDict
+
 from pants.backend.core.tasks.task import Task
 from pants.base.build_manual import get_builddict_info
 from pants.base.exceptions import TaskError
 from pants.base.generator import Generator, TemplateData
+from pants.base.target import Target
 from pants.goal.option_helpers import add_global_options
 from pants.goal.goal import Goal
 from pants.util.dirutil import safe_open
+
 
 
 def indent_docstring_by_n(s, n=1):
@@ -114,31 +119,134 @@ def entry_for_one_method(nom, method):
                indent=2)
 
 
+# regex for docstring lines of the forms
+# :param foo: blah blah blah
+# :param string foo: blah blah blah
+param_re = re.compile(r':param (?P<type>[A-Za-z0-9_]* )?(?P<param>[^:]*):(?P<desc>.*)')
+
+
+# regex for docstring lines of the form
+# :type foo: list of strings
+type_re = re.compile(r':type (?P<param>[^:]*):(?P<type>.*)')
+
+
+def shard_param_docstring(s):
+  """Shard a Target class' sphinx-flavored __init__ docstring by param
+
+  E.g., if the docstring is
+
+  :param float x: x coordinate
+     blah blah blah
+  :param y: y coordinate
+  :type y: float
+
+  should return
+  OrderedDict(
+    'x' : {'type': 'float', 'param': 'x coordinate\n   blah blah blah'},
+    'y' : {'type': 'float', 'param': 'y coordinate'},
+  )
+  """
+
+  # state: what I'm "recording" right now. Needed for multi-line fields.
+  # ('x', 'param') : recording contents of a :param x: blah blah blah
+  # ('x', 'type') : recording contents of a :type x: blah blah blah
+  # ('!forget', '!') not recording useful things; purged before returning
+  state = ('!forget', '!')
+
+  # shards: return value
+  shards = OrderedDict([('!forget', {'!': ''})])
+
+  s = s or ''
+  for line in s.splitlines():
+    # If this line is indented, keep "recording" whatever we're recording:
+    if line and line[0].isspace():
+      param, type_or_desc = state
+      shards[param][type_or_desc] += '\n' + line
+    else:  # line not indented, starting something new
+      # if a :param foo: line...
+      if param_re.match(line):
+        param_m = param_re.match(line)
+        param_name = param_m.group('param')
+        state = (param_name, 'param')
+        if not param_name in shards:
+          shards[param_name] = {}
+        if param_m.group('type'):
+          shards[param_name]['type'] = param_m.group('type')
+        shards[param_name]['param'] = param_m.group('desc')
+      # if a :type foo: line...
+      elif type_re.match(line):
+        type_m = type_re.match(line)
+        param_name = type_m.group('param')
+        state = (param_name, 'type')
+        if not param_name in shards:
+          shards[param_name] = {}
+        shards[param_name]['type'] = type_m.group('type')
+      # else, nothing that we want to "record"
+      else:
+        state = ('!forget', '!')
+  del shards['!forget']
+  return shards
+
+
 def entry_for_one_class(nom, cls):
   """  Generate a BUILD dictionary entry for a class.
   nom: name like 'python_binary'
   cls: class like pants.python_binary"""
-  try:
+
+  if issubclass(cls, Target):
+    # special case for Target classes: "inherit" information up the class tree.
+
+    args_accumulator = []
+    defaults_accumulator = ()
+    docs_accumulator = []
+    for c in inspect.getmro(cls):
+      if not issubclass(c, Target): continue
+      if not inspect.ismethod(c.__init__): continue
+      args, _, _, defaults = inspect.getargspec(c.__init__)
+      args_accumulator = args[1:] + args_accumulator
+      defaults_accumulator = (defaults or ()) + defaults_accumulator
+      dedented_doc = indent_docstring_by_n(c.__init__.__doc__, 0)
+      docs_accumulator.append(shard_param_docstring(dedented_doc))
+    # Suppress these from BUILD dictionary: they're legit args to the
+    # Target implementation, but they're not for BUILD files:
+    assert(args_accumulator[1] == 'address')
+    assert(args_accumulator[2] == 'build_graph')
+    assert(args_accumulator[3] == 'payload')
+    args_accumulator = [args_accumulator[0]] + args_accumulator[4:]
+    defaults_accumulator = (defaults_accumulator[0],) + defaults_accumulator[4:]
+    argspec = inspect.formatargspec(args_accumulator,
+                                    None,
+                                    None,
+                                    defaults_accumulator)
+    # Suppress these from BUILD dictionary: they're legit args to the
+    # Target implementation, but they're not for BUILD files:
+    suppress = set(['address', 'build_graph', 'payload'])
+    funcdoc = ''
+    for shard in docs_accumulator:
+      for param, parts in shard.items():
+        if param in suppress:
+          continue
+        suppress.add(param)  # only show things once
+        if 'param' in parts:
+          funcdoc += '\n:param {0}: {1}'.format(param, parts['param'])
+        if 'type' in parts:
+          funcdoc += '\n:type {0}: {1}'.format(param, parts['type'])
+  else:
     args, varargs, varkw, defaults = inspect.getargspec(cls.__init__)
     argspec = inspect.formatargspec(args[1:], varargs, varkw, defaults)
     funcdoc = cls.__init__.__doc__
 
-    methods = []
-    for attrname in dir(cls):
-      attr = getattr(cls, attrname)
-      attr_bdi = get_builddict_info(attr)
-      if attr_bdi is None: continue
-      if inspect.ismethod(attr):
-        methods.append(entry_for_one_method(attrname, attr))
-        continue
-      raise TaskError('@manual.builddict on non-method %s within class %s '
-                      'but I only know what to do with methods' %
-                      (attrname, nom))
-
-  except TypeError:  # __init__ might not be a Python function
-    argspec = None
-    funcdoc = None
-    methods = None
+  methods = []
+  for attrname in dir(cls):
+    attr = getattr(cls, attrname)
+    attr_bdi = get_builddict_info(attr)
+    if attr_bdi is None: continue
+    if inspect.ismethod(attr):
+      methods.append(entry_for_one_method(attrname, attr))
+      continue
+    raise TaskError('@manual.builddict on non-method %s within class %s '
+                    'but I only know what to do with methods' %
+                    (attrname, nom))
 
   return entry(nom,
                classdoc=cls.__doc__,

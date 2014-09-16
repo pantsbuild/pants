@@ -7,14 +7,10 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.jvm_compile.jvm_fingerprint_strategy import JvmFingerprintStrategy
-
 from pants_test.base_test import BaseTest
 
 
 class JvmFingerprintStrategyTest(BaseTest):
-  def setUp(self):
-    super(JvmFingerprintStrategyTest, self).setUp()
-
   def test_platform_data_differs_from_no_data(self):
     # Pass in platform data, could be java versions for example.
     a = self.make_target(':a', target_type=JvmTarget, dependencies=[])

@@ -15,16 +15,8 @@ class PythonTests(PythonTarget):
 
   def __init__(self, coverage=None, **kwargs):
     """
-    :param name: See PythonLibrary target
-    :param sources: Source code files to compile. Paths are relative to the
-      BUILD file's directory.
-    :type sources: ``Fileset`` or list of strings
-    :param resources: See PythonLibrary target
-    :param dependencies: Other targets that this target depends on.
-    :type dependencies: list of target specs
     :param coverage: the module(s) whose coverage should be generated, e.g.
       'twitter.common.log' or ['twitter.common.log', 'twitter.common.http']
-    :param dict exclusives: An optional dict of exclusives tags. See :ref:`howto_check_exclusives` for details.
     """
     self._coverage = maybe_list(coverage) if coverage is not None else []
     super(PythonTests, self).__init__(**kwargs)

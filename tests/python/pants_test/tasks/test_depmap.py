@@ -285,7 +285,7 @@ class ProjectInfoTest(ConsoleTaskTest):
     )
 
     self.make_target(
-      'project_info:java_lib',
+      'java/project_info:java_lib',
       target_type=JavaLibrary,
       sources=['com/foo/Bar.java', 'com/foo/Baz.java'],
     )
@@ -294,7 +294,8 @@ class ProjectInfoTest(ConsoleTaskTest):
       'project_info:third',
       target_type=ScalaLibrary,
       dependencies=[jar_lib],
-      java_sources=['project_info:java_lib'],
+      java_sources=['java/project_info:java_lib'],
+      sources=['com/foo/Bar.scala', 'com/foo/Baz.scala'],
     )
 
     self.make_target(
@@ -361,11 +362,26 @@ class ProjectInfoTest(ConsoleTaskTest):
       args=['--test-project-info'],
       targets=[self.target('project_info:third')]
     ))
-    self.assertEqual(['org.apache:apache-jar:12.12.2012'],
-                     result['targets']['project_info:third']['libraries'])
-    self.assertEqual(1, len(result['targets']['project_info:third']['roots']))
-    self.assertEqual('com.foo',
-                     result['targets']['project_info:third']['roots'][0]['package_prefix'])
+    self.assertEqual(['org.apache:apache-jar:12.12.2012'], result['targets']['project_info:third']['libraries'])
+    self.assertEqual(2, len(result['targets']['project_info:third']['roots']))
+    self.assertEqual(
+      'com.foo',
+      result['targets']['project_info:third']['roots'][0]['package_prefix']
+    )
+    self.assertEqual(
+      'com.foo',
+      result['targets']['project_info:third']['roots'][1]['package_prefix']
+    )
+    self.assertEqual(
+      [
+        '%s/java/project_info/com/foo' % self.build_root,
+        '%s/project_info/com/foo' % self.build_root
+      ],
+      sorted([
+        result['targets']['project_info:third']['roots'][0]['source_root'],
+        result['targets']['project_info:third']['roots'][1]['source_root']
+      ])
+    )
     self.assertEqual(['org.apache:apache-jar:12.12.2012'],
                      result['targets']['project_info:third']['libraries'])
 

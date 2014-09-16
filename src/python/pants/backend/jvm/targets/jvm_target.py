@@ -31,15 +31,6 @@ class JvmTarget(Target, Jarable):
                configurations=None,
                **kwargs):
     """
-    :param string name: The name of this target, which combined with this
-      build file defines the :doc:`target address <target_addresses>`.
-    :param sources: Source code files to compile. Paths are relative to the
-      BUILD file's directory.
-    :type sources: ``Fileset`` or list of strings
-    :param dependencies: Other targets that this target depends on.
-    :type dependencies: list of target specs
-    :param excludes: List of :ref:`exclude <bdict_exclude>`\s
-      to filter this target's transitive dependencies against.
     :param configurations: One or more ivy configurations to resolve for this target.
       This parameter is not intended for general use.
     :type configurations: tuple of strings

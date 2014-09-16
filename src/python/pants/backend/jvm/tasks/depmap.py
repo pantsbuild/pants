@@ -253,7 +253,7 @@ class Depmap(ConsoleTask):
         if target.is_test:
           return Depmap.SourceRootTypes.TEST
         else:
-          if isinstance(target, Resources) and resource_target_map[target].is_test:
+          if isinstance(target, Resources) and target in resource_target_map and resource_target_map[target].is_test:
             return Depmap.SourceRootTypes.TEST_RESOURCE
           elif isinstance(target, Resources):
             return Depmap.SourceRootTypes.RESOURCE
@@ -283,12 +283,12 @@ class Depmap(ConsoleTask):
       """
 
       roots = set(itertools.chain(
-        *[self._sources_for_target(t) for t in java_sources_targets + [current_target]]
+        *[self._source_roots_for_target(t) for t in java_sources_targets + [current_target]]
       ))
 
-      info['roots'] = map(lambda source: {
-        'source_root': os.path.join(get_buildroot(), current_target.target_base, source),
-        'package_prefix': source.replace(os.sep, '.')
+      info['roots'] = map(lambda (source_root, package_prefix): {
+        'source_root': source_root,
+        'package_prefix': package_prefix
       }, roots)
       targets_map[self._address(current_target.address)] = info
 
@@ -315,9 +315,12 @@ class Depmap(ConsoleTask):
     return mapping
 
   @staticmethod
-  def _sources_for_target(target):
+  def _source_roots_for_target(target):
     """
     :type target:pants.base.target.Target
     """
-    return [os.path.dirname(source) for source in target.sources_relative_to_source_root()]
+    def root_package_prefix(source_file):
+      source = os.path.dirname(source_file)
+      return os.path.join(get_buildroot(), target.target_base, source), source.replace(os.sep, '.')
+    return map(root_package_prefix, target.sources_relative_to_source_root())
 
