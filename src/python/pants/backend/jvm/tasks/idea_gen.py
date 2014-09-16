@@ -213,6 +213,14 @@ class IdeaGen(IdeGen):
     if self.context.options.idea_exclude_maven_target:
       exclude_folders += IdeaGen._maven_targets_excludes(get_buildroot())
 
+    exclude_folders += self.context.config.getlist('idea', 'exclude_folders',
+                                                   default=[
+                                                     '.pants.d/compile',
+                                                     '.pants.d/ivy',
+                                                     '.pants.d/python',
+                                                     '.pants.d/resources',
+                                                     ])
+
     configured_module = TemplateData(
       root_dir=get_buildroot(),
       path=self.module_filename,
