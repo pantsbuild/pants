@@ -17,7 +17,9 @@ class PythonBuilder(object):
   def __init__(self, run_tracker):
     self._run_tracker = run_tracker
 
-  def build(self, targets, args, interpreter=None, conn_timeout=None, fast_tests=False):
+  def build(self, targets, args, interpreter=None, conn_timeout=None, fast_tests=False,
+            debug=False):
+
     test_targets = []
     binary_targets = []
     interpreter = interpreter or PythonInterpreter.get()
@@ -37,7 +39,8 @@ class PythonBuilder(object):
         args,
         interpreter=interpreter,
         conn_timeout=conn_timeout,
-        fast=fast_tests).run()
+        fast=fast_tests,
+        debug=debug).run()
     if rv != 0:
       return rv
 

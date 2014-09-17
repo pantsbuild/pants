@@ -48,6 +48,8 @@ class Build(Command):
     if not self.args:
       self.error("A spec argument is required")
 
+    self._verbose = self.options.verbose
+
     self.config = Config.load()
 
     interpreters = self.options.interpreters or [b'']
@@ -96,7 +98,7 @@ class Build(Command):
     self.targets = [target for target in self.targets if target.is_python]
 
   def debug(self, message):
-    if self.options.verbose:
+    if self._verbose:
       print(message, file=sys.stderr)
 
   def execute(self):
@@ -124,7 +126,8 @@ class Build(Command):
         self.build_args,
         interpreter=self.interpreter,
         conn_timeout=self.options.conn_timeout,
-        fast_tests=self.options.fast)
+        fast_tests=self.options.fast,
+        debug=self._verbose)
     except:
       self.error("Problem executing PythonBuilder for targets %s: %s" % (targets,
                                                                          traceback.format_exc()))

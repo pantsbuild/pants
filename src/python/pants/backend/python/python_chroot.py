@@ -73,10 +73,13 @@ class PythonChroot(object):
     self._key_generator = CacheKeyGenerator()
     self._build_invalidator = BuildInvalidator( self._egg_cache_root)
 
+  def delete(self):
+    """Deletes this chroot from disk if it has been dumped."""
+    safe_rmtree(self.path())
 
   def __del__(self):
     if os.getenv('PANTS_LEAVE_CHROOT') is None:
-      safe_rmtree(self.path())
+      self.delete()
     else:
       self.debug('Left chroot at %s' % self.path())
 

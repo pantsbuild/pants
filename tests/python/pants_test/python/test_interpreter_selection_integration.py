@@ -15,11 +15,11 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class InterpreterSelectionIntegrationTest(PantsRunIntegrationTest):
-
   def test_conflict(self):
-    pants_run = self._build_pex('tests/python/pants_test/python:'
-                                'deliberately_conficting_compatibility')
-    self.assertNotEqual(0, pants_run.returncode)
+    binary_target = 'tests/python/pants_test/python:deliberately_conficting_compatibility'
+    pants_run = self._build_pex(binary_target)
+    self.assert_failure(pants_run,
+                        'Unexpected successful build of {binary}.'.format(binary=binary_target))
 
   def test_select_26(self):
     self._maybe_test_version('2.6')
@@ -48,7 +48,8 @@ class InterpreterSelectionIntegrationTest(PantsRunIntegrationTest):
       binary_name = 'echo_interpreter_version_%s' % version
       binary_target = 'tests/python/pants_test/python:' + binary_name
       pants_run = self._build_pex(binary_target, config)
-      self.assertEqual(0, pants_run.returncode)
+      self.assert_success(pants_run, 'Failed to build {binary}.'.format(binary=binary_target))
+
       # Run the built pex.
       exe = os.path.join(distdir, binary_name + '.pex')
       proc = subprocess.Popen([exe], stdout=subprocess.PIPE)

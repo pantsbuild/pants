@@ -44,11 +44,11 @@ class PytestRun(PythonTask):
     if test_targets:
       self.context.lock.release()
 
+      # TODO(benjy): A less hacky way to find the log level.
+      debug = self.context.options.log_level == 'debug'
+
       # TODO(benjy): Only color on terminals that support it.
       args = ['--color', 'yes']
-      # TODO(benjy): A less hacky way to find the log level.
-      if self.context.options.log_level == 'debug':
-        args.append('-s')  # Make pytest emit all stdout/stderr, even for successful tests.
       if self.context.options.pytest_run_options:
         for options in self.context.options.pytest_run_options:
           args.extend(shlex.split(options))
@@ -56,7 +56,8 @@ class PytestRun(PythonTask):
                                        args=args,
                                        interpreter=self.interpreter,
                                        conn_timeout=self.conn_timeout,
-                                       fast=self.context.options.pytest_run_fast)
+                                       fast=self.context.options.pytest_run_fast,
+                                       debug=debug)
       with self.context.new_workunit(name='run',
                                      labels=[WorkUnit.TOOL, WorkUnit.TEST]) as workunit:
         # pytest uses py.io.terminalwriter for output. That class detects the terminal
