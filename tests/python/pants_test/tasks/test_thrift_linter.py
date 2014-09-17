@@ -101,13 +101,3 @@ class ThriftLinterTest(PantsRunIntegrationTest):
     pants_run = self.run_pants(cmd, config = pants_ini_config)
     self.assertSuccess(pants_run)
     self.assertTrue('Lint errors found!' in pants_run.stdout_data)
-
-  def test_gen_depends_on_thrift_linter(self):
-    # thrift-linter is a dependency of gen goal.
-    cmd = ['goal',
-           'gen',
-           'testprojects/src/thrift/com/pants/thrift_linter:bad-thrift-non-strict',
-           '--thrift-linter-strict']
-    pants_run = self.run_pants(cmd)
-    self.assertFailure(pants_run)
-    self.assertTrue('Lint errors found!' in pants_run.stdout_data)
