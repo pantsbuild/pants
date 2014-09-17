@@ -35,7 +35,7 @@ from pants.base.generator import Generator, TemplateData
 from pants.base.target import Target
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy import Ivy
-from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree
+from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree, touch
 
 
 class PushDb(object):
@@ -528,9 +528,12 @@ class JarPublish(JarTask, ScmPublish):
       # TODO(tdesai) Handle resource type in get_db.
       if tgt.provides is None:
         raise TaskError('trying to publish target %r which does not provide an artifact' % tgt)
-      dbfile = tgt.provides.repo.push_db
+      dbfile = tgt.provides.repo.push_db(tgt)
       result = pushdbs.get(dbfile)
       if not result:
+        # Create an empty db file if none exists.
+        touch(dbfile)
+
         db = PushDb.load(dbfile)
         repo = self.repos[tgt.provides.repo.name]
         result = (db, dbfile, repo)

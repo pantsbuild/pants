@@ -19,7 +19,7 @@ class ArtifactTest(BaseTest):
     repo = self.make_target(target_type=Repository,
                             spec=":myRepo",
                             url="myUrl",
-                            push_db="myPushDb")
+                            push_db_basedir="myPushDb")
     Artifact(org="testOrg", name="testName", repo=repo, description="Test")
     with pytest.raises(ValueError):
       Artifact(org=1, name="testName", repo=repo, description="Test")

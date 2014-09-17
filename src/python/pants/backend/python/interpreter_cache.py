@@ -108,6 +108,10 @@ class PythonInterpreterCache(object):
     return PythonSetup(config).scratch_dir('interpreter_cache', default_name='interpreters')
 
   @staticmethod
+  def _interpreter_requirement(config):
+    return PythonSetup(config).interpreter_requirement
+
+  @staticmethod
   def _matches(interpreter, filters):
     return any(interpreter.identity.matches(filt) for filt in filters)
 
@@ -132,6 +136,7 @@ class PythonInterpreterCache(object):
     safe_mkdir(self._path)
     self._interpreters = set()
     self._logger = logger or (lambda msg: True)
+    self._default_filters = (PythonInterpreterCache._interpreter_requirement(config) or b'',)
 
   @property
   def interpreters(self):
@@ -198,6 +203,7 @@ class PythonInterpreterCache(object):
       for requirements agnostic to interpreter class.
     """
     has_setup = False
+    filters = self._default_filters if not any(filters) else filters
     setup_paths = paths or os.getenv('PATH').split(os.pathsep)
     self._setup_cached(filters)
     if force:

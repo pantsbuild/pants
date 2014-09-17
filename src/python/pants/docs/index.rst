@@ -52,6 +52,16 @@ Using Pants With...
    with_emacs
    with_intellij
 
+News
+----
+
+.. toctree::
+   :hidden:
+
+   announce_201409
+
+*  `2014-09-16 Announcement <announce_201409.html>`_ "Hello Pants Build"
+
 Advanced Documentation
 ----------------------
 

@@ -23,7 +23,7 @@ class FilemapTest(ConsoleTaskTest):
         'python_library': PythonLibrary,
       },
       context_aware_object_factories={
-        'source_root': SourceRoot,
+        'source_root': SourceRoot.factory,
       }
     )
 

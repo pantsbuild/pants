@@ -83,7 +83,7 @@ def build_file_aliases():
       'buildfile_path': BuildFilePath,
       'globs': Globs,
       'rglobs': RGlobs,
-      'source_root': SourceRoot,
+      'source_root': SourceRoot.factory,
       'zglobs': ZGlobs,
     }
   )

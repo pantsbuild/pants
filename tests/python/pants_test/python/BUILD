@@ -12,6 +12,7 @@ python_test_suite(
   name = 'python',
   dependencies = [
     ':test_antlr_builder',
+    ':test_interpreter_cache',
     ':test_resolver',
     ':test_thrift_builder',
     ':test_thrift_namespace_packages',
@@ -103,6 +104,16 @@ python_tests(
   sources = ['test_python_repl_integration.py'],
   dependencies = [
     'tests/python/pants_test:int-test',
+  ],
+)
+
+python_tests(
+  name = 'test_interpreter_cache',
+  sources = ['test_interpreter_cache.py'],
+  dependencies = [
+    '3rdparty/python:mock',
+    'src/python/pants/backend/python:interpreter_cache',
+    'src/python/pants/util:contextutil',
   ],
 )
 
