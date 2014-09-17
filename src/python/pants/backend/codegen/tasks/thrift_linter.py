@@ -33,7 +33,7 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
                             dest='thrift_linter_strict',
                             default=None,
                             action="callback", callback=mkflag.set_bool,
-                            help='[%default] Ignore thrift-linter errors')
+                            help='[%default] Fail the goal if thrift errors are found.')
 
   @classmethod
   def product_types(cls):
