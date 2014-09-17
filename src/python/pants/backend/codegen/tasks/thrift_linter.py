@@ -67,10 +67,10 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
     # 2. java_thrift_library target in BUILD file, thrift_linter_strict = False,
     # 3. pants.ini, [scrooge-linter] section, strict field.
     # 4. default = False
-    cmdlineStrict = getattr(self.context.options, 'thrift_linter_strict', None)
+    cmdline_strict = getattr(self.context.options, 'thrift_linter_strict', None)
 
-    if cmdlineStrict != None:
-      return self._to_bool(cmdlineStrict)
+    if cmdline_strict != None:
+      return self._to_bool(cmdline_strict)
 
     if target.thrift_linter_strict != None:
       return self._to_bool(target.thrift_linter_strict)
