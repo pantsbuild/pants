@@ -9,8 +9,8 @@ python_library(
   name='sitegen',
   sources=['sitegen.py'],
   dependencies=[
-    'src/python/internal_backend/sitegen:PyYAML',
-    'src/python/internal_backend/sitegen:beautifulsoup4',
+    '3rdparty/python/internal_backend:PyYAML',
+    '3rdparty/python/internal_backend:beautifulsoup4',
     'src/python/pants/base:exceptions',
     'src/python/pants/backend/core/tasks:task',
   ]

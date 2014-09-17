@@ -10,6 +10,3 @@ python_library(
   ]
 )
 
-# Requires some things _not_ required by Pants itself:
-python_requirements()
-

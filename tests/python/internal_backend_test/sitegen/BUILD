@@ -5,8 +5,8 @@ python_tests(
   name = 'sitegen',
   sources=['test_sitegen.py'],
   dependencies = [
-    'src/python/internal_backend/sitegen:beautifulsoup4',
-    'src/python/internal_backend/sitegen:PyYAML',
+    '3rdparty/python/internal_backend:PyYAML',
+    '3rdparty/python/internal_backend:beautifulsoup4',
     'src/python/internal_backend/sitegen/tasks:sitegen',
   ],
 )
