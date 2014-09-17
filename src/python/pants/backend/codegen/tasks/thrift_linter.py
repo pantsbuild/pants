@@ -76,7 +76,7 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
       return self._to_bool(target.thrift_linter_strict)
 
     return self._to_bool(self.context.config.get(self._CONFIG_SECTION, 'strict',
-                                                default=ThriftLinter.STRICT_DEFAULT))
+                                                 default=ThriftLinter.STRICT_DEFAULT))
 
   def lint(self, target, path):
     self.context.log.debug("Linting %s" % path)
