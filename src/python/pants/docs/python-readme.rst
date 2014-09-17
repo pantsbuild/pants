@@ -360,8 +360,7 @@ names to track coverage against.  For example::
   $ PANTS_PY_COVERAGE=modules:example.hello.greet,example.hello.main ./pants ...
 
 This would measure coverage against all python code in the `example.hello.greet` and
-`example.hello.main` packages regardless of `coverage` attributes present on the `python_tests`
-targets in-play.
+`example.hello.main`. It ignores coverage attributes.
 
 Similarly, a set of base paths can be specified containing the code for coverage to be measured
 over::
