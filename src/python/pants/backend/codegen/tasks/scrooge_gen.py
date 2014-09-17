@@ -116,10 +116,6 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
   def config_section(self):
     return _CONFIG_SECTION
 
-  def prepare(self, round_manager):
-    # Depend on the linter
-    round_manager.require_data('thrift-linter')
-
   # TODO(benjy): Use regular os-located tmpfiles, as we do everywhere else.
   def _tempname(self):
     # don't assume the user's cwd is buildroot
