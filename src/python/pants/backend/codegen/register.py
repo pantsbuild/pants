@@ -41,7 +41,7 @@ def register_goals():
   task(name='thrift', action=ApacheThriftGen).install('gen').with_description('Generate code.')
 
   # Install as top level goal.
-  task(name='thrift-linter', dependencies=['imports'], action=ThriftLinter
+  task(name='thrift-linter', action=ThriftLinter
   ).install().with_description('Check thrift files for non-recommended usage patterns.')
 
   task(name='scrooge', dependencies=['bootstrap', 'thrift-linter'], action=ScroogeGen).install('gen')
