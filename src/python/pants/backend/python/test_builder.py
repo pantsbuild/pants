@@ -273,7 +273,6 @@ class PythonTestBuilder(object):
   def _test_runner(self, targets, stdout, stderr):
     builder = PEXBuilder(interpreter=self._interpreter)
     builder.info.entry_point = 'pytest'
-    # Cleans itself up via __del__ when the with scope is exited
     chroot = PythonChroot(
       targets=targets,
       extra_requirements=self._TESTING_TARGETS,
@@ -281,16 +280,19 @@ class PythonTestBuilder(object):
       platforms=('current',),
       interpreter=self._interpreter,
       conn_timeout=self._conn_timeout)
-    builder = chroot.dump()
-    builder.freeze()
-    pex = PEX(builder.path(), interpreter=self._interpreter)
-    with self._maybe_emit_junit_xml(targets) as junit_args:
-      with self._maybe_emit_coverage_data(targets,
-                                          builder.path(),
-                                          pex,
-                                          stdout,
-                                          stderr) as coverage_args:
-        yield pex, junit_args + coverage_args
+    try:
+      builder = chroot.dump()
+      builder.freeze()
+      pex = PEX(builder.path(), interpreter=self._interpreter)
+      with self._maybe_emit_junit_xml(targets) as junit_args:
+        with self._maybe_emit_coverage_data(targets,
+                                            builder.path(),
+                                            pex,
+                                            stdout,
+                                            stderr) as coverage_args:
+          yield pex, junit_args + coverage_args
+    finally:
+      chroot.delete()
 
   def _run_tests(self, targets, stdout, stderr):
     if not targets:

@@ -123,10 +123,25 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
               'lib:core'
             ]
           )
+
+          python_tests(
+            name='all-with-coverage',
+            sources=[
+              'test_core_green.py',
+              'test_core_red.py'
+            ],
+            dependencies=[
+              'lib:core'
+            ],
+            coverage=[
+              'core'
+            ]
+          )
         '''))
     self.green = self.target('tests:green')
     self.red = self.target('tests:red')
     self.all = self.target('tests:all')
+    self.all_with_coverage = self.target('tests:all-with-coverage')
 
   def test_green(self):
     self.assertEqual(0, self.run_tests(targets=[self.green]))
@@ -204,6 +219,11 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
       all_statements, not_run_statements = self.load_coverage_data(covered_file)
       self.assertEqual([1, 2, 5, 6], all_statements)
       self.assertEqual([1, 2, 5, 6], not_run_statements)
+
+      self.assertEqual(1, self.run_tests(targets=[self.all_with_coverage]))
+      all_statements, not_run_statements = self.load_coverage_data(covered_file)
+      self.assertEqual([1, 2, 5, 6], all_statements)
+      self.assertEqual([], not_run_statements)
 
   def test_coverage_modules(self):
     self.assertFalse(os.path.isfile(self.coverage_data_file()))
