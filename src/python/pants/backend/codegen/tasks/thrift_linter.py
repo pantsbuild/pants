@@ -46,7 +46,7 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
     self._bootstrap_key = 'scrooge-linter'
 
     bootstrap_tools = self.context.config.getlist(self._CONFIG_SECTION, 'bootstrap-tools',
-                                                  default=[':scrooge-linter'])
+                                                  default=['//:scrooge-linter'])
     self.register_jvm_tool(self._bootstrap_key, bootstrap_tools)
 
   @property
@@ -57,26 +57,25 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
     # Linter depends on ivy running before it.
     round_manager.require_data('ivy_imports')
 
-  def _toBool(self, value):
+  def _to_bool(self, value):
     # Converts boolean and string values to boolean.
     return str(value) == 'True'
 
-  def isStrict(self, target):
+  def is_strict(self, target):
     # The strict value is read from the following, in order:
     # 1. command line, --[no-]thrift-linter-strict
     # 2. java_thrift_library target in BUILD file, thrift_linter_strict = False,
     # 3. pants.ini, [scrooge-linter] section, strict field.
     # 4. default = False
-    strict = None
     cmdlineStrict = getattr(self.context.options, 'thrift_linter_strict', None)
 
     if cmdlineStrict != None:
-      return self._toBool(cmdlineStrict)
+      return self._to_bool(cmdlineStrict)
 
     if target.thrift_linter_strict != None:
-      return self._toBool(target.thrift_linter_strict)
+      return self._to_bool(target.thrift_linter_strict)
 
-    return self._toBool(self.context.config.get(self._CONFIG_SECTION, 'strict',
+    return self._to_bool(self.context.config.get(self._CONFIG_SECTION, 'strict',
                                                 default=ThriftLinter.STRICT_DEFAULT))
 
   def lint(self, target, path):
@@ -84,8 +83,7 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
 
     classpath = self.tool_classpath(self._bootstrap_key)
     args = [path, '--verbose']
-    strict = self.isStrict(target)
-    if not self.isStrict(target):
+    if not self.is_strict(target):
       args.append('--ignore-errors')
 
     # If runjava returns non-zero, this marks the workunit as a
