@@ -52,7 +52,7 @@ function do_open() {
 }
 
 # generate some markdown as fodder for prototype doc site generator
-${HERE}/../../pants goal markdown --markdown-fragment src:: examples:: || \
+${HERE}/../../pants goal markdown --markdown-fragment src:: examples:: //:readme || \
   die "Failed to generate HTML from markdown'."
 
 # invoke doc site generator
