@@ -141,15 +141,17 @@ def entry_for_one_method(nom, method):
   method: method object"""
   # TODO(lhosken) : This is darned similar to entry_for_one_func. Merge 'em?
   #                 (Punted so far since funcdoc indentation made my head hurt,
-  #                 but that will go away when we stop using RST)
+  #                 but that will go away when we stop generating RST)
   assert inspect.ismethod(method)
   args, varargs, varkw, defaults = inspect.getargspec(method)
   # args[:1] instead of args to discard "self" arg
   argspec = inspect.formatargspec(args[1:], varargs, varkw, defaults)
+  funcdoc_body_html = rst_to_html(dedent_docstring(method.__doc__))
+  param_docshards = shard_param_docstring(dedent_docstring(method.__doc__))
+  param_html = param_docshards_to_html(param_docshards)
   return entry(nom,
                argspec=argspec,
-               funcdoc_html='''<pre>ONE_METHOD
-{0}</pre>'''.format(method.__doc__), # TODO
+               funcdoc_html=funcdoc_body_html + param_html,
                funcdoc_rst=(method.__doc__ or ""),
                indent=2)
 
