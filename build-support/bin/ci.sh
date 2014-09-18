@@ -131,9 +131,9 @@ fi
 if [[ "${skip_python:-false}" == "false" ]]; then
   banner "Running core python tests"
   (
-    ./pants.pex goal list tests/python/:: | grep -v integration | \
-      PANTS_PY_COVERAGE=paths:pants/ PANTS_PYTHON_TEST_FAILSOFT=1 \
-        xargs ./pants.pex goal test ${PANTS_ARGS[@]}
+    PANTS_PY_COVERAGE=paths:pants/ PANTS_PYTHON_TEST_FAILSOFT=1 \
+      ./pants.pex goal test ${PANTS_ARGS[@]} \
+        $(./pants.pex goal list tests/python/:: | grep -v integration)
   ) || die "Core python test failure"
 fi
 
@@ -176,9 +176,9 @@ fi
 if [[ "${skip_integration:-false}" == "false" ]]; then
   banner "Running Pants Integration tests"
   (
-    ./pants.pex goal list tests/python/:: | grep integration | \
-      PANTS_PYTHON_TEST_FAILSOFT=1 \
-        xargs ./pants.pex goal test ${PANTS_ARGS[@]}
+    PANTS_PYTHON_TEST_FAILSOFT=1 \
+      ./pants.pex goal test ${PANTS_ARGS[@]} \
+        $(./pants.pex goal list tests/python/:: | grep integration)
   ) || die "Pants Integration test failure"
 fi
 
