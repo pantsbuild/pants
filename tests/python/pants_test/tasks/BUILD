@@ -65,6 +65,7 @@ python_test_suite(
     ':scrooge_gen',
     ':sorttargets',
     ':targets_help',
+    ':thrift_linter',
     ':what_changed',
     'tests/python/pants_test/tasks/jvm_compile/scala'
   ],
@@ -555,6 +556,16 @@ python_tests(
     'src/python/pants/base:target',
     'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/core/tasks:targets_help',
+  ],
+)
+
+python_tests(
+  name = 'thrift_linter',
+  sources = ['test_thrift_linter.py'],
+  dependencies = [
+    ':base',
+    'src/python/pants/base:target',
+    'src/python/pants/backend/codegen/tasks:scrooge_gen',
   ],
 )
 

@@ -51,6 +51,7 @@ class JavaThriftLibrary(JvmTarget):
                language=None,
                rpc_style=None,
                namespace_map=None,
+               thrift_linter_strict=None,
                **kwargs):
     """
     :param compiler: The compiler used to compile the thrift files; default is 'thrift'
@@ -58,6 +59,7 @@ class JavaThriftLibrary(JvmTarget):
     :param language: The language used to generate the output files; defaults to 'java'.
     :param rpc_style: An optional rpc style to generate service stubs with.
     :param namespace_map: An optional dictionary of namespaces to remap {old: new}
+    :param thrift_linter_strict: If True, fail if thrift linter produces any warnings.
     """
 
     # It's critical that provides is set 1st since _provides() is called elsewhere in the
@@ -80,6 +82,7 @@ class JavaThriftLibrary(JvmTarget):
     self.rpc_style = check_value_for_arg('rpc_style', rpc_style, self._RPC_STYLES)
 
     self.namespace_map = namespace_map
+    self.thrift_linter_strict = thrift_linter_strict
 
   @property
   def is_thrift(self):
