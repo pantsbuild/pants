@@ -179,6 +179,10 @@ please ask one to do this section for you.) ::
 
 Here, ensure that the commit message generated from the review summary is
 accurate, and that the resulting commit contains the changes you expect.
+(If ``rbt`` gives mysterious errors, pass ``--debug`` for more info. If that
+doesn't clarify the problem, mail pants-devel (and include that ``--debug``
+output).)
+
 Finally, ::
 
    git push origin master

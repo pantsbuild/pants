@@ -112,7 +112,12 @@ jar_library(name = 'scalastyle',
 
 jar_library(name = 'scrooge-gen',
             jars = [
-              jar(org='com.twitter', name='scrooge-generator_2.9.2', rev='3.12.1')
+              jar(org='com.twitter', name='scrooge-generator_2.9.2', rev='3.16.3')
+            ])
+
+jar_library(name = 'scrooge-linter',
+            jars = [
+              jar(org='com.twitter', name='scrooge-linter_2.9.2', rev='3.16.3')
             ])
 
 jar_library(name = 'jar-tool',

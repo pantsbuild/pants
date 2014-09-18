@@ -340,18 +340,35 @@ match the pattern \*foo\*, you could run ::
 Code Coverage
 =============
 
-.. for me,
-   PANTS_PY_COVERAGE=1 ./pants examples/tests/python/example_test/hello/greet
-   horks up
-   Coverage.py warning: Module example_test.hello.greet was never imported.
-   Coverage.py warning: No data was collected.
-   ...
-   (crash dump with CoverageException: No data to report.)
-   https://github.com/pantsbuild/pants/issues/328
-
 To get code coverage data, set the `PANTS_PY_COVERAGE` environment variable::
 
-    $ PANTS_PY_COVERAGE=1  ./pants examples/tests/python/example_test/hello/greet:greet
+    $ PANTS_PY_COVERAGE=1 ./pants examples/tests/python/example_test/hello/greet:greet
+
+This uses the `python_tests.coverage` target attribute to determine what modules to measure
+coverage against for each `python_tests` target run.  If the attribute is not present it's assumed
+the coverage should be measured over the same packages that house the test target's sources. This
+heuristic only works with parallel source and test package structures and reliance upon it is
+discouraged.
+
+There are 2 alternatives to specifying `coverage` attributes on all `python_tests` targets, but both
+override any existing `coverage` attributes in-play to form a global coverage specification for the
+test run.
+
+`PANTS_PY_COVERAGE=modules:[module1](,...,[moduleN])` allows specification of package or module
+names to track coverage against.  For example::
+
+  $ PANTS_PY_COVERAGE=modules:example.hello.greet,example.hello.main ./pants ...
+
+This would measure coverage against all python code in the `example.hello.greet` and
+`example.hello.main`. It ignores coverage attributes.
+
+Similarly, a set of base paths can be specified containing the code for coverage to be measured
+over::
+
+  $ PANTS_PY_COVERAGE=paths:example/hello ./pants ...
+
+In this case the paths should be relative to the source root housing the python code; for this
+example, `examples/src/python`.
 
 Interactive Debugging on Test Failure
 =====================================
@@ -426,7 +443,7 @@ produce coverage reports.
 .. TODO: dynamically self-updating PEX files
 
 .. TODO: tailoring your dependency resolution environment with pants.ini,
-   including local cheeseshop mirrors 
+   including local cheeseshop mirrors
 
 .. toctree::
    :maxdepth: 1
