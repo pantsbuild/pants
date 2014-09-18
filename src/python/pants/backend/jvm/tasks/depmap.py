@@ -9,9 +9,12 @@ import itertools
 import json
 import os
 
+from twitter.common.collections import OrderedSet
+
 from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.backend.core.targets.dependencies import Dependencies
 from pants.backend.core.targets.resources import Resources
+from pants.backend.jvm.ivy_utils import IvyUtils
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.base.build_environment import get_buildroot
@@ -119,6 +122,9 @@ class Depmap(ConsoleTask):
     self.separator = self.context.options.depmap_separator
     self.project_info = self.context.options.depmap_is_project_info
     self.format = self.context.options.depmap_is_formatted
+    self._ivy_utils = IvyUtils(config=self.context.config,
+                               options=self.context.options,
+                               log=self.context.log)
 
   def console_output(self, targets):
     if len(self.context.target_roots) == 0:
@@ -244,6 +250,7 @@ class Depmap(ConsoleTask):
   def project_info_output(self, targets):
     targets_map = {}
     resource_target_map = {}
+    ivy_info = self._ivy_utils.parse_xml_report(targets, 'default')
 
     def process_target(current_target):
       """
@@ -260,6 +267,13 @@ class Depmap(ConsoleTask):
           else:
             return Depmap.SourceRootTypes.SOURCE
 
+      def get_transitive_jars(jar_lib):
+        transitive_jars = OrderedSet()
+        if ivy_info:
+          for jar in jar_lib.jar_dependencies:
+            transitive_jars.update(ivy_info.get_jars_for_ivy_module(jar))
+        return transitive_jars
+
       info = {
         'targets': [],
         'libraries': [],
@@ -267,12 +281,15 @@ class Depmap(ConsoleTask):
         'target_type': get_target_type(current_target)
       }
 
+      target_libraries = get_transitive_jars(current_target) if current_target.is_jar_library else OrderedSet()
       for dep in current_target.dependencies:
         if dep.is_java or dep.is_jar_library or dep.is_jvm or dep.is_scala or dep.is_scalac_plugin:
           info['targets'].append(self._address(dep.address))
         if dep.is_jar_library:
           for jar in dep.jar_dependencies:
-            info['libraries'].append(self._jar_id(jar))
+            target_libraries.add(jar)
+          # Add all the jars pulled in by this jar_library
+          target_libraries.update(get_transitive_jars(dep))
         if isinstance(dep, Resources):
           info['targets'].append(self._address(dep.address))
           resource_target_map[dep] = current_target
@@ -290,6 +307,7 @@ class Depmap(ConsoleTask):
         'source_root': source_root,
         'package_prefix': package_prefix
       }, roots)
+      info['libraries'] = [self._jar_id(lib) for lib in target_libraries]
       targets_map[self._address(current_target.address)] = info
 
     for target in targets:
