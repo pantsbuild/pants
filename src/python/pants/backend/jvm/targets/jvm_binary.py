@@ -213,8 +213,6 @@ class JvmBinary(JvmTarget):
                deploy_jar_rules=None,
                **kwargs):
     """
-    :param string name: The name of this target, which combined with this
-      build file defines the :doc:`target address <target_addresses>`.
     :param string main: The name of the ``main`` class, e.g.,
       ``'com.pants.examples.hello.main.HelloMain'``. This class may be
       present as the source of this target or depended-upon library.
@@ -228,15 +226,13 @@ class JvmBinary(JvmTarget):
     :param dependencies: Targets (probably ``java_library`` and
      ``scala_library`` targets) to "link" in.
     :type dependencies: list of target specs
-    :param excludes: List of :ref:`exclude <bdict_exclude>`\s
-      to filter this target's transitive dependencies against.
-    :param deploy_excludes: List of :ref:`exclude <bdict_exclude>`\s to apply
+    :param deploy_excludes: List of `exclude <#exclude>`_\s to apply
       at deploy time.
       If you, for example, deploy a java servlet that has one version of
       ``servlet.jar`` onto a Tomcat environment that provides another version,
       they might conflict. ``deploy_excludes`` gives you a way to build your
       code but exclude the conflicting ``jar`` when deploying.
-    :param deploy_jar_rules: :ref:`Jar rules <bdict_jar_rules>` for packaging this binary in a
+    :param deploy_jar_rules: `Jar rules <#jar_rules>`_ for packaging this binary in a
       deploy jar.
     :param configurations: Ivy configurations to resolve for this target.
       This parameter is not intended for general use.
@@ -371,8 +367,6 @@ class JvmApp(Target):
 
   def __init__(self, name=None, binary=None, bundles=None, basename=None, **kwargs):
     """
-    :param string name: The name of this target, which combined with this
-      build file defines the :doc:`target address <target_addresses>`.
     :param string binary: Target spec of the ``jvm_binary`` that contains the
       app main.
     :param bundles: One or more ``bundle``\s

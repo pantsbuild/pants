@@ -21,7 +21,8 @@ class PythonArtifact(object):
   ])
 
   def __init__(self, **kwargs):
-    """Passes params to `setuptools.setup <https://pythonhosted.org/setuptools/setuptools.html>`_."""
+    """
+    :param kwargs: Passed to `setuptools.setup <https://pythonhosted.org/setuptools/setuptools.html>`_."""
     self._kw = kwargs
     self._binaries = {}
 

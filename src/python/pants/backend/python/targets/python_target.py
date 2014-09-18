@@ -41,7 +41,7 @@ class PythonTarget(Target):
       recommended that your application uses the pkgutil package to access these
       resources in a .zip-module friendly way.)
     :param provides:
-      The :ref:`setup_py <bdict_setup_py>` to publish that represents this
+      The `setup_py <#setup_py>`_ to publish that represents this
       target outside the repo.
     :param compatibility: either a string or list of strings that represents
       interpreter compatibility for this target, using the Requirement-style

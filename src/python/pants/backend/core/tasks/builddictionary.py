@@ -12,6 +12,7 @@ import optparse
 import os
 import re
 
+from docutils.core import publish_parts
 from twitter.common.collections.ordereddict import OrderedDict
 
 from pants.backend.core.tasks.task import Task
@@ -60,15 +61,35 @@ def indent_docstring_by_n(s, n=1):
   return '\n'.join([indent + t for t in trimmed])
 
 
-def entry(nom, classdoc=None, msg_rst=None, argspec=None, funcdoc=None,
-          methods=None, impl=None, indent=1):
+def dedent_docstring(s):
+  return indent_docstring_by_n(s, 0)
+
+
+def rst_to_html(s, span=False):
+  """Returns HTML rendering of an RST fragment.
+
+  :param s: rst-formatted string
+  :param span: if True, expecting a "span", a fragment of a paragraph.
+     Our RST parser thinks "foo" is a paragraph.
+  """
+  if not s: return ''
+  body =  publish_parts(s, writer_name='html')['body'].strip()
+  if span:
+    if body.startswith('<p>') and body.endswith('</p>') and body.count('<p>') == 1:
+      body = body[3:-4]
+  return body
+
+
+def entry(nom, classdoc=None, msg_rst=None, msg_html=None, argspec=None,
+          funcdoc_rst=None, funcdoc_html=None, methods=None, impl=None,
+          indent=1):
   """Create a struct that our template expects to see.
 
   :param nom: Symbol name, e.g. python_binary
   :param classdoc: plain text appears above argspec
   :param msg_rst: reST. useful in hand-crafted entries
   :param argspec: arg string like (x, y="deflt")
-  :param funcdoc: function's __doc__, plain text
+  :param funcdoc_rst: function's __doc__, plain text
   :param methods: list of entries for class' methods
   :param impl: name of thing that implements this.
      E.g., "pants.backend.core.tasks.builddict.BuildBuildDictionary"
@@ -78,17 +99,23 @@ def entry(nom, classdoc=None, msg_rst=None, argspec=None, funcdoc=None,
   return TemplateData(
     nom=nom.strip(),
     classdoc=indent_docstring_by_n(classdoc),
+    msg_html=msg_html,
     msg_rst=indent_docstring_by_n(msg_rst, indent),
     argspec=argspec,
-    funcdoc=indent_docstring_by_n(funcdoc, indent),
+    funcdoc_html=funcdoc_html,
+    funcdoc_rst=indent_docstring_by_n(funcdoc_rst, indent),
     methods=methods,
     showmethods=methods and (len(methods) > 0),
     impl=impl)
 
 
-def msg_entry(nom, defn):
-  """For hard-wired entries a la "See Instead" or other simple stuff"""
-  return entry(nom, msg_rst=defn)
+def msg_entry(nom, msg_rst, msg_html):
+  """For hard-wired entries a la "See Instead" or other simple stuff
+
+  :param nom: name
+  :param msg_rst: restructured text message
+  :param msg_html: HTML message; by default, convert from rst"""
+  return entry(nom, msg_rst=msg_rst, msg_html=msg_html)
 
 
 def entry_for_one_func(nom, func):
@@ -97,9 +124,14 @@ def entry_for_one_func(nom, func):
   func: function object"""
   args, varargs, varkw, defaults = inspect.getargspec(func)
   argspec = inspect.formatargspec(args, varargs, varkw, defaults)
+  funcdoc_body_rst = docstring_to_body(dedent_docstring(func.__doc__))
+  funcdoc_body_html = rst_to_html(funcdoc_body_rst)
+  param_docshards = shard_param_docstring(dedent_docstring(func.__doc__))
+  param_html = param_docshards_to_html(param_docshards)
   return entry(nom,
                argspec=argspec,
-               funcdoc=func.__doc__,
+               funcdoc_html=funcdoc_body_html + param_html,
+               funcdoc_rst=func.__doc__ or '',
                impl="{0}.{1}".format(func.__module__, func.__name__))
 
 
@@ -108,14 +140,17 @@ def entry_for_one_method(nom, method):
   nom: name like 'with_description'
   method: method object"""
   # TODO(lhosken) : This is darned similar to entry_for_one_func. Merge 'em?
-  #                 (Punted so far since funcdoc indentation made my head hurt)
+  #                 (Punted so far since funcdoc indentation made my head hurt,
+  #                 but that will go away when we stop using RST)
   assert inspect.ismethod(method)
   args, varargs, varkw, defaults = inspect.getargspec(method)
   # args[:1] instead of args to discard "self" arg
   argspec = inspect.formatargspec(args[1:], varargs, varkw, defaults)
   return entry(nom,
                argspec=argspec,
-               funcdoc=(method.__doc__ or ""),
+               funcdoc_html='''<pre>ONE_METHOD
+{0}</pre>'''.format(method.__doc__), # TODO
+               funcdoc_rst=(method.__doc__ or ""),
                indent=2)
 
 
@@ -130,8 +165,27 @@ param_re = re.compile(r':param (?P<type>[A-Za-z0-9_]* )?(?P<param>[^:]*):(?P<des
 type_re = re.compile(r':type (?P<param>[^:]*):(?P<type>.*)')
 
 
+def docstring_to_body(s):
+  """Passed a sphinx-flavored docstring, return just the "body" part.
+
+  Filter out the :param...: and :type...: part, if any.
+  """
+  s = s or ''
+  body = ''  # return value
+  recording_state = True  # are we "recording" or not
+  for line in s.splitlines():
+    if line and not line[0].isspace():
+      if [regex for regex in [param_re, type_re] if regex.match(line)]:
+        recording_state = False
+      else:
+        recording_state = True
+    if recording_state:
+      body += line + '\n'
+  return body
+
+
 def shard_param_docstring(s):
-  """Shard a Target class' sphinx-flavored __init__ docstring by param
+  """Shard a sphinx-flavored __init__ docstring by param
 
   E.g., if the docstring is
 
@@ -187,6 +241,22 @@ def shard_param_docstring(s):
   del shards['!forget']
   return shards
 
+def param_docshards_to_html(funcdoc_shards):
+  if funcdoc_shards:
+    funcdoc_html = '<div class="param-section">\n<p><b>Params</b>\n'
+    for param, parts in funcdoc_shards.items():
+      funcdoc_html += ('\n<p class="param">'
+                       '<b class="paramname">{0}</b>').format(param)
+      if 'type' in parts:
+        funcdoc_html += '(<em class="paramtype">{0}</em>)'.format(parts['type'])
+      if 'param' in parts:
+        funcdoc_html += rst_to_html(dedent_docstring(parts['param']),
+                                    span=True)
+    funcdoc_html += '\n</div>\n'
+  else:
+    funcdoc_html = ''
+  return funcdoc_html
+
 
 def entry_for_one_class(nom, cls):
   """  Generate a BUILD dictionary entry for a class.
@@ -205,7 +275,7 @@ def entry_for_one_class(nom, cls):
       args, _, _, defaults = inspect.getargspec(c.__init__)
       args_accumulator = args[1:] + args_accumulator
       defaults_accumulator = (defaults or ()) + defaults_accumulator
-      dedented_doc = indent_docstring_by_n(c.__init__.__doc__, 0)
+      dedented_doc = dedent_docstring(c.__init__.__doc__)
       docs_accumulator.append(shard_param_docstring(dedented_doc))
     # Suppress these from BUILD dictionary: they're legit args to the
     # Target implementation, but they're not for BUILD files:
@@ -221,20 +291,29 @@ def entry_for_one_class(nom, cls):
     # Suppress these from BUILD dictionary: they're legit args to the
     # Target implementation, but they're not for BUILD files:
     suppress = set(['address', 'build_graph', 'payload'])
-    funcdoc = ''
+    funcdoc_html = '<p><b>Params</b>'
+    funcdoc_rst = ''
     for shard in docs_accumulator:
       for param, parts in shard.items():
         if param in suppress:
           continue
         suppress.add(param)  # only show things once
-        if 'param' in parts:
-          funcdoc += '\n:param {0}: {1}'.format(param, parts['param'])
+        # Don't interpret param names like "type_" as links.
+        funcdoc_html += ('\n<p class="param">'
+                         '<b class="paramname">{0}</b> ').format(param)
         if 'type' in parts:
-          funcdoc += '\n:type {0}: {1}'.format(param, parts['type'])
+          funcdoc_html += '(<em class="paramtype">{0}</em>) '.format(parts['type'])
+          funcdoc_rst += '\n:type {0}: {1}'.format(param, parts['type'])
+        if 'param' in parts:
+          funcdoc_html += rst_to_html(dedent_docstring(parts['param']),
+                                      span=True)
+          funcdoc_rst += '\n:param {0}: {1}'.format(param, parts['param'])
   else:
     args, varargs, varkw, defaults = inspect.getargspec(cls.__init__)
     argspec = inspect.formatargspec(args[1:], varargs, varkw, defaults)
-    funcdoc = cls.__init__.__doc__
+    funcdoc_shards = shard_param_docstring(dedent_docstring(cls.__init__.__doc__))
+    funcdoc_html = param_docshards_to_html(funcdoc_shards)
+    funcdoc_rst = cls.__init__.__doc__
 
   methods = []
   for attrname in dir(cls):
@@ -251,7 +330,8 @@ def entry_for_one_class(nom, cls):
   return entry(nom,
                classdoc=cls.__doc__,
                argspec=argspec,
-               funcdoc=funcdoc,
+               funcdoc_html=funcdoc_html,
+               funcdoc_rst=funcdoc_rst,
                methods=methods,
                impl='{0}.{1}'.format(cls.__module__, cls.__name__))
 
@@ -261,26 +341,41 @@ def entry_for_one(nom, sym):
     return entry_for_one_class(nom, sym)
   if inspect.ismethod(sym) or inspect.isfunction(sym):
     return entry_for_one_func(nom, sym)
-  return msg_entry(nom, "TODO! no doc gen for %s %s" % (
-        str(type(sym)), str(sym)))
+  return msg_entry(nom,
+                   "TODO! no doc gen for %s %s" % (str(type(sym)), str(sym)),
+                   "TODO! no doc gen for %s %s" % (str(type(sym)), str(sym)))
 
 
 PREDEFS = {  # some hardwired entries
-  'dependencies' : {'defn': msg_entry('dependencies',
-                    """Old name for `target`_"""),},
+  'dependencies' : {'defn':
+                      msg_entry('dependencies',
+                                'Old name for `target`_',
+                                'Old name for <a href="#target">target</a>'),},
   'egg' : {'defn': msg_entry('egg',
                              'In older Pants, loads a pre-built Python egg '
+                             'from file system. Undefined in newer Pants.',
+                             'In older Pants, loads a pre-built Python egg '
                              'from file system. Undefined in newer Pants.')},
-  'java_tests': {'defn': msg_entry('java_tests',
-                  """Old name for `junit_tests`_"""),},
+  'java_tests': {'defn':
+                   msg_entry('java_tests',
+                             'Old name for `junit_tests`_',
+                             'Old name for <a href="#junit_tests">junit_tests</a>'),},
   'pants': {'defn': msg_entry('pants',
+                  """In old Pants versions, a reference to a Pants targets.
+                  (In new Pants versions, just use strings.)""",
                   """In old Pants versions, a reference to a Pants targets.
                   (In new Pants versions, just use strings.)""")},
   'python_artifact': {'suppress': True},  # unused alias for PythonArtifact
-  'python_test_suite': {'defn': msg_entry('python_test_suite',
-                                          """Deprecated way to group Python tests; use `dependencies`_""")},
-  'scala_tests': {'defn': msg_entry('scala_tests',
-                  """Old name for `scala_specs`_""")},
+  'python_test_suite': {'defn':
+                          msg_entry('python_test_suite',
+                                    'Deprecated way to group Python tests;'
+                                    ' use `target`_',
+                                    'Deprecated way to group Python tests;'
+                                    ' use <a href="#target">target</a>')},
+  'scala_tests': {'defn':
+                    msg_entry('scala_tests',
+                              'Old name for `scala_specs`_',
+                              'Old name for <a href="#scala_specs">scala_specs</a>')},
 }
 
 # Report symbols defined in BUILD files (jvm_binary...)
@@ -451,11 +546,21 @@ class BuildBuildDictionary(Task):
   def _gen_build_dictionary(self):
     """Generate the BUILD dictionary reference rst doc."""
     d = assemble(build_file_parser=self.context.build_file_parser)
-    template = resource_string(__name__, os.path.join(self._templates_dir, 'page.mustache'))
     tocs = [tocl(d), jvm_sub_tocl(d), python_sub_tocl(d)]
 
     defns = [d[t]['defn'] for t in sorted(d.keys(), key=_lower)]
+    # generate rst
+    template = resource_string(__name__, os.path.join(self._templates_dir, 'page.mustache'))
     filename = os.path.join(self._outdir, 'build_dictionary.rst')
+    self.context.log.info('Generating %s' % filename)
+    with safe_open(filename, 'w') as outfile:
+      generator = Generator(template,
+                            tocs=tocs,
+                            defns=defns)
+      generator.write(outfile)
+    # generate html
+    template = resource_string(__name__, os.path.join(self._templates_dir, 'bdict_html.mustache'))
+    filename = os.path.join(self._outdir, 'build_dictionary.html')
     self.context.log.info('Generating %s' % filename)
     with safe_open(filename, 'w') as outfile:
       generator = Generator(template,

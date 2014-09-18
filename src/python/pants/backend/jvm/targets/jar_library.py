@@ -15,7 +15,7 @@ class JarLibrary(Target):
 
   def __init__(self, jars=None, *args, **kwargs):
     """
-    :param jars: List of :ref:`jar <bdict_jar>`\s to depend upon.
+    :param jars: List of `jar <#jar>`_\s to depend upon.
     """
     payload = JarLibraryPayload(self.assert_list(jars, expected_type=JarDependency))
     super(JarLibrary, self).__init__(payload=payload, *args, **kwargs)
