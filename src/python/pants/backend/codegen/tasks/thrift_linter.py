@@ -29,7 +29,7 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
   def setup_parser(cls, option_group, args, mkflag):
     super(ThriftLinter, cls).setup_parser(option_group, args, mkflag)
 
-    option_group.add_option(mkflag("strict"), mkflag("strict", negate=True),
+    option_group.add_option(mkflag('strict'), mkflag('strict', negate=True),
                             dest='thrift_linter_strict',
                             default=None,
                             action='callback', callback=mkflag.set_bool,
@@ -79,7 +79,7 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
                                                  default=ThriftLinter.STRICT_DEFAULT))
 
   def lint(self, target, path):
-    self.context.log.debug("Linting %s" % path)
+    self.context.log.debug('Linting %s' % path)
 
     classpath = self.tool_classpath(self._bootstrap_key)
     args = [path, '--verbose']
