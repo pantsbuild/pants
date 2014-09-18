@@ -46,17 +46,18 @@ python_library(
 python_binary(
   name = 'pants',
   entry_point = 'pants.bin.pants_exe:main',
-  platforms=[
-    'current',
-    'linux-x86_64',
-    'macosx-10.4-x86_64',
-  ],
+#  platforms=[
+#    'current',
+#    'linux-x86_64',
+#    'macosx-10.4-x86_64',
+#  ],
   # 3.0 - 3.2 did not support unicode literals so we don't support these for now since it would
   # take some work to make the codebase compatible.
   # Additionally we force a an ascii string for python 3.3.x here.
   compatibility='CPython>=2.6,<3,>=3.3',
   dependencies = [
     ':pants_exe',
+    'src/python/internal_backend/sitegen:plugin',
     'src/python/pants/backend/python/commands:pants_old',
     'src/python/pants/commands:pants_new',
   ],
