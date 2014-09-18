@@ -29,10 +29,10 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
   def setup_parser(cls, option_group, args, mkflag):
     super(ThriftLinter, cls).setup_parser(option_group, args, mkflag)
 
-    option_group.add_option("--thrift-linter-strict", "--no-thrift-linter-strict",
+    option_group.add_option(mkflag("strict"), mkflag("strict", negate=True),
                             dest='thrift_linter_strict',
                             default=None,
-                            action="callback", callback=mkflag.set_bool,
+                            action='callback', callback=mkflag.set_bool,
                             help='[%default] Fail the goal if thrift errors are found.')
 
   @classmethod
