@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<head>
+  <title>Pants BUILD Dictionary</title>
+</head>
+<body>
+
+<p>
+A <tt>BUILD</tt> file defines one or more <em>build targets</em>.
+A build target might create a jar or a deployable package,
+run some tests or perform whatever actions you might associate
+with the ant concept of a build target. This page describes the
+commands and values available. Many of these define <tt>BUILD</tt>
+targets; some are handy utilities.
+
+<!-- some styles used only in build dictionary, so far -->
+<style>
+p.bdict_argspec {
+  border-top: 1px dotted #bcd;
+  background-color: #def;
+  font-family: monospace;
+}
+</style>
+
+{{#tocs}}
+<p>
+<b>{{t}}</b> |
+  {{#e}}
+    <a href="#{{.}}">{{.}}</a>
+  {{/e}}
+{{/tocs}}
+
+{{#defns}}
+
+<a xmark="_bdict_{{nom}}"> </a>
+<h1 id="{{nom}}">{{nom}}</h1>
+
+{{#argspec}}
+<p class="bdict_argspec">{{nom}}{{argspec}}
+{{/argspec}}
+
+{{#classdoc}}
+<p><b>classdoc</b>
+{{{classdoc}}}
+{{/classdoc}}
+
+{{#msg_html}}
+<p><b>msg_html</b>
+{{{msg_html}}}
+{{/msg_html}}
+
+{{#funcdoc_html}}
+<p><b>funcdoc</b>
+{{{funcdoc_html}}}
+{{/funcdoc_html}}
+
+{{#impl}}
+<p>
+Implemented by <tt>{{impl}}</tt>
+{{/impl}}
+
+{{#showmethods}}
+<p><b>Methods:</b>
+{{#methods}}
+<div class="bdict_method">
+<p class="bdict_argspec">{{nom}}{{argspec}}
+
+<p><b>funcdoc</b>
+{{{funcdoc_html}}}
+</div>
+{{/methods}}
+{{/showmethods}}
+
+{{/defns}}
+
+</body>
+</html>
