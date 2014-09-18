@@ -6,3 +6,4 @@ target(
   dependencies=[
     'tests/python/internal_backend_test/sitegen',
   ]
+)
