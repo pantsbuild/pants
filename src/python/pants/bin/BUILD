@@ -79,3 +79,14 @@ python_binary(
     'src/python/pants/backend/python/commands:pants_old',
   ],
 )
+
+python_binary(
+  name = 'pants_plus',
+  entry_point = 'pants.bin.pants_exe:main',
+  dependencies = [
+    ':pants_exe',
+    'src/python/internal_backend/sitegen:plugin',
+    'src/python/pants/backend/python/commands:pants_old',
+    'src/python/pants/commands:pants_new',
+  ],
+)

@@ -19,7 +19,6 @@ import pystache
 import bs4
 import yaml
 
-
 from pants.backend.core.tasks.task import Task
 from pants.base.exceptions import TaskError
 
