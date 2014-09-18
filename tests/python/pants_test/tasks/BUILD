@@ -74,6 +74,7 @@ python_test_suite(
 python_test_suite(
   name = 'integration',
   dependencies = [
+    'depmap_integration',
     ':eclipse_integration',
     ':ensime_integration',
     ':idea_integration',
@@ -273,6 +274,15 @@ python_tests(
     'src/python/pants/backend/python:plugin',
     'src/python/pants/base:build_file_aliases',
   ]
+)
+
+python_tests(
+  name = 'depmap_integration',
+  sources = ['test_depmap_integration.py'],
+  dependencies = [
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test:int-test',
+  ],
 )
 
 python_tests(
