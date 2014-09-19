@@ -73,7 +73,7 @@ def rst_to_html(s, span=False):
      Our RST parser thinks "foo" is a paragraph.
   """
   if not s: return ''
-  body =  publish_parts(s, writer_name='html')['body'].strip()
+  body = publish_parts(s, writer_name='html')['body'].strip()
   if span:
     if body.startswith('<p>') and body.endswith('</p>') and body.count('<p>') == 1:
       body = body[3:-4]
@@ -250,6 +250,7 @@ def shard_param_docstring(s):
   del shards['!forget']
   return shards
 
+
 def param_docshards_to_template_datas(funcdoc_shards):
   template_datas = []
   if funcdoc_shards:
@@ -354,24 +355,25 @@ def entry_for_one(nom, sym):
 
 
 PREDEFS = {  # some hardwired entries
-  'dependencies' : {'defn':
-                      msg_entry('dependencies',
-                                'Old name for `target`_',
-                                'Old name for <a href="#target">target</a>'),},
-  'egg' : {'defn': msg_entry('egg',
-                             'In older Pants, loads a pre-built Python egg '
-                             'from file system. Undefined in newer Pants.',
-                             'In older Pants, loads a pre-built Python egg '
-                             'from file system. Undefined in newer Pants.')},
+  'dependencies': {'defn':
+                     msg_entry('dependencies',
+                               'Old name for `target`_',
+                               'Old name for <a href="#target">target</a>')},
+  'egg': {'defn': msg_entry('egg',
+                            'In older Pants, loads a pre-built Python egg '
+                            'from file system. Undefined in newer Pants.',
+                            'In older Pants, loads a pre-built Python egg '
+                            'from file system. Undefined in newer Pants.')},
   'java_tests': {'defn':
                    msg_entry('java_tests',
                              'Old name for `junit_tests`_',
-                             'Old name for <a href="#junit_tests">junit_tests</a>'),},
-  'pants': {'defn': msg_entry('pants',
-                  """In old Pants versions, a reference to a Pants targets.
-                  (In new Pants versions, just use strings.)""",
-                  """In old Pants versions, a reference to a Pants targets.
-                  (In new Pants versions, just use strings.)""")},
+                             'Old name for <a href="#junit_tests">junit_tests</a>')},
+  'pants': {'defn':
+              msg_entry('pants',
+                        """In old Pants versions, a reference to a Pants targets.
+                        (In new Pants versions, just use strings.)""",
+                        """In old Pants versions, a reference to a Pants targets.
+                        (In new Pants versions, just use strings.)""")},
   'python_artifact': {'suppress': True},  # unused alias for PythonArtifact
   'python_test_suite': {'defn':
                           msg_entry('python_test_suite',
