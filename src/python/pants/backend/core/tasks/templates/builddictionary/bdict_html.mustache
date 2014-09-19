@@ -40,6 +40,10 @@ p.bdict_method_heading {
 div.bdict_method {
   border: 1px dotted #def;
   margin-left: 1em;
+  padding: 0px 0.5em;
+}
+p.bdict_impl {
+  font-size: 90%;
 }
 </style>
 
@@ -93,8 +97,7 @@ div.bdict_method {
 {{/showparams}}
 
 {{#impl}}
-<p>
-Implemented by <tt>{{impl}}</tt>
+<p class="bdict_impl">Implemented by <tt>{{impl}}</tt>
 {{/impl}}
 
 {{#showmethods}}
