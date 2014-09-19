@@ -1,2 +1,1 @@
-PyYAML==3.10
 beautifulsoup4

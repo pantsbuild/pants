@@ -12,12 +12,12 @@ Suggested use:
   ./build-support/bin/publish_docs.sh  # invokes sitegen.py
 '''
 
+import json
 import os
 import shutil
 import pystache
 
 import bs4
-import yaml
 
 from pants.backend.core.tasks.task import Task
 from pants.base.exceptions import TaskError
@@ -30,12 +30,12 @@ class SiteGen(Task):
     option_group.add_option(mkflag('config-path'),
                             dest='sitegen_config_path',
                             action='append',
-                            help='[%default] Path to YAML file describing site structure.')
+                            help='[%default] Path to .json file describing site structure.')
 
   def execute(self):
     if not self.context.options.sitegen_config_path:
       raise TaskError('Need to pass '
-                      '--sitegen-config-path=src/python/pants/docs/docsite.yaml'
+                      '--sitegen-config-path=src/python/pants/docs/docsite.json'
                       ' or something.')
     for config_path in self.context.options.sitegen_config_path:
       config = load_config(config_path)
@@ -47,10 +47,10 @@ class SiteGen(Task):
       copy_extras(config)
 
 
-def load_config(yaml_path):
-  '''Load config info from a .yaml file and return it'''
-  with open(yaml_path) as yaml_file:
-    config = yaml.safe_load(yaml_file.read().decode('utf8'))
+def load_config(json_path):
+  '''Load config info from a .json file and return it'''
+  with open(json_path) as json_file:
+    config = json.loads(json_file.read().decode('utf8'))
   # sanity-test the config:
   assert(config['tree'][0]['page'] == 'index')
   return config
@@ -161,7 +161,7 @@ def write_en_pages(config, soups, precomputed, template):
 
 
 def copy_extras(config):
-  '''copy over "extra" files named in config yaml: stylesheets, logos, ...'''
+  '''copy over "extra" files named in config json: stylesheets, logos, ...'''
   outdir = config['outdir']
   for dst, src in config['extras'].items():
     dst_path = os.path.join(outdir, dst)

@@ -62,7 +62,7 @@ cat >> pants.ini.sitegen <<EOF
 packages: [
     'internal_backend.sitegen']
 EOF
-PANTS_CONFIG_OVERRIDE=pants.ini.sitegen ${HERE}/../../pants goal sitegen --sitegen-config-path=src/python/pants/docs/docsite.yaml || \
+PANTS_CONFIG_OVERRIDE=pants.ini.sitegen ${HERE}/../../pants goal sitegen --sitegen-config-path=src/python/pants/docs/docsite.json || \
   die "Failed to generate doc site'."
 
 do_open "${HERE}/../../dist/docsite/index.html"

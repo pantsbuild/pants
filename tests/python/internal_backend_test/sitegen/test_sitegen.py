@@ -5,23 +5,27 @@
 import unittest2 as unittest
 
 import bs4
-import yaml
+import json
 
 from internal_backend.sitegen.tasks import sitegen
 
-CONFIG_YAML = '''
-sources:
-  index: fake0/README.html
-  subdir/page1: fake1/p1.html
-
-tree:
-  page: index
-  children:
-  - page: subdir/page1
-
-# outdir: dist/test_sitegen/ # omit for now...
-
-template: fake/fake.mustache
+CONFIG_JSON = '''
+{
+  "sources": {
+    "index": "fake0/README.html",
+    "subdir/page1": "fake1/p1.html"
+  },
+  "extras": {
+  },
+  "tree": [
+    { "page": "index",
+      "children": [
+        { "page": "subdir/page1" }
+      ]
+    }
+  ],
+  "template": "fake/fake.mustache"
+}
 '''
 
 INDEX_HTML = '''
@@ -44,7 +48,7 @@ TEMPLATE_MUSTACHE = '''
 
 class AllTheThingsTestCase(unittest.TestCase):
   def setUp(self):
-    self.config = yaml.load(CONFIG_YAML)
+    self.config = json.loads(CONFIG_JSON)
     self.orig_soups = {
       'index': bs4.BeautifulSoup(INDEX_HTML),
       'subdir/page1': bs4.BeautifulSoup(P1_HTML)
