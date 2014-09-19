@@ -115,13 +115,13 @@ class JarRules(object):
   One issue is signed jars that must be included on the
   classpath.  These have a signature that depends on the jar contents and assembly of the deploy jar
   changes the content of the jar, breaking the signatures.  For cases like these the signed jars
-  must be verified and then the signature information thrown away.  The :ref:`Skip <bdict_Skip>`
+  must be verified and then the signature information thrown away.  The `Skip <#Skip>`_
   rule supports this sort of issue by allowing outright entry exclusion in the final deploy jar.
 
   Another issue is duplicate jar entries.  Although the underlying zip format supports these, the
   java jar tool and libraries do not.  As such some action must be taken for each duplicate entry
   such that there are no duplicates in the final deploy jar.  The four
-  :ref:`Duplicate <bdict_Duplicate>` rules support resolution of these cases by allowing 1st wins,
+  `Duplicate <#Duplicate>`_ rules support resolution of these cases by allowing 1st wins,
   last wins, concatenation of the duplicate entry contents or raising an exception.
   """
   @classmethod

@@ -26,7 +26,7 @@ class PythonRequirement(object):
   `kombu>=2.1.1,<3.0`, `anyjson>=0.3.1`, `importlib`, and `amqplib>=1.0`.
 
   To let other Targets depend on this ``python_requirement``, put it in a
-  :ref:`python_requirement_library <bdict_python_requirement_library>`.
+  `python_requirement_library <#python_requirement_library>`_.
   """
 
   def __init__(self, requirement, name=None, repository=None, version_filter=None, use_2to3=False,

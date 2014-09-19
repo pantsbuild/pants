@@ -80,13 +80,14 @@ def rst_to_html(s, span=False):
   return body
 
 
-def entry(nom, classdoc=None, msg_rst=None, msg_html=None, argspec=None,
-          funcdoc_rst=None, funcdoc_html=None, methods=None, impl=None,
-          indent=1):
+def entry(nom, classdoc_rst=None, classdoc_html=None,
+          msg_rst=None, msg_html=None, argspec=None,
+          funcdoc_rst=None, funcdoc_html=None, methods=None, paramdocs=None,
+          impl=None, indent=1):
   """Create a struct that our template expects to see.
 
   :param nom: Symbol name, e.g. python_binary
-  :param classdoc: plain text appears above argspec
+  :param classdoc_rst: plain text appears above argspec
   :param msg_rst: reST. useful in hand-crafted entries
   :param argspec: arg string like (x, y="deflt")
   :param funcdoc_rst: function's __doc__, plain text
@@ -98,7 +99,8 @@ def entry(nom, classdoc=None, msg_rst=None, msg_html=None, argspec=None,
 
   return TemplateData(
     nom=nom.strip(),
-    classdoc=indent_docstring_by_n(classdoc),
+    classdoc_rst=indent_docstring_by_n(classdoc_rst),
+    classdoc_html=classdoc_html,
     msg_html=msg_html,
     msg_rst=indent_docstring_by_n(msg_rst, indent),
     argspec=argspec,
@@ -106,6 +108,8 @@ def entry(nom, classdoc=None, msg_rst=None, msg_html=None, argspec=None,
     funcdoc_rst=indent_docstring_by_n(funcdoc_rst, indent),
     methods=methods,
     showmethods=methods and (len(methods) > 0),
+    paramdocs=paramdocs,
+    showparams=paramdocs and (len(paramdocs) > 0),
     impl=impl)
 
 
@@ -127,12 +131,13 @@ def entry_for_one_func(nom, func):
   funcdoc_body_rst = docstring_to_body(dedent_docstring(func.__doc__))
   funcdoc_body_html = rst_to_html(funcdoc_body_rst)
   param_docshards = shard_param_docstring(dedent_docstring(func.__doc__))
-  param_html = param_docshards_to_html(param_docshards)
+  paramdocs = param_docshards_to_template_datas(param_docshards)
   return entry(nom,
                argspec=argspec,
-               funcdoc_html=funcdoc_body_html + param_html,
+               funcdoc_html=funcdoc_body_html,
                funcdoc_rst=func.__doc__ or '',
-               impl="{0}.{1}".format(func.__module__, func.__name__))
+               impl="{0}.{1}".format(func.__module__, func.__name__),
+               paramdocs=paramdocs)
 
 
 def entry_for_one_method(nom, method):
@@ -146,13 +151,15 @@ def entry_for_one_method(nom, method):
   args, varargs, varkw, defaults = inspect.getargspec(method)
   # args[:1] instead of args to discard "self" arg
   argspec = inspect.formatargspec(args[1:], varargs, varkw, defaults)
-  funcdoc_body_html = rst_to_html(dedent_docstring(method.__doc__))
+  funcdoc_body_rst = docstring_to_body(dedent_docstring(method.__doc__))
+  funcdoc_body_html = rst_to_html(funcdoc_body_rst)
   param_docshards = shard_param_docstring(dedent_docstring(method.__doc__))
-  param_html = param_docshards_to_html(param_docshards)
+  paramdocs = param_docshards_to_template_datas(param_docshards)
   return entry(nom,
                argspec=argspec,
-               funcdoc_html=funcdoc_body_html + param_html,
+               funcdoc_html=funcdoc_body_html,
                funcdoc_rst=(method.__doc__ or ""),
+               paramdocs=paramdocs,
                indent=2)
 
 
@@ -243,21 +250,20 @@ def shard_param_docstring(s):
   del shards['!forget']
   return shards
 
-def param_docshards_to_html(funcdoc_shards):
+def param_docshards_to_template_datas(funcdoc_shards):
+  template_datas = []
   if funcdoc_shards:
-    funcdoc_html = '<div class="param-section">\n<p><b>Params</b>\n'
     for param, parts in funcdoc_shards.items():
-      funcdoc_html += ('\n<p class="param">'
-                       '<b class="paramname">{0}</b>').format(param)
       if 'type' in parts:
-        funcdoc_html += '(<em class="paramtype">{0}</em>)'.format(parts['type'])
+        type_ = parts['type']
+      else:
+        type_ = None
       if 'param' in parts:
-        funcdoc_html += rst_to_html(dedent_docstring(parts['param']),
-                                    span=True)
-    funcdoc_html += '\n</div>\n'
-  else:
-    funcdoc_html = ''
-  return funcdoc_html
+        desc = rst_to_html(dedent_docstring(parts['param']), span=True)
+      else:
+        desc = None
+      template_datas.append(TemplateData(param=param, typ=type_, desc=desc))
+  return template_datas
 
 
 def entry_for_one_class(nom, cls):
@@ -293,28 +299,26 @@ def entry_for_one_class(nom, cls):
     # Suppress these from BUILD dictionary: they're legit args to the
     # Target implementation, but they're not for BUILD files:
     suppress = set(['address', 'build_graph', 'payload'])
-    funcdoc_html = '<p><b>Params</b>'
     funcdoc_rst = ''
+    funcdoc_shards = OrderedDict()
     for shard in docs_accumulator:
       for param, parts in shard.items():
         if param in suppress:
           continue
         suppress.add(param)  # only show things once
+        funcdoc_shards[param] = parts
         # Don't interpret param names like "type_" as links.
-        funcdoc_html += ('\n<p class="param">'
-                         '<b class="paramname">{0}</b> ').format(param)
         if 'type' in parts:
-          funcdoc_html += '(<em class="paramtype">{0}</em>) '.format(parts['type'])
           funcdoc_rst += '\n:type {0}: {1}'.format(param, parts['type'])
         if 'param' in parts:
-          funcdoc_html += rst_to_html(dedent_docstring(parts['param']),
-                                      span=True)
           funcdoc_rst += '\n:param {0}: {1}'.format(param, parts['param'])
+
+    paramdocs = param_docshards_to_template_datas(funcdoc_shards)
   else:
     args, varargs, varkw, defaults = inspect.getargspec(cls.__init__)
     argspec = inspect.formatargspec(args[1:], varargs, varkw, defaults)
     funcdoc_shards = shard_param_docstring(dedent_docstring(cls.__init__.__doc__))
-    funcdoc_html = param_docshards_to_html(funcdoc_shards)
+    paramdocs = param_docshards_to_template_datas(funcdoc_shards)
     funcdoc_rst = cls.__init__.__doc__
 
   methods = []
@@ -330,11 +334,12 @@ def entry_for_one_class(nom, cls):
                     (attrname, nom))
 
   return entry(nom,
-               classdoc=cls.__doc__,
+               classdoc_rst=cls.__doc__,
+               classdoc_html=rst_to_html(dedent_docstring(cls.__doc__)),
                argspec=argspec,
-               funcdoc_html=funcdoc_html,
                funcdoc_rst=funcdoc_rst,
                methods=methods,
+               paramdocs=paramdocs,
                impl='{0}.{1}'.format(cls.__module__, cls.__name__))
 
 

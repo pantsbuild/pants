@@ -12,7 +12,8 @@ from pants.base.target import Target
 class Resources(Target):
   """A set of files accessible as resources from the JVM classpath.
 
-  Looking for loose files in your application bundle? Those are :ref:`bdict_bundle`\ s.
+  Looking for loose files in your application bundle? Those are
+  `bundle <#bundle>`_\s.
 
   Resources are Java-style resources accessible via the ``Class.getResource``
   and friends API. In the ``jar`` goal, the resource files are placed in the resulting `.jar`.

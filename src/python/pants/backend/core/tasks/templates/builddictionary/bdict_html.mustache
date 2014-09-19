@@ -4,6 +4,8 @@
 </head>
 <body>
 
+<h1>Pants BUILD Dictionary</h1>
+
 <p>
 A <tt>BUILD</tt> file defines one or more <em>build targets</em>.
 A build target might create a jar or a deployable package,
@@ -14,10 +16,30 @@ targets; some are handy utilities.
 
 <!-- some styles used only in build dictionary, so far -->
 <style>
+.bdict_section {
+  margin-left: 0.5em;
+}
+.bdict_heading {
+  margin-left: -0.25em;
+  border-top: 4px solid #9bf;
+}
 p.bdict_argspec {
   border-top: 1px dotted #bcd;
   background-color: #def;
   font-family: monospace;
+  padding: 0.5em;
+}
+div.bdict_params_section {
+  margin-left: 1em;
+  font-size: 90%;
+}
+p.bdict_method_heading {
+  border-top: 2px solid #bcd;
+  margin-bottom: 0px;
+}
+div.bdict_method {
+  border: 1px dotted #def;
+  margin-left: 1em;
 }
 </style>
 
@@ -29,29 +51,46 @@ p.bdict_argspec {
   {{/e}}
 {{/tocs}}
 
+<p>&nbsp;
+
 {{#defns}}
 
+<div class="bdict_section">
 <a xmark="_bdict_{{nom}}"> </a>
-<h1 id="{{nom}}">{{nom}}</h1>
+<h2 id="{{nom}}" class="bdict_heading">{{nom}}</h2>
 
 {{#argspec}}
 <p class="bdict_argspec">{{nom}}{{argspec}}
 {{/argspec}}
 
-{{#classdoc}}
-<p><b>classdoc</b>
-{{{classdoc}}}
-{{/classdoc}}
+{{#classdoc_html}}
+<div>
+{{{classdoc_html}}}
+</div>
+{{/classdoc_html}}
 
 {{#msg_html}}
-<p><b>msg_html</b>
 {{{msg_html}}}
 {{/msg_html}}
 
 {{#funcdoc_html}}
-<p><b>funcdoc</b>
 {{{funcdoc_html}}}
 {{/funcdoc_html}}
+
+{{#showparams}}
+<div class="bdict_params_section">
+<p><b>Params:</b>
+{{#paramdocs}}
+
+<p class="bdict_param"><b class="bdict_param_name">{{param}}</b>
+  {{#typ}}
+  (<em class="bdict_param_type">{{typ}}</em>)
+  {{/typ}}
+  {{{desc}}}
+
+{{/paramdocs}}
+</div>
+{{/showparams}}
 
 {{#impl}}
 <p>
@@ -61,14 +100,32 @@ Implemented by <tt>{{impl}}</tt>
 {{#showmethods}}
 <p><b>Methods:</b>
 {{#methods}}
+<p class="bdict_method_heading">{{nom}}
 <div class="bdict_method">
 <p class="bdict_argspec">{{nom}}{{argspec}}
 
-<p><b>funcdoc</b>
 {{{funcdoc_html}}}
+
+  {{#showparams}}
+  <div class="bdict_params_section">
+  <p><b>Params:</b>
+  {{#paramdocs}}
+
+  <p class="bdict_param"><b class="bdict_param_name">{{param}}</b>
+    {{#typ}}
+    (<em class="bdict_param_type">{{typ}}</em>)
+    {{/typ}}
+    {{{desc}}}
+
+  {{/paramdocs}}
+  </div>
+  {{/showparams}}
+
 </div>
 {{/methods}}
 {{/showmethods}}
+
+</div>
 
 {{/defns}}
 
