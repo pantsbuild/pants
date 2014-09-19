@@ -18,6 +18,7 @@ python_library(
   ),
   dependencies=[
     '3rdparty/python:ansicolors',
+    '3rdparty/python:docutils',
     '3rdparty/python:Markdown',
     '3rdparty/python:pex',
     '3rdparty/python:psutil',
