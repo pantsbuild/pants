@@ -4,7 +4,7 @@
 java_library(name='missingdepswhitelist',
   sources=rglobs('*.java'),
   dependencies=[
-    'examples/src/java/com/pants/examples/hello/greet',
+    'testprojects/src/java/com/pants/testproject/publish/hello/greet',
     'testprojects/src/java/com/pants/testproject/missingdepswhitelist2'
   ]
 )

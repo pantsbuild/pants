@@ -5,7 +5,7 @@ scala_library(
   name = 'javasources',
   java_sources=[
     'testprojects/src/java/com/pants/testproject/javasources',
-    'examples/src/java/com/pants/examples/hello/greet:greet'
+    'testprojects/src/java/com/pants/testproject/publish/hello/greet:greet'
   ],
   sources = rglobs('*.scala')
 )

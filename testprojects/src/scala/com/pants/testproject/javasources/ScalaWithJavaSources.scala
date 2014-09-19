@@ -3,7 +3,7 @@
 
 package com.pants.testproject.javasources
 
-import com.pants.examples.hello.greet.Greeting
+import com.pants.testproject.publish.hello.greet.Greeting
 
 class ScalaWithJavaSources {
   def example(): String = {

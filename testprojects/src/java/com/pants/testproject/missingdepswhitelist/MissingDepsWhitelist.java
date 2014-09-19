@@ -1,6 +1,6 @@
 package com.pants.testproject.missingdepswhitelist;
 
-import com.pants.examples.hello.greet.Greeting;
+import com.pants.testproject.publish.hello.greet.Greeting;
 import com.pants.testproject.missingdepswhitelist2.MissingDepsWhitelist2;
 
 public class MissingDepsWhitelist {
