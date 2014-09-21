@@ -129,6 +129,12 @@ class PythonTestBuilder(object):
     return '\n\t{values}'.format(values='\n\t'.join(values))
 
   def _generate_coverage_config(self, source_mappings):
+    # For the benefit of macos testing, add the 'real' path the the directory as an equivalent.
+    def add_realpath(path):
+      realpath = os.path.realpath(path)
+      if realpath != canonical and realpath not in alternates:
+        realpaths.add(realpath)
+
     cp = configparser.SafeConfigParser()
     cp.readfp(Compatibility.StringIO(self.DEFAULT_COVERAGE_CONFIG))
 
@@ -138,7 +144,11 @@ class PythonTestBuilder(object):
     cp.add_section('paths')
     for canonical, alternates in source_mappings.items():
       key = canonical.replace(os.sep, '.')
-      cp.set('paths', key, self._format_string_list([canonical] + list(alternates)))
+      realpaths = set()
+      add_realpath(canonical)
+      for path in alternates:
+        add_realpath(path)
+      cp.set('paths', key, self._format_string_list([canonical] + list(alternates) + list(realpaths)))
 
     # See the debug options here: http://nedbatchelder.com/code/coverage/cmd.html#cmd-run-debug
     if self._debug:
