@@ -58,7 +58,8 @@ def temporary_dir(root_dir=None, cleanup=True):
   """
   path = tempfile.mkdtemp(dir=root_dir)
   try:
-    yield path
+    name = os.path.realpath(path)
+    yield name
   finally:
     if cleanup:
       shutil.rmtree(path, ignore_errors=True)
@@ -75,7 +76,8 @@ def temporary_file_path(root_dir=None, cleanup=True):
   """
   with temporary_file(root_dir, cleanup) as fd:
     fd.close()
-    yield fd.name
+    name = os.path.realpath(fd.name)
+    yield name
 
 
 @contextmanager
