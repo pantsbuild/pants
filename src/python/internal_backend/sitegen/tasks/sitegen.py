@@ -60,8 +60,8 @@ def load_soups(config):
   '''Generate BeautifulSoup AST for each page listed in config'''
   soups = {}
   for page, path in config['sources'].items():
-    with open(path) as orig_file:
-      soups[page] = bs4.BeautifulSoup(orig_file.read().decode('utf8'))
+    with open(path, 'rb') as orig_file:
+      soups[page] = bs4.BeautifulSoup(orig_file.read().decode('utf-8'))
   return soups
 
 
@@ -156,8 +156,8 @@ def write_en_pages(config, soups, precomputed, template):
     dst_dir = os.path.dirname(dst_path)
     if not os.path.isdir(dst_dir):
       os.makedirs(dst_dir)
-    with open(dst_path, 'w') as f:
-      f.write(html.encode('utf8'))
+    with open(dst_path, 'wb') as f:
+      f.write(html.encode('utf-8'))
 
 
 def copy_extras(config):
@@ -173,6 +173,6 @@ def copy_extras(config):
 
 def load_template(config):
   '''Return text of template file specified in config'''
-  with open(config['template']) as template_file:
-    template = template_file.read().encode('utf8')
+  with open(config['template'], 'rb') as template_file:
+    template = template_file.read().decode('utf-8')
   return template
