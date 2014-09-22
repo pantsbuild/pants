@@ -134,7 +134,7 @@ if [[ "${skip_python:-false}" == "false" ]]; then
     PANTS_PY_COVERAGE=paths:pants/ PANTS_PYTHON_TEST_FAILSOFT=1 \
       ./pants.pex goal test ${PANTS_ARGS[@]} \
         $(./pants.pex goal list tests/python/pants_test:: | grep -v integration)
-    PANTS_PY_COVERAGE=paths:internal_backend/ PANTS_PYTHON_TEST_FAILSOFT=1 \
+    PANTS_PYTHON_TEST_FAILSOFT=1 \
       ./pants.pex goal test ${PANTS_ARGS[@]} \
         $(./pants.pex goal list tests/python/internal_backend_test:: | grep -v integration)
   ) || die "Core python test failure"
