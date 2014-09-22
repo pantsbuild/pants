@@ -54,6 +54,10 @@ GLOBAL_OPTIONS = [
          help='Write build artifacts to cache, if possible.'),
   Option('--print-exception-stacktrace', dest='print_exception_stacktrace', action='store_true',
          default=False, help='Print to console the full exception stack trace if encountered.'),
+  Option('--fail-fast', dest='fail_fast', action='store_true',
+         default=False, help="When parsing specs, will stop on the first erronous BUILD file "
+                             "encountered. Otherwise, will parse all builds in a spec and "
+                             "then throw an Exception."),
 ]
 
 
