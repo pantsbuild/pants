@@ -10,11 +10,6 @@ jdk:
 install:
   - pip install coveralls
 
-script: |
-  uname -a
-  java -version
-  ./build-support/bin/ci.sh -d
-
 env:
   global:
     # Credentials for OSX syncing: GH_USER, GH_EMAIL, GH_TOKEN
@@ -25,12 +20,13 @@ env:
     # See: http://docs.travis-ci.com/user/encryption-keys/
     - secure: VvwbndU++a2/iNAjk9cd67ATiipDwqcKnxDR4/J2Ik3GH10wHEDUhJ1+MK4WLhedfaOakDOEmarZQS3GwtgvCHO3knpTJuJc8d/bCfZovYuSqdi//BEv4dS7hDt6tQeJfkbBjG0T4yNjPJ3W9R9KDWCy/vj2CUm90BGg2CmxUbg=
 
-after_script: |
-  # Only sync pantsbuild/pants-for-travis-osx-ci on pushes to pantsbuild/pants master
-  if [[ TRAVIS_PULL_REQUEST == "false" && TRAVIS_BRANCH == "master" ]]
-  then
-    ./build-support/bin/ci-sync.sh
-  fi
+before_script: |
+  ./build-support/bin/ci-sync.sh
+
+script: |
+  uname -a
+  java -version
+  ./build-support/bin/ci.sh -d
 
 notifications:
   email:
