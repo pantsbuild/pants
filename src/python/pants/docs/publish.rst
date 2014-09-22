@@ -256,35 +256,16 @@ doesn't "remember" them.
   a particular artifact at the same time you were, your changes may be too
   "entangled" to salvage this way.)
 
-**Depending on how "entangled" your state is,** you either want to
-reset and start over or merge the pushdb by hand.
-
 **To reset and start over** In git, this might mean::
 
     git reset origin/master # (if ``master`` is your release branch)
     git pull
     ./pants goal clean-all && ./pants goal publish <your previous args>
 
-Since you uploaded new versions artifacts but the reset pushdb doesn't
-"remember" that, you might  get
-"Versioned Artifact Already Exists"
-errors.
-Use ``--publish_override`` to set version numbers to avoid these.
-
-**To merge the pushdb by hand** In git, this might mean
-
-* Use ``git status`` to check your change.
-* Commit it with ``git commit``.
-* ``git commit -a -m "pants build committing publish data for push of org#artifact;version"``
-* as fast as you can, execute the following steps::
-
-    git fetch origin master
-    git rebase origin/master
-    git push origin master
-
-* If that worked, great; if it didn't work, you might try repeating that
-  last set of steps *or* (if it keeps on not working) giving up, resetting,
-  and starting over.
+Since you uploaded new versioned artifacts but the reset pushdb doesn't
+"remember" that, you might get "Versioned Artifact Already Exists"
+errors: see the section above, and use ``--publish-override`` to set
+version numbers to avoid these.
 
 .. _publish-no-provides:
 
