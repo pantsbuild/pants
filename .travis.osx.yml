@@ -1,0 +1,13 @@
+language: objective-c
+
+script: |
+  sw_vers
+  python --version
+  java -version
+  ./build-support/bin/ci.sh -d
+
+notifications:
+  email:
+    # TODO(John Sirois): update this list to match .travis.yml
+    - john.sirois@gmail.com
+
