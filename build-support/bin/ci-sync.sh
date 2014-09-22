@@ -19,7 +19,7 @@
 #  http://docs.travis-ci.com/user/pull-requests/#Security-Restrictions-when-testing-Pull-Requests
 if [[ -z ${GH_TOKEN} ]]
 then
-  echo "Not syncing OSX CI for clone of $(git config --get remote.origin.url)."
+  echo "Not syncing OSX CI for fork of pantsbuild/pants."
   exit 0
 fi
 
