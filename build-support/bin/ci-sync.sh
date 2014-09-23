@@ -46,11 +46,26 @@ then
   exit 0
 fi
 
+function prepare_osx_yaml() {
+  # NB: we can freely `pip install` in our Travis CI ephemeral build environment.
+  pip install PyYAML && python << EOF
+import yaml
+with open('.travis.yml') as fp:
+  config_linux = yaml.safe_load(fp)
+with open('.travis.osx.yml') as fp:
+  config_osx = yaml.safe_load(fp)
+# We maintain notifications mailing lists centrally in the main `.travis.yml` config.
+config_osx['notifications'] = config_linux['notifications']
+with open('.travis.yml', 'w') as fp:
+  yaml.safe_dump(config_osx, fp)
+EOF
+}
+
 echo "Syncing OSX CI to $(git rev-parse HEAD) for CI build ${TRAVIS_BUILD_NUMBER}." && \
-cp .travis.osx.yml .travis.yml && \
+prepare_osx_yaml && \
 git config --local user.email "${GH_EMAIL}" && \
 git config --local user.name "${GH_USER}" && \
-git commit -am "Prepare pants OSX mirror for CI." && \
+git commit -am "Sync of https://github.com/pantsbuild/pants/commit/$(git rev-parse HEAD)" && \
 git config --local credential.helper "store --file=.git/credentials" && \
 echo "https://${GH_TOKEN}:@github.com" > .git/credentials && \
 git push -f https://github.com/pantsbuild/pants-for-travis-osx-ci.git HEAD:master

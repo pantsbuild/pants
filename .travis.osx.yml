@@ -16,8 +16,5 @@ script: |
   java -version
   ./build-support/bin/ci.sh -d
 
-notifications:
-  email:
-    # TODO(John Sirois): update this list to match .travis.yml
-    - john.sirois@gmail.com
-
+# The `notifications:` configuration will be programatically copied over from `.travis.yml` for
+# central maintenance of distribution lists, see: `build-support/bin/ci-sync.sh`.
