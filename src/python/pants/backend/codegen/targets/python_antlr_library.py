@@ -17,9 +17,6 @@ class PythonAntlrLibrary(PythonTarget):
     """
     :param module: everything beneath module is relative to this module name, None if root namespace
     :param antlr_version:
-    :param resources: non-Python resources, e.g. templates, keys, other data (it is
-        recommended that your application uses the pkgutil package to access these
-        resources in a .zip-module friendly way.)
     """
 
     super(PythonAntlrLibrary, self).__init__(*args, **kwargs)

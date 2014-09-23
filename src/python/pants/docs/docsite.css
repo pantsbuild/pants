@@ -1,0 +1,101 @@
+/*
+ * Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+ * Licensed under the Apache License, Version 2.0 (see LICENSE).
+ */
+
+
+body {
+  background-color: #eee;
+  color: #111;
+  font-family: sans-serif;
+}
+.mainflow {
+  margin: 64px 2% 40em 30%;
+}
+
+nav.breadcrumbs ul {
+  margin: 0px; padding: 0px;
+}
+
+nav.breadcrumbs ul li {
+  display: inline;
+  list-style-type: none;
+}
+
+nav.breadcrumbs ul li:before {
+  content: " ← ";
+}
+
+nav.breadcrumbs ul li:first-child:before {
+  content: none;
+}
+
+nav.breadcrumbs ul li a {
+  text-decoration: none;
+  background-color: #ddd;
+}
+
+nav.breadcrumbs ul li a:hover {
+  background-color: #fff;
+}
+
+nav.bignav {
+  font-size: larger;
+  position: absolute;
+  top: 0px;
+  left: 0px;
+  margin: 64px 0.5%;
+  max-width: 23%;
+  border: 3px solid #38c;
+  border-radius: 3px;
+  background-color: #888;
+}
+
+.bignav-logo {
+  text-align: center;
+  margin-top: -20px;
+}
+.bignav-logo img {
+  border: 3px solid #38c;
+  border-radius: 3px;
+}
+
+form.search {
+  padding: 1em 0px;
+}
+
+form.search input.query {
+  width: 70%;
+  background-color: #fff;
+  padding: 0.5em 0.6em;
+  border: 1px solid #147;
+  border-radius: 2px;
+}
+
+form.search .button {
+  width: 20%;
+  padding: 0.5em 1em;
+  background-color: #eee;
+  color: #258;
+  border: 1px solid #147;
+  border-radius: 2px;
+}
+
+nav.bignav .bigtoc {
+  background-color: #eee;
+}
+
+div.ci-status {
+  position: absolute;
+  top: 0px; right: 0px;
+}
+
+div.ci-status .caption {
+  vertical-align: middle;
+  font-size: small;
+  color: #232;
+}
+
+div.ci-status img {
+  vertical-align: middle;
+}

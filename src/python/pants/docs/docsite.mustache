@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<!--
+  Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+  Licensed under the Apache License, Version 2.0 (see LICENSE).
+-->
+
+<head>
+  <meta charset="utf-8" />
+  <title>{{title}}</title>
+  <link rel="stylesheet" href="{{topdots}}s.css">
+  <script src="{{topdots}}s.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="shortcut icon" href="{{topdots}}logo.ico">
+</head>
+
+<body>
+
+<div class="mainflow">
+<nav class="breadcrumbs">
+TODO(lhosken) this would be a good place for "breadcrumb" navigation
+</nav>
+
+<!-- main content start -->
+{{{body_html}}}
+<!-- main content end -->
+
+</div> <!-- end of mainflow -->
+
+<nav class="bignav">
+  <div class="bignav-logo">
+    <a href="{{topdots}}index.html">
+      <img src="{{topdots}}logo.ico" alt="[pantsbuild logo]">
+    </a>
+  </div>
+  <form class="search" action="https://www.google.com/search">
+  <input name="as_q" class="query">
+  <input name="as_sitesearch" value="pantsbuild.github.io" type="hidden">
+  <input value="Search" type=submit class="button">
+  </form>
+
+<div class="bigtoc">
+TODO(lhosken) this would be a good place for a Table of
+              Contents showing all pages in the site
+</div>
+</nav>
+
+<div class="ci-status">
+<span class="caption">Testing status:</span>
+<a href="https://travis-ci.org/pantsbuild/pants">
+<img src="https://travis-ci.org/pantsbuild/pants.png?branch=master"></a>
+</div>
+
+</body>
+</html>
+

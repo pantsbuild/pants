@@ -16,7 +16,6 @@ class Repository(Target):
 
   def __init__(self, url=None, push_db_basedir=None, **kwargs):
     """
-    :param string name: Name of the repository.
     :param string url: Optional URL of the repository.
     :param string push_db_basedir: Push history file base directory.
     """
