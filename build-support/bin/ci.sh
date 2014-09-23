@@ -131,10 +131,9 @@ fi
 if [[ "${skip_python:-false}" == "false" ]]; then
   banner "Running core python tests"
   (
-    # TODO(Eric Ayers): Substitute tests/python:: when all tests are working that way
     PANTS_PY_COVERAGE=paths:pants/ PANTS_PYTHON_TEST_FAILSOFT=1 \
-      ./pants.pex goal test tests/python/pants_test:all \
-        ${PANTS_ARGS[@]}
+      ./pants.pex goal test ${PANTS_ARGS[@]} \
+        $(./pants.pex goal list tests/python/:: | grep -v integration)
   ) || die "Core python test failure"
 fi
 
@@ -154,7 +153,10 @@ if [[ "${skip_testprojects:-false}" == "false" ]]; then
     testprojects/src/thrift/com/pants/thrift_linter:
   )
 
-  targets_to_exclude=( "${known_failing_targets[@]}" "${negative_test_targets[@]}" )
+  targets_to_exclude=(
+    ${known_failing_targets[@]}
+    ${negative_test_targets[@]}
+  )
   exclude_opts="${targets_to_exclude[@]/#/--exclude-target-regexp=}"
 
   banner "Running tests in testprojects/ "
@@ -174,9 +176,9 @@ fi
 if [[ "${skip_integration:-false}" == "false" ]]; then
   banner "Running Pants Integration tests"
   (
-    PANTS_PYTHON_TEST_FAILSOFT=1
-      ./pants.pex goal test tests/python/pants_test:integration \
-        ${PANTS_ARGS[@]}
+    PANTS_PYTHON_TEST_FAILSOFT=1 \
+      ./pants.pex goal test ${PANTS_ARGS[@]} \
+        $(./pants.pex goal list tests/python/:: | grep integration)
   ) || die "Pants Integration test failure"
 fi
 

@@ -205,7 +205,6 @@ class JvmBinary(JvmTarget):
   * ``run`` - Executes the main class of this binary locally.
   """
   def __init__(self,
-               name=None,
                main=None,
                basename=None,
                source=None,
@@ -239,7 +238,7 @@ class JvmBinary(JvmTarget):
     :type configurations: tuple of strings
     """
     sources = [source] if source else None
-    super(JvmBinary, self).__init__(name=name, sources=self.assert_list(sources), **kwargs)
+    super(JvmBinary, self).__init__(sources=self.assert_list(sources), **kwargs)
 
     if main and not isinstance(main, Compatibility.string):
       raise TargetDefinitionException(self, 'main must be a fully qualified classname')
@@ -255,7 +254,7 @@ class JvmBinary(JvmTarget):
       raise TargetDefinitionException(self, 'deploy_jar_rules must be a JarRules specification')
 
     self.main = main
-    self.basename = basename or name
+    self.basename = basename or self.name
     self.deploy_excludes = self.assert_list(deploy_excludes, expected_type=Exclude)
     self.deploy_jar_rules = deploy_jar_rules or JarRules.default()
 
