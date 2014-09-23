@@ -20,8 +20,6 @@ class Resources(Target):
 
   def __init__(self, address=None, sources=None, **kwargs):
     """
-    :param string name: The name of this target, which combined with this
-      build file defines the :doc:`target address <target_addresses>`.
     :param sources: Files to "include". Paths are relative to the
       BUILD file's directory.
     :type sources: ``Fileset`` or list of strings

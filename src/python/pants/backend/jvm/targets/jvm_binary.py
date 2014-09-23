@@ -225,8 +225,6 @@ class JvmBinary(JvmTarget):
     :param dependencies: Targets (probably ``java_library`` and
      ``scala_library`` targets) to "link" in.
     :type dependencies: list of target specs
-    :param excludes: List of :ref:`exclude <bdict_exclude>`\s
-      to filter this target's transitive dependencies against.
     :param deploy_excludes: List of :ref:`exclude <bdict_exclude>`\s to apply
       at deploy time.
       If you, for example, deploy a java servlet that has one version of
