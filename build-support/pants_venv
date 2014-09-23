@@ -12,6 +12,7 @@ REQUIREMENTS=(
 )
 
 DEV_REQUIREMENTS=(
+  ${REPO_ROOT}/3rdparty/python/internal_backend/requirements.txt
   ${REPO_ROOT}/3rdparty/python/dev_only_requirements.txt
 )
 

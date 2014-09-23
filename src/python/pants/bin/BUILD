@@ -57,6 +57,7 @@ python_binary(
   compatibility='CPython>=2.6,<3,>=3.3',
   dependencies = [
     ':pants_exe',
+    'src/python/internal_backend/sitegen:plugin',
     'src/python/pants/backend/python/commands:pants_old',
     'src/python/pants/commands:pants_new',
   ],
