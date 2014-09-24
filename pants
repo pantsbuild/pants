@@ -44,7 +44,7 @@ HERE=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
 source ${HERE}/build-support/pants_venv
 
 PANTS_EXE=${HERE}/src/python/pants/bin/pants_exe.py
-PANTS_BINARY=src/python/pants/bin:pants
+PANTS_BINARY=src/python/pants/bin:pants_local_binary
 PANTS_PEX="${HERE}/pants.pex"
 FAILED_BOOTSTRAP_SENTINEL="${HERE}/.pants.d/BOOTSTRAP_FAILED"
 
@@ -100,12 +100,13 @@ else
     # target(s).
     rm -rf ${PANTS_PEX} && \
     run_pants_bare build -v -i "CPython>=2.6,<3" -i "CPython>=3.3" ${PANTS_BINARY} && \
-    mv -v ${HERE}/dist/pants.pex ${PANTS_PEX} && \
+    mv -v ${HERE}/dist/pants_local_binary.pex ${PANTS_PEX} && \
     chmod +x ${PANTS_PEX}
     exit_status=$?
     if [ $exit_status != 0 ] ; then
       echo "*** Pants bootstrapping failed."
-      echo "This file is left as a sentinel to record that bootstrapping pants failed." > ${FAILED_BOOTSTRAP_SENTINEL}
+      echo "This file is left as a sentinel to record that bootstrapping pants failed." \
+        > ${FAILED_BOOTSTRAP_SENTINEL}
       exit $exit_status
     fi
   fi
