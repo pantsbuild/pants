@@ -89,7 +89,7 @@ if [[ "${skip_bootstrap:-false}" == "false" ]]; then
     ./build-support/python/clean.sh && \
     PANTS_DEV=1 PANTS_VERBOSE=1 PEX_VERBOSE=1 PYTHON_VERBOSE=1 \
       ./pants goal ${PANTS_ARGS[@]} binary src/python/pants/bin:pants_local_binary && \
-    mv dist/pants.pex ./pants.pex && \
+    mv dist/pants_local_binary.pex ./pants.pex && \
     ./pants.pex goal goals ${PANTS_ARGS[@]}
   ) || die "Failed to bootstrap pants."
 fi
