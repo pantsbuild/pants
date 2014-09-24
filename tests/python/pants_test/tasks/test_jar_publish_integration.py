@@ -33,6 +33,7 @@ def publish_extra_config(unique_config):
           'backends': {
             'packages': [
               'example.pants_publish_plugin',
+              'internal_backend.repositories',
               ],
             },
           }
