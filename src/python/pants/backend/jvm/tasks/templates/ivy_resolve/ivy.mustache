@@ -22,7 +22,7 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
       {{#lib.configurations}}
       <conf name="{{.}}"/>
       {{/lib.configurations}}
-     </configurations>
+    </configurations>
   {{/lib.configurations?}}
 
   {{#lib.publications?}}
@@ -38,6 +38,9 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
     {{#lib.publications.changelog}}
     <artifact conf="changelog" type="CHANGELOG" m:classifier="CHANGELOG" ext="txt"/>
     {{/lib.publications.changelog}}
+    {{#lib.extra_publications}}
+    <artifact name="{{name}}" conf="{{conf}}" type="{{type}}" m:classifier="{{classifier}}" ext="{{ext}}"/>
+    {{/lib.extra_publications}}
   </publications>
   {{/lib.publications?}}
 
