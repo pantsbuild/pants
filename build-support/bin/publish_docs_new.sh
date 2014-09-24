@@ -2,10 +2,9 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-HERE=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
+REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd "$(git rev-parse --show-toplevel)" && pwd)
 
-# Run pants from source
-export PANTS_DEV=1
+PANTS_EXE="${REPO_ROOT}/pants"
 
 function usage() {
   echo "Publishes the http://pantsbuild.github.io/ docs locally or remotely."
@@ -35,7 +34,7 @@ while getopts "hopd:" opt; do
   esac
 done
 
-${HERE}/../../pants goal builddict --print-exception-stacktrace || \
+${PANTS_EXE} goal builddict --print-exception-stacktrace || \
   die "Failed to generate the 'BUILD Dictionary'."
 
 function do_open() {
@@ -51,27 +50,23 @@ function do_open() {
 }
 
 # generate some markdown as fodder for prototype doc site generator
-${HERE}/../../pants goal markdown --markdown-fragment src:: examples:: //:readme || \
+${PANTS_EXE} goal markdown --print-exception-stacktrace \
+  --markdown-fragment src:: examples:: //:readme || \
   die "Failed to generate HTML from markdown'."
 
-# invoke doc site generator. It's in separate backend, so need a config tweak:
-cp -f pants.ini pants.ini.sitegen
-cat >> pants.ini.sitegen <<EOF
-[backends]
-packages: [
-    'internal_backend.sitegen']
-EOF
-PANTS_CONFIG_OVERRIDE=pants.ini.sitegen ${HERE}/../../pants goal sitegen --sitegen-config-path=src/python/pants/docs/docsite.json --print-exception-stacktrace || \
+# invoke doc site generator.
+${PANTS_EXE} goal sitegen --print-exception-stacktrace \
+  --sitegen-config-path=src/python/pants/docs/docsite.json || \
   die "Failed to generate doc site'."
 
-do_open "${HERE}/../../dist/docsite/index.html"
+do_open "${REPO_ROOT}/dist/docsite/index.html"
 
 if [[ "${publish}" = "true" ]]; then
   url="http://pantsbuild.github.io/${publish_path}"
   read -ep "To abort publishing these docs to ${url} press CTRL-C, otherwise press enter to \
 continue."
   (
-    ${HERE}/../../src/python/pants/docs/publish_via_git.sh \
+    ${REPO_ROOT}/src/python/pants/docs/publish_via_git.sh \
       git@github.com:pantsbuild/pantsbuild.github.io.git \
       ${publish_path} && \
     do_open ${url}/index.html
