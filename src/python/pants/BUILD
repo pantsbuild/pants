@@ -32,8 +32,13 @@ python_library(
     classifiers=[
       'Intended Audience :: Developers',
       'License :: OSI Approved :: Apache Software License',
-      'Operating System :: OS Independent',
+      # We know for a fact these OSs work but, for example, know Windows
+      # does not work yet.  Take the conservative approach and only list OSs
+      # we know pants works with for now.
+      'Operating System :: MacOS :: MacOS X',
+      'Operating System :: POSIX :: Linux',
       'Programming Language :: Python',
+      'Topic :: Software Development :: Build Tools',
     ]
   ).with_binaries(
     # TODO(John Sirois): Switch back when target cycles have been sorted out.
@@ -64,8 +69,14 @@ python_library(
     classifiers=[
       'Intended Audience :: Developers',
       'License :: OSI Approved :: Apache Software License',
-      'Operating System :: OS Independent',
+      # We know for a fact these OSs work but, for example, know Windows
+      # does not work yet.  Take the conservative approach and only list OSs
+      # we know pants works with for now.
+      'Operating System :: MacOS :: MacOS X',
+      'Operating System :: POSIX :: Linux',
       'Programming Language :: Python',
+      'Topic :: Software Development :: Build Tools',
+      'Topic :: Software Development :: Testing',
     ]
   )
 )
