@@ -9,8 +9,8 @@ import os
 import pytest
 from textwrap import dedent
 
-from pants.backend.jvm.targets.artifact import Artifact
-from pants.backend.jvm.targets.repository import Repository
+from pants.backend.jvm.artifact import Artifact
+from pants.backend.jvm.repository import Repository
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.base.exceptions import TargetDefinitionException
@@ -33,18 +33,14 @@ class PythonTargetTest(BaseTest):
 
   def test_validation(self):
 
-    self.make_target(spec=':internal',
-                     target_type=Repository,
-                     url=None,
-                     push_db_basedir=None,
-                     exclusives=None)
+    internal_repo = Repository(url=None, push_db_basedir=None, exclusives=None)
     # Adding a JVM Artifact as a provides on a PythonTarget doesn't make a lot of sense.
     # This test sets up that very scenario, and verifies that pants throws a
     # TargetDefinitionException.
     with pytest.raises(TargetDefinitionException):
       self.make_target(target_type=PythonTarget,
                        spec=":one",
-                       provides=Artifact(org='com.twitter', name='one-jar', repo=':internal'))
+                       provides=Artifact(org='com.twitter', name='one-jar', repo=internal_repo))
 
     spec = ":test-with-PythonArtifact"
     pa = PythonArtifact(name='foo', version='1.0', description='foo')

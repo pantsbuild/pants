@@ -418,7 +418,8 @@ class JarPublish(JarTask, ScmPublish):
   def __init__(self, *args, **kwargs):
     super(JarPublish, self).__init__(*args, **kwargs)
     ScmPublish.__init__(self, get_scm(),
-                        self.context.config.getlist(self._CONFIG_SECTION, 'restrict_push_branches'))
+                        self.context.config.getlist(self._CONFIG_SECTION,
+                                                    'restrict_push_branches'))
     self.cachedir = os.path.join(self.workdir, 'cache')
 
     self._jvmargs = self.context.config.getlist(self._CONFIG_SECTION, 'ivy_jvmargs', default=[])

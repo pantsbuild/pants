@@ -88,7 +88,7 @@ class CacheKeyGenerator(object):
     else:
       target_key = target.invalidation_hash(fingerprint_strategy)
     full_key = '{target_key}_{key_suffix}'.format(target_key=target_key, key_suffix=key_suffix)
-    return CacheKey(target.id, full_key, target.payload.num_chunking_units, (target.payload,))
+    return CacheKey(target.id, full_key, target.num_chunking_units, (target.payload,))
 
 
 # A persistent map from target set to cache key, which is a fingerprint of all

@@ -6,6 +6,6 @@ java_library(name = 'greet',
                      # but this "hello world" is pretty simple.
   sources = globs('*.java'),
   provides = artifact(org='com.pants.examples',
-                    name='hello-greet',
-                    repo='build-support/ivy:public',),
+                      name='hello-greet',
+                      repo=public,),
 )

@@ -211,9 +211,8 @@ def entry_for_one_class(nom, cls):
     # Target implementation, but they're not for BUILD files:
     assert(args_accumulator[1] == 'address')
     assert(args_accumulator[2] == 'build_graph')
-    assert(args_accumulator[3] == 'payload')
-    args_accumulator = [args_accumulator[0]] + args_accumulator[4:]
-    defaults_accumulator = (defaults_accumulator[0],) + defaults_accumulator[4:]
+    args_accumulator = [args_accumulator[0]] + args_accumulator[3:]
+    defaults_accumulator = (defaults_accumulator[0],) + defaults_accumulator[3:]
     argspec = inspect.formatargspec(args_accumulator,
                                     None,
                                     None,

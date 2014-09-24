@@ -5,6 +5,8 @@ python_library(
   name = 'plugin',
   sources = ['__init__.py', 'register.py'],
   dependencies = [
-    'src/python/internal_backend/sitegen/tasks:all',
+    'src/python/pants/base:build_file_aliases',
+    'src/python/pants/backend/jvm:repository',
   ]
 )
+
