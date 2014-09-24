@@ -66,15 +66,6 @@ python_binary(
     'linux-x86_64',
     'macosx-10.4-x86_64',
   ],
-  repositories=[
-    'https://pantsbuild.github.io/cheeseshop/third_party/python/dist/index.html',
-    'https://pantsbuild.github.io/cheeseshop/third_party/python/index.html',
-  ],
-  # We need to explicitly add the standard cheeseshop when specifying custom repositories to pickup
-  # all non-platform-specific distributions.
-  indices=[
-    'https://pypi.python.org/simple/',
-  ],
   compatibility=PANTS_COMPATIBILITY,
   dependencies = [
     ':pants_binary_deps',
