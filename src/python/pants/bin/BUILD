@@ -58,6 +58,12 @@ target(
 # Additionally we force a an ascii string for python 3.3.x here.
 PANTS_COMPATIBILITY = 'CPython>=2.6,<3,>=3.3'
 
+# This binary's entry_point is used by the pantsbuild.pants sdist to setup a binary for
+# pip installers, ie it is why this works to get `pants` on your PATH:
+# $ pip install pantsbuiold.pants
+# $ pants
+# NB: The platforms below are _only_ used when building a pex from this target.  They are
+# not used in the sdist generation.
 python_binary(
   name = 'pants',
   entry_point = 'pants.bin.pants_exe:main',
