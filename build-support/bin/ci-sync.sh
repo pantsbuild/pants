@@ -54,7 +54,7 @@ with open('.travis.yml') as fp:
   config_linux = yaml.safe_load(fp)
 with open('.travis.osx.yml') as fp:
   config_osx = yaml.safe_load(fp)
-# We maintain notifications mailing lists centrally in the main `.travis.yml` config.
+# We maintain notifications mailing lists centrally in the main '.travis.yml' config.
 config_osx['notifications'] = config_linux['notifications']
 with open('.travis.yml', 'w') as fp:
   yaml.safe_dump(config_osx, fp)
