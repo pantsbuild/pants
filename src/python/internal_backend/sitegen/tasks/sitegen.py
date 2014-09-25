@@ -138,9 +138,9 @@ def render_html(dst, config, soups, precomputed, template):
   title = precomputed.page[dst].title
   topdots = ('../' * dst.count('/'))
   if soup.body:
-    body_html = soup.body.prettify()
+    body_html = unicode(soup.body)
   else:
-    body_html = soup.prettify()
+    body_html = unicode(soup)
   html = renderer.render(template,
                          body_html=body_html,
                          title=title,
