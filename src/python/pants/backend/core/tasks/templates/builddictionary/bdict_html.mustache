@@ -45,6 +45,9 @@ div.bdict_method {
 p.bdict_impl {
   font-size: 90%;
 }
+.bdict_param {
+  margin-left: 1.0em;
+}
 </style>
 
 {{#tocs}}
@@ -60,7 +63,7 @@ p.bdict_impl {
 {{#defns}}
 
 <div class="bdict_section">
-<a xmark="_bdict_{{nom}}"> </a>
+<a xmark="bdict_{{nom}}"> </a>
 <h2 id="{{nom}}" class="bdict_heading">{{nom}}</h2>
 
 {{#argspec}}

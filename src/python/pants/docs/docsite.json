@@ -2,7 +2,9 @@
   "sources": {
     "index": "dist/markdown/html/README.html",
     "subdir/testproject": "dist/markdown/html/examples/src/java/com/pants/examples/hello/main/README.html",
-    "hello": "dist/markdown/html/src/python/pants/backend/python/README.html"
+    "hello": "dist/markdown/html/src/python/pants/backend/python/README.html",
+    "build_dictionary": "dist/builddict/build_dictionary.html",
+    "goals_reference": "dist/builddict/goals_reference.html"
   },
   "extras": {
     "logo.ico": "src/python/pants/docs/pants-logo.ico",
@@ -13,7 +15,9 @@
     { "page": "index",
       "children": [
         { "page": "hello" },
-        { "page": "testproject" }
+        { "page": "testproject" },
+        { "page": "build_dictionary" },
+        { "page": "goals_reference" }
       ]
     }
   ],

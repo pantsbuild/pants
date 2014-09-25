@@ -491,7 +491,8 @@ def gen_tasks_goals_reference_data():
     tasks = []
     for task_name in goal.ordered_task_names():
       task_type = goal.task_type_by_name(task_name)
-      doc = indent_docstring_by_n(task_type.__doc__ or '', 2)
+      doc_rst = indent_docstring_by_n(task_type.__doc__ or '', 2)
+      doc_html = rst_to_html(dedent_docstring(task_type.__doc__))
       options_title = Goal.option_group_title(goal, task_name)
       og = options_by_title[options_title]
       if og:
@@ -499,7 +500,8 @@ def gen_tasks_goals_reference_data():
       impl = '{0}.{1}'.format(task_type.__module__, task_type.__name__)
       tasks.append(TemplateData(
           impl=impl,
-          doc=doc,
+          doc_html=doc_html,
+          doc_rst=doc_rst,
           ogroup=gref_template_data_from_options(og)))
 
     leftover_option_groups = []
@@ -582,9 +584,19 @@ class BuildBuildDictionary(Task):
     goals = gen_tasks_goals_reference_data()
     glopts = gen_goals_glopts_reference_data()
 
+    # generate the .rst file
     template = resource_string(__name__,
                                os.path.join(self._templates_dir, 'goals_reference.mustache'))
     filename = os.path.join(self._outdir, 'goals_reference.rst')
+    self.context.log.info('Generating %s' % filename)
+    with safe_open(filename, 'w') as outfile:
+      generator = Generator(template, goals=goals, glopts=glopts)
+      generator.write(outfile)
+
+    # generate the .html file
+    template = resource_string(__name__,
+                               os.path.join(self._templates_dir, 'gref_html.mustache'))
+    filename = os.path.join(self._outdir, 'goals_reference.html')
     self.context.log.info('Generating %s' % filename)
     with safe_open(filename, 'w') as outfile:
       generator = Generator(template, goals=goals, glopts=glopts)
