@@ -269,6 +269,17 @@ class Target(AbstractTarget):
     return self._build_graph.get_derived_from(self.address)
 
   @property
+  def derived_from_chain(self):
+    """Returns all targets that this target was derived from.
+
+    If this target was not derived from another, returns an empty sequence.
+    """
+    cur = self
+    while cur.derived_from is not cur:
+      cur = cur.derived_from
+      yield cur
+
+  @property
   def concrete_derived_from(self):
     """Returns the concrete target this target was (directly or indirectly) derived from.
 
