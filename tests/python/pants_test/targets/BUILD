@@ -11,7 +11,6 @@ python_library(
 python_test_suite(
   name = 'targets',
   dependencies = [
-    ':artifact',
     ':exclusive',
     ':jar_library',
     ':java_agent',
@@ -31,16 +30,6 @@ python_test_suite(
   dependencies = [
     ':scala_library_integration',
   ],
-)
-
-python_tests(
-  name = 'artifact',
-  sources = ['test_artifact.py'],
-  dependencies = [
-    ':base',
-    'src/python/pants/backend/core/targets:common',
-    'src/python/pants/backend/jvm/targets:jvm',
-  ]
 )
 
 python_tests(
@@ -70,9 +59,7 @@ python_tests(
   sources = ['test_sort_targets.py'],
   dependencies = [
     ':base',
-    'src/python/pants/base:target',
     'src/python/pants/base:build_graph',
-    'src/python/pants/base:payload',
     'src/python/pants/backend/core/targets:common',
   ]
 )
@@ -157,7 +144,8 @@ python_tests(
   sources = ['test_python_target.py'],
   dependencies = [
     ':base',
-    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm:artifact',
+    'src/python/pants/backend/jvm:repository',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/backend/python:python_artifact',
     'src/python/pants/base:exceptions',

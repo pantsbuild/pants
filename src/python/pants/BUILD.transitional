@@ -28,6 +28,7 @@ python_library(
     '3rdparty/python:python-daemon',
     '3rdparty/python:requests',
     '3rdparty/python:setuptools',
+    '3rdparty/python:six',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.config',
     '3rdparty/python/twitter/commons:twitter.common.confluence',

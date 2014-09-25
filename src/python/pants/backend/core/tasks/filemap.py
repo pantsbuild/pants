@@ -18,11 +18,8 @@ class Filemap(ConsoleTask):
     for target in self._find_targets():
       if target not in visited:
         visited.add(target)
-        if hasattr(target.payload, 'sources') and target.payload.sources is not None:
-          for sourcefile in target.payload.sources:
-            path = os.path.normpath(os.path.join(target.payload.sources_rel_path,
-                                                 sourcefile))
-            yield '%s %s' % (path, target.address.spec)
+        for rel_source in target.sources_relative_to_buildroot():
+          yield '%s %s' % (rel_source, target.address.spec)
 
   def _find_targets(self):
     if len(self.context.target_roots) > 0:

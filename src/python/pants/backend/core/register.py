@@ -69,7 +69,6 @@ def build_file_aliases():
       'page': Page,
       'resources': Resources,
       'target': Dependencies,
-      'wiki': Wiki,
     },
     objects={
       'ConfluencePublish': ConfluencePublish,
@@ -78,6 +77,7 @@ def build_file_aliases():
       # TODO(Eric Ayers) pants() was officially deprecated in 0.0.24. Remove this function soon.
       'pants': PantsObsolete.pants,
       'wiki_artifact': WikiArtifact,
+      'Wiki': Wiki,
     },
     context_aware_object_factories={
       'buildfile_path': BuildFilePath,

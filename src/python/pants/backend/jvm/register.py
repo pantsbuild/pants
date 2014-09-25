@@ -5,9 +5,12 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+import os
+
 from pants.backend.core.tasks.group_task import GroupTask
+from pants.backend.jvm.artifact import Artifact
+from pants.backend.jvm.repository import Repository
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
-from pants.backend.jvm.targets.artifact import Artifact
 from pants.backend.jvm.targets.benchmark import Benchmark
 from pants.backend.jvm.targets.credentials import Credentials
 from pants.backend.jvm.targets.exclude import Exclude
@@ -23,7 +26,6 @@ from pants.backend.jvm.targets.jvm_binary import (
     JvmBinary,
     JarRules,
     Skip)
-from pants.backend.jvm.targets.repository import Repository
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.targets.scala_tests import ScalaTests
 from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
@@ -71,7 +73,6 @@ def build_file_aliases():
       'junit_tests': JavaTests,
       'jvm_app': JvmApp,
       'jvm_binary': JvmBinary,
-      'repo': Repository,
       'scala_library': ScalaLibrary,
       'scala_specs': ScalaTests,
       'scala_tests': ScalaTests,
@@ -83,6 +84,7 @@ def build_file_aliases():
       'exclude': Exclude,
       'jar': JarDependency,
       'jar_rules': JarRules,
+      'Repository': Repository,
       'Skip': Skip,
     },
     context_aware_object_factories={

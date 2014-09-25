@@ -35,14 +35,9 @@ class IvyResolveFingerprintStrategy(FingerprintStrategy):
 
   def compute_fingerprint(self, target):
     if isinstance(target, JarLibrary):
-      return target.payload.invalidation_hash()
+      return target.payload.fingerprint()
     elif isinstance(target, JvmTarget):
-      hasher = sha1()
-      for exclude in sorted(target.payload.excludes):
-        hasher.update(bytes(repr(exclude)))
-      for config in sorted(target.payload.configurations):
-        hasher.update(config)
-      return hasher.hexdigest()
+      return target.payload.fingerprint(field_keys=('excludes', 'configurations'))
     else:
       return sha1().hexdigest()
 

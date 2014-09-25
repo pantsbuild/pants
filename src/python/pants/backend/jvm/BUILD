@@ -3,6 +3,17 @@
 
 
 python_library(
+  name = 'artifact',
+  sources = ['artifact.py'],
+  dependencies = [
+    '3rdparty/python/twitter/commons:twitter.common.lang',
+    '3rdparty/python:six',
+    ':repository',
+    'src/python/pants/base:payload_field',
+  ],
+)
+
+python_library(
   name = 'plugin',
   sources = ['__init__.py', 'register.py'],
   dependencies = [
@@ -12,8 +23,10 @@ python_library(
     'src/python/pants/base:build_file_aliases',
     'src/python/pants/goal',
     'src/python/pants/goal:task_registrar',
+    ':artifact',
     ':ivy_utils',
     ':jvm_tool_bootstrapper',
+    ':repository',
   ],
 )
 
@@ -40,4 +53,9 @@ python_library(
   dependencies = [
     'src/python/pants/base:exceptions',
   ],
+)
+
+python_library(
+  name = 'repository',
+  sources = ['repository.py'],
 )
