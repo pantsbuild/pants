@@ -2,12 +2,12 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-HERE=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
+REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd "$(git rev-parse --show-toplevel)" && pwd)
 
 # We have special developer mode requirements - namely sphinx deps.
 export PANTS_DEV=1
 
-source ${HERE}/../pants_venv
+source ${REPO_ROOT}/build-support/pants_venv
 
 function usage() {
   echo "Publishes the http://pantsbuild.github.io/ docs locally or remotely."
@@ -37,7 +37,7 @@ while getopts "hopd:" opt; do
   esac
 done
 
-${HERE}/../../pants goal builddict --print-exception-stacktrace || \
+${REPO_ROOT}/pants goal builddict --print-exception-stacktrace || \
   die "Failed to generate the 'BUILD Dictionary'."
 cp dist/builddict/*.rst src/python/pants/docs/
 
@@ -59,14 +59,14 @@ function do_open() {
   fi
 }
 
-do_open "${HERE}/../../src/python/pants/docs/_build/html/index.html"
+do_open "${REPO_ROOT}/src/python/pants/docs/_build/html/index.html"
 
 if [[ "${publish}" = "true" ]]; then
   url="http://pantsbuild.github.io/${publish_path}"
   read -ep "To abort publishing these docs to ${url} press CTRL-C, otherwise press enter to \
 continue."
   (
-    ${HERE}/../../src/python/pants/docs/publish_via_git.sh \
+    ${REPO_ROOT}/src/python/pants/docs/publish_via_git.sh \
       git@github.com:pantsbuild/pantsbuild.github.io.git \
       ${publish_path} && \
     do_open ${url}/index.html

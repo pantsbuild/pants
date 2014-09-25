@@ -1,4 +1,5 @@
 # These are extra requirements only needed for dev tasks in the pantsbuild/pants repo itself.
+# TODO(John Sirois): Kill this when we switch over to publishing from internal_backend
 
 # For doc publishing
 Sphinx>=1.2,<1.3

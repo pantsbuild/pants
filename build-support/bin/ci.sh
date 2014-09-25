@@ -88,8 +88,8 @@ if [[ "${skip_bootstrap:-false}" == "false" ]]; then
   (
     ./build-support/python/clean.sh && \
     PANTS_DEV=1 PANTS_VERBOSE=1 PEX_VERBOSE=1 PYTHON_VERBOSE=1 \
-      ./pants goal ${PANTS_ARGS[@]} binary src/python/pants/bin:pants && \
-    mv dist/pants.pex ./pants.pex && \
+      ./pants goal ${PANTS_ARGS[@]} binary src/python/pants/bin:pants_local_binary && \
+    mv dist/pants_local_binary.pex ./pants.pex && \
     ./pants.pex goal goals ${PANTS_ARGS[@]}
   ) || die "Failed to bootstrap pants."
 fi
@@ -114,6 +114,17 @@ if [[ "${skip_distribution:-false}" == "false" ]]; then
   # setup_py
   banner "Running pants distribution tests"
   (
+    # The published pants should need no local plugins beyond the python backend to distribute
+    # itself so we override backends to ensure a minimal env works.
+    config=$(mktemp -t pants-ci.XXXXXX.ini) && \
+    (cat << EOF > ${config}
+[backends]
+packages: [
+    # TODO(John Sirois): When we have fine grained plugins, include the python backend here
+  ]
+EOF
+    ) && \
+    export PANTS_CONFIG_OVERRIDE=${config} && \
     ./pants.pex py --pex ${INTERPRETER_ARGS[@]} \
       src/python/pants:_pants_transitional_publishable_binary_ && \
     mv dist/_pants_transitional_publishable_binary_.pex dist/self.pex && \
