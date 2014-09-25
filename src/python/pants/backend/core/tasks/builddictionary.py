@@ -70,7 +70,8 @@ def rst_to_html(s, span=False):
 
   :param s: rst-formatted string
   :param span: if True, expecting a "span", a fragment of a paragraph.
-     Our RST parser thinks "foo" is a paragraph.
+     (By default, our RST parser thinks "foo" is a paragraph.)
+     If span=True, strip off the outer paragraph tag.
   """
   if not s: return ''
   body = publish_parts(s, writer_name='html')['body'].strip()
