@@ -4,9 +4,6 @@
 
 REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd "$(git rev-parse --show-toplevel)" && pwd)
 
-# run pants from source in case tweaking builddict, sitegen, etc
-PANTS_DEV=1
-
 PANTS_EXE="${REPO_ROOT}/pants"
 
 function usage() {
