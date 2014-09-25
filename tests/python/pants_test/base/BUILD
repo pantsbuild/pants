@@ -44,6 +44,7 @@ python_test_suite(
     ':revision',
     ':run_info',
     ':source_root',
+    ':target',
   ]
 )
 
@@ -213,6 +214,17 @@ python_tests(
     'src/python/pants/backend/core',
     'src/python/pants/base:build_file_aliases',
     'src/python/pants/base:payload',
+    'tests/python/pants_test:base_test',
+  ]
+)
+
+python_tests(
+  name = 'target',
+  sources = ['test_target.py'],
+  dependencies = [
+    'src/python/pants/backend/core',
+    'src/python/pants/base:address',
+    'src/python/pants/base:build_file_aliases',
     'tests/python/pants_test:base_test',
   ]
 )

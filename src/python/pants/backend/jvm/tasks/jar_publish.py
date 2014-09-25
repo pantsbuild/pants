@@ -704,7 +704,7 @@ class JarPublish(JarTask, ScmPublish):
           jar_coordinate(jar, (newentry.version() if self.force else oldentry.version()).version()),
           coordinate(self.restart_at[0], self.restart_at[1])
         ))
-        stage_artifacts(target, jar, oldver.version(), changelog)
+        stage_artifacts(target, jar, oldentry.version().version(), changelog)
       else:
         if not self.dryrun:
           # Confirm push looks good
@@ -805,27 +805,27 @@ class JarPublish(JarTask, ScmPublish):
 
   def check_targets(self, targets):
     invalid = defaultdict(lambda: defaultdict(set))
-    derived_by_target = dict()
+    derived_by_target = defaultdict(set)
 
-    def collect(publish_target, walked_target):
-      derived_by_target[walked_target.derived_from] = walked_target
+    def collect_invalid(publish_target, walked_target):
+      for derived_target in walked_target.derived_from_chain:
+        derived_by_target[derived_target].add(walked_target)
       if not walked_target.has_sources() or not walked_target.sources_relative_to_buildroot():
         invalid[publish_target][walked_target].add('No sources.')
       if not walked_target.is_exported:
-        invalid[publish_target][walked_target].add('Does not provide an artifact.')
+        invalid[publish_target][walked_target].add('Does not provide a binary artifact.')
 
     for target in targets:
-      target.walk(functools.partial(collect, target), predicate=lambda t: isinstance(t, Jarable))
+      target.walk(functools.partial(collect_invalid, target),
+                  predicate=lambda t: isinstance(t, Jarable))
 
     # When walking the graph of a publishable target, we may encounter families of sibling targets
     # that form a derivation chain.  As long as one of these siblings is publishable, we can
     # proceed and publish a valid graph.
-    # TODO(John Sirois): This does not actually handle derivation chains longer than 2 with the
-    # exported item in the most derived position - fix this.
     for publish_target, invalid_targets in list(invalid.items()):
       for invalid_target, reasons in list(invalid_targets.items()):
-        derived_target = derived_by_target[invalid_target]
-        if derived_target not in invalid_targets:
+        derived_from_set = derived_by_target[invalid_target]
+        if derived_from_set - set(invalid_targets.keys()):
           invalid_targets.pop(invalid_target)
       if not invalid_targets:
         invalid.pop(publish_target)
