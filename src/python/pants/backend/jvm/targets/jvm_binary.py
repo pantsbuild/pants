@@ -17,7 +17,8 @@ from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.build_environment import get_buildroot
 from pants.base.build_manual import manual
 from pants.base.exceptions import TargetDefinitionException
-from pants.base.payload_field import BundleField, PayloadField
+from pants.base.payload import Payload
+from pants.base.payload_field import BundleField
 from pants.base.target import Target
 from pants.base.validation import assert_list
 
@@ -366,7 +367,7 @@ class JvmApp(Target):
   extra files like config files, startup scripts, etc.
   """
 
-  def __init__(self, name=None, binary=None, bundles=None, basename=None, **kwargs):
+  def __init__(self, name=None, payload=None, binary=None, bundles=None, basename=None, **kwargs):
     """
     :param string name: The name of this target, which combined with this
       build file defines the :doc:`target address <target_addresses>`.
@@ -379,10 +380,11 @@ class JvmApp(Target):
       ``name``. Pants uses this in the ``bundle`` goal to name the distribution
       artifact. In most cases this parameter is not necessary.
     """
-    self.payload.add_fields({
+    payload = payload or Payload()
+    payload.add_fields({
       'bundles': BundleField(bundles or []),
     })
-    super(JvmApp, self).__init__(name=name, **kwargs)
+    super(JvmApp, self).__init__(name=name, payload=payload, **kwargs)
 
     if name == basename:
       raise TargetDefinitionException(self, 'basename must not equal name.')

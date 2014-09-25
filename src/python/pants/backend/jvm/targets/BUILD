@@ -29,6 +29,7 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/base:build_manual',
     'src/python/pants/base:exceptions',
+    'src/python/pants/base:payload',
     'src/python/pants/base:payload_field',
     'src/python/pants/base:target',
     'src/python/pants/base:validation',

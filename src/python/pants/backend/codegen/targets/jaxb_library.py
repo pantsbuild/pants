@@ -13,16 +13,14 @@ from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.build_environment import get_buildroot
+from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 
 
 class JaxbLibrary(JvmTarget):
   """Generates a stub Java library from jaxb xsd files."""
 
-  def __init__(self,
-               package=None,
-               language='java',
-               **kwargs):
+  def __init__(self, payload=None, package=None, language='java', **kwargs):
     """
     :param package: java package (com.company.package) in which to generate the output java files.
       If unspecified, Pants guesses it from the file path leading to the schema
@@ -32,11 +30,12 @@ class JaxbLibrary(JvmTarget):
     :param string language: only 'java' is supported. Default: 'java'
     """
 
-    self.payload.add_fields({
+    payload = payload or Payload()
+    payload.add_fields({
       'package': PrimitiveField(package),
       'jaxb_language': PrimitiveField(language),
     })
-    super(JaxbLibrary, self).__init__(**kwargs)
+    super(JaxbLibrary, self).__init__(payload=payload, **kwargs)
 
     self.add_labels('codegen')
     self.add_labels('jaxb')

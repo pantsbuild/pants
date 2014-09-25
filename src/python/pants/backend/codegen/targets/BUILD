@@ -14,6 +14,8 @@ python_library(
     '3rdparty/python:six',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:config',
+    'src/python/pants/base:payload',
+    'src/python/pants/base:payload_field',
     'src/python/pants/base:target',
   ],
 )

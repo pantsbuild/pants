@@ -9,6 +9,7 @@ from twitter.common.lang import Compatibility
 
 from pants.base.address import SyntheticAddress
 from pants.base.build_environment import get_buildroot
+from pants.base.payload import Payload
 from pants.base.payload_field import combine_hashes, PayloadField, SourcesField
 from pants.base.target import Target
 
@@ -69,18 +70,25 @@ class Page(Target):
     def _compute_fingerprint(self):
       return combine_hashes(artifact.fingerprint() for artifact in self)
 
-  def __init__(self, address=None, source=None, resources=None, provides=None, **kwargs):
+  def __init__(self,
+               address=None,
+               payload=None,
+               source=None,
+               resources=None,
+               provides=None,
+               **kwargs):
     """
     :param source: Source of the page in markdown format.
     :param resources: An optional list of Resources objects.
     """
-    self.payload.add_fields({
+    payload = payload or Payload()
+    payload.add_fields({
       'sources': SourcesField(sources=[source],
                               sources_rel_path=address.spec_path),
       'provides': self.ProvidesTupleField(provides or []),
     })
     self._resource_specs = resources or []
-    super(Page, self).__init__(address=address, **kwargs)
+    super(Page, self).__init__(address=address, payload=payload, **kwargs)
 
     if provides and not isinstance(provides[0], WikiArtifact):
       raise ValueError('Page must provide a wiki_artifact. Found instead: %s' % provides)

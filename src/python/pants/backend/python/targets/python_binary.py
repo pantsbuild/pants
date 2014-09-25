@@ -71,6 +71,7 @@ class PythonBinary(PythonTarget):
     if not isinstance(platforms, (list, tuple)) and not isinstance(platforms, Compatibility.string):
       raise TargetDefinitionException(self, 'platforms must be a list, tuple or string.')
 
+    # TODO(pl): Most if not all of these should live in payload fields
     self._entry_point = entry_point
     self._inherit_path = bool(inherit_path)
     self._zip_safe = bool(zip_safe)

@@ -11,6 +11,7 @@ from pants.backend.core.targets.resources import Resources
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.base.address import SyntheticAddress
 from pants.base.exceptions import TargetDefinitionException
+from pants.base.payload import Payload
 from pants.base.payload_field import (ConfigurationsField,
                                       ExcludesField,
                                       SourcesField)
@@ -25,6 +26,7 @@ class JvmTarget(Target, Jarable):
 
   def __init__(self,
                address=None,
+               payload=None,
                sources=None,
                provides=None,
                excludes=None,
@@ -36,7 +38,8 @@ class JvmTarget(Target, Jarable):
       This parameter is not intended for general use.
     :type configurations: tuple of strings
     """
-    self.payload.add_fields({
+    payload = payload or Payload()
+    payload.add_fields({
       'sources': SourcesField(sources=self.assert_list(sources),
                               sources_rel_path=address.spec_path),
       'provides': provides,
@@ -44,7 +47,7 @@ class JvmTarget(Target, Jarable):
       'configurations': ConfigurationsField(self.assert_list(configurations)),
     })
     self._resource_specs = self.assert_list(resources)
-    super(JvmTarget, self).__init__(address=address, **kwargs)
+    super(JvmTarget, self).__init__(address=address, payload=payload, **kwargs)
     self.add_labels('jvm')
 
   _jar_dependencies = None

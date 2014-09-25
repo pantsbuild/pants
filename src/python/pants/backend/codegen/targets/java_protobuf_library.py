@@ -15,6 +15,7 @@ from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.address import SyntheticAddress
+from pants.base.payload import Payload
 from pants.base.payload_field import combine_hashes, PayloadField
 
 
@@ -37,17 +38,18 @@ class JavaProtobufLibrary(ExportableJvmLibrary):
     generated.
     """
 
-  def __init__(self, buildflags=None, imports=None, **kwargs):
+  def __init__(self, payload=None, buildflags=None, imports=None, **kwargs):
     """
     :param buildflags: Unused, and will be removed in a future release.
     :param imports: List of external :class:`pants.backend.jvm.targets.jar_dependency.JarDependency`
       objects and addresses of :class:`pants.backend.jvm.targets.jar_library.JarLibrary` targets
       which contain .proto definitions.
     """
-    self.payload.add_fields({
+    payload = payload or Payload()
+    payload.add_fields({
       'raw_imports': ImportsField(imports or ())
     })
-    super(JavaProtobufLibrary, self).__init__(**kwargs)
+    super(JavaProtobufLibrary, self).__init__(payload=payload, **kwargs)
     self.add_labels('codegen')
     if imports:
       self.add_labels('has_imports')

@@ -167,7 +167,7 @@ class Target(AbstractTarget):
     ids = list(ids)  # We can't len a generator.
     return ids[0] if len(ids) == 1 else cls.combine_ids(ids)
 
-  def __init__(self, name, address, build_graph, exclusives=None):
+  def __init__(self, name, address, build_graph, payload=None, exclusives=None):
     """
     :param string name: The name of this target, which combined with this
       build file defines the target address.
@@ -175,10 +175,13 @@ class Target(AbstractTarget):
     :type dependencies: list of target specs
     :param Address address: The Address that maps to this Target in the BuildGraph
     :param BuildGraph build_graph: The BuildGraph that this Target lives within
+    :param Payload payload: The configuration encapsulated by this target.  Also in charge of
+      most fingerprinting details.
     :param exclusives: An optional map of exclusives tags.
       See :ref:`howto_check_exclusives` for details.
     """
     # dependencies is listed above; implementation hides in TargetAddressable
+    self.payload = payload or Payload()
     self.payload.freeze()
     self.name = name
     self.address = address
@@ -194,17 +197,9 @@ class Target(AbstractTarget):
     self._cached_fingerprint_map = {}
     self._cached_transitive_fingerprint_map = {}
 
-  _payload = None
-  @property
-  def payload(self):
-    if self._payload is None:
-      self._payload = Payload()
-    return self._payload
-
   @property
   def num_chunking_units(self):
     return max(1, len(self.sources_relative_to_buildroot()))
-
 
   def assert_list(self, maybe_list, expected_type=Compatibility.string):
     return assert_list(maybe_list, expected_type,

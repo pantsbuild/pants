@@ -13,6 +13,7 @@ from twitter.common.lang import Compatibility
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.core.targets.resources import Resources
 from pants.base.address import SyntheticAddress
+from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField, SourcesField
 from pants.base.target import Target
 from pants.base.exceptions import TargetDefinitionException
@@ -23,6 +24,7 @@ class PythonTarget(Target):
 
   def __init__(self,
                address=None,
+               payload=None,
                sources=None,
                resources=None,  # Old-style resources (file list, Fileset).
                resource_targets=None,  # New-style resources (Resources target specs).
@@ -48,7 +50,8 @@ class PythonTarget(Target):
       format, e.g. ``'CPython>=3', or just ['>=2.7','<3']`` for requirements
       agnostic to interpreter class.
     """
-    self.payload.add_fields({
+    payload = payload or Payload()
+    payload.add_fields({
       'sources': SourcesField(sources=self.assert_list(sources),
                               sources_rel_path=address.spec_path),
       'resources': SourcesField(sources=self.assert_list(resources),
@@ -56,7 +59,7 @@ class PythonTarget(Target):
       'provides': provides,
       'compatibility': PrimitiveField(maybe_list(compatibility or ())),
     })
-    super(PythonTarget, self).__init__(address=address, **kwargs)
+    super(PythonTarget, self).__init__(address=address, payload=payload, **kwargs)
     self._resource_target_specs = resource_targets
     self.add_labels('python')
 
