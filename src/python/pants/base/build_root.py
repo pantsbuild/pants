@@ -12,22 +12,22 @@ from twitter.common.lang import Singleton
 
 
 class BuildRoot(Singleton):
-  """Represents the global workspace ROOT_DIR.
+  """Represents the global workspace build root
 
   By default a pants workspace is defined by a root directory where the workspace configuration
   file - 'pants.ini' - lives.  This can be overridden by exporting 'PANTS_BUILD_ROOT' in the
-  environment with the path to the ROOT_DIR or manipulated through this interface.
+  environment with the path to the build root or manipulated through this interface.
   """
 
   class NotFoundError(Exception):
-    """Raised when unable to find the current workspace ROOT_DIR."""
+    """Raised when unable to find the current workspace build root."""
 
   def __init__(self):
     self._root_dir = None
 
   @property
   def path(self):
-    """Returns the ROOT_DIR for the current workspace."""
+    """Returns the build root for the current workspace."""
     if self._root_dir is None:
       if 'PANTS_BUILD_ROOT' in os.environ:
         self._root_dir = os.environ['PANTS_BUILD_ROOT']
@@ -43,14 +43,14 @@ class BuildRoot(Singleton):
 
   @path.setter
   def path(self, root_dir):
-    """Manually establishes the ROOT_DIR for the current workspace."""
+    """Manually establishes the build root for the current workspace."""
     path = os.path.realpath(root_dir)
     if not os.path.exists(path):
       raise ValueError('Build root does not exist: %s' % root_dir)
     self._root_dir = path
 
   def reset(self):
-    """Clears the last calculated ROOT_DIR for the current workspace."""
+    """Clears the last calculated build root for the current workspace."""
     self._root_dir = None
 
   def __str__(self):
@@ -58,7 +58,7 @@ class BuildRoot(Singleton):
 
   @contextmanager
   def temporary(self, path):
-    """A contextmanager that establishes a temporary ROOT_DIR, restoring the prior ROOT_DIR on
+    """A contextmanager that establishes a temporary build root, restoring the prior build root on
     exit."""
     if path is None:
       raise ValueError('Can only temporarily establish a build root given a path.')

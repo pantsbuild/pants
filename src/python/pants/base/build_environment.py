@@ -27,7 +27,7 @@ def pants_release():
 
 
 def get_buildroot():
-  """Returns the pants ROOT_DIR, calculating it if needed."""
+  """Returns the pants build root, calculating it if needed."""
   try:
     return BuildRoot().path
   except BuildRoot.NotFoundError as e:
