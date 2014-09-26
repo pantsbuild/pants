@@ -36,6 +36,9 @@ class PythonTarget(Target):
       ``python_thrift_library``, ``python_antlr_library`` and so forth) or
       ``python_requirement_library`` targets.
     :type dependencies: List of target specs
+    :param sources: Files to "include". Paths are relative to the
+      BUILD file's directory.
+    :type sources: ``Fileset`` or list of strings
     :param resources: non-Python resources, e.g. templates, keys, other data
       (it is
       recommended that your application uses the pkgutil package to access these

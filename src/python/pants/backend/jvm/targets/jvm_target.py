@@ -36,6 +36,9 @@ class JvmTarget(Target, Jarable):
     :type configurations: tuple of strings
     :param excludes: List of `exclude <#exclude>`_\s to filter this target's
       transitive dependencies against.
+    :param sources: Source code files to build. Paths are relative to the BUILD
+       file's directory.
+    :type sources: ``Fileset`` (from globs or rglobs) or list of strings
     """
 
     sources_rel_path = sources_rel_path or address.spec_path

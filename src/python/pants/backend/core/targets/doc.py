@@ -79,7 +79,6 @@ class Page(Target):
     """
     :param source: Source of the page in markdown format.
     :param resources: An optional list of Resources objects.
-    :param sources: Overridden by ``source`` param, do not use.
     """
 
     payload = self.PagePayload(sources_rel_path=kwargs.get('address').spec_path,

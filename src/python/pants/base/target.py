@@ -178,9 +178,6 @@ class Target(AbstractTarget):
     :param exclusives: An optional map of exclusives tags.
        `Keeps incompatible changes apart
        <build_files.html#howto-check-exclusives>`_.
-    :param sources: Source code files to build. Paths are relative to the BUILD
-       file's directory.
-    :type sources: ``Fileset`` (from globs or rglobs) or list of strings
     """
     # dependencies is listed above; implementation hides in TargetAddressable
     self.name = name
