@@ -34,6 +34,8 @@ class JvmTarget(Target, Jarable):
     :param configurations: One or more ivy configurations to resolve for this target.
       This parameter is not intended for general use.
     :type configurations: tuple of strings
+    :param excludes: List of `exclude <#exclude>`_\s to filter this target's
+      transitive dependencies against.
     """
 
     sources_rel_path = sources_rel_path or address.spec_path
