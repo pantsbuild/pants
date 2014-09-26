@@ -24,9 +24,9 @@ class GoalTest(BaseTest):
     super(GoalTest, self).tearDown()
     Goal.clear()
 
-  def assert_result(self, goals, specs, args):
-    g, s = GoalRunner.parse_args(args)
-    self.assertEquals((goals, specs), (list(g), list(s)))
+  def assert_result(self, goals, specs, args, fail_fast=False):
+    g, s, ff = GoalRunner.parse_args(args)
+    self.assertEquals((goals, specs, fail_fast), (list(g), list(s), ff))
 
   def test_top_level_dir(self):
     self.create_dir('topleveldir')
