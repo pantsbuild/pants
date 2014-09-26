@@ -6,6 +6,7 @@ python_library(
   sources = ['pants_exe.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
+    'src/python/internal_backend/repositories:plugin',
     'src/python/pants/backend/android:plugin',
     'src/python/pants/backend/authentication:authentication',
     'src/python/pants/backend/codegen:plugin',

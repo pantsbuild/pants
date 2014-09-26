@@ -5,5 +5,6 @@ target(
   name='plugins',
   dependencies = [
     'src/python/internal_backend/sitegen:plugin',
+    'src/python/internal_backend/repositories:plugin',
   ]
 )

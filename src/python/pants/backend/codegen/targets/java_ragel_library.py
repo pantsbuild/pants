@@ -14,12 +14,7 @@ from pants.base.exceptions import TargetDefinitionException
 class JavaRagelLibrary(JvmTarget):
   """Generates a stub Java library from a Ragel file."""
 
-  def __init__(self,
-               **kwargs):
+  def __init__(self, **kwargs):
     super(JavaRagelLibrary, self).__init__(**kwargs)
 
     self.add_labels('codegen')
-
-  @property
-  def is_ragel(self):
-    return True
