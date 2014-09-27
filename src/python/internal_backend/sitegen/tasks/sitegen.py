@@ -12,8 +12,10 @@ Suggested use:
   ./build-support/bin/publish_docs.sh  # invokes sitegen.py
 '''
 
+import collections
 import json
 import os
+import re
 import shutil
 import pystache
 
@@ -119,10 +121,38 @@ def fixup_internal_links(config, soups):
       tag['href'] = tag['href'].replace(old_rel_path, new_rel_path, 1)
 
 
+_heading_re = re.compile('^h[1-6]$')
+
+
+def ensure_headings_linkable(soups):
+  '''foreach soup, foreach h1,h2,etc, if no id=... or name=..., give it one.
+
+  Enables tables of contents.
+  '''
+  for soup in soups.values():
+    # To avoid re-assigning an existing id, note 'em down.
+    # Case-insensitve because distinguishing links #Foo and #foo would be weird.
+    existing_ids = set([])
+    for tag in soup.find_all(True):
+      existing_ids.add((tag.get('id') or '').lower())
+      existing_ids.add((tag.get('name') or '').lower())
+    count = 100
+    for tag in soup.find_all(_heading_re):
+      if not (tag.has_attr('id') or tag.has_attr('name')):
+        snippet = ''.join([c for c in tag.text if c.isalpha()])[:20]
+        while True:
+          count += 1
+          candidate_id = 'tmp_{}_{}'.format(snippet, count).lower()
+          if not candidate_id in existing_ids:
+            existing_ids.add(candidate_id)
+            tag['id'] = candidate_id
+            break
+
+
 def transform_soups(config, soups, precomputed):
   '''Mutate our soups to be better when we write them out later.'''
   fixup_internal_links(config, soups)
-  # TODO: more to come here
+  ensure_headings_linkable(soups)
 
 
 def get_title(soup):
@@ -132,17 +162,104 @@ def get_title(soup):
   return ''
 
 
+def generate_site_toc(config, precomputed, here):
+  site_toc = []
+  def recurse(tree, depth_so_far):
+    for node in tree:
+      if 'page' in node and node['page'] != 'index':
+        dst = node['page']
+        if dst == here:
+          link = here + '.html'
+        else:
+          link = os.path.relpath(dst + '.html', os.path.dirname(here))
+        site_toc.append(dict(depth=depth_so_far,
+                             link=link,
+                             text=precomputed.page[dst].title,
+                             here=(dst == here)))
+      if 'children' in node:
+        recurse(node['children'], depth_so_far)
+  if 'tree' in config:
+    recurse(config['tree'], 1)
+  return site_toc
+
+
+def generate_breadcrumbs(config, precomputed, here):
+  '''return template data for breadcrumbs'''
+  breadcrumb_pages = []
+  def recurse(tree, pages_so_far):
+    for node in tree:
+      if 'page' in node:
+        pages_so_far = pages_so_far + [node['page']]
+      if 'page' in node and node['page'] == here:
+        return pages_so_far
+      if 'children' in node:
+        r = recurse(node['children'], pages_so_far)
+        if r:
+          return r
+    return None
+
+  if 'tree' in config:
+    r = recurse(config['tree'], [])
+    if r:
+      breadcrumb_pages = r
+  breadcrumbs_template_data = []
+  for page in breadcrumb_pages:
+    breadcrumbs_template_data.append(dict(
+        link=os.path.relpath(page + '.html', os.path.dirname(here)),
+        text=precomputed.page[page].title))
+  return breadcrumbs_template_data
+
+
+def hdepth(tag):
+  '''Compute an h tag's "outline depth".
+
+  E.g., h1 at top level is 1, h1 in a section is 2, h2 at top level is 2.
+  '''
+  if not _heading_re.search(tag.name):
+    raise TaskError('Can\'t compute heading depth of non-heading {}'.format(tag))
+  depth = int(tag.name[1], 10)  # get the 2 from 'h2'
+  cursor = tag
+  while cursor:
+    if cursor.name == 'section':
+      depth += 1
+    cursor = cursor.parent
+  return depth
+
+
+def generate_page_toc(soup):
+  '''Return page-level (~list of headings) TOC template data for soup'''
+  found_depth_counts = collections.defaultdict(int)
+  for tag in soup.find_all(_heading_re):
+    if (tag.get('id') or tag.get('name')):
+      found_depth_counts[hdepth(tag)] += 1
+  depth_list = [i for i in range(100) if 1 < found_depth_counts[i]]
+  depth_list = depth_list[:4]
+  toc = []
+  for tag in soup.find_all(_heading_re):
+    depth = hdepth(tag)
+    if depth in depth_list:
+      toc.append(dict(depth=depth_list.index(depth) + 1,
+                      link=tag.get('id') or tag.get('name'),
+                      text=tag.text))
+  return toc
+
+
 def render_html(dst, config, soups, precomputed, template):
   soup = soups[dst]
   renderer = pystache.Renderer()
   title = precomputed.page[dst].title
   topdots = ('../' * dst.count('/'))
   if soup.body:
-    body_html = unicode(soup.body)
+    body_html = '{}'.format(soup.body)
   else:
-    body_html = unicode(soup)
+    body_html = '{}'.format(soup)
+  page_toc = generate_page_toc(soup)
   html = renderer.render(template,
                          body_html=body_html,
+                         breadcrumbs=generate_breadcrumbs(config, precomputed, dst),
+                         site_toc=generate_site_toc(config, precomputed, dst),
+                         has_page_toc=bool(page_toc),
+                         page_toc=page_toc,
                          title=title,
                          topdots=topdots)
   return html

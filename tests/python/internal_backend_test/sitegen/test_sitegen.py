@@ -41,6 +41,9 @@ INDEX_HTML = '''
 
 P1_HTML = '''
 <h1>Page 1</h1>
+
+<p>Fascinating description.
+   Some non-ASCII text: 東京スカパラダイスオーケストラ.
 '''
 
 P2_HTML = '''

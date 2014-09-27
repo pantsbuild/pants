@@ -4,9 +4,6 @@
 
 REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd "$(git rev-parse --show-toplevel)" && pwd)
 
-# run pants from source to get local improvements to builddict, sitegen, etc
-PANTS_DEV=1
-
 PANTS_EXE="${REPO_ROOT}/pants"
 
 function usage() {
@@ -37,7 +34,7 @@ while getopts "hopd:" opt; do
   esac
 done
 
-${PANTS_EXE} goal builddict --print-exception-stacktrace || \
+PANTS_DEV=1 ${PANTS_EXE} goal builddict --print-exception-stacktrace || \
   die "Failed to generate the 'BUILD Dictionary'."
 
 function do_open() {
@@ -53,12 +50,12 @@ function do_open() {
 }
 
 # generate some markdown as fodder for prototype doc site generator
-${PANTS_EXE} goal markdown --print-exception-stacktrace \
-  --markdown-fragment src:: examples:: //:readme || \
+PANTS_DEV=1 ${PANTS_EXE} goal markdown --print-exception-stacktrace \
+  --markdown-fragment src:: examples:: //:readme testprojects/src/java/com/pants/testproject/page:readme || \
   die "Failed to generate HTML from markdown'."
 
 # invoke doc site generator.
-${PANTS_EXE} goal sitegen --print-exception-stacktrace \
+PANTS_DEV=1 ${PANTS_EXE} goal sitegen --print-exception-stacktrace \
   --sitegen-config-path=src/python/pants/docs/docsite.json || \
   die "Failed to generate doc site'."
 
