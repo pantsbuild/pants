@@ -3,9 +3,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import unittest2 as unittest
+import json
 
 import bs4
-import json
 
 from internal_backend.sitegen.tasks import sitegen
 
