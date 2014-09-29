@@ -10,9 +10,9 @@ from textwrap import dedent
 
 from pants.backend.core.targets.dependencies import Dependencies
 from pants.backend.core.tasks.listtargets import ListTargets
-from pants.backend.jvm.targets.artifact import Artifact
+from pants.backend.jvm.artifact import Artifact
+from pants.backend.jvm.repository import Repository
 from pants.backend.jvm.targets.java_library import JavaLibrary
-from pants.backend.jvm.targets.repository import Repository
 from pants.base.build_file_aliases import BuildFileAliases
 from pants_test.tasks.test_base import ConsoleTaskTest
 
@@ -37,11 +37,13 @@ class ListTargetsTest(BaseListTargetsTest):
       targets={
         'target': Dependencies,
         'java_library': JavaLibrary,
-        'repo': Repository,
       },
       objects={
         'pants': lambda x: x,
         'artifact': Artifact,
+        'public': Repository(name='public',
+                             url='http://maven.twttr.com',
+                             push_db_basedir='/tmp'),
       }
     )
 
@@ -49,16 +51,6 @@ class ListTargetsTest(BaseListTargetsTest):
     super(ListTargetsTest, self).setUp()
 
     # Setup a BUILD tree for various list tests
-
-    repo_target = dedent('''
-        repo(
-          name='public',
-          url='http://maven.twttr.com',
-          push_db_basedir='/tmp'
-        )
-        ''').strip()
-    self.add_to_build_file('repos', repo_target)
-
     class Lib(object):
       def __init__(self, name, provides=False):
         self.name = name
@@ -66,7 +58,7 @@ class ListTargetsTest(BaseListTargetsTest):
             artifact(
               org='com.twitter',
               name='%s',
-              repo=pants('repos:public')
+              repo=public
             )
             ''' % name).strip() if provides else 'None'
 
@@ -85,8 +77,8 @@ class ListTargetsTest(BaseListTargetsTest):
         target(
           name='alias',
           dependencies=[
-            pants('a/b/c:c3'),
-            pants('a/b/d:d')
+            'a/b/c:c3',
+            'a/b/d:d',
           ]
         ).with_description("""
         Exercises alias resolution.
@@ -117,7 +109,6 @@ class ListTargetsTest(BaseListTargetsTest):
 
   def test_list_all(self):
     self.assert_entries('\n',
-        'repos:public',
         'a:a',
         'a/b:b',
         'a/b/c:c',
@@ -128,7 +119,6 @@ class ListTargetsTest(BaseListTargetsTest):
         'f:alias')
 
     self.assert_entries(', ',
-        'repos:public',
         'a:a',
         'a/b:b',
         'a/b/c:c',
@@ -140,7 +130,6 @@ class ListTargetsTest(BaseListTargetsTest):
         args=['--test-sep=, '])
 
     self.assert_console_output(
-        'repos:public',
         'a:a',
         'a/b:b',
         'a/b/c:c',

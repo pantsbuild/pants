@@ -16,7 +16,7 @@ from pants.base.build_manual import manual
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
 from pants.base.hash_utils import hash_all
-from pants.base.payload import EmptyPayload
+from pants.base.payload import Payload
 from pants.base.source_root import SourceRoot
 from pants.base.target_addressable import TargetAddressable
 from pants.base.validation import assert_list
@@ -170,19 +170,22 @@ class Target(AbstractTarget):
   def __init__(self, name, address, build_graph, payload=None, exclusives=None):
     """
     :param string name: The name of this target, which combined with this
-       build file defines the target address.
+      build file defines the target address.
     :param dependencies: Other targets that this target depends on.
     :type dependencies: list of target specs
     :param Address address: The Address that maps to this Target in the BuildGraph
     :param BuildGraph build_graph: The BuildGraph that this Target lives within
+    :param Payload payload: The configuration encapsulated by this target.  Also in charge of
+      most fingerprinting details.
     :param exclusives: An optional map of exclusives tags.
        `Keeps incompatible changes apart
        <build_files.html#howto-check-exclusives>`_.
     """
     # dependencies is listed above; implementation hides in TargetAddressable
+    self.payload = payload or Payload()
+    self.payload.freeze()
     self.name = name
     self.address = address
-    self.payload = payload or EmptyPayload()
     self._build_graph = build_graph
     self.description = None
     self.labels = set()
@@ -195,8 +198,13 @@ class Target(AbstractTarget):
     self._cached_fingerprint_map = {}
     self._cached_transitive_fingerprint_map = {}
 
+  @property
+  def num_chunking_units(self):
+    return max(1, len(self.sources_relative_to_buildroot()))
+
   def assert_list(self, maybe_list, expected_type=Compatibility.string):
-    return assert_list(maybe_list, expected_type, raise_type=lambda msg: TargetDefinitionException(self, msg))
+    return assert_list(maybe_list, expected_type,
+                       raise_type=lambda msg: TargetDefinitionException(self, msg))
 
   def compute_invalidation_hash(self, fingerprint_strategy=None):
     fingerprint_strategy = fingerprint_strategy or DefaultFingerprintStrategy()
@@ -246,11 +254,15 @@ class Target(AbstractTarget):
     self._build_graph.walk_transitive_dependee_graph([self.address], work=invalidate_dependee)
 
   def has_sources(self, extension=''):
-    return self.payload.has_sources(extension)
+    sources_field = self.payload.get_field('sources')
+    if sources_field:
+      return sources_field.has_sources(extension)
+    else:
+      return False
 
   def sources_relative_to_buildroot(self):
     if self.has_sources():
-      return self.payload.sources_relative_to_buildroot()
+      return self.payload.sources.relative_to_buildroot()
     else:
       return []
 

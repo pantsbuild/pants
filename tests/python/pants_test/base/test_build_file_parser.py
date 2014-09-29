@@ -10,7 +10,8 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.jvm.targets.artifact import Artifact
+from pants.backend.jvm.artifact import Artifact
+from pants.backend.jvm.repository import Repository
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
@@ -192,7 +193,11 @@ class BuildFileParserExposedContextAwareObjectFactoryTest(BaseTest):
       def provides_artifact(provides_name):
         if provides_name is None:
           return None
-        jvm_repo = 'pants-support/ivy:maven-central'
+        jvm_repo = Repository(
+          name = 'maven-central',
+          url = 'http://maven.twttr.com',
+          push_db_basedir = os.path.join('build-support', 'ivy', 'pushdb'),
+        )
         return parse_context.create_object('artifact',
                                            org=org,
                                            name=provides_name,

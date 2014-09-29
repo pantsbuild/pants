@@ -50,7 +50,7 @@ class CmdLineSpecParser(object):
     self._root_dir = os.path.realpath(root_dir)
     self._address_mapper = address_mapper
 
-  def parse_addresses(self, specs):
+  def parse_addresses(self, specs, fail_fast=False):
     """Process a list of command line specs and perform expansion.  This method can expand a list
     of command line specs, some of which may be subtracted from the  return value if they include
     the prefix '^'
@@ -62,18 +62,17 @@ class CmdLineSpecParser(object):
 
     addresses = OrderedSet()
     addresses_to_remove = set()
-
     for spec in specs:
       if spec.startswith('^'):
-        for address in self._parse_spec(spec.lstrip('^')):
+        for address in self._parse_spec(spec.lstrip('^'), fail_fast):
           addresses_to_remove.add(address)
       else:
-        for address in self._parse_spec(spec):
+        for address in self._parse_spec(spec, fail_fast):
           addresses.add(address)
     for result in addresses - addresses_to_remove:
       yield result
 
-  def _parse_spec(self, spec):
+  def _parse_spec(self, spec, fail_fast=False):
     def normalize_spec_path(path):
       is_abs = not path.startswith('//') and os.path.isabs(path)
       if is_abs:
@@ -91,6 +90,8 @@ class CmdLineSpecParser(object):
         normalized = ''
       return normalized
 
+    errored_out = []
+
     if spec.endswith('::'):
       addresses = set()
       spec_path = spec[:-len('::')]
@@ -99,11 +100,23 @@ class CmdLineSpecParser(object):
         raise self.BadSpecError('Can only recursive glob directories and {0} is not a valid dir'
                                 .format(spec_dir))
       try:
-        for build_file in BuildFile.scan_buildfiles(self._root_dir, spec_dir):
-          addresses.update(self._address_mapper.addresses_in_spec_path(build_file.spec_path))
-        return addresses
+        build_files = BuildFile.scan_buildfiles(self._root_dir, spec_dir)
       except (BuildFile.BuildFileError, AddressLookupError) as e:
         raise self.BadSpecError(e)
+
+      for build_file in build_files:
+        try:
+          addresses.update(self._address_mapper.addresses_in_spec_path(build_file.spec_path))
+        except (BuildFile.BuildFileError, AddressLookupError) as e:
+          if fail_fast:
+            raise self.BadSpecError(e)
+          errored_out.append('Exception message: {0}'.format(e.message))
+
+      if errored_out:
+        error_msg = '\n'.join(errored_out + ["Invalid BUILD files for [{0}]".format(spec)])
+        raise self.BadSpecError(error_msg)
+      return addresses
+
     elif spec.endswith(':'):
       spec_path = spec[:-len(':')]
       spec_dir = normalize_spec_path(spec_path)

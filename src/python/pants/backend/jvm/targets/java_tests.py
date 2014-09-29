@@ -16,9 +16,7 @@ from pants.base.validation import assert_list
 class JavaTests(JvmTarget):
   """Tests JVM sources with JUnit."""
 
-  def __init__(self,
-               sources=None,
-               **kwargs):
+  def __init__(self, sources=None, **kwargs):
     _sources = self.assert_list(sources)
 
     super(JavaTests, self).__init__(sources=_sources, **kwargs)

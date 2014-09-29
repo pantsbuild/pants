@@ -56,6 +56,7 @@ class GoalRunner(Command):
     goals = OrderedSet()
     specs = OrderedSet()
     explicit_multi = False
+    fail_fast = False
     logger = logging.getLogger(__name__)
     has_double_dash = u'--' in args
     goal_names = [goal.name for goal in Goal.all()]
@@ -91,11 +92,13 @@ class GoalRunner(Command):
         explicit_multi = True
         del args[i]
         break
+      elif '--fail-fast' == arg.lower():
+        fail_fast = True
 
     if explicit_multi:
       specs.update(arg for arg in args[len(goals):] if not arg.startswith('-'))
 
-    return goals, specs
+    return goals, specs, fail_fast
 
   # TODO(John Sirois): revisit wholesale locking when we move py support into pants new
   @classmethod
@@ -165,7 +168,7 @@ class GoalRunner(Command):
     show_help = len(help_flags.intersection(args)) > 0
     non_help_args = filter(lambda f: f not in help_flags, args)
 
-    goals, specs = GoalRunner.parse_args(non_help_args)
+    goals, specs, fail_fast = GoalRunner.parse_args(non_help_args)
     if show_help:
       print_help(goals)
       sys.exit(0)
@@ -177,7 +180,7 @@ class GoalRunner(Command):
       spec_parser = CmdLineSpecParser(self.root_dir, self.address_mapper)
       with self.run_tracker.new_workunit(name='parse', labels=[WorkUnit.SETUP]):
         for spec in specs:
-          for address in spec_parser.parse_addresses(spec):
+          for address in spec_parser.parse_addresses(spec, fail_fast):
             self.build_graph.inject_address_closure(address)
             self.targets.append(self.build_graph.get_target(address))
     self.goals = [Goal.by_name(goal) for goal in goals]

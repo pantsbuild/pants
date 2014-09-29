@@ -10,5 +10,5 @@ scala_library(name='welcome',
   sources=globs('*.scala'),
   provides = artifact(org='com.pants.testproject.publish.hello',
                       name='welcome',
-                      repo='testprojects/ivy:testing',),
+                      repo=testing,),
 )
