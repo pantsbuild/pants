@@ -92,6 +92,7 @@ def precompute(config, soups):
   page = {}
   for p, soup in soups.items():
     title = get_title(soup) or p
+    print("PREC", len(title), title)
     page[p] = PrecomputedPageInfo(title=title)
   return Precomputed(page=page)
 
@@ -142,7 +143,7 @@ def ensure_headings_linkable(soups):
         snippet = ''.join([c for c in tag.text if c.isalpha()])[:20]
         while True:
           count += 1
-          candidate_id = 'tmp_{}_{}'.format(snippet, count).lower()
+          candidate_id = 'tmp_{0}_{1}'.format(snippet, count).lower()
           if not candidate_id in existing_ids:
             existing_ids.add(candidate_id)
             tag['id'] = candidate_id
@@ -216,7 +217,7 @@ def hdepth(tag):
   E.g., h1 at top level is 1, h1 in a section is 2, h2 at top level is 2.
   '''
   if not _heading_re.search(tag.name):
-    raise TaskError('Can\'t compute heading depth of non-heading {}'.format(tag))
+    raise TaskError('Can\'t compute heading depth of non-heading {0}'.format(tag))
   depth = int(tag.name[1], 10)  # get the 2 from 'h2'
   cursor = tag
   while cursor:
@@ -250,9 +251,9 @@ def render_html(dst, config, soups, precomputed, template):
   title = precomputed.page[dst].title
   topdots = ('../' * dst.count('/'))
   if soup.body:
-    body_html = '{}'.format(soup.body)
+    body_html = '{0}'.format(soup.body)
   else:
-    body_html = '{}'.format(soup)
+    body_html = '{0}'.format(soup)
   page_toc = generate_page_toc(soup)
   html = renderer.render(template,
                          body_html=body_html,

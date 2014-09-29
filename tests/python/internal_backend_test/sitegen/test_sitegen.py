@@ -40,10 +40,9 @@ INDEX_HTML = '''
 '''
 
 P1_HTML = '''
-<h1>Page 1</h1>
+<h1>東京 is Tokyo</h1>
 
 <p>Fascinating description.
-   Some non-ASCII text: 東京スカパラダイスオーケストラ.
 '''
 
 P2_HTML = '''
@@ -83,13 +82,21 @@ class AllTheThingsTestCase(unittest.TestCase):
 
   def test_find_title(self):
     soups = self.orig_soups.copy()
-    html = sitegen.render_html('subdir/page2',
-                               self.config,
-                               soups,
-                               self.precomputed,
-                               '{{title}}')
-    self.assertEqual(html, 'Page 2: Electric Boogaloo',
+    p2_html = sitegen.render_html('subdir/page2',
+                                  self.config,
+                                  soups,
+                                  self.precomputed,
+                                  '{{title}}')
+    self.assertEqual(p2_html, 'Page 2: Electric Boogaloo',
                      '''Didn't find correct title''')
+    # ascii worked? great, try non-ASCII
+    p1_html = sitegen.render_html('subdir/page1',
+                                  self.config,
+                                  soups,
+                                  self.precomputed,
+                                  '{{title}}')
+    self.assertEqual(p1_html, u'東京 is Tokyo',
+                     '''Didn't find correct non-ASCII title''')
 
   def test_fixup_internal_links(self):
     soups = self.orig_soups.copy()
