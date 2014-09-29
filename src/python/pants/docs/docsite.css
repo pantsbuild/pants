@@ -106,21 +106,26 @@ nav.bignav .site-toc {
   color: white;
 }
 
+.site-toc .toc-h0 {
+  margin-left: 0px;
+  padding-left: 0px;
+  font-size: 120%;
+}
 .site-toc .toc-h1 {
   margin-left: 2px;
-  padding-left: 2px;
+  padding-left: 0px;
 }
 .site-toc .toc-h2 {
   margin-left: 2px;
-  padding-left: 6px;
+  padding-left: 1.0em;
 }
 .site-toc .toc-h3 {
   margin-left: 2px;
-  padding-left: 10px;
+  padding-left: 2.0em;
 }
 .site-toc .toc-h4 {
   margin-left: 2px;
-  padding-left: 14px;
+  padding-left: 3.0em;
 }
 
 nav.pagetoc {

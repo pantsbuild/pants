@@ -92,7 +92,6 @@ def precompute(config, soups):
   page = {}
   for p, soup in soups.items():
     title = get_title(soup) or p
-    print("PREC", len(title), title)
     page[p] = PrecomputedPageInfo(title=title)
   return Precomputed(page=page)
 
@@ -178,9 +177,9 @@ def generate_site_toc(config, precomputed, here):
                              text=precomputed.page[dst].title,
                              here=(dst == here)))
       if 'children' in node:
-        recurse(node['children'], depth_so_far)
+        recurse(node['children'], depth_so_far + 1)
   if 'tree' in config:
-    recurse(config['tree'], 1)
+    recurse(config['tree'], 0)
   return site_toc
 
 
