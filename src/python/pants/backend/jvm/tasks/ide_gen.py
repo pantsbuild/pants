@@ -515,7 +515,7 @@ class Project(object):
     targeted = set()
 
     def relative_sources(target):
-      sources = target.payload.sources_relative_to_buildroot()
+      sources = target.payload.sources.relative_to_buildroot()
       return [os.path.relpath(source, target.target_base) for source in sources]
 
     def source_target(target):

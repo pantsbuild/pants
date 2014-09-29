@@ -8,5 +8,5 @@ scala_library(name = 'jvm-run-example-lib',
   sources = ['JvmRunExample.scala'],
   provides = artifact(org='com.pants.testproject.publish',
                       name='jvm-example-lib',
-                      repo='testprojects/ivy:testing',)
+                      repo=testing,)
 )

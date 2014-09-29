@@ -50,7 +50,7 @@ class PythonThriftBuilder(CodeGenerator):
 
     def collect_sources(target):
       abs_target_base = os.path.join(get_buildroot(), target.target_base)
-      for source in target.payload.sources_relative_to_buildroot():
+      for source in target.payload.sources.relative_to_buildroot():
         source_root_relative_source = os.path.relpath(source, abs_target_base)
         all_thrifts.add((target.target_base, source_root_relative_source))
 

@@ -13,5 +13,5 @@ scala_library(name='welcome',
   ],
   provides = artifact(org='com.pants.example.hello',
                       name='welcome',
-                      repo='build-support/ivy:public',),
+                      repo=public,),
 )

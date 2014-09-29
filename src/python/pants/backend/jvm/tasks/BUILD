@@ -127,7 +127,7 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/core/tasks:console_task',
     'src/python/pants/base:exceptions',
-    'src/python/pants/base:payload',
+    'src/python/pants/base:payload_field',
   ],
 )
 

@@ -12,6 +12,7 @@ from pants.base.build_file_address_mapper import BuildFileAddressMapper
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file_parser import BuildFileParser
 from pants.base.build_graph import BuildGraph
+from pants.base.config import Config
 from pants.base.dev_backend_loader import load_build_configuration_from_source
 
 
@@ -22,7 +23,9 @@ class Utf8HeaderTest(unittest.TestCase):
     Look through all .py files and ensure they start with the line '# coding=utf8'
     """
 
-    build_configuration = load_build_configuration_from_source()
+    config = Config.load()
+    backend_packages = config.getlist('backends', 'packages')
+    build_configuration = load_build_configuration_from_source(backend_packages)
     build_file_parser = BuildFileParser(root_dir=get_buildroot(),
                                         build_configuration=build_configuration)
     address_mapper = BuildFileAddressMapper(build_file_parser)

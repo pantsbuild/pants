@@ -3,5 +3,8 @@
 
 java_protobuf_library(name='imports',
   sources=['test_imports.proto',],
-  imports=['3rdparty:protobuf-test-import',],
+  imports=[
+    '3rdparty:protobuf-test-import',
+    jar(org='com.squareup.testing.protolib', name='protolib-test', rev='1.0.1'),
+  ],
 )

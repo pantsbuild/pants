@@ -17,7 +17,6 @@ python_library(
 python_library(
   name = 'all_utils',
   dependencies = [
-    ':python_setup',
     ':antlr_builder',
     ':binary_builder',
     ':code_generator',
@@ -27,6 +26,7 @@ python_library(
     ':python_chroot',
     ':python_requirement',
     ':python_requirements',
+    ':python_setup',
     ':resolver',
     ':sdist_builder',
     ':test_builder',

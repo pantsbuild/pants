@@ -202,12 +202,16 @@ class MarkdownToHtml(Task):
   def __init__(self, *args, **kwargs):
     super(MarkdownToHtml, self).__init__(*args, **kwargs)
 
+    # TODO(pl): None of this should be setup in the __init__, it can interfere with unrelated
+    # tasks if this Task is misconfigured.
     self._templates_dir = os.path.join('templates', 'markdown')
     self.open = self.context.options.markdown_to_html_open
 
     self.extensions = set(
-      self.context.options.markdown_to_html_extensions
-      or self.context.config.getlist('markdown-to-html', 'extensions', default=['.md', '.markdown'])
+      self.context.options.markdown_to_html_extensions or
+      self.context.config.getlist('markdown-to-html',
+                                  'extensions',
+                                  default=['.md', '.markdown'])
     )
 
     self.fragment = self.context.options.markdown_to_html_fragment
@@ -220,8 +224,7 @@ class MarkdownToHtml(Task):
   def execute(self):
     # TODO(John Sirois): consider adding change detection
 
-    outdir = os.path.join(self.context.config.getdefault('pants_distdir'),
-                          'markdown')
+    outdir = os.path.join(self.context.config.getdefault('pants_distdir'), 'markdown')
     css_path = os.path.join(outdir, 'css', 'codehighlight.css')
     css = emit_codehighlight_css(css_path, self.code_style)
     if css:
@@ -252,7 +255,7 @@ class MarkdownToHtml(Task):
         def process_page(key, outdir, url_builder, config, genmap, fragment=False):
           html_path = self.process(
             os.path.join(outdir, page_to_html_path(page)),
-            os.path.join(page.payload.sources_rel_path, page.source),
+            os.path.join(page.payload.sources.rel_path, page.source),
             self.fragment or fragment,
             url_builder,
             config,
