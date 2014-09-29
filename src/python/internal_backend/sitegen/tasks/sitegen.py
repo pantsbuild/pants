@@ -121,7 +121,7 @@ def fixup_internal_links(config, soups):
       tag['href'] = tag['href'].replace(old_rel_path, new_rel_path, 1)
 
 
-_heading_re = re.compile('^h[1-6]$')
+_heading_re = re.compile('^h[1-6]$')  # match heading tag names h1,h2,h3,...
 
 
 def ensure_headings_linkable(soups):
@@ -153,6 +153,7 @@ def transform_soups(config, soups, precomputed):
   '''Mutate our soups to be better when we write them out later.'''
   fixup_internal_links(config, soups)
   ensure_headings_linkable(soups)
+  # TODO: yet more to come here
 
 
 def get_title(soup):
