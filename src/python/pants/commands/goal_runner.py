@@ -113,6 +113,15 @@ class GoalRunner(Command):
     self.config = None
     super(GoalRunner, self).__init__(*args, **kwargs)
 
+  def get_spec_excludes(self):
+    # Bootstrap user goals by loading any BUILD files implied by targets.
+    spec_excludes = self.config.getlist(Config.DEFAULT_SECTION, 'spec_excludes',
+                                        default=None)
+    if spec_excludes is None:
+       return [self.config.getdefault('pants_workdir')]
+    return  [os.path.join(self.root_dir, spec_exclude) for spec_exclude in spec_excludes]
+
+
   @contextmanager
   def check_errors(self, banner):
     errors = {}
@@ -176,8 +185,8 @@ class GoalRunner(Command):
     self.requested_goals = goals
 
     with self.run_tracker.new_workunit(name='setup', labels=[WorkUnit.SETUP]):
-      # Bootstrap user goals by loading any BUILD files implied by targets.
-      spec_parser = CmdLineSpecParser(self.root_dir, self.address_mapper)
+
+      spec_parser = CmdLineSpecParser(self.root_dir, self.address_mapper, spec_excludes=self.get_spec_excludes())
       with self.run_tracker.new_workunit(name='parse', labels=[WorkUnit.SETUP]):
         for spec in specs:
           for address in spec_parser.parse_addresses(spec, fail_fast):
@@ -283,6 +292,7 @@ class GoalRunner(Command):
       build_graph=self.build_graph,
       build_file_parser=self.build_file_parser,
       address_mapper=self.address_mapper,
+      spec_excludes=self.get_spec_excludes(),
       lock=lock)
 
     unknown = []

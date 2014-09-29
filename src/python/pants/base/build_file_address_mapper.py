@@ -167,7 +167,7 @@ class BuildFileAddressMapper(object):
     for spec in specs:
       yield self.spec_to_address(spec, relative_to=relative_to)
 
-  def scan_addresses(self, root=None):
+  def scan_addresses(self, root=None, spec_excludes=None):
     """Recursively gathers all addresses visible under `root` of the virtual address space.
     :raises AddressLookupError: if there is a problem parsing a BUILD file
     :param path root: defaults to the root directory of the pants project.
@@ -175,7 +175,7 @@ class BuildFileAddressMapper(object):
     addresses = set()
     root = root or get_buildroot()
     try:
-      for build_file in BuildFile.scan_buildfiles(root):
+      for build_file in BuildFile.scan_buildfiles(root, spec_excludes=spec_excludes):
         for address in self.addresses_in_spec_path(build_file.spec_path):
           addresses.add(address)
     except BuildFile.BuildFileError as e:

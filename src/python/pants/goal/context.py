@@ -76,7 +76,8 @@ class Context(object):
   # repository of attributes?
   def __init__(self, config, options, run_tracker, target_roots, requested_goals=None,
                lock=None, log=None, target_base=None, build_graph=None, build_file_parser=None,
-               address_mapper=None, console_outstream=None, scm=None, workspace=None):
+               address_mapper=None, console_outstream=None, scm=None, workspace=None,
+               spec_excludes=None):
     self._config = config
     self._options = options
     self.build_graph = build_graph
@@ -93,7 +94,7 @@ class Context(object):
     self._console_outstream = console_outstream or sys.stdout
     self._scm = scm or get_scm()
     self._workspace = workspace or (ScmWorkspace(self._scm) if self._scm else None)
-
+    self._spec_excludes = spec_excludes
     self.replace_targets(target_roots)
 
   @property
@@ -172,6 +173,10 @@ class Context(object):
   def ivy_home(self):
     return os.path.realpath(self.config.get('ivy', 'cache_dir',
                                             default=_IVY_CACHE_DIR_DEFAULT))
+
+  @property
+  def spec_excludes(self):
+    return self._spec_excludes
 
   def __str__(self):
     ident = Target.identify(self.targets())

@@ -30,8 +30,7 @@ class BuildFileTest(unittest.TestCase):
   def buildfile(cls, path):
     return BuildFile(BuildFileTest.root_dir, path)
 
-  @classmethod
-  def setUpClass(cls):
+  def setUp(self):
     BuildFileTest.base_dir = tempfile.mkdtemp()
 
     # Seed a BUILD outside the build root that should not be detected
@@ -51,16 +50,16 @@ class BuildFileTest(unittest.TestCase):
     BuildFileTest.touch('grandparent/parent/child2/child3/BUILD')
     BuildFileTest.makedirs('grandparent/parent/child2/BUILD')
     BuildFileTest.makedirs('grandparent/parent/child4')
+    BuildFileTest.touch('grandparent/parent/child5/BUILD')
     BuildFileTest.makedirs('path-that-does-exist')
     BuildFileTest.touch('path-that-does-exist/BUILD.invalid.suffix')
+    self.buildfile = BuildFileTest.buildfile('grandparent/parent/BUILD')
 
 
   @classmethod
   def tearDownClass(cls):
     shutil.rmtree(BuildFileTest.root_dir)
 
-  def setUp(self):
-    self.buildfile = BuildFileTest.buildfile('grandparent/parent/BUILD')
 
   def testSiblings(self):
     buildfile = BuildFileTest.buildfile('grandparent/parent/BUILD.twitter')
@@ -90,6 +89,7 @@ class BuildFileTest(unittest.TestCase):
         BuildFileTest.buildfile('grandparent/parent/child1/BUILD'),
         BuildFileTest.buildfile('grandparent/parent/child1/BUILD.twitter'),
         BuildFileTest.buildfile('grandparent/parent/child2/child3/BUILD'),
+        BuildFileTest.buildfile('grandparent/parent/child5'),
     ]), self.buildfile.descendants())
 
   def testMustExistFalse(self):
@@ -164,7 +164,24 @@ class BuildFileTest(unittest.TestCase):
       BuildFileTest.buildfile('grandparent/parent/child1/BUILD'),
       BuildFileTest.buildfile('grandparent/parent/child1/BUILD.twitter'),
       BuildFileTest.buildfile('grandparent/parent/child2/child3/BUILD'),
+      BuildFileTest.buildfile('grandparent/parent/child5/BUILD'),
+
       ]), buildfiles)
+
+    def test_scan_buildfiles_exclude(self):
+      buildfiles = BuildFile.scan_buildfiles(
+        BuildFileTest.root_dir, '', spec_excludes=[
+          os.path.join(BuildFileTest.root_dir, 'grandparent/parent/child1'),
+          os.path.join(BuildFileTest.root_dir, 'grandparent/parent/child2')
+        ])
+
+      self.assertEquals([BuildFileTest.buildfile('BUILD'),
+                         BuildFileTest.buildfile('/BUILD.twitter'),
+                         BuildFileTest.buildfile('/grandparent/parent/BUILD'),
+                         BuildFileTest.buildfile('/grandparent/parent/BUILD.twitter'),
+                         BuildFileTest.buildfile('/grandparent/parent/child5/BUILD'),
+                         ],
+                        buildfiles)
 
   def test_invalid_root_dir_error(self):
     BuildFileTest.touch('BUILD')
