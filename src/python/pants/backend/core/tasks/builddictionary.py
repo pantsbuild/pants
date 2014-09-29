@@ -65,18 +65,21 @@ def dedent_docstring(s):
   return indent_docstring_by_n(s, 0)
 
 
-def rst_to_html(s, span=False):
+def rst_to_html(in_rst, span=False):
   """Returns HTML rendering of an RST fragment.
 
-  :param s: rst-formatted string
+  :param in_rst: rst-formatted string
   :param span: if True, expecting a "span", a fragment of a paragraph.
-     (By default, our RST parser thinks "foo" is a paragraph.)
-     If span=True, strip off the outer paragraph tag.
+     The RST parser always returns a block; passed a fragment, it returns
+     a plain <p> element. If we expect a "span" we  want to strip off the <p>.
+     (But if the RST parser returns something more complex, e.g., a bulleted
+     list, preserve that. The comment author probably wanted that formatting.)
   """
-  if not s: return ''
-  body = publish_parts(s, writer_name='html')['body'].strip()
+  if not in_rst:
+    return ''
+  body = publish_parts(in_rst, writer_name='html')['body'].strip()
   if span:
-    if body.startswith('<p>') and body.endswith('</p>') and body.count('<p>') == 1:
+    if body.startswith('<p>') and body.endswith('</p>'):
       body = body[3:-4]
   return body
 
@@ -108,7 +111,7 @@ def entry(nom, classdoc_rst=None, classdoc_html=None,
     funcdoc_html=funcdoc_html,
     funcdoc_rst=indent_docstring_by_n(funcdoc_rst, indent),
     methods=methods,
-    showmethods=methods and (len(methods) > 0),
+    showmethods=len(methods or []) > 0,
     paramdocs=paramdocs,
     showparams=paramdocs and (len(paramdocs) > 0),
     impl=impl)
@@ -175,26 +178,23 @@ param_re = re.compile(r':param (?P<type>[A-Za-z0-9_]* )?(?P<param>[^:]*):(?P<des
 type_re = re.compile(r':type (?P<param>[^:]*):(?P<type>.*)')
 
 
-def docstring_to_body(s):
+def docstring_to_body(docstring):
   """Passed a sphinx-flavored docstring, return just the "body" part.
 
   Filter out the :param...: and :type...: part, if any.
   """
-  s = s or ''
+  docstring = docstring or ''
   body = ''  # return value
   recording_state = True  # are we "recording" or not
-  for line in s.splitlines():
+  for line in docstring.splitlines():
     if line and not line[0].isspace():
-      if [regex for regex in [param_re, type_re] if regex.match(line)]:
-        recording_state = False
-      else:
-        recording_state = True
+      recording_state = not any(r.match(line) for r in [param_re, type_re])
     if recording_state:
       body += line + '\n'
   return body
 
 
-def shard_param_docstring(s):
+def shard_param_docstring(docstring):
   """Shard a sphinx-flavored __init__ docstring by param
 
   E.g., if the docstring is
@@ -210,6 +210,7 @@ def shard_param_docstring(s):
     'y' : {'type': 'float', 'param': 'y coordinate'},
   )
   """
+  docstring = docstring or ''
 
   # state: what I'm "recording" right now. Needed for multi-line fields.
   # ('x', 'param') : recording contents of a :param x: blah blah blah
@@ -219,9 +220,7 @@ def shard_param_docstring(s):
 
   # shards: return value
   shards = OrderedDict([('!forget', {'!': ''})])
-
-  s = s or ''
-  for line in s.splitlines():
+  for line in docstring.splitlines():
     # If this line is indented, keep "recording" whatever we're recording:
     if line and line[0].isspace():
       param, type_or_desc = state
@@ -564,7 +563,7 @@ class BuildBuildDictionary(Task):
     template = resource_string(__name__, os.path.join(self._templates_dir, 'page.mustache'))
     filename = os.path.join(self._outdir, 'build_dictionary.rst')
     self.context.log.info('Generating %s' % filename)
-    with safe_open(filename, 'w') as outfile:
+    with safe_open(filename, 'wb') as outfile:
       generator = Generator(template,
                             tocs=tocs,
                             defns=defns)
@@ -573,7 +572,7 @@ class BuildBuildDictionary(Task):
     template = resource_string(__name__, os.path.join(self._templates_dir, 'bdict_html.mustache'))
     filename = os.path.join(self._outdir, 'build_dictionary.html')
     self.context.log.info('Generating %s' % filename)
-    with safe_open(filename, 'w') as outfile:
+    with safe_open(filename, 'wb') as outfile:
       generator = Generator(template,
                             tocs=tocs,
                             defns=defns)
@@ -589,7 +588,7 @@ class BuildBuildDictionary(Task):
                                os.path.join(self._templates_dir, 'goals_reference.mustache'))
     filename = os.path.join(self._outdir, 'goals_reference.rst')
     self.context.log.info('Generating %s' % filename)
-    with safe_open(filename, 'w') as outfile:
+    with safe_open(filename, 'wb') as outfile:
       generator = Generator(template, goals=goals, glopts=glopts)
       generator.write(outfile)
 
@@ -598,6 +597,6 @@ class BuildBuildDictionary(Task):
                                os.path.join(self._templates_dir, 'gref_html.mustache'))
     filename = os.path.join(self._outdir, 'goals_reference.html')
     self.context.log.info('Generating %s' % filename)
-    with safe_open(filename, 'w') as outfile:
+    with safe_open(filename, 'wb') as outfile:
       generator = Generator(template, goals=goals, glopts=glopts)
       generator.write(outfile)
