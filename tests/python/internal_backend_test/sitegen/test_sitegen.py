@@ -50,7 +50,19 @@ P2_HTML = '''
   <title>Page 2: Electric Boogaloo</title>
 </head>
 <body>
+
 <h1>Page 2</h1>
+
+<p>Some text</p>
+
+<h2 id="one">Section One</h2>
+
+<p>Some more text</p>
+
+<h2 id="two">Section Two</h2>
+
+<p>Some more text</p>
+
 </body>
 '''
 
@@ -108,6 +120,56 @@ class AllTheThingsTestCase(unittest.TestCase):
                                TEMPLATE_MUSTACHE)
     self.assertTrue('subdir/page1.html' in html,
                     'p1.html link did not get fixed up to page1.html')
+
+  def test_page_toc(self):
+    # One of our "pages" has a couple of basic headings.
+    # Do we get the correct info from that to generate
+    # a page-level table of contents?
+    soups = self.orig_soups.copy()
+    rendered = sitegen.render_html('subdir/page2',
+                                   self.config,
+                                   soups,
+                                   self.precomputed,
+                                   '''
+                                   {{#page_toc}}
+                                   DEPTH={{depth}} LINK={{link}} TEXT={{text}}
+                                   {{/page_toc}}
+                                   ''')
+    self.assertIn('DEPTH=1 LINK=one TEXT=Section One', rendered)
+    self.assertIn('DEPTH=1 LINK=two TEXT=Section Two', rendered)
+
+  def test_breadcrumbs(self):
+    # Our "site" has a simple outline.
+    # Do we get the correct info from that to generate
+    # "breadcrumbs" navigating from one page up to the top?
+    soups = self.orig_soups.copy()
+    rendered = sitegen.render_html('subdir/page2',
+                                   self.config,
+                                   soups,
+                                   self.precomputed,
+                                   '''
+                                   {{#breadcrumbs}}
+                                   LINK={{link}} TEXT={{text}}
+                                   {{/breadcrumbs}}
+                                   ''')
+    self.assertIn('LINK=../index.html TEXT=Pants Build System', rendered)
+
+  def test_site_toc(self):
+    # Our "site" has a simple outline.
+    # Do we get the correct info from that to generate
+    # a site-level table of contents?
+    soups = self.orig_soups.copy()
+    rendered = sitegen.render_html('index',
+                                   self.config,
+                                   soups,
+                                   self.precomputed,
+                                   '''
+                                   {{#site_toc}}
+                                   DEPTH={{depth}} LINK={{link}} TEXT={{text}}
+                                   {{/site_toc}}
+                                   ''')
+    self.assertIn(u'DEPTH=1 LINK=subdir/page1.html TEXT=東京 is Tokyo', rendered)
+    self.assertIn('DEPTH=1 LINK=subdir/page2.html TEXT=Page 2: Electric Boogaloo', rendered)
 
   def test_transform_fixes_up_internal_links(self):
     soups = self.orig_soups.copy()
