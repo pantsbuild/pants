@@ -65,23 +65,14 @@ def dedent_docstring(s):
   return indent_docstring_by_n(s, 0)
 
 
-def rst_to_html(in_rst, span=False):
+def rst_to_html(in_rst):
   """Returns HTML rendering of an RST fragment.
 
   :param in_rst: rst-formatted string
-  :param span: if True, expecting a "span", a fragment of a paragraph.
-     The RST parser always returns a block; passed a fragment, it returns
-     a plain <p> element. If we expect a "span" we  want to strip off the <p>.
-     (But if the RST parser returns something more complex, e.g., a bulleted
-     list, preserve that. The comment author probably wanted that formatting.)
   """
   if not in_rst:
     return ''
-  body = publish_parts(in_rst, writer_name='html')['body'].strip()
-  if span:
-    if body.startswith('<p>') and body.endswith('</p>'):
-      body = body[3:-4]
-  return body
+  return publish_parts(in_rst, writer_name='html')['body'].strip()
 
 
 def entry(nom, classdoc_rst=None, classdoc_html=None,
@@ -188,7 +179,10 @@ def docstring_to_body(docstring):
   recording_state = True  # are we "recording" or not
   for line in docstring.splitlines():
     if line and not line[0].isspace():
-      recording_state = not any(r.match(line) for r in [param_re, type_re])
+      if any(r.match(line) for r in [param_re, type_re]):
+        recording_state = False
+      else:
+        recording_state = True
     if recording_state:
       body += line + '\n'
   return body
@@ -260,7 +254,7 @@ def param_docshards_to_template_datas(funcdoc_shards):
       else:
         type_ = None
       if 'param' in parts:
-        desc = rst_to_html(dedent_docstring(parts['param']), span=True)
+        desc = rst_to_html(dedent_docstring(parts['param']))
       else:
         desc = None
       template_datas.append(TemplateData(param=param, typ=type_, desc=desc))

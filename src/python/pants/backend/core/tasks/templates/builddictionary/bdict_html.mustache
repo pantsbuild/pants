@@ -48,6 +48,9 @@ p.bdict_impl {
 .bdict_param {
   margin-left: 1.0em;
 }
+span.bdict_param_muffle_p p {
+  display: inline;
+}
 </style>
 
 {{#tocs}}
@@ -89,11 +92,14 @@ p.bdict_impl {
 <p><b>Params:</b>
 {{#paramdocs}}
 
-<p class="bdict_param"><b class="bdict_param_name">{{param}}</b>
+<div class="bdict_param"><b class="bdict_param_name">{{param}}</b>
   {{#typ}}
   (<em class="bdict_param_type">{{typ}}</em>)
   {{/typ}}
-  {{{desc}}}
+  {{#desc}}
+  <span class ="bdict_param_muffle_p">{{{desc}}}</span>
+  {{/desc}}
+</div>
 
 {{/paramdocs}}
 </div>
@@ -117,11 +123,14 @@ p.bdict_impl {
   <p><b>Params:</b>
   {{#paramdocs}}
 
-  <p class="bdict_param"><b class="bdict_param_name">{{param}}</b>
+  <div class="bdict_param"><b class="bdict_param_name">{{param}}</b>
     {{#typ}}
     (<em class="bdict_param_type">{{typ}}</em>)
     {{/typ}}
-    {{{desc}}}
+    {{#desc}}
+    <span class="bdict_param_muffle_p">{{{desc}}}</span>
+    {{/desc}}
+  </div>
 
   {{/paramdocs}}
   </div>
