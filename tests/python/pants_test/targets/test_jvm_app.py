@@ -198,6 +198,30 @@ class BundleTest(BaseJvmAppTest):
     self.assertEquals(app.bundles[0].filemap.values()[0],
                       'config/five.xml')
 
+  def test_bundle_filemap_dest_remap(self):
+    self.create_dir('src/java/org/archimedes/crown/config')
+    self.create_file('src/java/org/archimedes/crown/config/one.xml')
+    self.add_to_build_file('src/java/org/archimedes/crown/BUILD', dedent('''
+      jvm_binary(name='unused')
+    '''))
+    self.add_to_build_file('src/java/org/archimedes/crown/BUILD', dedent('''
+      from pants.backend.jvm.targets.jvm_binary import DirectoryReMapper
+
+      jvm_app(name='crown',
+        dependencies=[':unused'],
+        bundles=[
+          bundle(mapper=DirectoryReMapper('src/java/org/archimedes/crown/config', 'gold/config'))
+            .add('config/one.xml')
+        ]
+      )
+    '''))
+    app = self.target('src/java/org/archimedes/crown')
+    for k in app.bundles[0].filemap.keys():
+      if k.endswith('archimedes/crown/config/one.xml'):
+        fivexml_key = k
+    self.assertEquals(app.bundles[0].filemap.values()[0],
+                      'gold/config/one.xml')
+
   def test_bundle_add_add(self):
     self.create_dir('src/java/org/archimedes/volume/config/stone')
     self.create_file('src/java/org/archimedes/volume/config/stone/dense.xml')

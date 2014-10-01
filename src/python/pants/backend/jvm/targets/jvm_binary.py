@@ -279,6 +279,27 @@ class RelativeToMapper(object):
     return hash(self.base)
 
 
+class DirectoryReMapper(object):
+  """A mapper that maps files relative to a base directory into a destination directory."""
+
+  def __init__(self, base, dest):
+    """The base directory files should be mapped from, and the dest they should be mapped to.
+
+    :param string base: the relative path to get_buildroot()
+    :param string dest: the dest path in the bundle
+    """
+    self.base = os.path.abspath(os.path.join(get_buildroot(), base))
+    if not os.path.isdir(self.base):
+      raise ValueError('Could not find a directory to bundle relative to %s' % self.base)
+    self.dest = dest
+
+  def __call__(self, file):
+    return os.path.join(self.dest, os.path.relpath(file, self.base))
+
+  def __repr__(self):
+    return 'DirectoryReMapper(%s, %s)' % (self.base, self.dest)
+
+
 class Bundle(object):
   """A set of files to include in an application bundle.
 
