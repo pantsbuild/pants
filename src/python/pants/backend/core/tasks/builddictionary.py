@@ -425,12 +425,16 @@ def assemble(predefs=PREDEFS, build_file_parser=None):
   retval = {}
   for nom in predefs:
     val = predefs[nom]
-    if 'suppress' in val and val['suppress']: continue
+    if 'suppress' in val and val['suppress']:
+      continue
     retval[nom] = val
   if build_file_parser:
     symbol_hash = get_syms(build_file_parser)
     for nom in symbol_hash:
       v = symbol_hash[nom]
+      bdi = get_builddict_info(v)
+      if bdi and 'suppress' in bdi and bdi['suppress']:
+        continue
       retval[nom] = {'defn': entry_for_one(nom, v)}
   return retval
 
