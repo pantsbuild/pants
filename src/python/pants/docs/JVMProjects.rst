@@ -332,3 +332,6 @@ from the archive.
    :maxdepth: 1
 
    from_maven
+   scala_tutorial
+
+
