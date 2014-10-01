@@ -224,8 +224,8 @@ class GroupTask(Task):
     created for a given name.  If the task has already been created, it will just be returned.
 
     :param string name: The logical name of the group.
-    :param list product_type:  The name of the product types this group cooperatively produces.
-    :param list flag_namespace:
+    :param list product_type:  The names of the product types this group cooperatively produces.
+    :param list flag_namespace: The parent namespace for flags registered by member tasks.
     """
     group_task = cls._GROUPS.get(name)
     if not group_task:
@@ -238,6 +238,7 @@ class GroupTask(Task):
 
         @classmethod
         def known_scopes(cls):
+          """Yields all known scopes under this task (i.e., those of its member types.)"""
           for member_type in cls._member_types():
             yield member_type.options_scope
 

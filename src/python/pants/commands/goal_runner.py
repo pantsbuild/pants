@@ -121,7 +121,7 @@ class GoalRunner(Command):
     # self.options set up because the superclass ctor calls our register_options().
     # Fortunately this will all go away once we're fully off the old "Command" mechanism.
     legacy_parser = args[2] if len(args) > 2 else kwargs['parser']
-    self.options = Options(os.environ, self.config, known_scopes, args=sys.argv,
+    self.options = Options(os.environ.copy(), self.config, known_scopes, args=sys.argv,
                            legacy_parser=legacy_parser)
     super(GoalRunner, self).__init__(*args, **kwargs)
 

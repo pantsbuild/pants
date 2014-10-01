@@ -52,6 +52,7 @@ class TaskBase(AbstractClass):
 
   @classmethod
   def known_scopes(cls):
+    """Yields all known scopes under this task (usually just its own.)"""
     yield cls.options_scope
 
   @classmethod

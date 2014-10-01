@@ -136,8 +136,8 @@ class _Goal(object):
     # a class method to an instance method, and instantiating the task much sooner in the
     # lifecycle.
 
-    subclass_name = b'{1}_{0}'.format(task_registrar.task_type.__name__, options_scope)
-    task_type = type(subclass_name, (task_registrar.task_type, ), { 'options_scope': options_scope})
+    subclass_name = b'{0}_{1}'.format(task_registrar.task_type.__name__, options_scope)
+    task_type = type(subclass_name, (task_registrar.task_type,), {'options_scope': options_scope})
     self._task_type_by_name[task_name] = task_type
 
     otn = self._ordered_task_names
@@ -184,6 +184,7 @@ class _Goal(object):
       raise GoalError('Cannot uninstall unknown task: {0}'.format(name))
 
   def known_scopes(self):
+    """Yields all known scopes under this goal (including its own.)"""
     yield self.name
     for task_type in self.task_types():
       for scope in task_type.known_scopes():
