@@ -37,11 +37,19 @@ class Goal(object):
     cls._goal_by_name.clear()
 
   @staticmethod
+  def scope(goal_name, task_name):
+    """Returns options scope for specified task in specified goal."""
+    return goal_name if goal_name == task_name else '{0}.{1}'.format(goal_name, task_name)
+
+  @staticmethod
   def option_group_title(goal, task_name):
     """Returns name to use for CLI flag OptionGroup."""
+    # Note: This is almost the same as scope(), except for the case of a single task
+    # in a goal that has a different name than the goal. This will go away soon
+    # once we transition to new-style options.
     goal_leader = len(goal.ordered_task_names()) == 1 or task_name == goal.name
     namespace = [task_name] if goal_leader else [goal.name, task_name]
-    return ':'.join(namespace)
+    return '.'.join(namespace)
 
   @staticmethod
   def setup_parser(parser, args, goals):
@@ -62,7 +70,17 @@ class Goal(object):
           goal_leader = len(goal.ordered_task_names()) == 1 or task_name == goal.name
           namespace = [task_name] if goal_leader else [goal.name, task_name]
           mkflag = Mkflag(*namespace)
-          option_group = OptionGroup(parser, title=Goal.option_group_title(goal, task_name))
+          title = task_type.options_scope
+
+          # See if an option group already exists (created by the legacy options code
+          # in the new options system.)
+          option_group = None
+          for og in parser.option_groups:
+            if og.title == title:
+              option_group = og
+              break
+
+          option_group = option_group or OptionGroup(parser, title=title)
           task_type.setup_parser(option_group, args, mkflag)
           if option_group.option_list:
             parser.add_option_group(option_group)
@@ -89,6 +107,10 @@ class _Goal(object):
     self._task_type_by_name = {}  # name -> Task subclass.
     self._ordered_task_names = []  # The task names, in the order imposed by registration.
 
+  def register_options(self, options):
+    for task_type in self.task_types():
+      task_type.register_options_on_scope(options)
+
   def install(self, task_registrar, first=False, replace=False, before=None, after=None):
     """Installs the given task in this goal.
 
@@ -104,10 +126,24 @@ class _Goal(object):
       raise GoalError('Can only specify one of first, replace, before or after')
 
     task_name = task_registrar.name
-    self._task_type_by_name[task_name] = task_registrar.task_type
+    options_scope = Goal.scope(self.name, task_name)
+
+    # Currently we need to support registering the same task type multiple times in different
+    # scopes. However we still want to have each task class know the options scope it was
+    # registered in. So we create a synthetic subclass here.
+    # TODO(benjy): Revisit this when we revisit the task lifecycle. We probably want to have
+    # a task *instance* know its scope, but this means converting option registration from
+    # a class method to an instance method, and instantiating the task much sooner in the
+    # lifecycle.
+
+    subclass_name = b'{1}_{0}'.format(task_registrar.task_type.__name__, options_scope)
+    task_type = type(subclass_name, (task_registrar.task_type, ), { 'options_scope': options_scope})
+    self._task_type_by_name[task_name] = task_type
 
     otn = self._ordered_task_names
     if replace:
+      for task_type in self.task_types():
+        task_type.options_scope = None
       del otn[:]
     if first:
       otn.insert(0, task_name)
@@ -141,11 +177,18 @@ class _Goal(object):
                  product consumption-production model anyway.
     """
     if name in self._task_type_by_name:
+      self._task_type_by_name[name].options_scope = None
       del self._task_type_by_name[name]
       self._ordered_task_names = [x for x in self._ordered_task_names if x != name]
     else:
       raise GoalError('Cannot uninstall unknown task: {0}'.format(name))
 
+  def known_scopes(self):
+    yield self.name
+    for task_type in self.task_types():
+      for scope in task_type.known_scopes():
+        if scope != self.name:
+          yield scope
 
   def ordered_task_names(self):
     """The task names in this goal, in registration order."""
