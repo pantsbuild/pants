@@ -11,17 +11,18 @@ from pants.goal.goal import Goal
 
 class ListGoals(ConsoleTask):
   @classmethod
+  def register_options(cls, register):
+    super(ListGoals, cls).register_options(register)
+    register('--graph', action='store_true',
+             help='Generate a graphviz graph of installed goals.',
+             legacy='goal_list_graph')
+    register('--all', action='store_true',
+             help='List all goals even if no description is available.',
+             legacy='goal_list_all')
+
+  @classmethod
   def setup_parser(cls, option_group, args, mkflag):
     super(ListGoals, cls).setup_parser(option_group, args, mkflag)
-    option_group.add_option(mkflag("all"),
-                            dest="goal_list_all",
-                            default=False,
-                            action="store_true",
-                            help="[%default] List all goals even if no description is available.")
-    option_group.add_option(mkflag('graph'),
-                            dest='goal_list_graph',
-                            action='store_true',
-                            help='[%default] Generate a graphviz graph of installed goals.')
 
   def console_output(self, targets):
     def report():
