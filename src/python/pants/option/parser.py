@@ -146,9 +146,9 @@ class Parser(object):
       inverse_args = None
       help_args = args
 
-    # Register the option for displaying help.
-    # Note that we'll only display the default value for the scope in which
-    # we registered, even though the default may be overridden in inner scopes.
+    # Register the option, only on this scope, for the purpose of displaying help.
+    # Note that we'll only display the default value for this scope, even though the
+    # default may be overridden in inner scopes.
     raw_default = self._compute_default(dest, clean_kwargs).value
     clean_kwargs_with_default = dict(clean_kwargs, default=raw_default)
     self._help_argparser.add_argument(*help_args, **clean_kwargs_with_default)
@@ -158,7 +158,7 @@ class Parser(object):
     if self._legacy_options and legacy_dest:
       self._legacy_options.register(args, clean_kwargs_with_default, legacy_dest)
 
-    # Register the option for parsing, on this and all enclosed scopes.
+    # Register the option for the purpose of parsing, on this and all enclosed scopes.
     if inverse_args:
       inverse_kwargs = self._create_inverse_kwargs(clean_kwargs)
       if self._legacy_options:
