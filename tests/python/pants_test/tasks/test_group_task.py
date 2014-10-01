@@ -113,7 +113,8 @@ class BaseGroupTaskTest(BaseTest):
     self.recorded_actions = []
     # NB: GroupTask has a cache of tasks by name... use a distinct name
     self.group_task = GroupTask.named('jvm-compile-%s' % uuid.uuid4().hex,
-                                      ['classes_by_target', 'classes_by_source'])
+                                      ['classes_by_target', 'classes_by_source'],
+                                      ['test'])
     self.group_task.add_member(self.group_member('javac', lambda t: t.is_java))
     self.group_task.add_member(self.group_member('scalac', lambda t: t.is_scala))
 

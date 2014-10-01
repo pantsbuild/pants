@@ -7,12 +7,14 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from abc import abstractmethod, abstractproperty
 from collections import defaultdict
+from optparse import OptionGroup
 import os
 
 from pants.backend.core.tasks.check_exclusives import ExclusivesMapping
 from pants.backend.core.tasks.task import TaskBase, Task
 from pants.base.build_graph import sort_targets
 from pants.base.workunit import WorkUnit
+from pants.goal.goal import Goal
 from pants.goal.mkflag import Mkflag
 
 
@@ -222,7 +224,7 @@ class GroupTask(Task):
     created for a given name.  If the task has already been created, it will just be returned.
 
     :param string name: The logical name of the group.
-    :param string product_type:  The name of the product type this group cooperatively produces.
+    :param list product_type:  The name of the product types this group cooperatively produces.
     :param list flag_namespace:
     """
     group_task = cls._GROUPS.get(name)
@@ -230,13 +232,37 @@ class GroupTask(Task):
       class SingletonGroupTask(GroupTask):
         _MEMBER_TYPES = []
 
+        # We'd prefer to get the parent_options_scope from cls.options_scope,
+        # but unfortunately that hasn't been set yet.
+        parent_options_scope = '.'.join(flag_namespace)
+
+        @classmethod
+        def known_scopes(cls):
+          for member_type in cls._member_types():
+            yield member_type.options_scope
+
+        @classmethod
+        def register_options_on_scope(cls, options):
+          for member_type in cls._member_types():
+            member_type.register_options_on_scope(options)
+
         @classmethod
         def setup_parser(cls, option_group, args, mkflag):
           base_namespace = flag_namespace or mkflag.namespace
           for member_type in cls._member_types():
             member_namespace = base_namespace + [member_type.name()]
             mkflag = Mkflag(*member_namespace)
-            member_type.setup_parser(option_group, args, mkflag)
+
+            # Hack to find the right option group. Ugly, but old options are
+            # going away soon anyway.
+            title = Goal.scope(cls.parent_options_scope, member_type.name())
+            member_og = None
+            for og in option_group.parser.option_groups:
+              if og.title == title:
+                member_og = og
+                break
+            member_og = member_og or OptionGroup(option_group.parser, title=title)
+            member_type.setup_parser(member_og, args, mkflag)
 
         @classmethod
         def product_types(cls):
@@ -275,6 +301,7 @@ class GroupTask(Task):
       raise ValueError('Only GroupMember subclasses can join a GroupTask, '
                        'given %s of type %s' % (group_member, type(group_member)))
 
+    group_member.options_scope = Goal.scope(cls.parent_options_scope, group_member.name())
     cls._member_types().append(group_member)
 
   def __init__(self, *args, **kwargs):
