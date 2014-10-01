@@ -35,16 +35,18 @@ class ArgSplitterTest(unittest.TestCase):
     self._split('./pants goal', {'': []}, [])
     self._split('./pants -f', {'': ['-f']}, [])
     self._split('./pants goal -f', {'': ['-f']}, [])
-    self._split('./pants -f compile -g compile.java -x test.junit -i '
+    self._split('./pants --compile-java-long-flag -f compile -g compile.java -x test.junit -i '
                 'src/java/com/pants/foo src/java/com/pants/bar:baz',
-                {'': ['-f'], 'compile': ['-g'], 'compile.java': ['-x'], 'test.junit': ['-i']},
+                {'': ['-f'], 'compile': ['-g'], 'compile.java': ['--long-flag', '-x'],
+                 'test.junit': ['-i']},
                 ['src/java/com/pants/foo', 'src/java/com/pants/bar:baz'])
     self._split('./pants -farg --fff=arg compile --gg-gg=arg-arg -g test.junit --iii '
-                'src/java/com/pants/foo src/java/com/pants/bar:baz',
+                '--compile-java-long-flag src/java/com/pants/foo src/java/com/pants/bar:baz',
                 {
                   '': ['-farg', '--fff=arg'],
                   'compile': ['--gg-gg=arg-arg', '-g'],
-                 'test.junit': ['--iii']
+                  'compile.java': ['--long-flag'],
+                  'test.junit': ['--iii']
                 },
                 ['src/java/com/pants/foo', 'src/java/com/pants/bar:baz'])
 
@@ -55,8 +57,10 @@ class ArgSplitterTest(unittest.TestCase):
     self._split('./pants test -- test', {'': [], 'test': []}, ['test'])
 
     # Flags where only target specs should be.
-    self._error_split('./pants compile -- -f')
-    self._error_split('./pants compile -- foo/bar --flag')
+    # TODO(benjy): Uncomment if we re-enable this check, or delete if we decide to allow
+    #              this permanently.
+    #self._error_split('./pants compile -- -f')
+    #self._error_split('./pants compile -- foo/bar --flag')
 
   def test_help_detection(self):
     self._split('./pants help', {'': []}, [], True)
