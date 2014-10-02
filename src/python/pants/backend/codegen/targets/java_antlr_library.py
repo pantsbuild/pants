@@ -23,8 +23,6 @@ class JavaAntlrLibrary(ExportableJvmLibrary):
     """
     :param provides: The ``artifact``
       to publish that represents this target outside the repo.
-    :param excludes: List of :ref:`exclude <bdict_exclude>`\s
-      to filter this target's transitive dependencies against.
     :param compiler: The name of the compiler used to compile the ANTLR files.
         Currently only supports 'antlr3' and 'antlr4'
     :param package: A string which specifies the package to be used on the dependent sources.

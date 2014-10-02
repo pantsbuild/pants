@@ -17,17 +17,6 @@ class AndroidBinary(AndroidTarget, BuildTypeMixin):
                *args,
                **kwargs):
     """
-    :param string name: The name of this target, which combined with this
-      build file defines the :doc:`target address <target_addresses>`.
-    :param sources: Source code files to compile. Paths are relative to the
-      BUILD file's directory.
-    :type sources: ``Fileset`` or list of strings.
-    :param excludes: List of :ref:`exclude <bdict_exclude>`\s
-      to filter this target's transitive dependencies against.
-    :param build_tools_version: API for the Build Tools (separate from SDK version).
-      Defaults to the latest full release.
-    :param manifest: path/to/file of 'AndroidManifest.xml' (required name). Paths are relative
-      to the BUILD file's directory.
     :param string build_type: One of [debug, release]. The keystore to sign the package with.
       Set as 'debug' by default.
     """

@@ -288,12 +288,14 @@ class JarPublish(JarTask, ScmPublish):
   primarily provide linkage between publishable targets and the
   Ivy ``resolvers`` used to publish them.
 
-  The following target types are publishable: :ref:`bdict_java_library`,
-  :ref:`bdict_scala_library`, :ref:`bdict_java_thrift_library`,
-  :ref:`bdict_annotation_processor`.
+  The following target types are publishable:
+  `java_library <build_dictionary.html#java_library>`_,
+  `scala_library <build_dictionary.html#scala_library>`_,
+  `java_thrift_library <build_dictionary.html#java_thrift_library>`_,
+  `annotation_processor <build_dictionary.html#annotation_processor>`_.
   Targets to publish and their dependencies must be publishable target
   types and specify the ``provides`` argument. One exception is
-  :ref:`bdict_jar`\s - pants will generate a pom file that
+  `jar <build_dictionary.html#jar>`_\s - pants will generate a pom file that
   depends on the already-published jar.
 
   Example usage: ::

@@ -562,6 +562,7 @@ python_tests(
   ],
 )
 
+# TODO(Eric Ayers) This should be renamed and categorized as an integration test
 python_tests(
   name = 'thrift_linter',
   sources = ['test_thrift_linter.py'],
@@ -569,6 +570,7 @@ python_tests(
     ':base',
     'src/python/pants/base:target',
     'src/python/pants/backend/codegen/tasks:scrooge_gen',
+    'tests/python/pants_test:int-test',
   ],
 )
 
