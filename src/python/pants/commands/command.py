@@ -80,7 +80,7 @@ class Command(object):
 
     self.register_options()
     self.setup_parser(parser, args)
-    self.options, self.args = parser.parse_args(args)
+    self.old_options, self.args = parser.parse_args(args)
     self.parser = parser
 
   def register_options(self):
@@ -92,7 +92,7 @@ class Command(object):
   def setup_parser(self, parser, args):
     """Subclasses should override and configure the legacy OptionParser to reflect
     the subcommand option and argument requirements.  Upon successful
-    construction, subcommands will be able to access self.options and
+    construction, subcommands will be able to access self.old_options and
     self.args."""
 
     pass

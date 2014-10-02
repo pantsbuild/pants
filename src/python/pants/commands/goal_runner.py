@@ -118,11 +118,11 @@ class GoalRunner(Command):
 
     # Annoying but temporary hack to get the parser.  We can't use self.parser because
     # that only gets set up in the superclass ctor, and we can't call that until we have
-    # self.options set up because the superclass ctor calls our register_options().
+    # self.new_options set up because the superclass ctor calls our register_options().
     # Fortunately this will all go away once we're fully off the old "Command" mechanism.
     legacy_parser = args[2] if len(args) > 2 else kwargs['parser']
-    self.options = Options(os.environ.copy(), self.config, known_scopes, args=sys.argv,
-                           legacy_parser=legacy_parser)
+    self.new_options = Options(os.environ.copy(), self.config, known_scopes, args=sys.argv,
+                               legacy_parser=legacy_parser)
     super(GoalRunner, self).__init__(*args, **kwargs)
 
   @contextmanager
@@ -160,7 +160,7 @@ class GoalRunner(Command):
 
   def register_options(self):
     for goal in Goal.all():
-      goal.register_options(self.options)
+      goal.register_options(self.new_options)
 
   def setup_parser(self, parser, args):
     add_global_options(parser)
@@ -185,7 +185,7 @@ class GoalRunner(Command):
 
     goals, specs, fail_fast = GoalRunner.parse_args(non_help_args)
     if show_help:
-      self.options.print_help(goals=goals, legacy=True)
+      self.new_options.print_help(goals=goals, legacy=True)
       sys.exit(0)
 
     self.requested_goals = goals
@@ -235,9 +235,9 @@ class GoalRunner(Command):
     # context/work-unit logging and standard python logging doesn't buy us anything.
 
     # Enable standard python logging for code with no handle to a context/work-unit.
-    if self.options.log_level:
-      LogOptions.set_stderr_log_level((self.options.log_level or 'info').upper())
-      logdir = self.options.logdir or self.config.get('goals', 'logdir', default=None)
+    if self.old_options.log_level:
+      LogOptions.set_stderr_log_level((self.old_options.log_level or 'info').upper())
+      logdir = self.old_options.logdir or self.config.get('goals', 'logdir', default=None)
       if logdir:
         safe_mkdir(logdir)
         LogOptions.set_log_dir(logdir)
@@ -271,11 +271,11 @@ class GoalRunner(Command):
           mapping[matched_pattern].append(target)
       return mapping
 
-    is_explain = self.options.explain
-    update_reporting(self.options, is_quiet_task() or is_explain, self.run_tracker)
+    is_explain = self.old_options.explain
+    update_reporting(self.old_options, is_quiet_task() or is_explain, self.run_tracker)
 
-    if self.options.target_excludes:
-      excludes = self.options.target_excludes
+    if self.old_options.target_excludes:
+      excludes = self.old_options.target_excludes
       log.debug('excludes:\n  {excludes}'.format(excludes='\n  '.join(excludes)))
       by_pattern = targets_by_pattern(self.targets, excludes)
       self.targets = by_pattern[_UNMATCHED_KEY]
@@ -291,7 +291,8 @@ class GoalRunner(Command):
 
     context = Context(
       config=self.config,
-      options=self.options,
+      old_options=self.old_options,
+      new_options=self.new_options,
       run_tracker=self.run_tracker,
       target_roots=self.targets,
       requested_goals=self.requested_goals,

@@ -191,7 +191,7 @@ def _run():
     run_tracker.end()
     # Must kill nailguns only after run_tracker.end() is called, because there may still
     # be pending background work that needs a nailgun.
-    if (hasattr(command.options, 'cleanup_nailguns') and command.options.cleanup_nailguns) \
+    if (hasattr(command.old_options, 'cleanup_nailguns') and command.old_options.cleanup_nailguns) \
         or config.get('nailgun', 'autokill', default=False):
       NailgunTask.killall(None)
 

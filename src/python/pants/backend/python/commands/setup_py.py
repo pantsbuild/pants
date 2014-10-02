@@ -393,7 +393,7 @@ class SetupPy(Command):
     safe_rmtree(setup_dir)
     os.rename(chroot.path(), setup_dir)
 
-    if not self.options.run:
+    if not self.old_options.run:
       print('Running packager against %s' % setup_dir)
       setup_runner = Packager(setup_dir)
       tgz_name = os.path.basename(setup_runner.sdist())
@@ -401,12 +401,12 @@ class SetupPy(Command):
       os.rename(setup_runner.sdist(), os.path.join(dist_dir, tgz_name))
       safe_rmtree(setup_dir)
     else:
-      print('Running %s against %s' % (self.options.run, setup_dir))
-      setup_runner = SetupPyRunner(setup_dir, self.options.run)
+      print('Running %s against %s' % (self.old_options.run, setup_dir))
+      setup_runner = SetupPyRunner(setup_dir, self.old_options.run)
       setup_runner.run()
 
   def execute(self):
-    if self.options.recursive:
+    if self.old_options.recursive:
       setup_targets = OrderedSet()
       def add_providing_target(target):
         if isinstance(target, PythonTarget) and target.provides:

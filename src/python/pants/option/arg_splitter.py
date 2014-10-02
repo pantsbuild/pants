@@ -66,15 +66,16 @@ class ArgSplitter(object):
     scope_to_flags = defaultdict(list)
     targets = []
 
-    self._unconsumed_args = list(reversed(sys.argv if args is None else args))[:-1]
+    self._unconsumed_args = list(reversed(sys.argv if args is None else args))
+    # In regular use the first token is the binary name, so skip it. However tests may
+    # pass just a list of flags, so don't skip it in that case.
+    if not self._at_flag() and self._unconsumed_args:
+      self._unconsumed_args.pop()
     if self._unconsumed_args and self._unconsumed_args[-1] == 'goal':
       # TODO: Temporary warning. Eventually specifying 'goal' will be an error.
       # Turned off for now because it's annoying. Will turn back on at some point during migration.
       #print("WARNING: Specifying the 'goal' command explicitly is superfluous and deprecated.",
       #      file=sys.stderr)
-      self._unconsumed_args.pop()
-    # The 'new' command is a temporary hack during migration.
-    if self._unconsumed_args and self._unconsumed_args[-1] == 'new':
       self._unconsumed_args.pop()
 
     global_flags = self._consume_flags()
