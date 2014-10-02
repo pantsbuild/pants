@@ -281,7 +281,7 @@ class Depmap(ConsoleTask):
         'libraries': [],
         'roots': [],
         'target_type': get_target_type(current_target),
-        'is_code_gen': current_target.is_code_gen
+        'is_code_gen': current_target.is_codegen
       }
 
       target_libraries = set()
