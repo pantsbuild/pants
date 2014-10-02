@@ -45,9 +45,8 @@ class JavaProtobufLibrary(ExportableJvmLibrary):
   def __init__(self, payload=None, buildflags=None, imports=None, **kwargs):
     """
     :param buildflags: Unused, and will be removed in a future release.
-    :param imports: List of external :class:`pants.backend.jvm.targets.jar_dependency.JarDependency`
-      objects and addresses of :class:`pants.backend.jvm.targets.jar_library.JarLibrary` targets
-      which contain .proto definitions.
+    :param imports: List of external `jar <#jar>`_ objects and
+      `jar_library <#jar_library>`_ targets which contain .proto definitions.
     """
     payload = payload or Payload()
     # TODO(pl, zundel): Enforce either address specs or JarDependencies for this type, not either.
