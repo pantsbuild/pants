@@ -48,6 +48,13 @@ class Depmap(ConsoleTask):
     else:
       return '{0}:{1}'.format(jar.org, jar.name)
 
+  @staticmethod
+  def _address(address):
+    """
+    :type address: pants.base.address.SyntheticAddress
+    """
+    return '{0}:{1}'.format(address.spec_path, address.target_name)
+
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
     super(Depmap, cls).setup_parser(option_group, args, mkflag)
@@ -95,13 +102,6 @@ class Depmap(ConsoleTask):
                             dest="depmap_is_formatted",
                             default=True,
                             help='Causes project-info output to be a single line of JSON')
-    option_group.add_option(mkflag("single-module-per-codegen"),
-                            mkflag("single-module-per-codegen", negate=True),
-                            action="store_false",
-                            dest="single_codegen_module",
-                            default=True,
-                            help='Creates one module for all code generated sources per'
-                                ' codegen task')
 
   def __init__(self, *args, **kwargs):
     super(Depmap, self).__init__(*args, **kwargs)
@@ -125,7 +125,6 @@ class Depmap(ConsoleTask):
     self._ivy_utils = IvyUtils(config=self.context.config,
                                options=self.context.options,
                                log=self.context.log)
-    self._single_codegen_module = self.context.options.single_codegen_module
 
   def console_output(self, targets):
     if len(self.context.target_roots) == 0:
@@ -163,14 +162,6 @@ class Depmap(ConsoleTask):
       return "%(org)s%(sep)s%(name)s%(sep)s%(rev)s" % params, False
     else:
       return "%(org)s%(sep)s%(name)s" % params, True
-
-  def _address(self, target):
-    """
-    :type Target: pants.base.Target
-    """
-    if target.is_codegen and self._single_codegen_module:
-      return '{0}:{1}'.format(target.address.spec_path, os.path.basename(target.address.spec_path))
-    return '{0}:{1}'.format(target.address.spec_path, target.address.target_name)
 
   def _output_dependency_tree(self, target):
     def output_dep(dep, indent):
@@ -285,22 +276,19 @@ class Depmap(ConsoleTask):
             transitive_jars.update(ivy_info.get_jars_for_ivy_module(jar))
         return transitive_jars
 
-      info = {}
-      if self._address(current_target) in targets_map:
-        info = targets_map[self._address(current_target)]
-      else:
-        info = {
-          'targets': set(),
-          'libraries': set(),
-          'roots': [],
-          'target_type': get_target_type(current_target)
-        }
+      info = {
+        'targets': [],
+        'libraries': [],
+        'roots': [],
+        'target_type': get_target_type(current_target),
+        'is_code_gen': current_target.is_code_gen
+      }
 
       target_libraries = set()
       if current_target.is_jar_library:
         target_libraries = get_transitive_jars(current_target)
       for dep in current_target.dependencies:
-        info['targets'].add(self._address(dep))
+        info['targets'].append(self._address(dep.address))
         if dep.is_jar_library:
           for jar in dep.jar_dependencies:
             target_libraries.add(jar)
@@ -314,31 +302,24 @@ class Depmap(ConsoleTask):
       """
       :type java_sources_targets:list[pants.base.target.Target]
       """
+
       roots = set(itertools.chain(
         *[self._source_roots_for_target(t) for t in java_sources_targets + [current_target]]
       ))
-
-      info['roots'].extend(map(lambda (source_root, package_prefix): {
+      info['roots'] = map(lambda (source_root, package_prefix): {
         'source_root': source_root,
         'package_prefix': package_prefix
-      }, roots))
-
-      info['libraries'].update([self._jar_id(lib) for lib in target_libraries])
-      targets_map[self._address(current_target)] = info
+      }, roots)
+      info['libraries'] = [self._jar_id(lib) for lib in target_libraries]
+      targets_map[self._address(current_target.address)] = info
 
     for target in targets:
       process_target(target)
-
-    for target_add in targets_map.keys():
-      info = targets_map[target_add]
-      info['libraries'] = list(info['libraries'])
-      info['targets'] = list(info['targets'])
 
     graph_info = {
       'targets': targets_map,
       'libraries': self._resolve_jars_info()
     }
-
     if self.format:
       return json.dumps(graph_info, indent=4, separators=(',', ': ')).splitlines()
     else:
@@ -363,3 +344,4 @@ class Depmap(ConsoleTask):
       source = os.path.dirname(source_file)
       return os.path.join(get_buildroot(), target.target_base, source), source.replace(os.sep, '.')
     return map(root_package_prefix, target.sources_relative_to_source_root())
+
