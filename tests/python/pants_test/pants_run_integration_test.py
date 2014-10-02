@@ -11,6 +11,7 @@ import os
 import subprocess
 import unittest2 as unittest
 
+from pants.fs.archive import ZIP
 from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_open, safe_mkdir
@@ -81,7 +82,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
     :param config: Optional data for a generated ini file. A map of <section-name> ->
     map of key -> value. If order in the ini file matters, this should be an OrderedDict.
     :param kwargs: Extra keyword args to pass to `subprocess.Popen`.
-    :returns a tuple (exitcode, stdout_data, stderr_data).
+    :returns a tuple (returncode, stdout_data, stderr_data).
 
     IMPORTANT NOTE: The subprocess will be run with --no-lock, so that it doesn't deadlock waiting
     for this process to release the workspace lock. It's the caller's responsibility to ensure
@@ -90,6 +91,42 @@ class PantsRunIntegrationTest(unittest.TestCase):
 
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
       return self.run_pants_with_workdir(command, workdir, config, stdin_data, extra_env, **kwargs)
+
+  def bundle_and_run(self, target, bundle_name, args=None):
+    ''' Creates the bundle with pants, then does java -jar {bundle_name}.jar to execute the bundle.
+    :param target: target name to compile
+    :param bundle_name: resulting bundle filename (minus .jar extension)
+    :param args: optional arguments to pass to executable
+    :return: stdout as a string on success, raises an Exception on error
+    '''
+    pants_run = self.run_pants(['goal', 'bundle', '--bundle-archive=zip', target])
+    self.assertEquals(pants_run.returncode, self.PANTS_SUCCESS_CODE,
+                      "goal bundle expected success, got {0}\n"
+                      "got stderr:\n{1}\n"
+                      "got stdout:\n{2}\n".format(pants_run.returncode,
+                                                  pants_run.stderr_data,
+                                                  pants_run.stdout_data))
+
+    # TODO(John Sirois): We need a zip here to suck in external library classpath elements
+    # pointed to by symlinks in the run_pants ephemeral tmpdir.  Switch run_pants to be a
+    # contextmanager that yields its results while the tmpdir workdir is still active and change
+    # this test back to using an un-archived bundle.
+    with temporary_dir() as workdir:
+      ZIP.extract('dist/{bundle_name}.zip'.format(bundle_name=bundle_name), workdir)
+      optional_args = []
+      if args:
+        optional_args = args
+      java_run = subprocess.Popen(['java',
+                                   '-jar',
+                                   '{bundle_name}.jar'.format(bundle_name=bundle_name)]
+                                  + optional_args,
+                                  stdout=subprocess.PIPE,
+                                  cwd=workdir)
+
+      stdout, _ = java_run.communicate()
+    java_returncode = java_run.returncode
+    self.assertEquals(java_returncode, 0)
+    return stdout
 
   def assert_success(self, pants_run, msg=None):
     # TODO(John Sirois): de-dup ITs to use this helper

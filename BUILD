@@ -24,6 +24,7 @@ source_root('testprojects/tests/scala', page, junit_tests, scala_library, scala_
 
 # Example code intended to demonstrate to end users how to use Pants BUILD configuration
 source_root('examples/src/android', page, android_resources, android_binary)
+source_root('examples/src/antlr', page, java_antlr_library, python_antlr_library)
 source_root('examples/src/java', annotation_processor, jvm_binary, java_library, page)
 source_root('examples/src/protobuf', java_protobuf_library, page)
 source_root('examples/src/python', page, python_binary, python_library, resources)
