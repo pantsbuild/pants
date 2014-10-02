@@ -31,7 +31,8 @@ class Utf8HeaderTest(unittest.TestCase):
     address_mapper = BuildFileAddressMapper(build_file_parser)
     build_graph = BuildGraph(address_mapper=address_mapper)
 
-    for address in address_mapper.scan_addresses(get_buildroot()):
+    for address in address_mapper.scan_addresses(
+        get_buildroot(), spec_excludes=[config.getdefault('pants_workdir')]):
       build_graph.inject_address_closure(address)
 
     def has_hand_coded_python_files(tgt):
