@@ -73,6 +73,8 @@ python_library(
   ],
 )
 
+
+
 python_library(
   name = 'check_exclusives',
   sources = ['check_exclusives.py'],
@@ -285,10 +287,9 @@ python_library(
   name = 'targets_help',
   sources = ['targets_help.py'],
   dependencies = [
+    ':builddictionary',
     ':common',
     ':console_task',
-    'src/python/pants/base:target',
-    'src/python/pants/backend/core/targets:common',
   ],
 )
 
