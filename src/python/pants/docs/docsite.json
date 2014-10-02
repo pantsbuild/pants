@@ -3,6 +3,7 @@
     "index": "dist/markdown/html/README.html",
     "java/hello": "dist/markdown/html/examples/src/java/com/pants/examples/hello/main/README.html",
     "testproject/page": "dist/markdown/html/testprojects/src/java/com/pants/testproject/page/README.html",
+    "build_dictionary": "dist/builddict/build_dictionary.html",
     "goals_reference": "dist/builddict/goals_reference.html"
   },
   "extras": {
@@ -17,6 +18,7 @@
 	  "children": [
 	      { "page": "testproject/page" }
 	  ]},
+        { "page": "build_dictionary" },
         { "page": "goals_reference" }
       ]
     }
