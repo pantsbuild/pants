@@ -41,8 +41,9 @@ class DepmapIntegrationTest(PantsRunIntegrationTest):
         targets = json_data['targets']
         libraries = json_data['libraries']
         # check single code gen module is listed in the target
+        thrift_target_name = 'examples.src.thrift.com.pants.examples.precipitation.precipitation-java'
         codegen_target = os.path.join(os.path.relpath(workdir,get_buildroot()),
-                                      'gen/thrift/combined/gen-java:gen-java')
+                                      'gen/thrift/combined/gen-java:%s' %thrift_target_name)
         self.assertTrue(codegen_target in targets)
         # check if transitively pulled in jar exists as dependency
         self.assertTrue('org.hamcrest:hamcrest-core:1.3' in targets[test_target]['libraries'])
