@@ -35,7 +35,7 @@ class JavaProtobufLibrary(ExportableJvmLibrary):
   def __init__(self, payload=None, buildflags=None, imports=None, **kwargs):
     """
     :param buildflags: Unused, and will be removed in a future release.
-    :param imports: List of addresses of :class:`pants.backend.jvm.targets.jar_library.JarLibrary`
+    :param imports: List of addresses of `jar_library <#jar_library>`_
       targets which contain .proto definitions.
     """
     payload = payload or Payload()

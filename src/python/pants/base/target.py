@@ -178,7 +178,8 @@ class Target(AbstractTarget):
     :param Payload payload: The configuration encapsulated by this target.  Also in charge of
       most fingerprinting details.
     :param exclusives: An optional map of exclusives tags.
-      See :ref:`howto_check_exclusives` for details.
+       `Keeps incompatible changes apart
+       <build_files.html#howto-check-exclusives>`_.
     """
     # dependencies is listed above; implementation hides in TargetAddressable
     self.payload = payload or Payload()
