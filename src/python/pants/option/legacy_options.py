@@ -94,6 +94,11 @@ class LegacyOptions(object):
     """
     self._optparser.formatter.store_option_strings(self._optparser)
     if self._option_group and self._option_group.option_list:
+      # Hack to make the title more explanatory. In principle this conflicts
+      # with temporary legacy-compatibility code that finds groups by title.
+      # But in practice that use occurs before help printing is ever attempted,
+      # and we exit right after help printing anyway.
+      self._option_group.set_title(self._option_group.title + ' options')
       return self._option_group.format_help(self._optparser.formatter)
     else:
       return ''

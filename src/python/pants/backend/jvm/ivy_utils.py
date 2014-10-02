@@ -283,6 +283,8 @@ class IvyUtils(object):
 
   def _resolve_conflict(self, existing, proposed):
     if proposed == existing:
+      if proposed.force:
+        return proposed
       return existing
     elif existing.force and proposed.force:
       raise TaskError('Cannot force %s#%s to both rev %s and %s' % (

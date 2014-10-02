@@ -19,14 +19,15 @@ class ConsoleTask(Task, QuietTaskMixin):
 
   ConsoleTasks are not intended to modify build state.
   """
-
   @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    option_group.add_option(mkflag("sep"), dest="console_%s_separator" % cls.__name__,
-                            default='\\n', help="String to use to separate results.")
-    option_group.add_option(mkflag('output-file'),
-                            dest='console_outstream',
-                            help='Specifies the file to store the console output to.')
+  def register_options(cls, register):
+    super(ConsoleTask, cls).register_options(register)
+    register('--sep', default='\\n', metavar='<separator>',
+             help='String to use to separate results.',
+             legacy='console_{0}_separator'.format(cls.__name__))
+    register('--output-file', metavar='<path>',
+             help='Write the console output to this file instead.',
+             legacy='console_outstream')
 
   def __init__(self, *args, **kwargs):
     super(ConsoleTask, self).__init__(*args, **kwargs)
