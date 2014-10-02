@@ -96,7 +96,7 @@ class Depmap(ConsoleTask):
                             default=True,
                             help='Causes project-info output to be a single line of JSON')
     option_group.add_option(mkflag("single-module-per-codegen"),
-                            mkflag('single-module-per-codegen', negate=True),
+                            mkflag("single-module-per-codegen", negate=True),
                             action="store_false",
                             dest="single_codegen_module",
                             default=True,
