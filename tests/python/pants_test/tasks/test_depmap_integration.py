@@ -25,33 +25,43 @@ class DepmapIntegrationTest(PantsRunIntegrationTest):
                                                   pants_run.stderr_data,
                                                   pants_run.stdout_data))
 
-  def test_depmap_with_resolve(self):
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
-      depmap_out_file = '{workdir}/depmap_out.txt'.format(workdir=workdir)
-      test_target = 'examples/tests/java/com/pants/examples/usethrift:usethrift'
-      pants_run = self.run_pants_with_workdir(
-        ['goal', 'resolve', 'depmap', test_target, '--depmap-project-info',
-         '--depmap-output-file={out_file}'.format(out_file=depmap_out_file)], workdir)
-      self._assert_run_success(pants_run)
-      self.assertTrue(os.path.exists(depmap_out_file),
+  def run_depmap_project_info(self, test_target, workdir):
+    depmap_out_file = '{workdir}/depmap_out.txt'.format(workdir=workdir)
+    pants_run = self.run_pants_with_workdir(
+      ['goal', 'resolve', 'depmap', test_target, '--depmap-project-info',
+      '--depmap-output-file={out_file}'.format(out_file=depmap_out_file)], workdir)
+    self._assert_run_success(pants_run)
+    self.assertTrue(os.path.exists(depmap_out_file),
                       msg='Could not find depmap output file in {out_file}'
-                           .format(out_file=depmap_out_file))
-      with open(depmap_out_file) as json_file:
-        json_data = json.load(json_file)
-        targets = json_data['targets']
-        libraries = json_data['libraries']
-        # check single code gen module is listed in the target
-        thrift_target_name = 'examples.src.thrift.com.pants.examples.precipitation.precipitation-java'
-        codegen_target = os.path.join(os.path.relpath(workdir,get_buildroot()),
-                                      'gen/thrift/combined/gen-java:%s' %thrift_target_name)
-        self.assertTrue(codegen_target in targets)
-        # check if transitively pulled in jar exists as dependency
-        self.assertTrue('org.hamcrest:hamcrest-core:1.3' in targets[test_target]['libraries'])
-        #check correct library path.
-        ivy_cache_dir = Bootstrapper.instance().ivy_cache_dir
-        self.assertEquals(libraries['commons-lang:commons-lang:2.5'],
-                          [os.path.join(ivy_cache_dir,
-                                        'commons-lang/commons-lang/jars/commons-lang-2.5.jar')])
+                        .format(out_file=depmap_out_file))
+    with open(depmap_out_file) as json_file:
+      json_data = json.load(json_file)
+      return json_data
+
+  def test_depmap_code_gen(self):
+    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+      test_target = 'examples/tests/java/com/pants/examples/usethrift:usethrift'
+      json_data = self.run_depmap_project_info(test_target, workdir)
+      thrift_target_name = 'examples.src.thrift.com.pants.examples.precipitation.precipitation-java'
+      codegen_target = os.path.join(os.path.relpath(workdir, get_buildroot()),
+                                  'gen/thrift/combined/gen-java:%s' % thrift_target_name)
+      self.assertTrue(codegen_target in json_data.get('targets'))
+
+  def test_depmap_json_transitive_jar(self):
+    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+      test_target = 'examples/tests/java/com/pants/examples/usethrift:usethrift'
+      json_data = self.run_depmap_project_info(test_target, workdir)
+      targets = json_data.get('targets')
+      self.assertTrue('org.hamcrest:hamcrest-core:1.3' in targets[test_target]['libraries'])
+
+  def test_depmap_jar_path(self):
+    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+      test_target = 'examples/tests/java/com/pants/examples/usethrift:usethrift'
+      json_data = self.run_depmap_project_info(test_target, workdir)
+      ivy_cache_dir = Bootstrapper.instance().ivy_cache_dir
+      self.assertEquals(json_data.get('libraries').get('commons-lang:commons-lang:2.5'),
+                      [os.path.join(ivy_cache_dir,
+                                    'commons-lang/commons-lang/jars/commons-lang-2.5.jar')])
 
   def test_depmap_without_resolve(self):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
