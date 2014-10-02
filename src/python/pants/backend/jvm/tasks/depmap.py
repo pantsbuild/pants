@@ -298,7 +298,7 @@ class Depmap(ConsoleTask):
         if dep.is_jar_library:
           for jar in dep.jar_dependencies:
             target_libraries.add(jar)
-            # Add all the jars pulled in by this jar_library
+          # Add all the jars pulled in by this jar_library
           target_libraries.update(get_transitive_jars(dep))
         if isinstance(dep, Resources):
           resource_target_map[dep] = current_target
