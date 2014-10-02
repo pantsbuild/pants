@@ -13,7 +13,7 @@ source_root('tests/python', page, python_library, python_tests, python_test_suit
 # Projects used by tests to exercise pants functionality
 source_root('testprojects/src/antlr', page, java_antlr_library, python_antlr_library)
 source_root('testprojects/src/java', annotation_processor, jvm_binary, java_library, page)
-source_root('testprojects/src/protobuf', java_protobuf_library, page)
+source_root('testprojects/src/protobuf', java_protobuf_library, jar_library, page)
 source_root('testprojects/src/scala', jvm_binary, page, scala_library, benchmark)
 source_root('testprojects/src/thrift', java_thrift_library, page, python_thrift_library)
 
@@ -25,7 +25,7 @@ source_root('testprojects/tests/scala', page, junit_tests, scala_library, scala_
 # Example code intended to demonstrate to end users how to use Pants BUILD configuration
 source_root('examples/src/android', page, android_resources, android_binary)
 source_root('examples/src/java', annotation_processor, jvm_binary, java_library, page)
-source_root('examples/src/protobuf', java_protobuf_library, page)
+source_root('examples/src/protobuf', java_protobuf_library, jar_library, page)
 source_root('examples/src/python', page, python_binary, python_library, resources)
 source_root('examples/src/resources', page, resources, jaxb_library)
 source_root('examples/src/scala', jvm_binary, page, scala_library, benchmark)
