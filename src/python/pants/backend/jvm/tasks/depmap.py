@@ -100,7 +100,8 @@ class Depmap(ConsoleTask):
                             action="store_false",
                             dest="single_codegen_module",
                             default=True,
-                            help='Creates one module for all code generated sources per codegen task')
+                            help='Creates one module for all code generated sources per'
+                                ' codegen task')
 
   def __init__(self, *args, **kwargs):
     super(Depmap, self).__init__(*args, **kwargs)
@@ -268,7 +269,9 @@ class Depmap(ConsoleTask):
         if target.is_test:
           return Depmap.SourceRootTypes.TEST
         else:
-          if isinstance(target, Resources) and target in resource_target_map and resource_target_map[target].is_test:
+          if (isinstance(target, Resources) and
+              target in resource_target_map and
+              resource_target_map[target].is_test):
             return Depmap.SourceRootTypes.TEST_RESOURCE
           elif isinstance(target, Resources):
             return Depmap.SourceRootTypes.RESOURCE
@@ -283,7 +286,7 @@ class Depmap(ConsoleTask):
         return transitive_jars
 
       info = {}
-      if targets_map.has_key(self._address(current_target)):
+      if self._address(current_target) in targets_map:
         info = targets_map[self._address(current_target)]
       else:
         info = {
@@ -293,7 +296,9 @@ class Depmap(ConsoleTask):
           'target_type': get_target_type(current_target)
         }
 
-      target_libraries = get_transitive_jars(current_target) if current_target.is_jar_library else OrderedSet()
+      target_libraries = set()
+      if current_target.is_jar_library:
+        target_libraries = get_transitive_jars(current_target)
       for dep in current_target.dependencies:
         info['targets'].add(self._address(dep))
         if dep.is_jar_library:
@@ -304,7 +309,8 @@ class Depmap(ConsoleTask):
         if isinstance(dep, Resources):
           resource_target_map[dep] = current_target
 
-      java_sources_targets = list(current_target.java_sources) if isinstance(current_target, ScalaLibrary) else list()
+      java_sources_targets = list(current_target.java_sources) if isinstance(current_target,
+                                                                             ScalaLibrary) else []
       """
       :type java_sources_targets:list[pants.base.target.Target]
       """
@@ -357,4 +363,3 @@ class Depmap(ConsoleTask):
       source = os.path.dirname(source_file)
       return os.path.join(get_buildroot(), target.target_base, source), source.replace(os.sep, '.')
     return map(root_package_prefix, target.sources_relative_to_source_root())
-
