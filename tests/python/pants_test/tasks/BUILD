@@ -280,6 +280,7 @@ python_tests(
   name = 'depmap_integration',
   sources = ['test_depmap_integration.py'],
   dependencies = [
+    'src/python/pants/ivy:ivy',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
   ],
