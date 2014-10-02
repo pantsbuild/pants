@@ -74,7 +74,7 @@ python_test_suite(
 python_test_suite(
   name = 'integration',
   dependencies = [
-    'depmap_integration',
+    ':depmap_integration',
     ':eclipse_integration',
     ':ensime_integration',
     ':idea_integration',
