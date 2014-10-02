@@ -21,7 +21,7 @@ python_library(
   dependencies = [
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
-    'src/python/pants/base:payload',
+    'src/python/pants/base:payload_field',
     'src/python/pants/base:target',
     'src/python/pants/backend/core/targets:common'
   ],

@@ -215,7 +215,7 @@ Try publishing again, but pass ``--publish-override`` to specify the
 version number to use instead of incrementing the version number from
 the pushdb. Be sure to use a version number that has not
 already been published this time. For example, to override the default
-publish version number for the org.archie buoyancy artifact, you might
+publish version number for the ``org.archie`` buoyancy artifact, you might
 pass ``--publish-override=org.archie#buoyancy=2.5.8``.
 
 .. _publish-pushdb-push:
@@ -256,35 +256,16 @@ doesn't "remember" them.
   a particular artifact at the same time you were, your changes may be too
   "entangled" to salvage this way.)
 
-**Depending on how "entangled" your state is,** you either want to
-reset and start over or merge the pushdb by hand.
-
 **To reset and start over** In git, this might mean::
 
     git reset origin/master # (if ``master`` is your release branch)
     git pull
     ./pants goal clean-all && ./pants goal publish <your previous args>
 
-Since you uploaded new versions artifacts but the reset pushdb doesn't
-"remember" that, you might  get
-"Versioned Artifact Already Exists"
-errors.
-Use ``--publish_override`` to set version numbers to avoid these.
-
-**To merge the pushdb by hand** In git, this might mean
-
-* Use ``git status`` to check your change.
-* Commit it with ``git commit``.
-* ``git commit -a -m "pants build committing publish data for push of org#artifact;version"``
-* as fast as you can, execute the following steps::
-
-    git fetch origin master
-    git rebase origin/master
-    git push origin master
-
-* If that worked, great; if it didn't work, you might try repeating that
-  last set of steps *or* (if it keeps on not working) giving up, resetting,
-  and starting over.
+Since you uploaded new versioned artifacts but the reset pushdb doesn't
+"remember" that, you might get "Versioned Artifact Already Exists"
+errors: see the section above, and use ``--publish-override`` to set
+version numbers to avoid these.
 
 .. _publish-no-provides:
 
@@ -381,3 +362,88 @@ locally-published artifact. If the artifact is a jar, then in the
 3rdparty
 :ref:`jar target <bdict_jar>`,
 set ``mutable=True`` and change the version number.
+
+*************************************************
+Appendix A: Adding extra artifacts to the publish
+*************************************************
+
+.. TODO(lahosken) make this section its own page.
+   Remember link to it from this page and from dev_task
+   and to fix up the link from the sample code
+
+Pants supports "publish plugins", which allow end-users to add additional,
+arbitrary files to be published along with the primary artifact. For example,
+let's say that along with publishing your jar full of class files, you would
+also like to publish a companion file that contains some metadata -- code
+coverage info, source git repository, java version that created the jar, etc.
+To accomplish this, you'll first need to write a custom task, which creates any
+additional files (jar or otherwise) that you would like to publish. Next,
+you'll create a ``publish_extras`` section under ``[jar-publish]`` in
+pants.ini, and add a key for the new product type. Your custom task will create
+the extra file(s) that you want to publish, and write the path to the products
+map under the key that you have defined in pants.ini. The publishing code will
+loop over all keys found in pants.ini, and consult the product map. If pants
+finds a file for the current key, it will gather it up, and bundle it in with
+the rest of the files being published.
+
+An example of a custom task is supplied in the
+``examples/src/python/example/pants_publish_plugin`` directory. To use it, add
+the following to your pants.ini::
+
+    [jar-publish]
+    publish_extras: {
+        'extra_test_jar_example': {
+          'override_name': '{target_provides_name}-extra_example',
+          'classifier': 'classy',
+          'extension': 'jar',
+        },
+      }
+
+    [backends]
+    packages: [
+        'example.pants_publish_plugin',
+      ]
+
+In the above configuration example, the string 'extra_test_jar_example' is a
+key into the product map. In this case, the example task will add additional
+files for publishing to the product map under this key. And ``jar_publish.py``
+will examine the product map, looking for all keys defined here, and publishing
+any additional files found.
+
+Constructing a name for your extra artifact:
+============================================
+By default, pants uses the following scheme when publishing artifacts::
+
+    [artifactId]-[version](-[classifier]).[ext]
+
+The pants plugin publishing system allows a customization of the artifact
+identifier, classifier, and file extension. To customize the name of your extra
+object, you can supply some extra parameters in the ``pants.ini`` file:
+
+ * ``override_name`` -- allows customization of the name (``artifactId``) of
+   the additional file published. Specifying a string will completely override
+   the name, or include '``{target_provides_name}``' to tack an addition on to
+   the pre-existing artifact name. Defaults to the pre-existing artifact name.
+
+ * ``classifier`` -- the maven classifier. Can be any arbitrary string, or
+   leave this unspecified for nothing.
+
+ * ``extension`` -- the filename extension. Defaults to "jar".
+
+**Note:** You must supply a non-default value for at least one of the above
+parameters, otherwise your extra publish artifact won't have a unique name.
+With the above config in your pants.ini, invoke pants like this, to do a test
+publish::
+
+    WRAPPER_SRCPATH=examples/src/python PANTS_DEV=1 ./pants goal publish examples/src/java/com/pants/examples/hello/greet --no-publish-dryrun --publish-local=~/tmp
+
+Now if you examine the ``/tmp`` directory, you'll notice that an extra jar has
+been published for the ``greet`` target::
+
+    $ ls -1 /tmp/com/pants/examples/hello-greet/0.0.1-SNAPSHOT/|grep example
+    hello-greet-extra_example-0.0.1-SNAPSHOT-classy.jar
+    hello-greet-extra_example-0.0.1-SNAPSHOT-classy.jar.md5
+    hello-greet-extra_example-0.0.1-SNAPSHOT-classy.jar.sha1
+
+This example task should provide a rough starting guide, and can be tailored to
+suit a more specific situation.

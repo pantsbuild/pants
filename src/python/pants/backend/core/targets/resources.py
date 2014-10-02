@@ -5,7 +5,8 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from pants.base.payload import ResourcesPayload
+from pants.base.payload import Payload
+from pants.base.payload_field import SourcesField
 from pants.base.target import Target
 
 
@@ -18,15 +19,17 @@ class Resources(Target):
   and friends API. In the ``jar`` goal, the resource files are placed in the resulting `.jar`.
   """
 
-  def __init__(self, address=None, sources=None, **kwargs):
+  def __init__(self, address=None, payload=None, sources=None, **kwargs):
     """
-    :param string name: The name of this target, which combined with this
-      build file defines the :doc:`target address <target_addresses>`.
     :param sources: Files to "include". Paths are relative to the
       BUILD file's directory.
     :type sources: ``Fileset`` or list of strings
     """
-    payload = ResourcesPayload(sources_rel_path=address.spec_path, sources=sources)
+    payload = payload or Payload()
+    payload.add_fields({
+      'sources': SourcesField(sources=self.assert_list(sources),
+                              sources_rel_path=address.spec_path),
+    })
     super(Resources, self).__init__(address=address, payload=payload, **kwargs)
 
   def has_sources(self, extension=None):

@@ -131,3 +131,32 @@ class CmdLineSpecParserTest(BaseTest):
 
     self.assertEqual(sort(SyntheticAddress.parse(addr) for addr in expected),
                      sort(self.spec_parser.parse_addresses(cmdline_spec_list)))
+
+class CmdLineSpecParserBadBuildTest(BaseTest):
+  def setUp(self):
+    super(CmdLineSpecParserBadBuildTest, self).setUp()
+
+    self.add_to_build_file('bad/a', 'a_is_bad')
+    self.add_to_build_file('bad/b', 'b_is_bad')
+
+    self.spec_parser = CmdLineSpecParser(self.build_root, self.address_mapper)
+
+    self.NO_FAIL_FAST_RE = """^Exception message: name 'a_is_bad' is not defined
+ while executing BUILD file (/[^/]+)*/bad/a/BUILD
+ Loading addresses from 'bad/a' failed\.
+Exception message: name 'b_is_bad' is not defined
+ while executing BUILD file (/[^/]+)*T/bad/b/BUILD
+ Loading addresses from 'bad/b' failed\.
+Invalid BUILD files for \[::\]$"""
+
+    self.FAIL_FAST_RE = """^name 'a_is_bad' is not defined
+ while executing BUILD file (/[^/]+)*/bad/a/BUILD
+ Loading addresses from 'bad/a' failed.$"""
+
+  def test_bad_build_files(self):
+    with self.assertRaisesRegexp(self.spec_parser.BadSpecError, self.NO_FAIL_FAST_RE):
+      list(self.spec_parser.parse_addresses('::'))
+
+  def test_bad_build_files_fail_fast(self):
+    with self.assertRaisesRegexp(self.spec_parser.BadSpecError, self.FAIL_FAST_RE):
+      list(self.spec_parser.parse_addresses('::', True))

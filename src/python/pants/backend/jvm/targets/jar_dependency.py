@@ -50,7 +50,7 @@ class Artifact(object):
 class JarDependency(object):
   """A pre-built Maven repository dependency."""
 
-  _JAR_HASH_KEYS = (
+  _HASH_KEYS = (
     'org',
     'name',
     'rev',
@@ -61,7 +61,7 @@ class JarDependency(object):
   )
 
   def __init__(self, org, name, rev=None, force=False, ext=None, url=None, apidocs=None,
-               type_=None, classifier=None, mutable=None, exclusives=None):
+               type_=None, classifier=None, mutable=None):
     """
     :param string org: The Maven ``groupId`` of this dependency.
     :param string name: The Maven ``artifactId`` of this dependency.
@@ -86,32 +86,23 @@ class JarDependency(object):
     self.name = name
     self.rev = rev
     self.force = force
-    self.excludes = []
+    self.excludes = tuple()
     self.transitive = True
     self.apidocs = apidocs
     self.mutable = mutable
     self._classifier = classifier
 
-    self.artifacts = []
+    self.artifacts = tuple()
     if ext or url or type_ or classifier:
       self.with_artifact(name=name, type_=type_, ext=ext, url=url, classifier=classifier)
 
     self.id = "%s-%s-%s" % (self.org, self.name, self.rev)
-    self._configurations = ['default']
-    self.declared_exclusives = defaultdict(set)
-    if exclusives is not None:
-      for k in exclusives:
-        self.declared_exclusives[k] |= exclusives[k]
+    self._configurations = ('default',)
 
     # Support legacy method names
     # TODO(John Sirois): introduce a deprecation cycle for these and then kill
     self.withSources = self.with_sources
     self.withDocs = self.with_docs
-
-    self.declared_exclusives = defaultdict(set)
-    if exclusives is not None:
-      for k in exclusives:
-        self.declared_exclusives[k] |= exclusives[k]
 
   @property
   def configurations(self):
@@ -139,7 +130,7 @@ class JarDependency(object):
   def exclude(self, org, name=None):
     """Adds a transitive dependency of this jar to the exclude list."""
 
-    self.excludes.append(Exclude(org, name))
+    self.excludes += (Exclude(org, name),)
     return self
 
   @manual.builddict()
@@ -155,14 +146,14 @@ class JarDependency(object):
     """This requests the artifact have its source jar fetched.
     (This implies there *is* a source jar to fetch.) Used in contexts
     that can use source jars (as of 2013, just eclipse and idea goals)."""
-    self._configurations.append('sources')
+    self._configurations += ('sources',)
     return self
 
   def with_docs(self):
     """This requests the artifact have its javadoc jar fetched.
     (This implies there *is* a javadoc jar to fetch.) Used in contexts
     that can use source jars (as of 2014, just eclipse and idea goals)."""
-    self._configurations.append('javadoc')
+    self._configurations += ('javadoc',)
     return self
 
   @manual.builddict()
@@ -182,9 +173,13 @@ class JarDependency(object):
       be used to designate all public configurations.
     :param classifier: The maven classifier of this artifact.
     """
-    artifact = Artifact(name or self.name, type_=type_, ext=ext, url=url, conf=configuration,
+    artifact = Artifact(name or self.name,
+                        type_=type_,
+                        ext=ext,
+                        url=url,
+                        conf=configuration,
                         classifier=classifier)
-    self.artifacts.append(artifact)
+    self.artifacts += (artifact,)
     return self
 
   def __eq__(self, other):
@@ -206,7 +201,7 @@ class JarDependency(object):
     return self.id
 
   def cache_key(self):
-    key = ''.join(str(getattr(self, key)) for key in self._JAR_HASH_KEYS)
+    key = ''.join(str(getattr(self, key)) for key in self._HASH_KEYS)
     key += ''.join(sorted(self._configurations))
     key += ''.join(a.cache_key() for a in sorted(self.artifacts, key=lambda a: a.name + a.type_))
     return key

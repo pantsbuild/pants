@@ -8,9 +8,11 @@ source ${REPO_ROOT}/build-support/set_archflags.sh
 
 REQUIREMENTS=(
   ${REPO_ROOT}/3rdparty/python/requirements.txt
+  ${REPO_ROOT}/3rdparty/python/internal_backend/requirements.txt
   ${REPO_ROOT}/3rdparty/python/twitter/commons/requirements.txt
 )
 
+# TODO(John Sirois): Kill this when we switch over to publishing from internal_backend
 DEV_REQUIREMENTS=(
   ${REPO_ROOT}/3rdparty/python/dev_only_requirements.txt
 )

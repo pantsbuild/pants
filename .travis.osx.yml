@@ -1,0 +1,20 @@
+# Setting the language to objective-c is the magic to get an OSX slave
+# assigned by Travis CI.
+# Its not clearly spelled out, but the relevant bits are documented here:
+#   http://docs.travis-ci.com/user/languages/objective-c/
+#   http://docs.travis-ci.com/user/osx-ci-environment/
+#
+# NB: Travis-CI does have support for an os list in the main .travis.yml
+# and this would be preferrable, but they are currently under capacity
+# on osx slaves and not accepting new users:
+#   http://blog.travis-ci.com/2014-05-13-multi-os-feature-available/
+language: objective-c
+
+script: |
+  sw_vers
+  python --version
+  java -version
+  ./build-support/bin/ci.sh -d
+
+# The `notifications:` configuration will be programatically copied over from `.travis.yml` for
+# central maintenance of distribution lists, see: `build-support/bin/ci-sync.sh`.

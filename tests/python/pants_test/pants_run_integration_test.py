@@ -46,7 +46,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
     safe_mkdir(root)
     return root
 
-  def run_pants_with_workdir(self, command, workdir, config=None, stdin_data=None, **kwargs):
+  def run_pants_with_workdir(self, command, workdir, config=None, stdin_data=None, extra_env=None, **kwargs):
     config = config.copy() if config else {}
 
     # We add workdir to the DEFAULT section, and also ensure that it's emitted first.
@@ -64,14 +64,17 @@ class PantsRunIntegrationTest(unittest.TestCase):
       fp.write(ini)
     env = os.environ.copy()
     env['PANTS_CONFIG_OVERRIDE'] = ini_file_name
+    env.update(extra_env or {})
+
     pants_command = ([os.path.join(get_buildroot(), self.PANTS_SCRIPT_NAME)] + command +
                      ['--no-lock', '--kill-nailguns'])
+
     proc = subprocess.Popen(pants_command, env=env, stdin=subprocess.PIPE,
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
     (stdout_data, stderr_data) = proc.communicate(stdin_data)
     return PantsResult(pants_command, proc.returncode, stdout_data, stderr_data)
 
-  def run_pants(self, command, config=None, stdin_data=None, **kwargs):
+  def run_pants(self, command, config=None, stdin_data=None, extra_env=None, **kwargs):
     """Runs pants in a subprocess.
 
     :param list command: A list of command line arguments coming after `./pants`.
@@ -86,7 +89,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
     """
 
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
-      return self.run_pants_with_workdir(command, workdir, config, stdin_data, **kwargs)
+      return self.run_pants_with_workdir(command, workdir, config, stdin_data, extra_env, **kwargs)
 
   def assert_success(self, pants_run, msg=None):
     # TODO(John Sirois): de-dup ITs to use this helper

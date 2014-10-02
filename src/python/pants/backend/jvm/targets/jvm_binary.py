@@ -5,6 +5,7 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from hashlib import sha1
 import os
 import re
 
@@ -16,7 +17,8 @@ from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.build_environment import get_buildroot
 from pants.base.build_manual import manual
 from pants.base.exceptions import TargetDefinitionException
-from pants.base.payload import BundlePayload
+from pants.base.payload import Payload
+from pants.base.payload_field import BundleField
 from pants.base.target import Target
 from pants.base.validation import assert_list
 
@@ -205,7 +207,6 @@ class JvmBinary(JvmTarget):
   * ``run`` - Executes the main class of this binary locally.
   """
   def __init__(self,
-               name=None,
                main=None,
                basename=None,
                source=None,
@@ -213,8 +214,6 @@ class JvmBinary(JvmTarget):
                deploy_jar_rules=None,
                **kwargs):
     """
-    :param string name: The name of this target, which combined with this
-      build file defines the :doc:`target address <target_addresses>`.
     :param string main: The name of the ``main`` class, e.g.,
       ``'com.pants.examples.hello.main.HelloMain'``. This class may be
       present as the source of this target or depended-upon library.
@@ -228,8 +227,6 @@ class JvmBinary(JvmTarget):
     :param dependencies: Targets (probably ``java_library`` and
      ``scala_library`` targets) to "link" in.
     :type dependencies: list of target specs
-    :param excludes: List of :ref:`exclude <bdict_exclude>`\s
-      to filter this target's transitive dependencies against.
     :param deploy_excludes: List of :ref:`exclude <bdict_exclude>`\s to apply
       at deploy time.
       If you, for example, deploy a java servlet that has one version of
@@ -243,7 +240,7 @@ class JvmBinary(JvmTarget):
     :type configurations: tuple of strings
     """
     sources = [source] if source else None
-    super(JvmBinary, self).__init__(name=name, sources=self.assert_list(sources), **kwargs)
+    super(JvmBinary, self).__init__(sources=self.assert_list(sources), **kwargs)
 
     if main and not isinstance(main, Compatibility.string):
       raise TargetDefinitionException(self, 'main must be a fully qualified classname')
@@ -258,8 +255,9 @@ class JvmBinary(JvmTarget):
     if deploy_jar_rules and not isinstance(deploy_jar_rules, JarRules):
       raise TargetDefinitionException(self, 'deploy_jar_rules must be a JarRules specification')
 
+    # TODO(pl): These should all live in payload fields
     self.main = main
-    self.basename = basename or name
+    self.basename = basename or self.name
     self.deploy_excludes = self.assert_list(deploy_excludes, expected_type=Exclude)
     self.deploy_jar_rules = deploy_jar_rules or JarRules.default()
 
@@ -369,7 +367,7 @@ class JvmApp(Target):
   extra files like config files, startup scripts, etc.
   """
 
-  def __init__(self, name=None, binary=None, bundles=None, basename=None, **kwargs):
+  def __init__(self, name=None, payload=None, binary=None, bundles=None, basename=None, **kwargs):
     """
     :param string name: The name of this target, which combined with this
       build file defines the :doc:`target address <target_addresses>`.
@@ -382,13 +380,15 @@ class JvmApp(Target):
       ``name``. Pants uses this in the ``bundle`` goal to name the distribution
       artifact. In most cases this parameter is not necessary.
     """
-    payload = BundlePayload(bundles)
+    payload = payload or Payload()
+    payload.add_fields({
+      'bundles': BundleField(bundles or []),
+    })
     super(JvmApp, self).__init__(name=name, payload=payload, **kwargs)
 
     if name == basename:
       raise TargetDefinitionException(self, 'basename must not equal name.')
     self._basename = basename or name
-
     self._binary = binary
 
   @property

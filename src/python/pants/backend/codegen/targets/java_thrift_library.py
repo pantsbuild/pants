@@ -62,11 +62,6 @@ class JavaThriftLibrary(JvmTarget):
     :param thrift_linter_strict: If True, fail if thrift linter produces any warnings.
     """
 
-    # It's critical that provides is set 1st since _provides() is called elsewhere in the
-    # constructor flow.
-    # TODO(pl): Above is defunct?
-    # self._provides = provides
-
     super(JavaThriftLibrary, self).__init__(**kwargs)
 
     self.add_labels('codegen')
@@ -77,6 +72,7 @@ class JavaThriftLibrary(JvmTarget):
                                         (arg, ', or '.join(map(repr, values)), value))
       return value
 
+    # TODO(pl): These should all live in payload fields
     self.compiler = check_value_for_arg('compiler', compiler, self._COMPILERS)
     self.language = check_value_for_arg('language', language, self._LANGUAGES)
     self.rpc_style = check_value_for_arg('rpc_style', rpc_style, self._RPC_STYLES)

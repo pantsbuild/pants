@@ -32,10 +32,10 @@ from pants.engine.engine import Engine
 from pants.engine.round_engine import RoundEngine
 from pants.goal.context import Context
 from pants.goal.error import GoalError
-from pants.goal.help import print_help
 from pants.goal.initialize_reporting import update_reporting
 from pants.goal.option_helpers import add_global_options
 from pants.goal.goal import Goal
+from pants.option.options import Options
 from pants.util.dirutil import safe_mkdir
 
 
@@ -56,6 +56,7 @@ class GoalRunner(Command):
     goals = OrderedSet()
     specs = OrderedSet()
     explicit_multi = False
+    fail_fast = False
     logger = logging.getLogger(__name__)
     has_double_dash = u'--' in args
     goal_names = [goal.name for goal in Goal.all()]
@@ -91,11 +92,13 @@ class GoalRunner(Command):
         explicit_multi = True
         del args[i]
         break
+      elif '--fail-fast' == arg.lower():
+        fail_fast = True
 
     if explicit_multi:
       specs.update(arg for arg in args[len(goals):] if not arg.startswith('-'))
 
-    return goals, specs
+    return goals, specs, fail_fast
 
   # TODO(John Sirois): revisit wholesale locking when we move py support into pants new
   @classmethod
@@ -107,7 +110,19 @@ class GoalRunner(Command):
 
   def __init__(self, *args, **kwargs):
     self.targets = []
-    self.config = None
+    self.config = Config.load()
+    known_scopes = ['']
+    for goal in Goal.all():
+      # Note that enclosing scopes will appear before scopes they enclose.
+      known_scopes.extend(goal.known_scopes())
+
+    # Annoying but temporary hack to get the parser.  We can't use self.parser because
+    # that only gets set up in the superclass ctor, and we can't call that until we have
+    # self.options set up because the superclass ctor calls our register_options().
+    # Fortunately this will all go away once we're fully off the old "Command" mechanism.
+    legacy_parser = args[2] if len(args) > 2 else kwargs['parser']
+    self.options = Options(os.environ.copy(), self.config, known_scopes, args=sys.argv,
+                           legacy_parser=legacy_parser)
     super(GoalRunner, self).__init__(*args, **kwargs)
 
   @contextmanager
@@ -143,8 +158,11 @@ class GoalRunner(Command):
       # actual error message, so we don't show it in this case.
       self.error(msg.getvalue(), show_help=False)
 
+  def register_options(self):
+    for goal in Goal.all():
+      goal.register_options(self.options)
+
   def setup_parser(self, parser, args):
-    self.config = Config.load()
     add_global_options(parser)
 
     # We support attempting zero or more goals.  Multiple goals must be delimited from further
@@ -165,9 +183,9 @@ class GoalRunner(Command):
     show_help = len(help_flags.intersection(args)) > 0
     non_help_args = filter(lambda f: f not in help_flags, args)
 
-    goals, specs = GoalRunner.parse_args(non_help_args)
+    goals, specs, fail_fast = GoalRunner.parse_args(non_help_args)
     if show_help:
-      print_help(goals)
+      self.options.print_help(goals=goals, legacy=True)
       sys.exit(0)
 
     self.requested_goals = goals
@@ -177,7 +195,7 @@ class GoalRunner(Command):
       spec_parser = CmdLineSpecParser(self.root_dir, self.address_mapper)
       with self.run_tracker.new_workunit(name='parse', labels=[WorkUnit.SETUP]):
         for spec in specs:
-          for address in spec_parser.parse_addresses(spec):
+          for address in spec_parser.parse_addresses(spec, fail_fast):
             self.build_graph.inject_address_closure(address)
             self.targets.append(self.build_graph.get_target(address))
     self.goals = [Goal.by_name(goal) for goal in goals]

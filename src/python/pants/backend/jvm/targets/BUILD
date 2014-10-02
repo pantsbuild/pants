@@ -11,7 +11,6 @@ python_library(
 python_library(
   name = 'jvm',
   sources = [
-    'artifact.py',
     'benchmark.py',
     'credentials.py',
     'exclude.py',
@@ -21,7 +20,6 @@ python_library(
     'jarable.py',
     'jvm_binary.py',
     'jvm_target.py',
-    'repository.py',
   ],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
@@ -32,6 +30,7 @@ python_library(
     'src/python/pants/base:build_manual',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:payload',
+    'src/python/pants/base:payload_field',
     'src/python/pants/base:target',
     'src/python/pants/base:validation',
   ],

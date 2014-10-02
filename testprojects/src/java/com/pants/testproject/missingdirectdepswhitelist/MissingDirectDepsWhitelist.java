@@ -1,6 +1,6 @@
 package com.pants.testproject.missingdirectdepswhitelist;
 
-import com.pants.examples.hello.greet.Greeting;
+import com.pants.testproject.publish.hello.greet.Greeting;
 import com.pants.testproject.missingdirectdepswhitelist2.MissingDirectDepsWhitelist2;
 
 public class MissingDirectDepsWhitelist {

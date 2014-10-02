@@ -37,6 +37,9 @@ class PythonRequirement(object):
     self._repository = repository
     self._name = name or self._requirement.project_name
     self._use_2to3 = use_2to3
+    # TODO(pl): Change version_filter into a hashable flag instead of a lambda.
+    # It definitely belongs in the invalidation hash, and it's only ever used
+    # for differentiating between py3k and py2
     self._version_filter = version_filter or (lambda py, pl: True)
     # TODO(wickman) Unify this with PythonTarget .compatibility
     self.compatibility = compatibility or ['']

@@ -6,6 +6,7 @@ python_library(
   sources = ['pants_exe.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
+    'src/python/internal_backend/repositories:plugin',
     'src/python/pants/backend/android:plugin',
     'src/python/pants/backend/authentication:authentication',
     'src/python/pants/backend/codegen:plugin',
@@ -43,39 +44,49 @@ python_library(
   ],
 )
 
+target(
+  name='pants_binary_deps',
+  dependencies=[
+    ':pants_exe',
+    'src/python/pants/backend/python/commands:pants_old',
+    'src/python/pants/commands:pants_new',
+  ]
+)
+
+# 3.0 - 3.2 did not support unicode literals so we don't support these for now since it would
+# take some work to make the codebase compatible.
+# Additionally we force a an ascii string for python 3.3.x here.
+PANTS_COMPATIBILITY = 'CPython>=2.6,<3,>=3.3'
+
+# This binary's entry_point is used by the pantsbuild.pants sdist to setup a binary for
+# pip installers, ie: it is why this works to get `pants` on your PATH:
+# $ pip install pantsbuild.pants
+# $ pants
+# NB: The platforms below are _only_ used when building a pex from this target.  They are
+# not used in the sdist generation.
 python_binary(
   name = 'pants',
   entry_point = 'pants.bin.pants_exe:main',
+  # TODO(John Sirois): Nuke this - we don't publish pexes so we need not build cross-platform pexes.
   platforms=[
     'current',
     'linux-x86_64',
     'macosx-10.4-x86_64',
   ],
-  # 3.0 - 3.2 did not support unicode literals so we don't support these for now since it would
-  # take some work to make the codebase compatible.
-  # Additionally we force a an ascii string for python 3.3.x here.
-  compatibility='CPython>=2.6,<3,>=3.3',
+  compatibility=PANTS_COMPATIBILITY,
   dependencies = [
-    ':pants_exe',
-    'src/python/pants/backend/python/commands:pants_old',
-    'src/python/pants/commands:pants_new',
+    ':pants_binary_deps',
   ],
 )
 
+# This binary is for internal use only.  It adds a dep on internal_backends not meant for
+# publishing in the `pantsbuild.pants` sdist.
 python_binary(
-  name = 'pants_new',
+  name = 'pants_local_binary',
   entry_point = 'pants.bin.pants_exe:main',
+  compatibility=PANTS_COMPATIBILITY,
   dependencies = [
-    ':pants_exe',
-    'src/python/pants/commands:pants_new',
-  ],
-)
-
-python_binary(
-  name = 'pants_old',
-  entry_point = 'pants.bin.pants_exe:main',
-  dependencies = [
-    ':pants_exe',
-    'src/python/pants/backend/python/commands:pants_old',
+    ':pants_binary_deps',
+    'src/python/internal_backend:plugins',
   ],
 )

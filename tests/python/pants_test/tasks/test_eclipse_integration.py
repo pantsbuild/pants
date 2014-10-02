@@ -64,7 +64,7 @@ class EclipseIntegrationTest(PantsRunIntegrationTest):
 
   def test_eclipse_on_java_sources(self):
     classpath = self._eclipse_test(['testprojects/src/scala/com/pants/testproject/javasources::'])
-    self.assertIn('path="examples.src.java"', classpath)
+    self.assertIn('path="testprojects.src.java"', classpath)
 
   def test_eclipse_on_thriftdeptest(self):
     self._eclipse_test(['testprojects/src/java/com/pants/testproject/thriftdeptest::'])
@@ -72,4 +72,4 @@ class EclipseIntegrationTest(PantsRunIntegrationTest):
   def test_eclipse_on_scaladepsonboth(self):
     classpath = self._eclipse_test(['testprojects/src/scala/com/pants/testproject/scaladepsonboth::'])
     # Previously Java dependencies didn't get included
-    self.assertIn('path="examples.src.java"', classpath)
+    self.assertIn('path="testprojects.src.java"', classpath)

@@ -21,6 +21,7 @@ from pants.base.target import Target
 from pants.goal.context import Context
 from pants.goal.goal import Goal
 from pants.goal.mkflag import Mkflag
+from pants.option.options import Options
 from pants_test.base_test import BaseTest
 from pants_test.base.context_utils import create_config, create_run_tracker
 
@@ -52,6 +53,12 @@ def prepare_task(task_type,
   parser = OptionParser()
   option_group = OptionGroup(parser, 'test')
   mkflag = Mkflag('test')
+
+  new_options = Options(env={}, config=config, known_scopes=['', 'test'],
+                        args=[], legacy_parser=parser)
+
+  task_type.options_scope = 'test'
+  task_type.register_options_on_scope(new_options)
   task_type.setup_parser(option_group, args, mkflag)
   options, _ = parser.parse_args(args or [])
 

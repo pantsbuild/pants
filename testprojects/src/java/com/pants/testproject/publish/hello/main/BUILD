@@ -20,9 +20,3 @@ jvm_binary(name = 'main-bin',
   main = 'com.pants.testproject.publish.hello.main.HelloMain',
   basename = 'hello-example',
 )
-
-# README page:
-
-page(name="readme",
-  source="README.md")
-

@@ -1,21 +1,186 @@
 RELEASE HISTORY
 ===============
 
-0.0.24 or next (??/??/2014)
----------------------------
+0.0.24 (9/23/2014)
+------------------
 
 API Changes
 ~~~~~~~~~~~
 
-* Changed goal markdown: Writes output to ./dist/markdown/ . Pages can
-  `include snippets from source files
-  <http://pantsbuild.github.io/page.html#include-a-file-snippet>`_
+* Add a whitelist to jvm dependency analyzer
+  `RB #888 <https://rbcommons.com/s/twitter/r/888>`_
+
+* Refactor exceptions in build_file.py and build_file_parser.py to derive from a common baseclass
+  and eliminate throwing `IOError`.
+  `RB #954 <https://rbcommons.com/s/twitter/r/954>`_
+
+* Support absolute paths on the command line when they start with the build root
+  `RB #867 <https://rbcommons.com/s/twitter/r/867>`_
+
+* Make `::` fail for an invalid dir much like `:` does for a dir with no BUILD file.
+  `Issue #484 <https://github.com/pantsbuild/pants/issues/484>`_
+  `RB #907 <https://rbcommons.com/s/twitter/r/907>`_
+
+* Deprecate `pants` & `dependencies` aliases and remove `config`, `goal`, `phase`,
+  `get_scm` & `set_scm` aliases
+  `RB #899 <https://rbcommons.com/s/twitter/r/899>`_
+  `RB #903 <https://rbcommons.com/s/twitter/r/903>`_
+  `RB #912 <https://rbcommons.com/s/twitter/r/912>`_
+
+* Export test infrastructure for plugin writers to use in `pantsbuild.pants.testinfra` sdist
+  `Issue #539 <https://github.com/pantsbuild/pants/issues/539>`_
+  `RB #997 <https://rbcommons.com/s/twitter/r/997>`_
+  `RB #1004 <https://rbcommons.com/s/twitter/r/1004>`_
+
+* Publishing improvements:
+
+  - Add support for doing remote publishes with an explicit snapshot name
+  - One publish/push db file per artifact
+
+  `RB #923 <https://rbcommons.com/s/twitter/r/923>`_
+  `RB #994 <https://rbcommons.com/s/twitter/r/994>`_
+
+* Several improvements to `IdeGen` derived goals:
+
+  - Adds the `--<goal>-use-source-root` for IDE project generation tasks
+  - Added `--idea-exclude-maven-target` to keep IntelliJ from indexing 'target' directories
+  - Changes the behavior of goal idea to create a subdirectory named for the project name
+  - Added `exclude-folders` option in pants.ini, defaulted to excluding a few dirs in `.pants.d`
+
+  `Issue #564 <https://github.com/pantsbuild/pants/issues/564>`_
+  `RB #1006 <https://rbcommons.com/s/twitter/r/1006>`_
+  `RB #1017 <https://rbcommons.com/s/twitter/r/1017>`_
+  `RB #1019 <https://rbcommons.com/s/twitter/r/1019>`_
+  `RB #1023 <https://rbcommons.com/s/twitter/r/1023>`_
+
+* Enhancements to the `depmap` goal to support IDE plugins:
+
+  - Add flag to dump project info output to file
+  - Add missing resources to targets
+  - Add content type to project Info
+
+  `Issue #5 <https://github.com/pantsbuild/intellij-pants-plugin/issues/5>`_
+  `RB #964 <https://rbcommons.com/s/twitter/r/964>`_
+  `RB #987 <https://rbcommons.com/s/twitter/r/987>`_
+  `RB #998 <https://rbcommons.com/s/twitter/r/998>`_
+
+* Make `SourceRoot` fundamentally understand a rel_path
+  `RB #1036 <https://rbcommons.com/s/twitter/r/1036>`_
+
+* Added thrift-linter to pants
+  `RB #1044 <https://rbcommons.com/s/twitter/r/1044>`_
+
+* Support limiting coverage measurements globally by module or path
+  `Issue #328 <https://github.com/pantsbuild/pants/issues/328>`_
+  `Issue #369 <https://github.com/pantsbuild/pants/issues/369>`_
+  `RB #1034 <https://rbcommons.com/s/twitter/r/1034>`_
+
+* Update interpreter_cache.py to support a repo-wide interpreter requirement
+  `RB #1025 <https://rbcommons.com/s/twitter/r/1025>`_
+
+* Changed goal markdown:
+
+  - Writes output to `./dist/markdown/`
+  - Pages can include snippets from source files
+    `<http://pantsbuild.github.io/page.html#include-a-file-snippet>`_
+
+  `Issue #535 <https://github.com/pantsbuild/pants/issues/535>`_
   `RB #949 <https://rbcommons.com/s/twitter/r/949>`_
   `RB #961 <https://rbcommons.com/s/twitter/r/961>`_
 
+* Rename `Phase` -> `Goal`
+  `RB #856 <https://rbcommons.com/s/twitter/r/856>`_
+  `RB #879 <https://rbcommons.com/s/twitter/r/879>`_
+  `RB #880 <https://rbcommons.com/s/twitter/r/880>`_
+  `RB #887 <https://rbcommons.com/s/twitter/r/887>`_
+  `RB #890 <https://rbcommons.com/s/twitter/r/890>`_
+  `RB #910 <https://rbcommons.com/s/twitter/r/910>`_
+  `RB #913 <https://rbcommons.com/s/twitter/r/913>`_
+  `RB #915 <https://rbcommons.com/s/twitter/r/915>`_
+  `RB #931 <https://rbcommons.com/s/twitter/r/931>`_
+
+* Android support additions:
+
+  - Add `AaptBuild` task
+  - Add `JarsignerTask` and `Keystore` target
+
+  `RB #859 <https://rbcommons.com/s/twitter/r/859>`_
+  `RB #883 <https://rbcommons.com/s/twitter/r/883>`_
+
+* Git/Scm enhancements:
+
+  - Allow the buildroot to be a subdirectory of the git worktree
+  - Support getting the commit date of refs
+  - Add merge-base and origin url properties to git
+
+  `Issue #405 <https://github.com/pantsbuild/pants/issues/405>`_
+  `RB #834 <https://rbcommons.com/s/twitter/r/834>`_
+  `RB #871 <https://rbcommons.com/s/twitter/r/871>`_
+  `RB #884 <https://rbcommons.com/s/twitter/r/884>`_
+  `RB #886 <https://rbcommons.com/s/twitter/r/886>`_
 
 Bugfixes
 ~~~~~~~~
+
+* Numerous doc improvements & generation fixes
+  `Issue #397 <https://github.com/pantsbuild/pants/issues/397>`_
+  `Issue #451 <https://github.com/pantsbuild/pants/issues/451>`_
+  `Issue #475 <https://github.com/pantsbuild/pants/issues/475>`_
+  `RB #863 <https://rbcommons.com/s/twitter/r/863>`_
+  `RB #865 <https://rbcommons.com/s/twitter/r/865>`_
+  `RB #873 <https://rbcommons.com/s/twitter/r/873>`_
+  `RB #876 <https://rbcommons.com/s/twitter/r/876>`_
+  `RB #885 <https://rbcommons.com/s/twitter/r/885>`_
+  `RB #938 <https://rbcommons.com/s/twitter/r/938>`_
+  `RB #953 <https://rbcommons.com/s/twitter/r/953>`_
+  `RB #960 <https://rbcommons.com/s/twitter/r/960>`_
+  `RB #965 <https://rbcommons.com/s/twitter/r/965>`_
+  `RB #992 <https://rbcommons.com/s/twitter/r/992>`_
+  `RB #995 <https://rbcommons.com/s/twitter/r/995>`_
+  `RB #1007 <https://rbcommons.com/s/twitter/r/1007>`_
+  `RB #1008 <https://rbcommons.com/s/twitter/r/1008>`_
+  `RB #1018 <https://rbcommons.com/s/twitter/r/1018>`_
+  `RB #1020 <https://rbcommons.com/s/twitter/r/1020>`_
+  `RB #1048 <https://rbcommons.com/s/twitter/r/1048>`_
+
+* Fixup missing 'page.mustache' resource for `markdown` goal
+  `Issue #498 <https://github.com/pantsbuild/pants/issues/498>`_
+  `RB #918 <https://rbcommons.com/s/twitter/r/918>`_
+
+* Publishing fixes:
+
+  - Fix credentials fetching during publishing
+  - Skipping a doc phase should result in transitive deps being skipped as well
+
+  `RB #901 <https://rbcommons.com/s/twitter/r/901>`_
+  `RB #1011 <https://rbcommons.com/s/twitter/r/1011>`_
+
+* Several `IdeGen` derived task fixes:
+
+  - Fix eclipse_gen & idea_gen for targets with both java and scala
+  - Fixup EclipseGen resources globs to include prefs.
+  - When a directory contains both `java_library` and `junit_tests` targets, make sure the IDE
+    understands this is a test path, not a lib path
+
+  `RB #857 <https://rbcommons.com/s/twitter/r/857>`_
+  `RB #916 <https://rbcommons.com/s/twitter/r/916>`_
+  `RB #996 <https://rbcommons.com/s/twitter/r/996>`_
+
+* Fixes to the `depmap` goal to support IDE plugins:
+
+  - Fixed source roots in project info in case of `ScalaLibrary` with `java_sources`
+  - Fix `--depmap-project-info` for scala sources with the same package_prefix
+  - Fix depmap KeyError
+
+  `RB #955 <https://rbcommons.com/s/twitter/r/955>`_
+  `RB #990 <https://rbcommons.com/s/twitter/r/990>`_
+  `RB #1015 <https://rbcommons.com/s/twitter/r/1015>`_
+
+* Make a better error message when os.symlink fails during bundle
+  `RB #1037 <https://rbcommons.com/s/twitter/r/1037>`_
+
+* Faster source root operations - update the internal data structure to include a tree
+  `RB #1003 <https://rbcommons.com/s/twitter/r/1003>`_
 
 * The goal filter's --filter-ancestor parameter works better now
   `Issue #506 <https://github.com/pantsbuild/pants/issues/506>`_
@@ -24,6 +189,53 @@ Bugfixes
 * Fix: goal markdown failed to load page.mustache
   `Issue #498 <https://github.com/pantsbuild/pants/issues/498>`_
   `RB #918 <https://rbcommons.com/s/twitter/r/918>`_
+
+* Fix the `changed` goal so it can be run in a repo with a directory called 'build'
+  `RB #872 <https://rbcommons.com/s/twitter/r/872>`_
+
+* Patch `JvmRun` to accept `JvmApp`s
+  `RB #893 <https://rbcommons.com/s/twitter/r/893>`_
+
+* Add python as default codegen product
+  `RB #894 <https://rbcommons.com/s/twitter/r/894>`_
+
+* Fix the `filedeps` goal - it was using a now-gone .expand_files() API
+  `Issue #437 <https://github.com/pantsbuild/pants/issues/437>`_,
+  `RB #939 <https://rbcommons.com/s/twitter/r/939>`_
+
+* Put back error message that shows path to missing BUILD files
+  `RB #929 <https://rbcommons.com/s/twitter/r/929>`_
+
+* Make sure the `junit_run` task only runs on targets that are junit compatible
+  `Issue #508 <https://github.com/pantsbuild/pants/issues/508>`_
+  `RB #924 <https://rbcommons.com/s/twitter/r/924>`_
+
+* Fix `./pants goal targets`
+  `Issue #333 <https://github.com/pantsbuild/pants/issues/333>`_
+  `RB #796 <https://rbcommons.com/s/twitter/r/796>`_
+  `RB #914 <https://rbcommons.com/s/twitter/r/914>`_
+
+* Add `derived_from` to `ScroogeGen` synthetic targets
+  `RB #926 <https://rbcommons.com/s/twitter/r/926>`_
+
+* Properly order resources for pants goal test and pants goal run
+  `RB #845 <https://rbcommons.com/s/twitter/r/845>`_
+
+* Fixup Dependencies to be mainly target-type agnostic.
+  `Issue #499 <https://github.com/pantsbuild/pants/issues/499>`_
+  `RB #920 <https://rbcommons.com/s/twitter/r/920>`_
+
+* Fixup JvmRun only-write-cmd-line flag to accept relative paths.
+  `Issue #494 <https://github.com/pantsbuild/pants/issues/494>`_
+  `RB #908 <https://rbcommons.com/s/twitter/r/908>`_
+  `RB #911 <https://rbcommons.com/s/twitter/r/911>`_
+
+* Fix the `--ivy-report` option and add integration test
+  `RB #976 <https://rbcommons.com/s/twitter/r/976>`_
+
+* Fix a regression in Emma/Cobertura and add tests
+  `Issue #508 <https://github.com/pantsbuild/pants/issues/508>`_
+  `RB #935 <https://rbcommons.com/s/twitter/r/935>`_
 
 0.0.23 (8/11/2014)
 ------------------

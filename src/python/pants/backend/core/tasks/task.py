@@ -47,10 +47,35 @@ class TaskBase(AbstractClass):
   of the helpers.  Ideally console tasks don't inherit a workdir, invalidator or build cache for
   example.
   """
+  # The scope for this task's options. Will be set (on a synthetic subclass) during registration.
+  options_scope = None
+
+  @classmethod
+  def known_scopes(cls):
+    """Yields all known scopes under this task (usually just its own.)"""
+    yield cls.options_scope
+
+  @classmethod
+  def register_options_on_scope(cls, options):
+    """Trigger registration of this task's options.
+
+    Subclasses should not generally need to override this method.
+    """
+    def register(*args, **kwargs):
+      options.register(cls.options_scope, *args, **kwargs)
+    cls.register_options(register)
+
+  @classmethod
+  def register_options(cls, register):
+    """Set up the new options system.
+
+    Subclasses may override and call register(*args, **kwargs) with argparse arguments
+    to register options.
+    """
 
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
-    """Set up the cmd-line parser.
+    """Set up the legacy cmd-line parser.
 
     Subclasses can add flags to the pants command line using the given option group.
     Flag names should be created with mkflag([name]) to ensure flags are properly name-spaced

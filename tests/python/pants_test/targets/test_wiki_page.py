@@ -20,11 +20,12 @@ class WikiPageTest(BaseTest):
     return BuildFileAliases.create(
       targets={
         'page': Page,
-        'wiki': Wiki,
       },
       objects={
+        'Wiki': Wiki,
         'wiki_artifact': WikiArtifact,
-      }
+        'confluence': Wiki(name='confluence_wiki', url_builder=None),
+      },
     )
 
   def setUp(self):
@@ -36,16 +37,12 @@ class WikiPageTest(BaseTest):
 
     self.add_to_build_file('junk/docs', dedent("""
 
-        confluence = wiki(name='confluence_wiki',
-                          url_builder=None,
-                          )
-
         page(name='readme',
           source='README.md',
           dependencies=[':readme2'],
           provides=[
             wiki_artifact(
-              wiki='junk/docs:confluence_wiki',
+              wiki=confluence,
               space='~areitz',
               title='test_page',
             ),
@@ -57,7 +54,7 @@ class WikiPageTest(BaseTest):
           dependencies=[':readme'],
           provides=[
             wiki_artifact(
-              wiki='junk/docs:confluence_wiki',
+              wiki=confluence,
               space='~areitz',
               title='test_page2',
             ),

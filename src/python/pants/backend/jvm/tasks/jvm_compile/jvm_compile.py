@@ -19,7 +19,6 @@ from pants.backend.jvm.tasks.jvm_compile.jvm_fingerprint_strategy import JvmFing
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
 from pants.base.build_environment import get_buildroot, get_scm
-from pants.base.config import Config
 from pants.base.exceptions import TaskError
 from pants.base.target import Target
 from pants.base.worker_pool import Work
@@ -37,24 +36,22 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
   """
 
   @classmethod
+  def register_options(cls, register):
+    super(JvmCompile, cls).register_options(register)
+    register('--partition-size-hint', type=int, default=-1, metavar='<# source files>',
+             help='Roughly how many source files to attempt to compile together. Set to a large '
+                  'number to compile all sources together. Set to 0 to compile target-by-target.',
+             legacy='{0}_partition_size_hint'.format(cls._language))
+
+  @classmethod
   def setup_parser(cls, option_group, args, mkflag):
     super(JvmCompile, cls).setup_parser(option_group, args, mkflag)
-
     option_group.add_option(mkflag('warnings'), mkflag('warnings', negate=True),
                             dest=cls._language + '_compile_warnings',
                             default=True,
                             action='callback',
                             callback=mkflag.set_bool,
                             help='[%default] Compile with all configured warnings enabled.')
-
-    option_group.add_option(mkflag('partition-size-hint'),
-                            dest=cls._language + '_partition_size_hint',
-                            action='store',
-                            type='int',
-                            default=-1,
-                            help='Roughly how many source files to attempt to compile together. '
-                                 'Set to a large number to compile all sources together. Set this '
-                                 'to 0 to compile target-by-target. Default is set in pants.ini.')
 
     option_group.add_option(mkflag('missing-deps'),
                             dest=cls._language + '_missing_deps',
@@ -244,22 +241,22 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
     # Populated in prepare_execute().
     self._sources_by_target = None
 
-  def configure_args(self, args_defaults=[], warning_defaults=[], no_warning_defaults=[]):
+  def configure_args(self, args_defaults=None, warning_defaults=None, no_warning_defaults=None):
    """
    Setup the compiler command line arguments, optionally providing default values.  It is mandatory
    to call this from __init__() of your subclass.
-   :param list args_default:  compiler flags that should be invoked for all invocations
+   :param list args_defaults:  compiler flags that should be invoked for all invocations
    :param list warning_defaults: compiler flags to turn on warnings
    :param list no_warning_defaults:  compiler flags to turn off all warnings
    """
    self._args = self.context.config.getlist(self._config_section, 'args',
-                                       default=args_defaults)
+                                       default=args_defaults or [])
    if self._get_lang_specific_option('compile_warnings'):
      self._args.extend(self.context.config.getlist(self._config_section, 'warning_args',
-                                              default=warning_defaults))
+                                              default=warning_defaults or []))
    else:
      self._args.extend(self.context.config.getlist(self._config_section, 'no_warning_args',
-                                              default=no_warning_defaults))
+                                              default=no_warning_defaults or[]))
   def prepare(self, round_manager):
     # TODO(John Sirois): this is a fake requirement on 'ivy_jar_products' in order to force
     # resolve to run before this goal.  Require a new CompileClasspath product to be produced by

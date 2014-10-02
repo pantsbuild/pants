@@ -1,0 +1,22 @@
+{
+  "sources": {
+    "index": "dist/markdown/html/README.html",
+    "subdir/testproject": "dist/markdown/html/examples/src/java/com/pants/examples/hello/main/README.html",
+    "hello": "dist/markdown/html/src/python/pants/backend/python/README.html"
+  },
+  "extras": {
+    "logo.ico": "src/python/pants/docs/pants-logo.ico",
+    "s.js": "src/python/pants/docs/docsite.js",
+    "s.css": "src/python/pants/docs/docsite.css"
+  },
+  "tree": [
+    { "page": "index",
+      "children": [
+        { "page": "hello" },
+        { "page": "testproject" }
+      ]
+    }
+  ],
+  "template": "src/python/pants/docs/docsite.mustache",
+  "outdir": "dist/docsite/"
+}
