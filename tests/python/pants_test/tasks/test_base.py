@@ -55,7 +55,7 @@ def prepare_task(task_type,
   mkflag = Mkflag('test')
 
   new_options = Options(env={}, config=config, known_scopes=['', 'test'],
-                        args=[], legacy_parser=parser)
+                        args=args or [], legacy_parser=parser)
 
   task_type.options_scope = 'test'
   task_type.register_options_on_scope(new_options)

@@ -33,8 +33,8 @@ from pants.engine.round_engine import RoundEngine
 from pants.goal.context import Context
 from pants.goal.error import GoalError
 from pants.goal.initialize_reporting import update_reporting
-from pants.goal.option_helpers import add_global_options
 from pants.goal.goal import Goal
+from pants.option.global_options import register_global_options
 from pants.option.options import Options
 from pants.util.dirutil import safe_mkdir
 
@@ -167,12 +167,11 @@ class GoalRunner(Command):
       self.error(msg.getvalue(), show_help=False)
 
   def register_options(self):
+    register_global_options(self.new_options.register_global)
     for goal in Goal.all():
       goal.register_options(self.new_options)
 
   def setup_parser(self, parser, args):
-    add_global_options(parser)
-
     # We support attempting zero or more goals.  Multiple goals must be delimited from further
     # options and non goal args with a '--'.  The key permutations we need to support:
     # ./pants goal => goals

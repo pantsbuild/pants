@@ -80,6 +80,10 @@ class RankedValue(object):
   def value(self):
     return self._value
 
+  def append(self, arg):
+    # argparse may read an option value in order to append to it, so pass that through here.
+    self._value.append(arg)
+
   def __eq__(self):
     return self._rank == self._rank and self._value == self._value
 
