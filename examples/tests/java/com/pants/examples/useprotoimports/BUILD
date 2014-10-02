@@ -7,6 +7,6 @@ junit_tests(name='useprotoimports',
   sources=['UseImportsTest.java',],
   dependencies=[
     '3rdparty:junit',
-    'examples/src/java/com/pants/examples/protobuf:protobuf-imports-example',
+    'examples/src/java/com/pants/examples/protobuf/imports'
   ],
 )

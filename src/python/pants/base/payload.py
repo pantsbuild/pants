@@ -5,16 +5,7 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from abc import abstractmethod
 from hashlib import sha1
-import os
-
-from twitter.common.collections import OrderedSet
-from twitter.common.lang import AbstractClass
-
-from pants.base.build_environment import get_buildroot
-from pants.base.validation import assert_list
-
 
 class PayloadFieldAlreadyDefinedError(Exception): pass
 
