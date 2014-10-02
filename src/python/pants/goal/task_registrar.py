@@ -16,9 +16,10 @@ from pants.backend.core.tasks.task import Task
 class TaskRegistrar(object):
   def __init__(self, name, action, dependencies=None, serialize=True):
     """
-    :param name: the name of the goal.
-    :param action: the goal action object to invoke this goal.
-    :param dependencies: the names of other goals which must be achieved before invoking this goal.
+    :param name: the name of the task.
+    :param action: the Task action object to invoke this task.
+    :param dependencies: the names of other goals which must be achieved before invoking this
+                         task's goal.
     :param serialize: a flag indicating whether or not the action to achieve this goal requires
       the global lock. If true, the action will block until it can acquire the lock.
     """

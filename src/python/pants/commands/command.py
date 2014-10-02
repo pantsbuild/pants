@@ -78,12 +78,19 @@ class Command(object):
     parser.error = error
     self.error = error
 
+    self.register_options()
     self.setup_parser(parser, args)
     self.options, self.args = parser.parse_args(args)
     self.parser = parser
 
+  def register_options(self):
+    """The GoalRunner will override to configure the new Options system.
+
+    Other subclasses should not override this.
+    """
+
   def setup_parser(self, parser, args):
-    """Subclasses should override and confiure the OptionParser to reflect
+    """Subclasses should override and configure the legacy OptionParser to reflect
     the subcommand option and argument requirements.  Upon successful
     construction, subcommands will be able to access self.options and
     self.args."""

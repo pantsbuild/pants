@@ -158,7 +158,8 @@ class Options(object):
 
     Note: Ony useful if called after options have been registered.
     """
-    def _maybe_print(s):
+    def _maybe_help(scope):
+      s = self.format_help(scope, legacy=legacy)
       if s != '':  # Avoid superfluous blank lines for empty strings.
         print(s)
 
@@ -166,14 +167,14 @@ class Options(object):
     if goals:
       for goal_name in goals:
         goal = Goal.by_name(goal_name)
+        # Register old-style options for the purpose of help-printing.
+        Goal.setup_parser(self._legacy_parser, [], [goal])
         if not goal.ordered_task_names():
           print('\nUnknown goal: %s' % goal_name)
         else:
-          _maybe_print(self.format_help('%s' % goal.name, legacy=legacy))
-          for task_name in goal.ordered_task_names():
-            if task_name != goal.name:  # Otherwise we registered on the goal scope.
-              scope = '%s.%s' % (goal.name, task_name)
-              _maybe_print(self.format_help(scope, legacy=legacy))
+          print('\n{0}: {1}\n'.format(goal.name, goal.description))
+          for scope in goal.known_scopes():
+            _maybe_help(scope)
     else:
       print(pants_release())
       print('\nUsage:')
