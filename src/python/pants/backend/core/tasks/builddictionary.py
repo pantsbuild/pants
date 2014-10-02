@@ -433,11 +433,8 @@ def assemble(predefs=PREDEFS, build_file_parser=None):
     for nom in symbol_hash:
       v = symbol_hash[nom]
       bdi = get_builddict_info(v)
-      print("ASM", nom, "A", bdi)
       if bdi and 'suppress' in bdi and bdi['suppress']:
-        print("ASM", nom, "B")
         continue
-      print("ASM", nom, "C")
       retval[nom] = {'defn': entry_for_one(nom, v)}
   return retval
 
