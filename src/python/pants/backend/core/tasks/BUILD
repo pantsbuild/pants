@@ -286,6 +286,7 @@ python_library(
 python_library(
   name = 'targets_help',
   sources = ['targets_help.py'],
+  resources = globs('templates/targets_help/*.mustache'),
   dependencies = [
     ':builddictionary',
     ':common',
