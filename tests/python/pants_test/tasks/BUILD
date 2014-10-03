@@ -420,7 +420,11 @@ python_tests(
   dependencies = [
     '3rdparty/python:mock',
     ':base',
+    'src/python/pants/backend/jvm/targets:java',
+    'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:jar_publish',
+    'src/python/pants/base:build_file_aliases',
+    'src/python/pants/base:source_root',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
   ],

@@ -155,6 +155,7 @@ class Git(Scm):
     self._check_call(['push', remote, merge] + list(refs), raise_type=Scm.RemoteException)
 
   def _get_upstream(self):
+    """Return the remote and remote merge branch for the current branch"""
     if not self._remote or not self._branch:
       branch = self.branch_name
       if not branch:
