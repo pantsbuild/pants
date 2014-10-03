@@ -26,6 +26,9 @@ from pants.util.dirutil import safe_mkdir
 class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolTaskMixin):
   _CONFIG_SECTION = 'ivy-resolve'
 
+  class Error(TaskError):
+    """Error in IvyResolve."""
+
   @classmethod
   def register_options(cls, register):
     super(IvyResolve, cls).register_options(register)
@@ -51,19 +54,26 @@ class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolTaskMixin):
 
   @classmethod
   def product_types(cls):
-    return ['compile_classpath', 'ivy_jar_products', 'jar_dependencies', 'ivy_cache_dir']
+    return [
+      'compile_classpath',
+      'ivy_cache_dir',
+      'ivy_jar_products',
+      'jar_dependencies',
+      'jar_map_default',
+      'jar_map_sources',
+      'jar_map_javadoc',
+      ]
 
   def __init__(self, *args, **kwargs):
     super(IvyResolve, self).__init__(*args, **kwargs)
 
     self._ivy_bootstrapper = Bootstrapper.instance()
     self._cachedir = self._ivy_bootstrapper.ivy_cache_dir
-    self._confs = self.context.config.getlist(self._CONFIG_SECTION, 'confs', default=['default'])
     self._classpath_dir = os.path.join(self.workdir, 'mapped')
-
     self._outdir = self.get_options().outdir or os.path.join(self.workdir, 'reports')
     self._open = self.get_options().open
     self._report = self._open or self.get_options().report
+    self._confs = None
 
     # Typically this should be a local cache only, since classpaths aren't portable.
     self.setup_artifact_cache()
@@ -71,6 +81,19 @@ class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolTaskMixin):
   @property
   def config_section(self):
     return self._CONFIG_SECTION
+
+  @property
+  def confs(self):
+    if self._confs is None:
+      # The confs we get from the config file may be incomplete; make sure we map any jars that the
+      # targets we operate on request.
+      default_confs = self.context.config.getlist(self._CONFIG_SECTION, 'confs', default=['default'])
+      calculated_confs = set(default_confs) # Important not to modify the original reference.
+      for conf in ('default', 'sources', 'javadoc',):
+        if self.context.products.isrequired('jar_map_{conf}'.format(conf=conf)):
+          calculated_confs.add(conf)
+      self._confs = calculated_confs
+    return self._confs
 
   def prepare(self, round_manager):
     round_manager.require_data('java')
@@ -93,18 +116,18 @@ class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolTaskMixin):
       targets,
       executor=executor,
       workunit_name='ivy-resolve',
+      confs=self.confs,
     )
 
-    if self.context.products.is_required_data('ivy_jar_products'):
-      self._populate_ivy_jar_products(relevant_targets)
-
-    for conf in self._confs:
+    for conf in self.confs:
       # It's important we add the full classpath as an (ordered) unit for code that is classpath
       # order sensitive
       compile_classpath.update(map(lambda entry: (conf, entry), ivy_classpath))
 
     if self._report:
       self._generate_ivy_report(relevant_targets)
+    if self.context.products.is_required_data('ivy_jar_products'):
+      self._populate_ivy_jar_products(relevant_targets)
 
     create_jardeps_for = self.context.products.isrequired('jar_dependencies')
     if create_jardeps_for:
@@ -121,7 +144,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolTaskMixin):
   def _populate_ivy_jar_products(self, targets):
     """Populate the build products with an IvyInfo object for each generated ivy report."""
     ivy_products = self.context.products.get_data('ivy_jar_products') or defaultdict(list)
-    for conf in self._confs:
+    for conf in self.confs:
       ivyinfo = IvyUtils.parse_xml_report(targets, conf)
       if ivyinfo:
         # TODO(stuhood): Value is a list, previously to accommodate multiple exclusives groups.
@@ -160,7 +183,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolTaskMixin):
     # points.
     safe_mkdir(self._outdir, clean=False)
 
-    for conf in self._confs:
+    for conf in self.confs:
       params = dict(org=org, name=name, conf=conf)
       xml = IvyUtils.xml_report_path(targets, conf)
       if not os.path.exists(xml):
@@ -169,7 +192,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolTaskMixin):
       args = ['-IN', xml, '-XSL', xsl, '-OUT', out]
       if 0 != self.runjava(classpath=tool_classpath, main='org.apache.xalan.xslt.Process',
                            args=args, workunit_name='report'):
-        raise TaskError
+        raise IvyResolve.Error('Failed to create html report from xml ivy report.')
       reports.append(out)
 
     css = os.path.join(self._outdir, 'ivy-report.css')

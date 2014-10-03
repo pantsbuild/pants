@@ -15,7 +15,7 @@ import pkgutil
 import threading
 import xml
 
-from twitter.common.collections import OrderedDict, OrderedSet
+from twitter.common.collections import OrderedDict, OrderedSet, maybe_list
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
@@ -225,7 +225,7 @@ class IvyUtils(object):
         module=name,
         version='latest.integration',
         publications=None,
-        configurations=confs,
+        configurations=maybe_list(confs), # Mustache doesn't like sets.
         dependencies=dependencies,
         excludes=excludes,
         overrides=overrides)
@@ -316,7 +316,7 @@ class IvyUtils(object):
         excludes=[cls._generate_exclude_template(exclude) for exclude in jar.excludes],
         transitive=jar.transitive,
         artifacts=jar.artifacts,
-        configurations=[conf for conf in jar.configurations if conf in confs])
+        configurations=maybe_list(confs))
     return template
 
   ivy_lock = threading.RLock()
@@ -353,7 +353,6 @@ class IvyUtils(object):
     confs_to_resolve = confs or ['default']
     ivy_args.append('-confs')
     ivy_args.extend(confs_to_resolve)
-
     ivy_args.extend(args)
 
     with IvyUtils.ivy_lock:

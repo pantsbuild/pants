@@ -7,6 +7,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import os
 import xml.dom.minidom as minidom
+import re
 
 from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import temporary_dir
@@ -24,7 +25,6 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
     :param check_func: method to call back with the directory where project files are written.
     :param dict config: pants.ini configuration parameters
     """
-
     project_dir = os.path.join(get_buildroot(), project_dir)
     if not os.path.exists(project_dir):
       os.makedirs(project_dir)
@@ -52,6 +52,7 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
       self.assertTrue(all(os.path.exists(os.path.join(workdir, name))
                           for name in expected_files),
                       msg="Failed to exec ./pants {all_flags}".format(all_flags=all_flags))
+
       if check_func:
         check_func(workdir)
 
@@ -124,8 +125,75 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
   def test_idea_on_all_examples(self):
     self._idea_test(['examples/src/java/com/pants/examples::'])
 
+  def _check_javadoc_and_sources(self, path, library_name):
+    """
+    :param path: path to the idea project directory
+    :param library_name: name of the library to check for (e.g. guava)
+    """
+    def _get_module_library_orderEntry(dom):
+      module = dom.getElementsByTagName('module')[0]
+      components = module.getElementsByTagName('component')
+      for component in components:
+        if component.getAttribute('name') == 'NewModuleRootManager':
+          for orderEntry in component.getElementsByTagName('orderEntry'):
+            if orderEntry.getAttribute('type') == 'module-library':
+              for library in orderEntry.getElementsByTagName('library'):
+                if library.getAttribute('name') == 'external':
+                  return library
+      return None
+
+    iml_file = os.path.join(path, 'project.iml')
+    self.assertTrue(os.path.exists(iml_file))
+    dom = minidom.parse(iml_file)
+    libraryElement = _get_module_library_orderEntry(dom)
+    sources = libraryElement.getElementsByTagName('SOURCES')[0]
+    sources_found = False
+    roots = sources.getElementsByTagName('root')
+    for root in roots:
+      url = root.getAttribute('url')
+      if re.match(r'.*\bexternal-libsources\b.*{library_name}\b.*-sources\.jar\b.*$'
+                      .format(library_name=library_name), url):
+        sources_found = True
+        break
+    self.assertTrue(sources_found)
+
+    javadoc = libraryElement.getElementsByTagName('JAVADOC')[0]
+    javadoc_found = False
+    for root in javadoc.getElementsByTagName('root'):
+      url = root.getAttribute('url')
+      if re.match(r'.*\bexternal-libjavadoc\b.*{library_name}\b.*-javadoc\.jar\b.*$'
+                      .format(library_name=library_name), url):
+        javadoc_found = True
+        break
+    self.assertTrue(javadoc_found)
+
+  # NOTE(Garrett Malmquist): The test below assumes that the annotation example's dependency on
+  # guava will never be removed. If it ever is, these tests will need to be changed to check for a
+  # different 3rdparty jar library.
+  # Testing for:
+  # <orderEntry type="module-library">
+  #  <library name="external">
+  #    ...
+  #   <JAVADOC>
+  #    <root url="jar://$MODULE_DIR$/external-libjavadoc/guava-16.0-javadoc.jar!/" />
+  #   </JAVADOC>
+  #   <SOURCES>
+  #     <root url="jar://$MODULE_DIR$/external-libsources/guava-16.0-sources.jar!/" />
+  #   </SOURCES>
+  #  </library>
+  # </orderEntry>
+  def test_idea_external_javadoc_and_sources(self):
+    def do_check(path):
+      self._check_javadoc_and_sources(path, 'guava')
+    self._idea_test(['examples/src/java/com/pants/examples/annotation::'],
+                    check_func=do_check)
+
   def test_idea_on_java_sources(self):
     self._idea_test(['testprojects/src/scala/com/pants/testproject/javasources::'])
+
+  def test_idea_missing_sources(self):
+    """Test what happens if we try to fetch sources from a jar that doesn't have any."""
+    self._idea_test(['testprojects/src/java/com/pants/testproject/missing_sources'])
 
   def test_idea_on_thriftdeptest(self):
     self._idea_test(['testprojects/src/java/com/pants/testproject/thriftdeptest::'])
