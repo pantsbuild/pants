@@ -134,6 +134,5 @@ class ScmPublish(object):
     else:
       print('Skipping check for a clean %s in test mode.' % self.scm.branch_name)
 
-  def commit_push(self, coordinates):
-    self.scm.refresh()
+  def commit_pushdb(self, coordinates):
     self.scm.commit('pants build committing publish data for push of %s' % coordinates)

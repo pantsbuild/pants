@@ -5,6 +5,7 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 from textwrap import dedent
+import unittest2 as unittest
 
 import os
 
@@ -19,6 +20,7 @@ from pants.backend.jvm.tasks.jar_publish import JarPublish
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
+from pants.scm.scm import Scm
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir
 from pants_test.base_test import BaseTest
@@ -54,22 +56,15 @@ class JarPublishTest(BaseTest):
     )
 
   def _prepare_for_publishing(self):
-
     a = self.create_library('a', 'java_library', 'a', ['A.java'],
-                            provides="""artifact(org='com.example',
-                                              name='nail',
-                                              repo=internal)""")
+                            provides="""artifact(org='com.example', name='nail', repo=internal)""")
 
     b = self.create_library('b', 'java_library', 'b', ['B.java'],
-                            provides="""artifact(org='com.example',
-                                              name='shoe',
-                                              repo=internal)""",
+                            provides="""artifact(org='com.example', name='shoe', repo=internal)""",
                             dependencies=[a])
 
     c = self.create_library('c', 'java_library', 'c', ['C.java'],
-                            provides="""artifact(org='com.example',
-                                              name='horse',
-                                              repo=internal)""",
+                            provides="""artifact(org='com.example', name='horse', repo=internal)""",
                             dependencies=[b])
 
     targets = [a, b, c]
@@ -97,7 +92,7 @@ repos: {
     task.confirm_push = Mock(return_value=True)
 
   def test_publish_unlisted_repo(self):
-    # note that we set a different config here, so repos:internal has no config
+    # Note that we set a different config here, so repos:internal has no config
     config = """
 [jar-publish]
 repos: {
@@ -136,8 +131,8 @@ repos: {
       self._prepare_mocks(task)
       task.execute()
 
-      #Nothing is written to the pushdb during a dryrun publish
-      #(maybe some directories are created, but git will ignore them)
+      # Nothing is written to the pushdb during a dryrun publish
+      # (maybe some directories are created, but git will ignore them)
       files = []
       for _, _, filenames in os.walk(self.push_db_basedir):
         files.extend(filenames)
@@ -201,7 +196,63 @@ repos: {
     self.assertEquals(len(targets), task.scm.tag.call_count,
                       "Expected one call to scm.tag per artifact")
 
+  def test_publish_retry_works(self):
+    targets = self._prepare_for_publishing()
+
+    task = prepare_task(JarPublish,
+                        config=self._get_config(),
+                        args=['--no-test-dryrun',
+                              '--test-scm-push-attempts=3'],
+                        build_graph=self.build_graph,
+                        build_file_parser=self.build_file_parser,
+                        targets=[targets[0]])
+    self._prepare_mocks(task)
+
+    task.scm.push = Mock()
+    task.scm.push.side_effect = FailNTimes(2, Scm.RemoteException)
+    task.execute()
+    # Two failures, one success
+    self.assertEquals(2 + 1, task.scm.push.call_count)
+
+  def test_publish_retry_eventually_fails(self):
+    targets = self._prepare_for_publishing()
+
+    #confirm that we fail if we have too many failed push attempts
+    task = prepare_task(JarPublish,
+                        config=self._get_config(),
+                        args=['--no-test-dryrun',
+                              '--test-scm-push-attempts=3'],
+                        build_graph=self.build_graph,
+                        build_file_parser=self.build_file_parser,
+                        targets=[targets[0]])
+    self._prepare_mocks(task)
+    task.scm.push = Mock()
+    task.scm.push.side_effect = FailNTimes(3, Scm.RemoteException)
+    with self.assertRaises(Scm.RemoteException):
+      task.execute()
+
 
   def test_publish_local_only(self):
     with pytest.raises(TaskError) as exc:
       prepare_task(JarPublish)
+
+class FailNTimes:
+  def __init__(self, tries, exc_type, success=None):
+    self.tries = tries
+    self.exc_type = exc_type
+    self.success = success
+  def __call__(self, *args, **kwargs):
+    self.tries -= 1
+    if self.tries >= 0:
+      raise self.exc_type()
+    else:
+      return self.success
+
+class FailNTimesTest(unittest.TestCase):
+  def test_fail_n_times(self):
+    with self.assertRaises(ValueError):
+      foo = Mock()
+      foo.bar.side_effect = FailNTimes(1, ValueError)
+      foo.bar()
+
+    foo.bar()

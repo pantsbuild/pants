@@ -14,6 +14,7 @@ import os
 import pkgutil
 import shutil
 import sys
+import traceback
 
 from twitter.common.collections import OrderedDict, OrderedSet
 from twitter.common.config import Properties
@@ -339,6 +340,7 @@ class JarPublish(JarTask, ScmPublish):
   """
 
   _CONFIG_SECTION = 'jar-publish'
+  _SCM_PUSH_ATTEMPTS = 5
 
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
@@ -368,6 +370,12 @@ class JarPublish(JarTask, ScmPublish):
     option_group.add_option(local_flag, dest="jar_publish_local",
                             help="Publishes jars to a maven repository on the local filesystem at "
                                  "the specified path.")
+
+    scm_push_attempts_flag = mkflag("scm-push-attempts")
+    option_group.add_option(scm_push_attempts_flag, dest="scm_push_attempts",
+                            default=cls._SCM_PUSH_ATTEMPTS,
+                            type="int",
+                            help="Number of times to try pushing the pushdb to the SCM before aborting")
 
     local_snapshot_flag = mkflag("local-snapshot")
     option_group.add_option(local_snapshot_flag, mkflag("local-snapshot", negate=True),
@@ -823,8 +831,32 @@ class JarPublish(JarTask, ScmPublish):
             )
 
             pushdb.dump(dbfile)
-            self.commit_push(coordinate(org, name, rev))
-            self.scm.refresh()
+            self.commit_pushdb(coordinate(org, name, rev))
+            scm_exception = None
+            for attempt in range(self.context.options.scm_push_attempts):
+              try:
+                self.context.log.debug("Trying scm push")
+                self.scm.push()
+                break # success
+              except Scm.RemoteException as scm_exception:
+                self.context.log.debug("Scm push failed, trying to refresh")
+                # This might fail in the event that there is a real conflict, throwing
+                # a Scm.LocalException (in case of a rebase failure) or a Scm.RemoteException
+                # in the case of a fetch failure.  We'll directly raise a local exception,
+                # since we can't fix it by retrying, but if we do, we want to display the
+                # remote exception that caused the refresh as well just in case the user cares.
+                # Remote exceptions probably indicate network or configuration issues, so
+                # we'll let them propagate
+                try:
+                  self.scm.refresh(leave_clean=True)
+                except Scm.LocalException as local_exception:
+                  exc = traceback.format_exc(scm_exception)
+                  self.context.log.debug("SCM exception while pushing: %s" % exc)
+                  raise local_exception
+
+            else:
+              raise scm_exception
+
             self.scm.tag('%(org)s-%(name)s-%(rev)s' % args,
                          message='Publish of %(coordinate)s initiated by %(user)s %(cause)s' % args)
 
