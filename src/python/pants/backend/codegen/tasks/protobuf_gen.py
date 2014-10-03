@@ -290,6 +290,7 @@ def calculate_genfiles(path, source):
     multiple_files = False
     outer_types = set()
     type_depth = 0
+    java_package = None
     for line in lines:
       match = DEFAULT_PACKAGE_PARSER.match(line)
       if match:
@@ -300,7 +301,7 @@ def calculate_genfiles(path, source):
           name = match.group(1)
           value = match.group(2).strip('"')
           if 'java_package' == name:
-            package = value
+            java_package = value
           elif 'java_outer_classname' == name:
             outer_class_name = value
           elif 'java_multiple_files' == name:
@@ -313,6 +314,10 @@ def calculate_genfiles(path, source):
           if not match:
             match = TYPE_PARSER.match(line)
             _update_type_list(match, type_depth, outer_types)
+
+    # 'option java_package' supercedes 'package'
+    if java_package:
+      package = java_package
 
     # TODO(Eric Ayers) replace with a real lex/parse understanding of protos. This is a big hack.
     # The parsing for finding type definitions is not reliable. See
