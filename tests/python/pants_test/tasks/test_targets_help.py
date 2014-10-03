@@ -10,14 +10,13 @@ import os.path
 from pants.backend.core.tasks.targets_help import TargetsHelp
 from pants_test.tasks.test_base import ConsoleTaskTest
 
-
+# The build_file_parser doesn't have any symbols defined; all we have
+# are the PREDEFS, things like "dependencies: Old name for 'target'".
+# But we can make sure they don't blow up.
 class TargetsHelpTest(ConsoleTaskTest):
   @classmethod
   def task_type(cls):
     return TargetsHelp
-
-  # The build_file_parser doesn't have any symbols defined; all we have
-  # are the PREDEFS, things like "dependencies: Old name for 'target'"
 
   def test_list_all(self):
     output = '\n'.join(self.execute_console_task())

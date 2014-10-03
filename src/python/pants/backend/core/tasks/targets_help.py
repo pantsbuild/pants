@@ -27,7 +27,6 @@ class TargetsHelp(ConsoleTask):
     syms = d.keys()
     syms.sort(key=lambda x: x.lower())
     max_sym_len = max(len(sym) for sym in syms)
-    summaries = dict()
     console = []
     for sym in syms:
       blurb_template = '''
