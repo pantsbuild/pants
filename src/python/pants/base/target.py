@@ -212,10 +212,9 @@ class Target(AbstractTarget):
 
   def invalidation_hash(self, fingerprint_strategy=None):
     fingerprint_strategy = fingerprint_strategy or DefaultFingerprintStrategy()
-    fp_name = fingerprint_strategy.name()
-    if fp_name not in self._cached_fingerprint_map:
-      self._cached_fingerprint_map[fp_name] = self.compute_invalidation_hash(fingerprint_strategy)
-    return self._cached_fingerprint_map[fp_name]
+    if fingerprint_strategy not in self._cached_fingerprint_map:
+      self._cached_fingerprint_map[fingerprint_strategy] = self.compute_invalidation_hash(fingerprint_strategy)
+    return self._cached_fingerprint_map[fingerprint_strategy]
 
   def mark_extra_invalidation_hash_dirty(self):
     pass
@@ -227,8 +226,7 @@ class Target(AbstractTarget):
 
   def transitive_invalidation_hash(self, fingerprint_strategy=None):
     fingerprint_strategy = fingerprint_strategy or DefaultFingerprintStrategy()
-    fp_name = fingerprint_strategy.name()
-    if fp_name not in self._cached_transitive_fingerprint_map:
+    if fingerprint_strategy not in self._cached_transitive_fingerprint_map:
       hasher = sha1()
       direct_deps = sorted(self.dependencies)
       for dep in direct_deps:
@@ -237,8 +235,8 @@ class Target(AbstractTarget):
       dependencies_hash = hasher.hexdigest()[:12]
       combined_hash = '{target_hash}.{deps_hash}'.format(target_hash=target_hash,
                                                          deps_hash=dependencies_hash)
-      self._cached_transitive_fingerprint_map[fp_name] = combined_hash
-    return self._cached_transitive_fingerprint_map[fp_name]
+      self._cached_transitive_fingerprint_map[fingerprint_strategy] = combined_hash
+    return self._cached_transitive_fingerprint_map[fingerprint_strategy]
 
   def mark_transitive_invalidation_hash_dirty(self):
     self._cached_transitive_fingerprint_map = {}
