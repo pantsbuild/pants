@@ -75,6 +75,7 @@ python_test_suite(
 python_test_suite(
   name = 'integration',
   dependencies = [
+    ':antlr_integration',
     ':depmap_integration',
     ':eclipse_integration',
     ':ensime_integration',
@@ -100,6 +101,16 @@ python_tests(
     'src/python/pants/backend/codegen/tasks:antlr_gen',
     'tests/python/pants_test/jvm:nailgun_task_test_base',
   ],
+)
+
+python_tests(
+  name = 'antlr_integration',
+  sources = ['test_antlr_integration.py'],
+  dependencies = [
+    'src/python/pants/fs',
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test:int-test',
+    ]
 )
 
 python_tests(
@@ -436,7 +447,12 @@ python_tests(
   dependencies = [
     '3rdparty/python:mock',
     ':base',
+    'src/python/pants/backend/jvm/targets:java',
+    'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:jar_publish',
+    'src/python/pants/base:build_file_aliases',
+    'src/python/pants/base:source_root',
+    'src/python/pants/scm:scm',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
   ],

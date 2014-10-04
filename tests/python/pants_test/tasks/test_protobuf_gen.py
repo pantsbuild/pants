@@ -55,6 +55,16 @@ class ProtobufGenCalculateJavaTest(ProtobufGenCalculateGenfilesTestBase):
         'option java_package="com.example.baz.bip" ;',
         'com/example/baz/bip/BamBam.java')
 
+    self.assert_java_files(
+      'fred.proto',
+      '''
+        option java_package = "com.example.foo.bar";
+        package com.twitter.ads.revenue_tables;
+
+      ''',
+      'com/example/foo/bar/Fred.java')
+
+
   def test_custom_outer(self):
     self.assert_java_files(
         'jack_spratt.proto',
@@ -169,7 +179,6 @@ class ProtobufGenCalculateJavaTest(ProtobufGenCalculateGenfilesTestBase):
       'com/pants/protos/preferences/MessageAfterService.java',
       'com/pants/protos/preferences/MessageAfterServiceOrBuilder.java',)
 
-
 # TODO(Eric Ayers) This test won't pass because the .proto parse is not reliable.
 #  https://github.com/pantsbuild/pants/issues/96
 @pytest.mark.xfail
@@ -232,3 +241,4 @@ def test_whitespace_insensitivity(self):
       'com/example/foo/bar/FooOrBuilder.java'
       'com/example/foo/bar/FooBar.java',
       'com/example/foo/bar/FooBarOrBuilder.java')
+

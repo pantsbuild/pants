@@ -78,7 +78,16 @@ class Scm(AbstractClass):
 
   @abstractmethod
   def commit(self, message):
-    """Commits the changes in the local workspace and ensure this commit is on the server.
+    """Commits all the changes in the local workspace.
 
-    Subclasses should raise RemoteException if there is a problem getting the tag to the server.
+    Subclasses should raise LocalException if there is a problem making the commit.
+    """
+
+  @abstractmethod
+  def push(self):
+    """Push the current branch of the local repository to the corresponding local branch
+    on the server
+
+    Subclasses should raise RemoteException if there is a problem getting the commit to the
+    server.
     """

@@ -172,16 +172,19 @@ class BaseTest(unittest.TestCase):
             sources=%(sources)s,
             %(resources)s
             %(java_sources)s
+            %(provides)s
           )
         ''' % dict(target_type=target_type,
                    name=name,
                    sources=repr(sources or []),
-                   resources=('resources=[pants("%s")],' % kwargs.get('resources')
-                              if kwargs.has_key('resources') else ''),
-                   java_sources=('java_sources=[%s]'
-                                 % ','.join(map(lambda str_target: 'pants("%s")' % str_target,
+                   resources=('resources=["%s"],' % kwargs.get('resources')
+                              if 'resources' in kwargs else ''),
+                   java_sources=('java_sources=[%s],'
+                                 % ','.join(map(lambda str_target: '"%s"' % str_target,
                                                 kwargs.get('java_sources')))
-                                 if kwargs.has_key('java_sources') else ''),
+                                 if 'java_sources' in kwargs else ''),
+                   provides=('provides=%s,' % kwargs.get('provides')
+                              if 'provides' in kwargs else ''),
                    )))
     return self.target('%s:%s' % (path, name))
 
