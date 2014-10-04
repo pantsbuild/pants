@@ -257,6 +257,19 @@ python_library(
 )
 
 python_library(
+  name = 'reflect',
+  sources = ['reflect.py'],
+  dependencies = [
+    ':console_task',
+    'src/python/pants/base:build_manual',
+    'src/python/pants/base:generator',
+    'src/python/pants/base:target',
+    'src/python/pants/goal:goal',
+    'src/python/pants/goal:option_helpers',
+  ],
+)
+
+python_library(
   name = 'roots',
   sources = ['roots.py'],
   dependencies = [

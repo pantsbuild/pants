@@ -14,6 +14,7 @@ from docutils.core import publish_parts
 from twitter.common.collections.ordereddict import OrderedDict
 
 from pants.base.build_manual import get_builddict_info
+from pants.base.exceptions import TaskError
 from pants.base.generator import TemplateData
 from pants.base.target import Target
 from pants.goal.goal import Goal

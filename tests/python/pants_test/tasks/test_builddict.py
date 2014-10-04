@@ -8,8 +8,9 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 from contextlib import closing
 from StringIO import StringIO
 
-from pants.backend.core.tasks import builddictionary
 from pants.backend.core.register import build_file_aliases as register_core
+from pants.backend.core.tasks import builddictionary
+from pants.backend.core.tasks import reflect
 from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.python.register import build_file_aliases as register_python
 from pants.goal.goal import Goal
@@ -47,7 +48,7 @@ class ExtractedContentSanityTests(BaseTest):
 
   def setUp(self):
     super(ExtractedContentSanityTests, self).setUp()
-    self._syms = builddictionary.assemble(build_file_parser=self.build_file_parser)
+    self._syms = reflect.assemble_buildsyms(build_file_parser=self.build_file_parser)
 
   def test_exclude_unuseful(self):
     # These symbols snuck into old dictionaries, make sure they don't again:
