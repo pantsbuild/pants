@@ -29,5 +29,5 @@ class TargetsHelpTest(ConsoleTaskTest):
     self.assertIn('In older Pants', output)
 
   def test_bad_details(self):
-    self.assert_console_output('No such symbol: invalid',
+    self.assert_console_output('\nNo such symbol: invalid\n',
                                args=['--test-details=invalid'])

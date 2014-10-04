@@ -10,8 +10,8 @@ from pkg_resources import resource_string
 import pystache
 import re
 
-from pants.backend.core.tasks.builddictionary import assemble
 from pants.backend.core.tasks.console_task import ConsoleTask
+from pants.backend.core.tasks.reflect import assemble_buildsyms
 
 class TargetsHelp(ConsoleTask):
   """Show online help for symbols usable in BUILD files (java_library, etc)."""
@@ -27,18 +27,15 @@ class TargetsHelp(ConsoleTask):
     self._templates_dir = os.path.join('templates', 'targets_help')
 
   def list_all(self):
-    d = assemble(build_file_parser=self.context.build_file_parser)
+    d = assemble_buildsyms(build_file_parser=self.context.build_file_parser)
     syms = d.keys()
     syms.sort(key=lambda x: x.lower())
     max_sym_len = max(len(sym) for sym in syms)
     console = []
     for sym in syms:
-      blurb_template = '''
-      {{#defn.msg_rst}}{{defn.msg_rst}}{{/defn.msg_rst}}
-      {{#defn.classdoc_rst}}{{defn.classdoc_rst}}{{/defn.classdoc_rst}}
-      {{#defn.funcdoc_rst}}{{defn.funcdoc_rst}}{{/defn.funcdoc_rst}}
-      {{#defn.argspec}}{{defn.argspec}}{{/defn.argspec}}
-      '''
+      blurb_template = resource_string(__name__,
+                                       os.path.join(self._templates_dir,
+                                                    'cli_list_blurb.mustache'))
       blurb = pystache.render(blurb_template, d[sym])
       summary = re.sub('\s+', ' ', blurb).strip()
       if len(summary) > 50:
@@ -46,19 +43,21 @@ class TargetsHelp(ConsoleTask):
       console.append('{0}: {1}'.format(sym.rjust(max_sym_len), summary))
     return console
 
-  def details(self):
-    d = assemble(build_file_parser=self.context.build_file_parser)
-    sym = self.context.options.goal_targets_details
+  def details(self, sym):
+    '''Show details of one symbol.
+
+    :param sym: string like 'java_library' or 'artifact'.'''
+    d = assemble_buildsyms(build_file_parser=self.context.build_file_parser)
     if not sym in d:
-      return ['No such symbol: {0}'.format(sym)]
+      return ['\nNo such symbol: {0}\n'.format(sym)]
     template = resource_string(__name__, os.path.join(self._templates_dir,
-                                                      'cli.mustache'))
+                                                      'cli_details.mustache'))
     spacey_render = pystache.render(template, d[sym]['defn'])
     compact_render = re.sub('\n\n+', '\n\n', spacey_render)
     return compact_render.splitlines()
 
   def console_output(self, targets):
     if self.context.options.goal_targets_details:
-      return self.details()
+      return self.details(self.context.options.goal_targets_details)
     else:
       return self.list_all()

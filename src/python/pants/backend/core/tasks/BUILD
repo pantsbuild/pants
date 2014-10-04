@@ -54,6 +54,7 @@ python_library(
   resources = globs('templates/builddictionary/*.mustache'),
   dependencies = [
     ':common',
+    ':reflect',
     '3rdparty/python:docutils',
     '3rdparty/python:setuptools',
     '3rdparty/python/twitter/commons:twitter.common.collections',
@@ -291,6 +292,7 @@ python_library(
     ':builddictionary',
     ':common',
     ':console_task',
+    ':reflect',
   ],
 )
 
