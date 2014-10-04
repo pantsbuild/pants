@@ -28,15 +28,13 @@ class TargetsHelp(ConsoleTask):
 
   def list_all(self):
     d = assemble_buildsyms(build_file_parser=self.context.build_file_parser)
-    syms = d.keys()
-    syms.sort(key=lambda x: x.lower())
-    max_sym_len = max(len(sym) for sym in syms)
+    max_sym_len = max(len(sym) for sym in d.keys())
     console = []
-    for sym in syms:
-      blurb_template = resource_string(__name__,
-                                       os.path.join(self._templates_dir,
-                                                    'cli_list_blurb.mustache'))
-      blurb = pystache.render(blurb_template, d[sym])
+    blurb_template = resource_string(__name__,
+                                     os.path.join(self._templates_dir,
+                                                  'cli_list_blurb.mustache'))
+    for sym, data in sorted(d.items(), key=lambda(k, v): k.lower()):
+      blurb = pystache.render(blurb_template, data)
       summary = re.sub('\s+', ' ', blurb).strip()
       if len(summary) > 50:
         summary = summary[:47].strip() + '...'
