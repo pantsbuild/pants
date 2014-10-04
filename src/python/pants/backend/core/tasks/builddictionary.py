@@ -10,8 +10,8 @@ import os
 
 
 from pants.backend.core.tasks.reflect import (assemble_buildsyms,
-                                              gen_tasks_goals_reference_data,
-                                              gen_goals_glopts_reference_data)
+                                              gen_goals_glopts_reference_data,
+                                              gen_tasks_goals_reference_data)
 from pants.backend.core.tasks.task import Task
 from pants.util.dirutil import safe_open
 from pants.base.generator import Generator, TemplateData

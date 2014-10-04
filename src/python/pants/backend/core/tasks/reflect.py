@@ -20,7 +20,6 @@ from pants.base.target import Target
 from pants.goal.goal import Goal
 from pants.goal.option_helpers import add_global_options
 
-
 # Our CLI help and doc-website-gen use this to get useful help text.
 
 def indent_docstring_by_n(s, n=1):
@@ -377,6 +376,7 @@ PREDEFS = {  # some hardwired entries
                               'Old name for <a href="#scala_specs">scala_specs</a>')},
 }
 
+
 # Report symbols defined in BUILD files (jvm_binary...)
 # Returns dict {"scala_library": ScalaLibrary, ...}
 def get_syms(build_file_parser):
@@ -392,7 +392,6 @@ def get_syms(build_file_parser):
   map_symbols(aliases.objects)
   map_symbols(aliases.context_aware_object_factories)
   return syms
-
 
 
 def gen_goals_glopts_reference_data():
