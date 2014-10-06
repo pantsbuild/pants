@@ -78,17 +78,19 @@ class ArgSplitter(object):
       #      file=sys.stderr)
       self._unconsumed_args.pop()
 
+    def assign_flag_to_scope(flag, default_scope):
+      flag_scope, descoped_flag = self._descope_flag(flag, default_scope=default_scope)
+      scope_to_flags[flag_scope].append(descoped_flag)
+
     global_flags = self._consume_flags()
     scope_to_flags[GLOBAL_SCOPE].extend([])  # Force the scope to appear, even if empty.
     for flag in global_flags:
-      flag_scope, descoped_flag = self._descope_flag(flag, default_scope=GLOBAL_SCOPE)
-      scope_to_flags[flag_scope].append(descoped_flag)
+      assign_flag_to_scope(flag, GLOBAL_SCOPE)
     scope, flags = self._consume_scope()
     while scope:
       scope_to_flags[scope].extend([])  # Force the scope to appear, even if empty.
       for flag in flags:
-        flag_scope, descoped_flag = self._descope_flag(flag, default_scope=scope)
-        scope_to_flags[flag_scope].append(descoped_flag)
+        assign_flag_to_scope(flag, scope)
       scope, flags = self._consume_scope()
 
     if self._at_double_dash():
@@ -99,7 +101,7 @@ class ArgSplitter(object):
       if arg.startswith(b'-'):
         # During migration we allow flags here, and assume they are in global scope.
         # TODO(benjy): Should we allow this even after migration?
-        scope_to_flags[GLOBAL_SCOPE].append(arg)
+        assign_flag_to_scope(arg, GLOBAL_SCOPE)
       else:
         targets.append(arg)
 
