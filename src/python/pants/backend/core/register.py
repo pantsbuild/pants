@@ -99,7 +99,7 @@ def register_goals():
   ).install().with_description('List all documented goals.')
 
   task(name='targets', action=TargetsHelp
-  ).install().with_description('List all target types.')
+  ).install().with_description('List target types and BUILD file symbols (python_tests, jar, etc).')
 
   task(name='builddict', action=BuildBuildDictionary
   ).install()

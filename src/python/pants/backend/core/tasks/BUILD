@@ -54,6 +54,7 @@ python_library(
   resources = globs('templates/builddictionary/*.mustache'),
   dependencies = [
     ':common',
+    ':reflect',
     '3rdparty/python:docutils',
     '3rdparty/python:setuptools',
     '3rdparty/python/twitter/commons:twitter.common.collections',
@@ -72,6 +73,8 @@ python_library(
     'src/python/pants/util:dirutil',
   ],
 )
+
+
 
 python_library(
   name = 'check_exclusives',
@@ -254,6 +257,18 @@ python_library(
 )
 
 python_library(
+  name = 'reflect',
+  sources = ['reflect.py'],
+  dependencies = [
+    'src/python/pants/base:build_manual',
+    'src/python/pants/base:generator',
+    'src/python/pants/base:target',
+    'src/python/pants/goal:goal',
+    'src/python/pants/goal:option_helpers',
+  ],
+)
+
+python_library(
   name = 'roots',
   sources = ['roots.py'],
   dependencies = [
@@ -284,11 +299,12 @@ python_library(
 python_library(
   name = 'targets_help',
   sources = ['targets_help.py'],
+  resources = globs('templates/targets_help/*.mustache'),
   dependencies = [
+    ':builddictionary',
     ':common',
     ':console_task',
-    'src/python/pants/base:target',
-    'src/python/pants/backend/core/targets:common',
+    ':reflect',
   ],
 )
 
