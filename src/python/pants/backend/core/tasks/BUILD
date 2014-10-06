@@ -260,7 +260,6 @@ python_library(
   name = 'reflect',
   sources = ['reflect.py'],
   dependencies = [
-    ':console_task',
     'src/python/pants/base:build_manual',
     'src/python/pants/base:generator',
     'src/python/pants/base:target',

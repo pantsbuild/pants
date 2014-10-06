@@ -9,8 +9,7 @@ from contextlib import closing
 from StringIO import StringIO
 
 from pants.backend.core.register import build_file_aliases as register_core
-from pants.backend.core.tasks import builddictionary
-from pants.backend.core.tasks import reflect
+from pants.backend.core.tasks import builddictionary, reflect
 from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.python.register import build_file_aliases as register_python
 from pants.goal.goal import Goal
