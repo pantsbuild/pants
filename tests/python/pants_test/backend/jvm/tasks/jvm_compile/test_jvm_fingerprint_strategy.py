@@ -28,3 +28,40 @@ class JvmFingerprintStrategyTest(BaseTest):
     hash_no_extra = fingerprinter_no_data.compute_fingerprint(a)
     hash_extra = fingerprinter_data.compute_fingerprint(a)
     self.assertEquals(hash_no_extra, hash_extra)
+
+  def test_hashing_and_equality(self):
+    self.assertEqual(
+      JvmFingerprintStrategy(),
+      JvmFingerprintStrategy(),
+    )
+    self.assertEqual(
+      hash(JvmFingerprintStrategy()),
+      hash(JvmFingerprintStrategy()),
+    )
+
+    self.assertNotEqual(
+      JvmFingerprintStrategy(),
+      JvmFingerprintStrategy(['test']),
+    )
+    self.assertNotEqual(
+      hash(JvmFingerprintStrategy()),
+      hash(JvmFingerprintStrategy(['test'])),
+    )
+
+    self.assertEqual(
+      JvmFingerprintStrategy(['test']),
+      JvmFingerprintStrategy(('test',)),
+    )
+    self.assertEqual(
+      hash(JvmFingerprintStrategy(['test'])),
+      hash(JvmFingerprintStrategy(('test',))),
+    )
+
+    self.assertEqual(
+      JvmFingerprintStrategy(['a', 'b']),
+      JvmFingerprintStrategy(['b', 'a']),
+    )
+    self.assertEqual(
+      hash(JvmFingerprintStrategy(['a', 'b'])),
+      hash(JvmFingerprintStrategy(['b', 'a'])),
+    )

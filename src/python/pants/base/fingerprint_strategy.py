@@ -12,15 +12,6 @@ from twitter.common.lang import AbstractClass
 class FingerprintStrategy(AbstractClass):
   """A helper object for doing per-task, finer grained invalidation of Targets."""
 
-  @classmethod
-  def name(cls):
-    """The name of this strategy.
-
-    This will ultimately appear in a human readable form in the fingerprint itself, for debugging
-    purposes.
-    """
-    raise NotImplemented
-
   @abstractmethod
   def compute_fingerprint(self, target):
     """Subclasses override this method to actually compute the Task specific fingerprint."""
@@ -28,15 +19,25 @@ class FingerprintStrategy(AbstractClass):
   def fingerprint_target(self, target):
     """Consumers of subclass instances call this to get a fingerprint labeled with the name"""
     return '{fingerprint}-{name}'.format(fingerprint=self.compute_fingerprint(target),
-                                         name=self.name())
+                                         name=type(self).__name__)
+
+  @abstractmethod
+  def __hash__(self):
+    """Subclasses must implement a hash so computed fingerprints can be safely memoized."""
+
+  @abstractmethod
+  def __eq__(self):
+    """Subclasses must implement an equality check so computed fingerprints can be safely memoized."""
 
 
 class DefaultFingerprintStrategy(FingerprintStrategy):
   """The default FingerprintStrategy, which delegates to target.payload.invalidation_hash()."""
 
-  @classmethod
-  def name(cls):
-    return 'default'
-
   def compute_fingerprint(self, target):
     return target.payload.fingerprint()
+
+  def __hash__(self):
+    return hash(type(self))
+
+  def __eq__(self, other):
+    return type(self) == type(other)
