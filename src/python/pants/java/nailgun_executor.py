@@ -77,10 +77,18 @@ class NailgunExecutor(Executor):
     return None
 
   @staticmethod
-  def _fingerprint(jvm_args, classpath):
+  def _fingerprint(jvm_args, classpath, java_version):
+    """Compute a fingerprint for this invocation of a Java task.
+
+    :param list jvm_args:  JVM arguments passed to the java invocation
+    :param list classpath: The -cp arguments passed to the java invocation
+    :param Revision java_version: return value from Distribution.version()
+    :return: a hexstring representing a fingerprint of the java invocation
+    """
     digest = hashlib.sha1()
     digest.update(''.join(sorted(jvm_args)))
     digest.update(''.join(sorted(classpath)))  # TODO(John Sirois): hash classpath contents?
+    digest.update(repr(java_version))
     return digest.hexdigest()
 
   @staticmethod
@@ -199,7 +207,7 @@ class NailgunExecutor(Executor):
 
   def _get_nailgun_client(self, jvm_args, classpath, stdout, stderr):
     classpath = self._nailgun_classpath + classpath
-    new_fingerprint = self._fingerprint(jvm_args, classpath)
+    new_fingerprint = self._fingerprint(jvm_args, classpath, self._distribution.version)
 
     endpoint = self._get_nailgun_endpoint()
     running = endpoint and self._check_pid(endpoint.pid)
