@@ -43,6 +43,14 @@ class IvyInfo(object):
     for caller in module.callers:
       self.deps_by_caller[caller].add(module.ref)
 
+  def get_jars_for_ivy_module(self, jar):
+    ref = IvyModuleRef(jar.org, jar.name, jar.rev)
+    deps = OrderedSet()
+    for dep in self.deps_by_caller.get(ref, []):
+      deps.add(dep)
+      deps.update(self.get_jars_for_ivy_module(dep))
+    return deps
+
 
 class IvyUtils(object):
   IVY_TEMPLATE_PACKAGE_NAME = __name__

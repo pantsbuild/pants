@@ -5,6 +5,12 @@ java_protobuf_library(name='imports',
   sources=['test_imports.proto',],
   imports=[
     '3rdparty:protobuf-test-import',
-    jar(org='com.squareup.testing.protolib', name='protolib-test', rev='1.0.1'),
+    ':jars',
   ],
+)
+
+jar_library(name='jars',
+  dependencies=[
+    'examples/src/protobuf/com/pants/examples/imports',
+  ]
 )

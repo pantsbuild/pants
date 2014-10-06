@@ -14,13 +14,19 @@ from pants.base.config import Config
 from pants.base.target import Target
 from pants.goal.context import Context
 from pants.goal.run_tracker import RunTracker
+from pants.option.options import Options
 from pants.reporting.plaintext_reporter import PlainTextReporter
 from pants.reporting.report import Report
 from pants.util.dirutil import safe_mkdtemp
 
 
+def create_new_options():
+  # A dummy instance for now.
+  # TODO: Figure out a convenient way to specify new-style options in tests.
+  return Options(env={}, config={}, known_scopes=[''], args=[], legacy_parser=None)
+
 def create_options(options_hash=None):
-  """Creates an options object populated with no options at all by default.
+  """Creates an old-style options object populated with no options at all by default.
 
   :param dict options_hash: An optional dict of option values.
   """
@@ -28,10 +34,10 @@ def create_options(options_hash=None):
   if not isinstance(opts, dict):
     raise ValueError('The given options_hash must be a dict, got: %s' % options_hash)
 
-  class Options(object):
+  class OldOptions(object):
     def __init__(self):
       self.__dict__ = opts
-  return Options()
+  return OldOptions()
 
 
 def create_config(sample_ini='', defaults=None):
@@ -83,4 +89,5 @@ def create_context(config='', options=None, target_roots=None, **kwargs):
   config = config if isinstance(config, Config) else create_config(config)
   run_tracker = create_run_tracker()
   target_roots = maybe_list(target_roots, Target) if target_roots else []
-  return Context(config, create_options(options or {}), run_tracker, target_roots, **kwargs)
+  return Context(config, create_options(options or {}), create_new_options(),
+                 run_tracker, target_roots, **kwargs)

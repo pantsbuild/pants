@@ -62,8 +62,8 @@ class TestSetupPy(BaseTest):
   @contextmanager
   def run_execute(cls, target, recursive=False):
     setup_py = MockableSetupPyCommand(target)
-    setup_py.options = MagicMock()
-    setup_py.options.recursive = recursive
+    setup_py.old_options = MagicMock()
+    setup_py.old_options.recursive = recursive
     setup_py.run_one = MagicMock()
     setup_py.run_one.return_value = True
     setup_py.execute()

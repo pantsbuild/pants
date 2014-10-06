@@ -25,7 +25,9 @@ class CheckExclusives(Task):
   any collisions where a single target contains multiple tag values for a single
   exclusives key, then it generates an error and the compilation will fail.
 
-  See :ref:`howto_check_exclusives` to see how folks use this.
+  See `Tag incompatibilities with exclusives
+  <build_files.html#howto-check-exclusives>`_
+  to see how folks use this.
 
   Data about exclusives is provided to other tasks via data build products.
   If the build data product 'exclusives_groups' is required, then an

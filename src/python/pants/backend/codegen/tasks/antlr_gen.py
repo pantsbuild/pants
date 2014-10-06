@@ -5,6 +5,7 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+import logging
 import os
 
 from twitter.common.collections import OrderedSet
@@ -18,6 +19,9 @@ from pants.base.address import SyntheticAddress
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.util.dirutil import safe_mkdir
+
+
+logger = logging.getLogger(__name__)
 
 
 class AntlrGen(CodeGen, NailgunTask, JvmToolTaskMixin):
@@ -76,6 +80,8 @@ class AntlrGen(CodeGen, NailgunTask, JvmToolTaskMixin):
       args = ["-o", java_out]
 
       if target.compiler == 'antlr3':
+        if target.package is not None:
+          logger.warn("The 'package' attribute is not supported for antlr3 and will be ignored.")
         java_main = 'org.antlr.Tool'
       elif target.compiler == 'antlr4':
         args.append('-visitor')  # Generate Parse Tree Visitor As Well

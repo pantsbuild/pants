@@ -74,6 +74,8 @@ python_test_suite(
 python_test_suite(
   name = 'integration',
   dependencies = [
+    ':antlr_integration',
+    ':depmap_integration',
     ':eclipse_integration',
     ':ensime_integration',
     ':idea_integration',
@@ -98,6 +100,16 @@ python_tests(
     'src/python/pants/backend/codegen/tasks:antlr_gen',
     'tests/python/pants_test/jvm:nailgun_task_test_base',
   ],
+)
+
+python_tests(
+  name = 'antlr_integration',
+  sources = ['test_antlr_integration.py'],
+  dependencies = [
+    'src/python/pants/fs',
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test:int-test',
+    ]
 )
 
 python_tests(
@@ -278,6 +290,16 @@ python_tests(
 )
 
 python_tests(
+  name = 'depmap_integration',
+  sources = ['test_depmap_integration.py'],
+  dependencies = [
+    'src/python/pants/ivy:ivy',
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test:int-test',
+  ],
+)
+
+python_tests(
   name = 'detect_duplicates',
   sources = ['test_detect_duplicates.py'],
   dependencies = [
@@ -409,7 +431,12 @@ python_tests(
   dependencies = [
     '3rdparty/python:mock',
     ':base',
+    'src/python/pants/backend/jvm/targets:java',
+    'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:jar_publish',
+    'src/python/pants/base:build_file_aliases',
+    'src/python/pants/base:source_root',
+    'src/python/pants/scm:scm',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
   ],
@@ -562,6 +589,7 @@ python_tests(
   ],
 )
 
+# TODO(Eric Ayers) This should be renamed and categorized as an integration test
 python_tests(
   name = 'thrift_linter',
   sources = ['test_thrift_linter.py'],
@@ -569,6 +597,7 @@ python_tests(
     ':base',
     'src/python/pants/base:target',
     'src/python/pants/backend/codegen/tasks:scrooge_gen',
+    'tests/python/pants_test:int-test',
   ],
 )
 

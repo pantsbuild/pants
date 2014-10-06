@@ -48,11 +48,11 @@ class Build(Command):
     if not self.args:
       self.error("A spec argument is required")
 
-    self._verbose = self.options.verbose
+    self._verbose = self.old_options.verbose
 
     self.config = Config.load()
 
-    interpreters = self.options.interpreters or [b'']
+    interpreters = self.old_options.interpreters or [b'']
     self.interpreter_cache = PythonInterpreterCache(self.config, logger=self.debug)
     self.interpreter_cache.setup(filters=interpreters)
     interpreters = self.interpreter_cache.select_interpreter(
@@ -125,8 +125,8 @@ class Build(Command):
         targets,
         self.build_args,
         interpreter=self.interpreter,
-        conn_timeout=self.options.conn_timeout,
-        fast_tests=self.options.fast,
+        conn_timeout=self.old_options.conn_timeout,
+        fast_tests=self.old_options.fast,
         debug=self._verbose)
     except:
       self.error("Problem executing PythonBuilder for targets %s: %s" % (targets,

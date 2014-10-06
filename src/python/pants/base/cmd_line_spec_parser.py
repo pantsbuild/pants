@@ -46,9 +46,10 @@ class CmdLineSpecParser(object):
   class BadSpecError(Exception):
     """Indicates an invalid command line address selector."""
 
-  def __init__(self, root_dir, address_mapper):
+  def __init__(self, root_dir, address_mapper, spec_excludes=None):
     self._root_dir = os.path.realpath(root_dir)
     self._address_mapper = address_mapper
+    self._spec_excludes = spec_excludes
 
   def parse_addresses(self, specs, fail_fast=False):
     """Process a list of command line specs and perform expansion.  This method can expand a list
@@ -100,7 +101,7 @@ class CmdLineSpecParser(object):
         raise self.BadSpecError('Can only recursive glob directories and {0} is not a valid dir'
                                 .format(spec_dir))
       try:
-        build_files = BuildFile.scan_buildfiles(self._root_dir, spec_dir)
+        build_files = BuildFile.scan_buildfiles(self._root_dir, spec_dir, spec_excludes=self._spec_excludes)
       except (BuildFile.BuildFileError, AddressLookupError) as e:
         raise self.BadSpecError(e)
 

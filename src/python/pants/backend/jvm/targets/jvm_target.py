@@ -38,6 +38,11 @@ class JvmTarget(Target, Jarable):
     :param configurations: One or more ivy configurations to resolve for this target.
       This parameter is not intended for general use.
     :type configurations: tuple of strings
+    :param excludes: List of `exclude <#exclude>`_\s to filter this target's
+      transitive dependencies against.
+    :param sources: Source code files to build. Paths are relative to the BUILD
+       file's directory.
+    :type sources: ``Fileset`` (from globs or rglobs) or list of strings
     """
     if sources_rel_path is None:
       sources_rel_path = address.spec_path

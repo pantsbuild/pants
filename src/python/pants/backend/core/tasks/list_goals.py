@@ -82,4 +82,4 @@ class ListGoals(ConsoleTask):
           edges.add(edge)
       yield '}'
 
-    return graph() if self.context.options.goal_list_graph else report()
+    return graph() if self.get_options().graph else report()
