@@ -9,7 +9,7 @@ import bs4
 
 from internal_backend.sitegen.tasks import sitegen
 
-CONFIG_JSON = '''
+CONFIG_JSON = """
 {
   "sources": {
     "index": "fake0/README.html",
@@ -28,24 +28,24 @@ CONFIG_JSON = '''
   ],
   "template": "fake/fake.mustache"
 }
-'''
+"""
 
-INDEX_HTML = '''
+INDEX_HTML = """
 <h1 id="pants-build-system">Pants Build System</h1>
 
 <p>Pants is a build system.</p>
 
 <p>See also:
 <a href="../fake1/p1.html">another page</a>.</p>
-'''
+"""
 
-P1_HTML = '''
+P1_HTML = """
 <h1>東京 is Tokyo</h1>
 
 <p>Fascinating description.
-'''
+"""
 
-P2_HTML = '''
+P2_HTML = """
 <head>
   <title>Page 2: Electric Boogaloo</title>
 </head>
@@ -64,11 +64,11 @@ P2_HTML = '''
 <p>Some more text</p>
 
 </body>
-'''
+"""
 
-TEMPLATE_MUSTACHE = '''
+TEMPLATE_MUSTACHE = """
 {{{body_html}}}
-'''
+"""
 
 
 class AllTheThingsTestCase(unittest.TestCase):
@@ -100,7 +100,7 @@ class AllTheThingsTestCase(unittest.TestCase):
                                   self.precomputed,
                                   '{{title}}')
     self.assertEqual(p2_html, 'Page 2: Electric Boogaloo',
-                     '''Didn't find correct title''')
+                     """Didn't find correct title""")
     # ascii worked? great, try non-ASCII
     p1_html = sitegen.render_html('subdir/page1',
                                   self.config,
@@ -108,7 +108,7 @@ class AllTheThingsTestCase(unittest.TestCase):
                                   self.precomputed,
                                   '{{title}}')
     self.assertEqual(p1_html, u'東京 is Tokyo',
-                     '''Didn't find correct non-ASCII title''')
+                     """Didn't find correct non-ASCII title""")
 
   def test_fixup_internal_links(self):
     soups = self.orig_soups.copy()
@@ -130,11 +130,11 @@ class AllTheThingsTestCase(unittest.TestCase):
                                    self.config,
                                    soups,
                                    self.precomputed,
-                                   '''
+                                   """
                                    {{#page_toc}}
                                    DEPTH={{depth}} LINK={{link}} TEXT={{text}}
                                    {{/page_toc}}
-                                   ''')
+                                   """)
     self.assertIn('DEPTH=1 LINK=one TEXT=Section One', rendered)
     self.assertIn('DEPTH=1 LINK=two TEXT=Section Two', rendered)
 
@@ -147,11 +147,11 @@ class AllTheThingsTestCase(unittest.TestCase):
                                    self.config,
                                    soups,
                                    self.precomputed,
-                                   '''
+                                   """
                                    {{#breadcrumbs}}
                                    LINK={{link}} TEXT={{text}}
                                    {{/breadcrumbs}}
-                                   ''')
+                                   """)
     self.assertIn('LINK=../index.html TEXT=Pants Build System', rendered)
 
   def test_site_toc(self):
@@ -163,11 +163,11 @@ class AllTheThingsTestCase(unittest.TestCase):
                                    self.config,
                                    soups,
                                    self.precomputed,
-                                   '''
+                                   """
                                    {{#site_toc}}
                                    DEPTH={{depth}} LINK={{link}} TEXT={{text}}
                                    {{/site_toc}}
-                                   ''')
+                                   """)
     self.assertIn(u'DEPTH=1 LINK=subdir/page1.html TEXT=東京 is Tokyo', rendered)
     self.assertIn('DEPTH=1 LINK=subdir/page2.html TEXT=Page 2: Electric Boogaloo', rendered)
 
