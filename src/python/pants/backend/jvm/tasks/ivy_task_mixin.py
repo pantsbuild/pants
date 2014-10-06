@@ -26,11 +26,10 @@ logger = logging.getLogger(__name__)
 
 class IvyResolveFingerprintStrategy(FingerprintStrategy):
   @classmethod
-  def name(cls):
-    return 'ivy_resolve'
-
-  @classmethod
   def product_types(cls):
+    # TODO(pl): This is almost certainly supposed to be on IvyTaskMixin,
+    # but it might mess up MRO linearization.
+    # It seems to be completely unused right now.
     return ['symlink_map']
 
   def compute_fingerprint(self, target):
@@ -40,6 +39,12 @@ class IvyResolveFingerprintStrategy(FingerprintStrategy):
       return target.payload.fingerprint(field_keys=('excludes', 'configurations'))
     else:
       return sha1().hexdigest()
+
+  def __hash__(self):
+    return hash(type(self))
+
+  def __eq__(self, other):
+    return type(self) == type(other)
 
 
 class IvyTaskMixin(object):

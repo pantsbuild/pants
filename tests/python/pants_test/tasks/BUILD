@@ -61,6 +61,7 @@ python_test_suite(
     ':minimal_cover',
     ':protobuf_gen',
     ':ragel_gen',
+    ':reflect',
     ':roots',
     ':scrooge_gen',
     ':sorttargets',
@@ -128,6 +129,7 @@ python_tests(
     ':base',
     'src/python/pants/backend/core:plugin',
     'src/python/pants/backend/core/tasks:builddictionary',
+    'src/python/pants/backend/core/tasks:reflect',
     'src/python/pants/backend/jvm:plugin',
     'src/python/pants/backend/python:plugin',
     'src/python/pants/goal',
@@ -162,6 +164,20 @@ python_tests(
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
   ],
+)
+
+python_tests(
+  name = 'reflect',
+  sources = ['test_reflect.py'],
+  dependencies = [
+    ':base',
+    'src/python/pants/backend/core:plugin',
+    'src/python/pants/backend/core/tasks:reflect',
+    'src/python/pants/backend/jvm:plugin',
+    'src/python/pants/backend/python:plugin',
+    'src/python/pants/goal',
+    'src/python/pants/goal:task_registrar',
+  ]
 )
 
 python_tests(

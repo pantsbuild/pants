@@ -8,8 +8,8 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 from contextlib import closing
 from StringIO import StringIO
 
-from pants.backend.core.tasks import builddictionary
 from pants.backend.core.register import build_file_aliases as register_core
+from pants.backend.core.tasks import builddictionary, reflect
 from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.python.register import build_file_aliases as register_python
 from pants.goal.goal import Goal
@@ -47,12 +47,8 @@ class ExtractedContentSanityTests(BaseTest):
 
   def setUp(self):
     super(ExtractedContentSanityTests, self).setUp()
-    self._syms = builddictionary.assemble(build_file_parser=self.build_file_parser)
+    self._syms = reflect.assemble_buildsyms(build_file_parser=self.build_file_parser)
 
-  def test_exclude_unuseful(self):
-    # These symbols snuck into old dictionaries, make sure they don't again:
-    for unexpected in ['__builtins__', 'Target']:
-      self.assertTrue(unexpected not in self._syms.keys(), 'Found %s' % unexpected)
 
   def test_sub_tocls(self):
     python_symbols = builddictionary.python_sub_tocl(self._syms).e
@@ -68,11 +64,3 @@ class ExtractedContentSanityTests(BaseTest):
     jvm_symbols = builddictionary.jvm_sub_tocl(self._syms).e
     for sym in ['java_library', 'scala_library']:
       self.assertTrue(sym in jvm_symbols)
-
-
-class GoalReferenceTest(BaseTest):
-  def test_gen_tasks_goals_reference_data(self):
-    # can we run our reflection-y goal code without crashing? would be nice
-    Goal.by_name('jack').install(TaskRegistrar('jill', lambda: 42))
-    gref_data = builddictionary.gen_tasks_goals_reference_data()
-    self.assertTrue(len(gref_data) > 0, 'Tried to generate data for goals reference, got emptiness')
