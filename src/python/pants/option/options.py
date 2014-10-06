@@ -140,14 +140,10 @@ class Options(object):
       values = copy.copy(self.for_scope(scope.rpartition('.')[0]))
 
     # Now add our values.
-    try:
-      flags_in_scope = self._scope_to_flags.get(scope, [])
-      self._parser_hierarchy.get_parser_by_scope(scope).parse_args(flags_in_scope, values)
-      self._values_by_scope[scope] = values
-      return values
-    except ParseError as e:
-      self.print_help(str(e))
-      sys.exit(1)
+    flags_in_scope = self._scope_to_flags.get(scope, [])
+    self._parser_hierarchy.get_parser_by_scope(scope).parse_args(flags_in_scope, values)
+    self._values_by_scope[scope] = values
+    return values
 
   def for_global_scope(self):
     """Return the option values for the global scope."""
