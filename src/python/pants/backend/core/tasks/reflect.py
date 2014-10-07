@@ -16,7 +16,6 @@ from twitter.common.collections.ordereddict import OrderedDict
 from pants.base.build_manual import get_builddict_info
 from pants.base.exceptions import TaskError
 from pants.base.generator import TemplateData
-from pants.base.parse_context import ParseContext
 from pants.base.target import Target
 from pants.goal.goal import Goal
 from pants.goal.option_helpers import add_global_options
