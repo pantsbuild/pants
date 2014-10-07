@@ -77,11 +77,10 @@ class JavaCompile(JvmCompile):
   _JMAKE_MAIN = 'com.sun.tools.jmake.Main'
 
   @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    super(JavaCompile, cls).setup_parser(option_group, args, mkflag)
-
-    option_group.add_option(mkflag("args"), dest="java_compile_args", action="append",
-                            help="Pass these extra args to javac.")
+  def register_options(cls, register):
+    super(JavaCompile, cls).register_options(register)
+    register('--args', action='append', help='Pass these extra args to javac.',
+             legacy='java_compile_args')
 
   def __init__(self, *args, **kwargs):
     super(JavaCompile, self).__init__(*args, **kwargs)

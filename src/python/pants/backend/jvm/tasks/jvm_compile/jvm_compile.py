@@ -43,58 +43,36 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
                   'number to compile all sources together. Set to 0 to compile target-by-target.',
              legacy='{0}_partition_size_hint'.format(cls._language))
 
-  @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    super(JvmCompile, cls).setup_parser(option_group, args, mkflag)
-    option_group.add_option(mkflag('warnings'), mkflag('warnings', negate=True),
-                            dest=cls._language + '_compile_warnings',
-                            default=True,
-                            action='callback',
-                            callback=mkflag.set_bool,
-                            help='[%default] Compile with all configured warnings enabled.')
+    register('--warnings', default=True, action='store_true',
+             help='Compile with all configured warnings enabled.',
+             legacy='{0}_compile_warnings'.format(cls._language))
 
-    option_group.add_option(mkflag('missing-deps'),
-                            dest=cls._language + '_missing_deps',
-                            choices=['off', 'warn', 'fatal'],
-                            default='warn',
-                            help='[%default] One of off, warn, fatal. '
-                                 'Check for missing dependencies in ' + cls._language + 'code. '
-                                 'Reports actual dependencies A -> B where there is no '
-                                 'transitive BUILD file dependency path from A to B.'
-                                 'If fatal, missing deps are treated as a build error.')
+    register('--missing-deps', choices=['off', 'warn', 'fatal'], default='warn',
+             help='Check for missing dependencies in {0} code. Reports actual dependencies A -> B '
+                  'where there is no transitive BUILD file dependency path from A to B. If fatal, '
+                  'missing deps are treated as a build error.'.format(cls._language),
+             legacy='{0}_missing_deps'.format(cls._language))
 
-    option_group.add_option(mkflag('missing-direct-deps'),
-                            dest=cls._language + '_missing_direct_deps',
-                            choices=['off', 'warn', 'fatal'],
-                            default='off',
-                            help='[%default] One of off, warn, fatal. '
-                                 'Check for missing direct dependencies in ' + cls._language +
-                                 ' code. Reports actual dependencies A -> B where there is no '
-                                 'direct BUILD file dependency path from A to B. This is a very '
-                                 'strict check, as in practice it is common to rely on transitive, '
-                                 'non-direct dependencies, e.g., due to type inference or when the '
-                                 'main target in a BUILD file is modified to depend on other '
-                                 'targets in the same BUILD file as an implementation detail. It '
-                                 'may still be useful to set it to fatal temorarily, to detect '
-                                 'these.')
+    register('--missing-direct-deps', choices=['off', 'warn', 'fatal'], default='off',
+             help='Check for missing direct dependencies in {0} code. Reports actual dependencies '
+                  'A -> B where there is no direct BUILD file dependency path from A to B. This is '
+                  'a very strict check; In practice it is common to rely on transitive, indirect '
+                  'dependencies, e.g., due to type inference or when the main target in a BUILD '
+                  'file is modified to depend on other targets in the same BUILD file, as an '
+                  'implementation detail. However it may still be useful to use this on '
+                  'occasion. '.format(cls._language),
+             legacy='{0}_missing_direct_deps'.format(cls._language))
 
-    option_group.add_option(mkflag('unnecessary-deps'),
-                            dest=cls._language + '_unnecessary_deps',
-                            choices=['off', 'warn', 'fatal'],
-                            default='off',
-                            help='[%default] One of off, warn, fatal. Check for declared '
-                                 'dependencies in ' + cls._language + ' code that are not '
-                                 'needed. This is a very strict check. For example, generated code '
-                                 'will often legitimately have BUILD dependencies that are unused '
-                                 'in practice.')
+    register('--unnecessary-deps', choices=['off', 'warn', 'fatal'], default='off',
+             help='Check for declared dependencies in {0} code that are not needed. This is a very '
+                  'strict check. For example, generated code will often legitimately have BUILD '
+                  'dependencies that are unused in practice.'.format(cls._language),
+                            legacy='{0}_unnecessary_deps'.format(cls._language))
 
-    option_group.add_option(mkflag('delete-scratch'), mkflag('delete-scratch', negate=True),
-                            dest=cls._language + '_delete_scratch',
-                            default=True,
-                            action='callback',
-                            callback=mkflag.set_bool,
-                            help='[%default] Leave intermediate scratch files around, '
-                                 'for debugging build problems.')
+    register('--delete-scratch', default=True, action='store_true',
+             help='Leave intermediate scratch files around, for debugging build problems.',
+             legacy='{0}_delete_scratch'.format(cls._language),)
+
 
   # Subclasses must implement.
   # --------------------------
