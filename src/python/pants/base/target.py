@@ -398,7 +398,7 @@ class Target(AbstractTarget):
     """Returns this target's transitive dependencies, in DFS inorder traversal."""
     return self._build_graph.transitive_subgraph_of_addresses([self.address])
 
-  @manual.builddict()
+  @manual.builddict(show_method=True)
   def with_description(self, description):
     """Set a human-readable description of this target.
 

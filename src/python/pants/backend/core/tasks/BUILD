@@ -262,6 +262,7 @@ python_library(
   dependencies = [
     'src/python/pants/base:build_manual',
     'src/python/pants/base:generator',
+    'src/python/pants/base:parse_context',
     'src/python/pants/base:target',
     'src/python/pants/goal:goal',
     'src/python/pants/goal:option_helpers',

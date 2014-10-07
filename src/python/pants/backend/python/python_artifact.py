@@ -72,7 +72,7 @@ class PythonArtifact(PayloadField):
                            allow_nan=False,
                            sort_keys=True)).hexdigest()
 
-  @manual.builddict()
+  @manual.builddict(show_method=True)
   def with_binaries(self, *args, **kw):
     """Add binaries tagged to this artifact.
 

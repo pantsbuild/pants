@@ -282,9 +282,10 @@ class RelativeToMapper(object):
 class Bundle(object):
   """A set of files to include in an application bundle.
 
-  To learn about application bundles, see :ref:`jvm_bundles`.
+  To learn about application bundles, see
+  `bundles <JVMProjects.html#jvm-bundles>`_.
   Looking for Java-style resources accessible via the ``Class.getResource`` API?
-  Those are :ref:`bdict_resources`\ .
+  Those are `resources <build_dictionary.html#resources>`_.
 
   Files added to the bundle will be included when bundling an application target.
   By default relative paths are preserved. For example, to include ``config``
@@ -304,6 +305,7 @@ class Bundle(object):
   """
 
   @classmethod
+  @manual.builddict(factory=True)
   def factory(cls, parse_context):
     """Return a factory method that can create bundles rooted at the parse context path."""
     def bundle(**kwargs):
@@ -335,7 +337,7 @@ class Bundle(object):
     else:
       self.mapper = mapper or RelativeToMapper(os.path.join(get_buildroot(), self._rel_path))
 
-  @manual.builddict()
+  @manual.builddict(show_method=True)
   def add(self, *filesets):
     """Add files to the bundle, where ``filesets`` is a filename, ``globs``, or ``rglobs``.
     Note this is a variable length param and may be specified any number of times.

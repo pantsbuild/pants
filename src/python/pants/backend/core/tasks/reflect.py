@@ -16,6 +16,7 @@ from twitter.common.collections.ordereddict import OrderedDict
 from pants.base.build_manual import get_builddict_info
 from pants.base.exceptions import TaskError
 from pants.base.generator import TemplateData
+from pants.base.parse_context import ParseContext
 from pants.base.target import Target
 from pants.goal.goal import Goal
 from pants.goal.option_helpers import add_global_options
@@ -314,14 +315,14 @@ def entry_for_one_class(nom, cls):
   methods = []
   for attrname in dir(cls):
     attr = getattr(cls, attrname)
-    attr_bdi = get_builddict_info(attr)
-    if attr_bdi is None: continue
-    if inspect.ismethod(attr):
-      methods.append(entry_for_one_method(attrname, attr))
-      continue
-    raise TaskError('@manual.builddict on non-method %s within class %s '
-                    'but I only know what to do with methods' %
-                    (attrname, nom))
+    info = get_builddict_info(attr)
+    if info and info.get('show_method'):
+      if inspect.ismethod(attr):
+        methods.append(entry_for_one_method(attrname, attr))
+      else:
+        raise TaskError('@manual.builddict(show_method=True) on non-method %s'
+                        ' within class %s' %
+                        (attrname, nom))
 
   return entry(nom,
                classdoc_rst=cls.__doc__,
@@ -336,6 +337,10 @@ def entry_for_one_class(nom, cls):
 def entry_for_one(nom, sym):
   if inspect.isclass(sym):
     return entry_for_one_class(nom, sym)
+  info = get_builddict_info(sym)
+  if info and info.get('factory'):
+    # invoke the factory to make its thing:
+    return entry_for_one_class(nom, sym.im_self)
   if inspect.ismethod(sym) or inspect.isfunction(sym):
     return entry_for_one_func(nom, sym)
   return msg_entry(nom,
