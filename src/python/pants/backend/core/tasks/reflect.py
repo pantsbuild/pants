@@ -319,9 +319,8 @@ def entry_for_one_class(nom, cls):
       if inspect.ismethod(attr):
         methods.append(entry_for_one_method(attrname, attr))
       else:
-        raise TaskError('@manual.builddict(show_method=True) on non-method %s'
-                        ' within class %s' %
-                        (attrname, nom))
+        raise TaskError('@manual.builddict(show_method=True) on non-method {0}'
+                        ' within class {1}'.format(attrname, nom))
 
   return entry(nom,
                classdoc_rst=cls.__doc__,
