@@ -219,11 +219,11 @@ class Parser(object):
     for arg in args:
       self._dest_forwardings[arg.lstrip('-').replace('-', '_')] = scoped_dest
 
-    # Forward another hop, to the legacy flag.  Note that this means that *only* the
-    # legacy flag is supported for now.  This will be removed after we're finished migrating
-    # option registration to the new system, and work on migrating the actual runtime
-    # command-line parsing.
-    if legacy_dest:
+    # Forward another hop, to the legacy flag, but only if this won't create a forwarding cycle.
+    #   Note that this means that *only* the legacy flag is supported for now.
+    # This will be removed after we're finished migrating option registration to the new system,
+    # and work on migrating the actual runtime command-line parsing.
+    if legacy_dest and self._dest_forwardings.get(legacy_dest) != scoped_dest:
       self._dest_forwardings[scoped_dest] = legacy_dest
     return dest
 

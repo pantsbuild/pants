@@ -114,7 +114,7 @@ class GoalRunner(Command):
     known_scopes = ['']
     for goal in Goal.all():
       # Note that enclosing scopes will appear before scopes they enclose.
-      known_scopes.extend(goal.known_scopes())
+      known_scopes.extend(filter(None, goal.known_scopes()))
 
     # Annoying but temporary hack to get the parser.  We can't use self.parser because
     # that only gets set up in the superclass ctor, and we can't call that until we have
