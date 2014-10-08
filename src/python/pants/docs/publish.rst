@@ -250,17 +250,13 @@ doesn't "remember" them.
   problems, they are probably also about to fix the problem.
   You might want to coordinate and take turns.)
 
-* Git couldn't auto-merge your change to the pushdb; can you fix the merge
-  "by hand"? If the problem is just a merge conflict in the pushdb, you can
-  fix things by fixing the merge. (But if someone else was trying to publish
-  a particular artifact at the same time you were, your changes may be too
-  "entangled" to salvage this way.)
+**Resetting to try again**
 
-**To reset and start over** In git, this might mean::
+In git, this might mean::
 
     git reset origin/master # (if ``master`` is your release branch)
-    git pull
-    ./pants goal clean-all && ./pants goal publish <your previous args>
+    git pull origin master
+    ./pants goal publish <your previous args>
 
 Since you uploaded new versioned artifacts but the reset pushdb doesn't
 "remember" that, you might get "Versioned Artifact Already Exists"
