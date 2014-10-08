@@ -22,24 +22,26 @@ from pants.util.dirutil import safe_open
 class ConfluencePublish(Task):
 
   @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    cls.url_option = option_group.add_option(mkflag("url"), dest="confluence_publish_url",
-                                             help="The url of the confluence site to post to.")
-
-    option_group.add_option(mkflag("force"), mkflag("force", negate=True),
-                            dest = "confluence_publish_force",
-                            action="callback", callback=mkflag.set_bool, default=False,
-                            help = "[%default] Force publish the page even if its contents is "
-                                   "identical to the contents on confluence.")
-
-    option_group.add_option(mkflag("open"), mkflag("open", negate=True),
-                            dest="confluence_publish_open", default=False,
-                            action="callback", callback=mkflag.set_bool,
-                            help="[%default] Attempt to open the published confluence wiki page "
-                                 "in a browser.")
-
-    option_group.add_option(mkflag("user"), dest="confluence_user",
-                            help="Confluence user name, defaults to unix user.")
+  def register_options(cls, register):
+    super(ConfluencePublish, cls).register_options(register)
+    register('--url',
+             help='The url of the confluence site to post to.',
+             legacy='confluence_publish_url')
+    register('--force',
+             action='store_true',
+             default=False,
+             help=('Force publish the page even if its contents is '
+                   'identical to the contents on confluence.'),
+             legacy='confluence_publish_force')
+    register('--open',
+             action='store_true',
+             default=False,
+             help=('Attempt to open the published confluence wiki page '
+                   'in a browser.'),
+             legacy='confluence_publish_open')
+    register('--user',
+             help='Confluence user name, defaults to unix user.',
+             legacy='confluence_user"')
 
   def __init__(self, *args, **kwargs):
     super(ConfluencePublish, self).__init__(*args, **kwargs)

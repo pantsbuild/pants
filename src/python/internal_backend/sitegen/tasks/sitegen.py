@@ -27,12 +27,11 @@ from pants.base.exceptions import TaskError
 
 class SiteGen(Task):
   @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    super(SiteGen, cls).setup_parser(option_group, args, mkflag)
-    option_group.add_option(mkflag('config-path'),
-                            dest='sitegen_config_path',
-                            action='append',
-                            help='[%default] Path to .json file describing site structure.')
+  def register_options(cls, register):
+    super(SiteGen, cls).register_options(register)
+    register('--config-path', action='append',
+             help='Path to .json file describing site structure',
+             legacy='sitegen_config_path')
 
   def execute(self):
     if not self.context.options.sitegen_config_path:
