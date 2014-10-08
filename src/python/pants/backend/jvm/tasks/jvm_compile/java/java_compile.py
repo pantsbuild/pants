@@ -107,8 +107,8 @@ class JavaCompile(JvmCompile):
                         no_warning_defaults=_JAVA_COMPILE_WARNING_ARGS_DEFAULT)
 
     self._javac_opts = []
-    if self.context.options.java_compile_args:
-      for arg in self.context.options.java_compile_args:
+    if self.get_options().args:
+      for arg in self.get_options().args:
         self._javac_opts.extend(shlex.split(arg))
     else:
       self._javac_opts.extend(self.context.config.getlist('java-compile',

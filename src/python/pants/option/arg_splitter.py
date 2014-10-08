@@ -48,7 +48,7 @@ class ArgSplitter(object):
           leaf_scopes.discard(outer_scope)
         leaf_scopes.add(scope)
     for scope in leaf_scopes:
-      self._known_scoping_prefixes['--{0}-'.format(scope.replace('.', '-'))] = scope
+      self._known_scoping_prefixes['{0}-'.format(scope.replace('.', '-'))] = scope
 
   @property
   def is_help(self):
@@ -149,9 +149,11 @@ class ArgSplitter(object):
 
     returns a pair (scope, flag).
     """
-    for prefix, scope in self._known_scoping_prefixes.iteritems():
-      if flag.startswith(prefix):
-        return scope, '--' + flag[len(prefix):]
+    for scope_prefix, scope in self._known_scoping_prefixes.iteritems():
+      for flag_prefix in ['--', '--no-']:
+        prefix = flag_prefix + scope_prefix
+        if flag.startswith(prefix):
+          return scope, flag_prefix + flag[len(prefix):]
     return default_scope, flag
 
   def _at_flag(self):

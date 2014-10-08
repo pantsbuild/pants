@@ -9,6 +9,7 @@ from collections import defaultdict
 import itertools
 import os
 import shutil
+import sys
 import uuid
 
 from twitter.common.collections import OrderedSet
@@ -38,7 +39,7 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
   @classmethod
   def register_options(cls, register):
     super(JvmCompile, cls).register_options(register)
-    register('--partition-size-hint', type=int, default=-1, metavar='<# source files>',
+    register('--partition-size-hint', type=int, default=sys.maxint, metavar='<# source files>',
              help='Roughly how many source files to attempt to compile together. Set to a large '
                   'number to compile all sources together. Set to 0 to compile target-by-target.',
              legacy='{0}_partition_size_hint'.format(cls._language))
@@ -137,10 +138,6 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
   def _portable_analysis_for_target(analysis_dir, target):
     return JvmCompile._analysis_for_target(analysis_dir, target) + '.portable'
 
-  def _get_lang_specific_option(self, opt):
-    full_opt_name = self._language + '_' + opt
-    return getattr(self.context.options, full_opt_name, None)
-
   def __init__(self, *args, **kwargs):
     super(JvmCompile, self).__init__(*args, **kwargs)
     config_section = self.config_section
@@ -154,7 +151,7 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
     self._analysis_dir = os.path.join(self.workdir, 'analysis')
     self._target_sources_dir = os.path.join(self.workdir, 'target_sources')
 
-    self._delete_scratch = self._get_lang_specific_option('delete_scratch')
+    self._delete_scratch = self.get_options().delete_scratch
 
     safe_mkdir(self._classes_dir)
     safe_mkdir(self._analysis_dir)
@@ -172,10 +169,7 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
     self._lazy_analysis_tools = None
 
     # The rough number of source files to build in each compiler pass.
-    self._partition_size_hint = self._get_lang_specific_option('partition_size_hint')
-    if self._partition_size_hint == -1:
-      self._partition_size_hint = self.context.config.getint(config_section, 'partition_size_hint',
-                                                             default=1000)
+    self._partition_size_hint = self.get_options().partition_size_hint
 
     # JVM options for running the compiler.
     self._jvm_options = self.context.config.getlist(config_section, 'jvm_args')
@@ -185,10 +179,12 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
 
     # Set up dep checking if needed.
     def munge_flag(flag):
-      return None if flag == 'off' else flag
-    check_missing_deps = munge_flag(self._get_lang_specific_option('missing_deps'))
-    check_missing_direct_deps = munge_flag(self._get_lang_specific_option('missing_direct_deps'))
-    check_unnecessary_deps = munge_flag(self._get_lang_specific_option('unnecessary_deps'))
+      flag_value = getattr(self.get_options(), flag, None)
+      return None if flag_value == 'off' else flag_value
+
+    check_missing_deps = munge_flag('missing_deps')
+    check_missing_direct_deps = munge_flag('missing_direct_deps')
+    check_unnecessary_deps = munge_flag('unnecessary_deps')
 
     if check_missing_deps or check_missing_direct_deps or check_unnecessary_deps:
       target_whitelist = self.context.config.getlist('jvm', 'missing_deps_target_whitelist', default=[])
@@ -229,12 +225,13 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
    """
    self._args = self.context.config.getlist(self._config_section, 'args',
                                        default=args_defaults or [])
-   if self._get_lang_specific_option('compile_warnings'):
+   if self.get_options().warnings:
      self._args.extend(self.context.config.getlist(self._config_section, 'warning_args',
-                                              default=warning_defaults or []))
+                                                   default=warning_defaults or []))
    else:
      self._args.extend(self.context.config.getlist(self._config_section, 'no_warning_args',
-                                              default=no_warning_defaults or[]))
+                                                   default=no_warning_defaults or[]))
+
   def prepare(self, round_manager):
     # TODO(John Sirois): this is a fake requirement on 'ivy_jar_products' in order to force
     # resolve to run before this goal.  Require a new CompileClasspath product to be produced by
