@@ -15,6 +15,7 @@ from twitter.common.collections import OrderedSet
 from twitter.common.dirutil import safe_delete, safe_rmtree
 
 from pants import binary_util
+from pants.backend.jvm.jvm_debug_config import JvmDebugConfig
 from pants.backend.jvm.targets.java_tests import JavaTests as junit_tests
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
@@ -50,6 +51,7 @@ class _JUnitRunner(object):
   """Helper class to run JUnit tests with or without coverage.
 
   The default behavior is to just run JUnit tests."""
+
 
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
@@ -118,7 +120,7 @@ class _JUnitRunner(object):
                             help="An arbitrary argument to pass directly to the test runner. "
                                    "This option can be specified multiple times.")
 
-  def __init__(self, task_exports, context):
+  def __init__(self, task_exports, context, debug_args=None):
     self._task_exports = task_exports
     self._context = context
     self._junit_bootstrap_key = 'junit'
@@ -129,7 +131,7 @@ class _JUnitRunner(object):
     if context.options.junit_run_jvmargs:
       self._jvm_args.extend(context.options.junit_run_jvmargs)
     if context.options.junit_run_debug:
-      self._jvm_args.extend(context.config.getlist('jvm', 'debug_args'))
+      self._jvm_args.extend(JvmDebugConfig.debug_args(context.config))
 
     self._tests_to_run = context.options.junit_run_tests
     self._batch_size = context.options.junit_run_batch_size
@@ -337,8 +339,8 @@ class _Coverage(_JUnitRunner):
                             help='[%%default] Tries to open the generated html coverage report, '
                                    'implies %s.' % coverage_html_flag)
 
-  def __init__(self, task_exports, context):
-    super(_Coverage, self).__init__(task_exports, context)
+  def __init__(self, task_exports, context, **kwargs):
+    super(_Coverage, self).__init__(task_exports, context, **kwargs)
     self._coverage = context.options.junit_run_coverage
     self._coverage_filters = context.options.junit_run_coverage_patterns or []
     self._coverage_dir = os.path.join(task_exports.workdir, 'coverage')
@@ -397,8 +399,8 @@ class _Coverage(_JUnitRunner):
 class Emma(_Coverage):
   """Class to run coverage tests with Emma."""
 
-  def __init__(self, task_exports, context):
-    super(Emma, self).__init__(task_exports, context)
+  def __init__(self, task_exports, context, **kwargs):
+    super(Emma, self).__init__(task_exports, context, **kwargs)
     self._emma_bootstrap_key = 'emma'
     task_exports.register_jvm_tool(self._emma_bootstrap_key,
                                    context.config.getlist('junit-run', 'emma-bootstrap-tools',
@@ -477,8 +479,8 @@ class Emma(_Coverage):
 class Cobertura(_Coverage):
   """Class to run coverage tests with cobertura."""
 
-  def __init__(self, task_exports, context):
-    super(Cobertura, self).__init__(task_exports, context)
+  def __init__(self, task_exports, context, **kwargs):
+    super(Cobertura, self).__init__(task_exports, context, **kwargs)
     self._cobertura_bootstrap_key = 'cobertura'
     self._coverage_datafile = os.path.join(self._coverage_dir, 'cobertura.ser')
     task_exports.register_jvm_tool(self._cobertura_bootstrap_key,

@@ -49,7 +49,12 @@ class JvmRun(JvmTask):
       for arg in self.context.options.run_args:
         self.args.extend(shlex.split(arg))
     if self.context.options.run_debug:
-      self.jvm_args.extend(self.context.config.getlist('jvm', 'debug_args'))
+      debug_port = self.context.config.getint('jvm', 'debug_port', default=5005)
+      self.jvm_args.extend(self.context.config.getlist('jvm', 'debug_args', default=[
+        '-Xdebug',
+        '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address={debug_port}'
+        .format(debug_port=debug_port),
+      ]))
     self.confs = self.context.config.getlist('jvm-run', 'confs', default=['default'])
     self.only_write_cmd_line = self.context.options.only_write_cmd_line
 
