@@ -193,7 +193,9 @@ class JvmdocGen(JvmTask):
       safe_mkdir(gendir, clean=True)
       command = create_jvmdoc_command(classpath, gendir, *targets)
       if command:
-        create_jvmdoc(command, gendir)
+        self.context.log.debug("Running create_jvmdoc in %s with %s" % (gendir, " ".join(command)))
+        result, gendir = create_jvmdoc(command, gendir)
+        self._handle_create_jvmdoc_result(targets, result, command)
     if self.open:
       binary_util.ui_open(os.path.join(gendir, 'index.html'))
 
@@ -218,19 +220,29 @@ class JvmdocGen(JvmTask):
         #      raise self._value
         #  NameError: global name 'self' is not defined
         futures = []
-        for gendir, (target, command) in jobs.items():
-          futures.append(pool.apply_async(create_jvmdoc, args=(command, gendir)))
+        self.context.log.debug("Begin multiprocessing section; output may be misordered or garbled")
+        try:
+          for gendir, (target, command) in jobs.items():
+            self.context.log.debug("Running create_jvmdoc in %s with %s" %
+                                   (gendir, " ".join(command)))
+            futures.append(pool.apply_async(create_jvmdoc, args=(command, gendir)))
 
-        for future in futures:
-          result, gendir = future.get()
-          target, command = jobs[gendir]
-          if result != 0:
-            message = 'Failed to process %s for %s [%d]: %s' % (
-                      self.jvmdoc().tool_name, target, result, command)
-            if self.ignore_failure:
-              self.context.log.warn(message)
-            else:
-              raise TaskError(message)
+          for future in futures:
+            result, gendir = future.get()
+            target, command = jobs[gendir]
+            self._handle_create_jvmdoc_result([target], result, command)
+        finally:
+          self.context.log.debug("End multiprocessing section")
+
+  def _handle_create_jvmdoc_result(self, targets, result, command):
+    if result != 0:
+      targetlist = ", ".join(map(str, targets))
+      message = 'Failed to process %s for %s [%d]: %s' % (
+                self.jvmdoc().tool_name, targetlist, result, command)
+      if self.ignore_failure:
+        self.context.log.warn(message)
+      else:
+        raise TaskError(message)
 
   def _gendir(self, target):
     return os.path.join(self.workdir, target.id)

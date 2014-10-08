@@ -5,8 +5,11 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+import os
+
 from pants.backend.core.tasks.check_exclusives import ExclusivesMapping
 from pants.backend.jvm.tasks.jvmdoc_gen import Jvmdoc, JvmdocGen
+from pants.base.exceptions import TaskError
 from pants_test.base_test import BaseTest
 from pants.util.dirutil import safe_mkdtemp, safe_rmtree
 
@@ -51,9 +54,11 @@ class JvmdocGenTest(BaseTest):
     context = self.context(target_roots=[self.t1],
                            options=options)
 
+    self.targets = context.targets()
+
     # Create the exclusives mapping.
     exclusives_mapping = ExclusivesMapping(context)
-    exclusives_mapping._populate_target_maps(context.targets())
+    exclusives_mapping._populate_target_maps(self.targets)
     exclusives_mapping.set_base_classpath_for_group('foo=a', ['baz'])
     context.products.safe_create_data('exclusives_groups', lambda: exclusives_mapping)
 
@@ -65,3 +70,16 @@ class JvmdocGenTest(BaseTest):
 
   def test_classpath(self):
     self.task.execute()
+
+  def test_generate(self):
+    def create_jvmdoc_command_fail(classpath, gendir, *targets):
+      return os.path.join(os.path.dirname(__file__), "false.py")
+    def create_jvmdoc_command_succeed(classpath, gendir, *targets):
+      return os.path.join(os.path.dirname(__file__), "true.py")
+
+    for generate in [self.task._generate_individual,
+                     self.task._generate_combined]:
+      with self.assertRaises(TaskError):
+        generate([], self.targets, create_jvmdoc_command_fail)
+
+      generate([], self.targets, create_jvmdoc_command_succeed)
