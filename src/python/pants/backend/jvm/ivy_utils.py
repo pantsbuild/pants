@@ -13,7 +13,7 @@ import pkgutil
 import threading
 import xml
 
-from twitter.common.collections import OrderedDict, OrderedSet
+from twitter.common.collections import OrderedDict, OrderedSet, maybe_list
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
@@ -364,10 +364,11 @@ class IvyUtils(object):
                    '[organisation]-[artifact]-[revision](-[classifier]).[ext]' % mapdir,
       '-symlink',
     ]
+    confs = target.payload.get_field_value('configurations') or []
     self.exec_ivy(mapdir,
                   [target],
                   ivyargs,
-                  confs=target.payload.configurations,
+                  confs=maybe_list(confs),
                   ivy=Bootstrapper.default_ivy(executor),
                   workunit_factory=workunit_factory,
                   workunit_name='map-jars',

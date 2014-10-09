@@ -149,6 +149,7 @@ class BuildFileAddressMapper(object):
   def spec_to_address(self, spec, relative_to=''):
     """A helper method for mapping a spec to the correct BuildFileAddress.
     :param spec: a spec to lookup in the map.
+    :param relative_to: path the spec might be relative to
     :raises AddressLookupError: if the BUILD file cannot be found in the path specified by the spec
     :returns a new BuildFileAddress instanace
     """

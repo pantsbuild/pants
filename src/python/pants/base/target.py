@@ -5,18 +5,19 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-import collections
 from hashlib import sha1
 import os
 
 from twitter.common.lang import Compatibility
 
+from pants.base.address import Addresses, SyntheticAddress
 from pants.base.build_environment import get_buildroot
 from pants.base.build_manual import manual
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
 from pants.base.hash_utils import hash_all
 from pants.base.payload import Payload
+from pants.base.payload_field import DeferredSourcesField, SourcesField
 from pants.base.source_root import SourceRoot
 from pants.base.target_addressable import TargetAddressable
 from pants.base.validation import assert_list
@@ -111,6 +112,10 @@ class Target(AbstractTarget):
   Handles registration of a target amongst all parsed targets as well as location of the target
   parse context.
   """
+
+  class WrongNumberOfAddresses(Exception):
+    """Internal error, too many elements in Addresses"""
+    pass
 
   LANG_DISCRIMINATORS = {
     'java':   lambda t: t.is_jvm,
@@ -341,7 +346,10 @@ class Target(AbstractTarget):
     graph and linked in the graph as dependencies of this target
     :rtype: list of strings
     """
-    return []
+    # To support DeferredSourcesField
+    for name, payload_field in self.payload.fields:
+      if isinstance(payload_field, DeferredSourcesField) and payload_field.address:
+        yield payload_field.address.spec
 
   @property
   def dependencies(self):
@@ -444,3 +452,23 @@ class Target(AbstractTarget):
   def __repr__(self):
     addr = self.address if hasattr(self, 'address') else 'address not yet set'
     return "%s(%s)" % (type(self).__name__, addr)
+
+  def create_sources_field(self, sources, sources_rel_path, address=None, build_graph=None):
+    """Factory method to create a SourcesField appropriate for the type of the sources object.
+
+    Note that this method is called before the call to Target.__init__ so don't expect fields to
+    be populated!
+    :return: a payload field object representing the sources parameter
+    :rtype: SourcesField
+    """
+
+    if isinstance(sources, Addresses):
+      # Currently, this is only created by the result of from_target() which takes a single argument
+      if len(sources.addresses) != 1:
+        raise self.WrongNumberOfAddresses(
+          "Expected a single address to from_target() as argument to {spec}"
+          .format(spec=address.spec))
+      referenced_address = SyntheticAddress.parse(sources.addresses[0],
+                                                  relative_to=sources.rel_path)
+      return DeferredSourcesField(ref_address=referenced_address)
+    return SourcesField(sources=sources, sources_rel_path=sources_rel_path)
