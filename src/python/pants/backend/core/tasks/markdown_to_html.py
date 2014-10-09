@@ -278,15 +278,19 @@ class MarkdownToHtml(Task):
         if self.open and page in roots:
           show.append(html)
 
-        if page.provides:
-          for wiki in page.provides:
-            def get_config(page):
-              # Take the first provided WikiArtifact. If a page is published to multiple places, it's
-              # undefined what the "proper" one is to link to. So we just take whatever is "first".
-              for wiki_artifact in page.payload.provides:
-                return wiki_artifact.config
-            basedir = os.path.join(self.workdir, str(hash(wiki)))
-            process_page((wiki, page), basedir, wiki.wiki.url_builder, get_config,
+        # If this page "provides" to some published spot, we want to fix up
+        # its links to other pages.
+        if page.payload.provides:
+          for wiki_artifact in page.payload.provides:
+            def get_config(dst_page):
+              for dst_wiki_artifact in dst_page.payload.provides:
+                if dst_wiki_artifact.wiki == wiki_artifact.wiki:
+                  return wiki_artifact.config
+              else:
+                raise TaskError('Link destination page {0} does not provide to'                                 ' same wiki as linking page {1}.'
+                                .format(dst_page, page))
+            basedir = os.path.join(self.workdir, str(hash(wiki_artifact)))
+            process_page((wiki_artifact, page), basedir, wiki_artifact.wiki.url_builder, get_config,
                          wikigenmap, fragment=True)
 
     if show:
