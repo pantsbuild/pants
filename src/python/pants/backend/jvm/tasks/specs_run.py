@@ -7,6 +7,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from twitter.common.collections import OrderedSet
 
+from pants.backend.jvm.jvm_debug_config import JvmDebugConfig
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.base.exceptions import TaskError
@@ -53,7 +54,7 @@ class SpecsRun(JvmTask, JvmToolTaskMixin):
     if self.context.options.specs_run_jvm_options:
       self._jvm_options.extend(self.context.options.specs_run_jvm_options)
     if self.context.options.specs_run_debug:
-      self._jvm_options.extend(self.context.config.getlist('jvm', 'debug_args'))
+      self._jvm_options.extend(JvmDebugConfig.debug_args(self.context.config))
 
     self.skip = self.context.options.specs_run_skip
     self.color = self.context.options.specs_run_color
