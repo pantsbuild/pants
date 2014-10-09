@@ -108,7 +108,7 @@ class _Goal(object):
     self._ordered_task_names = []  # The task names, in the order imposed by registration.
 
   def register_options(self, options):
-    for task_type in self.task_types():
+    for task_type in sorted(self.task_types(), key=lambda cls: cls.options_scope):
       task_type.register_options_on_scope(options)
 
   def install(self, task_registrar, first=False, replace=False, before=None, after=None):
