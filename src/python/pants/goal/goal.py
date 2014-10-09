@@ -42,16 +42,6 @@ class Goal(object):
     return goal_name if goal_name == task_name else '{0}.{1}'.format(goal_name, task_name)
 
   @staticmethod
-  def option_group_title(goal, task_name):
-    """Returns name to use for CLI flag OptionGroup."""
-    # Note: This is almost the same as scope(), except for the case of a single task
-    # in a goal that has a different name than the goal. This will go away soon
-    # once we transition to new-style options.
-    goal_leader = len(goal.ordered_task_names()) == 1 or task_name == goal.name
-    namespace = [task_name] if goal_leader else [goal.name, task_name]
-    return '.'.join(namespace)
-
-  @staticmethod
   def setup_parser(parser, args, goals):
     """Set up an OptionParser with options info for a goal and its deps.
     This readies the parser to handle options for this goal and its deps.
@@ -67,8 +57,7 @@ class Goal(object):
           do_setup_parser(dep)
         for task_name in goal.ordered_task_names():
           task_type = goal.task_type_by_name(task_name)
-          goal_leader = len(goal.ordered_task_names()) == 1 or task_name == goal.name
-          namespace = [task_name] if goal_leader else [goal.name, task_name]
+          namespace = [task_name] if task_name == goal.name else [goal.name, task_name]
           mkflag = Mkflag(*namespace)
           title = task_type.options_scope
 
