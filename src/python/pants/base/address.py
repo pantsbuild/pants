@@ -189,6 +189,12 @@ class BuildFileAddress(Address):
 class SyntheticAddress(Address):
   @classmethod
   def parse(cls, spec, relative_to=''):
+    """
+    :param string spec: an address in string form <path>:<name>
+    :param string relative_to: For sibling specs, ie: ':another_in_same_build_family', interprets
+    the missing spec_path part as `relative_to`.
+    :return:
+    """
     spec_path, target_name = parse_spec(spec, relative_to=relative_to)
     return cls(spec_path, target_name)
 

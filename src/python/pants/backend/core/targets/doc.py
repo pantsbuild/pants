@@ -5,12 +5,10 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from twitter.common.lang import Compatibility
 
-from pants.base.address import SyntheticAddress
-from pants.base.build_environment import get_buildroot
 from pants.base.payload import Payload
 from pants.base.payload_field import combine_hashes, PayloadField, SourcesField
+from pants.backend.core.targets.source_set import SourceSet
 from pants.base.target import Target
 
 
@@ -76,6 +74,7 @@ class Page(Target):
                source=None,
                resources=None,
                provides=None,
+               build_graph=None,
                **kwargs):
     """
     :param source: Source of the page in markdown format.
@@ -83,12 +82,15 @@ class Page(Target):
     """
     payload = payload or Payload()
     payload.add_fields({
-      'sources': SourcesField(sources=[source],
-                              sources_rel_path=address.spec_path),
+      'sources': SourcesField(sources=SourceSet.from_source_object(address,
+                                                                   [source],
+                                                                   build_graph,
+                                                                   rel_path=address.spec_path)),
       'provides': self.ProvidesTupleField(provides or []),
     })
     self._resource_specs = resources or []
-    super(Page, self).__init__(address=address, payload=payload, **kwargs)
+    super(Page, self).__init__(address=address, payload=payload, build_graph=build_graph,
+                               **kwargs)
 
     if provides and not isinstance(provides[0], WikiArtifact):
       raise ValueError('Page must provide a wiki_artifact. Found instead: %s' % provides)

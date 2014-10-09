@@ -8,6 +8,7 @@ python_test_suite(
     ':idea_gen',
     ':junit_run',
     ':scalastyle',
+    ':unpack_external_archive',
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile',
   ]
 )
@@ -61,4 +62,14 @@ python_tests(
     'src/python/pants/base:exceptions',
     'tests/python/pants_test/jvm:nailgun_task_test_base',
   ]
+)
+
+python_tests(
+  name = 'unpack_external_archive',
+  sources = ['test_unpack_external_archive.py'],
+  dependencies = [
+    'src/python/pants/backend/core/targets:common',
+    'src/python/pants/backend/jvm/tasks:unpack_external_archive',
+    'tests/python/pants_test:base_test',
+    ]
 )

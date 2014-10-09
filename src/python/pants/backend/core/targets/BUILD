@@ -15,6 +15,7 @@ python_library(
     'doc.py',
     'prep_command.py',
     'resources.py',
+    'source_set.py',
   ],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',

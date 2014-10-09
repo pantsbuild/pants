@@ -12,6 +12,7 @@ from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.benchmark import Benchmark
 from pants.backend.jvm.targets.credentials import Credentials
 from pants.backend.jvm.targets.exclude import Exclude
+from pants.backend.jvm.targets.external_archive import ExternalArchive
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_agent import JavaAgent
@@ -53,6 +54,7 @@ from pants.backend.jvm.tasks.provides import Provides
 from pants.backend.jvm.tasks.scala_repl import ScalaRepl
 from pants.backend.jvm.tasks.scaladoc_gen import ScaladocGen
 from pants.backend.jvm.tasks.specs_run import SpecsRun
+from pants.backend.jvm.tasks.unpack_external_archive import UnpackExternalArchive
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.goal.task_registrar import TaskRegistrar as task
 from pants.goal.goal import Goal
@@ -64,6 +66,7 @@ def build_file_aliases():
       'annotation_processor': AnnotationProcessor,
       'benchmark': Benchmark,
       'credentials': Credentials,
+      'external_archive' : ExternalArchive,
       'jar_library': JarLibrary,
       'java_agent': JavaAgent,
       'java_library': JavaLibrary,
@@ -111,6 +114,10 @@ def register_goals():
   task(name='ivy-imports', action=IvyImports,
        dependencies=['bootstrap']
   ).install('imports')
+
+  task(name='unpack-external-archive', action=UnpackExternalArchive,
+       dependencies=['ivy-imports']
+  ).install('imports').with_description('Unpack artifacts specified by external_archive() targets.')
 
   # Compilation.
 

@@ -15,6 +15,7 @@ python_library(
     'credentials.py',
     'exclude.py',
     'exportable_jvm_library.py',
+    'external_archive.py',
     'jar_dependency.py',
     'jar_library.py',
     'jarable.py',

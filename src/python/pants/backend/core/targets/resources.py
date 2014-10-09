@@ -7,6 +7,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from pants.base.payload import Payload
 from pants.base.payload_field import SourcesField
+from pants.backend.core.targets.source_set import SourceSet
 from pants.base.target import Target
 
 
@@ -20,18 +21,21 @@ class Resources(Target):
   and friends API. In the ``jar`` goal, the resource files are placed in the resulting `.jar`.
   """
 
-  def __init__(self, address=None, payload=None, sources=None, **kwargs):
+  def __init__(self, address=None, payload=None, sources=None, build_graph=None, **kwargs):
     """
-    :param sources: Files to "include". Paths are relative to the
-      BUILD file's directory.
+    :param sources: list of files to "include", Fileset or SourceSet instance. Paths are relative
+     to the BUILD file's directory.
     :type sources: ``Fileset`` or list of strings
     """
     payload = payload or Payload()
     payload.add_fields({
-      'sources': SourcesField(sources=self.assert_list(sources),
-                              sources_rel_path=address.spec_path),
+      'sources': SourcesField(sources=SourceSet.from_source_object(address,
+                                                                   sources,
+                                                                   build_graph,
+                                                                   rel_path=address.spec_path)),
     })
-    super(Resources, self).__init__(address=address, payload=payload, **kwargs)
+    super(Resources, self).__init__(address=address, payload=payload, build_graph=build_graph,
+                                    **kwargs)
 
   def has_sources(self, extension=None):
     """``Resources`` never own sources of any particular native type, like for example

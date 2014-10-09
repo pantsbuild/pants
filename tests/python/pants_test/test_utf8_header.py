@@ -40,6 +40,7 @@ class Utf8HeaderTest(unittest.TestCase):
 
     nonconforming_files = []
 
+    # TODO(Eric Ayers) external_archive targets break this test.
     for target in build_graph.targets(has_hand_coded_python_files):
       for src in target.sources_relative_to_buildroot():
         with open(os.path.join(get_buildroot(), src), 'r') as python_file:

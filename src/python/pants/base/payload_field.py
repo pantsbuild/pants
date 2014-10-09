@@ -16,7 +16,6 @@ from twitter.common.collections import OrderedSet
 from twitter.common.lang import AbstractClass
 
 from pants.base.build_environment import get_buildroot
-from pants.base.validation import assert_list
 
 
 def stable_json_dumps(obj):
@@ -60,9 +59,19 @@ def combine_hashes(hashes):
 
 class SourcesField(PayloadField):
   """A PayloadField encapsulating specified sources."""
-  def __init__(self, sources_rel_path, sources):
-    self.rel_path = sources_rel_path
-    self.source_paths = assert_list(sources)
+  def __init__(self, sources):
+    """
+       :param SourceSet sources: encapsulation of the source file entries
+    """
+    self._sources = sources
+
+  @property
+  def source_paths(self):
+    return self._sources.files()
+
+  @property
+  def source_set(self):
+    return self._sources
 
   @property
   def num_chunking_units(self):
@@ -73,16 +82,20 @@ class SourcesField(PayloadField):
     """
     return len(self.source_paths)
 
-  def has_sources(self, extension=''):
-    return any(source.endswith(extension) for source in self.source_paths)
+  def has_sources(self, extension=None):
+    if extension:
+      return any(source.endswith(extension) for source in self.source_paths)
+    return not self._sources.is_empty()
+
 
   def relative_to_buildroot(self):
-    """All sources joined with ``self.rel_path``."""
-    return [os.path.join(self.rel_path, source) for source in self.source_paths]
+    """All sources joined with the common relative path."""
+    return self._sources.files_relative_to_buildroot()
 
   def _compute_fingerprint(self):
     hasher = sha1()
-    hasher.update(self.rel_path)
+    if self._sources.rel_path:
+      hasher.update(self._sources.rel_path)
     for source in sorted(self.relative_to_buildroot()):
       hasher.update(source)
       with open(os.path.join(get_buildroot(), source), 'rb') as f:

@@ -5,16 +5,15 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from twitter.common.collections import maybe_list
 
 from pex.interpreter import PythonIdentity
-from twitter.common.collections import maybe_list
-from twitter.common.lang import Compatibility
-
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.core.targets.resources import Resources
 from pants.base.address import SyntheticAddress
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField, SourcesField
+from pants.backend.core.targets.source_set import SourceSet
 from pants.base.target import Target
 from pants.base.exceptions import TargetDefinitionException
 
@@ -31,6 +30,7 @@ class PythonTarget(Target):
                resource_targets=None,  # New-style resources (Resources target specs).
                provides=None,
                compatibility=None,
+               build_graph=None,
                **kwargs):
     """
     :param dependencies: Other targets that this target depends on.
@@ -58,14 +58,19 @@ class PythonTarget(Target):
       sources_rel_path = address.spec_path
     payload = payload or Payload()
     payload.add_fields({
-      'sources': SourcesField(sources=self.assert_list(sources),
-                              sources_rel_path=sources_rel_path),
-      'resources': SourcesField(sources=self.assert_list(resources),
-                                sources_rel_path=address.spec_path),
+      'sources': SourcesField(sources=SourceSet.from_source_object(address,
+                                                                   sources,
+                                                                   build_graph,
+                                                                   rel_path=sources_rel_path)),
+      'resources': SourcesField(sources=SourceSet.from_source_object(address,
+                                                                     resources,
+                                                                     build_graph,
+                                                                     rel_path=address.spec_path)),
       'provides': provides,
       'compatibility': PrimitiveField(maybe_list(compatibility or ())),
     })
-    super(PythonTarget, self).__init__(address=address, payload=payload, **kwargs)
+    super(PythonTarget, self).__init__(address=address, payload=payload, build_graph=build_graph,
+                                       **kwargs)
     self._resource_target_specs = resource_targets
     self.add_labels('python')
 

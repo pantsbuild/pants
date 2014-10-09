@@ -6,16 +6,16 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 from pants.backend.jvm.targets.exclude import Exclude
-from pants.backend.jvm.targets.jar_dependency import Artifact, JarDependency
-from pants.backend.jvm.targets.jvm_binary import Bundle
+from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.python.python_requirement import PythonRequirement
-from pants.base.payload import Payload, PayloadFieldAlreadyDefinedError, PayloadFrozenError
-from pants.base.payload_field import (BundleField,
-                                      ExcludesField,
+from pants.base.address import SyntheticAddress
+from pants.base.payload_field import (ExcludesField,
                                       JarsField,
                                       PrimitiveField,
                                       PythonRequirementsField,
                                       SourcesField)
+from pants.backend.core.targets.source_set import DefaultSourceSet
+
 from pants_test.base_test import BaseTest
 
 
@@ -216,61 +216,74 @@ class PayloadTest(BaseTest):
     )
 
   def test_sources_field(self):
+    self._counter = 0
+
+    def make_source_set(rel_path, file_list):
+      self._counter += 1
+      name = 'dummy={0}'.format(self._counter)
+
+      return DefaultSourceSet(
+        file_list,
+        name=name,
+        address=SyntheticAddress.parse(rel_path, 'foo'),
+        build_graph=self.build_graph,
+        rel_path=rel_path,
+      )
     self.create_file('foo/bar/a.txt', 'a_contents')
     self.create_file('foo/bar/b.txt', 'b_contents')
 
     self.assertNotEqual(
-      SourcesField(
-        sources_rel_path='foo/bar',
-        sources=['a.txt'],
+      SourcesField(make_source_set(
+        rel_path='foo/bar',
+        file_list=['a.txt'])
       ).fingerprint(),
-      SourcesField(
-        sources_rel_path='foo/bar',
-        sources=['b.txt'],
+      SourcesField(make_source_set(
+        rel_path='foo/bar',
+        file_list=['b.txt'])
+      ).fingerprint(),
+      )
+
+    self.assertEqual(
+      SourcesField(make_source_set(
+        rel_path='foo/bar',
+        file_list=['a.txt']),
+      ).fingerprint(),
+      SourcesField(make_source_set(
+        rel_path='foo/bar',
+        file_list=['a.txt']),
       ).fingerprint(),
     )
 
     self.assertEqual(
-      SourcesField(
-        sources_rel_path='foo/bar',
-        sources=['a.txt'],
+      SourcesField(make_source_set(
+        rel_path='foo/bar',
+        file_list=['a.txt']),
       ).fingerprint(),
-      SourcesField(
-        sources_rel_path='foo/bar',
-        sources=['a.txt'],
-      ).fingerprint(),
-    )
-
-    self.assertEqual(
-      SourcesField(
-        sources_rel_path='foo/bar',
-        sources=['a.txt'],
-      ).fingerprint(),
-      SourcesField(
-        sources_rel_path='foo/bar',
-        sources=['a.txt'],
+      SourcesField(make_source_set(
+        rel_path='foo/bar',
+        file_list=['a.txt']),
       ).fingerprint(),
     )
 
     self.assertEqual(
-      SourcesField(
-        sources_rel_path='foo/bar',
-        sources=['a.txt', 'b.txt'],
+      SourcesField(make_source_set(
+        rel_path='foo/bar',
+        file_list=['a.txt', 'b.txt']),
       ).fingerprint(),
-      SourcesField(
-        sources_rel_path='foo/bar',
-        sources=['b.txt', 'a.txt'],
+      SourcesField(make_source_set(
+        rel_path='foo/bar',
+        file_list=['b.txt', 'a.txt']),
       ).fingerprint(),
     )
 
-    fp1 = SourcesField(
-            sources_rel_path='foo/bar',
-            sources=['a.txt'],
+    fp1 = SourcesField(make_source_set(
+            rel_path='foo/bar',
+            file_list=['a.txt']),
           ).fingerprint()
     self.create_file('foo/bar/a.txt', 'a_contents_different')
-    fp2 = SourcesField(
-            sources_rel_path='foo/bar',
-            sources=['a.txt'],
+    fp2 = SourcesField(make_source_set(
+            rel_path='foo/bar',
+            file_list=['a.txt']),
           ).fingerprint()
 
     self.assertNotEqual(fp1, fp2)

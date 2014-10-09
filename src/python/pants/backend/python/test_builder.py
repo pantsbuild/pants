@@ -12,6 +12,7 @@ except ImportError:
 
 from contextlib import contextmanager
 import itertools
+import logging
 import os
 import shutil
 from textwrap import dedent
@@ -29,6 +30,9 @@ from pants.base.config import Config
 from pants.base.target import Target
 from pants.util.contextutil import temporary_file, temporary_dir, environment_as
 from pants.util.dirutil import safe_mkdir, safe_open
+
+
+logger = logging.getLogger(__name__)
 
 
 class PythonTestResult(object):

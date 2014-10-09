@@ -45,7 +45,8 @@ python_library(
     ':scaladoc_gen',
     ':scalastyle',
     ':specs_run',
-  ],
+    ':unpack_external_archive',
+    ],
 )
 
 python_library(
@@ -184,6 +185,7 @@ python_library(
     'src/python/pants/base:generator',
   ],
 )
+
 
 # XXX(pl): Not really JVM, but a hairball violator
 python_library(
@@ -494,3 +496,12 @@ python_library(
   ],
 )
 
+python_library(
+  name = 'unpack_external_archive',
+  sources = ['unpack_external_archive.py'],
+  dependencies = [
+    ':common',
+    '3rdparty/python/twitter/commons:twitter.common.dirutil',
+    'src/python/pants/backend/jvm/targets:jvm',
+    ]
+)

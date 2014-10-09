@@ -23,6 +23,7 @@ from pants.base.address import SyntheticAddress
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+from pants.base.source_root import SourceRoot
 from pants.base.target import Target
 from pants.binary_util import BinaryUtil
 from pants.fs.archive import ZIP
@@ -201,7 +202,7 @@ class ProtobufGen(CodeGen):
         args.append("--%s_protobuf_out=%s" % (plugin, output_dir))
 
     for base in bases:
-      args.append('--proto_path=%s' % base)
+      args.append('--proto_path={path}'.format(path=base))
 
     args.extend(sources)
     log.debug('Executing: %s' % '\\\n  '.join(args))
@@ -218,10 +219,11 @@ class ProtobufGen(CodeGen):
     sources_by_base = OrderedDict()
     for target in self.context.build_graph.targets():
       if target in walked_targets:
-        base, sources = target.target_base, target.sources_relative_to_buildroot()
-        if base not in sources_by_base:
-          sources_by_base[base] = OrderedSet()
-        sources_by_base[base].update(sources)
+        for source in target.sources_relative_to_buildroot():
+          base = SourceRoot.find_by_path(source)
+          if base not in sources_by_base:
+            sources_by_base[base] = OrderedSet()
+          sources_by_base[base].add(source)
     return sources_by_base
 
   def createtarget(self, lang, gentarget, dependees):

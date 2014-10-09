@@ -335,9 +335,9 @@ class BuildGraph(object):
         target.mark_transitive_invalidation_hash_dirty()
 
     except AddressLookupError as e:
-      raise self.TransitiveLookupError("{message}\n  referenced from {spec}"
-                                       .format(message=e, spec=address.spec))
-
+     raise self.TransitiveLookupError("{message}\n  referenced from {spec}"
+                                      .format(message=e, spec=address.spec))
+     raise
 
   def inject_spec_closure(self, spec, relative_to=''):
     """Constructs a SyntheticAddress from `spec` and calls `inject_address_closure`.

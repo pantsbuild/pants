@@ -33,6 +33,7 @@ from pants.backend.core.tasks.run_prep_command import RunPrepCommand
 from pants.backend.core.tasks.sorttargets import SortTargets
 from pants.backend.core.tasks.targets_help import TargetsHelp
 from pants.backend.core.tasks.what_changed import WhatChanged
+from pants.backend.core.from_target import FromTarget
 from pants.backend.core.wrapped_globs import Globs, RGlobs, ZGlobs
 from pants.base.build_environment import get_buildroot, pants_version
 from pants.base.build_file_aliases import BuildFileAliases
@@ -85,6 +86,7 @@ def build_file_aliases():
     context_aware_object_factories={
       'buildfile_path': BuildFilePath,
       'globs': Globs,
+      'from_target': FromTarget,
       'rglobs': RGlobs,
       'source_root': SourceRoot.factory,
       'zglobs': ZGlobs,

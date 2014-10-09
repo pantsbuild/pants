@@ -26,7 +26,7 @@ source_root('testprojects/tests/scala', page, junit_tests, scala_library, scala_
 source_root('examples/src/android', page, android_resources, android_binary)
 source_root('examples/src/antlr', page, java_antlr_library, python_antlr_library)
 source_root('examples/src/java', annotation_processor, jvm_binary, java_library, page)
-source_root('examples/src/protobuf', java_protobuf_library, jar_library, page)
+source_root('examples/src/protobuf', java_protobuf_library, jar_library, external_archive, page)
 source_root('examples/src/python', page, python_binary, python_library, resources)
 source_root('examples/src/resources', page, resources, jaxb_library)
 source_root('examples/src/scala', jvm_binary, page, scala_library, benchmark)
