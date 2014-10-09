@@ -394,6 +394,9 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
           os.mkdir(partition_tmpdir)
           sources = list(itertools.chain.from_iterable(
               [invalid_sources_by_target.get(t, []) for t in vts.targets]))
+          self.context.log.info('=====================================')
+          self.context.log.info(sources)
+          self.context.log.info('=====================================')
           de_duped_sources = list(OrderedSet(sources))
           if len(sources) != len(de_duped_sources):
             counts = [(src, len(list(srcs))) for src, srcs in itertools.groupby(sorted(sources))]
