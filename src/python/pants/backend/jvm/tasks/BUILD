@@ -389,6 +389,7 @@ python_library(
     'src/python/pants/java:executor',
     'src/python/pants/java:util',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:strutil',
   ],
 )
 
@@ -456,6 +457,7 @@ python_library(
     'src/python/pants/base:workunit',
     'src/python/pants/console:stty_utils',
     'src/python/pants/java:util',
+    'src/python/pants/util:strutil',
   ],
 )
 

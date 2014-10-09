@@ -5,8 +5,6 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-import shlex
-
 from pants.backend.jvm.jvm_debug_config import JvmDebugConfig
 from pants.backend.jvm.targets.jvm_binary import JvmApp, JvmBinary
 from pants.backend.jvm.tasks.jvm_task import JvmTask
@@ -16,6 +14,7 @@ from pants.fs.fs import expand_path
 from pants.java.executor import CommandLineGrabber
 from pants.java.util import execute_java
 from pants.util.dirutil import safe_open
+from pants.util.strutil import safe_shlex_split
 
 
 def is_binary(target):
@@ -44,11 +43,11 @@ class JvmRun(JvmTask):
     self.jvm_args = self.context.config.getlist('jvm-run', 'jvm_args', default=[])
     if self.context.options.run_jvmargs:
       for arg in self.context.options.run_jvmargs:
-        self.jvm_args.extend(shlex.split(arg))
+        self.jvm_args.extend(safe_shlex_split(arg))
     self.args = []
     if self.context.options.run_args:
       for arg in self.context.options.run_args:
-        self.args.extend(shlex.split(arg))
+        self.args.extend(safe_shlex_split(arg))
     if self.context.options.run_debug:
       self.jvm_args.extend(JvmDebugConfig.debug_args(self.context.config))
     self.confs = self.context.config.getlist('jvm-run', 'confs', default=['default'])
