@@ -337,7 +337,7 @@ class Bundle(object):
     else:
       self.mapper = mapper or RelativeToMapper(os.path.join(get_buildroot(), self._rel_path))
 
-  @manual.builddict(show_method=True)
+  @manual.builddict()
   def add(self, *filesets):
     """Add files to the bundle, where ``filesets`` is a filename, ``globs``, or ``rglobs``.
     Note this is a variable length param and may be specified any number of times.

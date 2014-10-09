@@ -126,14 +126,14 @@ class JarDependency(object):
                        'has more than 1 artifact: %s\n\t%s'
                        % (self, '\n\t'.join(map(str, self.artifacts))))
 
-  @manual.builddict(show_method=True)
+  @manual.builddict()
   def exclude(self, org, name=None):
     """Adds a transitive dependency of this jar to the exclude list."""
 
     self.excludes += (Exclude(org, name),)
     return self
 
-  @manual.builddict(show_method=True)
+  @manual.builddict()
   def intransitive(self):
     """Declares this Dependency intransitive, indicating only the jar for the dependency itself
     should be downloaded and placed on the classpath"""
@@ -141,7 +141,7 @@ class JarDependency(object):
     self.transitive = False
     return self
 
-  @manual.builddict(show_method=True)
+  @manual.builddict()
   def with_sources(self):
     """This requests the artifact have its source jar fetched.
     (This implies there *is* a source jar to fetch.) Used in contexts
@@ -156,7 +156,7 @@ class JarDependency(object):
     self._configurations += ('javadoc',)
     return self
 
-  @manual.builddict(show_method=True)
+  @manual.builddict()
   def with_artifact(self, name=None, type_=None, ext=None, url=None, configuration=None,
                     classifier=None):
     """

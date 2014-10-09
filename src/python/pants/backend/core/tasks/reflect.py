@@ -315,7 +315,8 @@ def entry_for_one_class(nom, cls):
   for attrname in dir(cls):
     attr = getattr(cls, attrname)
     info = get_builddict_info(attr)
-    if info and info.get('show_method'):
+    # we want methods tagged @manual.builddict--except factory functions
+    if info and not info.get('factory', False):
       if inspect.ismethod(attr):
         methods.append(entry_for_one_method(attrname, attr))
       else:
@@ -337,7 +338,7 @@ def entry_for_one(nom, sym):
     return entry_for_one_class(nom, sym)
   info = get_builddict_info(sym)
   if info and info.get('factory'):
-    # invoke the factory to make its thing:
+    # instead of getting factory info, get info about associated class:
     return entry_for_one_class(nom, sym.im_self)
   if inspect.ismethod(sym) or inspect.isfunction(sym):
     return entry_for_one_func(nom, sym)
