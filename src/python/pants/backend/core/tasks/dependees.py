@@ -21,24 +21,20 @@ class ReverseDepmap(ConsoleTask):
   """Outputs all targets whose dependencies include at least one of the input targets."""
 
   @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    super(ReverseDepmap, cls).setup_parser(option_group, args, mkflag)
+  def register_options(cls, register):
+    super(ReverseDepmap, cls).register_options(register)
+    register('--transitive', default=False, action='store_true',
+             help='List transitive dependees.',
+             legacy='reverse_depmap_transitive')
+    register('--closed', default=False, action='store_true',
+             help='Include the input targets in the output along with the dependees.',
+             legacy='reverse_depmap_closed')
+    register('--type', default=[], action='append',
+             help="Identifies target types to include. Multiple type inclusions "
+                  "can be specified at once in a comma separated list or else by "
+                  "using multiple instances of this flag.",
+             legacy='dependees_type')
 
-    option_group.add_option(mkflag("transitive"), mkflag("transitive", negate=True),
-                            dest="reverse_depmap_transitive", default=False,
-                            action="callback", callback=mkflag.set_bool,
-                            help="[%default] List transitive dependees.")
-
-    option_group.add_option(mkflag("closed"), mkflag("closed", negate=True),
-                            dest="reverse_depmap_closed", default=False,
-                            action="callback", callback=mkflag.set_bool,
-                            help="[%default] Include the input targets in the output along with "
-                                 "the dependees.")
-
-    option_group.add_option(mkflag('type'), dest='dependees_type', action='append', default=[],
-                            help="Identifies target types to include. Multiple type inclusions "
-                                 "can be specified at once in a comma separated list or else by "
-                                 "using multiple instances of this flag.")
 
   def __init__(self, *args, **kwargs):
     super(ReverseDepmap, self).__init__(*args, **kwargs)
