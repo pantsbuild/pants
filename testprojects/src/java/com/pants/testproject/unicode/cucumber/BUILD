@@ -4,6 +4,6 @@
 java_library(name='cucumber',
   sources=globs('*.java'),
   dependencies = [
-    '3rdparty:cucumber-java',
+    'testprojects/3rdparty:cucumber-java',
   ],
 )
