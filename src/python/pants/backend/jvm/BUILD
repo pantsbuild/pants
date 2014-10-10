@@ -8,6 +8,7 @@ python_library(
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.lang',
     '3rdparty/python:six',
+    ':jvm_debug_config',
     ':repository',
     'src/python/pants/base:payload_field',
   ],
@@ -53,6 +54,11 @@ python_library(
   dependencies = [
     'src/python/pants/base:exceptions',
   ],
+)
+
+python_library(
+  name = 'jvm_debug_config',
+  sources = ['jvm_debug_config.py'],
 )
 
 python_library(

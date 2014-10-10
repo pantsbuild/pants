@@ -8,6 +8,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import os
 import shutil
 
+from pants.backend.jvm.jvm_debug_config import JvmDebugConfig
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.base.exceptions import TaskError
@@ -64,7 +65,7 @@ class BenchmarkRun(JvmTask, JvmToolTaskMixin):
       self.caliper_args += ['--measureMemory']
 
     if self.context.options.debug:
-      self.jvm_args.extend(self.context.config.getlist('jvm', 'debug_args'))
+      self.jvm_args.extend(JvmDebugConfig.debug_args(self.context.config))
       self.caliper_args += ['--debug']
 
     self.caliper_args.extend(self.context.options.extra_caliper_args)
