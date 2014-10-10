@@ -197,7 +197,7 @@ class ApacheThriftGen(CodeGen):
                                          sources=files,
                                          provides=target.provides,
                                          dependencies=deps,
-                                         excludes=target.payload.excludes)
+                                         excludes=target.payload.get_field_value('excludes'))
     return self._inject_target(target, dependees, self.gen_java, 'java', create_target)
 
   def _create_python_target(self, target, dependees):

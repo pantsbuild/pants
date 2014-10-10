@@ -247,7 +247,7 @@ class ProtobufGen(CodeGen):
                                       sources=genfiles,
                                       provides=target.provides,
                                       dependencies=deps,
-                                      excludes=target.payload.excludes)
+                                      excludes=target.payload.get_field_value('excludes'))
     for dependee in dependees:
       dependee.inject_dependency(tgt.address)
     return tgt
