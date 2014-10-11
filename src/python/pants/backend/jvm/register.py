@@ -152,7 +152,7 @@ def register_goals():
   ).install('compile').with_description('Compile source code.')
 
   task(name='scalastyle', action=Scalastyle,
-       dependencies=['gen', 'resolve', 'check-exclusives', 'bootstrap']
+       dependencies=['bootstrap']
   ).install('compile').with_description('Scala source code style check.')
 
   # Generate documentation.

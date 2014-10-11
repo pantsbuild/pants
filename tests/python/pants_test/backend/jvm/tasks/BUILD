@@ -7,6 +7,7 @@ python_test_suite(
     ':ide_gen',
     ':idea_gen',
     ':junit_run',
+    ':scalastyle',
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile',
   ]
 )
@@ -49,3 +50,15 @@ python_tests(
   ]
 )
 
+python_tests(
+  name = 'scalastyle',
+  sources = ['test_scalastyle.py'],
+  dependencies = [
+    'src/python/pants/backend/jvm/targets:scala',
+    'src/python/pants/backend/jvm/tasks:scalastyle',
+    'src/python/pants/base:address',
+    'src/python/pants/base:config',
+    'src/python/pants/base:exceptions',
+    'tests/python/pants_test/jvm:nailgun_task_test_base',
+  ]
+)
