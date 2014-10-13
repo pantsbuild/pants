@@ -252,7 +252,8 @@ class Parser(object):
     env_val = None if env_val_str is None else value_type(env_val_str)
     config_val = self._config.get(config_section, dest, default=None) if self._config else None
     hardcoded_val = kwargs.get('default')
-    return RankedValue.choose(None, env_val, config_val, hardcoded_val)
+    default = [] if kwargs.get('action') == 'append' else None
+    return RankedValue.choose(None, env_val, config_val, hardcoded_val, default)
 
   def _create_inverse_kwargs(self, kwargs):
     """Create the kwargs for registering the inverse of a boolean flag."""

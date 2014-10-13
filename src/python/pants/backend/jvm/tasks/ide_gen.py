@@ -13,6 +13,7 @@ import shutil
 from twitter.common.collections.orderedset import OrderedSet
 
 from pants import binary_util
+from pants.backend.jvm.jvm_debug_config import JvmDebugConfig
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.checkstyle import Checkstyle
 from pants.backend.jvm.tasks.jvm_binary_task import JvmBinaryTask
@@ -161,7 +162,10 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
     self.checkstyle_suppression_files = self.context.config.getdefault(
       'checkstyle_suppression_files', type=list, default=[]
     )
-    self.debug_port = self.context.config.getint('ide', 'debug_port', default=5005)
+    # Everywhere else, debug_port is specified in the 'jvm' section. Use that as a default if none
+    # is specified in the 'ide' section.
+    jvm_config_debug_port = JvmDebugConfig.debug_port(self.context.config)
+    self.debug_port = self.context.config.getint('ide', 'debug_port', default=jvm_config_debug_port)
 
     self.checkstyle_bootstrap_key = 'checkstyle'
     checkstyle = self.context.config.getlist('checkstyle', 'bootstrap-tools',

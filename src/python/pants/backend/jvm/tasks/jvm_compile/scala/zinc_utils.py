@@ -90,8 +90,8 @@ class ZincUtils(object):
 
   def _plugin_args(self):
     # Allow multiple flags and also comma-separated values in a single flag.
-    if self.context.options.plugins is not None:
-      plugin_names = [p for val in self.context.options.plugins for p in val.split(',')]
+    if self._nailgun_task.get_options().plugins is not None:
+      plugin_names = [p for val in self._nailgun_task.get_options().plugins for p in val.split(',')]
     else:
       plugin_names = self.context.config.getlist('scala-compile', 'scalac-plugins', default=[])
 

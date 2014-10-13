@@ -19,8 +19,6 @@ from pants.java.nailgun_executor import NailgunExecutor
 
 class NailgunTaskBase(TaskBase, JvmToolTaskMixin):
 
-  _DAEMON_OPTION_PRESENT = False
-
   @staticmethod
   def killall(logger=None, everywhere=False):
     """Kills all nailgun servers launched by pants in the current repo.
@@ -34,14 +32,6 @@ class NailgunTaskBase(TaskBase, JvmToolTaskMixin):
       return False
     else:
       return NailgunExecutor.killall(logger=logger, everywhere=everywhere)
-
-  @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    if not NailgunTaskBase._DAEMON_OPTION_PRESENT:
-      option_group.parser.add_option("--ng-daemons", "--no-ng-daemons", dest="nailgun_daemon",
-                                     default=True, action="callback", callback=mkflag.set_bool,
-                                     help="[%default] Use nailgun daemons to execute java tasks.")
-      NailgunTaskBase._DAEMON_OPTION_PRESENT = True
 
   def __init__(self, *args, **kwargs):
     super(NailgunTaskBase, self).__init__(*args, **kwargs)

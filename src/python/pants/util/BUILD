@@ -16,3 +16,11 @@ python_library(
   dependencies = [
   ],
 )
+
+python_library(
+  name = 'strutil',
+  sources = ['strutil.py'],
+  dependencies = [
+    '3rdparty/python:six',
+  ],
+)

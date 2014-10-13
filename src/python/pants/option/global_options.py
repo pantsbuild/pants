@@ -13,8 +13,13 @@ def register_global_options(register):
            help='Times tasks and goals and outputs a report.')
   register('-e', '--explain', action='store_true', legacy='explain',
            help='Explain the execution of goals.')
+
+  # TODO: After moving to the new options system these abstraction leaks can go away.
   register('-k', '--kill-nailguns', action='store_true', legacy='cleanup_nailguns',
            help='Kill nailguns before exiting')
+  register('--ng-daemons', action='store_true', default=True, legacy='nailgun_daemon',
+           help='Use nailgun daemons to execute java tasks.')
+
   register('-d', '--logdir', legacy='logdir', metavar='<dir>',
            help='Write logs to files under this directory.')
   register('-l', '--level', legacy='log_level', choices=['debug', 'info', 'warn'],
