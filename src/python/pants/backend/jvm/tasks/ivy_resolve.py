@@ -77,9 +77,10 @@ class IvyResolve(NailgunTask, IvyTaskMixin, JvmToolTaskMixin):
     self._report = self._open or self.context.options.ivy_resolve_report
 
     self._ivy_bootstrap_key = 'ivy'
-    ivy_bootstrap_tools = self.context.config.getlist(self._CONFIG_SECTION,
-                                                      'bootstrap-tools', default=['//:xalan'])
-    self.register_jvm_tool(self._ivy_bootstrap_key, ivy_bootstrap_tools)
+    self.register_jvm_tool_from_config(self._ivy_bootstrap_key, self.context.config,
+                                       ini_section=self._CONFIG_SECTION,
+                                       ini_key='bootstrap-tools',
+                                       default=['//:xalan'])
 
     self._ivy_utils = IvyUtils(config=self.context.config,
                                options=self.context.options,

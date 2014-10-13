@@ -44,9 +44,10 @@ class SpecsRun(JvmTask, JvmToolTaskMixin):
     super(SpecsRun, self).__init__(*args, **kwargs)
 
     self._specs_bootstrap_key = 'specs'
-    bootstrap_tools = self.context.config.getlist('specs-run', 'bootstrap-tools',
-                                                  default=['//:scala-specs-2.9.3'])
-    self.register_jvm_tool(self._specs_bootstrap_key, bootstrap_tools)
+    self.register_jvm_tool_from_config(self._specs_bootstrap_key, self.context.config,
+                                       ini_section='specs-run',
+                                       ini_key='bootstrap-tools',
+                                       default=['//:scala-specs-2.9.3'])
 
     self.confs = self.context.config.getlist('specs-run', 'confs', default=['default'])
 
