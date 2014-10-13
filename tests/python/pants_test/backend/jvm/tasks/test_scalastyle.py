@@ -29,19 +29,21 @@ class ScalastyleTest(NailgunTaskTestBase):
     return dict(scalastyle_skip=False)
 
   def _create_scalastyle_config_file(self, rules=None):
-    # put a default rule there is rules are unspecified.
+    # put a default rule there if rules are not specified.
     rules = rules or ['org.scalastyle.scalariform.ImportGroupingChecker']
+    rule_section_xml = ''
+    for rule in rules:
+      rule_section_xml += dedent('''
+        <check level="error" class="{rule}" enabled="true"></check>
+      '''.format(rule=rule))
     return self.create_file(
       relpath='scalastyle_config.xml',
       contents=dedent('''
         <scalastyle commentFilter="enabled">
           <name>Test Scalastyle configuration</name>
-          {0}
+          {rule_section_xml}
         </scalastyle>
-      '''.format('\n'.join(
-        map(lambda rule: dedent('''
-          <check level="error" class="{0}" enabled="true"></check>
-        '''.format(rule)), rules)))))
+      '''.format(rule_section_xml=rule_section_xml)))
 
   def _create_scalastyle_excludes_file(self, exclude_patterns=None):
     return self.create_file(
@@ -55,9 +57,9 @@ class ScalastyleTest(NailgunTaskTestBase):
     return self.context(
       config=config or dedent('''
         [scalastyle]
-        config: {0}
+        config: {config}
         excludes:
-      '''.format(self._create_scalastyle_config_file())),
+      '''.format(config=self._create_scalastyle_config_file())),
       options=options or self._with_no_skip_option())
 
   def _create_scalastyle_task(self, config=None, options=None):
@@ -101,10 +103,10 @@ class ScalastyleTest(NailgunTaskTestBase):
   def test_initialize_config_no_excludes_setting(self):
     task = self._create_scalastyle_task(config=dedent('''
       [scalastyle]
-      config: {0}
+      config: {config}
       excludes:
-    '''.format(self._create_scalastyle_config_file())))
-    # config file shouldn't none and the task shouldn't be skipped.
+    '''.format(config=self._create_scalastyle_config_file())))
+    # config file shouldn't be none and the task shouldn't be skipped.
     self.assertIsNotNone(task._scalastyle_config)
     self.assertFalse(task._should_skip)
     # but the excludes pattern should remain none.
@@ -114,18 +116,18 @@ class ScalastyleTest(NailgunTaskTestBase):
     with self.assertRaises(Config.ConfigError):
       self._create_scalastyle_task(config=dedent('''
         [scalastyle]
-        config: {0}
+        config: {config}
         excludes: file_does_not_exist.xml
-      '''.format(self._create_scalastyle_config_file())))
+      '''.format(config=self._create_scalastyle_config_file())))
 
   def test_initialize_config_excludes_parsed_loaded_correctly(self):
     task = self._create_scalastyle_task(config=dedent('''
       [scalastyle]
-      config: {0}
-      excludes: {1}
+      config: {config}
+      excludes: {excludes}
     '''.format(
-      self._create_scalastyle_config_file(),
-      self._create_scalastyle_excludes_file(['.*\.cpp', '.*\.py']))))
+      config=self._create_scalastyle_config_file(),
+      excludes=self._create_scalastyle_excludes_file(['.*\.cpp', '.*\.py']))))
 
     self.assertEqual(2, len(task._scalastyle_excludes))
     self.assertTrue(task._should_include_source('com/some/org/x.scala'))
@@ -197,14 +199,14 @@ class ScalastyleTest(NailgunTaskTestBase):
 
   def test_get_non_excluded_scala_sources(self):
     # Create a custom context so we can manually inject scala targets
-    # that with mixed sources in them to test the source filtering logic.
+    # with mixed sources in them to test the source filtering logic.
     context = self._create_context(config=dedent('''
       [scalastyle]
-      config: {0}
-      excludes: {1}
+      config: {config}
+      excludes: {excludes}
     '''.format(
-      self._create_scalastyle_config_file(),
-      self._create_scalastyle_excludes_file(['a/scala_2/Source2.scala']))))
+      config=self._create_scalastyle_config_file(),
+      excludes=self._create_scalastyle_excludes_file(['a/scala_2/Source2.scala']))))
 
     # this scala target has mixed *.scala and *.java sources.
     # the *.java source should filtered out.

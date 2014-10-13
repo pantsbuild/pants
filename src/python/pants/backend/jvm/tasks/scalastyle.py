@@ -77,18 +77,19 @@ class Scalastyle(NailgunTask, JvmToolTaskMixin):
     # just skip the check all together.
     if not scalastyle_config:
       self.context.log.debug(
-        'Unable to get section[{0}] option[{1}] value in pants.ini. Scalastyle will be skipped.'
-          .format(self._CONFIG_SECTION, self._CONFIG_SECTION_CONFIG_OPTION))
+        'Unable to get section[{section}] option[{setting}] value in pants.ini. '
+        'Scalastyle will be skipped.'
+          .format(section=self._CONFIG_SECTION, setting=self._CONFIG_SECTION_CONFIG_OPTION))
       return
 
     # However, if the config setting value is specified, then it must be a valid file.
     if not os.path.exists(scalastyle_config):
       raise Config.ConfigError(
-        'Scalastyle config file specified in section[{0}] option[{1}] in pants.ini '
-        'does not exist: {2}'.format(
-          self._CONFIG_SECTION,
-          self._CONFIG_SECTION_CONFIG_OPTION,
-          scalastyle_config))
+        'Scalastyle config file specified in section[{section}] option[{setting}] in pants.ini '
+        'does not exist: {file}'.format(
+          section=self._CONFIG_SECTION,
+          setting=self._CONFIG_SECTION_CONFIG_OPTION,
+          file=scalastyle_config))
 
     excludes_file = self.context.config.get(
       self._CONFIG_SECTION, self._CONFIG_SECTION_EXCLUDES_OPTION)
@@ -97,21 +98,22 @@ class Scalastyle(NailgunTask, JvmToolTaskMixin):
     if excludes_file:
       if not os.path.exists(excludes_file):
         raise Config.ConfigError(
-          'Scalastyle excludes file specified in section[{0}] option[{1}] in pants.ini '
-          'does not exist: {2}'.format(
-            self._CONFIG_SECTION,
-            self._CONFIG_SECTION_EXCLUDES_OPTION,
-            excludes_file))
+          'Scalastyle excludes file specified in section[{section}] option[{setting}] in '
+          'pants.ini does not exist: {file}'.format(
+            section=self._CONFIG_SECTION,
+            setting=self._CONFIG_SECTION_EXCLUDES_OPTION,
+            file=excludes_file))
       with open(excludes_file) as fh:
         for pattern in fh.readlines():
           scalastyle_excludes.add(re.compile(pattern.strip()))
-          self.context.log.debug('Scalastyle file exclude pattern: {0}'.format(pattern))
+          self.context.log.debug(
+            'Scalastyle file exclude pattern: {pattern}'.format(pattern=pattern))
     else:
       # excludes setting is optional, but if specified, should point a valid file.
       self.context.log.debug(
-        'Unable to get section[{0}] option[{1}] value in pants.ini. '
+        'Unable to get section[{section}] option[{setting}] value in pants.ini. '
         'All scala sources will be checked.'.format(
-          self._CONFIG_SECTION, self._CONFIG_SECTION_EXCLUDES_OPTION))
+          section=self._CONFIG_SECTION, setting=self._CONFIG_SECTION_EXCLUDES_OPTION))
 
     # Only transfer to local variables to the state at the end to minimize side effects.
     self._scalastyle_config = scalastyle_config or None
@@ -161,12 +163,12 @@ class Scalastyle(NailgunTask, JvmToolTaskMixin):
     targets = self._get_non_synthetic_scala_targets(self.context.targets())
     self.context.log.debug('Non synthetic scala targets to be checked:')
     for target in targets:
-      self.context.log.debug('  {0}'.format(target.address.spec))
+      self.context.log.debug('  {address_spec}'.format(address_spec=target.address.spec))
 
     scala_sources = self._get_non_excluded_scala_sources(targets)
     self.context.log.debug('Non excluded scala sources to be checked:')
     for source in scala_sources:
-      self.context.log.debug('  {0}'.format(source))
+      self.context.log.debug('  {source}'.format(source=source))
 
     if scala_sources:
       def call(srcs):
@@ -176,4 +178,5 @@ class Scalastyle(NailgunTask, JvmToolTaskMixin):
                             args=['-c', self._scalastyle_config] + srcs)
       result = Xargs(call).execute(scala_sources)
       if result != 0:
-        raise TaskError('java {0} ... exited non-zero ({1})'.format(Scalastyle._MAIN, result))
+        raise TaskError('java {entry} ... exited non-zero ({exit_code})'.format(
+          entry=Scalastyle._MAIN, exit_code=result))
