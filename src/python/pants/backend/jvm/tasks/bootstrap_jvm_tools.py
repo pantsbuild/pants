@@ -9,11 +9,18 @@ import threading
 
 from pants.backend.core.tasks.task import Task
 from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
+from pants.base.address_lookup_error import AddressLookupError
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit
 
 
 class BootstrapJvmTools(Task, IvyTaskMixin):
+
+
+  class DepLookupError(AddressLookupError):
+    """Thrown when a dependency can't be found"""
+    pass
+
 
   @classmethod
   def product_types(cls):
@@ -53,7 +60,7 @@ class BootstrapJvmTools(Task, IvyTaskMixin):
       context.products.safe_create_data('jvm_build_tools_classpath_callbacks',
                                         lambda: callback_product_map)
 
-  def resolve_tool_targets(self, tools):
+  def _resolve_tool_targets(self, tools, key):
     if not tools:
       raise TaskError("BootstrapJvmTools.resolve_tool_targets called with no tool"
                       " dependency addresses.  This probably means that you don't"
@@ -63,11 +70,15 @@ class BootstrapJvmTools(Task, IvyTaskMixin):
         targets = list(self.context.resolve(tool))
         if not targets:
           raise KeyError
-      except KeyError:
-        self.context.log.error("Failed to resolve target for bootstrap tool: %s. "
+      except (KeyError, AddressLookupError) as e:
+        tool_product_config_map = self.context.products.get_data('jvm_build_tools_config') or {}
+        self.context.log.error("Failed to resolve target for bootstrap tool: {tool}. "
                                "You probably need to add this dep to your tools "
-                               "BUILD file(s), usually located in the root of the build." %
-                               tool)
+                               "BUILD file(s), usually located in the root of the build. \n"
+                               "See pants.ini section: [{section}] key: {key}\n"
+                               "Error: {e}\n".format(tool=tool, e=e,
+                                                   section=tool_product_config_map[key]['ini_section'],
+                                                   key=tool_product_config_map[key]['ini_key']))
         raise
       for target in targets:
         yield target
@@ -79,7 +90,7 @@ class BootstrapJvmTools(Task, IvyTaskMixin):
     def bootstrap_classpath(executor=None):
       with cache_lock:
         if 'classpath' not in cache:
-          targets = list(self.resolve_tool_targets(tools))
+          targets = list(self._resolve_tool_targets(tools, key))
           workunit_name = 'bootstrap-%s' % str(key)
           cache['classpath'] = self.ivy_resolve(targets,
                                                 executor=executor,

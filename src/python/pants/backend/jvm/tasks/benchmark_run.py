@@ -47,14 +47,15 @@ class BenchmarkRun(JvmTask, JvmToolTaskMixin):
                                    default=['-Xmx1g', '-XX:MaxPermSize=256m'])
 
     self._benchmark_bootstrap_key = 'benchmark-tool'
-    benchmark_bootstrap_tools = config.getlist('benchmark-run', 'bootstrap-tools',
-                                               default=['//:benchmark-caliper-0.5'])
-    self.register_jvm_tool(self._benchmark_bootstrap_key,
-                                                  benchmark_bootstrap_tools)
+    self.register_jvm_tool_from_config(self._benchmark_bootstrap_key, config,
+                           ini_section='benchmark-run',
+                           ini_key='bootstrap-tools',
+                           default=['//:benchmark-caliper-0.5'])
     self._agent_bootstrap_key = 'benchmark-agent'
-    agent_bootstrap_tools = config.getlist('benchmark-run', 'agent_profile',
-                                           default=[':benchmark-java-allocation-instrumenter-2.1'])
-    self.register_jvm_tool(self._agent_bootstrap_key, agent_bootstrap_tools)
+    self.register_jvm_tool_from_config(self._agent_bootstrap_key, config,
+                           ini_section='benchmark-run',
+                           ini_key='agent_profile',
+                           default=[':benchmark-java-allocation-instrumenter-2.1'])
 
     # TODO(Steve Gury):
     # Find all the target classes from the Benchmark target itself

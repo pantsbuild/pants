@@ -20,6 +20,7 @@ from pants.backend.codegen.tasks.code_gen import CodeGen
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.base.address import SyntheticAddress
+from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.target import Target
@@ -48,6 +49,12 @@ def _copytree(from_base, to_base):
 
 
 class ApacheThriftGen(CodeGen):
+
+
+  class DepLookupError(AddressLookupError):
+    """Thrown when a dependency can't be found"""
+    pass
+
   GenInfo = namedtuple('GenInfo', ['gen', 'deps'])
   ThriftSession = namedtuple('ThriftSession', ['outdir', 'cmd', 'process'])
 
@@ -88,12 +95,21 @@ class ApacheThriftGen(CodeGen):
     gen_info = self.context.config.getdict('thrift-gen', key)
     gen = gen_info['gen']
     deps = {}
+
     for category, depspecs in gen_info['deps'].items():
       dependencies = OrderedSet()
       deps[category] = dependencies
       for depspec in depspecs:
-        dependencies.update(self.context.resolve(depspec))
-    return self.GenInfo(gen, deps)
+        try:
+          dependencies.update(self.context.resolve(depspec))
+        except AddressLookupError as e:
+          raise self.DepLookupError("{message}\n  referenced from [{section}] key: {key}"
+                                    "in pants.ini" .format(message=e, section='thrift-gen',
+                                                           key="gen->deps->{category}"
+                                                           .format(cateegory=category)))
+      return self.GenInfo(gen, deps)
+
+
 
   _gen_java = None
   @property

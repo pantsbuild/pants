@@ -44,10 +44,9 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
     super(ThriftLinter, self).__init__(*args, **kwargs)
 
     self._bootstrap_key = 'scrooge-linter'
-
-    bootstrap_tools = self.context.config.getlist(self._CONFIG_SECTION, 'bootstrap-tools',
-                                                  default=['//:scrooge-linter'])
-    self.register_jvm_tool(self._bootstrap_key, bootstrap_tools)
+    self.register_jvm_tool_from_config(self._bootstrap_key, self.context.config,
+                                       self._CONFIG_SECTION, 'bootstrap-tools',
+                                       default=['//:scrooge-linter'])
 
   @property
   def config_section(self):

@@ -29,9 +29,11 @@ class ScalaRepl(JvmTask, JvmToolTaskMixin):
         self.jvm_args.extend(safe_shlex_split(arg))
     self.confs = self.context.config.getlist('scala-repl', 'confs', default=['default'])
     self._bootstrap_key = 'scala-repl'
-    bootstrap_tools = self.context.config.getlist('scala-repl', 'bootstrap-tools',
-                                                  default=['//:scala-repl-2.9.3'])
-    self.register_jvm_tool(self._bootstrap_key, bootstrap_tools)
+    self.register_jvm_tool_from_config(self._bootstrap_key, self.context.config,
+                                       ini_section='scala-repl',
+                                       ini_key='bootstrap-tools',
+                                       default=['//:scala-repl-2.9.3'])
+
     self.main = self.context.config.get('scala-repl', 'main')
     self.args = self.context.config.getlist('scala-repl', 'args', default=[])
     if self.context.options.run_args:
