@@ -73,6 +73,7 @@ class Precomputed(object):
   def __init__(self, page, xref):
     """
     :param page: dictionary of per-page precomputed info
+    :param xref: dictionary of xrefs {'foo': 'path/to/page.html#fooref', ...}
     """
     self.page = page
     self.xref = xref
@@ -89,16 +90,19 @@ class PrecomputedPageInfo(object):
 
 
 def precompute_xrefs(soups):
-  """Precompute links for <a xmark="foo"> tags. Alters soups to give needed ids.
+  """Return links for <a xmark="foo"> tags. Mutates soups to give needed ids.
 
   If we see <a xref="foo">something</a>, that's a link whose destination is
   a <a xmark="foo"> </a> tag, perhaps on some other tag. To stitch these
   together, we scan the docset to find all the xmarks. If an xmark does not
   yet have an id to anchor, we give it one.
+
+  Return value dictionary maps xrefs to locations:
+  { "foo": "path/to/foo.html#fooref", "bar": "other/page.html#barref", ...}
   """
   accumulator = {}
   for (page, soup) in soups.items():
-    existing_ids = find_existing_ids(soup)
+    existing_anchors = find_existing_anchors(soup)
     count = 100
     for tag in soup.find_all('a'):
       if tag.has_attr('xmark'):
@@ -106,14 +110,19 @@ def precompute_xrefs(soups):
         if xmark in accumulator:
           raise TaskError('xmarks are unique but "{0}" appears in {1} and {2}'
                           .format(xmark, page, accumulator[xmark]))
+
+        # To link to a place "mid-page", we need an HTML anchor.
+        # If this tag already has such an anchor, use it.
+        # Else, make one up.
         anchor = tag.get('id') or tag.get('name') or None
         if not anchor:
           anchor = xmark
-          while anchor in existing_ids:
+          while anchor in existing_anchors:
             count += 1
             anchor = '{0}_{1}'.format(xmark, count)
           tag['id'] = anchor
-          existing_ids = find_existing_ids(soup)
+          existing_anchors = find_existing_anchors(soup)
+
         link = '{0}.html#{1}'.format(page, anchor)
         accumulator[xmark] = link
   return accumulator
@@ -164,14 +173,14 @@ def rel_href(src, dst):
   return os.path.relpath(dst, src_dir)
 
 
-def find_existing_ids(soup):
+def find_existing_anchors(soup):
   """Return existing ids (and names) from a soup."""
-  existing_ids = set([])
+  existing_anchors = set([])
   for tag in soup.find_all(True):
     for attr in ['id', 'name']:
       if tag.has_attr(attr):
-        existing_ids.add(tag.get(attr))
-  return existing_ids
+        existing_anchors.add(tag.get(attr))
+  return existing_anchors
 
 
 def ensure_headings_linkable(soups):
@@ -182,7 +191,7 @@ def ensure_headings_linkable(soups):
   for soup in soups.values():
     # To avoid re-assigning an existing id, note 'em down.
     # Case-insensitve because distinguishing links #Foo and #foo would be weird.
-    existing_ids = find_existing_ids(soup)
+    existing_anchors = find_existing_anchors(soup)
     count = 100
     for tag in soup.find_all(_heading_re):
       if not (tag.has_attr('id') or tag.has_attr('name')):
@@ -190,13 +199,22 @@ def ensure_headings_linkable(soups):
         while True:
           count += 1
           candidate_id = 'heading_{0}_{1}'.format(snippet, count).lower()
-          if not candidate_id in existing_ids:
-            existing_ids.add(candidate_id)
+          if not candidate_id in existing_anchors:
+            existing_anchors.add(candidate_id)
             tag['id'] = candidate_id
             break
 
+PILCROW_LINK_CSS = 'pilcrow-link'
+
 
 def add_here_links(soups):
+  """Add the "pilcrow" links.
+
+  If the user hovers over a section, we want show a symbol that links to
+  this section.
+
+  Wraps header+pilcrow in a div w/css class h-plus-pilcrow.
+  """
   for soup in soups.values():
     for tag in soup.find_all(_heading_re):
       anchor = tag.get('id') or tag.get('name')
@@ -205,8 +223,8 @@ def add_here_links(soups):
       new_container = soup.new_tag('div')
       new_container['class'] = 'h-plus-pilcrow'
       tag.wrap(new_container)
-      pilcrow_link = soup.new_tag('a', href="#{0}".format(anchor))
-      pilcrow_link['class'] = ['pilcrow-link']
+      pilcrow_link = soup.new_tag('a', href='#{0}'.format(anchor))
+      pilcrow_link['class'] = [PILCROW_LINK_CSS]
       pilcrow_link.append(' ¶')
       tag.append(pilcrow_link)
 
@@ -229,7 +247,6 @@ def transform_soups(config, soups, precomputed):
   ensure_headings_linkable(soups)
   add_here_links(soups)
   link_xrefs(soups, precomputed)
-  # TODO: yet more to come here
 
 
 def get_title(soup):
@@ -305,19 +322,30 @@ def hdepth(tag):
 
 def generate_page_toc(soup):
   """Return page-level (~list of headings) TOC template data for soup"""
+  # Maybe we don't want to show all the headings. E.g., it's common for a page
+  # to have just one H1, a title at the top. Our heuristic: if a page has just
+  # one heading of some outline level, don't show it.
   found_depth_counts = collections.defaultdict(int)
   for tag in soup.find_all(_heading_re):
     if (tag.get('id') or tag.get('name')):
       found_depth_counts[hdepth(tag)] += 1
+
+  def text_without_pilcrow(tag):
+    tag_copy = bs4.BeautifulSoup('{0}'.format(tag))
+    if tag_copy.find(class_=PILCROW_LINK_CSS):
+      tag_copy.find(class_=PILCROW_LINK_CSS).string.replace_with('')
+    return tag_copy.text
+
   depth_list = [i for i in range(100) if 1 < found_depth_counts[i]]
   depth_list = depth_list[:4]
   toc = []
   for tag in soup.find_all(_heading_re):
     depth = hdepth(tag)
     if depth in depth_list:
+      tag_text = text_without_pilcrow(tag)
       toc.append(dict(depth=depth_list.index(depth) + 1,
                       link=tag.get('id') or tag.get('name'),
-                      text=tag.text))
+                      text=tag_text))
   return toc
 
 
