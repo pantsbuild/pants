@@ -35,6 +35,8 @@ INDEX_HTML = """
 
 <p>Pants is a build system.</p>
 
+<a xmark="xmark_index"></a>
+
 <p>See also:
 <a href="../fake1/p1.html">another page</a>.</p>
 """
@@ -42,7 +44,9 @@ INDEX_HTML = """
 P1_HTML = """
 <h1>東京 is Tokyo</h1>
 
-<p>Fascinating description.
+<a id="an_xmark" xmark="xmark_p1"></a>
+
+<p>Fascinating description. <a xref="xmark_index">to index</a>
 """
 
 P2_HTML = """
@@ -53,7 +57,7 @@ P2_HTML = """
 
 <h1>Page 2</h1>
 
-<p>Some text</p>
+<p>Some text <a xref="xmark_p1">to p1</a></p>
 
 <h2 id="one">Section One</h2>
 
@@ -89,8 +93,26 @@ class AllTheThingsTestCase(unittest.TestCase):
                                soups,
                                self.precomputed,
                                TEMPLATE_MUSTACHE)
-    self.assertTrue('subdir/page1.html' in html,
-                    'p1.html link did not get fixed up to page1.html')
+    self.assertIn('subdir/page1.html', html,
+                  'p1.html link did not get fixed up to page1.html')
+
+  def test_xrefs(self):
+    soups = self.orig_soups.copy()
+    sitegen.link_xrefs(soups, self.precomputed)
+    p1_html = sitegen.render_html('subdir/page1',
+                                  self.config,
+                                  soups,
+                                  self.precomputed,
+                                  TEMPLATE_MUSTACHE)
+    self.assertIn('href="../index.html#xmark_index"', p1_html,
+                  'xref_index did not get linked')
+    p2_html = sitegen.render_html('subdir/page2',
+                                  self.config,
+                                  soups,
+                                  self.precomputed,
+                                  TEMPLATE_MUSTACHE)
+    self.assertIn('href="page1.html#an_xmark"', p2_html,
+                  'xref_p1 did not get linked')
 
   def test_find_title(self):
     soups = self.orig_soups.copy()
@@ -110,16 +132,6 @@ class AllTheThingsTestCase(unittest.TestCase):
     self.assertEqual(p1_html, u'東京 is Tokyo',
                      """Didn't find correct non-ASCII title""")
 
-  def test_fixup_internal_links(self):
-    soups = self.orig_soups.copy()
-    sitegen.fixup_internal_links(self.config, soups)
-    html = sitegen.render_html('index',
-                               self.config,
-                               soups,
-                               self.precomputed,
-                               TEMPLATE_MUSTACHE)
-    self.assertTrue('subdir/page1.html' in html,
-                    'p1.html link did not get fixed up to page1.html')
 
   def test_page_toc(self):
     # One of our "pages" has a couple of basic headings.
