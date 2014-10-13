@@ -24,13 +24,6 @@ from pants.backend.core.tasks.task import Task
 from pants.util.dirutil import safe_mkdir, safe_open
 
 
-def configure_codehighlight_options(option_group, mkflag):
-  all_styles = list(get_all_styles())
-  option_group.add_option(mkflag('code-style'), dest='markdown_to_html_code_style',
-                          type='choice', choices=all_styles,
-                          help='Selects the stylesheet to use for code highlights, one of: '
-                               '%s.' % ' '.join(all_styles))
-
 def emit_codehighlight_css(path, style):
   with safe_open(path, 'w') as css:
     css.write((HtmlFormatter(style=style)).get_style_defs('.codehilite'))
@@ -176,24 +169,26 @@ def page_to_html_path(page):
 
 class MarkdownToHtml(Task):
   @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    configure_codehighlight_options(option_group, mkflag)
+  def register_options(cls, register):
+    register('--code-style',
+             choices=list(get_all_styles()),
+             help=('Selects the stylesheet to use for code highlights, '
+                   'one of {0}'.format(' '.join(get_all_styles()))),
+             legacy='markdown_to_html_code_style')
+    register('--open',
+             action='store_true',
+             help='Open the generated documents in a browser.',
+             legacy='markdown_to_html_open')
+    register('--fragment',
+             action='store_true',
+             help='Generate a fragment of html to embed in a page.',
+             legacy='markdown_to_html_fragment')
+    register('--extension',
+             action='append',
+             help=('Override the default markdown extensions and process pages '
+                   'whose source have these extensions instead.'),
+             legacy='markdown_to_html_extensions')
 
-    option_group.add_option(mkflag('open'), mkflag('open', negate=True),
-                            dest='markdown_to_html_open',
-                            action='callback', callback=mkflag.set_bool, default=False,
-                            help='[%default] Open the generated documents in a browser.')
-
-    option_group.add_option(mkflag('fragment'), mkflag('fragment', negate=True),
-                            dest = 'markdown_to_html_fragment',
-                            action='callback', callback=mkflag.set_bool, default=False,
-                            help='[%default] Generate a fragment of html to embed in a page.')
-
-    option_group.add_option(mkflag('extension'), dest='markdown_to_html_extensions',
-                            action='append',
-
-                            help='Override the default markdown extensions and process pages '
-                                 'whose source have these extensions instead.')
 
   @classmethod
   def product_types(cls):
