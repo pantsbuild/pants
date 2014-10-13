@@ -70,11 +70,12 @@ def load_soups(config):
 class Precomputed(object):
   """Info we compute (and preserve) before we mutate things."""
 
-  def __init__(self, page):
+  def __init__(self, page, xref):
     """
     :param page: dictionary of per-page precomputed info
     """
     self.page = page
+    self.xref = xref
 
 
 class PrecomputedPageInfo(object):
@@ -87,13 +88,45 @@ class PrecomputedPageInfo(object):
     self.title = title
 
 
+def precompute_xrefs(soups):
+  """Precompute links for <a xmark="foo"> tags. Alters soups to give needed ids.
+
+  If we see <a xref="foo">something</a>, that's a link whose destination is
+  a <a xmark="foo"> </a> tag, perhaps on some other tag. To stitch these
+  together, we scan the docset to find all the xmarks. If an xmark does not
+  yet have an id to anchor, we give it one.
+  """
+  accumulator = {}
+  for (page, soup) in soups.items():
+    existing_ids = find_existing_ids(soup)
+    count = 100
+    for tag in soup.find_all('a'):
+      if tag.has_attr('xmark'):
+        xmark = tag['xmark']
+        if xmark in accumulator:
+          raise TaskError('xmarks are unique but "{0}" appears in {1} and {2}'
+                          .format(xmark, page, accumulator[xmark]))
+        anchor = tag.get('id') or tag.get('name') or None
+        if not anchor:
+          anchor = xmark
+          while anchor in existing_ids:
+            count += 1
+            anchor = '{0}_{1}'.format(xmark, count)
+          tag['id'] = anchor
+          existing_ids = find_existing_ids(soup)
+        link = '{0}.html#{1}'.format(page, anchor)
+        accumulator[xmark] = link
+  return accumulator
+
+
 def precompute(config, soups):
   """Return info we want to compute (and preserve) before we mutate things."""
   page = {}
+  xrefs = precompute_xrefs(soups)
   for p, soup in soups.items():
     title = get_title(soup) or p
     page[p] = PrecomputedPageInfo(title=title)
-  return Precomputed(page=page)
+  return Precomputed(page=page, xref=xrefs)
 
 
 def fixup_internal_links(config, soups):
@@ -109,19 +142,36 @@ def fixup_internal_links(config, soups):
     reverse_directory[s] = d
   for name, soup in soups.items():
     old_src_dir = os.path.dirname(config['sources'][name])
-    new_src_dir = os.path.dirname(name)
     for tag in soup.find_all(True):
       if not 'href' in tag.attrs: continue
       old_rel_path = tag['href'].split('#')[0]
       old_dst = os.path.normpath(os.path.join(old_src_dir, old_rel_path))
       if not old_dst in reverse_directory: continue
-      new_dst = reverse_directory[old_dst]
-      new_rel_path = os.path.relpath(new_dst + '.html', new_src_dir)
+      new_dst = reverse_directory[old_dst] + '.html'
+      new_rel_path = rel_href(name, new_dst)
       # string replace instead of assign to not loose anchor in foo.html#anchor
       tag['href'] = tag['href'].replace(old_rel_path, new_rel_path, 1)
 
 
 _heading_re = re.compile('^h[1-6]$')  # match heading tag names h1,h2,h3,...
+
+
+def rel_href(src, dst):
+  """if src is 'foo/bar.html' and dst is 'garply.html#frotz' return relative
+     link '../garply.html#frotz'
+  """
+  src_dir = os.path.dirname(src)
+  return os.path.relpath(dst, src_dir)
+
+
+def find_existing_ids(soup):
+  """Return existing ids (and names) from a soup."""
+  existing_ids = set([])
+  for tag in soup.find_all(True):
+    for attr in ['id', 'name']:
+      if tag.has_attr(attr):
+        existing_ids.add(tag.get(attr))
+  return existing_ids
 
 
 def ensure_headings_linkable(soups):
@@ -132,10 +182,7 @@ def ensure_headings_linkable(soups):
   for soup in soups.values():
     # To avoid re-assigning an existing id, note 'em down.
     # Case-insensitve because distinguishing links #Foo and #foo would be weird.
-    existing_ids = set([])
-    for tag in soup.find_all(True):
-      existing_ids.add((tag.get('id') or '').lower())
-      existing_ids.add((tag.get('name') or '').lower())
+    existing_ids = find_existing_ids(soup)
     count = 100
     for tag in soup.find_all(_heading_re):
       if not (tag.has_attr('id') or tag.has_attr('name')):
@@ -149,10 +196,39 @@ def ensure_headings_linkable(soups):
             break
 
 
+def add_here_links(soups):
+  for soup in soups.values():
+    for tag in soup.find_all(_heading_re):
+      anchor = tag.get('id') or tag.get('name')
+      if not anchor:
+        continue
+      new_container = soup.new_tag('div')
+      new_container['class'] = 'h-plus-pilcrow'
+      tag.wrap(new_container)
+      pilcrow_link = soup.new_tag('a', href="#{0}".format(anchor))
+      pilcrow_link['class'] = ['pilcrow-link']
+      pilcrow_link.append(' ¶')
+      tag.append(pilcrow_link)
+
+
+def link_xrefs(soups, precomputed):
+  """Transorm soups: <a xref="foo"> becomes <a href="../foo_page.html#foo">"""
+  for (page, soup) in soups.items():
+    for a in soup.find_all('a'):
+      if a.has_attr('xref'):
+        xref = a['xref']
+        if not xref in precomputed.xref:
+          raise TaskError('Page {0} has xref "{1}" and I cannot find xmark for'
+                          ' it'.format(page, xref))
+        a['href'] = rel_href(page, precomputed.xref[xref])
+
+
 def transform_soups(config, soups, precomputed):
   """Mutate our soups to be better when we write them out later."""
   fixup_internal_links(config, soups)
   ensure_headings_linkable(soups)
+  add_here_links(soups)
+  link_xrefs(soups, precomputed)
   # TODO: yet more to come here
 
 
@@ -190,11 +266,11 @@ def generate_breadcrumbs(config, precomputed, here):
   def recurse(tree, pages_so_far):
     for node in tree:
       if 'page' in node:
-        pages_so_far = pages_so_far + [node['page']]
+        pages_so_far_next = pages_so_far + [node['page']]
       if 'page' in node and node['page'] == here:
-        return pages_so_far
+        return pages_so_far_next
       if 'children' in node:
-        r = recurse(node['children'], pages_so_far)
+        r = recurse(node['children'], pages_so_far_next)
         if r:
           return r
     return None
