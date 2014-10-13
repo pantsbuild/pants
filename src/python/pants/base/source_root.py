@@ -10,6 +10,7 @@ import os
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot
+from pants.base.build_manual import manual
 from pants.base.exceptions import TargetDefinitionException
 
 
@@ -164,6 +165,7 @@ class SourceRoot(object):
   """
 
   @classmethod
+  @manual.builddict(factory=True)
   def factory(cls, parse_context):
     """Creates a ``SourceRoot`` valid for the given ``ParseContext``."""
     return cls(parse_context.rel_path)

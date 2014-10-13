@@ -10,7 +10,6 @@ import sys
 from collections import defaultdict
 from contextlib import contextmanager
 
-from twitter.common.collections import OrderedSet
 from twitter.common.dirutil import Lock
 from twitter.common.process import ProcessProviderFactory
 from twitter.common.process.process_provider import ProcessProvider
@@ -278,9 +277,8 @@ class Context(object):
 
     :return: a list of targets evaluated by the predicate in inorder traversal order.
     """
-    target_set = OrderedSet()
-    for target in self._target_roots:
-      target_set.update(target.closure())
+    target_root_addresses = [target.address for target in self._target_roots]
+    target_set = self.build_graph.transitive_subgraph_of_addresses(target_root_addresses)
     return filter(predicate, target_set)
 
   def dependents(self, on_predicate=None, from_predicate=None):

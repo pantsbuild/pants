@@ -37,6 +37,8 @@ class ScalaCompile(JvmCompile):
   @classmethod
   def register_options(cls, register):
     super(ScalaCompile, cls).register_options(register)
+    # Note: Used in ZincUtils.
+    # TODO: Revisit this. It's unintuitive for ZincUtils to reach back into the task for options.
     register('--plugins', default=None, action='append', help='Use these scalac plugins.',
              legacy='plugins')
 

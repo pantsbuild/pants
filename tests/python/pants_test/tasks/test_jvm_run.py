@@ -18,7 +18,10 @@ from pants_test.tasks.test_base import prepare_task
 class JvmRunTest(BaseTest):
   def test_cmdline_only(self):
     jvm_binary = self.make_target('src/java/com/pants:binary', JvmBinary, main="com.pants.Binary")
-    jvm_run = prepare_task(JvmRun, args=['--test-only-write-cmd-line=a'], targets=[jvm_binary])
+    jvm_run = prepare_task(JvmRun,
+                           args=['--test-only-write-cmd-line=a'],
+                           targets=[jvm_binary],
+                           build_graph=self.build_graph)
 
     round_manager = RoundManager(jvm_run.context)
     jvm_run.prepare(round_manager)

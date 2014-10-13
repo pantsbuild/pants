@@ -314,14 +314,14 @@ def entry_for_one_class(nom, cls):
   methods = []
   for attrname in dir(cls):
     attr = getattr(cls, attrname)
-    attr_bdi = get_builddict_info(attr)
-    if attr_bdi is None: continue
-    if inspect.ismethod(attr):
-      methods.append(entry_for_one_method(attrname, attr))
-      continue
-    raise TaskError('@manual.builddict on non-method %s within class %s '
-                    'but I only know what to do with methods' %
-                    (attrname, nom))
+    info = get_builddict_info(attr)
+    # we want methods tagged @manual.builddict--except factory functions
+    if info and not info.get('factory', False):
+      if inspect.ismethod(attr):
+        methods.append(entry_for_one_method(attrname, attr))
+      else:
+        raise TaskError('@manual.builddict() on non-method {0}'
+                        ' within class {1}'.format(attrname, nom))
 
   return entry(nom,
                classdoc_rst=cls.__doc__,
@@ -336,6 +336,10 @@ def entry_for_one_class(nom, cls):
 def entry_for_one(nom, sym):
   if inspect.isclass(sym):
     return entry_for_one_class(nom, sym)
+  info = get_builddict_info(sym)
+  if info and info.get('factory'):
+    # instead of getting factory info, get info about associated class:
+    return entry_for_one_class(nom, sym.im_self)
   if inspect.ismethod(sym) or inspect.isfunction(sym):
     return entry_for_one_func(nom, sym)
   return msg_entry(nom,
@@ -446,7 +450,7 @@ def gen_tasks_goals_reference_data():
       task_type = goal.task_type_by_name(task_name)
       doc_rst = indent_docstring_by_n(task_type.__doc__ or '', 2)
       doc_html = rst_to_html(dedent_docstring(task_type.__doc__))
-      options_title = Goal.option_group_title(goal, task_name)
+      options_title = Goal.scope(goal.name, task_name)
       og = options_by_title[options_title]
       if og:
         found_option_groups.add(options_title)

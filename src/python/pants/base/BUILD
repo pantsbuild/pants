@@ -266,6 +266,7 @@ python_library(
   sources = ['source_root.py'],
   dependencies = [
     ':build_environment',
+    ':build_manual',
     ':exceptions',
     ':parse_context',
     '3rdparty/python/twitter/commons:twitter.common.collections',

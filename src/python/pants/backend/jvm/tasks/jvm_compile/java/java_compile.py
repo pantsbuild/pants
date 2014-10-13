@@ -6,7 +6,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import os
-import shlex
 
 from pants.backend.jvm.tasks.jvm_compile.analysis_tools import AnalysisTools
 from pants.backend.jvm.tasks.jvm_compile.java.jmake_analysis import JMakeAnalysis
@@ -17,11 +16,13 @@ from pants.base.exceptions import TaskError
 from pants.base.target import Target
 from pants.base.workunit import WorkUnit
 from pants.util.dirutil import relativize_paths, safe_open
+from pants.util.strutil import safe_shlex_split
 
 
 # From http://kenai.com/projects/jmake/sources/mercurial/content
 #  /src/com/sun/tools/jmake/Main.java?rev=26
 # Main.mainExternal docs.
+
 _JMAKE_ERROR_CODES = {
    -1: 'invalid command line option detected',
    -2: 'error reading command file',
@@ -107,9 +108,9 @@ class JavaCompile(JvmCompile):
                         no_warning_defaults=_JAVA_COMPILE_WARNING_ARGS_DEFAULT)
 
     self._javac_opts = []
-    if self.context.options.java_compile_args:
-      for arg in self.context.options.java_compile_args:
-        self._javac_opts.extend(shlex.split(arg))
+    if self.get_options().args:
+      for arg in self.get_options().args:
+        self._javac_opts.extend(safe_shlex_split(arg))
     else:
       self._javac_opts.extend(self.context.config.getlist('java-compile',
                                                           'javac_args', default=[]))
