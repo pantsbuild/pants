@@ -29,7 +29,8 @@ class IvyResolveIntegrationTest(PantsRunIntegrationTest):
       ivy_report_dir = '{workdir}/ivy-report'.format(workdir=workdir)
       pants_run = self.run_pants_with_workdir(
         ['goal', 'compile', 'testprojects/src/java/com/pants/testproject/unicode/main',
-         '--ivy-report', '--ivy-outdir={reportdir}'.format(reportdir=ivy_report_dir)], workdir)
+         '--resolve-ivy-report',
+         '--resolve-ivy-outdir={reportdir}'.format(reportdir=ivy_report_dir)], workdir)
       self._assert_run_success(pants_run)
 
       # Find the ivy report

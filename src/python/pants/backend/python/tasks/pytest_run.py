@@ -6,7 +6,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import os
-import shlex
 
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit
@@ -14,6 +13,7 @@ from pants.backend.python.test_builder import PythonTestBuilder
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.python_task import PythonTask
 from pants.util.contextutil import environment_as
+from pants.util.strutil import safe_shlex_split
 
 
 class PytestRun(PythonTask):
@@ -51,7 +51,7 @@ class PytestRun(PythonTask):
       args = ['--color', 'yes']
       if self.context.options.pytest_run_options:
         for options in self.context.options.pytest_run_options:
-          args.extend(shlex.split(options))
+          args.extend(safe_shlex_split(options))
       test_builder = PythonTestBuilder(targets=test_targets,
                                        args=args,
                                        interpreter=self.interpreter,

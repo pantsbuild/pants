@@ -55,7 +55,7 @@ class RankedValue(object):
   }
 
   @classmethod
-  def choose(cls, flag_val, env_val, config_val, hardcoded_val):
+  def choose(cls, flag_val, env_val, config_val, hardcoded_val, default):
     """Return the highest-ranked non-None value, wrapped in a RankedValue instance."""
     if flag_val is not None:
       return RankedValue(cls.FLAG, flag_val)
@@ -66,7 +66,7 @@ class RankedValue(object):
     elif hardcoded_val is not None:
       return RankedValue(cls.HARDCODED, hardcoded_val)
     else:
-      return RankedValue(cls.NONE, None)
+      return RankedValue(cls.NONE, default)
 
   def __init__(self, rank, value):
     self._rank = rank

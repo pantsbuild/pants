@@ -33,22 +33,13 @@ class ArgSplitter(object):
     self._unconsumed_args = []  # In reverse order, for efficient popping off the end.
     self._is_help = False  # True if the user asked for help.
 
-    # For historical reasons we allow --leaf-scope-flag-name anywhere on the cmd line,
-    # as an alternative to ... leaf.scope --flag-name. This makes the transition to
+    # For historical reasons we allow --scope-flag-name anywhere on the cmd line,
+    # as an alternative to ... scope --flag-name. This makes the transition to
     # the new options system easier, as old-style flags will still work.
-    self._known_scoping_prefixes = {}
 
-    # Note: This algorithm for finding the lead scopes relies on the fact that enclosing
-    # scopes are earlier than enclosed scopes in the list.
-    leaf_scopes = set()
-    for scope in known_scopes:
-      if scope:
-        outer_scope, _, _ = scope.rpartition('.')
-        if outer_scope in leaf_scopes:
-          leaf_scopes.discard(outer_scope)
-        leaf_scopes.add(scope)
-    for scope in leaf_scopes:
-      self._known_scoping_prefixes['--{0}-'.format(scope.replace('.', '-'))] = scope
+    # Check for prefixes in reverse order, so we match the longest prefix first.
+    self._known_scoping_prefixes = [('{0}-'.format(scope.replace('.', '-')), scope)
+                                    for scope in filter(None, sorted(self._known_scopes, reverse=True))]
 
   @property
   def is_help(self):
@@ -149,9 +140,11 @@ class ArgSplitter(object):
 
     returns a pair (scope, flag).
     """
-    for prefix, scope in self._known_scoping_prefixes.iteritems():
-      if flag.startswith(prefix):
-        return scope, '--' + flag[len(prefix):]
+    for scope_prefix, scope in self._known_scoping_prefixes:
+      for flag_prefix in ['--', '--no-']:
+        prefix = flag_prefix + scope_prefix
+        if flag.startswith(prefix):
+          return scope, flag_prefix + flag[len(prefix):]
     return default_scope, flag
 
   def _at_flag(self):

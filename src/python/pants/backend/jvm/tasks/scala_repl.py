@@ -5,13 +5,12 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-import shlex
-
 from pants.java.util import execute_java
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.base.target import Target
 from pants.console.stty_utils import preserve_stty_settings
+from pants.util.strutil import safe_shlex_split
 
 
 class ScalaRepl(JvmTask, JvmToolTaskMixin):
@@ -27,7 +26,7 @@ class ScalaRepl(JvmTask, JvmToolTaskMixin):
     self.jvm_args = self.context.config.getlist('scala-repl', 'jvm_args', default=[])
     if self.context.options.run_jvmargs:
       for arg in self.context.options.run_jvmargs:
-        self.jvm_args.extend(shlex.split(arg))
+        self.jvm_args.extend(safe_shlex_split(arg))
     self.confs = self.context.config.getlist('scala-repl', 'confs', default=['default'])
     self._bootstrap_key = 'scala-repl'
     bootstrap_tools = self.context.config.getlist('scala-repl', 'bootstrap-tools',
@@ -37,7 +36,7 @@ class ScalaRepl(JvmTask, JvmToolTaskMixin):
     self.args = self.context.config.getlist('scala-repl', 'args', default=[])
     if self.context.options.run_args:
       for arg in self.context.options.run_args:
-        self.args.extend(shlex.split(arg))
+        self.args.extend(safe_shlex_split(arg))
 
   def prepare(self, round_manager):
     # TODO(John Sirois): these are fake requirements in order to force compile run before this

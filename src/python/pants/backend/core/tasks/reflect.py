@@ -450,7 +450,7 @@ def gen_tasks_goals_reference_data():
       task_type = goal.task_type_by_name(task_name)
       doc_rst = indent_docstring_by_n(task_type.__doc__ or '', 2)
       doc_html = rst_to_html(dedent_docstring(task_type.__doc__))
-      options_title = Goal.option_group_title(goal, task_name)
+      options_title = Goal.scope(goal.name, task_name)
       og = options_by_title[options_title]
       if og:
         found_option_groups.add(options_title)
