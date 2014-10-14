@@ -41,7 +41,7 @@ class ConfluencePublish(Task):
              legacy='confluence_publish_open')
     register('--user',
              help='Confluence user name, defaults to unix user.',
-             legacy='confluence_user"')
+             legacy='confluence_user')
 
   def __init__(self, *args, **kwargs):
     super(ConfluencePublish, self).__init__(*args, **kwargs)
