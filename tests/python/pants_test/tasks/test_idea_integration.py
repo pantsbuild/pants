@@ -240,6 +240,6 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
                     })
 
   def test_all_targets(self):
-    # The android targets won't evaluate correctly if the Android ADK is not installed
     self._idea_test(['src::', 'tests::', 'examples::', 'testprojects::',
-                     '--exclude-target-regexp=.*android.*'])
+                     # The android targets won't work if the Android ADK is not installed
+                     '--exclude-target-regexp=.*android.*',])

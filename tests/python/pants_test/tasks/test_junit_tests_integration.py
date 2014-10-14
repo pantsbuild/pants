@@ -4,19 +4,14 @@
 
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
+
 import os
+
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
-class JunitTestsIntegrationTest(PantsRunIntegrationTest):
 
-  def _assert_run_success(self, pants_run):
-    self.assertEquals(pants_run.returncode, self.PANTS_SUCCESS_CODE,
-                      "goal compile expected success, got {0}\n"
-                      "got stderr:\n{1}\n"
-                      "got stdout:\n{2}\n".format(pants_run.returncode,
-                                                  pants_run.stderr_data,
-                                                  pants_run.stdout_data))
+class JunitTestsIntegrationTest(PantsRunIntegrationTest):
 
   def _assert_junit_output(self, workdir):
     self.assertTrue(os.path.exists(
@@ -36,9 +31,11 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
       pants_run = self.run_pants_with_workdir(
         ['goal', 'test', 'examples/tests/java//com/pants/examples/hello/greet',
-         'examples/tests/scala/com/pants/example/hello/welcome'],
+         'examples/tests/scala/com/pants/example/hello/welcome',
+         '--interpreter=CPython>=2.6,<3',
+         '--interpreter=CPython>=3.3',],
         workdir)
-      self._assert_run_success(pants_run)
+      self.assert_success(pants_run)
       self._assert_junit_output(workdir)
 
   def test_junit_test_with_emma(self):
@@ -46,13 +43,16 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
       pants_run = self.run_pants_with_workdir(
         ['goal', 'test', 'examples/tests/java//com/pants/examples/hello/greet',
          'examples/tests/scala/com/pants/example/hello/welcome',
+         '--interpreter=CPython>=2.6,<3',
+         '--interpreter=CPython>=3.3',
          '--test-junit-coverage-processor=emma', '--test-junit-coverage',
-         '--test-junit-coverage-xml', '--test-junit-coverage-html'],
+         '--test-junit-coverage-xml', '--test-junit-coverage-html',],
         workdir)
-      self._assert_run_success(pants_run)
+      self.assert_success(pants_run)
       self._assert_junit_output(workdir)
+      # TODO(Eric Ayers): Why does  emma puts coverage.xml in a different directory from cobertura?
       self.assertTrue(os.path.exists(
-        os.path.join(workdir, 'test', 'junit', 'coverage', 'xml', 'coverage.xml')))
+        os.path.join(workdir, 'test', 'junit', 'coverage', 'coverage.xml')))
       self.assertTrue(os.path.exists(
         os.path.join(workdir, 'test', 'junit', 'coverage', 'html', 'index.html')))
 
@@ -78,10 +78,12 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
       pants_run = self.run_pants_with_workdir(
         ['goal', 'test', 'examples/tests/java//com/pants/examples/hello/greet',
          'examples/tests/scala/com/pants/example/hello/welcome',
+         '--interpreter=CPython>=2.6,<3',
+         '--interpreter=CPython>=3.3',
          '--test-junit-coverage-processor=cobertura', '--test-junit-coverage',
-         '--test-junit-coverage-xml', '--test-junit-coverage-html'],
+         '--test-junit-coverage-xml', '--test-junit-coverage-html',],
         workdir)
-      self._assert_run_success(pants_run)
+      self.assert_success(pants_run)
       self._assert_junit_output(workdir)
 
       self.assertTrue(os.path.exists(
@@ -89,5 +91,4 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
       # TODO(Eric Ayers): Look at the xml report.  I think something is broken, it is empty
       self.assertTrue(os.path.exists(
         os.path.join(workdir, 'test', 'junit', 'coverage', 'xml', 'coverage.xml')))
-
 
