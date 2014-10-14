@@ -78,9 +78,7 @@ function run_local_pants() {
 # To solve that problem, we override pants.ini with an empty list of
 # additional backends option.
 function execute_packaged_pants_without_internal_backends() {
-  NO_INTERNAL_BACKEND_PANTS_INI=$(mktemp -t pants.no.internal.backends.ini) && \
-  echo -e "[backends]\npackages: []" > $NO_INTERNAL_BACKEND_PANTS_INI && \
-  PANTS_CONFIG_OVERRIDE=$NO_INTERNAL_BACKEND_PANTS_INI pants "$@"
+  PANTS_CONFIG_OVERRIDE=pants.no.internal.backend.ini pants "$@"
 }
 
 function pkg_name() {
