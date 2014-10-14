@@ -7,6 +7,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from contextlib import closing, contextmanager
 import os
+import shutil
 import subprocess
 
 import posixpath
@@ -162,7 +163,7 @@ class BinaryUtil(object):
         with self.select_binary_stream(base_path, version, name) as stream:
           with safe_open(downloadpath, 'wb') as bootstrapped_binary:
             bootstrapped_binary.write(stream())
-          os.rename(downloadpath, bootstrapped_binary_path)
+          shutil.move(downloadpath, bootstrapped_binary_path)
           chmod_plus_x(bootstrapped_binary_path)
       finally:
         safe_delete(downloadpath)

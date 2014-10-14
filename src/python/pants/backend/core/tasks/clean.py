@@ -6,6 +6,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import os
+import shutil
 import time
 
 import daemon
@@ -29,7 +30,7 @@ def _cautious_rmtree(root):
 def _async_cautious_rmtree(root):
   if os.path.exists(root):
     new_path = root + '.deletable.%f' % time.time()
-    os.rename(root, new_path)
+    shutil.move(root, new_path)
     with daemon.DaemonContext():
       _cautious_rmtree(new_path)
 
