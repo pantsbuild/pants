@@ -15,14 +15,6 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 class IvyResolveIntegrationTest(PantsRunIntegrationTest):
 
-  def _assert_run_success(self, pants_run):
-    self.assertEquals(pants_run.returncode, self.PANTS_SUCCESS_CODE,
-                      "goal compile expected success, got {0}\n"
-                      "got stderr:\n{1}\n"
-                      "got stdout:\n{2}\n".format(pants_run.returncode,
-                                                  pants_run.stderr_data,
-                                                  pants_run.stdout_data))
-
   def test_java_compile_with_ivy_report(self):
     # Ensure the ivy report file gets generated
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
@@ -31,7 +23,7 @@ class IvyResolveIntegrationTest(PantsRunIntegrationTest):
         ['goal', 'compile', 'testprojects/src/java/com/pants/testproject/unicode/main',
          '--resolve-ivy-report',
          '--resolve-ivy-outdir={reportdir}'.format(reportdir=ivy_report_dir)], workdir)
-      self._assert_run_success(pants_run)
+      self.assert_success(pants_run)
 
       # Find the ivy report
       found = False

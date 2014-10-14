@@ -29,6 +29,7 @@ python_library(
   sources = ['pants_run_integration_test.py'],
   dependencies = [
     'src/python/pants/base:build_environment',
+    'src/python/pants/fs',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
   ]
