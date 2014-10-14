@@ -119,13 +119,21 @@ class _JUnitRunner(object):
                             help="An arbitrary argument to pass directly to the test runner. "
                                    "This option can be specified multiple times.")
 
+  def register_jvm_tool(self, key, ini_section, ini_key, default):
+    tool = self._context.config.getlist(ini_section, ini_key, default)
+    self._task_exports.register_jvm_tool(key,
+                                         tool,
+                                         ini_section=ini_section,
+                                         ini_key=ini_key)
+
   def __init__(self, task_exports, context):
     self._task_exports = task_exports
     self._context = context
     self._junit_bootstrap_key = 'junit'
-    task_exports.register_jvm_tool(self._junit_bootstrap_key,
-                             context.config.getlist('junit-run', 'junit-bootstrap-tools',
-                                                    default=['//:junit']))
+    self.register_jvm_tool(self._junit_bootstrap_key,
+                           ini_section='junit-run',
+                           ini_key='junit-bootstrap-tools',
+                           default=['//:junit'])
     self._jvm_args = context.config.getlist('junit-run', 'jvm_args', default=[])
     if context.options.junit_run_jvmargs:
       self._jvm_args.extend(context.options.junit_run_jvmargs)
@@ -401,9 +409,10 @@ class Emma(_Coverage):
   def __init__(self, task_exports, context, **kwargs):
     super(Emma, self).__init__(task_exports, context, **kwargs)
     self._emma_bootstrap_key = 'emma'
-    task_exports.register_jvm_tool(self._emma_bootstrap_key,
-                                   context.config.getlist('junit-run', 'emma-bootstrap-tools',
-                                                          default=['//:emma']))
+    self.register_jvm_tool(self._emma_bootstrap_key,
+                           ini_section='junit-run',
+                           ini_key='emma-bootstrap-tools',
+                           default=['//:emma'])
 
   def instrument(self, targets, tests, junit_classpath):
     safe_mkdir(self._coverage_instrument_dir, clean=True)
@@ -482,9 +491,10 @@ class Cobertura(_Coverage):
     super(Cobertura, self).__init__(task_exports, context, **kwargs)
     self._cobertura_bootstrap_key = 'cobertura'
     self._coverage_datafile = os.path.join(self._coverage_dir, 'cobertura.ser')
-    task_exports.register_jvm_tool(self._cobertura_bootstrap_key,
-                                   context.config.getlist('junit-run', 'cobertura-bootstrap-tools',
-                                                          default=['//:cobertura']))
+    self.register_jvm_tool_from_config(self._cobertura_bootstrap_key,
+                                       ini_section='junit-run',
+                                       ini_key='cobertura-bootstrap-tools',
+                                       default=['//:cobertura'])
     self._rootdirs = defaultdict(OrderedSet)
     self._include_filters = []
     self._exclude_filters = []

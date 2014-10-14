@@ -39,6 +39,9 @@ class Globs(FilesetRelPathWrapper):
 
   E.g., ``sources = globs('*java'),`` to get .java files in this directory.
   """
+  def wrapper(*globspecs, **kw):
+    import pdb; pdb.set_trace()
+    Fileset.globs(*globspecs, **kw)
   wrapped_fn = Fileset.globs
 
 
