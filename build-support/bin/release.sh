@@ -25,7 +25,9 @@ PKG_PANTS=(
 function pkg_pants_install_test() {
   PIP_ARGS="$@"
   pip install ${PIP_ARGS} pantsbuild.pants==$(local_version) && \
-  pants goal list //:: && [[ "$(pants --version 2>/dev/null)" == "$(local_version)" ]]
+  execute_packaged_pants_without_internal_backends goal list src:: && \
+  [[ "$(execute_packaged_pants_without_internal_backends --version 2>/dev/null)" \
+    == "$(local_version)" ]]
 }
 
 PKG_PANTS_TESTINFRA=(
@@ -67,6 +69,18 @@ function banner() {
 
 function run_local_pants() {
   PANTS_DEV=1 ${ROOT}/pants "$@"
+}
+
+# When we do (dry-run) testing, we need to run the packaged pants.
+# It doesn't have internal backend plugins so when we execute it
+# at the repo build root, the root pants.ini will ask it load
+# internal backend packages, which it doesn't have, and it'll fail.
+# To solve that problem, we override pants.ini with an empty list of
+# additional backends option.
+function execute_packaged_pants_without_internal_backends() {
+  NO_INTERNAL_BACKEND_PANTS_INI=$(mktemp -t pants.no.internal.backends.ini) && \
+  echo -e "[backends]\npackages: []" > $NO_INTERNAL_BACKEND_PANTS_INI && \
+  PANTS_CONFIG_OVERRIDE=$NO_INTERNAL_BACKEND_PANTS_INI pants "$@"
 }
 
 function pkg_name() {
