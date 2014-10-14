@@ -24,9 +24,8 @@ class Scalastyle(NailgunTask, JvmToolTaskMixin):
 
   Scalastyle is configured via the 'scalastyle' pants.ini section.
 
-  * ``config`` - Optional path of the scalastyle configuration
-    file. If not specified, the check will be skipped. If the file
-    doesn't exist, the task will throw.
+  * ``config`` - Required path of the scalastyle configuration
+    file. If the file doesn't exist, the task will throw.
   * ``excludes`` - Optional path of an excludes file that contains
     lines of regular expressions used to exclude matching files
     from style checks. File names matched against these regular
@@ -43,7 +42,6 @@ class Scalastyle(NailgunTask, JvmToolTaskMixin):
 
   _MAIN = 'org.scalastyle.Main'
 
-  _config_initialized = False
   _scalastyle_config = None
   _scalastyle_excludes = None
 
@@ -68,21 +66,19 @@ class Scalastyle(NailgunTask, JvmToolTaskMixin):
     return self._CONFIG_SECTION
 
   def _initialize_config(self):
-    self._config_initialized = False
-
     scalastyle_config = self.context.config.get(
       self._CONFIG_SECTION, self._CONFIG_SECTION_CONFIG_OPTION)
 
-    # Scalastyle config setting is optional, if missing it's fine. we'll
-    # just skip the check all together.
+    # Scalastyle task by default isn't wired up in pants, but if it is installed
+    # via plugin, then the config file setting is required.
     if not scalastyle_config:
-      self.context.log.debug(
-        'Unable to get section[{section}] option[{setting}] value in pants.ini. '
-        'Scalastyle will be skipped.'
-          .format(section=self._CONFIG_SECTION, setting=self._CONFIG_SECTION_CONFIG_OPTION))
-      return
+      raise Config.ConfigError(
+        'Scalastyle config is missing from section[{section}] option[{setting}] in '
+        'pants.ini.'.format(
+          section=self._CONFIG_SECTION,
+          setting=self._CONFIG_SECTION_CONFIG_OPTION))
 
-    # However, if the config setting value is specified, then it must be a valid file.
+    # And the config setting value must be a valid file.
     if not os.path.exists(scalastyle_config):
       raise Config.ConfigError(
         'Scalastyle config file specified in section[{section}] option[{setting}] in pants.ini '
@@ -96,6 +92,7 @@ class Scalastyle(NailgunTask, JvmToolTaskMixin):
 
     scalastyle_excludes = set()
     if excludes_file:
+      # excludes setting is optional, but if specified, must be a valid file.
       if not os.path.exists(excludes_file):
         raise Config.ConfigError(
           'Scalastyle excludes file specified in section[{section}] option[{setting}] in '
@@ -109,7 +106,7 @@ class Scalastyle(NailgunTask, JvmToolTaskMixin):
           self.context.log.debug(
             'Scalastyle file exclude pattern: {pattern}'.format(pattern=pattern))
     else:
-      # excludes setting is optional, but if specified, should point a valid file.
+      # excludes setting is optional.
       self.context.log.debug(
         'Unable to get section[{section}] option[{setting}] value in pants.ini. '
         'All scala sources will be checked.'.format(
@@ -118,11 +115,10 @@ class Scalastyle(NailgunTask, JvmToolTaskMixin):
     # Only transfer to local variables to the state at the end to minimize side effects.
     self._scalastyle_config = scalastyle_config or None
     self._scalastyle_excludes = scalastyle_excludes or None
-    self._config_initialized = True
 
   @property
   def _should_skip(self):
-    return not self._config_initialized or self.context.options.scalastyle_skip
+    return self.context.options.scalastyle_skip
 
   def _get_non_synthetic_scala_targets(self, targets):
     return filter(

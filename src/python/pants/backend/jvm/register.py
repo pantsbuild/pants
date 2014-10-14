@@ -52,7 +52,6 @@ from pants.backend.jvm.tasks.nailgun_task import NailgunKillall
 from pants.backend.jvm.tasks.provides import Provides
 from pants.backend.jvm.tasks.scala_repl import ScalaRepl
 from pants.backend.jvm.tasks.scaladoc_gen import ScaladocGen
-from pants.backend.jvm.tasks.scalastyle import Scalastyle
 from pants.backend.jvm.tasks.specs_run import SpecsRun
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.goal.task_registrar import TaskRegistrar as task
@@ -150,10 +149,6 @@ def register_goals():
   task(name='jvm', action=jvm_compile,
        dependencies=['gen', 'resolve', 'check-exclusives', 'bootstrap']
   ).install('compile').with_description('Compile source code.')
-
-  task(name='scalastyle', action=Scalastyle,
-       dependencies=['bootstrap']
-  ).install('compile').with_description('Scala source code style check.')
 
   # Generate documentation.
 

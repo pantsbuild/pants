@@ -75,22 +75,15 @@ class ScalastyleTest(NailgunTaskTestBase):
   # Test section
   #
 
-  def test_initialize_config_no_config_settings_means_task_skip(self):
-    task = self._create_scalastyle_task(config=dedent('''
-      [scalastyle]
-      # override the default pants.ini [scalastyle].config with empty string
-      # to test the logic: if config setting not specified, we should skip.
-      config:
-      # Intentionally put an error here in excludes. Because
-      # the initialization routine parses 'config' first and if
-      # that's missing, then we bail out early and gracefully.
-      # So this intentional error shouldn't cause a raise.
-      excludes: file_does_not_exist.xml
-    '''))
-    self.assertIsNone(task._scalastyle_config)
-    self.assertIsNone(task._scalastyle_excludes)
-    # Also, no config file setting for scalastyle means the entire task should be skipped.
-    self.assertTrue(task._should_skip)
+  def test_initialize_config_no_config_settings(self):
+    with self.assertRaises(Config.ConfigError):
+      task = self._create_scalastyle_task(config=dedent('''
+        [scalastyle]
+        # override the default pants.ini [scalastyle].config with empty string
+        # to test the logic: if config setting not specified, we should throw.
+        config:
+        excludes: file_does_not_exist.xml
+      '''))
 
   def test_initialize_config_config_setting_exist_but_invalid(self):
     with self.assertRaises(Config.ConfigError):
@@ -128,18 +121,13 @@ class ScalastyleTest(NailgunTaskTestBase):
     '''.format(
       config=self._create_scalastyle_config_file(),
       excludes=self._create_scalastyle_excludes_file(['.*\.cpp', '.*\.py']))))
-
     self.assertEqual(2, len(task._scalastyle_excludes))
     self.assertTrue(task._should_include_source('com/some/org/x.scala'))
     self.assertFalse(task._should_include_source('com/some/org/y.cpp'))
     self.assertFalse(task._should_include_source('z.py'))
 
   def test_should_skip_if_skip_option_specified(self):
-    # Intentionally skip config param here, because _create_scalastyle_task
-    # by default will create a valid scalastyle config section thus
-    # the Scalastyle._should_skip should solely rely on the option flag
     task = self._create_scalastyle_task(options=self._with_skip_option())
-    # Config is valid but we still skip because of the option flag.
     self.assertIsNotNone(task._scalastyle_config)
     self.assertTrue(task._should_skip)
 
