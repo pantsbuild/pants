@@ -10,20 +10,20 @@ import sbt.Project.Initialize
 object Scriptit {
   import Script._
 
-  val scriptitBase = SettingKey[File]("scriptit-base")
-  val scriptitTestName = SettingKey[String]("scriptit-test-name")
-  val scriptitCommands = TaskKey[Seq[Command]]("scriptit-commands")
-  val scriptitScalaVersions = SettingKey[Seq[String]]("scriptit-scala-versions")
-  val scriptitProperties = TaskKey[Map[String, String]]("scriptit-properties")
-  val scriptit = InputKey[Unit]("scriptit")
+  val scriptitBase = settingKey[File]("scriptit-base")
+  val scriptitTestName = settingKey[String]("scriptit-test-name")
+  val scriptitCommands = taskKey[Seq[Command]]("scriptit-commands")
+  val scriptitScalaVersions = settingKey[Seq[String]]("scriptit-scala-versions")
+  val scriptitProperties = taskKey[Map[String, String]]("scriptit-properties")
+  val scriptit = inputKey[Unit]("scriptit")
 
   lazy val settings: Seq[Setting[_]] = Seq(
-    scriptitBase <<= sourceDirectory / "scriptit",
+    scriptitBase := sourceDirectory.value / "scriptit",
     scriptitTestName := "test",
     scriptitCommands := Commands.defaultCommands,
-    scriptitCommands <+= (Dist.create in ZincBuild.dist) map Commands.zincCommand,
+    scriptitCommands += Commands.zincCommand(Dist.create.value),
     scriptitScalaVersions := Seq("2.9.3", "2.10.3", "2.11.0-RC3"),
-    scriptitProperties <<= (appConfiguration, scriptitScalaVersions) map scalaProperties,
+    scriptitProperties := scalaProperties(appConfiguration.value, scriptitScalaVersions.value),
     scriptitProperties ++= javaProperties,
     scriptit <<= scriptitTask
   )
@@ -56,7 +56,7 @@ object Scriptit {
     Defaults.distinctParser(scriptitTests(scriptitBase, script).toSet, raw = false)
 
   def scriptitTests(scriptitBase: File, script: String): Seq[String] =
-    (scriptitBase ** script).get map (_.getParentFile) x relativeTo(scriptitBase) map (_._2)
+    (scriptitBase ** script).get map (_.getParentFile) pair relativeTo(scriptitBase) map (_._2)
 
   def runTest(name: String, path: String, script: Seq[Line], commands: Seq[Command], properties: Map[String, String], log: Logger)(dir: File): Result = {
     val runner = new ScriptRunner(name, path, script)
