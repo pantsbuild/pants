@@ -371,6 +371,7 @@ python_tests(
   name = 'idea_integration',
   sources = ['test_idea_integration.py'],
   dependencies = [
+    '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
   ],

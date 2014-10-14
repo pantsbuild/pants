@@ -238,3 +238,8 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
                     config= {
                       'idea': {'exclude_folders': ['exclude-folder-sentinel']}
                     })
+
+  def test_all_targets(self):
+    # The android targets won't evaluate correctly if the Android ADK is not installed
+    self._idea_test(['src::', 'tests::', 'examples::', 'testprojects::',
+                     '--exclude-target-regexp=.*android.*'])

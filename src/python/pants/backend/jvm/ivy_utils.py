@@ -280,9 +280,9 @@ class IvyUtils(object):
           if jar.rev:
             add_jar(jar)
 
-      # Lift jvm target-level excludes up to the global excludes set
-      if target.is_jvm and target.payload.excludes:
-        excludes.update(target.payload.excludes)
+      target_excludes = target.payload.get_field_value('excludes')
+      if target_excludes:
+        excludes.update(target_excludes)
 
     for target in targets:
       target.walk(collect_jars)
