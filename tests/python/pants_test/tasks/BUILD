@@ -66,7 +66,6 @@ python_test_suite(
     ':scrooge_gen',
     ':sorttargets',
     ':targets_help',
-    ':thrift_linter',
     ':what_changed',
     'tests/python/pants_test/tasks/jvm_compile/scala'
   ],
@@ -88,6 +87,7 @@ python_test_suite(
     ':markdown_to_html_integration',
     ':protobuf_integration',
     ':scala_repl_integration',
+    ':thrift_linter_integration',
     'tests/python/pants_test/tasks/jvm_compile/java',
   ],
 )
@@ -616,10 +616,9 @@ python_tests(
   ],
 )
 
-# TODO(Eric Ayers) This should be renamed and categorized as an integration test
 python_tests(
-  name = 'thrift_linter',
-  sources = ['test_thrift_linter.py'],
+  name = 'thrift_linter_integration',
+  sources = ['test_thrift_linter_integration.py'],
   dependencies = [
     ':base',
     'src/python/pants/base:target',
