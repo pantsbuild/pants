@@ -18,7 +18,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.exceptions import TaskError
 from pants.goal.context import Context
-from pants.util.dirutil import safe_mkdtemp, safe_rmtree
+from pants.util.dirutil import safe_rmtree
 
 from pants_test.base_test import BaseTest
 from pants_test.tasks.test_base import prepare_task
