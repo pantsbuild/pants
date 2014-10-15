@@ -82,6 +82,7 @@ python_test_suite(
     ':idea_integration',
     ':ivy_resolve_integration',
     ':jar_publish_integration',
+    ':junit_tests_integration',
     ':jvm_bundle_integration',
     ':jvm_run_integration',
     ':markdown_to_html_integration',
@@ -144,6 +145,15 @@ python_tests(
     ':base',
     'src/python/pants/backend/jvm/tasks:bundle_create',
   ]
+)
+
+python_tests(
+  name = 'junit_tests_integration',
+  sources = ['test_junit_tests_integration.py'],
+  dependencies = [
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test:int-test',
+  ],
 )
 
 python_tests(
