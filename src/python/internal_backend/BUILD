@@ -4,7 +4,7 @@
 target(
   name='plugins',
   dependencies = [
-    'src/python/internal_backend/pants_internal:plugin',
+    'src/python/internal_backend/optional:plugin',
     'src/python/internal_backend/repositories:plugin',
     'src/python/internal_backend/sitegen:plugin',
   ]
