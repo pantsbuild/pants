@@ -9,8 +9,20 @@ body {
   color: #111;
   font-family: sans-serif;
 }
+
 .mainflow {
   margin: 64px 2% 40em 30%;
+}
+
+
+a.pilcrow-link {
+  color: transparent;
+  min-width: 2em;
+  text-decoration: none;
+}
+
+div.h-plus-pilcrow:hover a.pilcrow-link {
+  color: #04a;
 }
 
 nav.breadcrumbs ul {
