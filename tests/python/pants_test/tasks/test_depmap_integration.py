@@ -17,20 +17,12 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 class DepmapIntegrationTest(PantsRunIntegrationTest):
 
-  def _assert_run_success(self, pants_run):
-    self.assertEquals(pants_run.returncode, self.PANTS_SUCCESS_CODE,
-                      'goal depmap expected success, got {0}\n'
-                      'got stderr:\n{1}\n'
-                      'got stdout:\n{2}\n'.format(pants_run.returncode,
-                                                  pants_run.stderr_data,
-                                                  pants_run.stdout_data))
-
   def run_depmap_project_info(self, test_target, workdir):
     depmap_out_file = '{workdir}/depmap_out.txt'.format(workdir=workdir)
     pants_run = self.run_pants_with_workdir(
       ['goal', 'resolve', 'depmap', test_target, '--depmap-project-info',
       '--depmap-output-file={out_file}'.format(out_file=depmap_out_file)], workdir)
-    self._assert_run_success(pants_run)
+    self.assert_success(pants_run)
     self.assertTrue(os.path.exists(depmap_out_file),
                       msg='Could not find depmap output file in {out_file}'
                         .format(out_file=depmap_out_file))
@@ -70,7 +62,7 @@ class DepmapIntegrationTest(PantsRunIntegrationTest):
         ['goal', 'depmap', 'testprojects/src/java/com/pants/testproject/unicode/main',
          '--depmap-project-info',
          '--depmap-output-file={out_file}'.format(out_file=depmap_out_file)], workdir)
-      self._assert_run_success(pants_run)
+      self.assert_success(pants_run)
       self.assertTrue(os.path.exists(depmap_out_file),
                       msg='Could not find depmap output file {out_file}'
                            .format(out_file=depmap_out_file))
