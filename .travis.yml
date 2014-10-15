@@ -25,11 +25,8 @@ script: |
   java -version
   ./build-support/bin/ci.sh -d
 
-# We accept the default email author+comitter notification for now.
-# this is a placeholder for the build-support/bin/ci-sync.sh script
-# to rely on to transfer notification settings to .travis.osx.yml.
-notifications:
-  email: true
+# We accept the default travis-ci email author+comitter notification
+# for now which are enabled even with no `notifications` config.
 
 after_success:
   coveralls
