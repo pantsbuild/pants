@@ -17,12 +17,18 @@ class JvmToolTaskMixin(object):
       self._jvm_tool_bootstrapper = JvmToolBootstrapper(self.context.products)
     return self._jvm_tool_bootstrapper
 
-  def register_jvm_tool(self, key, target_addrs):
-    self.jvm_tool_bootstrapper.register_jvm_tool(key, target_addrs)
+  def register_jvm_tool(self, key, target_addrs, ini_section=None, ini_key=None):
+    self.jvm_tool_bootstrapper.register_jvm_tool(key, target_addrs,
+                                                 ini_section=ini_section, ini_key=ini_key)
+
+  def register_jvm_tool_from_config(self, key, config, ini_section, ini_key, default):
+    self.jvm_tool_bootstrapper.register_jvm_tool_from_config(key, config,
+                                                             ini_section=ini_section,
+                                                             ini_key=ini_key,
+                                                             default=default)
 
   def tool_classpath(self, key, executor=None):
     return self.jvm_tool_bootstrapper.get_jvm_tool_classpath(key, executor)
 
   def lazy_tool_classpath(self, key, executor=None):
     return self.jvm_tool_bootstrapper.get_lazy_jvm_tool_classpath(key, executor)
-

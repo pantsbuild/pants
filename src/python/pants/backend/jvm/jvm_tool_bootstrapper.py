@@ -31,7 +31,11 @@ class JvmToolBootstrapper(object):
       raise TaskError('No bootstrap callback registered for %s' % key)
     return lambda: callback(executor=executor)
 
-  def register_jvm_tool(self, key, tools):
+  def register_jvm_tool_from_config(self, key, config, ini_section, ini_key, default):
+    tools = config.getlist(ini_section, ini_key, default)
+    self.register_jvm_tool(key, tools, ini_section, ini_key)
+
+  def register_jvm_tool(self, key, tools, ini_section=None, ini_key=None):
     """Register a list of targets against a key.
 
     We can later use this key to get a callback that will resolve these targets.
@@ -41,6 +45,7 @@ class JvmToolBootstrapper(object):
       raise ValueError("No implementations were provided for tool '%s'" % key)
     self._products.require_data('jvm_build_tools_classpath_callbacks')
     tool_product_map = self._products.get_data('jvm_build_tools') or {}
+    tool_product_config_map = self._products.get_data('jvm_build_tools_config') or {}
     existing = tool_product_map.get(key)
     # It's OK to re-register with the same value, but not to change the value.
     if existing is not None:
@@ -49,4 +54,6 @@ class JvmToolBootstrapper(object):
                         % (key, existing, tools))
     else:
       tool_product_map[key] = tools
+      tool_product_config_map[key] = {'ini_section': ini_section, 'ini_key': ini_key}
       self._products.safe_create_data('jvm_build_tools', lambda: tool_product_map)
+      self._products.safe_create_data('jvm_build_tools_config', lambda: tool_product_config_map)
