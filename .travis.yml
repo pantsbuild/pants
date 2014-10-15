@@ -4,9 +4,6 @@ python:
   - "2.6"
   - "2.7"
 
-jdk:
-  - openjdk7
-
 install:
   - pip install coveralls
 
@@ -28,13 +25,11 @@ script: |
   java -version
   ./build-support/bin/ci.sh -d
 
+# We accept the default email author+comitter notification for now.
+# this is a placeholder for the build-support/bin/ci-sync.sh script
+# to rely on to transfer notification settings to .travis.osx.yml.
 notifications:
-  email:
-    - john.sirois@gmail.com
-    - lhosken@twitter.com
-    - zundel@squareup.com
-    - benjyw@gmail.com
-    - areitz@twitter.com
+  email: true
 
 after_success:
   coveralls
