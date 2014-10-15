@@ -5,8 +5,6 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-import os
-
 from pants.backend.core.tasks.group_task import GroupTask
 from pants.backend.jvm.artifact import Artifact
 from pants.backend.jvm.repository import Repository
