@@ -128,6 +128,22 @@ distribute code to different organizations, and want different configuration
 for them, you might put the relevant config code in `./BUILD.something`.
 You can give that file to some people and not-give it to others.
 
+**************************************
+Integrate New Tools via a Pants Plugin
+**************************************
+
+Pants knows how to build many things, but maybe you need it to learn a new tool.
+Maybe your organization has a custom linter, a custom code generator,
+or some other custom tool. Maybe your organization uses a tool that, while
+not custom, has not yet been integrated with Pants.
+
+* If your organization has some custom tools to integrate,
+  set up a :doc:`Pants plugin <howto_plugin>`.
+* If you want to integrate with a not-custom tool, you
+  still want to set up a Pants plugin (or perhaps add abilities
+  to an existing plugin), but it might make sense to
+  :doc:`get your changes in upstream <howto_contribute>`.
+
 **********************************************
 BUILD.* in the source tree for special targets
 **********************************************
