@@ -43,7 +43,7 @@ class JarCreateMiscTest(JarCreateTestBase):
           """).strip()
 
     JarCreate(create_context(config=ini,
-                             options=self.create_options(),
+                             old_options=self.create_options(),
                              build_graph=self.build_graph,
                              build_file_parser=self.build_file_parser,
                              address_mapper=self.address_mapper),
@@ -103,7 +103,7 @@ class JarCreateExecuteTest(JarCreateTestBase):
 
   def context(self, config='', **options):
     return create_context(config=self.config(overrides=config),
-                          options=self.create_options(**options),
+                          old_options=self.create_options(**options),
                           build_graph=self.build_graph,
                           build_file_parser=self.build_file_parser,
                           address_mapper=self.address_mapper,

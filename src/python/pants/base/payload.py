@@ -38,6 +38,15 @@ class Payload(object):
     """
     return self._fields.get(key, default)
 
+  def get_field_value(self, key, default=None):
+    """Retrieves the value in the payload field if the field exists, otherwise returns the default.
+    """
+    if key in self._fields:
+      payload_field = self._fields[key]
+      if payload_field:
+        return payload_field.value
+    return default
+
   def add_fields(self, field_dict):
     """Add a mapping of field names to PayloadField instances."""
     for key, field in field_dict.items():

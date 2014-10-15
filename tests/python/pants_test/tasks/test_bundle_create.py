@@ -20,11 +20,11 @@ pants_distdir = /tmp/dist
 class BundleCreateTest(unittest.TestCase):
 
   def test_bundle_create_init(self):
-    options = {
+    old_options = {
                'bundle_create_deployjar': None,
                'bundle_create_prefix': None,
                'bundle_create_archive': None
                }
-    bundle_create = BundleCreate(create_context(config=sample_ini_test_1, options=options),
+    bundle_create = BundleCreate(create_context(config=sample_ini_test_1, old_options=old_options),
                                  '/tmp/workdir')
     self.assertEquals(bundle_create._outdir, '/tmp/dist')

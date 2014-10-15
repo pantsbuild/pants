@@ -17,10 +17,11 @@ class TargetsHelp(ConsoleTask):
   """Show online help for symbols usable in BUILD files (java_library, etc)."""
 
   @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    super(TargetsHelp, cls).setup_parser(option_group, args, mkflag)
-    option_group.add_option(mkflag("details"), dest="goal_targets_details", default=None,
-                            help='Display details about the specific target type or BUILD symbol.')
+  def register_options(cls, register):
+    super(TargetsHelp, cls).register_options(register)
+    register('--details',
+             help='Display details about the specific target type or BUILD symbol.',
+             legacy='goal_targets_details')
 
   def __init__(self, *args, **kwargs):
     super(TargetsHelp, self).__init__(*args, **kwargs)
