@@ -27,11 +27,6 @@ class RcFile(object):
   # split is healed.
   _DISABLE_PANTS_RC_OPTION = '--no-pantsrc'
 
-  @staticmethod
-  def install_disable_rc_option(parser):
-    parser.add_option(RcFile._DISABLE_PANTS_RC_OPTION, action = 'store_true', dest = 'nopantsrc',
-                      default = False, help = 'Specifies that pantsrc files should be ignored.')
-
   def __init__(self, paths, default_prepend=True, process_default=False):
     """
     :param paths: The rcfiles to apply default subcommand options from.
