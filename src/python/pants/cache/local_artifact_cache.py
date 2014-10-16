@@ -51,7 +51,7 @@ class LocalArtifactCache(ArtifactCache):
     # If we crash between the unlink and the rename. But that's OK.
     if os.path.exists(tarfile):
       os.unlink(tarfile)
-    shutil.move(tarfile_tmp, tarfile)
+    os.rename(tarfile_tmp, tarfile)
 
   def has(self, cache_key):
     return os.path.isfile(self._cache_file_for_key(cache_key))
