@@ -110,7 +110,7 @@ class JvmTarget(Target, Jarable):
     return self.payload.excludes
 
   def to_jar_dependencies(self, jar_library_specs):
-    """Convenience method to resolve a list of specs to JarLibraries and return its jars attributes
+    """Convenience method to resolve a list of specs to JarLibraries and return its jars attributes.
 
     Expects that the jar_libraries are declared relative to this target.
 

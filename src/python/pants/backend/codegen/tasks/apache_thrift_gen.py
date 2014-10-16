@@ -50,10 +50,6 @@ def _copytree(from_base, to_base):
 
 class ApacheThriftGen(CodeGen):
 
-  class DepLookupError(AddressLookupError):
-    """Thrown when a dependency can't be found"""
-    pass
-
   GenInfo = namedtuple('GenInfo', ['gen', 'deps'])
   ThriftSession = namedtuple('ThriftSession', ['outdir', 'cmd', 'process'])
 

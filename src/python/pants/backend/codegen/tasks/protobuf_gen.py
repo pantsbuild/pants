@@ -42,10 +42,6 @@ _PROTOBUF_GEN_PYTHONDEPS_DEFAULT = []
 
 class ProtobufGen(CodeGen):
 
-  class DepLookupError(AddressLookupError):
-    """Thrown when a dependency can't be found"""
-    pass
-
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
     option_group.add_option(mkflag('lang'), dest='protobuf_gen_langs', default=[],
