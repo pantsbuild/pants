@@ -92,7 +92,6 @@ python_library(
   sources = ['clean.py'],
   dependencies = [
     ':task',
-    '3rdparty/python:python-daemon',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:config',
     'src/python/pants/util:dirutil',
