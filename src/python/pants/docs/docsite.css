@@ -214,3 +214,18 @@ div.ci-status {
 div.ci-status img {
   vertical-align: middle;
 }
+
+.generated {
+  margin-top: 5em;
+  font-size: 70%;
+  text-align: center;
+  color: #777;
+}
+
+.generated a {
+  text-decoration: none;
+}
+
+.generated a:hover {
+  background-color: #fff;
+}

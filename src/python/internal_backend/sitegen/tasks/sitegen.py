@@ -351,7 +351,6 @@ def generate_page_toc(soup):
   return toc
 
 
-
 NOW = datetime.datetime.now().isoformat()
 
 
