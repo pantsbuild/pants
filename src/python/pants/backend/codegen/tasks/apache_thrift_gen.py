@@ -50,7 +50,6 @@ def _copytree(from_base, to_base):
 
 class ApacheThriftGen(CodeGen):
 
-
   class DepLookupError(AddressLookupError):
     """Thrown when a dependency can't be found"""
     pass
@@ -107,8 +106,6 @@ class ApacheThriftGen(CodeGen):
                                                            key="gen->deps->{category}"
                                                            .format(category=category)))
     return self.GenInfo(gen, deps)
-
-
 
   _gen_java = None
   @property

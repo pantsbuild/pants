@@ -74,7 +74,6 @@ _TARGET_TYPE_FOR_LANG = dict(scala=ScalaLibrary, java=JavaLibrary)
 
 class ScroogeGen(NailgunTask, JvmToolTaskMixin):
 
-
   class DepLookupError(AddressLookupError):
     """Thrown when a dependency can't be found"""
     pass

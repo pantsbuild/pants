@@ -90,7 +90,6 @@ class ProtobufGen(CodeGen):
                                     .format(message=e, section='protobuf-gen', key=key))
     return deps
 
-
   @property
   def javadeps(self):
     return self.resolve_deps('javadeps',

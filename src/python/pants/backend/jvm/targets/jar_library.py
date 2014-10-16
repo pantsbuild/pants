@@ -33,3 +33,4 @@ class JarLibrary(Target):
   @property
   def excludes(self):
     return self.payload.excludes
+

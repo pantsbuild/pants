@@ -16,11 +16,9 @@ from pants.base.workunit import WorkUnit
 
 class BootstrapJvmTools(Task, IvyTaskMixin):
 
-
   class DepLookupError(AddressLookupError):
     """Thrown when a dependency can't be found"""
     pass
-
 
   @classmethod
   def product_types(cls):
