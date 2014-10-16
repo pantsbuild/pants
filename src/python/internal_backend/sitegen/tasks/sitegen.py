@@ -12,6 +12,7 @@ Suggested use:
   ./build-support/bin/publish_docs.sh  # invokes sitegen.py
 """
 
+import datetime
 import collections
 import json
 import os
@@ -203,9 +204,6 @@ def ensure_headings_linkable(soups):
             tag['id'] = candidate_id
             break
 
-PILCROW_LINK_CSS = 'pilcrow-link'
-
-
 def add_here_links(soups):
   """Add the "pilcrow" links.
 
@@ -219,13 +217,25 @@ def add_here_links(soups):
       anchor = tag.get('id') or tag.get('name')
       if not anchor:
         continue
-      new_container = soup.new_tag('div')
-      new_container['class'] = 'h-plus-pilcrow'
-      tag.wrap(new_container)
+      new_table = soup.new_tag('table')
+      new_table['class'] = ['h-plus-pilcrow']
+      new_tbody = soup.new_tag('tbody')
+      new_table.append(new_tbody)
+      new_tr = soup.new_tag('tr')
+      new_tbody.append(new_tr)
+      new_tdleft = soup.new_tag('td')
+      new_tr.append(new_tdleft)
+      tag.replace_with(new_table)
+      new_tdleft.append(tag)
       pilcrow_link = soup.new_tag('a', href='#{0}'.format(anchor))
-      pilcrow_link['class'] = [PILCROW_LINK_CSS]
-      pilcrow_link.append(' ¶')
-      tag.append(pilcrow_link)
+      pilcrow_link['class'] = ['pilcrow-link']
+      pilcrow_link.append('¶')
+      pilcrow_div = soup.new_tag('div')
+      pilcrow_div['class'] = ['pilcrow-div']
+      new_tdright = soup.new_tag('td')
+      new_tr.append(new_tdright)
+      new_tdright.append(pilcrow_div)
+      pilcrow_div.append(pilcrow_link)
 
 
 def link_xrefs(soups, precomputed):
@@ -329,23 +339,24 @@ def generate_page_toc(soup):
     if (tag.get('id') or tag.get('name')):
       found_depth_counts[hdepth(tag)] += 1
 
-  def text_without_pilcrow(tag):
-    tag_copy = bs4.BeautifulSoup('{0}'.format(tag))
-    if tag_copy.find(class_=PILCROW_LINK_CSS):
-      tag_copy.find(class_=PILCROW_LINK_CSS).string.replace_with('')
-    return tag_copy.text
-
   depth_list = [i for i in range(100) if 1 < found_depth_counts[i]]
   depth_list = depth_list[:4]
   toc = []
   for tag in soup.find_all(_heading_re):
     depth = hdepth(tag)
     if depth in depth_list:
-      tag_text = text_without_pilcrow(tag)
       toc.append(dict(depth=depth_list.index(depth) + 1,
                       link=tag.get('id') or tag.get('name'),
-                      text=tag_text))
+                      text=tag.text))
   return toc
+
+
+
+NOW = datetime.datetime.now().isoformat()
+
+
+def generate_generated(config, here):
+  return('{0} {1}'.format(config['sources'][here], NOW))
 
 
 def render_html(dst, config, soups, precomputed, template):
@@ -361,6 +372,7 @@ def render_html(dst, config, soups, precomputed, template):
   html = renderer.render(template,
                          body_html=body_html,
                          breadcrumbs=generate_breadcrumbs(config, precomputed, dst),
+                         generated=generate_generated(config, dst),
                          site_toc=generate_site_toc(config, precomputed, dst),
                          has_page_toc=bool(page_toc),
                          page_toc=page_toc,

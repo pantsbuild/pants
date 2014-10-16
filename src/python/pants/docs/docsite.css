@@ -15,13 +15,34 @@ body {
 }
 
 
+.codehilite pre {
+  padding: 1em;
+  border-radius: 3px;
+  background-color: #eef;
+  color: #002;
+}
+
+
+div.pilcrow-div {
+  margin: 1em 0.5em;
+}
+
 a.pilcrow-link {
+  font-size: 150%;
   color: transparent;
-  min-width: 2em;
   text-decoration: none;
 }
 
-div.h-plus-pilcrow:hover a.pilcrow-link {
+table.h-plus-pilcrow td {
+  vertical-align: top;
+}
+
+table.h-plus-pilcrow:hover {
+  background-color: #eef;
+  color: #002;
+}
+
+table.h-plus-pilcrow:hover a.pilcrow-link {
   color: #04a;
 }
 
