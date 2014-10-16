@@ -5,15 +5,14 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from textwrap import dedent
+
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
-
 from pants.base.address import SyntheticAddress
 
 from pants_test.base_test import BaseTest
-
-from textwrap import dedent
 
 
 # TODO(Eric Ayers) there are a lot of tests to backfill

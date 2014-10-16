@@ -27,10 +27,6 @@ logger = logging.getLogger(__name__)
 
 class AntlrGen(CodeGen, NailgunTask, JvmToolTaskMixin):
 
-  class DepLookupError(AddressLookupError):
-    """Thrown when a dependency can't be found"""
-    pass
-
   # Maps the compiler attribute of a target to the config key in pants.ini
   _CONFIG_SECTION_BY_COMPILER = {
     'antlr3': 'antlr-gen',
@@ -173,8 +169,9 @@ class AntlrGen(CodeGen, NailgunTask, JvmToolTaskMixin):
         deps.update(self.context.resolve(dep))
       return deps
     except AddressLookupError as e:
-      raise self.DepLookupError("{message}\n  referenced from [{section}] key: {key} in pants.ini"
-                                .format(message=e, section=section, key='javadeps'))
+      raise self.DepLookupError("{message}\n"
+                                "  referenced from [{section}] key: javadeps in pants.ini"
+                                .format(message=e, section=section))
 
 
   def _all_possible_antlr_bootstrap_tools(self):

@@ -74,10 +74,6 @@ _TARGET_TYPE_FOR_LANG = dict(scala=ScalaLibrary, java=JavaLibrary)
 
 class ScroogeGen(NailgunTask, JvmToolTaskMixin):
 
-  class DepLookupError(AddressLookupError):
-    """Thrown when a dependency can't be found"""
-    pass
-
   GenInfo = namedtuple('GenInfo', ['gen', 'deps'])
 
   class PartialCmd(namedtuple('PC', ['compiler', 'language', 'rpc_style', 'namespace_map'])):
