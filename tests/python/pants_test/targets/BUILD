@@ -71,7 +71,7 @@ python_tests(
     ':base',
     'src/python/pants/base:target',
     'src/python/pants/backend/jvm/targets:jvm',
-  ]
+    ]
 )
 
 python_tests(

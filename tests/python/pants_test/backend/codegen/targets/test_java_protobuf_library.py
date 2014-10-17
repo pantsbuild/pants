@@ -7,10 +7,12 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from textwrap import dedent
 
-from pants.base.address import SyntheticAddress
 from pants.backend.codegen.targets.java_protobuf_library import JavaProtobufLibrary
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.backend.jvm.targets.jvm_target import JvmTarget
+
+from pants.base.address import SyntheticAddress
 
 from pants_test.base_test import BaseTest
 
@@ -68,7 +70,7 @@ class JavaProtobufLibraryTest(BaseTest):
     self.build_graph.inject_spec_closure('//:foo')
     target = self.build_graph.get_target(SyntheticAddress.parse('//:foo'))
     self.assertIsInstance(target, JavaProtobufLibrary)
-    with self.assertRaises(JavaProtobufLibrary.WrongTargetTypeError):
+    with self.assertRaises(JvmTarget.WrongTargetTypeError):
       target.imports
 
   def test_wrong_import_type2(self):
@@ -83,7 +85,7 @@ class JavaProtobufLibraryTest(BaseTest):
     self.build_graph.inject_spec_closure('//:foo')
     target = self.build_graph.get_target(SyntheticAddress.parse('//:foo'))
     self.assertIsInstance(target, JavaProtobufLibrary)
-    with self.assertRaises(JavaProtobufLibrary.ExpectedAddressError):
+    with self.assertRaises(JvmTarget.ExpectedAddressError):
       target.imports
 
   def test_traversable_specs(self):
@@ -103,7 +105,7 @@ class JavaProtobufLibraryTest(BaseTest):
     )
     java_protobuf_library(name='proto_dep',
         sources=[],
-      )
+    )
     '''))
     self.build_graph.inject_spec_closure('//:foo')
     target = self.build_graph.get_target(SyntheticAddress.parse('//:foo'))

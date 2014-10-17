@@ -20,6 +20,7 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.base.address import SyntheticAddress
+from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.target import Target
@@ -40,6 +41,7 @@ _PROTOBUF_GEN_JAVADEPS_DEFAULT='3rdparty:protobuf-{version}'
 _PROTOBUF_GEN_PYTHONDEPS_DEFAULT = []
 
 class ProtobufGen(CodeGen):
+
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
     option_group.add_option(mkflag('lang'), dest='protobuf_gen_langs', default=[],
@@ -77,7 +79,11 @@ class ProtobufGen(CodeGen):
     deps = OrderedSet()
     for dep in self.context.config.getlist('protobuf-gen', key, default=maybe_list(default)):
       if dep:
-        deps.update(self.context.resolve(dep))
+        try:
+          deps.update(self.context.resolve(dep))
+        except AddressLookupError as e:
+          raise self.DepLookupError("{message}\n  referenced from [{section}] key: {key} in pants.ini"
+                                    .format(message=e, section='protobuf-gen', key=key))
     return deps
 
   @property

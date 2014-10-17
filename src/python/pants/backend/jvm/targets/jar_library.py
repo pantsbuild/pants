@@ -5,7 +5,6 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.base.payload import Payload
 from pants.base.payload_field import ExcludesField, JarsField
@@ -34,3 +33,4 @@ class JarLibrary(Target):
   @property
   def excludes(self):
     return self.payload.excludes
+

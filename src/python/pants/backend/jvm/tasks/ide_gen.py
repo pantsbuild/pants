@@ -168,16 +168,18 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
     self.debug_port = self.context.config.getint('ide', 'debug_port', default=jvm_config_debug_port)
 
     self.checkstyle_bootstrap_key = 'checkstyle'
-    checkstyle = self.context.config.getlist('checkstyle', 'bootstrap-tools',
-                                             default=['//:twitter-checkstyle'])
-    self.register_jvm_tool(self.checkstyle_bootstrap_key, checkstyle)
+    self.register_jvm_tool_from_config(self.checkstyle_bootstrap_key, self.context.config,
+                                       ini_section='checkstyle',
+                                       ini_key='bootstrap-tools',
+                                       default=['//:twitter-checkstyle'])
 
     self.scalac_bootstrap_key = None
     if not self.skip_scala:
       self.scalac_bootstrap_key = 'scalac'
-      scalac = self.context.config.getlist('scala-compile', 'compile-bootstrap-tools',
-                                           default=['//:scala-compiler-2.9.3'])
-      self.register_jvm_tool(self.scalac_bootstrap_key, scalac)
+      self.register_jvm_tool_from_config(self.scalac_bootstrap_key, self.context.config,
+                                         ini_section='scala-compile',
+                                         ini_key='compile-bootstrap-tools',
+                                         default=['//:scala-compiler-2.9.3'])
 
   def prepare(self, round_manager):
     if self.python:

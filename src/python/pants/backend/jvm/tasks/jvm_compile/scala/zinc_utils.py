@@ -16,6 +16,7 @@ from twitter.common.collections import OrderedDict
 from pants.backend.jvm.jvm_tool_bootstrapper import JvmToolBootstrapper
 from pants.backend.jvm.scala.target_platform import TargetPlatform
 from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.hash_utils import hash_file
@@ -33,6 +34,11 @@ class ZincUtils(object):
 
   Instances are immutable, and all methods are reentrant (assuming that the java_runner is).
   """
+
+  class DepLookupError(AddressLookupError):
+    """Thrown when a dependency can't be found."""
+    pass
+
   _ZINC_MAIN = 'com.typesafe.zinc.Main'
 
   def __init__(self, context, nailgun_task, jvm_options, color):
@@ -46,13 +52,17 @@ class ZincUtils(object):
     self._compile_bootstrap_key = 'scalac'
     self._compile_bootstrap_tools = TargetPlatform(config=context.config).compiler_specs
     self._jvm_tool_bootstrapper.register_jvm_tool(self._compile_bootstrap_key,
-                                                  self._compile_bootstrap_tools)
+                                                  self._compile_bootstrap_tools,
+                                                  ini_section='scala-compile',
+                                                  ini_key='compile-bootstrap-tools')
 
     # The zinc version (and the scala version it needs, which may differ from the target version).
     self._zinc_bootstrap_key = 'zinc'
-    zinc_bootstrap_tools = context.config.getlist('scala-compile', 'zinc-bootstrap-tools',
-                                                  default=['//:zinc'])
-    self._jvm_tool_bootstrapper.register_jvm_tool(self._zinc_bootstrap_key, zinc_bootstrap_tools)
+    self._jvm_tool_bootstrapper.register_jvm_tool_from_config(self._zinc_bootstrap_key,
+                                                              context.config,
+                                                              ini_section='scala-compile',
+                                                              ini_key='zinc-bootstrap-tools',
+                                                              default=['//:zinc'])
 
     # Compiler plugins.
     plugins_bootstrap_tools = context.config.getlist('scala-compile',
@@ -61,7 +71,9 @@ class ZincUtils(object):
     if plugins_bootstrap_tools:
       self._plugins_bootstrap_key = 'plugins'
       self._jvm_tool_bootstrapper.register_jvm_tool(self._plugins_bootstrap_key,
-                                                    plugins_bootstrap_tools)
+                                                    plugins_bootstrap_tools,
+                                                    ini_section='scala-compile',
+                                                    ini_key='scalac-plugin-bootstrap-tools')
     else:
       self._plugins_bootstrap_key = None
 
@@ -130,8 +142,14 @@ class ZincUtils(object):
     # Go through all the bootstrap tools required to compile.
     for target in self._compile_bootstrap_tools:
       # Resolve to their actual targets.
-      resolved_libs = [t for t in self.context.resolve(target) if isinstance(t, JarLibrary)]
-      for lib in resolved_libs:
+      try:
+        deps = self.context.resolve(target)
+      except AddressLookupError as e:
+        raise self.DepLookupError("{message}\n  referenced from [{section}] key: {key} in pants.ini"
+                                  .format(message=e, section='scala-compile',
+                                          key='compile-bootstrap-tools'))
+
+      for lib in (t for t in deps if isinstance(t, JarLibrary)):
         for jar in lib.jar_dependencies:
           ret.append(jar.cache_key())
     return sorted(ret)

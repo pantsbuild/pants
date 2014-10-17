@@ -215,11 +215,10 @@ class JarTask(NailgunTask):
 
     # TODO(John Sirois): Consider poking a hole for custom jar-tool jvm args - namely for Xmx
     # control.
-
-    jar_bootstrap_tools = self.context.config.getlist(self._CONFIG_SECTION,
-                                                      'bootstrap-tools',
-                                                      default=['//:jar-tool'])
-    self.register_jvm_tool(self._JAR_TOOL_CLASSPATH_KEY, jar_bootstrap_tools)
+    self.register_jvm_tool_from_config(self._JAR_TOOL_CLASSPATH_KEY, self.context.config,
+                                       ini_section=self._CONFIG_SECTION,
+                                       ini_key='bootstrap-tools',
+                                       default=['//:jar-tool'])
 
   @property
   def config_section(self):

@@ -128,7 +128,6 @@ def _run():
     argv = ['goal'] + argv
 
   parser = optparse.OptionParser(add_help_option=False, version=version)
-  RcFile.install_disable_rc_option(parser)
   parser.add_option(_LOG_EXIT_OPTION,
                     action='store_true',
                     default=False,

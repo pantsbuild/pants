@@ -66,7 +66,6 @@ python_test_suite(
     ':scrooge_gen',
     ':sorttargets',
     ':targets_help',
-    ':thrift_linter',
     ':what_changed',
     'tests/python/pants_test/tasks/jvm_compile/scala'
   ],
@@ -82,11 +81,13 @@ python_test_suite(
     ':idea_integration',
     ':ivy_resolve_integration',
     ':jar_publish_integration',
+    ':junit_tests_integration',
     ':jvm_bundle_integration',
     ':jvm_run_integration',
     ':markdown_to_html_integration',
     ':protobuf_integration',
     ':scala_repl_integration',
+    ':thrift_linter_integration',
     'tests/python/pants_test/tasks/jvm_compile/java',
   ],
 )
@@ -144,6 +145,15 @@ python_tests(
     ':base',
     'src/python/pants/backend/jvm/tasks:bundle_create',
   ]
+)
+
+python_tests(
+  name = 'junit_tests_integration',
+  sources = ['test_junit_tests_integration.py'],
+  dependencies = [
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test:int-test',
+  ],
 )
 
 python_tests(
@@ -606,10 +616,9 @@ python_tests(
   ],
 )
 
-# TODO(Eric Ayers) This should be renamed and categorized as an integration test
 python_tests(
-  name = 'thrift_linter',
-  sources = ['test_thrift_linter.py'],
+  name = 'thrift_linter_integration',
+  sources = ['test_thrift_linter_integration.py'],
   dependencies = [
     ':base',
     'src/python/pants/base:target',

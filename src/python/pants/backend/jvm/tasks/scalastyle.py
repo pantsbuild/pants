@@ -59,7 +59,7 @@ class Scalastyle(NailgunTask, JvmToolTaskMixin):
 
     self._initialize_config()
     self._scalastyle_bootstrap_key = 'scalastyle'
-    self.register_jvm_tool(self._scalastyle_bootstrap_key, [':scalastyle'])
+    self.register_jvm_tool(self._scalastyle_bootstrap_key, ['//:scalastyle'])
 
   @property
   def config_section(self):
