@@ -15,11 +15,15 @@ body {
 }
 
 
-.codehilite pre {
+pre {
   padding: 1em;
   border-radius: 3px;
   background-color: #eef;
   color: #002;
+}
+
+code,tt {
+  background-color: #eef;
 }
 
 
@@ -163,7 +167,7 @@ nav.bignav .site-toc {
 
 nav.pagetoc {
   float: right;
-  margin: 4em 0px;
+  margin: 0px -1em 0px 1em;
   padding-left: 1em;
   background-color: #ddd;
   max-width: 24%;
