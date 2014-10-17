@@ -16,7 +16,7 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 class ProtobufIntegrationTest(PantsRunIntegrationTest):
   def test_bundle_protobuf_normal(self):
     pants_run = self.run_pants(
-        ['goal', 'bundle', 'examples/src/java/com/pants/examples/protobuf:protobuf-example',
+        ['goal', 'bundle', 'examples/src/java/com/pants/examples/protobuf/distance',
          '--bundle-deployjar', '--print-exception-stacktrace',])
     self.assertEquals(pants_run.returncode, self.PANTS_SUCCESS_CODE,
                       "goal bundle run expected success, got {0}\n"
@@ -26,7 +26,7 @@ class ProtobufIntegrationTest(PantsRunIntegrationTest):
                                                   pants_run.stdout_data))
     out_path = os.path.join(get_buildroot(), 'dist', 'protobuf-example-bundle')
     java_run = subprocess.Popen(['java', '-cp', 'protobuf-example.jar',
-                                 'com.pants.examples.protobuf.ExampleProtobuf'],
+                                 'com.pants.examples.protobuf.distance.ExampleProtobuf'],
                                 stdout=subprocess.PIPE,
                                 cwd=out_path)
     java_retcode = java_run.wait()
@@ -36,7 +36,7 @@ class ProtobufIntegrationTest(PantsRunIntegrationTest):
 
   def test_bundle_protobuf_imports(self):
     pants_run = self.run_pants(
-        ['goal', 'bundle', 'examples/src/java/com/pants/examples/protobuf:protobuf-imports-example',
+        ['goal', 'bundle', 'examples/src/java/com/pants/examples/protobuf/imports',
          '--bundle-deployjar', '--print-exception-stacktrace',])
     self.assertEquals(pants_run.returncode, self.PANTS_SUCCESS_CODE,
                       "goal bundle run expected success, got {0}\n"

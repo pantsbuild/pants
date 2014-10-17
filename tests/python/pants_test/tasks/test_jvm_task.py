@@ -5,7 +5,6 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-import pytest
 
 from pants.backend.core.tasks.check_exclusives import ExclusivesMapping
 from pants.backend.jvm.tasks.jvm_task import JvmTask
@@ -51,5 +50,5 @@ class JvmTaskTest(BaseTest):
     self.task.get_base_classpath_for_compatible_targets([self.t1, self.t2])
 
   def test_get_base_classpath_for_incompatible_targets(self):
-    with pytest.raises(TaskError):
+    with self.assertRaises(TaskError):
       self.task.get_base_classpath_for_compatible_targets([self.t1, self.t3])

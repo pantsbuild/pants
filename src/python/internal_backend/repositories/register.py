@@ -9,7 +9,7 @@ import os
 
 from pants.backend.jvm.repository import Repository
 from pants.base.build_file_aliases import BuildFileAliases
-
+from pants.base.build_manual import manual
 
 public_repo = Repository(name = 'public',
                          url = 'http://maven.twttr.com',
@@ -20,10 +20,16 @@ testing_repo = Repository(name = 'testing',
                           push_db_basedir = os.path.join('testprojects', 'ivy', 'pushdb'))
 
 
+# Your repositories don't need this manual.builddict magic.
+# It keeps these examples out of http://pantsbuild.github.io/build_dictionary.html
+manual.builddict(suppress=True)(public_repo)
+manual.builddict(suppress=True)(testing_repo)
+
+
 def build_file_aliases():
   return BuildFileAliases.create(
     objects={
-      'public': public_repo,
+      'public': public_repo,  # key 'public' must match name='public' above
       'testing': testing_repo,
     },
   )

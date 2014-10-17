@@ -19,6 +19,7 @@ from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.address import SyntheticAddress
+from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.thrift_util import calculate_compile_sources
@@ -72,6 +73,7 @@ _TARGET_TYPE_FOR_LANG = dict(scala=ScalaLibrary, java=JavaLibrary)
 
 
 class ScroogeGen(NailgunTask, JvmToolTaskMixin):
+
   GenInfo = namedtuple('GenInfo', ['gen', 'deps'])
 
   class PartialCmd(namedtuple('PC', ['compiler', 'language', 'rpc_style', 'namespace_map'])):
@@ -105,10 +107,10 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
                                   for name, config in _CONFIG_FOR_COMPILER.items())
 
     for name, compiler in self.compiler_for_name.items():
-      bootstrap_tools = self.context.config.getlist(
-        compiler.config_section, 'bootstrap-tools',
-        default=['//:{spec}'.format(spec=compiler.profile)])
-      self.register_jvm_tool(compiler.name, bootstrap_tools)
+      self.register_jvm_tool_from_config(compiler.name, self.context.config,
+                                         ini_section=compiler.config_section,
+                                         ini_key='bootstrap-tools',
+                                         default=['//:{spec}'.format(spec=compiler.profile)])
 
     self.defaults = JavaThriftLibrary.Defaults(self.context.config)
 
@@ -258,7 +260,13 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
         dependencies = OrderedSet()
         deps[category] = dependencies
         for depspec in depspecs:
-          dependencies.update(self.context.resolve(depspec))
+          try:
+            dependencies.update(self.context.resolve(depspec))
+          except AddressLookupError as e:
+            raise self.DepLookupError("{message}\n  referenced from [{section}] key: {key}" \
+                                      "in pants.ini" .format(message=e, section='thrift-gen',
+                                                             key="gen->deps->{category}"
+                                                             .format(cateegory=category)))
       return self.GenInfo(gen, deps)
 
     return self._inject_target(gentarget, dependees,

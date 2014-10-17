@@ -108,6 +108,10 @@ class TaskBase(AbstractClass):
         context.config.get('tasks', 'build_invalidator', default=default_invalidator_root),
         suffix_type)
 
+  def get_options(self):
+    """Returns the option values for this task's scope."""
+    return self.context.new_options.for_scope(self.options_scope)
+
   def prepare(self, round_manager):
     """Prepares a task for execution.
 

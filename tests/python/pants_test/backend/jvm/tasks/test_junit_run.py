@@ -23,6 +23,10 @@ from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 class JUnitRunnerTest(JvmToolTaskTestBase):
   """Tests for junit_run._JUnitRunner class"""
 
+  @classmethod
+  def task_type(cls):
+    return JUnitRun
+
   def create_options(self, **kwargs):
     options = dict(junit_run_coverage=False,
                    junit_run_coverage_html_open=False,
@@ -117,7 +121,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
       target_predicate=lambda t: t != resources)
 
     # Finally execute the task.
-    self.execute(context, JUnitRun)
+    self.execute(context)
 
 
 class EmmaTest(JvmToolTaskTestBase):

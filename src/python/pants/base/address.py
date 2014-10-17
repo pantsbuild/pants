@@ -112,23 +112,31 @@ class Address(AbstractClass):
     if type(self) == Address:
       raise TypeError('Cannot instantiate abstract class Address')
     norm_path = os.path.normpath(spec_path)
-    self.spec_path = norm_path if norm_path != '.' else ''
-    self.target_name = target_name
+    self._spec_path = norm_path if norm_path != '.' else ''
+    self._target_name = target_name
+
+  @property
+  def spec_path(self):
+    return self._spec_path
+
+  @property
+  def target_name(self):
+    return self._target_name
 
   @property
   def spec(self):
-    return '{spec_path}:{target_name}'.format(spec_path=self.spec_path,
-                                              target_name=self.target_name)
+    return '{spec_path}:{target_name}'.format(spec_path=self._spec_path,
+                                              target_name=self._target_name)
 
   @property
   def path_safe_spec(self):
     return ('{safe_spec_path}.{target_name}'
-            .format(safe_spec_path=self.spec_path.replace(os.sep, '.'),
-                    target_name=self.target_name))
+            .format(safe_spec_path=self._spec_path.replace(os.sep, '.'),
+                    target_name=self._target_name))
 
   @property
   def relative_spec(self):
-    return ':{target_name}'.format(target_name=self.target_name)
+    return ':{target_name}'.format(target_name=self._target_name)
 
   @property
   def is_synthetic(self):
@@ -136,20 +144,23 @@ class Address(AbstractClass):
 
   def reference(self, referencing_path=None):
     """How to reference this address in a BUILD file."""
-    if referencing_path and self.spec_path == referencing_path:
+    if referencing_path and self._spec_path == referencing_path:
       return self.relative_spec
-    elif os.path.basename(self.spec_path) != self.target_name:
+    elif os.path.basename(self._spec_path) != self._target_name:
       return self.spec
     else:
-      return self.spec_path
+      return self._spec_path
 
   def __eq__(self, other):
     return (other and
-            self.spec_path == other.spec_path and
-            self.target_name == other.target_name)
+            self._spec_path == other._spec_path and
+            self._target_name == other._target_name)
 
+  _hash = None
   def __hash__(self):
-    return hash((self.spec_path, self.target_name))
+    if self._hash is None:
+      self._hash = hash((self._spec_path, self._target_name))
+    return self._hash
 
   def __ne__(self, other):
     return not self.__eq__(other)
@@ -158,7 +169,7 @@ class Address(AbstractClass):
     return self.spec
 
   def __lt__(self, other):
-    return (self.spec_path, self.target_name) < (other.spec_path, other.target_name)
+    return (self._spec_path, self._target_name) < (other._spec_path, other._target_name)
 
 
 class BuildFileAddress(Address):

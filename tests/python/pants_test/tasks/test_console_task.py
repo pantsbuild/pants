@@ -12,11 +12,10 @@ import threading
 import pytest
 
 from pants.backend.core.tasks.console_task import ConsoleTask
-from pants_test.base_test import BaseTest
-from pants_test.tasks.test_base import prepare_task
+from pants_test.tasks.test_base import TaskTest
 
 
-class ConsoleTaskTest(BaseTest):
+class ConsoleTaskTest(TaskTest):
   class Infinite(ConsoleTask):
     def __init__(self, *args, **kwargs):
       super(ConsoleTaskTest.Infinite, self).__init__(*args, **kwargs)
@@ -29,13 +28,16 @@ class ConsoleTaskTest(BaseTest):
     def stop(self):
       self.halt.set()
 
+  @classmethod
+  def task_type(cls):
+    return cls.Infinite
+
   def test_sigpipe(self):
     r, w = os.pipe()
     outstream = os.fdopen(w, 'w')
-    task = prepare_task(task_type=self.Infinite,
-                        build_graph=self.build_graph,
-                        build_file_parser=self.build_file_parser,
-                        console_outstream=outstream)
+    task = self.prepare_task(build_graph=self.build_graph,
+                             build_file_parser=self.build_file_parser,
+                             console_outstream=outstream)
     raised = Queue(maxsize=1)
 
     def execute():

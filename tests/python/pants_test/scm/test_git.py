@@ -163,10 +163,11 @@ class GitTest(unittest.TestCase):
     # confirm that files outside of a given relative_to path are ignored
     self.assertEqual(set(), self.git.changed_files(relative_to='non-existent'))
 
+    self.git.commit('API Changes.')
     try:
       # These changes should be rejected because our branch point from origin is 1 commit behind
       # the changes pushed there in clone 2.
-      self.git.commit('API Changes.')
+      self.git.push()
     except Scm.RemoteException:
       with environment_as(GIT_DIR=self.gitdir, GIT_WORK_TREE=self.worktree):
         subprocess.check_call(['git', 'reset', '--hard', 'depot/master'])
@@ -174,6 +175,7 @@ class GitTest(unittest.TestCase):
       edit_readme()
 
     self.git.commit('''API '"' " Changes.''')
+    self.git.push()
     # HEAD is merged into master
     self.assertEqual(self.git.commit_date(self.git.merge_base()), self.git.commit_date('HEAD'))
     self.assertEqual(self.git.commit_date('HEAD'), self.git.commit_date('HEAD'))
@@ -224,3 +226,29 @@ class GitTest(unittest.TestCase):
         worktree_relative_to('is', clone)
         worktree_relative_to('is/a', clone)
         worktree_relative_to('is/a/dir', clone)
+
+  def test_refresh_with_conflict(self):
+    with environment_as(GIT_DIR=self.gitdir, GIT_WORK_TREE=self.worktree):
+      self.assertEqual(set(), self.git.changed_files())
+      self.assertEqual(set(['README']), self.git.changed_files(from_commit='HEAD^'))
+
+      # Create a change on this branch that is incompatible with the change to master
+      with open(self.readme_file, 'w') as readme:
+        readme.write('Conflict')
+
+      subprocess.check_call(['git', 'commit', '-am', 'Conflict'])
+
+      self.assertEquals(set([]), self.git.changed_files(include_untracked=True, from_commit='HEAD'))
+      with self.assertRaises(Scm.LocalException):
+        self.git.refresh(leave_clean=False)
+      # The repo is dirty
+      self.assertEquals(set(['README']), self.git.changed_files(include_untracked=True, from_commit='HEAD'))
+
+      with environment_as(GIT_DIR=self.gitdir, GIT_WORK_TREE=self.worktree):
+        subprocess.check_call(['git', 'reset', '--hard', 'HEAD'])
+
+      # Now try with leave_clean
+      with self.assertRaises(Scm.LocalException):
+        self.git.refresh(leave_clean=True)
+      # The repo is clean
+      self.assertEquals(set([]), self.git.changed_files(include_untracked=True, from_commit='HEAD'))

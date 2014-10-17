@@ -9,8 +9,20 @@ body {
   color: #111;
   font-family: sans-serif;
 }
+
 .mainflow {
   margin: 64px 2% 40em 30%;
+}
+
+
+a.pilcrow-link {
+  color: transparent;
+  min-width: 2em;
+  text-decoration: none;
+}
+
+div.h-plus-pilcrow:hover a.pilcrow-link {
+  color: #04a;
 }
 
 nav.breadcrumbs ul {
@@ -81,19 +93,101 @@ form.search .button {
   border-radius: 2px;
 }
 
-nav.bignav .bigtoc {
+nav.bignav .site-toc {
   background-color: #eee;
+}
+
+.site-toc ul {
+  padding-left: 1em;
+  padding-right: 1em;
+  list-style-type: none;
+}
+
+.site-toc li.toc-here {
+  background-color: #fff;
+}
+.site-toc li:hover {
+  background-color: black;
+  color: white;
+}
+.site-toc li.toc-here:hover {
+  background-color: #eee;
+  color: black;
+}
+.site-toc li:hover a {
+  color: white;
+}
+
+.site-toc .toc-h0 {
+  margin-left: 0px;
+  padding-left: 0px;
+  font-size: 120%;
+}
+.site-toc .toc-h1 {
+  margin-left: 2px;
+  padding-left: 0px;
+}
+.site-toc .toc-h2 {
+  margin-left: 2px;
+  padding-left: 1.0em;
+}
+.site-toc .toc-h3 {
+  margin-left: 2px;
+  padding-left: 2.0em;
+}
+.site-toc .toc-h4 {
+  margin-left: 2px;
+  padding-left: 3.0em;
+}
+
+nav.pagetoc {
+  float: right;
+  margin: 4em 0px;
+  padding-left: 1em;
+  background-color: #ddd;
+  max-width: 24%;
+  border: 3px solid #38c;
+  border-radius: 3px;
+}
+
+nav.pagetoc ul {
+  padding-left: 0px;
+  list-style-type: none;
+}
+
+nav.pagetoc li {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+nav.pagetoc li:hover {
+  background-color: black;
+  color: white;
+}
+nav.pagetoc li:hover a {
+  color: white;
+}
+nav.pagetoc .toc-h1 {
+  margin-left: 2px;
+  padding-left: 2px;
+}
+nav.pagetoc .toc-h2 {
+  margin-left: 2px;
+  padding-left: 6px;
+}
+nav.pagetoc .toc-h3 {
+  margin-left: 2px;
+  padding-left: 10px;
+}
+nav.pagetoc .toc-h4 {
+  margin-left: 2px;
+  padding-left: 14px;
 }
 
 div.ci-status {
   position: absolute;
   top: 0px; right: 0px;
-}
-
-div.ci-status .caption {
-  vertical-align: middle;
-  font-size: small;
-  color: #232;
 }
 
 div.ci-status img {

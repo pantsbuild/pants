@@ -7,6 +7,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from twitter.common.collections import OrderedSet
 
+from pants.backend.jvm.jvm_debug_config import JvmDebugConfig
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.base.exceptions import TaskError
@@ -43,9 +44,10 @@ class SpecsRun(JvmTask, JvmToolTaskMixin):
     super(SpecsRun, self).__init__(*args, **kwargs)
 
     self._specs_bootstrap_key = 'specs'
-    bootstrap_tools = self.context.config.getlist('specs-run', 'bootstrap-tools',
-                                                  default=['//:scala-specs-2.9.3'])
-    self.register_jvm_tool(self._specs_bootstrap_key, bootstrap_tools)
+    self.register_jvm_tool_from_config(self._specs_bootstrap_key, self.context.config,
+                                       ini_section='specs-run',
+                                       ini_key='bootstrap-tools',
+                                       default=['//:scala-specs-2.9.3'])
 
     self.confs = self.context.config.getlist('specs-run', 'confs', default=['default'])
 
@@ -53,7 +55,7 @@ class SpecsRun(JvmTask, JvmToolTaskMixin):
     if self.context.options.specs_run_jvm_options:
       self._jvm_options.extend(self.context.options.specs_run_jvm_options)
     if self.context.options.specs_run_debug:
-      self._jvm_options.extend(self.context.config.getlist('jvm', 'debug_args'))
+      self._jvm_options.extend(JvmDebugConfig.debug_args(self.context.config))
 
     self.skip = self.context.options.specs_run_skip
     self.color = self.context.options.specs_run_color

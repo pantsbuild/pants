@@ -10,7 +10,6 @@ import sys
 from collections import defaultdict
 from contextlib import contextmanager
 
-from twitter.common.collections import OrderedSet
 from twitter.common.dirutil import Lock
 from twitter.common.process import ProcessProviderFactory
 from twitter.common.process.process_provider import ProcessProvider
@@ -74,11 +73,13 @@ class Context(object):
 
   # TODO: Figure out a more structured way to construct and use context than this big flat
   # repository of attributes?
-  def __init__(self, config, options, run_tracker, target_roots, requested_goals=None,
-               lock=None, log=None, target_base=None, build_graph=None, build_file_parser=None,
-               address_mapper=None, console_outstream=None, scm=None, workspace=None):
+  def __init__(self, config, old_options, new_options, run_tracker, target_roots,
+               requested_goals=None, lock=None, log=None, target_base=None, build_graph=None,
+               build_file_parser=None, address_mapper=None, console_outstream=None, scm=None,
+               workspace=None, spec_excludes=None):
     self._config = config
-    self._options = options
+    self._old_options = old_options
+    self._new_options = new_options
     self.build_graph = build_graph
     self.build_file_parser = build_file_parser
     self.address_mapper = address_mapper
@@ -93,7 +94,7 @@ class Context(object):
     self._console_outstream = console_outstream or sys.stdout
     self._scm = scm or get_scm()
     self._workspace = workspace or (ScmWorkspace(self._scm) if self._scm else None)
-
+    self._spec_excludes = spec_excludes
     self.replace_targets(target_roots)
 
   @property
@@ -103,8 +104,13 @@ class Context(object):
 
   @property
   def options(self):
-    """Returns the command line options parsed at startup."""
-    return self._options
+    """Returns the old-style command line options parsed at startup."""
+    return self._old_options
+
+  @property
+  def new_options(self):
+    """Returns the new-style options."""
+    return self._new_options
 
   @property
   def lock(self):
@@ -172,6 +178,10 @@ class Context(object):
   def ivy_home(self):
     return os.path.realpath(self.config.get('ivy', 'cache_dir',
                                             default=_IVY_CACHE_DIR_DEFAULT))
+
+  @property
+  def spec_excludes(self):
+    return self._spec_excludes
 
   def __str__(self):
     ident = Target.identify(self.targets())
@@ -267,9 +277,8 @@ class Context(object):
 
     :return: a list of targets evaluated by the predicate in inorder traversal order.
     """
-    target_set = OrderedSet()
-    for target in self._target_roots:
-      target_set.update(target.closure())
+    target_root_addresses = [target.address for target in self._target_roots]
+    target_set = self.build_graph.transitive_subgraph_of_addresses(target_root_addresses)
     return filter(predicate, target_set)
 
   def dependents(self, on_predicate=None, from_predicate=None):
@@ -300,6 +309,6 @@ class Context(object):
     :returns: A new build graph encapsulating the targets found.
     """
     build_graph = BuildGraph(self.address_mapper)
-    for address in self.address_mapper.scan_addresses(root):
+    for address in self.address_mapper.scan_addresses(root, spec_excludes=self.spec_excludes):
       build_graph.inject_address_closure(address)
     return build_graph

@@ -43,6 +43,14 @@ class IvyInfo(object):
     for caller in module.callers:
       self.deps_by_caller[caller].add(module.ref)
 
+  def get_jars_for_ivy_module(self, jar):
+    ref = IvyModuleRef(jar.org, jar.name, jar.rev)
+    deps = OrderedSet()
+    for dep in self.deps_by_caller.get(ref, []):
+      deps.add(dep)
+      deps.update(self.get_jars_for_ivy_module(dep))
+    return deps
+
 
 class IvyUtils(object):
   IVY_TEMPLATE_PACKAGE_NAME = __name__
@@ -272,9 +280,9 @@ class IvyUtils(object):
           if jar.rev:
             add_jar(jar)
 
-      # Lift jvm target-level excludes up to the global excludes set
-      if target.is_jvm and target.payload.excludes:
-        excludes.update(target.payload.excludes)
+      target_excludes = target.payload.get_field_value('excludes')
+      if target_excludes:
+        excludes.update(target_excludes)
 
     for target in targets:
       target.walk(collect_jars)

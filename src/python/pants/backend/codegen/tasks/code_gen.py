@@ -8,6 +8,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import os.path
 from collections import defaultdict
 
+from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_environment import get_buildroot
 from pants.backend.core.tasks.task import Task
 
@@ -18,6 +19,10 @@ class CodeGen(Task):
   This Task will only invoke code generation for changed targets and for the set of languages
   in the active context that require codegen unless forced.
   """
+
+  class DepLookupError(AddressLookupError):
+    """Thrown when a dependency can't be found."""
+    pass
 
   @classmethod
   def product_types(cls):

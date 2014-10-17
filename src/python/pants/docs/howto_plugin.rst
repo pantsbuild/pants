@@ -15,7 +15,9 @@ Much of Pants' own functionality is organized in plugins; see
 them in ``src/python/pants/backend/*``.
 
 A plugin registers its functionality with Pants by defining some
-functions in a ``register.py`` file. For example, Pants' ``jvm``
-code registers in
-`src/python/pnats/backend/jvm/register.py
+functions in a ``register.py`` file in its top directory.
+For example, Pants' ``jvm`` code registers in
+`src/python/pants/backend/jvm/register.py
 <https://github.com/pantsbuild/pants/blob/master/src/python/pants/backend/jvm/register.py>`_
+Pants' backend-loader code assumes your plugin has a ``register.py``
+file there.

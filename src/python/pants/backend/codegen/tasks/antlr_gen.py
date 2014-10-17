@@ -5,6 +5,7 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+import logging
 import os
 
 from twitter.common.collections import OrderedSet
@@ -15,9 +16,13 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.address import SyntheticAddress
+from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.util.dirutil import safe_mkdir
+
+
+logger = logging.getLogger(__name__)
 
 
 class AntlrGen(CodeGen, NailgunTask, JvmToolTaskMixin):
@@ -76,6 +81,8 @@ class AntlrGen(CodeGen, NailgunTask, JvmToolTaskMixin):
       args = ["-o", java_out]
 
       if target.compiler == 'antlr3':
+        if target.package is not None:
+          logger.warn("The 'package' attribute is not supported for antlr3 and will be ignored.")
         java_main = 'org.antlr.Tool'
       elif target.compiler == 'antlr4':
         args.append('-visitor')  # Generate Parse Tree Visitor As Well
@@ -154,12 +161,18 @@ class AntlrGen(CodeGen, NailgunTask, JvmToolTaskMixin):
     return tgt
 
   def _resolve_java_deps(self, target):
-    key = self._CONFIG_SECTION_BY_COMPILER[target.compiler]
+    section = self._CONFIG_SECTION_BY_COMPILER[target.compiler]
 
     deps = OrderedSet()
-    for dep in self.context.config.getlist(key, 'javadeps'):
-      deps.update(self.context.resolve(dep))
-    return deps
+    try:
+      for dep in self.context.config.getlist(section, 'javadeps'):
+        deps.update(self.context.resolve(dep))
+      return deps
+    except AddressLookupError as e:
+      raise self.DepLookupError("{message}\n"
+                                "  referenced from [{section}] key: javadeps in pants.ini"
+                                .format(message=e, section=section))
+
 
   def _all_possible_antlr_bootstrap_tools(self):
     for compiler, key in self._CONFIG_SECTION_BY_COMPILER.items():

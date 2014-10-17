@@ -14,7 +14,7 @@ from pants.backend.core.targets.resources import Resources
 from pants.backend.core.tasks.build_lint import BuildLint
 from pants.backend.core.tasks.builddictionary import BuildBuildDictionary
 from pants.backend.core.tasks.check_exclusives import CheckExclusives
-from pants.backend.core.tasks.clean import Invalidator, Cleaner, AsyncCleaner
+from pants.backend.core.tasks.clean import Cleaner, Invalidator
 from pants.backend.core.tasks.confluence_publish import ConfluencePublish
 from pants.backend.core.tasks.dependees import ReverseDepmap
 from pants.backend.core.tasks.filemap import Filemap
@@ -99,7 +99,7 @@ def register_goals():
   ).install().with_description('List all documented goals.')
 
   task(name='targets', action=TargetsHelp
-  ).install().with_description('List all target types.')
+  ).install().with_description('List target types and BUILD file symbols (python_tests, jar, etc).')
 
   task(name='builddict', action=BuildBuildDictionary
   ).install()
@@ -113,8 +113,14 @@ def register_goals():
   clean_all.with_description('Clean all build output.')
   clean_all.install(invalidate, first=True)
 
+  class AsyncCleaner(Cleaner):
+    def execute(self):
+      print('The `clean-all-async` goal is deprecated and currently just forwards to `clean-all`.',
+            file=sys.stderr)
+      print('Please update your usages to `clean-all`.', file=sys.stderr)
+      super(AsyncCleaner, self).execute()
   clean_all_async = task(name='clean-all-async', action=AsyncCleaner, dependencies=['invalidate']
-  ).install().with_description('Clean all build output in a background process.')
+  ).install().with_description('[deprecated] Clean all build output in a background process.')
   clean_all_async.install(invalidate, first=True)
 
   # Reporting.

@@ -20,10 +20,6 @@ class ListGoals(ConsoleTask):
              help='List all goals even if no description is available.',
              legacy='goal_list_all')
 
-  @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    super(ListGoals, cls).setup_parser(option_group, args, mkflag)
-
   def console_output(self, targets):
     def report():
       yield 'Installed goals:'
@@ -34,7 +30,7 @@ class ListGoals(ConsoleTask):
         if goal.description:
           documented_rows.append((goal.name, goal.description))
           max_width = max(max_width, len(goal.name))
-        elif self.context.options.goal_list_all:
+        elif self.get_options().all:
           undocumented.append(goal.name)
       for name, description in documented_rows:
         yield '  %s: %s' % (name.rjust(max_width), description)
@@ -82,4 +78,4 @@ class ListGoals(ConsoleTask):
           edges.add(edge)
       yield '}'
 
-    return graph() if self.context.options.goal_list_graph else report()
+    return graph() if self.get_options().graph else report()

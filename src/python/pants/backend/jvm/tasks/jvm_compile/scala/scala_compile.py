@@ -35,12 +35,12 @@ class ScalaCompile(JvmCompile):
   _config_section = 'scala-compile'
 
   @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    super(ScalaCompile, cls).setup_parser(option_group, args, mkflag)
-
-    option_group.add_option(mkflag('plugins'), dest='plugins', default=None,
-                            action='append',
-                            help='Use these scalac plugins. Default is set in pants.ini.')
+  def register_options(cls, register):
+    super(ScalaCompile, cls).register_options(register)
+    # Note: Used in ZincUtils.
+    # TODO: Revisit this. It's unintuitive for ZincUtils to reach back into the task for options.
+    register('--plugins', default=None, action='append', help='Use these scalac plugins.',
+             legacy='plugins')
 
   def __init__(self, *args, **kwargs):
     super(ScalaCompile, self).__init__(*args, **kwargs)

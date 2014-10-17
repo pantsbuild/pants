@@ -15,7 +15,6 @@ import psutil
 from twitter.common.dirutil import Lock
 
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
-from pants.base.address import Address
 from pants.base.build_environment import get_buildroot, pants_version
 from pants.base.build_file_address_mapper import BuildFileAddressMapper
 from pants.base.build_file_parser import BuildFileParser
@@ -102,8 +101,7 @@ def _process_info(pid):
   return '%d (%s)' % (pid, ' '.join(process.cmdline))
 
 def _run():
-  # place the registration of the unhandled exception hook
-  # as early as possible in the code
+  # Place the registration of the unhandled exception hook as early as possible in the code.
   sys.excepthook = _unhandled_exception_hook
 
   """
@@ -130,7 +128,6 @@ def _run():
     argv = ['goal'] + argv
 
   parser = optparse.OptionParser(add_help_option=False, version=version)
-  RcFile.install_disable_rc_option(parser)
   parser.add_option(_LOG_EXIT_OPTION,
                     action='store_true',
                     default=False,
@@ -185,13 +182,16 @@ def _run():
     except KeyboardInterrupt:
       command.cleanup()
       raise
+    except Exception:
+      run_tracker.set_root_outcome(WorkUnit.FAILURE)
+      raise
     finally:
       lock.release()
   finally:
     run_tracker.end()
     # Must kill nailguns only after run_tracker.end() is called, because there may still
     # be pending background work that needs a nailgun.
-    if (hasattr(command.options, 'cleanup_nailguns') and command.options.cleanup_nailguns) \
+    if (hasattr(command.old_options, 'cleanup_nailguns') and command.old_options.cleanup_nailguns) \
         or config.get('nailgun', 'autokill', default=False):
       NailgunTask.killall(None)
 

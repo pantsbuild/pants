@@ -68,17 +68,17 @@ class DuplicateDetectorTest(TaskTest):
     safe_rmtree(self.base_dir)
 
   def test_duplicate_found(self):
-    options = {'fail_fast': False, 'excludes': None, 'max_dups' : 10}
-    task = DuplicateDetector(create_context(options=options), workdir=None)
+    old_options = {'fail_fast': False, 'excludes': None, 'max_dups' : 10}
+    task = DuplicateDetector(create_context(old_options=old_options), workdir=None)
     self.assertTrue(task._is_conflicts(self.path_with_duplicates, binary_target=None))
 
   def test_duplicate_not_found(self):
-    options = {'fail_fast': False, 'excludes': None, 'max_dups' : 10}
-    task = DuplicateDetector(create_context(options=options), workdir=None)
+    old_options = {'fail_fast': False, 'excludes': None, 'max_dups' : 10}
+    task = DuplicateDetector(create_context(old_options=old_options), workdir=None)
     self.assertFalse(task._is_conflicts(self.path_without_duplicates, binary_target=None))
 
   def test_fail_fast_error_raised(self):
-    options = {'fail_fast': True, 'excludes': None, 'max_dups' : 10}
-    task = DuplicateDetector(create_context(options=options), workdir=None)
+    old_options = {'fail_fast': True, 'excludes': None, 'max_dups' : 10}
+    task = DuplicateDetector(create_context(old_options=old_options), workdir=None)
     with self.assertRaises(TaskError):
       task._is_conflicts(self.path_with_duplicates, binary_target=None)

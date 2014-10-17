@@ -56,6 +56,11 @@ class ArgSplitterTest(unittest.TestCase):
     self._split('./pants compile -- test', {'': [], 'compile': []}, ['test'])
     self._split('./pants test -- test', {'': [], 'test': []}, ['test'])
 
+    # De-scoping old-style flags correctly.
+    self._split('./pants compile test --compile-java-bar --no-test-junit-baz foo',
+                {'': [], 'compile': [], 'compile.java': ['--bar'],
+                 'test': [], 'test.junit': ['--no-baz']}, ['foo'])
+
     # Flags where only target specs should be.
     # TODO(benjy): Uncomment if we re-enable this check, or delete if we decide to allow
     #              this permanently.

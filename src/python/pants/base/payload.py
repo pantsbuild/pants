@@ -5,16 +5,7 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from abc import abstractmethod
 from hashlib import sha1
-import os
-
-from twitter.common.collections import OrderedSet
-from twitter.common.lang import AbstractClass
-
-from pants.base.build_environment import get_buildroot
-from pants.base.validation import assert_list
-
 
 class PayloadFieldAlreadyDefinedError(Exception): pass
 
@@ -46,6 +37,15 @@ class Payload(object):
     Has the same semantics as dict.get, and in fact just delegates to the underlying field mapping.
     """
     return self._fields.get(key, default)
+
+  def get_field_value(self, key, default=None):
+    """Retrieves the value in the payload field if the field exists, otherwise returns the default.
+    """
+    if key in self._fields:
+      payload_field = self._fields[key]
+      if payload_field:
+        return payload_field.value
+    return default
 
   def add_fields(self, field_dict):
     """Add a mapping of field names to PayloadField instances."""

@@ -5,24 +5,30 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from twitter.common.lang import Compatibility
+import six
 
 from pants.backend.core.targets.resources import Resources
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.base.address import SyntheticAddress
-from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import (ConfigurationsField,
                                       ExcludesField,
                                       SourcesField)
 from pants.base.target import Target
-from pants.base.validation import assert_list
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jarable import Jarable
 
 
 class JvmTarget(Target, Jarable):
   """A base class for all java module targets that provides path and dependency translation."""
+
+  class WrongTargetTypeError(Exception):
+    """Thrown if the wrong type of target is encountered.
+    """
+
+  class ExpectedAddressError(Exception):
+    """Thrown if an object that is not an address.
+    """
 
   def __init__(self,
                address=None,
@@ -38,6 +44,11 @@ class JvmTarget(Target, Jarable):
     :param configurations: One or more ivy configurations to resolve for this target.
       This parameter is not intended for general use.
     :type configurations: tuple of strings
+    :param excludes: List of `exclude <#exclude>`_\s to filter this target's
+      transitive dependencies against.
+    :param sources: Source code files to build. Paths are relative to the BUILD
+       file's directory.
+    :type sources: ``Fileset`` (from globs or rglobs) or list of strings
     """
     if sources_rel_path is None:
       sources_rel_path = address.spec_path
@@ -97,3 +108,34 @@ class JvmTarget(Target, Jarable):
   @property
   def excludes(self):
     return self.payload.excludes
+
+  def to_jar_dependencies(self, jar_library_specs):
+    """Convenience method to resolve a list of specs to JarLibraries and return its jars attributes.
+
+    Expects that the jar_libraries are declared relative to this target.
+
+    :param Address relative_to: Address that references library_specs, for error messages
+    :param library_specs: string specs to JavaLibrary targets. Note, this list should be returned
+      by the caller's traversable_specs() implementation to make sure that the jar_dependency jars
+      have been added to the build graph.
+    :param build_graph: build graph instance used to search for specs
+    :return: list of JarDependency instances represented by the library_specs
+    """
+    jar_deps = set()
+    for spec in jar_library_specs:
+      if not isinstance(spec, six.string_types):
+        raise self.ExpectedAddressError(
+          "{address}: expected imports to contain string addresses, got {found_class}."
+          .format(address=self.address.spec,
+                  found_class=type(spec).__name__))
+      address = SyntheticAddress.parse(spec, relative_to=self.address.spec_path)
+      target = self._build_graph.get_target(address)
+      if isinstance(target, JarLibrary):
+        jar_deps.update(target.jar_dependencies)
+      else:
+        raise self.WrongTargetTypeError(
+          "{address}: expected {spec} to be jar_library target type, got {found_class}"
+          .format(address=self.address.spec,
+                  spec=address.spec,
+                  found_class=type(target).__name__))
+    return list(jar_deps)

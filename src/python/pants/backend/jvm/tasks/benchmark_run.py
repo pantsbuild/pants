@@ -8,6 +8,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import os
 import shutil
 
+from pants.backend.jvm.jvm_debug_config import JvmDebugConfig
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.base.exceptions import TaskError
@@ -46,14 +47,15 @@ class BenchmarkRun(JvmTask, JvmToolTaskMixin):
                                    default=['-Xmx1g', '-XX:MaxPermSize=256m'])
 
     self._benchmark_bootstrap_key = 'benchmark-tool'
-    benchmark_bootstrap_tools = config.getlist('benchmark-run', 'bootstrap-tools',
-                                               default=['//:benchmark-caliper-0.5'])
-    self.register_jvm_tool(self._benchmark_bootstrap_key,
-                                                  benchmark_bootstrap_tools)
+    self.register_jvm_tool_from_config(self._benchmark_bootstrap_key, config,
+                                       ini_section='benchmark-run',
+                                       ini_key='bootstrap-tools',
+                                       default=['//:benchmark-caliper-0.5'])
     self._agent_bootstrap_key = 'benchmark-agent'
-    agent_bootstrap_tools = config.getlist('benchmark-run', 'agent_profile',
-                                           default=[':benchmark-java-allocation-instrumenter-2.1'])
-    self.register_jvm_tool(self._agent_bootstrap_key, agent_bootstrap_tools)
+    self.register_jvm_tool_from_config(self._agent_bootstrap_key, config,
+                                       ini_section='benchmark-run',
+                                       ini_key='agent_profile',
+                                       default=[':benchmark-java-allocation-instrumenter-2.1'])
 
     # TODO(Steve Gury):
     # Find all the target classes from the Benchmark target itself
@@ -64,7 +66,7 @@ class BenchmarkRun(JvmTask, JvmToolTaskMixin):
       self.caliper_args += ['--measureMemory']
 
     if self.context.options.debug:
-      self.jvm_args.extend(self.context.config.getlist('jvm', 'debug_args'))
+      self.jvm_args.extend(JvmDebugConfig.debug_args(self.context.config))
       self.caliper_args += ['--debug']
 
     self.caliper_args.extend(self.context.options.extra_caliper_args)

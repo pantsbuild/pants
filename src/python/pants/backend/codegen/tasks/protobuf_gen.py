@@ -20,6 +20,7 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.base.address import SyntheticAddress
+from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.target import Target
@@ -40,6 +41,7 @@ _PROTOBUF_GEN_JAVADEPS_DEFAULT='3rdparty:protobuf-{version}'
 _PROTOBUF_GEN_PYTHONDEPS_DEFAULT = []
 
 class ProtobufGen(CodeGen):
+
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
     option_group.add_option(mkflag('lang'), dest='protobuf_gen_langs', default=[],
@@ -77,7 +79,11 @@ class ProtobufGen(CodeGen):
     deps = OrderedSet()
     for dep in self.context.config.getlist('protobuf-gen', key, default=maybe_list(default)):
       if dep:
-        deps.update(self.context.resolve(dep))
+        try:
+          deps.update(self.context.resolve(dep))
+        except AddressLookupError as e:
+          raise self.DepLookupError("{message}\n  referenced from [{section}] key: {key} in pants.ini"
+                                    .format(message=e, section='protobuf-gen', key=key))
     return deps
 
   @property
@@ -247,7 +253,7 @@ class ProtobufGen(CodeGen):
                                       sources=genfiles,
                                       provides=target.provides,
                                       dependencies=deps,
-                                      excludes=target.payload.excludes)
+                                      excludes=target.payload.get_field_value('excludes'))
     for dependee in dependees:
       dependee.inject_dependency(tgt.address)
     return tgt
@@ -290,6 +296,7 @@ def calculate_genfiles(path, source):
     multiple_files = False
     outer_types = set()
     type_depth = 0
+    java_package = None
     for line in lines:
       match = DEFAULT_PACKAGE_PARSER.match(line)
       if match:
@@ -300,7 +307,7 @@ def calculate_genfiles(path, source):
           name = match.group(1)
           value = match.group(2).strip('"')
           if 'java_package' == name:
-            package = value
+            java_package = value
           elif 'java_outer_classname' == name:
             outer_class_name = value
           elif 'java_multiple_files' == name:
@@ -313,6 +320,10 @@ def calculate_genfiles(path, source):
           if not match:
             match = TYPE_PARSER.match(line)
             _update_type_list(match, type_depth, outer_types)
+
+    # 'option java_package' supercedes 'package'
+    if java_package:
+      package = java_package
 
     # TODO(Eric Ayers) replace with a real lex/parse understanding of protos. This is a big hack.
     # The parsing for finding type definitions is not reliable. See

@@ -18,7 +18,7 @@ python_library(
     'src/python/pants/backend/jvm/tasks:bootstrap_jvm_tools',
     'src/python/pants/base:dev_backend_loader',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test:base_test',
+    'tests/python/pants_test:task_test_base',
   ]
 )
 

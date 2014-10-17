@@ -96,9 +96,9 @@ class OptionsTest(unittest.TestCase):
 
     # Get defaults from config and environment.
     config = OptionsTest.FakeConfig({
-      'DEFAULT': { 'num': 88 },
-      'compile': { 'num': 77 },
-      'compile.java': { 'num': 66 }
+      'DEFAULT': { 'num': '88' },
+      'compile': { 'num': '77' },
+      'compile.java': { 'num': '66' }
     })
     options = self._parse('./pants compile.java -n22', config=config)
     self.assertEqual(88, options.for_global_scope().num)
@@ -122,8 +122,8 @@ class OptionsTest(unittest.TestCase):
     # The example from the design doc.
     # Get defaults from config and environment.
     config = OptionsTest.FakeConfig({
-      'DEFAULT': { 'b': 99 },
-      'compile': { 'a': 88, 'c': 77 },
+      'DEFAULT': { 'b': '99' },
+      'compile': { 'a': '88', 'c': '77' },
     })
     env = {
       'PANTS_COMPILE_C': '66'

@@ -219,11 +219,11 @@ class Parser(object):
     for arg in args:
       self._dest_forwardings[arg.lstrip('-').replace('-', '_')] = scoped_dest
 
-    # Forward another hop, to the legacy flag.  Note that this means that *only* the
-    # legacy flag is supported for now.  This will be removed after we're finished migrating
-    # option registration to the new system, and work on migrating the actual runtime
-    # command-line parsing.
-    if legacy_dest:
+    # Forward another hop, to the legacy flag, but only if this won't create a forwarding cycle.
+    #   Note that this means that *only* the legacy flag is supported for now.
+    # This will be removed after we're finished migrating option registration to the new system,
+    # and work on migrating the actual runtime command-line parsing.
+    if legacy_dest and self._dest_forwardings.get(legacy_dest) != scoped_dest:
       self._dest_forwardings[scoped_dest] = legacy_dest
     return dest
 
@@ -250,9 +250,11 @@ class Parser(object):
     env_val_str = self._env.get(env_var) if self._env else None
 
     env_val = None if env_val_str is None else value_type(env_val_str)
-    config_val = self._config.get(config_section, dest, default=None) if self._config else None
+    config_val_str = self._config.get(config_section, dest, default=None) if self._config else None
+    config_val = None if config_val_str is None else value_type(config_val_str)
     hardcoded_val = kwargs.get('default')
-    return RankedValue.choose(None, env_val, config_val, hardcoded_val)
+    default = [] if kwargs.get('action') == 'append' else None
+    return RankedValue.choose(None, env_val, config_val, hardcoded_val, default)
 
   def _create_inverse_kwargs(self, kwargs):
     """Create the kwargs for registering the inverse of a boolean flag."""

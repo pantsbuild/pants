@@ -128,6 +128,22 @@ distribute code to different organizations, and want different configuration
 for them, you might put the relevant config code in `./BUILD.something`.
 You can give that file to some people and not-give it to others.
 
+**************************************
+Integrate New Tools via a Pants Plugin
+**************************************
+
+Pants knows how to build many things, but maybe you need it to learn a new tool.
+Maybe your organization has a custom linter, a custom code generator,
+or some other custom tool. Maybe your organization uses a tool that, while
+not custom, has not yet been integrated with Pants.
+
+* If your organization has some custom tools to integrate,
+  set up a :doc:`Pants plugin <howto_plugin>`.
+* If you want to integrate with a not-custom tool, you
+  still want to set up a Pants plugin (or perhaps add abilities
+  to an existing plugin), but it might make sense to
+  :doc:`get your changes in upstream <howto_contribute>`.
+
 **********************************************
 BUILD.* in the source tree for special targets
 **********************************************
@@ -157,13 +173,92 @@ If you don't want to make this test definition available to the public (lest
 they complain about how long it takes), you might put this in a `BUILD.foo`
 file and hold back this file when mirroring for the public repository.
 
+.. _setup_publish:
+
+**********************
+Enabling Pants Publish
+**********************
+
+Pants can :doc:`ease "publishing" <publish>`:
+uploading versioned compiled artifacts.
+There are some special things to set up to enable and customize publishing.
+
+Tell Pants about your Artifact Repository
+=========================================
+
+To tell Pants which artifact repsitory to publish to,
+
+Create a :doc:`plugin <howto_plugin>` if you haven't already.
+Register it with Pants.
+
+In the plugin, define and register a ``Repository`` in a BUILD file
+alias as shown in
+`src/python/internal_backend/repositories/register.py <https://github.com/pantsbuild/pants/blob/master/src/python/internal_backend/repositories/register.py>`_\.
+
+
+``BUILD`` targets can use this Repository's alias as the
+``repo`` parameter to an :ref:`artifact <bdict_artifact>`.
+For example, the ``src/java/com/pants/examples/hello/greet/BUILD``
+refers to the ``public`` repostiory defined above.
+(Notice it's a Python object, not a string.) ::
+
+    provides = artifact(org='com.pants.examples',
+                        name='hello-greet',
+                        repo=public,)
+
+If you get an error that the repo name (here, ``public``) isn't defined,
+your plugin didn't register with Pants successfully. Make sure you bootstrap
+Pants in a way that loads your ``register.py``.
+
+.. ivysettings.xml mentioned here, but w/out details TODO
+
+In your config file (usually ``pants.ini``), set up a
+``[jar-publish]`` section. In that section, create a ``dict`` called ``repos``.
+It should contain a section for each Repository::
+
+    repos: {
+      'public': {  # must match the alias above
+        'resolver': 'maven.twttr.com', # must match URL above and <url> name
+                                       # in ivysettings.xml
+        'confs': ['default', 'sources', 'docs', 'changelog'],
+        # 'auth': 'build-support:netrc',
+        # 'help': 'Configure your ~/.netrc for artifactory access.
+      },
+      'testing': { # this key must match the alias name above
+        'resolver': 'maven.twttr.com',
+        'confs': ['default', 'sources', 'docs', 'changelog'],
+        # 'auth': 'build-support:netrc',
+        # 'help': 'Configure your ~/.netrc for artifactory access.
+      },
+    }
+
+
 .. _setup_publish_restrict_branch:
 
-***************************************
 Restricting Publish to "Release Branch"
-***************************************
+=======================================
 
 Your organization might have a notion of a special "release branch": you want
 :doc:`artifact publishing <publish>`
 to happen on this source control branch, which you maintain
-extra-carefully. You can set this branch using the restrict_push_branches option.
+extra-carefully.
+You can set this branch using the restrict_push_branches option
+of the ``[jar-publish]`` section of your config file (usually ``pants.ini``).
+
+Task to Publish "Extra" Artifacts
+=================================
+
+Pants supports "publish plugins", which allow end-users to add additional,
+arbitrary files to be published along with the primary artifact. For example,
+let's say that along with publishing your jar full of class files, you would
+also like to publish a companion file that contains some metadata -- code
+coverage info, source git repository, java version that created the jar, etc.
+By developing a :doc:`task <dev_tasks>` in a :doc:`plugin <howto_plugin>`,
+you give Pants a new ability. See
+:doc:` <dev_task_publish_extras>` to find out how to develop a special
+Task to include "extra" data with published artifacts.
+
+.. toctree::
+   :maxdepth: 1
+
+   dev_tasks_publish_extras

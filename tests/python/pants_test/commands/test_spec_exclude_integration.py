@@ -6,10 +6,10 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 from contextlib import contextmanager
-from shutil import rmtree
-
 import os
+from shutil import rmtree
 import subprocess
+import tempfile
 
 from pants.base.build_environment import get_buildroot
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
@@ -66,7 +66,7 @@ class SpecExcludeIntegrationTest(PantsRunIntegrationTest):
     self.assertFalse(missing, "Some bundles weren't generated! {missing}"
         .format(missing=', '.join(missing)))
 
-  def _test_bundle_existences(self, args, bundles):
+  def _test_bundle_existences(self, args, bundles, config=None):
     all_bundles = set(bundle.spec for bundle in Bundles.all_bundles)
     all_paths = [self._bundle_path(bundle) for bundle in all_bundles]
 
@@ -78,7 +78,7 @@ class SpecExcludeIntegrationTest(PantsRunIntegrationTest):
         rmtree(path)
 
     with self._handle_bundles(names) as (paths, jars):
-      pants_run = self.run_pants(['goal', 'bundle',] + args)
+      pants_run = self.run_pants(['goal', 'bundle',] + args, config=config)
       self.assertEquals(pants_run.returncode, self.PANTS_SUCCESS_CODE,
                         "goal bundle expected success, got {0}\n"
                         "got stderr:\n{1}\n"
@@ -140,3 +140,49 @@ class SpecExcludeIntegrationTest(PantsRunIntegrationTest):
         ],
         set(Bundles.all_bundles) - set([Bundles.there_was_a_duck, Bundles.once_upon_a_time,]),
     )
+
+class SpecExcludePantsIniIntegrationTest(PantsRunIntegrationTest):
+  """Tests the functionality of the exclude_specs option in pants.ini ."""
+
+  def test_exclude_spec_pants_ini(self):
+    def output_to_list(output_filename):
+      with open(output_filename, 'r') as results_file:
+        return set([line.rstrip() for line in results_file.readlines()])
+
+    tempdir = tempfile.mkdtemp()
+    tmp_output = os.path.join(tempdir, 'minimize-output1.txt')
+    run_result = self.run_pants(
+      ['goal', 'minimize', 'testprojects::', '--quiet',
+       '--minimize-output-file={0}'.format(tmp_output)])
+    self.assertEquals(0, run_result.returncode,
+                      msg="failed with output: {0}".format(run_result.stdout_data))
+    results = output_to_list(tmp_output)
+    self.assertIn('testprojects/src/java/com/pants/testproject/phrases:ten-thousand',
+                  results)
+    self.assertIn('testprojects/src/java/com/pants/testproject/phrases:once-upon-a-time',
+                  results)
+    self.assertIn('testprojects/src/java/com/pants/testproject/phrases:lesser-of-two',
+                  results)
+    self.assertIn('testprojects/src/java/com/pants/testproject/phrases:there-was-a-duck',
+                  results)
+
+    tmp_output = os.path.join(tempdir, 'minimize-output2.txt')
+
+    run_result = self.run_pants(['goal', 'minimize', 'testprojects::', '--quiet',
+                                 '--minimize-output-file={0}'.format(tmp_output)],
+                                config={
+                                  'DEFAULT' : {'spec_excludes' : [
+                                    'testprojects/src/java/com/pants/testproject/phrases'
+                                  ]}
+    })
+    self.assertEquals(0, run_result.returncode,
+                      msg="failed with output: {0}".format(run_result.stdout_data))
+    results = output_to_list(tmp_output)
+    self.assertNotIn('testprojects/src/java/com/pants/testproject/phrases:ten-thousand',
+                     results)
+    self.assertNotIn('testprojects/src/java/com/pants/testproject/phrases:once-upon-a-time',
+                     results)
+    self.assertNotIn('testprojects/src/java/com/pants/testproject/phrases:lesser-of-two',
+                     results)
+    self.assertNotIn('testprojects/src/java/com/pants/testproject/phrases:there-was-a-duck',
+                     results)
