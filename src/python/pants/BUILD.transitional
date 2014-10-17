@@ -31,7 +31,6 @@ python_library(
     '3rdparty/python:pystache',
     '3rdparty/python:pytest',
     '3rdparty/python:pytest-cov',
-    '3rdparty/python:python-daemon',
     '3rdparty/python:requests',
     '3rdparty/python:setuptools',
     '3rdparty/python:six',
