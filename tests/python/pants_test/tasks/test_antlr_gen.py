@@ -16,6 +16,10 @@ from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
 
 
 class AntlrGenTest(NailgunTaskTestBase):
+  @classmethod
+  def task_type(cls):
+    return AntlrGen
+
   def test_antlr4(self):
     parts = {'srcroot': 'testprojects/src/antlr',
              'dir': 'this/is/a/directory',
@@ -43,7 +47,7 @@ class AntlrGenTest(NailgunTaskTestBase):
 
     # generate a context to contain the build graph for the input target, then execute
     context = self.context(target_roots=[self.target('%(srcroot)s/%(dir)s:%(name)s' % parts)])
-    task = self.execute(context, AntlrGen)
+    task = self.execute(context)
 
     # get the synthetic target from the private graph
     task_outdir = os.path.join(task.workdir, 'antlr4', 'gen-java')

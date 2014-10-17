@@ -11,17 +11,19 @@ from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.tasks.jvm_run import JvmRun
 from pants.engine.round_manager import RoundManager
 from pants.util.contextutil import pushd, temporary_dir
-from pants_test.base_test import BaseTest
-from pants_test.tasks.test_base import prepare_task
+from pants_test.tasks.test_base import TaskTest
 
 
-class JvmRunTest(BaseTest):
+class JvmRunTest(TaskTest):
+  @classmethod
+  def task_type(cls):
+    return JvmRun
+
   def test_cmdline_only(self):
     jvm_binary = self.make_target('src/java/com/pants:binary', JvmBinary, main="com.pants.Binary")
-    jvm_run = prepare_task(JvmRun,
-                           args=['--test-only-write-cmd-line=a'],
-                           targets=[jvm_binary],
-                           build_graph=self.build_graph)
+    jvm_run = self.prepare_task(args=['--test-only-write-cmd-line=a'],
+                                targets=[jvm_binary],
+                                build_graph=self.build_graph)
 
     round_manager = RoundManager(jvm_run.context)
     jvm_run.prepare(round_manager)

@@ -26,57 +26,6 @@ from pants_test.base_test import BaseTest
 from pants_test.base.context_utils import create_config, create_run_tracker
 
 
-def prepare_task(task_type,
-                 config=None,
-                 args=None,
-                 targets=None,
-                 build_graph=None,
-                 build_file_parser=None,
-                 address_mapper=None,
-                 console_outstream=None,
-                 workspace=None):
-  """Prepares a Task for execution.
-
-  task_type: The class of the Task to create.
-  config: An optional string representing the contents of a pants.ini config.
-  args: optional list of command line flags, these should be prefixed with '--test-'.
-  targets: optional list of Target objects passed on the command line.
-
-  Returns a new Task ready to execute.
-  """
-
-  assert issubclass(task_type, Task), 'task_type must be a Task subclass, got %s' % task_type
-
-  config = create_config(config or '')
-  workdir = os.path.join(config.getdefault('pants_workdir'), 'test', task_type.__name__)
-
-  parser = OptionParser()
-  option_group = OptionGroup(parser, 'test')
-  mkflag = Mkflag('test')
-
-  new_options = Options(env={}, config=config, known_scopes=['', 'test'],
-                        args=args or [], legacy_parser=parser)
-
-  task_type.options_scope = 'test'
-  task_type.register_options_on_scope(new_options)
-  task_type.setup_parser(option_group, args, mkflag)
-  old_options, _ = parser.parse_args(args or [])
-
-  run_tracker = create_run_tracker()
-
-  context = Context(config,
-                    old_options,
-                    new_options,
-                    run_tracker,
-                    targets or [],
-                    build_graph=build_graph,
-                    build_file_parser=build_file_parser,
-                    address_mapper=address_mapper,
-                    console_outstream=console_outstream,
-                    workspace=workspace)
-  return task_type(context, workdir)
-
-
 def is_exe(name):
   result = subprocess.call(['which', name], stdout=open(os.devnull, 'w'), stderr=subprocess.STDOUT)
   return result == 0
@@ -84,6 +33,62 @@ def is_exe(name):
 
 class TaskTest(BaseTest):
   """A baseclass useful for testing Tasks."""
+
+  @classmethod
+  def task_type(cls):
+    """Subclasses must return the type of the ConsoleTask subclass under test."""
+    raise NotImplementedError()
+
+  def prepare_task(self,
+                   config=None,
+                   args=None,
+                   targets=None,
+                   build_graph=None,
+                   build_file_parser=None,
+                   address_mapper=None,
+                   console_outstream=None,
+                   workspace=None):
+    """Prepares a Task for execution.
+
+    task_type: The class of the Task to create.
+    config: An optional string representing the contents of a pants.ini config.
+    args: optional list of command line flags, these should be prefixed with '--test-'.
+    targets: optional list of Target objects passed on the command line.
+
+    Returns a new Task ready to execute.
+    """
+
+    task_type = self.task_type()
+    assert issubclass(task_type, Task), 'task_type must be a Task subclass, got %s' % task_type
+
+    config = create_config(config or '')
+    workdir = os.path.join(config.getdefault('pants_workdir'), 'test', task_type.__name__)
+
+    parser = OptionParser()
+    option_group = OptionGroup(parser, 'test')
+    mkflag = Mkflag('test')
+
+    new_options = Options(env={}, config=config, known_scopes=['', 'test'],
+                          args=args or [], legacy_parser=parser)
+
+    task_type.options_scope = 'test'
+    task_type.register_options_on_scope(new_options)
+    task_type.setup_parser(option_group, args, mkflag)
+    old_options, _ = parser.parse_args(args or [])
+
+    run_tracker = create_run_tracker()
+
+    context = Context(config,
+                      old_options,
+                      new_options,
+                      run_tracker,
+                      targets or [],
+                      build_graph=build_graph,
+                      build_file_parser=build_file_parser,
+                      address_mapper=address_mapper,
+                      console_outstream=console_outstream,
+                      workspace=workspace)
+    return task_type(context, workdir)
 
   def targets(self, spec):
     """Resolves a target spec to one or more Target objects.
@@ -124,11 +129,6 @@ class ConsoleTaskTest(TaskTest):
     assert issubclass(task_type, ConsoleTask), \
         'task_type() must return a ConsoleTask subclass, got %s' % task_type
 
-  @classmethod
-  def task_type(cls):
-    """Subclasses must return the type of the ConsoleTask subclass under test."""
-    raise NotImplementedError()
-
   def execute_task(self, config=None, args=None, targets=None):
     """Creates a new task and executes it with the given config, command line args and targets.
 
@@ -138,14 +138,13 @@ class ConsoleTaskTest(TaskTest):
     Returns the text output of the task.
     """
     with closing(StringIO()) as output:
-      task = prepare_task(self.task_type(),
-                          config=config,
-                          args=args,
-                          targets=targets,
-                          build_graph=self.build_graph,
-                          build_file_parser=self.build_file_parser,
-                          address_mapper=self.address_mapper,
-                          console_outstream=output)
+      task = self.prepare_task(config=config,
+                               args=args,
+                               targets=targets,
+                               build_graph=self.build_graph,
+                               build_file_parser=self.build_file_parser,
+                               address_mapper=self.address_mapper,
+                               console_outstream=output)
       task.execute()
       return output.getvalue()
 
@@ -162,14 +161,13 @@ class ConsoleTaskTest(TaskTest):
 
     Returns the list of items returned from invoking the console task's console_output method.
     """
-    task = prepare_task(self.task_type(),
-                        config=config,
-                        args=args,
-                        targets=targets,
-                        build_graph=self.build_graph,
-                        build_file_parser=self.build_file_parser,
-                        address_mapper=self.address_mapper,
-                        workspace=workspace)
+    task = self.prepare_task(config=config,
+                             args=args,
+                             targets=targets,
+                             build_graph=self.build_graph,
+                             build_file_parser=self.build_file_parser,
+                             address_mapper=self.address_mapper,
+                             workspace=workspace)
     return list(task.console_output(list(task.context.targets()) + list(extra_targets or ())))
 
   def assert_entries(self, sep, *output, **kwargs):
