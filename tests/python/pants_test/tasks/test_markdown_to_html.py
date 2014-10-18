@@ -17,74 +17,74 @@ charlie"""
 class ChooseLinesTest(unittest.TestCase):
   def test_include_no_params(self):
     self.assertEquals(
-        markdown_to_html.choose_include_lines(ABC, '', 'fake.md'),
-        ['able', 'baker', 'charlie'])
+        markdown_to_html.choose_include_text(ABC, '', 'fake.md'),
+        '\n'.join(['able', 'baker', 'charlie']))
 
   def test_include_start_at(self):
     self.assertEquals(
-        markdown_to_html.choose_include_lines(ABC, 'start-at=abl', 'fake.md'),
-        ['able', 'baker', 'charlie'])
+        markdown_to_html.choose_include_text(ABC, 'start-at=abl', 'fake.md'),
+        '\n'.join(['able', 'baker', 'charlie']))
 
     self.assertEquals(
-        markdown_to_html.choose_include_lines(ABC, 'start-at=bak', 'fake.md'),
-        ['baker', 'charlie'])
+        markdown_to_html.choose_include_text(ABC, 'start-at=bak', 'fake.md'),
+        '\n'.join(['baker', 'charlie']))
 
     self.assertEquals(
-      markdown_to_html.choose_include_lines(ABC, 'start-at=xxx', 'fake.md'),
-      [])
+      markdown_to_html.choose_include_text(ABC, 'start-at=xxx', 'fake.md'),
+      '')
 
   def test_include_start_after(self):
     self.assertEquals(
-      markdown_to_html.choose_include_lines(ABC, 'start-after=bak', 'fake.md'),
-      ['charlie'])
+      markdown_to_html.choose_include_text(ABC, 'start-after=bak', 'fake.md'),
+      'charlie')
 
     self.assertEquals(
-      markdown_to_html.choose_include_lines(ABC, 'start-after=cha', 'fake.md'),
-      [])
+      markdown_to_html.choose_include_text(ABC, 'start-after=cha', 'fake.md'),
+      '')
 
     self.assertEquals(
-      markdown_to_html.choose_include_lines(ABC, 'start-after=xxx', 'fake.md'),
-      [])
+      markdown_to_html.choose_include_text(ABC, 'start-after=xxx', 'fake.md'),
+      '')
 
   def test_include_end_at(self):
     self.assertEquals(
-      markdown_to_html.choose_include_lines(ABC, 'end-at=abl', 'fake.md'),
-      ['able'])
+      markdown_to_html.choose_include_text(ABC, 'end-at=abl', 'fake.md'),
+      'able')
 
     self.assertEquals(
-      markdown_to_html.choose_include_lines(ABC, 'end-at=bak', 'fake.md'),
-      ['able', 'baker'])
+      markdown_to_html.choose_include_text(ABC, 'end-at=bak', 'fake.md'),
+      '\n'.join(['able', 'baker']))
 
     self.assertEquals(
-      markdown_to_html.choose_include_lines(ABC, 'end-at=xxx', 'fake.md'),
-      [])
+      markdown_to_html.choose_include_text(ABC, 'end-at=xxx', 'fake.md'),
+      '')
 
   def test_include_end_before(self):
     self.assertEquals(
-      markdown_to_html.choose_include_lines(ABC, 'end-before=abl', 'fake.md'),
-      [])
+      markdown_to_html.choose_include_text(ABC, 'end-before=abl', 'fake.md'),
+      '')
 
     self.assertEquals(
-      markdown_to_html.choose_include_lines(ABC, 'end-before=xxx', 'fake.md'),
-      [])
+      markdown_to_html.choose_include_text(ABC, 'end-before=xxx', 'fake.md'),
+      '')
 
     self.assertEquals(
-      markdown_to_html.choose_include_lines(ABC, 'end-before=bak', 'fake.md'),
-      ['able'])
+      markdown_to_html.choose_include_text(ABC, 'end-before=bak', 'fake.md'),
+      'able')
 
   def test_include_start_at_end_at(self):
     self.assertEquals(
-      markdown_to_html.choose_include_lines(ABC, 'start-at=abl&end-at=abl', 'fake.md'),
-      ['able'])
+      markdown_to_html.choose_include_text(ABC, 'start-at=abl&end-at=abl', 'fake.md'),
+      'able')
 
     self.assertEquals(
-      markdown_to_html.choose_include_lines(ABC, 'start-at=cha&end-at=cha', 'fake.md'),
-      ['charlie'])
+      markdown_to_html.choose_include_text(ABC, 'start-at=cha&end-at=cha', 'fake.md'),
+      'charlie')
 
     self.assertEquals(
-      markdown_to_html.choose_include_lines(ABC, 'start-at=abl&end-at=bak', 'fake.md'),
-      ['able', 'baker'])
+      markdown_to_html.choose_include_text(ABC, 'start-at=abl&end-at=bak', 'fake.md'),
+      '\n'.join(['able', 'baker']))
 
     self.assertEquals(
-      markdown_to_html.choose_include_lines(ABC, 'start-at=bak&end-at=abl', 'fake.md'),
-      [])
+      markdown_to_html.choose_include_text(ABC, 'start-at=bak&end-at=abl', 'fake.md'),
+      '')
