@@ -192,7 +192,10 @@ class BundleTest(BaseJvmAppTest):
       )
     '''))
     app = self.target('src/java/org/archimedes/crown')
-    self.assertEquals(app.bundles[0].filemap.values()[0],
+    for k in app.bundles[0].filemap.keys():
+      if k.endswith('archimedes/crown/gold/config/five.xml'):
+        fivexml_key = k
+    self.assertEquals(app.bundles[0].filemap[fivexml_key],
                       'config/five.xml')
 
   def test_bundle_filemap_dest_remap(self):
@@ -213,7 +216,10 @@ class BundleTest(BaseJvmAppTest):
       )
     '''))
     app = self.target('src/java/org/archimedes/crown')
-    self.assertEquals(app.bundles[0].filemap.values()[0],
+    for k in app.bundles[0].filemap.keys():
+      if k.endswith('archimedes/crown/config/one.xml'):
+        fivexml_key = k
+    self.assertEquals(app.bundles[0].filemap[fivexml_key],
                       'gold/config/one.xml')
 
   def test_bundle_add_add(self):
