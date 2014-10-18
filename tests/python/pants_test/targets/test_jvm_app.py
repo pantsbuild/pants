@@ -218,8 +218,8 @@ class BundleTest(BaseJvmAppTest):
     app = self.target('src/java/org/archimedes/crown')
     for k in app.bundles[0].filemap.keys():
       if k.endswith('archimedes/crown/config/one.xml'):
-        fivexml_key = k
-    self.assertEquals(app.bundles[0].filemap[fivexml_key],
+        onexml_key = k
+    self.assertEquals(app.bundles[0].filemap[onexml_key],
                       'gold/config/one.xml')
 
   def test_bundle_add_add(self):
