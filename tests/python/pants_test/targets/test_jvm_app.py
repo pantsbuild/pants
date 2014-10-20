@@ -221,7 +221,7 @@ class BundleTest(BaseJvmAppTest):
     self.assertEquals(app.bundles[0].filemap[onexml_key],
                       'gold/config/one.xml')
 
-  def test_bundle_filemap_remap_dest_not_exist(self):
+  def test_bundle_filemap_remap_dest_missing(self):
     self.create_dir('src/java/org/archimedes/crown/config')
     self.create_file('src/java/org/archimedes/crown/config/one.xml')
     self.add_to_build_file('src/java/org/archimedes/crown/BUILD', dedent('''
