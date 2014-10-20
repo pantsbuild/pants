@@ -153,10 +153,6 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
 
     self._delete_scratch = self.get_options().delete_scratch
 
-    safe_mkdir(self._classes_dir)
-    safe_mkdir(self._analysis_dir)
-    safe_mkdir(self._target_sources_dir)
-
     self._analysis_file = os.path.join(self._analysis_dir, 'global_analysis.valid')
     self._invalid_analysis_file = os.path.join(self._analysis_dir, 'global_analysis.invalid')
 
@@ -268,6 +264,12 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
     return None
 
   def pre_execute(self):
+    # Only create these working dirs during execution phase, otherwise, they
+    # would be wiped out by clean-all goal/task if it's specified.
+    safe_mkdir(self._classes_dir)
+    safe_mkdir(self._analysis_dir)
+    safe_mkdir(self._target_sources_dir)
+
     # TODO(John Sirois): Ensuring requested product maps are available - if empty - should probably
     # be lifted to Task infra.
 

@@ -12,9 +12,7 @@ from pants.backend.core.register import build_file_aliases as register_core
 from pants.backend.core.tasks import builddictionary, reflect
 from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.python.register import build_file_aliases as register_python
-from pants.goal.goal import Goal
-from pants.goal.task_registrar import TaskRegistrar
-from pants_test.tasks.test_base import BaseTest, TaskTest, prepare_task
+from pants_test.tasks.test_base import BaseTest, TaskTest
 
 OUTDIR = '/tmp/dist'
 
@@ -25,9 +23,13 @@ outdir: %s
 
 
 class BaseBuildBuildDictionaryTest(TaskTest):
+  @classmethod
+  def task_type(cls):
+    return builddictionary.BuildBuildDictionary
+
   def execute_task(self, config=sample_ini_test_1):
     with closing(StringIO()) as output:
-      task = prepare_task(builddictionary.BuildBuildDictionary, config=config)
+      task = self.prepare_task(config=config)
       task.execute()
       return output.getvalue()
 
