@@ -11,6 +11,7 @@ import pytest
 
 from pants.backend.core.register import build_file_aliases as register_core
 from pants.backend.jvm.register import build_file_aliases as register_jvm
+from pants.base.address_lookup_error import AddressLookupError
 from pants.base.exceptions import TargetDefinitionException
 from pants_test.base_test import BaseTest
 
@@ -205,8 +206,6 @@ class BundleTest(BaseJvmAppTest):
       jvm_binary(name='unused')
     '''))
     self.add_to_build_file('src/java/org/archimedes/crown/BUILD', dedent('''
-      from pants.backend.jvm.targets.jvm_binary import DirectoryReMapper
-
       jvm_app(name='crown',
         dependencies=[':unused'],
         bundles=[
@@ -221,6 +220,25 @@ class BundleTest(BaseJvmAppTest):
         onexml_key = k
     self.assertEquals(app.bundles[0].filemap[onexml_key],
                       'gold/config/one.xml')
+
+  def test_bundle_filemap_remap_dest_not_exist(self):
+    self.create_dir('src/java/org/archimedes/crown/config')
+    self.create_file('src/java/org/archimedes/crown/config/one.xml')
+    self.add_to_build_file('src/java/org/archimedes/crown/BUILD', dedent('''
+      jvm_binary(name='unused')
+    '''))
+    self.add_to_build_file('src/java/org/archimedes/crown/BUILD', dedent('''
+      jvm_app(name='crown',
+        dependencies=[':unused'],
+        bundles=[
+          bundle(mapper=DirectoryReMapper('src/java/org/archimedes/crown/missing', 'gold/config'))
+            .add('config/one.xml')
+        ]
+      )
+    '''))
+
+    with pytest.raises(AddressLookupError):
+      app = self.target('src/java/org/archimedes/crown')
 
   def test_bundle_add_add(self):
     self.create_dir('src/java/org/archimedes/volume/config/stone')
