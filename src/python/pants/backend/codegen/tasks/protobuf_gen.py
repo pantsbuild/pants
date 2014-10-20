@@ -71,9 +71,11 @@ class ProtobufGen(CodeGen):
       'protoc'
     )
 
+  # TODO https://github.com/pantsbuild/pants/issues/604 prep start
   def prepare(self, round_manager):
     super(ProtobufGen, self).prepare(round_manager)
     round_manager.require_data('ivy_imports')
+  # TODO https://github.com/pantsbuild/pants/issues/604 prep finish
 
   def resolve_deps(self, key, default=[]):
     deps = OrderedSet()
