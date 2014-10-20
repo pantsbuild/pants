@@ -11,11 +11,11 @@ import os
 from tempfile import mkdtemp
 from textwrap import dedent
 import unittest2 as unittest
-from pants.base.exceptions import TaskError
 
 from pants.backend.core.tasks.check_exclusives import ExclusivesMapping
 from pants.backend.core.targets.dependencies import Dependencies
 from pants.base.address import SyntheticAddress
+from pants.base.exceptions import TaskError
 from pants.base.build_file_address_mapper import BuildFileAddressMapper
 from pants.base.build_configuration import BuildConfiguration
 from pants.base.build_file import BuildFile
@@ -97,6 +97,7 @@ class BaseTest(unittest.TestCase):
     return BuildFileAliases.create(targets={'target': Dependencies})
 
   def setUp(self):
+    super(BaseTest, self).setUp()
     Goal.clear()
     self.real_build_root = BuildRoot().path
     self.build_root = os.path.realpath(mkdtemp(suffix='_BUILD_ROOT'))
@@ -125,10 +126,13 @@ class BaseTest(unittest.TestCase):
 
   def context(self, for_task_types=None, config='', options=None, new_options=None,
               target_roots=None, **kwargs):
+    for_task_types = for_task_types or []
+    new_options = new_options or {}
+
     new_option_values = defaultdict(dict)
 
     # Get values for all new-style options registered by the tasks in for_task_types.
-    for task_type in for_task_types or []:
+    for task_type in for_task_types:
       scope = task_type.options_scope
       if scope is None:
         raise TaskError('You must set a scope on your task type before using it in tests.')
@@ -148,7 +152,7 @@ class BaseTest(unittest.TestCase):
       task_type.register_options(register)
 
     # Now override with any caller-specified values.
-    for scope, opts in (new_options or {}).items():
+    for scope, opts in new_options.items():
       for key, val in opts.items():
         new_option_values[scope][key] = val
 

@@ -683,7 +683,6 @@ python_tests(
     'src/python/pants/backend/jvm/tasks:jvm_run',
     'src/python/pants/engine',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:base_test',
   ]
 )
 
@@ -723,6 +722,5 @@ python_tests(
     'src/python/pants/base:build_file_aliases',
     'src/python/pants/goal:context',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:base_test',
   ],
 )

@@ -18,6 +18,10 @@ from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
 class ScalastyleTest(NailgunTaskTestBase):
   """Tests for the class Scalastyle."""
 
+  @classmethod
+  def task_type(cls):
+    return Scalastyle
+
   #
   # Internal test helper section
   #
@@ -256,7 +260,7 @@ class ScalastyleTest(NailgunTaskTestBase):
     scala_target = context.build_graph.get_target(scala_target_address)
     context.replace_targets([scala_target])
 
-    self.execute(context, Scalastyle)
+    self.execute(context)
 
   def test_fail(self):
     # Default scalastyle config (import grouping rule) and no excludes.
@@ -283,4 +287,4 @@ class ScalastyleTest(NailgunTaskTestBase):
     context.replace_targets([scala_target])
 
     with self.assertRaises(TaskError):
-      self.execute(context, Scalastyle)
+      self.execute(context)

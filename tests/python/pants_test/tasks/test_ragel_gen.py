@@ -19,8 +19,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.goal.context import Context
 from pants.util.contextutil import temporary_file
-from pants_test.base_test import BaseTest
-from pants_test.tasks.test_base import is_exe, prepare_task
+from pants_test.tasks.test_base import TaskTest, is_exe
 from pants.util.dirutil import safe_rmtree
 
 
@@ -66,7 +65,10 @@ public class Parser {
 """)
 
 
-class RagelGenTest(BaseTest):
+class RagelGenTest(TaskTest):
+  @classmethod
+  def task_type(cls):
+    return RagelGen
 
   RAGEL = is_exe('ragel')
   @property
@@ -93,10 +95,9 @@ class RagelGenTest(BaseTest):
       )
     """))
 
-    task = prepare_task(RagelGen,
-                        build_graph=self.build_graph,
-                        targets=[self.target('test_ragel_gen:atoi')],
-                        build_file_parser=self.build_file_parser)
+    task = self.prepare_task(build_graph=self.build_graph,
+                             targets=[self.target('test_ragel_gen:atoi')],
+                             build_file_parser=self.build_file_parser)
 
     task._ragel_binary = 'ragel'
     task.invalidate_for_files = lambda: []

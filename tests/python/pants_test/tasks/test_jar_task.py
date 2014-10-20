@@ -22,11 +22,15 @@ class BaseJarTaskTest(JarTaskTestBase):
     def execute(self):
       pass
 
+  @classmethod
+  def task_type(cls):
+    return cls.TestJarTask
+
   def setUp(self):
     super(BaseJarTaskTest, self).setUp()
 
     self.workdir = safe_mkdtemp()
-    self.jar_task = self.prepare_execute(self.context(), self.workdir, self.TestJarTask)
+    self.jar_task = self.prepare_execute(self.context(), self.workdir)
 
   def tearDown(self):
     super(BaseJarTaskTest, self).tearDown()
@@ -41,7 +45,7 @@ class BaseJarTaskTest(JarTaskTestBase):
       yield fd.name
 
   def prepare_jar_task(self, context):
-    return self.prepare_execute(context, self.workdir, self.TestJarTask)
+    return self.prepare_execute(context, self.workdir)
 
   def assert_listing(self, jar, *expected_items):
     self.assertEquals(set(['META-INF/', 'META-INF/MANIFEST.MF']) | set(expected_items),

@@ -35,17 +35,13 @@ How Some Base Classes Interrelate
     compilation, a Task for Scala compilation, etc. If you want an existing Goal
     to do something new (e.g., compile FooLang), instead of cramming your code
     into an existing Task, you probably want to define a new Task and `install`
-    it in the existing Goal. When installing a Task in a Goal, you can specify
-    that it depends on other Goals, expressing that Pants should carry out those Goals
-    before carrying out this Goal. For example, the java-test Task depends on the
-    `compile` Goal because testing uncompiled Java code is hard.
-
+    it in the existing Goal.
     A Task looks at the environment and Targets, invokes some tool, generates
-    things, and reports success/failure. It can define command-line flags to check.
+    things, and reports success/failure.
     If you're giving Pants the ability to do something new, you're probably
     adding a Task. See :doc:`dev_tasks`.
 
-**Backend**
+**Plugin (or "Backend")**
     Collection of Targets, Goals, Tasks, Commands to do something useful.
     At Pants' core are the abstractions Target, and Task.
     These abstractions don't do anything in particular.
@@ -53,7 +49,7 @@ How Some Base Classes Interrelate
     classes.
     For example, to build Java code, you want the ``JavaLibrary`` Target,
     ``JavaCompile`` task (registered in the ``compile`` goal), and many more.
-    We organize this "real" code into "backends". A typical backend defines
+    We organize this "real" code into "plugins". A typical plugin defines
     several classes and registers them with the Pants core.
     For a design discussion on registering plugins, see the
     `Plugin Engine
@@ -104,60 +100,7 @@ Defining a Task
 Defining a new Task tells Pants of some new action it can take. This might
 be a new goal or adding new functionality in an existing goal (e.g., telling
 the "gen" code-generation goal about some new way to generate code).
-
-A task can mutate the target graph. If it, say, generates some Java code
-from some other language, it can create a Java target and make things that
-depended on an ``otherlang_gen`` target instead depend on the created
-Java target. 
-
-.. Where to Put it
-   ===============
-   TODO: this
-
-Basic Task
-==========
-
-A ``Task`` is the class that does the "work".
-When you define a new ``Task`` class, you'll want to have at least
-
-* ``setup_parser(cls, option_group, args, mkflag)``
-  Defines command-line flags user can use.
-* ``__init__(self, context)``
-  The ``context`` encapsulates the outside world.
-  It has values of command-line flags for this invocation;
-  an API to see configuration from :ref:`pants.ini <setup-pants-ini>`;
-  a way to get files that are products of other build steps.
-* ``execute(self, targets)``
-  Actually do something; perhaps generate some products from some sources.
-
-There are some base ``Task`` classes to help you get started. E.g., if your
-task just outputs information to the console, subclass ``ConsoleTask``.
-
-The user's source code is organized by :ref:`source roots <setup_source_root>`.
-If a task needs to know the path from "the root" to a source file (perhaps
-to turn a path/to/dir/Foo into a package path.to.dir.Foo), it should probably
-compute that based on the source root (``target.target_base``), not the
-build root. The absolute paths to a target's source files are::
-
-    abspaths = [os.path.join(get_buildroot(), target.target_base, rel_path) for rel_path in target.sources_relative_to_source_root()]
-
-GroupTask
-=========
-
-Some ``Task``\s are grouped together under a parent ``GroupTask``. Specifically, the JVM compile tasks::
-
-    jvm_compile = GroupTask.named(
-    'jvm-compilers',
-    product_type=['classes_by_target', 'classes_by_source'],
-    flag_namespace=['compile'])
-
-    jvm_compile.add_member(ScalaCompile)
-    jvm_compile.add_member(AptCompile)
-    jvm_compile.add_member(JavaCompile)
-
-A ``GroupTask`` allows its constituent tasks to 'claim' targets for processing, and can iterate
-between those tasks until all work is done. This allows, e.g., Java code to depend on Scala code
-which itself depends on some other Java code.
+See :doc:`dev_tasks`.
 
 ***********
 Code Layout

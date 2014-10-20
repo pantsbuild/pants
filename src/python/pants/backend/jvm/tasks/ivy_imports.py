@@ -29,9 +29,11 @@ class IvyImports(NailgunTask):
 
   _CONFIG_SECTION = 'ivy-imports'
 
+  # TODO https://github.com/pantsbuild/pants/issues/604 product_types start
   @classmethod
   def product_types(cls):
     return ['ivy_imports']
+  # TODO https://github.com/pantsbuild/pants/issues/604 product_types finish
 
   @property
   def config_section(self):

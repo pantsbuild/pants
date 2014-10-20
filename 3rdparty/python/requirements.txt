@@ -16,7 +16,6 @@ Pygments==1.4
 pystache==0.5.3
 pytest>=2.6,<2.7
 pytest-cov>=1.8,<1.9
-python_daemon==1.5.5
 requests>=2.3.0,<2.4
 setuptools==5.4.1
 six==1.8.0
