@@ -223,7 +223,7 @@ def add_here_links(soups):
         <tr>
           <td class="h-plus-pilcrow-holder"></td>
           <td><div class="pilcrow-div">
-            <a href={anchor} class="pilcrow-link">¶</a>
+            <a href="{anchor}" class="pilcrow-link">¶</a>
           </div></td>
         </tr>
         </tbody>
