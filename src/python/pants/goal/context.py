@@ -270,15 +270,17 @@ class Context(object):
                                              **kwargs)
     return self.build_graph.get_target(address)
 
-  def targets(self, predicate=None):
+  def targets(self, predicate=None, postorder=False):
     """Selects targets in-play in this run from the target roots and their transitive dependencies.
 
     If specified, the predicate will be used to narrow the scope of targets returned.
 
-    :return: a list of targets evaluated by the predicate in inorder traversal order.
+    :return: a list of targets evaluated by the predicate in preorder (or postorder, if the
+    postorder parameter is True) traversal order.
     """
     target_root_addresses = [target.address for target in self._target_roots]
-    target_set = self.build_graph.transitive_subgraph_of_addresses(target_root_addresses)
+    target_set = self.build_graph.transitive_subgraph_of_addresses(target_root_addresses,
+                                                                   postorder=postorder)
     return filter(predicate, target_set)
 
   def dependents(self, on_predicate=None, from_predicate=None):
