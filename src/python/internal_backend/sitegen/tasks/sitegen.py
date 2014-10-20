@@ -12,8 +12,8 @@ Suggested use:
   ./build-support/bin/publish_docs.sh  # invokes sitegen.py
 """
 
-import datetime
 import collections
+import datetime
 import json
 import os
 import re
@@ -217,25 +217,21 @@ def add_here_links(soups):
       anchor = tag.get('id') or tag.get('name')
       if not anchor:
         continue
-      new_table = soup.new_tag('table')
-      new_table['class'] = ['h-plus-pilcrow']
-      new_tbody = soup.new_tag('tbody')
-      new_table.append(new_tbody)
-      new_tr = soup.new_tag('tr')
-      new_tbody.append(new_tr)
-      new_tdleft = soup.new_tag('td')
-      new_tr.append(new_tdleft)
+      new_table = bs4.BeautifulSoup('''
+      <table class="h-plus-pilcrow">
+        <tbody>
+        <tr>
+          <td class="h-plus-pilcrow-holder"></td>
+          <td><div class="pilcrow-div">
+            <a href={anchor} class="pilcrow-link">¶</a>
+          </div></td>
+        </tr>
+        </tbody>
+      </table>
+      '''.format(anchor=anchor))
       tag.replace_with(new_table)
-      new_tdleft.append(tag)
-      pilcrow_link = soup.new_tag('a', href='#{0}'.format(anchor))
-      pilcrow_link['class'] = ['pilcrow-link']
-      pilcrow_link.append('¶')
-      pilcrow_div = soup.new_tag('div')
-      pilcrow_div['class'] = ['pilcrow-div']
-      new_tdright = soup.new_tag('td')
-      new_tr.append(new_tdright)
-      new_tdright.append(pilcrow_div)
-      pilcrow_div.append(pilcrow_link)
+      header_holder = new_table.find(attrs={'class': 'h-plus-pilcrow-holder'})
+      header_holder.append(tag)
 
 
 def link_xrefs(soups, precomputed):
@@ -351,11 +347,9 @@ def generate_page_toc(soup):
   return toc
 
 
-NOW = datetime.datetime.now().isoformat()
-
-
 def generate_generated(config, here):
-  return('{0} {1}'.format(config['sources'][here], NOW))
+  return('{0} {1}'.format(config['sources'][here],
+                          datetime.datetime.now().isoformat()))
 
 
 def render_html(dst, config, soups, precomputed, template):
