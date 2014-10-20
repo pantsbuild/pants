@@ -8,8 +8,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import shlex
 import unittest2 as unittest
 
-import pytest
-
 from pants.option.options import Options
 
 
@@ -25,10 +23,14 @@ class OptionsTest(unittest.TestCase):
         return default
       return self._values[section][name]
 
+    def getlist(self, section, name, default):
+      return self.get(section, name, default)
+
   def _register(self, options):
     options.register_global('-v', '--verbose', action='store_true', help='Verbose output.')
     options.register_global('-n', '--num', type=int, default=99)
     options.register_global('-x', '--xlong', action='store_true')
+    options.register_global('--y', action='append', type=int)
 
     # For the design doc example test.
     options.register_global('--a', type=int)
@@ -43,7 +45,7 @@ class OptionsTest(unittest.TestCase):
 
   def _parse(self, args_str, env=None, config=None):
     args = shlex.split(str(args_str))
-    options = Options(env or {}, config or OptionsTest.FakeConfig({}),
+    options = Options(env or {}, OptionsTest.FakeConfig(config or {}),
                       OptionsTest._known_scopes, args)
     self._register(options)
     return options
@@ -80,6 +82,13 @@ class OptionsTest(unittest.TestCase):
     self.assertEqual(100, options.for_scope('test').xlong)
     self.assertEqual(True, options.for_scope('test').x)
 
+    # Test list-typed option.
+    options = self._parse('./pants', config={ 'DEFAULT': { 'y': ['88', '-99'] }})
+    self.assertEqual([88, -99], options.for_global_scope().y)
+
+    options = self._parse('./pants --y=5 --y=-6 --y=77', config={ 'DEFAULT': { 'y': ['88', '-99'] }})
+    self.assertEqual([88, -99, 5, -6, 77], options.for_global_scope().y)
+
   def test_defaults(self):
     # Hard-coded defaults.
     options = self._parse('./pants compile.java -n33')
@@ -95,11 +104,11 @@ class OptionsTest(unittest.TestCase):
     self.assertEqual(33, options.for_scope('compile.java').num)
 
     # Get defaults from config and environment.
-    config = OptionsTest.FakeConfig({
+    config = {
       'DEFAULT': { 'num': '88' },
       'compile': { 'num': '77' },
       'compile.java': { 'num': '66' }
-    })
+    }
     options = self._parse('./pants compile.java -n22', config=config)
     self.assertEqual(88, options.for_global_scope().num)
     self.assertEqual(77, options.for_scope('compile').num)
@@ -121,13 +130,15 @@ class OptionsTest(unittest.TestCase):
   def test_designdoc_example(self):
     # The example from the design doc.
     # Get defaults from config and environment.
-    config = OptionsTest.FakeConfig({
+    config = {
       'DEFAULT': { 'b': '99' },
       'compile': { 'a': '88', 'c': '77' },
-    })
+    }
+
     env = {
       'PANTS_COMPILE_C': '66'
     }
+
     options = self._parse('./pants --a=1 compile --b=2 compile.java --a=3 --c=4',
                           env=env, config=config)
 
