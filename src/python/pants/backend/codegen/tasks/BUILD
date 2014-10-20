@@ -12,6 +12,7 @@ python_library(
     ':scrooge_gen',
     ':thrift_linter',
     ':jaxb_gen',
+    ':wire_gen'
   ],
 )
 
@@ -152,4 +153,9 @@ python_library(
     'src/python/pants:thrift_util',
     'src/python/pants/util:dirutil',
   ],
+)
+
+python_library(
+  name = 'wire_gen',
+  sources = ['wire_gen.py'],
 )
