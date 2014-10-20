@@ -168,8 +168,6 @@ class BuildGraph(object):
     """Returns all the targets in the graph in no particular order.
 
     :param predicate: A target predicate that will be used to filter the targets returned.
-
-    :return: a list of targets evaluated in inorder traversal order.
     """
     return filter(predicate, self._target_by_address.values())
 
@@ -177,12 +175,14 @@ class BuildGraph(object):
     """:return: targets ordered from most dependent to least."""
     return sort_targets(self._target_by_address.values())
 
-  def walk_transitive_dependency_graph(self, addresses, work, predicate=None):
+  def walk_transitive_dependency_graph(self, addresses, work, predicate=None, postorder=False):
     """Given a work function, walks the transitive dependency closure of `addresses`.
 
     :param list<Address> addresses: The closure of `addresses` will be walked.
     :param function work: The function that will be called on every target in the closure using
-      inorder traversal order.
+      the specified traversal order.
+    :param bool postorder: When ``True``, the traversal order is postorder (children before
+      parents), else it is preorder (parents before children).
     :param function predicate: If this parameter is not given, no Targets will be filtered
       out of the closure.  If it is given, any Target which fails the predicate will not be
       walked, nor will its dependencies.  Thus predicate effectively trims out any subgraph
@@ -194,14 +194,18 @@ class BuildGraph(object):
         walked.add(address)
         target = self._target_by_address[address]
         if not predicate or predicate(target):
-          work(target)
+          if not postorder:
+            work(target)
           for dep_address in self._target_dependencies_by_address[address]:
             _walk_rec(dep_address)
+          if postorder:
+            work(target)
     for address in addresses:
       _walk_rec(address)
 
-  def walk_transitive_dependee_graph(self, addresses, work, predicate=None):
-    """Identical to `walk_transitive_dependency_graph`, but walks dependees inorder traversal order.
+  def walk_transitive_dependee_graph(self, addresses, work, predicate=None, postorder=False):
+    """Identical to `walk_transitive_dependency_graph`, but walks dependees preorder (or postorder
+    if the postorder parameter is True).
 
     This is identical to reversing the direction of every arrow in the DAG, then calling
     `walk_transitive_dependency_graph`.
@@ -212,13 +216,16 @@ class BuildGraph(object):
         walked.add(address)
         target = self._target_by_address[address]
         if not predicate or predicate(target):
-          work(target)
+          if not postorder:
+            work(target)
           for dep_address in self._target_dependees_by_address[address]:
             _walk_rec(dep_address)
+          if postorder:
+            work(target)
     for address in addresses:
       _walk_rec(address)
 
-  def transitive_dependees_of_addresses(self, addresses, predicate=None):
+  def transitive_dependees_of_addresses(self, addresses, predicate=None, postorder=False):
     """Returns all transitive dependees of `address`.
 
     Note that this uses `walk_transitive_dependee_graph` and the predicate is passed through,
@@ -229,10 +236,10 @@ class BuildGraph(object):
     :param function predicate: The predicate passed through to `walk_transitive_dependee_graph`.
     """
     ret = OrderedSet()
-    self.walk_transitive_dependee_graph(addresses, ret.add, predicate=predicate)
+    self.walk_transitive_dependee_graph(addresses, ret.add, predicate=predicate, postorder=False)
     return ret
 
-  def transitive_subgraph_of_addresses(self, addresses, predicate=None):
+  def transitive_subgraph_of_addresses(self, addresses, predicate=None, postorder=False):
     """Returns all transitive dependencies of `address`.
 
     Note that this uses `walk_transitive_dependencies_graph` and the predicate is passed through,
@@ -244,7 +251,9 @@ class BuildGraph(object):
       `walk_transitive_dependencies_graph`.
     """
     ret = OrderedSet()
-    self.walk_transitive_dependency_graph(addresses, ret.add, predicate=predicate)
+    self.walk_transitive_dependency_graph(addresses, ret.add,
+                                          predicate=predicate,
+                                          postorder=postorder)
     return ret
 
   def inject_synthetic_target(self,

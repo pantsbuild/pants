@@ -145,18 +145,20 @@ class BuildGraphTest(BaseTest):
   def test_walk_graph(self):
     """
     Make sure that BuildGraph.walk_transitive_dependency_graph() and
-    BuildGraph.walk_transitive_dependee_graph() return DFS inorder traversal.
+    BuildGraph.walk_transitive_dependee_graph() return DFS preorder (or postorder) traversal.
     """
-    def assertDependencyWalk(target, results):
+    def assertDependencyWalk(target, results, postorder=False):
       targets = []
       self.build_graph.walk_transitive_dependency_graph([target.address],
-                                                         lambda x: targets.append(x))
+                                                         lambda x: targets.append(x),
+                                                        postorder=postorder)
       self.assertEquals(results, targets)
 
-    def assertDependeeWalk(target, results):
+    def assertDependeeWalk(target, results, postorder=False):
       targets = []
       self.build_graph.walk_transitive_dependee_graph([target.address],
-                                                        lambda x: targets.append(x))
+                                                        lambda x: targets.append(x),
+                                                        postorder=postorder)
       self.assertEquals(results, targets)
 
     a = self.make_target('a')
@@ -167,7 +169,7 @@ class BuildGraphTest(BaseTest):
 
     assertDependencyWalk(a, [a])
     assertDependencyWalk(b, [b, a])
-    assertDependencyWalk(c, [c, b , a])
+    assertDependencyWalk(c, [c, b, a])
     assertDependencyWalk(d, [d, c, b, a])
     assertDependencyWalk(e, [e, d, c, b, a])
 
@@ -176,6 +178,28 @@ class BuildGraphTest(BaseTest):
     assertDependeeWalk(c, [c, d, e])
     assertDependeeWalk(d, [d, e])
     assertDependeeWalk(e, [e])
+
+    assertDependencyWalk(a, [a], postorder=True)
+    assertDependencyWalk(b, [a, b], postorder=True)
+    assertDependencyWalk(c, [a, b, c], postorder=True)
+    assertDependencyWalk(d, [a, b, c, d], postorder=True)
+    assertDependencyWalk(e, [a, b, c, d, e], postorder=True)
+
+    assertDependeeWalk(a, [e, d, c, b, a], postorder=True)
+    assertDependeeWalk(b, [e, d, c, b], postorder=True)
+    assertDependeeWalk(c, [e, d, c], postorder=True)
+    assertDependeeWalk(d, [e, d], postorder=True)
+    assertDependeeWalk(e, [e], postorder=True)
+
+    #Try a case where postorder traversal is not identical to reversed preorder traversal
+    c = self.make_target('c1', dependencies=[])
+    d = self.make_target('d1', dependencies=[c])
+    b = self.make_target('b1', dependencies=[c, d])
+    e = self.make_target('e1', dependencies=[b])
+    a = self.make_target('a1', dependencies=[b, e])
+
+    assertDependencyWalk(a, [a, b, c, d, e])
+    assertDependencyWalk(a, [c, d, b, e, a], postorder=True)
 
   def test_target_closure(self):
     a = self.make_target('a')
@@ -260,4 +284,3 @@ class BuildGraphTest(BaseTest):
                                  '\s+referenced from goodpath:b'
                                  '\s+referenced from :a$'):
       self.build_graph.inject_spec_closure('//:a')
-
