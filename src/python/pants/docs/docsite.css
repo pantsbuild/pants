@@ -15,13 +15,38 @@ body {
 }
 
 
+pre {
+  padding: 1em;
+  border-radius: 3px;
+  background-color: #eef;
+  color: #002;
+}
+
+code,tt {
+  background-color: #eef;
+}
+
+
+div.pilcrow-div {
+  margin: 1em 0.5em;
+}
+
 a.pilcrow-link {
+  font-size: 150%;
   color: transparent;
-  min-width: 2em;
   text-decoration: none;
 }
 
-div.h-plus-pilcrow:hover a.pilcrow-link {
+table.h-plus-pilcrow td {
+  vertical-align: top;
+}
+
+table.h-plus-pilcrow:hover {
+  background-color: #eef;
+  color: #002;
+}
+
+table.h-plus-pilcrow:hover a.pilcrow-link {
   color: #04a;
 }
 
@@ -142,7 +167,7 @@ nav.bignav .site-toc {
 
 nav.pagetoc {
   float: right;
-  margin: 4em 0px;
+  margin: 0px -1em 0px 1em;
   padding-left: 1em;
   background-color: #ddd;
   max-width: 24%;
@@ -192,4 +217,19 @@ div.ci-status {
 
 div.ci-status img {
   vertical-align: middle;
+}
+
+.generated {
+  margin-top: 5em;
+  font-size: 70%;
+  text-align: center;
+  color: #777;
+}
+
+.generated a {
+  text-decoration: none;
+}
+
+.generated a:hover {
+  background-color: #fff;
 }

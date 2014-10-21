@@ -376,7 +376,7 @@ class Target(AbstractTarget):
     return self.id
 
   def walk(self, work, predicate=None):
-    """Walk of this target's dependency graph, DFS inorder traversal, visiting each node exactly
+    """Walk of this target's dependency graph, DFS preorder traversal, visiting each node exactly
     once.
 
     If a predicate is supplied it will be used to test each target before handing the target to
@@ -395,7 +395,7 @@ class Target(AbstractTarget):
     self._build_graph.walk_transitive_dependency_graph([self.address], work, predicate)
 
   def closure(self):
-    """Returns this target's transitive dependencies, in DFS inorder traversal."""
+    """Returns this target's transitive dependencies, in DFS preorder traversal."""
     return self._build_graph.transitive_subgraph_of_addresses([self.address])
 
   @manual.builddict()

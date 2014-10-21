@@ -150,6 +150,17 @@ class AllTheThingsTestCase(unittest.TestCase):
     self.assertIn('DEPTH=1 LINK=one TEXT=Section One', rendered)
     self.assertIn('DEPTH=1 LINK=two TEXT=Section Two', rendered)
 
+  def test_here_links(self):
+    soups = self.orig_soups.copy()
+    sitegen.add_here_links(soups)
+    html = sitegen.render_html('index',
+                               self.config,
+                               soups,
+                               self.precomputed,
+                               TEMPLATE_MUSTACHE)
+    self.assertIn('href="#pants-build-system"', html,
+                  'Generated html lacks auto-created link to h1.')
+
   def test_breadcrumbs(self):
     # Our "site" has a simple outline.
     # Do we get the correct info from that to generate
