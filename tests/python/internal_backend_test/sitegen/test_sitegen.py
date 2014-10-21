@@ -2,7 +2,12 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
+
 import unittest2 as unittest
+
+import copy
 import json
 
 import bs4
@@ -138,10 +143,12 @@ class AllTheThingsTestCase(unittest.TestCase):
     # Do we get the correct info from that to generate
     # a page-level table of contents?
     soups = self.orig_soups.copy()
+    precomputed = copy.deepcopy(self.precomputed)
+    sitegen.generate_page_tocs(soups, precomputed)
     rendered = sitegen.render_html('subdir/page2',
                                    self.config,
                                    soups,
-                                   self.precomputed,
+                                   precomputed,
                                    """
                                    {{#page_toc}}
                                    DEPTH={{depth}} LINK={{link}} TEXT={{text}}
