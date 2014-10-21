@@ -282,6 +282,9 @@ class RelativeToMapper(object):
 class DirectoryReMapper(object):
   """A mapper that maps files relative to a base directory into a destination directory."""
 
+  class BaseNotExistsError(Exception):
+    "The base directory does not exist error"
+
   def __init__(self, base, dest):
     """The base directory files should be mapped from, and the dest they should be mapped to.
 
@@ -290,14 +293,15 @@ class DirectoryReMapper(object):
     """
     self.base = os.path.abspath(os.path.join(get_buildroot(), base))
     if not os.path.isdir(self.base):
-      raise ValueError('Could not find a directory to bundle relative to %s' % self.base)
+      raise DirectoryReMapper.BaseNotExistsError(
+          'Could not find a directory to bundle relative to {0}'.format(self.base))
     self.dest = dest
 
   def __call__(self, path):
     return os.path.join(self.dest, os.path.relpath(path, self.base))
 
   def __repr__(self):
-    return 'DirectoryReMapper(%s, %s)' % (self.base, self.dest)
+    return 'DirectoryReMapper({0}, {1})'.format(self.base, self.dest)
 
 
 class Bundle(object):
