@@ -11,6 +11,7 @@ import pytest
 
 from pants.backend.core.register import build_file_aliases as register_core
 from pants.backend.jvm.register import build_file_aliases as register_jvm
+from pants.backend.jvm.targets.jvm_binary import DirectoryReMapper
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.exceptions import TargetDefinitionException
 from pants_test.base_test import BaseTest
@@ -222,6 +223,11 @@ class BundleTest(BaseJvmAppTest):
                       'gold/config/one.xml')
 
   def test_bundle_filemap_remap_base_not_exists(self):
+    # Create directly
+    with pytest.raises(DirectoryReMapper.BaseNotExistsError):
+      DirectoryReMapper("dummy/src/java/org/archimedes/crown/missing", "dummy")
+
+    # Used in the BUILD
     self.create_dir('src/java/org/archimedes/crown/config')
     self.create_file('src/java/org/archimedes/crown/config/one.xml')
     self.add_to_build_file('src/java/org/archimedes/crown/BUILD', dedent('''
