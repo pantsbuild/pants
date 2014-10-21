@@ -103,7 +103,7 @@ The rule of thumb is that
 each directory of ``.java`` or ``.scala`` files has a library target. If you
 find
 yourself thinking "we should move some of this code to another directory,"
-you probably also want to set up a ``BUILD` file with a ``java_library``
+you probably also want to set up a ``BUILD`` file with a ``java_library``
 (or ``scala_library``) target. Here we see the library target which
 ``main-bin`` depends on. This library target lives in ``hello/greet/BUILD``:
 

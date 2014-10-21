@@ -1,10 +1,13 @@
 {
   "sources": {
-    "index": "dist/markdown/html/README.html",
-    "java/hello": "dist/markdown/html/examples/src/java/com/pants/examples/hello/main/README.html",
-    "testproject/page": "dist/markdown/html/testprojects/src/java/com/pants/testproject/page/README.html",
     "build_dictionary": "dist/builddict/build_dictionary.html",
-    "goals_reference": "dist/builddict/goals_reference.html"
+    "build_files": "dist/markdown/html/src/docs/build_files.html",
+    "goals_reference": "dist/builddict/goals_reference.html",
+    "index": "dist/markdown/html/README.html",
+    "JVMProjects": "dist/markdown/html/examples/src/java/com/pants/examples/readme.html",
+    "publish": "dist/markdown/html/src/docs/publish.html",
+    "python_old": "dist/markdown/html/examples/src/python/example/python_old.html",
+    "python-readme": "dist/markdown/html/examples/src/python/example/readme.html"
   },
   "extras": {
     "logo.ico": "src/python/pants/docs/pants-logo.ico",
@@ -14,10 +17,14 @@
   "tree": [
     { "page": "index",
       "children": [
-        { "page": "java/hello",
-	  "children": [
-	      { "page": "testproject/page" }
-	  ]},
+        { "page": "JVMProjects" },
+        { "page": "python-readme",
+          "children": [
+            { "page": "python_old" }
+          ]
+        },
+        { "page": "build_files" },
+        { "page": "publish" },
         { "page": "build_dictionary" },
         { "page": "goals_reference" }
       ]
