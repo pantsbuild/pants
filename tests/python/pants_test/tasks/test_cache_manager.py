@@ -26,13 +26,13 @@ class AppendingCacheKeyGenerator(CacheKeyGenerator):
       combined_hash = ','.join([cache_key.hash for cache_key in sorted_cache_keys])
       combined_num_sources = reduce(lambda x, y: x + y,
                                     [cache_key.num_sources for cache_key in sorted_cache_keys], 0)
-      return CacheKey(combined_id, combined_hash, combined_num_sources, [])
+      return CacheKey(combined_id, combined_hash, combined_num_sources)
 
   def key_for_target(self, target, sources=None, transitive=False, fingerprint_strategy=None):
-    return CacheKey(target.id, target.id, target.num_chunking_units, [])
+    return CacheKey(target.id, target.id, target.num_chunking_units)
 
   def key_for(self, tid, sources):
-    return CacheKey(tid, tid, len(sources), [])
+    return CacheKey(tid, tid, len(sources))
 
 
 def print_vt(vt):
