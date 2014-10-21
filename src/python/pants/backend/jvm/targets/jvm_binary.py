@@ -293,8 +293,8 @@ class DirectoryReMapper(object):
       raise ValueError('Could not find a directory to bundle relative to %s' % self.base)
     self.dest = dest
 
-  def __call__(self, file):
-    return os.path.join(self.dest, os.path.relpath(file, self.base))
+  def __call__(self, path):
+    return os.path.join(self.dest, os.path.relpath(path, self.base))
 
   def __repr__(self):
     return 'DirectoryReMapper(%s, %s)' % (self.base, self.dest)
