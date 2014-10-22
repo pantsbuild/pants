@@ -125,7 +125,8 @@ class _Goal(object):
     # a class method to an instance method, and instantiating the task much sooner in the
     # lifecycle.
 
-    subclass_name = b'{0}_{1}'.format(task_registrar.task_type.__name__, options_scope)
+    subclass_name = b'{0}_{1}'.format(task_registrar.task_type.__name__,
+                                      options_scope.replace('.', '_').replace('-', '_'))
     task_type = type(subclass_name, (task_registrar.task_type,), {'options_scope': options_scope})
     self._task_type_by_name[task_name] = task_type
 

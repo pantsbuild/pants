@@ -211,19 +211,19 @@ def register_goals():
 
   # Running.
 
-  task(name='jvm-run', action=JvmRun,
+  task(name='jvm', action=JvmRun,
        dependencies=['compile', 'resources', 'bootstrap'], serialize=False
   ).install('run').with_description('Run a binary target.')
 
-  task(name='jvm-run-dirty', action=JvmRun,
+  task(name='jvm-dirty', action=JvmRun,
        serialize=False
   ).install('run-dirty').with_description('Run a binary target, skipping compilation.')
 
-  task(name='scala-repl', action=ScalaRepl,
+  task(name='scala', action=ScalaRepl,
        dependencies=['compile', 'resources', 'bootstrap'], serialize=False
   ).install('repl').with_description('Run a REPL.')
 
-  task(name='scala-repl-dirty', action=ScalaRepl,
+  task(name='scala-dirty', action=ScalaRepl,
        serialize=False
   ).install('repl-dirty').with_description('Run a REPL, skipping compilation.')
 
