@@ -10,6 +10,7 @@ import sys
 
 from pants.backend.core.targets.dependencies import Dependencies, DeprecatedDependencies
 from pants.backend.core.targets.doc import Page, Wiki, WikiArtifact
+from pants.backend.core.targets.prep_command import PrepCommand
 from pants.backend.core.targets.resources import Resources
 from pants.backend.core.tasks.build_lint import BuildLint
 from pants.backend.core.tasks.builddictionary import BuildBuildDictionary
@@ -28,6 +29,7 @@ from pants.backend.core.tasks.paths import Path, Paths
 from pants.backend.core.tasks.prepare_resources import PrepareResources
 from pants.backend.core.tasks.reporting_server import RunServer, KillServer
 from pants.backend.core.tasks.roots import ListRoots
+from pants.backend.core.tasks.run_prep_command import RunPrepCommand
 from pants.backend.core.tasks.sorttargets import SortTargets
 from pants.backend.core.tasks.targets_help import TargetsHelp
 from pants.backend.core.tasks.what_changed import WhatChanged
@@ -67,6 +69,7 @@ def build_file_aliases():
       # NB: the 'dependencies' alias is deprecated in favor of the 'target' alias
       'dependencies': DeprecatedDependencies,
       'page': Page,
+      'prep_command': PrepCommand,
       'resources': Resources,
       'target': Dependencies,
     },
@@ -180,6 +183,9 @@ def register_goals():
 
   task(name='roots', action=ListRoots
   ).install('roots').with_description("Print the workspace's source roots and associated target types.")
+
+  task(name='run_prep_command', action=RunPrepCommand
+  ).install('test', first=True).with_description("Run a command before tests")
 
   task(name='changed', action=WhatChanged
   ).install().with_description('Print the targets changed since some prior commit.')

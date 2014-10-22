@@ -19,6 +19,7 @@ from twitter.common.collections import OrderedSet
 from pants.backend.codegen.targets.python_antlr_library import PythonAntlrLibrary
 from pants.backend.codegen.targets.python_thrift_library import PythonThriftLibrary
 from pants.backend.core.targets.dependencies import Dependencies
+from pants.backend.core.targets.prep_command import PrepCommand
 from pants.backend.python.antlr_builder import PythonAntlrBuilder
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.python_setup import PythonSetup
@@ -36,6 +37,7 @@ from pants.util.dirutil import safe_mkdir, safe_rmtree
 
 class PythonChroot(object):
   _VALID_DEPENDENCIES = {
+    PrepCommand: 'prep',
     PythonLibrary: 'libraries',
     PythonRequirementLibrary: 'reqs',
     PythonBinary: 'binaries',
