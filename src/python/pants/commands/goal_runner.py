@@ -231,8 +231,7 @@ class GoalRunner(Command):
       if augmented_args != args:
         # TODO(John Sirois): Cleanup this currently important mutation of the passed in args
         # once the 2-layer of command -> goal is squashed into one.
-        del args[:]
-        args.extend(augmented_args)
+        args[:] = augmented_args
         sys.stderr.write("(using pantsrc expansion: pants goal %s)\n" % ' '.join(augmented_args))
 
     Goal.setup_parser(parser, args, self.goals)
