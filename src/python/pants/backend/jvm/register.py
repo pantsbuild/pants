@@ -19,6 +19,7 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.java_tests import JavaTests
 from pants.backend.jvm.targets.jvm_binary import (
     Bundle,
+    DirectoryReMapper,
     Duplicate,
     JvmApp,
     JvmBinary,
@@ -78,6 +79,7 @@ def build_file_aliases():
     },
     objects={
       'artifact': Artifact,
+      'DirectoryReMapper': DirectoryReMapper,
       'Duplicate': Duplicate,
       'exclude': Exclude,
       'jar': JarDependency,
