@@ -562,13 +562,15 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
   def _write_to_artifact_cache(self, analysis_file, vts, sources_by_target):
     vt_by_target = dict([(vt.target, vt) for vt in vts.versioned_targets])
 
+    vts_targets = [t for t in vts.targets if not t.has_label('no_cache')]
+
     split_analysis_files = [
-        JvmCompile._analysis_for_target(self._analysis_tmpdir, t) for t in vts.targets]
+        JvmCompile._analysis_for_target(self._analysis_tmpdir, t) for t in vts_targets]
     portable_split_analysis_files = [
-        JvmCompile._portable_analysis_for_target(self._analysis_tmpdir, t) for t in vts.targets]
+        JvmCompile._portable_analysis_for_target(self._analysis_tmpdir, t) for t in vts_targets]
 
     # Set up args for splitting the analysis into per-target files.
-    splits = zip([sources_by_target.get(t, []) for t in vts.targets], split_analysis_files)
+    splits = zip([sources_by_target.get(t, []) for t in vts_targets], split_analysis_files)
     splits_args_tuples = [(analysis_file, splits)]
 
     # Set up args for rebasing the splits.
@@ -578,6 +580,8 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
     vts_artifactfiles_pairs = []
     classes_by_source = self._compute_classes_by_source(analysis_file)
     for target, sources in sources_by_target.items():
+      if target.has_label('no_cache'):
+        continue
       artifacts = []
       for source in sources:
         artifacts.extend(classes_by_source.get(source, []))
