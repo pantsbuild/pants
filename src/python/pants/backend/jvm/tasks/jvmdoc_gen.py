@@ -184,6 +184,10 @@ class JvmdocGen(JvmTask):
             target, command = jobs[gendir]
             self._handle_create_jvmdoc_result([target], result, command)
         finally:
+          # In the event of an exception, we want to call terminate() because otherwise
+          # we get errors on exit when multiprocessing tries to do it, because what
+          # is dead may never die.
+          pool.terminate()
           self.context.log.debug("End multiprocessing section")
 
   def _handle_create_jvmdoc_result(self, targets, result, command):
