@@ -18,6 +18,7 @@ from twitter.common.lang import AbstractClass
 
 from pants.util.contextutil import open_tar, open_zip
 from pants.util.dirutil import safe_walk
+from pants.util.strutil import ensure_text
 
 
 class Archiver(AbstractClass):
@@ -48,9 +49,9 @@ class TarArchiver(Archiver):
     self.extension = extension
 
   def create(self, basedir, outdir, name, prefix=None):
-    tarpath = os.path.join(outdir, '%s.%s' % (name.decode('utf-8'), self.extension))
+    basedir = ensure_text(basedir)
+    tarpath = os.path.join(outdir, '%s.%s' % (ensure_text(name), self.extension))
     with open_tar(tarpath, self.mode, dereference=True, errorlevel=1) as tar:
-      basedir = basedir.decode('utf-8')
       tar.add(basedir, arcname=prefix or '.')
     return tarpath
 
@@ -86,13 +87,13 @@ class ZipArchiver(Archiver):
     zippath = os.path.join(outdir, '%s.zip' % name)
     with open_zip(zippath, 'w', compression=ZIP_DEFLATED) as zip:
       for root, _, files in safe_walk(basedir):
-        root = root.decode('utf-8')
+        root = ensure_text(root)
         for file in files:
-          file = file.decode('utf-8')
+          file = ensure_text(file)
           full_path = os.path.join(root, file)
           relpath = os.path.relpath(full_path, basedir)
           if prefix:
-            relpath = os.path.join(prefix.decode('utf-8'), relpath)
+            relpath = os.path.join(ensure_text(prefix), relpath)
           zip.write(full_path, relpath)
     return zippath
 

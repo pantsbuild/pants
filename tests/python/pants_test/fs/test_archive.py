@@ -17,10 +17,10 @@ class ArchiveTest(unittest.TestCase):
   def _listtree(self, root, empty_dirs):
     listing = set()
     for path, dirs, files in safe_walk(root):
-      relpath = os.path.normpath(os.path.relpath(path, root)).decode('utf-8')
+      relpath = os.path.normpath(os.path.relpath(path, root))
       if empty_dirs:
-        listing.update(os.path.normpath(os.path.join(relpath, d.decode('utf-8'))) for d in dirs)
-      listing.update(os.path.normpath(os.path.join(relpath, f.decode('utf-8'))) for f in files)
+        listing.update(os.path.normpath(os.path.join(relpath, d)) for d in dirs)
+      listing.update(os.path.normpath(os.path.join(relpath, f)) for f in files)
     return listing
 
   def round_trip(self, archiver, empty_dirs):
