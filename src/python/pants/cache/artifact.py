@@ -11,7 +11,7 @@ import shutil
 import tarfile
 
 from pants.util.contextutil import open_tar
-from pants.util.dirutil import safe_mkdir, safe_mkdir_for
+from pants.util.dirutil import safe_mkdir, safe_mkdir_for, safe_walk
 
 
 class ArtifactError(Exception):
@@ -61,7 +61,7 @@ class DirectoryArtifact(Artifact):
       self._relpaths.add(relpath)
 
   def extract(self):
-    for dir_name, _, filenames in os.walk(self._directory):
+    for dir_name, _, filenames in safe_walk(self._directory):
       for filename in filenames:
         filename = os.path.join(dir_name, filename)
         relpath = os.path.relpath(filename, self._directory)

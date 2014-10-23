@@ -17,7 +17,7 @@ from pants.backend.python.code_generator import CodeGenerator
 from pants.backend.codegen.targets.python_thrift_library import PythonThriftLibrary
 from pants.base.build_environment import get_buildroot
 from pants.thrift_util import select_thrift_binary
-from pants.util.dirutil import safe_mkdir
+from pants.util.dirutil import safe_mkdir, safe_walk
 
 
 class PythonThriftBuilder(CodeGenerator):
@@ -125,7 +125,7 @@ class PythonThriftBuilder(CodeGenerator):
     # Thrift generates code with all parent namespaces with empty __init__.py's. Generally
     # speaking we want to drop anything w/o an __init__.py, and for anything with an __init__.py,
     # we want to explicitly make it a namespace package, hence the hoops here.
-    for root, _, files in os.walk(os.path.normpath(self.package_root)):
+    for root, _, files in safe_walk(os.path.normpath(self.package_root)):
       reldir = os.path.relpath(root, self.package_root)
       if reldir == '.':  # skip root
         continue

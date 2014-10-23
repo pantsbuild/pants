@@ -28,7 +28,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.config import Config
 from pants.base.exceptions import TargetDefinitionException
 from pants.commands.command import Command
-from pants.util.dirutil import safe_rmtree
+from pants.util.dirutil import safe_rmtree, safe_walk
 
 
 SETUP_BOILERPLATE = """
@@ -176,7 +176,7 @@ class SetupPy(Command):
 
     builder = builder_cls(target, root, config)
     builder.generate()
-    for root, _, files in os.walk(builder.package_root):
+    for root, _, files in safe_walk(builder.package_root):
       for fn in files:
         target_file = os.path.join(root, fn)
         yield os.path.relpath(target_file, builder.package_root), target_file
@@ -205,7 +205,7 @@ class SetupPy(Command):
     resources = defaultdict(set)
 
     def iter_files():
-      for root, _, files in os.walk(base):
+      for root, _, files in safe_walk(base):
         module = os.path.relpath(root, base).replace(os.path.sep, '.')
         for filename in files:
           yield module, filename, os.path.join(root, filename)

@@ -19,7 +19,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.config import ConfigOption
 from pants.base.generator import Generator, TemplateData
 from pants.base.source_root import SourceRoot
-from pants.util.dirutil import safe_mkdir
+from pants.util.dirutil import safe_mkdir, safe_walk
 
 
 _TEMPLATE_BASEDIR = 'templates/idea'
@@ -143,7 +143,7 @@ class IdeaGen(IdeGen):
   @staticmethod
   def _maven_targets_excludes(repo_root):
     excludes = []
-    for (dirpath, dirnames, filenames) in os.walk(repo_root):
+    for (dirpath, dirnames, filenames) in safe_walk(repo_root):
       if "pom.xml" in filenames:
         excludes.append(os.path.join(os.path.relpath(dirpath, start=repo_root), "target"))
     return excludes
@@ -313,7 +313,7 @@ class IdeaGen(IdeGen):
 
     # TODO(John Sirois): make test resources 1st class in ant build and punch this through to pants
     # model
-    for _, _, files in os.walk(os.path.join(get_buildroot(), 'tests', 'resources')):
+    for _, _, files in safe_walk(os.path.join(get_buildroot(), 'tests', 'resources')):
       resource_extensions.update(Project.extract_resource_extensions(files))
 
     return resource_extensions

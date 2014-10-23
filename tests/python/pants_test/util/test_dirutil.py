@@ -13,7 +13,8 @@ import mox
 import unittest2 as unittest
 
 from pants.util import dirutil
-from pants.util.dirutil import _mkdtemp_unregister_cleaner
+from pants.util.contextutil import temporary_dir
+from pants.util.dirutil import _mkdtemp_unregister_cleaner, safe_mkdir
 
 
 class DirutilTest(unittest.TestCase):
@@ -59,3 +60,11 @@ class DirutilTest(unittest.TestCase):
       dirutil._mkdtemp_unregister_cleaner()
 
     self._mox.VerifyAll()
+
+  def test_safe_walk(self):
+    with temporary_dir() as tmpdir:
+      safe_mkdir(os.path.join(tmpdir, '中文'))
+      if isinstance(tmpdir, unicode):
+        tmpdir = tmpdir.encode('utf-8')
+      for _, dirs, _ in dirutil.safe_walk(tmpdir):
+        self.assertTrue(all(isinstance(dirname, unicode) for dirname in dirs))
