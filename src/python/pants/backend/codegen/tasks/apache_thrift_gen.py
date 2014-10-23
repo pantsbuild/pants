@@ -25,7 +25,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.target import Target
 from pants.thrift_util import calculate_compile_roots, select_thrift_binary
-from pants.util.dirutil import safe_mkdir, safe_walk
+from pants.util.dirutil import safe_mkdir
 
 
 def _copytree(from_base, to_base):
@@ -40,7 +40,7 @@ def _copytree(from_base, to_base):
       if e.errno != errno.EEXIST:
         raise e
 
-  for dirpath, dirnames, filenames in safe_walk(from_base, topdown=True, onerror=abort):
+  for dirpath, dirnames, filenames in os.walk(from_base, topdown=True, onerror=abort):
     to_path = os.path.join(to_base, os.path.relpath(dirpath, from_base))
     for dirname in dirnames:
       safe_mkdir(os.path.join(to_path, dirname))

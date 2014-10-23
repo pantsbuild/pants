@@ -10,13 +10,13 @@ import unittest2 as unittest
 
 from pants.fs.archive import TAR, TBZ2, TGZ, ZIP
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import safe_mkdir, safe_walk, touch
+from pants.util.dirutil import safe_mkdir, touch
 
 
 class ArchiveTest(unittest.TestCase):
   def _listtree(self, root, empty_dirs):
     listing = set()
-    for path, dirs, files in safe_walk(root):
+    for path, dirs, files in os.walk(root):
       relpath = os.path.normpath(os.path.relpath(path, root)).decode('utf-8')
       if empty_dirs:
         listing.update(os.path.normpath(os.path.join(relpath, d.decode('utf-8'))) for d in dirs)

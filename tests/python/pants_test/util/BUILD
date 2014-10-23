@@ -24,6 +24,5 @@ python_tests(
     '3rdparty/python:mox',
     '3rdparty/python:pytest',
     'src/python/pants/util:dirutil',
-    'src/python/pants/util:contextutil',
   ]
 )

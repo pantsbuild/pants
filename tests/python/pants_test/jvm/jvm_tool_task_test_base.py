@@ -10,7 +10,7 @@ import os
 
 from pants.backend.jvm.tasks.bootstrap_jvm_tools import BootstrapJvmTools
 from pants.base.dev_backend_loader import load_build_configuration_from_source
-from pants.util.dirutil import safe_mkdir, safe_mkdtemp, safe_walk
+from pants.util.dirutil import safe_mkdir, safe_mkdtemp
 from pants_test.task_test_base import TaskTestBase
 
 
@@ -44,7 +44,7 @@ class JvmToolTaskTestBase(TaskTestBase):
     def link_tree(path, optional=False, force=False):
       src = os.path.join(self.real_build_root, path)
       if not optional or os.path.exists(src):
-        for abspath, dirs, files in safe_walk(src):
+        for abspath, dirs, files in os.walk(src):
           for f in files:
             link(os.path.relpath(os.path.join(abspath, f), self.real_build_root), force=force)
 

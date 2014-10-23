@@ -17,7 +17,6 @@ from twitter.common.collections.ordereddict import OrderedDict
 from twitter.common.lang import AbstractClass
 
 from pants.util.contextutil import open_tar, open_zip
-from pants.util.dirutil import safe_walk
 
 
 class Archiver(AbstractClass):
@@ -85,7 +84,7 @@ class ZipArchiver(Archiver):
   def create(self, basedir, outdir, name, prefix=None):
     zippath = os.path.join(outdir, '%s.zip' % name)
     with open_zip(zippath, 'w', compression=ZIP_DEFLATED) as zip:
-      for root, _, files in safe_walk(basedir):
+      for root, _, files in os.walk(basedir):
         root = root.decode('utf-8')
         for file in files:
           file = file.decode('utf-8')

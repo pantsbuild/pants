@@ -15,7 +15,7 @@ import subprocess
 from pants import binary_util
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.base.exceptions import TaskError
-from pants.util.dirutil import safe_mkdir, safe_walk
+from pants.util.dirutil import safe_mkdir
 
 
 Jvmdoc = collections.namedtuple('Jvmdoc', ['tool_name', 'product_type'])
@@ -135,7 +135,7 @@ class JvmdocGen(JvmTask):
       for target in targets:
         gendir = self._gendir(target)
         jvmdocs = []
-        for root, dirs, files in safe_walk(gendir):
+        for root, dirs, files in os.walk(gendir):
           jvmdocs.extend(os.path.relpath(os.path.join(root, f), gendir) for f in files)
         self.context.products.get(self.jvmdoc().product_type).add(target, gendir, jvmdocs)
 

@@ -20,7 +20,7 @@ from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.exceptions import TaskError
 from pants.scm.scm import Scm
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import safe_mkdir, safe_walk
+from pants.util.dirutil import safe_mkdir
 from pants_test.tasks.test_base import TaskTest
 
 
@@ -131,7 +131,7 @@ repos: {
       # Nothing is written to the pushdb during a dryrun publish
       # (maybe some directories are created, but git will ignore them)
       files = []
-      for _, _, filenames in safe_walk(self.push_db_basedir):
+      for _, _, filenames in os.walk(self.push_db_basedir):
         files.extend(filenames)
       self.assertEquals(0, len(files),
                         "Nothing should be written to the pushdb during a dryrun publish")
@@ -156,7 +156,7 @@ repos: {
       #Nothing is written to the pushdb during a local publish
       #(maybe some directories are created, but git will ignore them)
       files = []
-      for _, _, filenames in safe_walk(self.push_db_basedir):
+      for _, _, filenames in os.walk(self.push_db_basedir):
         files.extend(filenames)
       self.assertEquals(0, len(files),
                         "Nothing should be written to the pushdb during a local publish")
@@ -179,7 +179,7 @@ repos: {
 
     # One file per task is written to the pushdb during a local publish
     files = []
-    for _, _, filenames in safe_walk(self.push_db_basedir):
+    for _, _, filenames in os.walk(self.push_db_basedir):
       files.extend(filenames)
     self.assertEquals(len(targets), len(files),
                       "During a remote publish, one pushdb should be written per target")

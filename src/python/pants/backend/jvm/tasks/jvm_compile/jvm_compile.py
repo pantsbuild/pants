@@ -26,7 +26,7 @@ from pants.base.worker_pool import Work
 from pants.goal.products import MultipleRootedProducts
 from pants.reporting.reporting_utils import items_to_report_element
 from pants.util.contextutil import open_zip, temporary_dir
-from pants.util.dirutil import safe_mkdir, safe_rmtree, safe_walk
+from pants.util.dirutil import safe_mkdir, safe_rmtree
 
 
 class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
@@ -711,7 +711,7 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
               if cls.endswith(b'.class') and not cls in self._upstream_class_to_path:
                 self._upstream_class_to_path[cls] = cp_entry
         elif os.path.isdir(cp_entry):
-          for dirpath, _, filenames in safe_walk(cp_entry, followlinks=True):
+          for dirpath, _, filenames in os.walk(cp_entry, followlinks=True):
             for f in filter(lambda x: x.endswith('.class'), filenames):
               cls = os.path.relpath(os.path.join(dirpath, f), cp_entry)
               if not cls in self._upstream_class_to_path:
