@@ -316,7 +316,7 @@ More About Python Tests
 
 Pants runs Python tests with `pytest`. You can pass CLI options to
 `pytest` with `--test-pytest-options`. For example, to only run tests
-whose names match the pattern `*foo*`, you could run :
+whose names match the pattern `*foo*`, you could run:
 
     :::bash
     $ ./pants goal test examples/tests/python/example_test/hello/greet --test-pytest-options='-k foo'

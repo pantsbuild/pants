@@ -77,7 +77,7 @@ Things can go wrong; you can recover:
 -   Uploading the artifact can fail for another reason: that
     artifact+version already exists on the server. *In theory*, this
     shouldn't happen: Pants bumps the version it found in the pushdb.
-    But in practice, this can happen. :
+    But in practice, this can happen.
 
         Exception in thread "main" java.io.IOException: destination file exists and overwrite == false
         ...
@@ -155,7 +155,7 @@ files](http://www.gnu.org/software/inetutils/manual/html_node/The-_002enetrc-Fil
 to get a user's username and password on an artifact repository machine.
 To make this work:
 
--   Each user needs a `~/.netrc` file with a section that looks like :
+-   Each user needs a `~/.netrc` file with a section that looks like:
 
         machine maven.twttr.com
           login sandy
