@@ -58,10 +58,14 @@ class ZipArchiver(Archiver):
   """An archiver that stores files in a zip file with optional compression."""
 
   @classmethod
-  def extract(cls, path, outdir):
+  def extract(cls, path, outdir, filter=None):
     """OS X's python 2.6.1 has a bug in zipfile that makes it unzip directories as regular files.
 
     This method should work on for python 2.6-3.x.
+    :param string path: path to the zipfile to extract from
+    :param string outdir: directory to extract files into
+    :param function filter: optional filter with the filename as the parameter.  Returns True if
+      the file should be extracted.
     """
     with open_zip(path) as zip:
       for path in zip.namelist():
@@ -70,7 +74,8 @@ class ZipArchiver(Archiver):
           raise ValueError('Zip file contains unsafe path: %s' % path)
         # Ignore directories. extract() will create parent dirs as needed.
         if not path.endswith(b'/'):
-          zip.extract(path, outdir)
+          if (not filter or filter(path)):
+            zip.extract(path, outdir)
 
   def __init__(self, compression):
     Archiver.__init__(self)
