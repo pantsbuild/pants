@@ -36,6 +36,21 @@ def safe_mkdir_for(path, clean=False):
   safe_mkdir(os.path.dirname(path), clean)
 
 
+def safe_walk(path):
+  """Just like os.path.walk, but ensures that the returned values are
+    unicode objects.  This isn't strictly safe, in that it is possible
+    that some paths will not be decodeable, but that case
+    is rare, and the only alternative is to somehow avoid all
+    interaction between paths and unicode objects, which seems
+    especially tough in the presence of unicode_literals. See e.g.
+    https://mail.python.org/pipermail/python-dev/2008-December/083856.html
+
+  """
+  if isinstance(path, str):
+    path = path.decode('utf-8')
+  return os.walk(path)
+
+
 _MKDTEMP_CLEANER = None
 _MKDTEMP_DIRS = defaultdict(set)
 _MKDTEMP_LOCK = threading.RLock()

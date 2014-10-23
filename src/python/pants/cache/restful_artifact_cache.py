@@ -41,7 +41,7 @@ class RESTfulArtifactCache(ArtifactCache):
       raise ValueError('RESTfulArtifactCache only supports HTTP and HTTPS')
     self._timeout_secs = 4.0
     self._netloc = parsed_url.netloc
-    self._path_prefix = parsed_url.path.rstrip('/')
+    self._path_prefix = parsed_url.path.rstrip(b'/')
     self.compress = compress
 
     # To enable connection reuse, all requests must be created from same session.
