@@ -106,6 +106,8 @@ version:
 Testing
 -------
 
+<a xmark="dev_run_all_tests"> </a>
+
 ### Running Tests
 
 Pants has many tests. There are BUILD targets to run those tests. We try

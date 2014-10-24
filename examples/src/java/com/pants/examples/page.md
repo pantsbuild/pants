@@ -143,9 +143,11 @@ set its `provides` to something like:
 ...assuming your workspace is set up with a wiki target named
 `confluence` in a top-level `BUILD` file (as described below).
 
+<a xmark="page_setup_confluence"></a>
+
 **Setting up your workspace for Confluence publish**
 
-That <a xref="bdict_wiki">wiki</a> specifies some information about your wiki
+That `wiki` specifies some information about your wiki
 server. So far, the only kind of thing you can publish to is a
 Confluence wiki. You want to specify its target. Do this in one of the
 `BUILD` files that's always processed (probably a top-directory `BUILD`
