@@ -1,9 +1,3 @@
-# To toggle to private releases, un-comment these search override flags and remove version
-# constraints from the requirements below.
-
-#--find-links https://pantsbuild.github.io/cheeseshop/third_party/twitter-commons/0da0aff8fc7cce4d2d3991e36bc13f021ec66133/index.html
-#--no-index
-
 twitter.common.collections>=0.3.1,<0.4
 twitter.common.config>=0.3.1,<0.4
 twitter.common.confluence>=0.3.1,<0.4
