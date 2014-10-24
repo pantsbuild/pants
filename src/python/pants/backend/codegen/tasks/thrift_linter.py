@@ -26,14 +26,11 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
     return target.is_thrift
 
   @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    super(ThriftLinter, cls).setup_parser(option_group, args, mkflag)
-
-    option_group.add_option(mkflag('strict'), mkflag('strict', negate=True),
-                            dest='thrift_linter_strict',
-                            default=None,
-                            action='callback', callback=mkflag.set_bool,
-                            help='[%default] Fail the goal if thrift errors are found.')
+  def register_options(cls, register):
+    super(ThriftLinter, cls).register_options(register)
+    register('--strict', default=False, action='store_true',
+             help='Fail the goal if thrift errors are found.',
+             legacy='thrift_linter_strict')
 
   @classmethod
   def product_types(cls):
@@ -61,6 +58,11 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
     return str(value) == 'True'
 
   def is_strict(self, target):
+    # TODO: the new options parsing doesn't support this. This task wants the target in the BUILD
+    # file to be able to override a value in the pants.ini file. Finally, command-line overrides
+    # that. But parsing of options combines the command-line values and pants.ini values in a single
+    # "merged" view, into which there's no opportunity to inject an override from the BUILD target.
+
     # The strict value is read from the following, in order:
     # 1. command line, --[no-]thrift-linter-strict
     # 2. java_thrift_library target in BUILD file, thrift_linter_strict = False,
