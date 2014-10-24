@@ -23,6 +23,7 @@
     "index": "dist/markdown/html/src/docs/index.html",
     "install": "dist/markdown/html/src/docs/install.html",
     "intellij": "dist/markdown/html/src/python/pants/docs/intellij.html",
+    "internals": "dist/markdown/html/src/python/pants/docs/internals.html",
     "invoking": "dist/markdown/html/src/docs/invoking.html",
     "JVMProjects": "dist/markdown/html/examples/src/java/com/pants/examples/readme.html",
     "publish": "dist/markdown/html/src/docs/publish.html",
@@ -88,6 +89,7 @@
             { "page": "howto_plugin" },
             { "page": "howto_customize" },
             { "page": "intellij" },
+            { "page": "internals" },
             { "page": "docs" },
             { "page": "credits" }
         ]}

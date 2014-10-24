@@ -66,3 +66,8 @@ page(
   source='intellij.md',
 )
 
+page(
+  name='internals',
+  source='internals.md',
+)
+
