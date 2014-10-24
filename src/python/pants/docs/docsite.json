@@ -26,10 +26,14 @@
     "internals": "dist/markdown/html/src/python/pants/docs/internals.html",
     "invoking": "dist/markdown/html/src/docs/invoking.html",
     "JVMProjects": "dist/markdown/html/examples/src/java/com/pants/examples/readme.html",
+    "page": "dist/markdown/html/examples/src/java/com/pants/examples/page.html",
+    "pex_design": "dist/markdown/html/examples/src/python/example/pex_design.html",
     "publish": "dist/markdown/html/src/docs/publish.html",
     "python_old": "dist/markdown/html/examples/src/python/example/python_old.html",
     "python-readme": "dist/markdown/html/examples/src/python/example/readme.html",
+    "release": "dist/markdown/html/src/python/pants/docs/release.html",
     "setup_repo": "dist/markdown/html/src/docs/setup_repo.html",
+    "target_addresses": "dist/markdown/html/src/docs/target_addresses.html",
     "ThriftDeps": "dist/markdown/html/examples/src/thrift/com/pants/examples/readme.html"
   },
   "extras": {
@@ -50,6 +54,7 @@
       "children": [
         { "page": "first_concepts" },
         { "page": "first_tutorial" },
+        { "page": "target_addresses" },
         { "page": "JVMProjects",
           "children": [
             { "page": "3rdparty_jvm" },
@@ -58,10 +63,12 @@
         },
         { "page": "python-readme",
           "children": [
-            { "page": "python_old" },
-            { "page": "3rdparty_py" }
+            { "page": "3rdparty_py" },
+            { "page": "pex_design" },
+            { "page": "python_old" }
           ]
         },
+        { "page": "page" },
         { "page": "build_files" },
         { "page": "invoking" },
         { "page": "3rdparty",
@@ -90,6 +97,7 @@
             { "page": "howto_customize" },
             { "page": "intellij" },
             { "page": "internals" },
+            { "page": "release" },
             { "page": "docs" },
             { "page": "credits" }
         ]}

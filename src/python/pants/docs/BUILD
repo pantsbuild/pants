@@ -71,3 +71,8 @@ page(
   source='internals.md',
 )
 
+page(
+  name='release',
+  source='release.md',
+)
+

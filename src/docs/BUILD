@@ -73,3 +73,8 @@ page(
   name='setup_repo',
   source='setup_repo.md'
 )
+
+page(
+  name='target_addresses',
+  source='target_addresses.md'
+)

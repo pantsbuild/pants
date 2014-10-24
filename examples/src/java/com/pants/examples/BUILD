@@ -22,4 +22,7 @@ page(
   ],
 )
 
-
+page(
+  name='page',
+  source='page.md',
+)

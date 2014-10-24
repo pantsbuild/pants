@@ -13,6 +13,11 @@ page(
     'src/docs:3rdparty'])
 
 page(
+  name='pex_design',
+  source='pex_design.md'
+)
+
+page(
   name='python_old',
   source='python_old.md'
 )
