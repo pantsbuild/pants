@@ -1,6 +1,19 @@
 page(
   name='readme',
   source='readme.md',
+  dependencies=[
+    ':credits',
+    ':dev_tasks',
+    ':docs',
+    ':howto_ask',
+    ':howto_contribute',
+    ':howto_customize',
+    ':howto_develop',
+    ':howto_plugin',
+    ':intellij',
+    ':internals',
+    ':release',
+  ]
 )
 
 page(
@@ -61,7 +74,7 @@ page(
   source='howto_plugin.md',
   dependencies=[
     ':docs',
-    # TODO    ':howto_develop',
+    ':howto_develop',
   ]
 )
 
@@ -73,6 +86,11 @@ page(
 page(
   name='internals',
   source='internals.md',
+  dependencies=[
+    ':dev_tasks',
+    'src/docs:first_concepts',
+    'src/python/pants/docs:dev_tasks',
+  ]
 )
 
 page(

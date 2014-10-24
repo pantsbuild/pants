@@ -135,7 +135,7 @@ tool that, while not custom, has not yet been integrated with Pants.
 -   If you want to integrate with a not-custom tool, you still want to
     set up a Pants plugin (or perhaps add abilities to an existing
     plugin), but it might make sense to
-    [[get your changes in upstream|pants('src/python/pants/docs:howto_plugin')]].
+    [[get your changes in upstream|pants('src/python/pants/docs:howto_contribute')]].
 
 BUILD.\* in the source tree for special targets
 -----------------------------------------------

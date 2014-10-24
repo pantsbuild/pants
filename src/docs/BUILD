@@ -39,15 +39,17 @@ page(
   name='index',
   source='index.md',
   dependencies=[
+    ':3rdparty',
+    ':announce_201409',
+    ':build_files',
+    ':first_concepts',
+    ':first_tutorial',
+    ':install',
+    ':publish',
+    ':setup_repo',
     'examples/src/java/com/pants/examples:readme',
     'examples/src/python/example:readme',
     'examples/src/thrift/com/pants/examples:readme',
-    'src/docs:3rdparty',
-    'src/docs:announce_201409',
-    'src/docs:build_files',
-    'src/docs:first_concepts',
-    'src/docs:first_tutorial',
-    'src/docs:publish',
     'src/python/pants/docs:readme',
     ])
 
@@ -55,7 +57,7 @@ page(
   name='invoking',
   source='invoking.md',
   dependencies=[
-    ':install',
+    ':first_tutorial',
   ]
 )
 
@@ -71,7 +73,15 @@ page(
 
 page(
   name='setup_repo',
-  source='setup_repo.md'
+  source='setup_repo.md',
+  dependencies=[
+    ':first_concepts',
+    ':publish',
+    'src/python/pants/docs:dev_tasks',
+    'src/python/pants/docs:dev_tasks_publish_extras',
+    'src/python/pants/docs:howto_contribute',
+    'src/python/pants/docs:howto_plugin',
+  ]
 )
 
 page(
