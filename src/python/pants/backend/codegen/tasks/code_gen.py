@@ -76,6 +76,8 @@ class CodeGen(Task):
   def prepare(self, round_manager):
     round_manager.require_data('jvm_build_tools_classpath_callbacks')
 
+
+
   def execute(self):
     gentargets = self.context.targets(self.is_gentarget)
     capabilities = self.genlangs() # lang_name => predicate
@@ -146,3 +148,45 @@ class CodeGen(Task):
                 self.updatedependencies(langtarget, dep)
       if write_to_artifact_cache:
         self.update_artifact_cache(vts_artifactfiles_pairs)
+
+  def _same_contents(self, a, b):
+    with open(a, 'r') as f:
+      a_data = f.read()
+    with open(b, 'r') as f:
+      b_data = f.read()
+    return a_data == b_data
+
+  def check_duplicate_conflicting_protos(self, sources_by_base, sources):
+    """
+    :param OrderedDict(string -> OrderedSet) sources_by_base: mapping of base path to full path of proto files
+    :param OrderedSet sources: full path to proto files
+    """
+    sources_by_genfile = {}
+    for base in sources_by_base.keys(): # Need to iterate over /original/ bases.
+      for path in sources_by_base[base]:
+        if not path in sources:
+          continue # Check to make sure we haven't already removed it.
+        source = path[len(base):]
+
+        genfiles = self.calculate_genfiles(path, source)
+        for key in genfiles.keys():
+          for genfile in genfiles[key]:
+            if genfile in sources_by_genfile:
+              # Possible conflict!
+              prev = sources_by_genfile[genfile]
+              if not prev in sources:
+                # Must have been culled by an earlier pass.
+                continue
+              if not self._same_contents(path, prev):
+                self.context.log.error('Proto conflict detected (.proto files are different):')
+                self.context.log.error('  1: {prev}'.format(prev=prev))
+                self.context.log.error('  2: {curr}'.format(curr=path))
+              else:
+                self.context.log.warn('Proto duplication detected (.proto files are identical):')
+                self.context.log.warn('  1: {prev}'.format(prev=prev))
+                self.context.log.warn('  2: {curr}'.format(curr=path))
+              self.context.log.warn('  Arbitrarily favoring proto 1.')
+              if path in sources:
+                sources.remove(path) # Favor the first version.
+              continue
+            sources_by_genfile[genfile] = path
