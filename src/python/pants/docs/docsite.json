@@ -99,7 +99,6 @@
                 { "page": "dev_tasks_publish_extras" }
 	      ]
             },
-            { "page": "dev_tasks" },
             { "page": "howto_plugin" },
             { "page": "howto_customize" },
             { "page": "intellij" },
