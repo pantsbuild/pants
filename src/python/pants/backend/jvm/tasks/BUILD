@@ -442,6 +442,7 @@ python_library(
     'src/python/pants/backend/jvm:ivy_utils',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
   ],
 )
 
