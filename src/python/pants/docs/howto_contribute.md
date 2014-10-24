@@ -74,7 +74,7 @@ yourself.
 ### Getting Pants Source Code
 
 If you just want to compile and look at the source code, the easiest way
-is to clone the repo. :
+is to clone the repo.
 
     :::bash
     $ git clone https://github.com/pantsbuild/pants
@@ -114,7 +114,7 @@ You might want to familiarize yourself with the
 [[Pants Internals|pants('src/python/pants/docs:internals')]] or
 [[Pants Developers Guide|pants('src/python/pants/docs:howto_develop')]].
 
-Create a new branch off master and make changes. :
+Create a new branch off master and make changes.
 
     :::bash
     $ git checkout -b $FEATURE_BRANCH
@@ -150,7 +150,7 @@ building info.
 
 Post your change for review:
 
-    ::bash
+    :::bash
     $ ./rbt post -o -g
 
 The first time you `post`, rbt asks you to log in. Subsequent runs use
@@ -195,7 +195,7 @@ Press the web form's Publish button.
 
 At this point you've made a change, had it reviewed and are ready to
 complete things by getting your change in master. (If you're not a
-committer, please ask one to do this section for you.) :
+committer, please ask one to do this section for you.)
 
     :::bash
     $ cd /path/to/pants/repo
@@ -210,7 +210,7 @@ expect. (If `rbt` gives mysterious errors, pass `--debug` for more info.
 If that doesn't clarify the problem, mail pants-devel (and include that
 `--debug` output).)
 
-Finally, :
+Finally,
 
     :::bash
     $ git push origin master

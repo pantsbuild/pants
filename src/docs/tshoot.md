@@ -48,7 +48,7 @@ don't want to track down exactly what, you can reset your state:
 Nailgun 5 seconds
 -----------------
 
-If Pants fails with a stack trace that ends with something like :
+If Pants fails with a stack trace that ends with something like
 
     :::bash
     File "pants/tasks/nailgun_task.py", line 255, in _spawn_nailgun_server

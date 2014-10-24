@@ -41,7 +41,7 @@ Invoking Pants
 
 Pants knows about goals ("verbs" like `bundle` and `test`) and targets
 (build-able things in your source code). A typical pants command-line
-invocation looks like :
+invocation looks like
 
     :::bash
     $ ./pants goal test examples/tests/java/com/pants/examples/hello/greet:greet
@@ -139,7 +139,7 @@ tests.
 
 To get help about a Pants goal, invoke <tt>./pants goal *goalname* -h</tt>.
 This lists the many command-line options you can pass for that goal.
-E.g., :
+E.g.,
 
     :::bash
     $ ./pants goal test -h
@@ -158,7 +158,7 @@ E.g., :
 
 For a list of available goals, `./pants goal goals`.
 
-For help with things that aren't goals, use :
+For help with things that aren't goals, use
 
     :::bash
     $ ./pants -h
@@ -196,7 +196,7 @@ they still work.
 
 ### Anatomy of a `BUILD` Target
 
-A target definition in a `BUILD` file looks something like :
+A target definition in a `BUILD` file looks something like
 
     :::python
     scala_library(

@@ -149,7 +149,7 @@ the file.
 
 For example, you might work at the Foo Corporation, which maintains a
 fleet of machines to run big test jobs. You might define a humungous
-test job as a convenient way to send many many tests to the fleet :
+test job as a convenient way to send many many tests to the fleet:
 
     :::python
     # src/javatest/com/foo/BUILD.foo
@@ -192,7 +192,7 @@ as shown in
 `BUILD` targets can use this Repository's alias as the `repo` parameter
 to an <a xref="bdict_artifact">`artifact`</a>. For example, the
 `src/java/com/pants/examples/hello/greet/BUILD` refers to the `public`
-repostiory defined above. (Notice it's a Python object, not a string.) :
+repostiory defined above. (Notice it's a Python object, not a string.)
 
     :::python
     provides = artifact(org='com.pants.examples',

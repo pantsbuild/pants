@@ -59,7 +59,7 @@ BUILD file:
 
 To refer to a target in a top-level BUILD file, prefix the target name
 with `//:`. (You can prefix any absolute path with //, but it's mainly
-useful for top-level targets since ":target" is relative.) :
+useful for top-level targets since ":target" is relative.)
 
     :::python
     java_library(name='application', ...)

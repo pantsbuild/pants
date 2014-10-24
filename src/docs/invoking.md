@@ -3,8 +3,8 @@ Invoking Pants Build
 
 This page discusses some advanced features of invoking the Pants build
 tool on the command line. We assume you already know the
-[[basic command-line structure|pants('src/docs:first_tutorial')]], something
-like:
+[[basic command-line structure|pants('src/docs:first_tutorial')]],
+something like:
 
     :::bash
     $ ./pants goal test bundle path/to/target path/to/another/target
@@ -49,7 +49,7 @@ options affecting it:
 
 Although `/etc/pantsrc` and `~/.pants.rc` are the typical places for
 this configuration, you can check pants.ini \<setup-pants-ini\> to find
-out what your source tree uses. :
+out what your source tree uses.
 
     # excerpt from pants.ini
     [DEFAULT]

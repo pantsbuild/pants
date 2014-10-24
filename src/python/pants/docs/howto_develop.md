@@ -11,7 +11,7 @@ These instructions assume you've already
 Running from sources
 --------------------
 
-As pants is implemented in python it can be run directly from sources. :
+As pants is implemented in python it can be run directly from sources.
 
     $ PANTS_DEV=1 ./pants goal goals
     *** running pants in dev mode from ./src/python/pants/bin/pants_exe.py ***
@@ -120,7 +120,7 @@ work with a particular feature, you might explore
 Typically, you're not sure precisely which tests you need to run, so you
 run all of them.
 
-To run all tests, :
+To run all tests,
 
     ./pants goal test tests::
 
@@ -162,7 +162,7 @@ number to easily close the pull request.
 Debugging
 ---------
 
-To run Pants under `pdb` and set a breakpoint, you can typically add :
+To run Pants under `pdb` and set a breakpoint, you can typically add
 
     import pdb; pdb.set_trace()
 

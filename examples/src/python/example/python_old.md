@@ -254,13 +254,13 @@ format of pkg\_resources.EntryPoint, which is something akin to
 some.module.name:my.attr which means run the function pointed by my.attr
 inside the module some.module inside the environment. The :my.attr
 component can be omitted and the module is executed directly (presuming
-it has a \_\_main\_\_.py.)
+it has a `__main__.py`.)
 
 #### python\_requirement
 
 A python\_requirement target describes an external dependency as
 understood by easy\_install or pip. It takes only a single non-keyword
-argument of the Requirement-style string, e.g. :
+argument of the Requirement-style string, e.g.,
 
     python_requirement('django-celery')
     python_requirement('tornado==2.2')
