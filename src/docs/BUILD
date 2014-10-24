@@ -78,3 +78,21 @@ page(
   name='target_addresses',
   source='target_addresses.md'
 )
+
+page(
+  name='tshoot',
+  source='tshoot.md',
+  dependencies=[
+    'src/python/pants/docs:howto_ask',
+  ]
+)
+
+page(
+  name='with_emacs',
+  source='with_emacs.md'
+)
+
+page(
+  name='with_intellij',
+  source='with_intellij.md'
+)

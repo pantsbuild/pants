@@ -34,7 +34,10 @@
     "release": "dist/markdown/html/src/python/pants/docs/release.html",
     "setup_repo": "dist/markdown/html/src/docs/setup_repo.html",
     "target_addresses": "dist/markdown/html/src/docs/target_addresses.html",
-    "ThriftDeps": "dist/markdown/html/examples/src/thrift/com/pants/examples/readme.html"
+    "tshoot": "dist/markdown/html/src/docs/tshoot.html",
+    "ThriftDeps": "dist/markdown/html/examples/src/thrift/com/pants/examples/readme.html",
+    "with_emacs": "dist/markdown/html/src/docs/with_emacs.html",
+    "with_intellij": "dist/markdown/html/src/docs/with_intellij.html"
   },
   "extras": {
     "images/intellij-configure-tests.png": "src/python/pants/docs/images/intellij-configure-tests.png",
@@ -71,6 +74,7 @@
         { "page": "page" },
         { "page": "build_files" },
         { "page": "invoking" },
+        { "page": "tshoot" },
         { "page": "3rdparty",
           "children": [
             { "page": "3rdparty_jvm" },
@@ -79,6 +83,8 @@
         },
         { "page": "ThriftDeps" },
         { "page": "publish" },
+        { "page": "with_emacs" },
+        { "page": "with_intellij" },
         { "page": "install" },
         { "page": "setup_repo" },
         { "page": "build_dictionary" },
