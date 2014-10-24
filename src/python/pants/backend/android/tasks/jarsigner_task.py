@@ -18,13 +18,11 @@ class JarsignerTask(Task):
   """Sign Android packages with keystore."""
 
   @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    #TODO(mateor) Ensure a change of target-sdk or build-tools rebuilds product w/o clean
-    super(JarsignerTask, cls).setup_parser(option_group, args, mkflag)
-
-    option_group.add_option(mkflag("build-type"), dest="build_type",
-                            help="[%default] One of ['debug', 'release']. Specifies the build type "
-                                 "and which keystore to sign the package.")
+  def register_options(cls, register):
+    super(JarsignerTask, cls).register_options(register)
+    register('--build-type', choices=['debug', 'release'],
+             legacy='build_type',
+             help = 'Specifies the build type and keystore used to sign the package.')
 
   @classmethod
   def is_signtarget(cls, target):
@@ -33,7 +31,7 @@ class JarsignerTask(Task):
   def __init__(self, *args, **kwargs):
     super(JarsignerTask, self).__init__(*args, **kwargs)
     self._distdir = self.context.config.getdefault('pants_distdir')
-    self._build_type = self.context.options.build_type
+    self._build_type = self.get_options().build_type
     # No Java 8 for Android. I am considering max=1.7.0_50. See comment in render_args().
     self._dist = Distribution.cached(maximum_version="1.7.0_99")
 

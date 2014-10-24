@@ -39,13 +39,11 @@ class CheckExclusives(Task):
     return ['exclusives_groups']
 
   @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    option_group.add_option(mkflag('error_on_collision'),
-                            mkflag('error_on_collision', negate=True),
-                            dest='exclusives_error_on_collision', default=True,
-                            action='callback', callback=mkflag.set_bool,
-                            help=("[%default] Signal an error and abort the build if an " +
-                                  "exclusives collision is detected"))
+  def register_options(cls, register):
+    super(CheckExclusives, cls).register_options(register)
+    register('--error-on-collision', default=True, action='store_true',
+             legacy='exclusives_error_on_collision',
+             help='Abort the build if an exclusives collision is detected.')
 
   def prepare(self, round_manager):
     round_manager.require_data('java')
@@ -88,7 +86,7 @@ class CheckExclusives(Task):
         if len(excl[key]) > 1:
           msg = 'target %s has more than one exclusives tag for key %s: %s' % \
                 (t.address.reference(), key, list(excl[key]))
-          if self.context.options.exclusives_error_on_collision:
+          if self.get_options().error_on_collision:
             raise TaskError(msg)
           else:
             print('Warning: %s' % msg)
