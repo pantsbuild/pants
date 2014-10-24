@@ -89,7 +89,6 @@ class TestArtifactCache(unittest.TestCase):
         artifact_cache = LocalArtifactCache(None, artifact_root, cache_root)
         self.do_test_artifact_cache(artifact_cache)
 
-
   def test_restful_cache(self):
     httpd = None
     httpd_thread = None
@@ -140,3 +139,65 @@ class TestArtifactCache(unittest.TestCase):
       # Delete it.
       artifact_cache.delete(key)
       self.assertFalse(artifact_cache.has(key))
+
+  def test_combined_cache(self):
+    """Make sure that the combined cache finds what it should and that it backfills."""
+    httpd = None
+    httpd_thread = None
+    try:
+      with temporary_dir() as http_root:
+        with temporary_dir() as cache_root:
+          with pushd(http_root):  # SimpleRESTHandler serves from the cwd.
+            httpd = SocketServer.TCPServer(('localhost', 0), SimpleRESTHandler)
+            port = httpd.server_address[1]
+            httpd_thread = Thread(target=httpd.serve_forever)
+            httpd_thread.start()
+            with temporary_dir() as artifact_root:
+              local = LocalArtifactCache(None, artifact_root, cache_root)
+              remote = RESTfulArtifactCache(MockLogger(), artifact_root, 'http://localhost:%d' % port)
+              combined = CombinedArtifactCache([local, remote])
+
+              key = CacheKey('muppet_key', 'fake_hash', 42)
+
+              with temporary_file(artifact_root) as f:
+                # Write the file.
+                f.write(TEST_CONTENT1)
+                path = f.name
+                f.close()
+
+                # No cache has key.
+                self.assertFalse(local.has(key))
+                self.assertFalse(remote.has(key))
+                self.assertFalse(combined.has(key))
+
+                # No cache returns key.
+                self.assertFalse(bool(local.use_cached_files(key)))
+                self.assertFalse(bool(remote.use_cached_files(key)))
+                self.assertFalse(bool(combined.use_cached_files(key)))
+
+                # Attempting to use key that no cache had should not change anything.
+                self.assertFalse(local.has(key))
+                self.assertFalse(remote.has(key))
+                self.assertFalse(combined.has(key))
+
+                # Add to only remote cache.
+                remote.insert(key, [path])
+
+                self.assertFalse(local.has(key))
+                self.assertTrue(remote.has(key))
+                self.assertTrue(combined.has(key))
+
+                # Successfully using via remote should NOT change local.
+                self.assertTrue(bool(remote.use_cached_files(key)))
+                self.assertFalse(local.has(key))
+
+                # Successfully using via combined SHOULD backfill local.
+                self.assertTrue(bool(combined.use_cached_files(key)))
+                self.assertTrue(local.has(key))
+                self.assertTrue(bool(local.use_cached_files(key)))
+    finally:
+      if httpd:
+        httpd.shutdown()
+      if httpd_thread:
+        httpd_thread.join()
+

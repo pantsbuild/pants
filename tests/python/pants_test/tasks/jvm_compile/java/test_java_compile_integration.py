@@ -38,6 +38,25 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
       self._java_compile_produces_valid_analysis_file(workdir)
       self._java_compile_produces_valid_analysis_file(workdir)
 
+  def test_nocache(self):
+    with temporary_dir() as cache_dir:
+      bad_artifact_dir = os.path.join(cache_dir, 'JavaCompile',
+                                  'testprojects.src.java.com.pants.testproject.nocache.nocache')
+      good_artifact_dir = os.path.join(cache_dir, 'JavaCompile',
+                                  'testprojects.src.java.com.pants.testproject.nocache.cache_me')
+      config = {'java-compile': {'write_artifact_caches': [cache_dir]}}
+
+      pants_run = self.run_pants(
+        ['goal', 'compile', 'testprojects/src/java/com/pants/testproject/nocache::'],
+        config)
+      self.assert_success(pants_run)
+
+      # The nocache target is labeled with no_cache so it should not be written to the
+      # artifact cache.
+      self.assertFalse(os.path.exists(bad_artifact_dir))
+      # But cache_me should be written.
+      self.assertEqual(len(os.listdir(good_artifact_dir)), 1)
+
   def test_java_compile_produces_different_artifact_depending_on_java_version(self):
     # Ensure that running java compile with java 6 and then java 7
     # produces two different artifacts.

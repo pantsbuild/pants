@@ -207,6 +207,12 @@ class Target(AbstractTarget):
                        raise_type=lambda msg: TargetDefinitionException(self, msg))
 
   def compute_invalidation_hash(self, fingerprint_strategy=None):
+    """
+     :param FingerprintStrategy fingerprint_strategy: optional fingerprint strategy to use to compute
+    the fingerprint of a target
+    :return: a fingerprint representing this target (no dependencies)
+    :rtype: string
+    """
     fingerprint_strategy = fingerprint_strategy or DefaultFingerprintStrategy()
     return fingerprint_strategy.fingerprint_target(self)
 
@@ -225,6 +231,12 @@ class Target(AbstractTarget):
     self.mark_extra_invalidation_hash_dirty()
 
   def transitive_invalidation_hash(self, fingerprint_strategy=None):
+    """
+    :param FingerprintStrategy fingerprint_strategy: optional fingerprint strategy to use to compute
+    the fingerprint of a target
+    :return: a fingerprint representing this target and all of its dependencies
+    :rtype: string
+    """
     fingerprint_strategy = fingerprint_strategy or DefaultFingerprintStrategy()
     if fingerprint_strategy not in self._cached_transitive_fingerprint_map:
       hasher = sha1()
@@ -252,6 +264,11 @@ class Target(AbstractTarget):
     self._build_graph.walk_transitive_dependee_graph([self.address], work=invalidate_dependee)
 
   def has_sources(self, extension=''):
+    """
+    :param string extension: suffix of filenames to test for
+    :return: True if the target contains sources that match the optional extension suffix
+    :rtype: bool
+    """
     sources_field = self.payload.get_field('sources')
     if sources_field:
       return sources_field.has_sources(extension)
@@ -301,24 +318,44 @@ class Target(AbstractTarget):
 
   @property
   def traversable_specs(self):
+    """
+    :return: specs referenced by this target to be injected into the build graph
+    :rtype: list of strings
+    """
     return []
 
   @property
   def traversable_dependency_specs(self):
+    """
+    :return: specs representing dependencies of this target that will be injected to the build
+    graph and linked in the graph as dependencies of this target
+    :rtype: list of strings
+    """
     return []
 
   @property
   def dependencies(self):
+    """
+    :return: targets that this target depends on
+    :rtype: list of Target
+    """
     return [self._build_graph.get_target(dep_address)
             for dep_address in self._build_graph.dependencies_of(self.address)]
 
   @property
   def dependents(self):
+    """
+    :return: targets that depend on this target
+    :rtype: list of Target
+    """
     return [self._build_graph.get_target(dep_address)
             for dep_address in self._build_graph.dependents_of(self.address)]
 
   @property
   def is_synthetic(self):
+    """
+    :return: True if this target did not originate from a BUILD file.
+    """
     return self.address.is_synthetic
 
   @property

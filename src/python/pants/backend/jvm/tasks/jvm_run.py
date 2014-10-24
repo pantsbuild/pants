@@ -5,7 +5,6 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from pants.backend.jvm.jvm_debug_config import JvmDebugConfig
 from pants.backend.jvm.targets.jvm_binary import JvmApp, JvmBinary
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.base.exceptions import TaskError
@@ -14,7 +13,6 @@ from pants.fs.fs import expand_path
 from pants.java.executor import CommandLineGrabber
 from pants.java.util import execute_java
 from pants.util.dirutil import safe_open
-from pants.util.strutil import safe_shlex_split
 
 
 def is_binary(target):
@@ -23,34 +21,13 @@ def is_binary(target):
 
 class JvmRun(JvmTask):
   @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    option_group.add_option(mkflag('jvmargs'), dest='run_jvmargs', action='append',
-      help='Run binary in a jvm with these extra jvm args.')
-
-    option_group.add_option(mkflag('args'), dest='run_args', action='append',
-      help='Run binary with these main() args.')
-
-    option_group.add_option(mkflag('debug'), mkflag('debug', negate=True), dest='run_debug',
-      action='callback', callback=mkflag.set_bool, default=False,
-      help='[%default] Run binary with a debugger')
-
-    option_group.add_option(mkflag('only-write-cmd-line'), dest='only_write_cmd_line',
-      action='store', default=None,
-      help='[%default] Instead of running, just write the cmd line to this file')
+  def register_options(cls, register):
+    super(JvmRun, cls).register_options(register)
+    register('--only-write-cmd-line',  metavar='<file>', legacy='only_write_cmd_line',
+             help='Instead of running, just write the cmd line to this file.')
 
   def __init__(self, *args, **kwargs):
     super(JvmRun, self).__init__(*args, **kwargs)
-    self.jvm_args = self.context.config.getlist('jvm-run', 'jvm_args', default=[])
-    if self.context.options.run_jvmargs:
-      for arg in self.context.options.run_jvmargs:
-        self.jvm_args.extend(safe_shlex_split(arg))
-    self.args = []
-    if self.context.options.run_args:
-      for arg in self.context.options.run_args:
-        self.args.extend(safe_shlex_split(arg))
-    if self.context.options.run_debug:
-      self.jvm_args.extend(JvmDebugConfig.debug_args(self.context.config))
-    self.confs = self.context.config.getlist('jvm-run', 'confs', default=['default'])
     self.only_write_cmd_line = self.context.options.only_write_cmd_line
 
   def prepare(self, round_manager):
@@ -90,7 +67,7 @@ class JvmRun(JvmTask):
         classpath=(self.classpath(confs=self.confs, exclusives_classpath=exclusives_classpath)),
         main=binary.main,
         executor=executor,
-        jvm_options=self.jvm_args,
+        jvm_options=self.jvm_options,
         args=self.args,
         workunit_factory=self.context.new_workunit,
         workunit_name='run',

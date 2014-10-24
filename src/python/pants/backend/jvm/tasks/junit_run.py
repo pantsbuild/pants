@@ -7,6 +7,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from abc import abstractmethod
 from collections import defaultdict, namedtuple
+import copy
 import fnmatch
 import os
 import sys
@@ -15,7 +16,6 @@ from twitter.common.collections import OrderedSet
 from twitter.common.dirutil import safe_delete, safe_rmtree
 
 from pants import binary_util
-from pants.backend.jvm.jvm_debug_config import JvmDebugConfig
 from pants.backend.jvm.targets.java_tests import JavaTests as junit_tests
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
@@ -34,8 +34,18 @@ from pants.util.dirutil import safe_mkdir, safe_open
 # methods inherited by JUnitRun from Task. Rather than pass a reference
 # to the entire Task instance, we isolate the methods that are used
 # in a named tuple and pass that one around.
+
+# TODO(benjy): Why? This seems unnecessarily clunky. The runners only exist because we can't
+# (yet?) pick a Task type based on cmd-line flags. But they act "as-if" they were Task types,
+# so it seems prefectly reasonable for them to have a reference to the task.
+# This trick just makes debugging harder, and requires extra work when a runner implementation
+# needs some new thing from the task.
 _TaskExports = namedtuple('_TaskExports',
                           ['classpath',
+                           'task_options',
+                           'jvm_options',
+                           'args',
+                           'confs',
                            'get_base_classpath_for_target',
                            'register_jvm_tool',
                            'tool_classpath',
@@ -53,71 +63,31 @@ class _JUnitRunner(object):
   The default behavior is to just run JUnit tests."""
 
   @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    _Coverage.setup_parser(option_group, args, mkflag)
-    option_group.add_option(mkflag('skip'), mkflag('skip', negate=True), dest='junit_run_skip',
-                            action='callback', callback=mkflag.set_bool, default=False,
-                            help='[%default] Skip running tests')
-
-    option_group.add_option(mkflag('debug'), mkflag('debug', negate=True), dest='junit_run_debug',
-                            action='callback', callback=mkflag.set_bool, default=False,
-                            help='[%default] Run junit tests with a debugger')
-
-    option_group.add_option(mkflag('fail-fast'), mkflag('fail-fast', negate=True),
-                            dest='junit_run_fail_fast',
-                            action='callback', callback=mkflag.set_bool, default=False,
-                            help='[%default] Fail fast on the first test failure in a suite')
-
-    option_group.add_option(mkflag('batch-size'), type='int', default=sys.maxint,
-                            dest='junit_run_batch_size',
-                            help='[ALL] Runs at most this many tests in a single test process.')
-
-    # TODO: Rename flag to jvm-options.
-    option_group.add_option(mkflag('jvmargs'), dest='junit_run_jvmargs', action='append',
-                            help='Runs junit tests in a jvm with these extra jvm args.')
-
-    option_group.add_option(mkflag('test'), dest='junit_run_tests', action='append',
-                            help='[%default] Force running of just these tests.  Tests can be '
-                                   'specified using any of: [classname], [classname]#[methodname], '
-                                   '[filename] or [filename]#[methodname]')
-
-    xmlreport = mkflag('xmlreport')
-    option_group.add_option(xmlreport, mkflag('xmlreport', negate=True),
-                            dest='junit_run_xmlreport',
-                            action='callback', callback=mkflag.set_bool, default=False,
-                            help='[%default] Causes an xml report to be output for each test '
-                                   'class that is run.')
-
-    option_group.add_option(mkflag('per-test-timer'), mkflag('per-test-timer', negate=True),
-                            dest='junit_run_per_test_timer',
-                            action='callback', callback=mkflag.set_bool, default=False,
-                            help='[%default] Shows progress and timer for each test '
-                                   'class that is run.')
-
-    option_group.add_option(mkflag('default-parallel'), mkflag('default-parallel', negate=True),
-                            dest='junit_run_default_parallel',
-                            action='callback', callback=mkflag.set_bool, default=False,
-                            help='[%default] Whether to run classes without @TestParallel or '
-                                   '@TestSerial annotations in parallel.')
-
-    option_group.add_option(mkflag('parallel-threads'), type='int', default=0,
-                            dest='junit_run_parallel_threads',
-                            help='Number of threads to run tests in parallel. 0 for autoset.')
-
-    option_group.add_option(mkflag("test-shard"), dest="junit_run_test_shard",
-                            help="Subset of tests to run, in the form M/N, 0 <= M < N."
-                                   "For example, 1/3 means run tests number 2, 5, 8, 11, ...")
-
-    option_group.add_option(mkflag('suppress-output'), mkflag('suppress-output', negate=True),
-                            dest='junit_run_suppress_output',
-                            action='callback', callback=mkflag.set_bool, default=True,
-                            help='[%%default] Redirects test output to files '
-                                 '(in .pants.d/test/junit). Implied by %s' % xmlreport)
-
-    option_group.add_option(mkflag("arg"), dest="junit_run_arg",
-                            action="append",
-                            help="An arbitrary argument to pass directly to the test runner. "
-                                   "This option can be specified multiple times.")
+  def register_options(cls, register):
+    _Coverage.register_options(register)
+    register('--skip', action='store_true', legacy='junit_run_skip',
+             help='Skip running junit.')
+    register('--fail-fast', action='store_true', legacy='junit_run_fail_fast',
+             help='Fail fast on the first test failure in a suite.')
+    register('--batch-size', type=int, default=sys.maxint, legacy='junit_run_batch_size',
+             help='Run at most this many tests in a single test process.')
+    register('--test', action='append', legacy='junit_run_tests',
+             help='Force running of just these tests.  Tests can be specified using any of: '
+                  '[classname], [classname]#[methodname], [filename] or [filename]#[methodname]')
+    register('--xml-report', action='store_true', legacy='junit_run_xmlreport',
+             help='Output an XML report for the test run.')
+    register('--per-test-timer', action='store_true', legacy='junit_run_per_test_timer',
+             help='Show progress and timer for each test.')
+    register('--default-parallel', action='store_true', legacy='junit_run_default_parallel',
+             help='Run classes without @TestParallel or @TestSerial annotations in parallel.')
+    register('--parallel-threads', type=int, default=0, legacy='junit_run_parallel_threads',
+             help='Number of threads to run tests in parallel. 0 for autoset.')
+    register('--test-shard', legacy='junit_run_test_shard',
+             help='Subset of tests to run, in the form M/N, 0 <= M < N. '
+                  'For example, 1/3 means run tests number 2, 5, 8, 11, ...')
+    register('--suppress-output', action='store_true', default=True,
+             legacy='junit_run_suppress_output',
+             help='Redirect test output to files in .pants.d/test/junit. Implied by --xml-report.')
 
   def register_jvm_tool(self, key, ini_section, ini_key, default):
     tool = self._context.config.getlist(ini_section, ini_key, default)
@@ -130,43 +100,36 @@ class _JUnitRunner(object):
     self._task_exports = task_exports
     self._context = context
     self._junit_bootstrap_key = 'junit'
-    self.register_jvm_tool(self._junit_bootstrap_key,
+    self.register_jvm_tool(key=self._junit_bootstrap_key,
                            ini_section='junit-run',
                            ini_key='junit-bootstrap-tools',
                            default=['//:junit'])
-    self._jvm_args = context.config.getlist('junit-run', 'jvm_args', default=[])
-    if context.options.junit_run_jvmargs:
-      self._jvm_args.extend(context.options.junit_run_jvmargs)
-    if context.options.junit_run_debug:
-      self._jvm_args.extend(JvmDebugConfig.debug_args(context.config))
 
-    self._tests_to_run = context.options.junit_run_tests
-    self._batch_size = context.options.junit_run_batch_size
-    self._fail_fast = context.options.junit_run_fail_fast
+    options = task_exports.task_options
+    self._tests_to_run = options.test
+    self._batch_size = options.batch_size
+    self._fail_fast = options.fail_fast
 
-    self._opts = []
-    if context.options.junit_run_xmlreport or context.options.junit_run_suppress_output:
+    self._args = copy.copy(task_exports.args)
+    if options.xml_report or options.suppress_output:
       if self._fail_fast:
-        self._opts.append('-fail-fast')
-      if context.options.junit_run_xmlreport:
-        self._opts.append('-xmlreport')
-      self._opts.append('-suppress-output')
-      self._opts.append('-outdir')
-      self._opts.append(task_exports.workdir)
+        self._args.append('-fail-fast')
+      if options.xml_report:
+        self._args.append('-xmlreport')
+      self._args.append('-suppress-output')
+      self._args.append('-outdir')
+      self._args.append(task_exports.workdir)
 
-    if context.options.junit_run_per_test_timer:
-      self._opts.append('-per-test-timer')
-    if context.options.junit_run_default_parallel:
-      self._opts.append('-default-parallel')
-    self._opts.append('-parallel-threads')
-    self._opts.append(str(context.options.junit_run_parallel_threads))
+    if options.per_test_timer:
+      self._args.append('-per-test-timer')
+    if options.default_parallel:
+      self._args.append('-default-parallel')
+    self._args.append('-parallel-threads')
+    self._args.append(str(options.parallel_threads))
 
-    if context.options.junit_run_test_shard:
-      self._opts.append('-test-shard')
-      self._opts.append(context.options.junit_run_test_shard)
-
-    if context.options.junit_run_arg:
-      self._opts.extend(context.options.junit_run_arg)
+    if options.test_shard:
+      self._args.append('-test-shard')
+      self._args.append(options.test_shard)
 
   def execute(self, targets):
     # For running the junit tests, we're only interested in
@@ -185,7 +148,7 @@ class _JUnitRunner(object):
       bootstrapped_cp = self._task_exports.tool_classpath(self._junit_bootstrap_key)
       junit_classpath = self._task_exports.classpath(
         cp=bootstrapped_cp,
-        confs=self._context.config.getlist('junit-run', 'confs', default=['default']),
+        confs=self._task_exports.confs,
         exclusives_classpath=self._task_exports.get_base_classpath_for_target(java_tests_targets[0]))
 
       self._context.lock.release()
@@ -219,7 +182,7 @@ class _JUnitRunner(object):
       the junit will be executed.
     """
 
-    self._run_tests(tests, junit_classpath, JUnitRun._MAIN, jvm_args=None)
+    self._run_tests(tests, junit_classpath, JUnitRun._MAIN)
 
   def report(self, targets, tests, junit_classpath):
     """Post-processing of any test output.
@@ -228,18 +191,19 @@ class _JUnitRunner(object):
 
     pass
 
-  def _run_tests(self, tests, classpath, main, jvm_args=None):
+  def _run_tests(self, tests, classpath, main, extra_jvm_options=None):
     # TODO(John Sirois): Integrated batching with the test runner.  As things stand we get
     # results summaries for example for each batch but no overall summary.
     # http://jira.local.twitter.com/browse/AWESOME-1114
+    extra_jvm_options = extra_jvm_options or []
     result = 0
     for batch in self._partition(tests):
       with binary_util.safe_args(batch) as batch_tests:
         result += abs(execute_java(
           classpath=classpath,
           main=main,
-          jvm_options=(jvm_args or []) + self._jvm_args,
-          args=self._opts + batch_tests,
+          jvm_options=self._task_exports.jvm_options + extra_jvm_options,
+          args=self._args + batch_tests,
           workunit_factory=self._context.new_workunit,
           workunit_name='run',
           workunit_labels=[WorkUnit.TEST]
@@ -305,66 +269,42 @@ class _Coverage(_JUnitRunner):
   """Base class for emma-like coverage processors. Do not instantiate."""
 
   @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    coverage_patterns = mkflag('coverage-patterns')
-    option_group.add_option(coverage_patterns, dest='junit_run_coverage_patterns',
-                            action='append',
-                            help='By default all non-test code depended on by the selected tests '
-                                 'is measured for coverage during the test run.  By specifying '
-                                 'coverage patterns you can select which classes and packages '
-                                 'should be counted.  Values should be class name prefixes in '
-                                 'dotted form with ? and * wildcard support. If preceded with a - '
-                                 'the pattern is excluded. '
-                                 'For example, to include all code in com.twitter.raven except '
-                                 'claws and the eye you would use: '
-                                 '%(flag)s=com.twitter.raven.* '
-                                 '%(flag)s=-com.twitter.raven.claw '
-                                 '%(flag)s=-com.twitter.raven.Eye'
-                                 'This option can be specified multiple times. ' % dict(
-                                    flag=coverage_patterns
-                                 ))
+  def register_options(cls, register):
+    register('--coverage-patterns', action='append', legacy='junit_run_coverage_patterns',
+             help='Restrict coverage measurement. Values are class name prefixes in dotted form '
+                  'with ? and * wildcards. If preceded with a - the pattern is excluded. For '
+                  'example, to include all code in com.pants.raven except claws and the eye you '
+                  'would use: %(flag)s=com.pants.raven.* %(flag)s=-com.pants.raven.claw '
+                  '%(flag)s=-com.pants.raven.Eye.'.format(flag='--coverage_patterns'))
+    register('--coverage-console', action='store_true', default=True,
+             legacy='junit_run_coverage_console',
+             help='Output a simple coverage report to the console.')
+    register('--coverage-xml', action='store_true', legacy='junit_run_coverage_xml',
+             help='Output an XML coverage report.')
+    register('--coverage-html', action='store_true', legacy='junit_run_coverage_html',
+            help='Output an HTML coverage report.')
+    register('--coverage-html-open', action='store_true', legacy='junit_run_coverage_html_open',
+             help='Open the generated HTML coverage report in a browser. Implies --coverage-html.')
 
-    option_group.add_option(mkflag('coverage-console'), mkflag('coverage-console', negate=True),
-                            dest='junit_run_coverage_console',
-                            action='callback', callback=mkflag.set_bool, default=True,
-                            help='[%default] Outputs a simple coverage report to the console.')
-
-    option_group.add_option(mkflag('coverage-xml'), mkflag('coverage-xml', negate=True),
-                            dest='junit_run_coverage_xml',
-                            action='callback', callback=mkflag.set_bool, default=False,
-                            help='[%%default] Produces an xml coverage report.')
-
-    coverage_html_flag = mkflag('coverage-html')
-    option_group.add_option(coverage_html_flag, mkflag('coverage-html', negate=True),
-                            dest='junit_run_coverage_html',
-                            action='callback', callback=mkflag.set_bool, default=False,
-                            help='[%%default] Produces an html coverage report.')
-
-    option_group.add_option(mkflag('coverage-html-open'), mkflag('coverage-html-open', negate=True),
-                            dest='junit_run_coverage_html_open',
-                            action='callback', callback=mkflag.set_bool, default=False,
-                            help='[%%default] Tries to open the generated html coverage report, '
-                                   'implies %s.' % coverage_html_flag)
-
-  def __init__(self, task_exports, context, **kwargs):
-    super(_Coverage, self).__init__(task_exports, context, **kwargs)
-    self._coverage = context.options.junit_run_coverage
-    self._coverage_filters = context.options.junit_run_coverage_patterns or []
+  def __init__(self, task_exports, context):
+    super(_Coverage, self).__init__(task_exports, context)
+    options = task_exports.task_options
+    self._coverage = options.coverage
+    self._coverage_filters = options.coverage_patterns or []
     self._coverage_dir = os.path.join(task_exports.workdir, 'coverage')
     self._coverage_instrument_dir = os.path.join(self._coverage_dir, 'classes')
     # TODO(ji): These may need to be transferred down to the Emma class, as the suffixes
     # may be emma-specific. Resolve when we also provide cobertura support.
     self._coverage_metadata_file = os.path.join(self._coverage_dir, 'coverage.em')
     self._coverage_file = os.path.join(self._coverage_dir, 'coverage.ec')
-    self._coverage_report_console = context.options.junit_run_coverage_console
+    self._coverage_report_console = options.coverage_console
     self._coverage_console_file = os.path.join(self._coverage_dir, 'coverage.txt')
 
-    self._coverage_report_xml = context.options.junit_run_coverage_xml
+    self._coverage_report_xml = options.coverage_xml
     self._coverage_xml_file = os.path.join(self._coverage_dir, 'coverage.xml')
 
-    self._coverage_report_html_open = context.options.junit_run_coverage_html_open
-    self._coverage_report_html = (self._coverage_report_html_open or
-                                  context.options.junit_run_coverage_html)
+    self._coverage_report_html_open = options.coverage_html_open
+    self._coverage_report_html = self._coverage_report_html_open or options.coverage_html
     self._coverage_html_file = os.path.join(self._coverage_dir, 'html', 'index.html')
 
   @abstractmethod
@@ -406,8 +346,8 @@ class _Coverage(_JUnitRunner):
 class Emma(_Coverage):
   """Class to run coverage tests with Emma."""
 
-  def __init__(self, task_exports, context, **kwargs):
-    super(Emma, self).__init__(task_exports, context, **kwargs)
+  def __init__(self, task_exports, context):
+    super(Emma, self).__init__(task_exports, context)
     self._emma_bootstrap_key = 'emma'
     self.register_jvm_tool(self._emma_bootstrap_key,
                            ini_section='junit-run',
@@ -439,7 +379,7 @@ class Emma(_Coverage):
     self._run_tests(tests,
                     [self._coverage_instrument_dir] + junit_classpath + self._emma_classpath,
                     JUnitRun._MAIN,
-                    jvm_args=['-Demma.coverage.out.file=%s' % self._coverage_file])
+                    extra_jvm_options=['-Demma.coverage.out.file={0}'.format(self._coverage_file)])
 
   def report(self, targets, tests, junit_classpath):
     args = [
@@ -487,8 +427,8 @@ class Emma(_Coverage):
 class Cobertura(_Coverage):
   """Class to run coverage tests with cobertura."""
 
-  def __init__(self, task_exports, context, **kwargs):
-    super(Cobertura, self).__init__(task_exports, context, **kwargs)
+  def __init__(self, task_exports, context):
+    super(Cobertura, self).__init__(task_exports, context)
     self._cobertura_bootstrap_key = 'cobertura'
     self._coverage_datafile = os.path.join(self._coverage_dir, 'cobertura.ser')
     self.register_jvm_tool(self._cobertura_bootstrap_key,
@@ -559,7 +499,7 @@ class Cobertura(_Coverage):
     self._run_tests(tests,
                     self._cobertura_classpath + junit_classpath,
                     JUnitRun._MAIN,
-                    jvm_args=['-Dnet.sourceforge.cobertura.datafile=' + self._coverage_datafile])
+                    extra_jvm_options=['-Dnet.sourceforge.cobertura.datafile=' + self._coverage_datafile])
 
   def _build_sources_by_class(self):
     """Invert classes_by_source."""
@@ -652,36 +592,37 @@ class JUnitRun(JvmTask, JvmToolTaskMixin):
   _MAIN = 'com.twitter.common.junit.runner.ConsoleRunner'
 
   @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    _JUnitRunner.setup_parser(option_group, args, mkflag)
-    option_group.add_option(mkflag('coverage'), mkflag('coverage', negate=True),
-                            dest='junit_run_coverage',
-                            action='callback', callback=mkflag.set_bool, default=False,
-                            help='[%default] Collects code coverage data')
+  def register_options(cls, register):
+    super(JUnitRun, cls).register_options(register)
+    _JUnitRunner.register_options(register)
+    register('--coverage', action='store_true', legacy='junit_run_coverage',
+             help='Collect code coverage data.')
+    register('--coverage-processor', default='emma', legacy='junit_coverage_processor',
+             help='Which coverage subsystem to use.')
 
-    option_group.add_option(mkflag('coverage-processor'),
-                            dest='junit_coverage_processor',
-                            default='emma',
-                            help='[%default] Which coverage subsystem to use')
 
   def __init__(self, *args, **kwargs):
     super(JUnitRun, self).__init__(*args, **kwargs)
 
     task_exports = _TaskExports(classpath=self.classpath,
+                                task_options=self.get_options(),
+                                jvm_options=self.jvm_options,
+                                args=self.args,
+                                confs=self.confs,
                                 get_base_classpath_for_target=self.get_base_classpath_for_target,
                                 register_jvm_tool=self.register_jvm_tool,
                                 tool_classpath=self.tool_classpath,
                                 workdir=self.workdir)
 
-    options = self.context.options
-    if options.junit_run_coverage or options.junit_run_coverage_html_open:
-      if options.junit_coverage_processor == 'emma':
+    options = self.get_options()
+    if options.coverage or options.coverage_html_open:
+      coverage_processor = options.coverage_processor
+      if coverage_processor == 'emma':
         self._runner = Emma(task_exports, self.context)
-      elif options.junit_coverage_processor == 'cobertura':
+      elif coverage_processor == 'cobertura':
         self._runner = Cobertura(task_exports, self.context)
       else:
-        raise TaskError('unknown coverage processor %s' %
-                        self.context.options.junit_coverage_processor)
+        raise TaskError('unknown coverage processor %s' % coverage_processor)
     else:
       self._runner = _JUnitRunner(task_exports, self.context)
 
@@ -694,6 +635,6 @@ class JUnitRun(JvmTask, JvmToolTaskMixin):
     round_manager.require_data('classes_by_source')
 
   def execute(self):
-    if not self.context.options.junit_run_skip:
+    if not self.get_options().skip:
       targets = self.context.targets()
       self._runner.execute(targets)

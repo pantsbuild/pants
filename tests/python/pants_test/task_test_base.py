@@ -7,7 +7,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import uuid
 
-from pants.base.exceptions import TaskError
 from pants_test.base_test import BaseTest
 
 

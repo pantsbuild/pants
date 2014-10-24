@@ -13,6 +13,7 @@ import os
 import re
 
 from pex.interpreter import PythonIdentity
+from pants.util.dirutil import safe_walk
 from twitter.common.collections import OrderedSet
 
 
@@ -74,7 +75,7 @@ class BuildFile(object):
 
     def calc_exclude_roots(root_dir, excludes):
       """Return a map of root directories to subdirectory names suitable for a quick evaluation
-      inside os.walk()
+      inside safe_walk()
       """
       result = defaultdict(set)
       for exclude in excludes:
@@ -100,7 +101,7 @@ class BuildFile(object):
     else:
       exclude_roots = calc_exclude_roots(root_dir, spec_excludes)
 
-    for root, dirs, files in os.walk(os.path.join(root_dir, base_path or ''), topdown=True):
+    for root, dirs, files in safe_walk(os.path.join(root_dir, base_path or ''), topdown=True):
       to_remove = find_excluded(root, dirs, exclude_roots)
       for subdir in to_remove:
         dirs.remove(subdir)

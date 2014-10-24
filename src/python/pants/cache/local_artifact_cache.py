@@ -79,4 +79,4 @@ class LocalArtifactCache(ArtifactCache):
     # Note: it's important to use the id as well as the hash, because two different targets
     # may have the same hash if both have no sources, but we may still want to differentiate them.
     return os.path.join(self._cache_root, cache_key.id, cache_key.hash) + \
-           '.tar.gz' if self._compress else '.tar'
+           ('.tar.gz' if self._compress else '.tar')

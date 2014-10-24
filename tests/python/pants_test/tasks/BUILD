@@ -693,7 +693,7 @@ python_tests(
     'src/python/pants/backend/core/tasks:check_exclusives',
     'src/python/pants/backend/jvm/tasks:jvm_task',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test:base_test',
+    'tests/python/pants_test:task_test_base',
   ]
 )
 
@@ -704,7 +704,7 @@ python_tests(
     'src/python/pants/backend/core/tasks:check_exclusives',
     'src/python/pants/backend/jvm/tasks:jvmdoc_gen',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test:base_test',
+    'tests/python/pants_test:task_test_base',
   ]
 )
 
