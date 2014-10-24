@@ -12,6 +12,7 @@ from twitter.common.collections import OrderedDict, OrderedSet, maybe_list
 
 from pants.backend.codegen.targets.java_wire_library import JavaWireLibrary
 from pants.backend.codegen.tasks.code_gen import CodeGen
+from pants.backend.codegen.tasks.protobuf_gen import check_duplicate_conflicting_protos
 from pants.backend.codegen.tasks.protobuf_parse import ProtobufParse
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
@@ -75,7 +76,7 @@ class WireGen(CodeGen, JvmToolTaskMixin):
     sources_by_base = self._calculate_sources(targets)
     sources = reduce(lambda a, b: a ^ b, sources_by_base.values(), OrderedSet())
 
-    self.check_duplicate_conflicting_protos(sources_by_base, sources)
+    check_duplicate_conflicting_protos(sources_by_base, sources, self.context)
 
     if lang != 'java':
       raise TaskError('Unrecognized wire gen lang: %s' % lang)
@@ -116,7 +117,7 @@ class WireGen(CodeGen, JvmToolTaskMixin):
     genfiles = []
     for source in target.sources_relative_to_source_root():
       path = os.path.join(target.target_base, source)
-      genfiles.extend(self.calculate_genfiles(path, source).get('java', []))
+      genfiles.extend(calculate_genfiles(path, source).get('java', []))
 
     spec_path = os.path.relpath(self.java_out, get_buildroot())
     address = SyntheticAddress(spec_path, target.id)
@@ -141,19 +142,19 @@ class WireGen(CodeGen, JvmToolTaskMixin):
     return tgt
 
 
-  def calculate_genfiles(self, path, source):
-    protobuf_parse = ProtobufParse('wire', path, source)
-    protobuf_parse.parse()
+def calculate_genfiles(path, source):
+  protobuf_parse = ProtobufParse('wire', path, source)
+  protobuf_parse.parse()
 
-    genfiles = defaultdict(set)
-    genfiles['java'].update(self.calculate_java_genfiles(protobuf_parse.package, protobuf_parse.types))
-    return genfiles
+  genfiles = defaultdict(set)
+  genfiles['java'].update(calculate_java_genfiles(protobuf_parse.package, protobuf_parse.types))
+  return genfiles
 
-  def calculate_java_genfiles(self, package, types):
-    basepath = package.replace('.', '/')
+def calculate_java_genfiles(package, types):
+  basepath = package.replace('.', '/')
 
-    def path(name):
-      return os.path.join(basepath, '%s.java' % name)
+  def path(name):
+    return os.path.join(basepath, '%s.java' % name)
 
-    for type_ in types:
-      yield path(type_)
+  for type_ in types:
+    yield path(type_)

@@ -147,7 +147,7 @@ class ProtobufGen(CodeGen):
     bases = OrderedSet(sources_by_base.keys())
     bases.update(self._proto_path_imports(targets))
 
-    self.check_duplicate_conflicting_protos(sources_by_base, sources)
+    check_duplicate_conflicting_protos(sources_by_base, sources, self.context)
 
     if lang == 'java':
       output_dir = self.java_out
@@ -205,7 +205,7 @@ class ProtobufGen(CodeGen):
     genfiles = []
     for source in target.sources_relative_to_source_root():
       path = os.path.join(target.target_base, source)
-      genfiles.extend(self.calculate_genfiles(path, source).get('java', []))
+      genfiles.extend(calculate_genfiles(path, source).get('java', []))
     spec_path = os.path.relpath(self.java_out, get_buildroot())
     address = SyntheticAddress(spec_path, target.id)
     deps = OrderedSet(self.javadeps)
@@ -233,7 +233,7 @@ class ProtobufGen(CodeGen):
     genfiles = []
     for source in target.sources_relative_to_source_root():
       path = os.path.join(target.target_base, source)
-      genfiles.extend(self.calculate_genfiles(path, source).get('py', []))
+      genfiles.extend(calculate_genfiles(path, source).get('py', []))
     spec_path = os.path.relpath(self.py_out, get_buildroot())
     address = SyntheticAddress(spec_path, target.id)
     tgt = self.context.add_new_target(address,
@@ -247,26 +247,65 @@ class ProtobufGen(CodeGen):
     return tgt
 
 
-  def calculate_genfiles(self, path, source):
-    protobuf_parse = ProtobufParse('protoc', path, source)
-    protobuf_parse.parse()
+def calculate_genfiles(path, source):
+  protobuf_parse = ProtobufParse('protoc', path, source)
+  protobuf_parse.parse()
 
-    genfiles = defaultdict(set)
-    genfiles['py'].update(self.calculate_python_genfiles(source))
-    genfiles['java'].update(self.calculate_java_genfiles(protobuf_parse.package,
-                                                    protobuf_parse.outer_class_name,
-                                                    protobuf_parse.types))
-    return genfiles
+  genfiles = defaultdict(set)
+  genfiles['py'].update(calculate_python_genfiles(source))
+  genfiles['java'].update(calculate_java_genfiles(protobuf_parse.package,
+                                                  protobuf_parse.outer_class_name,
+                                                  protobuf_parse.types))
+  return genfiles
 
-  def calculate_python_genfiles(self, source):
-    yield re.sub(r'\.proto$', '_pb2.py', source)
+def calculate_python_genfiles(source):
+  yield re.sub(r'\.proto$', '_pb2.py', source)
 
-  def calculate_java_genfiles(self, package, outer_class_name, types):
-    basepath = package.replace('.', '/')
+def calculate_java_genfiles(package, outer_class_name, types):
+  basepath = package.replace('.', '/')
 
-    def path(name):
-      return os.path.join(basepath, '%s.java' % name)
+  def path(name):
+    return os.path.join(basepath, '%s.java' % name)
 
-    yield path(outer_class_name)
-    for type_ in types:
-      yield path(type_)
+  yield path(outer_class_name)
+  for type_ in types:
+    yield path(type_)
+
+
+def _same_contents(a, b):
+  with open(a, 'r') as f:
+    a_data = f.read()
+  with open(b, 'r') as f:
+    b_data = f.read()
+  return a_data == b_data
+
+def check_duplicate_conflicting_protos(sources_by_base, sources, context):
+  sources_by_genfile = {}
+  for base in sources_by_base.keys(): # Need to iterate over /original/ bases.
+    for path in sources_by_base[base]:
+      if not path in sources:
+        continue # Check to make sure we haven't already removed it.
+      source = path[len(base):]
+
+      genfiles = calculate_genfiles(path, source)
+      for key in genfiles.keys():
+        for genfile in genfiles[key]:
+          if genfile in sources_by_genfile:
+            # Possible conflict!
+            prev = sources_by_genfile[genfile]
+            if not prev in sources:
+              # Must have been culled by an earlier pass.
+              continue
+            if not _same_contents(path, prev):
+              context.log.error('Proto conflict detected (.proto files are different):')
+              context.log.error('  1: {prev}'.format(prev=prev))
+              context.log.error('  2: {curr}'.format(curr=path))
+            else:
+              context.log.warn('Proto duplication detected (.proto files are identical):')
+              context.log.warn('  1: {prev}'.format(prev=prev))
+              context.log.warn('  2: {curr}'.format(curr=path))
+            context.log.warn('  Arbitrarily favoring proto 1.')
+            if path in sources:
+              sources.remove(path) # Favor the first version.
+            continue
+          sources_by_genfile[genfile] = path

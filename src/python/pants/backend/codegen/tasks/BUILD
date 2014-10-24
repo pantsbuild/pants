@@ -93,6 +93,7 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.log',
     ':code_gen',
     ':common',
+    ':protobuf_parse',
     'src/python/pants/backend/codegen/targets:java',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/python/targets:python',

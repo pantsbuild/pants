@@ -60,6 +60,7 @@ python_test_suite(
     ':markdown_to_html',
     ':minimal_cover',
     ':protobuf_gen',
+    ':protobuf_parse',
     ':ragel_gen',
     ':reflect',
     ':roots',
@@ -67,6 +68,7 @@ python_test_suite(
     ':sorttargets',
     ':targets_help',
     ':what_changed',
+    ':wire_gen',
     'tests/python/pants_test/tasks/jvm_compile/scala'
   ],
 )
@@ -88,6 +90,7 @@ python_test_suite(
     ':protobuf_integration',
     ':scala_repl_integration',
     ':thrift_linter_integration',
+    ':wire_integration',
     'tests/python/pants_test/tasks/jvm_compile/java',
   ],
 )
@@ -556,6 +559,35 @@ python_tests(
     'tests/python/pants_test:int-test',
   ],
 )
+
+python_tests(
+  name = 'protobuf_parse',
+  sources = ['test_protobuf_parse.py'],
+  dependencies = [
+    ':base',
+    'src/python/pants/backend/codegen/tasks:protobuf_parse',
+    'src/python/pants/util:contextutil',
+  ],
+)
+
+python_tests(
+  name = 'wire_gen',
+  sources = ['test_wire_gen.py'],
+  dependencies = [
+    ':base',
+    'src/python/pants/backend/codegen/tasks:wire_gen',
+    'src/python/pants/util:contextutil',
+  ],
+)
+
+python_tests(
+  name = 'wire_integration',
+  sources = ['test_wire_integration.py'],
+  dependencies = [
+    'tests/python/pants_test:int-test',
+  ],
+)
+
 
 python_tests(
   name = 'jaxb_gen',
