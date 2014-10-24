@@ -200,6 +200,8 @@ transformed into:
 And as a result, both jars will now be brought into the target's
 classpath.
 
+<a xmark="test_3rdparty_jvm_snapshot"> </a>
+
 Using a SNAPSHOT JVM Dependency
 -------------------------------
 

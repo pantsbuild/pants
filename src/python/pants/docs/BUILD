@@ -34,6 +34,8 @@ page(
   dependencies=[
     ':docs',
     ':howto_ask',
+    ':howto_develop',
+    ':internals',
   ]
 )
 
@@ -49,6 +51,8 @@ page(
   name='howto_develop',
   source='howto_develop.md',
   dependencies=[
+    ':howto_contribute',
+    'src/docs:first_tutorial',
   ]
 )
 

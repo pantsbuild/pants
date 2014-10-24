@@ -93,6 +93,7 @@
           "children": [
             { "page": "howto_contribute" },
             { "page": "howto_ask" },
+            { "page": "howto_develop" },
             { "page": "dev_tasks",
               "children": [
                 { "page": "dev_tasks_publish_extras" }
