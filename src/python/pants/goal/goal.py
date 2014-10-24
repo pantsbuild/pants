@@ -128,6 +128,8 @@ class _Goal(object):
     subclass_name = b'{0}_{1}'.format(task_registrar.task_type.__name__,
                                       options_scope.replace('.', '_').replace('-', '_'))
     task_type = type(subclass_name, (task_registrar.task_type,), {'options_scope': options_scope})
+    if replace:
+      self._task_type_by_name = {}
     self._task_type_by_name[task_name] = task_type
 
     otn = self._ordered_task_names
