@@ -81,9 +81,11 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
     self.context.log.debug('Linting %s' % path)
 
     classpath = self.tool_classpath(self._bootstrap_key)
-    args = [path, '--verbose']
+    config_args = self.context.config.getlist('thrift-linter', 'linter_args', default=[])
     if not self.is_strict(target):
-      args.append('--ignore-errors')
+      config_args.append('--ignore-errors')
+
+    args = config_args + [path]
 
     # If runjava returns non-zero, this marks the workunit as a
     # FAILURE, and there is no way to wrap this here.
