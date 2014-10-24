@@ -1,9 +1,5 @@
 Publishing Artifacts
 ====================
-<!--
-  Converted from src/python/pants/docs/publish.rst 2014/10/16
-  TODO(lahosken): before new doc system "goes live", freshen this as needed.
--->
 
 A library owner/maintainer can *publish* versioned artifacts that folks
 elsewhere can fetch and import. In the JVM world, these are jars (with
@@ -14,8 +10,7 @@ This page talks about publishing artifacts. We assume you already know
 enough about Pants to *build* the library that underlies an artifact. To
 *use* an artifact that has already been published from some other source
 tree, see
-<!-- TODO(lahosken) proper link -->
-[Third-Party Dependencies](http://pantsbuild.github.io/3rdparty.html)
+[[Third-Party Dependencies|pants('src/docs:3rdparty')]].
 (To use a artifact that has been published from
 *your own* source tree... don't do that. Instead, depend on the
 `*_library` build target.)
@@ -135,9 +130,8 @@ Restricting to "Release Branch"
 Your organization might have a notion of a special "release branch": you
 want all publishing to happen on this source control branch, which you
 maintain extra-carefully. You can
-<!-- TODO(lahosken) proper link , look out for underscore hyphen switcheroo -->
-[configure your repo](http://pantsbuild.github.io/setup_repo.html#setup-publish-restrict-branch) so the
-`publish` goal only allows `publish`-ing from this special branch.
+<a xref="setup_publish_restrict_branch">configure your repo so that the
+`publish` goal only allows `publish`-ing from this special branch</a>.
 
 Authenticating to the Artifact Repository
 -----------------------------------------
@@ -293,8 +287,7 @@ coordinates from the target's `provides` parameter. Thus, if you try to
 publish a target that has no `provides`, Pants doesn't try. If the
 target depends on *other* targets that *do* provide artifacts, Pants
 might publish those. This is a case of
-<!-- TODO(lahosken) proper link, beware of underscore/hyphen switcheroo -->
-[goal-target mismatch](http://pantsbuild.github.io/first_tutorial.html#tut-goal-target-mismatch)
+<a xref="tut_goal_target_mismatch">goal-target mismatch</a>
 To fix this, set `provides` correctly.
 
 Want to Publish Something? Publish Many Things
@@ -354,7 +347,6 @@ Setting Up Your Workspace
 -------------------------
 
 To get Pants publish working in the first place, someone needs to
-<!-- TODO(lahosken) proper link, watch out for underscore hyphen switcheroo -->
-[configure your codebase](http://pantsbuild.github.io/setup_repo.html#setup-publish) to register one or more
+<a xref="setup_publish">configure your codebase</a>
+to register one or more
 artifact repositories and, optionally, enable some features.
-

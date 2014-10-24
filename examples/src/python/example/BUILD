@@ -3,6 +3,7 @@ page(
   source='readme.md',
   dependencies=[
     ':python_old',
+    'src/docs:first_concepts',
   ]
 )
 
@@ -19,5 +20,9 @@ page(
 
 page(
   name='python_old',
-  source='python_old.md'
+  source='python_old.md',
+  dependencies=[
+    'src/docs:first_concepts',
+    'src/docs:install',
+  ]
 )

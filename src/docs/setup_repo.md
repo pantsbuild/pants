@@ -168,6 +168,8 @@ If you don't want to make this test definition available to the public
 BUILD.foo file and hold back this file when mirroring for the public
 repository.
 
+<a xmark="setup_publish"></a>
+
 Enabling Pants Publish
 ----------------------
 
@@ -220,6 +222,8 @@ contain a section for each Repository:
         # 'help': 'Configure your ~/.netrc for artifactory access.
       },
     }
+
+<a xmark="setup_publish_restrict_branch"> </a>
 
 ### Restricting Publish to "Release Branch"
 

@@ -9,12 +9,15 @@ page(
 
 page(
   name='announce_201409',
-  source='announce_201409.md'
+  source='announce_201409.md',
 )
 
 page(
   name='build_files',
-  source='build_files.md'
+  source='build_files.md',
+  dependencies=[
+    ':first_tutorial',
+  ]
 )
 
 page(
@@ -45,8 +48,14 @@ page(
     ':first_concepts',
     ':first_tutorial',
     ':install',
+    ':invoking',
     ':publish',
     ':setup_repo',
+    ':target_addresses',
+    ':tshoot',
+    ':with_emacs',
+    ':with_intellij',
+    'examples/src/java/com/pants/examples:page',
     'examples/src/java/com/pants/examples:readme',
     'examples/src/python/example:readme',
     'examples/src/thrift/com/pants/examples:readme',
@@ -58,17 +67,24 @@ page(
   source='invoking.md',
   dependencies=[
     ':first_tutorial',
+    ':target_addresses',
   ]
 )
 
 page(
   name='install',
   source='install.md',
+  dependencies=[
+    ':setup_repo',
+  ]
 )
 
 page(
   name='publish',
-  source='publish.md'
+  source='publish.md',
+  dependencies=[
+    ':3rdparty',
+  ]
 )
 
 page(

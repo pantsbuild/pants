@@ -10,24 +10,22 @@ Getting started using Pants
 
 Tutorials and basic concepts. How to use Pants to build things. How to
 configure build-able things in BUILD files.
-<!-- TODO(lahosken) proper link for some things below -->
 
 + [[Pants Conceptual Overview|pants('src/docs:first_concepts')]]
 + [[First Tutorial|pants('src/docs:first_tutorial')]]
-+ <a href="target_addresses.html">Target Addresses</a>
++ [[Target Addresses|pants('src/docs:target_addresses')]]
 + [[JVM Projects|pants('examples/src/java/com/pants/examples:readme')]]
 + [[Python Projects|pants('examples/src/python/example:readme')]]
-+ <a href="page.html">README Files and Markdown</a>
++ [[README Files and Markdown|pants('examples/src/java/com/pants/examples:page')]]
 + [[Pants Conceptual Overview|pants('src/docs:build_files')]]
-+ <a href="invoking.html">Invoking Pants Build</a>
-+ <a href="tshoot.html">Troubleshooting</a>
++ [[Invoking Pants Build|pants('src/docs:invoking')]]
++ [[Troubleshooting|pants('src/docs:tshoot')]]
 
 Troubleshooting
 ---------------
 
 +   Something that usually works just failed? See
-    <!-- TODO(lahosken) proper link -->
-    <a href="tshoot.html">Troubleshooting</a>.
+    [[Troubleshooting|pants('src/docs:tshoot')]]
 +   Publishing can fail in more ways. See
     [[Publishing Artifacts|pants('src/docs:publish')]].
 
@@ -43,8 +41,8 @@ Common Pants build idioms.
 Using Pants With...
 -------------------
 
-+ <a href="with_emacs.html">Emacs and Ensime</a>
-+ <a href="with_intellij.html">IntelliJ IDEA</a>
++ [[Emacs and Ensime|pants('src/docs:with_emacs')]]
++ [[IntelliJ IDEA|pants('src/docs:with_intellij')]]
 
 News
 ----
@@ -55,7 +53,7 @@ News
 Advanced Documentation
 ----------------------
 
-+ <a href="setup_repo.html">Set up your Source Tree for Pants</a>
++ [[Set up your Source Tree for Pants|pants('src/docs:announce_201409')]]
 + [[Installing Pants|pants('src/docs:install')]]
 
 Pants Reference Documentation

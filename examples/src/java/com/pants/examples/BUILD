@@ -2,7 +2,11 @@ page(
   name='readme',
   source='readme.md',
   dependencies=[
+    ':3rdparty_jvm',
+    ':from_maven',
     'src/docs:publish',
+    'src/docs:first_concepts',
+    'src/docs:first_tutorial',
   ]
 )
 

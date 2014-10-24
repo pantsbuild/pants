@@ -10,8 +10,7 @@ like:
     $ ./pants goal test bundle path/to/target path/to/another/target
 
 For a full description of specifying target addresses, see
-<!-- TODO(lahosken)  proper link -->
-<a href="target_addresses.html">Target Addresses</a>.
+[[Target Addresses|pants('src/docs:target_addresses')]].
 
 rc files
 --------

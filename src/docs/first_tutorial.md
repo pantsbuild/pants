@@ -123,6 +123,8 @@ In this example, it doesn't make sense to run library code as a test, so
 Pants doesn't do that. Since pants knows that the `test` goal depends on
 the `compile` goal, it *does* compile the library.
 
+<a xmark="tut_goal_target_mismatch"></a>
+
 *Goal-Target Mismatch*
 
 One tricky side effect of this is accidental *goal-target mismatch*: You

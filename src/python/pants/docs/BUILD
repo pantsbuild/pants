@@ -56,7 +56,8 @@ page(
   name='howto_customize',
   source='howto_customize.md',
   dependencies=[
-    ':howto_contribute'
+    ':howto_contribute',
+    ':howto_plugin'
   ]
 )
 
@@ -81,7 +82,9 @@ page(
 page(
   name='intellij',
   source='intellij.md',
-)
+  dependencies=[
+    'src/docs:with_intellij',
+  ])
 
 page(
   name='internals',
