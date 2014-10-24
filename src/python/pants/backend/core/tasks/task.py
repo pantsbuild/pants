@@ -149,8 +149,10 @@ class TaskBase(AbstractClass):
   def _create_artifact_cache(self, spec, action):
     if len(spec) > 0:
       pants_workdir = self.context.config.getdefault('pants_workdir')
+      compression = self.context.config.getint('cache', 'compression', default=5)
       my_name = self.__class__.__name__
-      return create_artifact_cache(self.context.log, pants_workdir, spec, my_name, action)
+      return create_artifact_cache(self.context.log, pants_workdir, spec,
+                                   my_name, compression, action)
     else:
       return None
 

@@ -72,7 +72,8 @@ class TestArtifactCache(unittest.TestCase):
     artifact_root = '/bogus/artifact/root'
 
     def check(expected_type, spec):
-      cache = create_artifact_cache(MockLogger(), artifact_root, spec, 'TestTask', 'testing')
+      cache = create_artifact_cache(MockLogger(), artifact_root, spec,
+                                    'TestTask', compression=1, action='testing')
       self.assertTrue(isinstance(cache, expected_type))
       self.assertEquals(cache.artifact_root, artifact_root)
 
@@ -86,7 +87,7 @@ class TestArtifactCache(unittest.TestCase):
   def test_local_cache(self):
     with temporary_dir() as artifact_root:
       with temporary_dir() as cache_root:
-        artifact_cache = LocalArtifactCache(None, artifact_root, cache_root)
+        artifact_cache = LocalArtifactCache(MockLogger(), artifact_root, cache_root, compression=0)
         self.do_test_artifact_cache(artifact_cache)
 
   def test_restful_cache(self):
@@ -101,7 +102,8 @@ class TestArtifactCache(unittest.TestCase):
           httpd_thread.start()
           with temporary_dir() as artifact_root:
             artifact_cache = RESTfulArtifactCache(MockLogger(), artifact_root,
-                                                  'http://localhost:%d' % port)
+                                                  'http://localhost:{0}'.format(port),
+                                                  compression=1)
             self.do_test_artifact_cache(artifact_cache)
     finally:
       if httpd:
@@ -153,8 +155,10 @@ class TestArtifactCache(unittest.TestCase):
             httpd_thread = Thread(target=httpd.serve_forever)
             httpd_thread.start()
             with temporary_dir() as artifact_root:
-              local = LocalArtifactCache(None, artifact_root, cache_root)
-              remote = RESTfulArtifactCache(MockLogger(), artifact_root, 'http://localhost:%d' % port)
+              local = LocalArtifactCache(None, artifact_root, cache_root, compression=1)
+              remote = RESTfulArtifactCache(MockLogger(), artifact_root,
+                                            'http://localhost:{0}'.format(port),
+                                            compression=1)
               combined = CombinedArtifactCache([local, remote])
 
               key = CacheKey('muppet_key', 'fake_hash', 42)
