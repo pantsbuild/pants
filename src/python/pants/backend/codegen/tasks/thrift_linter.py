@@ -64,7 +64,7 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
     # "merged" view, into which there's no opportunity to inject an override from the BUILD target.
 
     # The strict value is read from the following, in order:
-    # 1. command line, --[no-]strict
+    # 1. command line, --[no-]thrift-linter-strict
     # 2. java_thrift_library target in BUILD file, thrift_linter_strict = False,
     # 3. pants.ini, [scrooge-linter] section, strict field.
     # 4. default = False
