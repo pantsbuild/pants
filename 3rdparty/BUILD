@@ -35,13 +35,6 @@ jar_library(name='commons-lang',
             ]
            )
 
-
-jar_library(name='cucumber-java',
-            jars=[
-              jar(org='info.cukes', name='cucumber-java', rev='1.1.7'),
-            ],
-)
-
 # common rev for all com.twitter%finagle* artifacts
 FINAGLE_REV = '6.8.1'
 
@@ -100,12 +93,6 @@ jar_library(name='protobuf-java',
               ':protobuf-2.4.1'
             ])
 
-jar_library(name='protobuf-test-import',
-  jars = [
-    jar(org='com.squareup.testing.protolib', name='protolib-test', rev='1.0.1'),
-  ],
-)
-
 jar_library(name='scala-compiler',
             jars = [
               jar(org='org.scala-lang', name='scala-compiler', rev='2.9.3').with_sources()
@@ -125,11 +112,6 @@ jar_library(name='scrooge-core',
             ]
           )
 
-jar_library(name='shapeless',
-            jars=[
-              jar(org='com.chuusai', name='shapeless_2.9.2', rev='1.2.4'),
-            ],
-)
 
 jar_library(name='slf4j-api',
             jars = [

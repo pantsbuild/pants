@@ -4,7 +4,7 @@
 java_protobuf_library(name='imports',
   sources=['test_imports.proto',],
   imports=[
-    '3rdparty:protobuf-test-import',
+    'examples/3rdparty:protobuf-test-import',
     ':jars',
   ],
 )

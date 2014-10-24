@@ -3,5 +3,5 @@
 
 java_protobuf_library(name='a',
   sources=['testproto1.proto', 'testproto2.proto',],
-  imports=['3rdparty:protobuf-test-import',],
+  imports=['examples/3rdparty:protobuf-test-import',],
 )

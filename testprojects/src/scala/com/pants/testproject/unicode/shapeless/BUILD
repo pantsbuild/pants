@@ -4,6 +4,6 @@
 scala_library(name='shapeless',
   sources=globs('*.scala'),
   dependencies = [
-    '3rdparty:shapeless',
+    'testprojects/3rdparty:shapeless',
   ],
 )
