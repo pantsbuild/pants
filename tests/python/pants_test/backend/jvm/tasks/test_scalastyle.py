@@ -27,10 +27,14 @@ class ScalastyleTest(NailgunTaskTestBase):
   #
 
   def _with_skip_option(self):
-    return dict(scalastyle_skip=True)
+    return {
+      self.options_scope: { 'skip': True }
+    }
 
   def _with_no_skip_option(self):
-    return dict(scalastyle_skip=False)
+    return {
+      self.options_scope: { 'skip': False }
+    }
 
   def _create_scalastyle_config_file(self, rules=None):
     # put a default rule there if rules are not specified.
@@ -64,14 +68,14 @@ class ScalastyleTest(NailgunTaskTestBase):
         config: {config}
         excludes:
       '''.format(config=self._create_scalastyle_config_file())),
-      options=options or self._with_no_skip_option())
+      new_options=options or self._with_no_skip_option())
 
   def _create_scalastyle_task(self, config=None, options=None):
-    return Scalastyle(self._create_context(config, options), self.build_root)
+    return self.create_task(self._create_context(config, options), self.build_root)
 
   def _create_scalastyle_task_from_context(self, context=None):
     if context:
-      return Scalastyle(context, self.build_root)
+      return self.create_task(context, self.build_root)
     else:
       return self._create_scalastyle_task()
 
