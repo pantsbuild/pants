@@ -33,7 +33,7 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
                             dest='thrift_linter_strict',
                             default=None,
                             action='callback', callback=mkflag.set_bool,
-                            help='[%default] Fail the goal if thrift errors are found.')
+                            help='[%default] Fail the goal if thrift linter errors are found.')
 
   @classmethod
   def product_types(cls):
@@ -86,9 +86,11 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
     self.context.log.debug('Linting %s' % path)
 
     classpath = self.tool_classpath(self._bootstrap_key)
-    args = [path, '--verbose']
+    config_args = self.context.config.getlist(self._CONFIG_SECTION, 'linter_args', default=[])
     if not self.is_strict(target):
-      args.append('--ignore-errors')
+      config_args.append('--ignore-errors')
+
+    args = config_args + [path]
 
     # If runjava returns non-zero, this marks the workunit as a
     # FAILURE, and there is no way to wrap this here.
