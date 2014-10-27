@@ -5,6 +5,8 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from collections import namedtuple
+import os
 import subprocess
 
 from pants.backend.core.tasks.task import Task
@@ -13,6 +15,7 @@ from pants.base.workunit import WorkUnit
 from pants.goal.products import MultipleRootedProducts
 from pants.util.dirutil import safe_mkdir
 
+
 class RunPrepCommand(Task):
   def __init__(self, *args, **kwargs):
     super(RunPrepCommand, self).__init__(*args, **kwargs)
@@ -20,13 +23,14 @@ class RunPrepCommand(Task):
 
   def execute(self):
     targets = self.context.targets(postorder=True)
-
+    Cmdline = namedtuple('Cmdline', ['cmdline', 'environ'])
     def make_cmdline(target):
       executable = target.payload.get_field_value('prep_command_executable')
       args = target.payload.get_field_value('prep_command_args', [])
+      prep_environ = target.payload.get_field_value('prep_environ')
       cmdline = [executable]
       cmdline.extend(args)
-      return tuple(cmdline)
+      return Cmdline(cmdline=tuple(cmdline), environ=prep_environ)
 
     def has_prep(target):
       return target.payload.get_field_value('prep_command_executable')
@@ -38,18 +42,30 @@ class RunPrepCommand(Task):
 
     with self.context.new_workunit(name='prep_command', labels=[WorkUnit.PREP]) as workunit:
       completed_cmdlines = set()
-      for cmdline in cmdlines:
+      for item in cmdlines:
+        cmdline = item.cmdline
+        environ = item.environ
         if not cmdline in completed_cmdlines:
           completed_cmdlines.add(cmdline)
-          stdout = workunit.output('stdout') if workunit else None
           stderr = workunit.output('stderr') if workunit else None
           try:
-            process = subprocess.Popen(cmdline, stdout=stdout, stderr=stderr)
+            process = subprocess.Popen(cmdline, stdout=subprocess.PIPE, stderr=stderr)
           except OSError as e:
             workunit.set_outcome(WorkUnit.FAILURE)
-            raise TaskError("RunPrepCommand failed to execute {cmdline}: {error}".format(
+            raise TaskError('RunPrepCommand failed to execute {cmdline}: {error}'.format(
               cmdline=cmdline, error=e))
-          process.communicate()
+          stdout, _ = process.communicate()
+
+          if environ:
+            if not process.returncode:
+              environment_vars = stdout.split('\0')
+              for kvpair in environment_vars:
+                var, value = kvpair.split('=',1)
+                os.environ[var] = value
+          else:
+            if workunit:
+              workunit.output('stdout').write(stdout)
+
           workunit.set_outcome(WorkUnit.FAILURE if process.returncode else WorkUnit.SUCCESS)
           if process.returncode:
-            raise TaskError("RunPrepCommand failed to run {cmdline}".format(cmdline=cmdline))
+            raise TaskError('RunPrepCommand failed to run {cmdline}'.format(cmdline=cmdline))
