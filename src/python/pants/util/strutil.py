@@ -18,6 +18,15 @@ def ensure_binary(text_or_binary):
     raise TypeError('Argument is neither text nor binary type.')
 
 
+def ensure_text(text_or_binary):
+  if isinstance(text_or_binary, six.binary_type):
+    return text_or_binary.decode('utf-8')
+  elif isinstance(text_or_binary, six.text_type):
+    return text_or_binary
+  else:
+    raise TypeError('Argument is neither text nor binary type.')
+
+
 def safe_shlex_split(text_or_binary):
   """Split a string using shell-like syntax.
 

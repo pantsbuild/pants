@@ -6,6 +6,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 from collections import defaultdict
+import logging
 import os
 import shutil
 import sys
@@ -19,6 +20,7 @@ from twitter.common.collections import OrderedSet
 from pants.backend.codegen.targets.python_antlr_library import PythonAntlrLibrary
 from pants.backend.codegen.targets.python_thrift_library import PythonThriftLibrary
 from pants.backend.core.targets.dependencies import Dependencies
+from pants.backend.core.targets.prep_command import PrepCommand
 from pants.backend.python.antlr_builder import PythonAntlrBuilder
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.python_setup import PythonSetup
@@ -34,8 +36,11 @@ from pants.base.config import Config
 from pants.util.dirutil import safe_mkdir, safe_rmtree
 
 
+logger = logging.getLogger(__name__)
+
 class PythonChroot(object):
   _VALID_DEPENDENCIES = {
+    PrepCommand: 'prep',
     PythonLibrary: 'libraries',
     PythonRequirementLibrary: 'reqs',
     PythonBinary: 'binaries',
@@ -102,12 +107,25 @@ class PythonChroot(object):
 
     self.debug('  Dumping library: %s' % library)
     for relpath in library.sources_relative_to_source_root():
-      copy_to_chroot(library.target_base, relpath, self._builder.add_source)
+      try:
+        copy_to_chroot(library.target_base, relpath, self._builder.add_source)
+      except OSError as e:
+        logger.error("Failed to copy {path} for library {library}"
+                     .format(path=os.path.join(library.target_base, relpath),
+                             library=library))
+        raise
 
     for resources_tgt in library.resources:
       for resource_file_from_source_root in resources_tgt.sources_relative_to_source_root():
-        copy_to_chroot(resources_tgt.target_base, resource_file_from_source_root,
-                       self._builder.add_resource)
+        try:
+          copy_to_chroot(resources_tgt.target_base, resource_file_from_source_root,
+                         self._builder.add_resource)
+        except OSError as e:
+          logger.error("Failed to copy {path} for resource {resource}"
+                       .format(path=os.path.join(resources_tgt.target_base,
+                                                 resource_file_from_source_root),
+                               resource=resources_tgt.address.spec))
+          raise
 
   def _dump_requirement(self, req, dynamic, repo):
     self.debug('  Dumping requirement: %s%s%s' % (str(req),

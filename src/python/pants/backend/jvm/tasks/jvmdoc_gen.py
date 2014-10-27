@@ -15,14 +15,10 @@ import subprocess
 from pants import binary_util
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.base.exceptions import TaskError
-from pants.util.dirutil import safe_mkdir
+from pants.util.dirutil import safe_mkdir, safe_walk
 
 
 Jvmdoc = collections.namedtuple('Jvmdoc', ['tool_name', 'product_type'])
-
-ParserConfig = collections.namedtuple('JvmdocGenParserConfig',
-                                      ['include_codegen_opt', 'transitive_opt', 'open_opt',
-                                       'combined_opt', 'ignore_failure_opt', 'skip_opt'])
 
 
 class JvmdocGen(JvmTask):
@@ -36,76 +32,40 @@ class JvmdocGen(JvmTask):
     return [cls.jvmdoc().product_type]
 
   @classmethod
-  def setup_parser_config(cls):
-    return ParserConfig(*['%s_%s' % (cls.__name__, opt) for opt in ParserConfig._fields])
-
-  @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    parser_config = cls.setup_parser_config()
+  def register_options(cls, register):
+    super(JvmdocGen, cls).register_options(register)
     tool_name = cls.jvmdoc().tool_name
 
-    option_group.add_option(
-      mkflag('include-codegen'),
-      mkflag('include-codegen', negate=True),
-      dest=parser_config.include_codegen_opt,
-      default=None,
-      action='callback',
-      callback=mkflag.set_bool,
-      help='[%%default] Create %s for generated code.' % tool_name)
+    register('--include-codegen', default=False, action='store_true',
+             legacy='{0}_include_codegen'.format(tool_name),
+             help='Create {0} for generated code.'.format(tool_name))
 
-    option_group.add_option(
-      mkflag('transitive'),
-      mkflag('transitive', negate=True),
-      dest=parser_config.transitive_opt,
-      default=True,
-      action='callback',
-      callback=mkflag.set_bool,
-      help='[%%default] Create %s for the transitive closure of internal '
-           'targets reachable from the roots specified on the command line.' % tool_name)
+    register('--transitive', default=True, action='store_true',
+             legacy='{0}_transitive'.format(tool_name),
+             help='Create {0} for the transitive closure of internal targets reachable from the '
+                  'roots specified on the command line.'.format(tool_name))
 
-    combined_flag = mkflag('combined')
-    option_group.add_option(
-      combined_flag,
-      mkflag('combined', negate=True),
-      dest=parser_config.combined_opt,
-      default=False,
-      action='callback',
-      callback=mkflag.set_bool,
-      help='[%%default] Generate %s for all targets combined instead of '
-           'each target individually.' % tool_name)
+    register('--combined', default=False, action='store_true',
+             legacy='{0}_combined'.format(tool_name),
+             help='Generate {0} for all targets combined, instead of each target '
+                  'individually.'.format(tool_name))
 
-    option_group.add_option(
-      mkflag('open'),
-      mkflag('open', negate=True),
-      dest=parser_config.open_opt,
-      default=False,
-      action='callback',
-      callback=mkflag.set_bool,
-      help='[%%default] Attempt to open the generated %s in a browser '
-           '(implies %s).' % (tool_name, combined_flag))
+    register('--open', default=False, action='store_true',
+             legacy='{0}_open'.format(tool_name),
+             help='Open the generated {0} in a browser (implies --combined).'.format(tool_name))
 
-    option_group.add_option(
-      mkflag('ignore-failure'),
-      mkflag('ignore-failure', negate=True),
-      dest=parser_config.ignore_failure_opt,
-      default=False,
-      action='callback',
-      callback=mkflag.set_bool,
-      help='Specifies that %s errors should not cause build errors' % tool_name)
+    register('--ignore-failure', default=False, action='store_true',
+             legacy='{0}_ignore_failure'.format(tool_name),
+             help='Do not consider {0} errors to be build errors.'.format(tool_name))
 
     # TODO(John Sirois): This supports the JarPublish task and is an abstraction leak.
     # It allows folks doing a local-publish to skip an expensive and un-needed step.
     # Remove this flag and instead support conditional requirements being registered against
     # the round manager.  This may require incremental or windowed flag parsing that happens bit by
     # bit as tasks are recursively prepared vs. the current all-at once style.
-    option_group.add_option(
-      mkflag('skip'),
-      mkflag('skip', negate=True),
-      dest=parser_config.skip_opt,
-      default=False,
-      action='callback',
-      callback=mkflag.set_bool,
-      help='[%%default] Can be used to skip %s generation' % tool_name)
+    register('--skip', default=False, action='store_true',
+             legacy='{0}_skip'.format(tool_name),
+             help='Skip {0} generation.'.format(tool_name))
 
   def __init__(self, *args, **kwargs):
     super(JvmdocGen, self).__init__(*args, **kwargs)
@@ -113,22 +73,14 @@ class JvmdocGen(JvmTask):
     jvmdoc_tool_name = self.jvmdoc().tool_name
 
     config_section = '%s-gen' % jvmdoc_tool_name
-    parser_config = self.setup_parser_config()
 
-    def getattr_options(option):
-      return getattr(self.context.options, option)
-
-    flagged_codegen = getattr_options(parser_config.include_codegen_opt)
-    self._include_codegen = (flagged_codegen if flagged_codegen is not None
-                             else self.context.config.getbool(config_section, 'include_codegen',
-                                                              default=False))
-
-    self.transitive = getattr_options(parser_config.transitive_opt)
-    self.confs = self.context.config.getlist(config_section, 'confs', default=['default'])
-    self.open = getattr_options(parser_config.open_opt)
-    self.combined = self.open or getattr_options(parser_config.combined_opt)
-    self.ignore_failure = getattr_options(parser_config.ignore_failure_opt)
-    self.skip = getattr_options(parser_config.skip_opt)
+    options = self.get_options()
+    self._include_codegen = options.include_codegen
+    self.transitive = options.transitive
+    self.open = options.open
+    self.combined = self.open or options.combined
+    self.ignore_failure = options.ignore_failure
+    self.skip = options.skip
 
   def prepare(self, round_manager):
     # TODO(John Sirois): this is a fake requirement in order to force compile run before this
@@ -183,7 +135,7 @@ class JvmdocGen(JvmTask):
       for target in targets:
         gendir = self._gendir(target)
         jvmdocs = []
-        for root, dirs, files in os.walk(gendir):
+        for root, dirs, files in safe_walk(gendir):
           jvmdocs.extend(os.path.relpath(os.path.join(root, f), gendir) for f in files)
         self.context.products.get(self.jvmdoc().product_type).add(target, gendir, jvmdocs)
 
@@ -232,6 +184,10 @@ class JvmdocGen(JvmTask):
             target, command = jobs[gendir]
             self._handle_create_jvmdoc_result([target], result, command)
         finally:
+          # In the event of an exception, we want to call terminate() because otherwise
+          # we get errors on exit when multiprocessing tries to do it, because what
+          # is dead may never die.
+          pool.terminate()
           self.context.log.debug("End multiprocessing section")
 
   def _handle_create_jvmdoc_result(self, targets, result, command):

@@ -14,17 +14,18 @@ from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.core.tasks.task import Task
 from pants.backend.jvm.ivy_utils import IvyModuleRef, IvyUtils
 from pants.util.contextutil import open_zip as open_jar
+from pants.util.dirutil import safe_mkdir
 
 
 class Provides(Task):
   @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    option_group.add_option(mkflag('transitive'), default=False,
-      action='store_true', dest='provides_transitive',
-      help='Shows the symbols provided not just by the specified targets but by all their transitive dependencies.')
-    option_group.add_option(mkflag('also-write-to-stdout'), default=False,
-      action='store_true', dest='provides_also_write_to_stdout',
-      help='If set, also outputs the provides information to stdout.')
+  def register_options(cls, register):
+    register('--transitive', default=False, action='store_true', legacy='provides_transitive',
+             help='Shows the symbols provided not just by the specified targets but by all their '
+                  'transitive dependencies.')
+    register('--also-write-to-stdout', default=False, action='store_true',
+             legacy='provides_also_write_to_stdout',
+             help='Also write the provides information to stdout.')
 
   def __init__(self, *args, **kwargs):
     super(Provides, self).__init__(*args, **kwargs)
@@ -33,8 +34,8 @@ class Provides(Task):
                               log=self.context.log)
     self.confs = self.context.config.getlist('ivy', 'confs', default=['default'])
     self.target_roots = self.context.target_roots
-    self.transitive = self.context.options.provides_transitive
-    self.also_write_to_stdout = self.context.options.provides_also_write_to_stdout or False
+    self.transitive = self.get_options().transitive
+    self.also_write_to_stdout = self.get_options().also_write_to_stdout
     # Create a fake target, in case we were run directly on a JarLibrary containing nothing but JarDependencies.
     # TODO(benjy): Get rid of this special-casing of jar dependencies.
     # TODO(pl): Is this necessary?  Now JarLibrary only contains a payload of JarDependency
@@ -45,7 +46,11 @@ class Provides(Task):
     #   configurations=self.confs)
     # self.context.products.require('jars')
 
+  def prepare(self, round_manager):
+    round_manager.require_data('jars')
+
   def execute(self):
+    safe_mkdir(self.workdir)
     targets = self.context.targets()
     for conf in self.confs:
       outpath = os.path.join(self.workdir, '%s.%s.provides' %
@@ -69,7 +74,7 @@ class Provides(Task):
               class_name = line[:-6].replace('/', '.')
               do_write(class_name)
               do_write('\n')
-      print('Wrote provides information to %s' % outpath)
+      self.context.log.info('Wrote provides information to %s' % outpath)
 
   def get_jar_paths(self, ivyinfo, target, conf):
     jar_paths = OrderedSet()
@@ -84,9 +89,9 @@ class Provides(Task):
     elif target.is_jvm:
       for basedir, jars in self.context.products.get('jars').get(target).items():
         jar_paths.update([os.path.join(basedir, jar) for jar in jars])
-      if self.transitive:
-        for dep in target.dependencies:
-          jar_paths.update(self.get_jar_paths(ivyinfo, dep, conf))
+    if self.transitive:
+      for dep in target.dependencies:
+        jar_paths.update(self.get_jar_paths(ivyinfo, dep, conf))
 
     return jar_paths
 

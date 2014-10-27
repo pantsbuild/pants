@@ -44,13 +44,6 @@ class Compiler(namedtuple('CompilerConfigWithContext', ('context',) + CompilerCo
     return args
 
   @property
-  def verbose(self):
-    if self.context.options.scrooge_gen_quiet is not None:
-      return not self.context.options.scrooge_gen_quiet
-    else:
-      return self.context.config.getbool(self.config_section, 'verbose', default=False)
-
-  @property
   def strict(self):
     return self.context.config.getbool(self.config_section, 'strict', default=False)
 
@@ -90,12 +83,10 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
       return os.path.join(self.compiler.name, output_style)
 
   @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    super(ScroogeGen, cls).setup_parser(option_group, args, mkflag)
-
-    option_group.add_option(mkflag('quiet'), dest='scrooge_gen_quiet',
-                            action='callback', callback=mkflag.set_bool, default=None,
-                            help='[%default] Suppress output, overrides verbose flag in pants.ini.')
+  def register_options(cls, register):
+    super(ScroogeGen, cls).register_options(register)
+    register('--verbose', default=False, action='store_true', help='Emit verbose output.',
+             legacy='scrooge_gen_quiet')
 
   @classmethod
   def product_types(cls):
@@ -207,7 +198,7 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
         if not compiler.strict:
           args.append('--disable-strict')
 
-        if compiler.verbose:
+        if self.get_options().verbose:
           args.append('--verbose')
 
         gen_file_map_path = os.path.relpath(self._tempname())

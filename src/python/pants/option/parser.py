@@ -191,9 +191,17 @@ class Parser(object):
 
   def _validate(self, args, kwargs):
     """Ensure that the caller isn't trying to use unsupported argparse features."""
+    for arg in args:
+      if not arg.startswith('-'):
+        raise RegistrationError('Option {0} in scope {1} must begin '
+                                'with a dash.'.format(arg, self._scope))
+      if not arg.startswith('--') and len(arg) > 2:
+        raise RegistrationError('Multicharacter option {0} in scope {1} must begin '
+                                'with a double-dash'.format(arg, self._scope))
     for k in ['nargs', 'required']:
       if k in kwargs:
-        raise RegistrationError('%s unsupported in registration of option %s.' % (k, args))
+        raise RegistrationError('{0} unsupported in registration of option {1} in '
+                                'scope {2}.'.format(k, args, self._scope))
 
   def _set_dest(self, args, kwargs, legacy_dest):
     """Maps the externally-used dest to a scoped one only seen internally.

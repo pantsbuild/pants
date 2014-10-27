@@ -55,7 +55,6 @@ python_library(
     ':common',
     ':jvm_task',
     'src/python/pants/java:util',
-    'src/python/pants/backend/jvm:jvm_debug_config',
     'src/python/pants/backend/jvm/tasks:jvm_tool_task_mixin',
   ],
 )
@@ -356,7 +355,6 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/base:workunit',
     'src/python/pants/java:util',
-    'src/python/pants/backend/jvm:jvm_debug_config',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/tasks:jvm_tool_task_mixin',
     'src/python/pants:binary_util',
@@ -382,7 +380,6 @@ python_library(
   dependencies = [
     ':common',
     ':jvm_task',
-    'src/python/pants/backend/jvm:jvm_debug_config',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:workunit',
     'src/python/pants/fs',
@@ -398,6 +395,7 @@ python_library(
   sources = ['jvm_task.py'],
   dependencies = [
     ':common',
+    'src/python/pants/backend/jvm:jvm_debug_config',
     'src/python/pants/base:build_environment',
   ],
 )
@@ -444,6 +442,7 @@ python_library(
     'src/python/pants/backend/jvm:ivy_utils',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
   ],
 )
 
@@ -492,7 +491,6 @@ python_library(
     'src/python/pants/base:workunit',
     'src/python/pants:binary_util',
     'src/python/pants/java:util',
-    'src/python/pants/backend/jvm:jvm_debug_config',
     'src/python/pants/backend/jvm/tasks:jvm_tool_task_mixin',
   ],
 )

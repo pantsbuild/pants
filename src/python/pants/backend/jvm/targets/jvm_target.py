@@ -39,6 +39,7 @@ class JvmTarget(Target, Jarable):
                excludes=None,
                resources=None,
                configurations=None,
+               no_cache=False,
                **kwargs):
     """
     :param configurations: One or more ivy configurations to resolve for this target.
@@ -49,6 +50,7 @@ class JvmTarget(Target, Jarable):
     :param sources: Source code files to build. Paths are relative to the BUILD
        file's directory.
     :type sources: ``Fileset`` (from globs or rglobs) or list of strings
+    :param no_cache: If True, this should not be stored in the artifact cache
     """
     if sources_rel_path is None:
       sources_rel_path = address.spec_path
@@ -61,8 +63,11 @@ class JvmTarget(Target, Jarable):
       'configurations': ConfigurationsField(self.assert_list(configurations)),
     })
     self._resource_specs = self.assert_list(resources)
+
     super(JvmTarget, self).__init__(address=address, payload=payload, **kwargs)
     self.add_labels('jvm')
+    if no_cache:
+      self.add_labels('no_cache')
 
   _jar_dependencies = None
   @property

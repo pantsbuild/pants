@@ -125,15 +125,16 @@ class _Goal(object):
     # a class method to an instance method, and instantiating the task much sooner in the
     # lifecycle.
 
-    subclass_name = b'{0}_{1}'.format(task_registrar.task_type.__name__, options_scope)
+    subclass_name = b'{0}_{1}'.format(task_registrar.task_type.__name__,
+                                      options_scope.replace('.', '_').replace('-', '_'))
     task_type = type(subclass_name, (task_registrar.task_type,), {'options_scope': options_scope})
-    self._task_type_by_name[task_name] = task_type
 
     otn = self._ordered_task_names
     if replace:
-      for task_type in self.task_types():
-        task_type.options_scope = None
+      for tt in self.task_types():
+        tt.options_scope = None
       del otn[:]
+      self._task_type_by_name = {}
     if first:
       otn.insert(0, task_name)
     elif before in otn:
@@ -143,6 +144,7 @@ class _Goal(object):
     else:
       otn.append(task_name)
 
+    self._task_type_by_name[task_name] = task_type
     self.dependencies.update(task_registrar.dependencies)
 
     if task_registrar.serialize:

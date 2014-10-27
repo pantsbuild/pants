@@ -7,7 +7,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from twitter.common.collections import OrderedSet
 
-from pants.backend.jvm.jvm_debug_config import JvmDebugConfig
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.base.exceptions import TaskError
@@ -18,27 +17,16 @@ from pants.java.util import execute_java
 
 class SpecsRun(JvmTask, JvmToolTaskMixin):
   @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    option_group.add_option(mkflag('skip'), mkflag('skip', negate=True), dest='specs_run_skip',
-                            action='callback', callback=mkflag.set_bool, default=False,
-                            help='[%default] Skip running specs')
-
-    option_group.add_option(mkflag('debug'), mkflag('debug', negate=True), dest='specs_run_debug',
-                            action='callback', callback=mkflag.set_bool, default=False,
-                            help='[%default] Run specs with a debugger')
-
-    option_group.add_option(mkflag('jvmargs'), dest='specs_run_jvm_options', action='append',
-                            help='Runs specs in a jvm with these extra jvm options.')
-
-    option_group.add_option(mkflag('test'), dest='specs_run_tests', action='append',
-                            help='[%default] Force running of just these specs.  Tests can be '
-                                 'specified either by fully qualified classname or '
-                                 'full file path.')
-
-    option_group.add_option(mkflag('color'), mkflag('color', negate=True),
-                            dest='specs_run_color', default=True,
-                            action='callback', callback=mkflag.set_bool,
-                            help='[%default] Emit test result with ANSI terminal color codes.')
+  def register_options(cls, register):
+    super(SpecsRun, cls).register_options(register)
+    register('--skip', action='store_true', legacy='specs_run_skip',
+             help='Skip running specs.')
+    register('--test', action='append', legacy='specs_run_tests',
+             help='Force running of just these specs.  Tests can be specified either by fully '
+                  'qualified classname or full file path.')
+    # TODO: Get rid of this in favor of the inherited global color flag.
+    register('--color', action='store_true', default=True,
+             help='Emit test result with ANSI terminal color codes.')
 
   def __init__(self, *args, **kwargs):
     super(SpecsRun, self).__init__(*args, **kwargs)
@@ -49,18 +37,9 @@ class SpecsRun(JvmTask, JvmToolTaskMixin):
                                        ini_key='bootstrap-tools',
                                        default=['//:scala-specs-2.9.3'])
 
-    self.confs = self.context.config.getlist('specs-run', 'confs', default=['default'])
-
-    self._jvm_options = self.context.config.getlist('specs-run', 'jvm_args', default=[])
-    if self.context.options.specs_run_jvm_options:
-      self._jvm_options.extend(self.context.options.specs_run_jvm_options)
-    if self.context.options.specs_run_debug:
-      self._jvm_options.extend(JvmDebugConfig.debug_args(self.context.config))
-
-    self.skip = self.context.options.specs_run_skip
-    self.color = self.context.options.specs_run_color
-
-    self.tests = self.context.options.specs_run_tests
+    self.skip = self.get_options().skip
+    self.color = self.get_options().color
+    self.tests = self.get_options().test
 
   def prepare(self, round_manager):
     super(SpecsRun, self).prepare(round_manager)
@@ -90,8 +69,8 @@ class SpecsRun(JvmTask, JvmToolTaskMixin):
         result = execute_java(
           classpath=classpath,
           main=specs_runner_main,
-          jvm_options=self._jvm_options,
-          args=args,
+          jvm_options=self.jvm_options,
+          args=self.args + args,
           workunit_factory=self.context.new_workunit,
           workunit_name='specs',
           workunit_labels=[WorkUnit.TEST]

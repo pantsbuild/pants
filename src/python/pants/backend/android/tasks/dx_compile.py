@@ -26,16 +26,12 @@ class DxCompile(AndroidTask, NailgunTask):
   _CONFIG_SECTION = 'dx-tool'
 
   @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    super(DxCompile, cls).setup_parser(option_group, args, mkflag)
-
-    option_group.add_option(mkflag("build-tools-version"), dest="build_tools_version",
-                            help="[%default] Specifies the Android build-tools version used "
-                                 "to create the dex file.")
-
-    option_group.add_option(mkflag("VM-options"), dest="vm_options",
-                            help="[%default] Pass VM-specific options to the virtual machine "
-                                 "that runs dx (e.g. Xmx1024m).")
+  def register_options(cls, register):
+    super(DxCompile, cls).register_options(register)
+    register('--build-tools-version', legacy='build_tools_version',
+             help='Create the dex file using this version of the Android build tools.')
+    register('--jvm-options', legacy='jvm_options',
+             help='Run dx with these JVM options.')
 
   @classmethod
   def is_dextarget(cls, target):
@@ -49,8 +45,8 @@ class DxCompile(AndroidTask, NailgunTask):
   def __init__(self, *args, **kwargs):
     super(DxCompile, self).__init__(*args, **kwargs)
     self._android_dist = self.android_sdk
-    self._forced_build_tools_version = self.context.options.build_tools_version
-    self._forced_vm_options = self.context.options.vm_options
+    self._forced_build_tools_version = self.get_options().build_tools_version
+    self._forced_jvm_options = self.get_options().jvm_options
 
     config_section = self.config_section
     self.setup_artifact_cache_from_config(config_section=config_section)
@@ -83,7 +79,7 @@ class DxCompile(AndroidTask, NailgunTask):
     else:
       classpath = [self.dx_jar_tool(build_tools_version)]
 
-    jvm_options = self._forced_vm_options if self._forced_vm_options else None
+    jvm_options = self._forced_jvm_options if self._forced_jvm_options else None
     java_main = 'com.android.dx.command.Main'
     return self.runjava(classpath=classpath, jvm_options=jvm_options, main=java_main,
                         args=args, workunit_name='dx')

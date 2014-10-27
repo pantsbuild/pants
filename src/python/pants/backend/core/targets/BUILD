@@ -13,6 +13,7 @@ python_library(
   sources = [
     'dependencies.py',
     'doc.py',
+    'prep_command.py',
     'resources.py',
   ],
   dependencies = [

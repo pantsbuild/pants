@@ -253,7 +253,7 @@ class Config(object):
     """Return whether or not this config has the section."""
     return self.configparser.has_section(section)
 
-  def _has_option(self, section, option):
+  def has_option(self, section, option):
     if self.overrides_parser and self.overrides_parser.has_option(section, option):
       return True
     elif self.configparser.has_option(section, option):
@@ -266,7 +266,7 @@ class Config(object):
     return self.configparser.get(section, option)
 
   def _getinstance(self, section, option, type, default=None):
-    if not self._has_option(section, option):
+    if not self.has_option(section, option):
       return default
     raw_value = self._get_value(section, option)
     if issubclass(type, str):

@@ -17,36 +17,24 @@ from pants.util.dirutil import safe_mkdir
 
 
 class BundleCreate(JvmBinaryTask):
-
   @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    super(BundleCreate, cls).setup_parser(option_group, args, mkflag)
-
-    option_group.add_option(mkflag('deployjar'), mkflag('deployjar', negate=True),
-                            dest='bundle_create_deployjar', default=False,
-                            action='callback', callback=mkflag.set_bool,
-                            help="[%default] Expand 3rdparty jars into loose classfiles in the "
-                                 "bundle's root dir. If unset, the root will contain internal classfiles"
-                                 "only, and 3rdparty jars will go into the bundle's libs dir.")
-
-    archive_flag = mkflag('archive')
-    option_group.add_option(archive_flag, dest='bundle_create_archive',
-                            type='choice', choices=list(archive.TYPE_NAMES),
-                            help='[%%default] Create an archive from the bundle. '
-                                 'Choose from %s' % sorted(archive.TYPE_NAMES))
-
-    option_group.add_option(mkflag('archive-prefix'), mkflag('archive-prefix', negate=True),
-                            dest='bundle_create_prefix', default=False,
-                            action='callback', callback=mkflag.set_bool,
-                            help='[%%default] Used in conjunction with %s this packs the archive '
-                                 'with its basename as the path prefix.' % archive_flag)
+  def register_options(cls, register):
+    super(BundleCreate, cls).register_options(register)
+    register('--deployjar', action='store_true', default=False, legacy='bundle_create_deployjar',
+             help="Expand 3rdparty jars into loose classfiles in the bundle's root dir. "
+                  "If unset, the root will contain internal classfiles only, and 3rdparty jars "
+                  "will go into the bundle's libs dir.")
+    register('--archive', choices=list(archive.TYPE_NAMES), legacy='bundle_create_archive',
+             help='Create an archive of this type from the bundle.')
+    register('--archive-prefix', action='store_true', default=False, legacy='bundle_create_prefix',
+             help='If --archive is specified, use the target basename as the path prefix.')
 
   def __init__(self, *args, **kwargs):
     super(BundleCreate, self).__init__(*args, **kwargs)
     self._outdir = self.context.config.getdefault('pants_distdir')
-    self._prefix = self.context.options.bundle_create_prefix
-    self._archiver_type = self.context.options.bundle_create_archive
-    self._create_deployjar = self.context.options.bundle_create_deployjar
+    self._prefix = self.get_options().archive_prefix
+    self._archiver_type = self.get_options().archive
+    self._create_deployjar = self.get_options().deployjar
 
   class App(object):
     """A uniform interface to an app."""

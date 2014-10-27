@@ -142,8 +142,9 @@ python_tests(
   name = 'bundle_create',
   sources = ['test_bundle_create.py'],
   dependencies = [
-    ':base',
     'src/python/pants/backend/jvm/tasks:bundle_create',
+    'src/python/pants/util:dirutil',
+    'tests/python/pants_test:task_test_base'
   ]
 )
 
@@ -213,11 +214,11 @@ python_tests(
   name = 'check_exclusives',
   sources = ['test_check_exclusives.py'],
   dependencies = [
-    ':base',
     'src/python/pants/base:config',
     'src/python/pants/goal:context',
     'src/python/pants/backend/core/tasks:check_exclusives',
     'src/python/pants/util:dirutil',
+    'tests/python/pants_test:task_test_base',
   ]
 )
 
@@ -693,7 +694,7 @@ python_tests(
     'src/python/pants/backend/core/tasks:check_exclusives',
     'src/python/pants/backend/jvm/tasks:jvm_task',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test:base_test',
+    'tests/python/pants_test:task_test_base',
   ]
 )
 
@@ -704,7 +705,7 @@ python_tests(
     'src/python/pants/backend/core/tasks:check_exclusives',
     'src/python/pants/backend/jvm/tasks:jvmdoc_gen',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test:base_test',
+    'tests/python/pants_test:task_test_base',
   ]
 )
 

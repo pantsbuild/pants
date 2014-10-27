@@ -6,8 +6,7 @@ This page describes the developer workflow when changing Pants itself. (If you
 wanted instructions for using Pants to develop other programs, please see
 :doc:`first_tutorial`.)
 
-.. Getting the source code section.
-
+These instructions assume you've already :ref:`downloaded the source code <download_source_code>`.
 
 ********************
 Running from sources
@@ -65,9 +64,9 @@ Building a Pants PEX for Production
 ***********************************
 
 Most of the time, you will probably want to use an official published version of pants.
-But what if you want to let some of your internal users try out the latest and greatest 
-unreleased code?  What if you want to create a custom build of pants with some 
-unpublished patches?  In that case, you want to build a production ready version of 
+But what if you want to let some of your internal users try out the latest and greatest
+unreleased code?  What if you want to create a custom build of pants with some
+unpublished patches?  In that case, you want to build a production ready version of
 pants including dependencies for all platforms, not just your development environment.
 
 The following command will create a locally built ``pants.pex`` for all platforms::
@@ -146,14 +145,15 @@ run it before you contribute a change or merge it to master::
 
    ./build-support/bin/ci.sh
 
-Sometimes you want to run tests on Travis-CI even though you're not sure
-your change is ready to merge to master.
+You can run your code through the Travis-CI before you submit a change.  Travis-CI is integrated
+with the pull requests for the ``pantsbuild/pants`` repo.  Travis-CI will test it soon after the
+pull request is created.  It will queue up a new job every time you subsequently push your branch.
 
-* If you can push to the ``pantsbuild/pants`` project,
-  push your development branch to origin. Travis-CI will test it soon after.
-* If you *can't* push to the ``pantsbuild/pants`` project,
-  push a branch to your fork of pantsbuild on github, then open a pull request
-  against pants with your branch. Travis-CI will test it soon after.
+To kick off a new CI-build, push a branch to your :ref:`fork <download_source_code>` of
+``pantsbuild/pants``.  Create a pull request on the ``pantsbuild/pants``
+`repo <https://github.com/pantsbuild/pants>`_,
+not your fork.  If you are posting a review request, put the pull request number into the Bug field.
+Then, when you close the request, you can navigate from the bug number to easily close the pull request.
 
 *********
 Debugging

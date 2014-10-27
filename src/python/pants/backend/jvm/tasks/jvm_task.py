@@ -8,11 +8,49 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import os
 
 from pants.backend.core.tasks.task import Task
+from pants.backend.jvm.jvm_debug_config import JvmDebugConfig
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+from pants.util.strutil import safe_shlex_split
 
 
 class JvmTask(Task):
+
+  @classmethod
+  def _legacy_dest_prefix(cls):
+    return cls.options_scope.replace('.', '_')
+
+  @classmethod
+  def register_options(cls, register):
+    super(JvmTask, cls).register_options(register)
+    register('--jvm-options', action='append', metavar='<option>...',
+             legacy='{0}_jvm_options'.format(cls._legacy_dest_prefix()),
+             help='Run the jvm with these extra jvm options.')
+    register('--args', action='append', metavar='<arg>...',
+             legacy='{0}_args'.format(cls._legacy_dest_prefix()),
+             help='Run the jvm with these extra program args.')
+    register('--debug', action='store_true',
+             legacy='{0}_debug'.format(cls._legacy_dest_prefix()),
+             help='Run the jvm under a debugger.')
+    register('--confs', action='append', default=['default'],
+             legacy='{0}_confs'.format(cls._legacy_dest_prefix()),
+             help='Use only these Ivy configurations of external deps.')
+
+  def __init__(self, *args, **kwargs):
+    super(JvmTask, self).__init__(*args, **kwargs)
+
+    self.jvm_options = []
+    for jvm_option in self.get_options().jvm_options:
+      self.jvm_options.extend(safe_shlex_split(jvm_option))
+
+    if self.get_options().debug:
+      self.jvm_options.extend(JvmDebugConfig.debug_args(self.context.config))
+
+    self.args = []
+    for arg in self.get_options().args:
+      self.args.extend(safe_shlex_split(arg))
+
+    self.confs = self.get_options().confs
 
   def prepare(self, round_manager):
     # TODO(John Sirois): this is a fake requirement on 'ivy_jar_products' in order to force

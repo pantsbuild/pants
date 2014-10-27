@@ -26,7 +26,7 @@ from pants.base.worker_pool import Work
 from pants.goal.products import MultipleRootedProducts
 from pants.reporting.reporting_utils import items_to_report_element
 from pants.util.contextutil import open_zip, temporary_dir
-from pants.util.dirutil import safe_mkdir, safe_rmtree
+from pants.util.dirutil import safe_mkdir, safe_rmtree, safe_walk
 
 
 class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
@@ -562,13 +562,15 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
   def _write_to_artifact_cache(self, analysis_file, vts, sources_by_target):
     vt_by_target = dict([(vt.target, vt) for vt in vts.versioned_targets])
 
+    vts_targets = [t for t in vts.targets if not t.has_label('no_cache')]
+
     split_analysis_files = [
-        JvmCompile._analysis_for_target(self._analysis_tmpdir, t) for t in vts.targets]
+        JvmCompile._analysis_for_target(self._analysis_tmpdir, t) for t in vts_targets]
     portable_split_analysis_files = [
-        JvmCompile._portable_analysis_for_target(self._analysis_tmpdir, t) for t in vts.targets]
+        JvmCompile._portable_analysis_for_target(self._analysis_tmpdir, t) for t in vts_targets]
 
     # Set up args for splitting the analysis into per-target files.
-    splits = zip([sources_by_target.get(t, []) for t in vts.targets], split_analysis_files)
+    splits = zip([sources_by_target.get(t, []) for t in vts_targets], split_analysis_files)
     splits_args_tuples = [(analysis_file, splits)]
 
     # Set up args for rebasing the splits.
@@ -578,6 +580,8 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
     vts_artifactfiles_pairs = []
     classes_by_source = self._compute_classes_by_source(analysis_file)
     for target, sources in sources_by_target.items():
+      if target.has_label('no_cache'):
+        continue
       artifacts = []
       for source in sources:
         artifacts.extend(classes_by_source.get(source, []))
@@ -711,7 +715,7 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
               if cls.endswith(b'.class') and not cls in self._upstream_class_to_path:
                 self._upstream_class_to_path[cls] = cp_entry
         elif os.path.isdir(cp_entry):
-          for dirpath, _, filenames in os.walk(cp_entry, followlinks=True):
+          for dirpath, _, filenames in safe_walk(cp_entry, followlinks=True):
             for f in filter(lambda x: x.endswith('.class'), filenames):
               cls = os.path.relpath(os.path.join(dirpath, f), cp_entry)
               if not cls in self._upstream_class_to_path:

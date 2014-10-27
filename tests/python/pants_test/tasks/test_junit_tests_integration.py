@@ -30,7 +30,7 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
   def test_junit_test(self):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
       pants_run = self.run_pants_with_workdir(
-        ['goal', 'test', 'examples/tests/java//com/pants/examples/hello/greet',
+        ['goal', 'test', 'examples/tests/java/com/pants/examples/hello/greet',
          'examples/tests/scala/com/pants/example/hello/welcome',
          '--interpreter=CPython>=2.6,<3',
          '--interpreter=CPython>=3.3',],

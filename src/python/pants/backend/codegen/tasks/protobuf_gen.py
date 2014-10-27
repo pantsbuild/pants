@@ -43,10 +43,11 @@ _PROTOBUF_GEN_PYTHONDEPS_DEFAULT = []
 class ProtobufGen(CodeGen):
 
   @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    option_group.add_option(mkflag('lang'), dest='protobuf_gen_langs', default=[],
-                            action='append', type='choice', choices=['python', 'java'],
-                            help='Force generation of protobuf code for these languages.')
+  def register_options(cls, register):
+    super(ProtobufGen, cls).register_options(register)
+    register('--lang', action='append', choices=['python', 'java'],
+         help='Force generation of protobuf code for these languages.',
+         legacy='protobuf_gen_langs')
 
   def __init__(self, *args, **kwargs):
     super(ProtobufGen, self).__init__(*args, **kwargs)
@@ -60,7 +61,7 @@ class ProtobufGen(CodeGen):
     self.java_out = os.path.join(self.workdir, 'gen-java')
     self.py_out = os.path.join(self.workdir, 'gen-py')
 
-    self.gen_langs = set(self.context.options.protobuf_gen_langs)
+    self.gen_langs = set(self.get_options().lang)
     for lang in ('java', 'python'):
       if self.context.products.isrequired(lang):
         self.gen_langs.add(lang)

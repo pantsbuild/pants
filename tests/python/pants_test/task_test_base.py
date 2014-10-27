@@ -7,7 +7,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import uuid
 
-from pants.base.exceptions import TaskError
 from pants_test.base_test import BaseTest
 
 
@@ -32,10 +31,10 @@ class TaskTestBase(BaseTest):
     # Create a synthetic subclass of the task type, with a unique scope, to ensure
     # proper test isolation (unfortunately we currently rely on class-level state in Task.)
     # TODO: Get rid of this once we re-do the Task lifecycle.
-    scope = str(uuid.uuid4())
-    subclass_name = b'test_{0}_{1}'.format(self.task_type().__name__, scope)
+    self.options_scope = str(uuid.uuid4())
+    subclass_name = b'test_{0}_{1}'.format(self.task_type().__name__, self.options_scope)
     self._testing_task_type = type(subclass_name, (self.task_type(),),
-                                   {'options_scope': scope})
+                                   {'options_scope': self.options_scope})
 
   def context(self, config='', options=None, new_options=None, target_roots=None, **kwargs):
     # Add in our task type.
