@@ -26,11 +26,14 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
     return target.is_thrift
 
   @classmethod
-  def register_options(cls, register):
-    super(ThriftLinter, cls).register_options(register)
-    register('--strict', default=False, action='store_true',
-             help='Fail the goal if thrift errors are found.',
-             legacy='thrift_linter_strict')
+  def setup_parser(cls, option_group, args, mkflag):
+    super(ThriftLinter, cls).setup_parser(option_group, args, mkflag)
+
+    option_group.add_option(mkflag('strict'), mkflag('strict', negate=True),
+                            dest='thrift_linter_strict',
+                            default=None,
+                            action='callback', callback=mkflag.set_bool,
+                            help='[%default] Fail the goal if thrift errors are found.')
 
   @classmethod
   def product_types(cls):
