@@ -7,28 +7,22 @@ import os
 from pants.backend.android.tasks.android_task import AndroidTask
 
 
-# These are hardcoded into aapt but we added 'BUILD*'. Changes clobber, so we need entire string
+# These are hardcoded into aapt but we added 'BUILD*'. Changes clobber, so we need entire string.
 IGNORED_ASSETS = ('!.svn:!.git:!.ds_store:!*.scc:.*:<dir>_*:!CVS:'
                   '!thumbs.db:!picasa.ini:!*~:BUILD*')
 
 class AaptTask(AndroidTask):
-  """ Base class for tasks performed by the Android aapt tool"""
+  """Base class for tasks performed by the Android aapt tool."""
   @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    #TODO(mateor) Ensure a change of target-sdk or build-tools rebuilds product w/o clean
-    super(AaptTask, cls).setup_parser(option_group, args, mkflag)
-
-    option_group.add_option(mkflag("target-sdk"), dest="target_sdk",
-                            help="[%default] Specifies the target Android SDK used to compile "
-                                 "resources. Overrides AndroidManifest.xml.")
-
-    option_group.add_option(mkflag("build-tools-version"), dest="build_tools_version",
-                            help="[%default] Specifies the Android build-tools version used "
-                                 "to compile resources.")
-
-    option_group.add_option(mkflag("ignored-assets"), dest="ignored_assets", default=IGNORED_ASSETS,
-                            help="[%default] Specifies regex patterns the aapt tools should "
-                                 "ignore as it spiders down the resource_dir.")
+  def register_options(cls, register):
+    super(AaptTask, cls).register_options(register)
+    register('--target-sdk', legacy='target_sdk',
+             help='Use this Android SDK to compile resources. Overrides AndroidManifest.xml.')
+    register('--build-tools-version', legacy='build_tools_version',
+             help='Use this Android build-tools version to compile resources.')
+    register('--ignored-assets', default=IGNORED_ASSETS, metavar='<PATTERN>',
+             legacy='ignored_assets',
+             help='Patterns the aapt tools should ignore as they search the resource_dir.')
 
   @classmethod
   def package_path(cls, package):
@@ -38,13 +32,9 @@ class AaptTask(AndroidTask):
   def __init__(self, *args, **kwargs):
     super(AaptTask, self).__init__(*args, **kwargs)
     self._android_dist = self.android_sdk
-    self._forced_build_tools_version = self.context.options.build_tools_version
-
-    if self.context.options.ignored_assets:
-      self.ignored_assets = self.context.options.ignored_assets
-    else:
-      self.ignored_assets = IGNORED_ASSETS
-    self._forced_target_sdk = self.context.options.target_sdk
+    self._forced_build_tools_version = self.get_options().build_tools_version
+    self.ignored_assets = self.get_options().ignored_assets
+    self._forced_target_sdk = self.get_options().target_sdk
 
   def aapt_tool(self, build_tools_version):
     """Return the appropriate aapt tool.

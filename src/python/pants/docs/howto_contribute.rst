@@ -76,13 +76,39 @@ If you have an idea for new work that's not yet been discussed on `pants-devel
 conversation there to vet the proposal. Once the group agrees it's worth
 a spike you can file a github issue and assign it to yourself.
 
+.. _download_source_code:
 
 Getting Pants Source Code
 =========================
 
-After deciding on the change you'd like to make we'll need to get the code. ::
+If you just want to compile and look at the source code, the easiest way is to clone the repo. ::
 
    git clone https://github.com/pantsbuild/pants
+
+If you would like to start developing patches and contributing them back, you will want to
+create a fork of the repo using the `instructions on github.com
+<https://help.github.com/articles/fork-a-repo/>`_.  With this setup, you can push branches and run
+Travis-CI before your change is committed.
+
+If you've already cloned your repo without forking, you don't have to re-checkout your repo.  First,
+create the fork on github.  Make a note the clone url of your fork.  Then run the following
+commands::
+
+   git remote remove origin
+   git remote add origin <url-to-clone-your-fork>
+   git remote add upstream  https://github.com/pantsbuild/pants
+
+After this change, ``git push`` and ``git pull`` will go to your fork.  You can get
+the latest changes from the ``pantsbuild/pants`` repo's master branch
+using the `syncing a fork <https://help.github.com/articles/syncing-a-fork/>`_ instructions
+on github.
+
+**Pro tip:** If you want your local master branch to be an exact copy of the ``pantsbuild/pants`` repo's
+master branch, use these commands::
+
+   git co master
+   git fetch upstream
+   git reset --hard upstream/master
 
 
 Making the Change
@@ -139,7 +165,9 @@ This ``post`` creates a new review, but does not yet publish it.
 At the provided URL, there's a web form. To get your change reviewed,
 you must fill in the change description, reviewers, testing done, etc.
 To make sure it gets seen, add ``pants-reviews`` to the Groups field
-and a specific reviewer to the People field.
+and a specific reviewer to the People field.  If you have created a
+`pull request <_dev_run_all_tests>`_ on github to run Travis-CI, put the pull request
+number in the Bug field and your git branch name in the Branch field.
 
 When the review looks good, publish it.
 An email will be sent to the ``pants-reviews`` mailing list and the reviewers

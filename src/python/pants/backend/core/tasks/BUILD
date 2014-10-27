@@ -24,6 +24,7 @@ target(
     ':prepare_resources',
     ':reporting_server',
     ':roots',
+    ':run_prep_command',
     ':scm_publish',
     ':sorttargets',
     ':targets_help',
@@ -272,6 +273,15 @@ python_library(
   sources = ['roots.py'],
   dependencies = [
     ':console_task',
+    'src/python/pants/backend/core/targets:common',
+  ],
+)
+
+python_library(
+  name = 'run_prep_command',
+  sources = ['run_prep_command.py'],
+  dependencies = [
+    ':common',
     'src/python/pants/backend/core/targets:common',
   ],
 )

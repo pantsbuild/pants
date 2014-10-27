@@ -21,40 +21,43 @@ class JavadocGen(JvmdocGen):
     return javadoc
 
   def execute(self):
-    self.generate_doc(is_java, create_javadoc_command)
+    self.generate_doc(is_java, self.create_javadoc_command)
 
+  def create_javadoc_command(self, classpath, gendir, *targets):
+    sources = []
+    for target in targets:
+      sources.extend(target.sources_relative_to_buildroot())
 
-def create_javadoc_command(classpath, gendir, *targets):
-  sources = []
-  for target in targets:
-    sources.extend(target.sources_relative_to_buildroot())
+    if not sources:
+      return None
 
-  if not sources:
-    return None
+    # TODO(John Sirois): try com.sun.tools.javadoc.Main via ng
+    command = [
+      'javadoc',
+      '-quiet',
+      '-encoding', 'UTF-8',
+      '-notimestamp',
+      '-use',
+      '-classpath', ':'.join(classpath),
+      '-d', gendir,
+    ]
 
-  # TODO(John Sirois): try com.sun.tools.javadoc.Main via ng
-  command = [
-    'javadoc',
-    '-quiet',
-    '-encoding', 'UTF-8',
-    '-notimestamp',
-    '-use',
-    '-classpath', ':'.join(classpath),
-    '-d', gendir,
-  ]
+    command.extend(['-J{0}'.format(jvm_option) for jvm_option in self.jvm_options])
 
-  # Always provide external linking for java API
-  offlinelinks = set(['http://download.oracle.com/javase/6/docs/api/'])
+    # Always provide external linking for java API
+    offlinelinks = set(['http://download.oracle.com/javase/6/docs/api/'])
 
-  def link(target):
-    for jar in target.jar_dependencies:
-      if jar.apidocs:
-        offlinelinks.add(jar.apidocs)
-  for target in targets:
-    target.walk(link, lambda t: t.is_jvm)
+    def link(target):
+      for jar in target.jar_dependencies:
+        if jar.apidocs:
+          offlinelinks.add(jar.apidocs)
+    for target in targets:
+      target.walk(link, lambda t: t.is_jvm)
 
-  for link in offlinelinks:
-    command.extend(['-linkoffline', link, link])
+    for link in offlinelinks:
+      command.extend(['-linkoffline', link, link])
 
-  command.extend(sources)
-  return command
+    command.extend(self.args)
+
+    command.extend(sources)
+    return command

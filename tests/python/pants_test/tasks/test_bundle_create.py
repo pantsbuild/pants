@@ -5,10 +5,9 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-import unittest2 as unittest
-
+from pants.util.dirutil import safe_mkdtemp, safe_rmtree
 from pants.backend.jvm.tasks.bundle_create import BundleCreate
-from pants_test.base.context_utils import create_context
+from pants_test.task_test_base import TaskTestBase
 
 
 sample_ini_test_1 = """
@@ -17,14 +16,29 @@ pants_distdir = /tmp/dist
 """
 
 
-class BundleCreateTest(unittest.TestCase):
+class BundleCreateTest(TaskTestBase):
+
+  @classmethod
+  def task_type(cls):
+    return BundleCreate
+
+  def setUp(self):
+    super(BundleCreateTest, self).setUp()
+    self.workdir = safe_mkdtemp()
+
+  def tearDown(self):
+    super(BundleCreateTest, self).tearDown()
+    safe_rmtree(self.workdir)
 
   def test_bundle_create_init(self):
-    old_options = {
-               'bundle_create_deployjar': None,
-               'bundle_create_prefix': None,
-               'bundle_create_archive': None
-               }
-    bundle_create = BundleCreate(create_context(config=sample_ini_test_1, old_options=old_options),
-                                 '/tmp/workdir')
+    options = {
+      'bundle': {
+        'deployjar': None,
+        'archive_prefix': None,
+        'archive': None
+      }
+    }
+
+    bundle_create = self.create_task(self.context(config=sample_ini_test_1, new_options=options),
+                                     self.workdir)
     self.assertEquals(bundle_create._outdir, '/tmp/dist')

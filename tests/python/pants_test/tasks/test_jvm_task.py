@@ -10,7 +10,7 @@ from pants.backend.core.tasks.check_exclusives import ExclusivesMapping
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.base.exceptions import TaskError
 from pants.util.dirutil import safe_mkdtemp, safe_rmtree
-from pants_test.base_test import BaseTest
+from pants_test.task_test_base import TaskTestBase
 
 
 class DummyJvmTask(JvmTask):
@@ -18,8 +18,12 @@ class DummyJvmTask(JvmTask):
     pass
 
 
-class JvmTaskTest(BaseTest):
+class JvmTaskTest(TaskTestBase):
   """Test some base functionality in JvmTask."""
+
+  @classmethod
+  def task_type(cls):
+    return DummyJvmTask
 
   def setUp(self):
     super(JvmTaskTest, self).setUp()
@@ -40,7 +44,7 @@ class JvmTaskTest(BaseTest):
     exclusives_mapping._populate_target_maps(context.targets())
     context.products.safe_create_data('exclusives_groups', lambda: exclusives_mapping)
 
-    self.task = DummyJvmTask(context, self.workdir)
+    self.task = self.create_task(context, self.workdir)
 
   def tearDown(self):
     super(JvmTaskTest, self).tearDown()

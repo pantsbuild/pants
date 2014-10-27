@@ -16,3 +16,12 @@ python_tests(
     'tests/python/pants_test:base_test',
   ]
 )
+
+python_tests(
+  name = 'prep',
+  sources = ['test_prep.py'],
+  dependencies = [
+    'src/python/pants/backend/core:plugin',
+    'tests/python/pants_test:base_test',
+  ]
+)

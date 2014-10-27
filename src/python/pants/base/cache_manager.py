@@ -49,7 +49,6 @@ class VersionedTargetSet(object):
     # The following line is a no-op if cache_key was set in the VersionedTarget __init__ method.
     self.cache_key = CacheKeyGenerator.combine_cache_keys([vt.cache_key
                                                            for vt in versioned_targets])
-    self.payloads = self.cache_key.payloads
     self.num_chunking_units = self.cache_key.num_chunking_units
     self.valid = not cache_manager.needs_update(self.cache_key)
 

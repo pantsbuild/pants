@@ -14,6 +14,7 @@ python_library(
   name = 'dirutil',
   sources = ['dirutil.py'],
   dependencies = [
+    ':strutil',
   ],
 )
 

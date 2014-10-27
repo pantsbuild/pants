@@ -10,24 +10,12 @@ from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.base.target import Target
 from pants.console.stty_utils import preserve_stty_settings
-from pants.util.strutil import safe_shlex_split
 
 
 class ScalaRepl(JvmTask, JvmToolTaskMixin):
-  @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    option_group.add_option(mkflag("jvmargs"), dest="run_jvmargs", action="append",
-                            help="Run the repl in a jvm with these extra jvm args.")
-    option_group.add_option(mkflag('args'), dest='run_args', action='append',
-                            help='run the repl in a jvm with extra args.')
-
   def __init__(self, *args, **kwargs):
     super(ScalaRepl, self).__init__(*args, **kwargs)
-    self.jvm_args = self.context.config.getlist('scala-repl', 'jvm_args', default=[])
-    if self.context.options.run_jvmargs:
-      for arg in self.context.options.run_jvmargs:
-        self.jvm_args.extend(safe_shlex_split(arg))
-    self.confs = self.context.config.getlist('scala-repl', 'confs', default=['default'])
+
     self._bootstrap_key = 'scala-repl'
     self.register_jvm_tool_from_config(self._bootstrap_key, self.context.config,
                                        ini_section='scala-repl',
@@ -35,10 +23,6 @@ class ScalaRepl(JvmTask, JvmToolTaskMixin):
                                        default=['//:scala-repl-2.9.3'])
 
     self.main = self.context.config.get('scala-repl', 'main')
-    self.args = self.context.config.getlist('scala-repl', 'args', default=[])
-    if self.context.options.run_args:
-      for arg in self.context.options.run_args:
-        self.args.extend(safe_shlex_split(arg))
 
   def prepare(self, round_manager):
     # TODO(John Sirois): these are fake requirements in order to force compile run before this
@@ -65,7 +49,7 @@ class ScalaRepl(JvmTask, JvmToolTaskMixin):
           # NOTE: We execute with no workunit, as capturing REPL output makes it very sluggish.
           execute_java(classpath=classpath,
                        main=self.main,
-                       jvm_options=self.jvm_args,
+                       jvm_options=self.jvm_options,
                        args=self.args)
         except KeyboardInterrupt:
           # TODO(John Sirois): Confirm with Steve Gury that finally does not work on mac and an

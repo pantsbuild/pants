@@ -23,7 +23,7 @@ from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
 from pants.base.target import Target
 from pants.goal.goal import Goal
-from pants.util.dirutil import safe_mkdir
+from pants.util.dirutil import safe_mkdir, safe_walk
 
 logger = logging.getLogger(__name__)
 
@@ -652,7 +652,7 @@ class Project(object):
     for source_set in self.sources:
       paths = set()
       source_base = os.path.join(self.root_dir, source_set.source_base)
-      for root, dirs, _ in os.walk(os.path.join(source_base, source_set.path)):
+      for root, dirs, _ in safe_walk(os.path.join(source_base, source_set.path)):
         if dirs:
           paths.update([os.path.join(root, directory) for directory in dirs])
       unused_children = paths - targeted

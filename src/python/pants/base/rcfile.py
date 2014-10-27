@@ -11,6 +11,7 @@ from twitter.common.lang import Compatibility
 from twitter.common.log import logger
 
 from pants.base.config import Config
+from pants.util.strutil import safe_shlex_split
 
 
 log = logger(name='rcfile')
@@ -75,7 +76,7 @@ class RcFile(object):
     log.debug('using rcfiles: %s to modify args' % ','.join(read_from))
 
     def get_rcopts(command, key):
-      return config.get(command, key).split() if config.has_option(command, key) else []
+      return safe_shlex_split(config.get(command, key)) if config.has_option(command, key) else []
 
     commands = list(commands)
     if self.process_default:

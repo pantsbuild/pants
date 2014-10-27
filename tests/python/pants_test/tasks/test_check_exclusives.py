@@ -11,11 +11,15 @@ import tempfile
 from pants.backend.core.tasks.check_exclusives import CheckExclusives
 from pants.base.exceptions import TaskError
 
-from pants_test.base_test import BaseTest
+from pants_test.task_test_base import TaskTestBase
 
 
-class CheckExclusivesTest(BaseTest):
+class CheckExclusivesTest(TaskTestBase):
   """Test of the CheckExclusives task."""
+
+  @classmethod
+  def task_type(cls):
+    return CheckExclusives
 
   def setUp(self):
     super(CheckExclusivesTest, self).setUp()
@@ -32,8 +36,11 @@ class CheckExclusivesTest(BaseTest):
     d = self.make_target(':d', dependencies=[a, b])
     e = self.make_target(':e', dependencies=[a, c], exclusives={'c': '1'})
 
-    context = self.context(target_roots=[d, e], options={'exclusives_error_on_collision': True})
-    check_exclusives_task = CheckExclusives(context, self.workdir)
+    context = self.context(target_roots=[d, e], new_options={
+      self.options_scope: { 'exclusives_error_on_collision': True }
+    }
+    )
+    check_exclusives_task = self.create_task(context, self.workdir)
     try:
       check_exclusives_task.execute()
       self.fail("Expected a conflicting exclusives exception to be thrown.")
@@ -49,7 +56,7 @@ class CheckExclusivesTest(BaseTest):
 
     context = self.context(target_roots=[a, b, c, d])
     context.products.require_data('exclusives_groups')
-    check_exclusives_task = CheckExclusives(context, self.workdir)
+    check_exclusives_task = self.create_task(context, self.workdir)
     check_exclusives_task.execute()
     egroups = context.products.get_data('exclusives_groups')
     # Expected compatibility:
@@ -86,7 +93,7 @@ class CheckExclusivesTest(BaseTest):
 
     context = self.context(target_roots=[a, b, c, d])
     context.products.require_data('exclusives_groups')
-    check_exclusives_task = CheckExclusives(context, self.workdir)
+    check_exclusives_task = self.create_task(context, self.workdir)
     check_exclusives_task.execute()
     egroups = context.products.get_data('exclusives_groups')
 

@@ -107,8 +107,8 @@ class ScroogeGenTest(TaskTest):
       sources = [os.path.join(self.task_outdir, 'com/pants/example/Example.scala')]
       task.gen.return_value = {'test_smoke/a.thrift': sources}
 
+      saved_add_new_target = Context.add_new_target
       try:
-        saved_add_new_target = Context.add_new_target
         Context.add_new_target = MagicMock()
         task.execute()
         relative_task_outdir = os.path.relpath(self.task_outdir, get_buildroot())

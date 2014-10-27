@@ -25,11 +25,11 @@ class RESTfulArtifactCache(ArtifactCache):
 
   READ_SIZE_BYTES = 4 * 1024 * 1024
 
-  def __init__(self, log, artifact_root, url_base, compress=True):
+  def __init__(self, log, artifact_root, url_base, compression):
     """
     url_base: The prefix for urls on some RESTful service. We must be able to PUT and GET to any
               path under this base.
-    compress: Whether to compress the artifacts before storing them.
+    :param int compression: compression level (of false-y to skip compression) for artifacts
     """
     ArtifactCache.__init__(self, log, artifact_root)
     parsed_url = urlparse.urlparse(url_base)
@@ -41,8 +41,8 @@ class RESTfulArtifactCache(ArtifactCache):
       raise ValueError('RESTfulArtifactCache only supports HTTP and HTTPS')
     self._timeout_secs = 4.0
     self._netloc = parsed_url.netloc
-    self._path_prefix = parsed_url.path.rstrip('/')
-    self.compress = compress
+    self._path_prefix = parsed_url.path.rstrip(b'/')
+    self.compression = compression
 
     # To enable connection reuse, all requests must be created from same session.
     # TODO: Re-evaluate session's life-cycle if/when a longer-lived pants process exists.
@@ -51,7 +51,7 @@ class RESTfulArtifactCache(ArtifactCache):
 
   def try_insert(self, cache_key, paths):
     with temporary_file_path() as tarfile:
-      artifact = TarballArtifact(self.artifact_root, tarfile, self.compress)
+      artifact = TarballArtifact(self.artifact_root, tarfile, self.compression)
       artifact.collect(paths)
 
       with open(tarfile, 'rb') as infile:
@@ -83,7 +83,7 @@ class RESTfulArtifactCache(ArtifactCache):
                        (total_bytes,self._url_string(remote_path)))
 
         # Extract the tarfile.
-        artifact = TarballArtifact(self.artifact_root, outfile.name, self.compress)
+        artifact = TarballArtifact(self.artifact_root, outfile.name, self.compression)
         artifact.extract()
         return artifact
     except Exception as e:
@@ -103,7 +103,7 @@ class RESTfulArtifactCache(ArtifactCache):
     # Note: it's important to use the id as well as the hash, because two different targets
     # may have the same hash if both have no sources, but we may still want to differentiate them.
     return '%s/%s/%s%s' % (self._path_prefix, cache_key.id, cache_key.hash,
-                               '.tar.gz' if self.compress else '.tar')
+                           '.tar.gz' if self.compression else '.tar')
 
   # Returns a response if we get a 200, None if we get a 404 and raises an exception otherwise.
   def _request(self, method, path, body=None):

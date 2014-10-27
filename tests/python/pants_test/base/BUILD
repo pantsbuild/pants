@@ -44,6 +44,7 @@ python_test_suite(
     ':hash_utils',
     ':payload',
     ':payload_field',
+    ':rcfile',
     ':revision',
     ':run_info',
     ':source_root',
@@ -253,6 +254,15 @@ python_tests(
     'src/python/pants/backend/core',
     'src/python/pants/base:address',
     'src/python/pants/base:build_file_aliases',
+    'tests/python/pants_test:base_test',
+  ]
+)
+
+python_tests(
+  name = 'rcfile',
+  sources = ['test_rcfile.py'],
+  dependencies = [
+    'src/python/pants/base:rcfile',
     'tests/python/pants_test:base_test',
   ]
 )

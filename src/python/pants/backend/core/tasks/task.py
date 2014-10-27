@@ -149,8 +149,10 @@ class TaskBase(AbstractClass):
   def _create_artifact_cache(self, spec, action):
     if len(spec) > 0:
       pants_workdir = self.context.config.getdefault('pants_workdir')
+      compression = self.context.config.getint('cache', 'compression', default=5)
       my_name = self.__class__.__name__
-      return create_artifact_cache(self.context.log, pants_workdir, spec, my_name, action)
+      return create_artifact_cache(self.context.log, pants_workdir, spec,
+                                   my_name, compression, action)
     else:
       return None
 
@@ -283,11 +285,12 @@ class TaskBase(AbstractClass):
 
     if not silent:
       targets = []
-      payloads = []
       num_invalid_partitions = len(invalidation_check.invalid_vts_partitioned)
       for vt in invalidation_check.invalid_vts_partitioned:
         targets.extend(vt.targets)
-        payloads.extend(vt.cache_key.payloads)
+
+      payloads = [t.payload for t in targets]
+
       if len(targets):
         msg_elements = ['Invalidated ',
                         items_to_report_element([t.address.reference() for t in targets], 'target')]
