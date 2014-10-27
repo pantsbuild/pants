@@ -89,17 +89,6 @@ at that key; later tasks can read (and perhaps further change) that
 value. That value might be, say, a dictionary that maps target specs to
 file paths.
 
-### require\_data, is\_required
-
-It might "expensive" for a task to generate some not-always-useful
-product. E.g., if Ivy takes a while to compute jar dependencies but
-they're not always needed, then it might make sense to skip generating
-them in most cases. One task can call
-`self.context.products.isrequired('jar_dependencies')` to say it needs
-that data. The Ivy task uses
-`if self.context.products.isrequired('jar_dependencies'):` to find out
-if another task needs this data.
-
 Task Configuration
 ------------------
 

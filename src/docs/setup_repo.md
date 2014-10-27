@@ -60,7 +60,9 @@ If your project's source tree is laid out for Maven, there's a shortcut
 function
 <a xref="bdict_maven_layout">`maven_layout`</a>
 that configures source roots for Maven's expected
-source code tree structure.
+source code tree structure. See
+[`testprojects/maven_layout`](https://github.com/pantsbuild/pants/tree/master/testprojects/maven_layout)
+for examples of using this style source tree.
 
 ### Organized by Language
 
