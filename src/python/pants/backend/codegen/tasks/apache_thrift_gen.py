@@ -54,14 +54,12 @@ class ApacheThriftGen(CodeGen):
   ThriftSession = namedtuple('ThriftSession', ['outdir', 'cmd', 'process'])
 
   @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    option_group.add_option(mkflag('version'), dest='thrift_version',
-                            help='Thrift compiler version.')
-
-    option_group.add_option(mkflag('lang'), dest='thrift_gen_langs',  default=[],
-                            action='append', type='choice', choices=['python', 'java'],
-                            help='Force generation of thrift code for these languages.')
-
+  def register_options(cls, register):
+    super(ApacheThriftGen, cls).register_options(register)
+    register('--version', help='Thrift compiler version.', legacy='thrift_version')
+    register('--lang', action='append', choices=['python', 'java'],
+             help='Force generation of thrift code for these languages.',
+             legacy='thrift_gen_langs')
 
   def __init__(self, *args, **kwargs):
     super(ApacheThriftGen, self).__init__(*args, **kwargs)
@@ -72,13 +70,13 @@ class ApacheThriftGen(CodeGen):
     self.strict = self.context.config.getbool('thrift-gen', 'strict')
     self.verbose = self.context.config.getbool('thrift-gen', 'verbose')
 
-    self.gen_langs = set(self.context.options.thrift_gen_langs)
+    self.gen_langs = set(self.get_options().lang)
     for lang in ('java', 'python'):
       if self.context.products.isrequired(lang):
         self.gen_langs.add(lang)
 
     self.thrift_binary = select_thrift_binary(self.context.config,
-                                              version=self.context.options.thrift_version)
+                                              version=self.get_options().version)
 
     self.defaults = JavaThriftLibrary.Defaults(self.context.config)
 

@@ -30,6 +30,9 @@ migrations = {
   ('scala-repl', 'confs'): ('repl.scala', 'confs'),
 
   ('scala-repl', 'args'): ('repl.scala', 'args'),
+
+  ('scala-compile', 'scalac-plugins'): ('compile.scala', 'plugins'),
+  ('scala-compile', 'scalac-plugin-args'): ('compile.scala', 'plugin-args'),
 }
 
 
