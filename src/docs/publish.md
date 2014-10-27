@@ -183,7 +183,7 @@ To make this work:
 
 If you need to implement some other kind of authentication, you might
 look at [the Netrc
-implementation](https://github.com/pantsbuild/pants/blob/master/src/python/pants/authentication/netrc_util.py)
+implementation](https://github.com/pantsbuild/pants/blob/master/src/python/pants/backend/authentication/netrc_util.py)
 and the <a xref="bdict_credentials">`credentials`</a> target type for inspiration.
 
 Troubleshooting

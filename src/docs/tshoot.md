@@ -1,9 +1,11 @@
 Troubleshooting
 ===============
 
-Sometimes Pants doesn't do what you hoped. Sometimes it's a problem in
-your code, but Pants' error handling is not so useful. (Please report
-these when you see them. We want Pants' error messages to be useful.)
+Sometimes Pants doesn't do what you hoped.
+Pants has good error messages for common errors, but
+some messages are not so useful.
+(Please report these when you see them.
+We want Pants' error messages to be useful.)
 Sometimes Pants just plain doesn't work. (Please report these, too.) The
 following workarounds can get you up and running again.
 

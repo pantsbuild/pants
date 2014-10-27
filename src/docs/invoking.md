@@ -11,9 +11,14 @@ something like:
 
 For a full description of specifying target addresses, see
 [[Target Addresses|pants('src/docs:target_addresses')]].
+For a list of Pants' goals and their options, see the
+<a href="goals_reference.html">Goals Reference</a>.
 
 rc files
 --------
+
+(As of November 2014, rc file support was changing. Expect this
+info to be obsolete soon:)
 
 If there's a command line flag that you always (or nearly always) use,
 you might set up a configuration file to ease this. A typical Pants
@@ -62,4 +67,3 @@ These files are formatted as [Python config
 files](http://docs.python.org/install/index.html#inst-config-syntax),
 parsed by
 [ConfigParser](http://docs.python.org/library/configparser.html).
-

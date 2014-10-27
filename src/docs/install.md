@@ -57,6 +57,5 @@ PEX-based Installation
 
 To support hermetic builds and not depend on a local pants installation
 (e.g.: CI machines may prohibit software installation), some sites fetch
-a pre-build pants.pex whose version is checked-into pants.ini. If your
-site uses such an installation, please ask around for details.
+a pre-build pants.pex whose version is checked-into pants.ini.
 

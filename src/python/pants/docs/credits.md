@@ -10,10 +10,13 @@ Major contributors in alphabetical order:
 -   Bill Farner
 -   Brian Wickman
 -   David Buchfuhrer
+-   Eric Ayers
+-   Ity Kaul
 -   John Sirois
 -   Larry Hosken
 -   Mark McBride
 -   Tejal Desai
+-   Travis Crawford
 
 If you are a contributor, please add your name to the list!
 

@@ -52,8 +52,8 @@ goal `foo`, use `Goal.by_name('foo').install`. You can install more than
 one task in a goal; e.g., there are separate tasks to run Java tests and
 Python tests; but both are in the `test` goal.
 
-product\_types and require\_data: Why "test" comes after "compile"
-------------------------------------------------------------------
+`product_types` and `require_data`: Why "test" comes after "compile"
+--------------------------------------------------------------------
 
 It might only make sense to run your Task after some other Task has
 finished. E.g., Pants has separate tasks to compile Java code and run
@@ -94,7 +94,7 @@ file paths.
 It might "expensive" for a task to generate some not-always-useful
 product. E.g., if Ivy takes a while to compute jar dependencies but
 they're not always needed, then it might make sense to skip generating
-them in most cases. In one tasks's `__init__`, it can call
+them in most cases. One task can call
 `self.context.products.isrequired('jar_dependencies')` to say it needs
 that data. The Ivy task uses
 `if self.context.products.isrequired('jar_dependencies'):` to find out
