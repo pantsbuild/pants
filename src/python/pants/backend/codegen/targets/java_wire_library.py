@@ -6,10 +6,8 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import logging
-import six
 
 from pants.backend.jvm.targets.exportable_jvm_library import ExportableJvmLibrary
-from pants.backend.jvm.targets.jar_library import JarLibrary
 
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
