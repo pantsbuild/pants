@@ -1,5 +1,9 @@
 Publishing Artifacts
 ====================
+<!--
+  Converted from src/python/pants/docs/publish.rst 2014/10/16
+  TODO(lahosken): before new doc system "goes live", freshen this as needed.
+-->
 
 A library owner/maintainer can *publish* versioned artifacts that folks
 elsewhere can fetch and import. In the JVM world, these are jars (with
@@ -10,7 +14,8 @@ This page talks about publishing artifacts. We assume you already know
 enough about Pants to *build* the library that underlies an artifact. To
 *use* an artifact that has already been published from some other source
 tree, see
-[[Third-Party Dependencies|pants('src/docs:3rdparty')]].
+<!-- TODO(lahosken) proper link -->
+[Third-Party Dependencies](http://pantsbuild.github.io/3rdparty.html)
 (To use a artifact that has been published from
 *your own* source tree... don't do that. Instead, depend on the
 `*_library` build target.)
@@ -72,7 +77,7 @@ Things can go wrong; you can recover:
 -   Uploading the artifact can fail for another reason: that
     artifact+version already exists on the server. *In theory*, this
     shouldn't happen: Pants bumps the version it found in the pushdb.
-    But in practice, this can happen.
+    But in practice, this can happen. :
 
         Exception in thread "main" java.io.IOException: destination file exists and overwrite == false
         ...
@@ -130,8 +135,9 @@ Restricting to "Release Branch"
 Your organization might have a notion of a special "release branch": you
 want all publishing to happen on this source control branch, which you
 maintain extra-carefully. You can
-<a xref="setup_publish_restrict_branch">configure your repo so that the
-`publish` goal only allows `publish`-ing from this special branch</a>.
+<!-- TODO(lahosken) proper link , look out for underscore hyphen switcheroo -->
+[configure your repo](http://pantsbuild.github.io/setup_repo.html#setup-publish-restrict-branch) so the
+`publish` goal only allows `publish`-ing from this special branch.
 
 Authenticating to the Artifact Repository
 -----------------------------------------
@@ -149,7 +155,7 @@ files](http://www.gnu.org/software/inetutils/manual/html_node/The-_002enetrc-Fil
 to get a user's username and password on an artifact repository machine.
 To make this work:
 
--   Each user needs a `~/.netrc` file with a section that looks like:
+-   Each user needs a `~/.netrc` file with a section that looks like :
 
         machine maven.twttr.com
           login sandy
@@ -183,7 +189,7 @@ To make this work:
 
 If you need to implement some other kind of authentication, you might
 look at [the Netrc
-implementation](https://github.com/pantsbuild/pants/blob/master/src/python/pants/backend/authentication/netrc_util.py)
+implementation](https://github.com/pantsbuild/pants/blob/master/src/python/pants/authentication/netrc_util.py)
 and the <a xref="bdict_credentials">`credentials`</a> target type for inspiration.
 
 Troubleshooting
@@ -287,7 +293,8 @@ coordinates from the target's `provides` parameter. Thus, if you try to
 publish a target that has no `provides`, Pants doesn't try. If the
 target depends on *other* targets that *do* provide artifacts, Pants
 might publish those. This is a case of
-<a xref="tut_goal_target_mismatch">goal-target mismatch</a>
+<!-- TODO(lahosken) proper link, beware of underscore/hyphen switcheroo -->
+[goal-target mismatch](http://pantsbuild.github.io/first_tutorial.html#tut-goal-target-mismatch)
 To fix this, set `provides` correctly.
 
 Want to Publish Something? Publish Many Things
@@ -347,6 +354,7 @@ Setting Up Your Workspace
 -------------------------
 
 To get Pants publish working in the first place, someone needs to
-<a xref="setup_publish">configure your codebase</a>
-to register one or more
+<!-- TODO(lahosken) proper link, watch out for underscore hyphen switcheroo -->
+[configure your codebase](http://pantsbuild.github.io/setup_repo.html#setup-publish) to register one or more
 artifact repositories and, optionally, enable some features.
+

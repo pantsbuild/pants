@@ -1,9 +1,14 @@
 Python Projects with Pants
 ==========================
+<!--
+  Converted from src/python/pants/docs/python-readme.rst 2014/10/16
+  TODO(lahosken): before new doc system "goes live", freshen this as needed.
+-->
 
 Pants makes the manipulation and distribution of hermetically sealed
 Python environments painless. You can organize your code in the
-[[Pants way|pants('src/docs:first_concepts')]]
+<!-- TODO(lahosken) proper link -->
+[Pants way](http://pantsbuild.github.io/first_concepts.html)
 with targets for binaries, libraries, and
 tests. Pants builds Python code into
 [PEXes](https://github.com/twitter/commons/blob/master/src/python/twitter/common/python/README.md).
@@ -13,7 +18,8 @@ you have some "common code" used by more than one PEX, Pants makes it
 easy to manage the dependencies.
 
 This page assumes that you've already read
-[[the Pants Tutorial|pants('src/docs:first_tutorial')]].
+<!-- TODO(lahosken) proper link -->
+[the Pants Tutorial](http://pantsbuild.github.io/first_tutorial.html).
 
 Pants' Python support changed in 2014. Depending on how old your Pants
 is, Pants goals might not work with Python code. If you use older pants,
@@ -310,7 +316,7 @@ More About Python Tests
 
 Pants runs Python tests with `pytest`. You can pass CLI options to
 `pytest` with `--test-pytest-options`. For example, to only run tests
-whose names match the pattern `*foo*`, you could run:
+whose names match the pattern `*foo*`, you could run :
 
     :::bash
     $ ./pants goal test examples/tests/python/example_test/hello/greet --test-pytest-options='-k foo'
@@ -427,3 +433,4 @@ You can then combine the coverage files by running `PEX_MODULE=coverage`
 `my_pex.pex` report. Since PEX files are just zip files, coverage is able
 to understand and extract source and line numbers from them in order to
 produce coverage reports.
+
