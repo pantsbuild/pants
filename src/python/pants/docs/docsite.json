@@ -31,6 +31,7 @@
     "publish": "dist/markdown/html/src/docs/publish.html",
     "python_old": "dist/markdown/html/examples/src/python/example/python_old.html",
     "python-readme": "dist/markdown/html/examples/src/python/example/readme.html",
+    "scala": "dist/markdown/html/examples/src/scala/pants/example/readme.html",
     "release": "dist/markdown/html/src/python/pants/docs/release.html",
     "setup_repo": "dist/markdown/html/src/docs/setup_repo.html",
     "target_addresses": "dist/markdown/html/src/docs/target_addresses.html",
@@ -61,6 +62,7 @@
         { "page": "JVMProjects",
           "children": [
             { "page": "3rdparty_jvm" },
+            { "page": "scala" },
             { "page": "from_maven" }
           ]
         },
