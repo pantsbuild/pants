@@ -25,40 +25,29 @@ class IvyResolve(NailgunTask, IvyTaskMixin, JvmToolTaskMixin):
   _CONFIG_SECTION = 'ivy-resolve'
 
   @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    super(IvyResolve, cls).setup_parser(option_group, args, mkflag)
-
-    flag = mkflag('override')
-    option_group.add_option(flag, action='append', dest='ivy_resolve_overrides',
-                            help="""Specifies a jar dependency override in the form:
-                            [org]#[name]=(revision|url)
-
-                            For example, to specify 2 overrides:
-                            %(flag)s=com.foo#bar=0.1.2 \\
-                            %(flag)s=com.baz#spam=file:///tmp/spam.jar
-                            """ % dict(flag=flag))
-
-    report = mkflag("report")
-    option_group.add_option(report, mkflag("report", negate=True), dest="ivy_resolve_report",
-                            action="callback", callback=mkflag.set_bool, default=False,
-                            help="[%default] Generate an ivy resolve html report")
-
-    option_group.add_option(mkflag("open"), mkflag("open", negate=True),
-                            dest="ivy_resolve_open", default=False,
-                            action="callback", callback=mkflag.set_bool,
-                            help="[%%default] Attempt to open the generated ivy resolve report "
-                                 "in a browser (implies %s)." % report)
-
-    option_group.add_option(mkflag("outdir"), dest="ivy_resolve_outdir",
-                            help="Emit ivy report outputs in to this directory.")
-
-    option_group.add_option(mkflag("args"), dest="ivy_args", action="append", default=[],
-                            help="Pass these extra args to ivy.")
-
-    option_group.add_option(mkflag("mutable-pattern"), dest="ivy_mutable_pattern",
-                            help="If specified, all artifact revisions matching this pattern will "
-                                 "be treated as mutable unless a matching artifact explicitly "
-                                 "marks mutable as False.")
+  def register_options(cls, register):
+    super(IvyResolve, cls).register_options(register)
+    scope_flag_prefix = cls.options_scope.replace('.', '-')
+    register('--override', action='append', legacy='ivy_resolve_overrides',
+             help='Specifies a jar dependency override in the form: '
+             '[org]#[name]=(revision|url) '
+             'Multiple overrides can be specified using repeated invocations of this flag. '
+             'For example, to specify 2 overrides: '
+             '--{scope}-override=com.foo#bar=0.1.2 '
+             '--{scope}-override=com.baz#spam=file:///tmp/spam.jar '
+             .format(scope=scope_flag_prefix))
+    register('--report', action='store_true', legacy='ivy_resolve_report', default=False,
+             help='Generate an ivy resolve html report')
+    register('--open', action='store_true', legacy='ivy_resolve_open', default=False,
+             help='Attempt to open the generated ivy resolve report '
+                  'in a browser (implies --{scope}-report)'.format(scope=scope_flag_prefix))
+    register('--outdir', legacy='ivy_resolve_outdir',
+             help='Emit ivy report outputs in to this directory.')
+    register('--args', action='append', legacy='ivy_args',
+             help='Pass these extra args to ivy.')
+    register('--mutable-pattern', legacy='ivy_mutable_pattern',
+             help='If specified, all artifact revisions matching this pattern will be treated as '
+                  'mutable unless a matching artifact explicitly marks mutable as False.')
 
   @classmethod
   def product_types(cls):
@@ -72,9 +61,9 @@ class IvyResolve(NailgunTask, IvyTaskMixin, JvmToolTaskMixin):
     self._confs = self.context.config.getlist(self._CONFIG_SECTION, 'confs', default=['default'])
     self._classpath_dir = os.path.join(self.workdir, 'mapped')
 
-    self._outdir = self.context.options.ivy_resolve_outdir or os.path.join(self.workdir, 'reports')
-    self._open = self.context.options.ivy_resolve_open
-    self._report = self._open or self.context.options.ivy_resolve_report
+    self._outdir = self.get_options().outdir or os.path.join(self.workdir, 'reports')
+    self._open = self.get_options().open
+    self._report = self._open or self.get_options().report
 
     self._ivy_bootstrap_key = 'ivy'
     self.register_jvm_tool_from_config(self._ivy_bootstrap_key, self.context.config,
