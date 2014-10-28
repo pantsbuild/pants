@@ -804,6 +804,11 @@ class JarPublish(JarTask, ScmPublish):
           if no_changes:
             print(changelog)
           else:
+            assert isinstance(coordinate(jar.org, jar.name), unicode)
+            assert isinstance("%s" % oldentry.version(), unicode)
+            if oldentry.sha:
+              assert isinstance(oldentry.sha, unicode)
+            assert isinstance(changelog, unicode)
             print('\nChanges for %s since %s @ %s:\n\n%s' % (
               coordinate(jar.org, jar.name), oldentry.version(), oldentry.sha, changelog
             ))
