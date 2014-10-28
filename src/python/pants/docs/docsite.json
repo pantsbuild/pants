@@ -1,10 +1,53 @@
 {
   "sources": {
-    "index": "dist/markdown/html/README.html",
-    "subdir/testproject": "dist/markdown/html/examples/src/java/com/pants/examples/hello/main/README.html",
-    "hello": "dist/markdown/html/src/python/pants/backend/python/README.html"
+    "3rdparty": "dist/markdown/html/src/docs/3rdparty.html",
+    "3rdparty_jvm": "dist/markdown/html/examples/src/java/com/pants/examples/3rdparty_jvm.html",
+    "3rdparty_py": "dist/markdown/html/examples/src/python/example/3rdparty_py.html",
+    "announce_201409": "dist/markdown/html/src/docs/announce_201409.html",
+    "build_dictionary": "dist/builddict/build_dictionary.html",
+    "build_files": "dist/markdown/html/src/docs/build_files.html",
+    "credits": "dist/markdown/html/src/python/pants/docs/credits.html",
+    "dev": "dist/markdown/html/src/python/pants/docs/readme.html",
+    "dev_tasks": "dist/markdown/html/src/python/pants/docs/dev_tasks.html",
+    "dev_tasks_publish_extras": "dist/markdown/html/src/python/pants/docs/dev_tasks_publish_extras.html",
+    "docs": "dist/markdown/html/src/python/pants/docs/docs.html",
+    "first_concepts": "dist/markdown/html/src/docs/first_concepts.html",
+    "first_tutorial": "dist/markdown/html/src/docs/first_tutorial.html",
+    "from_maven": "dist/markdown/html/examples/src/java/com/pants/examples/from_maven.html",
+    "goals_reference": "dist/builddict/goals_reference.html",
+    "howto_ask": "dist/markdown/html/src/python/pants/docs/howto_ask.html",
+    "howto_contribute": "dist/markdown/html/src/python/pants/docs/howto_contribute.html",
+    "howto_customize": "dist/markdown/html/src/python/pants/docs/howto_customize.html",
+    "howto_develop": "dist/markdown/html/src/python/pants/docs/howto_develop.html",
+    "howto_plugin": "dist/markdown/html/src/python/pants/docs/howto_plugin.html",
+    "index": "dist/markdown/html/src/docs/index.html",
+    "install": "dist/markdown/html/src/docs/install.html",
+    "intellij": "dist/markdown/html/src/python/pants/docs/intellij.html",
+    "internals": "dist/markdown/html/src/python/pants/docs/internals.html",
+    "invoking": "dist/markdown/html/src/docs/invoking.html",
+    "JVMProjects": "dist/markdown/html/examples/src/java/com/pants/examples/readme.html",
+    "page": "dist/markdown/html/examples/src/java/com/pants/examples/page.html",
+    "pex_design": "dist/markdown/html/examples/src/python/example/pex_design.html",
+    "publish": "dist/markdown/html/src/docs/publish.html",
+    "python_old": "dist/markdown/html/examples/src/python/example/python_old.html",
+    "python-readme": "dist/markdown/html/examples/src/python/example/readme.html",
+    "release": "dist/markdown/html/src/python/pants/docs/release.html",
+    "setup_repo": "dist/markdown/html/src/docs/setup_repo.html",
+    "target_addresses": "dist/markdown/html/src/docs/target_addresses.html",
+    "tshoot": "dist/markdown/html/src/docs/tshoot.html",
+    "ThriftDeps": "dist/markdown/html/examples/src/thrift/com/pants/examples/readme.html",
+    "with_emacs": "dist/markdown/html/src/docs/with_emacs.html",
+    "with_intellij": "dist/markdown/html/src/docs/with_intellij.html"
   },
   "extras": {
+    "images/intellij-configure-tests.png": "src/python/pants/docs/images/intellij-configure-tests.png",
+    "images/intellij-new-project-1.png": "src/python/pants/docs/images/intellij-configure-tests.png",
+    "images/intellij-new-project-2.png": "src/python/pants/docs/images/intellij-configure-tests.png",
+    "images/intellij-new-pythonsdk.png": "src/python/pants/docs/images/intellij-configure-tests.png",
+    "images/intellij-project-structure-modules-sources.png": "src/python/pants/docs/images/intellij-configure-tests.png",
+    "images/intellij-project-structure-project.png": "src/python/pants/docs/images/intellij-configure-tests.png",
+    "images/intellij-run.png": "src/python/pants/docs/images/intellij-configure-tests.png",
+    "images/intellij-select-venv.png": "src/python/pants/docs/images/intellij-configure-tests.png",
     "logo.ico": "src/python/pants/docs/pants-logo.ico",
     "s.js": "src/python/pants/docs/docsite.js",
     "s.css": "src/python/pants/docs/docsite.css"
@@ -12,8 +55,58 @@
   "tree": [
     { "page": "index",
       "children": [
-        { "page": "hello" },
-        { "page": "testproject" }
+        { "page": "first_concepts" },
+        { "page": "first_tutorial" },
+        { "page": "target_addresses" },
+        { "page": "JVMProjects",
+          "children": [
+            { "page": "3rdparty_jvm" },
+            { "page": "from_maven" }
+          ]
+        },
+        { "page": "python-readme",
+          "children": [
+            { "page": "3rdparty_py" },
+            { "page": "pex_design" },
+            { "page": "python_old" }
+          ]
+        },
+        { "page": "page" },
+        { "page": "build_files" },
+        { "page": "invoking" },
+        { "page": "tshoot" },
+        { "page": "3rdparty",
+          "children": [
+            { "page": "3rdparty_jvm" },
+            { "page": "3rdparty_py" }
+          ]
+        },
+        { "page": "ThriftDeps" },
+        { "page": "publish" },
+        { "page": "with_emacs" },
+        { "page": "with_intellij" },
+        { "page": "install" },
+        { "page": "setup_repo" },
+        { "page": "build_dictionary" },
+        { "page": "goals_reference" },
+        { "page": "dev",
+          "children": [
+            { "page": "howto_contribute" },
+            { "page": "howto_ask" },
+            { "page": "howto_develop" },
+            { "page": "dev_tasks",
+              "children": [
+                { "page": "dev_tasks_publish_extras" }
+	      ]
+            },
+            { "page": "howto_plugin" },
+            { "page": "howto_customize" },
+            { "page": "intellij" },
+            { "page": "internals" },
+            { "page": "release" },
+            { "page": "docs" },
+            { "page": "credits" }
+        ]}
       ]
     }
   ],

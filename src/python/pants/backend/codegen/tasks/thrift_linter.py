@@ -26,14 +26,11 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
     return target.is_thrift
 
   @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    super(ThriftLinter, cls).setup_parser(option_group, args, mkflag)
-
-    option_group.add_option(mkflag('strict'), mkflag('strict', negate=True),
-                            dest='thrift_linter_strict',
-                            default=None,
-                            action='callback', callback=mkflag.set_bool,
-                            help='[%default] Fail the goal if thrift errors are found.')
+  def register_options(cls, register):
+    super(ThriftLinter, cls).register_options(register)
+    register('--strict', default=None, action='store_true',
+             help='Fail the goal if thrift linter errors are found.',
+             legacy='thrift_linter_strict')
 
   @classmethod
   def product_types(cls):
@@ -44,10 +41,9 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
     super(ThriftLinter, self).__init__(*args, **kwargs)
 
     self._bootstrap_key = 'scrooge-linter'
-
-    bootstrap_tools = self.context.config.getlist(self._CONFIG_SECTION, 'bootstrap-tools',
-                                                  default=['//:scrooge-linter'])
-    self.register_jvm_tool(self._bootstrap_key, bootstrap_tools)
+    self.register_jvm_tool_from_config(self._bootstrap_key, self.context.config,
+                                       self._CONFIG_SECTION, 'bootstrap-tools',
+                                       default=['//:scrooge-linter'])
 
   @property
   def config_section(self):
@@ -62,6 +58,11 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
     return str(value) == 'True'
 
   def is_strict(self, target):
+    # TODO: the new options parsing doesn't support this. This task wants the target in the BUILD
+    # file to be able to override a value in the pants.ini file. Finally, command-line overrides
+    # that. But parsing of options combines the command-line values and pants.ini values in a single
+    # "merged" view, into which there's no opportunity to inject an override from the BUILD target.
+
     # The strict value is read from the following, in order:
     # 1. command line, --[no-]thrift-linter-strict
     # 2. java_thrift_library target in BUILD file, thrift_linter_strict = False,
@@ -82,9 +83,11 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
     self.context.log.debug('Linting %s' % path)
 
     classpath = self.tool_classpath(self._bootstrap_key)
-    args = [path, '--verbose']
+    config_args = self.context.config.getlist(self._CONFIG_SECTION, 'linter_args', default=[])
     if not self.is_strict(target):
-      args.append('--ignore-errors')
+      config_args.append('--ignore-errors')
+
+    args = config_args + [path]
 
     # If runjava returns non-zero, this marks the workunit as a
     # FAILURE, and there is no way to wrap this here.

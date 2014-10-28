@@ -146,9 +146,9 @@ class Parser(object):
       inverse_args = None
       help_args = args
 
-    # Register the option for displaying help.
-    # Note that we'll only display the default value for the scope in which
-    # we registered, even though the default may be overridden in inner scopes.
+    # Register the option, only on this scope, for the purpose of displaying help.
+    # Note that we'll only display the default value for this scope, even though the
+    # default may be overridden in inner scopes.
     raw_default = self._compute_default(dest, clean_kwargs).value
     clean_kwargs_with_default = dict(clean_kwargs, default=raw_default)
     self._help_argparser.add_argument(*help_args, **clean_kwargs_with_default)
@@ -158,7 +158,7 @@ class Parser(object):
     if self._legacy_options and legacy_dest:
       self._legacy_options.register(args, clean_kwargs_with_default, legacy_dest)
 
-    # Register the option for parsing, on this and all enclosed scopes.
+    # Register the option for the purpose of parsing, on this and all enclosed scopes.
     if inverse_args:
       inverse_kwargs = self._create_inverse_kwargs(clean_kwargs)
       if self._legacy_options:
@@ -191,9 +191,17 @@ class Parser(object):
 
   def _validate(self, args, kwargs):
     """Ensure that the caller isn't trying to use unsupported argparse features."""
+    for arg in args:
+      if not arg.startswith('-'):
+        raise RegistrationError('Option {0} in scope {1} must begin '
+                                'with a dash.'.format(arg, self._scope))
+      if not arg.startswith('--') and len(arg) > 2:
+        raise RegistrationError('Multicharacter option {0} in scope {1} must begin '
+                                'with a double-dash'.format(arg, self._scope))
     for k in ['nargs', 'required']:
       if k in kwargs:
-        raise RegistrationError('%s unsupported in registration of option %s.' % (k, args))
+        raise RegistrationError('{0} unsupported in registration of option {1} in '
+                                'scope {2}.'.format(k, args, self._scope))
 
   def _set_dest(self, args, kwargs, legacy_dest):
     """Maps the externally-used dest to a scoped one only seen internally.
@@ -219,11 +227,11 @@ class Parser(object):
     for arg in args:
       self._dest_forwardings[arg.lstrip('-').replace('-', '_')] = scoped_dest
 
-    # Forward another hop, to the legacy flag.  Note that this means that *only* the
-    # legacy flag is supported for now.  This will be removed after we're finished migrating
-    # option registration to the new system, and work on migrating the actual runtime
-    # command-line parsing.
-    if legacy_dest:
+    # Forward another hop, to the legacy flag, but only if this won't create a forwarding cycle.
+    #   Note that this means that *only* the legacy flag is supported for now.
+    # This will be removed after we're finished migrating option registration to the new system,
+    # and work on migrating the actual runtime command-line parsing.
+    if legacy_dest and self._dest_forwardings.get(legacy_dest) != scoped_dest:
       self._dest_forwardings[scoped_dest] = legacy_dest
     return dest
 
@@ -250,9 +258,16 @@ class Parser(object):
     env_val_str = self._env.get(env_var) if self._env else None
 
     env_val = None if env_val_str is None else value_type(env_val_str)
-    config_val = self._config.get(config_section, dest, default=None) if self._config else None
+    if kwargs.get('action') == 'append':
+      config_val_strs = self._config.getlist(config_section, dest, default=[]) if self._config else []
+      config_val = [value_type(config_val_str) for config_val_str in config_val_strs]
+      default = []
+    else:
+      config_val_str = self._config.get(config_section, dest, default=None) if self._config else None
+      config_val = None if config_val_str is None else value_type(config_val_str)
+      default = None
     hardcoded_val = kwargs.get('default')
-    return RankedValue.choose(None, env_val, config_val, hardcoded_val)
+    return RankedValue.choose(None, env_val, config_val, hardcoded_val, default)
 
   def _create_inverse_kwargs(self, kwargs):
     """Create the kwargs for registering the inverse of a boolean flag."""

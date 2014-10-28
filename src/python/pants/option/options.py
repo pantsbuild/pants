@@ -137,17 +137,13 @@ class Options(object):
       if self._legacy_values:
         values.update(vars(self._legacy_values))  # Proxy any legacy option values.
     else:
-      values = copy.copy(self.for_scope(scope.rpartition('.')[0]))
+      values = copy.deepcopy(self.for_scope(scope.rpartition('.')[0]))
 
     # Now add our values.
-    try:
-      flags_in_scope = self._scope_to_flags.get(scope, [])
-      self._parser_hierarchy.get_parser_by_scope(scope).parse_args(flags_in_scope, values)
-      self._values_by_scope[scope] = values
-      return values
-    except ParseError as e:
-      self.print_help(str(e))
-      sys.exit(1)
+    flags_in_scope = self._scope_to_flags.get(scope, [])
+    self._parser_hierarchy.get_parser_by_scope(scope).parse_args(flags_in_scope, values)
+    self._values_by_scope[scope] = values
+    return values
 
   def for_global_scope(self):
     """Return the option values for the global scope."""
@@ -158,7 +154,8 @@ class Options(object):
 
     Note: Ony useful if called after options have been registered.
     """
-    def _maybe_print(s):
+    def _maybe_help(scope):
+      s = self.format_help(scope, legacy=legacy)
       if s != '':  # Avoid superfluous blank lines for empty strings.
         print(s)
 
@@ -166,21 +163,21 @@ class Options(object):
     if goals:
       for goal_name in goals:
         goal = Goal.by_name(goal_name)
+        # Register old-style options for the purpose of help-printing.
+        Goal.setup_parser(self._legacy_parser, [], [goal])
         if not goal.ordered_task_names():
           print('\nUnknown goal: %s' % goal_name)
         else:
-          _maybe_print(self.format_help('%s' % goal.name, legacy=legacy))
-          for task_name in goal.ordered_task_names():
-            if task_name != goal.name:  # Otherwise we registered on the goal scope.
-              scope = '%s.%s' % (goal.name, task_name)
-              _maybe_print(self.format_help(scope, legacy=legacy))
+          print('\n{0}: {1}\n'.format(goal.name, goal.description))
+          for scope in goal.known_scopes():
+            _maybe_help(scope)
     else:
       print(pants_release())
       print('\nUsage:')
       print('  ./pants [option ...] [goal ...] [target...]  Attempt the specified goals.')
       print('  ./pants help                                 Get help.')
       print('  ./pants help [goal]                          Get help for the specified goal.')
-      print('  ./pants goals                                List all installed goals.')
+      print('  ./pants goal goals                           List all installed goals.')
       print('')
       print('  [target] accepts two special forms:')
       print('    dir:  to include all targets in the specified directory.')

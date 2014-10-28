@@ -9,6 +9,7 @@ from collections import defaultdict
 import itertools
 import os
 import shutil
+import sys
 import uuid
 
 from twitter.common.collections import OrderedSet
@@ -19,14 +20,13 @@ from pants.backend.jvm.tasks.jvm_compile.jvm_fingerprint_strategy import JvmFing
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
 from pants.base.build_environment import get_buildroot, get_scm
-from pants.base.config import Config
 from pants.base.exceptions import TaskError
 from pants.base.target import Target
 from pants.base.worker_pool import Work
 from pants.goal.products import MultipleRootedProducts
 from pants.reporting.reporting_utils import items_to_report_element
 from pants.util.contextutil import open_zip, temporary_dir
-from pants.util.dirutil import safe_mkdir, safe_rmtree
+from pants.util.dirutil import safe_mkdir, safe_rmtree, safe_walk
 
 
 class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
@@ -37,67 +37,43 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
   """
 
   @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    super(JvmCompile, cls).setup_parser(option_group, args, mkflag)
+  def register_options(cls, register):
+    super(JvmCompile, cls).register_options(register)
+    register('--partition-size-hint', type=int, default=sys.maxint, metavar='<# source files>',
+             help='Roughly how many source files to attempt to compile together. Set to a large '
+                  'number to compile all sources together. Set to 0 to compile target-by-target.',
+             legacy='{0}_partition_size_hint'.format(cls._language))
 
-    option_group.add_option(mkflag('warnings'), mkflag('warnings', negate=True),
-                            dest=cls._language + '_compile_warnings',
-                            default=True,
-                            action='callback',
-                            callback=mkflag.set_bool,
-                            help='[%default] Compile with all configured warnings enabled.')
+    register('--warnings', default=True, action='store_true',
+             help='Compile with all configured warnings enabled.',
+             legacy='{0}_compile_warnings'.format(cls._language))
 
-    option_group.add_option(mkflag('partition-size-hint'),
-                            dest=cls._language + '_partition_size_hint',
-                            action='store',
-                            type='int',
-                            default=-1,
-                            help='Roughly how many source files to attempt to compile together. '
-                                 'Set to a large number to compile all sources together. Set this '
-                                 'to 0 to compile target-by-target. Default is set in pants.ini.')
+    register('--missing-deps', choices=['off', 'warn', 'fatal'], default='warn',
+             help='Check for missing dependencies in {0} code. Reports actual dependencies A -> B '
+                  'where there is no transitive BUILD file dependency path from A to B. If fatal, '
+                  'missing deps are treated as a build error.'.format(cls._language),
+             legacy='{0}_missing_deps'.format(cls._language))
 
-    option_group.add_option(mkflag('missing-deps'),
-                            dest=cls._language + '_missing_deps',
-                            choices=['off', 'warn', 'fatal'],
-                            default='warn',
-                            help='[%default] One of off, warn, fatal. '
-                                 'Check for missing dependencies in ' + cls._language + 'code. '
-                                 'Reports actual dependencies A -> B where there is no '
-                                 'transitive BUILD file dependency path from A to B.'
-                                 'If fatal, missing deps are treated as a build error.')
+    register('--missing-direct-deps', choices=['off', 'warn', 'fatal'], default='off',
+             help='Check for missing direct dependencies in {0} code. Reports actual dependencies '
+                  'A -> B where there is no direct BUILD file dependency path from A to B. This is '
+                  'a very strict check; In practice it is common to rely on transitive, indirect '
+                  'dependencies, e.g., due to type inference or when the main target in a BUILD '
+                  'file is modified to depend on other targets in the same BUILD file, as an '
+                  'implementation detail. However it may still be useful to use this on '
+                  'occasion. '.format(cls._language),
+             legacy='{0}_missing_direct_deps'.format(cls._language))
 
-    option_group.add_option(mkflag('missing-direct-deps'),
-                            dest=cls._language + '_missing_direct_deps',
-                            choices=['off', 'warn', 'fatal'],
-                            default='off',
-                            help='[%default] One of off, warn, fatal. '
-                                 'Check for missing direct dependencies in ' + cls._language +
-                                 ' code. Reports actual dependencies A -> B where there is no '
-                                 'direct BUILD file dependency path from A to B. This is a very '
-                                 'strict check, as in practice it is common to rely on transitive, '
-                                 'non-direct dependencies, e.g., due to type inference or when the '
-                                 'main target in a BUILD file is modified to depend on other '
-                                 'targets in the same BUILD file as an implementation detail. It '
-                                 'may still be useful to set it to fatal temorarily, to detect '
-                                 'these.')
+    register('--unnecessary-deps', choices=['off', 'warn', 'fatal'], default='off',
+             help='Check for declared dependencies in {0} code that are not needed. This is a very '
+                  'strict check. For example, generated code will often legitimately have BUILD '
+                  'dependencies that are unused in practice.'.format(cls._language),
+                            legacy='{0}_unnecessary_deps'.format(cls._language))
 
-    option_group.add_option(mkflag('unnecessary-deps'),
-                            dest=cls._language + '_unnecessary_deps',
-                            choices=['off', 'warn', 'fatal'],
-                            default='off',
-                            help='[%default] One of off, warn, fatal. Check for declared '
-                                 'dependencies in ' + cls._language + ' code that are not '
-                                 'needed. This is a very strict check. For example, generated code '
-                                 'will often legitimately have BUILD dependencies that are unused '
-                                 'in practice.')
+    register('--delete-scratch', default=True, action='store_true',
+             help='Leave intermediate scratch files around, for debugging build problems.',
+             legacy='{0}_delete_scratch'.format(cls._language),)
 
-    option_group.add_option(mkflag('delete-scratch'), mkflag('delete-scratch', negate=True),
-                            dest=cls._language + '_delete_scratch',
-                            default=True,
-                            action='callback',
-                            callback=mkflag.set_bool,
-                            help='[%default] Leave intermediate scratch files around, '
-                                 'for debugging build problems.')
 
   # Subclasses must implement.
   # --------------------------
@@ -162,10 +138,6 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
   def _portable_analysis_for_target(analysis_dir, target):
     return JvmCompile._analysis_for_target(analysis_dir, target) + '.portable'
 
-  def _get_lang_specific_option(self, opt):
-    full_opt_name = self._language + '_' + opt
-    return getattr(self.context.options, full_opt_name, None)
-
   def __init__(self, *args, **kwargs):
     super(JvmCompile, self).__init__(*args, **kwargs)
     config_section = self.config_section
@@ -179,11 +151,7 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
     self._analysis_dir = os.path.join(self.workdir, 'analysis')
     self._target_sources_dir = os.path.join(self.workdir, 'target_sources')
 
-    self._delete_scratch = self._get_lang_specific_option('delete_scratch')
-
-    safe_mkdir(self._classes_dir)
-    safe_mkdir(self._analysis_dir)
-    safe_mkdir(self._target_sources_dir)
+    self._delete_scratch = self.get_options().delete_scratch
 
     self._analysis_file = os.path.join(self._analysis_dir, 'global_analysis.valid')
     self._invalid_analysis_file = os.path.join(self._analysis_dir, 'global_analysis.invalid')
@@ -197,10 +165,7 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
     self._lazy_analysis_tools = None
 
     # The rough number of source files to build in each compiler pass.
-    self._partition_size_hint = self._get_lang_specific_option('partition_size_hint')
-    if self._partition_size_hint == -1:
-      self._partition_size_hint = self.context.config.getint(config_section, 'partition_size_hint',
-                                                             default=1000)
+    self._partition_size_hint = self.get_options().partition_size_hint
 
     # JVM options for running the compiler.
     self._jvm_options = self.context.config.getlist(config_section, 'jvm_args')
@@ -210,10 +175,12 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
 
     # Set up dep checking if needed.
     def munge_flag(flag):
-      return None if flag == 'off' else flag
-    check_missing_deps = munge_flag(self._get_lang_specific_option('missing_deps'))
-    check_missing_direct_deps = munge_flag(self._get_lang_specific_option('missing_direct_deps'))
-    check_unnecessary_deps = munge_flag(self._get_lang_specific_option('unnecessary_deps'))
+      flag_value = getattr(self.get_options(), flag, None)
+      return None if flag_value == 'off' else flag_value
+
+    check_missing_deps = munge_flag('missing_deps')
+    check_missing_direct_deps = munge_flag('missing_direct_deps')
+    check_unnecessary_deps = munge_flag('unnecessary_deps')
 
     if check_missing_deps or check_missing_direct_deps or check_unnecessary_deps:
       target_whitelist = self.context.config.getlist('jvm', 'missing_deps_target_whitelist', default=[])
@@ -244,22 +211,23 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
     # Populated in prepare_execute().
     self._sources_by_target = None
 
-  def configure_args(self, args_defaults=[], warning_defaults=[], no_warning_defaults=[]):
+  def configure_args(self, args_defaults=None, warning_defaults=None, no_warning_defaults=None):
    """
    Setup the compiler command line arguments, optionally providing default values.  It is mandatory
    to call this from __init__() of your subclass.
-   :param list args_default:  compiler flags that should be invoked for all invocations
+   :param list args_defaults:  compiler flags that should be invoked for all invocations
    :param list warning_defaults: compiler flags to turn on warnings
    :param list no_warning_defaults:  compiler flags to turn off all warnings
    """
    self._args = self.context.config.getlist(self._config_section, 'args',
-                                       default=args_defaults)
-   if self._get_lang_specific_option('compile_warnings'):
+                                       default=args_defaults or [])
+   if self.get_options().warnings:
      self._args.extend(self.context.config.getlist(self._config_section, 'warning_args',
-                                              default=warning_defaults))
+                                                   default=warning_defaults or []))
    else:
      self._args.extend(self.context.config.getlist(self._config_section, 'no_warning_args',
-                                              default=no_warning_defaults))
+                                                   default=no_warning_defaults or[]))
+
   def prepare(self, round_manager):
     # TODO(John Sirois): this is a fake requirement on 'ivy_jar_products' in order to force
     # resolve to run before this goal.  Require a new CompileClasspath product to be produced by
@@ -296,6 +264,12 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
     return None
 
   def pre_execute(self):
+    # Only create these working dirs during execution phase, otherwise, they
+    # would be wiped out by clean-all goal/task if it's specified.
+    safe_mkdir(self._classes_dir)
+    safe_mkdir(self._analysis_dir)
+    safe_mkdir(self._target_sources_dir)
+
     # TODO(John Sirois): Ensuring requested product maps are available - if empty - should probably
     # be lifted to Task infra.
 
@@ -588,13 +562,15 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
   def _write_to_artifact_cache(self, analysis_file, vts, sources_by_target):
     vt_by_target = dict([(vt.target, vt) for vt in vts.versioned_targets])
 
+    vts_targets = [t for t in vts.targets if not t.has_label('no_cache')]
+
     split_analysis_files = [
-        JvmCompile._analysis_for_target(self._analysis_tmpdir, t) for t in vts.targets]
+        JvmCompile._analysis_for_target(self._analysis_tmpdir, t) for t in vts_targets]
     portable_split_analysis_files = [
-        JvmCompile._portable_analysis_for_target(self._analysis_tmpdir, t) for t in vts.targets]
+        JvmCompile._portable_analysis_for_target(self._analysis_tmpdir, t) for t in vts_targets]
 
     # Set up args for splitting the analysis into per-target files.
-    splits = zip([sources_by_target.get(t, []) for t in vts.targets], split_analysis_files)
+    splits = zip([sources_by_target.get(t, []) for t in vts_targets], split_analysis_files)
     splits_args_tuples = [(analysis_file, splits)]
 
     # Set up args for rebasing the splits.
@@ -604,6 +580,8 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
     vts_artifactfiles_pairs = []
     classes_by_source = self._compute_classes_by_source(analysis_file)
     for target, sources in sources_by_target.items():
+      if target.has_label('no_cache'):
+        continue
       artifacts = []
       for source in sources:
         artifacts.extend(classes_by_source.get(source, []))
@@ -737,7 +715,7 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
               if cls.endswith(b'.class') and not cls in self._upstream_class_to_path:
                 self._upstream_class_to_path[cls] = cp_entry
         elif os.path.isdir(cp_entry):
-          for dirpath, _, filenames in os.walk(cp_entry, followlinks=True):
+          for dirpath, _, filenames in safe_walk(cp_entry, followlinks=True):
             for f in filter(lambda x: x.endswith('.class'), filenames):
               cls = os.path.relpath(os.path.join(dirpath, f), cp_entry)
               if not cls in self._upstream_class_to_path:

@@ -22,6 +22,11 @@ function usage() {
   fi
 }
 
+function die() {
+  (($# > 0)) && echo -e "$@" 1>&2
+  exit 1
+}
+
 publish_path=""
 
 while getopts "hopd:" opt; do
@@ -51,7 +56,7 @@ function do_open() {
 
 # generate some markdown as fodder for prototype doc site generator
 ${PANTS_EXE} goal markdown --print-exception-stacktrace \
-  --markdown-fragment src:: examples:: //:readme || \
+  --markdown-fragment examples:: src:: || \
   die "Failed to generate HTML from markdown'."
 
 # invoke doc site generator.

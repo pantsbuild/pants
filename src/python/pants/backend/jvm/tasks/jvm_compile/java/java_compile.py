@@ -6,7 +6,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import os
-import shlex
 
 from pants.backend.jvm.tasks.jvm_compile.analysis_tools import AnalysisTools
 from pants.backend.jvm.tasks.jvm_compile.java.jmake_analysis import JMakeAnalysis
@@ -17,11 +16,13 @@ from pants.base.exceptions import TaskError
 from pants.base.target import Target
 from pants.base.workunit import WorkUnit
 from pants.util.dirutil import relativize_paths, safe_open
+from pants.util.strutil import safe_shlex_split
 
 
 # From http://kenai.com/projects/jmake/sources/mercurial/content
 #  /src/com/sun/tools/jmake/Main.java?rev=26
 # Main.mainExternal docs.
+
 _JMAKE_ERROR_CODES = {
    -1: 'invalid command line option detected',
    -2: 'error reading command file',
@@ -77,11 +78,10 @@ class JavaCompile(JvmCompile):
   _JMAKE_MAIN = 'com.sun.tools.jmake.Main'
 
   @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    super(JavaCompile, cls).setup_parser(option_group, args, mkflag)
-
-    option_group.add_option(mkflag("args"), dest="java_compile_args", action="append",
-                            help="Pass these extra args to javac.")
+  def register_options(cls, register):
+    super(JavaCompile, cls).register_options(register)
+    register('--args', action='append', help='Pass these extra args to javac.',
+             legacy='java_compile_args')
 
   def __init__(self, *args, **kwargs):
     super(JavaCompile, self).__init__(*args, **kwargs)
@@ -92,25 +92,25 @@ class JavaCompile(JvmCompile):
     self._depfile = os.path.join(self._analysis_dir, 'global_depfile')
 
     self._jmake_bootstrap_key = 'jmake'
-    external_tools = self.context.config.getlist('java-compile',
-                                                 'jmake-bootstrap-tools',
-                                                 default=['//:jmake'])
-    self.register_jvm_tool(self._jmake_bootstrap_key, external_tools)
+    self.register_jvm_tool_from_config(self._jmake_bootstrap_key, self.context.config,
+                                       ini_section='java-compile',
+                                       ini_key='jmake-bootstrap-tools',
+                                       default=['//:jmake'])
 
     self._compiler_bootstrap_key = 'java-compiler'
-    compiler_bootstrap_tools = self.context.config.getlist('java-compile',
-                                                           'compiler-bootstrap-tools',
-                                                           default=['//:java-compiler'])
-    self.register_jvm_tool(self._compiler_bootstrap_key, compiler_bootstrap_tools)
+    self.register_jvm_tool_from_config(self._compiler_bootstrap_key, self.context.config,
+                                       ini_section='java-compile',
+                                       ini_key='compiler-bootstrap-tools',
+                                       default=['//:java-compiler'])
 
     self.configure_args(args_defaults=_JAVA_COMPILE_ARGS_DEFAULT,
                         warning_defaults=_JAVA_COMPILE_WARNING_ARGS_DEFAULT,
                         no_warning_defaults=_JAVA_COMPILE_WARNING_ARGS_DEFAULT)
 
     self._javac_opts = []
-    if self.context.options.java_compile_args:
-      for arg in self.context.options.java_compile_args:
-        self._javac_opts.extend(shlex.split(arg))
+    if self.get_options().args:
+      for arg in self.get_options().args:
+        self._javac_opts.extend(safe_shlex_split(arg))
     else:
       self._javac_opts.extend(self.context.config.getlist('java-compile',
                                                           'javac_args', default=[]))

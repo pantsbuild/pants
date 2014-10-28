@@ -61,7 +61,7 @@ class Py(Command):
     self.extra_requirements = []
     self.config = Config.load()
 
-    interpreters = self.options.interpreters or [b'']
+    interpreters = self.old_options.interpreters or [b'']
     self.interpreter_cache = PythonInterpreterCache(self.config, logger=self.debug)
     self.interpreter_cache.setup(filters=interpreters)
     interpreters = self.interpreter_cache.select_interpreter(
@@ -70,7 +70,7 @@ class Py(Command):
       self.error('Unable to detect suitable interpreter.')
     self.interpreter = interpreters[0]
 
-    for req in self.options.extra_requirements:
+    for req in self.old_options.extra_requirements:
       self.extra_requirements.append(PythonRequirement(req, use_2to3=True))
 
     # We parse each arg in the context of the cli usage:
@@ -116,27 +116,27 @@ class Py(Command):
       self.error('No valid targets specified!')
 
   def debug(self, message):
-    if self.options.verbose:
+    if self.old_options.verbose:
       print(message, file=sys.stderr)
 
   def execute(self):
-    if self.options.pex and self.options.ipython:
+    if self.old_options.pex and self.old_options.ipython:
       self.error('Cannot specify both --pex and --ipython!')
 
-    if self.options.entry_point and self.options.ipython:
+    if self.old_options.entry_point and self.old_options.ipython:
       self.error('Cannot specify both --entry_point and --ipython!')
 
-    if self.options.verbose:
+    if self.old_options.verbose:
       print('Build operating on targets: %s' % ' '.join(str(target) for target in self.targets))
 
 
     builder = PEXBuilder(tempfile.mkdtemp(), interpreter=self.interpreter,
                          pex_info=self.binary.pexinfo if self.binary else None)
 
-    if self.options.entry_point:
-      builder.set_entry_point(self.options.entry_point)
+    if self.old_options.entry_point:
+      builder.set_entry_point(self.old_options.entry_point)
 
-    if self.options.ipython:
+    if self.old_options.ipython:
       if not self.config.has_section('python-ipython'):
         self.error('No python-ipython sections defined in your pants.ini!')
 
@@ -156,11 +156,11 @@ class Py(Command):
         builder=builder,
         platforms=self.binary.platforms if self.binary else None,
         interpreter=self.interpreter,
-        conn_timeout=self.options.conn_timeout)
+        conn_timeout=self.old_options.conn_timeout)
 
     executor.dump()
 
-    if self.options.pex:
+    if self.old_options.pex:
       pex_name = self.binary.name if self.binary else Target.maybe_readable_identify(self.targets)
       pex_path = os.path.join(self.root_dir, 'dist', '%s.pex' % pex_name)
       builder.build(pex_path)

@@ -16,7 +16,7 @@ from pants.util.dirutil import safe_delete, safe_mkdir, safe_mkdir_for
 
 class LocalArtifactCache(ArtifactCache):
   """An artifact cache that stores the artifacts in local files."""
-  def __init__(self, log, artifact_root, cache_root, compress=True, copy_fn=None):
+  def __init__(self, log, artifact_root, cache_root, compression, copy_fn=None):
     """
     cache_root: The locally cached files are stored under this directory.
     copy_fn: An optional function with the signature copy_fn(absolute_src_path, relative_dst_path) that
@@ -24,7 +24,7 @@ class LocalArtifactCache(ArtifactCache):
     """
     ArtifactCache.__init__(self, log, artifact_root)
     self._cache_root = os.path.expanduser(cache_root)
-    self._compress = compress
+    self._compression = compression
 
     def copy(src, rel_dst):
       dst = os.path.join(self.artifact_root, rel_dst)
@@ -43,7 +43,7 @@ class LocalArtifactCache(ArtifactCache):
     if os.path.exists(tarfile_tmp):
       os.unlink(tarfile_tmp)
 
-    artifact = TarballArtifact(self.artifact_root, tarfile_tmp, self._compress)
+    artifact = TarballArtifact(self.artifact_root, tarfile_tmp, self._compression)
     artifact.collect(paths)
     # Note: Race condition here if multiple pants runs (in different workspaces)
     # try to write the same thing at the same time. However since rename is atomic,
@@ -60,7 +60,7 @@ class LocalArtifactCache(ArtifactCache):
     try:
       tarfile = self._cache_file_for_key(cache_key)
       if os.path.exists(tarfile):
-        artifact = TarballArtifact(self.artifact_root, tarfile, self._compress)
+        artifact = TarballArtifact(self.artifact_root, tarfile, self._compression)
         artifact.extract()
         return artifact
       else:
@@ -78,5 +78,4 @@ class LocalArtifactCache(ArtifactCache):
   def _cache_file_for_key(self, cache_key):
     # Note: it's important to use the id as well as the hash, because two different targets
     # may have the same hash if both have no sources, but we may still want to differentiate them.
-    return os.path.join(self._cache_root, cache_key.id, cache_key.hash) + \
-           '.tar.gz' if self._compress else '.tar'
+    return os.path.join(self._cache_root, cache_key.id, cache_key.hash) + '.tgz'

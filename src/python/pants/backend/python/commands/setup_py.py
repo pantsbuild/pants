@@ -6,10 +6,11 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import ast
+from collections import defaultdict
 import itertools
 import os
 import pprint
-from collections import defaultdict
+import shutil
 
 from pex.compatibility import string, to_bytes
 from pex.installer import InstallerBase, Packager
@@ -27,7 +28,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.config import Config
 from pants.base.exceptions import TargetDefinitionException
 from pants.commands.command import Command
-from pants.util.dirutil import safe_rmtree
+from pants.util.dirutil import safe_rmtree, safe_walk
 
 
 SETUP_BOILERPLATE = """
@@ -175,7 +176,7 @@ class SetupPy(Command):
 
     builder = builder_cls(target, root, config)
     builder.generate()
-    for root, _, files in os.walk(builder.package_root):
+    for root, _, files in safe_walk(builder.package_root):
       for fn in files:
         target_file = os.path.join(root, fn)
         yield os.path.relpath(target_file, builder.package_root), target_file
@@ -204,7 +205,7 @@ class SetupPy(Command):
     resources = defaultdict(set)
 
     def iter_files():
-      for root, _, files in os.walk(base):
+      for root, _, files in safe_walk(base):
         module = os.path.relpath(root, base).replace(os.path.sep, '.')
         for filename in files:
           yield module, filename, os.path.join(root, filename)
@@ -391,22 +392,22 @@ class SetupPy(Command):
     target_base = '%s-%s' % (target.provides.name, target.provides.version)
     setup_dir = os.path.join(dist_dir, target_base)
     safe_rmtree(setup_dir)
-    os.rename(chroot.path(), setup_dir)
+    shutil.move(chroot.path(), setup_dir)
 
-    if not self.options.run:
+    if not self.old_options.run:
       print('Running packager against %s' % setup_dir)
       setup_runner = Packager(setup_dir)
       tgz_name = os.path.basename(setup_runner.sdist())
       print('Writing %s' % os.path.join(dist_dir, tgz_name))
-      os.rename(setup_runner.sdist(), os.path.join(dist_dir, tgz_name))
+      shutil.move(setup_runner.sdist(), os.path.join(dist_dir, tgz_name))
       safe_rmtree(setup_dir)
     else:
-      print('Running %s against %s' % (self.options.run, setup_dir))
-      setup_runner = SetupPyRunner(setup_dir, self.options.run)
+      print('Running %s against %s' % (self.old_options.run, setup_dir))
+      setup_runner = SetupPyRunner(setup_dir, self.old_options.run)
       setup_runner.run()
 
   def execute(self):
-    if self.options.recursive:
+    if self.old_options.recursive:
       setup_targets = OrderedSet()
       def add_providing_target(target):
         if isinstance(target, PythonTarget) and target.provides:

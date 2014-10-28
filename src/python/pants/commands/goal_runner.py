@@ -32,10 +32,10 @@ from pants.engine.engine import Engine
 from pants.engine.round_engine import RoundEngine
 from pants.goal.context import Context
 from pants.goal.error import GoalError
-from pants.goal.help import print_help
 from pants.goal.initialize_reporting import update_reporting
-from pants.goal.option_helpers import add_global_options
 from pants.goal.goal import Goal
+from pants.option.global_options import register_global_options
+from pants.option.options import Options
 from pants.util.dirutil import safe_mkdir
 
 
@@ -110,8 +110,28 @@ class GoalRunner(Command):
 
   def __init__(self, *args, **kwargs):
     self.targets = []
-    self.config = None
+    self.config = Config.load()
+    known_scopes = ['']
+    for goal in Goal.all():
+      # Note that enclosing scopes will appear before scopes they enclose.
+      known_scopes.extend(filter(None, goal.known_scopes()))
+
+    # Annoying but temporary hack to get the parser.  We can't use self.parser because
+    # that only gets set up in the superclass ctor, and we can't call that until we have
+    # self.new_options set up because the superclass ctor calls our register_options().
+    # Fortunately this will all go away once we're fully off the old "Command" mechanism.
+    legacy_parser = args[2] if len(args) > 2 else kwargs['parser']
+    self.new_options = Options(os.environ.copy(), self.config, known_scopes, args=sys.argv,
+                               legacy_parser=legacy_parser)
     super(GoalRunner, self).__init__(*args, **kwargs)
+
+  def get_spec_excludes(self):
+    spec_excludes = self.config.getlist(Config.DEFAULT_SECTION, 'spec_excludes',
+                                        default=None)
+    if spec_excludes is None:
+       return [self.config.getdefault('pants_workdir')]
+    return  [os.path.join(self.root_dir, spec_exclude) for spec_exclude in spec_excludes]
+
 
   @contextmanager
   def check_errors(self, banner):
@@ -146,10 +166,12 @@ class GoalRunner(Command):
       # actual error message, so we don't show it in this case.
       self.error(msg.getvalue(), show_help=False)
 
-  def setup_parser(self, parser, args):
-    self.config = Config.load()
-    add_global_options(parser)
+  def register_options(self):
+    register_global_options(self.new_options.register_global)
+    for goal in Goal.all():
+      goal.register_options(self.new_options)
 
+  def setup_parser(self, parser, args):
     # We support attempting zero or more goals.  Multiple goals must be delimited from further
     # options and non goal args with a '--'.  The key permutations we need to support:
     # ./pants goal => goals
@@ -170,14 +192,14 @@ class GoalRunner(Command):
 
     goals, specs, fail_fast = GoalRunner.parse_args(non_help_args)
     if show_help:
-      print_help(goals)
+      self.new_options.print_help(goals=goals, legacy=True)
       sys.exit(0)
 
     self.requested_goals = goals
 
     with self.run_tracker.new_workunit(name='setup', labels=[WorkUnit.SETUP]):
-      # Bootstrap user goals by loading any BUILD files implied by targets.
-      spec_parser = CmdLineSpecParser(self.root_dir, self.address_mapper)
+
+      spec_parser = CmdLineSpecParser(self.root_dir, self.address_mapper, spec_excludes=self.get_spec_excludes())
       with self.run_tracker.new_workunit(name='parse', labels=[WorkUnit.SETUP]):
         for spec in specs:
           for address in spec_parser.parse_addresses(spec, fail_fast):
@@ -209,8 +231,7 @@ class GoalRunner(Command):
       if augmented_args != args:
         # TODO(John Sirois): Cleanup this currently important mutation of the passed in args
         # once the 2-layer of command -> goal is squashed into one.
-        del args[:]
-        args.extend(augmented_args)
+        args[:] = augmented_args
         sys.stderr.write("(using pantsrc expansion: pants goal %s)\n" % ' '.join(augmented_args))
 
     Goal.setup_parser(parser, args, self.goals)
@@ -220,9 +241,9 @@ class GoalRunner(Command):
     # context/work-unit logging and standard python logging doesn't buy us anything.
 
     # Enable standard python logging for code with no handle to a context/work-unit.
-    if self.options.log_level:
-      LogOptions.set_stderr_log_level((self.options.log_level or 'info').upper())
-      logdir = self.options.logdir or self.config.get('goals', 'logdir', default=None)
+    if self.old_options.log_level:
+      LogOptions.set_stderr_log_level((self.old_options.log_level or 'info').upper())
+      logdir = self.old_options.logdir or self.config.get('goals', 'logdir', default=None)
       if logdir:
         safe_mkdir(logdir)
         LogOptions.set_log_dir(logdir)
@@ -256,11 +277,11 @@ class GoalRunner(Command):
           mapping[matched_pattern].append(target)
       return mapping
 
-    is_explain = self.options.explain
-    update_reporting(self.options, is_quiet_task() or is_explain, self.run_tracker)
+    is_explain = self.old_options.explain
+    update_reporting(self.old_options, is_quiet_task() or is_explain, self.run_tracker)
 
-    if self.options.target_excludes:
-      excludes = self.options.target_excludes
+    if self.old_options.target_excludes:
+      excludes = self.old_options.target_excludes
       log.debug('excludes:\n  {excludes}'.format(excludes='\n  '.join(excludes)))
       by_pattern = targets_by_pattern(self.targets, excludes)
       self.targets = by_pattern[_UNMATCHED_KEY]
@@ -276,13 +297,15 @@ class GoalRunner(Command):
 
     context = Context(
       config=self.config,
-      options=self.options,
+      old_options=self.old_options,
+      new_options=self.new_options,
       run_tracker=self.run_tracker,
       target_roots=self.targets,
       requested_goals=self.requested_goals,
       build_graph=self.build_graph,
       build_file_parser=self.build_file_parser,
       address_mapper=self.address_mapper,
+      spec_excludes=self.get_spec_excludes(),
       lock=lock)
 
     unknown = []

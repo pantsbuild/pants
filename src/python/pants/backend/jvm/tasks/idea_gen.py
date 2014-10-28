@@ -19,7 +19,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.config import ConfigOption
 from pants.base.generator import Generator, TemplateData
 from pants.base.source_root import SourceRoot
-from pants.util.dirutil import safe_mkdir
+from pants.util.dirutil import safe_mkdir, safe_walk
 
 
 _TEMPLATE_BASEDIR = 'templates/idea'
@@ -43,97 +43,57 @@ _SCALA_VERSIONS = {
 
 
 class IdeaGen(IdeGen):
-  _IDEA_JAVA_MAX_HEAP_MB = ConfigOption.create(
-    section='idea',
-    option='java_maximum_heap_size_mb',
-    help='Max heap size for javac in megabytes.',
-    valtype=int,
-    default=512)
-
-  _IDEA_SCALA_MAX_HEAP_MB = ConfigOption.create(
-    section='idea',
-    option='scala_maximum_heap_size_mb',
-    help='Max heap size for scalac in megabytes.',
-    valtype=int,
-    default=512)
 
   @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    super(IdeaGen, cls).setup_parser(option_group, args, mkflag)
-
-    supported_versions = sorted(list(_VERSIONS.keys()))
-    option_group.add_option(mkflag("idea-version"), dest="idea_gen_version",
-                            default='11', type="choice", choices=supported_versions,
-                            help="[%%default] The IntelliJ IDEA version the project "
-                                   "configuration should be generated for; can be one of: " \
-                                   "%s" % supported_versions)
-
-    option_group.add_option(mkflag("merge"), mkflag("merge", negate=True), default=True,
-                            action="callback", callback=mkflag.set_bool, dest="idea_gen_merge",
-                            help="[%default] Merge any manual customizations in existing "
-                                   "Intellij IDEA configuration. If False, manual customizations "
-                                   "will be over-written.")
-
-    option_group.add_option(mkflag("open"), mkflag("open", negate=True), default=True,
-                            action="callback", callback=mkflag.set_bool, dest="idea_gen_open",
-                            help="[%default] Attempts top open the generated project in IDEA.")
-
-    option_group.add_option(mkflag("bash"), mkflag("bash", negate=True), default=False,
-                            action="callback", callback=mkflag.set_bool, dest="idea_gen_bash",
-                            help="Adds a bash facet to the generated project configuration.")
-
-    option_group.add_option(mkflag("scala-language-level"), default=_SCALA_VERSION_DEFAULT,
-                            type="choice", choices=_SCALA_VERSIONS.keys(),
-                            dest="idea_scala_language_level",
-                            help="[%default] Set the scala language level used for IDEA linting.")
-    option_group.add_option(mkflag("scala-maximum-heap-size"),
-                            dest="idea_gen_scala_maximum_heap_size",
-                            help="[%default] Sets the maximum heap size (in megabytes) for scalac.")
-    option_group.add_option(mkflag("fsc"), mkflag("fsc", negate=True), default=False,
-                            action="callback", callback=mkflag.set_bool, dest="idea_gen_fsc",
-                            help="If the project contains any scala targets this specifies the "
-                                 "fsc compiler should be enabled.")
-
-    option_group.add_option(mkflag("java-encoding"), default="UTF-8",
-                            dest="idea_gen_java_encoding",
-                            help="[%default] Sets the file encoding for java files in this "
-                                   "project.")
-    option_group.add_option(mkflag("java-maximum-heap-size"),
-                            dest="idea_gen_java_maximum_heap_size",
-                            help="[%default] Sets the maximum heap size (in megabytes) for javac.")
-
-    option_group.add_option(mkflag("exclude-maven-target"),
-                            mkflag("exclude-maven-target", negate=True), default=False,
-                            action="callback", callback=mkflag.set_bool,
-                            dest="idea_exclude_maven_target",
-                            help="Exclude 'target' directories for directories containing "
-                                 "pom.xml files.  These directories contain generated code and"
-                                 "copies of files staged for deployment.")
-
+  def register_options(cls, register):
+    super(IdeaGen, cls).register_options(register)
+    register('--version', legacy='idea_gen_version',
+             choices=sorted(list(_VERSIONS.keys())), default='11',
+             help='The IntelliJ IDEA version the project config should be generated for.')
+    register('--merge', action='store_true', legacy='ide_gen_merge', default=True,
+             help='Merge any manual customizations in existing '
+                  'Intellij IDEA configuration. If False, manual customizations '
+                  'will be over-written.')
+    register('--open', action='store_true', legacy='idea_gen_open', default=True,
+             help='Attempts to open the generated project in IDEA.')
+    register('--bash', action='store_true', legacy='idea_gen_bash',
+             help='Adds a bash facet to the generated project configuration.')
+    register('--scala-language-level', legacy='idea_scala_language_level',
+             choices=_SCALA_VERSIONS.keys(), default=_SCALA_VERSION_DEFAULT,
+             help='Set the scala language level used for IDEA linting.')
+    register('--scala-maximum-heap-size-mb', legacy='idea_gen_scala_maximum_heap_size', default=512,
+             help='Sets the maximum heap size (in megabytes) for scalac.')
+    register('--fsc', action='store_true', legacy='idea_gen_fsc', default=False,
+             help='If the project contains any scala targets this specifies the '
+                  'fsc compiler should be enabled.')
+    register('--java-encoding', legacy='idea_gen_java_encoding', default='UTF-8',
+             help='Sets the file encoding for java files in this project.')
+    register('--java-maximum-heap-size-mb', legacy='idea_gen_java_maximum_heap_size', default=512,
+             help='Sets the maximum heap size (in megabytes) for javac.')
+    register('--exclude-maven-target', action='store_true',
+             legacy='idea_exclude_maven_target', default=False,
+             help="Exclude 'target' directories for directories containing "
+                  "pom.xml files.  These directories contain generated code and"
+                  "copies of files staged for deployment.")
 
   def __init__(self, *args, **kwargs):
     super(IdeaGen, self).__init__(*args, **kwargs)
 
     self.intellij_output_dir = os.path.join(self.gen_project_workdir, 'out')
-    self.nomerge = not self.context.options.idea_gen_merge
-    self.open = self.context.options.idea_gen_open
-    self.bash = self.context.options.idea_gen_bash
+    self.nomerge = not self.get_options().merge
+    self.open = self.get_options().open
+    self.bash = self.get_options().bash
 
     self.scala_language_level = _SCALA_VERSIONS.get(
-      self.context.options.idea_scala_language_level, None)
-    self.scala_maximum_heap_size = (
-      self.context.options.idea_gen_scala_maximum_heap_size
-      or self.context.config.get_option(self._IDEA_SCALA_MAX_HEAP_MB)
-    )
-    self.fsc = self.context.options.idea_gen_fsc
+      self.get_options().scala_language_level, None)
+    self.scala_maximum_heap_size = self.get_options().scala_maximum_heap_size_mb
 
-    self.java_encoding = self.context.options.idea_gen_java_encoding
-    self.java_maximum_heap_size = (
-      self.context.options.idea_gen_java_maximum_heap_size
-      or self.context.config.get_option(self._IDEA_JAVA_MAX_HEAP_MB)
-    )
+    self.fsc = self.get_options().fsc
 
-    idea_version = _VERSIONS[self.context.options.idea_gen_version]
+    self.java_encoding = self.get_options().java_encoding
+    self.java_maximum_heap_size = self.get_options().java_maximum_heap_size_mb
+
+    idea_version = _VERSIONS[self.get_options().version]
     self.project_template = os.path.join(_TEMPLATE_BASEDIR, 'project-%s.mustache' % idea_version)
     self.module_template = os.path.join(_TEMPLATE_BASEDIR, 'module-%s.mustache' % idea_version)
 
@@ -143,7 +103,7 @@ class IdeaGen(IdeGen):
   @staticmethod
   def _maven_targets_excludes(repo_root):
     excludes = []
-    for (dirpath, dirnames, filenames) in os.walk(repo_root):
+    for (dirpath, dirnames, filenames) in safe_walk(repo_root):
       if "pom.xml" in filenames:
         excludes.append(os.path.join(os.path.relpath(dirpath, start=repo_root), "target"))
     return excludes
@@ -179,7 +139,7 @@ class IdeaGen(IdeGen):
       root_relative_path = os.path.join(source_set.source_base, source_set.path) \
                            if source_set.path else source_set.source_base
 
-      if self.context.options.ide_infer_test_from_siblings:
+      if self.get_options().infer_test_from_siblings:
         is_test = IdeaGen._sibling_is_test(source_set)
       else:
         is_test = source_set.is_test
@@ -210,7 +170,7 @@ class IdeaGen(IdeGen):
       )
 
     exclude_folders = []
-    if self.context.options.idea_exclude_maven_target:
+    if self.get_options().exclude_maven_target:
       exclude_folders += IdeaGen._maven_targets_excludes(get_buildroot())
 
     exclude_folders += self.context.config.getlist('idea', 'exclude_folders',
@@ -313,7 +273,7 @@ class IdeaGen(IdeGen):
 
     # TODO(John Sirois): make test resources 1st class in ant build and punch this through to pants
     # model
-    for _, _, files in os.walk(os.path.join(get_buildroot(), 'tests', 'resources')):
+    for _, _, files in safe_walk(os.path.join(get_buildroot(), 'tests', 'resources')):
       resource_extensions.update(Project.extract_resource_extensions(files))
 
     return resource_extensions

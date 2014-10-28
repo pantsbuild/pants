@@ -14,5 +14,14 @@ python_library(
   name = 'dirutil',
   sources = ['dirutil.py'],
   dependencies = [
+    ':strutil',
+  ],
+)
+
+python_library(
+  name = 'strutil',
+  sources = ['strutil.py'],
+  dependencies = [
+    '3rdparty/python:six',
   ],
 )

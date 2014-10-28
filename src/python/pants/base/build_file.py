@@ -5,6 +5,7 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from collections import defaultdict
 from glob import glob1
 import logging
 import marshal
@@ -12,6 +13,7 @@ import os
 import re
 
 from pex.interpreter import PythonIdentity
+from pants.util.dirutil import safe_walk
 from twitter.common.collections import OrderedSet
 
 
@@ -65,10 +67,44 @@ class BuildFile(object):
     return BuildFile._PATTERN.match(name)
 
   @staticmethod
-  def scan_buildfiles(root_dir, base_path=None):
-    """Looks for all BUILD files under base_path"""
+  def scan_buildfiles(root_dir, base_path=None, spec_excludes=None):
+    """Looks for all BUILD files
+    :param root_dir: the root of the repo containing sources
+    :param base_path: directory under root_dir to scan
+    :param spec_excludes: list of absolute paths to exclude from the scan"""
+
+    def calc_exclude_roots(root_dir, excludes):
+      """Return a map of root directories to subdirectory names suitable for a quick evaluation
+      inside safe_walk()
+      """
+      result = defaultdict(set)
+      for exclude in excludes:
+        if exclude and exclude.startswith(root_dir):
+          result[os.path.dirname(exclude)].add(os.path.basename(exclude))
+      return result
+
+    def find_excluded(root, dirs, exclude_roots):
+      """Removes any of the directories specified in exclude_roots from dirs.
+      """
+      to_remove = []
+      for exclude_root in exclude_roots:
+        # root ends with a /, trim it off
+        if root.rstrip('/') == exclude_root:
+          for subdir in exclude_roots[exclude_root]:
+            if subdir in dirs:
+              to_remove.append(subdir)
+      return to_remove
+
     buildfiles = []
-    for root, dirs, files in os.walk(os.path.join(root_dir, base_path or '')):
+    if not spec_excludes:
+      exclude_roots = {}
+    else:
+      exclude_roots = calc_exclude_roots(root_dir, spec_excludes)
+
+    for root, dirs, files in safe_walk(os.path.join(root_dir, base_path or ''), topdown=True):
+      to_remove = find_excluded(root, dirs, exclude_roots)
+      for subdir in to_remove:
+        dirs.remove(subdir)
       for filename in files:
         if BuildFile._is_buildfile_name(filename):
           buildfile_relpath = os.path.relpath(os.path.join(root, filename), root_dir)

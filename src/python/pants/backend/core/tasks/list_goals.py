@@ -11,17 +11,14 @@ from pants.goal.goal import Goal
 
 class ListGoals(ConsoleTask):
   @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    super(ListGoals, cls).setup_parser(option_group, args, mkflag)
-    option_group.add_option(mkflag("all"),
-                            dest="goal_list_all",
-                            default=False,
-                            action="store_true",
-                            help="[%default] List all goals even if no description is available.")
-    option_group.add_option(mkflag('graph'),
-                            dest='goal_list_graph',
-                            action='store_true',
-                            help='[%default] Generate a graphviz graph of installed goals.')
+  def register_options(cls, register):
+    super(ListGoals, cls).register_options(register)
+    register('--graph', action='store_true',
+             help='Generate a graphviz graph of installed goals.',
+             legacy='goal_list_graph')
+    register('--all', action='store_true',
+             help='List all goals even if no description is available.',
+             legacy='goal_list_all')
 
   def console_output(self, targets):
     def report():
@@ -33,7 +30,7 @@ class ListGoals(ConsoleTask):
         if goal.description:
           documented_rows.append((goal.name, goal.description))
           max_width = max(max_width, len(goal.name))
-        elif self.context.options.goal_list_all:
+        elif self.get_options().all:
           undocumented.append(goal.name)
       for name, description in documented_rows:
         yield '  %s: %s' % (name.rjust(max_width), description)
@@ -81,4 +78,4 @@ class ListGoals(ConsoleTask):
           edges.add(edge)
       yield '}'
 
-    return graph() if self.context.options.goal_list_graph else report()
+    return graph() if self.get_options().graph else report()

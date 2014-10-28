@@ -24,6 +24,7 @@ target(
     ':prepare_resources',
     ':reporting_server',
     ':roots',
+    ':run_prep_command',
     ':scm_publish',
     ':sorttargets',
     ':targets_help',
@@ -54,6 +55,8 @@ python_library(
   resources = globs('templates/builddictionary/*.mustache'),
   dependencies = [
     ':common',
+    ':reflect',
+    '3rdparty/python:docutils',
     '3rdparty/python:setuptools',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/core/tasks:task',
@@ -72,6 +75,8 @@ python_library(
   ],
 )
 
+
+
 python_library(
   name = 'check_exclusives',
   sources = ['check_exclusives.py'],
@@ -88,7 +93,6 @@ python_library(
   sources = ['clean.py'],
   dependencies = [
     ':task',
-    '3rdparty/python:python-daemon',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:config',
     'src/python/pants/util:dirutil',
@@ -253,10 +257,31 @@ python_library(
 )
 
 python_library(
+  name = 'reflect',
+  sources = ['reflect.py'],
+  dependencies = [
+    'src/python/pants/base:build_manual',
+    'src/python/pants/base:generator',
+    'src/python/pants/base:target',
+    'src/python/pants/goal:goal',
+    'src/python/pants/goal:option_helpers',
+  ],
+)
+
+python_library(
   name = 'roots',
   sources = ['roots.py'],
   dependencies = [
     ':console_task',
+    'src/python/pants/backend/core/targets:common',
+  ],
+)
+
+python_library(
+  name = 'run_prep_command',
+  sources = ['run_prep_command.py'],
+  dependencies = [
+    ':common',
     'src/python/pants/backend/core/targets:common',
   ],
 )
@@ -283,11 +308,12 @@ python_library(
 python_library(
   name = 'targets_help',
   sources = ['targets_help.py'],
+  resources = globs('templates/targets_help/*.mustache'),
   dependencies = [
+    ':builddictionary',
     ':common',
     ':console_task',
-    'src/python/pants/base:target',
-    'src/python/pants/backend/core/targets:common',
+    ':reflect',
   ],
 )
 

@@ -11,6 +11,7 @@ from twitter.common.lang import Compatibility
 from twitter.common.log import logger
 
 from pants.base.config import Config
+from pants.util.strutil import safe_shlex_split
 
 
 log = logger(name='rcfile')
@@ -26,11 +27,6 @@ class RcFile(object):
   # TODO(John Sirois): localize handling of this flag value back into pants_exe.py once the new old
   # split is healed.
   _DISABLE_PANTS_RC_OPTION = '--no-pantsrc'
-
-  @staticmethod
-  def install_disable_rc_option(parser):
-    parser.add_option(RcFile._DISABLE_PANTS_RC_OPTION, action = 'store_true', dest = 'nopantsrc',
-                      default = False, help = 'Specifies that pantsrc files should be ignored.')
 
   def __init__(self, paths, default_prepend=True, process_default=False):
     """
@@ -80,7 +76,7 @@ class RcFile(object):
     log.debug('using rcfiles: %s to modify args' % ','.join(read_from))
 
     def get_rcopts(command, key):
-      return config.get(command, key).split() if config.has_option(command, key) else []
+      return safe_shlex_split(config.get(command, key)) if config.has_option(command, key) else []
 
     commands = list(commands)
     if self.process_default:

@@ -60,6 +60,7 @@ python_library(
   sources = ['code_gen.py'],
   dependencies = [
     ':common',
+    'src/python/pants/base:address_lookup_error',
     'src/python/pants/base:build_environment',
   ],
 )

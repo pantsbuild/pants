@@ -6,8 +6,7 @@ This page describes the developer workflow when changing Pants itself. (If you
 wanted instructions for using Pants to develop other programs, please see
 :doc:`first_tutorial`.)
 
-.. Getting the source code section.
-
+These instructions assume you've already :ref:`downloaded the source code <download_source_code>`.
 
 ********************
 Running from sources
@@ -23,13 +22,13 @@ Notice this invocation specifies the ``PANTS_DEV`` environment variable.
 By defining ``PANTS_DEV`` pants will be run from sources.
 
 
-********************
-Building a Pants PEX
-********************
+********************************
+Building a Pants PEX for Testing
+********************************
 
-While you can build a Pants PEX in the usual Python way, the ``./pants``
-wrapper provides some extra conveniences. If you call it without the
-``PANTS_DEV=1`` environment described above, it
+The ``./pants`` wrapper provides a convenient way to produce a ``.pex`` file for testing pants
+on your local workstation.  If you call it without the ``PANTS_DEV=1`` environment described above,
+it
 
    * Checks the source tree's top directory for a ``pants.pex`` and runs it
      if it exists. Otherwise ``./pants``...
@@ -40,9 +39,12 @@ It looks something like::
 
    $ rm pants.pex
    $ ./pants goal my-new-feature
-   Build operating on targets: OrderedSet([PythonBinary(src/python/pants/BUILD:pants)])
-   Building PythonBinary PythonBinary(src/python/pants/BUILD:pants):
-   Wrote /Users/travis/src/science/dist/pants.pex
+   Building pants.pex to /Users/zundel/Src/Pants/pants.pex...
+   ...
+   Build operating on top level addresses: set([BuildFileAddress(/Users/pantsdev/Src/pants/src/python/pants/bin/BUILD, pants_local_binary)])
+   Building PythonBinary PythonBinary(BuildFileAddress(/Users/pantsdev/Src/pants/src/python/pants/bin/BUILD, pants_local_binary)):
+   Wrote /Users/pantsdev/Src/pants/dist/pants_local_binary.pex
+   /Users/pantsdev/Src/Pants/dist/pants_local_binary.pex -> /Users/pantsdev/Src/Pants/pants.pex
    AMAZING NEW FEATURE PRINTS HERE
    $ ls pants.pex # gets moved here, though originally "Wrote" to ./dist/
    pants.pex
@@ -55,6 +57,51 @@ between trying the generated ``pants.pex`` and fixing source code
 as inspired by its misbehaviors. When the fixed source code is in a
 consistent state, remove ``pants.pex`` so that it will get replaced
 on the next ``./pants`` run.
+
+
+***********************************
+Building a Pants PEX for Production
+***********************************
+
+Most of the time, you will probably want to use an official published version of pants.
+But what if you want to let some of your internal users try out the latest and greatest
+unreleased code?  What if you want to create a custom build of pants with some
+unpublished patches?  In that case, you want to build a production ready version of
+pants including dependencies for all platforms, not just your development environment.
+
+The following command will create a locally built ``pants.pex`` for all platforms::
+
+   $ ./pants goal binary src/python/pants/bin:pants
+   ...
+   SUCCESS
+
+The resulting ``pants.pex`` will be in the ``dist/`` directory::
+
+   $ ls -l dist/pants.pex
+   -rwxr-xr-x  1 pantsdev  pantsdev  5561254 Oct  8 09:52 dist/pants.pex
+
+You can see that the pex contains bundled dependencies for both mac and linux::
+
+   $ unzip -l dist/pants.pex | grep -e 'macos\|linux'
+
+You can distribute the resulting ``pants.pex`` file to your users via your favorite method.
+A user can just copy this pex to the top of their Pants workspace and use it::
+
+   $ cp /mnt/fd0/pants.pex .
+   $ ./pants.pex goal test examples/tests/java/com/pants/examples/hello/greet:
+
+There are some parameters in ``src/python/pants/bin/BUILD`` that you may want to tweak for your
+production distribution.  For example, you may want to update the list of supported platforms::
+
+   platforms=[
+    'linux-x86_64',
+    'macosx-10.4-x86_64',
+  ],
+
+Or you may want to force the Python interpreter to be a specific version::
+
+   PANTS_COMPATIBILITY = 'CPython>=2.7,<2.8'
+
 
 *******
 Testing
@@ -98,14 +145,15 @@ run it before you contribute a change or merge it to master::
 
    ./build-support/bin/ci.sh
 
-Sometimes you want to run tests on Travis-CI even though you're not sure
-your change is ready to merge to master.
+You can run your code through the Travis-CI before you submit a change.  Travis-CI is integrated
+with the pull requests for the ``pantsbuild/pants`` repo.  Travis-CI will test it soon after the
+pull request is created.  It will queue up a new job every time you subsequently push your branch.
 
-* If you can push to the ``pantsbuild/pants`` project,
-  push your development branch to origin. Travis-CI will test it soon after.
-* If you *can't* push to the ``pantsbuild/pants`` project,
-  push a branch to your fork of pantsbuild on github, then open a pull request
-  against pants with your branch. Travis-CI will test it soon after.
+To kick off a new CI-build, push a branch to your :ref:`fork <download_source_code>` of
+``pantsbuild/pants``.  Create a pull request on the ``pantsbuild/pants``
+`repo <https://github.com/pantsbuild/pants>`_,
+not your fork.  If you are posting a review request, put the pull request number into the Bug field.
+Then, when you close the request, you can navigate from the bug number to easily close the pull request.
 
 *********
 Debugging

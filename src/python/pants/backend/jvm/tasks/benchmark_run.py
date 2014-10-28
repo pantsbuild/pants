@@ -16,58 +16,39 @@ from pants.java.util import execute_java
 
 class BenchmarkRun(JvmTask, JvmToolTaskMixin):
   @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    option_group.add_option(mkflag("target"), dest="target_class", action="append",
-                            help="Name of the benchmark class.")
+  def register_options(cls, register):
+    super(BenchmarkRun, cls).register_options(register)
+    # TODO(benjy): Why is this 'append'? We treat the value as a scalar, not a list.
+    register('--target', action='append', legacy='target_class',
+             help='Name of the benchmark class.')
 
-    option_group.add_option(mkflag("memory"), mkflag("memory", negate=True),
-                            dest="memory_profiling", default=False,
-                            action="callback", callback=mkflag.set_bool,
-                            help="[%default] Enable memory profiling.")
-
-    option_group.add_option(mkflag("debug"), mkflag("debug", negate=True),
-                            dest="debug", default=False,
-                            action="callback", callback=mkflag.set_bool,
-                            help="[%default] Enable caliper debug mode.")
-
-    option_group.add_option(mkflag("caliper-args"), dest="extra_caliper_args", default=[],
-                            action="append",
-                            help="Allows the user to pass additional command line options to "
-                                 "caliper. Can be used multiple times and arguments will be "
-                                 "concatenated. Example use: --bench-caliper-args='-Dsize=10,20 "
-                                 "-Dcomplex=true,false' --bench-caliper-args=-Dmem=1,2,3")
+    register('--memory', default=False, action='store_true', legacy='memory_profiling',
+             help='Enable memory profiling.')
 
   def __init__(self, *args, **kwargs):
     super(BenchmarkRun, self).__init__(*args, **kwargs)
 
     config = self.context.config
-    self.confs = config.getlist('benchmark-run', 'confs', default=['default'])
-    self.jvm_args = config.getlist('benchmark-run', 'jvm_args',
-                                   default=['-Xmx1g', '-XX:MaxPermSize=256m'])
 
     self._benchmark_bootstrap_key = 'benchmark-tool'
-    benchmark_bootstrap_tools = config.getlist('benchmark-run', 'bootstrap-tools',
-                                               default=['//:benchmark-caliper-0.5'])
-    self.register_jvm_tool(self._benchmark_bootstrap_key,
-                                                  benchmark_bootstrap_tools)
+    self.register_jvm_tool_from_config(self._benchmark_bootstrap_key, config,
+                                       ini_section='benchmark-run',
+                                       ini_key='bootstrap-tools',
+                                       default=['//:benchmark-caliper-0.5'])
     self._agent_bootstrap_key = 'benchmark-agent'
-    agent_bootstrap_tools = config.getlist('benchmark-run', 'agent_profile',
-                                           default=[':benchmark-java-allocation-instrumenter-2.1'])
-    self.register_jvm_tool(self._agent_bootstrap_key, agent_bootstrap_tools)
+    self.register_jvm_tool_from_config(self._agent_bootstrap_key, config,
+                                       ini_section='benchmark-run',
+                                       ini_key='agent_profile',
+                                       default=[':benchmark-java-allocation-instrumenter-2.1'])
 
     # TODO(Steve Gury):
     # Find all the target classes from the Benchmark target itself
     # https://jira.twitter.biz/browse/AWESOME-1938
-    self.caliper_args = self.context.options.target_class
-
-    if self.context.options.memory_profiling:
-      self.caliper_args += ['--measureMemory']
-
-    if self.context.options.debug:
-      self.jvm_args.extend(self.context.config.getlist('jvm', 'debug_args'))
-      self.caliper_args += ['--debug']
-
-    self.caliper_args.extend(self.context.options.extra_caliper_args)
+    self.args.insert(0, self.get_options().target)
+    if self.get_options().memory:
+      self.args.append('--measureMemory')
+    if self.get_options().debug:
+      self.args.append('--debug')
 
   def prepare(self, round_manager):
     # TODO(John Sirois): these are fake requirements in order to force compile to run before this
@@ -100,8 +81,8 @@ class BenchmarkRun(JvmTask, JvmToolTaskMixin):
     caliper_main = 'com.google.caliper.Runner'
     exit_code = execute_java(classpath=classpath,
                              main=caliper_main,
-                             jvm_options=self.jvm_args,
-                             args=self.caliper_args,
+                             jvm_options=self.jvm_options,
+                             args=self.args,
                              workunit_factory=self.context.new_workunit,
                              workunit_name='caliper')
     if exit_code != 0:

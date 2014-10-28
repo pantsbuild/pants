@@ -166,6 +166,10 @@ python_library(
   sources = ['test_builder.py'],
   dependencies = [
     ':python_chroot',
+    # NOTE(pl): We must pull in coverage by hand even though it isn't imported.
+    # pytest-cov otherwise pulls in a newer version of coverage that doesn't
+    # work in all environments, notably some OSX installs.
+    '3rdparty/python:coverage',
     '3rdparty/python:pex',
     '3rdparty/python:pytest',
     '3rdparty/python:pytest-cov',

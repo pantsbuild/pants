@@ -20,11 +20,12 @@ from pants.backend.codegen.tasks.code_gen import CodeGen
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.base.address import SyntheticAddress
+from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.target import Target
 from pants.thrift_util import calculate_compile_roots, select_thrift_binary
-from pants.util.dirutil import safe_mkdir
+from pants.util.dirutil import safe_mkdir, safe_walk
 
 
 def _copytree(from_base, to_base):
@@ -39,7 +40,7 @@ def _copytree(from_base, to_base):
       if e.errno != errno.EEXIST:
         raise e
 
-  for dirpath, dirnames, filenames in os.walk(from_base, topdown=True, onerror=abort):
+  for dirpath, dirnames, filenames in safe_walk(from_base, topdown=True, onerror=abort):
     to_path = os.path.join(to_base, os.path.relpath(dirpath, from_base))
     for dirname in dirnames:
       safe_mkdir(os.path.join(to_path, dirname))
@@ -48,18 +49,17 @@ def _copytree(from_base, to_base):
 
 
 class ApacheThriftGen(CodeGen):
+
   GenInfo = namedtuple('GenInfo', ['gen', 'deps'])
   ThriftSession = namedtuple('ThriftSession', ['outdir', 'cmd', 'process'])
 
   @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    option_group.add_option(mkflag('version'), dest='thrift_version',
-                            help='Thrift compiler version.')
-
-    option_group.add_option(mkflag('lang'), dest='thrift_gen_langs',  default=[],
-                            action='append', type='choice', choices=['python', 'java'],
-                            help='Force generation of thrift code for these languages.')
-
+  def register_options(cls, register):
+    super(ApacheThriftGen, cls).register_options(register)
+    register('--version', help='Thrift compiler version.', legacy='thrift_version')
+    register('--lang', action='append', choices=['python', 'java'],
+             help='Force generation of thrift code for these languages.',
+             legacy='thrift_gen_langs')
 
   def __init__(self, *args, **kwargs):
     super(ApacheThriftGen, self).__init__(*args, **kwargs)
@@ -70,13 +70,13 @@ class ApacheThriftGen(CodeGen):
     self.strict = self.context.config.getbool('thrift-gen', 'strict')
     self.verbose = self.context.config.getbool('thrift-gen', 'verbose')
 
-    self.gen_langs = set(self.context.options.thrift_gen_langs)
+    self.gen_langs = set(self.get_options().lang)
     for lang in ('java', 'python'):
       if self.context.products.isrequired(lang):
         self.gen_langs.add(lang)
 
     self.thrift_binary = select_thrift_binary(self.context.config,
-                                              version=self.context.options.thrift_version)
+                                              version=self.get_options().version)
 
     self.defaults = JavaThriftLibrary.Defaults(self.context.config)
 
@@ -92,7 +92,13 @@ class ApacheThriftGen(CodeGen):
       dependencies = OrderedSet()
       deps[category] = dependencies
       for depspec in depspecs:
-        dependencies.update(self.context.resolve(depspec))
+        try:
+          dependencies.update(self.context.resolve(depspec))
+        except AddressLookupError as e:
+          raise self.DepLookupError("{message}\n  referenced from [{section}] key: {key}"
+                                    "in pants.ini" .format(message=e, section='thrift-gen',
+                                                           key="gen->deps->{category}"
+                                                           .format(category=category)))
     return self.GenInfo(gen, deps)
 
   _gen_java = None
@@ -197,7 +203,7 @@ class ApacheThriftGen(CodeGen):
                                          sources=files,
                                          provides=target.provides,
                                          dependencies=deps,
-                                         excludes=target.payload.excludes)
+                                         excludes=target.payload.get_field_value('excludes'))
     return self._inject_target(target, dependees, self.gen_java, 'java', create_target)
 
   def _create_python_target(self, target, dependees):

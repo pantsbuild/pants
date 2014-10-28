@@ -7,6 +7,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import os
 import subprocess
+import traceback
 
 from pants.scm.scm import Scm
 
@@ -130,9 +131,27 @@ class Git(Scm):
     """Returns the merge-base of master and HEAD in bash: `git merge-base left right`"""
     return self._check_output(['merge-base', left, right], raise_type=Scm.LocalException)
 
-  def refresh(self):
+  def refresh(self, leave_clean=False):
+    """Attempt to pull-with-rebase from upstream.  This is implemented as fetch-plus-rebase
+       so that we can distinguish between errors in the fetch stage (likely network errors)
+       and errors in the rebase stage (conflicts).  If leave_clean is true, then in the event
+       of a rebase failure, the branch will be rolled back.  Otherwise, it will be left in the
+       conflicted state.
+    """
     remote, merge = self._get_upstream()
-    self._check_call(['pull', '--ff-only', '--tags', remote, merge], raise_type=Scm.RemoteException)
+    self._check_call(['fetch', '--tags', remote, merge], raise_type=Scm.RemoteException)
+    try:
+      self._check_call(['rebase', 'FETCH_HEAD'], raise_type=Scm.LocalException)
+    except Scm.LocalException as e:
+      if leave_clean:
+        self._log.debug('Cleaning up after failed rebase')
+        try:
+          self._check_call(['rebase', '--abort'], raise_type=Scm.LocalException)
+        except Scm.LocalException as abort_exc:
+          self._log.debug('Failed to up after failed rebase')
+          self._log.debug(traceback.format_exc(abort_exc))
+          # But let the original exception propagate, since that's the more interesting one
+      raise e
 
   def tag(self, name, message=None):
     # We use -a here instead of --annotate to maintain maximum git compatibility.
@@ -140,21 +159,21 @@ class Git(Scm):
     #   https://github.com/git/git/commit/c97eff5a95d57a9561b7c7429e7fcc5d0e3a7f5d
     self._check_call(['tag', '-a', '--message=%s' % (message or ''), name],
                      raise_type=Scm.LocalException)
-    self._push('refs/tags/%s' % name)
+    self.push('refs/tags/%s' % name)
 
   def commit(self, message):
     self._check_call(['commit', '--all', '--message=%s' % message], raise_type=Scm.LocalException)
-    self._push()
 
   def commit_date(self, commit_reference):
     return self._check_output(['log', '-1', '--pretty=tformat:%ci', commit_reference],
                               raise_type=Scm.LocalException)
 
-  def _push(self, *refs):
+  def push(self, *refs):
     remote, merge = self._get_upstream()
     self._check_call(['push', remote, merge] + list(refs), raise_type=Scm.RemoteException)
 
   def _get_upstream(self):
+    """Return the remote and remote merge branch for the current branch"""
     if not self._remote or not self._branch:
       branch = self.branch_name
       if not branch:

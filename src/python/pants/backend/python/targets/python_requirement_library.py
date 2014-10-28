@@ -5,10 +5,11 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from pants.base.target import Target
+from pants.backend.python.python_requirement import PythonRequirement
 from pants.base.payload import Payload
 from pants.base.payload_field import PythonRequirementsField
-
+from pants.base.target import Target
+from pants.base.validation import assert_list
 
 class PythonRequirementLibrary(Target):
   """Named target for some pip requirements."""
@@ -18,6 +19,8 @@ class PythonRequirementLibrary(Target):
     :type requirements: List of :ref:`python_requirement <bdict_python_requirement>`\s
     """
     payload = payload or Payload()
+
+    assert_list(requirements, expected_type=PythonRequirement)
     payload.add_fields({
       'requirements': PythonRequirementsField(requirements or []),
     })

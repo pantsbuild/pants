@@ -4,6 +4,7 @@
 python_test_suite(
   name = 'backend',
   dependencies = [
+    'tests/python/pants_test/backend/codegen',
     'tests/python/pants_test/backend/core',
     'tests/python/pants_test/backend/jvm',
     'tests/python/pants_test/backend/python',

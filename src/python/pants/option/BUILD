@@ -3,10 +3,19 @@
 
 python_library(
   name = 'option',
-  sources = globs('*.py'),
+  sources = globs('*.py') - ['migrate_config.py'],
   dependencies = [
     '3rdparty/python:argparse',
     'src/python/pants/base:build_environment',
     'src/python/pants/goal'
+  ]
+)
+
+python_binary(
+  name= 'migrate_config',
+  source = 'migrate_config.py',
+  dependencies = [
+    '3rdparty/python:ansicolors',
+    'src/python/pants/base:config',
   ]
 )

@@ -11,6 +11,7 @@ python_library(
     'src/python/pants/base:target',
     'src/python/pants/goal:context',
     'src/python/pants/goal:run_tracker',
+    'src/python/pants/option',
     'src/python/pants/reporting',
     'src/python/pants/util:dirutil',
   ]
@@ -38,10 +39,12 @@ python_test_suite(
     ':cmd_line_spec_parser',
     ':dev_backend_loader',
     ':double_dag',
+    ':fingerprint_strategy',
     ':generator',
     ':hash_utils',
     ':payload',
     ':payload_field',
+    ':rcfile',
     ':revision',
     ':run_info',
     ':source_root',
@@ -191,6 +194,15 @@ python_tests(
 )
 
 python_tests(
+  name = 'fingerprint_strategy',
+  sources = ['test_fingerprint_strategy.py'],
+  dependencies = [
+    'src/python/pants/base:fingerprint_strategy',
+    'tests/python/pants_test:base_test',
+  ]
+)
+
+python_tests(
   name = 'generator',
   sources = ['test_generator.py'],
   dependencies = [
@@ -242,6 +254,15 @@ python_tests(
     'src/python/pants/backend/core',
     'src/python/pants/base:address',
     'src/python/pants/base:build_file_aliases',
+    'tests/python/pants_test:base_test',
+  ]
+)
+
+python_tests(
+  name = 'rcfile',
+  sources = ['test_rcfile.py'],
+  dependencies = [
+    'src/python/pants/base:rcfile',
     'tests/python/pants_test:base_test',
   ]
 )

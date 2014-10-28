@@ -6,6 +6,15 @@
 python_tests(name='greet',
   dependencies=[
     'examples/src/python/example/hello/greet:greet',
+    ':prep',
   ],
   sources=globs('*.py'),
+)
+
+# Prepare for the 'greet' test. Realistically, you wouldn't set up a
+# prep_command just to create an emtpy temp file. This is meant as a
+# simple example.
+prep_command(name='prep',
+  prep_executable='touch',
+  prep_args=['/tmp/prep_command_result']
 )

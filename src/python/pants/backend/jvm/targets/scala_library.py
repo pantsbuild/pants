@@ -9,7 +9,6 @@ from pants.backend.jvm.scala.target_platform import TargetPlatform
 from pants.backend.jvm.targets.exportable_jvm_library import ExportableJvmLibrary
 from pants.base.address import SyntheticAddress
 from pants.base.exceptions import TargetDefinitionException
-from pants.base.validation import assert_list
 
 
 class ScalaLibrary(ExportableJvmLibrary):
@@ -71,10 +70,3 @@ class ScalaLibrary(ExportableJvmLibrary):
       if target is None:
         raise TargetDefinitionException(self, 'No such java target: %s' % spec)
       yield target
-
-  def closure(self):
-    # Overrides the default implementation to return java_sources as well
-    target_set = super(ScalaLibrary, self).closure()
-    for java_source_target in self.java_sources:
-      target_set.update(java_source_target.closure())
-    return target_set

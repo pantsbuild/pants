@@ -68,6 +68,8 @@ class WorkUnit(object):
   RUN = 11       # Running a binary.
   REPL = 12      # Running a repl.
 
+  PREP = 13      # Running a prep command
+
   def __init__(self, run_tracker, parent, name, labels=None, cmd=''):
     """
     - run_tracker: The RunTracker that tracks this WorkUnit.

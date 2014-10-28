@@ -25,6 +25,10 @@ from pants_test.jvm.jar_task_test_base import JarTaskTestBase
 
 
 class JarCreateTestBase(JarTaskTestBase):
+  @classmethod
+  def task_type(cls):
+    return JarCreate
+
   def create_options(self, **kwargs):
     options = dict(jar_create_transitive=True,
                    jar_create_compressed=False,
@@ -43,7 +47,7 @@ class JarCreateMiscTest(JarCreateTestBase):
           """).strip()
 
     JarCreate(create_context(config=ini,
-                             options=self.create_options(),
+                             old_options=self.create_options(),
                              build_graph=self.build_graph,
                              build_file_parser=self.build_file_parser,
                              address_mapper=self.address_mapper),
@@ -103,7 +107,7 @@ class JarCreateExecuteTest(JarCreateTestBase):
 
   def context(self, config='', **options):
     return create_context(config=self.config(overrides=config),
-                          options=self.create_options(**options),
+                          old_options=self.create_options(**options),
                           build_graph=self.build_graph,
                           build_file_parser=self.build_file_parser,
                           address_mapper=self.address_mapper,
@@ -153,7 +157,7 @@ class JarCreateExecuteTest(JarCreateTestBase):
           with self.add_data(context, 'resources_by_target', self.res, 'r.txt.transformed'):
             with self.add_data(context, 'classes_by_target', self.scala_lib, 'scala_foo.class',
                                'java_foo.class'):
-              self.execute(context, JarCreate)
+              self.execute(context)
 
               self.assert_jar_contents(context, 'jars', self.jl,
                                         'a.class', 'b.class', 'r.txt.transformed')

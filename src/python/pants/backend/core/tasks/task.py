@@ -47,10 +47,35 @@ class TaskBase(AbstractClass):
   of the helpers.  Ideally console tasks don't inherit a workdir, invalidator or build cache for
   example.
   """
+  # The scope for this task's options. Will be set (on a synthetic subclass) during registration.
+  options_scope = None
+
+  @classmethod
+  def known_scopes(cls):
+    """Yields all known scopes under this task (usually just its own.)"""
+    yield cls.options_scope
+
+  @classmethod
+  def register_options_on_scope(cls, options):
+    """Trigger registration of this task's options.
+
+    Subclasses should not generally need to override this method.
+    """
+    def register(*args, **kwargs):
+      options.register(cls.options_scope, *args, **kwargs)
+    cls.register_options(register)
+
+  @classmethod
+  def register_options(cls, register):
+    """Set up the new options system.
+
+    Subclasses may override and call register(*args, **kwargs) with argparse arguments
+    to register options.
+    """
 
   @classmethod
   def setup_parser(cls, option_group, args, mkflag):
-    """Set up the cmd-line parser.
+    """Set up the legacy cmd-line parser.
 
     Subclasses can add flags to the pants command line using the given option group.
     Flag names should be created with mkflag([name]) to ensure flags are properly name-spaced
@@ -82,6 +107,10 @@ class TaskBase(AbstractClass):
     self._build_invalidator_dir = os.path.join(
         context.config.get('tasks', 'build_invalidator', default=default_invalidator_root),
         suffix_type)
+
+  def get_options(self):
+    """Returns the option values for this task's scope."""
+    return self.context.new_options.for_scope(self.options_scope)
 
   def prepare(self, round_manager):
     """Prepares a task for execution.
@@ -120,8 +149,10 @@ class TaskBase(AbstractClass):
   def _create_artifact_cache(self, spec, action):
     if len(spec) > 0:
       pants_workdir = self.context.config.getdefault('pants_workdir')
+      compression = self.context.config.getint('cache', 'compression', default=5)
       my_name = self.__class__.__name__
-      return create_artifact_cache(self.context.log, pants_workdir, spec, my_name, action)
+      return create_artifact_cache(self.context.log, pants_workdir, spec,
+                                   my_name, compression, action)
     else:
       return None
 
@@ -254,11 +285,12 @@ class TaskBase(AbstractClass):
 
     if not silent:
       targets = []
-      payloads = []
       num_invalid_partitions = len(invalidation_check.invalid_vts_partitioned)
       for vt in invalidation_check.invalid_vts_partitioned:
         targets.extend(vt.targets)
-        payloads.extend(vt.cache_key.payloads)
+
+      payloads = [t.payload for t in targets]
+
       if len(targets):
         msg_elements = ['Invalidated ',
                         items_to_report_element([t.address.reference() for t in targets], 'target')]

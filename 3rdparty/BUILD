@@ -4,6 +4,9 @@
 # This BUILD file defines common external library dependencies used across many modules.  Modules
 # can use these jar_library deps by specifying '3rdparty:[name]' in their dependencies list.
 
+# To add dependency for a JVM-tool needed by Pants itself (e.g., Antlr),
+# see http://pantsbuild.github.io/dev_tasks.html#jvm-tool-bootstrapping
+
 ###################
 # Production libs
 #

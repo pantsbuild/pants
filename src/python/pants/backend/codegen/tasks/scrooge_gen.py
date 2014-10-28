@@ -19,6 +19,7 @@ from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.address import SyntheticAddress
+from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.thrift_util import calculate_compile_sources
@@ -43,13 +44,6 @@ class Compiler(namedtuple('CompilerConfigWithContext', ('context',) + CompilerCo
     return args
 
   @property
-  def verbose(self):
-    if self.context.options.scrooge_gen_quiet is not None:
-      return not self.context.options.scrooge_gen_quiet
-    else:
-      return self.context.config.getbool(self.config_section, 'verbose', default=False)
-
-  @property
   def strict(self):
     return self.context.config.getbool(self.config_section, 'strict', default=False)
 
@@ -72,6 +66,7 @@ _TARGET_TYPE_FOR_LANG = dict(scala=ScalaLibrary, java=JavaLibrary)
 
 
 class ScroogeGen(NailgunTask, JvmToolTaskMixin):
+
   GenInfo = namedtuple('GenInfo', ['gen', 'deps'])
 
   class PartialCmd(namedtuple('PC', ['compiler', 'language', 'rpc_style', 'namespace_map'])):
@@ -88,12 +83,10 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
       return os.path.join(self.compiler.name, output_style)
 
   @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    super(ScroogeGen, cls).setup_parser(option_group, args, mkflag)
-
-    option_group.add_option(mkflag('quiet'), dest='scrooge_gen_quiet',
-                            action='callback', callback=mkflag.set_bool, default=None,
-                            help='[%default] Suppress output, overrides verbose flag in pants.ini.')
+  def register_options(cls, register):
+    super(ScroogeGen, cls).register_options(register)
+    register('--verbose', default=False, action='store_true', help='Emit verbose output.',
+             legacy='scrooge_gen_quiet')
 
   @classmethod
   def product_types(cls):
@@ -105,10 +98,10 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
                                   for name, config in _CONFIG_FOR_COMPILER.items())
 
     for name, compiler in self.compiler_for_name.items():
-      bootstrap_tools = self.context.config.getlist(
-        compiler.config_section, 'bootstrap-tools',
-        default=['//:{spec}'.format(spec=compiler.profile)])
-      self.register_jvm_tool(compiler.name, bootstrap_tools)
+      self.register_jvm_tool_from_config(compiler.name, self.context.config,
+                                         ini_section=compiler.config_section,
+                                         ini_key='bootstrap-tools',
+                                         default=['//:{spec}'.format(spec=compiler.profile)])
 
     self.defaults = JavaThriftLibrary.Defaults(self.context.config)
 
@@ -205,7 +198,7 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
         if not compiler.strict:
           args.append('--disable-strict')
 
-        if compiler.verbose:
+        if self.get_options().verbose:
           args.append('--verbose')
 
         gen_file_map_path = os.path.relpath(self._tempname())
@@ -258,7 +251,13 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
         dependencies = OrderedSet()
         deps[category] = dependencies
         for depspec in depspecs:
-          dependencies.update(self.context.resolve(depspec))
+          try:
+            dependencies.update(self.context.resolve(depspec))
+          except AddressLookupError as e:
+            raise self.DepLookupError("{message}\n  referenced from [{section}] key: {key}" \
+                                      "in pants.ini" .format(message=e, section='thrift-gen',
+                                                             key="gen->deps->{category}"
+                                                             .format(cateegory=category)))
       return self.GenInfo(gen, deps)
 
     return self._inject_target(gentarget, dependees,

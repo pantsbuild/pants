@@ -14,6 +14,8 @@ import stat
 import tempfile
 import threading
 
+from pants.util.strutil import ensure_text
+
 
 def safe_mkdir(directory, clean=False):
   """Ensure a directory is present.
@@ -34,6 +36,22 @@ def safe_mkdir_for(path, clean=False):
     If it is, no-op. If clean is True, ensure the directory is empty.
   """
   safe_mkdir(os.path.dirname(path), clean)
+
+
+def safe_walk(path, **kwargs):
+  """Just like os.walk, but ensures that the returned values are unicode objects.
+
+    This isn't strictly safe, in that it is possible that some paths
+    will not be decodeable, but that case is rare, and the only
+    alternative is to somehow avoid all interaction between paths and
+    unicode objects, which seems especially tough in the presence of
+    unicode_literals. See e.g.
+    https://mail.python.org/pipermail/python-dev/2008-December/083856.html
+
+  """
+  # If os.walk is given a text argument, it yields text values; if it
+  # is given a binary argument, it yields binary values.
+  return os.walk(ensure_text(path), **kwargs)
 
 
 _MKDTEMP_CLEANER = None

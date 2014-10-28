@@ -12,5 +12,6 @@ python_library(
     'src/python/pants/base:target',
     'src/python/pants/base:workunit',
     'src/python/pants/util:contextutil',
+    'src/python/pants/util:strutil',
   ]
 )

@@ -8,6 +8,7 @@ python_library(
     globs('java/distribution/*.class') +
     rglobs('reporting/assets/*') + globs('reporting/templates/*.mustache') +
     globs('backend/core/tasks/templates/builddictionary/*.mustache') +
+    globs('backend/core/tasks/templates/targets_help/*.mustache') +
     globs('backend/jvm/tasks/templates/eclipse/*.mustache') +
     globs('backend/jvm/tasks/templates/eclipse/*.prefs') +
     globs('backend/jvm/tasks/templates/ensime/*.mustache') +
@@ -18,6 +19,11 @@ python_library(
   ),
   dependencies=[
     '3rdparty/python:ansicolors',
+    '3rdparty/python:docutils',
+    # NOTE(pl): We must pull in coverage by hand even though it isn't imported.
+    # pytest-cov otherwise pulls in a newer version of coverage that doesn't
+    # work in all environments, notably some OSX installs.
+    '3rdparty/python:coverage',
     '3rdparty/python:Markdown',
     '3rdparty/python:pex',
     '3rdparty/python:psutil',
@@ -25,7 +31,6 @@ python_library(
     '3rdparty/python:pystache',
     '3rdparty/python:pytest',
     '3rdparty/python:pytest-cov',
-    '3rdparty/python:python-daemon',
     '3rdparty/python:requests',
     '3rdparty/python:setuptools',
     '3rdparty/python:six',

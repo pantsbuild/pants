@@ -14,14 +14,6 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 class JavaCompileIntegrationTest(PantsRunIntegrationTest):
 
-  def _assert_run_success(self, pants_run):
-    self.assertEquals(pants_run.returncode, self.PANTS_SUCCESS_CODE,
-                      "goal compile expected success, got {0}\n"
-                      "got stderr:\n{1}\n"
-                      "got stdout:\n{2}\n".format(pants_run.returncode,
-                                                  pants_run.stderr_data,
-                                                  pants_run.stdout_data))
-
   def _java_compile_produces_valid_analysis_file(self, workdir):
     # A bug was introduced where if a java compile was run twice, the second
     # time the global_analysis.valid file would incorrectly be empty.
@@ -29,7 +21,7 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.run_pants_with_workdir(
       ['goal', 'compile', 'testprojects/src/java/com/pants/testproject/unicode/main'],
       workdir)
-    self._assert_run_success(pants_run)
+    self.assert_success(pants_run)
 
     # Parse the analysis file from the compilation.
     analysis_file = os.path.join(workdir, 'compile', 'jvm', 'java', 'analysis',
@@ -46,6 +38,25 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
       self._java_compile_produces_valid_analysis_file(workdir)
       self._java_compile_produces_valid_analysis_file(workdir)
 
+  def test_nocache(self):
+    with temporary_dir() as cache_dir:
+      bad_artifact_dir = os.path.join(cache_dir, 'JavaCompile',
+                                  'testprojects.src.java.com.pants.testproject.nocache.nocache')
+      good_artifact_dir = os.path.join(cache_dir, 'JavaCompile',
+                                  'testprojects.src.java.com.pants.testproject.nocache.cache_me')
+      config = {'java-compile': {'write_artifact_caches': [cache_dir]}}
+
+      pants_run = self.run_pants(
+        ['goal', 'compile', 'testprojects/src/java/com/pants/testproject/nocache::'],
+        config)
+      self.assert_success(pants_run)
+
+      # The nocache target is labeled with no_cache so it should not be written to the
+      # artifact cache.
+      self.assertFalse(os.path.exists(bad_artifact_dir))
+      # But cache_me should be written.
+      self.assertEqual(len(os.listdir(good_artifact_dir)), 1)
+
   def test_java_compile_produces_different_artifact_depending_on_java_version(self):
     # Ensure that running java compile with java 6 and then java 7
     # produces two different artifacts.
@@ -58,7 +69,7 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
       pants_run = self.run_pants(
         ['goal', 'compile', 'testprojects/src/java/com/pants/testproject/unicode/main'],
         config)
-      self._assert_run_success(pants_run)
+      self.assert_success(pants_run)
 
       # One artifact for java 6
       self.assertEqual(len(os.listdir(artifact_dir)), 1)
@@ -68,7 +79,7 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
         ['goal', 'compile', 'testprojects/src/java/com/pants/testproject/unicode/main',
          '--compile-java-args=\'-target 1.7\''],
         config)
-      self._assert_run_success(pants_run)
+      self.assert_success(pants_run)
 
       # One artifact for java 6 and one for 7
       self.assertEqual(len(os.listdir(artifact_dir)), 2)
@@ -96,7 +107,7 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
 
     pants_run = self.run_pants(args, config)
 
-    self._assert_run_success(pants_run)
+    self.assert_success(pants_run)
 
 
   def test_java_compile_missing_dep_analysis_whitelist(self):

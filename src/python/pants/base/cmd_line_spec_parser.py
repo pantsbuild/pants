@@ -6,6 +6,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import os
+import traceback
 
 from twitter.common.collections import maybe_list, OrderedSet
 
@@ -46,9 +47,10 @@ class CmdLineSpecParser(object):
   class BadSpecError(Exception):
     """Indicates an invalid command line address selector."""
 
-  def __init__(self, root_dir, address_mapper):
+  def __init__(self, root_dir, address_mapper, spec_excludes=None):
     self._root_dir = os.path.realpath(root_dir)
     self._address_mapper = address_mapper
+    self._spec_excludes = spec_excludes
 
   def parse_addresses(self, specs, fail_fast=False):
     """Process a list of command line specs and perform expansion.  This method can expand a list
@@ -100,7 +102,7 @@ class CmdLineSpecParser(object):
         raise self.BadSpecError('Can only recursive glob directories and {0} is not a valid dir'
                                 .format(spec_dir))
       try:
-        build_files = BuildFile.scan_buildfiles(self._root_dir, spec_dir)
+        build_files = BuildFile.scan_buildfiles(self._root_dir, spec_dir, spec_excludes=self._spec_excludes)
       except (BuildFile.BuildFileError, AddressLookupError) as e:
         raise self.BadSpecError(e)
 
@@ -110,6 +112,8 @@ class CmdLineSpecParser(object):
         except (BuildFile.BuildFileError, AddressLookupError) as e:
           if fail_fast:
             raise self.BadSpecError(e)
+          errored_out.append('--------------------')
+          errored_out.append(traceback.format_exc())
           errored_out.append('Exception message: {0}'.format(e.message))
 
       if errored_out:

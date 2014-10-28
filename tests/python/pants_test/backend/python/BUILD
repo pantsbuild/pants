@@ -5,6 +5,7 @@ target(
   name='python',
   dependencies=[
     ':test_builder',
+    ':test_python_requirement_list',
   ]
 )
 
@@ -17,6 +18,16 @@ python_tests(
     'src/python/pants/backend/python:test_builder',
     'src/python/pants/base:build_file_aliases',
     'src/python/pants/util:contextutil',
+    'tests/python/pants_test:base_test'
+  ]
+)
+
+python_tests(
+  name='test_python_requirement_list',
+  sources=['test_python_requirement_list.py'],
+  dependencies=[
+    'src/python/pants/backend/python/targets:python',
+    'src/python/pants/base:build_file_aliases',
     'tests/python/pants_test:base_test'
   ]
 )

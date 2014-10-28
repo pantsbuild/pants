@@ -10,11 +10,11 @@ import os
 
 from pants.backend.jvm.tasks.bootstrap_jvm_tools import BootstrapJvmTools
 from pants.base.dev_backend_loader import load_build_configuration_from_source
-from pants.util.dirutil import safe_mkdir, safe_mkdtemp
-from pants_test.base_test import BaseTest
+from pants.util.dirutil import safe_mkdir, safe_mkdtemp, safe_walk
+from pants_test.task_test_base import TaskTestBase
 
 
-class JvmToolTaskTestBase(BaseTest):
+class JvmToolTaskTestBase(TaskTestBase):
   """Prepares an ephemeral test build root that supports tasks that use jvm tool bootstrapping."""
 
   @property
@@ -44,7 +44,7 @@ class JvmToolTaskTestBase(BaseTest):
     def link_tree(path, optional=False, force=False):
       src = os.path.join(self.real_build_root, path)
       if not optional or os.path.exists(src):
-        for abspath, dirs, files in os.walk(src):
+        for abspath, dirs, files in safe_walk(src):
           for f in files:
             link(os.path.relpath(os.path.join(abspath, f), self.real_build_root), force=force)
 
@@ -60,7 +60,7 @@ class JvmToolTaskTestBase(BaseTest):
     support_dir = real_config.getdefault('pants_supportdir')
     link_tree(os.path.relpath(os.path.join(support_dir, 'ivy'), self.real_build_root), force=True)
 
-  def prepare_execute(self, context, workdir, task_type):
+  def prepare_execute(self, context, workdir):
     """Prepares a jvm tool using task for execution, ensuring any required jvm tools are
     bootstrapped.
 
@@ -71,12 +71,12 @@ class JvmToolTaskTestBase(BaseTest):
     """
     # TODO(John Sirois): This is emulating Engine behavior - construct reverse order, then execute;
     # instead it should probably just be using an Engine.
-    task = task_type(context, workdir)
+    task = self.create_task(context, workdir)
     task.invalidate()
     BootstrapJvmTools(context, workdir).execute()
     return task
 
-  def execute(self, context, task_type):
+  def execute(self, context):
     """Executes the given task ensuring any required jvm tools are bootstrapped.
 
     NB: Other task pre-requisites will not be ensured and tests must instead setup their own product
@@ -87,6 +87,6 @@ class JvmToolTaskTestBase(BaseTest):
     # TODO(John Sirois): This is emulating Engine behavior - construct reverse order, then execute;
     # instead it should probably just be using an Engine.
     workdir = safe_mkdtemp(dir=self.build_root)
-    task = self.prepare_execute(context, workdir, task_type)
+    task = self.prepare_execute(context, workdir)
     task.execute()
     return task

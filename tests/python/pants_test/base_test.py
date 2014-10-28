@@ -5,6 +5,7 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from collections import defaultdict
 from contextlib import contextmanager
 import os
 from tempfile import mkdtemp
@@ -14,6 +15,7 @@ import unittest2 as unittest
 from pants.backend.core.tasks.check_exclusives import ExclusivesMapping
 from pants.backend.core.targets.dependencies import Dependencies
 from pants.base.address import SyntheticAddress
+from pants.base.exceptions import TaskError
 from pants.base.build_file_address_mapper import BuildFileAddressMapper
 from pants.base.build_configuration import BuildConfiguration
 from pants.base.build_file import BuildFile
@@ -95,6 +97,7 @@ class BaseTest(unittest.TestCase):
     return BuildFileAliases.create(targets={'target': Dependencies})
 
   def setUp(self):
+    super(BaseTest, self).setUp()
     Goal.clear()
     self.real_build_root = BuildRoot().path
     self.build_root = os.path.realpath(mkdtemp(suffix='_BUILD_ROOT'))
@@ -121,9 +124,41 @@ class BaseTest(unittest.TestCase):
   def create_options(self, **kwargs):
     return dict(**kwargs)
 
-  def context(self, config='', options=None, target_roots=None, **kwargs):
+  def context(self, for_task_types=None, config='', options=None, new_options=None,
+              target_roots=None, **kwargs):
+    for_task_types = for_task_types or []
+    new_options = new_options or {}
+
+    new_option_values = defaultdict(dict)
+
+    # Get values for all new-style options registered by the tasks in for_task_types.
+    for task_type in for_task_types:
+      scope = task_type.options_scope
+      if scope is None:
+        raise TaskError('You must set a scope on your task type before using it in tests.')
+
+      # We provide our own test-only registration implementation, bypassing argparse.
+      # When testing we set option values directly, so we don't care about cmd-line flags, config,
+      # env vars etc. In fact, for test isolation we explicitly don't want to look at those.
+      def register(*rargs, **rkwargs):
+        scoped_options = new_option_values[scope]
+        default = rkwargs.get('default')
+        if default is None and rkwargs.get('action') == 'append':
+          default = []
+        for flag_name in rargs:
+          option_name = flag_name.lstrip('-').replace('-', '_')
+          scoped_options[option_name] = default
+
+      task_type.register_options(register)
+
+    # Now override with any caller-specified values.
+    for scope, opts in new_options.items():
+      for key, val in opts.items():
+        new_option_values[scope][key] = val
+
     return create_context(config=self.config(overrides=config),
-                          options=self.create_options(**(options or {})),
+                          old_options=self.create_options(**(options or {})),
+                          new_options = new_option_values,
                           target_roots=target_roots,
                           build_graph=self.build_graph,
                           build_file_parser=self.build_file_parser,
@@ -172,16 +207,19 @@ class BaseTest(unittest.TestCase):
             sources=%(sources)s,
             %(resources)s
             %(java_sources)s
+            %(provides)s
           )
         ''' % dict(target_type=target_type,
                    name=name,
                    sources=repr(sources or []),
-                   resources=('resources=[pants("%s")],' % kwargs.get('resources')
-                              if kwargs.has_key('resources') else ''),
-                   java_sources=('java_sources=[%s]'
-                                 % ','.join(map(lambda str_target: 'pants("%s")' % str_target,
+                   resources=('resources=["%s"],' % kwargs.get('resources')
+                              if 'resources' in kwargs else ''),
+                   java_sources=('java_sources=[%s],'
+                                 % ','.join(map(lambda str_target: '"%s"' % str_target,
                                                 kwargs.get('java_sources')))
-                                 if kwargs.has_key('java_sources') else ''),
+                                 if 'java_sources' in kwargs else ''),
+                   provides=('provides=%s,' % kwargs.get('provides')
+                              if 'provides' in kwargs else ''),
                    )))
     return self.target('%s:%s' % (path, name))
 

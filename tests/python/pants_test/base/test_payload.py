@@ -85,3 +85,23 @@ class PayloadTest(BaseTest):
   def test_single_source(self):
     self.add_to_build_file('y/BUILD', 'java_library(name="y", sources=["Source.scala"])')
     self.context().scan(self.build_root)
+
+  def test_missing_payload_field(self):
+    payload = Payload()
+    payload.add_field('foo', PrimitiveField('test-value'))
+    payload.add_field('bar', PrimitiveField(None))
+    self.assertEquals('test-value', payload.foo);
+    self.assertEquals('test-value', payload.get_field('foo').value)
+    self.assertEquals('test-value', payload.get_field_value('foo'))
+    self.assertEquals(None, payload.bar);
+    self.assertEquals(None, payload.get_field('bar').value)
+    self.assertEquals(None, payload.get_field_value('bar'))
+    self.assertEquals(None, payload.get_field('bar', default='nothing').value)
+    self.assertEquals(None, payload.get_field_value('bar', default='nothing'))
+    with self.assertRaises(KeyError):
+      self.assertEquals(None, payload.field_doesnt_exist)
+    self.assertEquals(None, payload.get_field('field_doesnt_exist'))
+    self.assertEquals(None, payload.get_field_value('field_doesnt_exist'))
+    self.assertEquals('nothing', payload.get_field('field_doesnt_exist', default='nothing'))
+    self.assertEquals('nothing', payload.get_field_value('field_doesnt_exist', default='nothing'))
+

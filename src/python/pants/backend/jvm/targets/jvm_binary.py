@@ -117,13 +117,13 @@ class JarRules(object):
   One issue is signed jars that must be included on the
   classpath.  These have a signature that depends on the jar contents and assembly of the deploy jar
   changes the content of the jar, breaking the signatures.  For cases like these the signed jars
-  must be verified and then the signature information thrown away.  The :ref:`Skip <bdict_Skip>`
+  must be verified and then the signature information thrown away.  The `Skip <#Skip>`_
   rule supports this sort of issue by allowing outright entry exclusion in the final deploy jar.
 
   Another issue is duplicate jar entries.  Although the underlying zip format supports these, the
   java jar tool and libraries do not.  As such some action must be taken for each duplicate entry
   such that there are no duplicates in the final deploy jar.  The four
-  :ref:`Duplicate <bdict_Duplicate>` rules support resolution of these cases by allowing 1st wins,
+  `Duplicate <#Duplicate>`_ rules support resolution of these cases by allowing 1st wins,
   last wins, concatenation of the duplicate entry contents or raising an exception.
   """
   @classmethod
@@ -227,13 +227,13 @@ class JvmBinary(JvmTarget):
     :param dependencies: Targets (probably ``java_library`` and
      ``scala_library`` targets) to "link" in.
     :type dependencies: list of target specs
-    :param deploy_excludes: List of :ref:`exclude <bdict_exclude>`\s to apply
+    :param deploy_excludes: List of `exclude <#exclude>`_\s to apply
       at deploy time.
       If you, for example, deploy a java servlet that has one version of
       ``servlet.jar`` onto a Tomcat environment that provides another version,
       they might conflict. ``deploy_excludes`` gives you a way to build your
       code but exclude the conflicting ``jar`` when deploying.
-    :param deploy_jar_rules: :ref:`Jar rules <bdict_jar_rules>` for packaging this binary in a
+    :param deploy_jar_rules: `Jar rules <#jar_rules>`_ for packaging this binary in a
       deploy jar.
     :param configurations: Ivy configurations to resolve for this target.
       This parameter is not intended for general use.
@@ -279,12 +279,38 @@ class RelativeToMapper(object):
     return hash(self.base)
 
 
+class DirectoryReMapper(object):
+  """A mapper that maps files relative to a base directory into a destination directory."""
+
+  class BaseNotExistsError(Exception):
+    "The base directory does not exist error"
+
+  def __init__(self, base, dest):
+    """The base directory files should be mapped from, and the dest they should be mapped to.
+
+    :param string base: the relative path to get_buildroot()
+    :param string dest: the dest path in the bundle
+    """
+    self.base = os.path.abspath(os.path.join(get_buildroot(), base))
+    if not os.path.isdir(self.base):
+      raise DirectoryReMapper.BaseNotExistsError(
+          'Could not find a directory to bundle relative to {0}'.format(self.base))
+    self.dest = dest
+
+  def __call__(self, path):
+    return os.path.join(self.dest, os.path.relpath(path, self.base))
+
+  def __repr__(self):
+    return 'DirectoryReMapper({0}, {1})'.format(self.base, self.dest)
+
+
 class Bundle(object):
   """A set of files to include in an application bundle.
 
-  To learn about application bundles, see :ref:`jvm_bundles`.
+  To learn about application bundles, see
+  `bundles <JVMProjects.html#jvm-bundles>`_.
   Looking for Java-style resources accessible via the ``Class.getResource`` API?
-  Those are :ref:`bdict_resources`\ .
+  Those are `resources <build_dictionary.html#resources>`_.
 
   Files added to the bundle will be included when bundling an application target.
   By default relative paths are preserved. For example, to include ``config``
@@ -304,6 +330,7 @@ class Bundle(object):
   """
 
   @classmethod
+  @manual.builddict(factory=True)
   def factory(cls, parse_context):
     """Return a factory method that can create bundles rooted at the parse context path."""
     def bundle(**kwargs):
@@ -369,8 +396,6 @@ class JvmApp(Target):
 
   def __init__(self, name=None, payload=None, binary=None, bundles=None, basename=None, **kwargs):
     """
-    :param string name: The name of this target, which combined with this
-      build file defines the :doc:`target address <target_addresses>`.
     :param string binary: Target spec of the ``jvm_binary`` that contains the
       app main.
     :param bundles: One or more ``bundle``\s

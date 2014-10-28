@@ -6,6 +6,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import os
+import re
 
 from pants.base.address import SyntheticAddress
 from pants.base.build_file import BuildFile
@@ -132,6 +133,19 @@ class CmdLineSpecParserTest(BaseTest):
     self.assertEqual(sort(SyntheticAddress.parse(addr) for addr in expected),
                      sort(self.spec_parser.parse_addresses(cmdline_spec_list)))
 
+  def test_pants_dot_d_excluded(self):
+    expected_specs=[':root', 'a', 'a:b', 'a/b', 'a/b:c']
+
+    # This bogus BUILD file gets in the way of parsing.
+    self.add_to_build_file('.pants.d/some/dir', 'COMPLETELY BOGUS BUILDFILE)\n')
+    with self.assertRaises(CmdLineSpecParser.BadSpecError):
+      self.assert_parsed_list(cmdline_spec_list=['::'], expected=expected_specs)
+
+    self.spec_parser = CmdLineSpecParser(self.build_root, self.address_mapper,
+                                         spec_excludes=[os.path.join(self.build_root, '.pants.d')])
+    self.assert_parsed_list(cmdline_spec_list=['::'], expected=expected_specs)
+
+
 class CmdLineSpecParserBadBuildTest(BaseTest):
   def setUp(self):
     super(CmdLineSpecParserBadBuildTest, self).setUp()
@@ -141,13 +155,16 @@ class CmdLineSpecParserBadBuildTest(BaseTest):
 
     self.spec_parser = CmdLineSpecParser(self.build_root, self.address_mapper)
 
-    self.NO_FAIL_FAST_RE = """^Exception message: name 'a_is_bad' is not defined
+    self.NO_FAIL_FAST_RE = re.compile(r"""^--------------------
+.*
+Exception message: name 'a_is_bad' is not defined
  while executing BUILD file (/[^/]+)*/bad/a/BUILD
  Loading addresses from 'bad/a' failed\.
+.*
 Exception message: name 'b_is_bad' is not defined
  while executing BUILD file (/[^/]+)*T/bad/b/BUILD
  Loading addresses from 'bad/b' failed\.
-Invalid BUILD files for \[::\]$"""
+Invalid BUILD files for \[::\]$""", re.DOTALL)
 
     self.FAIL_FAST_RE = """^name 'a_is_bad' is not defined
  while executing BUILD file (/[^/]+)*/bad/a/BUILD

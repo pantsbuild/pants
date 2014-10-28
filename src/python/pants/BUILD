@@ -51,6 +51,7 @@ python_library(
   name='test_infra',
   dependencies=[
     'tests/python/pants_test:base_test',
+    'tests/python/pants_test:int-test',
     'tests/python/pants_test/jvm:jar_task_test_base',
     'tests/python/pants_test/jvm:nailgun_task_test_base',
     'tests/python/pants_test/jvm:jvm_tool_task_test_base',

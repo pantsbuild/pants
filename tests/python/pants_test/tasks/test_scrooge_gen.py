@@ -18,17 +18,20 @@ from pants.base.build_environment import get_buildroot
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.exceptions import TaskError
 from pants.goal.context import Context
-from pants.util.dirutil import safe_mkdtemp, safe_rmtree
+from pants.util.dirutil import safe_rmtree
 
-from pants_test.base_test import BaseTest
-from pants_test.tasks.test_base import prepare_task
+from pants_test.tasks.test_base import TaskTest
 
 import pytest
 from mock import MagicMock, patch
 
 
 # TODO (tdesai) Issue-240: Use JvmToolTaskTestBase for ScroogeGenTest
-class ScroogeGenTest(BaseTest):
+class ScroogeGenTest(TaskTest):
+  @classmethod
+  def task_type(cls):
+    return ScroogeGen
+
   @property
   def alias_groups(self):
     return BuildFileAliases.create(targets={'java_thrift_library': JavaThriftLibrary})
@@ -92,10 +95,9 @@ class ScroogeGenTest(BaseTest):
     '''))
 
     target = self.target('test_smoke:a')
-    task = prepare_task(ScroogeGen,
-                        build_graph=self.build_graph,
-                        targets=[target],
-                        build_file_parser=self.build_file_parser)
+    task = self.prepare_task(build_graph=self.build_graph,
+                             targets=[target],
+                             build_file_parser=self.build_file_parser)
 
     with patch('pants.backend.codegen.tasks.scrooge_gen.calculate_services'):
       task._outdir = MagicMock()
@@ -105,8 +107,8 @@ class ScroogeGenTest(BaseTest):
       sources = [os.path.join(self.task_outdir, 'com/pants/example/Example.scala')]
       task.gen.return_value = {'test_smoke/a.thrift': sources}
 
+      saved_add_new_target = Context.add_new_target
       try:
-        saved_add_new_target = Context.add_new_target
         Context.add_new_target = MagicMock()
         task.execute()
         relative_task_outdir = os.path.relpath(self.task_outdir, get_buildroot())

@@ -55,7 +55,7 @@ class RankedValue(object):
   }
 
   @classmethod
-  def choose(cls, flag_val, env_val, config_val, hardcoded_val):
+  def choose(cls, flag_val, env_val, config_val, hardcoded_val, default):
     """Return the highest-ranked non-None value, wrapped in a RankedValue instance."""
     if flag_val is not None:
       return RankedValue(cls.FLAG, flag_val)
@@ -66,7 +66,7 @@ class RankedValue(object):
     elif hardcoded_val is not None:
       return RankedValue(cls.HARDCODED, hardcoded_val)
     else:
-      return RankedValue(cls.NONE, None)
+      return RankedValue(cls.NONE, default)
 
   def __init__(self, rank, value):
     self._rank = rank
@@ -79,6 +79,10 @@ class RankedValue(object):
   @property
   def value(self):
     return self._value
+
+  def append(self, arg):
+    # argparse may read an option value in order to append to it, so pass that through here.
+    self._value.append(arg)
 
   def __eq__(self):
     return self._rank == self._rank and self._value == self._value

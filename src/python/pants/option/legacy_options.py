@@ -37,7 +37,7 @@ class LegacyOptions(object):
 
   def __init__(self, scope, optparser):
     """This object registers on behalf of the given scope, into the given optparser."""
-    self._scope_prefix = scope.replace('.', '-')
+    self._scope_prefix = '' if scope == GLOBAL_SCOPE else scope.replace('.', '-') + '-'
     self._optparser = optparser
     self._option_group = self._get_option_group(scope, optparser)
 
@@ -52,12 +52,12 @@ class LegacyOptions(object):
       optparse_args = []
       for arg in legacy_args or args:
         if arg.startswith('--no-'):
-          optparse_args.append('--no-%s-%s' % (self._scope_prefix, arg[5:]))
+          optparse_args.append('--no-{0}{1}'.format(self._scope_prefix, arg[5:]))
           optparse_kwargs.pop('help', None)
         elif arg.startswith('--'):
-          optparse_args.append('--%s-%s' % (self._scope_prefix, arg[2:]))
+          optparse_args.append('--{0}{1}'.format(self._scope_prefix, arg[2:]))
         elif arg.startswith('-'):
-          if self._scope_prefix == GLOBAL_SCOPE:
+          if self._scope_prefix == '':
             optparse_args.append(arg)
           else:
             raise LegacyOptionsError('Short legacy options only allowed at global scope: %s' % arg)
@@ -94,6 +94,11 @@ class LegacyOptions(object):
     """
     self._optparser.formatter.store_option_strings(self._optparser)
     if self._option_group and self._option_group.option_list:
+      # Hack to make the title more explanatory. In principle this conflicts
+      # with temporary legacy-compatibility code that finds groups by title.
+      # But in practice that use occurs before help printing is ever attempted,
+      # and we exit right after help printing anyway.
+      self._option_group.set_title(self._option_group.title + ' options')
       return self._option_group.format_help(self._optparser.formatter)
     else:
       return ''

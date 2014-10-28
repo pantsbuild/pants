@@ -15,28 +15,23 @@ from pants.backend.core.tasks.task import Task
 
 class BuildLint(Task):
   @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    option_group.add_option(mkflag("transitive"), mkflag("transitive", negate=True),
-      dest="buildlint_transitive", default=False,
-      action="callback", callback=mkflag.set_bool,
-      help="[%default] apply lint rules transitively to all dependency buildfiles.")
-
-    option_group.add_option(mkflag("include-intransitive-deps"),
-      mkflag("include-intransitive-deps", negate=True),
-      dest="buildlint_include_intransitive", default=False,
-      action="callback", callback=mkflag.set_bool,
-      help="[%default] correct both simple missing dependencies and intransitive missing deps")
-
-
-    option_group.add_option(mkflag("action"), dest="buildlint_actions", default=[],
-      action="append", type="choice", choices=['diff', 'rewrite'],
-      help="diff=print out diffs, rewrite=apply changes to BUILD files directly.")
+  def register_options(cls, register):
+    super(BuildLint, cls).register_options(register)
+    register('--transitive', default=False, action='store_true',
+             legacy='buildlint_transitive',
+             help='Apply lint rules transitively to all dependency buildfiles.')
+    register('--include-intransitive-deps', default=False, action='store_true',
+             legacy='buildlint_include_intransitive',
+             help='Correct both simple missing dependencies and intransitive missing deps.')
+    register('--action', action='append', choices=['diff', 'rewrite'], default=[],
+             legacy='buildlint_actions',
+             help='diff=print out diffs, rewrite=apply changes to BUILD files directly.')
 
   def __init__(self, *args, **kwargs):
     super(BuildLint, self).__init__(*args, **kwargs)
-    self.transitive = self.context.options.buildlint_transitive
-    self.actions = set(self.context.options.buildlint_actions)
-    self.include_intransitive = self.context.options.buildlint_include_intransitive
+    self.transitive = self.get_options().transitive
+    self.actions = set(self.get_options().action)
+    self.include_intransitive = self.get_options().include_intransitive_deps
     # Manually apply the default. Can't use flag default, because action is 'append', so
     # diffs would always be printed, even if we only wanted to rewrite.
     if not self.actions:
