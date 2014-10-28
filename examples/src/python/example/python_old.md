@@ -1,9 +1,5 @@
 Using Pants for Python development, 2014 and Earlier
 ====================================================
-<!--
-  Converted from src/python/pants/docs/python_old.rst 2014/10/15
-  TODO(lahosken): before new doc system "goes live", freshen this as needed.
--->
 
 Why use Pants for Python development?
 -------------------------------------
@@ -56,12 +52,10 @@ Getting started
 ---------------
 
 First it is necessary to install Pants. See
-<!-- TODO(lahosken) proper link-->
-[Installing Pants](http://pantsbuild.github.io/install.html).
+[[Installing Pants|pants('src/docs:install')]].
 
 It is also helpful to read the
-<!-- TODO(lahosken) proper link-->
-[Pants Conceptual Overview](http://pantsbuild.github.io/first_concepts.html).
+[[Pants Conceptual Overview|pants('src/docs:first_concepts')]].
 
 TL;DR - 'Hello world!' with Pants Python
 ----------------------------------------
@@ -260,13 +254,13 @@ format of pkg\_resources.EntryPoint, which is something akin to
 some.module.name:my.attr which means run the function pointed by my.attr
 inside the module some.module inside the environment. The :my.attr
 component can be omitted and the module is executed directly (presuming
-it has a \_\_main\_\_.py.)
+it has a `__main__.py`.)
 
 #### python\_requirement
 
 A python\_requirement target describes an external dependency as
 understood by easy\_install or pip. It takes only a single non-keyword
-argument of the Requirement-style string, e.g. :
+argument of the Requirement-style string, e.g.,
 
     python_requirement('django-celery')
     python_requirement('tornado==2.2')

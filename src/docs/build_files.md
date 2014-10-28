@@ -1,9 +1,5 @@
 BUILD files
 ===========
-<!--
-  Converted from src/python/pants/docs/build_files.rst 2014/10/16
-  TODO(lahosken): before new doc system "goes live", freshen this as needed.
--->
 
 To tell Pants about your source code, you have files named `BUILD` in
 directories of your source tree. These files define build-able targets
@@ -12,8 +8,7 @@ and specify source code layout. This page goes into some detail about
 `BUILD` files (`java_library`, `python_binary`, etc.), please see the
 [BUILD Dictionary](build_dictionary.html). If you want less detail-y
 information about `BUILD` files,
-<!-- TODO(lahosken) proper link -->
-[the Tutorial](http://pantsbuild.github.io/first_tutorial.html)
+[[the Tutorial|pants('src/docs:first_tutorial')]]
 is a good place to start.
 
 `BUILD` files are little Python scripts with some

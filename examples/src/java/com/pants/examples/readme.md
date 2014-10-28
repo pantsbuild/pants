@@ -1,24 +1,17 @@
 JVM Projects with Pants
 =======================
-<!--
-  Converted from src/python/pants/docs/JVMProjects.rst 2014/10/16
-  TODO(lahosken): before new doc system "goes live", freshen this as needed.
--->
 
 Assuming you know the basic
-<!-- TODO(lahosken) proper link -->
-[Pants concepts](http://pantsbuild.github.io/first_concepts.html) and have
-gone through the
-<!-- TODO(lahosken) proper link -->
-[first Tutorial](http://pantsbuild.github.io/first_tutorial.html),
+[[Pants concepts|pants('src/docs:first_concepts')]]
+and have gone through the
+[[first Tutorial|pants('src/docs:first_tutorial')]],
 you've made a great start towards
 using Pants to work with Java and Scala code. This page goes into some
 of the details.
 
 If you are accustomed to the Maven tool and contemplating moving to
 Pants, you are not alone;
-<!-- TODO(lahosken) proper link -->
-[Pants for Maven Experts](http://pantsbuild.github.io/from_maven.html)
+[[Pants for Maven Experts|pants('examples/src/java/com/pants/examples:from_maven')]]
 has some advice.
 
 Relevant Goals and Targets
@@ -62,8 +55,8 @@ especially relevant.
 >
 > To use pre-built `.jar`s, a JVM target can depend on a `jar`, a
 > reference to published code; these `jar`s normally live in a
-> <!-- TODO(lahosken) proper link -->
-> directory called [3rdparty](http://pantsbuild.github.io/3rdparty_jvm.html).
+> directory called
+> [[3rdparty|pants('examples/src/java/com/pants/examples:3rdparty_jvm')]].
 >
 > Pants can `publish` a JVM library so code in other repos can use it;
 > if the `*_library` target has a `provides` parameter, that specifies
