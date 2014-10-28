@@ -137,7 +137,7 @@ class Options(object):
       if self._legacy_values:
         values.update(vars(self._legacy_values))  # Proxy any legacy option values.
     else:
-      values = copy.copy(self.for_scope(scope.rpartition('.')[0]))
+      values = copy.deepcopy(self.for_scope(scope.rpartition('.')[0]))
 
     # Now add our values.
     flags_in_scope = self._scope_to_flags.get(scope, [])
