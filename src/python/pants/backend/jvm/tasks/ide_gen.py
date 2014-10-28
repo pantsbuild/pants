@@ -44,76 +44,50 @@ def is_java(target):
 
 # XXX(pl): JVM hairball violator (or is it just JVM specific?)
 class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
+
   @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    super(IdeGen, cls).setup_parser(option_group, args, mkflag)
-
-    option_group.add_option(mkflag("project-name"), dest="ide_gen_project_name", default="project",
-                            help="[%default] Specifies the name to use for the generated project.")
-
-    gen_dir = mkflag("project-dir")
-    option_group.add_option(gen_dir, dest="ide_gen_project_dir",
-                            help="[%default] Specifies the directory to output the generated "
-                                "project files to.")
-    option_group.add_option(mkflag("project-cwd"), dest="ide_gen_project_cwd",
-                            help="[%%default] Specifies the directory the generated project should "
-                                 "use as the cwd for processes it launches.  Note that specifying "
-                                 "this trumps %s and not all project related files will be stored "
-                                 "there." % gen_dir)
-
-    option_group.add_option(mkflag("intransitive"), default=False,
-                            action="store_true", dest='ide_gen_intransitive',
-                            help="Limits the sources included in the generated project to just "
-                                 "those owned by the targets specified on the command line")
-
-    option_group.add_option(mkflag("python"), mkflag("python", negate=True), default=False,
-                            action="callback", callback=mkflag.set_bool, dest='ide_gen_python',
-                            help="[%default] Adds python support to the generated project "
-                                 "configuration.")
-
-    option_group.add_option(mkflag("java"), mkflag("java", negate=True), default=True,
-                            action="callback", callback=mkflag.set_bool, dest='ide_gen_java',
-                            help="[%default] Includes java sources in the project; otherwise "
-                                 "compiles them and adds them to the project classpath.")
-    java_language_level = mkflag("java-language-level")
-
-    option_group.add_option(java_language_level, default=7,
-                            dest="ide_gen_java_language_level", type="int",
-                            help="[%default] Sets the java language and jdk used to compile the "
-                                 "project's java sources.")
-    option_group.add_option(mkflag("java-jdk-name"), default=None,
-                            dest="ide_gen_java_jdk",
-                            help="Sets the jdk used to compile the project's java sources. If "
-                                 "unset the default jdk name for the "
-                                 "%s is used." % java_language_level)
-
-    option_group.add_option(mkflag("scala"), mkflag("scala", negate=True), default=True,
-                            action="callback", callback=mkflag.set_bool, dest='ide_gen_scala',
-                            help="[%default] Includes scala sources in the project; otherwise "
-                                 "compiles them and adds them to the project classpath.")
-
-    option_group.add_option(mkflag("use-source-root"), mkflag("use-source-root", negate=True),
-                            default=False, action="callback", callback=mkflag.set_bool,
-                            dest='ide_gen_use_source_root',
-                            help="[%default] Use source_root() settings to collapse source"
-                                 "paths in project and determine which paths are used for "
-                                 "tests.  This is usually what you want if your repo uses "
-                                 "a maven style directory layout.")
-    option_group.add_option(mkflag("infer-test-from-siblings"),
-                            mkflag("infer-test-from-siblings", negate=True),
-                            default=True, action="callback", callback=mkflag.set_bool,
-                            dest='ide_infer_test_from_siblings',
-                            help="[%default] When determining if a path should be added to the "
-                                 "IDE, check to see if any of its sibling source_root() entries "
-                                 "define test targets.  This is usually what you want so that "
-                                 "resource directories under test source roots are picked up as "
-                                 "test paths.")
+  def register_options(cls, register):
+    super(IdeGen, cls).register_options(register)
+    register('--project-name', legacy='ide_gen_project_name', default='project',
+             help='Specifies the name to use for the generated project.')
+    register('--project-dir', legacy='ide_gen_project_dir',
+             help='Specifies the directory to output the generated project files to.')
+    register('--project-cwd', legacy='ide_gen_project_cwd',
+             help='Specifies the directory the generated project should use as the cwd for '
+                  'processes it launches.  Note that specifying this trumps --project-dir '
+                  'and not all project related files will be stored there.')
+    register('--intransitive', action='store_true', legacy='ide_gen_intransitive', default=False,
+             help='Limits the sources included in the generated project to just '
+                  'those owned by the targets specified on the command line.')
+    register('--python', action='store_true', legacy='ide_gen_python', default=False,
+             help='Adds python support to the generated project configuration.')
+    register('--java', action='store_true', legacy='ide_gen_java', default=True,
+             help='Includes java sources in the project; otherwise compiles them and adds them '
+                   'to the project classpath.')
+    register('--java-language-level', legacy='ide_gen_java_language_level', type=int, default=7,
+             help='Sets the java language and jdk used to compile the project\'s java sources.')
+    register('--java-jdk-name', legacy='ide_gen_java_jdk', default=None,
+             help='Sets the jdk used to compile the project\'s java sources. If unset the default '
+                  'jdk name for the --java-language-level is used')
+    register('--scala', action='store_true', legacy='ide_gen_scala', default=True,
+             help='Includes scala sources in the project; otherwise compiles them and adds them '
+                  'to the project classpath.')
+    register('--use-source-root', action='store_true', legacy='ide_gen_use_source_root',
+             default=False,
+             help='Use source_root() settings to collapse sourcepaths in project and determine '
+                  'which paths are used for tests.  This is usually what you want if your repo '
+                  ' uses a maven style directory layout.')
+    register('--infer-test-from-siblings', action='store_true',
+             legacy='ide_infer_test_from_siblings', default=True,
+             help='When determining if a path should be added to the IDE, check to see if any of '
+                  'its sibling source_root() entries define test targets.  This is usually what '
+                  'you want so that resource directories under test source roots are picked up as '
+                  'test paths.')
 
   class Error(TaskError):
     """IdeGen Error."""
 
-  # XXX(pl): What is up with this subclassing?  It seems completely wrong.
-  class TargetUtil(Target):
+  class TargetUtil(object):
     def __init__(self, context):
       self.context = context
 
@@ -131,33 +105,33 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
   def __init__(self, *args, **kwargs):
     super(IdeGen, self).__init__(*args, **kwargs)
 
-    self.project_name = self.context.options.ide_gen_project_name
-    self.python = self.context.options.ide_gen_python
-    self.skip_java = not self.context.options.ide_gen_java
-    self.skip_scala = not self.context.options.ide_gen_scala
-    self.use_source_root = self.context.options.ide_gen_use_source_root
+    self.project_name = self.get_options().project_name
+    self.python = self.get_options().python
+    self.skip_java = not self.get_options().java
+    self.skip_scala = not self.get_options().scala
+    self.use_source_root = self.get_options().use_source_root
 
-    self.java_language_level = self.context.options.ide_gen_java_language_level
-    if self.context.options.ide_gen_java_jdk:
-      self.java_jdk = self.context.options.ide_gen_java_jdk
+    self.java_language_level = self.get_options().java_language_level
+    if self.get_options().java_jdk_name:
+      self.java_jdk = self.get_options().java_jdk_name
     else:
       self.java_jdk = '1.%d' % self.java_language_level
 
     # Always tack on the project name to the work dir so each project gets its own linked jars,
     # etc. See https://github.com/pantsbuild/pants/issues/564
-    if self.context.options.ide_gen_project_dir:
+    if self.get_options().project_dir:
       self.gen_project_workdir = os.path.abspath(
-        os.path.join(self.context.options.ide_gen_project_dir, self.project_name))
+        os.path.join(self.get_options().project_dir, self.project_name))
     else:
       self.gen_project_workdir = os.path.abspath(
         os.path.join(self.workdir, self.__class__.__name__, self.project_name))
 
     self.cwd = (
-      os.path.abspath(self.context.options.ide_gen_project_cwd) if
-      self.context.options.ide_gen_project_cwd else self.gen_project_workdir
+      os.path.abspath(self.get_options().project_cwd) if
+      self.get_options().project_cwd else self.gen_project_workdir
     )
 
-    self.intransitive = self.context.options.ide_gen_intransitive
+    self.intransitive = self.get_options().intransitive
 
     self.checkstyle_suppression_files = self.context.config.getdefault(
       'checkstyle_suppression_files', type=list, default=[]
