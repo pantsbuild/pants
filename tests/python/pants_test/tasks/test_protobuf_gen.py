@@ -5,14 +5,18 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-import unittest2 as unittest
 import pytest
 
-from pants.backend.codegen.tasks.protobuf_gen import calculate_genfiles
+from pants.backend.codegen.tasks.protobuf_gen import ProtobufGen, calculate_genfiles
+from pants_test.tasks.test_base import TaskTest
 from pants.util.contextutil import temporary_file
 
 
-class ProtobufGenCalculateGenfilesTestBase(unittest.TestCase):
+class ProtobufGenCalculateGenfilesTestBase(TaskTest):
+  @classmethod
+  def task_type(cls):
+    return ProtobufGen
+
   def assert_files(self, lang, rel_path, contents, *expected_files):
     with temporary_file() as fp:
       fp.write(contents)

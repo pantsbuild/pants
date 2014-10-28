@@ -26,14 +26,12 @@ class JavaWireLibraryTest(BaseTest):
 
   def test_empty(self):
     self.assertIsInstance(self.target, JavaWireLibrary)
-    traversable_specs = [seq for seq in self.target.traversable_specs]
-    self.assertSequenceEqual([], traversable_specs)
 
   def test_fields(self):
-      assert self.target.payload.get_field('service_writer') is not None
-      assert self.target.payload.get_field('service_writer_options') is not None
-      assert self.target.payload.get_field('roots') is not None
+    assert self.target.payload.get_field('service_writer') is not None
+    assert self.target.payload.get_field('service_writer_options') is not None
+    assert self.target.payload.get_field('roots') is not None
 
   def test_label_fields(self):
-      self.assertTrue(self.target.has_label('codegen'))
-      self.assertTrue(self.target.has_label('exportable'))
+    self.assertTrue(self.target.has_label('codegen'))
+    self.assertTrue(self.target.has_label('exportable'))

@@ -5,34 +5,74 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from contextlib import contextmanager
 import unittest2 as unittest
+import os
 
-from pants.backend.codegen.tasks.protobuf_parse import ProtobufParse
-from pants.backend.codegen.tasks.protobuf_parse import TYPE_PARSER
+from pants.backend.codegen.tasks.protobuf_parse import (ProtobufParse, TYPE_PARSER, camelcase, get_outer_class_name,
+                                                        update_type_list)
+from pants.util.contextutil import temporary_dir
 
 
 class ProtobufGenCalculateJavaTest(unittest.TestCase):
 
-  def setUp(self):
-    self.proto_parser_wire = ProtobufParse(
-      'wire',
-      '/Users/arp/src/pants/examples/src/wire/com/pants/examples/temperature/temperatures.proto',
-      'examples/src/wire/com/pants/examples/temperature/temperatures.proto')
+  @contextmanager
+  def test_parse_for_wire(self):
+    with temporary_dir() as workdir:
+      with open(os.path.join(workdir, "temperatures.proto"), 'w') as fd:
+        fd.write(
+          '''
+            // Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+            // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-    self.proto_parser_protoc = ProtobufParse(
-      'protoc',
-      '/Users/arp/src/pants/examples/src/protobuf/com/pants/examples/distance/distances.proto',
-      'examples/src/protobuf/com/pants/examples/distance/distances.proto')
+            package com.pants.examples.temperature;
 
-  def test_parse(self):
-    self.proto_parser_wire.parse()
-    self.assertEqual('com.pants.examples.temperature', self.proto_parser_wire.package)
-    self.assertEqual(set(['Temperature']), self.proto_parser_wire.types)
+            /**
+             * Structure for expressing temperature: 75 Fahrenheit, 12 Celsius, etc.
+             * Not so useful on its own.
+             */
+            message Temperature {
+              optional string unit = 1;
+              required int64 number = 2;
+            }
+          '''
+        )
+        fd.close()
 
-    self.proto_parser_protoc.parse()
-    self.assertEqual('com.pants.examples.distance', self.proto_parser_protoc.package)
-    self.assertEqual(set([]), self.proto_parser_protoc.types)
-    self.assertEqual('Distances', self.proto_parser_protoc.outer_class_name)
+        proto_parser_wire =  ProtobufParse('wire', fd.name, 'temperatures.proto')
+        proto_parser_wire.parse()
+        self.assertEqual('com.pants.examples.temperature', proto_parser_wire.package)
+        self.assertEqual(set(['Temperature']), proto_parser_wire.types)
+
+
+  @contextmanager
+  def test_parse_for_wire(self):
+    with temporary_dir() as workdir:
+      with open(os.path.join(workdir, "distances.proto"), 'w') as fd:
+        fd.write(
+          '''
+            // Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+            // Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+            package com.pants.examples.distance;
+
+            /**
+             * Structure for expressing distance measures: 8mm, 12 parsecs, etc.
+             * Not so useful on its own.
+             */
+            message Distance {
+              optional string unit = 1;
+              required int64 number = 2;
+            }
+          '''
+        )
+        fd.close()
+
+        proto_parser_protoc =  ProtobufParse('protoc', fd.name, 'distances.proto')
+        proto_parser_protoc.parse()
+        self.assertEqual('com.pants.examples.distance', proto_parser_protoc.package)
+        self.assertEqual(set([]), proto_parser_protoc.types)
+        self.assertEqual('Distances', proto_parser_protoc.outer_class_name)
 
   def test_update_type_list(self):
     match = TYPE_PARSER.match('message Temperature {')
@@ -40,16 +80,16 @@ class ProtobufGenCalculateJavaTest(unittest.TestCase):
     expected_value = set()
     expected_value.add('Temperature')
     actual_value = set()
-    self.proto_parser_wire.update_type_list(match, 0, actual_value)
+    update_type_list('wire', match, 0, actual_value)
     self.assertEqual(expected_value, actual_value)
 
     expected_value.add('TemperatureOrBuilder')
     actual_value = set()
-    self.proto_parser_protoc.update_type_list(match, 0, actual_value)
+    update_type_list('protoc', match, 0, actual_value)
     self.assertEqual(expected_value, actual_value)
 
   def get_outer_class_name(self, source):
-    self.assertEqual('Distances', self.proto_parser_wire.get_outer_class_name('distances.java'))
+    self.assertEqual('Distances', get_outer_class_name('distances.java'))
 
   def test_camelcase(self):
-    self.assertEqual('TestingOut', self.proto_parser_wire.camelcase('testing_out'))
+    self.assertEqual('TestingOut', camelcase('testing_out'))

@@ -5,14 +5,10 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-import logging
-
 from pants.backend.jvm.targets.exportable_jvm_library import ExportableJvmLibrary
 
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
-
-logger = logging.getLogger(__name__)
 
 
 class JavaWireLibrary(ExportableJvmLibrary):

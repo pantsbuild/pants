@@ -9,21 +9,13 @@ python_test_suite(
   ],
 )
 
-
-python_library(
-  name = 'jvm_binary_test_base',
-  dependencies = [
-    'tests/python/pants_test/jvm:jar_task_test_base',
-  ]
-)
-
 python_tests(
   name = 'protobuf_parse',
   sources = ['test_protobuf_parse.py'],
   dependencies = [
-    #':base',
     'src/python/pants/backend/codegen/tasks:protobuf_parse',
     'src/python/pants/util:contextutil',
+    'tests/python/pants_test/tasks:base',
   ],
 )
 
@@ -31,9 +23,8 @@ python_tests(
   name = 'wire_gen',
   sources = ['test_wire_gen.py'],
   dependencies = [
-    ':jvm_binary_test_base',
     'src/python/pants/backend/codegen/tasks:wire_gen',
     'src/python/pants/util:contextutil',
-    ':jvm_binary_test_base',
+    'tests/python/pants_test/tasks:base',
   ],
 )

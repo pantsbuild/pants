@@ -26,12 +26,10 @@ class WireIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.run_pants(cmd)
     self.assertSuccess(pants_run)
 
-
     expected_outputs = [
-      'Compiling proto source file /Users/arp/Src/pants/examples/src/wire/com/pants/examples/temperature/temperatures.proto',
-      'Created output directory /Users/arp/Src/pants/.pants.d/tmp/',
-      '/gen/wire/gen-java/com/pants/examples/temperature',
-      'Writing generated code to /Users/arp/Src/pants/.pants.d/tmp/',
+      'Compiling proto source file',
+      'Created output directory',
+      'Writing generated code',
       '/gen/wire/gen-java/com/pants/examples/temperature/Temperature.java',
     ]
     for expected_output in expected_outputs:

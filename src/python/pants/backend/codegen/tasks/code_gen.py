@@ -76,8 +76,6 @@ class CodeGen(Task):
   def prepare(self, round_manager):
     round_manager.require_data('jvm_build_tools_classpath_callbacks')
 
-
-
   def execute(self):
     gentargets = self.context.targets(self.is_gentarget)
     capabilities = self.genlangs() # lang_name => predicate

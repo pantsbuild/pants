@@ -65,18 +65,10 @@ class WireGen(CodeGen, JvmToolTaskMixin):
   def genlangs(self):
     return {'java': lambda t: t.is_jvm}
 
-  def _same_contents(self, a, b):
-    with open(a, 'r') as f:
-      a_data = f.read()
-    with open(b, 'r') as f:
-      b_data = f.read()
-    return a_data == b_data
-
   def genlang(self, lang, targets):
     sources_by_base = self._calculate_sources(targets)
     sources = reduce(lambda a, b: a ^ b, sources_by_base.values(), OrderedSet())
-
-    check_duplicate_conflicting_protos(sources_by_base, sources, self.context)
+    check_duplicate_conflicting_protos(sources_by_base, sources, self.context.log)
 
     if lang != 'java':
       raise TaskError('Unrecognized wire gen lang: %s' % lang)
@@ -122,14 +114,6 @@ class WireGen(CodeGen, JvmToolTaskMixin):
     spec_path = os.path.relpath(self.java_out, get_buildroot())
     address = SyntheticAddress(spec_path, target.id)
     deps = OrderedSet(self.javadeps)
-    jars_tgt = self.context.add_new_target(SyntheticAddress(spec_path, target.id + str('-rjars')),
-                                           JarLibrary,
-                                           # jars=import_jars,
-                                           derived_from=target)
-    # Add in the 'spec-rjars' target, which contains all the JarDependency targets passed in via the
-    # imports parameter. Each of these jars is expected to contain .proto files bundled together
-    # with their .class files.
-    deps.add(jars_tgt)
     tgt = self.context.add_new_target(address,
                                       JavaLibrary,
                                       derived_from=target,
@@ -152,9 +136,5 @@ def calculate_genfiles(path, source):
 
 def calculate_java_genfiles(package, types):
   basepath = package.replace('.', '/')
-
-  def path(name):
-    return os.path.join(basepath, '%s.java' % name)
-
   for type_ in types:
-    yield path(type_)
+    yield os.path.join(basepath, '{0}.java'.format(type_))

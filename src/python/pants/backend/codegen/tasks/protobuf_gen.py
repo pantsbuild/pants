@@ -139,15 +139,13 @@ class ProtobufGen(CodeGen):
       for path in self._jars_to_directories(target):
         yield os.path.relpath(path, get_buildroot())
 
-
-
   def genlang(self, lang, targets):
     sources_by_base = self._calculate_sources(targets)
     sources = reduce(lambda a,b: a^b, sources_by_base.values(), OrderedSet())
     bases = OrderedSet(sources_by_base.keys())
     bases.update(self._proto_path_imports(targets))
 
-    check_duplicate_conflicting_protos(sources_by_base, sources, self.context)
+    check_duplicate_conflicting_protos(sources_by_base, sources, self.context.log)
 
     if lang == 'java':
       output_dir = self.java_out
@@ -271,7 +269,6 @@ def calculate_java_genfiles(package, outer_class_name, types):
   for type_ in types:
     yield path(type_)
 
-
 def _same_contents(a, b):
   with open(a, 'r') as f:
     a_data = f.read()
@@ -279,7 +276,14 @@ def _same_contents(a, b):
     b_data = f.read()
   return a_data == b_data
 
-def check_duplicate_conflicting_protos(sources_by_base, sources, context):
+def check_duplicate_conflicting_protos(sources_by_base, sources, log):
+  """
+  Checks if proto files are duplicate or conflicting.
+  :param dict sources_by_base: mapping of base to path
+  :param list sources: list of sources
+  :param context:
+  :return:
+  """
   sources_by_genfile = {}
   for base in sources_by_base.keys(): # Need to iterate over /original/ bases.
     for path in sources_by_base[base]:
@@ -297,14 +301,14 @@ def check_duplicate_conflicting_protos(sources_by_base, sources, context):
               # Must have been culled by an earlier pass.
               continue
             if not _same_contents(path, prev):
-              context.log.error('Proto conflict detected (.proto files are different):')
-              context.log.error('  1: {prev}'.format(prev=prev))
-              context.log.error('  2: {curr}'.format(curr=path))
+              log.error('Proto conflict detected (.proto files are different):')
+              log.error('  1: {prev}'.format(prev=prev))
+              log.error('  2: {curr}'.format(curr=path))
             else:
-              context.log.warn('Proto duplication detected (.proto files are identical):')
-              context.log.warn('  1: {prev}'.format(prev=prev))
-              context.log.warn('  2: {curr}'.format(curr=path))
-            context.log.warn('  Arbitrarily favoring proto 1.')
+              log.warn('Proto duplication detected (.proto files are identical):')
+              log.warn('  1: {prev}'.format(prev=prev))
+              log.warn('  2: {curr}'.format(curr=path))
+            log.warn('  Arbitrarily favoring proto 1.')
             if path in sources:
               sources.remove(path) # Favor the first version.
             continue

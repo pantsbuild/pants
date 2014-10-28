@@ -5,13 +5,16 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-import unittest2 as unittest
-
-from pants.backend.codegen.tasks.wire_gen import calculate_genfiles
+from pants.backend.codegen.tasks.wire_gen import WireGen, calculate_genfiles
+from pants_test.tasks.test_base import TaskTest
 from pants.util.contextutil import temporary_file
 
 
-class WireGenCalculateGenfilesTestBase(unittest.TestCase):
+class WireGenCalculateGenfilesTestBase(TaskTest):
+  @classmethod
+  def task_type(cls):
+    return WireGen
+
   def assert_files(self, lang, rel_path, contents, *expected_files):
     if isinstance(expected_files[0], list):
       expected_files = expected_files[0]

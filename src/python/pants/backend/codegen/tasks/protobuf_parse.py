@@ -28,11 +28,11 @@ class ProtobufParse():
     self.source = source
 
     self.package = ''
-    self.outer_class_name = self.get_outer_class_name(source)
+    self.outer_class_name = get_outer_class_name(source)
     self.types = set()
 
   def parse(self):
-    lines = self.read_lines()
+    lines = self._read_lines()
     multiple_files = False
     outer_types = set()
     type_depth = 0
@@ -58,10 +58,10 @@ class ProtobufParse():
           uline = line.decode('utf-8').strip()
           type_depth += uline.count('{') - uline.count('}')
           match = SERVICE_PARSER.match(line)
-          self.update_type_list(match, type_depth, outer_types)
+          update_type_list(self.compiler, match, type_depth, outer_types)
           if not match:
             match = TYPE_PARSER.match(line)
-            self.update_type_list(match, type_depth, outer_types)
+            update_type_list(self.compiler, match, type_depth, outer_types)
 
     # 'option java_package' supercedes 'package'
     if java_package:
@@ -70,22 +70,22 @@ class ProtobufParse():
     if (self.compiler == 'protoc' and multiple_files and type_depth == 0) or self.compiler == 'wire':
       self.types = outer_types
 
-  def update_type_list(self, match, type_depth, outer_types):
-    if match and type_depth < 2:  # This takes care of the case where { } are on the same line.
-      type_name = match.group(2)
-      outer_types.add(type_name)
-      if match.group(1) == 'message' and self.compiler == 'protoc':
-        outer_types.add('%sOrBuilder' % type_name)
-
-  def read_lines(self):
+  def _read_lines(self):
     with open(self.path, 'r') as protobuf:
       lines = protobuf.readlines()
     return lines
 
-  def get_outer_class_name(self, source):
-    filename = re.sub(r'\.proto$', '', os.path.basename(source))
-    return self.camelcase(filename)
+def update_type_list(compiler, match, type_depth, outer_types):
+  if match and type_depth < 2:  # This takes care of the case where { } are on the same line.
+    type_name = match.group(2)
+    outer_types.add(type_name)
+    if match.group(1) == 'message' and compiler == 'protoc':
+      outer_types.add('%sOrBuilder' % type_name)
 
-  def camelcase(self, string):
-    """Convert snake casing where present to camel casing"""
-    return ''.join(word.capitalize() for word in re.split('[-_]', string))
+def get_outer_class_name(source):
+  filename = re.sub(r'\.proto$', '', os.path.basename(source))
+  return camelcase(filename)
+
+def camelcase(string):
+  """Convert snake casing where present to camel casing"""
+  return ''.join(word.capitalize() for word in re.split('[-_]', string))
