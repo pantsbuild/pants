@@ -16,10 +16,10 @@ from pants.backend.jvm.targets.java_tests import JavaTests
 from pants.backend.jvm.targets.scala_tests import ScalaTests
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.base.build_environment import get_buildroot
-from pants.base.config import ConfigOption
 from pants.base.generator import Generator, TemplateData
 from pants.base.source_root import SourceRoot
 from pants.util.dirutil import safe_mkdir, safe_walk
+from pants.scm.git import Git
 
 
 _TEMPLATE_BASEDIR = 'templates/idea'
@@ -207,6 +207,7 @@ class IdeaGen(IdeGen):
     configured_project = TemplateData(
       root_dir=get_buildroot(),
       outdir=outdir,
+      git_root=Git.detect_worktree(),
       modules=[ configured_module ],
       java=TemplateData(
         encoding=self.java_encoding,
