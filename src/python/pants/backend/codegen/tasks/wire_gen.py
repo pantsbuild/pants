@@ -97,9 +97,11 @@ class WireGen(CodeGen, JvmToolTaskMixin):
       for enum_option in target.payload.get_field_value('enum_options'):
         args.append('--enum_options=%s' % enum_option)
 
-    util.execute_java(classpath=self.tool_classpath('wire'),
+    result = util.execute_java(classpath=self.tool_classpath('wire'),
                       main='com.squareup.wire.WireCompiler',
                       args=args)
+    if result != 0:
+      raise TaskError('Wire compiler exited non-zero (%i)' % result)
 
   def _calculate_sources(self, targets):
     walked_targets = set()
