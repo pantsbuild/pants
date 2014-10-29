@@ -39,7 +39,7 @@ class WikiPageTest(BaseTest):
 
         page(name='readme',
           source='README.md',
-          dependencies=[':readme2'],
+          links=[':readme2'],
           provides=[
             wiki_artifact(
               wiki=confluence,
@@ -51,7 +51,7 @@ class WikiPageTest(BaseTest):
 
         page(name='readme2',
           source='README2.md',
-          dependencies=[':readme'],
+          links=[':readme'],
           provides=[
             wiki_artifact(
               wiki=confluence,
@@ -82,11 +82,9 @@ This is the second readme file! Isn't it exciting?
   def test_wiki_page(self):
     p = self.target('junk/docs:readme')
 
-    # FIXME(areitz): bring these back once TestBase inherits from unittest2.
-    # https://github.com/pantsbuild/pants/issues/253
-    # self.assertIsInstance(p, Page)
-    # self.assertIsInstance(p.provides[0], WikiArtifact)
-    # self.assertIsInstance(p.provides[0].wiki, Wiki)
+    self.assertIsInstance(p, Page)
+    self.assertIsInstance(p.provides[0], WikiArtifact)
+    self.assertIsInstance(p.provides[0].wiki, Wiki)
     self.assertTrue(isinstance(p, Page), "%s isn't an instance of Page" % p)
     self.assertTrue(isinstance(p.provides[0], WikiArtifact), "%s isn't an instance of WikiArtifact" % p)
     self.assertTrue(isinstance(p.provides[0].wiki, Wiki), "%s isn't an instance of Wiki" % p)
