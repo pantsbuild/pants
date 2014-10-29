@@ -11,3 +11,12 @@ message Temperature {
   optional string unit = 1;
   required int64 number = 2;
 }
+
+message TemperatureRequest {
+  optional string msg = 1;
+}
+
+service TemperatureService {
+  rpc GetTemperature (TemperatureRequest) returns (Temperature);
+  rpc PredictTemperature (TemperatureRequest) returns (Temperature);
+}

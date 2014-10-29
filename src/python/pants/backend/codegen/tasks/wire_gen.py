@@ -14,7 +14,6 @@ from pants.backend.codegen.targets.java_wire_library import JavaWireLibrary
 from pants.backend.codegen.tasks.code_gen import CodeGen
 from pants.backend.codegen.tasks.protobuf_gen import check_duplicate_conflicting_protos
 from pants.backend.codegen.tasks.protobuf_parse import ProtobufParse
-from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.address import SyntheticAddress
@@ -80,6 +79,23 @@ class WireGen(CodeGen, JvmToolTaskMixin):
     args = [gen]
     args.append('--proto_path=%s' % self.proto_path)
     args.extend(sources)
+
+    # Add all params in payload to args
+    for target in targets:
+      if target.payload.get_field_value('no_option') is True:
+        args.append('--no_option')
+
+      args.append('--service_writer=%s' % target.payload.get_field_value('service_writer'))
+
+      registry_class = target.payload.get_field_value('registry_class')
+      if registry_class:
+        args.append('--registry_class=%s' % registry_class)
+
+      for root in target.payload.get_field_value('roots'):
+        args.append('--roots=%s' % root)
+
+      for enum_option in target.payload.get_field_value('enum_options'):
+        args.append('--enum_options=%s' % enum_option)
 
     util.execute_java(classpath=self.tool_classpath('wire'),
                       main='com.squareup.wire.WireCompiler',

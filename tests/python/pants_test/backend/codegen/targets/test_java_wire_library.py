@@ -20,6 +20,7 @@ class JavaWireLibraryTest(BaseTest):
     self.add_to_build_file('BUILD', dedent('''
       java_wire_library(name='foo',
         sources=[],
+        service_writer='com.squareup.wire.RetrofitServiceWriter'
       )'''))
     self.build_graph.inject_spec_closure('//:foo')
     self.target = self.build_graph.get_target(SyntheticAddress.parse('//:foo'))
@@ -28,9 +29,9 @@ class JavaWireLibraryTest(BaseTest):
     self.assertIsInstance(self.target, JavaWireLibrary)
 
   def test_fields(self):
-    assert self.target.payload.get_field('service_writer') is not None
-    assert self.target.payload.get_field('service_writer_options') is not None
-    assert self.target.payload.get_field('roots') is not None
+    self.assertEqual('com.squareup.wire.RetrofitServiceWriter', self.target.payload.get_field_value('service_writer'))
+    self.assertEqual([], self.target.payload.get_field_value('service_writer_options'))
+    self.assertEqual([], self.target.payload.get_field_value('roots'))
 
   def test_label_fields(self):
     self.assertTrue(self.target.has_label('codegen'))
