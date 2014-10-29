@@ -151,8 +151,13 @@ class TaskBase(AbstractClass):
       pants_workdir = self.context.config.getdefault('pants_workdir')
       compression = self.context.config.getint('cache', 'compression', default=5)
       my_name = self.__class__.__name__
-      return create_artifact_cache(self.context.log, pants_workdir, spec,
-                                   my_name, compression, action)
+      return create_artifact_cache(
+        log=self.context.log,
+        artifact_root=pants_workdir,
+        spec=spec,
+        task_name=my_name,
+        compression=compression,
+        action=action)
     else:
       return None
 
