@@ -8,7 +8,7 @@
     "publish": "dist/markdown/html/src/docs/publish.html",
     "python_old": "dist/markdown/html/examples/src/python/example/python_old.html",
     "python-readme": "dist/markdown/html/examples/src/python/example/readme.html",
-    "scala": "dist/markdown/html/examples/src/scala/com/pants/example/readme.html",
+    "scala": "dist/markdown/html/examples/src/scala/com/pants/example/readme.html"
   },
   "extras": {
     "logo.ico": "src/python/pants/docs/pants-logo.ico",
