@@ -18,12 +18,12 @@ class OptionsTest(unittest.TestCase):
     def __init__(self, values):
       self._values = values
 
-    def get(self, section, name, default):
+    def get(self, section, name, default=None):
       if section not in self._values or name not in self._values[section]:
         return default
       return self._values[section][name]
 
-    def getlist(self, section, name, default):
+    def getlist(self, section, name, default=None):
       return self.get(section, name, default)
 
   def _register(self, options):
