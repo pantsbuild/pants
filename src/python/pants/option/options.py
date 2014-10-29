@@ -12,7 +12,6 @@ from pants.base.build_environment import pants_release
 from pants.goal.goal import Goal
 from pants.option.arg_splitter import ArgSplitter, GLOBAL_SCOPE
 from pants.option.option_value_container import OptionValueContainer
-from pants.option.parser import ParseError
 from pants.option.parser_hierarchy import ParserHierarchy
 
 
