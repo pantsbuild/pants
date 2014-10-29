@@ -84,7 +84,7 @@ class Page(Target):
     :type links: List of target specs
     :param provides: Optional "Addresses" at which this page is published.
        E.g., a wiki location.
-    :type links: List of ``wiki_artifact``s
+    :type provides: List of ``wiki_artifact``s
     :param resources: An optional list of Resources objects.
     """
     payload = payload or Payload()
