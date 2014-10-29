@@ -21,7 +21,7 @@ jvm_binary(name ='jvm-run-example',
 page(
   name='readme',
   source='readme.md',
-  dependencies=[
+  links=[
     'examples/src/java/com/pants/examples:readme',
   ],
 )
