@@ -41,6 +41,8 @@ def create_artifact_cache(log, artifact_root, spec, task_name, compression, acti
   """
   if not spec:
     raise ValueError('Empty artifact cache spec')
+  if not isinstance(compression, (int, long)):
+    raise ValueError('compression value must be an integer: {comp}'.format(comp=compression))
   if isinstance(spec, basestring):
     if spec.startswith('/') or spec.startswith('~'):
       path = os.path.join(spec, task_name)
@@ -61,7 +63,12 @@ def create_artifact_cache(log, artifact_root, spec, task_name, compression, acti
     else:
       raise ValueError('Invalid artifact cache spec: %s' % spec)
   elif isinstance(spec, (list, tuple)):
-    caches = [create_artifact_cache(log, artifact_root, x,
-                                    task_name, action, compression) for x in spec]
+    caches = [create_artifact_cache(
+      log=log,
+      artifact_root=artifact_root,
+      spec=x,
+      task_name=task_name,
+      compression=compression,
+      action=action) for x in spec]
     caches = filter(None, caches)
     return CombinedArtifactCache(caches) if caches else None
