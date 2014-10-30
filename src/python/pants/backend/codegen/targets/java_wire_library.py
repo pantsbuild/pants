@@ -22,16 +22,15 @@ class JavaWireLibrary(ExportableJvmLibrary):
     """
     :param string service_writer: the name of the class to pass as the --service_writer option to the Wire compiler
     if service_writer is not specified, com.squareup.wire.SimpleServiceWriter will be used
-    :param list service_writer_options: A list of service methods to generate.
+    :param list service_writer_options: A list of options to pass to the service writer
     :param list roots: passed through to the --roots option of the Wire compiler
     :param string registry_class: name of RegistryClass to create
     :param list enum_options: list of enums to pass to as the --enum-enum_options option, # optional
     :param boolean no_options: boolean that determines if --no_options flag is passed
     """
     payload = payload or Payload()
-    # print("++++++++++++++++++++++++++++++++++++++ service_writer=%r" % service_writer)
     payload.add_fields({
-      'service_writer': PrimitiveField(service_writer or 'com.squareup.wire.SimpleServiceWriter'),
+      'service_writer': PrimitiveField(service_writer or None),
       'service_writer_options': PrimitiveField(service_writer_options or []),
       'roots': PrimitiveField(roots or []),
       'registry_class': PrimitiveField(registry_class or None),
@@ -41,6 +40,15 @@ class JavaWireLibrary(ExportableJvmLibrary):
 
     if service_writer_options:
       logger.warn('The service_writer_options flag is ignored.')
+    if roots:
+      logger.warn(
+        '''
+          It is known that passing in roots may not work as intended. Pants tries to predict what files
+          Wire will generate then does a verification to see if all of those files were generated.
+          With the roots flag set, it may be the case that not all predicted files will be generated.
+          and the verification will fail.
+        '''
+      )
 
     super(JavaWireLibrary, self).__init__(payload=payload, **kwargs)
     self.add_labels('codegen')

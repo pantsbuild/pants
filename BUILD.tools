@@ -130,10 +130,10 @@ jar_library(name = 'jar-tool',
 
 jar_library(name = 'wire-runtime',
             jars = [
-              jar(org = 'com.squareup.wire', name = 'wire-runtime', rev = '1.5.2')
+              jar(org = 'com.squareup.wire', name = 'wire-runtime', rev = '1.6.0')
             ])
 
 jar_library(name = 'wire-compiler',
             jars = [
-              jar(org = 'com.squareup.wire', name = 'wire-compiler', rev = '1.5.2')
+              jar(org = 'com.squareup.wire', name = 'wire-compiler', rev = '1.6.0')
             ])

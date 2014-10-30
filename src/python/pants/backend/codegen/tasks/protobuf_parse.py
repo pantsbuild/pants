@@ -30,11 +30,13 @@ class ProtobufParse():
     self.package = ''
     self.outer_class_name = get_outer_class_name(source)
     self.types = set()
+    self.services = set()
 
   def parse(self):
     lines = self._read_lines()
     multiple_files = False
     outer_types = set()
+    services = set()
     type_depth = 0
     java_package = None
 
@@ -58,7 +60,7 @@ class ProtobufParse():
           uline = line.decode('utf-8').strip()
           type_depth += uline.count('{') - uline.count('}')
           match = SERVICE_PARSER.match(line)
-          update_type_list(self.compiler, match, type_depth, outer_types)
+          update_type_list(self.compiler, match, type_depth, services)
           if not match:
             match = TYPE_PARSER.match(line)
             update_type_list(self.compiler, match, type_depth, outer_types)
@@ -67,8 +69,11 @@ class ProtobufParse():
     if java_package:
       self.package = java_package
 
-    if (self.compiler == 'protoc' and multiple_files and type_depth == 0) or self.compiler == 'wire':
+    if (self.compiler == 'protoc' and multiple_files and type_depth == 0):
+      self.types = outer_types.union(services)
+    elif self.compiler == 'wire':
       self.types = outer_types
+      self.services = services
 
   def _read_lines(self):
     with open(self.path, 'r') as protobuf:

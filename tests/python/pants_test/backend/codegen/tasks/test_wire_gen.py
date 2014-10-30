@@ -15,20 +15,20 @@ class WireGenCalculateGenfilesTestBase(TaskTest):
   def task_type(cls):
     return WireGen
 
-  def assert_files(self, lang, rel_path, contents, *expected_files):
+  def assert_files(self, lang, rel_path, contents, service_writer, *expected_files):
     if isinstance(expected_files[0], list):
       expected_files = expected_files[0]
 
     with temporary_file() as fp:
       fp.write(contents)
       fp.close()
-      self.assertEqual(set(expected_files), calculate_genfiles(fp.name, rel_path)[lang])
+      self.assertEqual(set(expected_files), calculate_genfiles(fp.name, rel_path, service_writer)[lang])
 
 
 class WireGenCalculateJavaTest(WireGenCalculateGenfilesTestBase):
 
-  def assert_java_files(self, rel_path, contents, *expected_files):
-    self.assert_files('java', rel_path, contents, *expected_files)
+  def assert_java_files(self, rel_path, contents, service_writer, *expected_files):
+    self.assert_files('java', rel_path, contents, service_writer, *expected_files)
 
   def test_plain(self):
     self.assert_java_files(
@@ -45,11 +45,13 @@ class WireGenCalculateJavaTest(WireGenCalculateGenfilesTestBase):
           required int64 number = 2;
         }
       ''',
+      None,
       'com/pants/examples/temperature/Temperature.java')
 
     self.assert_java_files(
       'temperatures.proto',
       'package com.pants.examples.temperature',
+      None,
       [])
 
   def test_custom_package(self):
@@ -63,11 +65,13 @@ class WireGenCalculateJavaTest(WireGenCalculateGenfilesTestBase):
           optional string name = 1;
         }
       ''',
+      None,
       'com/example/foo/bar/Fred.java')
 
     self.assert_java_files(
       'bam_bam.proto',
       'option java_package = "com.example.baz.bip";',
+      None,
       [])
 
     self.assert_java_files(
@@ -79,6 +83,7 @@ class WireGenCalculateJavaTest(WireGenCalculateGenfilesTestBase):
           optional string name = 1;
         }
       ''',
+      None,
       'com/example/baz/bip/BamBam.java')
 
     self.assert_java_files(
@@ -88,6 +93,7 @@ class WireGenCalculateJavaTest(WireGenCalculateGenfilesTestBase):
         package com.twitter.ads.revenue_tables;
 
       ''',
+      None,
       [])
 
   def test_multiple_files(self):
@@ -97,6 +103,7 @@ class WireGenCalculateJavaTest(WireGenCalculateGenfilesTestBase):
         package com.twitter.lean;
         option java_multiple_files = false;
       ''',
+      None,
       [])
 
     self.assert_java_files(
@@ -107,6 +114,7 @@ class WireGenCalculateJavaTest(WireGenCalculateGenfilesTestBase):
         enum Jake { FOO=1;}
         message joe_bob {}
       ''',
+      None,
       'com/twitter/lean/Jake.java',
       'com/twitter/lean/joe_bob.java',
       )
@@ -122,6 +130,7 @@ class WireGenCalculateJavaTest(WireGenCalculateGenfilesTestBase):
         message joe_bob {
         }
       ''',
+      None,
       'com/twitter/lean/Jake.java',
       'com/twitter/lean/joe_bob.java')
 
@@ -136,6 +145,7 @@ class WireGenCalculateJavaTest(WireGenCalculateGenfilesTestBase):
           }
         }
       ''',
+      None,
       'com/pants/protos/Foo.java')
 
     self.assert_java_files(
@@ -144,6 +154,7 @@ class WireGenCalculateJavaTest(WireGenCalculateGenfilesTestBase):
         package pants.preferences;
         option java_package = "com.pants.protos.preferences";
       ''',
+      None,
       [])
 
     self.assert_java_files(
@@ -157,7 +168,7 @@ class WireGenCalculateJavaTest(WireGenCalculateGenfilesTestBase):
         }
         service SomeService { rpc AndAnother() {} }
       ''',
-      'com/pants/protos/preferences/SomeService.java',
+      None,
       'com/pants/protos/preferences/Wat.java')
 
     self.assert_java_files(
@@ -181,6 +192,133 @@ class WireGenCalculateJavaTest(WireGenCalculateGenfilesTestBase):
           MEH = 0;
         }
       ''',
+      None,
+      'com/pants/protos/preferences/AnotherMessage.java',
+      'com/pants/protos/preferences/MessageAfterService.java')
+
+  def test_service_writer(self):
+    self.assert_java_files(
+      'pants.proto',
+      '''
+        package pants.preferences;
+        option java_multiple_files = true;
+        option java_package = "com.pants.protos.preferences";
+        message AnotherMessage {
+          BAZ = 0;
+        }
+
+        service SomeService {
+          rpc SomeRpc();
+          rpc AnotherRpc() {
+          }
+          rpc AndAnother() {}
+        }
+
+        message MessageAfterService {
+          MEH = 0;
+        }
+      ''',
+      'com.squareup.wire.SimpleServiceWriter',
       'com/pants/protos/preferences/AnotherMessage.java',
       'com/pants/protos/preferences/SomeService.java',
+      'com/pants/protos/preferences/MessageAfterService.java')
+
+  def test_multiple_files(self):
+    self.assert_java_files(
+      'jack_spratt.proto',
+      '''
+        package com.twitter.lean;
+        option java_multiple_files = false;
+      ''',
+      None,
+      [])
+
+    self.assert_java_files(
+      'jack_spratt_no_whitespace.proto',
+      '''
+        package com.twitter.lean;
+        option java_multiple_files = true;
+        enum Jake { FOO=1;}
+        message joe_bob {}
+      ''',
+      None,
+      'com/twitter/lean/Jake.java',
+      'com/twitter/lean/joe_bob.java',
+      )
+
+    self.assert_java_files(
+      'jack_spratt.proto',
+      '''
+        package com.twitter.lean;
+        option java_multiple_files = true;
+
+        enum Jake { FOO=1;
+        }
+        message joe_bob {
+        }
+      ''',
+      None,
+      'com/twitter/lean/Jake.java',
+      'com/twitter/lean/joe_bob.java')
+
+    self.assert_java_files(
+      'inner_class.proto',
+      '''
+        package com.pants.protos;
+        option java_multiple_files = true;
+        message Foo {
+          enum Bar {
+            BAZ = 0;
+          }
+        }
+      ''',
+      None,
+      'com/pants/protos/Foo.java')
+
+    self.assert_java_files(
+      'Camel-case.proto',
+      '''
+        package pants.preferences;
+        option java_package = "com.pants.protos.preferences";
+      ''',
+      None,
+      [])
+
+    self.assert_java_files(
+      'curly_braces.proto',
+      '''
+        package pants.preferences;
+        option java_package = "com.pants.protos.preferences";
+        option java_multiple_files = true;
+        message Wat { message Inner { option meh = true; }
+          option Inner field = 1;
+        }
+        service SomeService { rpc AndAnother() {} }
+      ''',
+      None,
+      'com/pants/protos/preferences/Wat.java')
+
+    self.assert_java_files(
+      'pants.proto',
+      '''
+        package pants.preferences;
+        option java_multiple_files = true;
+        option java_package = "com.pants.protos.preferences";
+        message AnotherMessage {
+          BAZ = 0;
+        }
+
+        service SomeService {
+          rpc SomeRpc();
+          rpc AnotherRpc() {
+          }
+          rpc AndAnother() {}
+        }
+
+        message MessageAfterService {
+          MEH = 0;
+        }
+      ''',
+      None,
+      'com/pants/protos/preferences/AnotherMessage.java',
       'com/pants/protos/preferences/MessageAfterService.java')
