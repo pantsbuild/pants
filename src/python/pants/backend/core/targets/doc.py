@@ -91,7 +91,7 @@ class Page(Target):
     payload.add_fields({
       'sources': SourcesField(sources=[source],
                               sources_rel_path=address.spec_path),
-      'links': self.ProvidesTupleField(links or []),
+      'links': self.PrimitiveField(links or []),
       'provides': self.ProvidesTupleField(provides or []),
     })
     self._resource_specs = resources or []
