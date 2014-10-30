@@ -18,7 +18,8 @@ class BenchmarkRun(JvmTask, JvmToolTaskMixin):
   @classmethod
   def register_options(cls, register):
     super(BenchmarkRun, cls).register_options(register)
-    register('--target', legacy='target_class', help='Name of the benchmark class.')
+    register('--target', legacy='target_class',
+             help='Name of the benchmark class. This is a mandatory argument.')
 
     register('--memory', default=False, action='store_true', legacy='memory_profiling',
              help='Enable memory profiling.')
@@ -42,6 +43,8 @@ class BenchmarkRun(JvmTask, JvmToolTaskMixin):
     # TODO(Steve Gury):
     # Find all the target classes from the Benchmark target itself
     # https://jira.twitter.biz/browse/AWESOME-1938
+    if not self.get_options().target:
+      raise ValueError('Mandatory argument --bench-target must be specified.')
     self.args.insert(0, self.get_options().target)
     if self.get_options().memory:
       self.args.append('--measureMemory')
