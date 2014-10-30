@@ -265,30 +265,39 @@ def entry_for_one_class(nom, cls):
   if issubclass(cls, Target):
     # special case for Target classes: "inherit" information up the class tree.
 
+    # args to not-document in BUILD Dictionary. BUILD file authors shouldn't
+    # use these; they're implementation-only.
+    ARGS_SUPPRESS = ['address', 'build_graph', 'payload']
+
+    # "accumulate" argspec and docstring fragments going up inheritance tree.
+    suppress = set(ARGS_SUPPRESS)
     args_accumulator = []
-    defaults_accumulator = ()
+    defaults_accumulator = []
     docs_accumulator = []
     for c in inspect.getmro(cls):
       if not issubclass(c, Target): continue
       if not inspect.ismethod(c.__init__): continue
       args, _, _, defaults = inspect.getargspec(c.__init__)
-      args_accumulator = args[1:] + args_accumulator
-      defaults_accumulator = (defaults or ()) + defaults_accumulator
+      args_that_have_defaults = args[len(args) - len(defaults or ()):]
+      args_with_no_defaults = args[1:(len(args) - len(defaults or ()))]
+      for i in range(len(args_that_have_defaults)):
+        arg = args_that_have_defaults[i]
+        if not arg in suppress:
+          suppress.add(arg)
+          args_accumulator.append(arg)
+          defaults_accumulator.append(defaults[i])
+      for arg in args_with_no_defaults:
+        if not arg in suppress:
+          suppress.add(arg)
+          args_accumulator.insert(0, arg)
       dedented_doc = dedent_docstring(c.__init__.__doc__)
       docs_accumulator.append(shard_param_docstring(dedented_doc))
-    # Suppress these from BUILD dictionary: they're legit args to the
-    # Target implementation, but they're not for BUILD files:
-    assert(args_accumulator[1] == 'address')
-    assert(args_accumulator[2] == 'build_graph')
-    args_accumulator = [args_accumulator[0]] + args_accumulator[3:]
-    defaults_accumulator = (defaults_accumulator[0],) + defaults_accumulator[3:]
     argspec = inspect.formatargspec(args_accumulator,
                                     None,
                                     None,
                                     defaults_accumulator)
-    # Suppress these from BUILD dictionary: they're legit args to the
-    # Target implementation, but they're not for BUILD files:
-    suppress = set(['address', 'build_graph', 'payload'])
+
+    suppress = set(ARGS_SUPPRESS)
     funcdoc_rst = ''
     funcdoc_shards = OrderedDict()
     for shard in docs_accumulator:
