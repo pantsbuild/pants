@@ -36,7 +36,7 @@ class BenchmarkRun(JvmTask, JvmToolTaskMixin):
     self._agent_bootstrap_key = 'benchmark-agent'
     self.register_jvm_tool_from_config(self._agent_bootstrap_key, config,
                                        ini_section='benchmark-run',
-                                       ini_key='agent_profile',
+                                       ini_key='agent-bootstrap-tools',
                                        default=[':benchmark-java-allocation-instrumenter-2.1'])
 
     # TODO(Steve Gury):
