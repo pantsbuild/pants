@@ -15,45 +15,29 @@ class ListTargets(ConsoleTask):
   If no targets are specified, lists all targets in the workspace.
   """
   @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    super(ListTargets, cls).setup_parser(option_group, args, mkflag)
-
-    option_group.add_option(
-        mkflag('provides'),
-        action='store_true',
-        dest='list_provides', default=False,
-        help='Specifies only targets that provide an artifact should be '
-        'listed. The output will be 2 columns in this case: '
-        '[target address] [artifact id]')
-
-    option_group.add_option(
-        mkflag('provides-columns'),
-        dest='list_provides_columns',
-        default='address,artifact_id',
-        help='Specifies the columns to include in listing output when '
-        'restricting the listing to targets that provide an artifact. '
-        'Available columns are: address, artifact_id, repo_name, repo_url '
-        'and repo_db')
-
-    option_group.add_option(
-        mkflag('documented'),
-        action='store_true',
-        dest='list_documented',
-        default=False,
-        help='Prints only targets that are documented with a description.')
+  def register_options(cls, register):
+    super(ListTargets, cls).register_options(register)
+    register('--provides', action='store_true', default=False, legacy='list_provides',
+             help='List only targets that provide an artifact, displaying the columns specified by '
+                  '--provides-columns.')
+    register('--provides-columns', default='address,artifact_id', legacy='list_provides_columns',
+             help='Display these columns when --provides is specified. Available columns are: '
+                  'address, artifact_id, repo_name, repo_url, push_db_basedir')
+    register('--documented', action='store_true', default=False, legacy='list_documented',
+             help='Print only targets that are documented with a description.')
 
   def __init__(self, *args, **kwargs):
     super(ListTargets, self).__init__(*args, **kwargs)
 
-    self._provides = self.context.options.list_provides
-    self._provides_columns = self.context.options.list_provides_columns
-    self._documented = self.context.options.list_documented
+    self._provides = self.get_options().provides
+    self._provides_columns = self.get_options().provides_columns
+    self._documented = self.get_options().documented
 
   def console_output(self, targets):
     if self._provides:
       def extract_artifact_id(target):
         provided_jar, _, _ = target.get_artifact_info()
-        return '%s%s%s' % (provided_jar.org, '#', provided_jar.name)
+        return '{0}#{1}'.format(provided_jar.org, provided_jar.name)
 
       extractors = dict(
           address=lambda target: target.address.spec,
@@ -70,15 +54,15 @@ class ListTargets(ConsoleTask):
       try:
         column_extractors = [extractors[col] for col in (self._provides_columns.split(','))]
       except KeyError:
-        raise TaskError('Invalid columns specified %s. Valid ones include address, artifact_id, '
-                        'repo_name, repo_url and repo_db.' % self._provides_columns)
+        raise TaskError('Invalid columns specified: {0}. Valid columns are: address, artifact_id, '
+                        'repo_name, repo_url, push_db_basedir.'.format(self._provides_columns))
 
       print_fn = lambda target: print_provides(column_extractors, target)
     elif self._documented:
       def print_documented(target):
         if target.description:
-          return '%s\n  %s' % (target.address.spec,
-                               '\n  '.join(target.description.strip().split('\n')))
+          return '{0}\n  {1}'.format(target.address.spec,
+                                     '\n  '.join(target.description.strip().split('\n')))
       print_fn = print_documented
     else:
       print_fn = lambda target: target.address.spec

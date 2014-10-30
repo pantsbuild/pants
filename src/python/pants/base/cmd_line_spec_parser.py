@@ -6,6 +6,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import os
+import traceback
 
 from twitter.common.collections import maybe_list, OrderedSet
 
@@ -111,6 +112,8 @@ class CmdLineSpecParser(object):
         except (BuildFile.BuildFileError, AddressLookupError) as e:
           if fail_fast:
             raise self.BadSpecError(e)
+          errored_out.append('--------------------')
+          errored_out.append(traceback.format_exc())
           errored_out.append('Exception message: {0}'.format(e.message))
 
       if errored_out:

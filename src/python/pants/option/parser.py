@@ -126,7 +126,7 @@ class Parser(object):
       ancestor._freeze()
       ancestor = ancestor._parent_parser
 
-    clean_kwargs = copy.copy(kwargs)  # Copy kwargs so we can remove legacy-related keys.
+    clean_kwargs = copy.deepcopy(kwargs)  # Copy kwargs so we can remove legacy-related keys.
     kwargs = None  # Ensure no code below modifies kwargs accidentally.
     self._validate(args, clean_kwargs)
     legacy_dest = clean_kwargs.pop('legacy', None)
@@ -259,11 +259,13 @@ class Parser(object):
 
     env_val = None if env_val_str is None else value_type(env_val_str)
     if kwargs.get('action') == 'append':
-      config_val_strs = self._config.getlist(config_section, dest, default=[]) if self._config else []
-      config_val = [value_type(config_val_str) for config_val_str in config_val_strs]
+      config_val_strs = self._config.getlist(config_section, dest) if self._config else None
+      config_val = (None if config_val_strs is None else
+                    [value_type(config_val_str) for config_val_str in config_val_strs])
       default = []
     else:
-      config_val_str = self._config.get(config_section, dest, default=None) if self._config else None
+      config_val_str = (self._config.get(config_section, dest, default=None)
+                        if self._config else None)
       config_val = None if config_val_str is None else value_type(config_val_str)
       default = None
     hardcoded_val = kwargs.get('default')

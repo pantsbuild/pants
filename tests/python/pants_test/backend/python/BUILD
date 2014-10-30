@@ -26,6 +26,7 @@ python_tests(
   name='test_python_requirement_list',
   sources=['test_python_requirement_list.py'],
   dependencies=[
+    'src/python/pants/backend/python:python_requirement',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/base:build_file_aliases',
     'tests/python/pants_test:base_test'

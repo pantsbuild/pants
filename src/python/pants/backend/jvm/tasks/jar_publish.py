@@ -38,6 +38,7 @@ from pants.base.target import Target
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy import Ivy
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree, touch
+from pants.util.strutil import ensure_text
 
 
 class PushDb(object):
@@ -959,8 +960,8 @@ class JarPublish(JarTask, ScmPublish):
     return sha.hexdigest()
 
   def changelog(self, target, sha):
-    return self.scm.changelog(from_commit=sha,
-                              files=target.sources_relative_to_buildroot())
+    return ensure_text(self.scm.changelog(from_commit=sha,
+                                          files=target.sources_relative_to_buildroot()))
 
   def generate_ivysettings(self, ivy, publishedjars, publish_local=None):
     if ivy.ivy_settings is None:

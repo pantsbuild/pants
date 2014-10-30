@@ -18,19 +18,14 @@ from pants.util.strutil import safe_shlex_split
 
 class PytestRun(PythonTask):
   @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    super(PytestRun, cls).setup_parser(option_group, args, mkflag)
-    option_group.add_option(mkflag('fast'), mkflag('fast', negate=True),
-                            dest='pytest_run_fast',
-                            action='callback', callback=mkflag.set_bool, default=True,
-                            help='[%default] Run all tests in a single chroot. If set to false, '
-                                 'each test target will create a new chroot, which will be much '
-                                 'slower.')
+  def register_options(cls, register):
+    super(PytestRun, cls).register_options(register)
+    register('--fast', action='store_true', default=True, legacy='pytest_run_fast',
+             help='Run all tests in a single chroot. If turned off, each test target will '
+                  'create a new chroot, which will be much slower.')
     # TODO(benjy): Support direct passthru of pytest flags.
-    option_group.add_option(mkflag('options'),
-                            dest='pytest_run_options',
-                            action='append', default=[],
-                            help='[%default] options to pass to the underlying pytest runner.')
+    register('--options', action='append', legacy='pytest_run_options',
+             help='Pass these options to pytest.')
 
   def execute(self):
     def is_python_test(target):
@@ -44,19 +39,17 @@ class PytestRun(PythonTask):
     if test_targets:
       self.context.lock.release()
 
-      # TODO(benjy): A less hacky way to find the log level.
-      debug = self.context.options.log_level == 'debug'
+      debug = self.get_options().level == 'debug'
 
-      # TODO(benjy): Only color on terminals that support it.
-      args = ['--color', 'yes']
-      if self.context.options.pytest_run_options:
-        for options in self.context.options.pytest_run_options:
+      args = [] if self.get_options().no_colors else ['--color', 'yes']
+      if self.get_options().options:
+        for options in self.get_options().options:
           args.extend(safe_shlex_split(options))
       test_builder = PythonTestBuilder(targets=test_targets,
                                        args=args,
                                        interpreter=self.interpreter,
                                        conn_timeout=self.conn_timeout,
-                                       fast=self.context.options.pytest_run_fast,
+                                       fast=self.get_options().fast,
                                        debug=debug)
       with self.context.new_workunit(name='run',
                                      labels=[WorkUnit.TOOL, WorkUnit.TEST]) as workunit:
