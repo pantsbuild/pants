@@ -18,9 +18,7 @@ class BenchmarkRun(JvmTask, JvmToolTaskMixin):
   @classmethod
   def register_options(cls, register):
     super(BenchmarkRun, cls).register_options(register)
-    # TODO(benjy): Why is this 'append'? We treat the value as a scalar, not a list.
-    register('--target', action='append', legacy='target_class',
-             help='Name of the benchmark class.')
+    register('--target', legacy='target_class', help='Name of the benchmark class.')
 
     register('--memory', default=False, action='store_true', legacy='memory_profiling',
              help='Enable memory profiling.')
