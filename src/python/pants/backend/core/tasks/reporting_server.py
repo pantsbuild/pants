@@ -21,28 +21,27 @@ from pants.reporting.reporting_server import ReportingServer, ReportingServerMan
 
 class RunServer(Task, QuietTaskMixin):
   """Runs the reporting server."""
+
   @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    super(RunServer, cls).setup_parser(option_group, args, mkflag)
-    option_group.add_option(mkflag('port'), dest='port', action='store', type='int', default=0,
-                            help='Serve on this port. Leave unset to choose a free port '
-                                 'automatically (recommended if using pants concurrently in '
-                                 'multiple workspaces on the same host).')
-    option_group.add_option(mkflag('allowed-clients'), dest='allowed_clients',
-                            default=['127.0.0.1'], action='append',
-                            help='Only requests from these IPs may access this server. Useful for '
-                                 'temporarily showing build results to a colleague. The special '
-                                 'value ALL means any client may connect. Use with caution, as '
-                                 'your source code is exposed to all allowed clients!')
-    option_group.add_option(mkflag('open'), mkflag('open', negate=True), dest='server_open',
-                            action='callback', callback=mkflag.set_bool, default=False,
-                            help='[%default] Attempt to open the server web ui in a browser.')
+  def register_options(cls, register):
+    super(RunServer, cls).register_options(register)
+    register('--port', legacy='port', type=int, default=0,
+             help='Serve on this port. Leave unset to choose a free port '
+                  'automatically (recommended if using pants concurrently in '
+                  'multiple workspaces on the same host).')
+    register('--allowed-clients', action='append', legacy='allowed_clients', default=['127.0.0.1'],
+             help='Only requests from these IPs may access this server. Useful for '
+                  'temporarily showing build results to a colleague. The special '
+                  'value ALL means any client may connect. Use with caution, as '
+                  'your source code is exposed to all allowed clients!')
+    register('--open', action='store_true', legacy='server_open', default=False,
+             help='Attempt to open the server web ui in a browser.')
 
   def execute(self):
     DONE = '__done_reporting'
 
     def maybe_open(port):
-      if self.context.options.server_open:
+      if self.get_options().open:
         binary_util.ui_open('http://localhost:%d' % port)
 
     port = ReportingServerManager.get_current_server_port()
@@ -72,8 +71,8 @@ class RunServer(Task, QuietTaskMixin):
           assets_dir = self.context.config.get('reporting', 'reports_assets_dir')
           settings = ReportingServer.Settings(info_dir=info_dir, template_dir=template_dir,
                                               assets_dir=assets_dir, root=get_buildroot(),
-                                              allowed_clients=self.context.options.allowed_clients)
-          server = ReportingServer(self.context.options.port, settings)
+                                              allowed_clients=self.get_options().allowed_clients)
+          server = ReportingServer(self.get_options().port, settings)
           actual_port = server.server_port()
           ReportingServerManager.save_current_server_port(actual_port)
           report_launch(actual_port)
