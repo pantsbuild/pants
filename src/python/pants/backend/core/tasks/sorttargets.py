@@ -19,17 +19,14 @@ class SortTargets(ConsoleTask):
     return isinstance(item, Target)
 
   @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    super(SortTargets, cls).setup_parser(option_group, args, mkflag)
-
-    option_group.add_option(mkflag("reverse"), mkflag("reverse", negate=True),
-                            dest="sort_targets_reverse", default=False,
-                            action="callback", callback=mkflag.set_bool,
-                            help="[%default] Sort least dependent to most.")
+  def register_options(cls, register):
+    super(SortTargets, cls).register_options(register)
+    register('--reverse', action='store_true', default=False, legacy='sort_targets_reverse',
+             help='Sort least-dependent to most-dependent.')
 
   def __init__(self, *args, **kwargs):
     super(SortTargets, self).__init__(*args, **kwargs)
-    self._reverse = self.context.options.sort_targets_reverse
+    self._reverse = self.get_options().reverse
 
   def console_output(self, targets):
     depmap = defaultdict(set)

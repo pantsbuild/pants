@@ -41,34 +41,24 @@ class Filter(ConsoleTask):
   """Filters targets based on various criteria."""
 
   @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    super(Filter, cls).setup_parser(option_group, args, mkflag)
-
-    option_group.add_option(mkflag('type'), dest='filter_type', action='append', default=[],
-                            help="Identifies target types to include (optional '+' prefix) or "
-                                 "exclude ('-' prefix).  Multiple type inclusions or exclusions "
-                                 "can be specified at once in a comma separated list or else by "
-                                 "using multiple instances of this flag.")
-
-    option_group.add_option(mkflag('target'), dest='filter_target', action='append', default=[],
-                            help="Identifies specific targets to include (optional '+' prefix) or "
-                                 "exclude ('-' prefix).  Multiple target inclusions or exclusions "
-                                 "can be specified at once in a comma separated list or else by "
-                                 "using multiple instances of this flag.")
-
-    option_group.add_option(mkflag('ancestor'), dest='filter_ancestor', action='append', default=[],
-                            help="Identifies ancestor targets (containing targets) that make a "
-                                 "select child (contained) targets to include "
-                                 "(optional '+' prefix) or exclude ('-' prefix).  Multiple "
-                                 "ancestor inclusions or exclusions can be specified at once in "
-                                 "a comma separated list or else by using multiple instances of "
-                                 "this flag.")
-
-    option_group.add_option(mkflag('regex'), dest='filter_regex', action='append', default=[],
-                            help="Identifies regexes of target addresses to include "
-                                 "(optional '+' prefix) or exclude ('-' prefix).  Multiple target "
-                                 "inclusions or exclusions can be specified at once in a comma "
-                                 "separated list or else by using multiple instances of this flag.")
+  def register_options(cls, register):
+    super(Filter, cls).register_options(register)
+    register('--type', action='append', legacy='filter_type',
+             help="Target types to include (optional '+' prefix) or exclude ('-' prefix).  "
+                  "Multiple type inclusions or exclusions can be specified in a comma-separated "
+                  "list or by using multiple instances of this flag.")
+    register('--target', action='append', legacy='filter_target',
+             help="Targets to include (optional '+' prefix) or exclude ('-' prefix).  Multiple "
+                  "target inclusions or exclusions can be specified in a comma-separated list or "
+                  "by using multiple instances of this flag.")
+    register('--ancestor', action='append', legacy='filter_ancestor',
+             help="Dependency targets of targets to include (optional '+' prefix) or exclude "
+                  "('-' prefix).  Multiple ancestor inclusions or exclusions can be specified "
+                  "in a comma-separated list or by using multiple instances of this flag.")
+    register('--regex', action='append', legacy='filter_regex',
+             help="Regex patterns of target addresses to include (optional '+' prefix) or exclude "
+                  "('-' prefix).  Multiple target inclusions or exclusions can be specified "
+                  "in a comma-separated list or by using multiple instances of this flag.")
 
   def __init__(self, *args, **kwargs):
     super(Filter, self).__init__(*args, **kwargs)
@@ -92,7 +82,7 @@ class Filter(ConsoleTask):
     def filter_for_address(spec):
       matches = _get_targets(spec)
       return lambda target: target in matches
-    self._filters.extend(_create_filters(self.context.options.filter_target, filter_for_address))
+    self._filters.extend(_create_filters(self.get_options().target, filter_for_address))
 
     def filter_for_type(name):
       # FIXME(pl): This should be a standard function provided by the plugin/BuildFileParser
@@ -111,7 +101,7 @@ class Filter(ConsoleTask):
       if not issubclass(target_type, Target):
         raise TaskError('Not a Target type: %s' % name)
       return lambda target: isinstance(target, target_type)
-    self._filters.extend(_create_filters(self.context.options.filter_type, filter_for_type))
+    self._filters.extend(_create_filters(self.get_options().type, filter_for_type))
 
     def filter_for_ancestor(spec):
       ancestors = _get_targets(spec)
@@ -119,12 +109,12 @@ class Filter(ConsoleTask):
       for ancestor in ancestors:
         ancestor.walk(children.add)
       return lambda target: target in children
-    self._filters.extend(_create_filters(self.context.options.filter_ancestor, filter_for_ancestor))
+    self._filters.extend(_create_filters(self.get_options().ancestor, filter_for_ancestor))
 
     def filter_for_regex(regex):
       parser = re.compile(regex)
       return lambda target: parser.search(str(target.address.spec))
-    self._filters.extend(_create_filters(self.context.options.filter_regex, filter_for_regex))
+    self._filters.extend(_create_filters(self.get_options().regex, filter_for_regex))
 
   def console_output(self, _):
     filtered = set()

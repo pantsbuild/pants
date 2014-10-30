@@ -6,6 +6,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import os
+import re
 
 from pants.base.address import SyntheticAddress
 from pants.base.build_file import BuildFile
@@ -154,13 +155,16 @@ class CmdLineSpecParserBadBuildTest(BaseTest):
 
     self.spec_parser = CmdLineSpecParser(self.build_root, self.address_mapper)
 
-    self.NO_FAIL_FAST_RE = """^Exception message: name 'a_is_bad' is not defined
+    self.NO_FAIL_FAST_RE = re.compile(r"""^--------------------
+.*
+Exception message: name 'a_is_bad' is not defined
  while executing BUILD file (/[^/]+)*/bad/a/BUILD
  Loading addresses from 'bad/a' failed\.
+.*
 Exception message: name 'b_is_bad' is not defined
  while executing BUILD file (/[^/]+)*T/bad/b/BUILD
  Loading addresses from 'bad/b' failed\.
-Invalid BUILD files for \[::\]$"""
+Invalid BUILD files for \[::\]$""", re.DOTALL)
 
     self.FAIL_FAST_RE = """^name 'a_is_bad' is not defined
  while executing BUILD file (/[^/]+)*/bad/a/BUILD

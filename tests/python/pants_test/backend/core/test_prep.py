@@ -40,6 +40,18 @@ class PrepTest(BaseTest):
         task.execute()
         self.assertTrue(os.path.exists(files[2]))
 
+  def test_prep_environ(self):
+    with temporary_dir() as workdir:
+      a = self.make_target('a', dependencies=[], target_type=PrepCommand,
+                           prep_executable='echo',
+                           prep_args=['-n', 'test_prep_env_var=fleem'],
+                           prep_environ=True)
+
+      context = self.context(target_roots=[a])
+      task = RunPrepCommand(context=context, workdir=workdir)
+      task.execute()
+      self.assertEquals('fleem', os.environ['test_prep_env_var'])
+
   def test_prep_no_command(self):
     with self.assertRaises(TaskError):
       a = self.make_target('a', dependencies=[], target_type=PrepCommand,

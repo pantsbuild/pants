@@ -362,28 +362,23 @@ class ProjectInfoTest(ConsoleTaskTest):
       args=['--test-project-info'],
       targets=[self.target('project_info:third')]
     ))
-    self.assertEqual(['org.apache:apache-jar:12.12.2012'], result['targets']['project_info:third']['libraries'])
-    self.assertEqual(2, len(result['targets']['project_info:third']['roots']))
-    self.assertEqual(
-      'com.foo',
-      result['targets']['project_info:third']['roots'][0]['package_prefix']
-    )
-    self.assertEqual(
-      'com.foo',
-      result['targets']['project_info:third']['roots'][1]['package_prefix']
-    )
+
     self.assertEqual(
       [
-        '%s/java/project_info/com/foo' % self.build_root,
-        '%s/project_info/com/foo' % self.build_root
+        'java/project_info:java_lib',
+        'project_info:jar_lib'
       ],
-      sorted([
-        result['targets']['project_info:third']['roots'][0]['source_root'],
-        result['targets']['project_info:third']['roots'][1]['source_root']
-      ])
+      sorted(result['targets']['project_info:third']['targets'])
     )
-    self.assertEqual(['org.apache:apache-jar:12.12.2012'],
-                     result['targets']['project_info:third']['libraries'])
+    self.assertEqual(['org.apache:apache-jar:12.12.2012'], result['targets']['project_info:third']['libraries'])
+
+    self.assertEqual(1, len(result['targets']['project_info:third']['roots']))
+    source_root = result['targets']['project_info:third']['roots'][0]
+    self.assertEqual('com.foo', source_root['package_prefix'])
+    self.assertEqual(
+      '%s/project_info/com/foo' % self.build_root,
+      source_root['source_root']
+    )
 
   def test_jvm_app(self):
     result = get_json(self.execute_console_task(

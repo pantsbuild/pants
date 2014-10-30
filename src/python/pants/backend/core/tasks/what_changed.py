@@ -16,25 +16,18 @@ from pants.goal.workspace import Workspace
 
 class WhatChanged(ConsoleTask):
   """Emits the targets that have been modified since a given commit."""
-
   @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    super(WhatChanged, cls).setup_parser(option_group, args, mkflag)
-
-    option_group.add_option(mkflag('parent'), dest='what_changed_create_prefix', default='HEAD',
-                            help='[%default] Identifies the parent tree-ish to calculate changes '
-                                 'against.')
-
-    option_group.add_option(mkflag("files"), mkflag("files", negate=True), default=False,
-                            action="callback", callback=mkflag.set_bool,
-                            dest='what_changed_show_files',
-                            help='[%default] Shows changed files instead of the targets that own '
-                                 'them.')
+  def register_options(cls, register):
+    super(WhatChanged, cls).register_options(register)
+    register('--parent', default='HEAD', legacy='what_changed_create_prefix',
+             help='Calculate changes against this tree-ish.')
+    register('--files', action='store_true', default=False, legacy='what_changed_show_files',
+             help='Show changed files instead of the targets that own them.')
 
   def __init__(self, *args, **kwargs):
     super(WhatChanged, self).__init__(*args, **kwargs)
-    self._parent = self.context.options.what_changed_create_prefix
-    self._show_files = self.context.options.what_changed_show_files
+    self._parent = self.get_options().parent
+    self._show_files = self.get_options().files
     self._workspace = self.context.workspace
     self._filemap = {}
 

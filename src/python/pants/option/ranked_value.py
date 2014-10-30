@@ -5,6 +5,8 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+import copy
+
 
 class RankedValue(object):
   """An option value, together with a rank inferred from its source.
@@ -80,9 +82,13 @@ class RankedValue(object):
   def value(self):
     return self._value
 
-  def append(self, arg):
-    # argparse may read an option value in order to append to it, so pass that through here.
-    self._value.append(arg)
+  def __copy__(self):
+    # The only time copy.copy() is called on a RankedValue is when the action is 'append', in which
+    # case argparse copies the default value (which will be a RankedValue wrapping a list), appends
+    # to it, and then sets the copy as the new value.
+    # We expect argparse to set regular values, not RankedValue instances, so we return a copy of
+    # the underlying list here.
+    return copy.copy(self._value)
 
   def __eq__(self):
     return self._rank == self._rank and self._value == self._value

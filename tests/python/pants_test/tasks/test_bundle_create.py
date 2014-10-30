@@ -32,7 +32,7 @@ class BundleCreateTest(TaskTestBase):
 
   def test_bundle_create_init(self):
     options = {
-      'bundle': {
+      self.options_scope: {
         'deployjar': None,
         'archive_prefix': None,
         'archive': None

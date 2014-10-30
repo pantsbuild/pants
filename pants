@@ -77,7 +77,7 @@ function run_pants_bare() {
 
 function exec_pants_bare() {
   activate_pants_venv
-  PYTHONPATH="${PANTS_SRCPATH}" exec python ${PANTS_EXE} "$@"
+  PYTHONPATH="${PANTS_SRCPATH}:${PYTHONPATH}" exec python ${PANTS_EXE} "$@"
 }
 
 if [ ! -z "${PANTS_DEV}" ]; then

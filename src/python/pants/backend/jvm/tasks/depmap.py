@@ -298,19 +298,15 @@ class Depmap(ConsoleTask):
         if isinstance(dep, Resources):
           resource_target_map[dep] = current_target
 
-      java_sources_targets = list(current_target.java_sources) if isinstance(current_target,
-                                                                             ScalaLibrary) else []
-      """
-      :type java_sources_targets:list[pants.base.target.Target]
-      """
+      if isinstance(current_target, ScalaLibrary):
+        for dep in current_target.java_sources:
+          info['targets'].append(self._address(dep.address))
 
-      roots = set(itertools.chain(
-        *[self._source_roots_for_target(t) for t in java_sources_targets + [current_target]]
-      ))
       info['roots'] = map(lambda (source_root, package_prefix): {
         'source_root': source_root,
         'package_prefix': package_prefix
-      }, roots)
+      }, self._source_roots_for_target(current_target))
+
       info['libraries'] = [self._jar_id(lib) for lib in target_libraries]
       targets_map[self._address(current_target.address)] = info
 
@@ -344,5 +340,5 @@ class Depmap(ConsoleTask):
     def root_package_prefix(source_file):
       source = os.path.dirname(source_file)
       return os.path.join(get_buildroot(), target.target_base, source), source.replace(os.sep, '.')
-    return map(root_package_prefix, target.sources_relative_to_source_root())
+    return set(map(root_package_prefix, target.sources_relative_to_source_root()))
 

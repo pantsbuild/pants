@@ -12,37 +12,45 @@ import requests
 from requests import RequestException
 
 from pants.cache.artifact import TarballArtifact
-from pants.cache.artifact_cache import ArtifactCache
-from pants.util.contextutil import temporary_file, temporary_file_path
+from pants.cache.artifact_cache import ArtifactCache, ArtifactCacheError
+from pants.cache.local_artifact_cache import TempLocalArtifactCache
+from pants.util.contextutil import temporary_dir, temporary_file, temporary_file_path
 
+logger = logging.getLogger(__name__)
 
 # Reduce the somewhat verbose logging of requests.
 # TODO do this in a central place
 logging.getLogger('requests').setLevel(logging.WARNING)
+
+class InvalidRESTfulCacheProtoError(ArtifactCacheError):
+  """Indicates an invalid protocol used in a remote spec."""
+  pass
 
 class RESTfulArtifactCache(ArtifactCache):
   """An artifact cache that stores the artifacts on a RESTful service."""
 
   READ_SIZE_BYTES = 4 * 1024 * 1024
 
-  def __init__(self, log, artifact_root, url_base, compression):
+  def __init__(self, artifact_root, url_base, local):
     """
-    url_base: The prefix for urls on some RESTful service. We must be able to PUT and GET to any
+    :param str artifact_root: The path under which cacheable products will be read/written.
+    :param str url_base: The prefix for urls on some RESTful service. We must be able to PUT and GET to any
               path under this base.
-    :param int compression: compression level (of false-y to skip compression) for artifacts
+    :param BaseLocalArtifactCache local: local cache instance for storing and creating artifacts
     """
-    ArtifactCache.__init__(self, log, artifact_root)
+    super(RESTfulArtifactCache, self).__init__(artifact_root)
     parsed_url = urlparse.urlparse(url_base)
     if parsed_url.scheme == 'http':
       self._ssl = False
     elif parsed_url.scheme == 'https':
       self._ssl = True
     else:
-      raise ValueError('RESTfulArtifactCache only supports HTTP and HTTPS')
+      raise InvalidRESTfulCacheProtoError(
+        'RESTfulArtifactCache only supports HTTP(S). Found: {0}'.format(parsed_url.scheme))
     self._timeout_secs = 4.0
     self._netloc = parsed_url.netloc
     self._path_prefix = parsed_url.path.rstrip(b'/')
-    self.compression = compression
+    self._localcache = local
 
     # To enable connection reuse, all requests must be created from same session.
     # TODO: Re-evaluate session's life-cycle if/when a longer-lived pants process exists.
@@ -50,65 +58,48 @@ class RESTfulArtifactCache(ArtifactCache):
 
 
   def try_insert(self, cache_key, paths):
-    with temporary_file_path() as tarfile:
-      artifact = TarballArtifact(self.artifact_root, tarfile, self.compression)
-      artifact.collect(paths)
-
+    # Delegate creation of artifact to local cache.
+    with self._localcache.insert_paths(cache_key, paths) as tarfile:
+      # Upload local artifact to remote cache.
       with open(tarfile, 'rb') as infile:
         remote_path = self._remote_path_for_key(cache_key)
         if not self._request('PUT', remote_path, body=infile):
-          raise self.CacheError('Failed to PUT to %s. Error: 404' % self._url_string(remote_path))
+          url = self._url_string(remote_path)
+          raise self.CacheError('Failed to PUT to {0}.'.format(url))
 
   def has(self, cache_key):
+    if self._localcache.has(cache_key):
+      return True
     return self._request('HEAD', self._remote_path_for_key(cache_key)) is not None
 
   def use_cached_files(self, cache_key):
-    # This implementation fetches the appropriate tarball and extracts it.
+    if self._localcache.has(cache_key):
+      return self._localcache.use_cached_files(cache_key)
+
     remote_path = self._remote_path_for_key(cache_key)
     try:
-      # Send an HTTP request for the tarball.
       response = self._request('GET', remote_path)
-      if response is None:
-        return None
-
-      with temporary_file() as outfile:
-        total_bytes = 0
-        # Read the data in a loop.
-        for chunk in response.iter_content(self.READ_SIZE_BYTES):
-          outfile.write(chunk)
-          total_bytes += len(chunk)
-
-        outfile.close()
-        self.log.debug('Read %d bytes from artifact cache at %s' %
-                       (total_bytes,self._url_string(remote_path)))
-
-        # Extract the tarfile.
-        artifact = TarballArtifact(self.artifact_root, outfile.name, self.compression)
-        artifact.extract()
-        return artifact
+      if response is not None:
+        # Delegate storage and extraction to local cache
+        byte_iter = response.iter_content(self.READ_SIZE_BYTES)
+        return self._localcache.store_and_use_artifact(cache_key, byte_iter)
     except Exception as e:
-      self.log.warn('Error while reading from remote artifact cache: %s' % e)
-      return None
+      logger.warn('\nError while reading from remote artifact cache: {0}\n'.format(e))
+
+    return False
 
   def delete(self, cache_key):
+    self._localcache.delete(cache_key)
     remote_path = self._remote_path_for_key(cache_key)
     self._request('DELETE', remote_path)
 
-  def prune(self, age_hours):
-    # Doesn't make sense for a client to prune a remote server.
-    # Better to run tmpwatch on the server.
-    pass
-
   def _remote_path_for_key(self, cache_key):
-    # Note: it's important to use the id as well as the hash, because two different targets
-    # may have the same hash if both have no sources, but we may still want to differentiate them.
-    return '%s/%s/%s%s' % (self._path_prefix, cache_key.id, cache_key.hash,
-                           '.tar.gz' if self.compression else '.tar')
+    return '{0}/{1}/{2}.tgz'.format(self._path_prefix, cache_key.id, cache_key.hash)
 
   # Returns a response if we get a 200, None if we get a 404 and raises an exception otherwise.
   def _request(self, method, path, body=None):
     url = self._url_string(path)
-    self.log.debug('Sending %s request to %s' % (method, url))
+    logger.debug('Sending {0} request to {1}'.format(method, url))
 
     try:
       response = None
@@ -121,19 +112,24 @@ class RESTfulArtifactCache(ArtifactCache):
       elif 'DELETE' == method:
         response = self._session.delete(url, timeout=self._timeout_secs)
       else:
-        raise ValueError('Unknown request method %s' % method)
+        raise ValueError('Unknown request method {0}'.format(method))
 
       # Allow all 2XX responses. E.g., nginx returns 201 on PUT. HEAD may return 204.
       if int(response.status_code / 100) == 2:
         return response
       elif response.status_code == 404:
-        self.log.debug('404 returned for %s request to %s' % (method, self._url_string(path)))
+        logger.debug('404 returned for {0} request to {1}'.format(method, self._url_string(path)))
         return None
       else:
-        raise self.CacheError('Failed to %s %s. Error: %d %s' % (method, self._url_string(path),
-                                                                 response.status_code, response.reason))
+        raise self.CacheError('Failed to {0} {1}. Error: {2} {3}'.format(method,
+                                                                         self._url_string(path),
+                                                                         response.status_code,
+                                                                         response.reason))
     except RequestException as e:
       raise self.CacheError(e)
 
   def _url_string(self, path):
-    return '%s://%s%s' % (('https' if self._ssl else 'http'), self._netloc, path)
+    proto = 'http'
+    if self._ssl:
+      proto = 'https'
+    return '{0}://{1}{2}'.format(proto, self._netloc, path)

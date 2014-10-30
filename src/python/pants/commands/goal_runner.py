@@ -247,7 +247,19 @@ class GoalRunner(Command):
       if logdir:
         safe_mkdir(logdir)
         LogOptions.set_log_dir(logdir)
+
+        prev_log_level = None
+        # If quiet, temporarily change stderr log level to kill init's output.
+        if self.old_options.quiet:
+          prev_log_level = LogOptions.loglevel_name(LogOptions.stderr_log_level())
+          # loglevel_name can fail, so only change level if we were able to get the current one.
+          if prev_log_level is not None:
+            LogOptions.set_stderr_log_level(LogOptions._LOG_LEVEL_NONE_KEY)
+
         log.init('goals')
+
+        if prev_log_level is not None:
+          LogOptions.set_stderr_log_level(prev_log_level)
       else:
         log.init()
 

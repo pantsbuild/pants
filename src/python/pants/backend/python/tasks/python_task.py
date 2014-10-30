@@ -18,15 +18,16 @@ from pants.base.exceptions import TaskError
 
 class PythonTask(Task):
   @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    option_group.add_option(mkflag('timeout'), dest='python_conn_timeout', type='int',
-                            default=0, help='Number of seconds to wait for http connections.')
+  def register_options(cls, register):
+    super(PythonTask, cls).register_options(register)
+    register('--timeout', type=int, default=0, legacy='python_conn_timeout',
+             help='Number of seconds to wait for http connections.')
 
   def __init__(self, *args, **kwargs):
     super(PythonTask, self).__init__(*args, **kwargs)
-    self.conn_timeout = (self.context.options.python_conn_timeout or
+    self.conn_timeout = (self.get_options().timeout or
                          self.context.config.getdefault('connection_timeout'))
-    compatibilities = self.context.options.interpreter or [b'']
+    compatibilities = self.get_options().interpreter or [b'']
 
     self.interpreter_cache = PythonInterpreterCache(self.context.config,
                                                     logger=self.context.log.debug)

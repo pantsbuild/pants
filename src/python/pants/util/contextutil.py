@@ -53,8 +53,8 @@ def temporary_dir(root_dir=None, cleanup=True):
     A with-context that creates a temporary directory.
 
     You may specify the following keyword args:
-      root_dir [path]: The parent directory to create the temporary directory.
-      cleanup [True/False]: Whether or not to clean up the temporary directory.
+    :param str root_dir: The parent directory to create the temporary directory.
+    :param bool cleanup: Whether or not to clean up the temporary directory.
   """
   path = tempfile.mkdtemp(dir=root_dir)
   try:
@@ -70,8 +70,8 @@ def temporary_file_path(root_dir=None, cleanup=True):
     A with-context that creates a temporary file and returns its path.
 
     You may specify the following keyword args:
-      root_dir [path]: The parent directory to create the temporary file.
-      cleanup [True/False]: Whether or not to clean up the temporary file.
+    :param str root_dir: The parent directory to create the temporary file.
+    :param bool cleanup: Whether or not to clean up the temporary file.
   """
   with temporary_file(root_dir, cleanup) as fd:
     fd.close()
@@ -79,15 +79,20 @@ def temporary_file_path(root_dir=None, cleanup=True):
 
 
 @contextmanager
-def temporary_file(root_dir=None, cleanup=True):
+def temporary_file(root_dir=None, cleanup=True, suffix=''):
   """
     A with-context that creates a temporary file and returns a writeable file descriptor to it.
 
     You may specify the following keyword args:
-      root_dir [path]: The parent directory to create the temporary file.
-      cleanup [True/False]: Whether or not to clean up the temporary file.
+    :param str root_dir: The parent directory to create the temporary file.
+    :param bool cleanup: Whether or not to clean up the temporary file.
+    :param str suffix: If suffix is specified, the file name will end with that suffix.
+                       Otherwise there will be no suffix.
+                       mkstemp() does not put a dot between the file name and the suffix;
+                       if you need one, put it at the beginning of suffix.
+                       See :py:class:`tempfile.NamedTemporaryFile`.
   """
-  with tempfile.NamedTemporaryFile(dir=root_dir, delete=False) as fd:
+  with tempfile.NamedTemporaryFile(suffix=suffix, dir=root_dir, delete=False) as fd:
     try:
       yield fd
     finally:
@@ -101,10 +106,10 @@ def safe_file(path, suffix=None, cleanup=True):
 
   This is useful for doing work on a file but only changing its state on success.
 
-    - suffix: Use this suffix to create the copy. Otherwise use a random string.
-    - cleanup: Whether or not to clean up the copy.
+  :param str suffix: Use this suffix to create the copy. Otherwise use a random string.
+  :param bool cleanup: Whether or not to clean up the copy.
   """
-  safe_path = path + '.%s' % suffix or uuid.uuid4()
+  safe_path = '{0}.{1}'.format(path, suffix or uuid.uuid4())
   if os.path.exists(path):
     shutil.copy(path, safe_path)
   try:
@@ -139,7 +144,7 @@ def open_zip(path_or_file, *args, **kwargs):
   try:
     zf = zipfile.ZipFile(path_or_file, *args, **kwargs)
   except zipfile.BadZipfile as bze:
-    raise zipfile.BadZipfile("Bad Zipfile %s: %s" % (path_or_file, bze))
+    raise zipfile.BadZipfile("Bad Zipfile {0}: {1}".format(path_or_file, bze))
   try:
     yield zf
   finally:

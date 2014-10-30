@@ -78,7 +78,9 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
   {{/project.scala?}}
 
   <component name="VcsDirectoryMappings">
-    <mapping directory="{{project.root_dir}}" vcs="Git"/>
+  {{#project.git_root}}
+    <mapping directory="{{.}}" vcs="Git"/>
+  {{/project.git_root}}
   </component>
 
   <component name="CheckStyle-IDEA">
@@ -96,6 +98,5 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 {{#project.extra_components}}
   {{{.}}}
-
 {{/project.extra_components}}
 </project>

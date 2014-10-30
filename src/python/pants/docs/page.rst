@@ -46,14 +46,14 @@ You can use a Pants-specific syntax to make links that work with
 generated HTML or wiki pages.
 
 To set up a page ``source.md`` that contains a link to ``dest.md``, you
-make a ``dependencies`` relation and use the special ``pants(...)`` syntax
+make a ``links`` relation and use the special ``pants(...)`` syntax
 in the markdown.
 
 In the ``BUILD`` file::
 
         page(name='source',
           source='source.md',
-          dependencies=[':dest'], # enables linking
+          links=[':dest'],  # enables linking
           provides=[...publishing info...],
         )
 
