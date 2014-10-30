@@ -44,7 +44,7 @@ class BenchmarkRun(JvmTask, JvmToolTaskMixin):
     # Find all the target classes from the Benchmark target itself
     # https://jira.twitter.biz/browse/AWESOME-1938
     if not self.get_options().target:
-      raise ValueError('Mandatory argument --bench-target must be specified.')
+      raise ValueError('Mandatory argument --target must be specified.')
     self.args.insert(0, self.get_options().target)
     if self.get_options().memory:
       self.args.append('--measureMemory')
