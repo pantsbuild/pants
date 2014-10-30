@@ -8,10 +8,21 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import os
 import urlparse
 
-from pants.cache.combined_artifact_cache import CombinedArtifactCache
-from pants.cache.local_artifact_cache import LocalArtifactCache
+from pants.cache.artifact_cache import ArtifactCacheError
+from pants.cache.local_artifact_cache import LocalArtifactCache, TempLocalArtifactCache
 from pants.cache.pinger import Pinger
 from pants.cache.restful_artifact_cache import RESTfulArtifactCache
+
+class EmptyCacheSpecError(ArtifactCacheError):
+  pass
+class LocalCacheSpecRequiredError(ArtifactCacheError):
+  pass
+class CacheSpecFormatError(ArtifactCacheError):
+  pass
+class InvalidCacheSpecError(ArtifactCacheError):
+  pass
+class RemoteCacheSpecRequiredError(ArtifactCacheError):
+  pass
 
 
 def select_best_url(spec, pinger, log):
@@ -26,49 +37,72 @@ def select_best_url(spec, pinger, log):
   best_url = urls[argmin]
   if pingtimes[argmin][1] == Pinger.UNREACHABLE:
     return None  # No reachable artifact caches.
-  log.debug('Best artifact cache is %s' % best_url)
+  log.debug('Best artifact cache is {0}'.format(best_url))
   return best_url
 
 
-def create_artifact_cache(log, artifact_root, spec, task_name, compression, action='using'):
+def create_artifact_cache(log, artifact_root, spec, task_name, compression,
+                          action='using', local=None):
   """Returns an artifact cache for the specified spec.
 
   spec can be:
     - a path to a file-based cache root.
     - a URL of a RESTful cache root.
     - a bar-separated list of URLs, where we'll pick the one with the best ping times.
-    - A list of the above, for a combined cache.
+    - A list or tuple of two specs, local, then remote, each as described above
+
+  :param log: context.log
+  :param str artifact_root: The path under which cacheable products will be read/written.
+  :param str spec: See above.
+  :param str task_name: The name of the task using this cache (eg 'ScalaCompile')
+  :param int compression: The gzip compression level for created artifacts.
+                          Valid values are 1-9, or Falsy-y to disable compression.
+  :param str action: A verb, eg 'read' or 'write' for printed messages.
+  :param LocalArtifactCache local: A local cache for use by created remote caches
   """
   if not spec:
-    raise ValueError('Empty artifact cache spec')
-  if not isinstance(compression, (int, long)):
+    raise EmptyCacheSpecError()
+  if compression and not isinstance(compression, (int, long)):
     raise ValueError('compression value must be an integer: {comp}'.format(comp=compression))
+
+  def recurse(new_spec, new_local=local):
+    return create_artifact_cache(log=log, artifact_root=artifact_root, spec=new_spec,
+                                 task_name=task_name, compression=compression, action=action,
+                                 local=new_local)
+
+  def is_remote(spec):
+    return spec.startswith('http://') or spec.startswith('https://')
+
   if isinstance(spec, basestring):
     if spec.startswith('/') or spec.startswith('~'):
       path = os.path.join(spec, task_name)
-      log.info('%s %s local artifact cache at %s' % (task_name, action, path))
-      return LocalArtifactCache(log, artifact_root, path, compression)
-    elif spec.startswith('http://') or spec.startswith('https://'):
+      log.info('{0} {1} local artifact cache at {2}'.format(task_name, action, path))
+      return LocalArtifactCache(artifact_root, path, compression)
+    elif is_remote(spec):
       # Caches are supposed to be close, and we don't want to waste time pinging on no-op builds.
       # So we ping twice with a short timeout.
       pinger = Pinger(timeout=0.5, tries=2)
       best_url = select_best_url(spec, pinger, log)
       if best_url:
         url = best_url.rstrip('/') + '/' + task_name
-        log.info('%s %s remote artifact cache at %s' % (task_name, action, url))
-        return RESTfulArtifactCache(log, artifact_root, url, compression)
+        log.info('{0} {1} remote artifact cache at {2}'.format(task_name, action, url))
+        local = local or TempLocalArtifactCache(artifact_root)
+        return RESTfulArtifactCache(artifact_root, url, local)
       else:
-        log.warn('%s has no reachable artifact cache in %s.' % (task_name, spec))
+        log.warn('{0} has no reachable artifact cache in {1}.'.format(task_name, spec))
         return None
     else:
-      raise ValueError('Invalid artifact cache spec: %s' % spec)
-  elif isinstance(spec, (list, tuple)):
-    caches = [create_artifact_cache(
-      log=log,
-      artifact_root=artifact_root,
-      spec=x,
-      task_name=task_name,
-      compression=compression,
-      action=action) for x in spec]
-    caches = filter(None, caches)
-    return CombinedArtifactCache(caches) if caches else None
+      raise CacheSpecFormatError('Invalid artifact cache spec: {0}'.format(spec))
+  elif isinstance(spec, (list, tuple)) and len(spec) is 1:
+    return recurse(spec[0])
+  elif isinstance(spec, (list, tuple)) and len(spec) is 2:
+    first = recurse(spec[0])
+    if not isinstance(first, LocalArtifactCache):
+      raise LocalCacheSpecRequiredError(
+        'First of two cache specs must be a local cache path. Found: {0}'.format(spec[0]))
+    if not is_remote(spec[1]):
+      raise RemoteCacheSpecRequiredError(
+        'Second of two cache specs must be a remote spec. Found: {0}'.format(spec[1]))
+    return recurse(spec[1], new_local=first)
+  else:
+    raise InvalidCacheSpecError('Invalid artifact cache spec: {0}'.format(spec))
