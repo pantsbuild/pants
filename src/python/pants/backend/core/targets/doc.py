@@ -10,7 +10,7 @@ from twitter.common.lang import Compatibility
 from pants.base.address import SyntheticAddress
 from pants.base.build_environment import get_buildroot
 from pants.base.payload import Payload
-from pants.base.payload_field import combine_hashes, PayloadField, SourcesField
+from pants.base.payload_field import combine_hashes, PayloadField, PrimitiveField, SourcesField
 from pants.base.target import Target
 
 
