@@ -35,24 +35,17 @@ _SCALA_VERSIONS = {
 class EnsimeGen(IdeGen):
 
   @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    IdeGen.setup_parser(option_group, args, mkflag)
-
-    option_group.add_option(mkflag("scala-language-level"), default=_SCALA_VERSION_DEFAULT,
-                            type="choice", choices=_SCALA_VERSIONS.keys(),
-                            dest="ensime_scala_language_level",
-                            help="[%default] Set the scala language level used for Ensime linting.")
-
-    option_group.add_option(mkflag("java-encoding"), default="UTF-8",
-                            dest="ensime_gen_java_encoding",
-                            help="[%default] Sets the file encoding for java files in this "
-                                   "project.")
+  def register_options(cls, register):
+    super(EnsimeGen, cls).register_options(register)
+    register('--scala-language-level', legacy='ensime_scala_language_level',
+             choices=_SCALA_VERSIONS.keys(), default=_SCALA_VERSION_DEFAULT,
+             help='Set the scala language level used for Ensime linting.')
 
   def __init__(self, *args, **kwargs):
     super(EnsimeGen, self).__init__(*args, **kwargs)
 
     self.scala_language_level = _SCALA_VERSIONS.get(
-      self.context.options.ensime_scala_language_level, None)
+      self.get_options().scala_language_level, None)
     self.project_template = os.path.join(_TEMPLATE_BASEDIR, 'ensime.mustache')
     self.project_filename = os.path.join(self.cwd, '.ensime')
     self.ensime_output_dir = os.path.join(self.gen_project_workdir, 'out')

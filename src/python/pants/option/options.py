@@ -12,7 +12,6 @@ from pants.base.build_environment import pants_release
 from pants.goal.goal import Goal
 from pants.option.arg_splitter import ArgSplitter, GLOBAL_SCOPE
 from pants.option.option_value_container import OptionValueContainer
-from pants.option.parser import ParseError
 from pants.option.parser_hierarchy import ParserHierarchy
 
 
@@ -137,7 +136,7 @@ class Options(object):
       if self._legacy_values:
         values.update(vars(self._legacy_values))  # Proxy any legacy option values.
     else:
-      values = copy.copy(self.for_scope(scope.rpartition('.')[0]))
+      values = copy.deepcopy(self.for_scope(scope.rpartition('.')[0]))
 
     # Now add our values.
     flags_in_scope = self._scope_to_flags.get(scope, [])

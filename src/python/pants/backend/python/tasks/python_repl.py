@@ -17,11 +17,10 @@ from pants.console import stty_utils
 
 class PythonRepl(PythonTask):
   @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    super(PythonRepl, cls).setup_parser(option_group, args, mkflag)
-    option_group.add_option(mkflag('ipython'), dest='python_repl_ipython',
-                            action='callback', callback=mkflag.set_bool, default=False,
-                            help='Run an IPython REPL instead of the standard python one.')
+  def register_options(cls, register):
+    super(PythonRepl, cls).register_options(register)
+    register('--ipython', action='store_true', legacy='python_repl_ipython',
+             help='Run an IPython REPL instead of the standard python one.')
 
   def execute(self):
     (accept_predicate, reject_predicate) = Target.lang_discriminator('python')
@@ -33,7 +32,7 @@ class PythonRepl(PythonTask):
       interpreter = self.select_interpreter_for_targets(targets)
 
       extra_requirements = []
-      if self.context.options.python_repl_ipython:
+      if self.get_options().ipython:
         entry_point = self.context.config.get('python-ipython', 'entry_point',
                                               default='IPython:start_ipython')
         ipython_requirements = self.context.config.getlist('python-ipython', 'requirements',

@@ -34,21 +34,18 @@ _SETTINGS = (
 
 
 class EclipseGen(IdeGen):
-  @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    super(EclipseGen, cls).setup_parser(option_group, args, mkflag)
 
-    supported_versions = sorted(list(_VERSIONS.keys()))
-    option_group.add_option(mkflag("eclipse-version"), dest="eclipse_gen_version",
-                            default='3.6', type="choice", choices=supported_versions,
-                            help="[%%default] The Eclipse version the project "
-                                   "configuration should be generated for; can be one of: "
-                                   "%s" % supported_versions)
+  @classmethod
+  def register_options(cls, register):
+    super(EclipseGen, cls).register_options(register)
+    register('--version', legacy='eclipse_gen_version',
+             choices=sorted(list(_VERSIONS.keys())), default='3.6',
+             help='The Eclipse version the project configuration should be generated for.')
 
   def __init__(self, *args, **kwargs):
     super(EclipseGen, self).__init__(*args, **kwargs)
 
-    version = _VERSIONS[self.context.options.eclipse_gen_version]
+    version = _VERSIONS[self.get_options().version]
     self.project_template = os.path.join(_TEMPLATE_BASEDIR, 'project-%s.mustache' % version)
     self.classpath_template = os.path.join(_TEMPLATE_BASEDIR, 'classpath-%s.mustache' % version)
     self.apt_template = os.path.join(_TEMPLATE_BASEDIR, 'factorypath-%s.mustache' % version)

@@ -1,7 +1,7 @@
 page(
   name='readme',
   source='readme.md',
-  dependencies=[
+  links=[
     ':3rdparty_jvm',
     ':from_maven',
     'src/docs:publish',
@@ -13,7 +13,7 @@ page(
 page(
   name='from_maven',
   source='from_maven.md',
-  dependencies=[
+  links=[
     ':3rdparty_jvm',
   ],
 )
@@ -21,7 +21,7 @@ page(
 page(
   name='3rdparty_jvm',
   source='3rdparty_jvm.md',
-  dependencies=[
+  links=[
     'src/docs:3rdparty',
   ],
 )

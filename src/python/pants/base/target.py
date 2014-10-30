@@ -167,7 +167,7 @@ class Target(AbstractTarget):
     ids = list(ids)  # We can't len a generator.
     return ids[0] if len(ids) == 1 else cls.combine_ids(ids)
 
-  def __init__(self, name, address, build_graph, payload=None, exclusives=None):
+  def __init__(self, name, address, build_graph, payload=None, exclusives=None, tags=None):
     """
     :param string name: The name of this target, which combined with this
       build file defines the target address.
@@ -180,12 +180,17 @@ class Target(AbstractTarget):
     :param exclusives: An optional map of exclusives tags.
        `Keeps incompatible changes apart
        <build_files.html#howto-check-exclusives>`_.
+    :param iterable<string> tags: Arbitrary string tags that describe this target. Usable
+        by downstream/custom tasks for reasoning about build graph. NOT included in payloads
+        and thus not used in fingerprinting, thus not suitable for anything that affects how
+        a particular target is built.
     """
     # dependencies is listed above; implementation hides in TargetAddressable
     self.payload = payload or Payload()
     self.payload.freeze()
     self.name = name
     self.address = address
+    self._tags = set(tags or [])
     self._build_graph = build_graph
     self.description = None
     self.labels = set()
@@ -197,6 +202,10 @@ class Target(AbstractTarget):
 
     self._cached_fingerprint_map = {}
     self._cached_transitive_fingerprint_map = {}
+
+  @property
+  def tags(self):
+    return self._tags
 
   @property
   def num_chunking_units(self):

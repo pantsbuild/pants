@@ -1,7 +1,7 @@
 page(
   name='readme',
   source='readme.md',
-  dependencies=[
+  links=[
     ':python_old',
     'src/docs:first_concepts',
   ]

@@ -46,13 +46,9 @@ class Scalastyle(NailgunTask, JvmToolTaskMixin):
   _scalastyle_excludes = None
 
   @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    super(Scalastyle, cls).setup_parser(option_group, args, mkflag)
-
-    option_group.add_option(mkflag("skip"), mkflag("skip", negate=True),
-                            dest="scalastyle_skip", default=False,
-                            action="callback", callback=mkflag.set_bool,
-                            help="[%default] Skip scalastyle.")
+  def register_options(cls, register):
+    super(Scalastyle, cls).register_options(register)
+    register('--skip', action='store_true', legacy='scalastyle_skip', help='Skip scalastyle.')
 
   def __init__(self, *args, **kwargs):
     super(Scalastyle, self).__init__(*args, **kwargs)
@@ -118,7 +114,7 @@ class Scalastyle(NailgunTask, JvmToolTaskMixin):
 
   @property
   def _should_skip(self):
-    return self.context.options.scalastyle_skip
+    return self.get_options().skip
 
   def _get_non_synthetic_scala_targets(self, targets):
     return filter(

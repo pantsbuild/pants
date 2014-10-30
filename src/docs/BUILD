@@ -1,7 +1,7 @@
 page(
   name='3rdparty',
   source='3rdparty.md',
-  dependencies=[
+  links=[
     'examples/src/java/com/pants/examples:3rdparty_jvm',
     'examples/src/python/example:3rdparty_py',
   ],
@@ -15,7 +15,7 @@ page(
 page(
   name='build_files',
   source='build_files.md',
-  dependencies=[
+  links=[
     ':first_tutorial',
   ]
 )
@@ -23,7 +23,7 @@ page(
 page(
   name='first_concepts',
   source='first_concepts.md',
-  dependencies=[
+  links=[
     ':first_tutorial',
   ]
 )
@@ -31,7 +31,7 @@ page(
 page(
   name='first_tutorial',
   source='first_tutorial.md',
-  dependencies=[
+  links=[
     ':first_concepts',
     'examples/src/java/com/pants/examples:readme',
     'examples/src/python/example:readme',
@@ -41,7 +41,7 @@ page(
 page(
   name='index',
   source='index.md',
-  dependencies=[
+  links=[
     ':3rdparty',
     ':announce_201409',
     ':build_files',
@@ -65,7 +65,7 @@ page(
 page(
   name='invoking',
   source='invoking.md',
-  dependencies=[
+  links=[
     ':first_tutorial',
     ':target_addresses',
   ]
@@ -74,7 +74,7 @@ page(
 page(
   name='install',
   source='install.md',
-  dependencies=[
+  links=[
     ':setup_repo',
   ]
 )
@@ -82,7 +82,7 @@ page(
 page(
   name='publish',
   source='publish.md',
-  dependencies=[
+  links=[
     ':3rdparty',
   ]
 )
@@ -90,7 +90,7 @@ page(
 page(
   name='setup_repo',
   source='setup_repo.md',
-  dependencies=[
+  links=[
     ':first_concepts',
     ':publish',
     'src/python/pants/docs:dev_tasks',
@@ -108,7 +108,7 @@ page(
 page(
   name='tshoot',
   source='tshoot.md',
-  dependencies=[
+  links=[
     'src/python/pants/docs:howto_ask',
   ]
 )

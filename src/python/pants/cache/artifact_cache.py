@@ -5,13 +5,17 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+import logging
 import os
-
 
 # Note throughout the distinction between the artifact_root (which is where the artifacts are
 # originally built and where the cache restores them to) and the cache root path/URL (which is
 # where the artifacts are cached).
 
+logger = logging.getLogger(__name__)
+
+class ArtifactCacheError(Exception):
+  pass
 
 class ArtifactCache(object):
   """A map from cache key to a set of build artifacts.
@@ -22,16 +26,15 @@ class ArtifactCache(object):
   Subclasses implement the methods below to provide this functionality.
   """
 
-  class CacheError(Exception):
+  class CacheError(ArtifactCacheError):
     """Indicates a problem writing to or reading from the cache."""
     pass
 
-  def __init__(self, log, artifact_root):
+  def __init__(self, artifact_root):
     """Create an ArtifactCache.
 
     All artifacts must be under artifact_root.
     """
-    self.log = log
     self.artifact_root = artifact_root
 
   def insert(self, cache_key, paths):
@@ -42,22 +45,24 @@ class ArtifactCache(object):
     TODO: Check that they're equal? They might not have to be if there are multiple equivalent
           outputs.
 
-    cache_key: A CacheKey object.
-    paths: List of absolute paths to generated dirs/files. These must be under the artifact_root.
+    :param CacheKey cache_key: A CacheKey object.
+    :param list<str> paths: List of absolute paths to generated dirs/files. These must be under the artifact_root.
     """
     missing_files = filter(lambda f: not os.path.exists(f), paths)
     try:
       if missing_files:
-        raise ArtifactCache.CacheError('Tried to cache nonexistent files: %s' % missing_files)
+        raise ArtifactCache.CacheError('Tried to cache nonexistent files {0}'.format(missing_files))
       self.try_insert(cache_key, paths)
+      return True
     except Exception as e:
-      self.log.error('Error while writing to artifact cache: %s. ' % e)
+      logger.error('Error while writing to artifact cache: {0}. '.format(e))
+      return False
 
   def try_insert(self, cache_key, paths):
     """Attempt to cache the output of a build, without error-handling.
 
-    cache_key: A CacheKey object.
-    paths: List of absolute paths to generated dirs/files. These must be under the artifact_root.
+    :param CacheKey cache_key: A CacheKey object.
+    :param list<str> paths: List of absolute paths to generated dirs/files. These must be under the artifact_root.
     """
     pass
 
@@ -71,7 +76,7 @@ class ArtifactCache(object):
     Callers will typically only care about the truthiness of the return value. They usually
     don't need to tinker with the returned instance.
 
-    cache_key: A CacheKey object.
+    :param CacheKey cache_key: A CacheKey object.
     """
     pass
 
@@ -79,9 +84,6 @@ class ArtifactCache(object):
     """Delete the artifacts for the specified key.
 
     Deleting non-existent artifacts is a no-op.
+    :param CacheKey cache_key: A CacheKey object.
     """
-    pass
-
-  def prune(self, age_hours):
-    """Clean up cache files older than age_hours, if possible."""
     pass
