@@ -10,7 +10,7 @@ from twitter.common.lang import Compatibility
 from pants.base.address import SyntheticAddress
 from pants.base.build_environment import get_buildroot
 from pants.base.payload import Payload
-from pants.base.payload_field import combine_hashes, PayloadField, SourcesField
+from pants.base.payload_field import combine_hashes, PayloadField, PrimitiveField, SourcesField
 from pants.base.target import Target
 
 
@@ -74,17 +74,24 @@ class Page(Target):
                address=None,
                payload=None,
                source=None,
+               links=None,
                resources=None,
                provides=None,
                **kwargs):
     """
     :param source: Source of the page in markdown format.
+    :param links: Other ``page`` targets that this `page` links to.
+    :type links: List of target specs
+    :param provides: Optional "Addresses" at which this page is published.
+       E.g., a wiki location.
+    :type provides: List of ``wiki_artifact``s
     :param resources: An optional list of Resources objects.
     """
     payload = payload or Payload()
     payload.add_fields({
       'sources': SourcesField(sources=[source],
                               sources_rel_path=address.spec_path),
+      'links': PrimitiveField(links or []),
       'provides': self.ProvidesTupleField(provides or []),
     })
     self._resource_specs = resources or []
@@ -104,6 +111,13 @@ class Page(Target):
       yield spec
     for resource_spec in self._resource_specs:
       yield resource_spec
+
+  @property
+  def traversable_specs(self):
+    for spec in super(Page, self).traversable_specs:
+      yield spec
+    for spec in self.payload.links:
+      yield spec
 
   @property
   def provides(self):

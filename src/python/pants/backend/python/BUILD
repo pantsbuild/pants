@@ -37,7 +37,7 @@ python_library(
 page(
   name = 'readme',
   source = 'README.md',
-  dependencies = [
+  links = [
     'src/python/pants:readme',
   ]
 )

@@ -3,5 +3,15 @@
 
 page(name="readme",
      source="README.md",
-     dependencies=['examples/src/java/com/pants/examples/hello/main:readme']
+     links=[
+       'examples/src/java/com/pants/examples/hello/main:readme',
+       ':circular',
+     ]
+)
+
+page(name="circular",
+     source="circular.md",
+     links=[
+       ':readme',
+     ]
 )
