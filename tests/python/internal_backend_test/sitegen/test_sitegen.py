@@ -7,7 +7,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import unittest2 as unittest
 
-import copy
 import json
 
 import bs4
@@ -83,59 +82,53 @@ TEMPLATE_MUSTACHE = """
 class AllTheThingsTestCase(unittest.TestCase):
   def setUp(self):
     self.config = json.loads(CONFIG_JSON)
-    self.orig_soups = {
+    self.soups = {
       'index': bs4.BeautifulSoup(INDEX_HTML),
       'subdir/page1': bs4.BeautifulSoup(P1_HTML),
       'subdir/page2': bs4.BeautifulSoup(P2_HTML),
     }
-    self.orig_precomputed = sitegen.precompute(self.config, self.orig_soups)
+    self.precomputed = sitegen.precompute(self.config, self.soups)
 
   def test_fixup_internal_links(self):
-    soups = self.orig_soups.copy()
-    precomputed = copy.deepcopy(self.orig_precomputed)
-    sitegen.fixup_internal_links(self.config, soups)
+    sitegen.fixup_internal_links(self.config, self.soups)
     html = sitegen.render_html('index',
                                self.config,
-                               soups,
-                               precomputed,
+                               self.soups,
+                               self.precomputed,
                                TEMPLATE_MUSTACHE)
     self.assertIn('subdir/page1.html', html,
                   'p1.html link did not get fixed up to page1.html')
 
   def test_xrefs(self):
-    soups = self.orig_soups.copy()
-    precomputed = copy.deepcopy(self.orig_precomputed)
-    sitegen.link_xrefs(soups, precomputed)
+    sitegen.link_xrefs(self.soups, self.precomputed)
     p1_html = sitegen.render_html('subdir/page1',
                                   self.config,
-                                  soups,
-                                  precomputed,
+                                  self.soups,
+                                  self.precomputed,
                                   TEMPLATE_MUSTACHE)
     self.assertIn('href="../index.html#xmark_index"', p1_html,
                   'xref_index did not get linked')
     p2_html = sitegen.render_html('subdir/page2',
                                   self.config,
-                                  soups,
-                                  precomputed,
+                                  self.soups,
+                                  self.precomputed,
                                   TEMPLATE_MUSTACHE)
     self.assertIn('href="page1.html#an_xmark"', p2_html,
                   'xref_p1 did not get linked')
 
   def test_find_title(self):
-    soups = self.orig_soups.copy()
-    precomputed = copy.deepcopy(self.orig_precomputed)
     p2_html = sitegen.render_html('subdir/page2',
                                   self.config,
-                                  soups,
-                                  precomputed,
+                                  self.soups,
+                                  self.precomputed,
                                   '{{title}}')
     self.assertEqual(p2_html, 'Page 2: Electric Boogaloo',
                      """Didn't find correct title""")
     # ascii worked? great, try non-ASCII
     p1_html = sitegen.render_html('subdir/page1',
                                   self.config,
-                                  soups,
-                                  precomputed,
+                                  self.soups,
+                                  self.precomputed,
                                   '{{title}}')
     self.assertEqual(p1_html, u'東京 is Tokyo',
                      """Didn't find correct non-ASCII title""")
@@ -145,13 +138,11 @@ class AllTheThingsTestCase(unittest.TestCase):
     # One of our "pages" has a couple of basic headings.
     # Do we get the correct info from that to generate
     # a page-level table of contents?
-    soups = self.orig_soups.copy()
-    precomputed = copy.deepcopy(self.orig_precomputed)
-    sitegen.generate_page_tocs(soups, precomputed)
+    sitegen.generate_page_tocs(self.soups, self.precomputed)
     rendered = sitegen.render_html('subdir/page2',
                                    self.config,
-                                   soups,
-                                   precomputed,
+                                   self.soups,
+                                   self.precomputed,
                                    """
                                    {{#page_toc}}
                                    DEPTH={{depth}} LINK={{link}} TEXT={{text}}
@@ -163,13 +154,11 @@ class AllTheThingsTestCase(unittest.TestCase):
   def test_transforms_not_discard_page_tocs(self):
     # We had a bug where one step of transform lost the info
     # we need to build page-tocs. Make sure that doesn't happen again.
-    soups = self.orig_soups.copy()
-    precomputed = copy.deepcopy(self.orig_precomputed)
-    sitegen.transform_soups(self.config, soups, precomputed)
+    sitegen.transform_soups(self.config, self.soups, self.precomputed)
     rendered = sitegen.render_html('subdir/page2',
                                    self.config,
-                                   soups,
-                                   precomputed,
+                                   self.soups,
+                                   self.precomputed,
                                    """
                                    {{#page_toc}}
                                    DEPTH={{depth}} LINK={{link}} TEXT={{text}}
@@ -179,13 +168,11 @@ class AllTheThingsTestCase(unittest.TestCase):
     self.assertIn('DEPTH=1 LINK=two TEXT=Section Two', rendered)
 
   def test_here_links(self):
-    soups = self.orig_soups.copy()
-    precomputed = copy.deepcopy(self.orig_precomputed)
-    sitegen.add_here_links(soups)
+    sitegen.add_here_links(self.soups)
     html = sitegen.render_html('index',
                                self.config,
-                               soups,
-                               precomputed,
+                               self.soups,
+                               self.precomputed,
                                TEMPLATE_MUSTACHE)
     self.assertIn('href="#pants-build-system"', html,
                   'Generated html lacks auto-created link to h1.')
@@ -194,12 +181,10 @@ class AllTheThingsTestCase(unittest.TestCase):
     # Our "site" has a simple outline.
     # Do we get the correct info from that to generate
     # "breadcrumbs" navigating from one page up to the top?
-    soups = self.orig_soups.copy()
-    precomputed = copy.deepcopy(self.orig_precomputed)
     rendered = sitegen.render_html('subdir/page2',
                                    self.config,
-                                   soups,
-                                   precomputed,
+                                   self.soups,
+                                   self.precomputed,
                                    """
                                    {{#breadcrumbs}}
                                    LINK={{link}} TEXT={{text}}
@@ -211,12 +196,10 @@ class AllTheThingsTestCase(unittest.TestCase):
     # Our "site" has a simple outline.
     # Do we get the correct info from that to generate
     # a site-level table of contents?
-    soups = self.orig_soups.copy()
-    precomputed = copy.deepcopy(self.orig_precomputed)
     rendered = sitegen.render_html('index',
                                    self.config,
-                                   soups,
-                                   precomputed,
+                                   self.soups,
+                                   self.precomputed,
                                    """
                                    {{#site_toc}}
                                    DEPTH={{depth}} LINK={{link}} TEXT={{text}}
@@ -226,13 +209,11 @@ class AllTheThingsTestCase(unittest.TestCase):
     self.assertIn('DEPTH=1 LINK=subdir/page2.html TEXT=Page 2: Electric Boogaloo', rendered)
 
   def test_transform_fixes_up_internal_links(self):
-    soups = self.orig_soups.copy()
-    precomputed = copy.deepcopy(self.orig_precomputed)
-    sitegen.transform_soups(self.config, soups, precomputed)
+    sitegen.transform_soups(self.config, self.soups, self.precomputed)
     html = sitegen.render_html('index',
                                self.config,
-                               soups,
-                               precomputed,
+                               self.soups,
+                               self.precomputed,
                                TEMPLATE_MUSTACHE)
     self.assertTrue('subdir/page1.html' in html,
                     'p1.html link did not get fixed up to page1.html')
