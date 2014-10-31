@@ -16,6 +16,7 @@ from twitter.common.collections import OrderedDict, OrderedSet, maybe_list
 
 from pants.backend.codegen.targets.java_protobuf_library import JavaProtobufLibrary
 from pants.backend.codegen.tasks.code_gen import CodeGen
+from pants.backend.codegen.tasks.protobuf_parse import ProtobufParse
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.python.targets.python_library import PythonLibrary
@@ -46,8 +47,8 @@ class ProtobufGen(CodeGen):
   def register_options(cls, register):
     super(ProtobufGen, cls).register_options(register)
     register('--lang', action='append', choices=['python', 'java'],
-         help='Force generation of protobuf code for these languages.',
-         legacy='protobuf_gen_langs')
+             help='Force generation of protobuf code for these languages.',
+             legacy='protobuf_gen_langs')
 
   def __init__(self, *args, **kwargs):
     super(ProtobufGen, self).__init__(*args, **kwargs)
@@ -138,48 +139,13 @@ class ProtobufGen(CodeGen):
       for path in self._jars_to_directories(target):
         yield os.path.relpath(path, get_buildroot())
 
-  def _same_contents(self, a, b):
-    with open(a, 'r') as f:
-      a_data = f.read()
-    with open(b, 'r') as f:
-      b_data = f.read()
-    return a_data == b_data
-
   def genlang(self, lang, targets):
     sources_by_base = self._calculate_sources(targets)
     sources = reduce(lambda a,b: a^b, sources_by_base.values(), OrderedSet())
     bases = OrderedSet(sources_by_base.keys())
     bases.update(self._proto_path_imports(targets))
 
-    # Check for duplicate/conflicting protos.
-    sources_by_genfile = {}
-    for base in sources_by_base.keys(): # Need to iterate over /original/ bases.
-      for path in sources_by_base[base]:
-        if not path in sources:
-          continue # Check to make sure we haven't already removed it.
-        source = path[len(base):]
-        genfiles = calculate_genfiles(path, source)
-        for key in genfiles.keys():
-          for genfile in genfiles[key]:
-            if genfile in sources_by_genfile:
-              # Possible conflict!
-              prev = sources_by_genfile[genfile]
-              if not prev in sources:
-                # Must have been culled by an earlier pass.
-                continue
-              if not self._same_contents(path, prev):
-                self.context.log.error('Proto conflict detected (.proto files are different):')
-                self.context.log.error('  1: {prev}'.format(prev=prev))
-                self.context.log.error('  2: {curr}'.format(curr=path))
-              else:
-                self.context.log.warn('Proto duplication detected (.proto files are identical):')
-                self.context.log.warn('  1: {prev}'.format(prev=prev))
-                self.context.log.warn('  2: {curr}'.format(curr=path))
-              self.context.log.warn('  Arbitrarily favoring proto 1.')
-              if path in sources:
-                sources.remove(path) # Favor the first version.
-              continue
-            sources_by_genfile[genfile] = path
+    check_duplicate_conflicting_protos(sources_by_base, sources, self.context.log)
 
     if lang == 'java':
       output_dir = self.java_out
@@ -279,84 +245,73 @@ class ProtobufGen(CodeGen):
     return tgt
 
 
-DEFAULT_PACKAGE_PARSER = re.compile(r'^\s*package\s+([^;]+)\s*;\s*$')
-OPTION_PARSER = re.compile(r'^\s*option\s+([^ =]+)\s*=\s*([^\s]+)\s*;\s*$')
-SERVICE_PARSER = re.compile(r'^\s*(service)\s+([^\s{]+).*')
-TYPE_PARSER = re.compile(r'^\s*(enum|message)\s+([^\s{]+).*')
-
-
-def camelcase(string):
-  """Convert snake casing where present to camel casing"""
-  return ''.join(word.capitalize() for word in re.split('[-_]', string))
-
-
 def calculate_genfiles(path, source):
-  with open(path, 'r') as protobuf:
-    lines = protobuf.readlines()
-    package = ''
-    filename = re.sub(r'\.proto$', '', os.path.basename(source))
-    outer_class_name = camelcase(filename)
-    multiple_files = False
-    outer_types = set()
-    type_depth = 0
-    java_package = None
-    for line in lines:
-      match = DEFAULT_PACKAGE_PARSER.match(line)
-      if match:
-        package = match.group(1)
-      else:
-        match = OPTION_PARSER.match(line)
-        if match:
-          name = match.group(1)
-          value = match.group(2).strip('"')
-          if 'java_package' == name:
-            java_package = value
-          elif 'java_outer_classname' == name:
-            outer_class_name = value
-          elif 'java_multiple_files' == name:
-            multiple_files = (value == 'true')
-        else:
-          uline = line.decode('utf-8').strip()
-          type_depth += uline.count('{') - uline.count('}')
-          match = SERVICE_PARSER.match(line)
-          _update_type_list(match, type_depth, outer_types)
-          if not match:
-            match = TYPE_PARSER.match(line)
-            _update_type_list(match, type_depth, outer_types)
+  protobuf_parse = ProtobufParse(path, source)
+  protobuf_parse.parse()
 
-    # 'option java_package' supercedes 'package'
-    if java_package:
-      package = java_package
-
-    # TODO(Eric Ayers) replace with a real lex/parse understanding of protos. This is a big hack.
-    # The parsing for finding type definitions is not reliable. See
-    # https://github.com/pantsbuild/pants/issues/96
-    types = outer_types if multiple_files and type_depth == 0 else set()
-
-    genfiles = defaultdict(set)
-    genfiles['py'].update(calculate_python_genfiles(source))
-    genfiles['java'].update(calculate_java_genfiles(package, outer_class_name, types))
-    return genfiles
-
-
-def _update_type_list(match, type_depth, outer_types):
-  if match and type_depth < 2: # This takes care of the case where { } are on the same line.
-    type_name = match.group(2)
-    outer_types.add(type_name)
-    if match.group(1) == 'message':
-      outer_types.add('%sOrBuilder' % type_name)
-
+  genfiles = defaultdict(set)
+  genfiles['py'].update(calculate_python_genfiles(source))
+  genfiles['java'].update(calculate_java_genfiles(protobuf_parse))
+  return genfiles
 
 def calculate_python_genfiles(source):
   yield re.sub(r'\.proto$', '_pb2.py', source)
 
+def calculate_java_genfiles(protobuf_parse):
+  basepath = protobuf_parse.package.replace('.', os.path.sep)
 
-def calculate_java_genfiles(package, outer_class_name, types):
-  basepath = package.replace('.', '/')
+  classnames = set([protobuf_parse.outer_class_name])
+  if protobuf_parse.multiple_files:
+    classnames |= protobuf_parse.enums | protobuf_parse.messages | protobuf_parse.services | \
+      set(['{name}OrBuilder'.format(name=m) for m in protobuf_parse.messages])
 
-  def path(name):
-    return os.path.join(basepath, '%s.java' % name)
+  for classname in classnames:
+    yield os.path.join(basepath, '{0}.java'.format(classname))
 
-  yield path(outer_class_name)
-  for type_ in types:
-    yield path(type_)
+def _same_contents(a, b):
+  with open(a, 'r') as f:
+    a_data = f.read().replace(' ', '')
+  with open(b, 'r') as f:
+    b_data = f.read().replace(' ', '')
+  return a_data == b_data
+
+def check_duplicate_conflicting_protos(sources_by_base, sources, log):
+  """Checks if proto files are duplicate or conflicting.
+
+  There are sometimes two files with the same name on the .proto path.  This causes the protobuf
+  compiler to stop with an error.  Some repos have legitimate cases for this, and so this task
+  decides to just choose one to keep the entire build from failing.  Sometimes, they are identical
+  copies.  That is harmless, but if there are two files with the same name with different contents,
+  that is ambiguous and we want to complain loudly.
+
+  :param dict sources_by_base: mapping of base to path
+  :param list sources: list of sources
+  :param Context.Log log: writes error messages to the console for conflicts
+  """
+  sources_by_genfile = {}
+  for base in sources_by_base.keys(): # Need to iterate over /original/ bases.
+    for path in sources_by_base[base]:
+      if not path in sources:
+        continue # Check to make sure we haven't already removed it.
+      source = path[len(base):]
+
+      genfiles = calculate_genfiles(path, source)
+      for key in genfiles.keys():
+        for genfile in genfiles[key]:
+          if genfile in sources_by_genfile:
+            # Possible conflict!
+            prev = sources_by_genfile[genfile]
+            if not prev in sources:
+              # Must have been culled by an earlier pass.
+              continue
+            if not _same_contents(path, prev):
+              log.error('Proto conflict detected (.proto files are different):\n'
+                        '1: {prev}\n2: {curr}'.format(prev=prev, curr=path))
+            else:
+              log.warn('Proto duplication detected (.proto files are identical):\n'
+                       '1: {prev}\n2: {curr}'.format(prev=prev, curr=path))
+            log.warn('  Arbitrarily favoring proto 1.')
+            if path in sources:
+              sources.remove(path) # Favor the first version.
+            continue
+          sources_by_genfile[genfile] = path
