@@ -82,11 +82,13 @@ class Precomputed(object):
 class PrecomputedPageInfo(object):
   """Info we compute (and preserve) for each page before we mutate things."""
 
-  def __init__(self, title):
+  def __init__(self, title, toc=[]):
     """
     :param title: Page title
+    :param toc: Page table of contents
     """
     self.title = title
+    self.toc = toc
 
 
 def precompute_xrefs(soups):
@@ -250,8 +252,14 @@ def transform_soups(config, soups, precomputed):
   """Mutate our soups to be better when we write them out later."""
   fixup_internal_links(config, soups)
   ensure_headings_linkable(soups)
-  add_here_links(soups)
+
+  # Before add_here_links, which transforms soups in a way such that
+  # bs4 doesn't "find" headings. Do this after ensure_headings_linkable
+  # so that there will be links.
+  generate_page_tocs(soups, precomputed)
+
   link_xrefs(soups, precomputed)
+  add_here_links(soups)
 
 
 def get_title(soup):
@@ -325,6 +333,11 @@ def hdepth(tag):
   return depth
 
 
+def generate_page_tocs(soups, precomputed):
+  for name, soup in soups.items():
+    precomputed.page[name].toc = generate_page_toc(soup)
+
+
 def generate_page_toc(soup):
   """Return page-level (~list of headings) TOC template data for soup"""
   # Maybe we don't want to show all the headings. E.g., it's common for a page
@@ -361,14 +374,13 @@ def render_html(dst, config, soups, precomputed, template):
     body_html = '{0}'.format(soup.body)
   else:
     body_html = '{0}'.format(soup)
-  page_toc = generate_page_toc(soup)
   html = renderer.render(template,
                          body_html=body_html,
                          breadcrumbs=generate_breadcrumbs(config, precomputed, dst),
                          generated=generate_generated(config, dst),
                          site_toc=generate_site_toc(config, precomputed, dst),
-                         has_page_toc=bool(page_toc),
-                         page_toc=page_toc,
+                         has_page_toc=bool(precomputed.page[dst].toc),
+                         page_toc=precomputed.page[dst].toc,
                          title=title,
                          topdots=topdots)
   return html
