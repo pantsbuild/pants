@@ -249,7 +249,6 @@ def calculate_genfiles(path, source):
   protobuf_parse = ProtobufParse(path, source)
   protobuf_parse.parse()
 
-
   genfiles = defaultdict(set)
   genfiles['py'].update(calculate_python_genfiles(source))
   genfiles['java'].update(calculate_java_genfiles(protobuf_parse))
@@ -274,9 +273,9 @@ def calculate_java_genfiles(protobuf_parse):
 
 def _same_contents(a, b):
   with open(a, 'r') as f:
-    a_data = f.read()
+    a_data = f.read().replace(' ', '')
   with open(b, 'r') as f:
-    b_data = f.read()
+    b_data = f.read().replace(' ', '')
   return a_data == b_data
 
 def check_duplicate_conflicting_protos(sources_by_base, sources, log):
