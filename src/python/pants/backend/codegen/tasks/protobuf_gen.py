@@ -260,16 +260,16 @@ def calculate_python_genfiles(source):
 def calculate_java_genfiles(protobuf_parse):
   basepath = protobuf_parse.package.replace('.', '/')
 
-  tmp_types = set()
-  for type in protobuf_parse.messages:
-    tmp_types.add('%sOrBuilder' % type)
-  classnames = protobuf_parse.messages.union(tmp_types)
-  classnames = classnames.union(protobuf_parse.services)
-  classnames = classnames.union(protobuf_parse.enums)
-  classnames.add(protobuf_parse.outer_class_name)
+  classnames = set([protobuf_parse.outer_class_name])
+  if protobuf_parse.multiple_files:
+    classnames = classnames.\
+      union(protobuf_parse.enums).\
+      union(protobuf_parse.messages).\
+      union(protobuf_parse.services).\
+      union(set(['{name}OrBuilder'.format(name=m) for m in protobuf_parse.messages]))
 
   for classname in classnames:
-    yield os.path.join(basepath, '%s.java' % classname)
+    yield os.path.join(basepath, '{0}.java'.format(classname))
 
 def _same_contents(a, b):
   with open(a, 'r') as f:
@@ -303,21 +303,12 @@ def check_duplicate_conflicting_protos(sources_by_base, sources, log):
               # Must have been culled by an earlier pass.
               continue
             if not _same_contents(path, prev):
-              log.error(
-                '''
-                  Proto conflict detected (.proto files are different):
-                  1: {prev}'.format(prev=prev)
-                  2: {curr}'.format(curr=path)
-                '''
-              )
+              log.error('Proto conflict detected (.proto files are different):\n'
+                        '1: {prev}\n2: {curr}'.format(prev=prev, curr=path))
+
             else:
-              log.warn(
-                '''
-                  Proto duplication detected (.proto files are identical):')
-                  1: {prev}'.format(prev=prev))
-                  2: {curr}'.format(curr=path))
-                '''
-              )
+              log.warn('Proto duplication detected (.proto files are identical):\n'
+                       '1: {prev}\n2: {curr}'.format(prev=prev, curr=path))
             log.warn('  Arbitrarily favoring proto 1.')
             if path in sources:
               sources.remove(path) # Favor the first version.

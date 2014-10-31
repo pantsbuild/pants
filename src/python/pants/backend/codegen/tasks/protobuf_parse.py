@@ -20,7 +20,6 @@ class ProtobufParse():
 
   def __init__(self, path, source):
     """
-    :param string compiler: Name of the compiler that will compile proto files to Java files.
     :param string path: base path to proto file
     :param string source: relative path to proto file with respect to the base
     """
@@ -28,10 +27,13 @@ class ProtobufParse():
     self.source = source
 
     self.package = ''
-    self.enums = set()
-    self.messages = set()
+    self.multiple_files = False
     self.services = set()
     self.outer_class_name = get_outer_class_name(source)
+
+    # Note that nesting of types isn't taken into account
+    self.enums = set()
+    self.messages = set()
 
   def parse(self):
     lines = self._read_lines()
@@ -53,7 +55,7 @@ class ProtobufParse():
           elif 'java_outer_classname' == name:
             self.outer_class_name = value
           elif 'java_multiple_files' == name:
-            multiple_files = (value == 'true')
+            self.multiple_files = (value == 'true')
         else:
           uline = line.decode('utf-8').strip()
           type_depth += uline.count('{') - uline.count('}')
