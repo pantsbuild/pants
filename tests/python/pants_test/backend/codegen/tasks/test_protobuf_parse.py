@@ -22,15 +22,7 @@ class ProtobufGenCalculateJavaTest(unittest.TestCase):
       with open(os.path.join(workdir, "temperatures.proto"), 'w') as fd:
         fd.write(
           '''
-            // Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
-            // Licensed under the Apache License, Version 2.0 (see LICENSE).
-
             package com.pants.examples.temperature;
-
-            /**
-             * Structure for expressing temperature: 75 Fahrenheit, 12 Celsius, etc.
-             * Not so useful on its own.
-             */
             message Temperature {
               optional string unit = 1;
               required int64 number = 2;
@@ -38,12 +30,10 @@ class ProtobufGenCalculateJavaTest(unittest.TestCase):
           '''
         )
         fd.close()
-
         proto_parser_wire =  ProtobufParse('wire', fd.name, 'temperatures.proto')
         proto_parser_wire.parse()
         self.assertEqual('com.pants.examples.temperature', proto_parser_wire.package)
         self.assertEqual(set(['Temperature']), proto_parser_wire.types)
-
 
   @contextmanager
   def test_parse_for_wire(self):
@@ -51,15 +41,7 @@ class ProtobufGenCalculateJavaTest(unittest.TestCase):
       with open(os.path.join(workdir, "distances.proto"), 'w') as fd:
         fd.write(
           '''
-            // Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
-            // Licensed under the Apache License, Version 2.0 (see LICENSE).
-
             package com.pants.examples.distance;
-
-            /**
-             * Structure for expressing distance measures: 8mm, 12 parsecs, etc.
-             * Not so useful on its own.
-             */
             message Distance {
               optional string unit = 1;
               required int64 number = 2;
@@ -67,7 +49,6 @@ class ProtobufGenCalculateJavaTest(unittest.TestCase):
           '''
         )
         fd.close()
-
         proto_parser_protoc =  ProtobufParse('protoc', fd.name, 'distances.proto')
         proto_parser_protoc.parse()
         self.assertEqual('com.pants.examples.distance', proto_parser_protoc.package)

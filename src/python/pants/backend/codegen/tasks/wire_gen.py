@@ -105,7 +105,8 @@ class WireGen(CodeGen, JvmToolTaskMixin):
       args.append('--proto_path=%s' % os.path.join(get_buildroot(), SourceRoot.find(target)))
 
       for dep_target in target.dependencies:
-        if dep_target not in dependency_set and (self.is_gentarget(dep_target) or self.is_proto_target(dep_target)):
+        if (dep_target not in dependency_set and
+            (self.is_gentarget(dep_target) or self.is_proto_target(dep_target))):
           args.append('--proto_path=%s' % os.path.join(get_buildroot(), SourceRoot.find(dep_target)))
           dependency_set.add(dep_target)
 
@@ -141,7 +142,10 @@ class WireGen(CodeGen, JvmToolTaskMixin):
     genfiles = []
     for source in target.sources_relative_to_source_root():
       path = os.path.join(target.target_base, source)
-      genfiles.extend(calculate_genfiles(path, source, target.payload.get_field_value('service_writer')).get('java', []))
+      genfiles.extend(calculate_genfiles(
+        path,
+        source,
+        target.payload.get_field_value('service_writer')).get('java', []))
 
     spec_path = os.path.relpath(self.java_out, get_buildroot())
     address = SyntheticAddress(spec_path, target.id)
