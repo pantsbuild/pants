@@ -6,6 +6,7 @@ python_library(
     'java_protobuf_library.py',
     'java_thrift_library.py',
     'java_ragel_library.py',
+    'java_wire_library.py',
     'jaxb_library.py',
   ],
   dependencies = [

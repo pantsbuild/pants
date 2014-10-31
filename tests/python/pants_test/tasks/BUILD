@@ -88,6 +88,7 @@ python_test_suite(
     ':protobuf_integration',
     ':scala_repl_integration',
     ':thrift_linter_integration',
+    ':wire_integration',
     'tests/python/pants_test/tasks/jvm_compile/java',
   ],
 )
@@ -558,6 +559,15 @@ python_tests(
 )
 
 python_tests(
+  name = 'wire_integration',
+  sources = ['test_wire_integration.py'],
+  dependencies = [
+    'tests/python/pants_test:int-test',
+    'src/python/pants/base:build_environment',
+  ],
+)
+
+python_tests(
   name = 'jaxb_gen',
   sources = ['test_jaxb_gen.py'],
   dependencies = [
@@ -708,7 +718,6 @@ python_tests(
     'tests/python/pants_test:task_test_base',
   ]
 )
-
 
 python_tests(
   name = 'ragel_gen',

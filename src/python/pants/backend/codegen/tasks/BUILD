@@ -8,10 +8,12 @@ python_library(
     ':antlr_gen',
     ':code_gen',
     ':protobuf_gen',
+    ':protobuf_parse',
     ':ragel_gen',
     ':scrooge_gen',
     ':thrift_linter',
     ':jaxb_gen',
+    ':wire_gen'
   ],
 )
 
@@ -91,6 +93,7 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.log',
     ':code_gen',
     ':common',
+    ':protobuf_parse',
     'src/python/pants/backend/codegen/targets:java',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/python/targets:python',
@@ -100,6 +103,11 @@ python_library(
     'src/python/pants:binary_util',
     'src/python/pants/util:dirutil',
   ],
+)
+
+python_library(
+  name = 'protobuf_parse',
+  sources = ['protobuf_parse.py'],
 )
 
 python_library(
@@ -150,6 +158,26 @@ python_library(
     'src/python/pants/backend/jvm/tasks:nailgun_task',
     'src/python/pants/backend/core/targets:common',
     'src/python/pants:thrift_util',
+    'src/python/pants/util:dirutil',
+  ],
+)
+
+python_library(
+  name = 'wire_gen',
+  sources = ['wire_gen.py'],
+  dependencies = [
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    ':code_gen',
+    ':protobuf_gen',
+    ':protobuf_parse',
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/targets:java',
+    'src/python/pants/backend/jvm/tasks:jvm_tool_task_mixin',
+    'src/python/pants/base:address',
+    'src/python/pants/base:address_lookup_error',
+    'src/python/pants/base:build_environment',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/java:util',
     'src/python/pants/util:dirutil',
   ],
 )
