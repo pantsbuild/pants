@@ -5,6 +5,7 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from contextlib import contextmanager
 import SimpleHTTPServer
 import SocketServer
 import os
@@ -27,7 +28,6 @@ class MockPinger(object):
   # Returns a fake ping time such that the last host is always the 'fastest'.
   def pings(self, hosts):
     return map(lambda host: (host, self._hosts_to_times.get(host, 9999)), hosts)
-
 
 # A very trivial server that serves files under the cwd.
 class SimpleRESTHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
@@ -57,12 +57,50 @@ class SimpleRESTHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
       self.send_error(404, 'File not found')
     self.end_headers()
 
-
 TEST_CONTENT1 = 'muppet'
 TEST_CONTENT2 = 'kermit'
 
-
 class TestArtifactCache(unittest.TestCase):
+  @contextmanager
+  def setup_local_cache(self):
+    with temporary_dir() as artifact_root:
+      with temporary_dir() as cache_root:
+        yield LocalArtifactCache(artifact_root, cache_root, compression=0)
+
+  @contextmanager
+  def setup_server(self):
+    httpd = None
+    httpd_thread = None
+    try:
+      with temporary_dir() as cache_root:
+        with pushd(cache_root):  # SimpleRESTHandler serves from the cwd.
+          httpd = SocketServer.TCPServer(('localhost', 0), SimpleRESTHandler)
+          port = httpd.server_address[1]
+          httpd_thread = Thread(target=httpd.serve_forever)
+          httpd_thread.start()
+          yield 'http://localhost:{0}'.format(port)
+    finally:
+      if httpd:
+        httpd.shutdown()
+      if httpd_thread:
+        httpd_thread.join()
+
+  @contextmanager
+  def setup_rest_cache(self, local=None):
+    with temporary_dir() as artifact_root:
+      local = local or TempLocalArtifactCache(artifact_root)
+      with self.setup_server() as base_url:
+        yield RESTfulArtifactCache(artifact_root, base_url, local)
+
+  @contextmanager
+  def setup_test_file(self, parent):
+    with temporary_file(parent) as f:
+      # Write the file.
+      f.write(TEST_CONTENT1)
+      path = f.name
+      f.close()
+      yield path
+
   def test_select_best_url(self):
     spec = 'http://host1|https://host2:666/path/to|http://host3/path/'
     best = select_best_url(spec, MockPinger({'host1':  5, 'host2:666': 3, 'host3': 7}), MockLogger())
@@ -111,46 +149,20 @@ class TestArtifactCache(unittest.TestCase):
       with self.assertRaises(InvalidCacheSpecError):
         mk_cache([4])
 
-
   def test_local_cache(self):
-    with temporary_dir() as artifact_root:
-      with temporary_dir() as cache_root:
-        artifact_cache = LocalArtifactCache(artifact_root, cache_root, compression=0)
-        self.do_test_artifact_cache(artifact_cache)
+    with self.setup_local_cache() as artifact_cache:
+      self.do_test_artifact_cache(artifact_cache)
 
   def test_restful_cache(self):
     with self.assertRaises(InvalidRESTfulCacheProtoError):
-     RESTfulArtifactCache('foo', 'ftp://localhost/bar', 'foo')
+      RESTfulArtifactCache('foo', 'ftp://localhost/bar', 'foo')
 
-    httpd = None
-    httpd_thread = None
-    try:
-      with temporary_dir() as cache_root:
-        with pushd(cache_root):  # SimpleRESTHandler serves from the cwd.
-          httpd = SocketServer.TCPServer(('localhost', 0), SimpleRESTHandler)
-          port = httpd.server_address[1]
-          httpd_thread = Thread(target=httpd.serve_forever)
-          httpd_thread.start()
-          with temporary_dir() as artifact_root:
-            tmp = TempLocalArtifactCache(artifact_root)
-            base_url = 'http://localhost:{0}'.format(port)
-            artifact_cache = RESTfulArtifactCache(artifact_root, base_url, tmp)
-            self.do_test_artifact_cache(artifact_cache)
-    finally:
-      if httpd:
-        httpd.shutdown()
-      if httpd_thread:
-        httpd_thread.join()
-
+    with self.setup_rest_cache() as artifact_cache:
+      self.do_test_artifact_cache(artifact_cache)
 
   def do_test_artifact_cache(self, artifact_cache):
     key = CacheKey('muppet_key', 'fake_hash', 42)
-    with temporary_file(artifact_cache.artifact_root) as f:
-      # Write the file.
-      f.write(TEST_CONTENT1)
-      path = f.name
-      f.close()
-
+    with self.setup_test_file(artifact_cache.artifact_root) as path:
       # Cache it.
       self.assertFalse(artifact_cache.has(key))
       self.assertFalse(bool(artifact_cache.use_cached_files(key)))
@@ -175,65 +187,43 @@ class TestArtifactCache(unittest.TestCase):
 
   def test_local_backed_remote_cache(self):
     """make sure that the combined cache finds what it should and that it backfills"""
-    httpd = None
-    httpd_thread = None
-    try:
-      with temporary_dir() as http_root:
-        with temporary_dir() as cache_root:
-          with pushd(http_root):  # SimpleRESTHandler serves from the cwd.
-            httpd = SocketServer.TCPServer(('localhost', 0), SimpleRESTHandler)
-            port = httpd.server_address[1]
-            httpd_thread = Thread(target=httpd.serve_forever)
-            httpd_thread.start()
-            with temporary_dir() as artifact_root:
-              url = 'http://localhost:{0}'.format(port)
-              local = LocalArtifactCache(artifact_root, cache_root, compression=1)
-              tmp = TempLocalArtifactCache(artifact_root)
-              remote = RESTfulArtifactCache(artifact_root, url, tmp)
-              combined = RESTfulArtifactCache(artifact_root, url, local)
+    with self.setup_server() as url:
+      with self.setup_local_cache() as local:
+        tmp = TempLocalArtifactCache(local.artifact_root)
+        remote = RESTfulArtifactCache(local.artifact_root, url, tmp)
+        combined = RESTfulArtifactCache(local.artifact_root, url, local)
 
-              key = CacheKey('muppet_key', 'fake_hash', 42)
+        key = CacheKey('muppet_key', 'fake_hash', 42)
 
-              with temporary_file(artifact_root) as f:
-                # Write the file.
-                f.write(TEST_CONTENT1)
-                path = f.name
-                f.close()
+        with self.setup_test_file(local.artifact_root) as path:
+          # No cache has key.
+          self.assertFalse(local.has(key))
+          self.assertFalse(remote.has(key))
+          self.assertFalse(combined.has(key))
 
-                # No cache has key.
-                self.assertFalse(local.has(key))
-                self.assertFalse(remote.has(key))
-                self.assertFalse(combined.has(key))
+          # No cache returns key.
+          self.assertFalse(bool(local.use_cached_files(key)))
+          self.assertFalse(bool(remote.use_cached_files(key)))
+          self.assertFalse(bool(combined.use_cached_files(key)))
 
-                # No cache returns key.
-                self.assertFalse(bool(local.use_cached_files(key)))
-                self.assertFalse(bool(remote.use_cached_files(key)))
-                self.assertFalse(bool(combined.use_cached_files(key)))
+          # Attempting to use key that no cache had should not change anything.
+          self.assertFalse(local.has(key))
+          self.assertFalse(remote.has(key))
+          self.assertFalse(combined.has(key))
 
-                # Attempting to use key that no cache had should not change anything.
-                self.assertFalse(local.has(key))
-                self.assertFalse(remote.has(key))
-                self.assertFalse(combined.has(key))
+          # Add to only remote cache.
+          remote.insert(key, [path])
 
-                # Add to only remote cache.
-                remote.insert(key, [path])
+          # After insertion to remote, remote and only remote should have key
+          self.assertFalse(local.has(key))
+          self.assertTrue(remote.has(key))
+          self.assertTrue(combined.has(key))
 
-                # After insertion to remote, remote and only remote should have key
-                self.assertFalse(local.has(key))
-                self.assertTrue(remote.has(key))
-                self.assertTrue(combined.has(key))
+          # Successfully using via remote should NOT change local.
+          self.assertTrue(bool(remote.use_cached_files(key)))
+          self.assertFalse(local.has(key))
 
-                # Successfully using via remote should NOT change local.
-                self.assertTrue(bool(remote.use_cached_files(key)))
-                self.assertFalse(local.has(key))
-
-                # Successfully using via combined SHOULD backfill local.
-                self.assertTrue(bool(combined.use_cached_files(key)))
-                self.assertTrue(local.has(key))
-                self.assertTrue(bool(local.use_cached_files(key)))
-    finally:
-      if httpd:
-        httpd.shutdown()
-      if httpd_thread:
-        httpd_thread.join()
-
+          # Successfully using via combined SHOULD backfill local.
+          self.assertTrue(bool(combined.use_cached_files(key)))
+          self.assertTrue(local.has(key))
+          self.assertTrue(bool(local.use_cached_files(key)))
