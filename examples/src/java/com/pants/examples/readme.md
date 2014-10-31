@@ -246,6 +246,10 @@ Java version and are switching to another, you probably need to:
 
 so that the next build starts from scratch.
 
+**Note:** Currently, pants is known to work with OpenJDK version 7 or greater,
+and Oracle JDK version 6 or greater.
+
+
 <a xmark="jvm_bundles"></a>
 
 Bundles: Deploy-able Runnable File Trees
