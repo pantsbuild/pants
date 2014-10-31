@@ -7,6 +7,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import logging
 import os
+import sys
 
 # Note throughout the distinction between the artifact_root (which is where the artifacts are
 # originally built and where the cache restores them to) and the cache root path/URL (which is
@@ -86,3 +87,28 @@ class ArtifactCache(object):
     :param CacheKey cache_key: A CacheKey object.
     """
     pass
+
+def call_use_cached_files(tup):
+  """Importable helper for multi-proc calling of ArtifactCache.use_cached_files
+
+  Multiprocessing map/apply/etc require functions which can be imported, not bound methods.
+  To call a bound method, instead call a helper like this and pass tuple of the instance and args.
+  The helper can then call the original method on the deserialized instance.
+
+  :param tup: A tuple of an ArtifactCache and a argument to ArtifactCache.use_cached_files
+  """
+  res = tup[0].use_cached_files(tup[1])
+  sys.stderr.write('.')
+  return bool(res)
+
+def call_insert(cache, key, files):
+  """Importable helper for multi-proc calling of ArtifactCache.insert
+
+  See docstring on call_use_cached_files explaining why this is useful.
+
+  :param ArtifactCache cache: Cache into which to insert artifact
+  :param CacheKey key: cache key for inserted artifact
+  :param iterable<str> files: File paths to insert
+  """
+  return cache.insert(key, files)
+
