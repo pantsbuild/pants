@@ -105,7 +105,7 @@ class AllTheThingsTestCase(unittest.TestCase):
   def test_xrefs(self):
     soups = self.orig_soups.copy()
     precomputed = copy.deepcopy(self.orig_precomputed)
-    sitegen.link_xrefs(soups, self.orig_precomputed)
+    sitegen.link_xrefs(soups, precomputed)
     p1_html = sitegen.render_html('subdir/page1',
                                   self.config,
                                   soups,
@@ -116,7 +116,7 @@ class AllTheThingsTestCase(unittest.TestCase):
     p2_html = sitegen.render_html('subdir/page2',
                                   self.config,
                                   soups,
-                                  self.orig_precomputed,
+                                  precomputed,
                                   TEMPLATE_MUSTACHE)
     self.assertIn('href="page1.html#an_xmark"', p2_html,
                   'xref_p1 did not get linked')
@@ -135,7 +135,7 @@ class AllTheThingsTestCase(unittest.TestCase):
     p1_html = sitegen.render_html('subdir/page1',
                                   self.config,
                                   soups,
-                                  self.orig_precomputed,
+                                  precomputed,
                                   '{{title}}')
     self.assertEqual(p1_html, u'東京 is Tokyo',
                      """Didn't find correct non-ASCII title""")
