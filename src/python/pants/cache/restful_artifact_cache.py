@@ -12,7 +12,7 @@ import requests
 from requests import RequestException
 
 from pants.cache.artifact import TarballArtifact
-from pants.cache.artifact_cache import ArtifactCache, ArtifactCacheError
+from pants.cache.artifact_cache import ArtifactCache, ArtifactCacheError, NonfatalArtifactCacheError
 from pants.cache.local_artifact_cache import TempLocalArtifactCache
 from pants.util.contextutil import temporary_dir, temporary_file, temporary_file_path
 
@@ -65,7 +65,7 @@ class RESTfulArtifactCache(ArtifactCache):
         remote_path = self._remote_path_for_key(cache_key)
         if not self._request('PUT', remote_path, body=infile):
           url = self._url_string(remote_path)
-          raise self.CacheError('Failed to PUT to {0}.'.format(url))
+          raise NonfatalCacheError('Failed to PUT to {0}.'.format(url))
 
   def has(self, cache_key):
     if self._localcache.has(cache_key):
@@ -121,12 +121,12 @@ class RESTfulArtifactCache(ArtifactCache):
         logger.debug('404 returned for {0} request to {1}'.format(method, self._url_string(path)))
         return None
       else:
-        raise self.CacheError('Failed to {0} {1}. Error: {2} {3}'.format(method,
+        raise NonfatalCacheError('Failed to {0} {1}. Error: {2} {3}'.format(method,
                                                                          self._url_string(path),
                                                                          response.status_code,
                                                                          response.reason))
     except RequestException as e:
-      raise self.CacheError(e)
+      raise NonfatalCacheError(e)
 
   def _url_string(self, path):
     proto = 'http'

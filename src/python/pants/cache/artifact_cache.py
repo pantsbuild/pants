@@ -17,6 +17,9 @@ logger = logging.getLogger(__name__)
 class ArtifactCacheError(Exception):
   pass
 
+class NonfatalArtifactCacheError(Exception):
+  pass
+
 class ArtifactCache(object):
   """A map from cache key to a set of build artifacts.
 
@@ -25,10 +28,6 @@ class ArtifactCache(object):
 
   Subclasses implement the methods below to provide this functionality.
   """
-
-  class CacheError(ArtifactCacheError):
-    """Indicates a problem writing to or reading from the cache."""
-    pass
 
   def __init__(self, artifact_root):
     """Create an ArtifactCache.
@@ -51,10 +50,10 @@ class ArtifactCache(object):
     missing_files = filter(lambda f: not os.path.exists(f), paths)
     try:
       if missing_files:
-        raise ArtifactCache.CacheError('Tried to cache nonexistent files {0}'.format(missing_files))
+        raise ArtifactCacheError('Tried to cache nonexistent files {0}'.format(missing_files))
       self.try_insert(cache_key, paths)
       return True
-    except Exception as e:
+    except NonfatalArtifactCacheError as e:
       logger.error('Error while writing to artifact cache: {0}. '.format(e))
       return False
 

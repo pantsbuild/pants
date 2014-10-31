@@ -11,8 +11,11 @@ import re
 
 import markdown
 from pkg_resources import resource_string
+from pygments import highlight
 from pygments.formatters.html import HtmlFormatter
+from pygments.lexers import guess_lexer_for_filename, PythonLexer, TextLexer
 from pygments.styles import get_all_styles
+from pygments.util import ClassNotFound
 
 from pants import binary_util
 from pants.base.address import SyntheticAddress
@@ -57,7 +60,7 @@ class WikilinksExtension(markdown.Extension):
 INCLUDE_PATTERN = r'!inc(\[(?P<params>[^]]*)\])?\((?P<path>[^' + '\n' + r']*)\)'
 
 
-def choose_include_lines(s, params, source_path):
+def choose_include_text(s, params, source_path):
   """Given the contents of a file and !inc[these params], return matching lines
 
   If there was a problem matching parameters, return empty list.
@@ -104,7 +107,7 @@ def choose_include_lines(s, params, source_path):
       break
   else:
     # never started recording:
-    return []
+    return ''
   for line_ix in range(line_ix, len(lines)):
     line = lines[line_ix]
     if end_before is not None and end_before in line:
@@ -115,8 +118,8 @@ def choose_include_lines(s, params, source_path):
   else:
     if (end_before or end_at):
       # we had an end- filter, but never encountered it.
-      return []
-  return chosen_lines
+      return ''
+  return '\n'.join(chosen_lines)
 
 
 class IncludeExcerptPattern(markdown.inlinepatterns.Pattern):
@@ -134,19 +137,32 @@ class IncludeExcerptPattern(markdown.inlinepatterns.Pattern):
     include_path = os.path.join(source_dir, rel_include_path)
     try:
       with open(include_path) as include_file:
-        include_text = include_file.read()
+        file_text = include_file.read()
     except IOError as e:
       raise IOError('Markdown file {0} tried to include file {1}, got '
                     '{2}'.format(self.source_path,
                                  rel_include_path,
                                  e.strerror))
-    include_lines = choose_include_lines(include_text, params, self.source_path)
-    if not include_lines:
+    include_text = choose_include_text(file_text, params, self.source_path)
+    if not include_text:
       raise TaskError('Markdown file {0} tried to include file {1} but '
                       'filtered out everything'.format(self.source_path,
                                                        rel_include_path))
-    el = markdown.util.etree.Element('pre')
-    el.text = markdown.util.AtomicString('\n'.join(include_lines))
+    el = markdown.util.etree.Element('div')
+    el.set('class', 'md-included-snippet')
+    try:
+      lexer = guess_lexer_for_filename(include_path, file_text)
+    except ClassNotFound:
+      # e.g., ClassNotFound: no lexer for filename u'BUILD' found
+      if 'BUILD' in include_path:
+        lexer = PythonLexer()
+      else:
+        lexer = TextLexer()  # the boring plain-text lexer
+
+    html_snippet = highlight(include_text,
+                             lexer,
+                             HtmlFormatter(cssclass='codehilite'))
+    el.text = html_snippet
     return el
 
 
