@@ -161,7 +161,7 @@ class IncludeExcerptPattern(markdown.inlinepatterns.Pattern):
 
     html_snippet = highlight(include_text,
                              lexer,
-                             HtmlFormatter(cssclass="codehilite"))
+                             HtmlFormatter(cssclass='codehilite'))
     el.text = html_snippet
     return el
 
