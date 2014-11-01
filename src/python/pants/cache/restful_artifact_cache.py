@@ -26,6 +26,14 @@ class InvalidRESTfulCacheProtoError(ArtifactCacheError):
   """Indicates an invalid protocol used in a remote spec."""
   pass
 
+class RequestsSession(object):
+  _session = None
+  @classmethod
+  def instance(cls):
+    if cls._session is None:
+      cls._session = requests.Session()
+    return cls._session
+
 class RESTfulArtifactCache(ArtifactCache):
   """An artifact cache that stores the artifacts on a RESTful service."""
 
@@ -51,11 +59,6 @@ class RESTfulArtifactCache(ArtifactCache):
     self._netloc = parsed_url.netloc
     self._path_prefix = parsed_url.path.rstrip(b'/')
     self._localcache = local
-
-    # To enable connection reuse, all requests must be created from same session.
-    # TODO: Re-evaluate session's life-cycle if/when a longer-lived pants process exists.
-    self._session = requests.Session()
-
 
   def try_insert(self, cache_key, paths):
     # Delegate creation of artifact to local cache.
@@ -101,16 +104,18 @@ class RESTfulArtifactCache(ArtifactCache):
     url = self._url_string(path)
     logger.debug('Sending {0} request to {1}'.format(method, url))
 
+    session = RequestsSession.instance()
+
     try:
       response = None
       if 'PUT' == method:
-        response = self._session.put(url, data=body, timeout=self._timeout_secs)
+        response = session.put(url, data=body, timeout=self._timeout_secs)
       elif 'GET' == method:
-        response = self._session.get(url, timeout=self._timeout_secs, stream=True)
+        response = session.get(url, timeout=self._timeout_secs, stream=True)
       elif 'HEAD' == method:
-        response = self._session.head(url, timeout=self._timeout_secs)
+        response = session.head(url, timeout=self._timeout_secs)
       elif 'DELETE' == method:
-        response = self._session.delete(url, timeout=self._timeout_secs)
+        response = session.delete(url, timeout=self._timeout_secs)
       else:
         raise ValueError('Unknown request method {0}'.format(method))
 
