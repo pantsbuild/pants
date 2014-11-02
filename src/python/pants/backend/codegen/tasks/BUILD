@@ -8,6 +8,7 @@ python_library(
     ':antlr_gen',
     ':code_gen',
     ':protobuf_gen',
+    ':protobuf_parse',
     ':ragel_gen',
     ':scrooge_gen',
     ':thrift_linter',
@@ -91,6 +92,7 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.log',
     ':code_gen',
     ':common',
+    ':protobuf_parse',
     'src/python/pants/backend/codegen/targets:java',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/python/targets:python',
@@ -100,6 +102,11 @@ python_library(
     'src/python/pants:binary_util',
     'src/python/pants/util:dirutil',
   ],
+)
+
+python_library(
+  name = 'protobuf_parse',
+  sources = ['protobuf_parse.py'],
 )
 
 python_library(
