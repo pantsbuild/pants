@@ -68,7 +68,7 @@ class RESTfulArtifactCache(ArtifactCache):
         remote_path = self._remote_path_for_key(cache_key)
         if not self._request('PUT', remote_path, body=infile):
           url = self._url_string(remote_path)
-          raise NonfatalCacheError('Failed to PUT to {0}.'.format(url))
+          raise NonfatalArtifactCacheError('Failed to PUT to {0}.'.format(url))
 
   def has(self, cache_key):
     if self._localcache.has(cache_key):
@@ -126,12 +126,12 @@ class RESTfulArtifactCache(ArtifactCache):
         logger.debug('404 returned for {0} request to {1}'.format(method, self._url_string(path)))
         return None
       else:
-        raise NonfatalCacheError('Failed to {0} {1}. Error: {2} {3}'.format(method,
+        raise NonfatalArtifactCacheError('Failed to {0} {1}. Error: {2} {3}'.format(method,
                                                                          self._url_string(path),
                                                                          response.status_code,
                                                                          response.reason))
     except RequestException as e:
-      raise NonfatalCacheError(e)
+      raise NonfatalArtifactCacheError(e)
 
   def _url_string(self, path):
     proto = 'http'
