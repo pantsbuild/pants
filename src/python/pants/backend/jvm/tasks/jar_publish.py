@@ -83,6 +83,11 @@ class PushDb(object):
       """Returns a clone of this entry with the given sha and fingerprint."""
       return PushDb.Entry(self.sem_ver, self.named_ver, self.named_is_latest, sha, fingerprint)
 
+    def __repr__(self):
+      return '<%s, %s, %s, %s, %s, %s>' % (
+        self.__class__.__name__, self.sem_ver, self.named_ver, self.named_is_latest,
+        self.sha, self.fingerprint)
+
   def __init__(self, props=None):
     self._props = props or OrderedDict()
 
@@ -93,9 +98,9 @@ class PushDb(object):
     major = int(db_get('revision.major', '0'))
     minor = int(db_get('revision.minor', '0'))
     patch = int(db_get('revision.patch', '0'))
-    snapshot = db_get('revision.snapshot', 'false').lower() == 'true'
+    snapshot = str(db_get('revision.snapshot', 'false')).lower() == 'true'
     named_version = db_get('revision.named_version', None)
-    named_is_latest = db_get('revision.named_is_latest', False)
+    named_is_latest = str(db_get('revision.named_is_latest', 'false')).lower() == 'true'
     sha = db_get('revision.sha', None)
     fingerprint = db_get('revision.fingerprint', None)
     sem_ver = Semver(major, minor, patch, snapshot=snapshot)
@@ -111,7 +116,7 @@ class PushDb(object):
     db_set('revision.snapshot', str(pe.sem_ver.snapshot).lower())
     if pe.named_ver:
       db_set('revision.named_version', pe.named_ver.version())
-    db_set('revision.named_is_latest', pe.named_is_latest)
+    db_set('revision.named_is_latest', str(pe.named_is_latest).lower())
     db_set('revision.sha', pe.sha)
     db_set('revision.fingerprint', pe.fingerprint)
 
