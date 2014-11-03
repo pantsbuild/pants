@@ -68,7 +68,7 @@ class Options(object):
            the old-style flags during migration.
     """
     splitter = ArgSplitter(known_scopes)
-    self._scope_to_flags, self._target_specs = splitter.split_args(args)
+    self._scope_to_flags, self._target_specs, self._passthru = splitter.split_args(args)
     self._is_help = splitter.is_help
     self._parser_hierarchy = ParserHierarchy(env, config, known_scopes, legacy_parser)
     self._legacy_parser = legacy_parser  # Old-style options, used temporarily during transition.
