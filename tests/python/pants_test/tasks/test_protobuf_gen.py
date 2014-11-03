@@ -5,11 +5,11 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+import os
 import unittest2 as unittest
-import pytest
 
-from pants.backend.codegen.tasks.protobuf_gen import calculate_genfiles
-from pants.util.contextutil import temporary_file
+from pants.backend.codegen.tasks.protobuf_gen import calculate_genfiles, _same_contents
+from pants.util.contextutil import temporary_dir, temporary_file
 
 
 class ProtobufGenCalculateGenfilesTestBase(unittest.TestCase):
@@ -64,7 +64,6 @@ class ProtobufGenCalculateJavaTest(ProtobufGenCalculateGenfilesTestBase):
       ''',
       'com/example/foo/bar/Fred.java')
 
-
   def test_custom_outer(self):
     self.assert_java_files(
         'jack_spratt.proto',
@@ -91,26 +90,10 @@ class ProtobufGenCalculateJavaTest(ProtobufGenCalculateGenfilesTestBase):
           enum Jake { FOO=1;}
           message joe_bob {}
         ''',
-        'com/twitter/lean/JackSprattNoWhitespace.java',
         'com/twitter/lean/Jake.java',
         'com/twitter/lean/joe_bob.java',
-        'com/twitter/lean/joe_bobOrBuilder.java')
-
-    self.assert_java_files(
-      'jack_spratt.proto',
-      '''
-        package com.twitter.lean;
-        option java_multiple_files = true;
-
-        enum Jake { FOO=1;
-        }
-        message joe_bob {
-        }
-      ''',
-      'com/twitter/lean/JackSpratt.java',
-      'com/twitter/lean/Jake.java',
-      'com/twitter/lean/joe_bob.java',
-      'com/twitter/lean/joe_bobOrBuilder.java')
+        'com/twitter/lean/joe_bobOrBuilder.java',
+        'com/twitter/lean/JackSprattNoWhitespace.java',)
 
     self.assert_java_files(
       'inner_class.proto',
@@ -179,66 +162,27 @@ class ProtobufGenCalculateJavaTest(ProtobufGenCalculateGenfilesTestBase):
       'com/pants/protos/preferences/MessageAfterService.java',
       'com/pants/protos/preferences/MessageAfterServiceOrBuilder.java',)
 
-# TODO(Eric Ayers) This test won't pass because the .proto parse is not reliable.
-#  https://github.com/pantsbuild/pants/issues/96
-@pytest.mark.xfail
-def test_whitespace_insensitivity(self):
-    self.assert_java_files(
-      'inner_class_no_newline.proto',
-      '''
-        package com.pants.protos;
-        option java_multiple_files = true;
-        message Foo {
-           enum Bar { BAZ = 0; }
-        }
-      ''',
-      'com/pants/protos/InnerClassNoNewline.java',
-      'com/pants/protos/Foo.java',
-      'com/pants/protos/FooOrBuilder.java')
+  def test_same_contents(self):
+    with temporary_dir() as workdir:
+      with open(os.path.join(workdir, 'dup1.proto'), 'w') as dup1:
+        dup1.write(
+          '''
+            package com.twitter.lean;
+            option java_multiple_files = true;
+            enum Jake { FOO=1;}
+            message joe_bob {}
+          '''
+        )
+        dup1.close()
+        with open(os.path.join(workdir, 'dup2.proto'), 'w') as dup2:
+          dup2.write(
+            '''
+              package com.twitter.lean;
+              option java_multiple_files = true;
+              enum Jake { FOO=1;}
+              message joe_bob {}
+            '''
+          )
+          dup2.close()
 
-    self.assert_java_files(
-      'no_newline_at_all1.proto',
-      'package com.pants.protos; option java_multiple_files = true; message Foo {'
-      + ' enum Bar { BAZ = 0; } } message FooBar { }',
-      'com/pants/protos/InnerClassNoNewlineAtAll1.java',
-      'com/pants/protos/Foo.java',
-      'com/pants/protos/FooOrBuilder.java'
-      'com/pants/protos/FooBar.java',
-      'com/pants/protos/FooBarOrBuilder.java')
-
-    self.assert_java_files(
-      'no_newline_at_all2.proto',
-      '''
-        package com.pants.protos; message Foo { enum Bar { BAZ = 0; } } message FooBar { }
-      ''',
-      'com/pants/protos/InnerClassNoNewlineAtAll2.java')
-
-    self.assert_java_files(
-      'no_newline_at_all3.proto',
-      '''
-        package com.pants.protos; option java_package = "com.example.foo.bar"; message Foo { }
-      ''',
-      'com/example/foo/bar/InnerClassNoNewlineAtAll3.java')
-
-    self.assert_java_files(
-      'crazy_whitespace.proto',
-      '''
-        package
-           com.pants.protos; option
-               java_multiple_files
-               = true; option java_package =
-               "com.example.foo.bar"; message
-        Foo
-        {
-        enum
-        Bar {
-        BAZ = 0; } } message
-        FooBar
-        { }
-      ''',
-      'com/example/foo/bar/CrazyWhitespace.java',
-      'com/example/foo/bar/Foo.java',
-      'com/example/foo/bar/FooOrBuilder.java'
-      'com/example/foo/bar/FooBar.java',
-      'com/example/foo/bar/FooBarOrBuilder.java')
-
+          self.assertTrue(_same_contents(dup1.name, dup2.name))
