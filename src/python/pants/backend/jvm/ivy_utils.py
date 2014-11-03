@@ -175,7 +175,7 @@ class IvyUtils(object):
 
   def identify(self, targets):
     targets = list(targets)
-    if len(targets) == 1 and hasattr(targets[0], 'provides') and targets[0].provides:
+    if len(targets) == 1 and targets[0].is_jvm and getattr(targets[0], 'provides', None):
       return targets[0].provides.org, targets[0].provides.name
     else:
       return 'internal', Target.maybe_readable_identify(targets)
