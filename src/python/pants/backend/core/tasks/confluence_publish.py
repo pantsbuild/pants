@@ -54,10 +54,10 @@ class ConfluencePublish(Task):
                       "the 'confluence-publish' heading in pants.ini or using the --confluence-url "
                       "command-line option.")
 
-    self.force = self.get_options().publish_force
+    self.force = self.get_options().force
     self.open = self.get_options().open
     self._wiki = None
-    self.user = self.get_options().confluence_user
+    self.user = self.get_options().user
 
   def prepare(self, round_manager):
     round_manager.require('wiki_html')

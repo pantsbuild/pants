@@ -186,7 +186,7 @@ def page_to_html_path(page):
 class MarkdownToHtml(Task):
   @classmethod
   def register_options(cls, register):
-    register('--code-style',
+    register('--code-style', default='friendly',
              choices=list(get_all_styles()),
              help=('Selects the stylesheet to use for code highlights, '
                    'one of {0}'.format(' '.join(get_all_styles()))),
@@ -216,21 +216,12 @@ class MarkdownToHtml(Task):
     # TODO(pl): None of this should be setup in the __init__, it can interfere with unrelated
     # tasks if this Task is misconfigured.
     self._templates_dir = os.path.join('templates', 'markdown')
-    self.open = self.context.options.markdown_to_html_open
+    self.open = self.get_options().open
 
-    self.extensions = set(
-      self.context.options.markdown_to_html_extensions or
-      self.context.config.getlist('markdown-to-html',
-                                  'extensions',
-                                  default=['.md', '.markdown'])
-    )
-
-    self.fragment = self.context.options.markdown_to_html_fragment
-
-    self.code_style = self.context.config.get('markdown-to-html', 'code-style', default='friendly')
-    if hasattr(self.context.options, 'markdown_to_html_code_style'):
-      if self.context.options.markdown_to_html_code_style:
-        self.code_style = self.context.options.markdown_to_html_code_style
+    # better way to do default-is-a-list?
+    self.extensions = set(self.get_options().extension or ['.md', '.markdown'])
+    self.fragment = self.get_options().fragment
+    self.code_style = self.get_options().code_style
 
   def execute(self):
     # TODO(John Sirois): consider adding change detection
