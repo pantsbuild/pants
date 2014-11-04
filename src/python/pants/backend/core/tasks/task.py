@@ -123,6 +123,11 @@ class TaskBase(AbstractClass):
 
   @property
   def workdir(self):
+    """A scratch-space for this task that will be deleted by `clean-all`.
+
+    It's not guaranteed that the workdir exists, just that no other task has been given this
+    workdir path to use.
+    """
     return self._workdir
 
   def setup_artifact_cache_from_config(self, config_section=None):
