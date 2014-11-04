@@ -48,16 +48,16 @@ class ConfluencePublish(Task):
   def __init__(self, *args, **kwargs):
     super(ConfluencePublish, self).__init__(*args, **kwargs)
 
-    self.url = self.config_options().url
+    self.url = self.get_options().url
     if not self.url:
       raise TaskError("Unable to proceed publishing to confluence. Please configure a 'url' under "
                       "the 'confluence-publish' heading in pants.ini or using the --confluence-url "
                       "command-line option.")
 
-    self.force = self.config_options().publish_force
-    self.open = self.config_options().open
+    self.force = self.get_options().publish_force
+    self.open = self.get_options().open
     self._wiki = None
-    self.user = self.config_options().confluence_user
+    self.user = self.get_options().confluence_user
 
   def prepare(self, round_manager):
     round_manager.require('wiki_html')
