@@ -12,6 +12,7 @@ from colors import cyan, green
 from pants.base.config import Config
 
 migrations = {
+  ('confluence-publish', 'url'): ('confluence', 'url'),
   ('java-compile', 'partition_size_hint'): ('compile.java', 'partition_size_hint'),
 
   ('javadoc-gen', 'include_codegen'): ('gen.javadoc', 'include_codegen'),
