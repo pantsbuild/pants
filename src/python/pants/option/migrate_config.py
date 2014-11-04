@@ -33,6 +33,13 @@ migrations = {
 
   ('scala-compile', 'scalac-plugins'): ('compile.scala', 'plugins'),
   ('scala-compile', 'scalac-plugin-args'): ('compile.scala', 'plugin-args'),
+
+  ('markdown-to-html', 'extensions'): ('markdown', 'extensions'),
+  ('markdown-to-html', 'code-style'): ('markdown', 'code_style'),
+
+  # Note: This assumes that ConfluencePublish is registered as the only task in a
+  #       goal called 'confluence'.  Adjust if this is not the case in your pants.ini.
+  ('confluence-publish', 'url'): ('confluence', 'url'),
 }
 
 
