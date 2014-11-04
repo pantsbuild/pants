@@ -282,7 +282,18 @@ def pushdb_coordinate(jar, entry):
 
 
 def target_internal_dependencies(target):
-  return filter(lambda tgt: isinstance(tgt, Jarable), target.dependencies)
+  """Returns internal Jarable dependencies that were "directly" declared.
+
+  Directly declared deps are those that are explicitly listed in the definition of a
+  target, rather than being depended on transitively. But in order to walk through
+  aggregator targets such as `target`, `dependencies`, or `jar_library`, this recursively
+  descends the dep graph and stops at Jarable instances."""
+  for dep in target.dependencies:
+    if isinstance(dep, Jarable):
+      yield dep
+    else:
+      for childdep in target_internal_dependencies(dep):
+        yield childdep
 
 
 class JarPublish(JarTask, ScmPublish):

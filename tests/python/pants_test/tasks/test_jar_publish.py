@@ -11,6 +11,7 @@ import unittest2 as unittest
 from mock import Mock
 import pytest
 
+from pants.backend.core.targets.dependencies import Dependencies
 from pants.backend.jvm.artifact import Artifact
 from pants.backend.jvm.repository import Repository
 from pants.backend.jvm.targets.jar_library import JarLibrary
@@ -46,6 +47,7 @@ class JarPublishTest(TaskTest):
       targets={
         'jar_library': JarLibrary,
         'java_library': JavaLibrary,
+        'target': Dependencies,
       },
       objects={
         'artifact': Artifact,
@@ -54,20 +56,27 @@ class JarPublishTest(TaskTest):
       },
     )
 
-  def _prepare_for_publishing(self):
-    a = self.create_library('a', 'java_library', 'a', ['A.java'],
-                            provides="""artifact(org='com.example', name='nail', repo=internal)""")
+  def _prepare_for_publishing(self, with_alias=False):
+    targets = {}
+    targets['a'] = self.create_library('a', 'java_library', 'a', ['A.java'],
+                                       provides="""artifact(org='com.example', name='nail', repo=internal)""")
 
-    b = self.create_library('b', 'java_library', 'b', ['B.java'],
-                            provides="""artifact(org='com.example', name='shoe', repo=internal)""",
-                            dependencies=[a])
+    targets['b'] = self.create_library('b', 'java_library', 'b', ['B.java'],
+                                   provides="""artifact(org='com.example', name='shoe', repo=internal)""",
+                                   dependencies=['a'])
 
-    c = self.create_library('c', 'java_library', 'c', ['C.java'],
-                            provides="""artifact(org='com.example', name='horse', repo=internal)""",
-                            dependencies=[b])
+    if with_alias:
+      # add an alias target between c and b
+      targets['z'] = self.create_library('z', 'target', 'z', dependencies=['b'])
+      c_deps = ['z']
+    else:
+      c_deps = ['b']
 
-    targets = [a, b, c]
-    return targets
+    targets['c'] = self.create_library('c', 'java_library', 'c', ['C.java'],
+                                       provides="""artifact(org='com.example', name='horse', repo=internal)""",
+                                       dependencies=c_deps)
+
+    return targets.values()
 
   def _get_config(self):
     return """
@@ -142,29 +151,31 @@ repos: {
                         "Expected publish not to be called")
 
   def test_publish_local(self):
-    targets = self._prepare_for_publishing()
+    for with_alias in [True, False]:
+      targets = self._prepare_for_publishing(with_alias=with_alias)
 
-    with temporary_dir() as publish_dir:
-      task = self.prepare_task(args=['--test-local=%s' % publish_dir,
-                                     '--no-test-dryrun'],
-                               build_graph=self.build_graph,
-                               build_file_parser=self.build_file_parser,
-                               targets=targets)
-      self._prepare_mocks(task)
-      task.execute()
+      with temporary_dir() as publish_dir:
+        task = self.prepare_task(args=['--test-local=%s' % publish_dir,
+                                      '--no-test-dryrun'],
+                                build_graph=self.build_graph,
+                                build_file_parser=self.build_file_parser,
+                                targets=targets)
+        self._prepare_mocks(task)
+        task.execute()
 
-      #Nothing is written to the pushdb during a local publish
-      #(maybe some directories are created, but git will ignore them)
-      files = []
-      for _, _, filenames in safe_walk(self.push_db_basedir):
-        files.extend(filenames)
-      self.assertEquals(0, len(files),
-                        "Nothing should be written to the pushdb during a local publish")
+        #Nothing is written to the pushdb during a local publish
+        #(maybe some directories are created, but git will ignore them)
+        files = []
+        for _, _, filenames in safe_walk(self.push_db_basedir):
+          files.extend(filenames)
+        self.assertEquals(0, len(files),
+                          "Nothing should be written to the pushdb during a local publish")
 
-      self.assertEquals(len(targets), task.confirm_push.call_count,
-                        "Expected one call to confirm_push per artifact")
-      self.assertEquals(len(targets), task.publish.call_count,
-                        "Expected one call to publish per artifact")
+        publishable_count = len(targets) - (1 if with_alias else 0)
+        self.assertEquals(publishable_count, task.confirm_push.call_count,
+                          "Expected one call to confirm_push per artifact")
+        self.assertEquals(publishable_count, task.publish.call_count,
+                          "Expected one call to publish per artifact")
 
   def test_publish_remote(self):
     targets = self._prepare_for_publishing()
@@ -223,7 +234,6 @@ repos: {
     task.scm.push.side_effect = FailNTimes(3, Scm.RemoteException)
     with self.assertRaises(Scm.RemoteException):
       task.execute()
-
 
   def test_publish_local_only(self):
     with pytest.raises(TaskError) as exc:
