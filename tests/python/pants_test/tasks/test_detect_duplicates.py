@@ -14,11 +14,17 @@ from pants.backend.jvm.tasks.detect_duplicates import DuplicateDetector
 from pants.base.exceptions import TaskError
 from pants.util.dirutil import safe_rmtree, touch
 from pants_test.base.context_utils import create_context
-from pants_test.tasks.test_base import TaskTest
+from pants_test.task_test_base import TaskTestBase
 
 
-class DuplicateDetectorTest(TaskTest):
+class DuplicateDetectorTest(TaskTestBase):
+
+  @classmethod
+  def task_type(cls):
+    return DuplicateDetector
+
   def setUp(self):
+    super(DuplicateDetectorTest, self).setUp()
     self.base_dir = tempfile.mkdtemp()
 
     def generate_path(name):
@@ -68,17 +74,32 @@ class DuplicateDetectorTest(TaskTest):
     safe_rmtree(self.base_dir)
 
   def test_duplicate_found(self):
-    old_options = {'fail_fast': False, 'excludes': None, 'max_dups' : 10}
-    task = DuplicateDetector(create_context(old_options=old_options), workdir=None)
+    context = self.context(
+      new_options={
+          self.options_scope: { 'fail_fast': False, 'excludes': None, 'max_dups' : 10 }
+      }
+    )
+    task = self.create_task(context, workdir=None)
+    task.execute()
     self.assertTrue(task._is_conflicts(self.path_with_duplicates, binary_target=None))
 
   def test_duplicate_not_found(self):
-    old_options = {'fail_fast': False, 'excludes': None, 'max_dups' : 10}
-    task = DuplicateDetector(create_context(old_options=old_options), workdir=None)
+    context = self.context(
+      new_options={
+          self.options_scope: { 'fail_fast': False, 'excludes': None, 'max_dups' : 10 }
+      }
+    )
+    task = self.create_task(context, workdir=None)
+    task.execute()
     self.assertFalse(task._is_conflicts(self.path_without_duplicates, binary_target=None))
 
   def test_fail_fast_error_raised(self):
-    old_options = {'fail_fast': True, 'excludes': None, 'max_dups' : 10}
-    task = DuplicateDetector(create_context(old_options=old_options), workdir=None)
+    context = self.context(
+      new_options={
+          self.options_scope: { 'fail_fast': True, 'excludes': None, 'max_dups' : 10 }
+      }
+    )
+    task = self.create_task(context, workdir=None)
+    task.execute()
     with self.assertRaises(TaskError):
       task._is_conflicts(self.path_with_duplicates, binary_target=None)

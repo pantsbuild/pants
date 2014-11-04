@@ -29,30 +29,23 @@ class DuplicateDetector(JvmBinaryTask):
     return name[-1] == '/'
 
   @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    super(DuplicateDetector, cls).setup_parser(option_group, args, mkflag)
-    option_group.add_option(mkflag("fail-fast"), mkflag("fail-fast", negate=True),
-                            dest="fail_fast", default=False,
-                            action="callback", callback=mkflag.set_bool,
-                            help="[%default] Fail fast if duplicate classes/resources are found.")
-    option_group.add_option(mkflag("excludes"),
-                            dest="excludes", default=EXCLUDED_FILES,
-                            help="A comma separated list of case insensitive filenames (without "
-                                 "directory) to exclude from duplicate check, "
-                                 "defaults to: [%default]")
-    option_group.add_option(mkflag("max-dups"),
-                            dest="max_dups", default=10,
-                            help="Maximum number of duplicate classes to display per artifact"
-                                 "defaults to: [%default]")
+  def register_options(cls, register):
+    super(DuplicateDetector, cls).register_options(register)
+    register('--fail-fast', default=False, action='store_true', legacy='fail_fast',
+             help='Fail fast if duplicate classes/resources are found.')
+    register('--excludes', default=EXCLUDED_FILES, action='append', legacy='excludes',
+             help='Case insensitive filenames (without directory) to exclude from duplicate check. '
+                  'Filenames can be specified in a comma-separated list or by using multiple '
+                  'instances of this flag.')
+    register('--max-dups', type=int, default=10, legacy='max_dups',
+             help='Maximum number of duplicate classes to display per artifact.')
 
   def __init__(self, *args, **kwargs):
     super(DuplicateDetector, self).__init__(*args, **kwargs)
-    self._fail_fast = self.context.options.fail_fast
-    excludes = self.context.options.excludes
-    if not excludes:
-      excludes = EXCLUDED_FILES
+    self._fail_fast = self.get_options().fail_fast
+    excludes = self.get_options().excludes
     self._excludes = set([x.lower() for x in excludes.split(',')])
-    self._max_dups = int(self.context.options.max_dups)
+    self._max_dups = int(self.get_options().max_dups)
 
   def prepare(self, round_manager):
     round_manager.require_data('resources_by_target')
