@@ -56,72 +56,53 @@ class Depmap(ConsoleTask):
     return '{0}:{1}'.format(address.spec_path, address.target_name)
 
   @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    super(Depmap, cls).setup_parser(option_group, args, mkflag)
+  def register_options(cls, register):
+    super(Depmap, cls).register_options(register)
+    register('--internal-only', default=False, action='store_true',
+             legacy='depmap_is_internal_only',
+             help='Specifies that only internal dependencies should be included in the graph '
+                  'output (no external jars).')
+    register('--external-only', default=False, action='store_true',
+             legacy='depmap_is_external_only',
+             help='Specifies that only external dependencies should be included in the graph '
+                  'output (only external jars).')
+    register('--minimal', default=False, action='store_true',
+             legacy='depmap_is_minimal',
+             help='For a textual dependency tree, only prints a dependency the 1st '
+                  'time it is encountered.  For graph output this does nothing.')
+    register('--graph', default=False, action='store_true',
+             legacy='depmap_is_graph',
+             help='Specifies the internal dependency graph should be output in the dot digraph '
+                  'format.')
+    register('--project-info', default=False, action='store_true',
+             legacy='depmap_is_project_info',
+             help='Produces a json object with info about the target, including source roots, '
+                  'dependencies, and paths to libraries for their targets and dependencies.')
+    register('--project-info-formatted', default=True, action='store_false',
+             legacy='depmap_is_formatted',
+             help='Causes project-info output to be a single line of JSON.')
+    register('--separator', default='-',
+             legacy='depmap_separator',
+             help='Specifies the separator to use between the org/name/rev components of a '
+                  'dependency\'s fully qualified name.')
 
-    cls.internal_only_flag = mkflag("internal-only")
-    cls.external_only_flag = mkflag("external-only")
-    option_group.add_option(cls.internal_only_flag,
-                            action="store_true",
-                            dest="depmap_is_internal_only",
-                            default=False,
-                            help='Specifies that only internal dependencies should'
-                                 ' be included in the graph output (no external jars).')
-    option_group.add_option(cls.external_only_flag,
-                            action="store_true",
-                            dest="depmap_is_external_only",
-                            default=False,
-                            help='Specifies that only external dependencies should'
-                            ' be included in the graph output (only external jars).')
-    option_group.add_option(mkflag("minimal"),
-                            action="store_true",
-                            dest="depmap_is_minimal",
-                            default=False,
-                            help='For a textual dependency tree, only prints a dependency the 1st'
-                                 ' time it is encountered.  For graph output this does nothing.')
-    option_group.add_option(mkflag("separator"),
-                            dest="depmap_separator",
-                            default="-",
-                            help='Specifies the separator to use between the org/name/rev'
-                                 ' components of a dependency\'s fully qualified name.')
-    option_group.add_option(mkflag("graph"),
-                            action="store_true",
-                            dest="depmap_is_graph",
-                            default=False,
-                            help='Specifies the internal dependency graph should be'
-                                 ' output in the dot digraph format')
-    option_group.add_option(mkflag("project-info"),
-                            action="store_true",
-                            dest="depmap_is_project_info",
-                            default=False,
-                            help='Produces a json object with info about the target,'
-                                 ' including source roots, dependencies, and paths to'
-                                 ' libraries for their targets and dependencies.')
-    option_group.add_option(mkflag("project-info-formatted"),
-                            action="store_false",
-                            dest="depmap_is_formatted",
-                            default=True,
-                            help='Causes project-info output to be a single line of JSON')
 
   def __init__(self, *args, **kwargs):
     super(Depmap, self).__init__(*args, **kwargs)
     # Require information about jars
     self.context.products.require_data('ivy_jar_products')
 
-    if (self.context.options.depmap_is_internal_only
-        and self.context.options.depmap_is_external_only):
-      cls = self.__class__
-      error_str = "At most one of %s or %s can be selected." % (cls.internal_only_flag,
-                                                                      cls.external_only_flag)
-      raise TaskError(error_str)
+    self.is_internal_only = self.get_options().internal_only
+    self.is_external_only = self.get_options().external_only
 
-    self.is_internal_only = self.context.options.depmap_is_internal_only
-    self.is_external_only = self.context.options.depmap_is_external_only
-    self.is_minimal = self.context.options.depmap_is_minimal
-    self.is_graph = self.context.options.depmap_is_graph
-    self.separator = self.context.options.depmap_separator
-    self.project_info = self.context.options.depmap_is_project_info
-    self.format = self.context.options.depmap_is_formatted
+    if self.is_internal_only and self.is_external_only:
+      raise TaskError('At most one of --internal-only or --external-only can be selected.')
+
+    self.is_minimal = self.get_options().minimal
+    self.is_graph = self.get_options().graph
+    self.separator = self.get_options().separator
+    self.project_info = self.get_options().project_info
+    self.format = self.get_options().project_info_formatted
     self._ivy_utils = IvyUtils(config=self.context.config,
                                options=self.context.options,
                                log=self.context.log)
