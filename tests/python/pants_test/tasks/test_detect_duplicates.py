@@ -76,7 +76,7 @@ class DuplicateDetectorTest(TaskTestBase):
   def test_duplicate_found(self):
     context = self.context(
       new_options={
-          self.options_scope: { 'fail_fast': False, 'excludes': None, 'max_dups' : 10 }
+          self.options_scope: { 'fail_fast': False, 'excludes': [], 'max_dups' : 10 }
       }
     )
     task = self.create_task(context, workdir=None)
@@ -86,7 +86,7 @@ class DuplicateDetectorTest(TaskTestBase):
   def test_duplicate_not_found(self):
     context = self.context(
       new_options={
-          self.options_scope: { 'fail_fast': False, 'excludes': None, 'max_dups' : 10 }
+          self.options_scope: { 'fail_fast': False, 'excludes': [], 'max_dups' : 10 }
       }
     )
     task = self.create_task(context, workdir=None)
@@ -96,7 +96,7 @@ class DuplicateDetectorTest(TaskTestBase):
   def test_fail_fast_error_raised(self):
     context = self.context(
       new_options={
-          self.options_scope: { 'fail_fast': True, 'excludes': None, 'max_dups' : 10 }
+          self.options_scope: { 'fail_fast': True, 'excludes': [], 'max_dups' : 10 }
       }
     )
     task = self.create_task(context, workdir=None)

@@ -17,8 +17,8 @@ from pants.base.exceptions import TaskError
 from pants.java.jar.manifest import Manifest
 
 
-EXCLUDED_FILES = ("dependencies,license,notice,.DS_Store,notice.txt,cmdline.arg.info.txt.1,"
-                  "license.txt")
+EXCLUDED_FILES = ['dependencies,license,notice,.DS_Store,notice.txt,cmdline.arg.info.txt.1,'
+                  'license.txt']
 
 
 class DuplicateDetector(JvmBinaryTask):
@@ -44,7 +44,7 @@ class DuplicateDetector(JvmBinaryTask):
     super(DuplicateDetector, self).__init__(*args, **kwargs)
     self._fail_fast = self.get_options().fail_fast
     excludes = self.get_options().excludes
-    self._excludes = set([x.lower() for x in excludes.split(',')])
+    self._excludes = set([x.lower() for exclude in excludes for x in exclude.split(',')])
     self._max_dups = int(self.get_options().max_dups)
 
   def prepare(self, round_manager):
