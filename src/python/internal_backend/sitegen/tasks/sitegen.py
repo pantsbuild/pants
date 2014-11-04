@@ -35,11 +35,11 @@ class SiteGen(Task):
              legacy='sitegen_config_path')
 
   def execute(self):
-    if not self.context.options.sitegen_config_path:
+    if not self.get_options().config_path:
       raise TaskError('Need to pass '
                       '--sitegen-config-path=src/python/pants/docs/docsite.json'
                       ' or something.')
-    for config_path in self.context.options.sitegen_config_path:
+    for config_path in self.get_options().config_path:
       config = load_config(config_path)
       soups = load_soups(config)
       precomputed = precompute(config, soups)

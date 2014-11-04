@@ -24,6 +24,8 @@ class ConfluencePublish(Task):
   @classmethod
   def register_options(cls, register):
     super(ConfluencePublish, cls).register_options(register)
+    # TODO https://github.com/pantsbuild/pants/issues/395:
+    #      url should probably be a param of the wiki, not a config.
     register('--url',
              help='The url of the confluence site to post to.',
              legacy='confluence_publish_url')
@@ -46,20 +48,16 @@ class ConfluencePublish(Task):
   def __init__(self, *args, **kwargs):
     super(ConfluencePublish, self).__init__(*args, **kwargs)
 
-    self.url = (
-      self.context.options.confluence_publish_url
-      or self.context.config.get('confluence-publish', 'url')
-    )
-
+    self.url = self.config_options().url
     if not self.url:
       raise TaskError("Unable to proceed publishing to confluence. Please configure a 'url' under "
                       "the 'confluence-publish' heading in pants.ini or using the %s command line "
                       "option." % self.url_option)
 
-    self.force = self.context.options.confluence_publish_force
-    self.open = self.context.options.confluence_publish_open
+    self.force = self.config_options().publish_force
+    self.open = self.config_options().open
     self._wiki = None
-    self.user = self.context.options.confluence_user
+    self.user = self.config_options().confluence_user
 
   def prepare(self, round_manager):
     round_manager.require('wiki_html')
