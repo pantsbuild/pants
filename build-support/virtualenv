@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Wrapper for self-bootstrapping virtualenv
 set -e
-VIRTUALENV_VERSION=1.11.4
+VIRTUALENV_VERSION=1.11.6
 
 if [[ -z "$PY" ]]; then
   if which python2.7 >/dev/null; then
