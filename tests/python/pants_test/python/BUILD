@@ -124,7 +124,7 @@ python_binary(
     ':echo_interpreter_version_lib',
   ],
   entry_point = 'pants_test.python.echo_interpreter_version',
-  compatibility = ['CPython>=2.6,<3']
+  compatibility = ['CPython>=2.6,<2.7']
 )
 
 # Used by interpreter_selection_integration.

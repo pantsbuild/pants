@@ -54,11 +54,6 @@ target(
   ]
 )
 
-# 3.0 - 3.2 did not support unicode literals so we don't support these for now since it would
-# take some work to make the codebase compatible.
-# Additionally we force a an ascii string for python 3.3.x here.
-PANTS_COMPATIBILITY = 'CPython>=2.6,<3,>=3.3'
-
 # This binary's entry_point is used by the pantsbuild.pants sdist to setup a binary for
 # pip installers, ie: it is why this works to get `pants` on your PATH:
 # $ pip install pantsbuild.pants
@@ -74,7 +69,6 @@ python_binary(
     'linux-x86_64',
     'macosx-10.4-x86_64',
   ],
-  compatibility=PANTS_COMPATIBILITY,
   dependencies = [
     ':pants_binary_deps',
   ],
@@ -85,7 +79,6 @@ python_binary(
 python_binary(
   name = 'pants_local_binary',
   entry_point = 'pants.bin.pants_exe:main',
-  compatibility=PANTS_COMPATIBILITY,
   dependencies = [
     ':pants_binary_deps',
     'src/python/internal_backend:plugins',
