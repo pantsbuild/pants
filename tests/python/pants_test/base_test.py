@@ -101,6 +101,7 @@ class BaseTest(unittest.TestCase):
     Goal.clear()
     self.real_build_root = BuildRoot().path
     self.build_root = os.path.realpath(mkdtemp(suffix='_BUILD_ROOT'))
+    self.new_options = defaultdict(dict)  # scope -> key-value mapping.
     BuildRoot().path = self.build_root
 
     self.create_file('pants.ini')
@@ -123,6 +124,9 @@ class BaseTest(unittest.TestCase):
 
   def create_options(self, **kwargs):
     return dict(**kwargs)
+
+  def set_new_options_for_scope(self, scope, **kwargs):
+    self.new_options[scope].update(kwargs)
 
   def context(self, for_task_types=None, config='', options=None, new_options=None,
               target_roots=None, **kwargs):
@@ -152,7 +156,13 @@ class BaseTest(unittest.TestCase):
       task_type.register_options(register)
 
     # Now override with any caller-specified values.
+
+    # TODO(benjy): Get rid of the new_options arg, and require tests to call set_new_options.
     for scope, opts in new_options.items():
+      for key, val in opts.items():
+        new_option_values[scope][key] = val
+
+    for scope, opts in self.new_options.items():
       for key, val in opts.items():
         new_option_values[scope][key] = val
 

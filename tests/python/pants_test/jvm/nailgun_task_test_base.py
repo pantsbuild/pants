@@ -12,6 +12,9 @@ from .jvm_tool_task_test_base import JvmToolTaskTestBase
 
 class NailgunTaskTestBase(JvmToolTaskTestBase):
   """Prepares an ephemeral test build root that supports nailgun tasks."""
+  def setUp(self):
+    super(NailgunTaskTestBase, self).setUp()
+    self.set_new_options(ng_daemons=True)
 
   def create_options(self, **kwargs):
     options = dict(nailgun_daemon=True)

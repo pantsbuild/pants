@@ -176,10 +176,10 @@ class TaskBase(AbstractClass):
       return self._artifact_cache
 
   def artifact_cache_reads_enabled(self):
-    return bool(self._read_artifact_cache_spec) and self.context.options.read_from_artifact_cache
+    return bool(self._read_artifact_cache_spec) and self.get_options().read_from_artifact_cache
 
   def artifact_cache_writes_enabled(self):
-    return bool(self._write_artifact_cache_spec) and self.context.options.write_to_artifact_cache
+    return bool(self._write_artifact_cache_spec) and self.get_options().write_to_artifact_cache
 
   @classmethod
   def product_types(self):

@@ -41,11 +41,12 @@ class ZincUtils(object):
 
   _ZINC_MAIN = 'com.typesafe.zinc.Main'
 
-  def __init__(self, context, nailgun_task, jvm_options, color):
+  def __init__(self, context, nailgun_task, jvm_options, color=True, log_level='info'):
     self.context = context
     self._nailgun_task = nailgun_task  # We run zinc on this task's behalf.
     self._jvm_options = jvm_options
     self._color = color
+    self._log_level = log_level
     self._jvm_tool_bootstrapper = JvmToolBootstrapper(self.context.products)
 
     # The target scala version.
@@ -119,7 +120,7 @@ class ZincUtils(object):
 
   def _run_zinc(self, args, workunit_name='zinc', workunit_labels=None):
     zinc_args = [
-      '-log-level', self.context.options.log_level or 'info',
+      '-log-level', self._log_level,
     ]
     if not self._color:
       zinc_args.append('-no-color')

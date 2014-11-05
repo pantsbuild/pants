@@ -47,13 +47,10 @@ class JarCreate(JarTask):
   """Jars jvm libraries and optionally their sources and their docs."""
 
   @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    super(JarCreate, cls).setup_parser(option_group, args, mkflag)
-
-    option_group.add_option(mkflag('compressed'), mkflag('compressed', negate=True),
-                            dest='jar_create_compressed', default=True,
-                            action='callback', callback=mkflag.set_bool,
-                            help='[%default] Create compressed jars.')
+  def register_options(cls, register):
+    super(JarCreate, cls).register_options(register)
+    register('--compressed', default=True, action='store_true', legacy='jar_create_compressed',
+             help='Create compressed jars.')
 
   @classmethod
   def product_types(cls):
@@ -62,7 +59,7 @@ class JarCreate(JarTask):
   def __init__(self, *args, **kwargs):
     super(JarCreate, self).__init__(*args, **kwargs)
 
-    self.compressed = self.context.options.jar_create_compressed
+    self.compressed = self.get_options().compressed
     self._jar_builder = self.prepare_jar_builder()
     self._jars = {}
 

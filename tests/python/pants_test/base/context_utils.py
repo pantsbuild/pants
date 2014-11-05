@@ -19,7 +19,7 @@ from pants.reporting.report import Report
 from pants.util.dirutil import safe_mkdtemp
 
 
-def create_new_options(new_options=None):
+def create_new_options(new_options):
   """Create a fake new-style options object for testing.
 
   Note that the returned object only provides access to the provided options values. There is
@@ -105,5 +105,5 @@ def create_context(config='', old_options=None, new_options=None, target_roots=N
   config = config if isinstance(config, Config) else create_config(config)
   run_tracker = create_run_tracker()
   target_roots = maybe_list(target_roots, Target) if target_roots else []
-  return Context(config, create_options(old_options or {}), create_new_options(new_options),
+  return Context(config, create_options(old_options or {}), create_new_options(new_options or {}),
                  run_tracker, target_roots, **kwargs)

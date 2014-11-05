@@ -36,6 +36,9 @@ class TaskTestBase(BaseTest):
     self._testing_task_type = type(subclass_name, (self.task_type(),),
                                    {'options_scope': self.options_scope})
 
+  def set_new_options(self, **kwargs):
+    self.set_new_options_for_scope(self.options_scope, **kwargs)
+
   def context(self, config='', options=None, new_options=None, target_roots=None, **kwargs):
     # Add in our task type.
     return super(TaskTestBase, self).context(for_task_types=[self._testing_task_type],
