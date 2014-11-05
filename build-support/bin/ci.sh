@@ -26,6 +26,8 @@ function usage() {
   echo " -d           if running jvm tests, don't use nailgun daemons"
   echo " -p           skip core python tests"
   echo " -c           skip pants integration tests"
+  echo " -i N:X       if running integration tests, only run every Nth starting at X"
+  echo "              to run only even tests: '-i 2:0', odd: '-i 2:1'"
   echo " -e           skip example tests"
   echo " -a           skip android targets when running tests"
   echo " -t           skip testprojects tests"
@@ -38,7 +40,7 @@ function usage() {
 
 daemons="--ng-daemons"
 
-while getopts "hbsrdpceat" opt; do
+while getopts "hbsrdpci:eat" opt; do
   case ${opt} in
     h) usage ;;
     b) skip_bootstrap="true" ;;
@@ -47,6 +49,13 @@ while getopts "hbsrdpceat" opt; do
     d) daemons="--no-ng-daemons" ;;
     p) skip_python="true" ;;
     c) skip_integration="true" ;;
+    i)
+      if [[ "valid" != "$(echo ${OPTARG} | tr -s '0-9' '#' | sed 's|#:#|valid|')" ]]; then
+        usage "Invalid shard specification '${OPTARG}'"
+      fi
+      N=${OPTARG%%:*}
+      X=${OPTARG##*:}
+      ;;
     e) skip_examples="true" ;;
     a) skip_android="true" ;;
     t) skip_testprojects="true" ;;
@@ -185,11 +194,15 @@ fi
 
 
 if [[ "${skip_integration:-false}" == "false" ]]; then
-  banner "Running Pants Integration tests"
+  if [[ ! -z "${N}" ]]; then
+    shard_desc=" [shard $((X+1)) of ${N}]"
+  fi
+  banner "Running Pants Integration tests${shard_desc}"
   (
     PANTS_PYTHON_TEST_FAILSOFT=1 \
       ./pants.pex goal test ${PANTS_ARGS[@]} \
-        $(./pants.pex goal list tests/python:: | grep integration)
+        $(./pants.pex goal list tests/python:: | grep integration | \
+            sed -n "${X:-0}~${N:-1}p")
   ) || die "Pants Integration test failure"
 fi
 

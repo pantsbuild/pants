@@ -88,7 +88,7 @@ python_test_suite(
     ':protobuf_integration',
     ':scala_repl_integration',
     ':thrift_linter_integration',
-    'tests/python/pants_test/tasks/jvm_compile/java',
+    'tests/python/pants_test/tasks/jvm_compile/java:integration',
   ],
 )
 
