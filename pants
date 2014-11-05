@@ -72,12 +72,12 @@ PANTS_SRCPATH="$(echo ${PANTS_SRCPATH[@]} | tr ' ' :)"
 
 function run_pants_bare() {
   activate_pants_venv
-  PYTHONPATH="${PANTS_SRCPATH}" ${PY} ${PANTS_EXE} "$@"
+  PYTHONPATH="${PANTS_SRCPATH}:${PYTHONPATH}" python ${PANTS_EXE} "$@"
 }
 
 function exec_pants_bare() {
   activate_pants_venv
-  PYTHONPATH="${PANTS_SRCPATH}:${PYTHONPATH}" exec ${PY} ${PANTS_EXE} "$@"
+  PYTHONPATH="${PANTS_SRCPATH}:${PYTHONPATH}" exec python ${PANTS_EXE} "$@"
 }
 
 if [ ! -z "${PANTS_DEV}" ]; then
