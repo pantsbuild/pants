@@ -11,15 +11,7 @@ import os
 import sys
 import traceback
 
-try:
-  import psutil
-except ImportError:
-  print('!!! failed to import psutil with sys.path:\n\t{0}'.format('\n\t'.join(sys.path)))
-  for path in sys.path:
-    if os.path.isdir(path):
-      print('sys.path element {0} contains:\n\t{1}'.format(path, '\n\t'.join(os.listdir(path))))
-  raise
-
+import psutil
 from twitter.common.dirutil import Lock
 
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
