@@ -67,8 +67,7 @@ banner "CI BEGINS"
 # TODO(John sirois): Re-plumb build such that it grabs constraints from the built python_binary
 # target(s).
 INTERPRETER_CONSTRAINTS=(
-  "CPython>=2.6,<3"
-  "CPython>=3.3"
+  "CPython>=2.7,<3"
 )
 for constraint in ${INTERPRETER_CONSTRAINTS[@]}; do
   INTERPRETER_ARGS=(
