@@ -28,7 +28,7 @@ class JvmRun(JvmTask):
 
   def __init__(self, *args, **kwargs):
     super(JvmRun, self).__init__(*args, **kwargs)
-    self.only_write_cmd_line = self.context.options.only_write_cmd_line
+    self.only_write_cmd_line = self.get_options().only_write_cmd_line
 
   def prepare(self, round_manager):
     # TODO(John Sirois): these are fake requirements in order to force compile run before this

@@ -118,8 +118,8 @@ python_tests(
   name = 'binary_create',
   sources = ['test_binary_create.py'],
   dependencies = [
-    ':base',
     'src/python/pants/backend/jvm/tasks:binary_create',
+    'tests/python/pants_test:task_test_base',
   ]
 )
 

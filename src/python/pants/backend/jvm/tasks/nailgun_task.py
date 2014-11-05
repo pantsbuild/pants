@@ -62,7 +62,7 @@ class NailgunTaskBase(TaskBase, JvmToolTaskMixin):
 
     Call only in execute() or later. TODO: Enforce this.
     """
-    if self.nailgun_is_enabled and self.context.options.nailgun_daemon:
+    if self.nailgun_is_enabled and self.get_options().ng_daemons:
       classpath = os.pathsep.join(self.tool_classpath(self._nailgun_bootstrap_key))
       client = NailgunExecutor(self._executor_workdir, classpath, distribution=self._dist)
     else:

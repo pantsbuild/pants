@@ -56,7 +56,7 @@ class TargetsHelp(ConsoleTask):
     return compact_render.splitlines()
 
   def console_output(self, targets):
-    if self.context.options.goal_targets_details:
-      return self.details(self.context.options.goal_targets_details)
+    if self.get_options().details:
+      return self.details(self.get_options().details)
     else:
       return self.list_all()

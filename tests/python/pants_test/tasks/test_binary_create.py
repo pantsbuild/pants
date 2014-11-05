@@ -5,10 +5,8 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-import unittest2 as unittest
-
 from pants.backend.jvm.tasks.binary_create import BinaryCreate
-from pants_test.base.context_utils import create_context
+from pants_test.task_test_base import TaskTestBase
 
 
 sample_ini_test_1 = """
@@ -17,9 +15,10 @@ pants_distdir = /tmp/dist
 """
 
 
-class BinaryCreateTest(unittest.TestCase):
+class BinaryCreateTest(TaskTestBase):
+  def task_type(cls):
+    return BinaryCreate
 
   def test_binary_create_init(self):
-    binary_create = BinaryCreate(create_context(config=sample_ini_test_1),
-                                 '/tmp/workdir')
+    binary_create = self.create_task(self.context(config=sample_ini_test_1), '/tmp/workdir')
     self.assertEquals(binary_create._outdir, '/tmp/dist')

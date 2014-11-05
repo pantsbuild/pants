@@ -13,7 +13,6 @@ from zipfile import ZipFile
 from pants.backend.jvm.tasks.detect_duplicates import DuplicateDetector
 from pants.base.exceptions import TaskError
 from pants.util.dirutil import safe_rmtree, touch
-from pants_test.base.context_utils import create_context
 from pants_test.task_test_base import TaskTestBase
 
 

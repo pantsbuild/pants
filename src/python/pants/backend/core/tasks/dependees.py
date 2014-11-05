@@ -39,9 +39,9 @@ class ReverseDepmap(ConsoleTask):
   def __init__(self, *args, **kwargs):
     super(ReverseDepmap, self).__init__(*args, **kwargs)
 
-    self._transitive = self.context.options.reverse_depmap_transitive
-    self._closed = self.context.options.reverse_depmap_closed
-    self._dependees_type = self.context.options.dependees_type
+    self._transitive = self.get_options().transitive
+    self._closed = self.get_options().closed
+    self._dependees_type = self.get_options().type
 
   def console_output(self, _):
     buildfiles = OrderedSet()

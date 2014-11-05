@@ -35,11 +35,9 @@ class SiteGen(Task):
              legacy='sitegen_config_path')
 
   def execute(self):
-    if not self.context.options.sitegen_config_path:
-      raise TaskError('Need to pass '
-                      '--sitegen-config-path=src/python/pants/docs/docsite.json'
-                      ' or something.')
-    for config_path in self.context.options.sitegen_config_path:
+    if not self.get_options().config_path:
+      raise TaskError('The config_path option must be specified, e.g., with the --config-path flag')
+    for config_path in self.get_options().config_path:
       config = load_config(config_path)
       soups = load_soups(config)
       precomputed = precompute(config, soups)
@@ -82,13 +80,13 @@ class Precomputed(object):
 class PrecomputedPageInfo(object):
   """Info we compute (and preserve) for each page before we mutate things."""
 
-  def __init__(self, title, toc=[]):
+  def __init__(self, title, toc=None):
     """
     :param title: Page title
     :param toc: Page table of contents
     """
     self.title = title
-    self.toc = toc
+    self.toc = toc or []
 
 
 def precompute_xrefs(soups):
@@ -294,6 +292,7 @@ def generate_breadcrumbs(config, precomputed, here):
   """return template data for breadcrumbs"""
   breadcrumb_pages = []
   def recurse(tree, pages_so_far):
+    pages_so_far_next = []
     for node in tree:
       if 'page' in node:
         pages_so_far_next = pages_so_far + [node['page']]
