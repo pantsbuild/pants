@@ -91,10 +91,8 @@ code shows the BUILD file for a simple Java binary (in the ``main/`` directory):
    :start-after: runnable
    :end-before: README page
 
-This small program has just two dependencies. One is a library, a
+This small program has just one dependency. It is a library, a
 ``java_library``, a compiled set of source code from this workspace.
-The other is a "third party" dependency, a pre-compiled artifact
-whose source lives somewhere outside the workspace.
 
 Depending on a Library
 ======================
@@ -126,7 +124,9 @@ need a target for them:
    :start-after: Test the
 
 As with other targets, this one depends on code that it imports. Thus, a typical
-test target depends on the library that it tests.
+test target depends on both the library that it tests and the test framework it uses.
+The dependency on junit is a “third party” dependency, a pre-compiled artifact whose source
+lives somewhere outside the workspace.
 
 Depending on a Jar
 ==================
@@ -290,34 +290,34 @@ The generated bundle is basically a directory tree containing ``.jar``\s and
 extra files. The ``.jar`` in the top-level directory has a manifest
 so you can run it with ``java -jar``::
 
-    $ cd dist/main-bundle/
-    $ java -jar main-bin.jar
+    $ cd dist/hello-example-bundle/
+    $ java -jar hello-example.jar
     16:52:11 INFO : Hello, world!
 
 The "bundle" is basically a tree of files::
 
-    $ cd dist/main-bundle/
+    $ cd dist/hello-example-bundle/
     $ find .
     .
+    ./greetee.txt
+    ./hello-example.jar
     ./libs
-    ./libs/javax.activation-activation-1.1.jar
-    ./libs/javax.mail-mail-1.4.jar
-    ./libs/log4j-log4j-1.2.15.jar
-    ./log4j.properties
-    ./main-bin.jar
-    $ jar -tf main-bin.jar
+    $ jar -tf hello-example.jar
+    META-INF/
+    META-INF/MANIFEST.MF
     com/
     com/pants/
     com/pants/examples/
     com/pants/examples/hello/
-    com/pants/examples/hello/greet/
-    com/pants/examples/hello/greet/Greeting.class
     com/pants/examples/hello/main/
     com/pants/examples/hello/main/HelloMain.class
-    META-INF/
-    META-INF/MANIFEST.MF
+    com/pants/example/
+    com/pants/example/hello/
+    com/pants/example/hello/world.txt
+    com/pants/examples/hello/greet/
+    com/pants/examples/hello/greet/Greeting.class
 
-That ``log4j.properties`` file came from the ``bundles=`` parameter.
+That ``greetee.txt`` file came from the ``bundles=`` parameter.
 The ``libs/`` directory contains 3rdparty jars.
 The jar in the top directory contains code compiled for this target.
 
