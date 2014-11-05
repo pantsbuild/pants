@@ -21,6 +21,7 @@ from pants.base.config import Config
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import Work
 from pants.base.workunit import WorkUnit
+from pants.cache.artifact_cache import call_insert, call_use_cached_files
 from pants.cache.cache_setup import create_artifact_cache
 from pants.cache.read_write_artifact_cache import ReadWriteArtifactCache
 from pants.reporting.reporting_utils import items_to_report_element
@@ -345,10 +346,11 @@ class TaskBase(AbstractClass):
     cached_vts = []
     uncached_vts = OrderedSet(vts)
 
-    with self.context.new_workunit(name='check', labels=[WorkUnit.MULTITOOL]) as parent:
-      res = self.context.submit_foreground_work_and_wait(
-        Work(lambda vt: bool(self.get_artifact_cache().use_cached_files(vt.cache_key)),
-             [(vt, ) for vt in vts], 'fetch'), workunit_parent=parent)
+    cache = self.get_artifact_cache()
+    items = [(cache, vt.cache_key) for vt in vts]
+
+    res = self.context.subproc_map(call_use_cached_files, items)
+
     for vt, was_in_cache in zip(vts, res):
       if was_in_cache:
         cached_vts.append(vt)
@@ -395,8 +397,11 @@ class TaskBase(AbstractClass):
       # Cache the artifacts.
       args_tuples = []
       for vts, artifactfiles in vts_artifactfiles_pairs:
-        args_tuples.append((vts.cache_key, artifactfiles))
-      return Work(lambda *args: cache.insert(*args), args_tuples, 'insert')
+        args_tuples.append((cache, vts.cache_key, artifactfiles))
+
+      def bg_insert(cache, key, files):
+        self.context.exec_on_subproc(call_insert, (cache, key, files))
+      return Work(bg_insert, args_tuples, 'insert')
     else:
       return None
 

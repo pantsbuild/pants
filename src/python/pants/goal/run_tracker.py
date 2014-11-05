@@ -18,7 +18,7 @@ import httplib
 
 from pants.base.config import Config
 from pants.base.run_info import RunInfo
-from pants.base.worker_pool import WorkerPool
+from pants.base.worker_pool import SubprocPool, WorkerPool
 from pants.base.workunit import WorkUnit
 from pants.goal.aggregated_timings import AggregatedTimings
 from pants.goal.artifact_cache_stats import ArtifactCacheStats
@@ -124,6 +124,10 @@ class RunTracker(object):
     # For background work.  Created lazily if needed.
     self._background_worker_pool = None
     self._background_root_workunit = None
+
+    # Trigger subproc pool init while our memory image is still clean (see SubprocPool docstring)
+    SubprocPool.foreground()
+    SubprocPool.background()
 
     self._aborted = False
 
@@ -251,6 +255,7 @@ class RunTracker(object):
 
     Note: If end() has been called once, subsequent calls are no-ops.
     """
+
     if self._background_worker_pool:
       if self._aborted:
         self.log(Report.INFO, "Aborting background workers.")
@@ -268,6 +273,8 @@ class RunTracker(object):
       else:
         self.log(Report.INFO, "Waiting for foreground workers to finish.")
         self._foreground_worker_pool.shutdown()
+
+    SubprocPool.shutdown(self._aborted)
 
     self.report.end_workunit(self._main_root_workunit)
     self._main_root_workunit.end()

@@ -13,6 +13,7 @@ import unittest2 as unittest
 from threading import Thread
 
 from pants.base.build_invalidator import CacheKey
+from pants.cache.artifact_cache import call_use_cached_files, call_insert
 from pants.cache.cache_setup import (create_artifact_cache, select_best_url, EmptyCacheSpecError,
                                      LocalCacheSpecRequiredError, CacheSpecFormatError,
                                      InvalidCacheSpecError, RemoteCacheSpecRequiredError)
@@ -21,6 +22,7 @@ from pants.cache.restful_artifact_cache import InvalidRESTfulCacheProtoError, RE
 from pants.util.contextutil import pushd, temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir
 from pants_test.testutils.mock_logger import MockLogger
+from pants_test.base.context_utils import create_context
 
 class MockPinger(object):
   def __init__(self, hosts_to_times):
@@ -227,3 +229,19 @@ class TestArtifactCache(unittest.TestCase):
           self.assertTrue(bool(combined.use_cached_files(key)))
           self.assertTrue(local.has(key))
           self.assertTrue(bool(local.use_cached_files(key)))
+
+  def test_multiproc(self):
+    context = create_context()
+    key = CacheKey('muppet_key', 'fake_hash', 42)
+
+    with self.setup_local_cache() as cache:
+      self.assertEquals(context.subproc_map(call_use_cached_files, [(cache, key)]), [False])
+      with self.setup_test_file(cache.artifact_root) as path:
+        context.exec_on_subproc(call_insert, (cache, key, [path]))
+      self.assertEquals(context.subproc_map(call_use_cached_files, [(cache, key)]), [True])
+
+    with self.setup_rest_cache() as cache:
+      self.assertEquals(context.subproc_map(call_use_cached_files, [(cache, key)]), [False])
+      with self.setup_test_file(cache.artifact_root) as path:
+        context.exec_on_subproc(call_insert, (cache, key, [path]))
+      self.assertEquals(context.subproc_map(call_use_cached_files, [(cache, key)]), [True])
