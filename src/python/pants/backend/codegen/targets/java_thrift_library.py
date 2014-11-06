@@ -6,7 +6,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 from pants.backend.jvm.targets.jvm_target import JvmTarget
-from pants.base.config import Config
 from pants.base.exceptions import TargetDefinitionException
 
 
@@ -19,8 +18,8 @@ class JavaThriftLibrary(JvmTarget):
       if not isinstance(target, JavaThriftLibrary):
         raise ValueError('Expected a JavaThriftLibrary, got: %s of type %s' % (target, type(target)))
 
-    def __init__(self, config=None):
-      self._config = config or Config.load()
+    def __init__(self, config):
+      self._config = config
 
     def _get_default(self, key, fallback):
       return self._config.get('java-thrift-library', key, default=fallback)

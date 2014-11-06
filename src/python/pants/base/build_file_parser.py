@@ -52,9 +52,10 @@ class BuildFileParser(object):
   class ExecuteError(BuildFileParserError):
     """An exception was encountered executing code in the BUILD file"""
 
-  def __init__(self, build_configuration, root_dir, run_tracker=None):
+  def __init__(self, build_configuration, root_dir, config, run_tracker=None):
     self._build_configuration = build_configuration
     self._root_dir = root_dir
+    self._config = config
     self.run_tracker = run_tracker
 
   def registered_aliases(self):
@@ -141,7 +142,7 @@ class BuildFileParser(object):
                               .format(error_type=e.__class__.__name__,
                                       message=e, build_file=build_file))
 
-    parse_state = self._build_configuration.initialize_parse_state(build_file)
+    parse_state = self._build_configuration.initialize_parse_state(build_file, self._config)
     try:
       Compatibility.exec_function(build_file_code, parse_state.parse_globals)
     except Exception as e:

@@ -9,9 +9,10 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 class ParseContext(object):
   """The build file context that context aware objects operate against."""
 
-  def __init__(self, rel_path, type_aliases):
+  def __init__(self, rel_path, type_aliases, config):
     self._rel_path = rel_path
     self._type_aliases = type_aliases
+    self.config = config
 
   def create_object(self, alias, *args, **kwargs):
     """Constructs the type with the given alias using the given args and kwargs."""

@@ -81,7 +81,7 @@ class SpecsRun(JvmTask, JvmToolTaskMixin):
       if self.tests:
         run_tests(self.tests)
       else:
-        with safe_args(self.calculate_tests(targets)) as tests:
+        with safe_args(self.context.config, self.calculate_tests(targets)) as tests:
           if tests:
             run_tests(tests)
 

@@ -13,8 +13,6 @@ import posixpath
 from twitter.common import log
 from twitter.common.collections import OrderedSet
 from twitter.common.lang import Compatibility
-
-from pants.base.config import Config
 from pants.base.exceptions import TaskError
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import chmod_plus_x, safe_delete, safe_open
@@ -60,12 +58,13 @@ class BinaryUtil(object):
   class NoBaseUrlsError(TaskError):
     """Indicates that no urls were specified in pants.ini."""
 
-  def __init__(self, bootstrap_dir=None, baseurls=None, timeout=None, config=None,
+  def __init__(self, config, bootstrap_dir=None, baseurls=None, timeout=None,
                binary_base_path_strategy=None):
     """Creates a BinaryUtil with the given settings to define binary lookup behavior.
 
     Relevant settings may either be specified in the arguments, or will be loaded from the given
     config file.
+    :param config: Config object to lookup parameters which are left unspecified as None.
     :param bootstrap_dir: Directory search for binaries in, or download binaries to if needed.
       Defaults to the value of 'pants_bootstrapdir' in config if unspecified.
     :param baseurls: List of url prefixes which represent repositories of binaries. Defaults to the
@@ -73,15 +72,13 @@ class BinaryUtil(object):
     :param timeout: Timeout in seconds for url reads. Defaults to the value of
       'pants_support_fetch_timeout_secs' in config if unspecified, or 30 seconds if that value isn't
       found in config.
-    :param config: Config object to lookup parameters which are left unspecified as None. If config
-      is left unspecified, it defaults to pants.ini via Config.load().
     :param binary_base_path_strategy: Optional function to override default select_binary_base_path
       behavior. Takes in parameters (base_path, version, name) and returns a relative path to a
       binary. This relative path is used both for appending to the baseurl to determine the full url
       to the binary, and as the path to the subfolder the binary is stored in under the bootstrap_dir.
     """
-    if bootstrap_dir is None or baseurls is None or timeout is None:
-      config = config or Config.load()
+    if config is None:
+      raise ValueError("config must not be None")
     if bootstrap_dir is None:
       bootstrap_dir = config.getdefault('pants_bootstrapdir')
     if baseurls is None:
@@ -94,6 +91,7 @@ class BinaryUtil(object):
     self._timeout = timeout
     self._baseurls = baseurls
     self._binary_base_path_strategy = binary_base_path_strategy
+    self._config = config
 
   def select_binary_base_path(self, base_path, version, name):
     """Base path used to select the binary file, exposed for associated unit tests."""
@@ -173,9 +171,10 @@ class BinaryUtil(object):
 
 
 @contextmanager
-def safe_args(args,
+def safe_args(
+              config,
+              args,
               max_args=None,
-              config=None,
               argfile=None,
               delimiter='\n',
               quoter=None,
@@ -183,12 +182,12 @@ def safe_args(args,
   """Yields args if there are less than a limit otherwise writes args to an argfile and yields an
   argument list with one argument formed from the path of the argfile.
 
+  :param config: Used to lookup the configured maximum number of args that can be passed to a
+    subprocess; looks for key 'max_subprocess_args' in the
+    DEFAULTS.
   :param args: The args to work with.
   :param max_args: The maximum number of args to let though without writing an argfile.  If not
     specified then the maximum will be loaded from config.
-  :param config: Used to lookup the configured maximum number of args that can be passed to a
-    subprocess; defaults to the default config and looks for key 'max_subprocess_args' in the
-    DEFAULTS.
   :param argfile: The file to write args to when there are too many; defaults to a temporary file.
   :param delimiter: The delimiter to insert between args written to the argfile, defaults to '\n'
   :param quoter: A function that can take the argfile path and return a single argument value;
@@ -196,7 +195,7 @@ def safe_args(args,
   :param delete: If True deletes any arg files created upon exit from this context; defaults to
     True.
   """
-  max_args = max_args or (config or Config.load()).getdefault('max_subprocess_args', int, 100)
+  max_args = max_args or config.getdefault('max_subprocess_args', int, 100)
   if len(args) > max_args:
     def create_argfile(fp):
       fp.write(delimiter.join(args))

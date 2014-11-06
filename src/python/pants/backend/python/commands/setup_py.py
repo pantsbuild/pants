@@ -25,7 +25,6 @@ from pants.backend.python.targets.python_requirement_library import PythonRequir
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.thrift_builder import PythonThriftBuilder
 from pants.base.build_environment import get_buildroot
-from pants.base.config import Config
 from pants.base.exceptions import TargetDefinitionException
 from pants.commands.command import Command
 from pants.util.dirutil import safe_rmtree, safe_walk
@@ -163,8 +162,7 @@ class SetupPy(Command):
     return False
 
   @classmethod
-  def iter_generated_sources(cls, target, root, config=None):
-    config = config or Config.load()
+  def iter_generated_sources(cls, target, root, config):
     # This is sort of facepalmy -- python.new will make this much better.
     for target_type, target_builder in cls.GENERATED_TARGETS.items():
       if isinstance(target, target_type):
@@ -266,7 +264,6 @@ class SetupPy(Command):
     if not self.args:
       self.error("A spec argument is required")
 
-    self._config = Config.load()
     self._root = self.root_dir
 
     self.build_graph.inject_spec_closure(self.args[0])
@@ -298,7 +295,7 @@ class SetupPy(Command):
 
     def write_target(target):
       if isinstance(target, tuple(self.GENERATED_TARGETS.keys())):
-        for relpath, abspath in self.iter_generated_sources(target, self._root, self._config):
+        for relpath, abspath in self.iter_generated_sources(target, self._root, self.config):
           write_codegen_source(relpath, abspath)
       else:
         sources_and_resources = (list(target.payload.sources.relative_to_buildroot()) +
@@ -385,7 +382,7 @@ class SetupPy(Command):
     chroot.write('include *.py'.encode('utf8'), 'MANIFEST.in')
 
   def run_one(self, target):
-    dist_dir = self._config.getdefault('pants_distdir')
+    dist_dir = self.config.getdefault('pants_distdir')
     chroot = Chroot(dist_dir, name=target.provides.name)
     self.write_contents(target, chroot)
     self.write_setup(target, chroot)

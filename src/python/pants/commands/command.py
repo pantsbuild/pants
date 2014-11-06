@@ -6,7 +6,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 from pants.base.build_file import BuildFile
-from pants.base.config import Config
 from pants.base.workunit import WorkUnit
 
 
@@ -41,7 +40,8 @@ class Command(object):
                args,
                build_file_parser,
                address_mapper,
-               build_graph):
+               build_graph,
+               config):
     """run_tracker: The (already opened) RunTracker to track this run with
     root_dir: The root directory of the pants workspace
     parser: an OptionParser
@@ -51,12 +51,11 @@ class Command(object):
     self.build_file_parser = build_file_parser
     self.address_mapper = address_mapper
     self.build_graph = build_graph
-
-    config = Config.load()
+    self.config = config
 
     with self.run_tracker.new_workunit(name='bootstrap', labels=[WorkUnit.SETUP]):
       # construct base parameters to be filled in for BuildGraph
-      for path in config.getlist('goals', 'bootstrap_buildfiles', default=[]):
+      for path in self.config.getlist('goals', 'bootstrap_buildfiles', default=[]):
         build_file = BuildFile.from_cache(root_dir=self.root_dir, relpath=path)
         # TODO(pl): This is an unfortunate interface leak, but I don't think
         # in the long run that we should be relying on "bootstrap" BUILD files

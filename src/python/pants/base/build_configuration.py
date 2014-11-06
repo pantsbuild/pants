@@ -124,7 +124,7 @@ class BuildConfiguration(object):
       raise TypeError('The given context aware object factory {factory} must be a callable.'
                       .format(factory=context_aware_object_factory))
 
-  def initialize_parse_state(self, build_file):
+  def initialize_parse_state(self, build_file, config):
     """Creates a fresh parse state for the given build file."""
     type_aliases = self._exposed_objects.copy()
 
@@ -138,7 +138,8 @@ class BuildConfiguration(object):
                                          registration_callback=registration_callback)
       type_aliases[alias] = call_proxy
 
-    parse_context = ParseContext(rel_path=build_file.spec_path, type_aliases=type_aliases)
+    parse_context = ParseContext(rel_path=build_file.spec_path, type_aliases=type_aliases,
+                                 config=config)
 
     parse_globals = type_aliases.copy()
 

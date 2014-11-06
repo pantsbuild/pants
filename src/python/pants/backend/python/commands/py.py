@@ -15,7 +15,6 @@ from pex.pex_builder import PEXBuilder
 
 from pants.base.address import BuildFileAddress, parse_spec
 from pants.base.build_file import BuildFile
-from pants.base.config import Config
 from pants.base.target import Target
 from pants.commands.command import Command
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
@@ -34,7 +33,7 @@ class Py(Command):
                      '  %prog py (options) [spec] args\n')
     parser.disable_interspersed_args()
     parser.add_option('-t', '--timeout', dest='conn_timeout', type='int',
-                      default=Config.load().getdefault('connection_timeout'),
+                      default=self.config.getdefault('connection_timeout'),
                       help='Number of seconds to wait for http connections.')
     parser.add_option('--pex', dest='pex', default=False, action='store_true',
                       help='Dump a .pex of this chroot instead of attempting to execute it.')
@@ -59,7 +58,6 @@ class Py(Command):
     self.binary = None
     self.targets = []
     self.extra_requirements = []
-    self.config = Config.load()
 
     interpreters = self.old_options.interpreters or [b'']
     self.interpreter_cache = PythonInterpreterCache(self.config, logger=self.debug)
@@ -152,6 +150,7 @@ class Py(Command):
 
     executor = PythonChroot(
         targets=self.targets,
+        config=self.config,
         extra_requirements=self.extra_requirements,
         builder=builder,
         platforms=self.binary.platforms if self.binary else None,

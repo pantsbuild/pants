@@ -12,6 +12,7 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.base.build_file_aliases import BuildFileAliases
+from pants.base.build_graph import BuildGraph
 from pants_test.base_test import BaseTest
 
 
@@ -36,6 +37,8 @@ class ScalaLibraryTest(BaseTest):
         [scala-compile]
         runtime-deps: []
         '''))
+    # Since the ini was modified, we need a new build graph w/ a fresh config
+    self.build_graph = BuildGraph(address_mapper=self.address_mapper, config=self.config())
 
     self.add_to_build_file('3rdparty', dedent('''
         jar_library(

@@ -81,7 +81,7 @@ class BinaryUtilTest(BaseTest):
   def _fake_url(cls, binaries, base, binary_key):
     base_path, version, name = binaries[binary_key]
     return '{base}/{binary}'.format(base=base,
-                                    binary=BinaryUtil().select_binary_base_path(
+                                    binary=BinaryUtil(Config.load()).select_binary_base_path(
                                         base_path, version, name))
 
   def _seens_test(self, binaries, bases, reader, config=None):

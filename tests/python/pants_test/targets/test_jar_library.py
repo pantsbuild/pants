@@ -24,21 +24,22 @@ class JarLibraryTest(BaseTest):
 
   def test_validation(self):
     target = Target(name='mybird', address=SyntheticAddress.parse('//:mybird'),
-                    build_graph=self.build_graph)
+                    build_graph=self.build_graph, config=self.config())
     # jars attribute must contain only JarLibrary instances
     with self.assertRaises(TargetDefinitionException):
-      JarLibrary(name="test", jars=[target])
+      JarLibrary(name="test", jars=[target], config=self.config())
 
   def test_jar_dependencies(self):
     jar1 = JarDependency(org='testOrg1', name='testName1', rev='123')
     jar2 = JarDependency(org='testOrg2', name='testName2', rev='456')
     lib = JarLibrary(name='foo', address=SyntheticAddress.parse('//:foo'),
                      build_graph=self.build_graph,
-                     jars=[jar1, jar2])
+                     jars=[jar1, jar2],
+                     config=self.config())
     self.assertEquals((jar1, jar2), lib.jar_dependencies)
 
   def test_excludes(self):
     # TODO(Eric Ayers) There doesn't seem to be any way to set this field at the moment.
     lib = JarLibrary(name='foo', address=SyntheticAddress.parse('//:foo'),
-                     build_graph=self.build_graph)
+                     build_graph=self.build_graph, config=self.config())
     self.assertEquals([], lib.excludes)

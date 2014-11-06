@@ -32,7 +32,6 @@ from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.thrift_builder import PythonThriftBuilder
 from pants.base.build_environment import get_buildroot
 from pants.base.build_invalidator import BuildInvalidator, CacheKeyGenerator
-from pants.base.config import Config
 from pants.util.dirutil import safe_mkdir, safe_rmtree
 
 
@@ -57,12 +56,13 @@ class PythonChroot(object):
 
   def __init__(self,
                targets,
+               config,
                extra_requirements=None,
                builder=None,
                platforms=None,
                interpreter=None,
                conn_timeout=None):
-    self._config = Config.load()
+    self._config = config
     self._targets = targets
     self._extra_requirements = list(extra_requirements) if extra_requirements else []
     self._platforms = platforms
