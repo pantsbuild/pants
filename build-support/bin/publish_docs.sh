@@ -54,7 +54,7 @@ function do_open() {
   fi
 }
 
-# generate some markdown as fodder for prototype doc site generator
+# generate html from markdown pages.
 ${PANTS_EXE} goal markdown --print-exception-stacktrace \
   --markdown-fragment src:: examples:: src/docs:: //:readme \
   testprojects/src/java/com/pants/testproject/page:readme || \
