@@ -52,6 +52,7 @@ class PythonBinaryCreate(PythonTask):
     with self.temporary_pex_builder(pex_info=pexinfo, interpreter=interpreter) as builder:
       chroot = PythonChroot(
         targets=[binary],
+        config=self.context.config,
         builder=builder,
         platforms=binary.platforms,
         interpreter=interpreter,

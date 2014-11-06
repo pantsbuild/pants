@@ -29,6 +29,7 @@ class PythonRun(PythonTask):
       with self.temporary_pex_builder(interpreter=interpreter, pex_info=binary.pexinfo) as builder:
         chroot = PythonChroot(
           targets=[binary],
+          config=self.context.config,
           builder=builder,
           platforms=binary.platforms,
           interpreter=interpreter,
