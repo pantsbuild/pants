@@ -115,6 +115,10 @@ class Config(object):
     help='Directory where pants will write its intermediate output files.',
     default=os.path.join(get_buildroot(), '.pants.d'))
 
+  # Cache the default config produced by load()
+  DEFAULT_CONFIG_PARSER = None
+  DEFAULT_CONFIG_PARSER_SIG = None
+
   class ConfigError(Exception):
     pass
 
@@ -126,10 +130,18 @@ class Config(object):
       file's DEFAULT section.  The 'buildroot', invoking 'user' and invoking user's 'homedir' are
       automatically defaulted.
     """
-    configpath = configpath or os.path.join(get_buildroot(), 'pants.ini')
+    default_configpath = os.path.join(get_buildroot(), 'pants.ini')
+    is_default_config = configpath is None and defaults is None
+    if (is_default_config and Config.DEFAULT_CONFIG_PARSER is not None and
+        Config.DEFAULT_CONFIG_PARSER_SIG == os.stat(default_configpath)):
+      return Config(Config.DEFAULT_CONFIG_PARSER)
+    configpath = configpath or default_configpath
     parser = Config.create_parser(defaults=defaults)
     with open(configpath) as ini:
       parser.readfp(ini)
+    if is_default_config:
+      Config.DEFAULT_CONFIG_PARSER = parser
+      Config.DEFAULT_CONFIG_PARSER_SIG = os.stat(default_configpath)
     return Config(parser)
 
   @classmethod
