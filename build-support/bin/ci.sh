@@ -198,8 +198,8 @@ fi
 
 
 if [[ "${skip_integration:-false}" == "false" ]]; then
-  if [[ ! -z "${N}" ]]; then
-    shard_desc=" [shard $((X+1)) of ${N}]"
+  if [[ ! -z "${TOTAL_SHARDS}" ]]; then
+    shard_desc=" [shard $((SHARD_NUMBER+1)) of ${TOTAL_SHARDS}]"
   fi
   banner "Running Pants Integration tests${shard_desc}"
   (
