@@ -26,7 +26,9 @@ function usage() {
   echo " -d           if running jvm tests, don't use nailgun daemons"
   echo " -p           skip core python tests"
   echo " -c           skip pants integration tests"
-  echo " -i N:X       if running integration tests, only run every Nth starting at X"
+  echo " -i TOTAL_SHARDS:SHARD_NUMBER"
+  echo "              if running integration tests, divide them into"
+  echo "              TOTAL_SHARDS shards and just run those in SHARD_NUMBER"
   echo "              to run only even tests: '-i 2:0', odd: '-i 2:1'"
   echo " -e           skip example tests"
   echo " -a           skip android targets when running tests"
@@ -50,11 +52,11 @@ while getopts "hbsrdpci:eat" opt; do
     p) skip_python="true" ;;
     c) skip_integration="true" ;;
     i)
-      if [[ "valid" != "$(echo ${OPTARG} | tr -s '0-9' '#' | sed 's|#:#|valid|')" ]]; then
+      if [[ "valid" != "$(echo ${OPTARG} | sed -E 's|[0-9]+:[0-9]+|valid|')" ]]; then
         usage "Invalid shard specification '${OPTARG}'"
       fi
-      N=${OPTARG%%:*}
-      X=${OPTARG##*:}
+      TOTAL_SHARDS=${OPTARG%%:*}
+      SHARD_NUMBER=${OPTARG##*:}
       ;;
     e) skip_examples="true" ;;
     a) skip_android="true" ;;
@@ -207,7 +209,7 @@ if [[ "${skip_integration:-false}" == "false" ]]; then
             xargs ./pants goal filter --filter-type=python_tests | \
             grep integration | \
             sort | \
-            sed -n "${X:-0}~${N:-1}p")
+            sed -n "${SHARD_NUMBER:-0}~${TOTAL_SHARDS:-1}p")
   ) || die "Pants Integration test failure"
 fi
 
