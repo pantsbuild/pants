@@ -49,8 +49,8 @@ class PythonBuilder(object):
     for binary_target in binary_targets:
       rv = PythonBinaryBuilder(
           binary_target,
-          self._config,
           self._run_tracker,
+          self._config,
           interpreter=interpreter,
           conn_timeout=conn_timeout).run()
       if rv != 0:
