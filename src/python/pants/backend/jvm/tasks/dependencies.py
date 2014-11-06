@@ -21,37 +21,25 @@ class Dependencies(ConsoleTask):
     return target.is_jvm or target.is_jvm_app
 
   @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    super(Dependencies, cls).setup_parser(option_group, args, mkflag)
-
-    cls.internal_only_flag = mkflag("internal-only")
-    cls.external_only_flag = mkflag("external-only")
-
-    option_group.add_option(cls.internal_only_flag,
-                            action="store_true",
-                            dest="dependencies_is_internal_only",
-                            default=False,
-                            help='Specifies that only internal dependencies should'
-                                 ' be included in the graph output (no external jars).')
-    option_group.add_option(cls.external_only_flag,
-                            action="store_true",
-                            dest="dependencies_is_external_only",
-                            default=False,
-                            help='Specifies that only external dependencies should'
-                                 ' be included in the graph output (only external jars).')
+  def register_options(cls, register):
+    super(Dependencies, cls).register_options(register)
+    register('--internal-only', default=False, action='store_true',
+             legacy='dependencies_is_internal_only',
+             help='Specifies that only internal dependencies should be included in the graph '
+                  'output (no external jars).')
+    register('--external-only', default=False, action='store_true',
+             legacy='dependencies_is_external_only',
+             help='Specifies that only external dependencies should be included in the graph '
+                  'output (only external jars).')
 
   def __init__(self, *args, **kwargs):
     super(Dependencies, self).__init__(*args, **kwargs)
 
-    if (self.context.options.dependencies_is_internal_only and
-        self.context.options.dependencies_is_external_only):
+    self.is_internal_only = self.get_options().internal_only
+    self.is_external_only = self.get_options().external_only
+    if self.is_internal_only and self.is_external_only:
+      raise TaskError('At most one of --internal-only or --external-only can be selected.')
 
-      error_str = "At most one of %s or %s can be selected." % (self.internal_only_flag,
-                                                                self.external_only_flag)
-      raise TaskError(error_str)
-
-    self.is_internal_only = self.context.options.dependencies_is_internal_only
-    self.is_external_only = self.context.options.dependencies_is_external_only
 
   def console_output(self, unused_method_argument):
     for target in self.context.target_roots:

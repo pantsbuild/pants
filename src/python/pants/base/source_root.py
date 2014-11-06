@@ -74,7 +74,7 @@ class SourceRootTree(object):
                                           .format(source_root=source_root))
     elif curr_node.children:
       # TODO(Eric Ayers) print the list of conflicting source_roots already registered.
-      raise self.NestedSourceRootError("{source_root} is nested inside an existing"
+      raise self.NestedSourceRootError("{source_root} is nested inside an existing "
                                        "source_root."
                                        .format(source_root=source_root))
     curr_node.set_leaf(types)

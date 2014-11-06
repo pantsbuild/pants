@@ -5,6 +5,7 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+import re
 import six
 import shlex
 
@@ -33,3 +34,8 @@ def safe_shlex_split(text_or_binary):
   Safe even on python versions whose shlex.split() method doesn't accept unicode.
   """
   return shlex.split(ensure_binary(text_or_binary))
+
+
+def camelcase(string):
+  """Convert snake casing (containing - or _ charadcters) to camel casing."""
+  return ''.join(word.capitalize() for word in re.split('[-_]', string))

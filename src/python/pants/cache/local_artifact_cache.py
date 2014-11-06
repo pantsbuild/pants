@@ -5,6 +5,8 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from contextlib import contextmanager
+import logging
 import os
 import shutil
 import uuid
@@ -12,70 +14,119 @@ import uuid
 from pants.cache.artifact import TarballArtifact
 from pants.cache.artifact_cache import ArtifactCache
 from pants.util.dirutil import safe_delete, safe_mkdir, safe_mkdir_for
+from pants.util.contextutil import temporary_file
 
+logger = logging.getLogger(__name__)
 
-class LocalArtifactCache(ArtifactCache):
-  """An artifact cache that stores the artifacts in local files."""
-  def __init__(self, log, artifact_root, cache_root, compression, copy_fn=None):
+class BaseLocalArtifactCache(ArtifactCache):
+  def __init__(self, artifact_root, compression):
     """
-    cache_root: The locally cached files are stored under this directory.
-    copy_fn: An optional function with the signature copy_fn(absolute_src_path, relative_dst_path) that
-        will copy cached files into the desired destination. If unspecified, a simple file copy is used.
+    :param str artifact_root: The path under which cacheable products will be read/written.
+    :param int compression: The gzip compression level for created artifacts.
+                            Valid values are 1-9, or Falsy-y to disable compression.
     """
-    ArtifactCache.__init__(self, log, artifact_root)
-    self._cache_root = os.path.expanduser(cache_root)
+    super(BaseLocalArtifactCache, self).__init__(artifact_root)
     self._compression = compression
+    self._cache_root = None
 
-    def copy(src, rel_dst):
-      dst = os.path.join(self.artifact_root, rel_dst)
-      safe_mkdir_for(dst)
-      shutil.copy(src, dst)
+  def _artifact(self, path):
+    return TarballArtifact(self.artifact_root, path, self._compression)
 
-    self._copy_fn = copy_fn or copy
+  @contextmanager
+  def _tmpfile(self, cache_key, use):
+    """Allocate tempfile on same device as cache with a suffix chosen to prevent collisions"""
+    with temporary_file(suffix=cache_key.id+use, root_dir=self._cache_root) as tmpfile:
+      yield tmpfile
+
+  @contextmanager
+  def insert_paths(self, cache_key, paths):
+    """Gather paths into artifact, store it, and yield the path to stored artifact tarball."""
+    with self._tmpfile(cache_key, 'write') as tmp:
+      self._artifact(tmp.name).collect(paths)
+      yield self._store_tarball(cache_key, tmp.name)
+
+  def store_and_use_artifact(self, cache_key, src):
+    """
+      Read the contents of an tarball from an iterator and return an artifact stored in the cache
+    """
+    with self._tmpfile(cache_key, 'read') as tmp:
+      for chunk in src:
+        tmp.write(chunk)
+      tmp.close()
+      self._artifact(self._store_tarball(cache_key, tmp.name)).extract()
+      return True
+
+  def _store_tarball(self, cache_key, src):
+    """Given a src path to an artifact tarball, store it and return stored artifact's path."""
+    pass
+
+class LocalArtifactCache(BaseLocalArtifactCache):
+  """An artifact cache that stores the artifacts in local files."""
+  def __init__(self, artifact_root, cache_root, compression):
+    """
+    :param str artifact_root: The path under which cacheable products will be read/written.
+    :param str cache_root: The locally cached files are stored under this directory.
+    :param int compression: The gzip compression level for created artifacts (1-9 or false-y).
+    """
+    super(LocalArtifactCache, self).__init__(artifact_root, compression)
+    self._cache_root = os.path.realpath(os.path.expanduser(cache_root))
+
     safe_mkdir(self._cache_root)
-
-  def try_insert(self, cache_key, paths):
-    tarfile = self._cache_file_for_key(cache_key)
-    safe_mkdir_for(tarfile)
-    # Write to a temporary name (on the same filesystem), and move it atomically, so if we
-    # crash in the middle we don't leave an incomplete or missing artifact.
-    tarfile_tmp = tarfile + '.' + str(uuid.uuid4()) + '.tmp'
-    if os.path.exists(tarfile_tmp):
-      os.unlink(tarfile_tmp)
-
-    artifact = TarballArtifact(self.artifact_root, tarfile_tmp, self._compression)
-    artifact.collect(paths)
-    # Note: Race condition here if multiple pants runs (in different workspaces)
-    # try to write the same thing at the same time. However since rename is atomic,
-    # this should not result in corruption. It may however result in a missing artifact
-    # If we crash between the unlink and the rename. But that's OK.
-    if os.path.exists(tarfile):
-      os.unlink(tarfile)
-    os.rename(tarfile_tmp, tarfile)
 
   def has(self, cache_key):
     return os.path.isfile(self._cache_file_for_key(cache_key))
+
+  def _store_tarball(self, cache_key, src):
+    dest = self._cache_file_for_key(cache_key)
+    safe_mkdir_for(dest)
+    os.rename(src, dest)
+    return dest
 
   def use_cached_files(self, cache_key):
     try:
       tarfile = self._cache_file_for_key(cache_key)
       if os.path.exists(tarfile):
-        artifact = TarballArtifact(self.artifact_root, tarfile, self._compression)
-        artifact.extract()
-        return artifact
-      else:
-        return None
+        self._artifact(tarfile).extract()
+        return True
     except Exception as e:
-      self.log.warn('Error while reading from local artifact cache: %s' % e)
-      return None
+      # TODO(davidt): Consider being more granular in what is caught.
+      logger.warn('Error while reading from local artifact cache: {0}'.format(e))
+
+    return False
+
+  def try_insert(self, cache_key, paths):
+    with self.insert_paths(cache_key, paths) as tmp:
+      pass
 
   def delete(self, cache_key):
     safe_delete(self._cache_file_for_key(cache_key))
-
-  def prune(self, age_hours):
-    pass
 
   def _cache_file_for_key(self, cache_key):
     # Note: it's important to use the id as well as the hash, because two different targets
     # may have the same hash if both have no sources, but we may still want to differentiate them.
     return os.path.join(self._cache_root, cache_key.id, cache_key.hash) + '.tgz'
+
+
+class TempLocalArtifactCache(BaseLocalArtifactCache):
+  """A local cache that does not actually store any files between calls.
+
+    This implementation does not have a backing _cache_root, and never
+    actually stores files between calls, but is useful for handling file IO for a remote cache.
+  """
+  def __init__(self, artifact_root):
+    """
+    :param str artifact_root: The path under which cacheable products will be read/written.
+    """
+    super(TempLocalArtifactCache, self).__init__(artifact_root, compression=None)
+
+  def _store_tarball(self, cache_key, src):
+    return src
+
+  def has(self, cache_key):
+    return False
+
+  def use_cached_files(self, cache_key):
+    return False
+
+  def delete(self, cache_key):
+    pass

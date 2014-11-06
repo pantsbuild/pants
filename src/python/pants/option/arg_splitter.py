@@ -5,7 +5,7 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 import sys
 
 
@@ -13,6 +13,17 @@ GLOBAL_SCOPE = ''
 
 
 class ArgSplitterError(Exception):
+  pass
+
+
+class SplitArgs(namedtuple('SplitArgs', ['scope_to_flags', 'targets', 'passthru'])):
+  """The result of splitting args.
+
+  scope_to_flags: A map from scope name to the list of flags belonging to that scope.
+                  The global scope is specified as an empty string.
+  targets: A list of target specs.
+  passthru: Any remaining args specified after a -- separator.
+  """
   pass
 
 
@@ -50,12 +61,11 @@ class ArgSplitter(object):
 
     args[0] is ignored.
 
-    Returns a pair scope_to_flags, targets where scope_to_flags is a map from scope name
-    to the list of flags belonging to that scope, and targets are a list of targets. The
-    global scope is designated by an empty string.
+    Returns a SplitArgs tuple.
     """
     scope_to_flags = defaultdict(list)
     targets = []
+    passthru = []
 
     self._unconsumed_args = list(reversed(sys.argv if args is None else args))
     # In regular use the first token is the binary name, so skip it. However tests may
@@ -84,10 +94,7 @@ class ArgSplitter(object):
         assign_flag_to_scope(flag, scope)
       scope, flags = self._consume_scope()
 
-    if self._at_double_dash():
-      self._unconsumed_args.pop()
-
-    while self._unconsumed_args:
+    while self._unconsumed_args and not self._at_double_dash():
       arg = self._unconsumed_args.pop()
       if arg.startswith(b'-'):
         # During migration we allow flags here, and assume they are in global scope.
@@ -96,9 +103,13 @@ class ArgSplitter(object):
       else:
         targets.append(arg)
 
+    if self._at_double_dash():
+      self._unconsumed_args.pop()
+      passthru = list(reversed(self._unconsumed_args))
+
     # We parse the word 'help' as a scope, but it's not a real one, so ignore it.
     scope_to_flags.pop('help', None)
-    return scope_to_flags, targets
+    return SplitArgs(scope_to_flags, targets, passthru)
 
   def _consume_scope(self):
     """Returns a pair (scope, list of flags encountered in that scope).

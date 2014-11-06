@@ -21,7 +21,7 @@ from twitter.common.config import Properties
 from twitter.common.log.options import LogOptions
 
 from pants.scm.scm import Scm
-from pants.backend.core.tasks.scm_publish import Namedver, ScmPublish, Semver, Version
+from pants.backend.core.tasks.scm_publish import Namedver, ScmPublish, Semver
 from pants.backend.jvm.ivy_utils import IvyUtils
 from pants.backend.jvm.targets.jarable import Jarable
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
@@ -37,7 +37,7 @@ from pants.base.generator import Generator, TemplateData
 from pants.base.target import Target
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy import Ivy
-from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree, touch
+from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree
 from pants.util.strutil import ensure_text
 
 
@@ -83,6 +83,11 @@ class PushDb(object):
       """Returns a clone of this entry with the given sha and fingerprint."""
       return PushDb.Entry(self.sem_ver, self.named_ver, self.named_is_latest, sha, fingerprint)
 
+    def __repr__(self):
+      return '<%s, %s, %s, %s, %s, %s>' % (
+        self.__class__.__name__, self.sem_ver, self.named_ver, self.named_is_latest,
+        self.sha, self.fingerprint)
+
   def __init__(self, props=None):
     self._props = props or OrderedDict()
 
@@ -93,9 +98,9 @@ class PushDb(object):
     major = int(db_get('revision.major', '0'))
     minor = int(db_get('revision.minor', '0'))
     patch = int(db_get('revision.patch', '0'))
-    snapshot = db_get('revision.snapshot', 'false').lower() == 'true'
+    snapshot = str(db_get('revision.snapshot', 'false')).lower() == 'true'
     named_version = db_get('revision.named_version', None)
-    named_is_latest = db_get('revision.named_is_latest', False)
+    named_is_latest = str(db_get('revision.named_is_latest', 'false')).lower() == 'true'
     sha = db_get('revision.sha', None)
     fingerprint = db_get('revision.fingerprint', None)
     sem_ver = Semver(major, minor, patch, snapshot=snapshot)
@@ -111,7 +116,7 @@ class PushDb(object):
     db_set('revision.snapshot', str(pe.sem_ver.snapshot).lower())
     if pe.named_ver:
       db_set('revision.named_version', pe.named_ver.version())
-    db_set('revision.named_is_latest', pe.named_is_latest)
+    db_set('revision.named_is_latest', str(pe.named_is_latest).lower())
     db_set('revision.sha', pe.sha)
     db_set('revision.fingerprint', pe.fingerprint)
 
@@ -277,7 +282,18 @@ def pushdb_coordinate(jar, entry):
 
 
 def target_internal_dependencies(target):
-  return filter(lambda tgt: isinstance(tgt, Jarable), target.dependencies)
+  """Returns internal Jarable dependencies that were "directly" declared.
+
+  Directly declared deps are those that are explicitly listed in the definition of a
+  target, rather than being depended on transitively. But in order to walk through
+  aggregator targets such as `target`, `dependencies`, or `jar_library`, this recursively
+  descends the dep graph and stops at Jarable instances."""
+  for dep in target.dependencies:
+    if isinstance(dep, Jarable):
+      yield dep
+    else:
+      for childdep in target_internal_dependencies(dep):
+        yield childdep
 
 
 class JarPublish(JarTask, ScmPublish):
@@ -344,8 +360,8 @@ class JarPublish(JarTask, ScmPublish):
   _SCM_PUSH_ATTEMPTS = 5
 
   @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    super(JarPublish, cls).setup_parser(option_group, args, mkflag)
+  def register_options(cls, register):
+    super(JarPublish, cls).register_options(register)
 
     # TODO(John Sirois): Support a preview mode that outputs a file with entries like:
     # artifact id:
@@ -356,76 +372,37 @@ class JarPublish(JarTask, ScmPublish):
     # Allow re-running this goal with the file as input to support forcing an arbitrary set of
     # revisions and supply of hand edited changelogs.
 
-    option_group.add_option(mkflag("dryrun"), mkflag("dryrun", negate=True),
-                            dest="jar_publish_dryrun", default=True,
-                            action="callback", callback=mkflag.set_bool,
-                            help="[%default] Runs through a push without actually pushing "
-                                 "artifacts, editing publish dbs or otherwise writing data")
-
-    option_group.add_option(mkflag("commit", negate=True),
-                            dest="jar_publish_commit", default=True,
-                            action="callback", callback=mkflag.set_bool,
-                            help="Turns off commits of the push db for local testing.")
-
-    local_flag = mkflag("local")
-    option_group.add_option(local_flag, dest="jar_publish_local",
-                            help="Publishes jars to a maven repository on the local filesystem at "
-                                 "the specified path.")
-
-    scm_push_attempts_flag = mkflag("scm-push-attempts")
-    option_group.add_option(scm_push_attempts_flag, dest="scm_push_attempts",
-                            default=cls._SCM_PUSH_ATTEMPTS,
-                            type="int",
-                            help="Number of times to try pushing the pushdb to the SCM before aborting")
-
-    local_snapshot_flag = mkflag("local-snapshot")
-    option_group.add_option(local_snapshot_flag, mkflag("local-snapshot", negate=True),
-                            dest="jar_publish_local_snapshot", default=True,
-                            action="callback", callback=mkflag.set_bool,
-                            help="[%default] Iff {0} is specified, publishes jars with '-SNAPSHOT' "
-                                 "revision suffixes.".format(local_flag))
-
-    named_snapshot_flag = mkflag("named-snapshot")
-    option_group.add_option(named_snapshot_flag,
-                            dest="jar_publish_named_snapshot",
-                            default=None,
-                            help="Publishes all artifacts with the given snapshot name replacing "
-                                 "their version. This is not Semantic Versioning compatible, but "
-                                 "is easier to consume in cases where many artifacts must align.")
-
-    option_group.add_option(mkflag("transitive"), mkflag("transitive", negate=True),
-                            dest="jar_publish_transitive", default=True,
-                            action="callback", callback=mkflag.set_bool,
-                            help="[%default] Publishes the specified targets and all their "
-                                 "internal dependencies transitively.")
-
-    option_group.add_option(mkflag("force"), mkflag("force", negate=True),
-                            dest="jar_publish_force", default=False,
-                            action="callback", callback=mkflag.set_bool,
-                            help="[%default] Forces pushing jars even if there have been no "
-                                 "changes since the last push.")
-
-    override_flag = mkflag('override')
-    option_group.add_option(override_flag, action='append', dest='jar_publish_override',
-                            help='''Specifies a published jar revision override in the form:
-                            ([org]#[name]|[target spec])=[new revision]
-
-                            For example, to specify 2 overrides:
-                            {flag}=com.twitter.common#quantity=0.1.2 \\
-                            {flag}=src/java/com/twitter/common/base=1.0.0 \\
-                            '''.format(flag=override_flag))
-
-    flag = mkflag("restart-at")
-    option_group.add_option(flag, dest="jar_publish_restart_at",
-                            help='''Restart a fail push at the given jar.  Jars can be identified by
-                            maven coordinate [org]#[name] or target.
-
-                            For example:
-                            %(flag)s=com.twitter.common#quantity
-
-                            Or:
-                            %(flag)s=src/java/com/twitter/common/base
-                            ''' % dict(flag=flag))
+    register('--dryrun', default=True, action='store_true', legacy='jar_publish_dryrun',
+             help='Run through a push without actually pushing artifacts, editing publish dbs or '
+                  'otherwise writing data')
+    register('--commit', default=True, action='store_true', legacy='jar_publish_commit',
+             help='Commit the push db. Turn off for local testing.')
+    register('--local', legacy='jar_publish_local', metavar='<PATH>',
+             help='Publish jars to a maven repository on the local filesystem at this path.')
+    register('--scm-push-attempts', type=int, default=cls._SCM_PUSH_ATTEMPTS,
+             legacy='scm_push_attempts',
+             help='Try pushing the pushdb to the SCM this many times before aborting.')
+    register('--local-snapshot', default=True, action='store_true',
+             legacy='jar_publish_local_snapshot',
+             help='If --local is specified, publishes jars with -SNAPSHOT revision suffixes.')
+    register('--named-snapshot', default=None, legacy='jar_publish_named_snapshot',
+             help='Publish all artifacts with the given snapshot name, replacing their version. '
+                  'This is not Semantic Versioning compatible, but is easier to consume in cases '
+                  'where many artifacts must align.')
+    register('--transitive', default=True, action='store_true', legacy='jar_publish_transitive',
+             help='Publish the specified targets and all their internal dependencies transitively.')
+    register('--force', default=False, action='store_true', legacy='jar_publish_force',
+             help='Force pushing jars even if there have been no changes since the last push.')
+    register('--override', action='append', legacy='jar_publish_override',
+             help='Specifies a published jar revision override in the form: '
+                  '([org]#[name]|[target spec])=[new revision] '
+                  'For example, to specify 2 overrides: '
+                  '--override=com.foo.bar#baz=0.1.2  --override=src/java/com/foo/bar/qux=1.0.0')
+    register('--restart-at', legacy='jar_publish_restart_at',
+             help='Restart a fail push at the given jar.  Jars can be identified by '
+                  'maven coordinate [org]#[name] or target. '
+                  'For example: --restart-at=com.twitter.common#quantity '
+                  'Or: --restart-at=src/java/com/twitter/common/base')
 
   def __init__(self, *args, **kwargs):
     super(JarPublish, self).__init__(*args, **kwargs)
@@ -436,16 +413,16 @@ class JarPublish(JarTask, ScmPublish):
 
     self._jvmargs = self.context.config.getlist(self._CONFIG_SECTION, 'ivy_jvmargs', default=[])
 
-    if self.context.options.jar_publish_local:
+    if self.get_options().local:
       local_repo = dict(
         resolver='publish_local',
-        path=os.path.abspath(os.path.expanduser(self.context.options.jar_publish_local)),
+        path=os.path.abspath(os.path.expanduser(self.get_options().local)),
         confs=['default'],
         auth=None
       )
       self.repos = defaultdict(lambda: local_repo)
       self.commit = False
-      self.local_snapshot = self.context.options.jar_publish_local_snapshot
+      self.local_snapshot = self.get_options().local_snapshot
     else:
       self.repos = self.context.config.getdict(self._CONFIG_SECTION, 'repos')
       if not self.repos:
@@ -461,18 +438,18 @@ class JarPublish(JarTask, ScmPublish):
           self.context.log.debug('Found auth for repo=%s user=%s' % (repo, user))
           self.repos[repo]['username'] = user
           self.repos[repo]['password'] = password
-      self.commit = self.context.options.jar_publish_commit
+      self.commit = self.get_options().commit
       self.local_snapshot = False
 
-    self.named_snapshot = self.context.options.jar_publish_named_snapshot
+    self.named_snapshot = self.get_options().named_snapshot
     if self.named_snapshot:
       self.named_snapshot = Namedver.parse(self.named_snapshot)
 
     self.ivycp = self.context.config.getlist('ivy', 'classpath')
 
-    self.dryrun = self.context.options.jar_publish_dryrun
-    self.transitive = self.context.options.jar_publish_transitive
-    self.force = self.context.options.jar_publish_force
+    self.dryrun = self.get_options().dryrun
+    self.transitive = self.get_options().transitive
+    self.force = self.get_options().force
 
     def parse_jarcoordinate(coordinate):
       components = coordinate.split('#', 1)
@@ -498,12 +475,9 @@ class JarPublish(JarTask, ScmPublish):
           .format(message=e, coordinate=coordinate))
 
     self.overrides = {}
-    if self.context.options.jar_publish_override:
+    if self.get_options().override:
       if self.named_snapshot:
-        named_snapshot_flag = self.context.options.named_snapshot_flag
-        override_flag = self.context.options.override_flag
-        raise TaskError('Flags {0} and {1} are mutually exclusive!'.format(named_snapshot_flag,
-                                                                           override_flag))
+        raise TaskError('Options --named-snapshot and --override are mutually exclusive!')
 
       def parse_override(override):
         try:
@@ -517,11 +491,11 @@ class JarPublish(JarTask, ScmPublish):
         except ValueError:
           raise TaskError('Invalid override: %s' % override)
 
-      self.overrides.update(parse_override(o) for o in self.context.options.jar_publish_override)
+      self.overrides.update(parse_override(o) for o in self.get_options().override)
 
     self.restart_at = None
-    if self.context.options.jar_publish_restart_at:
-      self.restart_at = parse_jarcoordinate(self.context.options.jar_publish_restart_at)
+    if self.get_options().restart_at:
+      self.restart_at = parse_jarcoordinate(self.get_options().restart_at)
 
   @property
   def config_section(self):
@@ -834,7 +808,7 @@ class JarPublish(JarTask, ScmPublish):
             pushdb.dump(dbfile)
             self.commit_pushdb(coordinate(org, name, rev))
             scm_exception = None
-            for attempt in range(self.context.options.scm_push_attempts):
+            for attempt in range(self.get_options().scm_push_attempts):
               try:
                 self.context.log.debug("Trying scm push")
                 self.scm.push()

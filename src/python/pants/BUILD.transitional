@@ -23,6 +23,8 @@ python_library(
     # NOTE(pl): We must pull in coverage by hand even though it isn't imported.
     # pytest-cov otherwise pulls in a newer version of coverage that doesn't
     # work in all environments, notably some OSX installs.
+    # NB: this is actually just a hack for the fact we have not uploaded pre-compiled
+    # platform-specific eggs for the newer coverage version to our cheeseshop!
     '3rdparty/python:coverage',
     '3rdparty/python:Markdown',
     '3rdparty/python:pex',

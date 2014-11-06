@@ -31,16 +31,13 @@ class ConsoleTask(Task, QuietTaskMixin):
 
   def __init__(self, *args, **kwargs):
     super(ConsoleTask, self).__init__(*args, **kwargs)
-    separator_option = "console_%s_separator" % self.__class__.__name__
-    self._console_separator = getattr(self.context.options,
-                                      separator_option).decode('string-escape')
-    if self.context.options.console_outstream:
+    self._console_separator = self.get_options().sep.decode('string-escape')
+    if self.get_options().output_file:
       try:
-        self._outstream = safe_open(os.path.abspath(self.context.options.console_outstream), 'w')
+        self._outstream = safe_open(os.path.abspath(self.get_options().output_file), 'w')
       except IOError as e:
         raise TaskError('Error opening stream {out_file} due to'
-                        ' {error_str}'.format(out_file=self.context.options.console_outstream,
-                                              error_str=e))
+                        ' {error_str}'.format(out_file=self.get_options().output_file, error_str=e))
     else:
       self._outstream = self.context.console_outstream
 
@@ -63,7 +60,7 @@ class ConsoleTask(Task, QuietTaskMixin):
           self._outstream.write(self._console_separator)
       finally:
         self._outstream.flush()
-        if self.context.options.console_outstream:
+        if self.get_options().output_file:
           self._outstream.close()
 
   def console_output(self, targets):

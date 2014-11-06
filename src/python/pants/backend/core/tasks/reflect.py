@@ -257,6 +257,62 @@ def param_docshards_to_template_datas(funcdoc_shards):
   return template_datas
 
 
+def info_for_target_class(cls):
+  """Walk up inheritance tree to get info about constructor args.
+
+  Helper function for entry_for_one_class. Target classes use inheritance
+  to handle constructor params. If you try to get the argspec for, e.g.,
+  `JunitTests.__init__`, it won't mention the `name` parameter, because
+  that's handled by the `Target` superclass.
+  """
+  # args to not-document. BUILD file authors shouldn't
+  # use these; they're meant to be impl-only.
+  ARGS_SUPPRESS = ['address', 'build_graph', 'payload']
+
+  # "accumulate" argspec and docstring fragments going up inheritance tree.
+  suppress = set(ARGS_SUPPRESS)  # only show things once. don't show silly things
+  args_accumulator = []
+  defaults_accumulator = []
+  docs_accumulator = []
+  for c in inspect.getmro(cls):
+    if not issubclass(c, Target): continue
+    if not inspect.ismethod(c.__init__): continue
+    args, _, _, defaults = inspect.getargspec(c.__init__)
+    args_that_have_defaults = args[len(args) - len(defaults or ()):]
+    args_with_no_defaults = args[1:(len(args) - len(defaults or ()))]
+    for i in range(len(args_that_have_defaults)):
+      arg = args_that_have_defaults[i]
+      if not arg in suppress:
+        suppress.add(arg)
+        args_accumulator.append(arg)
+        defaults_accumulator.append(defaults[i])
+    for arg in args_with_no_defaults:
+      if not arg in suppress:
+        suppress.add(arg)
+        args_accumulator.insert(0, arg)
+    dedented_doc = dedent_docstring(c.__init__.__doc__)
+    docs_accumulator.append(shard_param_docstring(dedented_doc))
+  argspec = inspect.formatargspec(args_accumulator,
+                                  None,
+                                  None,
+                                  defaults_accumulator)
+  suppress = set(ARGS_SUPPRESS)  # only show things once. don't show silly things
+  funcdoc_rst = ''
+  funcdoc_shards = OrderedDict()
+  for shard in docs_accumulator:
+    for param, parts in shard.items():
+      if param in suppress:
+        continue
+      suppress.add(param)
+      funcdoc_shards[param] = parts
+      # Don't interpret param names like "type_" as links.
+      if 'type' in parts:
+        funcdoc_rst += '\n:type {0}: {1}'.format(param, parts['type'])
+      if 'param' in parts:
+        funcdoc_rst += '\n:param {0}: {1}'.format(param, parts['param'])
+  paramdocs = param_docshards_to_template_datas(funcdoc_shards)
+  return(argspec, funcdoc_rst, paramdocs)
+
 def entry_for_one_class(nom, cls):
   """  Generate a BUILD dictionary entry for a class.
   nom: name like 'python_binary'
@@ -264,46 +320,8 @@ def entry_for_one_class(nom, cls):
 
   if issubclass(cls, Target):
     # special case for Target classes: "inherit" information up the class tree.
+    (argspec, funcdoc_rst, paramdocs) = info_for_target_class(cls)
 
-    args_accumulator = []
-    defaults_accumulator = ()
-    docs_accumulator = []
-    for c in inspect.getmro(cls):
-      if not issubclass(c, Target): continue
-      if not inspect.ismethod(c.__init__): continue
-      args, _, _, defaults = inspect.getargspec(c.__init__)
-      args_accumulator = args[1:] + args_accumulator
-      defaults_accumulator = (defaults or ()) + defaults_accumulator
-      dedented_doc = dedent_docstring(c.__init__.__doc__)
-      docs_accumulator.append(shard_param_docstring(dedented_doc))
-    # Suppress these from BUILD dictionary: they're legit args to the
-    # Target implementation, but they're not for BUILD files:
-    assert(args_accumulator[1] == 'address')
-    assert(args_accumulator[2] == 'build_graph')
-    args_accumulator = [args_accumulator[0]] + args_accumulator[3:]
-    defaults_accumulator = (defaults_accumulator[0],) + defaults_accumulator[3:]
-    argspec = inspect.formatargspec(args_accumulator,
-                                    None,
-                                    None,
-                                    defaults_accumulator)
-    # Suppress these from BUILD dictionary: they're legit args to the
-    # Target implementation, but they're not for BUILD files:
-    suppress = set(['address', 'build_graph', 'payload'])
-    funcdoc_rst = ''
-    funcdoc_shards = OrderedDict()
-    for shard in docs_accumulator:
-      for param, parts in shard.items():
-        if param in suppress:
-          continue
-        suppress.add(param)  # only show things once
-        funcdoc_shards[param] = parts
-        # Don't interpret param names like "type_" as links.
-        if 'type' in parts:
-          funcdoc_rst += '\n:type {0}: {1}'.format(param, parts['type'])
-        if 'param' in parts:
-          funcdoc_rst += '\n:param {0}: {1}'.format(param, parts['param'])
-
-    paramdocs = param_docshards_to_template_datas(funcdoc_shards)
   else:
     args, varargs, varkw, defaults = inspect.getargspec(cls.__init__)
     argspec = inspect.formatargspec(args[1:], varargs, varkw, defaults)

@@ -101,6 +101,7 @@ class BaseTest(unittest.TestCase):
     Goal.clear()
     self.real_build_root = BuildRoot().path
     self.build_root = os.path.realpath(mkdtemp(suffix='_BUILD_ROOT'))
+    self.new_options = defaultdict(dict)  # scope -> key-value mapping.
     BuildRoot().path = self.build_root
 
     self.create_file('pants.ini')
@@ -123,6 +124,9 @@ class BaseTest(unittest.TestCase):
 
   def create_options(self, **kwargs):
     return dict(**kwargs)
+
+  def set_new_options_for_scope(self, scope, **kwargs):
+    self.new_options[scope].update(kwargs)
 
   def context(self, for_task_types=None, config='', options=None, new_options=None,
               target_roots=None, **kwargs):
@@ -152,7 +156,13 @@ class BaseTest(unittest.TestCase):
       task_type.register_options(register)
 
     # Now override with any caller-specified values.
+
+    # TODO(benjy): Get rid of the new_options arg, and require tests to call set_new_options.
     for scope, opts in new_options.items():
+      for key, val in opts.items():
+        new_option_values[scope][key] = val
+
+    for scope, opts in self.new_options.items():
       for key, val in opts.items():
         new_option_values[scope][key] = val
 
@@ -191,7 +201,7 @@ class BaseTest(unittest.TestCase):
     for f in files:
       self.create_file(os.path.join(path, f), contents=f)
 
-  def create_library(self, path, target_type, name, sources, **kwargs):
+  def create_library(self, path, target_type, name, sources=None, **kwargs):
     """Creates a library target of given type at the BUILD file at path with sources
 
      path: The relative path to the BUILD file from the build root.
@@ -199,19 +209,23 @@ class BaseTest(unittest.TestCase):
      name: Name of the library target.
      sources: List of source file at the path relative to path.
      **kwargs: Optional attributes that can be set for any library target.
-       Currently it includes support for resources and java_sources
+       Currently it includes support for resources, java_sources, provides
+       and dependencies.
     """
-    self.create_files(path, sources)
+    if sources:
+      self.create_files(path, sources)
     self.add_to_build_file(path, dedent('''
           %(target_type)s(name='%(name)s',
-            sources=%(sources)s,
+            %(sources)s
             %(resources)s
             %(java_sources)s
             %(provides)s
+            %(dependencies)s
           )
         ''' % dict(target_type=target_type,
                    name=name,
-                   sources=repr(sources or []),
+                   sources=('sources=%s,' % repr(sources)
+                              if sources else ''),
                    resources=('resources=["%s"],' % kwargs.get('resources')
                               if 'resources' in kwargs else ''),
                    java_sources=('java_sources=[%s],'
@@ -220,6 +234,8 @@ class BaseTest(unittest.TestCase):
                                  if 'java_sources' in kwargs else ''),
                    provides=('provides=%s,' % kwargs.get('provides')
                               if 'provides' in kwargs else ''),
+                   dependencies=('dependencies=%s,' % kwargs.get('dependencies')
+                              if 'dependencies' in kwargs else ''),
                    )))
     return self.target('%s:%s' % (path, name))
 

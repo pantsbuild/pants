@@ -48,7 +48,7 @@ PANTS_BINARY=src/python/pants/bin:pants_local_binary
 PANTS_PEX="${HERE}/pants.pex"
 FAILED_BOOTSTRAP_SENTINEL="${HERE}/.pants.d/BOOTSTRAP_FAILED"
 
-PY=${PY:-$(which python)}
+PY=${PY:-$(which python2.7)}
 
 if [[ ! -z "${WRAPPER_REQUIREMENTS}" ]]; then
   PANTS_DEV=1
@@ -72,12 +72,12 @@ PANTS_SRCPATH="$(echo ${PANTS_SRCPATH[@]} | tr ' ' :)"
 
 function run_pants_bare() {
   activate_pants_venv
-  PYTHONPATH="${PANTS_SRCPATH}" python ${PANTS_EXE} "$@"
+  PYTHONPATH="${PANTS_SRCPATH}:${PYTHONPATH}" python ${PANTS_EXE} "$@"
 }
 
 function exec_pants_bare() {
   activate_pants_venv
-  PYTHONPATH="${PANTS_SRCPATH}" exec python ${PANTS_EXE} "$@"
+  PYTHONPATH="${PANTS_SRCPATH}:${PYTHONPATH}" exec python ${PANTS_EXE} "$@"
 }
 
 if [ ! -z "${PANTS_DEV}" ]; then
@@ -99,7 +99,7 @@ else
     # TODO(John sirois): Re-plumb build such that it grabs constraints from the built python_binary
     # target(s).
     rm -rf ${PANTS_PEX} && \
-    run_pants_bare build -v -i "CPython>=2.6,<3" -i "CPython>=3.3" ${PANTS_BINARY} && \
+    run_pants_bare build -v -i "CPython>=2.7,<3" ${PANTS_BINARY} && \
     mv -v ${HERE}/dist/pants_local_binary.pex ${PANTS_PEX} && \
     chmod +x ${PANTS_PEX}
     exit_status=$?

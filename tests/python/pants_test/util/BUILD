@@ -6,6 +6,7 @@ target(
   dependencies = [
     ':contextutil',
     ':dirutil',
+    ':strutil',
   ]
 )
 
@@ -25,5 +26,13 @@ python_tests(
     '3rdparty/python:pytest',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:contextutil',
+  ]
+)
+
+python_tests(
+  name = 'strutil',
+  sources = ['test_strutil.py'],
+  dependencies = [
+    'src/python/pants/util:strutil',
   ]
 )

@@ -12,7 +12,7 @@ from netrc import netrc as NetrcDb, NetrcParseError
 
 
 class Netrc(object):
-  """Fecthes username and passfrom from  ~/.netrc for logged in user."""
+  """Fetches username and password from ~/.netrc for logged in user."""
 
   class NetrcError(Exception):
     """Raised to indicate Netrc errors"""

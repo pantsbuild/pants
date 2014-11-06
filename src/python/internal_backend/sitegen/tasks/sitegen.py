@@ -35,11 +35,9 @@ class SiteGen(Task):
              legacy='sitegen_config_path')
 
   def execute(self):
-    if not self.context.options.sitegen_config_path:
-      raise TaskError('Need to pass '
-                      '--sitegen-config-path=src/python/pants/docs/docsite.json'
-                      ' or something.')
-    for config_path in self.context.options.sitegen_config_path:
+    if not self.get_options().config_path:
+      raise TaskError('The config_path option must be specified, e.g., with the --config-path flag')
+    for config_path in self.get_options().config_path:
       config = load_config(config_path)
       soups = load_soups(config)
       precomputed = precompute(config, soups)
@@ -82,11 +80,13 @@ class Precomputed(object):
 class PrecomputedPageInfo(object):
   """Info we compute (and preserve) for each page before we mutate things."""
 
-  def __init__(self, title):
+  def __init__(self, title, toc=None):
     """
     :param title: Page title
+    :param toc: Page table of contents
     """
     self.title = title
+    self.toc = toc or []
 
 
 def precompute_xrefs(soups):
@@ -250,8 +250,14 @@ def transform_soups(config, soups, precomputed):
   """Mutate our soups to be better when we write them out later."""
   fixup_internal_links(config, soups)
   ensure_headings_linkable(soups)
-  add_here_links(soups)
+
+  # Before add_here_links, which transforms soups in a way such that
+  # bs4 doesn't "find" headings. Do this after ensure_headings_linkable
+  # so that there will be links.
+  generate_page_tocs(soups, precomputed)
+
   link_xrefs(soups, precomputed)
+  add_here_links(soups)
 
 
 def get_title(soup):
@@ -286,6 +292,7 @@ def generate_breadcrumbs(config, precomputed, here):
   """return template data for breadcrumbs"""
   breadcrumb_pages = []
   def recurse(tree, pages_so_far):
+    pages_so_far_next = []
     for node in tree:
       if 'page' in node:
         pages_so_far_next = pages_so_far + [node['page']]
@@ -325,6 +332,11 @@ def hdepth(tag):
   return depth
 
 
+def generate_page_tocs(soups, precomputed):
+  for name, soup in soups.items():
+    precomputed.page[name].toc = generate_page_toc(soup)
+
+
 def generate_page_toc(soup):
   """Return page-level (~list of headings) TOC template data for soup"""
   # Maybe we don't want to show all the headings. E.g., it's common for a page
@@ -361,14 +373,13 @@ def render_html(dst, config, soups, precomputed, template):
     body_html = '{0}'.format(soup.body)
   else:
     body_html = '{0}'.format(soup)
-  page_toc = generate_page_toc(soup)
   html = renderer.render(template,
                          body_html=body_html,
                          breadcrumbs=generate_breadcrumbs(config, precomputed, dst),
                          generated=generate_generated(config, dst),
                          site_toc=generate_site_toc(config, precomputed, dst),
-                         has_page_toc=bool(page_toc),
-                         page_toc=page_toc,
+                         has_page_toc=bool(precomputed.page[dst].toc),
+                         page_toc=precomputed.page[dst].toc,
                          title=title,
                          topdots=topdots)
   return html

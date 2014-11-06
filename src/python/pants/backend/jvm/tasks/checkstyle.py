@@ -26,13 +26,9 @@ class Checkstyle(NailgunTask, JvmToolTaskMixin):
     return target.is_java and not target.is_synthetic
 
   @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    super(Checkstyle, cls).setup_parser(option_group, args, mkflag)
-
-    option_group.add_option(mkflag("skip"), mkflag("skip", negate=True),
-                            dest="checkstyle_skip", default=False,
-                            action="callback", callback=mkflag.set_bool,
-                            help="[%default] Skip checkstyle.")
+  def register_options(cls, register):
+    super(Checkstyle, cls).register_options(register)
+    register('--skip', action='store_true', legacy='checkstyle_skip', help='Skip checkstyle.')
 
   def __init__(self, *args, **kwargs):
     super(Checkstyle, self).__init__(*args, **kwargs)
@@ -61,7 +57,7 @@ class Checkstyle(NailgunTask, JvmToolTaskMixin):
     round_manager.require_data('exclusives_groups')
 
   def execute(self):
-    if self.context.options.checkstyle_skip:
+    if self.get_options().skip:
       return
     targets = self.context.targets(self._is_checked)
     with self.invalidated(targets) as invalidation_check:

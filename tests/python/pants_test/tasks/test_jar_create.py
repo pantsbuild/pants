@@ -20,7 +20,6 @@ from pants.base.source_root import SourceRoot
 from pants.goal.products import MultipleRootedProducts
 from pants.util.contextutil import open_zip, temporary_dir
 from pants.util.dirutil import safe_open
-from pants_test.base.context_utils import create_context
 from pants_test.jvm.jar_task_test_base import JarTaskTestBase
 
 
@@ -28,6 +27,14 @@ class JarCreateTestBase(JarTaskTestBase):
   @classmethod
   def task_type(cls):
     return JarCreate
+
+  def setUp(self):
+    super(JarCreateTestBase, self).setUp()
+    self.set_new_options(jar_create_transitive=True,
+                         jar_create_compressed=False,
+                         jar_create_classes=False,
+                         jar_create_sources=False,
+                         jar_create_javadoc=False)
 
   def create_options(self, **kwargs):
     options = dict(jar_create_transitive=True,
@@ -46,12 +53,7 @@ class JarCreateMiscTest(JarCreateTestBase):
           pants_supportdir: /tmp/build-support
           """).strip()
 
-    JarCreate(create_context(config=ini,
-                             old_options=self.create_options(),
-                             build_graph=self.build_graph,
-                             build_file_parser=self.build_file_parser,
-                             address_mapper=self.address_mapper),
-              '/tmp/workdir')
+    self.create_task(self.context(config=ini), '/tmp/workdir')
 
   def test_resources_with_scala_java_files(self):
     for ftype in ('java', 'scala'):
@@ -105,13 +107,10 @@ class JarCreateExecuteTest(JarCreateTestBase):
     self.binary = self.jvm_binary('src/java/com/twitter/baz', 'baz', source='b.java',
                                   resources='src/resources/com/twitter:spam')
 
-  def context(self, config='', **options):
-    return create_context(config=self.config(overrides=config),
-                          old_options=self.create_options(**options),
-                          build_graph=self.build_graph,
-                          build_file_parser=self.build_file_parser,
-                          address_mapper=self.address_mapper,
-                          target_roots=[self.jl, self.sl, self.binary, self.jtl, self.scala_lib])
+  def context(self, **kwargs):
+    return super(JarCreateExecuteTest, self).context(
+      target_roots=[self.jl, self.sl, self.binary, self.jtl, self.scala_lib],
+      **kwargs)
 
   @contextmanager
   def add_products(self, context, product_type, target, *products):

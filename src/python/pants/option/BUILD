@@ -5,7 +5,6 @@ python_library(
   name = 'option',
   sources = globs('*.py') - ['migrate_config.py'],
   dependencies = [
-    '3rdparty/python:argparse',
     'src/python/pants/base:build_environment',
     'src/python/pants/goal'
   ]

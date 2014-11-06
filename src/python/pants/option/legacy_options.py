@@ -44,7 +44,7 @@ class LegacyOptions(object):
   def register(self, args, kwargs, legacy_dest=None, legacy_args=None):
     """Register the option, using argparse params."""
     if legacy_dest:
-      optparse_kwargs = copy.copy(kwargs)
+      optparse_kwargs = copy.deepcopy(kwargs)
 
       # The args/kwargs are argparse-style, whereas we need optparse-style, so
       # we perform necessary adjustments here.

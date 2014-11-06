@@ -24,7 +24,7 @@ from pants.goal.products import Products
 from pants.goal.workspace import ScmWorkspace
 from pants.java.distribution.distribution import Distribution
 from pants.reporting.report import Report
-
+from pants.base.worker_pool import SubprocPool
 
 # Override with ivy -> cache_dir
 _IVY_CACHE_DIR_DEFAULT=os.path.expanduser('~/.ivy2/pants')
@@ -212,6 +212,41 @@ class Context(object):
   def background_worker_pool(self):
     """Returns the pool to which tasks can submit background work."""
     return self.run_tracker.background_worker_pool()
+
+  def subproc_map(self, f, items):
+    """Map function `f` over `items` in subprocesses and return the result.
+
+      :param f: A multiproc-friendly (importable) work function.
+      :param args: A iterable of pickleable arguments to f.
+    """
+    try:
+      # Pool.map (and async_map().get() w/o timeout) can miss SIGINT.
+      # See: http://stackoverflow.com/a/1408476, http://bugs.python.org/issue8844
+      # Instead, we map_async(...), wait *with a timeout* until ready, then .get()
+      # NB: in 2.x, wait() with timeout wakes up often to check, burning CPU. Oh well.
+      res = SubprocPool.foreground().map_async(f, items)
+      while not res.ready():
+        res.wait(60) # Repeatedly wait for up to a minute.
+        if not res.ready():
+          self.log.debug('subproc_map result still not ready...')
+      return res.get()
+    except KeyboardInterrupt:
+      SubprocPool.shutdown(True)
+      raise
+
+  def exec_on_subproc(self, f, args):
+    """Send work to a subprocess and block on it.
+
+       This can be used by existing background Work in a ThreadPool to sidestep the GIL:
+       The Thread calls this method and still blocks until the work is complete, so
+       existing reporting and accounting is unchanged, but the actual work is executed
+       in a subprocess, avoiding lock contention.
+
+       :param f: A multiproc-friendly (importable) work function.
+       :param args: Multiproc-friendly (pickleable) arguments to f.
+    """
+    return SubprocPool.background().apply(f, args)
+
 
   @contextmanager
   def new_workunit(self, name, labels=None, cmd=''):
