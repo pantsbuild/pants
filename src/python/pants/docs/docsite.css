@@ -5,7 +5,7 @@
 
 
 body {
-  background-color: #eee;
+  background-color: #e5e7f3;
   color: #111;
   font-family: sans-serif;
 }
@@ -112,14 +112,14 @@ form.search input.query {
 form.search .button {
   width: 20%;
   padding: 0.5em 1em;
-  background-color: #eee;
+  background-color: #e5e7f3;
   color: #258;
   border: 1px solid #147;
   border-radius: 2px;
 }
 
 nav.bignav .site-toc {
-  background-color: #eee;
+  background-color: #e5e7f3;
 }
 
 .site-toc ul {
@@ -136,7 +136,7 @@ nav.bignav .site-toc {
   color: white;
 }
 .site-toc li.toc-here:hover {
-  background-color: #eee;
+  background-color: #e5e7f3;
   color: black;
 }
 .site-toc li:hover a {
@@ -169,6 +169,7 @@ nav.pagetoc {
   float: right;
   margin: 0px -1em 0px 1em;
   padding-left: 1em;
+  padding-right: 1em;
   background-color: #ddd;
   max-width: 24%;
   border: 3px solid #38c;
@@ -178,12 +179,6 @@ nav.pagetoc {
 nav.pagetoc ul {
   padding-left: 0px;
   list-style-type: none;
-}
-
-nav.pagetoc li {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 nav.pagetoc li:hover {
