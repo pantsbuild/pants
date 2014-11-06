@@ -153,7 +153,9 @@ if [[ "${skip_python:-false}" == "false" ]]; then
     PANTS_PY_COVERAGE=paths:pants/,internal_backend/ \
       PANTS_PYTHON_TEST_FAILSOFT=1 \
       ./pants.pex goal test ${PANTS_ARGS[@]} \
-        $(./pants.pex goal list tests/python:: | grep -v integration)
+        $(./pants.pex goal list tests/python:: | \
+            xargs ./pants goal filter --filter-type=python_tests | \
+            grep -v integration)
   ) || die "Core python test failure"
 fi
 
@@ -201,7 +203,10 @@ if [[ "${skip_integration:-false}" == "false" ]]; then
   (
     PANTS_PYTHON_TEST_FAILSOFT=1 \
       ./pants.pex goal test ${PANTS_ARGS[@]} \
-        $(./pants.pex goal list tests/python:: | grep integration | \
+        $(./pants.pex goal list tests/python:: | \
+            xargs ./pants goal filter --filter-type=python_tests | \
+            grep integration | \
+            sort | \
             sed -n "${X:-0}~${N:-1}p")
   ) || die "Pants Integration test failure"
 fi
