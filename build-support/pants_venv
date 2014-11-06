@@ -12,11 +12,6 @@ REQUIREMENTS=(
   ${REPO_ROOT}/3rdparty/python/twitter/commons/requirements.txt
 )
 
-# TODO(John Sirois): Kill this when we switch over to publishing from internal_backend
-DEV_REQUIREMENTS=(
-  ${REPO_ROOT}/3rdparty/python/dev_only_requirements.txt
-)
-
 function log() {
   echo -e "$@" 1>&2
 }
@@ -48,13 +43,6 @@ function create_venv() {
 }
 
 function activate_pants_venv() {
-  if [ ! -z "${PANTS_DEV}" ]; then
-    REQUIREMENTS=(
-      ${DEV_REQUIREMENTS[@]}
-      ${REQUIREMENTS[@]}
-    )
-  fi
-
   fingerprint=""
   for req in ${REQUIREMENTS[@]}; do
     fingerprint="${fingerprint}$(cat ${req} | fingerprint_data)"
