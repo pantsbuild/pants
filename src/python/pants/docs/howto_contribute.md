@@ -36,18 +36,16 @@ Life of a Change
 ----------------
 
 Let's walk through the process of making a change to pants. At a high
-level we'll do the following:
+level, the steps are:
 
--   Identify the change you'd like to make (e.g.: fix a bug, add a
-    feature).
+-   Identify the change you'd like to make (e.g.: fix a bug, add a feature).
 -   Get the code.
 -   Make your change on a branch.
 -   Get a code review.
 -   Commit your change to master.
 
-Overall it's quite straightforward. Please note - despite being hosted
-on GitHub - we do not use just pull requests. This is because we prefer a linear
-commit history and doing code reviews with Review Board.
+Please note--despite being hosted on GitHub--we do not use just pull requests.
+This is because we prefer a linear commit history and doing code reviews with Review Board.
 
 ### Identify the change
 
@@ -134,8 +132,7 @@ run relevant tests. If you're not sure what those are,
 
 ### Code Review
 
-Now that your change is complete, we'll post it for review. We use
-<https://rbcommons.com> to host code reviews.
+Now that your change is complete, post it for review. We use `rbcommons.com` to host code reviews:
 
 #### Posting the First Draft
 

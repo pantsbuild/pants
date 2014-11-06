@@ -32,6 +32,7 @@ code, you pass flags
 Instead of passing them on the command line each time, you could set up
 a `~/.pants.rc` file:
 
+    :::ini
     [javac]
     options:
       --compile-javac-args=-source --compile-javac-args=7
@@ -48,6 +49,7 @@ If you know the Pants internals well enough to know the name of a `Task`
 class, you can use that class' name as a category to set command-line
 options affecting it:
 
+    :::ini
     [pants.tasks.nailgun_task.NailgunTask]
     # Don't spawn compilation daemons on this shared build server
     options: --no-ng-daemons
@@ -56,6 +58,7 @@ Although `/etc/pantsrc` and `~/.pants.rc` are the typical places for
 this configuration, you can check pants.ini \<setup-pants-ini\> to find
 out what your source tree uses.
 
+    :::ini
     # excerpt from pants.ini
     [DEFAULT]
     # Look for these rcfiles - they need not exist on the system

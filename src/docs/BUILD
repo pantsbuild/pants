@@ -120,5 +120,8 @@ page(
 
 page(
   name='with_intellij',
-  source='with_intellij.md'
+  source='with_intellij.md',
+  links=[
+    'src/python/pants/docs:intellij',
+  ],
 )

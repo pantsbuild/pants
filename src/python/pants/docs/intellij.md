@@ -47,8 +47,8 @@ SDK".
 
 This will be a "local" interpreter and you'll need to select the virtual
 environment bootstrapped above; it's in
-build-support/pants\_dev\_deps.venv (not
-build-support/pants\_deps.venv). This is **important** because the dev
+`build-support/pants_dev_deps.venv` (not
+`build-support/pants_deps.venv`). This is **important** because the dev
 virtual environment is designed to have 3rdparty dependencies that IDEs
 can handle.
 
@@ -65,17 +65,17 @@ In the "Modules" section, you need to mark "Sources" and "Tests". This
 establishes the loose python source roots to add to the PYTHONPATH - the
 parent directory of what you'll import. Click the "+ Add Content Root"
 button on the right, and choose the directory where you cloned pants.
-Next, mark the src/python directory as sources and tests/python
-directory as test\_sources in this new content root. IntelliJ may
-auto-select some sources and tests in directories such as src/java --you
-may wish to unselect these, as these are example files used for tests
-and/or documentation.
+Next, mark the `src/python` directory as sources and `tests/python`
+directory as `test_sources` in this new content root. IntelliJ may
+auto-select some sources and tests in directories such
+as `examples/src/java`--you may wish to unselect these, as these are
+example files used for tests and/or documentation.
 
 ![image](images/intellij-project-structure-modules-sources.png)
 
 Finally in "File -\> Settings -\> Python Integrated Tools" (or "IntelliJ
 Idea -\> Preferences -\> Python Integrated Tools" if you are on Mac OS
-X) set the default test runner to py.test - which is what pants uses to
+X) set the default test runner to `py.test`, which is what pants uses to
 drive python tests.
 
 ![image](images/intellij-configure-tests.png)
@@ -95,8 +95,8 @@ Open the "Run -\> Edit Configurations..." dialog box.
 
 -   Add a new Python configuration.
 -   Set the "Script" to the location of your
-    src/python/pants/bin/pants\_exe.py file (example:
-    /home/jsirois/dev-pants/src/python/pants/bin/pants\_exe.py)
+    `src/python/pants/bin/pants_exe.py` file (example:
+    `/home/jsirois/dev-pants/src/python/pants/bin/pants_exe.py`)
 -   Set the "Script parameters" to your pants command-line args, such as
     goal goals.
 -   Set the "Working directory" to where you want to run pants from.

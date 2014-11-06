@@ -52,21 +52,15 @@ Looking at the pieces of this we see
 That `./` isn't a typo. A source tree that's been set up with Pants
 build has a `pants` executable in its top-level directory.
 
-The first time you run `./pants`, it might take a while: it will
-probably auto-update by downloading the latest version.
+The first time you run `./pants`, it might take a while: it will probably auto-update by
+downloading the latest version.
 
 `goal`<br>
 Magic word that you use on most Pants command lines. We hope that
-someday we won't need to use this magic word anymore. As a rule of
-thumb, if you work with JVM code, you need `goal`; if you work with
-Python code, you leave it out.
+someday we won't need to use this magic word anymore.
 
 `test`<br>
-`test` is a *goal*, a "verb" that Pants knows about. The `test` goal
-runs tests and reports results. (When working with Python code, you
-don't normally specify a goal on the command line. Instead Pants
-"figures out" what to do based on the targets. E.g., it runs tests on
-test targets.)
+`test` is a *goal*, a "verb" that Pants knows about. The `test` goal runs tests and reports results.
 
 Some goals are `gen` (generate code from Thrift, Antlr, Protocol
 Buffer), `compile`, and `eclipse` (generate an Eclipse project). Pants
@@ -83,7 +77,7 @@ source code file tree. (You'll see more about these later.)
 
 Targets can depend on other targets. E.g., a test suite target normally
 depends on another target containing the "library" code to test; to
-build the test code, Pants also must build the library code.
+build and run the test code, Pants also first build the library code.
 
 You can specify more than one target on a command line. Pants will carry
 out its goals on all specified targets. E.g., you might use this to
@@ -171,20 +165,22 @@ some environment variables:
 BUILD Files
 -----------
 
-We told pants what target to build, but where are these defined?
-Scattered around the source tree are `BUILD` files. These `BUILD` files
-define targets. For example, this code snippet of
-`java/com/pants/examples/hello/main/BUILD` defines two targets: the app
-we ran and the binary that contains its code. These targets are named
-`main` (of type `jvm_app`) and and `main-bin` (of type `jvm_binary`):
+When we ran the `pants test` goal, we told pants what target to build, but where are these
+targets defined? Scattered around the source tree are `BUILD` files. These `BUILD` files
+define targets. For example, this code snippet of `java/com/pants/examples/hello/main/BUILD`
+defines two targets: the app we ran and the binary that contains its code.
+These targets are named `main` (of type `jvm_app`) and and `main-bin` (of type `jvm_binary`):
 
-That `dependencies` is interesting. The `main-bin` build target depends
-on other build targets; its `dependencies` lists those. To build a
-runnable Java binary, we need to first compile its dependencies. The
-`main-bin` binary has two dependencies,
-`'examples/src/java/com/pants/examples/hello/greet'` is the *address* of
-another target. Addresses look, roughly, like `path/to/dir:targetname`.
-We can see this build target in the `.../hello/greet/BUILD` file:
+!inc[start-after=Like Hello World&end-before=README page](../../examples/src/java/com/pants/examples/hello/main/BUILD)
+
+Those `dependencies` statements are interesting.
+The `main-bin` build target depends on other build targets;
+its `dependencies` lists those.
+To build a runnable Java binary, we need to first compile its dependencies.
+The `main-bin` binary's dependency,
+`'examples/src/java/com/pants/examples/hello/greet'`, is the *address* of
+another target. Addresses look, roughly, like `path/to/dir:targetname`. We can see this build
+target in the `.../hello/greet/BUILD` file:
 
 !inc[start-after=see LICENSE](../../examples/src/java/com/pants/examples/hello/greet/BUILD)
 

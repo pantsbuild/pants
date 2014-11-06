@@ -54,7 +54,7 @@ function do_open() {
   fi
 }
 
-# generate some markdown as fodder for prototype doc site generator
+# generate html from markdown
 ${PANTS_EXE} goal markdown --print-exception-stacktrace \
   --markdown-fragment examples:: src:: || \
   die "Failed to generate HTML from markdown'."

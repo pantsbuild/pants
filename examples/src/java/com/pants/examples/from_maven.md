@@ -51,7 +51,7 @@ Pants Equivalents
 `goal run`
 
 `-Xdebug` run a binary in the debugger<br>
-`goal run --jvm-run-debug`
+`goal run --run-jvm-debug`
 
 `-Dtest=com.foo.BarSpec -Dmaven.surefire.debug=true test` run one test in the debugger<br>
 `goal test --test-junit-debug --test-junit-test=com.foo.BarSpec` or

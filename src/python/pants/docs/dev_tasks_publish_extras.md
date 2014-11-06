@@ -55,21 +55,22 @@ artifact identifier, classifier, and file extension. To customize the
 name of your extra object, you can supply some extra parameters in the
 `pants.ini` file:
 
-> -   `override_name` -- allows customization of the name (`artifactId`)
->     of the additional file published. Specifying a string will
->     completely override the name, or include
->     '`{target_provides_name}`' to tack an addition on to the
->     pre-existing artifact name. Defaults to the pre-existing artifact
->     name.
-> -   `classifier` -- the maven classifier. Can be any arbitrary string,
->     or leave this unspecified for nothing.
-> -   `extension` -- the filename extension. Defaults to "jar".
++   `override_name` -- allows customization of the name (`artifactId`)
+    of the additional file published. Specifying a string will
+    completely override the name, or include
+    '`{target_provides_name}`' to tack an addition on to the
+    pre-existing artifact name. Defaults to the pre-existing artifact
+    name.
++   `classifier` -- the maven classifier. Can be any arbitrary string,
+    or leave this unspecified for nothing.
++   `extension` -- the filename extension. Defaults to "jar".
 
 **Note:** You must supply a non-default value for at least one of the
 above parameters, otherwise your extra publish artifact won't have a
 unique name. With the above config in your pants.ini, invoke pants like
 this, to do a test publish:
 
+    :::bash
     WRAPPER_SRCPATH=examples/src/python PANTS_DEV=1 ./pants goal publish examples/src/java/com/pants/examples/hello/greet --no-publish-dryrun --publish-local=~/tmp
 
 Now if you examine the `/tmp` directory, you'll notice that an extra jar

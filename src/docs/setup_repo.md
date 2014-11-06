@@ -121,7 +121,7 @@ When you invoke `./pants goal something src/foo:foo` it processes the
 code in src/foo/BUILD and the code in ./BUILD *and* ./BUILD.\*. If you
 distribute code to different organizations, and want different
 configuration for them, you might put the relevant config code in
-./BUILD.something. You can give that file to some people and not-give it
+./BUILD.something. You can give that file to some people and not give it
 to others.
 
 Integrate New Tools via a Pants Plugin
@@ -144,8 +144,8 @@ BUILD.\* in the source tree for special targets
 
 If you distribute code to different organizations, you might want to
 expose some targets to one organization but not to another. You can do
-this by defining those targets in a BUILD.\* file. You can give that
-file to some people and not-give it to others. This code will be
+this by defining those targets in a `BUILD.*` file. You can give that
+file to some people and not give it to others. This code will be
 processed by people invoking pants on this directory only if they have
 the file.
 

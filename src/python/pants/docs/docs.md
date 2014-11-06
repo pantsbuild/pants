@@ -31,6 +31,7 @@ If you'd like to publish remotely for others to preview your changes
 easily, there is a -d option that will create a copy of the site in a
 subdir of <http://pantsbuild.github.io/>:
 
+    :::bash
     # This publishes the docs locally and opens (-o) them in your browser for review
     # and then prompts you to confirm you want to publish these docs remotely before
     # proceeding to publish to http://pantsbuild.github.io/sirois-test-site

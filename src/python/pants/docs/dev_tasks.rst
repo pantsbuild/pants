@@ -79,7 +79,7 @@ same strings:
    :end-before: pants/issues/604 prep finish
 
 Pants uses this information to determine which tasks must run
-frist to prepare data required by other tasks. (If one task requires
+first to prepare data required by other tasks. (If one task requires
 data that no task provides, Pants errors out.)
 
 Products Map: how one task uses products of another

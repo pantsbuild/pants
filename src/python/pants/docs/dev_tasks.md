@@ -23,7 +23,7 @@ the work.
 
 The Task can see (and affect) the state of the build via its `.context`
 member, a
-[pants.goal.context.Context.](https://github.com/pantsbuild/pants/blob/master/src/python/pants/goal/context.py)
+[pants.goal.context.Context](https://github.com/pantsbuild/pants/blob/master/src/python/pants/goal/context.py).
 
 **Which targets to act on?** A typical Task wants to act on all "in
 play" targets that match some predicate. Here, "'in play' targets" means
@@ -70,7 +70,7 @@ The "late" task defines a `prepare` method that calls
 
 !inc[start-after=pants/issues/604 prep start&end-before=pants/issues/604 prep finish](../backend/codegen/tasks/protobuf_gen.py)
 
-Pants uses this information to determine which tasks must run frist to
+Pants uses this information to determine which tasks must run first to
 prepare data required by other tasks. (If one task requires data that no
 task provides, Pants errors out.)
 

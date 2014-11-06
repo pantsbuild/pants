@@ -95,10 +95,8 @@ directory):
 
 !inc[start-after=runnable&end-before=README page](hello/main/BUILD)
 
-This small program has just two dependencies. One is a library, a
-`java_library`, a compiled set of source code from this workspace. The
-other is a "third party" dependency, a pre-compiled artifact whose
-source lives somewhere outside the workspace.
+This small program has just one dependency. It is a library, a `java_library`, a compiled set of
+source code from this workspace.
 
 ### Depending on a Library
 
@@ -123,8 +121,10 @@ them:
 
 !inc[start-after=Test the](../../../../../tests/java/com/pants/examples/hello/greet/BUILD)
 
-As with other targets, this one depends on code that it imports. Thus, a
-typical test target depends on the library that it tests.
+As with other targets, this one depends on code that it imports. Thus, a typical test target
+depends the library that it tests and perhaps some others (here, `junit`).
+The dependency on `junit` is a "third party" dependency, a pre-compiled artifact whose source
+lives somewhere outside the workspace.
 
 ### Depending on a Jar
 
@@ -132,7 +132,7 @@ The test example depends on a jar, `junit`. Instead of compiling from
 source, Pants invokes ivy to fetch such jars. To reduce the danger of
 version conflicts, we use the 3rdparty idiom: we keep references to
 these "third-party" jars together in `BUILD` files under the `3rdparty/`
-directory. Thus, the test has a `3rdparty:` dependency:
+directory. Thus, the test has a `3rdparty` dependency:
 
 !inc[start-after=Test the](../../../../../tests/java/com/pants/examples/hello/greet/BUILD)
 
@@ -149,16 +149,17 @@ The `BUILD` files in `3rdparty/` have targets like:
                )
 
 Those <a xref="bdict_jar">`jar()` things</a> are references to public jars.
+You can read more about
+[[JVM 3rdpart dependencies|pants('examples/src/java/com/pants/examples:3rdparty_jvm')]].
 
 The Usual Commands: JVM
 -----------------------
 
 **Make sure code compiles and tests pass:**
 
-Use the `test` goal with the targets you're interested in. If they are
-test targets, Pants runs the tests. If they aren't test targets, Pants
-will still compile them since it knows it must compile before it can
-test.
+Use the `test` goal with the targets you're interested in. If they are test targets,
+Pants runs the tests. If they aren't test targets, Pants still compiles them since it knows it
+must compile before it can test.
 
     :::bash
     $ ./pants goal test examples/src/java/com/pants/examples/hello/:: examples/tests/java/com/pants/examples/hello/::
@@ -295,36 +296,37 @@ and extra files. The `.jar` in the top-level directory has a manifest so
 you can run it with `java -jar`:
 
     :::bash
-    $ cd dist/main-bundle/
-    $ java -jar main-bin.jar
+    $ cd dist/hello-example-bundle/
+    $ java -jar hello-example.jar
     16:52:11 INFO : Hello, world!
 
 The "bundle" is basically a tree of files:
 
     :::bash
-    $ cd dist/main-bundle/
+    $ cd dist/hello-example-bundle/
     $ find .
     .
+    ./greetee.txt
+    ./hello-example.jar
     ./libs
-    ./libs/javax.activation-activation-1.1.jar
-    ./libs/javax.mail-mail-1.4.jar
-    ./libs/log4j-log4j-1.2.15.jar
-    ./log4j.properties
-    ./main-bin.jar
-    $ jar -tf main-bin.jar
+    $ jar -tf hello-example.jar
+    META-INF/
+    META-INF/MANIFEST.MF
     com/
     com/pants/
     com/pants/examples/
     com/pants/examples/hello/
-    com/pants/examples/hello/greet/
-    com/pants/examples/hello/greet/Greeting.class
     com/pants/examples/hello/main/
     com/pants/examples/hello/main/HelloMain.class
-    META-INF/
-    META-INF/MANIFEST.MF
+    com/pants/example/
+    com/pants/example/hello/
+    com/pants/example/hello/world.txt
+    com/pants/examples/hello/greet/
+    com/pants/examples/hello/greet/Greeting.class
 
-That `log4j.properties` file came from the `bundles=` parameter. The
-`libs/` directory contains 3rdparty jars. The jar in the top directory
+
+That `greetee.txt` file came from the `bundles=` parameter.
+The `libs/` directory contains 3rdparty jars (if any). The `jar` in the top directory
 contains code compiled for this target.
 
 **Deploying a Bundle**

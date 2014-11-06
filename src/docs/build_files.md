@@ -48,41 +48,42 @@ Use the recursive wildcard: `goal list ::`
     KeyError: 'Failed to find target for: src/python/pants/docs/BUILD:obsolete'
     $ # Instead of listing all targets, a strack trace. We found a problem
 
-*Do I pull in the dependencies I expect?*
-Use `goal depmap` (JVM languages only).
-This lists dependencies from your source; it doesn't catch dependencies
-pulled in from 3rdparty `.jars`. For example, here it shows that
-`main-bin` depends on the 3rdparty `log4j` jar, but not that `log4j`
-depends on `javax.mail`:
+*Do I pull in the dependencies I expect?* Use `goal depmap` (JVM languages only):
 
     :::bash
-    $ ./pants goal depmap examples/src/com/pants/examples/hello/main
-    internal-src.java.com.pants.examples.hello.main.main
-      internal-src.java.com.pants.examples.hello.main.main-bin
-        internal-src.java.com.pants.examples.hello.greet.greet
-        log4j-log4j-1.2.15
+    $ ./pants goal depmap examples/tests/java/com/pants/examples/hello/greet
+    internal-examples.tests.java.com.pants.examples.hello.greet.greet
+      internal-3rdparty.junit
+        internal-3rdparty.hamcrest-core
+          org.hamcrest-hamcrest-core-1.3
+        junit-junit-dep-4.11
+      internal-examples.src.java.com.pants.examples.hello.greet.greet
+      internal-examples.src.resources.com.pants.example.hello.hello
+      junit-junit-dep-4.11
+      org.hamcrest-hamcrest-core-1.3
 
 *What source files do I depend on?* Use `goal filedeps`:
 
     :::bash
-    $ ./pants goal filedeps examples/src/com/pants/examples/hello/main
-    ~archie/workspace/pants/examples/src/com/pants/examples/hello/greet/BUILD
-    ~archie/workspace/pants/examples/src/com/pants/examples/hello/greet/Greeting.java
-    ~archie/workspace/pants/examples/src/com/pants/examples/hello/main/BUILD
-    ~archie/workspace/pants/examples/src/com/pants/examples/hello/main/config/log4j.properties
-    ~archie/workspace/pants/examples/src/com/pants/examples/hello/main/HelloMain.java
+    $ ./pants goal filedeps examples/src/java/com/pants/examples/hello/main
+    ~archie/workspace/pants/examples/src/resources/com/pants/example/hello/BUILD
+    ~archie/workspace/pants/examples/src/java/com/pants/examples/hello/main/BUILD
+    ~archie/workspace/pants/examples/src/java/com/pants/examples/hello/main/config/greetee.txt
+    ~archie/workspace/pants/examples/src/java/com/pants/examples/hello/greet/Greeting.java
+    ~archie/workspace/pants/examples/src/resources/com/pants/example/hello/world.txt
+    ~archie/workspace/pants/examples/src/java/com/pants/examples/hello/main/HelloMain.java
+    ~archie/workspace/pants/examples/src/java/com/pants/examples/hello/greet/BUILD
+
 
 Default Target
 --------------
 
-A build target with the same name as the `BUILD` file's containing
-directory is the *default target*. To signal "*this* is the main useful
-target here" and as a convenience to users, you should always have a
-default.
+A build target with the same name as the `BUILD` file's containing directory is the
+*default target*. To signal "*this* is the main useful target here" and as a convenience to users,
+have a default.
 
-Consider these libraries that use `tugboat` functionality. You can see
-that this code depends on just the default `tugboat` target, and thus
-uses just core functionality:
+Consider these libraries that use `tugboat` functionality. You can see that this code depends on
+just the default `tugboat` target, and thus uses just core functionality:
 
     :::python
     # depends on plain ol' tugboat
@@ -418,7 +419,7 @@ declare exclusives tags:
 
     :::python
     jar_library(name='slf4j-with-log4j-2.4', exclusives={'log4j': '2.4'}, jars=[...])
-    jar_library(name='joda-2.1', exclusives={'log4j': '1.9'}, jars=[...])
+    java_library(name='jlibb', exclusives={'log4j': '1.9'}, dependencies=[...])
 
 With the exclusives declared, pants can recognize that 'javabin' has
 conflicting dependencies, and can generate an appropriate error message.
