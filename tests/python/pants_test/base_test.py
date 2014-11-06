@@ -63,6 +63,12 @@ class BaseTest(unittest.TestCase):
       fp.write(contents)
     return path
 
+  def create_ini_file(self, contents, **kwargs):
+    self.create_file('pants.ini', contents, **kwargs)
+    # Since the ini was modified, we need a new build graph w/ a fresh config
+    self.build_graph = BuildGraph(address_mapper=self.address_mapper, config=self.config())
+
+
   def add_to_build_file(self, relpath, target):
     """Adds the given target specification to the BUILD file at relpath.
 

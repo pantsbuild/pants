@@ -33,12 +33,10 @@ class ScalaLibraryTest(BaseTest):
   def setUp(self):
     super(ScalaLibraryTest, self).setUp()
 
-    self.create_file('pants.ini', dedent('''
+    self.create_ini_file(dedent('''
         [scala-compile]
         runtime-deps: []
         '''))
-    # Since the ini was modified, we need a new build graph w/ a fresh config
-    self.build_graph = BuildGraph(address_mapper=self.address_mapper, config=self.config())
 
     self.add_to_build_file('3rdparty', dedent('''
         jar_library(
