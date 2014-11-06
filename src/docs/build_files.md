@@ -31,8 +31,8 @@ techniques can be especially helpful:
 *Did I define the targets I meant to?* Use `goal list`:
 
     :::bash
-    $ ./pants goal list examples/src/com/pants/examples/hello/greet
-    examples/src/com/pants/examples/hello/greet:greet
+    $ ./pants goal list examples/src/java/com/pants/examples/hello/greet
+    examples/src/java/com/pants/examples/hello/greet:greet
 
 *Did a change in one `BUILD` file break others?*
 List **every** target to find out:
@@ -46,7 +46,7 @@ Use the recursive wildcard: `goal list ::`
       File "pants/targets/internal.py", line 195, in update_dependencies
       File "pants/targets/pants_target.py", line 60, in resolve
     KeyError: 'Failed to find target for: src/python/pants/docs/BUILD:obsolete'
-    $ # Instead of listing all targets, a strack trace. We found a problem
+    $ # Instead of listing all targets, a stack trace. We found a problem
 
 *Do I pull in the dependencies I expect?* Use `goal depmap` (JVM languages only):
 
@@ -73,7 +73,6 @@ Use the recursive wildcard: `goal list ::`
     ~archie/workspace/pants/examples/src/resources/com/pants/example/hello/world.txt
     ~archie/workspace/pants/examples/src/java/com/pants/examples/hello/main/HelloMain.java
     ~archie/workspace/pants/examples/src/java/com/pants/examples/hello/greet/BUILD
-
 
 Default Target
 --------------
@@ -271,6 +270,7 @@ published as separate pants targets.**
     java_library(name='hbase',
       dependencies=[
         '3rdparty/jvm/org/apache/hbase',
+        'src/java/com/twitter/etl/from',
       ],
       sources=globs('*.java'),
     )
@@ -297,6 +297,7 @@ should still expose the interface separately.
     java_library(name='hbase',
       dependencies=[
         '3rdparty/jvm/org/apache/hbase',
+        'src/java/com/twitter/etl/from',
       ],
       sources=['HBaseDataImporter.java'],
     )

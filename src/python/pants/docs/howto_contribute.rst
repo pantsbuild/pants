@@ -137,7 +137,7 @@ relevant tests. If you're not sure what those are,
 Code Review
 ===========
 
-Now that your change is complete, we'll post it for review.
+Now that your change is complete, post it for review.
 We use https://rbcommons.com to host code reviews.
 
 Posting the First Draft

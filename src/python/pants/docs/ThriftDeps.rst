@@ -98,15 +98,14 @@ Thrift IDL
 ==========
 
 Our example uses two Thrift files, one of which ``include``\s the other.
-They look pretty ordinary. The include-d Thrift,
+They look pretty ordinary. The ``include``\d Thrift,
 ``examples/src/thrift/com/pants/examples/distance/distance.thrift``,
-is regular Thrift (albeit with a ``#namespace`` comment used for Thrift
-that will be compiled with both Apache Thrift and Scrooge):
+is regular Thrift:
 
 .. include:: ../../../../examples/src/thrift/com/pants/examples/distance/distance.thrift
    :code:
 
-The include-ing Thrift,
+The ``include``\ing Thrift,
 ``examples/src/thrift/com/pants/examples/precipitation/precipitation.thrift``,
 also looks ordinary. (The include path is a little tricky: it's based on
 source roots. Thus, if your source tree has more than one root
