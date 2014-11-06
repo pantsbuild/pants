@@ -19,10 +19,11 @@ env:
     # Everything except ITs
     - CI_FLAGS="-c"
     # Just ITs
-    # 3 shards gets them finishing faster than units for now.
-    - CI_FLAGS="-srpeat -i 3:0"
-    - CI_FLAGS="-srpeat -i 3:1"
-    - CI_FLAGS="-srpeat -i 3:2"
+    # 4 shards gets them finishing faster than units for now.
+    - CI_FLAGS="-srpeat -i 4:0"
+    - CI_FLAGS="-srpeat -i 4:1"
+    - CI_FLAGS="-srpeat -i 4:2"
+    - CI_FLAGS="-srpeat -i 4:3"
 
 before_script: |
   ./build-support/bin/ci-sync.sh
