@@ -26,6 +26,10 @@ function usage() {
   echo " -d           if running jvm tests, don't use nailgun daemons"
   echo " -p           skip core python tests"
   echo " -c           skip pants integration tests"
+  echo " -i TOTAL_SHARDS:SHARD_NUMBER"
+  echo "              if running integration tests, divide them into"
+  echo "              TOTAL_SHARDS shards and just run those in SHARD_NUMBER"
+  echo "              to run only even tests: '-i 2:0', odd: '-i 2:1'"
   echo " -e           skip example tests"
   echo " -a           skip android targets when running tests"
   echo " -t           skip testprojects tests"
@@ -38,7 +42,7 @@ function usage() {
 
 daemons="--ng-daemons"
 
-while getopts "hbsrdpceat" opt; do
+while getopts "hbsrdpci:eat" opt; do
   case ${opt} in
     h) usage ;;
     b) skip_bootstrap="true" ;;
@@ -47,6 +51,13 @@ while getopts "hbsrdpceat" opt; do
     d) daemons="--no-ng-daemons" ;;
     p) skip_python="true" ;;
     c) skip_integration="true" ;;
+    i)
+      if [[ "valid" != "$(echo ${OPTARG} | sed -E 's|[0-9]+:[0-9]+|valid|')" ]]; then
+        usage "Invalid shard specification '${OPTARG}'"
+      fi
+      TOTAL_SHARDS=${OPTARG%%:*}
+      SHARD_NUMBER=${OPTARG##*:}
+      ;;
     e) skip_examples="true" ;;
     a) skip_android="true" ;;
     t) skip_testprojects="true" ;;
@@ -144,7 +155,9 @@ if [[ "${skip_python:-false}" == "false" ]]; then
     PANTS_PY_COVERAGE=paths:pants/,internal_backend/ \
       PANTS_PYTHON_TEST_FAILSOFT=1 \
       ./pants.pex goal test ${PANTS_ARGS[@]} \
-        $(./pants.pex goal list tests/python:: | grep -v integration)
+        $(./pants.pex goal list tests/python:: | \
+            xargs ./pants goal filter --filter-type=python_tests | \
+            grep -v integration)
   ) || die "Core python test failure"
 fi
 
@@ -185,11 +198,18 @@ fi
 
 
 if [[ "${skip_integration:-false}" == "false" ]]; then
-  banner "Running Pants Integration tests"
+  if [[ ! -z "${TOTAL_SHARDS}" ]]; then
+    shard_desc=" [shard $((SHARD_NUMBER+1)) of ${TOTAL_SHARDS}]"
+  fi
+  banner "Running Pants Integration tests${shard_desc}"
   (
     PANTS_PYTHON_TEST_FAILSOFT=1 \
       ./pants.pex goal test ${PANTS_ARGS[@]} \
-        $(./pants.pex goal list tests/python:: | grep integration)
+        $(./pants.pex goal list tests/python:: | \
+            xargs ./pants goal filter --filter-type=python_tests | \
+            grep integration | \
+            sort | \
+            sed -n "${SHARD_NUMBER:-0}~${TOTAL_SHARDS:-1}p")
   ) || die "Pants Integration test failure"
 fi
 
