@@ -97,9 +97,9 @@ class ProtobufIntegrationTest(PantsRunIntegrationTest):
               'Local protoc bases must be ordered before imported bases!')
         continue
       # Check to make sure, eg, testproto4.proto never preceedes testproto2.proto.
-      protofile = re.search(r'\d+[.]proto$', line)
-      if protofile:
-        protofile = protofile.group()
+      match = re.search(r'\d+[.]proto$', line)
+      if match:
+        protofile = match.group()
         number = int(protofile[:protofile.find('.')])
         self.assertTrue(number > last_proto, '{proto} succeeded proto #{number}!'.format(
             proto=line, number=last_proto))
