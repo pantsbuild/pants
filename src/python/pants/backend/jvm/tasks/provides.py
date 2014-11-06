@@ -29,9 +29,6 @@ class Provides(Task):
 
   def __init__(self, *args, **kwargs):
     super(Provides, self).__init__(*args, **kwargs)
-    self.ivy_utils = IvyUtils(config=self.context.config,
-                              options=self.context.options,
-                              log=self.context.log)
     self.confs = self.context.config.getlist('ivy', 'confs', default=['default'])
     self.target_roots = self.context.target_roots
     self.transitive = self.get_options().transitive
@@ -53,11 +50,11 @@ class Provides(Task):
     safe_mkdir(self.workdir)
     targets = self.context.targets()
     for conf in self.confs:
-      outpath = os.path.join(self.workdir, '%s.%s.provides' %
-                             (self.ivy_utils.identify(targets)[1], conf))
+      outpath = os.path.join(self.workdir,
+                             '{0}.{1}.provides'.format(IvyUtils.identify(targets)[1], conf))
       if self.transitive:
         outpath += '.transitive'
-      ivyinfo = self.ivy_utils.parse_xml_report(self.context.target_roots, conf)
+      ivyinfo = IvyUtils.parse_xml_report(self.context.target_roots, conf)
       jar_paths = OrderedSet()
       for root in self.target_roots:
         jar_paths.update(self.get_jar_paths(ivyinfo, root, conf))

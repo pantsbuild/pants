@@ -169,7 +169,7 @@ class RoundEngine(Engine):
     execution_goals = ' -> '.join(e.goal.name for e in goal_executors)
     context.log.info('Executing tasks in goals: {goals}'.format(goals=execution_goals))
 
-    explain = getattr(context.options, 'explain', False)
+    explain = context.new_options.for_global_scope().explain
     if explain:
       print('Goal Execution Order:\n\n%s\n' % execution_goals)
       print('Goal [TaskRegistrar->Task] Order:\n')

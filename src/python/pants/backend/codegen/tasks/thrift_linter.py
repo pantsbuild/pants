@@ -5,13 +5,11 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
-
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit
-from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
+
 
 class ThriftLinter(NailgunTask, JvmToolTaskMixin):
   """Print linter warnings for thrift files.
@@ -68,12 +66,12 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
     # 2. java_thrift_library target in BUILD file, thrift_linter_strict = False,
     # 3. pants.ini, [scrooge-linter] section, strict field.
     # 4. default = False
-    cmdline_strict = self.context.options.thrift_linter_strict
+    cmdline_strict = self.get_options().strict
 
-    if cmdline_strict != None:
+    if cmdline_strict is not None:
       return self._to_bool(cmdline_strict)
 
-    if target.thrift_linter_strict != None:
+    if target.thrift_linter_strict is not None:
       return self._to_bool(target.thrift_linter_strict)
 
     return self._to_bool(self.context.config.get(self._CONFIG_SECTION, 'strict',
