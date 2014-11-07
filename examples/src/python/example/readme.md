@@ -40,7 +40,8 @@ Relevant Goals and Targets
 > <a xref="bdict_python_library">`python_library`</a> BUILD targets make Python
 > code "import-able". The rule of thumb is that each directory of `.py`
 > files has a `BUILD` file with a `python_library` target. A Python
-> target that has a `python_library` in its `dependencies` can import its code.
+> target that has a `python_library` in its `dependencies` can import
+> its code.
 >
 > To use code that's not in your workspace, use a
 > <a xref="bdict_python_requirement_library">`python_requirement_library`</a>
@@ -66,8 +67,9 @@ Relevant Goals and Targets
 BUILD for a Simple Binary
 -------------------------
 
-The pantsbuild/pants repo has a simple "hello world" sample Python binary. You can use
-`goal binary` to build a PEX from it. You can then run the PEX:
+The pantsbuild/pants repo has a simple "hello world" sample Python
+binary. You can use `goal binary` to build a PEX from it. You can then
+run the PEX:
 
     :::bash
     $ ./pants goal binary examples/src/python/example/hello/main
@@ -76,8 +78,9 @@ The pantsbuild/pants repo has a simple "hello world" sample Python binary. You c
     Hello, world!
     $
 
-`examples/src/python/example/hello/main/BUILD` defines a `python_binary` target, a build-able
-thing that configures a runnable program made from Python code:
+`examples/src/python/example/hello/main/BUILD` defines a `python_binary`
+target, a build-able thing that configures a runnable program made from
+Python code:
 
 !inc[start-after=Like Hello](hello/main/BUILD)
 
@@ -149,7 +152,8 @@ into an execution environment.
 PEX Contents
 ------------
 
-To build a PEX, invoke `./pants goal binary` on a `python_binary` target:
+To build a PEX, invoke `./pants goal binary` on a `python_binary`
+target:
 
     :::bash
     $ ./pants goal binary examples/src/python/example/hello/main
@@ -173,13 +177,19 @@ To drop into our example library target `examples/src/python/example/hello/greet
 turn on to see what's going on in the background:
 
     :::bash
-    $ PANTS_VERBOSE=1 ./pants py examples/src/python/example/hello/greet
-    /Users/lhosken/workspace/pants examples/src/python/example/hello/greet
-    Building chroot for [PythonLibrary(BuildFileAddress(/Users/lhosken/workspace/pants/examples/src/python/example/hello/greet/BUILD, greet))]:
+    $ PANTS_VERBOSE=1 ./pants goal repl examples/src/python/example/hello/greet
+    
+    15:11:41 00:00 [main]
+                   (To run a reporting server: ./pants goal server)
+      ...lots of build output...
+    15:11:42 00:01   [repl]
+    15:11:42 00:01     [python-repl]Building chroot for [PythonLibrary(BuildFileAddress(/Users/lhosken/workspace/pants/examples/src/python/example/hello/greet/BUILD, greet))]:
       Dumping library: PythonLibrary(BuildFileAddress(/Users/lhosken/workspace/pants/examples/src/python/example/hello/greet/BUILD, greet))
       Dumping requirement: ansicolors==1.0.2
       Dumping distribution: .../ansicolors-1.0.2-py2-none-any.whl
-    Python 2.7.5 (default, Mar  9 2014, 22:15:05)
+    
+    15:11:42 00:01       [run]
+    Python 2.7.5 (default, Mar  9 2014, 22:15:05) 
     [GCC 4.2.1 Compatible Apple LLVM 5.0 (clang-500.0.68)] on darwin
     Type "help", "copyright", "credits" or "license" for more information.
     (InteractiveConsole)
@@ -190,9 +200,8 @@ fetched this dependency over the network if necessary. (It wasn't
 necessary to download `ansicolors`; Pants already fetched it while
 "bootstrapping" itself.)
 
-You can convince yourself that the environment contains all the
-dependencies by inspecting sys.path and importing libraries as you
-desire:
+To convince yourself that the environment contains `greet`'s dependencies, you can inspect
+`sys.path` and import libraries:
 
     :::python
     >>> from example.hello.greet.greet import greet
