@@ -53,16 +53,6 @@ python_library(
 )
 
 python_library(
-  name = 'help',
-  sources = ['help.py'],
-  dependencies = [
-    ':option_helpers',
-    ':goal',
-    'src/python/pants/base:build_environment',
-  ],
-)
-
-python_library(
   name = 'initialize_reporting',  # XXX shouldn't this be in reporting?!
   sources = ['initialize_reporting.py'],
   dependencies = [
