@@ -17,7 +17,6 @@
     "goals_reference": "dist/builddict/goals_reference.html",
     "howto_ask": "dist/markdown/html/src/python/pants/docs/howto_ask.html",
     "howto_contribute": "dist/markdown/html/src/python/pants/docs/howto_contribute.html",
-    "howto_customize": "dist/markdown/html/src/python/pants/docs/howto_customize.html",
     "howto_develop": "dist/markdown/html/src/python/pants/docs/howto_develop.html",
     "howto_plugin": "dist/markdown/html/src/python/pants/docs/howto_plugin.html",
     "index": "dist/markdown/html/src/docs/index.html",
@@ -100,7 +99,6 @@
 	      ]
             },
             { "page": "howto_plugin" },
-            { "page": "howto_customize" },
             { "page": "intellij" },
             { "page": "internals" },
             { "page": "release" },
