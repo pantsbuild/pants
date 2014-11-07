@@ -118,10 +118,11 @@ applies here.
 
 **If you're converting a `mvn`-built workspace to use Pants**, you can get a head start by using
 information from your `pom.xml` files. The [`mvn2pants`](https://github.com/ericzundel/mvn2pants)
-shows some scripts that convert `pom.xml` files into `BUILD` files. This can get you up and running
-with Pants faster. Careful, though: Maven projects tend to be "coarser-grained" than Pants projects.
-Once you have things working, you'll probably want to replace the big automatically-generated
-targets with things that follow the 1:1:1 rule.
+shows some scripts that convert `pom.xml` files into `BUILD` files; Square wrote and used these
+to convert some projects. This can get you up and running with Pants faster. Careful, though:
+Maven projects tend to be "coarser-grained" than Pants projects. Once you have things working,
+you'll probably want to replace the big automatically-generated targets with things that follow
+the 1:1:1 rule.
 
 `BUILD.*` and environment-specific config
 -----------------------------------------
