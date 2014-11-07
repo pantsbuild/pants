@@ -155,7 +155,7 @@ def _run():
                                       run_tracker=run_tracker
                                       )
   address_mapper = BuildFileAddressMapper(build_file_parser)
-  build_graph = BuildGraph(run_tracker=run_tracker, address_mapper=address_mapper, config=config)
+  build_graph = BuildGraph(run_tracker=run_tracker, address_mapper=address_mapper)
 
   command_class, command_args = _parse_command(root_dir, argv)
   command = command_class(run_tracker,

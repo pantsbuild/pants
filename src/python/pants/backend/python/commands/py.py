@@ -91,7 +91,7 @@ class Py(Command):
 
       try:
         print(self.root_dir, arg, file=sys.stderr)
-        self.build_graph.inject_spec_closure(arg)
+        self.build_graph.inject_spec_closure(arg, self.config)
         spec_path, target_name = parse_spec(arg)
         build_file = BuildFile.from_cache(self.root_dir, spec_path)
         address = BuildFileAddress(build_file, target_name)

@@ -80,7 +80,7 @@ class Build(Command):
     for address in addresses:
       self.top_level_addresses.add(address)
       try:
-        self.build_graph.inject_address_closure(address)
+        self.build_graph.inject_address_closure(address, self.config)
         target = self.build_graph.get_target(address)
       except:
         self.error("Problem parsing BUILD target %s: %s" % (address, traceback.format_exc()))

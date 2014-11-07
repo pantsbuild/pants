@@ -150,7 +150,7 @@ class ScalastyleTest(NailgunTaskTestBase):
       self.add_to_build_file(
         'a/scala/BUILD', 'scala_library(name="s", sources=["Source.scala"])'),
       's')
-    context.build_graph.inject_address_closure(scala_target_address)
+    context.build_graph.inject_address_closure(scala_target_address, context.config)
     scala_target = context.build_graph.get_target(scala_target_address)
 
     # scala_library but with java sources - should be filtered
@@ -158,7 +158,7 @@ class ScalastyleTest(NailgunTaskTestBase):
       self.add_to_build_file(
         'a/scala_java/BUILD', 'scala_library(name="sj", sources=["Source.java"])'),
       'sj')
-    context.build_graph.inject_address_closure(scala_target_java_source_address)
+    context.build_graph.inject_address_closure(scala_target_java_source_address, context.config)
     scala_target_with_java_source = context.build_graph.get_target(
       scala_target_java_source_address)
 
@@ -167,7 +167,7 @@ class ScalastyleTest(NailgunTaskTestBase):
       self.add_to_build_file(
         'a/java/BUILD', 'java_library(name="j", sources=["Source.java"])'),
       'j')
-    context.build_graph.inject_address_closure(java_target_address)
+    context.build_graph.inject_address_closure(java_target_address, context.config)
     java_target = context.build_graph.get_target(java_target_address)
 
     # synthetic scala_library - should be filtered
@@ -211,7 +211,7 @@ class ScalastyleTest(NailgunTaskTestBase):
         'a/scala_1/BUILD',
         'scala_library(name="s1", sources=["Source1.java", "Source1.scala"])'),
       's1')
-    context.build_graph.inject_address_closure(scala_target_address_1)
+    context.build_graph.inject_address_closure(scala_target_address_1, context.config)
     scala_target_1 = context.build_graph.get_target(scala_target_address_1)
 
     # this scala target has single *.scala source but will be excluded out
@@ -220,7 +220,7 @@ class ScalastyleTest(NailgunTaskTestBase):
       self.add_to_build_file(
         'a/scala_2/BUILD', 'scala_library(name="s2", sources=["Source2.scala"])'),
       's2')
-    context.build_graph.inject_address_closure(scala_target_address_2)
+    context.build_graph.inject_address_closure(scala_target_address_2, context.config)
     scala_target_2 = context.build_graph.get_target(scala_target_address_2)
 
     # add all these targets to context.
@@ -260,7 +260,7 @@ class ScalastyleTest(NailgunTaskTestBase):
       self.add_to_build_file(
         'a/scala/BUILD', 'scala_library(name="pass", sources=["pass.scala"])'),
       'pass')
-    context.build_graph.inject_address_closure(scala_target_address)
+    context.build_graph.inject_address_closure(scala_target_address, context.config)
     scala_target = context.build_graph.get_target(scala_target_address)
     context.replace_targets([scala_target])
 
@@ -286,7 +286,7 @@ class ScalastyleTest(NailgunTaskTestBase):
       self.add_to_build_file(
         'a/scala/BUILD', 'scala_library(name="fail", sources=["fail.scala"])'),
       'fail')
-    context.build_graph.inject_address_closure(scala_target_address)
+    context.build_graph.inject_address_closure(scala_target_address, context.config)
     scala_target = context.build_graph.get_target(scala_target_address)
     context.replace_targets([scala_target])
 

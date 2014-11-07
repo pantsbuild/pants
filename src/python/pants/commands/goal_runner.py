@@ -202,7 +202,7 @@ class GoalRunner(Command):
       with self.run_tracker.new_workunit(name='parse', labels=[WorkUnit.SETUP]):
         for spec in specs:
           for address in spec_parser.parse_addresses(spec, fail_fast):
-            self.build_graph.inject_address_closure(address)
+            self.build_graph.inject_address_closure(address, self.config)
             self.targets.append(self.build_graph.get_target(address))
     self.goals = [Goal.by_name(goal) for goal in goals]
 

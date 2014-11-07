@@ -30,7 +30,7 @@ class JavaProtobufLibraryTest(BaseTest):
     java_protobuf_library(name='foo',
       sources=[],
     )'''))
-    self.build_graph.inject_spec_closure('//:foo')
+    self.build_graph.inject_spec_closure('//:foo', self.config())
     target = self.build_graph.get_target(SyntheticAddress.parse('//:foo'))
     self.assertIsInstance(target, JavaProtobufLibrary)
     self.assertSequenceEqual([], target.imports)
@@ -49,7 +49,7 @@ class JavaProtobufLibraryTest(BaseTest):
       ],
     )
     '''))
-    self.build_graph.inject_spec_closure('//:foo')
+    self.build_graph.inject_spec_closure('//:foo', self.config())
     target = self.build_graph.get_target(SyntheticAddress.parse('//:foo'))
     self.assertIsInstance(target, JavaProtobufLibrary)
     self.assertEquals(1, len(target.imports))
@@ -67,7 +67,7 @@ class JavaProtobufLibraryTest(BaseTest):
         sources=[],
       )
       '''))
-    self.build_graph.inject_spec_closure('//:foo')
+    self.build_graph.inject_spec_closure('//:foo', self.config())
     target = self.build_graph.get_target(SyntheticAddress.parse('//:foo'))
     self.assertIsInstance(target, JavaProtobufLibrary)
     with self.assertRaises(JvmTarget.WrongTargetTypeError):
@@ -82,7 +82,7 @@ class JavaProtobufLibraryTest(BaseTest):
         ],
       )
       '''))
-    self.build_graph.inject_spec_closure('//:foo')
+    self.build_graph.inject_spec_closure('//:foo', self.config())
     target = self.build_graph.get_target(SyntheticAddress.parse('//:foo'))
     self.assertIsInstance(target, JavaProtobufLibrary)
     with self.assertRaises(JvmTarget.ExpectedAddressError):
@@ -107,7 +107,7 @@ class JavaProtobufLibraryTest(BaseTest):
         sources=[],
     )
     '''))
-    self.build_graph.inject_spec_closure('//:foo')
+    self.build_graph.inject_spec_closure('//:foo', self.config())
     target = self.build_graph.get_target(SyntheticAddress.parse('//:foo'))
     self.assertIsInstance(target, JavaProtobufLibrary)
     traversable_specs = [spec for spec in target.traversable_specs]

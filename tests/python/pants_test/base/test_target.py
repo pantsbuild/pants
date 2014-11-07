@@ -34,7 +34,7 @@ class TargetTest(BaseTest):
     build_file = self.add_to_build_file('y/BUILD',
                                         'java_library(name="concrete", sources=["SourceA.scala"])')
     concrete_address = BuildFileAddress(build_file, 'concrete')
-    context.build_graph.inject_address_closure(concrete_address)
+    context.build_graph.inject_address_closure(concrete_address, context.config)
     concrete = context.build_graph.get_target(concrete_address)
 
     # add synthetic targets

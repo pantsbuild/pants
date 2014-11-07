@@ -77,7 +77,7 @@ class ReverseDepmap(ConsoleTask):
     for build_file in buildfiles:
       address_map = build_file_parser.parse_build_file(build_file)
       for address in address_map.keys():
-        build_graph.inject_address_closure(address)
+        build_graph.inject_address_closure(address, self.context.config)
       for address in address_map.keys():
         target = build_graph.get_target(address)
         # TODO(John Sirois): tighten up the notion of targets written down in a BUILD by a

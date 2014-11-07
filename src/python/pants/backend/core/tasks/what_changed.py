@@ -59,7 +59,7 @@ class WhatChanged(ConsoleTask):
       build_file_parser = self.context.build_file_parser
       address_map = build_file_parser.parse_build_file(build_file)
       for address, _ in address_map.items():
-        build_graph.inject_address_closure(address)
+        build_graph.inject_address_closure(address, self.context.config)
       is_build_file = (build_file.full_path == os.path.join(get_buildroot(), path))
 
       for target in build_graph.targets():

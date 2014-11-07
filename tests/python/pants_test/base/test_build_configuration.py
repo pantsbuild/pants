@@ -54,7 +54,7 @@ class BuildConfigurationTest(unittest.TestCase):
       self.build_configuration.register_target_alias('fred', object())
 
     config = Config.load()
-    target = Target('fred', SyntheticAddress.parse('a:b'), BuildGraph(address_mapper=None, config=config), config)
+    target = Target('fred', SyntheticAddress.parse('a:b'), BuildGraph(address_mapper=None), config)
     with self.assertRaises(TypeError):
       self.build_configuration.register_target_alias('fred', target)
 

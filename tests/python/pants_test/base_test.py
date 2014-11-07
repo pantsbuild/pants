@@ -65,8 +65,6 @@ class BaseTest(unittest.TestCase):
 
   def create_ini_file(self, contents, **kwargs):
     self.create_file('pants.ini', contents, **kwargs)
-    # Since the ini was modified, we need a new build graph w/ a fresh config
-    self.build_graph = BuildGraph(address_mapper=self.address_mapper, config=self.config())
 
 
   def add_to_build_file(self, relpath, target):
@@ -116,7 +114,7 @@ class BaseTest(unittest.TestCase):
     build_configuration.register_aliases(self.alias_groups)
     self.build_file_parser = BuildFileParser(build_configuration, self.build_root, self.config())
     self.address_mapper = BuildFileAddressMapper(self.build_file_parser)
-    self.build_graph = BuildGraph(address_mapper=self.address_mapper, config=self.config())
+    self.build_graph = BuildGraph(address_mapper=self.address_mapper)
 
   def config(self, overrides=''):
     """Returns a config valid for the test build root."""
@@ -196,7 +194,7 @@ class BaseTest(unittest.TestCase):
     Returns the corresponding Target or else None if the address does not point to a defined Target.
     """
     if self.build_graph.get_target_from_spec(spec) is None:
-      self.build_graph.inject_spec_closure(spec)
+      self.build_graph.inject_spec_closure(spec, self.config())
     return self.build_graph.get_target_from_spec(spec)
 
   def create_files(self, path, files):

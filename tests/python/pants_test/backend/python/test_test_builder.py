@@ -19,6 +19,9 @@ from pants.base.build_file_aliases import BuildFileAliases
 from pants.util.contextutil import pushd, environment_as
 from pants_test.base_test import BaseTest
 
+from pants.base.build_file_parser import BuildFileParser
+from pants.base.build_configuration import BuildConfiguration
+
 
 class PythonTestBuilderTestBase(BaseTest):
   def run_tests(self, targets, args=None, fast=True, debug=False):

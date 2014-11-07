@@ -63,7 +63,7 @@ class BuildGraphTest(BaseTest):
       build_configuration = BuildConfiguration()
       build_configuration.register_target_alias('fake', Target)
       parser = BuildFileParser(build_configuration, root_dir=root_dir)
-      build_graph = BuildGraph(self.address_mapper, config=self.config())
+      build_graph = BuildGraph(self.address_mapper)
       parser.inject_spec_closure_into_build_graph(':foo', build_graph)
       self.assertEqual(len(build_graph.dependencies_of(SyntheticAddress.parse(':foo'))), 1)
 
@@ -72,15 +72,15 @@ class BuildGraphTest(BaseTest):
   def test_target_invalid(self):
     self.add_to_build_file('a/BUILD', 'target(name="a")')
     with pytest.raises(BuildFileParser.InvalidTargetException):
-      self.build_graph.inject_spec_closure('a:nope')
+      self.build_graph.inject_spec_closure('a:nope', self.config())
 
     self.add_to_build_file('b/BUILD', 'target(name="a")')
     with pytest.raises(BuildFileParser.InvalidTargetException):
-      self.build_graph.inject_spec_closure('b')
+      self.build_graph.inject_spec_closure('b', self.config())
     with pytest.raises(BuildFileParser.InvalidTargetException):
-      self.build_graph.inject_spec_closure('b:b')
+      self.build_graph.inject_spec_closure('b:b', self.config())
     with pytest.raises(BuildFileParser.InvalidTargetException):
-      self.build_graph.inject_spec_closure('b:')
+      self.build_graph.inject_spec_closure('b:', self.config())
 
   # TODO(Eric Ayers) This test broke during a refactoring and should be moved removed or updated
   @pytest.mark.xfail
@@ -238,7 +238,7 @@ class BuildGraphTest(BaseTest):
 
     with self.assertRaisesRegexp(AddressLookupError,
                                  '^BUILD file does not exist at:.*/BUILD'):
-      self.build_graph.inject_spec_closure('//:a')
+      self.build_graph.inject_spec_closure('//:a', self.config())
 
     self.add_to_build_file('BUILD',
                            'target(name="a", '
@@ -248,7 +248,7 @@ class BuildGraphTest(BaseTest):
                                  '^BUILD file does not exist at:.*/non-existent-path/BUILD'
                                  '\s+when translating spec non-existent-path:b'
                                  '\s+referenced from :a$'):
-      self.build_graph.inject_spec_closure('//:a')
+      self.build_graph.inject_spec_closure('//:a', self.config())
 
   def test_invalid_address_two_hops(self):
     self.add_to_build_file('BUILD',
@@ -264,7 +264,7 @@ class BuildGraphTest(BaseTest):
                                  '\s+when translating spec non-existent-path:c'
                                  '\s+referenced from goodpath:b'
                                  '\s+referenced from :a$'):
-      self.build_graph.inject_spec_closure('//:a')
+      self.build_graph.inject_spec_closure('//:a', self.config())
 
   def test_invalid_address_two_hops_same_file(self):
     self.add_to_build_file('BUILD',
@@ -284,4 +284,4 @@ class BuildGraphTest(BaseTest):
                                  '\s+referenced from goodpath:c'
                                  '\s+referenced from goodpath:b'
                                  '\s+referenced from :a$'):
-      self.build_graph.inject_spec_closure('//:a')
+      self.build_graph.inject_spec_closure('//:a', self.config())

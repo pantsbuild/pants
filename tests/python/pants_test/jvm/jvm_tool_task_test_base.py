@@ -9,6 +9,7 @@ import errno
 import os
 
 from pants.backend.jvm.tasks.bootstrap_jvm_tools import BootstrapJvmTools
+from pants.base.config import Config
 from pants.base.dev_backend_loader import load_build_configuration_from_source
 from pants.util.dirutil import safe_mkdir, safe_mkdtemp, safe_walk
 from pants_test.task_test_base import TaskTestBase
@@ -22,7 +23,7 @@ class JvmToolTaskTestBase(TaskTestBase):
     return load_build_configuration_from_source().registered_aliases()
 
   def setUp(self):
-    real_config = self.config()
+    real_config = Config.load()
     super(JvmToolTaskTestBase, self).setUp()
 
     def link(path, optional=False, force=False):

@@ -102,7 +102,7 @@ class TaskTest(BaseTest):
     spec_parser = CmdLineSpecParser(self.build_root, self.address_mapper)
     addresses = list(spec_parser.parse_addresses(spec))
     for address in addresses:
-      self.build_graph.inject_address_closure(address)
+      self.build_graph.inject_address_closure(address, self.config())
     targets = [self.build_graph.get_target(address) for address in addresses]
     return targets
 

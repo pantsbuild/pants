@@ -299,9 +299,11 @@ class Context(object):
     if dependencies:
       dependencies = [dep.address for dep in dependencies]
 
+
     self.build_graph.inject_synthetic_target(address=address,
                                              target_type=target_type,
                                              dependencies=dependencies,
+                                             config=self._config,
                                              **kwargs)
     return self.build_graph.get_target(address)
 
@@ -332,7 +334,7 @@ class Context(object):
 
   def resolve(self, spec):
     """Returns an iterator over the target(s) the given address points to."""
-    self.build_graph.inject_spec_closure(spec)
+    self.build_graph.inject_spec_closure(spec, self.config)
     return self.build_graph.transitive_subgraph_of_addresses([SyntheticAddress.parse(spec)])
 
   def scan(self, root=None):
@@ -345,7 +347,7 @@ class Context(object):
     :param string root: The path to scan; by default, the build root.
     :returns: A new build graph encapsulating the targets found.
     """
-    build_graph = BuildGraph(self.address_mapper, self.config)
+    build_graph = BuildGraph(self.address_mapper)
     for address in self.address_mapper.scan_addresses(root, spec_excludes=self.spec_excludes):
-      build_graph.inject_address_closure(address)
+      build_graph.inject_address_closure(address, self._config)
     return build_graph
