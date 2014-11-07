@@ -17,6 +17,7 @@ class RoundEngineTest(EngineTestBase, BaseTest):
   def setUp(self):
     super(RoundEngineTest, self).setUp()
 
+    self.set_new_options_for_scope('', explain=False)
     self._context = self.context()
     self.assertTrue(self._context.is_unlocked())
 

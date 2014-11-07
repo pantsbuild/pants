@@ -42,42 +42,6 @@ class Goal(object):
     return goal_name if goal_name == task_name else '{0}.{1}'.format(goal_name, task_name)
 
   @staticmethod
-  def setup_parser(parser, args, goals):
-    """Set up an OptionParser with options info for a goal and its deps.
-    This readies the parser to handle options for this goal and its deps.
-    It does not set up everything you might want for displaying help.
-    For that, you want setup_parser_for_help.
-    """
-    visited = set()
-
-    def do_setup_parser(goal):
-      if goal not in visited:
-        visited.add(goal)
-        for dep in goal.dependencies:
-          do_setup_parser(dep)
-        for task_name in goal.ordered_task_names():
-          task_type = goal.task_type_by_name(task_name)
-          namespace = [task_name] if task_name == goal.name else [goal.name, task_name]
-          mkflag = Mkflag(*namespace)
-          title = task_type.options_scope
-
-          # See if an option group already exists (created by the legacy options code
-          # in the new options system.)
-          option_group = None
-          for og in parser.option_groups:
-            if og.title == title:
-              option_group = og
-              break
-
-          option_group = option_group or OptionGroup(parser, title=title)
-          task_type.setup_parser(option_group, args, mkflag)
-          if option_group.option_list:
-            parser.add_option_group(option_group)
-
-    for goal in goals:
-      do_setup_parser(goal)
-
-  @staticmethod
   def all():
     """Returns all registered goals, sorted alphabetically by name."""
     return [pair[1] for pair in sorted(Goal._goal_by_name.items())]

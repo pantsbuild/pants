@@ -1,9 +1,9 @@
 Set up Your Source Tree for Pants
 =================================
 
-**As of September 2014, this is only possible for Pants experts.** **The
-Pants community is actively working to improve it.** If you're setting
-up the Pants build tool to work in your source tree, you need to
+**As of September 2014, this much more complex than it should be.**
+**The Pants community is actively working to simplify it.**
+If you're setting up the Pants build tool to work in your source tree, you need to
 configure Pants' behavior. (Once it's set up, most folks should be able
 [[to use Pants as normal|pants('src/docs:first_concepts')]]
 and not worry about these things.)
@@ -22,6 +22,7 @@ parsed by
 [ConfigParser](http://docs.python.org/library/configparser.html). Thus,
 they look something like:
 
+    :::ini
     [section]
     setting1: value1
     setting2: value2
@@ -30,6 +31,7 @@ The `[DEFAULT]` section is special: its values are available in other
 sections. It's thus handy for defining values that will be used in
 several contexts, as in these excerpts that define/use `thrift_workdir`:
 
+    :::ini
     [DEFAULT]
     thrift_workdir: %(pants_workdir)s/thrift
 
@@ -46,8 +48,24 @@ since these values will be available in all those contexts. The code
 that combines DEFAULT values with others is in Pants'
 [base/config.py](https://github.com/pantsbuild/pants/blob/master/src/python/pants/base/config.py).
 
-Configure Code Layout with `source_root`
-----------------------------------------
+Configure Pants' own Runtime Dependencies
+-----------------------------------------
+
+Pants calls out to other tools. E.g., it uses `jmake` for part of Java compilation.
+Some special files in your workspace specify versions of these to fetch.
+When setting up your Pants repo, you want to copy these files over from a working Pants
+repo and perhaps change some version numbers to fit your situation.
+
+**JVM** `BUILD.tools` has JVM dependencies. For example, when Pants fetches `jmake`, it looks in
+`BUILD.tools` for that target:
+
+!inc[start-at=jmake&end-before=java](../../BUILD.tools)
+
+**Python** `build-support/python/pants.requirements.txt` has Pants' runtime Python requirements,
+expressed as a `requirements.txt` file.
+
+Configure Code Layout with `source_root`, `maven_layout`
+--------------------------------------------------------
 
 Maybe someday all the world's programmers will agree on the one true
 directory structure for source code. Until then, you'll want some
@@ -68,7 +86,7 @@ for examples of using this style source tree.
 
 If your top-level `BUILD` file is `top/BUILD` and your main Java code is
 in `top/src/java/com/foo/` and your Java tests are in
-`top/src/javatest/com/foo/`, then your top-level BUILD file might look
+`top/src/javatest/com/foo/`, then your top-level `BUILD` file might look
 like:
 
     :::python
@@ -90,7 +108,7 @@ under each source root:
 
 If your top-level `BUILD` file is `top/BUILD` and the Java code for your
 Theodore and Hank projects live in `top/theodore/src/java/com/foo/`,
-then your top-level BUILD file might not contain any `source_root`
+then your top-level `BUILD` file might not contain any `source_root`
 statements. Instead, `theodore/BUILD` and `hank/BUILD` might look like:
 
     :::python
@@ -135,23 +153,34 @@ keep internal. You can put open-source things in `BUILD.oss` and internal things
 `BUILD.internal`. Pants "sees" both of these. When shipping open-source code, you can hold back
 the `BUILD.internal` file.
 
+Configure JVM Artifact Publishing
+---------------------------------
+
+Pants uses `ivy` to publish artifacts. To specify where it should publish those artifacts,
+bring over a working `build-support/ivy/ivysettings.xml` file from a working Pants workspace
+and tweak to fit your situation. You can change the location of this file in `pants.ini`:
+
+    :::ini
+    [ivy]
+    ivy_settings: some/other/path/ivysettings.xml
+
+
 Integrate New Tools via a Pants Plugin
 --------------------------------------
 
-Pants knows how to build many things, but maybe you need it to learn a
-new tool. Maybe your organization has a custom linter, a custom code
-generator, or some other custom tool. Maybe your organization uses a
-tool that, while not custom, has not yet been integrated with Pants.
+Pants knows how to build many things, but maybe you need it to learn a new tool.
+Maybe your organization has a custom linter, a custom code generator, or some other custom tool.
+Maybe your organization uses a tool that, while not custom, has not yet been integrated with Pants.
 
--   If your organization has some custom tools to integrate,
-    set up a [[Pants plugin|pants('src/python/pants/docs:howto_plugin')]].
+-   If your organization has some custom tools to integrate, set up a
+    [[Pants plugin|pants('src/python/pants/docs:howto_plugin')]].
 -   If you want to integrate with a not-custom tool, you still want to
     set up a Pants plugin (or perhaps add abilities to an existing
     plugin), but it might make sense to
     [[get your changes in upstream|pants('src/python/pants/docs:howto_contribute')]].
 
-BUILD.\* in the source tree for special targets
------------------------------------------------
+`BUILD.*` in the source tree for special targets
+------------------------------------------------
 
 If you distribute code to different organizations, you might want to
 expose some targets to one organization but not to another. You can do
@@ -198,7 +227,7 @@ To tell Pants which artifact repsitory to publish to,
 [[Create a plugin|pants('src/python/pants/docs:howto_plugin')]]
 if you haven't already. Register it with Pants.
 
-In the plugin, define and register a `Repository` in a BUILD file alias
+In the plugin, define and register a `Repository` in a `BUILD` file alias
 as shown in
 [`src/python/internal_backend/repositories/register.py`](https://github.com/pantsbuild/pants/blob/master/src/python/internal_backend/repositories/register.py).
 

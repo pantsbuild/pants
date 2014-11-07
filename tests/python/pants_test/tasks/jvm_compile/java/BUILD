@@ -1,5 +1,5 @@
 python_test_suite(
-  name = 'java',
+  name = 'integration',
   dependencies = [
     ':test_java_compile_integration',
   ],

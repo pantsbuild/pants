@@ -5,12 +5,13 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from collections import defaultdict
+import argparse
 import inspect
 import optparse
 import re
 
 from docutils.core import publish_parts
+from pants.option.parser import Parser
 from twitter.common.collections.ordereddict import OrderedDict
 
 from pants.base.build_manual import get_builddict_info
@@ -428,13 +429,16 @@ def gen_goals_glopts_reference_data():
   return glopts
 
 
-def gref_template_data_from_options(og):
-  """Get data for the Goals Reference from an optparse.OptionGroup"""
-  if not og: return None
-  title = og.title or ""
-  xref = "".join([c for c in title if c.isalnum()])
+def gref_template_data_from_options(scope, argparser):
+  """Get data for the Goals Reference from a CustomArgumentParser instance."""
+  if not argparser: return None
+  title = scope or ''
+  xref = ''.join([c for c in title if c.isalnum()])
   option_l = []
-  for o in og.option_list:
+  for o in argparser.walk_actions():
+    st = '/'.join(o.option_strings)
+    # Argparse elides the type in various circumstances, so we have to reverse that logic here.
+    typ = o.type or (type(o.const) if isinstance(o, argparse._StoreConstAction) else str)
     default = None
     if o.default and not str(o.default).startswith("('NO',"):
       default = o.default
@@ -442,54 +446,42 @@ def gref_template_data_from_options(og):
     if o.help:
       hlp = indent_docstring_by_n(o.help.replace('[%default]', '').strip(), 6)
     option_l.append(TemplateData(
-        st=str(o),
+        st=st,
         default=default,
         hlp=hlp,
-        typ=o.type))
+        typ=typ.__name__))
   return TemplateData(
     title=title,
     options=option_l,
     xref=xref)
-
 
 def gen_tasks_goals_reference_data():
   """Generate the template data for the goals reference rst doc."""
   goal_dict = {}
   goal_names = []
   for goal in Goal.all():
-    parser = optparse.OptionParser(add_help_option=False)
-    Goal.setup_parser(parser, [], [goal])
-    options_by_title = defaultdict(lambda: None)
-    for group in parser.option_groups:
-      options_by_title[group.title] = group
-    found_option_groups = set()
     tasks = []
     for task_name in goal.ordered_task_names():
       task_type = goal.task_type_by_name(task_name)
       doc_rst = indent_docstring_by_n(task_type.__doc__ or '', 2)
       doc_html = rst_to_html(dedent_docstring(task_type.__doc__))
-      options_title = Goal.scope(goal.name, task_name)
-      og = options_by_title[options_title]
-      if og:
-        found_option_groups.add(options_title)
-      impl = '{0}.{1}'.format(task_type.__module__, task_type.__name__)
+      option_parser = Parser(env={}, config={}, scope='', parent_parser=None)
+      task_type.register_options(option_parser.register)
+      argparser = option_parser._help_argparser
+      scope = Goal.scope(goal.name, task_name)
+      # task_type may actually be a synthetic subclass of the authored class from the source code.
+      # We want to display the authored class's name in the docs (but note that we must use the
+      # subclass for registering options above)
+      for authored_task_type in task_type.mro():
+        if authored_task_type.__module__ != 'abc':
+          break
+      impl = '{0}.{1}'.format(authored_task_type.__module__, authored_task_type.__name__)
       tasks.append(TemplateData(
           impl=impl,
           doc_html=doc_html,
           doc_rst=doc_rst,
-          ogroup=gref_template_data_from_options(og)))
-
-    leftover_option_groups = []
-    for group in parser.option_groups:
-      if group.title in found_option_groups: continue
-      leftover_option_groups.append(gref_template_data_from_options(group))
-    leftover_options = []
-    for option in parser.option_list:
-      leftover_options.append(TemplateData(st=str(option)))
-    goal_dict[goal.name] = TemplateData(goal=goal,
-                                        tasks=tasks,
-                                        leftover_opts=leftover_options,
-                                        leftover_ogs=leftover_option_groups)
+          ogroup=gref_template_data_from_options(scope, argparser)))
+    goal_dict[goal.name] = TemplateData(goal=goal, tasks=tasks)
     goal_names.append(goal.name)
 
   goals = [goal_dict[name] for name in sorted(goal_names, key=lambda x: x.lower())]

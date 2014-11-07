@@ -12,7 +12,6 @@ test pants, and how to get your change committed.
 + [[Pants Developers Guide|pants('src/python/pants/docs:howto_develop')]]
 + [[Developing a Task|pants('src/python/pants/docs:dev_tasks')]]
 + [[Developing a Plugin|pants('src/python/pants/docs:howto_plugin')]]
-+ [[How to Customize Pants for Your Site|pants('src/python/pants/docs:howto_customize')]]
 + [[Pants Development with IntelliJ IDEA|pants('src/python/pants/docs:intellij')]]
 + [[Pants Internals|pants('src/python/pants/docs:internals')]]
 + [[Release Process|pants('src/python/pants/docs:release')]]

@@ -15,6 +15,15 @@ env:
     #
     # See: http://docs.travis-ci.com/user/encryption-keys/
     - secure: VvwbndU++a2/iNAjk9cd67ATiipDwqcKnxDR4/J2Ik3GH10wHEDUhJ1+MK4WLhedfaOakDOEmarZQS3GwtgvCHO3knpTJuJc8d/bCfZovYuSqdi//BEv4dS7hDt6tQeJfkbBjG0T4yNjPJ3W9R9KDWCy/vj2CUm90BGg2CmxUbg=
+  matrix:
+    # Everything except ITs
+    - CI_FLAGS="-c"
+    # Just ITs
+    # 4 shards gets them finishing faster than units for now.
+    - CI_FLAGS="-srpeat -i 4:0"
+    - CI_FLAGS="-srpeat -i 4:1"
+    - CI_FLAGS="-srpeat -i 4:2"
+    - CI_FLAGS="-srpeat -i 4:3"
 
 before_script: |
   ./build-support/bin/ci-sync.sh
@@ -22,7 +31,7 @@ before_script: |
 script: |
   uname -a
   java -version
-  ./build-support/bin/ci.sh -d
+  ./build-support/bin/ci.sh -d ${CI_FLAGS}
 
 # We accept the default travis-ci email author+comitter notification
 # for now which is enabled even with no `notifications` config.

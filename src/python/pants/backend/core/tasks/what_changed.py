@@ -62,11 +62,11 @@ class WhatChanged(ConsoleTask):
         build_graph.inject_address_closure(address)
       is_build_file = (build_file.full_path == os.path.join(get_buildroot(), path))
 
-      for target in build_graph.sorted_targets():
+      for target in build_graph.targets():
         # HACK: Python targets currently wrap old-style file resources in a synthetic
         # resources target, but they do so lazily, when target.resources is first accessed.
         # We force that access here, so that the targets will show up in the subsequent
-        # invocation of build_graph.sorted_targets().
+        # invocation of build_graph.targets().
         if target.has_resources:
           _ = target.resources
       for target in build_graph.sorted_targets():
