@@ -6,7 +6,7 @@ Python environments painless. You can organize your code in the
 [[Pants way|pants('src/docs:first_concepts')]]
 with targets for binaries, libraries, and
 tests. Pants builds Python code into
-[PEXes](https://github.com/twitter/commons/blob/master/src/python/twitter/common/python/README.md).
+[PEXes](https://github.com/pantsbuild/pex/blob/master/docs/whatispex.rst).
 (A PEX is, roughly, an archive file containing a runnable Python
 environment.) Pants isn't the only PEX-generation tool out there; but if
 you have some "common code" used by more than one PEX, Pants makes it
@@ -30,10 +30,9 @@ Relevant Goals and Targets
 **Runnable Binary**
 
 > Pants can generate PEXes, executables built from Python. Invoke the
-> <a xref="gref_goal_binary">`binary` goal</a> on a
+> <a xref="gref_goal_binary">`binary`</a> goal on a
 > <a xref="bdict_python_binary">`python_binary`</a> target to generate a `.pex`.
-> You can also invoke the
-> <a xref="gref_goal_run">run goal</a> on a
+> You can also invoke the <a xref="gref_goal_run">`run`</a> goal on a
 > `python_binary` to run its code "in place."
 
 **Importable Code**
@@ -41,8 +40,7 @@ Relevant Goals and Targets
 > <a xref="bdict_python_library">`python_library`</a> BUILD targets make Python
 > code "import-able". The rule of thumb is that each directory of `.py`
 > files has a `BUILD` file with a `python_library` target. A Python
-> target that has a `python_library` in its `dependencies` can import
-> its code.
+> target that has a `python_library` in its `dependencies` can import its code.
 >
 > To use code that's not in your workspace, use a
 > <a xref="bdict_python_requirement_library">`python_requirement_library`</a>
@@ -68,9 +66,8 @@ Relevant Goals and Targets
 BUILD for a Simple Binary
 -------------------------
 
-The pantsbuild/pants repo has a simple "hello world" sample Python
-binary. You can use `goal binary` to build a PEX from it. You can then
-run the PEX:
+The pantsbuild/pants repo has a simple "hello world" sample Python binary. You can use
+`goal binary` to build a PEX from it. You can then run the PEX:
 
     :::bash
     $ ./pants goal binary examples/src/python/example/hello/main
@@ -79,9 +76,8 @@ run the PEX:
     Hello, world!
     $
 
-`examples/src/python/example/hello/main/BUILD` defines a `python_binary`
-target, a build-able thing that configures a runnable program made from
-Python code:
+`examples/src/python/example/hello/main/BUILD` defines a `python_binary` target, a build-able
+thing that configures a runnable program made from Python code:
 
 !inc[start-after=Like Hello](hello/main/BUILD)
 
@@ -146,15 +142,14 @@ Handling `python_requirement`
 targets wrapping
 <a xref="bdict_python_requirements">`python_requirement`</a>s.
 
-Pants handles these dependencies for you. It never installs anything
-globally. Instead, it builds the dependencies, caches them in .pants.d,
-and assembles them *a la carte* into an execution environment.
+Pants handles these dependencies for you. It never installs anything globally.
+Instead, it builds the dependencies, caches them in `.pants.d`, and assembles them *a la carte*
+into an execution environment.
 
 PEX Contents
 ------------
 
-To build a PEX, invoke `./pants goal binary` on a `python_binary`
-target:
+To build a PEX, invoke `./pants goal binary` on a `python_binary` target:
 
     :::bash
     $ ./pants goal binary examples/src/python/example/hello/main
@@ -168,27 +163,14 @@ closure of hello/main's dependencies pulled in hello/greet and, in turn,
 hello/greet's dependencies. Pants bundles up the closed set of all
 dependencies into into the PEX.
 
-REPL and environment manipulation with pants py
------------------------------------------------
+Interactive Console with `repl`
+-------------------------------
 
-Pants has a "py" command that lets you manipulate the environments
-described by `python_binary` and `python_library` targets, such as drop
-into an interpreter with the environment set up for you. Note that's
-"py", **not** "goal py".
+Use the `repl` goal with a Python target to run an interactive Python REPL session.
+Within the session, you can `import` the target's code and the code of its dependencies.
 
-`pants py <target>`...
-
-1.  For a `python_binary` target, builds the environment and executes
-    the target.
-2.  For `python_library` targets, builds the environment that is the
-    transitive closure of all targets and drops into an interpreter.
-3.  For a combination of `python_binary` and `python_library` targets,
-    builds the transitive closure of all targets and executes the first
-    binary target.
-
-Let's drop into our library target
-`examples/src/python/example/hello/greet` with verbosity turn on to see
-what's going on in the background:
+To drop into our example library target `examples/src/python/example/hello/greet` with verbosity
+turn on to see what's going on in the background:
 
     :::bash
     $ PANTS_VERBOSE=1 ./pants py examples/src/python/example/hello/greet
@@ -197,7 +179,7 @@ what's going on in the background:
       Dumping library: PythonLibrary(BuildFileAddress(/Users/lhosken/workspace/pants/examples/src/python/example/hello/greet/BUILD, greet))
       Dumping requirement: ansicolors==1.0.2
       Dumping distribution: .../ansicolors-1.0.2-py2-none-any.whl
-    Python 2.6.8 (unknown, Mar  9 2014, 22:16:00)
+    Python 2.7.5 (default, Mar  9 2014, 22:15:05)
     [GCC 4.2.1 Compatible Apple LLVM 5.0 (clang-500.0.68)] on darwin
     Type "help", "copyright", "credits" or "license" for more information.
     (InteractiveConsole)
