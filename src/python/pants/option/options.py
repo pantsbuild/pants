@@ -162,8 +162,6 @@ class Options(object):
     if goals:
       for goal_name in goals:
         goal = Goal.by_name(goal_name)
-        # Register old-style options for the purpose of help-printing.
-        Goal.setup_parser(self._legacy_parser, [], [goal])
         if not goal.ordered_task_names():
           print('\nUnknown goal: %s' % goal_name)
         else:

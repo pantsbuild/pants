@@ -5,7 +5,7 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from argparse import ArgumentParser
+from argparse import ArgumentParser, _HelpAction
 import copy
 
 from pants.option.arg_splitter import GLOBAL_SCOPE
@@ -29,6 +29,13 @@ class ParseError(Exception):
 class CustomArgumentParser(ArgumentParser):
   def error(self, message):
     raise ParseError(message)
+
+  def walk_actions(self):
+    """Iterates over the argparse.Action objects for options registered on this parser."""
+    for action_group in self._action_groups:
+      for action in action_group._group_actions:
+        if not isinstance(action, _HelpAction):
+          yield action
 
 
 class Parser(object):

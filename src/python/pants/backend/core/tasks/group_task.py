@@ -248,24 +248,6 @@ class GroupTask(Task):
             member_type.register_options_on_scope(options)
 
         @classmethod
-        def setup_parser(cls, option_group, args, mkflag):
-          base_namespace = flag_namespace or mkflag.namespace
-          for member_type in cls._member_types():
-            member_namespace = base_namespace + [member_type.name()]
-            mkflag = Mkflag(*member_namespace)
-
-            # Hack to find the right option group. Ugly, but old options are
-            # going away soon anyway.
-            title = Goal.scope(cls.parent_options_scope, member_type.name())
-            member_og = None
-            for og in option_group.parser.option_groups:
-              if og.title == title:
-                member_og = og
-                break
-            member_og = member_og or OptionGroup(option_group.parser, title=title)
-            member_type.setup_parser(member_og, args, mkflag)
-
-        @classmethod
         def product_types(cls):
           return product_type
 
