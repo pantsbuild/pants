@@ -33,7 +33,7 @@ class TaskBase(AbstractClass):
 
   Provides the base lifecycle methods that allow a task to interact with the command line, other
   tasks and the user.  The lifecycle is linear and run via the following sequence:
-  1. setup_parser - expose command line flags
+  1. register_options - declare options configurable via cmd-line flag or config file.
   2. __init__ - distill configuration into the information needed to execute
   3. prepare - request any products needed from goal dependencies
 
@@ -72,15 +72,6 @@ class TaskBase(AbstractClass):
 
     Subclasses may override and call register(*args, **kwargs) with argparse arguments
     to register options.
-    """
-
-  @classmethod
-  def setup_parser(cls, option_group, args, mkflag):
-    """Set up the legacy cmd-line parser.
-
-    Subclasses can add flags to the pants command line using the given option group.
-    Flag names should be created with mkflag([name]) to ensure flags are properly name-spaced
-    amongst other tasks.
     """
 
   def __init__(self, context, workdir):
