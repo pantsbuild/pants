@@ -7,7 +7,6 @@ page(
     ':docs',
     ':howto_ask',
     ':howto_contribute',
-    ':howto_customize',
     ':howto_develop',
     ':howto_plugin',
     ':intellij',
@@ -49,15 +48,6 @@ page(
     ':howto_ask',
     ':howto_develop',
     ':internals',
-  ]
-)
-
-page(
-  name='howto_customize',
-  source='howto_customize.md',
-  links=[
-    ':howto_contribute',
-    ':howto_plugin'
   ]
 )
 
