@@ -133,45 +133,66 @@ set its `provides` to something like:
     :::python
     page(...
       provides=[
-        wiki_artifact(wiki='//:confluence',
+        wiki_artifact(wiki=confluence,
           space='ENG',
           title='Pants Hello World Example',
           parent='Examples',
         )
       ],)
 
-...assuming your workspace is set up with a wiki target named
-`confluence` in a top-level `BUILD` file (as described below).
+...assuming your workspace is set up for confluence publishing with a `Wiki` symbol named
+`confluence` set up in a plugin as described below:
 
 <a xmark="page_setup_confluence"></a>
 
 **Setting up your workspace for Confluence publish**
 
-That `wiki` specifies some information about your wiki
-server. So far, the only kind of thing you can publish to is a
-Confluence wiki. You want to specify its target. Do this in one of the
-`BUILD` files that's always processed (probably a top-directory `BUILD`
-file). If your Confluence server lived at wiki.archie.org, the target
-would probably look something like:
+That `wiki` specifies some information about your wiki server. So far, the only kind of thing you
+can publish to is a Confluence wiki. To set up and register this symbol, set up a
+[[Pants plugin|pants('src/python/pants/docs:howto_plugin')]] if your workspace doesn't already
+have one. In the plugin, define a `Wiki` and register it:
 
     :::python
     import urllib
 
+    from pants.backend.core.targets.doc import Wiki
+
     def confluence_url_builder(page, config):
-      return config['title'], 'https://wiki.archie.org/display/%s/%s' % (
+      title = config['title']
+      return title, 'https://wiki.archie.org/display/%s/%s' % (
         config['space'],
-        urllib.quote_plus(config['title']))
+        urllib.quote_plus(title))
 
-    # Use this wiki target's address for the wiki= param in your wiki_artifacts
-    confluence = wiki(name="confluence",
-                      url_builder=confluence_url_builder)
+    confluence_wiki = Wiki(name='confluence', url_builder=confluence_url_builder)
 
-You need to install a goal to enable publishing a doc to confluence. To
-do this, create a Pants plugin that installs a goal that subclasses
-ConfluencePublish.
+    # in register.py:
+    def build_file_aliases():
+      return BuildFileAliases.create(
+        # ...
+        objects={
+          # ...
+          'confluence', confluence_wiki},
+      )
 
-In your `pants.ini` file, add a section with the url of your wiki
-server. E.g., if your server is at wiki.archie.org, it would look like:
+You need to install a goal to enable publishing a doc to confluence. To do this, in your Pants
+plugin, install a goal that subclasses ConfluencePublish and register that goal.
 
-    [confluence-publish]
+    :::python
+    from pants.backend.core.tasks.confluence_publish import ConfluencePublish
+
+    class ArchieConfluence(ConfluencePublish):
+      def wiki(self):
+        return confluence_wiki
+      def api(self):
+        return 'confluence2'
+
+    # in register.py:
+    def register_goals():
+      # ...
+      task(name='confluence', action=ArchieConfluence, dependencies=['markdown']).install()
+
+In your `pants.ini` file, add a section with the url of your wiki server. E.g., if your server
+is at wiki.archie.org, it would look like:
+
+    [confluence]
     url: https://wiki.archie.org
