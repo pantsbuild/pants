@@ -55,8 +55,7 @@ class FileDepsTest(ConsoleTaskTest):
         self.create_files(path, sources)
       self.add_to_build_file(path, definition)
 
-    self.create_file('pants.ini',
-                     contents=dedent('''
+    self.create_ini_file(dedent('''
                        [scala-compile]
                        runtime-deps: ['tools:scala-library']
                      '''),

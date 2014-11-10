@@ -17,6 +17,7 @@ from pants.base.address import SyntheticAddress
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.exceptions import TaskError
+from pants.base.config import Config
 from pants.goal.context import Context
 from pants.util.dirutil import safe_rmtree
 
@@ -46,7 +47,7 @@ class ScroogeGenTest(TaskTest):
     safe_rmtree(self.task_outdir)
 
   def test_validate(self):
-    defaults = JavaThriftLibrary.Defaults()
+    defaults = JavaThriftLibrary.Defaults(Config.load())
 
     self.add_to_build_file('test_validate', dedent('''
       java_thrift_library(name='one',

@@ -345,7 +345,7 @@ class Context(object):
     :param string root: The path to scan; by default, the build root.
     :returns: A new build graph encapsulating the targets found.
     """
-    build_graph = BuildGraph(self.address_mapper)
+    build_graph = BuildGraph(self.address_mapper, self.config)
     for address in self.address_mapper.scan_addresses(root, spec_excludes=self.spec_excludes):
       build_graph.inject_address_closure(address)
     return build_graph

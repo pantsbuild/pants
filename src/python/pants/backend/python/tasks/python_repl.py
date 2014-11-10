@@ -10,6 +10,7 @@ from pex.pex import PEX
 from pants.backend.python.python_chroot import PythonChroot
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.tasks.python_task import PythonTask
+from pants.base.config import Config
 from pants.base.target import Target
 from pants.base.workunit import WorkUnit
 from pants.console import stty_utils
@@ -46,6 +47,7 @@ class PythonRepl(PythonTask):
         builder.set_entry_point(entry_point)
         chroot = PythonChroot(
           targets=targets,
+          config=Config.load(),
           extra_requirements=extra_requirements,
           builder=builder,
           interpreter=interpreter,

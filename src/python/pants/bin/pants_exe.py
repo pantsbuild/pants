@@ -151,9 +151,11 @@ def _run():
   build_configuration = load_build_configuration_from_source(additional_backends=backend_packages)
   build_file_parser = BuildFileParser(build_configuration=build_configuration,
                                       root_dir=root_dir,
-                                      run_tracker=run_tracker)
+                                      config=config,
+                                      run_tracker=run_tracker
+                                      )
   address_mapper = BuildFileAddressMapper(build_file_parser)
-  build_graph = BuildGraph(run_tracker=run_tracker, address_mapper=address_mapper)
+  build_graph = BuildGraph(run_tracker=run_tracker, address_mapper=address_mapper, config=config)
 
   command_class, command_args = _parse_command(root_dir, argv)
   command = command_class(run_tracker,
@@ -162,7 +164,8 @@ def _run():
                           command_args,
                           build_file_parser,
                           address_mapper,
-                          build_graph)
+                          build_graph,
+                          config=config)
   try:
     if command.serialized():
       def onwait(pid):

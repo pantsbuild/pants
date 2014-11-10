@@ -57,7 +57,7 @@ class JvmTargetTest(BaseTest):
     assert_dep(lib2.jar_dependencies[1], 'testOrg3', 'testName3', '789')
 
     jvm_target = JvmTarget(name='dummy', address=SyntheticAddress.parse("//:dummy"),
-                           build_graph=self.build_graph)
+                           build_graph=self.build_graph, config=self.config())
     deps = jvm_target.to_jar_dependencies([':lib1', ':lib2'])
     self.assertEquals(3, len(deps))
     assert_dep(lib1.jar_dependencies[0], 'testOrg1', 'testName1', '123')

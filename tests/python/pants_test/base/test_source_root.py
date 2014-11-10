@@ -12,6 +12,7 @@ from twitter.common.collections import OrderedSet
 
 from pants.base.address import parse_spec, SyntheticAddress
 from pants.base.addressable import AddressableCallProxy
+from pants.base.config import Config
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.source_root import SourceRoot, SourceRootTree
 from pants.base.target import Target
@@ -20,13 +21,13 @@ from pants.base.target import Target
 class TestTarget(Target):
   def __init__(self, spec):
     spec_path, target_name = parse_spec(spec)
-    super(TestTarget, self).__init__(target_name, SyntheticAddress.parse(spec), None)
+    super(TestTarget, self).__init__(target_name, SyntheticAddress.parse(spec), None, config=Config.load())
 
 
 class NotTestTarget(Target):
   def __init__(self, spec):
     spec_path, target_name = parse_spec(spec)
-    super(NotTestTarget, self).__init__(target_name, SyntheticAddress.parse(spec), None)
+    super(NotTestTarget, self).__init__(target_name, SyntheticAddress.parse(spec), None, config=Config.load())
 
 
 class SourceRootTest(unittest.TestCase):

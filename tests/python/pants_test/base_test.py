@@ -63,6 +63,12 @@ class BaseTest(unittest.TestCase):
       fp.write(contents)
     return path
 
+  def create_ini_file(self, contents, **kwargs):
+    self.create_file('pants.ini', contents, **kwargs)
+    # Since the ini was modified, we need a new build graph w/ a fresh config
+    self.build_graph = BuildGraph(address_mapper=self.address_mapper, config=self.config())
+
+
   def add_to_build_file(self, relpath, target):
     """Adds the given target specification to the BUILD file at relpath.
 
@@ -83,6 +89,7 @@ class BaseTest(unittest.TestCase):
     target = target_type(name=address.target_name,
                          address=address,
                          build_graph=self.build_graph,
+                         config=Config.load(),
                          **kwargs)
     dependencies = dependencies or []
     dependencies.extend(resources or [])
@@ -107,9 +114,9 @@ class BaseTest(unittest.TestCase):
     self.create_file('pants.ini')
     build_configuration = BuildConfiguration()
     build_configuration.register_aliases(self.alias_groups)
-    self.build_file_parser = BuildFileParser(build_configuration, self.build_root)
+    self.build_file_parser = BuildFileParser(build_configuration, self.build_root, self.config())
     self.address_mapper = BuildFileAddressMapper(self.build_file_parser)
-    self.build_graph = BuildGraph(address_mapper=self.address_mapper)
+    self.build_graph = BuildGraph(address_mapper=self.address_mapper, config=self.config())
 
   def config(self, overrides=''):
     """Returns a config valid for the test build root."""

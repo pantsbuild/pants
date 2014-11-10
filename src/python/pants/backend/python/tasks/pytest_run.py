@@ -47,6 +47,7 @@ class PytestRun(PythonTask):
           args.extend(safe_shlex_split(options))
       test_builder = PythonTestBuilder(targets=test_targets,
                                        args=args,
+                                       config=self.context.config,
                                        interpreter=self.interpreter,
                                        conn_timeout=self.conn_timeout,
                                        fast=self.get_options().fast,

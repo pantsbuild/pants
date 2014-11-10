@@ -10,7 +10,6 @@ import traceback
 
 from twitter.common.collections import OrderedSet
 
-from pants.base.config import Config
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.commands.command import Command
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
@@ -27,7 +26,7 @@ class Build(Command):
                      "  %prog build (options) [spec] (build args)\n"
                      "  %prog build (options) [spec]... -- (build args)")
     parser.add_option("-t", "--timeout", dest="conn_timeout", type="int",
-                      default=Config.load().getdefault('connection_timeout'),
+                      default=self.config.getdefault('connection_timeout'),
                       help="Number of seconds to wait for http connections.")
     parser.add_option('-i', '--interpreter', dest='interpreters', default=[], action='append',
                       help="Constrain what Python interpreters to use.  Uses Requirement "
@@ -49,8 +48,6 @@ class Build(Command):
       self.error("A spec argument is required")
 
     self._verbose = self.old_options.verbose
-
-    self.config = Config.load()
 
     interpreters = self.old_options.interpreters or [b'']
     self.interpreter_cache = PythonInterpreterCache(self.config, logger=self.debug)
@@ -120,7 +117,7 @@ class Build(Command):
 
   def _python_build(self, targets):
     try:
-      executor = PythonBuilder(self.run_tracker)
+      executor = PythonBuilder(self.run_tracker, self.config)
       return executor.build(
         targets,
         self.build_args,

@@ -26,7 +26,6 @@ from twitter.common.lang import Compatibility
 from pants.backend.python.python_chroot import PythonChroot
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.targets.python_tests import PythonTests
-from pants.base.config import Config
 from pants.base.target import Target
 from pants.util.contextutil import temporary_file, temporary_dir, environment_as
 from pants.util.dirutil import safe_mkdir, safe_open
@@ -65,7 +64,8 @@ class PythonTestBuilder(object):
     PythonRequirement('unittest2py3k', version_filter=lambda py, pl: py.startswith('3'))
   ]
 
-  def __init__(self, targets, args, interpreter=None, conn_timeout=None, fast=False, debug=False):
+  def __init__(self, targets, args, config, interpreter=None, conn_timeout=None, fast=False,
+               debug=False):
     self._targets = targets
     self._args = args
     self._interpreter = interpreter or PythonInterpreter.get()
@@ -77,6 +77,7 @@ class PythonTestBuilder(object):
     self._fast = fast
 
     self._debug = debug
+    self._config = config
 
   def run(self, stdout=None, stderr=None):
     if self._fast:
@@ -277,7 +278,7 @@ class PythonTestBuilder(object):
           # producing just 1 console and 1 html report whether or not the tests are run in fast
           # mode.
           relpath = Target.maybe_readable_identify(targets)
-          pants_distdir = Config.load().getdefault('pants_distdir')
+          pants_distdir = self._config.getdefault('pants_distdir')
           target_dir = os.path.join(pants_distdir, 'coverage', relpath)
           safe_mkdir(target_dir)
           pex.run(args=['html', '-i', '--rcfile', coverage_rc, '-d', target_dir],
@@ -289,6 +290,7 @@ class PythonTestBuilder(object):
     builder.info.entry_point = 'pytest'
     chroot = PythonChroot(
       targets=targets,
+      config=self._config,
       extra_requirements=self._TESTING_TARGETS,
       builder=builder,
       platforms=('current',),

@@ -61,7 +61,6 @@ class GoalRunner(Command):
 
   def __init__(self, *args, **kwargs):
     self.targets = []
-    self.config = Config.load()
     known_scopes = ['']
     for goal in Goal.all():
       # Note that enclosing scopes will appear before scopes they enclose.
@@ -72,7 +71,7 @@ class GoalRunner(Command):
     # self.new_options set up because the superclass ctor calls our register_options().
     # Fortunately this will all go away once we're fully off the old "Command" mechanism.
     legacy_parser = args[2] if len(args) > 2 else kwargs['parser']
-    self.new_options = Options(os.environ.copy(), self.config, known_scopes, args=sys.argv,
+    self.new_options = Options(os.environ.copy(), kwargs['config'], known_scopes, args=sys.argv,
                                legacy_parser=legacy_parser)
     super(GoalRunner, self).__init__(*args, **kwargs)
 

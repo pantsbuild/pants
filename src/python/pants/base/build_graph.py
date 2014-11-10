@@ -25,9 +25,10 @@ class BuildGraph(object):
   class TransitiveLookupError(AddressLookupError):
     """Used to append the current node to the error message from an AddressLookupError """
 
-  def __init__(self, address_mapper, run_tracker=None):
+  def __init__(self, address_mapper, config, run_tracker=None):
     self._address_mapper = address_mapper
     self.run_tracker = run_tracker
+    self._config = config
     self.reset()
 
   def reset(self):
@@ -285,6 +286,7 @@ class BuildGraph(object):
     target = target_type(name=address.target_name,
                          address=address,
                          build_graph=self,
+                         config=self._config,
                          **kwargs)
     self.inject_target(target, dependencies=dependencies, derived_from=derived_from)
 
@@ -357,6 +359,7 @@ class BuildGraph(object):
     try:
       target = addressable.get_target_type()(build_graph=self,
                                              address=address,
+                                             config=self._config,
                                              **addressable.kwargs)
       target.with_description(addressable.description)
       return target

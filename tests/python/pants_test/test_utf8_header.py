@@ -27,9 +27,10 @@ class Utf8HeaderTest(unittest.TestCase):
     backend_packages = config.getlist('backends', 'packages')
     build_configuration = load_build_configuration_from_source(backend_packages)
     build_file_parser = BuildFileParser(root_dir=get_buildroot(),
-                                        build_configuration=build_configuration)
+                                        build_configuration=build_configuration,
+                                        config=Config.load())
     address_mapper = BuildFileAddressMapper(build_file_parser)
-    build_graph = BuildGraph(address_mapper=address_mapper)
+    build_graph = BuildGraph(address_mapper=address_mapper, config=Config.load())
 
     for address in address_mapper.scan_addresses(
         get_buildroot(), spec_excludes=[config.getdefault('pants_workdir')]):

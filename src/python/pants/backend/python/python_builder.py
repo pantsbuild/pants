@@ -14,8 +14,9 @@ from pants.backend.python.targets.python_tests import PythonTests
 
 
 class PythonBuilder(object):
-  def __init__(self, run_tracker):
+  def __init__(self, run_tracker, config):
     self._run_tracker = run_tracker
+    self._config = config
 
   def build(self, targets, args, interpreter=None, conn_timeout=None, fast_tests=False,
             debug=False):
@@ -37,6 +38,7 @@ class PythonBuilder(object):
     rv = PythonTestBuilder(
         test_targets,
         args,
+        self._config,
         interpreter=interpreter,
         conn_timeout=conn_timeout,
         fast=fast_tests,
@@ -48,6 +50,7 @@ class PythonBuilder(object):
       rv = PythonBinaryBuilder(
           binary_target,
           self._run_tracker,
+          self._config,
           interpreter=interpreter,
           conn_timeout=conn_timeout).run()
       if rv != 0:

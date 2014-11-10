@@ -12,6 +12,7 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.base.build_file_aliases import BuildFileAliases
+from pants.base.build_graph import BuildGraph
 from pants_test.base_test import BaseTest
 
 
@@ -32,7 +33,7 @@ class ScalaLibraryTest(BaseTest):
   def setUp(self):
     super(ScalaLibraryTest, self).setUp()
 
-    self.create_file('pants.ini', dedent('''
+    self.create_ini_file(dedent('''
         [scala-compile]
         runtime-deps: []
         '''))

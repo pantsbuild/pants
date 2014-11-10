@@ -13,6 +13,7 @@ from pants.base.address import SyntheticAddress
 from pants.base.build_configuration import BuildConfiguration
 from pants.base.build_file import BuildFile
 from pants.base.build_graph import BuildGraph
+from pants.base.config import Config
 from pants.base.target import Target
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import touch
@@ -33,7 +34,7 @@ class BuildConfigurationTest(unittest.TestCase):
     self.assertEqual(dict(fred=Fred), aliases.targets)
 
     build_file = BuildFile('/tmp', 'fred', must_exist=False)
-    parse_state = self.build_configuration.initialize_parse_state(build_file)
+    parse_state = self.build_configuration.initialize_parse_state(build_file, Config.load())
 
     self.assertEqual(0, len(parse_state.registered_addressable_instances))
     self.assertEqual(2, len(parse_state.parse_globals))
@@ -52,7 +53,8 @@ class BuildConfigurationTest(unittest.TestCase):
     with self.assertRaises(TypeError):
       self.build_configuration.register_target_alias('fred', object())
 
-    target = Target('fred', SyntheticAddress.parse('a:b'), BuildGraph(address_mapper=None))
+    config = Config.load()
+    target = Target('fred', SyntheticAddress.parse('a:b'), BuildGraph(address_mapper=None, config=config), config)
     with self.assertRaises(TypeError):
       self.build_configuration.register_target_alias('fred', target)
 
@@ -65,7 +67,7 @@ class BuildConfigurationTest(unittest.TestCase):
     self.assertEqual(dict(jane=42), aliases.objects)
 
     build_file = BuildFile('/tmp', 'jane', must_exist=False)
-    parse_state = self.build_configuration.initialize_parse_state(build_file)
+    parse_state = self.build_configuration.initialize_parse_state(build_file, Config.load())
 
     self.assertEqual(0, len(parse_state.registered_addressable_instances))
     self.assertEqual(2, len(parse_state.parse_globals))
@@ -131,7 +133,7 @@ class BuildConfigurationTest(unittest.TestCase):
       build_file_path = os.path.join(root, 'george', 'BUILD')
       touch(build_file_path)
       build_file = BuildFile(root, 'george')
-      parse_state = self.build_configuration.initialize_parse_state(build_file)
+      parse_state = self.build_configuration.initialize_parse_state(build_file, Config.load())
 
       self.assertEqual(0, len(parse_state.registered_addressable_instances))
       self.assertEqual(2, len(parse_state.parse_globals))

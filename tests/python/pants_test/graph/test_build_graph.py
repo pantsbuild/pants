@@ -63,7 +63,7 @@ class BuildGraphTest(BaseTest):
       build_configuration = BuildConfiguration()
       build_configuration.register_target_alias('fake', Target)
       parser = BuildFileParser(build_configuration, root_dir=root_dir)
-      build_graph = BuildGraph(self.address_mapper)
+      build_graph = BuildGraph(self.address_mapper, config=self.config())
       parser.inject_spec_closure_into_build_graph(':foo', build_graph)
       self.assertEqual(len(build_graph.dependencies_of(SyntheticAddress.parse(':foo'))), 1)
 
@@ -130,7 +130,8 @@ class BuildGraphTest(BaseTest):
     self.assertFalse(self.build_graph.contains_address(a))
     target = Target(name='a',
                     address=a,
-                    build_graph=self.build_graph)
+                    build_graph=self.build_graph,
+                    config=self.config())
     self.build_graph.inject_target(target)
     self.assertTrue(self.build_graph.contains_address(a))
 

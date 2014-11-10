@@ -12,7 +12,6 @@ import time
 from pex.interpreter import PythonInterpreter
 from pex.pex_builder import PEXBuilder
 
-from pants.base.config import Config
 from pants.backend.python.python_chroot import PythonChroot
 from pants.backend.python.targets.python_binary import PythonBinary
 
@@ -21,14 +20,13 @@ class PythonBinaryBuilder(object):
   class NotABinaryTargetException(Exception):
     pass
 
-  def __init__(self, target, run_tracker, interpreter=None, conn_timeout=None):
+  def __init__(self, target, run_tracker, config, interpreter=None, conn_timeout=None):
     self.target = target
     self.interpreter = interpreter or PythonInterpreter.get()
     if not isinstance(target, PythonBinary):
       raise PythonBinaryBuilder.NotABinaryTargetException(
           "Target %s is not a PythonBinary!" % target)
 
-    config = Config.load()
     self.distdir = config.getdefault('pants_distdir')
     distpath = tempfile.mktemp(dir=self.distdir, prefix=target.name)
 
@@ -43,6 +41,7 @@ class PythonBinaryBuilder(object):
 
     self.chroot = PythonChroot(
         targets=[target],
+        config=config,
         builder=builder,
         platforms=target.platforms,
         interpreter=self.interpreter,

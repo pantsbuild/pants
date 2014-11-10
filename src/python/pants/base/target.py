@@ -167,7 +167,7 @@ class Target(AbstractTarget):
     ids = list(ids)  # We can't len a generator.
     return ids[0] if len(ids) == 1 else cls.combine_ids(ids)
 
-  def __init__(self, name, address, build_graph, payload=None, exclusives=None, tags=None):
+  def __init__(self, name, address, build_graph, config, payload=None, exclusives=None, tags=None):
     """
     :param string name: The name of this target, which combined with this
       build file defines the target address.
@@ -175,6 +175,7 @@ class Target(AbstractTarget):
     :type dependencies: list of target specs
     :param Address address: The Address that maps to this Target in the BuildGraph
     :param BuildGraph build_graph: The BuildGraph that this Target lives within
+    :param Config config: data from a config file (must support config.get(section, name, default=)).
     :param Payload payload: The configuration encapsulated by this target.  Also in charge of
       most fingerprinting details.
     :param exclusives: An optional map of exclusives tags.
@@ -199,6 +200,7 @@ class Target(AbstractTarget):
       for k in exclusives:
         self.declared_exclusives[k].add(exclusives[k])
     self.exclusives = None
+    self._config = config
 
     self._cached_fingerprint_map = {}
     self._cached_transitive_fingerprint_map = {}
