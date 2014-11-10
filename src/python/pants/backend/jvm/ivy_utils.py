@@ -10,7 +10,6 @@ from contextlib import contextmanager
 import errno
 import os
 import pkgutil
-import re
 import threading
 import xml
 
@@ -53,20 +52,13 @@ class IvyInfo(object):
 
 
 class IvyUtils(object):
+  """Useful methods related to interaction with ivy."""
+
   IVY_TEMPLATE_PACKAGE_NAME = __name__
   IVY_TEMPLATE_PATH = os.path.join('tasks', 'templates', 'ivy_resolve', 'ivy.mustache')
 
-  """Useful methods related to interaction with ivy."""
-  def __init__(self, config, options, log):
+  def __init__(self, config, log):
     self._log = log
-
-    # TODO(pl): This is super awful, but options doesn't have a nice way to get out
-    # attributes that might not be there, and even then the attribute value might be
-    # None, which we still want to override
-    # Benjy thinks we should probably hoist these options to the global set of options,
-    # rather than just keeping them within IvyResolve.setup_parser
-    self._mutable_pattern = (getattr(options, 'ivy_mutable_pattern', None) or
-                             config.get('ivy-resolve', 'mutable_pattern', default=None))
 
     self._transitive = config.getbool('ivy-resolve', 'transitive', default=True)
     self._args = config.getlist('ivy-resolve', 'args', default=[])
@@ -75,40 +67,6 @@ class IvyUtils(object):
     self._jvm_options.append('-Dsun.io.useCanonCaches=false')
     self._workdir = os.path.join(config.getdefault('pants_workdir'), 'ivy')
     self._template_path = self.IVY_TEMPLATE_PATH
-
-    if self._mutable_pattern:
-      try:
-        self._mutable_pattern = re.compile(self._mutable_pattern)
-      except re.error as e:
-        raise TaskError('Invalid mutable pattern specified: %s %s' % (self._mutable_pattern, e))
-
-    def parse_override(override):
-      match = re.match(r'^([^#]+)#([^=]+)=([^\s]+)$', override)
-      if not match:
-        raise TaskError('Invalid dependency override: %s' % override)
-
-      org, name, rev_or_url = match.groups()
-
-      def fmt_message(message, template):
-        return message % dict(
-            overridden='%s#%s;%s' % (template.org, template.module, template.version),
-            rev=rev_or_url,
-            url=rev_or_url)
-
-      def replace_rev(template):
-        self._log.info(fmt_message('Overrode %(overridden)s with rev %(rev)s', template))
-        return template.extend(version=rev_or_url, url=None, force=True)
-
-      def replace_url(template):
-        self._log.info(fmt_message('Overrode %(overridden)s with snapshot at %(url)s', template))
-        return template.extend(version='SNAPSHOT', url=rev_or_url, force=True)
-
-      replace = replace_url if re.match(r'^\w+://.+', rev_or_url) else replace_rev
-      return (org, name), replace
-    self._overrides = {}
-    # TODO(pl): See above comment wrt options
-    if hasattr(options, 'ivy_resolve_overrides') and options.ivy_resolve_overrides:
-      self._overrides.update(parse_override(o) for o in options.ivy_resolve_overrides)
 
   @staticmethod
   def _generate_exclude_template(exclude):
@@ -173,22 +131,25 @@ class IvyUtils(object):
     symlink_map = dict(zip(paths, new_paths))
     return symlink_map
 
-  def identify(self, targets):
+  @staticmethod
+  def identify(targets):
     targets = list(targets)
     if len(targets) == 1 and targets[0].is_jvm and getattr(targets[0], 'provides', None):
       return targets[0].provides.org, targets[0].provides.name
     else:
       return 'internal', Target.maybe_readable_identify(targets)
 
-  def xml_report_path(self, targets, conf):
+  @classmethod
+  def xml_report_path(cls, targets, conf):
     """The path to the xml report ivy creates after a retrieve."""
-    org, name = self.identify(targets)
+    org, name = cls.identify(targets)
     cachedir = Bootstrapper.instance().ivy_cache_dir
     return os.path.join(cachedir, '%s-%s-%s.xml' % (org, name, conf))
 
-  def parse_xml_report(self, targets, conf):
+  @classmethod
+  def parse_xml_report(cls, targets, conf):
     """Returns the IvyInfo representing the info in the xml report, or None if no report exists."""
-    path = self.xml_report_path(targets, conf)
+    path = cls.xml_report_path(targets, conf)
     if not os.path.exists(path):
       return None
 
@@ -323,8 +284,6 @@ class IvyUtils(object):
   def _is_mutable(self, jar):
     if jar.mutable is not None:
       return jar.mutable
-    if self._mutable_pattern:
-      return self._mutable_pattern.match(jar.rev)
     return False
 
   def _generate_jar_template(self, jar, confs):
@@ -338,8 +297,7 @@ class IvyUtils(object):
         transitive=jar.transitive,
         artifacts=jar.artifacts,
         configurations=[conf for conf in jar.configurations if conf in confs])
-    override = self._overrides.get((jar.org, jar.name))
-    return override(template) if override else template
+    return template
 
   def mapto_dir(self):
     """Subclasses can override to establish an isolated jar mapping directory."""

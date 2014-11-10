@@ -13,7 +13,7 @@ from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 
 class ImportsUtil(IvyUtils):
   def __init__(self, context):
-    super(ImportsUtil, self).__init__(context.config, context.options, context.log)
+    super(ImportsUtil, self).__init__(context.config, context.log)
 
   def is_mappable_artifact(self, org, name, path):
     return path.endswith('.jar') and super(ImportsUtil, self).is_mappable_artifact(org, name, path)

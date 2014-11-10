@@ -91,6 +91,7 @@ page(
   name='setup_repo',
   source='setup_repo.md',
   links=[
+    ':build_files',
     ':first_concepts',
     ':publish',
     'src/python/pants/docs:dev_tasks',

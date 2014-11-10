@@ -103,9 +103,6 @@ class Depmap(ConsoleTask):
     self.separator = self.get_options().separator
     self.project_info = self.get_options().project_info
     self.format = self.get_options().project_info_formatted
-    self._ivy_utils = IvyUtils(config=self.context.config,
-                               options=self.context.options,
-                               log=self.context.log)
 
   def console_output(self, targets):
     if len(self.context.target_roots) == 0:
@@ -231,7 +228,7 @@ class Depmap(ConsoleTask):
   def project_info_output(self, targets):
     targets_map = {}
     resource_target_map = {}
-    ivy_info = self._ivy_utils.parse_xml_report(targets, 'default')
+    ivy_info = IvyUtils.parse_xml_report(targets, 'default')
 
     def process_target(current_target):
       """
