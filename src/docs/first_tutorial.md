@@ -63,7 +63,7 @@ someday we won't need to use this magic word anymore.
 `test` is a *goal*, a "verb" that Pants knows about. The `test` goal runs tests and reports results.
 
 Some goals are `gen` (generate code from Thrift, Antlr, Protocol
-Buffer), `compile`, and `eclipse` (generate an Eclipse project). Pants
+Buffer), `compile`, and `test` (run tests and report results). Pants
 knows that some of these goals depend on each other. E.g., in this
 example, before it run tests, it must compile the code.
 
