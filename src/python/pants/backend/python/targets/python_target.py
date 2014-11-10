@@ -144,7 +144,6 @@ class PythonTarget(Target):
       synthetic_address = SyntheticAddress.parse(spec=spec)
 
     self._build_graph.inject_synthetic_target(synthetic_address, Resources,
-                                              config=self._config,
                                               sources=self.payload.resources.source_paths,
                                               derived_from=self)
     return self._build_graph.get_target(synthetic_address)

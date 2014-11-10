@@ -25,9 +25,10 @@ class BuildGraph(object):
   class TransitiveLookupError(AddressLookupError):
     """Used to append the current node to the error message from an AddressLookupError """
 
-  def __init__(self, address_mapper, run_tracker=None):
+  def __init__(self, address_mapper, config, run_tracker=None):
     self._address_mapper = address_mapper
     self.run_tracker = run_tracker
+    self._config = config
     self.reset()
 
   def reset(self):
@@ -259,7 +260,6 @@ class BuildGraph(object):
   def inject_synthetic_target(self,
                               address,
                               target_type,
-                              config,
                               dependencies=None,
                               derived_from=None,
                               **kwargs):
@@ -286,21 +286,21 @@ class BuildGraph(object):
     target = target_type(name=address.target_name,
                          address=address,
                          build_graph=self,
-                         config=config,
+                         config=self._config,
                          **kwargs)
     self.inject_target(target, dependencies=dependencies, derived_from=derived_from)
 
-  def inject_address(self, address, config):
+  def inject_address(self, address):
     """Delegates to an internal AddressMapper to resolve, construct, and inject a Target.
 
     :param Address address: The address to inject.  Must be resolvable by `self._address_mapper`.
     """
     if not self.contains_address(address):
       target_addressable = self._address_mapper.resolve(address)
-      target = self.target_addressable_to_target(address, target_addressable, config)
+      target = self.target_addressable_to_target(address, target_addressable)
       self.inject_target(target)
 
-  def inject_address_closure(self, address, config):
+  def inject_address_closure(self, address):
     """Recursively calls `inject_address` through the transitive closure of dependencies."""
 
     if address in self._addresses_already_closed:
@@ -315,18 +315,16 @@ class BuildGraph(object):
       dep_addresses = list(mapper.specs_to_addresses(target_addressable.dependency_specs,
                                                      relative_to=address.spec_path))
       for dep_address in dep_addresses:
-        self.inject_address_closure(dep_address, config)
+        self.inject_address_closure(dep_address)
 
       if not self.contains_address(address):
-        target = self.target_addressable_to_target(address, target_addressable, config)
+        target = self.target_addressable_to_target(address, target_addressable)
         self.inject_target(target, dependencies=dep_addresses)
       else:
         target = self.get_target(address)
 
       for traversable_spec in target.traversable_dependency_specs:
-        self.inject_spec_closure(spec=traversable_spec,
-                                 config=config,
-                                 relative_to=address.spec_path)
+        self.inject_spec_closure(spec=traversable_spec, relative_to=address.spec_path)
         traversable_spec_target = self.get_target_from_spec(traversable_spec,
                                                             relative_to=address.spec_path)
         if traversable_spec_target not in target.dependencies:
@@ -335,8 +333,7 @@ class BuildGraph(object):
           target.mark_transitive_invalidation_hash_dirty()
 
       for traversable_spec in target.traversable_specs:
-        self.inject_spec_closure(spec=traversable_spec, config=config,
-                                 relative_to=address.spec_path)
+        self.inject_spec_closure(spec=traversable_spec, relative_to=address.spec_path)
         target.mark_transitive_invalidation_hash_dirty()
 
     except AddressLookupError as e:
@@ -344,16 +341,16 @@ class BuildGraph(object):
                                        .format(message=e, spec=address.spec))
 
 
-  def inject_spec_closure(self, spec, config, relative_to=''): #TODO
+  def inject_spec_closure(self, spec, relative_to=''):
     """Constructs a SyntheticAddress from `spec` and calls `inject_address_closure`.
 
     :param string spec: A Target spec
     :param string relative_to: The spec_path of the BUILD file this spec was read from.
     """
     address = self._address_mapper.spec_to_address(spec, relative_to=relative_to)
-    self.inject_address_closure(address, config)
+    self.inject_address_closure(address)
 
-  def target_addressable_to_target(self, address, addressable, config):
+  def target_addressable_to_target(self, address, addressable):
     """Realizes a TargetAddressable into a Target at `address`.
 
     :param TargetAddressable addressable:
@@ -362,7 +359,7 @@ class BuildGraph(object):
     try:
       target = addressable.get_target_type()(build_graph=self,
                                              address=address,
-                                             config=config,
+                                             config=self._config,
                                              **addressable.kwargs)
       target.with_description(addressable.description)
       return target

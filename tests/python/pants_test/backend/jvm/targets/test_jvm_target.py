@@ -43,13 +43,13 @@ class JvmTargetTest(BaseTest):
       ],
     )
     '''))
-    self.build_graph.inject_spec_closure('//:lib1', self.config())
+    self.build_graph.inject_spec_closure('//:lib1')
     lib1 = self.build_graph.get_target(SyntheticAddress.parse('//:lib1'))
     self.assertIsInstance(lib1, JarLibrary)
     self.assertEquals(1, len(lib1.jar_dependencies))
     assert_dep(lib1.jar_dependencies[0], 'testOrg1', 'testName1', '123')
 
-    self.build_graph.inject_spec_closure('//:lib2', self.config())
+    self.build_graph.inject_spec_closure('//:lib2')
     lib2 = self.build_graph.get_target(SyntheticAddress.parse('//:lib2'))
     self.assertIsInstance(lib2, JarLibrary)
     self.assertEquals(2, len(lib2.jar_dependencies))

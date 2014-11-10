@@ -30,11 +30,11 @@ class Utf8HeaderTest(unittest.TestCase):
                                         build_configuration=build_configuration,
                                         config=Config.load())
     address_mapper = BuildFileAddressMapper(build_file_parser)
-    build_graph = BuildGraph(address_mapper=address_mapper)
+    build_graph = BuildGraph(address_mapper=address_mapper, config=Config.load())
 
     for address in address_mapper.scan_addresses(
         get_buildroot(), spec_excludes=[config.getdefault('pants_workdir')]):
-      build_graph.inject_address_closure(address, config)
+      build_graph.inject_address_closure(address)
 
     def has_hand_coded_python_files(tgt):
       return (not tgt.is_synthetic) and tgt.is_original and tgt.has_sources('.py')

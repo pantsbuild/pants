@@ -73,7 +73,7 @@ class Filter(ConsoleTask):
       # filter specs may not have been parsed as part of the context: force parsing
       matches = set()
       for address in addresses:
-        self.context.build_graph.inject_address_closure(address, self.context.config)
+        self.context.build_graph.inject_address_closure(address)
         matches.add(self.context.build_graph.get_target(address))
       if not matches:
         raise TaskError('No matches for address selector: {spec}'.format(spec=spec))
