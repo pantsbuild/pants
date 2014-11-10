@@ -5,11 +5,11 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-import pytest
+from collections import OrderedDict
 import shlex
 import unittest2 as unittest
 
-from pants.option.arg_splitter import ArgSplitter, ArgSplitterError
+from pants.option.arg_splitter import ArgSplitter
 
 
 class ArgSplitterTest(unittest.TestCase):
@@ -34,17 +34,21 @@ class ArgSplitterTest(unittest.TestCase):
     self._split('./pants goal -f', {'': ['-f']}, [])
     self._split('./pants --compile-java-long-flag -f compile -g compile.java -x test.junit -i '
                 'src/java/com/pants/foo src/java/com/pants/bar:baz',
-                {'': ['-f'], 'compile': ['-g'], 'compile.java': ['--long-flag', '-x'],
-                 'test.junit': ['-i']},
+                OrderedDict([
+                  ('', ['-f']),
+                  ('compile.java', ['--long-flag', '-x']),
+                  ('compile', ['-g']),
+                  ('test.junit', ['-i'])
+                ]),
                 ['src/java/com/pants/foo', 'src/java/com/pants/bar:baz'])
     self._split('./pants -farg --fff=arg compile --gg-gg=arg-arg -g test.junit --iii '
                 '--compile-java-long-flag src/java/com/pants/foo src/java/com/pants/bar:baz',
-                {
-                  '': ['-farg', '--fff=arg'],
-                  'compile': ['--gg-gg=arg-arg', '-g'],
-                  'compile.java': ['--long-flag'],
-                  'test.junit': ['--iii']
-                },
+                OrderedDict([
+                  ('', ['-farg', '--fff=arg']),
+                  ('compile', ['--gg-gg=arg-arg', '-g']),
+                  ('test.junit', ['--iii']),
+                  ('compile.java', ['--long-flag']),
+                ]),
                 ['src/java/com/pants/foo', 'src/java/com/pants/bar:baz'])
 
     # Distinguishing goals and target specs.
