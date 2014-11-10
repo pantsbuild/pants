@@ -1,0 +1,13 @@
+digraph G {
+  compound=true;
+  rankdir=RL;
+  node [shape=box];
+
+  subgraph cluster_gen {
+    label="gen goal";
+    color=blue;
+    protoc;
+    scrooge;
+    thrift;
+  }
+}
