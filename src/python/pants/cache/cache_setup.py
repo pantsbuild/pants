@@ -76,7 +76,7 @@ def create_artifact_cache(log, artifact_root, spec, task_name, compression,
   if isinstance(spec, basestring):
     if spec.startswith('/') or spec.startswith('~'):
       path = os.path.join(spec, task_name)
-      log.info('{0} {1} local artifact cache at {2}'.format(task_name, action, path))
+      log.debug('{0} {1} local artifact cache at {2}'.format(task_name, action, path))
       return LocalArtifactCache(artifact_root, path, compression)
     elif is_remote(spec):
       # Caches are supposed to be close, and we don't want to waste time pinging on no-op builds.
@@ -85,7 +85,7 @@ def create_artifact_cache(log, artifact_root, spec, task_name, compression,
       best_url = select_best_url(spec, pinger, log)
       if best_url:
         url = best_url.rstrip('/') + '/' + task_name
-        log.info('{0} {1} remote artifact cache at {2}'.format(task_name, action, url))
+        log.debug('{0} {1} remote artifact cache at {2}'.format(task_name, action, url))
         local = local or TempLocalArtifactCache(artifact_root)
         return RESTfulArtifactCache(artifact_root, url, local)
       else:

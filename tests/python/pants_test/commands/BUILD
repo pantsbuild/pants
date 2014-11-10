@@ -11,7 +11,6 @@ python_test_suite(
 python_test_suite(
   name = 'commands',
   dependencies = [
-    ':test_goal',
     ':test_setup_py',
   ]
 )
@@ -20,17 +19,6 @@ python_test_suite(
   name = 'integration',
   dependencies = [
     ':test_spec_exclude_integration',
-  ]
-)
-
-python_tests(
-  name = 'test_goal',
-  sources = [ 'test_goal.py' ],
-  dependencies = [
-    'src/python/pants/backend/jvm:plugin',
-    'src/python/pants/commands:goal_runner',
-    'src/python/pants/goal',
-    'tests/python/pants_test:base_test',
   ]
 )
 

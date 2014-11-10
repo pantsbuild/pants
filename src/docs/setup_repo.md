@@ -125,12 +125,33 @@ Or:
     source_root('src/javatest', doc, java_library, java_tests, page)
     ...
 
-#### `BUILD.*` and environment-specific config
+Setting up `BUILD` files
+------------------------
 
-When we say `BUILD` files were named `BUILD`, we really meant `BUILD` or
-<tt>BUILD.*something*</tt>. If you have some rules that make sense for folks in
-one environment but not others, you might put them into a separate `BUILD`
-file named <tt>BUILD.*something*</tt>.
+Pants is well-suited to large multi-project workspaces. You probably have a lot of code
+organized in a big directory tree. [[The usual BUILD file advice|pants('src/docs:build_files')]]
+applies here.
+
+<a xmark="setup_mvn2pants"> </a>
+
+**If you're converting a `mvn`-built workspace to use Pants**, you can get a head start by using
+information from your `pom.xml` files. The [`mvn2pants`](https://github.com/ericzundel/mvn2pants)
+shows some scripts that convert `pom.xml` files into `BUILD` files; Square wrote and used these
+to convert some projects. This can get you up and running with Pants faster. Careful, though:
+Maven projects tend to be "coarser-grained" than Pants projects. Once you have things working,
+you'll probably want to replace the big automatically-generated targets with things that follow
+the 1:1:1 rule.
+
+`BUILD.*` and environment-specific config
+-----------------------------------------
+
+When we say `BUILD` files are named `BUILD`, we really mean `BUILD` or <tt>BUILD.*something*</tt>.
+If you have some rules that make sense for folks in one environment but not others, you might put
+them into a separate BUILD file named <tt>BUILD.*something*</tt>. For example, you might have
+some `BUILD` config that you'd like to ship with your open-source code but some other parts to
+keep internal. You can put open-source things in `BUILD.oss` and internal things in
+`BUILD.internal`. Pants "sees" both of these. When shipping open-source code, you can hold back
+the `BUILD.internal` file.
 
 Configure JVM Artifact Publishing
 ---------------------------------
@@ -142,6 +163,7 @@ and tweak to fit your situation. You can change the location of this file in `pa
     :::ini
     [ivy]
     ivy_settings: some/other/path/ivysettings.xml
+
 
 Integrate New Tools via a Pants Plugin
 --------------------------------------
