@@ -15,17 +15,9 @@ from pants.backend.jvm.ivy_utils import IvyUtils
 from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.util.contextutil import temporary_file_path
 from pants_test.base_test import BaseTest
-from pants_test.base.context_utils import create_config
 
 
 class IvyUtilsTestBase(BaseTest):
-  @staticmethod
-  def create_options(**kwargs):
-    options = dict(ivy_mutable_pattern=None,
-                   ivy_resolve_overrides=None)
-    options.update(**kwargs)
-    return options
-
   @property
   def alias_groups(self):
     return register_core().merge(register_jvm())
@@ -55,7 +47,8 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
         """))
 
     self.simple = self.target('src/java/targets:simple')
-    self.ivy_utils = IvyUtils(create_config(), self.create_options(), logging.Logger('test'))
+    context = self.context()
+    self.ivy_utils = IvyUtils(context.config, logging.Logger('test'))
 
   def test_force_override(self):
     jars = list(self.simple.payload.jars)

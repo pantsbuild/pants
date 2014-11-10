@@ -73,7 +73,6 @@ class TaskTest(BaseTest):
 
     task_type.options_scope = 'test'
     task_type.register_options_on_scope(new_options)
-    task_type.setup_parser(option_group, args, mkflag)
     old_options, _ = parser.parse_args(args or [])
 
     run_tracker = create_run_tracker()

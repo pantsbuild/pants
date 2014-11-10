@@ -69,9 +69,7 @@ class IvyResolve(NailgunTask, IvyTaskMixin, JvmToolTaskMixin):
                                        ini_key='bootstrap-tools',
                                        default=['//:xalan'])
 
-    self._ivy_utils = IvyUtils(config=self.context.config,
-                               options=self.context.options,
-                               log=self.context.log)
+    self._ivy_utils = IvyUtils(config=self.context.config, log=self.context.log)
 
     # Typically this should be a local cache only, since classpaths aren't portable.
     self.setup_artifact_cache_from_config(config_section=self._CONFIG_SECTION)
@@ -137,6 +135,8 @@ class IvyResolve(NailgunTask, IvyTaskMixin, JvmToolTaskMixin):
     if create_jardeps_for:
       genmap = self.context.products.get('jar_dependencies')
       for target in filter(create_jardeps_for, targets):
+        # TODO: Add mapjars to IvyTaskMixin? Or get rid of the mixin? It's weird that we use
+        # self.ivy_resolve for some ivy invocations but this for others.
         self._ivy_utils.mapjars(genmap, target, executor=executor,
                                 workunit_factory=self.context.new_workunit)
 
@@ -150,7 +150,7 @@ class IvyResolve(NailgunTask, IvyTaskMixin, JvmToolTaskMixin):
     """Populate the build products with an IvyInfo object for each generated ivy report."""
     ivy_products = self.context.products.get_data('ivy_jar_products') or defaultdict(list)
     for conf in self._confs:
-      ivyinfo = self._ivy_utils.parse_xml_report(targets, conf)
+      ivyinfo = IvyUtils.parse_xml_report(targets, conf)
       if ivyinfo:
         # Value is a list, to accommodate multiple exclusives groups.
         ivy_products[conf].append(ivyinfo)
@@ -181,7 +181,7 @@ class IvyResolve(NailgunTask, IvyTaskMixin, JvmToolTaskMixin):
     classpath = self.tool_classpath(self._ivy_bootstrap_key, self.create_java_executor())
 
     reports = []
-    org, name = self._ivy_utils.identify(targets)
+    org, name = IvyUtils.identify(targets)
     xsl = os.path.join(self._cachedir, 'ivy-report.xsl')
 
     # Xalan needs this dir to exist - ensure that, but do no more - we have no clue where this
@@ -190,7 +190,7 @@ class IvyResolve(NailgunTask, IvyTaskMixin, JvmToolTaskMixin):
 
     for conf in self._confs:
       params = dict(org=org, name=name, conf=conf)
-      xml = self._ivy_utils.xml_report_path(targets, conf)
+      xml = IvyUtils.xml_report_path(targets, conf)
       if not os.path.exists(xml):
         make_empty_report(xml, org, name, conf)
       out = os.path.join(self._outdir, '%(org)s-%(name)s-%(conf)s.html' % params)

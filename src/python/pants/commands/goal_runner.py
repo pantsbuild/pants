@@ -234,8 +234,6 @@ class GoalRunner(Command):
         args[:] = augmented_args
         sys.stderr.write("(using pantsrc expansion: pants goal %s)\n" % ' '.join(augmented_args))
 
-    Goal.setup_parser(parser, args, self.goals)
-
   def run(self, lock):
     # TODO(John Sirois): Consider moving to straight python logging.  The divide between the
     # context/work-unit logging and standard python logging doesn't buy us anything.

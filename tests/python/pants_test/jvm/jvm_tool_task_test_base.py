@@ -23,7 +23,6 @@ class JvmToolTaskTestBase(TaskTestBase):
 
   def setUp(self):
     real_config = self.config()
-
     super(JvmToolTaskTestBase, self).setUp()
 
     def link(path, optional=False, force=False):
