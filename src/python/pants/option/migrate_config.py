@@ -44,7 +44,7 @@ migrations = {
 
 
 def check_config_file(path):
-  config = Config.load(configpath=path)
+  config = Config.from_cache(configpath=path)
 
   print('Checking config file at {0} for unmigrated keys.'.format(path), file=sys.stderr)
   def section(s):
