@@ -18,7 +18,7 @@ GLOBAL_OPTIONS = [
   Option('-h', '--help', action='store_true', dest='help', default=False,
          help='Show this help message.'),
   Option('-t', '--timeout', dest='conn_timeout', type='int',
-         default=Config.load().getdefault('connection_timeout'),
+         default=Config.from_cache().getdefault('connection_timeout'),
          help='Number of seconds to wait for http connections.'),
   Option('-x', '--time', action='store_true', dest='time', default=False,
          help='Times tasks and goals and outputs a report.'),
