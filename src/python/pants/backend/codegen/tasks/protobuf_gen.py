@@ -7,6 +7,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from collections import defaultdict
 from hashlib import sha1
+import itertools
 import os
 import re
 import subprocess
@@ -51,6 +52,7 @@ class ProtobufGen(CodeGen):
              legacy='protobuf_gen_langs')
 
   def __init__(self, *args, **kwargs):
+    """Generates Java and Python files from .proto files using the Google protobuf compiler."""
     super(ProtobufGen, self).__init__(*args, **kwargs)
 
     self.protoc_supportdir = self.context.config.get('protobuf-gen', 'supportdir',
@@ -79,15 +81,15 @@ class ProtobufGen(CodeGen):
     round_manager.require_data('ivy_imports')
   # TODO https://github.com/pantsbuild/pants/issues/604 prep finish
 
-  def resolve_deps(self, key, default=[]):
+  def resolve_deps(self, key, default=None):
+    default = default or []
     deps = OrderedSet()
     for dep in self.context.config.getlist('protobuf-gen', key, default=maybe_list(default)):
-      if dep:
-        try:
-          deps.update(self.context.resolve(dep))
-        except AddressLookupError as e:
-          raise self.DepLookupError("{message}\n  referenced from [{section}] key: {key} in pants.ini"
-                                    .format(message=e, section='protobuf-gen', key=key))
+      try:
+        deps.update(self.context.resolve(dep))
+      except AddressLookupError as e:
+        raise self.DepLookupError("{message}\n  referenced from [{section}] key: {key} in pants.ini"
+                                  .format(message=e, section='protobuf-gen', key=key))
     return deps
 
   @property
@@ -141,10 +143,9 @@ class ProtobufGen(CodeGen):
 
   def genlang(self, lang, targets):
     sources_by_base = self._calculate_sources(targets)
-    sources = reduce(lambda a,b: a^b, sources_by_base.values(), OrderedSet())
+    sources = OrderedSet(itertools.chain.from_iterable(sources_by_base.values()))
     bases = OrderedSet(sources_by_base.keys())
     bases.update(self._proto_path_imports(targets))
-
     check_duplicate_conflicting_protos(sources_by_base, sources, self.context.log)
 
     if lang == 'java':
@@ -154,10 +155,10 @@ class ProtobufGen(CodeGen):
       output_dir = self.py_out
       gen_flag = '--python_out'
     else:
-      raise TaskError('Unrecognized protobuf gen lang: %s' % lang)
+      raise TaskError('Unrecognized protobuf gen lang: {0}'.format(lang))
 
     safe_mkdir(output_dir)
-    gen = '%s=%s' % (gen_flag, output_dir)
+    gen = '{0}={1}'.format(gen_flag, output_dir)
 
     args = [self.protobuf_binary, gen]
 
@@ -165,30 +166,33 @@ class ProtobufGen(CodeGen):
       for plugin in self.plugins:
         # TODO(Eric Ayers) Is it a good assumption that the generated source output dir is
         # acceptable for all plugins?
-        args.append("--%s_protobuf_out=%s" % (plugin, output_dir))
+        args.append("--{0}_protobuf_out={1}".format(plugin, output_dir))
 
     for base in bases:
-      args.append('--proto_path=%s' % base)
+      args.append('--proto_path={0}'.format(base))
 
     args.extend(sources)
-    log.debug('Executing: %s' % '\\\n  '.join(args))
+    log.debug('Executing: {0}'.format('\\\n  '.join(args)))
     process = subprocess.Popen(args)
     result = process.wait()
     if result != 0:
-      raise TaskError('%s ... exited non-zero (%i)' % (self.protobuf_binary, result))
+      raise TaskError('{0} ... exited non-zero ({1})'.format(self.protobuf_binary, result))
 
   def _calculate_sources(self, targets):
-    walked_targets = set()
-    for target in targets:
-      walked_targets.update(t for t in target.closure() if self.is_gentarget(t))
-
+    gentargets = OrderedSet()
+    def add_to_gentargets(target):
+      if self.is_gentarget(target):
+        gentargets.add(target)
+    self.context.build_graph.walk_transitive_dependency_graph(
+      [target.address for target in targets],
+      add_to_gentargets,
+      postorder=True)
     sources_by_base = OrderedDict()
-    for target in self.context.build_graph.targets():
-      if target in walked_targets:
-        base, sources = target.target_base, target.sources_relative_to_buildroot()
-        if base not in sources_by_base:
-          sources_by_base[base] = OrderedSet()
-        sources_by_base[base].update(sources)
+    for target in gentargets:
+      base, sources = target.target_base, target.sources_relative_to_buildroot()
+      if base not in sources_by_base:
+        sources_by_base[base] = OrderedSet()
+      sources_by_base[base].update(sources)
     return sources_by_base
 
   def createtarget(self, lang, gentarget, dependees):
@@ -197,7 +201,7 @@ class ProtobufGen(CodeGen):
     elif lang == 'python':
       return self._create_python_target(gentarget, dependees)
     else:
-      raise TaskError('Unrecognized protobuf gen lang: %s' % lang)
+      raise TaskError('Unrecognized protobuf gen lang: {0}'.format(lang))
 
   def _create_java_target(self, target, dependees):
     genfiles = []

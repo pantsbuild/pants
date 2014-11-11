@@ -16,10 +16,16 @@ OPTION_PARSER = re.compile(r'^\s*option\s+([^ =]+)\s*=\s*([^\s]+)\s*;\s*$')
 SERVICE_PARSER = re.compile(r'^\s*(service)\s+([^\s{]+).*')
 MESSAGE_PARSER = re.compile(r'^\s*(message)\s+([^\s{]+).*')
 ENUM_PARSER = re.compile(r'^\s*(enum)\s+([^\s{]+).*')
+EXTEND_PARSER = re.compile(r'^\s*(extend)\s+([^\s{]+).*')
 
+PROTO_FILENAME_PATTERN = re.compile(r'^(.*).proto$')
 
-class ProtobufParse():
+class ProtobufParse(object):
   """Parses a .proto file. """
+
+  class InvalidProtoFilenameError(Exception):
+    """Raised if an unexpected filename is passed"""
+    pass
 
   def __init__(self, path, source):
     """
@@ -32,6 +38,7 @@ class ProtobufParse():
     self.package = ''
     self.multiple_files = False
     self.services = set()
+    self.extends = set()
     self.outer_class_name = get_outer_class_name(source)
 
     # Note that nesting of types isn't taken into account
@@ -73,7 +80,10 @@ class ProtobufParse():
             if match:
               update_type_list(match, type_depth, self.messages)
               continue
-
+            match = EXTEND_PARSER.match(line)
+            if match:
+              update_type_list(match, type_depth, self.extends)
+              continue
     if java_package:
       self.package = java_package
 
@@ -81,6 +91,15 @@ class ProtobufParse():
     with open(self.path, 'r') as protobuf:
       lines = protobuf.readlines()
     return lines
+
+  @property
+  def filename(self):
+    ''':return: the name of the file without the directory or .proto extension.'''
+    name = os.path.basename(self.path)
+    match = PROTO_FILENAME_PATTERN.match(name)
+    if not name:
+      raise self.InvalidProtoFilenameError("{0}does not end with .proto".format(self.path))
+    return match.group(1)
 
 
 def update_type_list(match, type_depth, outer_types):

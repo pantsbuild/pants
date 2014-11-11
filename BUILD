@@ -31,6 +31,7 @@ source_root('examples/src/python', page, python_binary, python_library, resource
 source_root('examples/src/resources', page, resources, jaxb_library)
 source_root('examples/src/scala', jvm_binary, page, scala_library, benchmark)
 source_root('examples/src/thrift', java_thrift_library, page, python_thrift_library)
+source_root('examples/src/wire', java_wire_library, page)
 
 source_root('examples/tests/java', java_library, junit_tests, page)
 source_root('examples/tests/python', page, python_library, python_tests, python_test_suite, python_binary, resources)
