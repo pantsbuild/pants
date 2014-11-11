@@ -4,10 +4,28 @@ digraph G {
   node [shape=box];
 
   subgraph cluster_gen {
-    label="gen goal";
+    label="goal gen";
     color=blue;
-    protoc;
-    scrooge;
-    thrift;
+    scrooge protoc thrift;
   }
+
+  subgraph cluster_resolve {
+    label="goal resolve";
+    color=blue;
+    ivy;
+  }
+
+  subgraph cluster_compile {
+    label="goal compile";
+    color=blue;
+    jvm scalastyle;
+  }
+
+  subgraph cluster_test {
+    label="goal test";
+    color=blue;
+    junit prep pytest;
+  }
+
+  junit -> jvm -> ivy -> scrooge;
 }

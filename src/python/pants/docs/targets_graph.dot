@@ -7,9 +7,9 @@ digraph G {
   libc [label="scala_library"];
   libd [label="scala_library"];
 
-  jara [label="jar"];
+  jara [label="jar_library"];
 
-  thrifta [label="thrift_library"]
+  thrifta [label="java_thrift_library"]
 
   bina -> javaliba -> javalibb -> jara;
   javalibb -> thrifta;
