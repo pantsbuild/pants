@@ -12,7 +12,6 @@ python_library(
     'src/python/pants/base:target',
     'src/python/pants/commands:goal_runner',
     'src/python/pants/goal:context',
-    'src/python/pants/goal:mkflag',
     'src/python/pants/goal',
     'tests/python/pants_test/base:context_utils',
     'tests/python/pants_test:base_test',

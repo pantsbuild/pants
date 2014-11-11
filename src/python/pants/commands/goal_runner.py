@@ -74,7 +74,7 @@ class GoalRunner(Command):
     legacy_parser = args[2] if len(args) > 2 else kwargs['parser']
     self.new_options = Options(os.environ.copy(), self.config, known_scopes, args=sys.argv,
                                legacy_parser=legacy_parser)
-    super(GoalRunner, self).__init__(*args, **kwargs)
+    super(GoalRunner, self).__init__(*args, needs_old_options=False, **kwargs)
 
   def get_spec_excludes(self):
     spec_excludes = self.config.getlist(Config.DEFAULT_SECTION, 'spec_excludes',
@@ -83,6 +83,9 @@ class GoalRunner(Command):
        return [self.config.getdefault('pants_workdir')]
     return  [os.path.join(self.root_dir, spec_exclude) for spec_exclude in spec_excludes]
 
+  @property
+  def global_options(self):
+    return self.new_options.for_global_scope()
 
   @contextmanager
   def check_errors(self, banner):
@@ -185,16 +188,16 @@ class GoalRunner(Command):
     # context/work-unit logging and standard python logging doesn't buy us anything.
 
     # Enable standard python logging for code with no handle to a context/work-unit.
-    if self.old_options.log_level:
-      LogOptions.set_stderr_log_level((self.old_options.log_level or 'info').upper())
-      logdir = self.old_options.logdir or self.config.get('goals', 'logdir', default=None)
+    if self.global_options.level:
+      LogOptions.set_stderr_log_level((self.global_options.level or 'info').upper())
+      logdir = self.global_options.logdir or self.config.get('goals', 'logdir', default=None)
       if logdir:
         safe_mkdir(logdir)
         LogOptions.set_log_dir(logdir)
 
         prev_log_level = None
         # If quiet, temporarily change stderr log level to kill init's output.
-        if self.old_options.quiet:
+        if self.global_options.quiet:
           prev_log_level = LogOptions.loglevel_name(LogOptions.stderr_log_level())
           # loglevel_name can fail, so only change level if we were able to get the current one.
           if prev_log_level is not None:
@@ -233,11 +236,11 @@ class GoalRunner(Command):
           mapping[matched_pattern].append(target)
       return mapping
 
-    is_explain = self.old_options.explain
-    update_reporting(self.old_options, is_quiet_task() or is_explain, self.run_tracker)
+    is_explain = self.global_options.explain
+    update_reporting(self.global_options, is_quiet_task() or is_explain, self.run_tracker)
 
-    if self.old_options.target_excludes:
-      excludes = self.old_options.target_excludes
+    if self.global_options.exclude_target_regexp:
+      excludes = self.global_options.exclude_target_regexp
       log.debug('excludes:\n  {excludes}'.format(excludes='\n  '.join(excludes)))
       by_pattern = targets_by_pattern(self.targets, excludes)
       self.targets = by_pattern[_UNMATCHED_KEY]
@@ -253,7 +256,6 @@ class GoalRunner(Command):
 
     context = Context(
       config=self.config,
-      old_options=self.old_options,
       new_options=self.new_options,
       run_tracker=self.run_tracker,
       target_roots=self.targets,
