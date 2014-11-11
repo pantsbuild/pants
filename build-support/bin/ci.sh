@@ -1,19 +1,6 @@
 #!/usr/bin/env bash
 
-source build-support/set_archflags.sh
-
-function banner() {
-  echo
-  echo "[== $@ ==]"
-  echo
-}
-
-function die() {
-  if (( $# > 0 )); then
-    echo -e "\n$@"
-  fi
-  exit 1
-}
+source build-support/common.sh
 
 function usage() {
   echo "Runs commons tests for local or hosted CI."
