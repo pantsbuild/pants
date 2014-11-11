@@ -8,7 +8,7 @@ REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd "$(git rev-parse --show-topl
 source ${REPO_ROOT}/build-support/common.sh
 
 
-if [[ -z "$PY" ]]; then
+if [[ -z "${PY}" ]]; then
   if which python2.7 >/dev/null; then
     PY=`which python2.7`
   else
@@ -16,21 +16,21 @@ if [[ -z "$PY" ]]; then
   fi
 fi
 
-log "Using $PY"
+log "Using ${PY}"
 
 HERE=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
-BOOTSTRAP_FILE=$HERE/virtualenv-${VIRTUALENV_VERSION}/BOOTSTRAPPED
+BOOTSTRAP_FILE=${HERE}/virtualenv-${VIRTUALENV_VERSION}/BOOTSTRAPPED
 if ! [ -f "${BOOTSTRAP_FILE}" ]; then
-  pushd "$HERE"
+  pushd "${HERE}"
   VIRTUALENV_PACKAGE_FULL_URL=${VIRTUALENV_PACKAGE_LOCATION}/virtualenv-${VIRTUALENV_VERSION}.tar.gz
   log "Downloading ${VIRTUALENV_PACKAGE_FULL_URL}..."
   curl -O ${VIRTUALENV_PACKAGE_FULL_URL} || \
     die "Failed to download ${VIRTUALENV_PACKAGE_FULL_URL}."
-  tar zxvf virtualenv-$VIRTUALENV_VERSION.tar.gz || \
+  tar zxvf virtualenv-${VIRTUALENV_VERSION}.tar.gz || \
     die "Failed to extract ${VIRTUALENV_PACKAGE_FULL_URL}."
   # TODO(ksweeney): Checksum
   touch ${BOOTSTRAP_FILE}  # 2PC
   popd
 fi
 
-exec "$PY" "$HERE/virtualenv-${VIRTUALENV_VERSION}/virtualenv.py" "$@"
+exec "${PY}" "${HERE}/virtualenv-${VIRTUALENV_VERSION}/virtualenv.py" "$@"
