@@ -55,7 +55,8 @@ conflicts with other pip-installed applications.
 PEX-based Installation
 ----------------------
 
-To support hermetic builds and not depend on a local pants installation
-(e.g.: CI machines may prohibit software installation), some sites fetch
-a pre-build pants.pex whose version is checked-into pants.ini.
-
+To support hermetic builds and not depend on a local pants installation (e.g.: CI machines may
+prohibit software installation), some sites fetch a pre-build `pants.pex` whose version is
+checked-into `pants.ini`. To upgrade pants, generate a `pants.pex` and upload it to a file
+server at a location computable from the version number. Set up the workspace's `./pants` script
+to check the `.ini` file for a version number and download from the correct spot.

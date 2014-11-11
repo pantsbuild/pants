@@ -10,9 +10,11 @@ specify how to build those directories' source code. Both tools use the
 configuration-snippet files to build up a model of your source code,
 then execute tasks in a lifecycle over that model. Pants targets tend to
 be finer-grained than Maven's projects; but if you use subprojects in
-Maven, Pants targets might feel familiar. Both expect code to be laid
-out in directories in a consistent way. If you're used to Maven's
-commands, many of Pants' goals will feel eerily familiar.
+Maven, Pants targets might feel familiar. (If you're converting Maven
+`pom.xml`s to `BUILD` files, <a xref="setup_mvn2pants">some scripts written by others who
+have done the same</a> can give you a head start.)
+Both Maven and Pants expect code to be laid out in directories in a consistent way. If you're used
+to Maven's commands, many of Pants' goals will feel eerily familiar.
 
 Pants uses Ivy to manage artifact fetching and publishing; Ivy's
 behavior here is pretty similar to Maven.

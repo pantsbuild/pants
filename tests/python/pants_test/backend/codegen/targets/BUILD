@@ -3,13 +3,23 @@
 
 target(name='targets',
   dependencies=[
-    ":java_protobuf_library"
+    ':java_protobuf_library',
+    ':java_wire_library'
   ]
 )
 
 python_tests(
   name = 'java_protobuf_library',
   sources = ['test_java_protobuf_library.py'],
+  dependencies = [
+    'src/python/pants/backend/codegen/targets:java',
+    'tests/python/pants_test:base_test',
+    ]
+)
+
+python_tests(
+  name = 'java_wire_library',
+  sources = ['test_java_wire_library.py'],
   dependencies = [
     'src/python/pants/backend/codegen/targets:java',
     'tests/python/pants_test:base_test',

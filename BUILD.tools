@@ -128,3 +128,12 @@ jar_library(name = 'jar-tool',
               jar(org = 'com.twitter.common', name = 'jar-tool', rev = '0.1.7')
             ])
 
+jar_library(name = 'wire-runtime',
+            jars = [
+              jar(org = 'com.squareup.wire', name = 'wire-runtime', rev = '1.6.0')
+            ])
+
+jar_library(name = 'wire-compiler',
+            jars = [
+              jar(org = 'com.squareup.wire', name = 'wire-compiler', rev = '1.6.0')
+            ])

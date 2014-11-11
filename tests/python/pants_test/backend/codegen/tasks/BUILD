@@ -5,6 +5,7 @@ python_test_suite(
   name = 'tasks',
   dependencies = [
     ':protobuf_parse',
+    ':wire_gen',
   ],
 )
 
@@ -15,5 +16,16 @@ python_tests(
     'src/python/pants/backend/codegen/tasks:protobuf_parse',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/tasks:base',
+  ],
+)
+
+python_tests(
+  name = 'wire_gen',
+  sources = ['test_wire_gen.py'],
+  dependencies = [
+    'src/python/pants/backend/codegen/tasks:wire_gen',
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test/tasks:base',
+    'tests/python/pants_test/jvm:jar_task_test_base',
   ],
 )

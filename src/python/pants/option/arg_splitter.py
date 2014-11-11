@@ -5,7 +5,7 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from collections import defaultdict, namedtuple
+from collections import namedtuple, OrderedDict
 import sys
 
 
@@ -19,8 +19,9 @@ class ArgSplitterError(Exception):
 class SplitArgs(namedtuple('SplitArgs', ['scope_to_flags', 'targets', 'passthru'])):
   """The result of splitting args.
 
-  scope_to_flags: A map from scope name to the list of flags belonging to that scope.
+  scope_to_flags: An ordered map from scope name to the list of flags belonging to that scope.
                   The global scope is specified as an empty string.
+                  Keys are in the order encountered in the args.
   targets: A list of target specs.
   passthru: Any remaining args specified after a -- separator.
   """
@@ -63,7 +64,13 @@ class ArgSplitter(object):
 
     Returns a SplitArgs tuple.
     """
-    scope_to_flags = defaultdict(list)
+    scope_to_flags = OrderedDict()
+
+    def add_scope(s):
+      # Force the scope to appear, even if empty.
+      if s not in scope_to_flags:
+        scope_to_flags[s] = []
+
     targets = []
     passthru = []
 
@@ -81,15 +88,17 @@ class ArgSplitter(object):
 
     def assign_flag_to_scope(flag, default_scope):
       flag_scope, descoped_flag = self._descope_flag(flag, default_scope=default_scope)
+      if flag_scope not in scope_to_flags:
+        scope_to_flags[flag_scope] = []
       scope_to_flags[flag_scope].append(descoped_flag)
 
     global_flags = self._consume_flags()
-    scope_to_flags[GLOBAL_SCOPE].extend([])  # Force the scope to appear, even if empty.
+    add_scope(GLOBAL_SCOPE)
     for flag in global_flags:
       assign_flag_to_scope(flag, GLOBAL_SCOPE)
     scope, flags = self._consume_scope()
     while scope:
-      scope_to_flags[scope].extend([])  # Force the scope to appear, even if empty.
+      add_scope(scope)
       for flag in flags:
         assign_flag_to_scope(flag, scope)
       scope, flags = self._consume_scope()

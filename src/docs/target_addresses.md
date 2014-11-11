@@ -117,7 +117,6 @@ excluded from the list of targets:
     tests/python/pants_test:all
     tests/python/pants_test/cache:cache
     tests/python/pants_test/commands:commands
-    tests/python/pants_test/commands:test_goal
     ...
     tests/python/pants_test/tasks:sorttargets
     tests/python/pants_test/tasks:targets_help

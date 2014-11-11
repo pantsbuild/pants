@@ -40,20 +40,6 @@ def create_new_options(new_options):
 
   return TestOptions()
 
-def create_options(options_hash=None):
-  """Creates an old-style options object populated with no options at all by default.
-
-  :param dict options_hash: An optional dict of option values.
-  """
-  opts = options_hash or {}
-  if not isinstance(opts, dict):
-    raise ValueError('The given options_hash must be a dict, got: %s' % options_hash)
-
-  class OldOptions(object):
-    def __init__(self):
-      self.__dict__ = opts
-  return OldOptions()
-
 
 def create_config(sample_ini='', defaults=None):
   """Creates a ``Config`` from the ``sample_ini`` file contents.
@@ -92,12 +78,11 @@ def create_run_tracker(info_dir=None):
   return run_tracker
 
 
-def create_context(config='', old_options=None, new_options=None, target_roots=None, **kwargs):
+def create_context(config='', new_options=None, target_roots=None, **kwargs):
   """Creates a ``Context`` with no config values, options, or targets by default.
 
   :param config: Either a ``Context`` object or else a string representing the contents of the
     pants.ini to parse the config from.
-  :param old_options: An optional dict of old-style option values.
   :param new_options: An optional dict of scope -> (dict of name -> new-style option values).
   :param target_roots: An optional list of target roots to seed the context target graph from.
   :param ``**kwargs``: Any additional keyword arguments to pass through to the Context constructor.
@@ -105,5 +90,5 @@ def create_context(config='', old_options=None, new_options=None, target_roots=N
   config = config if isinstance(config, Config) else create_config(config)
   run_tracker = create_run_tracker()
   target_roots = maybe_list(target_roots, Target) if target_roots else []
-  return Context(config, create_options(old_options or {}), create_new_options(new_options or {}),
+  return Context(config, create_new_options(new_options or {}),
                  run_tracker, target_roots, **kwargs)

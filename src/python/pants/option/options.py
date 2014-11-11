@@ -8,6 +8,8 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import copy
 import sys
 
+from twitter.common.collections import OrderedSet
+
 from pants.base.build_environment import pants_release
 from pants.goal.goal import Goal
 from pants.option.arg_splitter import ArgSplitter, GLOBAL_SCOPE
@@ -82,10 +84,8 @@ class Options(object):
 
   @property
   def goals(self):
-    """The requested goals."""
-    # TODO: Order them in some way? We don't know anything about the topological
-    # order here, but it would be nice to, e.g., display help in that order.
-    return set([g.partition('.')[0] for g in self._scope_to_flags.keys() if g])
+    """The requested goals, in the order specified on the cmd-line."""
+    return OrderedSet([g.partition('.')[0] for g in self._scope_to_flags.keys() if g])
 
   @property
   def is_help(self):
@@ -162,8 +162,6 @@ class Options(object):
     if goals:
       for goal_name in goals:
         goal = Goal.by_name(goal_name)
-        # Register old-style options for the purpose of help-printing.
-        Goal.setup_parser(self._legacy_parser, [], [goal])
         if not goal.ordered_task_names():
           print('\nUnknown goal: %s' % goal_name)
         else:
