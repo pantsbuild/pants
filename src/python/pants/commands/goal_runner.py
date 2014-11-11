@@ -61,7 +61,7 @@ class GoalRunner(Command):
 
   def __init__(self, *args, **kwargs):
     self.targets = []
-    self.config = Config.load()
+    self.config = Config.from_cache()
     known_scopes = ['']
     for goal in Goal.all():
       # Note that enclosing scopes will appear before scopes they enclose.
