@@ -3,22 +3,35 @@
 set -e
 VIRTUALENV_VERSION=1.11.4
 
+VIRTUALENV_PACKAGE_LOCATION=${VIRTUALENV_PACKAGE_LOCATION:-https://pypi.python.org/packages/source/v/virtualenv}
+
+function log() {
+  echo -e "$@" 1>&2
+}
+
+function die() {
+  (($# > 0)) && log "$@"
+  exit 1
+}
+
 if [[ -z "$PY" ]]; then
   if which python2.7 >/dev/null; then
     PY=`which python2.7`
   else
-    echo 'No python2.7 interpreter found on the path.  Python will not work!' 1>&2
-    exit 1
+    die 'No python2.7 interpreter found on the path.  Python will not work!' 1>&2
   fi
 fi
 
-echo "Using $PY" >&2
+log "Using $PY"
 
 HERE=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
 if ! [ -f "$HERE/virtualenv-$VIRTUALENV_VERSION/BOOTSTRAPPED" ]; then
   pushd "$HERE"
-  curl -O https://pypi.python.org/packages/source/v/virtualenv/virtualenv-$VIRTUALENV_VERSION.tar.gz
-  tar zxvf virtualenv-$VIRTUALENV_VERSION.tar.gz
+  log "Downloading ${VIRTUALENV_PACKAGE_LOCATION}/virtualenv-$VIRTUALENV_VERSION.tar.gz..."
+  curl -O ${VIRTUALENV_PACKAGE_LOCATION}/virtualenv-$VIRTUALENV_VERSION.tar.gz || \
+    die "Failed to download ${VIRTUALENV_PACKAGE_LOCATION}/virtualenv-$VIRTUALENV_VERSION.tar.gz."
+  tar zxvf virtualenv-$VIRTUALENV_VERSION.tar.gz || \
+    die "Failed to extract ${VIRTUALENV_PACKAGE_LOCATION}/virtualenv-$VIRTUALENV_VERSION.tar.gz."
   # TODO(ksweeney): Checksum
   touch virtualenv-$VIRTUALENV_VERSION/BOOTSTRAPPED  # 2PC
   popd
