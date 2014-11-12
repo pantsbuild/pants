@@ -37,21 +37,28 @@ class ArtifactCache(object):
     """
     self.artifact_root = artifact_root
 
-  def insert(self, cache_key, paths):
+  def insert(self, cache_key, paths, overwrite=False):
     """Cache the output of a build.
 
-    If there is an existing set of artifacts for this key they are deleted.
-
-    TODO: Check that they're equal? They might not have to be if there are multiple equivalent
-          outputs.
+    By default, checks cache.has(key) first, only proceeding to create and insert an artifact
+    if it is not already in the cache (though `overwrite` can be used to skip the check and
+    unconditionally insert).
 
     :param CacheKey cache_key: A CacheKey object.
-    :param list<str> paths: List of absolute paths to generated dirs/files. These must be under the artifact_root.
+    :param list<str> paths: List of absolute paths to generated dirs/files.
+                            These must be under the artifact_root.
+    :param bool overwrite: Skip check for existing, insert even if already in cache.
     """
     missing_files = filter(lambda f: not os.path.exists(f), paths)
+    if missing_files:
+      raise ArtifactCacheError('Tried to cache nonexistent files {0}'.format(missing_files))
+
+    if not overwrite:
+      if self.has(cache_key):
+        logger.debug('Skipping insert of existing artifact: ', cache_key)
+        return False
+
     try:
-      if missing_files:
-        raise ArtifactCacheError('Tried to cache nonexistent files {0}'.format(missing_files))
       self.try_insert(cache_key, paths)
       return True
     except NonfatalArtifactCacheError as e:
@@ -101,14 +108,15 @@ def call_use_cached_files(tup):
   sys.stderr.write('.')
   return bool(res)
 
-def call_insert(cache, key, files):
+def call_insert(cache, key, files, overwrite=False):
   """Importable helper for multi-proc calling of ArtifactCache.insert
 
   See docstring on call_use_cached_files explaining why this is useful.
 
-  :param ArtifactCache cache: Cache into which to insert artifact
-  :param CacheKey key: cache key for inserted artifact
-  :param iterable<str> files: File paths to insert
+  :param ArtifactCache cache: see ArtifactCache.insert
+  :param CacheKey key: ArtifactCache.insert
+  :param iterable<str> files: ArtifactCache.insert
+  :param bool overwrite: ArtifactCache.insert
   """
-  return cache.insert(key, files)
+  return cache.insert(key, files, overwrite)
 

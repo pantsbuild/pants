@@ -385,13 +385,17 @@ class TaskBase(AbstractClass):
       for vts, _ in vts_artifactfiles_pairs:
         targets.update(vts.targets)
       self._report_targets('Caching artifacts for ', list(targets), '.')
+
+      # TODO(davidt): Track artifacts that erred while decompressing and overwrite just those.
+      overwrite = self.get_options().overwrite_cache_artifacts
+
       # Cache the artifacts.
       args_tuples = []
       for vts, artifactfiles in vts_artifactfiles_pairs:
-        args_tuples.append((cache, vts.cache_key, artifactfiles))
+        args_tuples.append((cache, vts.cache_key, artifactfiles, overwrite))
 
-      def bg_insert(cache, key, files):
-        self.context.exec_on_subproc(call_insert, (cache, key, files))
+      def bg_insert(cache, key, files, overwrite):
+        self.context.exec_on_subproc(call_insert, (cache, key, files, overwrite))
       return Work(bg_insert, args_tuples, 'insert')
     else:
       return None
