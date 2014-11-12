@@ -20,7 +20,6 @@ from pants.base.cache_manager import (InvalidationCacheManager, InvalidationChec
 from pants.base.config import Config
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import Work
-from pants.base.workunit import WorkUnit
 from pants.cache.artifact_cache import call_insert, call_use_cached_files
 from pants.cache.cache_setup import create_artifact_cache
 from pants.cache.read_write_artifact_cache import ReadWriteArtifactCache
@@ -74,6 +73,11 @@ class TaskBase(AbstractClass):
     to register options.
     """
 
+  @classmethod
+  def supports_passthru_args(cls):
+    """Subclasses may override to indicate that they can use passthru args."""
+    return False
+
   def __init__(self, context, workdir):
     """Subclass __init__ methods, if defined, *must* follow this idiom:
 
@@ -103,6 +107,12 @@ class TaskBase(AbstractClass):
   def get_options(self):
     """Returns the option values for this task's scope."""
     return self.context.new_options.for_scope(self.options_scope)
+
+  def get_passthru_args(self):
+    if not self.supports_passthru_args():
+      raise TaskError('{0} Does not support passthru args.'.format(self.__class__.__name__))
+    else:
+      return self.context.new_options.passthru_args_for_scope(self.options_scope)
 
   def prepare(self, round_manager):
     """Prepares a task for execution.

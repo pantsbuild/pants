@@ -8,8 +8,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import copy
 import sys
 
-from twitter.common.collections import OrderedSet
-
 from pants.base.build_environment import pants_release
 from pants.goal.goal import Goal
 from pants.option.arg_splitter import ArgSplitter, GLOBAL_SCOPE
@@ -70,7 +68,8 @@ class Options(object):
            the old-style flags during migration.
     """
     splitter = ArgSplitter(known_scopes)
-    self._scope_to_flags, self._target_specs, self._passthru = splitter.split_args(args)
+    self._goals, self._scope_to_flags, self._target_specs, self._passthru, self._passthru_owner = \
+      splitter.split_args(args)
     self._is_help = splitter.is_help
     self._parser_hierarchy = ParserHierarchy(env, config, known_scopes, legacy_parser)
     self._legacy_parser = legacy_parser  # Old-style options, used temporarily during transition.
@@ -84,8 +83,15 @@ class Options(object):
 
   @property
   def goals(self):
-    """The requested goals, in the order specified on the cmd-line."""
-    return OrderedSet([g.partition('.')[0] for g in self._scope_to_flags.keys() if g])
+    """The requested goals, in the order specified on the cmd line."""
+    return self._goals
+
+  def passthru_args_for_scope(self, scope):
+    # Passthru args "belong" to the last scope mentioned on the command-line.
+    if scope == self._passthru_owner:
+      return self._passthru
+    else:
+      return []
 
   @property
   def is_help(self):

@@ -5,8 +5,10 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from collections import namedtuple, OrderedDict
+from collections import namedtuple
 import sys
+
+from twitter.common.collections import OrderedSet
 
 
 GLOBAL_SCOPE = ''
@@ -16,14 +18,17 @@ class ArgSplitterError(Exception):
   pass
 
 
-class SplitArgs(namedtuple('SplitArgs', ['scope_to_flags', 'targets', 'passthru'])):
+class SplitArgs(namedtuple('SplitArgs',
+                           ['goals', 'scope_to_flags', 'targets', 'passthru', 'passthru_owner'])):
   """The result of splitting args.
 
+  goals: A list of explicitly specified goals.
   scope_to_flags: An ordered map from scope name to the list of flags belonging to that scope.
                   The global scope is specified as an empty string.
                   Keys are in the order encountered in the args.
   targets: A list of target specs.
   passthru: Any remaining args specified after a -- separator.
+  passthru_owner: The scope specified last on the command line, if any. None otherwise.
   """
   pass
 
@@ -64,7 +69,8 @@ class ArgSplitter(object):
 
     Returns a SplitArgs tuple.
     """
-    scope_to_flags = OrderedDict()
+    goals = OrderedSet()
+    scope_to_flags = {}
 
     def add_scope(s):
       # Force the scope to appear, even if empty.
@@ -73,6 +79,7 @@ class ArgSplitter(object):
 
     targets = []
     passthru = []
+    passthru_owner = None
 
     self._unconsumed_args = list(reversed(sys.argv if args is None else args))
     # In regular use the first token is the binary name, so skip it. However tests may
@@ -99,6 +106,8 @@ class ArgSplitter(object):
     scope, flags = self._consume_scope()
     while scope:
       add_scope(scope)
+      goals.add(scope.partition('.')[0])
+      passthru_owner = scope
       for flag in flags:
         assign_flag_to_scope(flag, scope)
       scope, flags = self._consume_scope()
@@ -118,21 +127,19 @@ class ArgSplitter(object):
 
     # We parse the word 'help' as a scope, but it's not a real one, so ignore it.
     scope_to_flags.pop('help', None)
-    return SplitArgs(scope_to_flags, targets, passthru)
+    return SplitArgs(goals, scope_to_flags, targets, passthru, passthru_owner if passthru else None)
 
   def _consume_scope(self):
     """Returns a pair (scope, list of flags encountered in that scope).
 
-    Each entry in the list is a pair (scope, flag) in case the flag was explicitly
-    scoped in the old style, and therefore may not actually belong to this scope.
+    Note that the flag may be explicitly scoped, and therefore not actually belong to this scope.
 
     For example, in:
 
     ./pants --compile-java-partition-size-hint=100 compile <target>
 
     --compile-java-partition-size-hint should be treated as if it were --partition-size-hint=100
-    in the compile.java scope.  This will make migration from old- to new-style flags much easier.
-    In fact, we may want to allow this even post-migration, for users that prefer it.
+    in the compile.java scope.
     """
     if not self._at_scope():
       return None, []
