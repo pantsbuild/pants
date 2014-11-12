@@ -63,12 +63,12 @@ someday we won't need to use this magic word anymore.
 `test` is a *goal*, a "verb" that Pants knows about. The `test` goal runs tests and reports results.
 
 Some goals are `gen` (generate code from Thrift, Antlr, Protocol
-Buffer), `compile`, and `eclipse` (generate an Eclipse project). Pants
+Buffer), `compile`, `run` (run a binary), and `test` (run tests and report results). Pants
 knows that some of these goals depend on each other. E.g., in this
 example, before it run tests, it must compile the code.
 
-You can specify more than one goal on a command line. E.g., to generate
-an Eclipse project *and* run tests, we could have said `eclipse tests`.
+You can specify more than one goal on a command line. E.g., to run
+a binary *and* run tests, we could have said `tests run`.
 
 `examples/tests/java/com/pants/examples/hello/greet:greet`<br>
 This is a *build target*, a "build-able" thing in your source code. To
@@ -81,7 +81,7 @@ build and run the test code, Pants also first build the library code.
 
 You can specify more than one target on a command line. Pants will carry
 out its goals on all specified targets. E.g., you might use this to
-generate an Eclipse project based on Hello World's source and tests.
+to run a few directories' worth of tests.
 
 ### Output
 
@@ -108,14 +108,11 @@ You can specify multiple goals and multiple targets. Pants applies all
 the goals to all the targets, skipping things that wouldn't make sense.
 E.g., you could
 
--   Invoke `eclipse` and `test` goals to both generate an Eclipse
-    project and run tests.
--   Specify both test-suite and "library" targets so Eclipse sees all
-    the source code.
+-   Invoke `run` and `test` goals to both run a binary and run tests.
+-   Specify both test-suite and binary targets.
 
-In this example, it doesn't make sense to run library code as a test, so
-Pants doesn't do that. Since pants knows that the `test` goal depends on
-the `compile` goal, it *does* compile the library.
+In this example, it doesn't make sense to run binary code as a test, so
+Pants doesn't do that.
 
 <a xmark="tut_goal_target_mismatch"></a>
 
