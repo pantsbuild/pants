@@ -164,7 +164,7 @@ class SetupPy(Command):
 
   @classmethod
   def iter_generated_sources(cls, target, root, config=None):
-    config = config or Config.load()
+    config = config or Config.from_cache()
     # This is sort of facepalmy -- python.new will make this much better.
     for target_type, target_builder in cls.GENERATED_TARGETS.items():
       if isinstance(target, target_type):
@@ -266,7 +266,7 @@ class SetupPy(Command):
     if not self.args:
       self.error("A spec argument is required")
 
-    self._config = Config.load()
+    self._config = Config.from_cache()
     self._root = self.root_dir
 
     self.build_graph.inject_spec_closure(self.args[0])

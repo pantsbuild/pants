@@ -73,12 +73,11 @@ class Context(object):
 
   # TODO: Figure out a more structured way to construct and use context than this big flat
   # repository of attributes?
-  def __init__(self, config, old_options, new_options, run_tracker, target_roots,
+  def __init__(self, config, new_options, run_tracker, target_roots,
                requested_goals=None, lock=None, log=None, target_base=None, build_graph=None,
                build_file_parser=None, address_mapper=None, console_outstream=None, scm=None,
                workspace=None, spec_excludes=None):
     self._config = config
-    self._old_options = old_options
     self._new_options = new_options
     self.build_graph = build_graph
     self.build_file_parser = build_file_parser
@@ -101,11 +100,6 @@ class Context(object):
   def config(self):
     """Returns a Config object containing the configuration data found in pants.ini."""
     return self._config
-
-  @property
-  def options(self):
-    """Returns the old-style command line options parsed at startup."""
-    return self._old_options
 
   @property
   def new_options(self):
@@ -217,7 +211,7 @@ class Context(object):
     """Map function `f` over `items` in subprocesses and return the result.
 
       :param f: A multiproc-friendly (importable) work function.
-      :param args: A iterable of pickleable arguments to f.
+      :param items: A iterable of pickleable arguments to f.
     """
     try:
       # Pool.map (and async_map().get() w/o timeout) can miss SIGINT.

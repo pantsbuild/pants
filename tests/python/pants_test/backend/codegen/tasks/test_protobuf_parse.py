@@ -5,9 +5,10 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-import unittest2 as unittest
 import os
 import pytest
+from textwrap import dedent
+import unittest2 as unittest
 
 from pants.backend.codegen.tasks.protobuf_parse import (MESSAGE_PARSER, ProtobufParse,
                                                         camelcase, get_outer_class_name,
@@ -21,15 +22,13 @@ class ProtobufParseTest(unittest.TestCase):
     with temporary_dir() as workdir:
       filename = 'temperatures.proto'
       with open(os.path.join(workdir, filename), 'w') as fd:
-        fd.write(
-          '''
+        fd.write(dedent('''
             package com.pants.examples.temperature;
             message Temperature {
               optional string unit = 1;
               required int64 number = 2;
             }
-          '''
-        )
+          '''))
         fd.close()
 
         proto_parser =  ProtobufParse(fd.name, filename)
@@ -44,14 +43,12 @@ class ProtobufParseTest(unittest.TestCase):
     with temporary_dir() as workdir:
       filename = 'jack_spratt_no_whitespace.proto'
       with open(os.path.join(workdir, filename), 'w') as fd:
-        fd.write(
-          '''
+        fd.write(dedent('''
             package com.twitter.lean;
             option java_multiple_files = true;
             enum Jake { FOO=1;}
             message joe_bob {}
-          '''
-        )
+          '''))
         fd.close()
         proto_parse_no_whitespace =  ProtobufParse(fd.name, filename)
         proto_parse_no_whitespace.parse()
@@ -63,8 +60,7 @@ class ProtobufParseTest(unittest.TestCase):
 
       filename = 'jack_spratt.proto'
       with open(os.path.join(workdir, filename), 'w') as fd:
-        fd.write(
-          '''
+        fd.write(dedent('''
             package com.twitter.lean;
             option java_multiple_files = true;
 
@@ -72,8 +68,7 @@ class ProtobufParseTest(unittest.TestCase):
             }
             message joe_bob {
             }
-          '''
-        )
+          '''))
         fd.close()
         proto_parse_with_whitespace =  ProtobufParse(fd.name, filename)
         proto_parse_with_whitespace.parse()
@@ -97,6 +92,36 @@ class ProtobufParseTest(unittest.TestCase):
   def test_camelcase(self):
     self.assertEqual('TestingOut', camelcase('testing_out'))
 
+  def test_filename(self):
+    with temporary_dir() as workdir:
+      filename = 'foobar/testfile.proto'
+      os.makedirs(os.path.join(workdir, 'foobar'))
+      with open(os.path.join(workdir, filename), 'w') as fd:
+        fd.write(dedent('''
+            package com.pants.protos;
+            message Foo {
+               optional string name = 1;
+            }
+          '''))
+        fd.close()
+        proto_parse = ProtobufParse(fd.name, filename)
+        self.assertEquals('testfile', proto_parse.filename)
+
+  def test_extend(self):
+    with temporary_dir() as workdir:
+      filename = 'testextend.proto'
+      with open(os.path.join(workdir, filename), 'w') as fd:
+        fd.write(dedent('''
+            package com.pants.protos;
+            extend Foo {
+              optional int32 bar = 126;
+            }
+          '''))
+        fd.close()
+        proto_parse = ProtobufParse(fd.name, filename)
+        proto_parse.parse()
+        self.assertEqual(set(['Foo']), proto_parse.extends)
+
   # TODO(Eric Ayers) The following tests won't pass because the .proto parse is not reliable.
   #  https://github.com/pantsbuild/pants/issues/96
   @pytest.mark.xfail
@@ -104,15 +129,13 @@ class ProtobufParseTest(unittest.TestCase):
     with temporary_dir() as workdir:
       filename = 'inner_class_no_newline.proto'
       with open(os.path.join(workdir, filename), 'w') as fd:
-        fd.write(
-          '''
+        fd.write(dedent('''
             package com.pants.protos;
             option java_multiple_files = true;
             message Foo {
                enum Bar { BAZ = 0; }
             }
-          '''
-        )
+          '''))
         fd.close()
         proto_parse =  ProtobufParse(fd.name, filename)
         proto_parse.parse()
@@ -174,8 +197,7 @@ class ProtobufParseTest(unittest.TestCase):
     with temporary_dir() as workdir:
       filename = 'crazy_whitespace.proto'
       with open(os.path.join(workdir, filename), 'w') as fd:
-        fd.write(
-          '''
+        fd.write(dedent('''
             package
                com.pants.protos; option
                    java_multiple_files
@@ -188,8 +210,7 @@ class ProtobufParseTest(unittest.TestCase):
             BAZ = 0; } } message
             FooBar
             { }
-          ''',
-        )
+          '''))
         fd.close()
         proto_parse =  ProtobufParse(fd.name, filename)
         proto_parse.parse()

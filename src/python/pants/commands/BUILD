@@ -32,8 +32,6 @@ python_library(
     'src/python/pants/backend/core/tasks:task',
     'src/python/pants/backend/jvm/tasks:nailgun_task',
     'src/python/pants/base:address',
-    'src/python/pants/base:build_environment',
-    'src/python/pants/base:build_file',
     'src/python/pants/base:config',
     'src/python/pants/base:cmd_line_spec_parser',
     'src/python/pants/base:rcfile',

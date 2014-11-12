@@ -19,7 +19,7 @@ class TargetPlatform(object):
   """Encapsulates information about the configured default scala target platform."""
 
   def __init__(self, config=None):
-    self._config = config or Config.load()
+    self._config = config or Config.from_cache()
 
   @property
   def compiler_specs(self):

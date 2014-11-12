@@ -133,7 +133,7 @@ The `__main__.py` in a real PEX file is somewhat special:
     monkeypatch()
     del monkeypatch
 
-    from twitter.common.python.pex import PEX
+    from pex.pex import PEX
     PEX(__entry_point__).execute()
 
 PEX is just a class that manages requirements (often embedded within PEX

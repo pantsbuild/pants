@@ -20,7 +20,7 @@ class JavaThriftLibrary(JvmTarget):
         raise ValueError('Expected a JavaThriftLibrary, got: %s of type %s' % (target, type(target)))
 
     def __init__(self, config=None):
-      self._config = config or Config.load()
+      self._config = config or Config.from_cache()
 
     def _get_default(self, key, fallback):
       return self._config.get('java-thrift-library', key, default=fallback)

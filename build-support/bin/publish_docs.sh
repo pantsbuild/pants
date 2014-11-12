@@ -7,6 +7,7 @@ REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd "$(git rev-parse --show-topl
 # We have special developer mode requirements - namely sphinx deps.
 export PANTS_DEV=1
 
+source ${REPO_ROOT}/build-support/common.sh
 source ${REPO_ROOT}/build-support/pants_venv
 
 function usage() {

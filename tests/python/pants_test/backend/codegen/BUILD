@@ -4,6 +4,7 @@
 target(name='codegen',
   dependencies=[
     'tests/python/pants_test/backend/codegen/targets',
+    'tests/python/pants_test/backend/codegen/tasks',
   ],
 )
 

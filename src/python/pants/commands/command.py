@@ -41,7 +41,8 @@ class Command(object):
                args,
                build_file_parser,
                address_mapper,
-               build_graph):
+               build_graph,
+               needs_old_options=True):
     """run_tracker: The (already opened) RunTracker to track this run with
     root_dir: The root directory of the pants workspace
     parser: an OptionParser
@@ -52,7 +53,7 @@ class Command(object):
     self.address_mapper = address_mapper
     self.build_graph = build_graph
 
-    config = Config.load()
+    config = Config.from_cache()
 
     with self.run_tracker.new_workunit(name='bootstrap', labels=[WorkUnit.SETUP]):
       # construct base parameters to be filled in for BuildGraph
@@ -80,8 +81,12 @@ class Command(object):
 
     self.register_options()
     self.setup_parser(parser, args)
-    self.old_options, self.args = parser.parse_args(args)
-    self.parser = parser
+    if needs_old_options:
+      self.old_options, self.args = parser.parse_args(args)
+    else:
+      # Ensure a predictable error if anything under goal tries to use these.
+      self.old_options = None
+      self.args = None
 
   def register_options(self):
     """The GoalRunner will override to configure the new Options system.

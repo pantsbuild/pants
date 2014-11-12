@@ -77,7 +77,7 @@ class Bootstrapper(object):
 
   def __init__(self):
     """Creates an ivy bootstrapper."""
-    self._config = Config.load()
+    self._config = Config.from_cache()
     self._bootstrap_jar_url = self._config.get('ivy', 'bootstrap_jar_url',
                                                default=self._DEFAULT_URL)
     self._timeout_secs = self._config.getint('ivy', 'bootstrap_fetch_timeout_secs', default=1)
