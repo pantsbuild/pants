@@ -5,6 +5,7 @@ python_library(
   name = 'option',
   sources = globs('*.py') - ['migrate_config.py'],
   dependencies = [
+    '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:build_environment',
     'src/python/pants/goal'
   ]

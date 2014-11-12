@@ -118,6 +118,20 @@ class Config(object):
   class ConfigError(Exception):
     pass
 
+
+  _cache = {}
+
+  @classmethod
+  def clear_cache(cls):
+    cls._cache = {}
+
+  @classmethod
+  def from_cache(cls, configpath=None):
+    configpath = configpath or os.path.join(get_buildroot(), 'pants.ini')
+    if configpath not in cls._cache:
+      cls._cache[configpath] = cls.load(configpath)
+    return cls._cache[configpath]
+
   @staticmethod
   def load(configpath=None, defaults=None):
     """

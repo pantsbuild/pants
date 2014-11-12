@@ -33,9 +33,9 @@ class ReadWriteArtifactCache(ArtifactCache):
     self._read_artifact_cache = read_artifact_cache
     self._write_artifact_cache = write_artifact_cache
 
-  def insert(self, cache_key, paths):
+  def insert(self, cache_key, paths, overwrite=False):
     if self._write_artifact_cache:
-      self._write_artifact_cache.insert(cache_key, paths)
+      self._write_artifact_cache.insert(cache_key, paths, overwrite)
 
   def has(self, cache_key):
     if self._read_artifact_cache:

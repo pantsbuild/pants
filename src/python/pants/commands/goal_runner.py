@@ -51,55 +51,6 @@ class GoalRunner(Command):
   __command__ = 'goal'
   output = None
 
-  @staticmethod
-  def parse_args(args):
-    goals = OrderedSet()
-    specs = OrderedSet()
-    explicit_multi = False
-    fail_fast = False
-    logger = logging.getLogger(__name__)
-    has_double_dash = u'--' in args
-    goal_names = [goal.name for goal in Goal.all()]
-    if not goal_names:
-      raise GoalError(
-        'Arguments cannot be parsed before the list of goals from Goal.all() is populated.')
-
-    def is_spec(spec):
-      if os.sep in spec or ':' in spec:
-        return True # Definitely not a goal.
-      if not (spec in goal_names):
-        return True # Definitely not a (known) goal.
-      if has_double_dash:
-        # This means that we're parsing the half of the expression before a --, so assume it's a
-        # goal without warning.
-        return False
-      # Here, it's possible we have a goal and target with the same name. For now, always give
-      # priority to the goal, but give a warning if they might have meant the target (if the BUILD
-      # file exists).
-      if BuildFile.from_cache(get_buildroot(), spec, must_exist=False).exists():
-        logger.warning(' Command-line argument "{spec}" is ambiguous, and was assumed to be a '
-                       'goal.  If this is incorrect, disambiguate it with the "--" argument to '
-                       'separate goals from targets.'.format(spec=spec))
-      return False
-
-    for i, arg in enumerate(args):
-      if not arg.startswith('-'):
-        specs.add(arg) if is_spec(arg) else goals.add(arg)
-      elif '--' == arg:
-        if specs:
-          raise GoalRunner.IntermixedArgumentsError(
-            'Cannot intermix targets with goals when using --. Targets should appear on the right')
-        explicit_multi = True
-        del args[i]
-        break
-      elif '--fail-fast' == arg.lower():
-        fail_fast = True
-
-    if explicit_multi:
-      specs.update(arg for arg in args[len(goals):] if not arg.startswith('-'))
-
-    return goals, specs, fail_fast
-
   # TODO(John Sirois): revisit wholesale locking when we move py support into pants new
   @classmethod
   def serialized(cls):
@@ -110,7 +61,7 @@ class GoalRunner(Command):
 
   def __init__(self, *args, **kwargs):
     self.targets = []
-    self.config = Config.load()
+    self.config = Config.from_cache()
     known_scopes = ['']
     for goal in Goal.all():
       # Note that enclosing scopes will appear before scopes they enclose.
@@ -123,7 +74,7 @@ class GoalRunner(Command):
     legacy_parser = args[2] if len(args) > 2 else kwargs['parser']
     self.new_options = Options(os.environ.copy(), self.config, known_scopes, args=sys.argv,
                                legacy_parser=legacy_parser)
-    super(GoalRunner, self).__init__(*args, **kwargs)
+    super(GoalRunner, self).__init__(*args, needs_old_options=False, **kwargs)
 
   def get_spec_excludes(self):
     spec_excludes = self.config.getlist(Config.DEFAULT_SECTION, 'spec_excludes',
@@ -132,6 +83,9 @@ class GoalRunner(Command):
        return [self.config.getdefault('pants_workdir')]
     return  [os.path.join(self.root_dir, spec_exclude) for spec_exclude in spec_excludes]
 
+  @property
+  def global_options(self):
+    return self.new_options.for_global_scope()
 
   @contextmanager
   def check_errors(self, banner):
@@ -172,34 +126,29 @@ class GoalRunner(Command):
       goal.register_options(self.new_options)
 
   def setup_parser(self, parser, args):
-    # We support attempting zero or more goals.  Multiple goals must be delimited from further
-    # options and non goal args with a '--'.  The key permutations we need to support:
-    # ./pants goal => goals
-    # ./pants goal goals => goals
-    # ./pants goal compile src/java/... => compile
-    # ./pants goal compile -x src/java/... => compile
-    # ./pants goal compile src/java/... -x => compile
-    # ./pants goal compile run -- src/java/... => compile, run
-    # ./pants goal compile run -- src/java/... -x => compile, run
-    # ./pants goal compile run -- -x src/java/... => compile, run
-
     if not args:
       args.append('help')
 
-    help_flags = set(['-h', '--help', 'help'])
-    show_help = len(help_flags.intersection(args)) > 0
-    non_help_args = filter(lambda f: f not in help_flags, args)
+    logger = logging.getLogger(__name__)
 
-    goals, specs, fail_fast = GoalRunner.parse_args(non_help_args)
-    if show_help:
+    goals = self.new_options.goals
+    specs = self.new_options.target_specs
+    fail_fast = self.new_options.for_global_scope().fail_fast
+
+    for goal in goals:
+      if BuildFile.from_cache(get_buildroot(), goal, must_exist=False).exists():
+        logger.warning(" Command-line argument '{0}' is ambiguous and was assumed to be "
+                       "a goal. If this is incorrect, disambiguate it with ./{0}.".format(goal))
+
+    if self.new_options.is_help:
       self.new_options.print_help(goals=goals, legacy=True)
       sys.exit(0)
 
     self.requested_goals = goals
 
     with self.run_tracker.new_workunit(name='setup', labels=[WorkUnit.SETUP]):
-
-      spec_parser = CmdLineSpecParser(self.root_dir, self.address_mapper, spec_excludes=self.get_spec_excludes())
+      spec_parser = CmdLineSpecParser(self.root_dir, self.address_mapper,
+                                      spec_excludes=self.get_spec_excludes())
       with self.run_tracker.new_workunit(name='parse', labels=[WorkUnit.SETUP]):
         for spec in specs:
           for address in spec_parser.parse_addresses(spec, fail_fast):
@@ -239,16 +188,16 @@ class GoalRunner(Command):
     # context/work-unit logging and standard python logging doesn't buy us anything.
 
     # Enable standard python logging for code with no handle to a context/work-unit.
-    if self.old_options.log_level:
-      LogOptions.set_stderr_log_level((self.old_options.log_level or 'info').upper())
-      logdir = self.old_options.logdir or self.config.get('goals', 'logdir', default=None)
+    if self.global_options.level:
+      LogOptions.set_stderr_log_level((self.global_options.level or 'info').upper())
+      logdir = self.global_options.logdir or self.config.get('goals', 'logdir', default=None)
       if logdir:
         safe_mkdir(logdir)
         LogOptions.set_log_dir(logdir)
 
         prev_log_level = None
         # If quiet, temporarily change stderr log level to kill init's output.
-        if self.old_options.quiet:
+        if self.global_options.quiet:
           prev_log_level = LogOptions.loglevel_name(LogOptions.stderr_log_level())
           # loglevel_name can fail, so only change level if we were able to get the current one.
           if prev_log_level is not None:
@@ -287,11 +236,11 @@ class GoalRunner(Command):
           mapping[matched_pattern].append(target)
       return mapping
 
-    is_explain = self.old_options.explain
-    update_reporting(self.old_options, is_quiet_task() or is_explain, self.run_tracker)
+    is_explain = self.global_options.explain
+    update_reporting(self.global_options, is_quiet_task() or is_explain, self.run_tracker)
 
-    if self.old_options.target_excludes:
-      excludes = self.old_options.target_excludes
+    if self.global_options.exclude_target_regexp:
+      excludes = self.global_options.exclude_target_regexp
       log.debug('excludes:\n  {excludes}'.format(excludes='\n  '.join(excludes)))
       by_pattern = targets_by_pattern(self.targets, excludes)
       self.targets = by_pattern[_UNMATCHED_KEY]
@@ -307,7 +256,6 @@ class GoalRunner(Command):
 
     context = Context(
       config=self.config,
-      old_options=self.old_options,
       new_options=self.new_options,
       run_tracker=self.run_tracker,
       target_roots=self.targets,

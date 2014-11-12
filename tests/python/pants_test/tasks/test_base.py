@@ -7,20 +7,19 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import os
 import subprocess
-
 from contextlib import closing
-from optparse import OptionGroup, OptionParser
+
 from StringIO import StringIO
 
 from twitter.common.collections import maybe_list
 
 from pants.backend.core.tasks.task import Task
+
 from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.target import Target
 from pants.goal.context import Context
 from pants.goal.goal import Goal
-from pants.goal.mkflag import Mkflag
 from pants.option.options import Options
 from pants_test.base_test import BaseTest
 from pants_test.base.context_utils import create_config, create_run_tracker
@@ -64,21 +63,14 @@ class TaskTest(BaseTest):
     config = create_config(config or '')
     workdir = os.path.join(config.getdefault('pants_workdir'), 'test', task_type.__name__)
 
-    parser = OptionParser()
-    option_group = OptionGroup(parser, 'test')
-    mkflag = Mkflag('test')
-
-    new_options = Options(env={}, config=config, known_scopes=['', 'test'],
-                          args=args or [], legacy_parser=parser)
+    new_options = Options(env={}, config=config, known_scopes=['', 'test'], args=args or [])
 
     task_type.options_scope = 'test'
     task_type.register_options_on_scope(new_options)
-    old_options, _ = parser.parse_args(args or [])
 
     run_tracker = create_run_tracker()
 
     context = Context(config,
-                      old_options,
                       new_options,
                       run_tracker,
                       targets or [],

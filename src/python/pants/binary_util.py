@@ -74,14 +74,14 @@ class BinaryUtil(object):
       'pants_support_fetch_timeout_secs' in config if unspecified, or 30 seconds if that value isn't
       found in config.
     :param config: Config object to lookup parameters which are left unspecified as None. If config
-      is left unspecified, it defaults to pants.ini via Config.load().
+      is left unspecified, it defaults to pants.ini via Config.from_cache().
     :param binary_base_path_strategy: Optional function to override default select_binary_base_path
       behavior. Takes in parameters (base_path, version, name) and returns a relative path to a
       binary. This relative path is used both for appending to the baseurl to determine the full url
       to the binary, and as the path to the subfolder the binary is stored in under the bootstrap_dir.
     """
     if bootstrap_dir is None or baseurls is None or timeout is None:
-      config = config or Config.load()
+      config = config or Config.from_cache()
     if bootstrap_dir is None:
       bootstrap_dir = config.getdefault('pants_bootstrapdir')
     if baseurls is None:
@@ -196,7 +196,7 @@ def safe_args(args,
   :param delete: If True deletes any arg files created upon exit from this context; defaults to
     True.
   """
-  max_args = max_args or (config or Config.load()).getdefault('max_subprocess_args', int, 100)
+  max_args = max_args or (config or Config.from_cache()).getdefault('max_subprocess_args', int, 100)
   if len(args) > max_args:
     def create_argfile(fp):
       fp.write(delimiter.join(args))

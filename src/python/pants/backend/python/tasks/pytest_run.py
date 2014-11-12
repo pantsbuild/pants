@@ -27,6 +27,10 @@ class PytestRun(PythonTask):
     register('--options', action='append', legacy='pytest_run_options',
              help='Pass these options to pytest.')
 
+  @classmethod
+  def supports_passthru_args(cls):
+    return True
+
   def execute(self):
     def is_python_test(target):
       # Note that we ignore PythonTestSuite, because we'll see the PythonTests targets
@@ -42,9 +46,8 @@ class PytestRun(PythonTask):
       debug = self.get_options().level == 'debug'
 
       args = [] if self.get_options().no_colors else ['--color', 'yes']
-      if self.get_options().options:
-        for options in self.get_options().options:
-          args.extend(safe_shlex_split(options))
+      for options in self.get_options().options + self.get_passthru_args():
+        args.extend(safe_shlex_split(options))
       test_builder = PythonTestBuilder(targets=test_targets,
                                        args=args,
                                        interpreter=self.interpreter,

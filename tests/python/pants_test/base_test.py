@@ -167,7 +167,6 @@ class BaseTest(unittest.TestCase):
         new_option_values[scope][key] = val
 
     return create_context(config=self.config(overrides=config),
-                          old_options=self.create_options(**(options or {})),
                           new_options = new_option_values,
                           target_roots=target_roots,
                           build_graph=self.build_graph,

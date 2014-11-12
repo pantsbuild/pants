@@ -49,23 +49,8 @@ RELEASE_PACKAGES=(PKG_PANTS PKG_PANTS_TESTINFRA)
 #
 
 
-function die() {
-  if (( $# > 0 )); then
-    echo -e "\n$@"
-  fi
-  exit 1
-}
-
-ROOT=$(
-  git rev-parse --show-toplevel || \
-    die "Failed to find the root of this pantsbuild/pants clone"
-)
-
-function banner() {
-  echo
-  echo "[== $@ ==]"
-  echo
-}
+ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd "$(git rev-parse --show-toplevel)" && pwd)
+source ${ROOT}/build-support/common.sh
 
 function run_local_pants() {
   PANTS_DEV=1 ${ROOT}/pants "$@"

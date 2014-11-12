@@ -12,7 +12,6 @@ python_library(
     'src/python/pants/base:target',
     'src/python/pants/commands:goal_runner',
     'src/python/pants/goal:context',
-    'src/python/pants/goal:mkflag',
     'src/python/pants/goal',
     'tests/python/pants_test/base:context_utils',
     'tests/python/pants_test:base_test',
@@ -88,6 +87,7 @@ python_test_suite(
     ':protobuf_integration',
     ':scala_repl_integration',
     ':thrift_linter_integration',
+    ':wire_integration',
     'tests/python/pants_test/tasks/jvm_compile/java:integration',
   ],
 )
@@ -558,6 +558,15 @@ python_tests(
 )
 
 python_tests(
+  name = 'wire_integration',
+  sources = ['test_wire_integration.py'],
+  dependencies = [
+    'src/python/pants/base:build_environment',
+    'tests/python/pants_test:int-test',
+  ],
+)
+
+python_tests(
   name = 'jaxb_gen',
   sources = ['test_jaxb_gen.py'],
   dependencies = [
@@ -708,7 +717,6 @@ python_tests(
     'tests/python/pants_test:task_test_base',
   ]
 )
-
 
 python_tests(
   name = 'ragel_gen',

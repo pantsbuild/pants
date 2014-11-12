@@ -34,7 +34,7 @@ class Py(Command):
                      '  %prog py (options) [spec] args\n')
     parser.disable_interspersed_args()
     parser.add_option('-t', '--timeout', dest='conn_timeout', type='int',
-                      default=Config.load().getdefault('connection_timeout'),
+                      default=Config.from_cache().getdefault('connection_timeout'),
                       help='Number of seconds to wait for http connections.')
     parser.add_option('--pex', dest='pex', default=False, action='store_true',
                       help='Dump a .pex of this chroot instead of attempting to execute it.')
@@ -59,7 +59,7 @@ class Py(Command):
     self.binary = None
     self.targets = []
     self.extra_requirements = []
-    self.config = Config.load()
+    self.config = Config.from_cache()
 
     interpreters = self.old_options.interpreters or [b'']
     self.interpreter_cache = PythonInterpreterCache(self.config, logger=self.debug)
