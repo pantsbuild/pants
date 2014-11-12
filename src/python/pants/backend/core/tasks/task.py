@@ -20,7 +20,6 @@ from pants.base.cache_manager import (InvalidationCacheManager, InvalidationChec
 from pants.base.config import Config
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import Work
-from pants.base.workunit import WorkUnit
 from pants.cache.artifact_cache import call_insert, call_use_cached_files
 from pants.cache.cache_setup import create_artifact_cache
 from pants.cache.read_write_artifact_cache import ReadWriteArtifactCache
@@ -74,6 +73,11 @@ class TaskBase(AbstractClass):
     to register options.
     """
 
+  @classmethod
+  def supports_passthru_args(cls):
+    """Subclasses may override to indicate that they can use passthru args."""
+    return False
+
   def __init__(self, context, workdir):
     """Subclass __init__ methods, if defined, *must* follow this idiom:
 
@@ -103,6 +107,12 @@ class TaskBase(AbstractClass):
   def get_options(self):
     """Returns the option values for this task's scope."""
     return self.context.new_options.for_scope(self.options_scope)
+
+  def get_passthru_args(self):
+    if not self.supports_passthru_args():
+      raise TaskError('{0} Does not support passthru args.'.format(self.__class__.__name__))
+    else:
+      return self.context.new_options.passthru_args_for_scope(self.options_scope)
 
   def prepare(self, round_manager):
     """Prepares a task for execution.
@@ -385,13 +395,17 @@ class TaskBase(AbstractClass):
       for vts, _ in vts_artifactfiles_pairs:
         targets.update(vts.targets)
       self._report_targets('Caching artifacts for ', list(targets), '.')
+
+      # TODO(davidt): Track artifacts that erred while decompressing and overwrite just those.
+      overwrite = self.get_options().overwrite_cache_artifacts
+
       # Cache the artifacts.
       args_tuples = []
       for vts, artifactfiles in vts_artifactfiles_pairs:
-        args_tuples.append((cache, vts.cache_key, artifactfiles))
+        args_tuples.append((cache, vts.cache_key, artifactfiles, overwrite))
 
-      def bg_insert(cache, key, files):
-        self.context.exec_on_subproc(call_insert, (cache, key, files))
+      def bg_insert(cache, key, files, overwrite):
+        self.context.exec_on_subproc(call_insert, (cache, key, files, overwrite))
       return Work(bg_insert, args_tuples, 'insert')
     else:
       return None

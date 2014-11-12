@@ -10,3 +10,19 @@ function set_archflags() {
   fi
 }
 set_archflags
+
+
+function log() {
+  echo -e "$@" 1>&2
+}
+
+function die() {
+  (($# > 0)) && log "\n$@"
+  exit 1
+}
+
+function banner() {
+  echo
+  echo "[== $@ ==]"
+  echo
+}

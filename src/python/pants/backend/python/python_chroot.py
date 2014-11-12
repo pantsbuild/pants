@@ -62,7 +62,7 @@ class PythonChroot(object):
                platforms=None,
                interpreter=None,
                conn_timeout=None):
-    self._config = Config.load()
+    self._config = Config.from_cache()
     self._targets = targets
     self._extra_requirements = list(extra_requirements) if extra_requirements else []
     self._platforms = platforms

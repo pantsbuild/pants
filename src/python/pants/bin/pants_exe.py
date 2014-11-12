@@ -134,7 +134,7 @@ def _run():
                     dest='log_exit',
                     help='Log an exit message on success or failure.')
 
-  config = Config.load()
+  config = Config.from_cache()
 
   # XXX(wickman) This should be in the command goal, not in pants_exe.py!
   run_tracker = RunTracker.from_config(config)

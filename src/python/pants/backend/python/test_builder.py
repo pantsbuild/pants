@@ -277,7 +277,7 @@ class PythonTestBuilder(object):
           # producing just 1 console and 1 html report whether or not the tests are run in fast
           # mode.
           relpath = Target.maybe_readable_identify(targets)
-          pants_distdir = Config.load().getdefault('pants_distdir')
+          pants_distdir = Config.from_cache().getdefault('pants_distdir')
           target_dir = os.path.join(pants_distdir, 'coverage', relpath)
           safe_mkdir(target_dir)
           pex.run(args=['html', '-i', '--rcfile', coverage_rc, '-d', target_dir],

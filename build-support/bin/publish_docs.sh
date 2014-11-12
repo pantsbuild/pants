@@ -4,6 +4,8 @@
 
 REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd "$(git rev-parse --show-toplevel)" && pwd)
 
+source ${REPO_ROOT}/build-support/common.sh
+
 PANTS_EXE="${REPO_ROOT}/pants"
 
 function usage() {
@@ -20,11 +22,6 @@ function usage() {
   else
     exit 0
   fi
-}
-
-function die() {
-  (($# > 0)) && echo -e "$@" 1>&2
-  exit 1
 }
 
 publish_path=""

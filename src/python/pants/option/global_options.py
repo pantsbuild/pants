@@ -47,6 +47,9 @@ def register_global_options(register):
   register('--write-to-artifact-cache', action='store_true',
            legacy='write_to_artifact_cache', default=True,
            help='Write build artifacts to cache, if possible.')
+  register('--overwrite-cache-artifacts', action='store_true',
+           legacy='overwrite_cache_artifacts', default=False,
+           help='If writing to build artifacts to cache, overwrite (instead of skip) existing.')
   register('--print-exception-stacktrace', legacy='print_exception_stacktrace', action='store_true',
            help='Print to console the full exception stack trace if encountered.')
   register('--fail-fast', legacy='fail_fast', action='store_true',

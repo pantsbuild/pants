@@ -3,8 +3,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd "$(git rev-parse --show-toplevel)" && pwd)
-
-source ${REPO_ROOT}/build-support/set_archflags.sh
+source ${REPO_ROOT}/build-support/common.sh
 
 REQUIREMENTS=(
   ${REPO_ROOT}/3rdparty/python/requirements.txt
@@ -66,14 +65,14 @@ function activate_pants_venv() {
       log "  ${req}"
     done
 
-    create_venv
-    activate_venv
+    create_venv || die "Failed to create venv."
+    activate_venv || die "Failed to activate venv."
     for req in ${REQUIREMENTS[@]}; do
       pip install ${pip_extra} -r "${req}" || die "Failed to install requirements from ${req}."
     done
     touch "${BOOTSTRAPPED_FILE}"
   else
-    activate_venv
+    activate_venv || die "Failed to activate venv."
   fi
 }
 

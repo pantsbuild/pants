@@ -53,7 +53,7 @@ class Command(object):
     self.address_mapper = address_mapper
     self.build_graph = build_graph
 
-    config = Config.load()
+    config = Config.from_cache()
 
     with self.run_tracker.new_workunit(name='bootstrap', labels=[WorkUnit.SETUP]):
       # construct base parameters to be filled in for BuildGraph
