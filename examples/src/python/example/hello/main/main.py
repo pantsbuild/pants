@@ -5,7 +5,12 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+import sys
+
 from example.hello.greet.greet import greet
 
+
 if __name__ == '__main__':
-  print(greet('world'))
+  greetees = sys.argv[1:] or ['world']
+  for greetee in greetees:
+    print(greet(greetee))
