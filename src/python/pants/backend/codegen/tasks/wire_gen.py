@@ -14,9 +14,9 @@ from twitter.common.collections import OrderedSet, maybe_list
 
 from pants.backend.codegen.targets.java_protobuf_library import JavaProtobufLibrary
 from pants.backend.codegen.targets.java_wire_library import JavaWireLibrary
-from pants.backend.codegen.tasks.code_gen import CodeGen
 from pants.backend.codegen.tasks.protobuf_gen import check_duplicate_conflicting_protos
 from pants.backend.codegen.tasks.protobuf_parse import ProtobufParse
+from pants.backend.codegen.tasks.simple_codegen_task import SimpleCodegenTask
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.address import SyntheticAddress
@@ -31,7 +31,7 @@ from pants.option.options import Options
 logger = logging.getLogger(__name__)
 
 
-class WireGen(CodeGen, JvmToolTaskMixin):
+class WireGen(SimpleCodegenTask, JvmToolTaskMixin):
   @classmethod
   def register_options(cls, register):
     super(WireGen, cls).register_options(register)
@@ -44,21 +44,50 @@ class WireGen(CodeGen, JvmToolTaskMixin):
     super(WireGen, self).__init__(*args, **kwargs)
     self.java_out = os.path.join(self.workdir, 'gen-java')
 
-  def resolve_deps(self, unresolved_deps):
-    deps = OrderedSet()
-    for dep in unresolved_deps:
-      try:
-        deps.update(self.context.resolve(dep))
-      except AddressLookupError as e:
-        raise self.DepLookupError('{message}\n  on dependency {dep}'.format(message=e, dep=dep))
-    return deps
+  @property
+  def synthetic_target_extra_dependencies(self):
+    def resolve_deps(self, unresolved_deps):
+      deps = OrderedSet()
+      for dep in unresolved_deps:
+        try:
+          deps.update(self.context.resolve(dep))
+        except AddressLookupError as e:
+          raise self.DepLookupError('{message}\n  on dependency {dep}'.format(message=e, dep=dep))
+      return deps
+    return resolve_deps(self.get_options().javadeps)
 
   @property
-  def javadeps(self):
-    return self.resolve_deps(self.get_options().javadeps)
+  def synthetic_target_type(self):
+    return JavaLibrary
 
-  def is_gentarget(self, target):
-    return isinstance(target, JavaWireLibrary)
+  def sources_generated_by_target(self, target):
+    def get_java_sources(path, source, service_writer):
+      protobuf_parse = ProtobufParse(path, source)
+      protobuf_parse.parse()
+
+      types = protobuf_parse.messages | protobuf_parse.enums
+      if service_writer:
+        types |= protobuf_parse.services
+
+      # Wire generates a single type for all of the 'extends' declarations in this file.
+      if protobuf_parse.extends:
+        types |= set(["Ext_{0}".format(protobuf_parse.filename)])
+
+      java_files = list(self.calculate_java_genfiles(protobuf_parse.package, types))
+      logger.debug('Path {path} yielded types {types} got files {java_files}'
+                   .format(path=path, types=types, java_files=java_files))
+      return java_files
+
+    result = []
+    for proto_source in sources:
+      result.extend(get_java_sources(proto_source))
+    return result
+
+  def codegen_targets(self):
+    return [target if isinstance(target, JavaWireLibrary) for target in self.context.targets()]
+    for target in self.context.targets():
+      if isinstance(target, JavaWireLibrary):
+        yield target
 
   def is_proto_target(self, target):
     return isinstance(target, JavaProtobufLibrary)

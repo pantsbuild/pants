@@ -237,6 +237,13 @@ class Context(object):
 
     This method ensures the target resolves files against the given target_base, creating the
     directory if needed and registering a source root.
+
+    :param Address address: The address of the new Target.  Must not already be in the BuildGraph.
+    :param target_type: The type of target to create.
+    :param dependencies: dependencies to add to the synthetic target.
+    :type dependencies: list of Address
+    :param Target derived_from:  The Target this Target will derive from.  This sets up a dependency
+      relationship between the two targets.
     """
     target_base = os.path.join(get_buildroot(), address.spec_path)
     if not os.path.exists(target_base):

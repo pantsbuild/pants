@@ -137,6 +137,16 @@ python_library(
 )
 
 python_library(
+  name = 'simple_codegen_task',
+  sources = ['simple_codegen_task.py'],
+  dependencies = [
+    ':common',
+    'src/python/pants/base:address',
+    'src/python/pants/base:build_environment',
+  ],
+)
+
+python_library(
   name = 'wire_gen',
   sources = ['wire_gen.py'],
   dependencies = [
