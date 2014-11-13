@@ -215,44 +215,6 @@ To convince yourself that the environment contains `greet`'s dependencies, you c
 dependencies only exist for the duration of the Python interpreter
 forked by Pants.
 
-### `pants py --pex`
-
-You can use `./pants py --pex` to build a PEX file from `python_library`
-targets with no `python_binary` target. Since there is no entry point
-specified, the resulting `.pex` file just behaves like a Python
-interpreter, but with the sys.path bootstrapped for you:
-
-    :::bash
-    $ ./pants py --pex examples/src/python/example/hello/greet
-    /Users/lhosken/workspace/pants examples/src/python/example/hello/greet
-    Wrote /Users/lhosken/workspace/pants/dist/src.python.example.hello.greet.greet.pex
-    $
-
-If you run `dist/src.python.example.hello.greet.greet.pex`, since it has
-no entry point, it drops you into an interpreter:
-
-    :::bash
-    $ ./dist/src.python.example.hello.greet.greet.pex
-    Python 2.6.8 (unknown, Mar  9 2014, 22:16:00)
-    [GCC 4.2.1 Compatible Apple LLVM 5.0 (clang-500.0.68)] on darwin
-    Type "help", "copyright", "credits" or "license" for more information.
-    (InteractiveConsole)
-    >>> from example.hello.greet.greet import greet
-    >>> greet("pex")
-    u'\x1b[32mHello, pex!\x1b[0m'
-    >>>
-
-It's like a single-file lightweight alternative to a virtualenv. We can
-even use it to run our main.py application:
-
-    :::bash
-    $ dist/src.python.example.hello.greet.greet.pex examples/src/python/example/hello/main/main.py
-    Hello, world!
-    $
-
-This can be an incredibly powerful and lightweight way to manage and
-deploy virtual environments without using virtualenv.
-
 `python_binary` `entry_point`
 ---------------------------
 
@@ -299,21 +261,49 @@ And now dist/fab.pex behaves like a standalone fab binary:
 More About Python Tests
 -----------------------
 
-Pants runs Python tests with `pytest`. You can pass CLI options to
+Pants runs Python tests with `pytest`. You can pass CLI options to `pytest` via passthrough
+if `test.pytest` is the last goal and task on your command line. E.g., to run only tests
+whose names contain `req`:
+
+    :::bash
+    $ ./pants goal test.pytest examples/tests/python/example_test/hello/greet -- -k req
+       ...lots of build output...
+    10:43:04 00:01   [test]
+    10:43:04 00:01     [run_prep_command]
+    10:43:04 00:01       [prep_command]
+    10:43:04 00:01     [pytest]
+    10:43:04 00:01       [run]
+                         ============== test session starts ===============
+                         platform darwin -- Python 2.7.5 -- py-1.4.26 -- pytest-2.6.4
+                         plugins: cov, timeout
+                         collected 2 items 
+                         
+                         examples/tests/python/example_test/hello/greet/greet.py .
+                         
+                         ========= 1 tests deselected by '-kreq' ==========
+                         ===== 1 passed, 1 deselected in 0.05 seconds =====
+                         
+    10:43:05 00:02     [junit]
+    10:43:05 00:02     [specs]
+                   SUCCESS
+
+You can instead pass CLI options to
 `pytest` with `--test-pytest-options`. For example, to only run tests
 whose names match the pattern `*foo*`, you could run:
 
     :::bash
-    $ ./pants goal test examples/tests/python/example_test/hello/greet --test-pytest-options='-k foo'
+    $ ./pants goal test examples/tests/python/example_test/hello/greet --test-pytest-options='-k req'
     ...
-                     ============== test session starts ===============
-                     platform darwin -- Python 2.6.8 -- py-1.4.20 -- pytest-2.5.2
-                     plugins: cov, timeout
-                     collected 1 items
-
-                     ========= 1 tests deselected by '-kfoo' ==========
-                     ========== 1 deselected in 0.01 seconds ==========
-
+                         ============== test session starts ===============
+                         platform darwin -- Python 2.7.5 -- py-1.4.26 -- pytest-2.6.4
+                         plugins: cov, timeout
+                         collected 2 items
+                         
+                         examples/tests/python/example_test/hello/greet/greet.py .
+                         
+                         ========= 1 tests deselected by '-kreq' ==========
+                         ===== 1 passed, 1 deselected in 0.06 seconds =====
+                         
     13:34:28 00:02     [junit]
     13:34:28 00:02     [specs]
                SUCCESS
