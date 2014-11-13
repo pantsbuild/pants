@@ -6,12 +6,12 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import os
+from textwrap import dedent
 import unittest2 as unittest
 
 from pants.backend.codegen.tasks.protobuf_gen import calculate_genfiles, _same_contents
 from pants.base.validation import assert_list
 from pants.util.contextutil import temporary_dir, temporary_file
-
 
 
 class ProtobufGenCalculateGenfilesTestBase(unittest.TestCase):
@@ -169,24 +169,33 @@ class ProtobufGenCalculateJavaTest(ProtobufGenCalculateGenfilesTestBase):
   def test_same_contents(self):
     with temporary_dir() as workdir:
       with open(os.path.join(workdir, 'dup1.proto'), 'w') as dup1:
-        dup1.write(
-          '''
+        dup1.write(dedent('''
             package com.twitter.lean;
             option java_multiple_files = true;
             enum Jake { FOO=1;}
             message joe_bob {}
-          '''
-        )
-        dup1.close()
-        with open(os.path.join(workdir, 'dup2.proto'), 'w') as dup2:
-          dup2.write(
-            '''
-              package com.twitter.lean;
-              option java_multiple_files = true;
-              enum Jake { FOO=1;}
-              message joe_bob {}
-            '''
-          )
-          dup2.close()
+          '''))
+      with open(os.path.join(workdir, 'dup2.proto'), 'w') as dup2:
+        dup2.write(dedent('''
+            package com.twitter.lean;
+            option java_multiple_files = true;
+            enum Jake { FOO=1;}
+            message joe_bob {}
+          '''))
+      self.assertTrue(_same_contents(dup1.name, dup2.name))
 
-          self.assertTrue(_same_contents(dup1.name, dup2.name))
+  def test_not_same_contents(self):
+    with temporary_dir() as workdir:
+      with open(os.path.join(workdir, 'dup1.proto'), 'w') as dup1:
+        dup1.write(dedent('''
+            package com.twitter.lean;
+            option java_multiple_files = true;
+            enum Jake { FOO=1;}
+            message joe_bob {}
+          '''))
+      with open(os.path.join(workdir, 'dup2.proto'), 'w') as dup2:
+        dup2.write(dedent('''
+            package com.twitter.lean;
+            message joe_bob {}
+          '''))
+      self.assertFalse(_same_contents(dup1.name, dup2.name))
