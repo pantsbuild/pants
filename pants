@@ -52,9 +52,9 @@ PY=${PY:-$(which python2.7)}
 
 if [[ ! -z "${WRAPPER_REQUIREMENTS}" ]]; then
   PANTS_DEV=1
-  DEV_REQUIREMENTS=(
+  REQUIREMENTS=(
     $(echo ${WRAPPER_REQUIREMENTS} | tr : ' ')
-    ${DEV_REQUIREMENTS[@]}
+    ${REQUIREMENTS[@]}
   )
 fi
 
