@@ -3,4 +3,7 @@
 
 java_library(name = 'java_sources',
   sources = globs('*.java'),
+  dependencies = [
+   'examples/src/scala/com/pants/example/scala_with_java_sources',
+  ],
 )
