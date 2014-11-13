@@ -279,6 +279,7 @@ class Depmap(ConsoleTask):
       if isinstance(current_target, ScalaLibrary):
         for dep in current_target.java_sources:
           info['targets'].append(self._address(dep.address))
+          process_target(dep)
 
       info['roots'] = map(lambda (source_root, package_prefix): {
         'source_root': source_root,
