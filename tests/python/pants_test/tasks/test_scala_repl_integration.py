@@ -19,6 +19,7 @@ class ScalaReplIntegrationTest(PantsRunIntegrationTest):
                '--interpreter=CPython>=2.6,<3',
                '--interpreter=CPython>=3.3', '--quiet']
     pants_run = self.run_pants(command=command, stdin_data=program)
+    self.assert_success(pants_run)
     return pants_run.stdout_data.rstrip().split('\n')
 
   def test_run_repl_direct(self):
