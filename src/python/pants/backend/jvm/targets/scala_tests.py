@@ -9,7 +9,7 @@ from pants.backend.jvm.targets.jvm_target import JvmTarget
 
 
 class ScalaTests(JvmTarget):
-  """Tests a Scala library with the Specs library."""
+  """Tests a Scala library with the Specs library. (You could use a `junit_test` instead.)"""
 
   def __init__(self, **kwargs):
     super(ScalaTests, self).__init__(**kwargs)
