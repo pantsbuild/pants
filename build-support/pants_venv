@@ -11,15 +11,6 @@ REQUIREMENTS=(
   ${REPO_ROOT}/3rdparty/python/twitter/commons/requirements.txt
 )
 
-function log() {
-  echo -e "$@" 1>&2
-}
-
-function die() {
-  (($# > 0)) && log "$@"
-  exit 1
-}
-
 function venv_dir() {
   if [ ! -z "${PANTS_DEV}" ]; then
     echo ${REPO_ROOT}/build-support/pants_dev_deps.venv
