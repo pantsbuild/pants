@@ -88,7 +88,21 @@ class Options(object):
 
   def passthru_args_for_scope(self, scope):
     # Passthru args "belong" to the last scope mentioned on the command-line.
-    if scope == self._passthru_owner:
+
+    # Note: If that last scope is a goal, we allow all tasks in that goal to access the passthru
+    # args. This is to allow the more intuitive
+    # pants run <target> -- <passthru args>
+    # instead of requiring
+    # pants run.py <target> -- <passthru args>.
+    #
+    # However note that in the case where multiple tasks run in the same goal, e.g.,
+    # pants test <target> -- <passthru args>
+    # Then, e.g., both junit and pytest will get the passthru args even though the user probably
+    # only intended them to go to one of them. If the wrong one is not a no-op then the error will
+    # be unpredictable. However this is  not a common case, and can be circumvented with an
+    # explicit test.pytest or test.junit scope.
+    if (scope and self._passthru_owner and scope.startswith(self._passthru_owner) and
+          (len(scope) == len(self._passthru_owner) or scope[len(self._passthru_owner)] == '.')):
       return self._passthru
     else:
       return []

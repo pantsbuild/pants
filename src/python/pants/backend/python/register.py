@@ -58,7 +58,7 @@ def register_goals():
        dependencies=['bootstrap', 'check-exclusives', 'resources']
   ).install('test')
 
-  task(name='python-run', action=PythonRun,
+  task(name='py', action=PythonRun,
        dependencies=['bootstrap', 'check-exclusives', 'resources']
   ).install('run')
 
