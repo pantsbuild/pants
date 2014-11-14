@@ -10,7 +10,6 @@ import copy
 
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.help_formatter import PantsHelpFormatter
-from pants.option.legacy_options import LegacyOptions
 from pants.option.ranked_value import RankedValue
 
 
@@ -51,28 +50,13 @@ class Parser(object):
   re-registering the same option name on an inner scope correctly replaces the identically-named
   option from the outer scope.
 
-  For migration purposes, this object also interacts with the legacy flags system:
-
-  Recall that the old flags system uses optparse, and scopes the flags using a prefix, e.g.,
-  ./pants --compile-scala-foo.
-
-  Whereas  this new system uses argparse and scopes the flags using command-line context, e.g.,
-  ./pants compile.scala --foo.
-
-  When registering (scala.compile, --foo), this object can also register it as --scala-compile-foo
-  on the old system.  This allows us to transition registration code to the new registration API
-  while retaining the old flag names.
-
-  Eventually all usages will switch to the new flag names, and we can remove this migration code.
-
   :param env: a dict of environment variables.
   :param config: data from a config file (must support config.get(section, name, default=)).
   :param scope: the scope this parser acts for.
   :param parent_parser: the parser for the scope immediately enclosing this one, or
          None if this is the global scope.
-  :param legacy_parser: an optparse.OptionParser instance for handling legacy options.
   """
-  def __init__(self, env, config, scope, parent_parser, legacy_parser=None):
+  def __init__(self, env, config, scope, parent_parser):
     self._env = env
     self._config = config
     self._scope = scope
@@ -104,9 +88,6 @@ class Parser(object):
     if self._parent_parser:
       self._parent_parser._register_child_parser(self)
 
-    # Handles legacy options on our behalf.
-    self._legacy_options = LegacyOptions(scope, legacy_parser) if legacy_parser else None
-
   def parse_args(self, args, namespace):
     """Parse the given args and set their values onto the namespace object's attributes."""
     namespace.add_forwardings(self._dest_forwardings)
@@ -114,12 +95,9 @@ class Parser(object):
     namespace.update(vars(new_args))
     return namespace
 
-  def format_help(self, legacy=False):
+  def format_help(self):
     """Return a help message for the options registered on this object."""
-    if legacy:
-      return self._legacy_options.format_help()
-    else:
-      return self._help_argparser.format_help() if self._has_help_options else ''
+    return self._help_argparser.format_help() if self._has_help_options else ''
 
   def register(self, *args, **kwargs):
     """Register an option, using argparse params."""
@@ -136,8 +114,8 @@ class Parser(object):
     clean_kwargs = copy.deepcopy(kwargs)  # Copy kwargs so we can remove legacy-related keys.
     kwargs = None  # Ensure no code below modifies kwargs accidentally.
     self._validate(args, clean_kwargs)
-    legacy_dest = clean_kwargs.pop('legacy', None)
-    dest = self._set_dest(args, clean_kwargs, legacy_dest)
+    clean_kwargs.pop('legacy', None)
+    dest = self._set_dest(args, clean_kwargs)
 
     # Is this a boolean flag?
     if clean_kwargs.get('action') in ('store_false', 'store_true'):
@@ -161,15 +139,9 @@ class Parser(object):
     self._help_argparser.add_argument(*help_args, **clean_kwargs_with_default)
     self._has_help_options = True
 
-    # Also register the option as a legacy option, if needed.
-    if self._legacy_options and legacy_dest:
-      self._legacy_options.register(args, clean_kwargs_with_default, legacy_dest)
-
     # Register the option for the purpose of parsing, on this and all enclosed scopes.
     if inverse_args:
       inverse_kwargs = self._create_inverse_kwargs(clean_kwargs)
-      if self._legacy_options:
-        self._legacy_options.register(inverse_args, inverse_kwargs, legacy_dest)
       self._register_boolean(dest, args, clean_kwargs, inverse_args, inverse_kwargs)
     else:
       self._register(dest, args, clean_kwargs)
@@ -210,7 +182,7 @@ class Parser(object):
         raise RegistrationError('{0} unsupported in registration of option {1} in '
                                 'scope {2}.'.format(k, args, self._scope))
 
-  def _set_dest(self, args, kwargs, legacy_dest):
+  def _set_dest(self, args, kwargs):
     """Maps the externally-used dest to a scoped one only seen internally.
 
     If an option is re-registered in an inner scope, it'll shadow the external dest but will
@@ -233,13 +205,6 @@ class Parser(object):
     # Also forward all option aliases, so we can reference -x (as options.x) in the example above.
     for arg in args:
       self._dest_forwardings[arg.lstrip('-').replace('-', '_')] = scoped_dest
-
-    # Forward another hop, to the legacy flag, but only if this won't create a forwarding cycle.
-    #   Note that this means that *only* the legacy flag is supported for now.
-    # This will be removed after we're finished migrating option registration to the new system,
-    # and work on migrating the actual runtime command-line parsing.
-    if legacy_dest and self._dest_forwardings.get(legacy_dest) != scoped_dest:
-      self._dest_forwardings[scoped_dest] = legacy_dest
     return dest
 
   def _select_dest(self, args, kwargs):
