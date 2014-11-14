@@ -17,6 +17,7 @@ from pants.base.build_file import BuildFile
 from pants.base.build_file_parser import BuildFileParser
 from pants.base.build_graph import BuildGraph
 from pants.base.build_root import BuildRoot
+from pants.base.duplicate_dependency_error import DuplicateDependencyError
 from pants.base.target import Target
 from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import touch
@@ -283,4 +284,17 @@ class BuildGraphTest(BaseTest):
                                  '\s+referenced from goodpath:c'
                                  '\s+referenced from goodpath:b'
                                  '\s+referenced from :a$'):
+      self.build_graph.inject_spec_closure('//:a')
+
+  def test_raise_on_duplicate_dependencies(self):
+    self.add_to_build_file('BUILD',
+                           'target(name="a", '
+                           '  dependencies=['
+                           '    "other:b",'
+                           '    "other:b",'
+                           '])')
+    self.add_to_build_file('other/BUILD',
+                           'target(name="b")')
+
+    with self.assertRaises(DuplicateDependencyError):
       self.build_graph.inject_spec_closure('//:a')

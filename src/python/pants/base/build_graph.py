@@ -13,6 +13,7 @@ from twitter.common.collections import OrderedDict, OrderedSet
 
 from pants.base.address import SyntheticAddress
 from pants.base.address_lookup_error import AddressLookupError
+from pants.base.duplicate_dependency_error import DuplicateDependencyError
 
 
 logger = logging.getLogger(__name__)
@@ -158,8 +159,8 @@ class BuildGraph(object):
                      .format(dependent=dependent, dependency=dependency))
 
     if dependency in self.dependencies_of(dependent):
-      logger.warn('{dependent} already depends on {dependency}'
-                  .format(dependent=dependent, dependency=dependency))
+      raise DuplicateDependencyError('{dependent} already depends on {dependency}'
+                                     .format(dependent=dependent, dependency=dependency))
     else:
       self._target_dependencies_by_address[dependent].add(dependency)
       self._target_dependees_by_address[dependency].add(dependent)
