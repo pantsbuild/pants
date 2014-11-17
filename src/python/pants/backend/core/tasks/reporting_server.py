@@ -25,16 +25,16 @@ class RunServer(Task, QuietTaskMixin):
   @classmethod
   def register_options(cls, register):
     super(RunServer, cls).register_options(register)
-    register('--port', legacy='port', type=int, default=0,
+    register('--port', type=int, default=0,
              help='Serve on this port. Leave unset to choose a free port '
                   'automatically (recommended if using pants concurrently in '
                   'multiple workspaces on the same host).')
-    register('--allowed-clients', action='append', legacy='allowed_clients', default=['127.0.0.1'],
+    register('--allowed-clients', action='append', default=['127.0.0.1'],
              help='Only requests from these IPs may access this server. Useful for '
                   'temporarily showing build results to a colleague. The special '
                   'value ALL means any client may connect. Use with caution, as '
                   'your source code is exposed to all allowed clients!')
-    register('--open', action='store_true', legacy='server_open', default=False,
+    register('--open', action='store_true', default=False,
              help='Attempt to open the server web ui in a browser.')
 
   def execute(self):

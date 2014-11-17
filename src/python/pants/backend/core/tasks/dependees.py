@@ -24,16 +24,13 @@ class ReverseDepmap(ConsoleTask):
   def register_options(cls, register):
     super(ReverseDepmap, cls).register_options(register)
     register('--transitive', default=False, action='store_true',
-             help='List transitive dependees.',
-             legacy='reverse_depmap_transitive')
+             help='List transitive dependees.')
     register('--closed', default=False, action='store_true',
-             help='Include the input targets in the output along with the dependees.',
-             legacy='reverse_depmap_closed')
+             help='Include the input targets in the output along with the dependees.')
     register('--type', default=[], action='append',
              help="Identifies target types to include. Multiple type inclusions "
                   "can be specified at once in a comma separated list or else by "
-                  "using multiple instances of this flag.",
-             legacy='dependees_type')
+                  "using multiple instances of this flag.")
 
 
   def __init__(self, *args, **kwargs):

@@ -17,13 +17,13 @@ class ListTargets(ConsoleTask):
   @classmethod
   def register_options(cls, register):
     super(ListTargets, cls).register_options(register)
-    register('--provides', action='store_true', default=False, legacy='list_provides',
+    register('--provides', action='store_true', default=False,
              help='List only targets that provide an artifact, displaying the columns specified by '
                   '--provides-columns.')
-    register('--provides-columns', default='address,artifact_id', legacy='list_provides_columns',
+    register('--provides-columns', default='address,artifact_id',
              help='Display these columns when --provides is specified. Available columns are: '
                   'address, artifact_id, repo_name, repo_url, push_db_basedir')
-    register('--documented', action='store_true', default=False, legacy='list_documented',
+    register('--documented', action='store_true', default=False,
              help='Print only targets that are documented with a description.')
 
   def __init__(self, *args, **kwargs):

@@ -26,24 +26,13 @@ class ConfluencePublish(Task):
 
     # TODO: https://github.com/pantsbuild/pants/issues/395:
     # url should probably be a param of the wiki, not a config.
-    register('--url',
-             help='The url of the confluence site to post to.',
-             legacy='confluence_publish_url')
-    register('--force',
-             action='store_true',
-             default=False,
-             help=('Force publish the page even if its contents is '
-                   'identical to the contents on confluence.'),
-             legacy='confluence_publish_force')
-    register('--open',
-             action='store_true',
-             default=False,
-             help=('Attempt to open the published confluence wiki page '
-                   'in a browser.'),
-             legacy='confluence_publish_open')
-    register('--user',
-             help='Confluence user name, defaults to unix user.',
-             legacy='confluence_user')
+    register('--url', help='The url of the confluence site to post to.')
+    register('--force', action='store_true', default=False,
+             help='Force publish the page even if its contents is '
+                   'identical to the contents on confluence.')
+    register('--open', action='store_true', default=False,
+             help='Attempt to open the published confluence wiki page in a browser.')
+    register('--user', help='Confluence user name, defaults to unix user.')
 
   def __init__(self, *args, **kwargs):
     super(ConfluencePublish, self).__init__(*args, **kwargs)
