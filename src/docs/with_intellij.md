@@ -21,7 +21,7 @@ If you're using an older Pants (pre-October 2014), then IntelliJ's plugin won't 
 need. You'll also need to use Pants to generate an IDEA project.
 
 To generate an IDEA project for the code in `src/java/com/archie/path/to:target` and
-`src/java/com/archie/another:target`, use the <a xref="gref_goal_idea">idea goal</a>:
+`src/java/com/archie/another:target`, use the <a pantsref="gref_goal_idea">idea goal</a>:
 
     :::bash
     $ ./pants goal idea src/java/com/archie/path/to:target src/java/com/archie/another:target

@@ -30,16 +30,16 @@ likely-looking `BUILD` file--in this example,
 `3rdparty/jvm/com/google/sun/jersey/BUILD`.
 
 In the appropriate `BUILD` file, you want to find a
-<a xref="bdict_jar_library">`jar_library`</a>
-with the <a xref="bdict_jar">`jar`</a>s you want:
+<a pantsref="bdict_jar_library">`jar_library`</a>
+with the <a pantsref="bdict_jar">`jar`</a>s you want:
 
 !inc[start-at=junit&end-before=specs](../../../../../../3rdparty/BUILD)
 
 Here, the
-<a xref="bdict_jar_library">`jar_library`</a>'s name
+<a pantsref="bdict_jar_library">`jar_library`</a>'s name
 defines a target address that
 other build targets can refer to. The
-<a xref="bdict_jar">`jar`</a>s refer to jars known to
+<a pantsref="bdict_jar">`jar`</a>s refer to jars known to
 your Ivy resolver.
 
 If there's already a `jar` importing the code you want but with a
@@ -200,7 +200,7 @@ transformed into:
 And as a result, both jars will now be brought into the target's
 classpath.
 
-<a xmark="test_3rdparty_jvm_snapshot"> </a>
+<a pantsmark="test_3rdparty_jvm_snapshot"> </a>
 
 Using a SNAPSHOT JVM Dependency
 -------------------------------

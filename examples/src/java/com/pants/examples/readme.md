@@ -33,7 +33,7 @@ especially relevant.
 > "extra stuff" (e.g.: start scripts, config files) use a `jvm_app`
 > which allows you to include files in the bundle directory that
 > supplement the binary jar and its dependencies. You can learn
-> more about <a xref="jvm_bundles">bundles</a>
+> more about <a pantsref="jvm_bundles">bundles</a>
 
 **Runnable Binary**
 
@@ -148,7 +148,7 @@ The `BUILD` files in `3rdparty/` have targets like:
                 ],
                )
 
-Those <a xref="bdict_jar">`jar()` things</a> are references to public jars.
+Those <a pantsref="bdict_jar">`jar()` things</a> are references to public jars.
 You can read more about
 [[JVM 3rdpart dependencies|pants('examples/src/java/com/pants/examples:3rdparty_jvm')]].
 
@@ -181,7 +181,7 @@ jar goal:
     :::bash
     $ ./pants goal jar examples/src/java/com/pants/examples/hello/greet
 
-To create a <a xref="jvm_bundles">bundle</a> (a runnable thing and its
+To create a <a pantsref="jvm_bundles">bundle</a> (a runnable thing and its
 dependencies, perhaps including helper files):
 
     :::bash
@@ -251,7 +251,7 @@ so that the next build starts from scratch.
 and Oracle JDK version 6 or greater.
 
 
-<a xmark="jvm_bundles"></a>
+<a pantsmark="jvm_bundles"></a>
 
 Bundles: Deploy-able Runnable File Trees
 ----------------------------------------
@@ -271,7 +271,7 @@ runnable binary and "bundles" of extra files:
 Here, we keep the extra files in a subdirectory, `config/` so that they
 don't clutter up this directory. (In this simple example, there's just
 one file, so there isn't actually much clutter.) By using the
-<a xref="bdict_bundle">`bundle`</a>'s
+<a pantsref="bdict_bundle">`bundle`</a>'s
 `relative_to` parameter, we "strip off" that
 subdirectory; in the generated bundle, these extra files will be in the
 top directory.
