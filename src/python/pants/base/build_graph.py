@@ -320,6 +320,9 @@ class BuildGraph(object):
         target = self.target_addressable_to_target(address, target_addressable)
         self.inject_target(target, dependencies=dep_addresses)
       else:
+        for dep_address in dep_addresses:
+          if not dep_address in self.dependencies_of(address):
+            self.inject_dependency(address, dep_address)
         target = self.get_target(address)
 
       for traversable_spec in target.traversable_dependency_specs:
