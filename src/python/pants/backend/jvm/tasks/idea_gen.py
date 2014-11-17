@@ -47,31 +47,29 @@ class IdeaGen(IdeGen):
   @classmethod
   def register_options(cls, register):
     super(IdeaGen, cls).register_options(register)
-    register('--version', legacy='idea_gen_version',
-             choices=sorted(list(_VERSIONS.keys())), default='11',
+    register('--version', choices=sorted(list(_VERSIONS.keys())), default='11',
              help='The IntelliJ IDEA version the project config should be generated for.')
-    register('--merge', action='store_true', legacy='ide_gen_merge', default=True,
+    register('--merge', action='store_true', default=True,
              help='Merge any manual customizations in existing '
                   'Intellij IDEA configuration. If False, manual customizations '
                   'will be over-written.')
-    register('--open', action='store_true', legacy='idea_gen_open', default=True,
+    register('--open', action='store_true', default=True,
              help='Attempts to open the generated project in IDEA.')
-    register('--bash', action='store_true', legacy='idea_gen_bash',
+    register('--bash', action='store_true',
              help='Adds a bash facet to the generated project configuration.')
-    register('--scala-language-level', legacy='idea_scala_language_level',
+    register('--scala-language-level',
              choices=_SCALA_VERSIONS.keys(), default=_SCALA_VERSION_DEFAULT,
              help='Set the scala language level used for IDEA linting.')
-    register('--scala-maximum-heap-size-mb', legacy='idea_gen_scala_maximum_heap_size', default=512,
+    register('--scala-maximum-heap-size-mb', type=int, default=512,
              help='Sets the maximum heap size (in megabytes) for scalac.')
-    register('--fsc', action='store_true', legacy='idea_gen_fsc', default=False,
+    register('--fsc', action='store_true', default=False,
              help='If the project contains any scala targets this specifies the '
                   'fsc compiler should be enabled.')
-    register('--java-encoding', legacy='idea_gen_java_encoding', default='UTF-8',
+    register('--java-encoding', default='UTF-8',
              help='Sets the file encoding for java files in this project.')
-    register('--java-maximum-heap-size-mb', legacy='idea_gen_java_maximum_heap_size', default=512,
+    register('--java-maximum-heap-size-mb', type=int, default=512,
              help='Sets the maximum heap size (in megabytes) for javac.')
-    register('--exclude-maven-target', action='store_true',
-             legacy='idea_exclude_maven_target', default=False,
+    register('--exclude-maven-target', action='store_true', default=False,
              help="Exclude 'target' directories for directories containing "
                   "pom.xml files.  These directories contain generated code and"
                   "copies of files staged for deployment.")

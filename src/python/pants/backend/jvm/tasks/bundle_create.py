@@ -20,13 +20,13 @@ class BundleCreate(JvmBinaryTask):
   @classmethod
   def register_options(cls, register):
     super(BundleCreate, cls).register_options(register)
-    register('--deployjar', action='store_true', default=False, legacy='bundle_create_deployjar',
+    register('--deployjar', action='store_true', default=False,
              help="Expand 3rdparty jars into loose classfiles in the bundle's root dir. "
                   "If unset, the root will contain internal classfiles only, and 3rdparty jars "
                   "will go into the bundle's libs dir.")
-    register('--archive', choices=list(archive.TYPE_NAMES), legacy='bundle_create_archive',
+    register('--archive', choices=list(archive.TYPE_NAMES),
              help='Create an archive of this type from the bundle.')
-    register('--archive-prefix', action='store_true', default=False, legacy='bundle_create_prefix',
+    register('--archive-prefix', action='store_true', default=False,
              help='If --archive is specified, use the target basename as the path prefix.')
 
   def __init__(self, *args, **kwargs):

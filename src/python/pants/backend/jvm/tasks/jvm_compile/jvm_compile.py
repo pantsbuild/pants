@@ -41,18 +41,15 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
     super(JvmCompile, cls).register_options(register)
     register('--partition-size-hint', type=int, default=sys.maxint, metavar='<# source files>',
              help='Roughly how many source files to attempt to compile together. Set to a large '
-                  'number to compile all sources together. Set to 0 to compile target-by-target.',
-             legacy='{0}_partition_size_hint'.format(cls._language))
+                  'number to compile all sources together. Set to 0 to compile target-by-target.')
 
     register('--warnings', default=True, action='store_true',
-             help='Compile with all configured warnings enabled.',
-             legacy='{0}_compile_warnings'.format(cls._language))
+             help='Compile with all configured warnings enabled.')
 
     register('--missing-deps', choices=['off', 'warn', 'fatal'], default='warn',
              help='Check for missing dependencies in {0} code. Reports actual dependencies A -> B '
                   'where there is no transitive BUILD file dependency path from A to B. If fatal, '
-                  'missing deps are treated as a build error.'.format(cls._language),
-             legacy='{0}_missing_deps'.format(cls._language))
+                  'missing deps are treated as a build error.'.format(cls._language))
 
     register('--missing-direct-deps', choices=['off', 'warn', 'fatal'], default='off',
              help='Check for missing direct dependencies in {0} code. Reports actual dependencies '
@@ -61,18 +58,15 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
                   'dependencies, e.g., due to type inference or when the main target in a BUILD '
                   'file is modified to depend on other targets in the same BUILD file, as an '
                   'implementation detail. However it may still be useful to use this on '
-                  'occasion. '.format(cls._language),
-             legacy='{0}_missing_direct_deps'.format(cls._language))
+                  'occasion. '.format(cls._language))
 
     register('--unnecessary-deps', choices=['off', 'warn', 'fatal'], default='off',
              help='Check for declared dependencies in {0} code that are not needed. This is a very '
                   'strict check. For example, generated code will often legitimately have BUILD '
-                  'dependencies that are unused in practice.'.format(cls._language),
-                            legacy='{0}_unnecessary_deps'.format(cls._language))
+                  'dependencies that are unused in practice.'.format(cls._language))
 
     register('--delete-scratch', default=True, action='store_true',
-             help='Leave intermediate scratch files around, for debugging build problems.',
-             legacy='{0}_delete_scratch'.format(cls._language),)
+             help='Leave intermediate scratch files around, for debugging build problems.')
 
 
   # Subclasses must implement.
