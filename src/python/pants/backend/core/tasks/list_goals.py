@@ -6,7 +6,8 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 from pants.backend.core.tasks.console_task import ConsoleTask
-from pants.backend.core.tasks.reflect import gen_tasks_goals_reference_data
+from pants.backend.core.tasks.reflect import (gen_goals_glopts_reference_data,
+                                              gen_tasks_goals_reference_data)
 from pants.goal.goal import Goal
 
 
@@ -48,6 +49,10 @@ class ListGoals(ConsoleTask):
           yield task['ogroup']['title']
           for option in task['ogroup']['options']:
             yield option['st']
+      global_option_data = gen_goals_glopts_reference_data()
+      yield "*GLOBALS*"
+      for option in global_option_data:
+        yield option['st']
 
     def graph():
       def get_cluster_name(goal):
