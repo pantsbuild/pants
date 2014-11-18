@@ -98,6 +98,7 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':address',
     ':address_lookup_error',
+    ':duplicate_dependency_error',
   ]
 )
 
@@ -166,6 +167,11 @@ python_library(
   dependencies = [
     ':abbreviate_target_ids',
   ]
+)
+
+python_library(
+  name = 'duplicate_dependency_error',
+  sources = ['duplicate_dependency_error.py'],
 )
 
 python_library(

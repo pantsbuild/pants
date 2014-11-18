@@ -56,10 +56,9 @@ class ApacheThriftGen(CodeGen):
   @classmethod
   def register_options(cls, register):
     super(ApacheThriftGen, cls).register_options(register)
-    register('--version', help='Thrift compiler version.', legacy='thrift_version')
+    register('--version', help='Thrift compiler version.')
     register('--lang', action='append', choices=['python', 'java'],
-             help='Force generation of thrift code for these languages.',
-             legacy='thrift_gen_langs')
+             help='Force generation of thrift code for these languages.')
 
   def __init__(self, *args, **kwargs):
     super(ApacheThriftGen, self).__init__(*args, **kwargs)

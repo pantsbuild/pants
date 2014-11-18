@@ -39,7 +39,7 @@ INDEX_HTML = """
 
 <p>Pants is a build system.</p>
 
-<a xmark="xmark_index"></a>
+<a pantsmark="pantsmark_index"></a>
 
 <p>See also:
 <a href="../fake1/p1.html">another page</a>.</p>
@@ -48,9 +48,9 @@ INDEX_HTML = """
 P1_HTML = """
 <h1>東京 is Tokyo</h1>
 
-<a id="an_xmark" xmark="xmark_p1"></a>
+<a id="an_pantsmark" pantsmark="pantsmark_p1"></a>
 
-<p>Fascinating description. <a xref="xmark_index">to index</a>
+<p>Fascinating description. <a pantsref="pantsmark_index">to index</a>
 """
 
 P2_HTML = """
@@ -61,7 +61,7 @@ P2_HTML = """
 
 <h1>Page 2</h1>
 
-<p>Some text <a xref="xmark_p1">to p1</a></p>
+<p>Some text <a pantsref="pantsmark_p1">to p1</a></p>
 
 <h2 id="one">Section One</h2>
 
@@ -99,22 +99,22 @@ class AllTheThingsTestCase(unittest.TestCase):
     self.assertIn('subdir/page1.html', html,
                   'p1.html link did not get fixed up to page1.html')
 
-  def test_xrefs(self):
-    sitegen.link_xrefs(self.soups, self.precomputed)
+  def test_pantsrefs(self):
+    sitegen.link_pantsrefs(self.soups, self.precomputed)
     p1_html = sitegen.render_html('subdir/page1',
                                   self.config,
                                   self.soups,
                                   self.precomputed,
                                   TEMPLATE_MUSTACHE)
-    self.assertIn('href="../index.html#xmark_index"', p1_html,
-                  'xref_index did not get linked')
+    self.assertIn('href="../index.html#pantsmark_index"', p1_html,
+                  'pantsref_index did not get linked')
     p2_html = sitegen.render_html('subdir/page2',
                                   self.config,
                                   self.soups,
                                   self.precomputed,
                                   TEMPLATE_MUSTACHE)
-    self.assertIn('href="page1.html#an_xmark"', p2_html,
-                  'xref_p1 did not get linked')
+    self.assertIn('href="page1.html#an_pantsmark"', p2_html,
+                  'pantsref_p1 did not get linked')
 
   def test_find_title(self):
     p2_html = sitegen.render_html('subdir/page2',

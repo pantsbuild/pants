@@ -9,16 +9,19 @@ IDEA](http://www.jetbrains.com/idea/). (To use IntelliJ to work on Pants
 Pants Build Plugin for IntelliJ
 -------------------------------
 
-For an installation walkthrough and quick demo, see
-<https://www.youtube.com/watch?v=mIr9BAi-1s4>
+IntelliJ can ask Pants for information about your code. You can install a Pants-aware IntelliJ
+plugin. Once you've done that, you can configure your IntelliJ setup by selecting BUILD targets.
+For the details, see the
+[IntelliJ-pants-plugin README](https://github.com/pantsbuild/intellij-pants-plugin/blob/master/README.md).
 
 Generating an IDEA Project
 --------------------------
 
-To generate an IDEA project for the code in
-`src/java/com/archie/path/to:target` and
-`src/java/com/archie/another:target`, use the
-<a xref="gref_goal_idea">idea goal</a>:
+If you're using an older Pants (pre-October 2014), then IntelliJ's plugin won't do everything you
+need. You'll also need to use Pants to generate an IDEA project.
+
+To generate an IDEA project for the code in `src/java/com/archie/path/to:target` and
+`src/java/com/archie/another:target`, use the <a pantsref="gref_goal_idea">idea goal</a>:
 
     :::bash
     $ ./pants goal idea src/java/com/archie/path/to:target src/java/com/archie/another:target

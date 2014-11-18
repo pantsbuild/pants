@@ -433,7 +433,7 @@ def gref_template_data_from_options(scope, argparser):
   """Get data for the Goals Reference from a CustomArgumentParser instance."""
   if not argparser: return None
   title = scope or ''
-  xref = ''.join([c for c in title if c.isalnum()])
+  pantsref = ''.join([c for c in title if c.isalnum()])
   option_l = []
   for o in argparser.walk_actions():
     st = '/'.join(o.option_strings)
@@ -453,7 +453,7 @@ def gref_template_data_from_options(scope, argparser):
   return TemplateData(
     title=title,
     options=option_l,
-    xref=xref)
+    pantsref=pantsref)
 
 def gen_tasks_goals_reference_data():
   """Generate the template data for the goals reference rst doc."""

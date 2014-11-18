@@ -23,7 +23,7 @@ def main():
 
   To run:
 
-  ./pants py src/python/pants/backend/jvm/tasks/jvm_compile:anonymize_zinc_analysis \
+  ./pants goal run src/python/pants/backend/jvm/tasks/jvm_compile:anonymize_zinc_analysis -- \
     <wordfile> <classes dir in analysis files> <analysis file glob 1> <analysis file glob 2> ...
   """
   word_file = sys.argv[1]

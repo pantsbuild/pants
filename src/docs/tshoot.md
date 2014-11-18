@@ -9,7 +9,7 @@ We want Pants' error messages to be useful.)
 Sometimes Pants just plain doesn't work. (Please report these, too.) The
 following workarounds can get you up and running again.
 
-<a xmark="tshoot_verbosity"> </a>
+<a pantsmark="tshoot_verbosity"> </a>
 
 Maximum Verbosity
 -----------------
@@ -24,7 +24,7 @@ flag (along with the parameters you meant to pass):
 This can be especially useful if you're trying to figure out what Pants
 was "looking at" when it crashed.
 
-<a xmark="washpants"> </a>
+<a pantsmark="washpants"> </a>
 
 Scrub the Environment
 ---------------------
@@ -66,7 +66,7 @@ To debug this, look in `./pants.d/ng/*/*`: these files should be named
 
 One typical cause behind this symptom: if you removed your machine's Ivy
 cache, Pants may try to use symbolic links to files that have gone away.
-To recover from this, <a xref="washpants">scrub the environment</a>.
+To recover from this, <a pantsref="washpants">scrub the environment</a>.
 
 Questions, Issues, Bug Reports
 ------------------------------

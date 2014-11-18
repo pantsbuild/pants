@@ -19,9 +19,9 @@ class WhatChanged(ConsoleTask):
   @classmethod
   def register_options(cls, register):
     super(WhatChanged, cls).register_options(register)
-    register('--parent', default='HEAD', legacy='what_changed_create_prefix',
+    register('--parent', default='HEAD',
              help='Calculate changes against this tree-ish.')
-    register('--files', action='store_true', default=False, legacy='what_changed_show_files',
+    register('--files', action='store_true', default=False,
              help='Show changed files instead of the targets that own them.')
 
   def __init__(self, *args, **kwargs):

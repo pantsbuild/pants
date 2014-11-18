@@ -1,6 +1,11 @@
 #!/bin/bash
 
 # Usage:
+#
+#   in practice, you probably want
+#       `./build-support/bin/publish_docs.sh`
+#   ...which invokes this.
+#
 #   sh publish_via_git.sh git@github.com:pantsbuild/pantsbuild.github.io.git
 #
 #   or, to publish to a subdir under there:
@@ -31,7 +36,7 @@ mkdir -p $out
 cd $out
 git clone $repo_url
 cd `ls`
-mkdir -p ./$path_within_url && cp -R $root/_build/html/* ./$path_within_url
+mkdir -p ./$path_within_url && cp -R $root/../../../../dist/docsite/* ./$path_within_url
 git add .
 git commit -am"publish by $USER"
 git push origin master

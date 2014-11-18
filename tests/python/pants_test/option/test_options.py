@@ -154,3 +154,12 @@ class OptionsTest(unittest.TestCase):
     self.assertEqual(3, options.for_scope('compile.java').a)
     self.assertEqual('foo', options.for_scope('compile.java').b)
     self.assertEqual(4, options.for_scope('compile.java').c)
+
+  def test_passthru_args(self):
+    options = self._parse('./pants compile foo -- bar --baz')
+    self.assertEqual(['bar', '--baz'], options.passthru_args_for_scope('compile'))
+    self.assertEqual(['bar', '--baz'], options.passthru_args_for_scope('compile.java'))
+    self.assertEqual(['bar', '--baz'], options.passthru_args_for_scope('compile.scala'))
+    self.assertEqual([], options.passthru_args_for_scope('test'))
+    self.assertEqual([], options.passthru_args_for_scope(''))
+    self.assertEqual([], options.passthru_args_for_scope(None))

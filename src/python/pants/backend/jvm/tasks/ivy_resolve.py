@@ -27,23 +27,22 @@ class IvyResolve(NailgunTask, IvyTaskMixin, JvmToolTaskMixin):
   @classmethod
   def register_options(cls, register):
     super(IvyResolve, cls).register_options(register)
-    register('--override', action='append', legacy='ivy_resolve_overrides',
+    register('--override', action='append',
              help='Specifies a jar dependency override in the form: '
              '[org]#[name]=(revision|url) '
              'Multiple overrides can be specified using repeated invocations of this flag. '
              'For example, to specify 2 overrides: '
              '--override=com.foo#bar=0.1.2 '
              '--override=com.baz#spam=file:///tmp/spam.jar ')
-    register('--report', action='store_true', legacy='ivy_resolve_report', default=False,
+    register('--report', action='store_true', default=False,
              help='Generate an ivy resolve html report')
-    register('--open', action='store_true', legacy='ivy_resolve_open', default=False,
+    register('--open', action='store_true', default=False,
              help='Attempt to open the generated ivy resolve report '
                   'in a browser (implies --report)')
-    register('--outdir', legacy='ivy_resolve_outdir',
-             help='Emit ivy report outputs in to this directory.')
-    register('--args', action='append', legacy='ivy_args',
+    register('--outdir', help='Emit ivy report outputs in to this directory.')
+    register('--args', action='append',
              help='Pass these extra args to ivy.')
-    register('--mutable-pattern', legacy='ivy_mutable_pattern',
+    register('--mutable-pattern',
              help='If specified, all artifact revisions matching this pattern will be treated as '
                   'mutable unless a matching artifact explicitly marks mutable as False.')
 

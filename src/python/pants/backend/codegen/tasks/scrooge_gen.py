@@ -85,8 +85,7 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
   @classmethod
   def register_options(cls, register):
     super(ScroogeGen, cls).register_options(register)
-    register('--verbose', default=False, action='store_true', help='Emit verbose output.',
-             legacy='scrooge_gen_quiet')
+    register('--verbose', default=False, action='store_true', help='Emit verbose output.')
 
   @classmethod
   def product_types(cls):

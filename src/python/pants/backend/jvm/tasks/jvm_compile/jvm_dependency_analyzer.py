@@ -66,7 +66,7 @@ class JvmDependencyAnalyzer(object):
         if isinstance(target, ScalaLibrary):
           for java_source in target.java_sources:
             for src in java_source.sources_relative_to_buildroot():
-              targets_by_file[os.path.join(buildroot, src)].add(java_source)
+              targets_by_file[os.path.join(buildroot, src)].add(target)
 
     # Compute class -> target.
     with self._context.new_workunit(name='map_classes'):

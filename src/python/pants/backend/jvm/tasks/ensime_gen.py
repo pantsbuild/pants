@@ -37,7 +37,7 @@ class EnsimeGen(IdeGen):
   @classmethod
   def register_options(cls, register):
     super(EnsimeGen, cls).register_options(register)
-    register('--scala-language-level', legacy='ensime_scala_language_level',
+    register('--scala-language-level',
              choices=_SCALA_VERSIONS.keys(), default=_SCALA_VERSION_DEFAULT,
              help='Set the scala language level used for Ensime linting.')
 

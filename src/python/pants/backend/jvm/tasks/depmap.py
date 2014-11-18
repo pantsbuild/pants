@@ -59,30 +59,23 @@ class Depmap(ConsoleTask):
   def register_options(cls, register):
     super(Depmap, cls).register_options(register)
     register('--internal-only', default=False, action='store_true',
-             legacy='depmap_is_internal_only',
              help='Specifies that only internal dependencies should be included in the graph '
                   'output (no external jars).')
     register('--external-only', default=False, action='store_true',
-             legacy='depmap_is_external_only',
              help='Specifies that only external dependencies should be included in the graph '
                   'output (only external jars).')
     register('--minimal', default=False, action='store_true',
-             legacy='depmap_is_minimal',
              help='For a textual dependency tree, only prints a dependency the 1st '
                   'time it is encountered.  For graph output this does nothing.')
     register('--graph', default=False, action='store_true',
-             legacy='depmap_is_graph',
              help='Specifies the internal dependency graph should be output in the dot digraph '
                   'format.')
     register('--project-info', default=False, action='store_true',
-             legacy='depmap_is_project_info',
              help='Produces a json object with info about the target, including source roots, '
                   'dependencies, and paths to libraries for their targets and dependencies.')
     register('--project-info-formatted', default=True, action='store_false',
-             legacy='depmap_is_formatted',
              help='Causes project-info output to be a single line of JSON.')
     register('--separator', default='-',
-             legacy='depmap_separator',
              help='Specifies the separator to use between the org/name/rev components of a '
                   'dependency\'s fully qualified name.')
 
@@ -279,6 +272,7 @@ class Depmap(ConsoleTask):
       if isinstance(current_target, ScalaLibrary):
         for dep in current_target.java_sources:
           info['targets'].append(self._address(dep.address))
+          process_target(dep)
 
       info['roots'] = map(lambda (source_root, package_prefix): {
         'source_root': source_root,

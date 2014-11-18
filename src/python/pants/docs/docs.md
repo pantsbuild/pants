@@ -37,20 +37,20 @@ subdir of <http://pantsbuild.github.io/>:
     # proceeding to publish to http://pantsbuild.github.io/sirois-test-site
     ./build-support/bin/publish_docs.sh -opd sirois-test-site
 
-X-References
-------------
+Cross References
+----------------
 
 If your doc has a
-link like `<a xref="bdict_java_library">java_library</a>`, it links to
+link like `<a pantsref="bdict_java_library">java_library</a>`, it links to
 the BUILD Dictionary entry for `java_library`. To set up a short-hand
 link like this...
 
-Define the destination of the link with an `xmark` anchor, e.g.,
-`<a xmark="bdict_java_library"> </a>`. The `xmark` attribute (here,
+Define the destination of the link with an `pantsmark` anchor, e.g.,
+`<a pantsmark="bdict_java_library"> </a>`. The `pantsmark` attribute (here,
 `bdict_java_library`) must be unique within the doc set.
 
-Link to the destination with an `xref`, e.g.,
-`<a xref="bdict_java_library">java_library</a>`.
+Link to the destination with an `pantsref`, e.g.,
+`<a pantsref="bdict_java_library">java_library</a>`.
 
 Doc Site Config
 ---------------

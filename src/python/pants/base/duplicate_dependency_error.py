@@ -5,12 +5,10 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-import sys
 
-from example.hello.greet.greet import greet
+class DuplicateDependencyError(Exception):
+  """Raised when a dependency is specified twice.
 
-
-if __name__ == '__main__':
-  greetees = sys.argv[1:] or ['world']
-  for greetee in greetees:
-    print(greet(greetee))
+  While not a serious error, it is better to give the user immediate feedback so
+  the dupe can be removed.
+  """

@@ -425,7 +425,7 @@ declare exclusives tags:
 With the exclusives declared, pants can recognize that 'javabin' has
 conflicting dependencies, and can generate an appropriate error message.
 
-<a xmark="build_pants_wrapper_gone"> </a>
+<a pantsmark="build_pants_wrapper_gone"> </a>
 
 What happened to the `pants()` wrapper around targets?
 ------------------------------------------------------
@@ -497,4 +497,4 @@ mentioned in the error message with the `pants()` wrapper function in
 your BUILD files. The open source Pants release deprecated the use of
 this wrapper and thus examples in this documentation don't include it.
 For more information, see the
-<a xref="build_pants_wrapper_gone">`pants` wrapper</a> notes above.
+<a pantsref="build_pants_wrapper_gone">`pants` wrapper</a> notes above.

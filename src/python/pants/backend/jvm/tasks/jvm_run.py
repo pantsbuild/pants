@@ -23,7 +23,7 @@ class JvmRun(JvmTask):
   @classmethod
   def register_options(cls, register):
     super(JvmRun, cls).register_options(register)
-    register('--only-write-cmd-line',  metavar='<file>', legacy='only_write_cmd_line',
+    register('--only-write-cmd-line',  metavar='<file>',
              help='Instead of running, just write the cmd line to this file.')
 
   def __init__(self, *args, **kwargs):
