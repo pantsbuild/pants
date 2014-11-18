@@ -12,7 +12,6 @@ import subprocess
 import unittest2 as unittest
 
 from pants.fs.archive import ZIP
-from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_open, safe_mkdir
@@ -26,13 +25,6 @@ class PantsRunIntegrationTest(unittest.TestCase):
 
   PANTS_SUCCESS_CODE = 0
   PANTS_SCRIPT_NAME = 'pants'
-
-  @classmethod
-  def tearDownClass(cls):
-    # When integration tests run in a private buildroot, they leave nailgun tasks running that
-    # won't be cleaned up until someone runs ./pants goal ng-killall.
-    NailgunTask.killall()
-    super(PantsRunIntegrationTest, cls).tearDownClass()
 
   @classmethod
   def has_python_version(cls, version):

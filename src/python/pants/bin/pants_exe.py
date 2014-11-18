@@ -185,7 +185,10 @@ def _run():
     run_tracker.end()
     # Must kill nailguns only after run_tracker.end() is called, because there may still
     # be pending background work that needs a nailgun.
+    # TODO(Eric Ayers) simplify after setup_py goes away.
     if (hasattr(command.old_options, 'cleanup_nailguns') and command.old_options.cleanup_nailguns) \
+        or (hasattr(command, 'new_options')
+            and command.new_options.for_global_scope().kill_nailguns) \
         or config.get('nailgun', 'autokill', default=False):
       NailgunTask.killall(None)
 

@@ -37,7 +37,6 @@ python_library(
   name = 'int-test',
   sources = ['pants_run_integration_test.py'],
   dependencies = [
-    'src/python/pants/backend/jvm/tasks:nailgun_task',
     'src/python/pants/base:build_environment',
     'src/python/pants/fs',
     'src/python/pants/util:contextutil',
