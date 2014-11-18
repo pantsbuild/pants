@@ -29,6 +29,11 @@ class NotTestTarget(Target):
     super(NotTestTarget, self).__init__(target_name, SyntheticAddress.parse(spec), None)
 
 
+class AnotherTarget(Target):
+  def __init__(self, spec):
+    spec_path, target_name = parse_spec(spec)
+    super(AnotherTarget, self).__init__(target_name, SyntheticAddress.parse(spec), None)
+
 class SourceRootTest(unittest.TestCase):
   """Tests for SourceRoot.  SourceRoot is a singleton so we must make sure this
   test cleans up after itself.
@@ -129,8 +134,11 @@ class SourceRootTest(unittest.TestCase):
     self.assertEquals(("tests/language", OrderedSet([NotTestTarget, TestTarget])),
                       tree.get_root_and_types("tests/language"),
                       msg="Failed for tree: {dump}".format(dump=tree._dump()))
-    self.assertEquals(("tests/language", set([NotTestTarget, TestTarget])),
-                      tree.get_root_and_types("tests/language/foo"),
+    root, types = tree.get_root_and_types("tests/language/foo")
+    self.assertEquals("tests/language", root,
+                      msg="Failed for tree: {dump}".format(dump=tree._dump()))
+    self.assertEquals(set(types),
+                      set([NotTestTarget, TestTarget]),
                       msg="Failed for tree: {dump}".format(dump=tree._dump()))
     self.assertEquals((None, None), tree.get_root_and_types("src"),
                       msg="Failed for tree: {dump}".format(dump=tree._dump()))
@@ -154,8 +162,11 @@ class SourceRootTest(unittest.TestCase):
                       msg="Failed for tree: {dump}".format(dump=tree._dump()))
     self.assertEquals((None, None), tree.get_root_and_types("src"),
                       msg="Failed for tree: {dump}".format(dump=tree._dump()))
-    with self.assertRaises(SourceRootTree.DuplicateSourceRootError):
-      tree.add_root("tests/language", set([NotTestTarget]))
+    tree.add_root("tests/language", set([AnotherTarget]))
+    self.assertEquals(set([AnotherTarget, NotTestTarget, TestTarget]),
+                      set(tree.get_root_and_types("tests/language")[1]),
+                      msg="Failed for tree: {dump}".format(dump=tree._dump()))
+
     with self.assertRaises(SourceRootTree.NestedSourceRootError):
       tree.add_root("tests", set([NotTestTarget]))
 

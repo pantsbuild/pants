@@ -20,9 +20,6 @@ class SourceRootTree(object):
   allowed along a path.
   """
 
-  class DuplicateSourceRootError(Exception):
-    pass
-
   class NestedSourceRootError(Exception):
     pass
 
@@ -38,7 +35,7 @@ class SourceRootTree(object):
 
     def set_leaf(self, types):
       self.is_leaf = True
-      self.types = types
+      self.types = OrderedSet(types)
 
     def get(self, key):
       return self.children.get(key)
@@ -70,14 +67,14 @@ class SourceRootTree(object):
       curr_node = curr_node.get_or_add(subdir)
 
     if curr_node.is_leaf and types != curr_node.types:
-      raise self.DuplicateSourceRootError("{source_root} already exists in tree."
-                                          .format(source_root=source_root))
+      curr_node.types.update(types)
     elif curr_node.children:
       # TODO(Eric Ayers) print the list of conflicting source_roots already registered.
       raise self.NestedSourceRootError("{source_root} is nested inside an existing "
                                        "source_root."
                                        .format(source_root=source_root))
-    curr_node.set_leaf(types)
+    else:
+      curr_node.set_leaf(types)
 
   def get(self, path):
     """
@@ -107,7 +104,7 @@ class SourceRootTree(object):
     """
     found, found_path = self.get(path)
     if found:
-      return os.path.sep.join(found_path), found.types
+      return os.path.sep.join(found_path), tuple(found.types)
     return None, None
 
   def get_root_siblings(self, path):
