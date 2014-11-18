@@ -114,7 +114,7 @@ E.g., you could
 In this example, it doesn't make sense to run a binary target as a test, so
 Pants doesn't do that.
 
-<a xmark="tut_goal_target_mismatch"></a>
+<a pantsmark="tut_goal_target_mismatch"></a>
 
 *Goal-Target Mismatch*
 

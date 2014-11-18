@@ -18,13 +18,10 @@ class BuildLint(Task):
   def register_options(cls, register):
     super(BuildLint, cls).register_options(register)
     register('--transitive', default=False, action='store_true',
-             legacy='buildlint_transitive',
              help='Apply lint rules transitively to all dependency buildfiles.')
     register('--include-intransitive-deps', default=False, action='store_true',
-             legacy='buildlint_include_intransitive',
              help='Correct both simple missing dependencies and intransitive missing deps.')
     register('--action', action='append', choices=['diff', 'rewrite'], default=[],
-             legacy='buildlint_actions',
              help='diff=print out diffs, rewrite=apply changes to BUILD files directly.')
 
   def __init__(self, *args, **kwargs):

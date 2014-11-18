@@ -21,7 +21,6 @@ class JarsignerTask(Task):
   def register_options(cls, register):
     super(JarsignerTask, cls).register_options(register)
     register('--build-type', choices=['debug', 'release'],
-             legacy='build_type',
              help = 'Specifies the build type and keystore used to sign the package.')
 
   @classmethod

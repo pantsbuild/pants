@@ -111,14 +111,11 @@ class Parser(object):
       ancestor._freeze()
       ancestor = ancestor._parent_parser
 
-    clean_kwargs = copy.deepcopy(kwargs)  # Copy kwargs so we can remove legacy-related keys.
-    kwargs = None  # Ensure no code below modifies kwargs accidentally.
-    self._validate(args, clean_kwargs)
-    clean_kwargs.pop('legacy', None)
-    dest = self._set_dest(args, clean_kwargs)
+    self._validate(args, kwargs)
+    dest = self._set_dest(args, kwargs)
 
     # Is this a boolean flag?
-    if clean_kwargs.get('action') in ('store_false', 'store_true'):
+    if kwargs.get('action') in ('store_false', 'store_true'):
       inverse_args = []
       help_args = []
       for flag in args:
@@ -134,17 +131,17 @@ class Parser(object):
     # Register the option, only on this scope, for the purpose of displaying help.
     # Note that we'll only display the default value for this scope, even though the
     # default may be overridden in inner scopes.
-    raw_default = self._compute_default(dest, clean_kwargs).value
-    clean_kwargs_with_default = dict(clean_kwargs, default=raw_default)
-    self._help_argparser.add_argument(*help_args, **clean_kwargs_with_default)
+    raw_default = self._compute_default(dest, kwargs).value
+    kwargs_with_default = dict(kwargs, default=raw_default)
+    self._help_argparser.add_argument(*help_args, **kwargs_with_default)
     self._has_help_options = True
 
     # Register the option for the purpose of parsing, on this and all enclosed scopes.
     if inverse_args:
-      inverse_kwargs = self._create_inverse_kwargs(clean_kwargs)
-      self._register_boolean(dest, args, clean_kwargs, inverse_args, inverse_kwargs)
+      inverse_kwargs = self._create_inverse_kwargs(kwargs)
+      self._register_boolean(dest, args, kwargs, inverse_args, inverse_kwargs)
     else:
-      self._register(dest, args, clean_kwargs)
+      self._register(dest, args, kwargs)
 
   def _register(self, dest, args, kwargs):
     """Recursively register the option for parsing."""

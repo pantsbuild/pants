@@ -298,3 +298,17 @@ class BuildGraphTest(BaseTest):
 
     with self.assertRaises(DuplicateDependencyError):
       self.build_graph.inject_spec_closure('//:a')
+
+  def test_inject_then_inject_closure(self):
+    self.add_to_build_file('BUILD',
+                           'target(name="a", '
+                           '  dependencies=['
+                           '    "other:b",'
+                           '])')
+    self.add_to_build_file('other/BUILD',
+                           'target(name="b")')
+    self.build_graph.inject_address(SyntheticAddress.parse('//:a'))
+    self.build_graph.inject_address_closure(SyntheticAddress.parse('//:a'))
+    a = self.build_graph.get_target_from_spec('//:a')
+    b = self.build_graph.get_target_from_spec('//other:b')
+    self.assertIn(b, a.dependencies)

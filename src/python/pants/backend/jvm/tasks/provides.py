@@ -20,11 +20,10 @@ from pants.util.dirutil import safe_mkdir
 class Provides(Task):
   @classmethod
   def register_options(cls, register):
-    register('--transitive', default=False, action='store_true', legacy='provides_transitive',
+    register('--transitive', default=False, action='store_true',
              help='Shows the symbols provided not just by the specified targets but by all their '
                   'transitive dependencies.')
     register('--also-write-to-stdout', default=False, action='store_true',
-             legacy='provides_also_write_to_stdout',
              help='Also write the provides information to stdout.')
 
   def __init__(self, *args, **kwargs):

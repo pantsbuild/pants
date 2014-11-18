@@ -20,12 +20,10 @@ class PytestRun(PythonTask):
   @classmethod
   def register_options(cls, register):
     super(PytestRun, cls).register_options(register)
-    register('--fast', action='store_true', default=True, legacy='pytest_run_fast',
+    register('--fast', action='store_true', default=True,
              help='Run all tests in a single chroot. If turned off, each test target will '
                   'create a new chroot, which will be much slower.')
-    # TODO(benjy): Support direct passthru of pytest flags.
-    register('--options', action='append', legacy='pytest_run_options',
-             help='Pass these options to pytest.')
+    register('--options', action='append', help='Pass these options to pytest.')
 
   @classmethod
   def supports_passthru_args(cls):

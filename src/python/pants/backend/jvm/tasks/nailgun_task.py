@@ -111,7 +111,6 @@ class NailgunKillall(Task):
   def register_options(cls, register):
     super(NailgunKillall, cls).register_options(register)
     register('--everywhere', default=False, action='store_true',
-             legacy='ng_killall_everywhere',
              help='Kill all nailguns servers launched by pants for all workspaces on the system.')
 
   def execute(self):

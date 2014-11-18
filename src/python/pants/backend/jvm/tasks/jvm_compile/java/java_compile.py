@@ -80,8 +80,7 @@ class JavaCompile(JvmCompile):
   @classmethod
   def register_options(cls, register):
     super(JavaCompile, cls).register_options(register)
-    register('--args', action='append', help='Pass these extra args to javac.',
-             legacy='java_compile_args')
+    register('--args', action='append', help='Pass these extra args to javac.')
 
   def __init__(self, *args, **kwargs):
     super(JavaCompile, self).__init__(*args, **kwargs)
