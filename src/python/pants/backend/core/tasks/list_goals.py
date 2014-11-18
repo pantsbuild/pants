@@ -42,17 +42,12 @@ class ListGoals(ConsoleTask):
         yield '  %s' % ' '.join(undocumented)
 
     def report_with_options():
-      reference_data = gen_tasks_goals_reference_data()
-      for goal in reference_data:
-        yield goal.goal
-        for task in goal.tasks:
-          yield task['ogroup']['title']
-          for option in task['ogroup']['options']:
-            yield option['st']
-      global_option_data = gen_goals_glopts_reference_data()
-      yield "*GLOBALS*"
-      for option in global_option_data:
-        yield option['st']
+      for goal in Goal.all():
+        try:
+          self.context.new_options.print_help(goals=[goal.name])
+        except:
+          print("LOLWUT", goal.name)
+      return []
 
     def graph():
       def get_cluster_name(goal):
