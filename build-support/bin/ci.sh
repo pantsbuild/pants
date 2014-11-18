@@ -196,7 +196,7 @@ if [[ "${skip_integration:-false}" == "false" ]]; then
             xargs ./pants goal filter --filter-type=python_tests | \
             grep integration | \
             sort | \
-            sed -n "${SHARD_NUMBER:-0}~${TOTAL_SHARDS:-1}p")
+            awk "NR%${TOTAL_SHARDS:-1}==${SHARD_NUMBER:-0}")
   ) || die "Pants Integration test failure"
 fi
 
