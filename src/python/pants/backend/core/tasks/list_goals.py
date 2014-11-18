@@ -42,12 +42,11 @@ class ListGoals(ConsoleTask):
         yield '  %s' % ' '.join(undocumented)
 
     def report_with_options():
+      yield self.context.new_options.format_global_help()
       for goal in Goal.all():
-        try:
-          self.context.new_options.print_help(goals=[goal.name])
-        except:
-          print("LOLWUT", goal.name)
-      return []
+        yield '\n{0}: {1}\n'.format(goal.name, goal.description or '')
+        for scope in goal.known_scopes():
+          yield self.context.new_options.format_help(scope)
 
     def graph():
       def get_cluster_name(goal):
