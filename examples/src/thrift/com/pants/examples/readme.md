@@ -118,24 +118,24 @@ just uses Java; thus, the `BUILD` file for `distance.thrift` looks like
 !inc[start-after=cd ../precipitation](distance/BUILD)
 
 Notice the target type is
-<a xref="bdict_java_thrift_library">java_thrift_library</a>,
+<a pantsref="bdict_java_thrift_library">java_thrift_library</a>,
 and this target staked its claim to our distance thrift IDL file.
 JVM library targets
 (e.g.:
-<a xref="bdict_java_library">`java_library`</a>,
-<a xref="bdict_scala_library">`scala_library`</a>) that depend on this
+<a pantsref="bdict_java_library">`java_library`</a>,
+<a pantsref="bdict_scala_library">`scala_library`</a>) that depend on this
 target will simply see generated code from the IDL. Since no additional
 options are specified we use the defaults; however, if we need more
 control over how code is generated we control that through arguments
 provided by
-<a xref="bdict_java_thrift_library">java_thrift_library</a>.
+<a pantsref="bdict_java_thrift_library">java_thrift_library</a>.
 
 > **note**
 >
 > While the name `java_thrift_library` might make you think it generates
 > Java, it can also generate other target languages via the `language`
 > parameter (scala for example). For Python code, however, use
-> <a xref="bdict_python_thrift_library">python_thrift_library</a>.
+> <a pantsref="bdict_python_thrift_library">python_thrift_library</a>.
 
 As with "regular" languages, for one target's code to include another's,
 a target should have the other in its `dependencies`. Thus, to allow

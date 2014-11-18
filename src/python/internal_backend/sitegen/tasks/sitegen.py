@@ -66,13 +66,13 @@ def load_soups(config):
 class Precomputed(object):
   """Info we compute (and preserve) before we mutate things."""
 
-  def __init__(self, page, xref):
+  def __init__(self, page, pantsref):
     """
     :param page: dictionary of per-page precomputed info
-    :param xref: dictionary of xrefs {'foo': 'path/to/page.html#fooref', ...}
+    :param pantsref: dictionary of pantsrefs {'foo': 'path/to/page.html#fooref', ...}
     """
     self.page = page
-    self.xref = xref
+    self.pantsref = pantsref
 
 
 class PrecomputedPageInfo(object):
@@ -87,15 +87,15 @@ class PrecomputedPageInfo(object):
     self.toc = toc or []
 
 
-def precompute_xrefs(soups):
-  """Return links for <a xmark="foo"> tags. Mutates soups to give needed ids.
+def precompute_pantsrefs(soups):
+  """Return links for <a pantsmark="foo"> tags. Mutates soups to give needed ids.
 
-  If we see <a xref="foo">something</a>, that's a link whose destination is
-  a <a xmark="foo"> </a> tag, perhaps on some other tag. To stitch these
-  together, we scan the docset to find all the xmarks. If an xmark does not
+  If we see <a pantsref="foo">something</a>, that's a link whose destination is
+  a <a pantsmark="foo"> </a> tag, perhaps on some other tag. To stitch these
+  together, we scan the docset to find all the pantsmarks. If an pantsmark does not
   yet have an id to anchor, we give it one.
 
-  Return value dictionary maps xrefs to locations:
+  Return value dictionary maps pantsrefs to locations:
   { "foo": "path/to/foo.html#fooref", "bar": "other/page.html#barref", ...}
   """
   accumulator = {}
@@ -103,37 +103,37 @@ def precompute_xrefs(soups):
     existing_anchors = find_existing_anchors(soup)
     count = 100
     for tag in soup.find_all('a'):
-      if tag.has_attr('xmark'):
-        xmark = tag['xmark']
-        if xmark in accumulator:
-          raise TaskError('xmarks are unique but "{0}" appears in {1} and {2}'
-                          .format(xmark, page, accumulator[xmark]))
+      if tag.has_attr('pantsmark'):
+        pantsmark = tag['pantsmark']
+        if pantsmark in accumulator:
+          raise TaskError('pantsmarks are unique but "{0}" appears in {1} and {2}'
+                          .format(pantsmark, page, accumulator[pantsmark]))
 
         # To link to a place "mid-page", we need an HTML anchor.
         # If this tag already has such an anchor, use it.
         # Else, make one up.
         anchor = tag.get('id') or tag.get('name')
         if not anchor:
-          anchor = xmark
+          anchor = pantsmark
           while anchor in existing_anchors:
             count += 1
-            anchor = '{0}_{1}'.format(xmark, count)
+            anchor = '{0}_{1}'.format(pantsmark, count)
           tag['id'] = anchor
           existing_anchors = find_existing_anchors(soup)
 
         link = '{0}.html#{1}'.format(page, anchor)
-        accumulator[xmark] = link
+        accumulator[pantsmark] = link
   return accumulator
 
 
 def precompute(config, soups):
   """Return info we want to compute (and preserve) before we mutate things."""
   page = {}
-  xrefs = precompute_xrefs(soups)
+  pantsrefs = precompute_pantsrefs(soups)
   for p, soup in soups.items():
     title = get_title(soup) or p
     page[p] = PrecomputedPageInfo(title=title)
-  return Precomputed(page=page, xref=xrefs)
+  return Precomputed(page=page, pantsref=pantsrefs)
 
 
 def fixup_internal_links(config, soups):
@@ -232,16 +232,16 @@ def add_here_links(soups):
       header_holder.append(tag)
 
 
-def link_xrefs(soups, precomputed):
-  """Transorm soups: <a xref="foo"> becomes <a href="../foo_page.html#foo">"""
+def link_pantsrefs(soups, precomputed):
+  """Transorm soups: <a pantsref="foo"> becomes <a href="../foo_page.html#foo">"""
   for (page, soup) in soups.items():
     for a in soup.find_all('a'):
-      if a.has_attr('xref'):
-        xref = a['xref']
-        if not xref in precomputed.xref:
-          raise TaskError('Page {0} has xref "{1}" and I cannot find xmark for'
-                          ' it'.format(page, xref))
-        a['href'] = rel_href(page, precomputed.xref[xref])
+      if a.has_attr('pantsref'):
+        pantsref = a['pantsref']
+        if not pantsref in precomputed.pantsref:
+          raise TaskError('Page {0} has pantsref "{1}" and I cannot find pantsmark for'
+                          ' it'.format(page, pantsref))
+        a['href'] = rel_href(page, precomputed.pantsref[pantsref])
 
 
 def transform_soups(config, soups, precomputed):
@@ -254,7 +254,7 @@ def transform_soups(config, soups, precomputed):
   # so that there will be links.
   generate_page_tocs(soups, precomputed)
 
-  link_xrefs(soups, precomputed)
+  link_pantsrefs(soups, precomputed)
   add_here_links(soups)
 
 
