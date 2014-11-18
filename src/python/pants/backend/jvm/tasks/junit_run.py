@@ -270,8 +270,8 @@ class _Coverage(_JUnitRunner):
              help='Restrict coverage measurement. Values are class name prefixes in dotted form '
                   'with ? and * wildcards. If preceded with a - the pattern is excluded. For '
                   'example, to include all code in com.pants.raven except claws and the eye you '
-                  'would use: %(flag)s=com.pants.raven.* %(flag)s=-com.pants.raven.claw '
-                  '%(flag)s=-com.pants.raven.Eye.'.format(flag='--coverage_patterns'))
+                  'would use: {flag}=com.pants.raven.* {flag}=-com.pants.raven.claw '
+                  '{flag}=-com.pants.raven.Eye.'.format(flag='--coverage_patterns'))
     register('--coverage-console', action='store_true', default=True,
              help='Output a simple coverage report to the console.')
     register('--coverage-xml', action='store_true',
