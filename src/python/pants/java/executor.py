@@ -24,13 +24,13 @@ class Executor(AbstractClass):
   """Executes java programs."""
 
   @staticmethod
-  def _scrub_args(classpath, main, jvm_options, args):
+  def _scrub_args(classpath, main, jvm_options, args, cwd):
     classpath = maybe_list(classpath)
     if not isinstance(main, Compatibility.string) or not main:
       raise ValueError('A non-empty main classname is required, given: %s' % main)
     jvm_options = maybe_list(jvm_options or ())
     args = maybe_list(args or ())
-    return classpath, main, jvm_options, args
+    return classpath, main, jvm_options, args, cwd
 
   class Error(Exception):
     """Indicates an error launching a java program."""
@@ -47,7 +47,7 @@ class Executor(AbstractClass):
       """Returns a string representation of the command that will be run."""
 
     @abstractmethod
-    def run(self, stdout=None, stderr=None):
+    def run(self, stdout=None, stderr=None, cwd=None):
       """Runs the configured java command.
 
       If there is a problem executing tha java program subclasses should raise Executor.Error.
@@ -55,6 +55,7 @@ class Executor(AbstractClass):
 
       :param stdout: An optional stream to pump stdout to; defaults to `sys.stdout`.
       :param stderr: An optional stream to pump stderr to; defaults to `sys.stderr`.
+      :param string cwd: optionally set the working directory
       """
 
   def __init__(self, distribution=None):
@@ -72,29 +73,32 @@ class Executor(AbstractClass):
 
     self._distribution = distribution
 
-  def runner(self, classpath, main, jvm_options=None, args=None):
+  def runner(self, classpath, main, jvm_options=None, args=None, cwd=None):
     """Returns an `Executor.Runner` for the given java command."""
-    return self._runner(*self._scrub_args(classpath, main, jvm_options, args))
+    return self._runner(*self._scrub_args(classpath, main, jvm_options, args, cwd=cwd))
 
-  def execute(self, classpath, main, jvm_options=None, args=None, stdout=None, stderr=None):
+  def execute(self, classpath, main, jvm_options=None, args=None, stdout=None, stderr=None,
+      cwd=None):
     """Launches the java program defined by the classpath and main.
 
     :param list classpath: the classpath for the java program
     :param string main: the fully qualified class name of the java program's entry point
     :param list jvm_options: an optional sequence of options for the underlying jvm
     :param list args: an optional sequence of args to pass to the java program
+    :param string cwd: optionally set the working directory
 
     Returns the exit code of the java program.
     Raises Executor.Error if there was a problem launching java itself.
     """
-    executor = self.runner(classpath=classpath, main=main, jvm_options=jvm_options, args=args)
-    return executor.run(stdout=stdout, stderr=stderr)
+    executor = self.runner(classpath=classpath, main=main, jvm_options=jvm_options, args=args,
+                           cwd=cwd)
+    return executor.run(stdout=stdout, stderr=stderr, cwd=cwd)
 
   @abstractmethod
-  def _runner(self, classpath, main, jvm_options, args):
+  def _runner(self, classpath, main, jvm_options, args, cwd=None):
     """Subclasses should return a `Runner` that can execute the given java main."""
 
-  def _create_command(self, classpath, main, jvm_options, args):
+  def _create_command(self, classpath, main, jvm_options, args, cwd=None):
     cmd = [self._distribution.java]
     cmd.extend(jvm_options)
     cmd.extend(['-cp', os.pathsep.join(classpath), main])
@@ -108,8 +112,8 @@ class CommandLineGrabber(Executor):
     super(CommandLineGrabber, self).__init__(distribution=distribution)
     self._command = None  # Initialized when we run something.
 
-  def _runner(self, classpath, main, jvm_options, args):
-    self._command = self._create_command(classpath, main, jvm_options, args)
+  def _runner(self, classpath, main, jvm_options, args, cwd=None):
+    self._command = self._create_command(classpath, main, jvm_options, args, cwd=cwd)
     class Runner(self.Runner):
       @property
       def executor(_):
@@ -119,7 +123,7 @@ class CommandLineGrabber(Executor):
       def cmd(_):
         return ' '.join(self._command)
 
-      def run(_, stdout=None, stderr=None):
+      def run(_, stdout=None, stderr=None, cwd=None):
         return 0
     return Runner()
 
@@ -158,14 +162,14 @@ class SubprocessExecutor(Executor):
     super(SubprocessExecutor, self).__init__(distribution=distribution)
     self._buildroot = get_buildroot()
 
-  def _create_command(self, classpath, main, jvm_options, args):
-    relative_classpath = relativize_paths(classpath, self._buildroot)
-
+  def _create_command(self, classpath, main, jvm_options, args, cwd=None):
+    cwd = cwd or self._buildroot
+    relative_classpath = relativize_paths(classpath, cwd)
     return super(SubprocessExecutor, self)._create_command(relative_classpath, main, jvm_options,
-                                                           args)
+                                                           args, cwd=cwd)
 
-  def _runner(self, classpath, main, jvm_options, args):
-    command = self._create_command(classpath, main, jvm_options, args)
+  def _runner(self, classpath, main, jvm_options, args, cwd=None):
+    command = self._create_command(classpath, main, jvm_options, args, cwd=cwd)
 
     class Runner(self.Runner):
       @property
@@ -176,23 +180,25 @@ class SubprocessExecutor(Executor):
       def cmd(_):
         return ' '.join(command)
 
-      def run(_, stdout=None, stderr=None):
-        return self._spawn(command, stdout=stdout, stderr=stderr).wait()
+      def run(_, stdout=None, stderr=None, cwd=None):
+        return self._spawn(command, stdout=stdout, stderr=stderr, cwd=cwd).wait()
 
     return Runner()
 
-  def spawn(self, classpath, main, jvm_options=None, args=None, **subprocess_args):
+  def spawn(self, classpath, main, jvm_options=None, args=None, cwd=None, **subprocess_args):
     """Spawns the java program passing any extra subprocess kwargs on to subprocess.Popen.
 
     Returns the Popen process object handle to the spawned java program subprocess.
     """
-    cmd = self._create_command(*self._scrub_args(classpath, main, jvm_options, args))
-    return self._spawn(cmd, **subprocess_args)
+    cmd = self._create_command(*self._scrub_args(classpath, main, jvm_options, args, cwd=cwd))
+    return self._spawn(cmd, cwd, **subprocess_args)
 
-  def _spawn(self, cmd, **subprocess_args):
+  def _spawn(self, cmd, cwd=None, **subprocess_args):
     with self._maybe_scrubbed_env():
-      log.debug('Executing: %s' % ' '.join(cmd))
+      cwd = cwd or self._buildroot
+      log.debug('Executing: {cmd} args={args} at cwd={cwd}'
+               .format(cmd=' '.join(cmd), args=subprocess_args, cwd=cwd))
       try:
-        return subprocess.Popen(cmd, cwd=self._buildroot, **subprocess_args)
+        return subprocess.Popen(cmd, cwd=cwd, **subprocess_args)
       except OSError as e:
-        raise self.Error('Problem executing %s: %s' % (self._distribution.java, e))
+        raise self.Error('Problem executing {0}: {1}'.format(self._distribution.java, e))

@@ -13,7 +13,7 @@ from pants.java.nailgun_executor import NailgunExecutor
 
 
 def execute_java(classpath, main, jvm_options=None, args=None, executor=None,
-                 workunit_factory=None, workunit_name=None, workunit_labels=None):
+                 workunit_factory=None, workunit_name=None, workunit_labels=None, cwd=None):
   """Executes the java program defined by the classpath and main.
 
   If `workunit_factory` is supplied, does so in the context of a workunit.
@@ -27,6 +27,7 @@ def execute_java(classpath, main, jvm_options=None, args=None, executor=None,
   :param workunit_factory: an optional callable that can produce a workunit context
   :param string workunit_name: an optional name for the work unit; defaults to the main
   :param list workunit_labels: an optional sequence of labels for the work unit
+  :param string cwd: optionally set the working directory
 
   Returns the exit code of the java program.
   Raises `pants.java.Executor.Error` if there was a problem launching java itself.
@@ -36,15 +37,17 @@ def execute_java(classpath, main, jvm_options=None, args=None, executor=None,
     raise ValueError('The executor argument must be a java Executor instance, give %s of type %s'
                      % (executor, type(executor)))
 
-  runner = executor.runner(classpath, main, args=args, jvm_options=jvm_options)
+  runner = executor.runner(classpath, main, args=args, jvm_options=jvm_options, cwd=cwd)
   workunit_name = workunit_name or main
   return execute_runner(runner,
                         workunit_factory=workunit_factory,
                         workunit_name=workunit_name,
-                        workunit_labels=workunit_labels)
+                        workunit_labels=workunit_labels,
+                        cwd=cwd)
 
 
-def execute_runner(runner, workunit_factory=None, workunit_name=None, workunit_labels=None):
+def execute_runner(runner, workunit_factory=None, workunit_name=None, workunit_labels=None,
+    cwd=None):
   """Executes the given java runner.
 
   If `workunit_factory` is supplied, does so in the context of a workunit.
@@ -53,6 +56,7 @@ def execute_runner(runner, workunit_factory=None, workunit_name=None, workunit_l
   :param workunit_factory: an optional callable that can produce a workunit context
   :param string workunit_name: an optional name for the work unit; defaults to the main
   :param list workunit_labels: an optional sequence of labels for the work unit
+  :param string cwd: optionally set the working directory
 
   Returns the exit code of the java runner.
   Raises `pants.java.Executor.Error` if there was a problem launching java itself.
@@ -70,6 +74,6 @@ def execute_runner(runner, workunit_factory=None, workunit_name=None, workunit_l
     ] + (workunit_labels or [])
 
     with workunit_factory(name=workunit_name, labels=workunit_labels, cmd=runner.cmd) as workunit:
-      ret = runner.run(stdout=workunit.output('stdout'), stderr=workunit.output('stderr'))
+      ret = runner.run(stdout=workunit.output('stdout'), stderr=workunit.output('stderr'), cwd=cwd)
       workunit.set_outcome(WorkUnit.FAILURE if ret else WorkUnit.SUCCESS)
       return ret
