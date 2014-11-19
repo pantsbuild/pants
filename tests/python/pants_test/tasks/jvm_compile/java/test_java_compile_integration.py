@@ -8,9 +8,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import os
 
 from pants.backend.jvm.tasks.jvm_compile.java.jmake_analysis_parser import JMakeAnalysisParser
-from pants.fs.archive import TarArchiver
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import safe_walk
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
@@ -86,33 +84,6 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
       # One artifact for java 6 and one for 7
       self.assertEqual(len(os.listdir(artifact_dir)), 2)
 
-
-  def test_java_compile_reads_resource_mapping(self):
-    # Ensure that if an annotation processor produces a resource-mapping,
-    # the artifact contains that resource mapping.
-
-    with temporary_dir() as cache_dir:
-      artifact_dir = os.path.join(cache_dir, 'JavaCompile',
-                                  'testprojects.src.java.com.pants.testproject.annotation.main.main')
-      config = {'java-compile': {'write_artifact_caches': [cache_dir]}}
-
-      pants_run = self.run_pants(
-        ['goal', 'compile', 'testprojects/src/java/com/pants/testproject/annotation/main'],
-        config)
-      self.assert_success(pants_run)
-
-      self.assertTrue(os.path.exists(artifact_dir))
-      artifacts = os.listdir(artifact_dir)
-      self.assertEqual(len(artifacts), 1)
-
-      with temporary_dir() as extract_dir:
-        TarArchiver.extract(os.path.join(artifact_dir, artifacts[0]), extract_dir)
-        all_files = set()
-        for dirpath, dirs, files in safe_walk(extract_dir):
-          for name in files:
-            path = os.path.join(dirpath, name)
-            all_files.add(path)
-        self.assertIn(os.path.join(extract_dir, "compile/jvm/java/classes/deprecation_report.txt"), all_files)
 
   def _whitelist_test(self, target, fatal_flag, whitelist):
     # We want to ensure that a project missing dependencies can be
