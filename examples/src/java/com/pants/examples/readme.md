@@ -175,49 +175,35 @@ other frameworks use other flags)
 
 **Packaging Binaries**
 
-To create a jar containing just the code built by a JVM target, use the
-jar goal:
-
-    :::bash
-    $ ./pants goal jar examples/src/java/com/pants/examples/hello/greet
-
-To create a <a pantsref="jvm_bundles">bundle</a> (a runnable thing and its
-dependencies, perhaps including helper files):
+To create a <a pantsref="jvm_bundles">bundle</a> (a binary and its dependencies, perhaps
+including helper files):
 
     :::bash
     $ ./pants goal bundle examples/src/java/com/pants/examples/hello/main --bundle-archive=zip
+       ...lots of build output...
+    08:50:54 00:02       [create-monolithic-jar]
+    08:50:54 00:02         [add-internal-classes]
+    08:50:54 00:02         [jar-tool]
+                       created dist/hello-example.zip
+    08:50:54 00:02     [dup]
+    08:50:54 00:02     [apk]
+    08:50:54 00:02       [apk-bundle]
+                   SUCCESS
+    $
 
-If your bundle is JVM, it's a zipfile which can run by means of an
-`unzip` and setting your `CLASSPATH` to `$BASEDIR/my_service.jar` (where
-`$BASEDIR is` the directory you've just unzipped).
-
-**Get Help**
-
-Get basic help:
-
-    :::bash
-    $ ./pants goal help
-
-Get a list of goals:
-
-    :::bash
-    $ ./pants goal goals
-
-Get help for one goal:
-
-    :::bash
-    $ ./pants goal help onegoal
+This generates a zipfile with runnable contents; instead of a zipfile, we could have put the
+contents a directory tree, a giant jar, or something else.
+<a pantsref="jvm_bundles">Learn more about bundles</a>.
 
 Toolchain
 ---------
 
-Pants uses [Ivy](http://ant.apache.org/ivy/) to resolve `jar`
-dependencies. To change how Pants resolves these, use `--ivy-*`
-command-line parameters along with `--resolve-*` parameters.
+Pants uses [Ivy](http://ant.apache.org/ivy/) to resolve `jar` dependencies. To change how Pants
+resolves these, configure `resolve.ivy`.
 
-Pants uses [Nailgun](https://github.com/martylamb/nailgun) to speed up
-compiles. It's a JVM daemon that runs in the background; this saves time
-for JVM startup and class loading.
+Pants uses [Nailgun](https://github.com/martylamb/nailgun) to speed up compiles. Nailgun is a
+JVM daemon that runs in the background. This means you don't need to start up a JVM and load
+classes for each JVM-based operation. Things go faster.
 
 Pants uses Jmake, a dependency tracking compiler facade.
 
@@ -289,6 +275,9 @@ Invoke `./pants goal bundle` on a JVM app or JVM binary target:
     :::bash
     $ ./pants goal bundle examples/src/java/com/pants/examples/hello/main:main
 
+With options, you can tell Pants to archive the bundle in a zip, a tar, and some other common
+formats. See the <a pantsref="gref_goal_bundle">bundle help</a> for built-in choices.
+
 **Contents of a Bundle**
 
 The generated bundle is basically a directory tree containing `.jar`s
@@ -331,10 +320,35 @@ contains code compiled for this target.
 
 **Deploying a Bundle**
 
-Instead of just creating a directory tree, you can pass
-`--bundle-archive` to `./pants goal bundle` to generate an archive file
-(a zipped tarfile or some other format) instead. You can copy the
-archive somewhere, then unpack it on the destination machine. If there
-are some "standard jars" that are already on the destination machine,
-you might want to exclude them from the archive.
+Instead of just creating a directory tree, you can pass `--bundle-archive` to
+`./pants goal bundle` to generate an archive file (a `.zip`, monolithic `.jar`, or some other
+format) instead.
+
+To use such an archive, put it where you want it, unpack it, and run:
+
+    :::bash
+    $ ./pants goal bundle --bundle-archive=zip examples/src/java/com/pants/examples/hello/main
+        ...lots of build output...
+    10:14:26 00:01       [create-monolithic-jar]
+    10:14:26 00:01         [add-internal-classes]
+    10:14:26 00:01         [jar-tool]
+                       created dist/hello-example.zip
+    10:14:26 00:01     [dup]
+    10:14:26 00:01     [apk]
+    10:14:26 00:01       [apk-bundle]
+                   SUCCESS
+    $ # let's use it:
+    $ mkdir tmp; cd tmp
+    $ unzip ../dist/hello-example.zip
+    Archive:  ../dist/hello-example.zip
+      inflating: greetee.txt
+      inflating: hello-example.jar
+    $ java -jar hello-example.jar
+    Hello, Bundled-File World!
+    Hello, Resource World!
+    $
+
+You can copy the archive somewhere, then unpack it on the destination machine. If there
+are some "standard jars" that are already on the destination machine, you might want to exclude
+them from the archive.
 

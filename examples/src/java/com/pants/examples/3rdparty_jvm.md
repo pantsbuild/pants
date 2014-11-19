@@ -105,18 +105,15 @@ source code and depend on local source:
 Troubleshooting a JVM Dependencies Problem
 ------------------------------------------
 
-If you're working in JVM (Java or Scala) and suspect you're pulling in
-different versions of some package, you can dump your dependency "tree"
-with versions with an Ivy resolve report. To generate a report for a
-target such as the `hello/main` example:
+If you're working in JVM (Java or Scala) and suspect you're pulling in different versions of some
+package, you can dump your dependency "tree" with versions with an Ivy resolve report.
+To generate a report for a target such as the `junit`-using `hello/greet` example tests:
 
     :::bash
-    $ ./pants goal resolve examples/src/java/com/pants/examples/hello/main --ivy-open
+    $ ./pants goal resolve.ivy --open examples/tests/java/com/pants/examples/hello/greet
 
-Ivy's report shows which things depend on which versions. You can see
-which package is pulling in the package-version you didn't expect. (It
-might not be clear which version you want to use; but at least you'll
-know what's causing the problem.)
+Ivy's report shows which which package is pulling in the package-version you didn't expect.
+(It might not be clear which version you *want*; but at least you've narrowed down the problem.)
 
 **If you notice a small number of wrong-version things,** then in a JVM
 target, you can depend on a `jar` that specifies a version and sets
