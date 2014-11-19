@@ -47,15 +47,17 @@ don't want to track down exactly what, you can reset your state:
         :::bash
         $ ./pants goal ng-killall --ng-killall-everywhere
 
-Nailgun 5 seconds
------------------
+Nailgun 10 seconds
+------------------
 
 If Pants fails with a stack trace that ends with something like
 
     :::bash
     File "pants/tasks/nailgun_task.py", line 255, in _spawn_nailgun_server
     File "pants/tasks/nailgun_task.py", line 226, in _await_nailgun_server
-    pants.java.nailgun_client.NailgunError: Failed to read ng output after 5 seconds
+    pants.java.nailgun_client.NailgunError: Failed to read ng output after 10 seconds...
+
+The exception might show some command args.
 
 Pants uses a program called nailgun to run some JVM jobs. Pants runs
 nailgun as a server in the background and then sends requests to it. If
