@@ -56,7 +56,7 @@ python_library(
 
 python_library(
   name = 'jvm_compile',
-  sources = ['jvm_compile.py'],
+  sources = ['jvm_compile.py', 'resource_mapping.py'],
   dependencies = [
     ':jvm_dependency_analyzer',
     ':jvm_fingerprint_strategy',
