@@ -6,6 +6,7 @@ python_test_suite(
   dependencies = [
     ':ide_gen',
     ':idea_gen',
+    ':ivy_imports',
     ':junit_run',
     ':scalastyle',
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile',
@@ -34,6 +35,17 @@ python_tests(
     'src/python/pants/base:source_root',
     'tests/python/pants_test:base_test',
   ]
+)
+
+python_tests(
+  name = 'ivy_imports',
+  sources = ['test_ivy_imports.py'],
+  dependencies = [
+    'src/python/pants/backend/jvm/targets:java',
+    'src/python/pants/base:address',
+    'src/python/pants/backend/jvm/tasks:ivy_imports',
+    'tests/python/pants_test/jvm:nailgun_task_test_base',
+    ]
 )
 
 python_tests(
