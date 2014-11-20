@@ -242,7 +242,6 @@ python_library(
   name = 'ivy_imports',
   sources = ['ivy_imports.py'],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/jvm:ivy_utils',
     ':nailgun_task',
     'src/python/pants:binary_util',

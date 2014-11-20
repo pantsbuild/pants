@@ -7,8 +7,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import os
 
-from twitter.common.collections import OrderedSet
-
 from pants.backend.jvm.ivy_utils import IvyUtils
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 
@@ -57,12 +55,11 @@ class IvyImports(NailgunTask):
       imports_util = ImportsUtil(self.context)
       imports_map = self.context.products.get('ivy_imports')
       executor = self.create_java_executor()
-      jars = OrderedSet()
       for target in resolve_for:
-        self.context.log.info('  {target}: \n    {jars}'.format(
-          target=nice_target_name(target),
-          jars='\n    '.join(self._str_jar(s) for s in target.imports)))
-        jars |= target.imports
-      imports_util.mapjars(imports_map, target, executor,
-                           workunit_factory=self.context.new_workunit,
-                           jars=jars)
+        jars = target.imports
+        self.context.log.info('Mapping import jars for {target}: \n  {jars}'.format(
+            target=nice_target_name(target),
+            jars='\n  '.join(self._str_jar(s) for s in jars)))
+        imports_util.mapjars(imports_map, target, executor,
+                             workunit_factory=self.context.new_workunit,
+                             jars=jars)
