@@ -291,12 +291,15 @@ class BuildGraphTest(BaseTest):
                            'target(name="a", '
                            '  dependencies=['
                            '    "other:b",'
-                           '    "other:b",'
+                           '    "//other:b",'  # we should perform the test on normalized addresses
                            '])')
     self.add_to_build_file('other/BUILD',
                            'target(name="b")')
 
-    with self.assertRaises(DuplicateDependencyError):
+    with self.assertRaisesRegexp(
+        BuildGraph.TransitiveLookupError,
+        '^Addresses in dependencies must be unique. \'other:b\' is referenced more than once.'
+        '\s+referenced from :a$'):
       self.build_graph.inject_spec_closure('//:a')
 
   def test_inject_then_inject_closure(self):
