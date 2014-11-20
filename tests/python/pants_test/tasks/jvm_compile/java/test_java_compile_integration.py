@@ -78,8 +78,8 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
 
       # Rerun for java 7
       pants_run = self.run_pants(
-        ['goal', 'compile', 'testprojects/src/java/com/pants/testproject/unicode/main',
-         '--compile-java-args=\'-target 1.7\''],
+        ['goal', 'compile.java', '--target=1.7',
+         'testprojects/src/java/com/pants/testproject/unicode/main'],
         config)
       self.assert_success(pants_run)
 

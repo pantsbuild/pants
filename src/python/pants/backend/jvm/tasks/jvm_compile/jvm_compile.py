@@ -46,8 +46,17 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
              help='Roughly how many source files to attempt to compile together. Set to a large '
                   'number to compile all sources together. Set to 0 to compile target-by-target.')
 
+    register('--args', action='append', default=list(cls.get_args_default()),
+             help='Args to pass to the compiler.')
+
     register('--warnings', default=True, action='store_true',
              help='Compile with all configured warnings enabled.')
+
+    register('--warning-args', action='append', default=list(cls.get_warning_args_default()),
+             help='Extra compiler args to use when warnings are enabled.')
+
+    register('--no-warning-args', action='append', default=list(cls.get_no_warning_args_default()),
+             help='Extra compiler args to use when warnings are disabled.')
 
     register('--missing-deps', choices=['off', 'warn', 'fatal'], default='warn',
              help='Check for missing dependencies in {0} code. Reports actual dependencies A -> B '
@@ -85,6 +94,21 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
   @classmethod
   def product_types(cls):
     return ['classes_by_target', 'classes_by_source', 'resources_by_target']
+
+  @classmethod
+  def get_args_default(cls):
+    """Override to set default for --args option."""
+    return ()
+
+  @classmethod
+  def get_warning_args_default(cls):
+    """Override to set default for --warning-args option."""
+    return ()
+
+  @classmethod
+  def get_no_warning_args_default(cls):
+    """Override to set default for --no-warning-args option."""
+    return ()
 
   def select(self, target):
     return target.has_sources(self._file_suffix)
@@ -139,9 +163,6 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
     super(JvmCompile, self).__init__(*args, **kwargs)
     config_section = self.config_section
 
-    # Global workdir.
-    self._pants_workdir = self.context.config.getdefault('pants_workdir')
-
     # Various working directories.
     self._classes_dir = os.path.join(self.workdir, 'classes')
     self._resources_dir = os.path.join(self.workdir, 'resources')
@@ -169,6 +190,12 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
 
     # The ivy confs for which we're building.
     self._confs = self.context.config.getlist(config_section, 'confs', default=['default'])
+
+    self._args = list(self.get_options().args)
+    if self.get_options().warnings:
+      self._args.extend(self.get_options().warning_args)
+    else:
+      self._args.extend(self.get_options().no_warning_args)
 
     # Set up dep checking if needed.
     def munge_flag(flag):
@@ -207,23 +234,6 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
     # Map of target -> list of sources (relative to buildroot), for all targets in all chunks.
     # Populated in prepare_execute().
     self._sources_by_target = None
-
-  def configure_args(self, args_defaults=None, warning_defaults=None, no_warning_defaults=None):
-   """
-   Setup the compiler command line arguments, optionally providing default values.  It is mandatory
-   to call this from __init__() of your subclass.
-   :param list args_defaults:  compiler flags that should be invoked for all invocations
-   :param list warning_defaults: compiler flags to turn on warnings
-   :param list no_warning_defaults:  compiler flags to turn off all warnings
-   """
-   self._args = self.context.config.getlist(self._config_section, 'args',
-                                       default=args_defaults or [])
-   if self.get_options().warnings:
-     self._args.extend(self.context.config.getlist(self._config_section, 'warning_args',
-                                                   default=warning_defaults or []))
-   else:
-     self._args.extend(self.context.config.getlist(self._config_section, 'no_warning_args',
-                                                   default=no_warning_defaults or[]))
 
   def prepare(self, round_manager):
     # TODO(John Sirois): this is a fake requirement on 'ivy_jar_products' in order to force

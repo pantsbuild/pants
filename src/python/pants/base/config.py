@@ -95,6 +95,8 @@ class Config(object):
     value of var_name.
   """
 
+  # TODO: Replace these with regularly registered new-style options.
+
   DEFAULT_SECTION = ConfigParser.DEFAULTSECT
 
   DEFAULT_PANTS_DISTDIR = ConfigOption.create(
