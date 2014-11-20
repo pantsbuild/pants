@@ -409,9 +409,7 @@ class TaskBase(AbstractClass):
         overwrite = always_overwrite or vts.cache_key in self._cache_key_errors
         args_tuples.append((cache, vts.cache_key, artifactfiles, overwrite))
 
-      def bg_insert(cache, key, files, overwrite):
-        self.context.exec_on_subproc(call_insert, (cache, key, files, overwrite))
-      return Work(bg_insert, args_tuples, 'insert')
+      return Work(lambda x: self.context.subproc_map(call_insert, x), [(args_tuples,)], 'insert')
     else:
       return None
 

@@ -228,20 +228,6 @@ class Context(object):
       SubprocPool.shutdown(True)
       raise
 
-  def exec_on_subproc(self, f, args):
-    """Send work to a subprocess and block on it.
-
-       This can be used by existing background Work in a ThreadPool to sidestep the GIL:
-       The Thread calls this method and still blocks until the work is complete, so
-       existing reporting and accounting is unchanged, but the actual work is executed
-       in a subprocess, avoiding lock contention.
-
-       :param f: A multiproc-friendly (importable) work function.
-       :param args: Multiproc-friendly (pickleable) arguments to f.
-    """
-    return SubprocPool.background().apply(f, args)
-
-
   @contextmanager
   def new_workunit(self, name, labels=None, cmd=''):
     """Create a new workunit under the calling thread's current workunit."""
