@@ -56,7 +56,6 @@ python_library(
     'tests/python/pants_test/jvm:nailgun_task_test_base',
     'tests/python/pants_test/jvm:jvm_tool_task_test_base',
     'tests/python/pants_test/engine:engine_test_base',
-    'tests/python/pants_test/tasks:jvm_binary_test_base',
   ],
   provides=setup_py(
     name='pantsbuild.pants.testinfra',
