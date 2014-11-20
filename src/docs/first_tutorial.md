@@ -129,23 +129,14 @@ tests.
 ### Help
 
 To get help about a Pants goal, invoke <tt>./pants goal *goalname* -h</tt>.
-This lists the many command-line options you can pass for that goal.
-E.g.,
+This lists the many command-line options you can pass for that goal. E.g.,
 
     :::bash
     $ ./pants goal test -h
 
     test: Test compiled code.
 
-    test options:
-      --ng-daemons, --no-ng-daemons
-                              [True] Use nailgun daemons to execute java tasks.
-
-    gen:thrift options:
-    ...
-      --test-specs-color, --no-test-specs-color
-                              [True] Emit test result with ANSI terminal color
-                              codes.
+    ...many test options...
 
 For a list of available goals, `./pants goal goals`.
 
@@ -154,9 +145,8 @@ For help with things that aren't goals, use
     :::bash
     $ ./pants -h
 
-If you want help diagnosing some strange Pants behavior, you might
-verbose output. To get this, instead of just invoking `./pants`, set
-some environment variables:
+If you want help diagnosing some strange Pants behavior, you might want verbose output.
+To get this, instead of just invoking `./pants`, set some environment variables:
 `PEX_VERBOSE=1 PANTS_VERBOSE=1 PYTHON_VERBOSE=1 ./pants`.
 
 BUILD Files
@@ -237,10 +227,10 @@ Get the list of goals:
     :::bash
     $ ./pants goal goals
 
-Get help for one goal:
+Get help for one goal, e.g., test:
 
     :::bash
-    $ ./pants goal help onegoal
+    $ ./pants goal test -h
 
 Next
 ----
