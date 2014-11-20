@@ -272,6 +272,7 @@ class SourceRoot(object):
     """
     cls._register(basedir, False, *allowed_target_types)
 
+  @classmethod
   def register_mutable(cls, basedir, *allowed_target_types):
     """Registers the given basedir (relative to the buildroot) as a source root.
 
