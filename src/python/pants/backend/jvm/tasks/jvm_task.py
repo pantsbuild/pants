@@ -100,6 +100,6 @@ class JvmTask(Task):
       add_resource_paths(lambda t: t.is_jvm and not t.is_test)
 
     if self.context.config.getbool('jvm', 'parallel_test_paths', default=False):
-      add_resource_paths(lambda t: t.is_jvm and not t.is_test)
+      add_resource_paths(lambda t: t.is_jvm and t.is_test)
 
     return classpath
