@@ -17,7 +17,6 @@ from pants.base.build_file import BuildFile
 from pants.base.build_file_parser import BuildFileParser
 from pants.base.build_graph import BuildGraph
 from pants.base.build_root import BuildRoot
-from pants.base.duplicate_dependency_error import DuplicateDependencyError
 from pants.base.target import Target
 from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import touch
