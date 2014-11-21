@@ -57,8 +57,9 @@ class PythonBinary(PythonTarget):
     :param ignore_errors: should we ignore inability to resolve dependencies?
     :param platforms: extra platforms to target when building this binary. If this is, e.g.,
       ``['current', 'linux-x86_64', 'macosx-10.4-x86_64']``, then when building the pex, then
-      for any platform-dependent modules, Pants will include ``egg``\s for Linux, OSX, and the
-      current (build) platform.
+      for any platform-dependent modules, Pants will include ``egg``\s for Linux (64-bit Intel),
+      Mac OS X (version 10.4 or newer), and the current platform (whatever is being used when
+      making the PEX).
     :param compatibility: either a string or list of strings that represents
       interpreter compatibility for this target, using the Requirement-style format,
       e.g. ``'CPython>=3', or just ['>=2.7','<3']`` for requirements agnostic to interpreter class.
