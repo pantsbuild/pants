@@ -45,7 +45,7 @@ don't want to track down exactly what, you can reset your state:
 -   **Stop background processes:**
 
         :::bash
-        $ ./pants goal ng-killall --ng-killall-everywhere
+        $ ./pants goal ng-killall --everywhere
 
 Nailgun 10 seconds
 ------------------

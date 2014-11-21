@@ -164,14 +164,18 @@ must compile before it can test.
     :::bash
     $ ./pants goal test examples/src/java/com/pants/examples/hello/:: examples/tests/java/com/pants/examples/hello/::
 
-Output from the test run is written to `.pants.d/test/junit/`; you can
-see it on the console with `--no-test-junit-suppress-output`.
+Assuming you use `junit_test` targets, output from the `junit` run is written to
+`.pants.d/test/junit/`; you can see it on the console with `--no--suppress-output`:
+
+    :::bash
+    $ ./pants goal test.junit --no-suppress-output examples/tests/java/com/pants/examples/hello::
+
 
 **Run just that one troublesome test class:** (assuming a JUnit test;
 other frameworks use other flags)
 
     :::bash
-    $ ./pants goal test examples/tests/java/com/pants/examples/hello/:: --test-junit-test=com.pants.examples.hello.greet.GreetingTest
+    $ ./pants goal test.junit --test=com.pants.examples.hello.greet.GreetingTest examples/tests/java/com/pants/examples/hello/::
 
 **Packaging Binaries**
 
@@ -179,7 +183,7 @@ To create a <a pantsref="jvm_bundles">bundle</a> (a binary and its dependencies,
 including helper files):
 
     :::bash
-    $ ./pants goal bundle examples/src/java/com/pants/examples/hello/main --bundle-archive=zip
+    $ ./pants goal bundle --archive=zip examples/src/java/com/pants/examples/hello/main
        ...lots of build output...
     08:50:54 00:02       [create-monolithic-jar]
     08:50:54 00:02         [add-internal-classes]
@@ -216,11 +220,11 @@ specific java version for just one pants invocation:
     :::bash
     $ PATH=/usr/lib/jvm/java-1.7.0-openjdk7/bin:${PATH} ./pants goal ...
 
-If you sometimes need to compile some code in Java 6 and sometimes Java
-7, you can use a command-line arg to specify Java version:
+If you sometimes need to compile some code in Java 6 and sometimes Java 7, you can use a
+`compile.java` command-line arg to specify Java version:
 
     :::bash
-    --compile-javac-args='-target 7 -source 7'
+    ./pants goal bundle compile.java --target=7 --source=7 examples/src/java/com/pants/examples/hello/main
 
 *BUT* beware: if you switch between Java versions, Pants doesn't realize
 when it needs to rebuild. If you build with version 7, change some code,
@@ -320,14 +324,14 @@ contains code compiled for this target.
 
 **Deploying a Bundle**
 
-Instead of just creating a directory tree, you can pass `--bundle-archive` to
+Instead of just creating a directory tree, you can specify `goal bundle --archive=zip` to
 `./pants goal bundle` to generate an archive file (a `.zip`, monolithic `.jar`, or some other
 format) instead.
 
 To use such an archive, put it where you want it, unpack it, and run:
 
     :::bash
-    $ ./pants goal bundle --bundle-archive=zip examples/src/java/com/pants/examples/hello/main
+    $ ./pants goal bundle --archive=zip examples/src/java/com/pants/examples/hello/main
         ...lots of build output...
     10:14:26 00:01       [create-monolithic-jar]
     10:14:26 00:01         [add-internal-classes]
