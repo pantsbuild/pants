@@ -40,7 +40,7 @@ def maven_layout(parse_context, basedir=''):
     ``**basedir**/src/main/java``.
   """
   def root(path, *types):
-    SourceRoot.register(os.path.join(parse_context.rel_path, basedir, path), *types)
+    SourceRoot.register_mutable(os.path.join(parse_context.rel_path, basedir, path), *types)
 
   root('src/main/antlr', JavaAntlrLibrary, Page, PythonAntlrLibrary)
   root('src/main/java', AnnotationProcessor, JavaAgent, JavaLibrary, JvmBinary, Page, Benchmark)
