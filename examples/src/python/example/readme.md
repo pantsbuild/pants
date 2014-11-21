@@ -32,17 +32,15 @@ Relevant Goals and Targets
 > Pants can generate PEXes, executables built from Python. Invoke the
 > <a pantsref="gref_goal_binary">`binary`</a> goal on a
 > <a pantsref="bdict_python_binary">`python_binary`</a> target to generate a `.pex`.
-> You can also invoke the
-> <a pantsref="gref_goal_run">run</a> goal on a
+> You can also invoke the <a pantsref="gref_goal_run">`run`</a> goal on a
 > `python_binary` to run its code "in place."
 
 **Importable Code**
 
-> <a pantsref="bdict_python_library">`python_library`</a> BUILD targets make Python
-> code "import-able". The rule of thumb is that each directory of `.py`
+> <a pantsref="bdict_python_library">`python_library`</a> BUILD targets make Python code
+> "import-able". The rule of thumb is that each directory of `.py`
 > files has a `BUILD` file with a `python_library` target. A Python
-> target that has a `python_library` in its `dependencies` can import
-> its code.
+> target that has a `python_library` in its `dependencies` can import its code.
 >
 > To use code that's not in your workspace, use a
 > <a pantsref="bdict_python_requirement_library">`python_requirement_library`</a>
@@ -54,10 +52,9 @@ Relevant Goals and Targets
 
 **Tests**
 
-> A <a pantsref="bdict_python_tests">`python_tests`</a> BUILD target has some
-> `pytest` tests. It normally depends on a `python_library` target so it
-> can import and test the library's code. Use the
-> <a pantsref="gref_goal_test">test goal</a> to run these tests.
+> A <a pantsref="bdict_python_tests">`python_tests`</a> BUILD target has some `pytest` tests.
+> It normally depends on a `python_library` target so it can import and test the library's code.
+> Use the <a pantsref="gref_goal_test">`test`</a> goal to run these tests.
 
 **Generated Code**
 
@@ -79,21 +76,20 @@ run the PEX:
     Hello, world!
     $
 
-`examples/src/python/example/hello/main/BUILD` defines a `python_binary`
-target, a build-able thing that configures a runnable program made from
-Python code:
+`examples/src/python/example/hello/main/BUILD` defines a `python_binary` target, a
+build-able thing that defines a runnable program made from Python code:
 
 !inc[start-after=Like Hello](hello/main/BUILD)
 
-This binary has a source file with its "main". A Python binary's "main"
-can be in a depended-upon `python_library` or in the `python_binary`'s
-`source`.
+This binary has a source file with its "main". A Python binary's "main" can be in a depended-upon
+`python_library` or in the `python_binary`'s `source`. (Notice that's `source`, not `sources`;
+a binary can have only one.)
 
 !inc[start-after=Apache License](hello/main/main.py)
 
-This code imports code from another target. To make this work, the
-binary target has a dependency `examples/src/python/example/hello/greet`
-and the Python code imports `example/hello/greet`.
+This code imports code from another target. To make this work, the binary target has a dependency
+`examples/src/python/example/hello/greet` and the Python code can thus import things from
+`example.hello.greet`.
 
 You remember that libraries configure "importable" code;
 `example/hello/greet/BUILD` has a `python_library`:
@@ -142,9 +138,10 @@ Handling `python_requirement`
 -----------------------------
 
 `BUILD` files specify outside Python dependencies via
-<a pantsref="bdict_python_requirement_library">`python_requirement_library`</a>
-targets wrapping
-<a pantsref="bdict_python_requirements">`python_requirement`</a>s.
+<a pantsref="bdict_python_requirements">`python_requirements`</a> and a
+`requirements.txt` file and/or
+<a pantsref="bdict_python_requirement_library">`python_requirement_library`</a> targets wrapping
+<a pantsref="bdict_python_requirement">`python_requirement`</a>s.
 
 Pants handles these dependencies for you. It never installs anything globally.
 Instead, it builds the dependencies, caches them in `.pants.d`, and assembles them *a la carte*
@@ -262,9 +259,8 @@ And now dist/fab.pex behaves like a standalone fab binary:
 More About Python Tests
 -----------------------
 
-<<<<<<< HEAD
 Pants runs Python tests with `pytest`. You can pass CLI options to `pytest` via passthrough
-if `test.pytest` is the last goal and task on your command line. E.g., to run only tests
+parameters if `test.pytest` is the last goal and task on your command line. E.g., to run only tests
 whose names contain `req`:
 
     :::bash
@@ -290,8 +286,8 @@ whose names contain `req`:
                    SUCCESS
 
 Pants runs Python tests with `pytest`. You can pass CLI options to `pytest` with
-`goal test.pytest --options`. For example, to only run tests whose names match the pattern
-`*req*`, you could run:
+`goal test.pytest --options`. For example, to only run tests whose names contain `req`,
+you could run:
 
     :::bash
     $ ./pants goal test.pytest --options='-k req' examples/tests/python/example_test/hello/greet
@@ -310,11 +306,19 @@ Pants runs Python tests with `pytest`. You can pass CLI options to `pytest` with
 
 ### Code Coverage
 
-To get code coverage data, set the `PANTS_PY_COVERAGE` environment
-variable:
+To get code coverage data, set the `PANTS_PY_COVERAGE` environment variable. If you don't
+configured coverage data, it doesn't do much:
 
     :::bash
-    $ PANTS_PY_COVERAGE=1 ./pants examples/tests/python/example_test/hello/greet:greet
+    $ PANTS_PY_COVERAGE=1 ./pants goal test examples/tests/python/example_test/hello/greet:greet
+        ...lots of build output...
+                         ============ 2 passed in 0.23 seconds ============
+                         Name    Stmts   Miss  Cover
+                         ---------------------------
+                         No data to report.
+
+    14:30:36 00:04     [junit]
+    14:30:36 00:04     [specs]
 
 This uses the `python_tests.coverage` target attribute to determine what
 modules to measure coverage against for each `python_tests` target run.
@@ -333,20 +337,36 @@ specification of package or module names to track coverage against. For
 example:
 
     :::bash
-    $ PANTS_PY_COVERAGE=modules:example.hello.greet,example.hello.main ./pants ...
+    $ PANTS_PY_COVERAGE=modules:example.hello.greet,example.hello.main ./pants goal test examples/tests/python/example_test/hello/greet:greet
+        ...lots of build output...
+                     ============ 2 passed in 0.22 seconds ============
+                     Name                                               Stmts   Miss Branch BrMiss  Cover
+                     ------------------------------------------------------------------------------------
+                     examples/src/python/example/hello/greet/__init__       0      0      0      0   100%
+                     examples/src/python/example/hello/greet/greet          4      0      0      0   100%
+                     ------------------------------------------------------------------------------------
+                     TOTAL                                                  4      0      0      0   100%
 
-This would measure coverage against all python code in the
-example.hello.greet and example.hello.main. It ignores coverage
-attributes.
+This measures coverage against all python code in `example.hello.greet` and `example.hello.main`.
+It ignores `python_library` `coverage=...` attributes.
 
 Similarly, a set of base paths can be specified containing the code for
 coverage to be measured over:
 
     :::bash
-    $ PANTS_PY_COVERAGE=paths:example/hello ./pants ...
+    $ PANTS_PY_COVERAGE=paths:example/hello ./pants goal test examples/tests/python/example_test/hello/greet:greet
+        ...lots of build output...
+                     ============ 2 passed in 0.23 seconds ============
+                     Name                                               Stmts   Miss Branch BrMiss  Cover
+                     ------------------------------------------------------------------------------------
+                     examples/src/python/example/hello/__init__             0      0      0      0   100%
+                     examples/src/python/example/hello/greet/__init__       0      0      0      0   100%
+                     examples/src/python/example/hello/greet/greet          4      0      0      0   100%
+                     ------------------------------------------------------------------------------------
+                     TOTAL                                                  4      0      0      0   100%
 
-In this case the paths should be relative to the source root housing the
-python code; for this example, examples/src/python.
+Paths are relative to the source root housing the python code; for this example,
+`examples/src/python`.
 
 ### Interactive Debugging on Test Failure
 
