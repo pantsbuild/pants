@@ -51,7 +51,7 @@ class Parser(object):
   option from the outer scope.
 
   :param env: a dict of environment variables.
-  :param config: data from a config file (must support config.get(section, name, default=)).
+  :param config: data from a config file (must support config.get[list](section, name, default=)).
   :param scope: the scope this parser acts for.
   :param parent_parser: the parser for the scope immediately enclosing this one, or
          None if this is the global scope.

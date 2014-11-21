@@ -9,22 +9,11 @@ import shlex
 import unittest2 as unittest
 
 from pants.option.options import Options
+from pants_test.option.fake_config import FakeConfig
 
 
 class OptionsTest(unittest.TestCase):
   _known_scopes = ['compile', 'compile.java', 'compile.scala', 'test', 'test.junit']
-
-  class FakeConfig(object):
-    def __init__(self, values):
-      self._values = values
-
-    def get(self, section, name, default=None):
-      if section not in self._values or name not in self._values[section]:
-        return default
-      return self._values[section][name]
-
-    def getlist(self, section, name, default=None):
-      return self.get(section, name, default)
 
   def _register(self, options):
     options.register_global('-v', '--verbose', action='store_true', help='Verbose output.')
@@ -45,8 +34,7 @@ class OptionsTest(unittest.TestCase):
 
   def _parse(self, args_str, env=None, config=None):
     args = shlex.split(str(args_str))
-    options = Options(env or {}, OptionsTest.FakeConfig(config or {}),
-                      OptionsTest._known_scopes, args)
+    options = Options(env or {}, FakeConfig(config or {}), OptionsTest._known_scopes, args)
     self._register(options)
     return options
 

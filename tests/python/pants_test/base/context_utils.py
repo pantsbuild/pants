@@ -41,7 +41,7 @@ def create_new_options(new_options):
   return TestOptions()
 
 
-def create_config(sample_ini='', defaults=None):
+def create_config(sample_ini=''):
   """Creates a ``Config`` from the ``sample_ini`` file contents.
 
   :param string sample_ini: The contents of the ini file containing the config values.
@@ -50,7 +50,7 @@ def create_config(sample_ini='', defaults=None):
   if not isinstance(sample_ini, Compatibility.string):
     raise ValueError('The sample_ini supplied must be a string, given: %s' % sample_ini)
 
-  parser = Config.create_parser(defaults)
+  parser = Config.create_parser()
   with io.BytesIO(sample_ini.encode('utf-8')) as ini:
     parser.readfp(ini)
   return Config(parser)

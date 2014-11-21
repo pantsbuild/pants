@@ -61,7 +61,7 @@ class Options(object):
     """Create an Options instance.
 
     :param env: a dict of environment variables.
-    :param config: data from a config file (must support config.get(section, name, default=)).
+    :param config: data from a config file (must support config.get[list](section, name, default=)).
     :param known_scopes: a list of all possible scopes that may be encountered.
     :param args: a list of cmd-line args.
     """

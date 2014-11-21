@@ -34,8 +34,8 @@ from pants.goal.context import Context
 from pants.goal.error import GoalError
 from pants.goal.initialize_reporting import update_reporting
 from pants.goal.goal import Goal
+from pants.option.bootstrap_options import create_bootstrapped_options
 from pants.option.global_options import register_global_options
-from pants.option.options import Options
 from pants.util.dirutil import safe_mkdir
 
 
@@ -61,18 +61,17 @@ class GoalRunner(Command):
 
   def __init__(self, *args, **kwargs):
     self.targets = []
-    self.config = Config.from_cache()
     known_scopes = ['']
     for goal in Goal.all():
       # Note that enclosing scopes will appear before scopes they enclose.
       known_scopes.extend(filter(None, goal.known_scopes()))
 
-    self.new_options = Options(os.environ.copy(), self.config, known_scopes, args=sys.argv)
+    self.new_options = create_bootstrapped_options(known_scopes=known_scopes)
+    self.config = Config.from_cache()  # Get the bootstrapped version.
     super(GoalRunner, self).__init__(*args, needs_old_options=False, **kwargs)
 
   def get_spec_excludes(self):
-    spec_excludes = self.config.getlist(Config.DEFAULT_SECTION, 'spec_excludes',
-                                        default=None)
+    spec_excludes = self.config.getlist(Config.DEFAULT_SECTION, 'spec_excludes', default=None)
     if spec_excludes is None:
        return [self.config.getdefault('pants_workdir')]
     return  [os.path.join(self.root_dir, spec_exclude) for spec_exclude in spec_excludes]
