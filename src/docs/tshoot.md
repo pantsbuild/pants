@@ -9,7 +9,7 @@ We want Pants' error messages to be useful.)
 Sometimes Pants just plain doesn't work. (Please report these, too.) The
 following workarounds can get you up and running again.
 
-<a xmark="tshoot_verbosity"> </a>
+<a pantsmark="tshoot_verbosity"> </a>
 
 Maximum Verbosity
 -----------------
@@ -24,7 +24,7 @@ flag (along with the parameters you meant to pass):
 This can be especially useful if you're trying to figure out what Pants
 was "looking at" when it crashed.
 
-<a xmark="washpants"> </a>
+<a pantsmark="washpants"> </a>
 
 Scrub the Environment
 ---------------------
@@ -45,17 +45,19 @@ don't want to track down exactly what, you can reset your state:
 -   **Stop background processes:**
 
         :::bash
-        $ ./pants goal ng-killall --ng-killall-everywhere
+        $ ./pants goal ng-killall --everywhere
 
-Nailgun 5 seconds
------------------
+Nailgun 10 seconds
+------------------
 
 If Pants fails with a stack trace that ends with something like
 
     :::bash
     File "pants/tasks/nailgun_task.py", line 255, in _spawn_nailgun_server
     File "pants/tasks/nailgun_task.py", line 226, in _await_nailgun_server
-    pants.java.nailgun_client.NailgunError: Failed to read ng output after 5 seconds
+    pants.java.nailgun_client.NailgunError: Failed to read ng output after 10 seconds...
+
+The exception might show some command args.
 
 Pants uses a program called nailgun to run some JVM jobs. Pants runs
 nailgun as a server in the background and then sends requests to it. If
@@ -66,7 +68,7 @@ To debug this, look in `./pants.d/ng/*/*`: these files should be named
 
 One typical cause behind this symptom: if you removed your machine's Ivy
 cache, Pants may try to use symbolic links to files that have gone away.
-To recover from this, <a xref="washpants">scrub the environment</a>.
+To recover from this, <a pantsref="washpants">scrub the environment</a>.
 
 Questions, Issues, Bug Reports
 ------------------------------

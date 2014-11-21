@@ -38,8 +38,7 @@ class EclipseGen(IdeGen):
   @classmethod
   def register_options(cls, register):
     super(EclipseGen, cls).register_options(register)
-    register('--version', legacy='eclipse_gen_version',
-             choices=sorted(list(_VERSIONS.keys())), default='3.6',
+    register('--version', choices=sorted(list(_VERSIONS.keys())), default='3.6',
              help='The Eclipse version the project configuration should be generated for.')
 
   def __init__(self, *args, **kwargs):

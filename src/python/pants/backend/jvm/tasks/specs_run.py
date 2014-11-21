@@ -19,9 +19,8 @@ class SpecsRun(JvmTask, JvmToolTaskMixin):
   @classmethod
   def register_options(cls, register):
     super(SpecsRun, cls).register_options(register)
-    register('--skip', action='store_true', legacy='specs_run_skip',
-             help='Skip running specs.')
-    register('--test', action='append', legacy='specs_run_tests',
+    register('--skip', action='store_true', help='Skip running specs.')
+    register('--test', action='append',
              help='Force running of just these specs.  Tests can be specified either by fully '
                   'qualified classname or full file path.')
     # TODO: Get rid of this in favor of the inherited global color flag.

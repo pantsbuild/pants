@@ -16,11 +16,6 @@ class NailgunTaskTestBase(JvmToolTaskTestBase):
     super(NailgunTaskTestBase, self).setUp()
     self.set_new_options(ng_daemons=True)
 
-  def create_options(self, **kwargs):
-    options = dict(nailgun_daemon=True)
-    options.update(**kwargs)
-    return super(NailgunTaskTestBase, self).create_options(**options)
-
   @classmethod
   def tearDownClass(cls):
     # Kill any nailguns launched in our ephemeral build root

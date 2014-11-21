@@ -31,13 +31,13 @@ class DuplicateDetector(JvmBinaryTask):
   @classmethod
   def register_options(cls, register):
     super(DuplicateDetector, cls).register_options(register)
-    register('--fail-fast', default=False, action='store_true', legacy='fail_fast',
+    register('--fail-fast', default=False, action='store_true',
              help='Fail fast if duplicate classes/resources are found.')
-    register('--excludes', default=EXCLUDED_FILES, action='append', legacy='excludes',
+    register('--excludes', default=EXCLUDED_FILES, action='append',
              help='Case insensitive filenames (without directory) to exclude from duplicate check. '
                   'Filenames can be specified in a comma-separated list or by using multiple '
                   'instances of this flag.')
-    register('--max-dups', type=int, default=10, legacy='max_dups',
+    register('--max-dups', type=int, default=10,
              help='Maximum number of duplicate classes to display per artifact.')
 
   def __init__(self, *args, **kwargs):

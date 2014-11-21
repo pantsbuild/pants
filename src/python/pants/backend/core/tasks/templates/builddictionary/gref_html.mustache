@@ -50,7 +50,7 @@ div.gref_ogroup_section h3 {
 {{#goals}}
 <div class="gref_goal_section">
 
-<a xmark="gref_goal_{{goal.name}}"> </a>
+<a pantsmark="gref_goal_{{goal.name}}"> </a>
 
 <h2 id="{{goal.name}}">{{goal.name}}</h2>
 
@@ -62,9 +62,9 @@ div.gref_ogroup_section h3 {
 
 {{#ogroup}}
 <div class="gref_ogroup_section">
-<a xmark="gref_cli_{{ogroup.xref}}"> </a>
+<a pantsmark="gref_cli_{{ogroup.pantsref}}"> </a>
 
-<h3 id="group_{{ogroup.xref}}">{{ogroup.title}}</h3>
+<h3 id="group_{{ogroup.pantsref}}">{{ogroup.title}}</h3>
 {{/ogroup}}
 
 <p>Implemented by <code>{{impl}}</code>
@@ -99,7 +99,7 @@ div.gref_ogroup_section h3 {
 <p><b>Other command-line options:</b><br>
 <a href="#Common">Common</a>
 {{#leftover_ogs}}
-<a href="#group_{{xref}}">{{title}}</a>
+<a href="#group_{{pantsref}}">{{title}}</a>
 {{/leftover_ogs}}
 
 </div>

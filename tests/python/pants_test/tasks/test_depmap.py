@@ -270,6 +270,10 @@ class ProjectInfoTest(ConsoleTaskTest):
   def task_type(cls):
     return Depmap
 
+  @property
+  def alias_groups(self):
+    return register_core().merge(register_jvm())
+
   def setUp(self):
     super(ProjectInfoTest, self).setUp()
 
@@ -306,7 +310,7 @@ class ProjectInfoTest(ConsoleTaskTest):
 
     self.make_target(
       'project_info:jvm_target',
-      target_type=JvmTarget,
+      target_type=ScalaLibrary,
       dependencies=[jar_lib],
       sources=['this/is/a/source/Foo.scala', 'this/is/a/source/Bar.scala'],
     )
@@ -350,6 +354,13 @@ class ProjectInfoTest(ConsoleTaskTest):
         resources=[src_resource],
     )
 
+    self.make_target(
+      'project_info:unrecognized_target_type',
+      target_type=JvmTarget,
+      dependencies=[],
+      resources=[],
+    )
+
   def test_without_dependencies(self):
     result = get_json(self.execute_console_task(
       args=['--test-project-info'],
@@ -370,7 +381,8 @@ class ProjectInfoTest(ConsoleTaskTest):
       ],
       sorted(result['targets']['project_info:third']['targets'])
     )
-    self.assertEqual(['org.apache:apache-jar:12.12.2012'], result['targets']['project_info:third']['libraries'])
+    self.assertEqual(['org.apache:apache-jar:12.12.2012'],
+                     result['targets']['project_info:third']['libraries'])
 
     self.assertEqual(1, len(result['targets']['project_info:third']['roots']))
     source_root = result['targets']['project_info:third']['roots'][0]
@@ -393,12 +405,21 @@ class ProjectInfoTest(ConsoleTaskTest):
       args=['--test-project-info'],
       targets=[self.target('project_info:jvm_target')]
     ))
-    self.assertIn('/this/is/a',
-                  result['targets']['project_info:jvm_target']['roots'][0]['source_root'])
-    self.assertEqual('this.is.a.source',
-                     result['targets']['project_info:jvm_target']['roots'][0]['package_prefix'])
-    self.assertEqual(['org.apache:apache-jar:12.12.2012'],
-                     result['targets']['project_info:jvm_target']['libraries'])
+    jvm_target = result['targets']['project_info:jvm_target']
+    expected_jmv_target = {
+      'libraries': ['org.apache:apache-jar:12.12.2012'],
+      'is_code_gen': False,
+      'targets': ['project_info:jar_lib'],
+      'roots': [
+         {
+           'source_root': '{root}/project_info/this/is/a/source'.format(root=self.build_root),
+           'package_prefix': 'this.is.a.source'
+         },
+      ],
+      'target_type': 'SOURCE',
+      'pants_target_type': 'scala_library'
+    }
+    self.assertEqual(jvm_target, expected_jmv_target)
 
   def test_java_test(self):
     result = get_json(self.execute_console_task(
@@ -456,6 +477,11 @@ class ProjectInfoTest(ConsoleTaskTest):
       self.execute_console_task(args=['--test-project-info',
                                       '--test-output-file=%s' % self.build_root],
                                 targets=[self.target('project_info:target_type')])
+
+  def test_unrecognized_target_type(self):
+    with self.assertRaises(TaskError):
+      self.execute_console_task(args=['--test-project-info'],
+                                targets=[self.target('project_info:unrecognized_target_type')])
 
 
 def get_json(lines):

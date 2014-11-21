@@ -19,7 +19,7 @@ class PythonRepl(PythonTask):
   @classmethod
   def register_options(cls, register):
     super(PythonRepl, cls).register_options(register)
-    register('--ipython', action='store_true', legacy='python_repl_ipython',
+    register('--ipython', action='store_true',
              help='Run an IPython REPL instead of the standard python one.')
 
   def execute(self):

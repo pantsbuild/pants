@@ -57,23 +57,19 @@ class Options(object):
     - The hard-coded value provided at registration time.
     - None.
   """
-  def __init__(self, env, config, known_scopes, args=sys.argv, legacy_parser=None):
+  def __init__(self, env, config, known_scopes, args=sys.argv):
     """Create an Options instance.
 
     :param env: a dict of environment variables.
     :param config: data from a config file (must support config.get(section, name, default=)).
     :param known_scopes: a list of all possible scopes that may be encountered.
     :param args: a list of cmd-line args.
-    :param legacy_parser: optional instance of optparse.OptionParser, used to register and access
-           the old-style flags during migration.
     """
     splitter = ArgSplitter(known_scopes)
     self._goals, self._scope_to_flags, self._target_specs, self._passthru, self._passthru_owner = \
       splitter.split_args(args)
     self._is_help = splitter.is_help
-    self._parser_hierarchy = ParserHierarchy(env, config, known_scopes, legacy_parser)
-    self._legacy_parser = legacy_parser  # Old-style options, used temporarily during transition.
-    self._legacy_values = None  # Values parsed from old-stype options.
+    self._parser_hierarchy = ParserHierarchy(env, config, known_scopes)
     self._values_by_scope = {}  # Arg values, parsed per-scope on demand.
 
   @property
@@ -88,7 +84,21 @@ class Options(object):
 
   def passthru_args_for_scope(self, scope):
     # Passthru args "belong" to the last scope mentioned on the command-line.
-    if scope == self._passthru_owner:
+
+    # Note: If that last scope is a goal, we allow all tasks in that goal to access the passthru
+    # args. This is to allow the more intuitive
+    # pants run <target> -- <passthru args>
+    # instead of requiring
+    # pants run.py <target> -- <passthru args>.
+    #
+    # However note that in the case where multiple tasks run in the same goal, e.g.,
+    # pants test <target> -- <passthru args>
+    # Then, e.g., both junit and pytest will get the passthru args even though the user probably
+    # only intended them to go to one of them. If the wrong one is not a no-op then the error will
+    # be unpredictable. However this is  not a common case, and can be circumvented with an
+    # explicit test.pytest or test.junit scope.
+    if (scope and self._passthru_owner and scope.startswith(self._passthru_owner) and
+          (len(scope) == len(self._passthru_owner) or scope[len(self._passthru_owner)] == '.')):
       return self._passthru
     else:
       return []
@@ -98,17 +108,13 @@ class Options(object):
     """Whether the command line indicates a request for help."""
     return self._is_help
 
-  def set_legacy_values(self, legacy_values):
-    """Override the values with those parsed from legacy flags."""
-    self._legacy_values = legacy_values
-
-  def format_global_help(self, legacy=False):
+  def format_global_help(self):
     """Generate a help message for global options."""
-    return self.get_global_parser().format_help(legacy=legacy)
+    return self.get_global_parser().format_help()
 
-  def format_help(self, scope, legacy=False):
+  def format_help(self, scope):
     """Generate a help message for options at the specified scope."""
-    return self.get_parser(scope).format_help(legacy=legacy)
+    return self.get_parser(scope).format_help()
 
   def register(self, scope, *args, **kwargs):
     """Register an option in the given scope, using argparse params."""
@@ -139,8 +145,6 @@ class Options(object):
     # First get enclosing scope's option values, if any.
     if scope == GLOBAL_SCOPE:
       values = OptionValueContainer()
-      if self._legacy_values:
-        values.update(vars(self._legacy_values))  # Proxy any legacy option values.
     else:
       values = copy.deepcopy(self.for_scope(scope.rpartition('.')[0]))
 
@@ -154,15 +158,18 @@ class Options(object):
     """Return the option values for the global scope."""
     return self.for_scope(GLOBAL_SCOPE)
 
-  def print_help(self, msg=None, goals=None, legacy=False):
+  def print_help(self, msg=None, goals=None):
     """Print a help screen, followed by an optional message.
 
     Note: Ony useful if called after options have been registered.
     """
     def _maybe_help(scope):
-      s = self.format_help(scope, legacy=legacy)
-      if s != '':  # Avoid superfluous blank lines for empty strings.
-        print(s)
+      s = self.format_help(scope)
+      if s != '':  # Avoid printing scope name for scope with empty options.
+        print(scope)
+        for line in s.split('\n'):
+          if line != '':  # Avoid superfluous blank lines for empty strings.
+            print('  {0}'.format(line))
 
     goals = goals or self.goals
     if goals:

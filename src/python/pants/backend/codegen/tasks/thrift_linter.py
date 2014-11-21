@@ -27,8 +27,7 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
   def register_options(cls, register):
     super(ThriftLinter, cls).register_options(register)
     register('--strict', default=None, action='store_true',
-             help='Fail the goal if thrift linter errors are found.',
-             legacy='thrift_linter_strict')
+             help='Fail the goal if thrift linter errors are found.')
 
   @classmethod
   def product_types(cls):

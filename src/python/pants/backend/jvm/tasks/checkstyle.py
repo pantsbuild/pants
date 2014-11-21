@@ -28,7 +28,7 @@ class Checkstyle(NailgunTask, JvmToolTaskMixin):
   @classmethod
   def register_options(cls, register):
     super(Checkstyle, cls).register_options(register)
-    register('--skip', action='store_true', legacy='checkstyle_skip', help='Skip checkstyle.')
+    register('--skip', action='store_true', help='Skip checkstyle.')
 
   def __init__(self, *args, **kwargs):
     super(Checkstyle, self).__init__(*args, **kwargs)

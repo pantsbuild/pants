@@ -42,7 +42,6 @@ class CheckExclusives(Task):
   def register_options(cls, register):
     super(CheckExclusives, cls).register_options(register)
     register('--error-on-collision', default=True, action='store_true',
-             legacy='exclusives_error_on_collision',
              help='Abort the build if an exclusives collision is detected.')
 
   def prepare(self, round_manager):

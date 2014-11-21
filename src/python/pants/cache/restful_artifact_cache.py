@@ -12,7 +12,7 @@ import requests
 from requests import RequestException
 
 from pants.cache.artifact import TarballArtifact
-from pants.cache.artifact_cache import ArtifactCache, ArtifactCacheError, NonfatalArtifactCacheError
+from pants.cache.artifact_cache import ArtifactCache, ArtifactCacheError, NonfatalArtifactCacheError, UnreadableArtifact
 from pants.cache.local_artifact_cache import TempLocalArtifactCache
 from pants.util.contextutil import temporary_dir, temporary_file, temporary_file_path
 
@@ -88,6 +88,7 @@ class RESTfulArtifactCache(ArtifactCache):
         return self._localcache.store_and_use_artifact(cache_key, byte_iter)
     except Exception as e:
       logger.warn('\nError while reading from remote artifact cache: {0}\n'.format(e))
+      return UnreadableArtifact(cache_key, e)
 
     return False
 

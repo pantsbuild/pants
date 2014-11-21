@@ -4,11 +4,9 @@
 
 REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd "$(git rev-parse --show-toplevel)" && pwd)
 
-# We have special developer mode requirements - namely sphinx deps.
-export PANTS_DEV=1
-
 source ${REPO_ROOT}/build-support/common.sh
-source ${REPO_ROOT}/build-support/pants_venv
+
+PANTS_EXE="${REPO_ROOT}/pants"
 
 function usage() {
   echo "Publishes the http://pantsbuild.github.io/ docs locally or remotely."
@@ -38,15 +36,8 @@ while getopts "hopd:" opt; do
   esac
 done
 
-${REPO_ROOT}/pants goal builddict --print-exception-stacktrace || \
-  die "Failed to generate the 'BUILD Dictionary'."
-cp dist/builddict/*.rst src/python/pants/docs/
-
-(
-  activate_pants_venv && \
-  cd src/python/pants/docs && \
-  make clean html
-) || die "Failed to generate the doc tree."
+${PANTS_EXE} goal builddict --print-exception-stacktrace || \
+  die "Failed to generate the 'BUILD Dictionary' and/or 'Goals Reference'."
 
 function do_open() {
   if [[ "${preview}" = "true" ]]; then
@@ -60,7 +51,18 @@ function do_open() {
   fi
 }
 
-do_open "${REPO_ROOT}/src/python/pants/docs/_build/html/index.html"
+# generate html from markdown pages.
+${PANTS_EXE} goal markdown --print-exception-stacktrace \
+  --markdown-fragment src:: examples:: src/docs:: //:readme \
+  testprojects/src/java/com/pants/testproject/page:readme || \
+  die "Failed to generate HTML from markdown'."
+
+# invoke doc site generator.
+${PANTS_EXE} goal sitegen --print-exception-stacktrace \
+  --sitegen-config-path=src/python/pants/docs/docsite.json || \
+  die "Failed to generate doc site'."
+
+do_open "${REPO_ROOT}/dist/docsite/index.html"
 
 if [[ "${publish}" = "true" ]]; then
   url="http://pantsbuild.github.io/${publish_path}"

@@ -52,9 +52,9 @@ PY=${PY:-$(which python2.7)}
 
 if [[ ! -z "${WRAPPER_REQUIREMENTS}" ]]; then
   PANTS_DEV=1
-  DEV_REQUIREMENTS=(
+  REQUIREMENTS=(
     $(echo ${WRAPPER_REQUIREMENTS} | tr : ' ')
-    ${DEV_REQUIREMENTS[@]}
+    ${REQUIREMENTS[@]}
   )
 fi
 
@@ -99,7 +99,7 @@ else
     # TODO(John sirois): Re-plumb build such that it grabs constraints from the built python_binary
     # target(s).
     rm -rf ${PANTS_PEX} && \
-    run_pants_bare build -v -i "CPython>=2.7,<3" ${PANTS_BINARY} && \
+    run_pants_bare goal binary ${PANTS_BINARY} && \
     mv -v ${HERE}/dist/pants_local_binary.pex ${PANTS_PEX} && \
     chmod +x ${PANTS_PEX}
     exit_status=$?

@@ -24,16 +24,12 @@ class JvmTask(Task):
   def register_options(cls, register):
     super(JvmTask, cls).register_options(register)
     register('--jvm-options', action='append', metavar='<option>...',
-             legacy='{0}_jvm_options'.format(cls._legacy_dest_prefix()),
              help='Run the jvm with these extra jvm options.')
     register('--args', action='append', metavar='<arg>...',
-             legacy='{0}_args'.format(cls._legacy_dest_prefix()),
              help='Run the jvm with these extra program args.')
     register('--debug', action='store_true',
-             legacy='{0}_debug'.format(cls._legacy_dest_prefix()),
              help='Run the jvm under a debugger.')
     register('--confs', action='append', default=['default'],
-             legacy='{0}_confs'.format(cls._legacy_dest_prefix()),
              help='Use only these Ivy configurations of external deps.')
 
   def __init__(self, *args, **kwargs):
@@ -104,6 +100,6 @@ class JvmTask(Task):
       add_resource_paths(lambda t: t.is_jvm and not t.is_test)
 
     if self.context.config.getbool('jvm', 'parallel_test_paths', default=False):
-      add_resource_paths(lambda t: t.is_jvm and not t.is_test)
+      add_resource_paths(lambda t: t.is_jvm and t.is_test)
 
     return classpath

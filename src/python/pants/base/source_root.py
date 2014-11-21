@@ -36,9 +36,10 @@ class SourceRootTree(object):
       self.is_leaf = False
       self.types = None
 
-    def set_leaf(self, types):
+    def set_leaf(self, types, mutable):
       self.is_leaf = True
-      self.types = types
+      self.types = OrderedSet(types)
+      self.mutable = mutable
 
     def get(self, key):
       return self.children.get(key)
@@ -57,7 +58,7 @@ class SourceRootTree(object):
   def __init__(self):
     self._root = self.Node(key="ROOT")
 
-  def add_root(self, source_root, types):
+  def add_root(self, source_root, types, mutable=False):
     """Add a single source root to the tree.
 
     :param string source_root:  a path in the source root tree
@@ -70,14 +71,18 @@ class SourceRootTree(object):
       curr_node = curr_node.get_or_add(subdir)
 
     if curr_node.is_leaf and types != curr_node.types:
-      raise self.DuplicateSourceRootError("{source_root} already exists in tree."
-                                          .format(source_root=source_root))
+      if mutable and curr_node.mutable:
+        curr_node.types.update(types)
+      else:
+        raise self.DuplicateSourceRootError("{source_root} already exists in tree."
+                                            .format(source_root=source_root))
     elif curr_node.children:
       # TODO(Eric Ayers) print the list of conflicting source_roots already registered.
       raise self.NestedSourceRootError("{source_root} is nested inside an existing "
                                        "source_root."
                                        .format(source_root=source_root))
-    curr_node.set_leaf(types)
+    else:
+      curr_node.set_leaf(types, mutable)
 
   def get(self, path):
     """
@@ -107,7 +112,7 @@ class SourceRootTree(object):
     """
     found, found_path = self.get(path)
     if found:
-      return os.path.sep.join(found_path), found.types
+      return os.path.sep.join(found_path), tuple(found.types)
     return None, None
 
   def get_root_siblings(self, path):
@@ -265,10 +270,20 @@ class SourceRoot(object):
     :param list allowed_target_types: Optional list of target types. If specified, we enforce that
       only targets of those types appear under this source root.
     """
-    cls._register(basedir, *allowed_target_types)
+    cls._register(basedir, False, *allowed_target_types)
 
   @classmethod
-  def _register(cls, source_root_dir, *allowed_target_types):
+  def register_mutable(cls, basedir, *allowed_target_types):
+    """Registers the given basedir (relative to the buildroot) as a source root.
+
+    :param string basedir: The base directory to resolve sources relative to.
+    :param list allowed_target_types: Optional list of target types. If specified, we enforce that
+      only targets of those types appear under this source root.
+    """
+    cls._register(basedir, True, *allowed_target_types)
+
+  @classmethod
+  def _register(cls, source_root_dir, mutable, *allowed_target_types):
     """Registers a source root.
 
     :param string source_root_dir: The source root directory against which we resolve source paths,
@@ -299,7 +314,7 @@ class SourceRoot(object):
         cls._ROOTS_BY_TYPE[allowed_target_type] = roots
       roots.add(source_root_dir)
 
-    cls._SOURCE_ROOT_TREE.add_root(source_root_dir, allowed_target_types)
+    cls._SOURCE_ROOT_TREE.add_root(source_root_dir, allowed_target_types, mutable)
 
   @classmethod
   def _dump(cls):

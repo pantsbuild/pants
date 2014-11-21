@@ -48,7 +48,7 @@ class Scalastyle(NailgunTask, JvmToolTaskMixin):
   @classmethod
   def register_options(cls, register):
     super(Scalastyle, cls).register_options(register)
-    register('--skip', action='store_true', legacy='scalastyle_skip', help='Skip scalastyle.')
+    register('--skip', action='store_true', help='Skip scalastyle.')
 
   def __init__(self, *args, **kwargs):
     super(Scalastyle, self).__init__(*args, **kwargs)

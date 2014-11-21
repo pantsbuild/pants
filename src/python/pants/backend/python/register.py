@@ -10,8 +10,6 @@ from pants.backend.python.tasks.python_binary_create import PythonBinaryCreate
 from pants.backend.python.tasks.pytest_run import PytestRun
 from pants.backend.python.tasks.python_repl import PythonRepl
 from pants.backend.python.tasks.python_run import PythonRun
-from pants.backend.python.commands.build import Build
-from pants.backend.python.commands.py import Py
 from pants.backend.python.commands.setup_py import SetupPy
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.python_requirement import PythonRequirement
@@ -45,8 +43,7 @@ def build_file_aliases():
 
 
 def register_commands():
-  for cmd in (Build, Py, SetupPy):
-    cmd._register()
+  SetupPy._register()
 
 
 def register_goals():
@@ -58,7 +55,7 @@ def register_goals():
        dependencies=['bootstrap', 'check-exclusives', 'resources']
   ).install('test')
 
-  task(name='python-run', action=PythonRun,
+  task(name='py', action=PythonRun,
        dependencies=['bootstrap', 'check-exclusives', 'resources']
   ).install('run')
 

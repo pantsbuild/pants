@@ -19,6 +19,15 @@ class PythonRun(PythonTask):
   def __init__(self, *args, **kwargs):
     super(PythonRun, self).__init__(*args, **kwargs)
 
+  @classmethod
+  def register_options(cls, register):
+    super(PythonRun, cls).register_options(register)
+    register('--args', action='append', help='Run with these extra args to main().')
+
+  @classmethod
+  def supports_passthru_args(cls):
+    return True
+
   def execute(self):
     binary = self.require_single_root_target()
     if isinstance(binary, PythonBinary):
@@ -39,7 +48,7 @@ class PythonRun(PythonTask):
         pex = PEX(builder.path(), interpreter=interpreter)
         self.context.lock.release()
         with self.context.new_workunit(name='run', labels=[WorkUnit.RUN]):
-          po = pex.run(blocking=False)
+          po = pex.run(blocking=False, args=self.get_options().args + self.get_passthru_args())
           try:
             return po.wait()
           except KeyboardInterrupt:

@@ -19,9 +19,7 @@ class TargetsHelp(ConsoleTask):
   @classmethod
   def register_options(cls, register):
     super(TargetsHelp, cls).register_options(register)
-    register('--details',
-             help='Display details about the specific target type or BUILD symbol.',
-             legacy='goal_targets_details')
+    register('--details', help='Display details about the specific target type or BUILD symbol.')
 
   def __init__(self, *args, **kwargs):
     super(TargetsHelp, self).__init__(*args, **kwargs)

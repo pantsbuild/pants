@@ -65,28 +65,24 @@ class _JUnitRunner(object):
   @classmethod
   def register_options(cls, register):
     _Coverage.register_options(register)
-    register('--skip', action='store_true', legacy='junit_run_skip',
-             help='Skip running junit.')
-    register('--fail-fast', action='store_true', legacy='junit_run_fail_fast',
+    register('--skip', action='store_true', help='Skip running junit.')
+    register('--fail-fast', action='store_true',
              help='Fail fast on the first test failure in a suite.')
-    register('--batch-size', type=int, default=sys.maxint, legacy='junit_run_batch_size',
+    register('--batch-size', type=int, default=sys.maxint,
              help='Run at most this many tests in a single test process.')
-    register('--test', action='append', legacy='junit_run_tests',
+    register('--test', action='append',
              help='Force running of just these tests.  Tests can be specified using any of: '
                   '[classname], [classname]#[methodname], [filename] or [filename]#[methodname]')
-    register('--xml-report', action='store_true', legacy='junit_run_xmlreport',
-             help='Output an XML report for the test run.')
-    register('--per-test-timer', action='store_true', legacy='junit_run_per_test_timer',
-             help='Show progress and timer for each test.')
-    register('--default-parallel', action='store_true', legacy='junit_run_default_parallel',
+    register('--xml-report', action='store_true', help='Output an XML report for the test run.')
+    register('--per-test-timer', action='store_true', help='Show progress and timer for each test.')
+    register('--default-parallel', action='store_true',
              help='Run classes without @TestParallel or @TestSerial annotations in parallel.')
-    register('--parallel-threads', type=int, default=0, legacy='junit_run_parallel_threads',
+    register('--parallel-threads', type=int, default=0,
              help='Number of threads to run tests in parallel. 0 for autoset.')
-    register('--test-shard', legacy='junit_run_test_shard',
+    register('--test-shard',
              help='Subset of tests to run, in the form M/N, 0 <= M < N. '
                   'For example, 1/3 means run tests number 2, 5, 8, 11, ...')
     register('--suppress-output', action='store_true', default=True,
-             legacy='junit_run_suppress_output',
              help='Redirect test output to files in .pants.d/test/junit. Implied by --xml-report.')
 
   def register_jvm_tool(self, key, ini_section, ini_key, default):
@@ -270,20 +266,19 @@ class _Coverage(_JUnitRunner):
 
   @classmethod
   def register_options(cls, register):
-    register('--coverage-patterns', action='append', legacy='junit_run_coverage_patterns',
+    register('--coverage-patterns', action='append',
              help='Restrict coverage measurement. Values are class name prefixes in dotted form '
                   'with ? and * wildcards. If preceded with a - the pattern is excluded. For '
                   'example, to include all code in com.pants.raven except claws and the eye you '
-                  'would use: %(flag)s=com.pants.raven.* %(flag)s=-com.pants.raven.claw '
-                  '%(flag)s=-com.pants.raven.Eye.'.format(flag='--coverage_patterns'))
+                  'would use: {flag}=com.pants.raven.* {flag}=-com.pants.raven.claw '
+                  '{flag}=-com.pants.raven.Eye.'.format(flag='--coverage_patterns'))
     register('--coverage-console', action='store_true', default=True,
-             legacy='junit_run_coverage_console',
              help='Output a simple coverage report to the console.')
-    register('--coverage-xml', action='store_true', legacy='junit_run_coverage_xml',
+    register('--coverage-xml', action='store_true',
              help='Output an XML coverage report.')
-    register('--coverage-html', action='store_true', legacy='junit_run_coverage_html',
+    register('--coverage-html', action='store_true',
             help='Output an HTML coverage report.')
-    register('--coverage-html-open', action='store_true', legacy='junit_run_coverage_html_open',
+    register('--coverage-html-open', action='store_true',
              help='Open the generated HTML coverage report in a browser. Implies --coverage-html.')
 
   def __init__(self, task_exports, context):
@@ -595,10 +590,8 @@ class JUnitRun(JvmTask, JvmToolTaskMixin):
   def register_options(cls, register):
     super(JUnitRun, cls).register_options(register)
     _JUnitRunner.register_options(register)
-    register('--coverage', action='store_true', legacy='junit_run_coverage',
-             help='Collect code coverage data.')
-    register('--coverage-processor', default='emma', legacy='junit_coverage_processor',
-             help='Which coverage subsystem to use.')
+    register('--coverage', action='store_true', help='Collect code coverage data.')
+    register('--coverage-processor', default='emma', help='Which coverage subsystem to use.')
 
 
   def __init__(self, *args, **kwargs):

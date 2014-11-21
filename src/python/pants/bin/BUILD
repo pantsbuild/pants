@@ -69,6 +69,7 @@ python_binary(
     'linux-x86_64',
     'macosx-10.4-x86_64',
   ],
+  compatibility='CPython>=2.7,<3',
   dependencies = [
     ':pants_binary_deps',
   ],

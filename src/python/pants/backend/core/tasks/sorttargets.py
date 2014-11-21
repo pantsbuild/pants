@@ -21,7 +21,7 @@ class SortTargets(ConsoleTask):
   @classmethod
   def register_options(cls, register):
     super(SortTargets, cls).register_options(register)
-    register('--reverse', action='store_true', default=False, legacy='sort_targets_reverse',
+    register('--reverse', action='store_true', default=False,
              help='Sort least-dependent to most-dependent.')
 
   def __init__(self, *args, **kwargs):

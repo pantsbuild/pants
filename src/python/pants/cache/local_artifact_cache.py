@@ -12,7 +12,7 @@ import shutil
 import uuid
 
 from pants.cache.artifact import TarballArtifact
-from pants.cache.artifact_cache import ArtifactCache
+from pants.cache.artifact_cache import ArtifactCache, UnreadableArtifact
 from pants.util.dirutil import safe_delete, safe_mkdir, safe_mkdir_for
 from pants.util.contextutil import temporary_file
 
@@ -91,6 +91,7 @@ class LocalArtifactCache(BaseLocalArtifactCache):
     except Exception as e:
       # TODO(davidt): Consider being more granular in what is caught.
       logger.warn('Error while reading from local artifact cache: {0}'.format(e))
+      return UnreadableArtifact(cache_key, e)
 
     return False
 

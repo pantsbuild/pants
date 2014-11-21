@@ -24,11 +24,9 @@ class Dependencies(ConsoleTask):
   def register_options(cls, register):
     super(Dependencies, cls).register_options(register)
     register('--internal-only', default=False, action='store_true',
-             legacy='dependencies_is_internal_only',
              help='Specifies that only internal dependencies should be included in the graph '
                   'output (no external jars).')
     register('--external-only', default=False, action='store_true',
-             legacy='dependencies_is_external_only',
              help='Specifies that only external dependencies should be included in the graph '
                   'output (only external jars).')
 

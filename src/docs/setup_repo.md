@@ -69,14 +69,14 @@ Configure Code Layout with `source_root`, `maven_layout`
 
 Maybe someday all the world's programmers will agree on the one true
 directory structure for source code. Until then, you'll want some
-<a xref="bdict_source_root">`source_root`</a>
+<a pantsref="bdict_source_root">`source_root`</a>
 rules to specify which directories hold your code. A
 typical programming language has a notion of *base paths* for imports;
 you configure pants to tell it those base paths.
 
 If your project's source tree is laid out for Maven, there's a shortcut
 function
-<a xref="bdict_maven_layout">`maven_layout`</a>
+<a pantsref="bdict_maven_layout">`maven_layout`</a>
 that configures source roots for Maven's expected
 source code tree structure. See
 [`testprojects/maven_layout`](https://github.com/pantsbuild/pants/tree/master/testprojects/maven_layout)
@@ -132,7 +132,7 @@ Pants is well-suited to large multi-project workspaces. You probably have a lot 
 organized in a big directory tree. [[The usual BUILD file advice|pants('src/docs:build_files')]]
 applies here.
 
-<a xmark="setup_mvn2pants"> </a>
+<a pantsmark="setup_mvn2pants"> </a>
 
 **If you're converting a `mvn`-built workspace to use Pants**, you can get a head start by using
 information from your `pom.xml` files. The [`mvn2pants`](https://github.com/ericzundel/mvn2pants)
@@ -210,7 +210,7 @@ If you don't want to make this test definition available to the public
 BUILD.foo file and hold back this file when mirroring for the public
 repository.
 
-<a xmark="setup_publish"></a>
+<a pantsmark="setup_publish"></a>
 
 Enabling Pants Publish
 ----------------------
@@ -232,7 +232,7 @@ as shown in
 [`src/python/internal_backend/repositories/register.py`](https://github.com/pantsbuild/pants/blob/master/src/python/internal_backend/repositories/register.py).
 
 `BUILD` targets can use this Repository's alias as the `repo` parameter
-to an <a xref="bdict_artifact">`artifact`</a>. For example, the
+to an <a pantsref="bdict_artifact">`artifact`</a>. For example, the
 `src/java/com/pants/examples/hello/greet/BUILD` refers to the `public`
 repostiory defined above. (Notice it's a Python object, not a string.)
 
@@ -265,7 +265,7 @@ contain a section for each Repository:
       },
     }
 
-<a xmark="setup_publish_restrict_branch"> </a>
+<a pantsmark="setup_publish_restrict_branch"> </a>
 
 ### Restricting Publish to "Release Branch"
 
