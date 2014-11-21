@@ -46,17 +46,17 @@ python_library(
     ':analysis_tools',
     ':jvm_compile',
     'src/python/pants/base:build_environment',
+    'src/python/pants/base:config',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:target',
     'src/python/pants/base:workunit',
     'src/python/pants/util:dirutil',
-    'src/python/pants/util:strutil',
   ],
 )
 
 python_library(
   name = 'jvm_compile',
-  sources = ['jvm_compile.py'],
+  sources = ['jvm_compile.py', 'resource_mapping.py'],
   dependencies = [
     ':jvm_dependency_analyzer',
     ':jvm_fingerprint_strategy',

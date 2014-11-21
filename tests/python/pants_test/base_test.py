@@ -122,9 +122,6 @@ class BaseTest(unittest.TestCase):
     else:
       return Config.load()
 
-  def create_options(self, **kwargs):
-    return dict(**kwargs)
-
   def set_new_options_for_scope(self, scope, **kwargs):
     self.new_options[scope].update(kwargs)
 

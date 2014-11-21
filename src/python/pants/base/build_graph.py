@@ -22,6 +22,9 @@ class BuildGraph(object):
   """A directed acyclic graph of Targets and dependencies. Not necessarily connected.
   """
 
+  class DuplicateAddressError(AddressLookupError):
+    """The same address appears multiple times in a dependency list"""
+
   class TransitiveLookupError(AddressLookupError):
     """Used to append the current node to the error message from an AddressLookupError """
 
@@ -158,8 +161,8 @@ class BuildGraph(object):
                      .format(dependent=dependent, dependency=dependency))
 
     if dependency in self.dependencies_of(dependent):
-      logger.warn('{dependent} already depends on {dependency}'
-                  .format(dependent=dependent, dependency=dependency))
+      logger.debug('{dependent} already depends on {dependency}'
+                   .format(dependent=dependent, dependency=dependency))
     else:
       self._target_dependencies_by_address[dependent].add(dependency)
       self._target_dependees_by_address[dependency].add(dependent)
@@ -311,14 +314,23 @@ class BuildGraph(object):
     self._addresses_already_closed.add(address)
     try:
       dep_addresses = list(mapper.specs_to_addresses(target_addressable.dependency_specs,
-                                                     relative_to=address.spec_path))
+                                                      relative_to=address.spec_path))
+      deps_seen = set()
       for dep_address in dep_addresses:
+        if dep_address in deps_seen:
+          raise self.DuplicateAddressError(
+            'Addresses in dependencies must be unique. \'{spec}\' is referenced more than once.'
+            .format(spec=dep_address.spec))
+        deps_seen.add(dep_address)
         self.inject_address_closure(dep_address)
 
       if not self.contains_address(address):
         target = self.target_addressable_to_target(address, target_addressable)
         self.inject_target(target, dependencies=dep_addresses)
       else:
+        for dep_address in dep_addresses:
+          if not dep_address in self.dependencies_of(address):
+            self.inject_dependency(address, dep_address)
         target = self.get_target(address)
 
       for traversable_spec in target.traversable_dependency_specs:

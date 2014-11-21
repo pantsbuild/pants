@@ -48,8 +48,7 @@ class ProtobufGen(CodeGen):
   def register_options(cls, register):
     super(ProtobufGen, cls).register_options(register)
     register('--lang', action='append', choices=['python', 'java'],
-             help='Force generation of protobuf code for these languages.',
-             legacy='protobuf_gen_langs')
+             help='Force generation of protobuf code for these languages.')
 
   def __init__(self, *args, **kwargs):
     """Generates Java and Python files from .proto files using the Google protobuf compiler."""

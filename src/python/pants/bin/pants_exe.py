@@ -29,7 +29,6 @@ from pants.goal.run_tracker import RunTracker
 from pants.reporting.report import Report
 
 
-_BUILD_COMMAND = 'build'
 _LOG_EXIT_OPTION = '--log-exit'
 _VERSION_OPTION = '--version'
 _PRINT_EXCEPTION_STACKTRACE = '--print-exception-stacktrace'
@@ -83,12 +82,7 @@ def _synthesize_command(root_dir, args):
   if command.startswith('-'):
     _exit_and_fail('Invalid command: %s' % command)
 
-  # assume 'build' if a command was omitted.
-  try:
-    # Address.parse(root_dir, command)
-    return _BUILD_COMMAND, _add_default_options(_BUILD_COMMAND, args)
-  except:
-    _exit_and_fail('Failed to execute pants build: %s' % traceback.format_exc())
+  _exit_and_fail('Pants build missing a command: %s' % traceback.format_exc())
 
 
 def _parse_command(root_dir, args):
@@ -191,7 +185,10 @@ def _run():
     run_tracker.end()
     # Must kill nailguns only after run_tracker.end() is called, because there may still
     # be pending background work that needs a nailgun.
+    # TODO(Eric Ayers) simplify after setup_py goes away.
     if (hasattr(command.old_options, 'cleanup_nailguns') and command.old_options.cleanup_nailguns) \
+        or (hasattr(command, 'new_options')
+            and command.new_options.for_global_scope().kill_nailguns) \
         or config.get('nailgun', 'autokill', default=False):
       NailgunTask.killall(None)
 

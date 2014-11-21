@@ -27,25 +27,6 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
   def task_type(cls):
     return JUnitRun
 
-  def create_options(self, **kwargs):
-    options = dict(junit_run_coverage=False,
-                   junit_run_coverage_html_open=False,
-                   junit_run_jvmargs=None,
-                   junit_run_debug=False,
-                   junit_run_tests=None,
-                   junit_run_batch_size=sys.maxint,
-                   junit_run_fail_fast=False,
-                   junit_run_xmlreport=False,
-                   junit_run_per_test_timer=False,
-                   junit_run_default_parallel=False,
-                   junit_run_parallel_threads=0,
-                   junit_run_test_shard=None,
-                   junit_run_arg=None,
-                   junit_run_suppress_output=True,
-                   junit_run_skip=False)
-    options.update(**kwargs)
-    return super(JUnitRunnerTest, self).create_options(**options)
-
   def test_junit_runner(self):
 
     # Create the temporary base test directory

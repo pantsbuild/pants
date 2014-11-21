@@ -67,13 +67,7 @@ class GoalRunner(Command):
       # Note that enclosing scopes will appear before scopes they enclose.
       known_scopes.extend(filter(None, goal.known_scopes()))
 
-    # Annoying but temporary hack to get the parser.  We can't use self.parser because
-    # that only gets set up in the superclass ctor, and we can't call that until we have
-    # self.new_options set up because the superclass ctor calls our register_options().
-    # Fortunately this will all go away once we're fully off the old "Command" mechanism.
-    legacy_parser = args[2] if len(args) > 2 else kwargs['parser']
-    self.new_options = Options(os.environ.copy(), self.config, known_scopes, args=sys.argv,
-                               legacy_parser=legacy_parser)
+    self.new_options = Options(os.environ.copy(), self.config, known_scopes, args=sys.argv)
     super(GoalRunner, self).__init__(*args, needs_old_options=False, **kwargs)
 
   def get_spec_excludes(self):
@@ -141,7 +135,7 @@ class GoalRunner(Command):
                        "a goal. If this is incorrect, disambiguate it with ./{0}.".format(goal))
 
     if self.new_options.is_help:
-      self.new_options.print_help(goals=goals, legacy=True)
+      self.new_options.print_help(goals=goals)
       sys.exit(0)
 
     self.requested_goals = goals

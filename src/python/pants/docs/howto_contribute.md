@@ -67,7 +67,7 @@ start a conversation there to vet the proposal. Once the group agrees
 it's worth a spike you can file a github issue and assign it to
 yourself.
 
-<a xmark="download_source_code"></a>
+<a pantsmark="download_source_code"></a>
 
 ### Getting Pants Source Code
 
@@ -128,7 +128,7 @@ so, then along with changing code...
 
 Before posting a review but certainly before the branch ships you should
 run relevant tests. If you're not sure what those are,
-<a xref="dev_run_all_tests">run all the tests</a>.
+<a pantsref="dev_run_all_tests">run all the tests</a>.
 
 ### Code Review
 
@@ -159,7 +159,7 @@ At the provided URL, there's a web form. To get your change reviewed,
 you must fill in the change description, reviewers, testing done, etc.
 To make sure it gets seen, add `pants-reviews` to the Groups field and a
 specific reviewer to the People field. If you have created a
-<a xref="dev_run_all_tests">pull request on github to run Travis-CI</a>,
+<a pantsref="dev_run_all_tests">pull request on github to run Travis-CI</a>,
 put the pull
 request number in the Bug field and your git branch name in the Branch
 field.

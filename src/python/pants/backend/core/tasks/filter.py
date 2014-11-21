@@ -43,19 +43,19 @@ class Filter(ConsoleTask):
   @classmethod
   def register_options(cls, register):
     super(Filter, cls).register_options(register)
-    register('--type', action='append', legacy='filter_type',
+    register('--type', action='append',
              help="Target types to include (optional '+' prefix) or exclude ('-' prefix).  "
                   "Multiple type inclusions or exclusions can be specified in a comma-separated "
                   "list or by using multiple instances of this flag.")
-    register('--target', action='append', legacy='filter_target',
+    register('--target', action='append',
              help="Targets to include (optional '+' prefix) or exclude ('-' prefix).  Multiple "
                   "target inclusions or exclusions can be specified in a comma-separated list or "
                   "by using multiple instances of this flag.")
-    register('--ancestor', action='append', legacy='filter_ancestor',
+    register('--ancestor', action='append',
              help="Dependency targets of targets to include (optional '+' prefix) or exclude "
                   "('-' prefix).  Multiple ancestor inclusions or exclusions can be specified "
                   "in a comma-separated list or by using multiple instances of this flag.")
-    register('--regex', action='append', legacy='filter_regex',
+    register('--regex', action='append',
              help="Regex patterns of target addresses to include (optional '+' prefix) or exclude "
                   "('-' prefix).  Multiple target inclusions or exclusions can be specified "
                   "in a comma-separated list or by using multiple instances of this flag.")

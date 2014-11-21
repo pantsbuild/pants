@@ -18,11 +18,8 @@ class BenchmarkRun(JvmTask, JvmToolTaskMixin):
   @classmethod
   def register_options(cls, register):
     super(BenchmarkRun, cls).register_options(register)
-    register('--target', legacy='target_class',
-             help='Name of the benchmark class. This is a mandatory argument.')
-
-    register('--memory', default=False, action='store_true', legacy='memory_profiling',
-             help='Enable memory profiling.')
+    register('--target', help='Name of the benchmark class. This is a mandatory argument.')
+    register('--memory', default=False, action='store_true', help='Enable memory profiling.')
 
   def __init__(self, *args, **kwargs):
     super(BenchmarkRun, self).__init__(*args, **kwargs)

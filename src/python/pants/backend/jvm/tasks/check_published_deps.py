@@ -17,7 +17,6 @@ class CheckPublishedDeps(ConsoleTask):
   def register_options(cls, register):
     super(CheckPublishedDeps, cls).register_options(register)
     register('--print-uptodate', default=False, action='store_true',
-             legacy='check_deps_print_uptodate',
              help='Print up-to-date dependencies.')
 
   def __init__(self, *args, **kwargs):

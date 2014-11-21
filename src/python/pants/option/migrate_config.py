@@ -13,6 +13,9 @@ from pants.base.config import Config
 
 migrations = {
   ('java-compile', 'partition_size_hint'): ('compile.java', 'partition_size_hint'),
+  ('java-compile', 'javac_args'): ('compile.java', 'args'),
+  ('java-compile', 'warning_args'): ('compile.java', 'warning_args'),
+  ('java-compile', 'no_warning_args'): ('compile.java', 'no_warning_args'),
 
   ('javadoc-gen', 'include_codegen'): ('gen.javadoc', 'include_codegen'),
   ('scaladoc-gen', 'include_codegen'): ('gen.scaladoc', 'include_codegen'),
@@ -42,6 +45,12 @@ migrations = {
   ('confluence-publish', 'url'): ('confluence', 'url'),
 }
 
+notes = {
+  ('java-compile', 'javac_args'): 'source and target args should be moved to separate source: and '
+                                  'target: options. Other args should be placed in args: and '
+                                  'prefixed with -C.',
+}
+
 
 def check_config_file(path):
   config = Config.from_cache(configpath=path)
@@ -56,6 +65,8 @@ def check_config_file(path):
             '{dst_section}.'.format(src_key=green(src_key), src_section=section(src_section),
                                     dst_key=green(dst_key), dst_section=section(dst_section)),
                                     file=sys.stderr)
+      if (src_section, src_key) in notes:
+        print('  Note: {0}'.format(notes[(src_section, src_key)]))
 
 
 if __name__ == '__main__':

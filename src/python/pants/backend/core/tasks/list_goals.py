@@ -14,11 +14,9 @@ class ListGoals(ConsoleTask):
   def register_options(cls, register):
     super(ListGoals, cls).register_options(register)
     register('--graph', action='store_true',
-             help='Generate a graphviz graph of installed goals.',
-             legacy='goal_list_graph')
+             help='Generate a graphviz graph of installed goals.')
     register('--all', action='store_true',
-             help='List all goals even if no description is available.',
-             legacy='goal_list_all')
+             help='List all goals even if no description is available.')
 
   def console_output(self, targets):
     def report():

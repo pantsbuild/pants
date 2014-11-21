@@ -372,33 +372,31 @@ class JarPublish(JarTask, ScmPublish):
     # Allow re-running this goal with the file as input to support forcing an arbitrary set of
     # revisions and supply of hand edited changelogs.
 
-    register('--dryrun', default=True, action='store_true', legacy='jar_publish_dryrun',
+    register('--dryrun', default=True, action='store_true',
              help='Run through a push without actually pushing artifacts, editing publish dbs or '
                   'otherwise writing data')
-    register('--commit', default=True, action='store_true', legacy='jar_publish_commit',
+    register('--commit', default=True, action='store_true',
              help='Commit the push db. Turn off for local testing.')
-    register('--local', legacy='jar_publish_local', metavar='<PATH>',
+    register('--local', metavar='<PATH>',
              help='Publish jars to a maven repository on the local filesystem at this path.')
     register('--scm-push-attempts', type=int, default=cls._SCM_PUSH_ATTEMPTS,
-             legacy='scm_push_attempts',
              help='Try pushing the pushdb to the SCM this many times before aborting.')
     register('--local-snapshot', default=True, action='store_true',
-             legacy='jar_publish_local_snapshot',
              help='If --local is specified, publishes jars with -SNAPSHOT revision suffixes.')
-    register('--named-snapshot', default=None, legacy='jar_publish_named_snapshot',
+    register('--named-snapshot', default=None,
              help='Publish all artifacts with the given snapshot name, replacing their version. '
                   'This is not Semantic Versioning compatible, but is easier to consume in cases '
                   'where many artifacts must align.')
-    register('--transitive', default=True, action='store_true', legacy='jar_publish_transitive',
+    register('--transitive', default=True, action='store_true',
              help='Publish the specified targets and all their internal dependencies transitively.')
-    register('--force', default=False, action='store_true', legacy='jar_publish_force',
+    register('--force', default=False, action='store_true',
              help='Force pushing jars even if there have been no changes since the last push.')
-    register('--override', action='append', legacy='jar_publish_override',
+    register('--override', action='append',
              help='Specifies a published jar revision override in the form: '
                   '([org]#[name]|[target spec])=[new revision] '
                   'For example, to specify 2 overrides: '
                   '--override=com.foo.bar#baz=0.1.2  --override=src/java/com/foo/bar/qux=1.0.0')
-    register('--restart-at', legacy='jar_publish_restart_at',
+    register('--restart-at',
              help='Restart a fail push at the given jar.  Jars can be identified by '
                   'maven coordinate [org]#[name] or target. '
                   'For example: --restart-at=com.twitter.common#quantity '

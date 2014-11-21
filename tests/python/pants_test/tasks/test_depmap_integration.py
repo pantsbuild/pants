@@ -66,3 +66,10 @@ class DepmapIntegrationTest(PantsRunIntegrationTest):
       self.assertTrue(os.path.exists(depmap_out_file),
                       msg='Could not find depmap output file {out_file}'
                            .format(out_file=depmap_out_file))
+
+  def test_dep_map_for_java_sources(self):
+    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+      test_target = 'examples/src/scala/com/pants/example/scala_with_java_sources'
+      json_data = self.run_depmap_project_info(test_target, workdir)
+      targets = json_data.get('targets')
+      self.assertTrue('examples/src/java/com/pants/examples/java_sources:java_sources' in targets)

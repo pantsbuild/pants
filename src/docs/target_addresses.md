@@ -10,20 +10,27 @@ the `BUILD` file path and target name. Addresses are used to reference
 targets in `BUILD` files, and from the command-line to specify what
 targets to perform the given actions on.
 
+<a pantsmark="addresses_synonyms"> </a>
+
 You can specify targets several ways. Some are most useful when writing
 `BUILD` targets, while others are useful when invoking pants on the
 command-line. Most specify a single target, but globs are available too.
 
 The following target addresses all specify the same single target.
 
--   Fully qualified target address is the BUILD file path plus target
-    name:
+-   Fully qualified target address is `//` plus the BUILD file's directory path plus target name:
+
+        :::bash
+        $ ./pants goal list //examples/src/java/com/pants/examples/hello/main:main
+        examples/src/java/com/pants/examples/hello/main:main
+
+-   The starting double-slash is optional if the target isn't in the top directory:
 
         :::bash
         $ ./pants goal list examples/src/java/com/pants/examples/hello/main:main
         examples/src/java/com/pants/examples/hello/main:main
 
--   Specify the default target, which matches the parent directory name:
+-   Specify the default target (the target whose name matches the parent directory name):
 
         :::bash
         $ ./pants goal list examples/src/java/com/pants/examples/hello/main
@@ -43,13 +50,11 @@ The following target addresses all specify the same single target.
         $ pants goal list $REPO_ROOT/src/java/com/pants/examples/hello/main
         src/java/com/pants/examples/hello/main:main
 
-    *NB: Neither the `./` or any other relative or absolute path forms nor
-    the trailing slash are allowed in target addresses written down in
-    BUILD files - these affordances are just for ease of command line
-    specification of target addresses.*
+*NB: Neither the `./` or any other relative or absolute path forms nor the trailing slash are
+allowed in target addresses in ``BUILD`` files. These are just for command-line convenience.*
 
-As a convenience, targets can be referenced relatively within the same
-BUILD file:
+As a convenience, you can reference a target in the same BUILD file by starting with a
+colon ``:targetname`` instead of specifying the whole path:
 
     :::python
     java_library(name='application', ...)
@@ -57,9 +62,9 @@ BUILD file:
       dependencies=[':application'],
     )
 
-To refer to a target in a top-level BUILD file, prefix the target name
-with `//:`. (You can prefix any absolute path with //, but it's mainly
-useful for top-level targets since ":target" is relative.)
+To refer to a target in a top-level BUILD file, prefix its name with `//:`. (You can prefix
+any absolute path with `//`, but it's mainly useful for top-level targets since ":target" is
+relative.)
 
     :::python
     java_library(name='application', ...)

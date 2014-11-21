@@ -20,7 +20,7 @@ class PythonTask(Task):
   @classmethod
   def register_options(cls, register):
     super(PythonTask, cls).register_options(register)
-    register('--timeout', type=int, default=0, legacy='python_conn_timeout',
+    register('--timeout', type=int, default=0,
              help='Number of seconds to wait for http connections.')
 
   def __init__(self, *args, **kwargs):

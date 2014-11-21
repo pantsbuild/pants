@@ -30,37 +30,38 @@ Relevant Goals and Targets
 **Runnable Binary**
 
 > Pants can generate PEXes, executables built from Python. Invoke the
-> <a xref="gref_goal_binary">`binary`</a> goal on a
-> <a xref="bdict_python_binary">`python_binary`</a> target to generate a `.pex`.
-> You can also invoke the <a xref="gref_goal_run">`run`</a> goal on a
+> <a pantsref="gref_goal_binary">`binary`</a> goal on a
+> <a pantsref="bdict_python_binary">`python_binary`</a> target to generate a `.pex`.
+> You can also invoke the
+> <a pantsref="gref_goal_run">run</a> goal on a
 > `python_binary` to run its code "in place."
 
 **Importable Code**
 
-> <a xref="bdict_python_library">`python_library`</a> BUILD targets make Python
+> <a pantsref="bdict_python_library">`python_library`</a> BUILD targets make Python
 > code "import-able". The rule of thumb is that each directory of `.py`
 > files has a `BUILD` file with a `python_library` target. A Python
 > target that has a `python_library` in its `dependencies` can import
 > its code.
 >
 > To use code that's not in your workspace, use a
-> <a xref="bdict_python_requirement_library">`python_requirement_library`</a>
+> <a pantsref="bdict_python_requirement_library">`python_requirement_library`</a>
 > and a
-> <a xref="bdict_python_requirement">`python_requirement`</a> to refer to
+> <a pantsref="bdict_python_requirement">`python_requirement`</a> to refer to
 > the code. To use several several of these via a `pip`-style
 > `requirements.txt` file, use a
-> <a xref="bdict_python_requirements">`python_requirements`</a>.
+> <a pantsref="bdict_python_requirements">`python_requirements`</a>.
 
 **Tests**
 
-> A <a xref="bdict_python_tests">`python_tests`</a> BUILD target has some
+> A <a pantsref="bdict_python_tests">`python_tests`</a> BUILD target has some
 > `pytest` tests. It normally depends on a `python_library` target so it
 > can import and test the library's code. Use the
-> <a xref="gref_goal_test">test goal</a> to run these tests.
+> <a pantsref="gref_goal_test">test goal</a> to run these tests.
 
 **Generated Code**
 
-> A <a xref="bdict_python_thrift_library">`python_thrift_library`</a> generates
+> A <a pantsref="bdict_python_thrift_library">`python_thrift_library`</a> generates
 > Python code from `.thrift` source; a Python target that has this
 > target in its `dependencies` can `import` the generated Python code.
 
@@ -141,9 +142,9 @@ Handling `python_requirement`
 -----------------------------
 
 `BUILD` files specify outside Python dependencies via
-<a xref="bdict_python_requirement_library">`python_requirement_library`</a>
+<a pantsref="bdict_python_requirement_library">`python_requirement_library`</a>
 targets wrapping
-<a xref="bdict_python_requirements">`python_requirement`</a>s.
+<a pantsref="bdict_python_requirements">`python_requirement`</a>s.
 
 Pants handles these dependencies for you. It never installs anything globally.
 Instead, it builds the dependencies, caches them in `.pants.d`, and assembles them *a la carte*
@@ -261,6 +262,7 @@ And now dist/fab.pex behaves like a standalone fab binary:
 More About Python Tests
 -----------------------
 
+<<<<<<< HEAD
 Pants runs Python tests with `pytest`. You can pass CLI options to `pytest` via passthrough
 if `test.pytest` is the last goal and task on your command line. E.g., to run only tests
 whose names contain `req`:
@@ -287,23 +289,21 @@ whose names contain `req`:
     10:43:05 00:02     [specs]
                    SUCCESS
 
-You can instead pass CLI options to
-`pytest` with `--test-pytest-options`. For example, to only run tests
-whose names match the pattern `*foo*`, you could run:
+Pants runs Python tests with `pytest`. You can pass CLI options to `pytest` with
+`goal test.pytest --options`. For example, to only run tests whose names match the pattern
+`*req*`, you could run:
 
     :::bash
-    $ ./pants goal test examples/tests/python/example_test/hello/greet --test-pytest-options='-k req'
+    $ ./pants goal test.pytest --options='-k req' examples/tests/python/example_test/hello/greet
     ...
-                         ============== test session starts ===============
-                         platform darwin -- Python 2.7.5 -- py-1.4.26 -- pytest-2.6.4
-                         plugins: cov, timeout
-                         collected 2 items
-                         
-                         examples/tests/python/example_test/hello/greet/greet.py .
-                         
-                         ========= 1 tests deselected by '-kreq' ==========
-                         ===== 1 passed, 1 deselected in 0.06 seconds =====
-                         
+                     ============== test session starts ===============
+                     platform darwin -- Python 2.6.8 -- py-1.4.20 -- pytest-2.5.2
+                     plugins: cov, timeout
+                     collected 2 items
+
+                     ========= 2 tests deselected by '-kfoo' ==========
+                     ========== 2 deselected in 0.01 seconds ==========
+
     13:34:28 00:02     [junit]
     13:34:28 00:02     [specs]
                SUCCESS
@@ -385,7 +385,7 @@ get debugging output printed to the console. Debugging output includes:
 If you have a PEX file without a prescribed entry point, or want to
 change the `entry_point` for a single invocation, you can set
 `PEX_MODULE=entry_point` using the same format as described in the
-<a xref="bdict_python_binary">`python_binary`</a> Pants target.
+<a pantsref="bdict_python_binary">`python_binary`</a> Pants target.
 
 This can be useful for bundling up some packages together and using that
 single file to execute scripts from each of them.

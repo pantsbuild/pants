@@ -165,7 +165,8 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
     with temporary_dir() as publish_dir:
       options = ['--publish-local=%s' % publish_dir,
                  '--no-publish-dryrun',
-                 '--publish-force']
+                 '--publish-force',
+                 '--print-exception-stacktrace',]
       if extra_options:
         options.extend(extra_options)
 
