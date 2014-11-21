@@ -114,7 +114,7 @@ class Options(object):
 
   def format_help(self, scope):
     """Generate a help message for options at the specified scope."""
-    return self.get_parser(scope).format_help()
+    return '{0} options:\n{1}'.format(scope, self.get_parser(scope).format_help())
 
   def register(self, scope, *args, **kwargs):
     """Register an option in the given scope, using argparse params."""
