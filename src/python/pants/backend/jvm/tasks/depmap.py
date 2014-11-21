@@ -5,7 +5,6 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 from collections import defaultdict
-import itertools
 import json
 import os
 
@@ -79,7 +78,6 @@ class Depmap(ConsoleTask):
              help='Specifies the separator to use between the org/name/rev components of a '
                   'dependency\'s fully qualified name.')
 
-
   def __init__(self, *args, **kwargs):
     super(Depmap, self).__init__(*args, **kwargs)
     # Require information about jars
@@ -96,6 +94,7 @@ class Depmap(ConsoleTask):
     self.separator = self.get_options().separator
     self.project_info = self.get_options().project_info
     self.format = self.get_options().project_info_formatted
+    self.target_aliases_map = None
 
   def console_output(self, targets):
     if len(self.context.target_roots) == 0:
@@ -118,7 +117,7 @@ class Depmap(ConsoleTask):
       elif target.is_python:
         raise TaskError('Unsupported for Python targets')
       else:
-        raise TaskError('Unsupported for target %s' % target)
+        raise TaskError('Unsupported for target {target}'.format(target=target))
 
   def _dep_id(self, dependency):
     """Returns a tuple of dependency_id , is_internal_dep."""
@@ -253,7 +252,8 @@ class Depmap(ConsoleTask):
         'libraries': [],
         'roots': [],
         'target_type': get_target_type(current_target),
-        'is_code_gen': current_target.is_codegen
+        'is_code_gen': current_target.is_codegen,
+        'pants_target_type': self._get_pants_target_alias(type(current_target))
       }
 
       target_libraries = set()
@@ -304,6 +304,17 @@ class Depmap(ConsoleTask):
         mapping[self._jar_id(module.ref)] = [artifact.path for artifact in module.artifacts]
     return mapping
 
+  def _get_pants_target_alias(self, pants_target_type):
+    """Returns the pants target alias for the given target"""
+    if not self.target_aliases_map:
+      target_aliases = self.context.build_file_parser.registered_aliases().targets
+      # If a target class is registered under multiple aliases returns the last one.
+      self.target_aliases_map = {classname: alias for alias, classname in target_aliases.items()}
+    if pants_target_type in self.target_aliases_map:
+      return self.target_aliases_map.get(pants_target_type)
+    else:
+      raise TaskError('Unregistered target type {target_type}'.format(target_type=pants_target_type))
+
   @staticmethod
   def _source_roots_for_target(target):
     """
@@ -313,4 +324,3 @@ class Depmap(ConsoleTask):
       source = os.path.dirname(source_file)
       return os.path.join(get_buildroot(), target.target_base, source), source.replace(os.sep, '.')
     return set(map(root_package_prefix, target.sources_relative_to_source_root()))
-

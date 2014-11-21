@@ -30,20 +30,7 @@ class JarCreateTestBase(JarTaskTestBase):
 
   def setUp(self):
     super(JarCreateTestBase, self).setUp()
-    self.set_new_options(jar_create_transitive=True,
-                         jar_create_compressed=False,
-                         jar_create_classes=False,
-                         jar_create_sources=False,
-                         jar_create_javadoc=False)
-
-  def create_options(self, **kwargs):
-    options = dict(jar_create_transitive=True,
-                   jar_create_compressed=False,
-                   jar_create_classes=False,
-                   jar_create_sources=False,
-                   jar_create_javadoc=False)
-    options.update(**kwargs)
-    return super(JarCreateTestBase, self).create_options(**options)
+    self.set_new_options(compressed=False)
 
 
 class JarCreateMiscTest(JarCreateTestBase):

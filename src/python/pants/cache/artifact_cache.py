@@ -21,6 +21,29 @@ class ArtifactCacheError(Exception):
 class NonfatalArtifactCacheError(Exception):
   pass
 
+class UnreadableArtifact(Exception):
+  """A False-y value to indicate a read-failure (vs a normal cache-miss)
+
+  See docstring on `ArtifactCache.use_cached_files` for details.
+  """
+
+  def __init__(self, key, err=None):
+    """
+    :param CacheKey key: The key of the artifact that encountered an error
+    :param err: Any additional information on the nature of the read error.
+    """
+    self.key = key
+    self.err = None
+
+  # For python 3
+  def __bool__(self):
+    return False
+
+  # For python 2
+  def __nonzero__(self):
+    return self.__bool__()
+
+
 class ArtifactCache(object):
   """A map from cache key to a set of build artifacts.
 
@@ -79,9 +102,19 @@ class ArtifactCache(object):
   def use_cached_files(self, cache_key):
     """Use the files cached for the given key.
 
-    Returns an appropriate Artifact instance if files were found and used, None otherwise.
-    Callers will typically only care about the truthiness of the return value. They usually
-    don't need to tinker with the returned instance.
+    Returned result indicates whether or not an artifact was successfully found
+    and decompressed to the `artifact_root`:
+      `True` if artifact was found and successfully decompressed
+      `False` if not in the cache
+
+    Implementations may choose to return an UnreadableArtifact instance instead
+    of `False` to indicate an artifact was in the cache but could not be read,
+    due to anerror or corruption. UnreadableArtifact evaluates as False-y, so
+    callers can treat the result as a boolean if they are only concerned with
+    whether or not an artifact was read.
+
+    Callers may also choose to attempt to repair or report corrupted artifacts
+    differently, as these are unexpected, unlike normal cache misses.
 
     :param CacheKey cache_key: A CacheKey object.
     """
