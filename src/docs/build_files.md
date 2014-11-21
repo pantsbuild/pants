@@ -105,19 +105,17 @@ a specific non-default target:
       sources=globs('*.java'),
     )
 
-Default targets are more convenient to reference on the command line and
-less verbose as build dependencies. For example, consider the following
-names for the same target:
+Default targets are more convenient to reference on the command line. There are a
+<a pantsref="addresses_synonyms">few ways to refer to a target</a> on the command line.
+It's especially convenient to refer to a default target on the command line. Consider these two
+ways to refer to the same target:
 
-    src/java/com/twitter/tugboat:tugboat  # absolute target name
-    src/java/com/twitter/tugboat/BUILD          # references default target "tugboat"
-    src/java/com/twitter/tugboat   # references default build file "BUILD" and default target "tugboat"
-    src/java/com/twitter/tugboat/  # trailing slashes are ignored - useful for command-line completion
+    //src/java/com/pants/tugboat:tugboat  # absolute target name
+    src/java/com/pants/tugboat/           # convenient command-line-completion syntax
 
-By providing a target with the default name, you simplify interacting
-with your target from the command-line. This gives users a better
-experience using your library. In BUILD files, dependencies are less
-verbose, which improves readability.
+By providing a default-name target, you make it easier for people to refer to it on the command
+line. This gives them a better experience. BUILD files dependencies can be less verbose,
+improving readability.
 
 The 1:1:1 Rule
 --------------
@@ -224,7 +222,7 @@ and let users provide plugins for each data source.
 
 The simple approach of providing a single BUILD target for both
 interface and implementations has a significant drawback: anyone wishing
-to implement the interface must depend on all dependencies for all
+to implement the interface must also depend on all dependencies for all
 implementations co-published with the interface. The classpath bloats.
 The risk of dependency conflicts increases greatly. For example:
 
@@ -243,13 +241,11 @@ The risk of dependency conflicts increases greatly. For example:
       sources=globs('*.java'),
     )
 
-An improved code organization uses separate packages when many fellow
-travelers are introduced. For example, if `FileDataImporter.java` only
-uses standard library classes its entirely appropriate to package it
-with the interface. HBase, however, its quite large itself, has many
-transitive dependencies, and is only required by jobs that actually read
-from HBase. **Implementations with many fellow travelers should be
-published as separate pants targets.**
+To avoid this bloat, define separate packages for code that introduces many extra dependencies.
+For example, if `FileDataImporter.java` only uses standard library classes, it's appropriate to
+package it with the interface. HBase, however, is quite large, has many transitive dependencies,
+and is only required by jobs that actually read from HBase. Not `DataImporter` user wants to pull
+down all those dependencies. Separate it out into its own target:
 
     :::python
     # Ideal repo layout - hbase as a subpackage and separate target.

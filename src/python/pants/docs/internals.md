@@ -60,15 +60,13 @@ communicate results and requests for build results.
 Examining a Goal-Task Chain
 ---------------------------
 
-It's not so easy to figure out in your head which Goals+Tasks are
-invoked for some command line. The dependency relationships between
-Goals and Tasks can get complex. The --explain flag helps here. Instead
-of building something, it echoes a summary of the goals and tasks it
-would use to build something. For example, you can find out what happens
-on a `compile`:
+It's not so easy to figure out in your head which Goals+Tasks are invoked for some command line.
+The dependency relationships between Goals and Tasks gets complex. The `--explain` global flag
+helps here. Instead of building something, it echoes a summary of the goals and tasks it
+*would* use to build something. For example, you can find out what happens on a `compile`:
 
     :::bash
-    $./pants goal compile --explain
+    $./pants goal --explain compile
     Goal Execution Order:
 
     bootstrap -> imports -> gen -> check-exclusives -> resolve -> compile

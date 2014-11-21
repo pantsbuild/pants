@@ -29,6 +29,12 @@ class NotTestTarget(Target):
     super(NotTestTarget, self).__init__(target_name, SyntheticAddress.parse(spec), None)
 
 
+class AnotherTarget(Target):
+  def __init__(self, spec):
+    spec_path, target_name = parse_spec(spec)
+    super(AnotherTarget, self).__init__(target_name, SyntheticAddress.parse(spec), None)
+
+
 class SourceRootTest(unittest.TestCase):
   """Tests for SourceRoot.  SourceRoot is a singleton so we must make sure this
   test cleans up after itself.
@@ -129,8 +135,11 @@ class SourceRootTest(unittest.TestCase):
     self.assertEquals(("tests/language", OrderedSet([NotTestTarget, TestTarget])),
                       tree.get_root_and_types("tests/language"),
                       msg="Failed for tree: {dump}".format(dump=tree._dump()))
-    self.assertEquals(("tests/language", set([NotTestTarget, TestTarget])),
-                      tree.get_root_and_types("tests/language/foo"),
+    root, types = tree.get_root_and_types("tests/language/foo")
+    self.assertEquals("tests/language", root,
+                      msg="Failed for tree: {dump}".format(dump=tree._dump()))
+    self.assertEquals(set(types),
+                      set([NotTestTarget, TestTarget]),
                       msg="Failed for tree: {dump}".format(dump=tree._dump()))
     self.assertEquals((None, None), tree.get_root_and_types("src"),
                       msg="Failed for tree: {dump}".format(dump=tree._dump()))
@@ -158,6 +167,22 @@ class SourceRootTest(unittest.TestCase):
       tree.add_root("tests/language", set([NotTestTarget]))
     with self.assertRaises(SourceRootTree.NestedSourceRootError):
       tree.add_root("tests", set([NotTestTarget]))
+
+  def test_mutable(self):
+    tree = SourceRootTree()
+    tree.add_root("mutable/foo", set([NotTestTarget, TestTarget]), mutable=True)
+    tree.add_root("immutable/foo", set([NotTestTarget, TestTarget]), mutable=False)
+    with self.assertRaises(SourceRootTree.DuplicateSourceRootError):
+      # Can't add an immutable root to a mutable root
+      tree.add_root("mutable/foo", set([AnotherTarget]))
+    with self.assertRaises(SourceRootTree.DuplicateSourceRootError):
+      # Can't add an mutable root to an immutable root
+      tree.add_root("immutable/foo", set([AnotherTarget]), mutable=True)
+    # But can add a mutable root to a mutable root
+    tree.add_root("mutable/foo", set([AnotherTarget]), mutable=True)
+    self.assertEquals(set([AnotherTarget, NotTestTarget, TestTarget]),
+                      set(tree.get_root_and_types("mutable/foo")[1]),
+                      msg="Failed for tree: {dump}".format(dump=tree._dump()))
 
   def _add_siblings1(self, tree, common_root):
     tree.add_root(os.path.join(common_root, 'src/java'),[NotTestTarget])

@@ -308,20 +308,20 @@ And now dist/fab.pex behaves like a standalone fab binary:
 More About Python Tests
 -----------------------
 
-Pants runs Python tests with `pytest`. You can pass CLI options to
-`pytest` with `--test-pytest-options`. For example, to only run tests
-whose names match the pattern `*foo*`, you could run:
+Pants runs Python tests with `pytest`. You can pass CLI options to `pytest` with
+`goal test.pytest --options`. For example, to only run tests whose names match the pattern
+`*foo*`, you could run:
 
     :::bash
-    $ ./pants goal test examples/tests/python/example_test/hello/greet --test-pytest-options='-k foo'
+    $ ./pants goal test.pytest --options='-k foo' examples/tests/python/example_test/hello/greet
     ...
                      ============== test session starts ===============
                      platform darwin -- Python 2.6.8 -- py-1.4.20 -- pytest-2.5.2
                      plugins: cov, timeout
-                     collected 1 items
+                     collected 2 items
 
-                     ========= 1 tests deselected by '-kfoo' ==========
-                     ========== 1 deselected in 0.01 seconds ==========
+                     ========= 2 tests deselected by '-kfoo' ==========
+                     ========== 2 deselected in 0.01 seconds ==========
 
     13:34:28 00:02     [junit]
     13:34:28 00:02     [specs]

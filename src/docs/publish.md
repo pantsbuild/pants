@@ -85,10 +85,9 @@ Things can go wrong; you can recover:
     merge conflicts can happen, and folks don't always recover from them
     correctly.
 
-    In this situation, you probably want to pass `--publish-override` to
-    specify a version to use instead of the automatically-computed
-    already-existing version. Choose a version that's not already on the
-    server. Pants records this version in the pushdb, so hopefully the
+    In this situation, you probably want to pass `goal publish --overrride=<version>` to specify a
+    version to use instead of the automatically-computed already-existing version. Choose a version
+    that's not already on the server. Pants records this version in the pushdb, so hopefully the
     next publisher won't have the same problem.
 
     Perhaps you are "racing" a colleague and just lost the race: they
@@ -120,7 +119,7 @@ How To
     to-be-published artifact. See
     <a pantsref="publish_local_test">Test with a Fake Local "Publish"</a>.
 -   Start the publish:
-    `./pants goal publish --no-publish-dryrun [target]` Don't wander
+    `./pants goal publish --no-dryrun [target]` Don't wander
     off; Pants will ask for confirmation as it goes (making sure you
     aren't publishing artifact[s] you didn't mean to).
 
@@ -189,10 +188,9 @@ and the <a pantsref="bdict_credentials">`credentials`</a> target type for inspir
 Troubleshooting
 ---------------
 
-Sometimes publishing doesn't do what you want. The fix usually involves
-publishing again, perhaps passing `--publish-override` (override the
-version number to use), `--publish-force`, and/or
-`--publish-restart-at`. The following are some usual symptoms/questions:
+Sometimes publishing doesn't do what you want. The fix usually involves publishing again, perhaps
+passing `--override` (override the version number to use), `--force`, and/or `--restart-at`. The
+following are some usual symptoms/questions:
 
 <a pantsmark="publish_version_exists"></a>
 
@@ -207,19 +205,17 @@ want to use. E.g., if you notice that versions up to 2.5.7 exist and you
 want to bump the patch version, you want to override the default version
 number and use 2.5.8 instead.
 
-Try publishing again, but pass `--publish-override` to specify the
-version number to use instead of incrementing the version number from
-the pushdb. Be sure to use a version number that has not already been
-published this time. For example, to override the default publish
-version number for the `org.archie` buoyancy artifact, you might pass
-`--publish-override=org.archie#buoyancy=2.5.8`.
+Try publishing again, but pass `--override` to specify the version number to use instead of
+incrementing the version number from the pushdb. Be sure to use a version number that has not
+already been published this time. For example, to override the default publish version number for
+the `org.archie` buoyancy artifact, you might pass
+`goal publish --override=org.archie#buoyancy=2.5.8`.
 
 <a pantsmark="publish_pushdb_push"></a>
 
 ### Failed to Push to Origin
 
-You might successfully publish your artifact but then fail to push your
-pushdb change to origin:
+You might successfully publish your artifact but then fail to push your pushdb change to origin:
 
     To https://git.archimedes.org/owls
      ! [rejected]        master -> master (non-fast-forward)
@@ -252,10 +248,9 @@ In git, this might mean:
     git pull origin master
     ./pants goal publish <your previous args>
 
-Since you uploaded new versioned artifacts but the reset pushdb doesn't
-"remember" that, you might get "Versioned Artifact Already Exists"
-errors: see the section above, and use `--publish-override` to set
-version numbers to avoid these.
+Since you uploaded new versioned artifacts but the reset pushdb doesn't "remember" that, you might
+get "Versioned Artifact Already Exists" errors: see the section above and use `--override` to
+set version numbers to avoid these.
 
 <a pantsmark="publish_no_provides"></a>
 
@@ -332,7 +327,7 @@ Maven configured to use `~/.m2/repository` as a local repo. You can make
 pants publish to that local repo with:
 
     :::bash
-    ./pants goal publish --no-publish-dryrun --publish-local=~/.m2/repository
+    ./pants goal publish --no-dryrun --local=~/.m2/repository
 
 In the other codebase, change the dependencies to pull in the new
 artifact.

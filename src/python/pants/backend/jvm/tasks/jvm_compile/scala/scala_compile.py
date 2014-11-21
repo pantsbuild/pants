@@ -14,25 +14,22 @@ from pants.backend.jvm.tasks.jvm_compile.scala.zinc_analysis_parser import ZincA
 from pants.backend.jvm.tasks.jvm_compile.scala.zinc_utils import ZincUtils
 
 
-# Overridden by parameter scala-compile -> args
-_SCALA_COMPILE_ARGS_DEFAULT = [
-  '-S-encoding', '-SUTF-8','-S-g:vars',
-]
-
-# Overridden by parameter scala-compile -> warning_args
-_SCALA_COMPILE_WARNING_ARGS_DEFAULT = [
-  '-S-deprecation', '-S-unchecked',
-]
-
-# Overridden by parameter scala-compile -> no_warning_args
-_SCALA_COMPILE_NO_WARNING_ARGS_DEFAULT = [
-  '-S-nowarn',
-]
-
 class ScalaCompile(JvmCompile):
   _language = 'scala'
   _file_suffix = '.scala'
   _config_section = 'scala-compile'
+
+  @classmethod
+  def get_args_default(cls):
+    return ('-S-encoding', '-SUTF-8','-S-g:vars')
+
+  @classmethod
+  def get_warning_args_default(cls):
+    return ('-S-deprecation', '-S-unchecked')
+
+  @classmethod
+  def get_no_warning_args_default(cls):
+    return ('-S-nowarn',)
 
   @classmethod
   def register_options(cls, register):
@@ -51,10 +48,6 @@ class ScalaCompile(JvmCompile):
                                  jvm_options=self._jvm_options,
                                  color=color,
                                  log_level=self.get_options().level)
-
-    self.configure_args(args_defaults=_SCALA_COMPILE_ARGS_DEFAULT,
-                        warning_defaults=_SCALA_COMPILE_WARNING_ARGS_DEFAULT,
-                        no_warning_defaults=_SCALA_COMPILE_WARNING_ARGS_DEFAULT)
 
   @property
   def config_section(self):

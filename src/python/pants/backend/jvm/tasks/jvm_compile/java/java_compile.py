@@ -6,6 +6,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import os
+from pants.base.config import Config
 
 from pants.backend.jvm.tasks.jvm_compile.analysis_tools import AnalysisTools
 from pants.backend.jvm.tasks.jvm_compile.java.jmake_analysis import JMakeAnalysis
@@ -16,7 +17,6 @@ from pants.base.exceptions import TaskError
 from pants.base.target import Target
 from pants.base.workunit import WorkUnit
 from pants.util.dirutil import relativize_paths, safe_open
-from pants.util.strutil import safe_shlex_split
 
 
 # From http://kenai.com/projects/jmake/sources/mercurial/content
@@ -43,29 +43,6 @@ _JMAKE_ERROR_CODES = {
 # When executed via a subprocess return codes will be treated as unsigned
 _JMAKE_ERROR_CODES.update((256 + code, msg) for code, msg in _JMAKE_ERROR_CODES.items())
 
-# Overridden by parameter java-compile -> args
-_JAVA_COMPILE_ARGS_DEFAULT = [
-  '-C-encoding', '-CUTF-8',
-  '-C-g',
-  '-C-Tcolor',
-
-  # Don't warn for generated code.
-  '-C-Tnowarnprefixes', '-C%(pants_workdir)s/gen',
-
-  # Suppress the warning for annotations with no processor - we know there are many of these!
-  '-C-Tnowarnregex', '-C^(warning: )?No processor claimed any of these annotations: .*'
-]
-
-# Overridden by parameter java-compile -> warning_args
-_JAVA_COMPILE_WARNING_ARGS_DEFAULT = [
-  '-C-Xlint:all',   '-C-Xlint:-serial',
-  '-C-Xlint:-path', '-C-deprecation',
-]
-
-# Overridden by parameter java-compile ->no_warning_args
-_JAVA_COMPILE_NO_WARNING_ARGS_DEFAULT = [
-  '-C-Xlint:none', '-C-nowarn',
-]
 
 class JavaCompile(JvmCompile):
   _language = 'java'
@@ -78,9 +55,29 @@ class JavaCompile(JvmCompile):
   _JMAKE_MAIN = 'com.sun.tools.jmake.Main'
 
   @classmethod
+  def get_args_default(cls):
+    return ('-C-encoding', '-CUTF-8', '-C-g', '-C-Tcolor',
+            # Don't warn for generated code. Note that we assume that we're using the default
+            # pants_workdir, which is always currently the case. In the future pants_workdir will
+            # be a regular option, and we will be able to get its value here, default or otherwise.
+            '-C-Tnowarnprefixes',
+            '-C{0}'.format(os.path.join(Config.DEFAULT_PANTS_WORKDIR.default, 'gen')),
+            # Suppress warning for annotations with no processor - we know there are many of these!
+            '-C-Tnowarnregex', '-C^(warning: )?No processor claimed any of these annotations: .*')
+
+  @classmethod
+  def get_warning_args_default(cls):
+    return ('-C-Xlint:all',   '-C-Xlint:-serial', '-C-Xlint:-path', '-C-deprecation')
+
+  @classmethod
+  def get_no_warning_args_default(cls):
+    return ('-C-Xlint:none', '-C-nowarn')
+
+  @classmethod
   def register_options(cls, register):
     super(JavaCompile, cls).register_options(register)
-    register('--args', action='append', help='Pass these extra args to javac.')
+    register('--source', help='Provide source compatibility with this release.')
+    register('--target', help='Generate class files for this JVM version.')
 
   def __init__(self, *args, **kwargs):
     super(JavaCompile, self).__init__(*args, **kwargs)
@@ -102,18 +99,6 @@ class JavaCompile(JvmCompile):
                                        ini_key='compiler-bootstrap-tools',
                                        default=['//:java-compiler'])
 
-    self.configure_args(args_defaults=_JAVA_COMPILE_ARGS_DEFAULT,
-                        warning_defaults=_JAVA_COMPILE_WARNING_ARGS_DEFAULT,
-                        no_warning_defaults=_JAVA_COMPILE_WARNING_ARGS_DEFAULT)
-
-    self._javac_opts = []
-    if self.get_options().args:
-      for arg in self.get_options().args:
-        self._javac_opts.extend(safe_shlex_split(arg))
-    else:
-      self._javac_opts.extend(self.context.config.getlist('java-compile',
-                                                          'javac_args', default=[]))
-
   @property
   def config_section(self):
     return self._config_section
@@ -133,20 +118,7 @@ class JavaCompile(JvmCompile):
   # Make the java target language version part of the cache key hash,
   # this ensures we invalidate if someone builds against a different version.
   def platform_version_info(self):
-    ret = []
-    opts = self._javac_opts
-
-    try:
-      # We only care about the target version for now.
-      target_pos = opts.index('-target')
-      if len(opts) >= target_pos + 2:
-        for t in opts[target_pos:target_pos + 2]:
-          ret.append(t)
-    except ValueError:
-      # No target in javac opts.
-      pass
-
-    return ret
+    return (self.get_options().target,) if self.get_options().target else ()
 
   def compile(self, args, classpath, sources, classes_output_dir, analysis_file):
     relative_classpath = relativize_paths(classpath, self._buildroot)
@@ -158,15 +130,23 @@ class JavaCompile(JvmCompile):
       '-pdb-text-format',
       ]
 
-    compiler_classpath = self.tool_classpath(
-      self._compiler_bootstrap_key)
+    compiler_classpath = self.tool_classpath(self._compiler_bootstrap_key)
     args.extend([
       '-jcpath', ':'.join(compiler_classpath),
       '-jcmainclass', 'com.twitter.common.tools.Compiler',
       ])
-    args.extend(map(lambda arg: '-C%s' % arg, self._javac_opts))
 
+    if self.get_options().source:
+      args.extend(['-C-source', '-C{0}'.format(self.get_options().source)])
+    if self.get_options().target:
+      args.extend(['-C-target', '-C{0}'.format(self.get_options().target)])
+
+    if '-C-source' in self._args:
+      raise TaskError("Set the source Java version with the 'source' option, not in 'args'.")
+    if '-C-target' in self._args:
+      raise TaskError("Set the target JVM version with the 'target' option, not in 'args'.")
     args.extend(self._args)
+
     args.extend(sources)
     result = self.runjava(classpath=jmake_classpath,
                           main=JavaCompile._JMAKE_MAIN,

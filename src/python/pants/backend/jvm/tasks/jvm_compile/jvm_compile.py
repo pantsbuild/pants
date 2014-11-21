@@ -6,8 +6,10 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 from collections import defaultdict
+from textwrap import dedent
 import itertools
 import os
+import re
 import shutil
 import sys
 import uuid
@@ -17,6 +19,7 @@ from twitter.common.collections import OrderedSet
 from pants.backend.core.tasks.group_task import GroupMember
 from pants.backend.jvm.tasks.jvm_compile.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.backend.jvm.tasks.jvm_compile.jvm_fingerprint_strategy import JvmFingerprintStrategy
+from pants.backend.jvm.tasks.jvm_compile.resource_mapping import ResourceMapping
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
 from pants.base.build_environment import get_buildroot, get_scm
@@ -43,8 +46,17 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
              help='Roughly how many source files to attempt to compile together. Set to a large '
                   'number to compile all sources together. Set to 0 to compile target-by-target.')
 
+    register('--args', action='append', default=list(cls.get_args_default()),
+             help='Args to pass to the compiler.')
+
     register('--warnings', default=True, action='store_true',
              help='Compile with all configured warnings enabled.')
+
+    register('--warning-args', action='append', default=list(cls.get_warning_args_default()),
+             help='Extra compiler args to use when warnings are enabled.')
+
+    register('--no-warning-args', action='append', default=list(cls.get_no_warning_args_default()),
+             help='Extra compiler args to use when warnings are disabled.')
 
     register('--missing-deps', choices=['off', 'warn', 'fatal'], default='warn',
              help='Check for missing dependencies in {0} code. Reports actual dependencies A -> B '
@@ -81,7 +93,22 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
 
   @classmethod
   def product_types(cls):
-    return ['classes_by_target', 'classes_by_source']
+    return ['classes_by_target', 'classes_by_source', 'resources_by_target']
+
+  @classmethod
+  def get_args_default(cls):
+    """Override to set default for --args option."""
+    return ()
+
+  @classmethod
+  def get_warning_args_default(cls):
+    """Override to set default for --warning-args option."""
+    return ()
+
+  @classmethod
+  def get_no_warning_args_default(cls):
+    """Override to set default for --no-warning-args option."""
+    return ()
 
   def select(self, target):
     return target.has_sources(self._file_suffix)
@@ -136,9 +163,6 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
     super(JvmCompile, self).__init__(*args, **kwargs)
     config_section = self.config_section
 
-    # Global workdir.
-    self._pants_workdir = self.context.config.getdefault('pants_workdir')
-
     # Various working directories.
     self._classes_dir = os.path.join(self.workdir, 'classes')
     self._resources_dir = os.path.join(self.workdir, 'resources')
@@ -166,6 +190,12 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
 
     # The ivy confs for which we're building.
     self._confs = self.context.config.getlist(config_section, 'confs', default=['default'])
+
+    self._args = list(self.get_options().args)
+    if self.get_options().warnings:
+      self._args.extend(self.get_options().warning_args)
+    else:
+      self._args.extend(self.get_options().no_warning_args)
 
     # Set up dep checking if needed.
     def munge_flag(flag):
@@ -204,23 +234,6 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
     # Map of target -> list of sources (relative to buildroot), for all targets in all chunks.
     # Populated in prepare_execute().
     self._sources_by_target = None
-
-  def configure_args(self, args_defaults=None, warning_defaults=None, no_warning_defaults=None):
-   """
-   Setup the compiler command line arguments, optionally providing default values.  It is mandatory
-   to call this from __init__() of your subclass.
-   :param list args_defaults:  compiler flags that should be invoked for all invocations
-   :param list warning_defaults: compiler flags to turn on warnings
-   :param list no_warning_defaults:  compiler flags to turn off all warnings
-   """
-   self._args = self.context.config.getlist(self._config_section, 'args',
-                                       default=args_defaults or [])
-   if self.get_options().warnings:
-     self._args.extend(self.context.config.getlist(self._config_section, 'warning_args',
-                                                   default=warning_defaults or []))
-   else:
-     self._args.extend(self.context.config.getlist(self._config_section, 'no_warning_args',
-                                                   default=no_warning_defaults or[]))
 
   def prepare(self, round_manager):
     # TODO(John Sirois): this is a fake requirement on 'ivy_jar_products' in order to force
@@ -573,12 +586,18 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
     # Set up args for artifact cache updating.
     vts_artifactfiles_pairs = []
     classes_by_source = self._compute_classes_by_source(analysis_file)
+    resources_by_target = self.context.products.get_data('resources_by_target')
     for target, sources in sources_by_target.items():
       if target.has_label('no_cache'):
         continue
       artifacts = []
+      if resources_by_target is not None:
+        for _, paths in resources_by_target.get(target).abs_paths():
+          artifacts.extend(paths)
       for source in sources:
-        artifacts.extend(classes_by_source.get(source, []))
+        classes = classes_by_source.get(source, [])
+        artifacts.extend(classes)
+
       vt = vt_by_target.get(target)
       if vt is not None:
         # NOTE: analysis_file doesn't exist yet.
@@ -774,8 +793,17 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
       self.context.products.safe_create_data('classes_by_source', make_products)
     if self.context.products.is_required_data('classes_by_target'):
       self.context.products.safe_create_data('classes_by_target', make_products)
-    if self.context.products.is_required_data('resources_by_target'):
-      self.context.products.safe_create_data('resources_by_target', make_products)
+
+    # Whether or not anything else requires resources_by_target, this task
+    # uses it internally.
+    self.context.products.safe_create_data('resources_by_target', make_products)
+
+  def _resources_by_class_file(self, class_file_name, resource_mapping):
+    assert class_file_name.endswith(".class")
+    assert class_file_name.startswith(self.workdir)
+    class_file_name = class_file_name[len(self._classes_dir) + 1:-len(".class")]
+    class_name = class_file_name.replace("/", ".")
+    return resource_mapping.get(class_name, [])
 
   def _register_products(self, targets, analysis_file):
     classes_by_source = self.context.products.get_data('classes_by_source')
@@ -784,10 +812,15 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
 
     if classes_by_source is not None or classes_by_target is not None:
       computed_classes_by_source = self._compute_classes_by_source(analysis_file)
+      resource_mapping = ResourceMapping(self._classes_dir)
       for target in targets:
         target_products = classes_by_target[target] if classes_by_target is not None else None
         for source in self._sources_by_target.get(target, []):  # Source is relative to buildroot.
           classes = computed_classes_by_source.get(source, [])  # Classes are absolute paths.
+          for cls in classes:
+            resources = self._resources_by_class_file(cls, resource_mapping)
+            resources_by_target[target].add_abs_paths(self._classes_dir, resources)
+
           if classes_by_target is not None:
             target_products.add_abs_paths(self._classes_dir, classes)
           if classes_by_source is not None:
