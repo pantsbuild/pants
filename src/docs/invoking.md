@@ -20,13 +20,21 @@ Order of Arguments
 A simple Pants command line looks like <tt>./pants goal <var>goal</var> <var>target</var></tt>.
 A less-simple Pants command looks like:
 
+    :::bash
     ./pants goal <goal1> <options for goal1> <goal2> <options for goal2> \
             <target1> <target2> <global options> [-- pass-through options for last goal]>
 
 You can specify one or more goals. You can specify options for any goal right after that goal's
-name. Some goals are made up of tasks; you can specify an option for that particular task:
+name:
 
-    ./pants goal compile --no-delete-scratch src:: # compile src, keeping "scratch files"
+    :::bash
+    $ ./pants goal list --sep='|' examples/src/python/example:
+    examples/src/python/example:readme|examples/src/python/example:pex_design|examples/sr...
+
+Some goals are made up of tasks; to specify an option for that task, use the dotted
+_goal.task_ notation:
+
+    :::bash
     ./pants goal compile.java --no-delete-scratch src:: # compile src, keeping Java compile's "scratch files"
 
 You can specify one or more targets to operate upon. Target specifications come after goals
