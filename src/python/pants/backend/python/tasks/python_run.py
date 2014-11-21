@@ -48,9 +48,13 @@ class PythonRun(PythonTask):
         pex = PEX(builder.path(), interpreter=interpreter)
         self.context.lock.release()
         with self.context.new_workunit(name='run', labels=[WorkUnit.RUN]):
-          po = pex.run(blocking=False, args=self.get_options().args + self.get_passthru_args())
+          args = self.get_options().args + self.get_passthru_args()
+          po = pex.run(blocking=False, args=args)
           try:
-            return po.wait()
+            result = po.wait()
+            if result != 0:
+              raise TaskError('python {args} ... exited non-zero ({code})' % dict(args=args, code=result),
+                              exit_code=result)
           except KeyboardInterrupt:
             po.send_signal(signal.SIGINT)
             raise

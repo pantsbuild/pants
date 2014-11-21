@@ -18,6 +18,13 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
   def test_run_27(self):
     self._maybe_run_version('2.7')
 
+  def test_die(self):
+    command = ['goal', 'run', 'tests/python/pants_test/python:die'
+               '--interpreter=CPython>=2.6,<3',
+               '--interpreter=CPython>=3.3', '--quiet']
+    pants_run = self.run_pants(command=command)
+    assert pants_run.returncode == 1
+
   def _maybe_run_version(self, version):
     if self.has_python_version(version):
       print('Found python %s. Testing running on it.' % version)
