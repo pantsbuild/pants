@@ -165,8 +165,11 @@ class Options(object):
     """
     def _maybe_help(scope):
       s = self.format_help(scope)
-      if s != '':  # Avoid superfluous blank lines for empty strings.
-        print(s)
+      if s != '':  # Avoid printing scope name for scope with empty options.
+        print(scope)
+        for line in s.split('\n'):
+          if line != '':  # Avoid superfluous blank lines for empty strings.
+            print('  {0}'.format(line))
 
     goals = goals or self.goals
     if goals:
