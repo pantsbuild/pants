@@ -37,7 +37,7 @@ class ScalaRepl(JvmTask, JvmToolTaskMixin):
     targets = self.require_homogeneous_targets(accept_predicate, reject_predicate)
     if targets:
       tools_classpath = self.tool_classpath(self._bootstrap_key)
-      self.context.lock.release()
+      self.context.release_lock()
       with preserve_stty_settings():
         exclusives_classpath = self.get_base_classpath_for_target(targets[0])
         classpath = self.classpath(tools_classpath,

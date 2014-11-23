@@ -46,7 +46,7 @@ class PythonRun(PythonTask):
         chroot.dump()
         builder.freeze()
         pex = PEX(builder.path(), interpreter=interpreter)
-        self.context.lock.release()
+        self.context.release_lock()
         with self.context.new_workunit(name='run', labels=[WorkUnit.RUN]):
           args = self.get_options().args + self.get_passthru_args()
           po = pex.run(blocking=False, args=args)

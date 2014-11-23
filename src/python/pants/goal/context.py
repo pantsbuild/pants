@@ -107,11 +107,6 @@ class Context(object):
     return self._new_options
 
   @property
-  def lock(self):
-    """Returns the global pants run lock so a goal can release it if needed."""
-    return self._lock
-
-  @property
   def log(self):
     """Returns the preferred logger for goals to use."""
     return self._log
