@@ -11,9 +11,6 @@ import os
 import sys
 import traceback
 
-import psutil
-from twitter.common.dirutil import Lock
-
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.build_environment import get_buildroot, pants_version
 from pants.base.build_file_address_mapper import BuildFileAddressMapper
@@ -89,11 +86,6 @@ def _parse_command(root_dir, args):
   command, args = _synthesize_command(root_dir, args)
   return Command.get_command(command), args
 
-
-def _process_info(pid):
-  process = psutil.Process(pid)
-  return '%d (%s)' % (pid, ' '.join(process.cmdline))
-
 def _run():
   # Place the registration of the unhandled exception hook as early as possible in the code.
   sys.excepthook = _unhandled_exception_hook
@@ -158,18 +150,8 @@ def _run():
                           address_mapper,
                           build_graph)
   try:
-    if command.serialized():
-      def onwait(pid):
-        process = psutil.Process(pid)
-        print('Waiting on pants process %d (%s) to complete' %
-              (pid, ' '.join(process.cmdline)), file=sys.stderr)
-        return True
-      runfile = os.path.join(root_dir, '.pants.run')
-      lock = Lock.acquire(runfile, onwait=onwait)
-    else:
-      lock = Lock.unlocked()
     try:
-      result = command.run(lock)
+      result = command.run()
       if result:
         run_tracker.set_root_outcome(WorkUnit.FAILURE)
       _do_exit(result)
@@ -179,8 +161,6 @@ def _run():
     except Exception:
       run_tracker.set_root_outcome(WorkUnit.FAILURE)
       raise
-    finally:
-      lock.release()
   finally:
     run_tracker.end()
     # Must kill nailguns only after run_tracker.end() is called, because there may still

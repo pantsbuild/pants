@@ -51,14 +51,6 @@ class GoalRunner(Command):
   __command__ = 'goal'
   output = None
 
-  # TODO(John Sirois): revisit wholesale locking when we move py support into pants new
-  @classmethod
-  def serialized(cls):
-    # Goal serialization is now handled in goal execution during group processing.
-    # The goal command doesn't need to hold the serialization lock; individual goals will
-    # acquire the lock if they need to be serialized.
-    return False
-
   def __init__(self, *args, **kwargs):
     self.targets = []
     known_scopes = ['']
@@ -180,7 +172,7 @@ class GoalRunner(Command):
         args[:] = augmented_args
         sys.stderr.write("(using pantsrc expansion: pants goal %s)\n" % ' '.join(augmented_args))
 
-  def run(self, lock):
+  def run(self):
     # TODO(John Sirois): Consider moving to straight python logging.  The divide between the
     # context/work-unit logging and standard python logging doesn't buy us anything.
 
@@ -260,8 +252,8 @@ class GoalRunner(Command):
       build_graph=self.build_graph,
       build_file_parser=self.build_file_parser,
       address_mapper=self.address_mapper,
-      spec_excludes=self.get_spec_excludes(),
-      lock=lock)
+      spec_excludes=self.get_spec_excludes()
+    )
 
     unknown = []
     for goal in self.goals:
