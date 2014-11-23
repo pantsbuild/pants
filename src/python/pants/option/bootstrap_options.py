@@ -15,10 +15,17 @@ from pants.option.options import Options
 
 
 def register_bootstrap_options(register, buildroot=None):
-  """Register options whose values can be interpolated into the config file.
+  """Register bootstrap options.
 
-  The values of these options are determined before those of any other options, so that
-  they can be used to compute the values of the other options.
+  "Bootstrap options" are a small set of options whose values are useful when registering other
+  options. Therefore we must bootstrap them early, before other options are registered, let
+  alone parsed.
+
+  Bootstrap option values can be interpolated into the config file, and can be referenced
+  programatically in registration code, e.g., as register.bootstrap.pants_workdir.
+
+  Note that regular code can also access these options as normal global-scope options. Their
+  status as "bootstrap options" is only pertinent during option registration.
   """
   buildroot = buildroot or get_buildroot()
   register('--pants-workdir', metavar='<dir>', default=os.path.join(buildroot, '.pants.d'),
@@ -33,21 +40,14 @@ def get_bootstrap_option_values(env=None, config=None, args=None, buildroot=None
   """Get the values of just the bootstrap options."""
   # Filter just the bootstrap args, so we don't choke on other global-scope args on the cmd line.
   flags = set()
-  option_names = []
-
-  def capture_option_names(*args, **kwargs):
+  def capture_the_flags(*args, **kwargs):
     flags.update(args)
-    arg = next((a for a in args if a.startswith('--')), args[0])
-    option_names.append(arg.lstrip('-').replace('-', '_'))
-
-  register_bootstrap_options(capture_option_names, buildroot=buildroot)
+  register_bootstrap_options(capture_the_flags, buildroot=buildroot)
   bargs = filter(lambda x: x.partition('=')[0] in flags, args)
 
   bootstrap_options = Options(env=env, config=config, known_scopes=[GLOBAL_SCOPE], args=bargs)
   register_bootstrap_options(bootstrap_options.register_global, buildroot=buildroot)
-  vals = bootstrap_options.for_global_scope()
-
-  return {k: getattr(vals, k) for k in option_names }
+  return bootstrap_options.for_global_scope()
 
 
 def create_bootstrapped_options(known_scopes, env=None, configpath=None, args=None, buildroot=None):
@@ -57,15 +57,17 @@ def create_bootstrapped_options(known_scopes, env=None, configpath=None, args=No
   args = args or sys.argv
   buildroot = buildroot or get_buildroot()
   bootstrap_option_values = get_bootstrap_option_values(env, pre_bootstrap_config, args, buildroot)
-  Config._defaults.update(bootstrap_option_values)
+  Config.reset_default_bootstrap_option_values(bootstrap_option_values)
 
   # Ensure that we cache the post-bootstrap version.
   Config.clear_cache()
   post_bootstrap_config = Config.from_cache(configpath)
 
-  opts = Options(env, post_bootstrap_config, known_scopes, args=args)
+  opts = Options(env, post_bootstrap_config, known_scopes, args=args,
+                 bootstrap_option_values=bootstrap_option_values)
 
-  # The bootstrap options need to be registered on the Options instance, so it won't choke on
-  # them if specified on the command line, and also so we can access them in code if needed.
+  # The bootstrap options need to be registered on the post-bootstrap Options instance, so it won't
+  # choke on them if specified on the command line, and also so we can access their values as
+  # regular global-scope options, if needed.
   register_bootstrap_options(opts.register_global, buildroot=buildroot)
   return opts

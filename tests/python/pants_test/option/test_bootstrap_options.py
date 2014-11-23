@@ -24,9 +24,12 @@ class BootstrapOptionsTest(unittest.TestCase):
       'pants_supportdir': expected_vals[1],
       'pants_distdir': expected_vals[2]
     }
+
     config_obj = FakeConfig({ 'DEFAULT': config }) if config else None
     vals = get_bootstrap_option_values(env, config_obj, args, buildroot='/buildroot')
-    self.assertEquals(expected_vals_dict, vals)
+
+    vals_dict = {k: getattr(vals, k) for k in expected_vals_dict }
+    self.assertEquals(expected_vals_dict, vals_dict)
 
   def test_bootstrap_option_values(self):
     # Check all defaults.

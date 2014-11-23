@@ -71,10 +71,9 @@ class GoalRunner(Command):
     super(GoalRunner, self).__init__(*args, needs_old_options=False, **kwargs)
 
   def get_spec_excludes(self):
-    spec_excludes = self.config.getlist(Config.DEFAULT_SECTION, 'spec_excludes', default=None)
-    if spec_excludes is None:
-       return [self.config.getdefault('pants_workdir')]
-    return  [os.path.join(self.root_dir, spec_exclude) for spec_exclude in spec_excludes]
+    # Note: Only call after register_options() has been called.
+    return [os.path.join(self.root_dir, spec_exclude)
+            for spec_exclude in self.new_options.for_global_scope().spec_excludes]
 
   @property
   def global_options(self):
@@ -114,7 +113,12 @@ class GoalRunner(Command):
       self.error(msg.getvalue(), show_help=False)
 
   def register_options(self):
-    register_global_options(self.new_options.register_global)
+    # Add a 'bootstrap' attribute to the register function, so that register_global can
+    # access the bootstrap option values.
+    def register_global(*args, **kwargs):
+      return self.new_options.register_global(*args, **kwargs)
+    register_global.bootstrap = self.new_options.bootstrap_option_values()
+    register_global_options(register_global)
     for goal in Goal.all():
       goal.register_options(self.new_options)
 

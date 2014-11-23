@@ -9,7 +9,6 @@ import os
 
 from pants.backend.core.tasks.task import Task
 from pants.base.build_environment import get_buildroot
-from pants.base.config import Config
 from pants.base.exceptions import TaskError
 from pants.util.dirutil import safe_rmtree
 
@@ -25,12 +24,11 @@ def _cautious_rmtree(root):
 class Invalidator(Task):
   """Invalidate the entire build."""
   def execute(self):
-    build_invalidator_dir = os.path.join(
-      self.context.config.get_option(Config.DEFAULT_PANTS_WORKDIR), 'build_invalidator')
+    build_invalidator_dir = os.path.join(self.get_options().pants_workdir, 'build_invalidator')
     _cautious_rmtree(build_invalidator_dir)
 
 
 class Cleaner(Task):
   """Clean all current build products."""
   def execute(self):
-    _cautious_rmtree(self.context.config.getdefault('pants_workdir'))
+    _cautious_rmtree(self.get_options().pants_workdir)

@@ -63,6 +63,7 @@ class TaskBase(AbstractClass):
     """
     def register(*args, **kwargs):
       options.register(cls.options_scope, *args, **kwargs)
+    register.bootstrap = options.bootstrap_option_values()
     cls.register_options(register)
 
   @classmethod
@@ -99,8 +100,8 @@ class TaskBase(AbstractClass):
 
     self._cache_key_errors = set()
 
-    default_invalidator_root = os.path.join(self.context.config.getdefault('pants_workdir'),
-                                            'build_invalidator')
+    default_invalidator_root = os.path.join(
+      self.context.new_options.for_global_scope().pants_workdir, 'build_invalidator')
     suffix_type = self.__class__.__name__
     self._build_invalidator_dir = os.path.join(
         context.config.get('tasks', 'build_invalidator', default=default_invalidator_root),
@@ -157,7 +158,7 @@ class TaskBase(AbstractClass):
 
   def _create_artifact_cache(self, spec, action):
     if len(spec) > 0:
-      pants_workdir = self.context.config.getdefault('pants_workdir')
+      pants_workdir = self.context.new_options.for_global_scope().pants_workdir
       compression = self.context.config.getint('cache', 'compression', default=5)
       my_name = self.__class__.__name__
       return create_artifact_cache(

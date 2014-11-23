@@ -46,7 +46,7 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
              help='Roughly how many source files to attempt to compile together. Set to a large '
                   'number to compile all sources together. Set to 0 to compile target-by-target.')
 
-    register('--args', action='append', default=list(cls.get_args_default()),
+    register('--args', action='append', default=list(cls.get_args_default(register.bootstrap)),
              help='Args to pass to the compiler.')
 
     register('--warnings', default=True, action='store_true',
@@ -96,8 +96,13 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
     return ['classes_by_target', 'classes_by_source', 'resources_by_target']
 
   @classmethod
-  def get_args_default(cls):
-    """Override to set default for --args option."""
+  def get_args_default(cls, bootstrap_option_values):
+    """Override to set default for --args option.
+
+    :param bootstrap_option_values: An the values of the "bootstrap options" (e.g., pants_workdir).
+                                    Implementations can use these when generating the default.
+                                    See src/python/pants/options/bootstrap_options.py for details.
+    """
     return ()
 
   @classmethod
