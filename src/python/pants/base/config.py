@@ -4,122 +4,73 @@
 
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
-
 try:
   import ConfigParser
 except ImportError:
   import configparser as ConfigParser
 
+import copy
 import os
 import getpass
 
 from pants.base.build_environment import get_buildroot
 
 
-class ConfigOption(object):
-  """Registry of pants.ini options.
+def reset_default_bootstrap_option_values(defaults, values=None):
+  """Reset the bootstrap options' default values.
 
-  Options are created in code, typically scoped as close to their use as possible. ::
+  :param defaults: The dict to set the values on.
+  :param values: A namespace containing the values to set. If unspecified, uses hard-coded defaults.
 
-     my_opt = ConfigOption.create(
-       section='mycache',
-       option='cachedir',
-       help='Directory, relative to pants_workdir, of the cache directory.',
-       default='mycache')
+  The bootstrapping code will use this to set the bootstrapped values. Code that doesn't trigger
+  bootstrapping (i.e., the one remaining old-style command) will get the hard-coded defaults, as
+  it did before.
 
-  Read an option from ``pants.ini`` with ::
+  It's a code smell to update nominally static data dynamically, but this is temporary,
+  and saves us having to plumb things through to all the Config.from_cache() call sites.
 
-     mycache_dir = os.path.join(config.get_option(config.DEFAULT_PANTS_WORKDIR),
-                                config.get_option(my_opt))
+  This method is also called in tests of this code, to reset state for unrelated tests.
 
-  Please note `configparser <http://docs.python.org/2/library/configparser.html>`_
-  is used to retrieve options, so variable interpolation and the default section
-  are used as defined in the configparser docs.
+  TODO: Remove after all direct config reads have been subsumed into the options system,
+        which can pass these into Config.load() itself after bootstrapping them.
   """
 
-  class Option(object):
-    """A ``pants.ini`` option."""
-    def __init__(self, section, option, help, valtype, default):
-      """Do not instantiate directly - use ConfigOption.create."""
-      self.section = section
-      self.option = option
-      self.help = help
-      self.valtype = valtype
-      self.default = default
-
-    def __hash__(self):
-      return hash(self.section + self.option)
-
-    def __eq__(self, other):
-      if other is None:
-        return False
-      return True if self.section == other.section and self.option == other.option else False
-
-    def __repr__(self):
-      return '%s(%s.%s)' % (self.__class__.__name__, self.section, self.option)
-
-  _CONFIG_OPTIONS = set()
-
-  @classmethod
-  def all(cls):
-    return cls._CONFIG_OPTIONS
-
-  @classmethod
-  def create(cls, section, option, help, valtype=str, default=None):
-    """Create a new ``pants.ini`` option.
-
-    :param section: Name of section to retrieve option from.
-    :param option: Name of option to retrieve from section.
-    :param help: Description for display in the configuration reference.
-    :param valtype: Type to cast the retrieved option to.
-    :param default: Default value if undefined in the config.
-    :returns: An ``Option`` suitable for use with ``Config.get_option``.
-    :raises: ``ValueError`` if the option already exists.
-    """
-    new_opt = cls.Option(section=section,
-                         option=option,
-                         help=help,
-                         valtype=valtype,
-                         default=default)
-    for existing_opt in cls._CONFIG_OPTIONS:
-      if new_opt.section == existing_opt.section and new_opt.option == existing_opt.option:
-        raise ValueError('Option %s.%s already exists.' % (new_opt.section, new_opt.option))
-    cls._CONFIG_OPTIONS.add(new_opt)
-    return new_opt
+  if values:
+    defaults.update({
+      'pants_workdir': values.pants_workdir,
+      'pants_supportdir': values.pants_supportdir,
+      'pants_distdir': values.pants_distdir
+    })
+  else:
+    defaults.update({
+      'pants_workdir': os.path.join(get_buildroot(), '.pants.d'),
+      'pants_supportdir': os.path.join(get_buildroot(), 'build-support'),
+      'pants_distdir': os.path.join(get_buildroot(), 'dist')
+    })
 
 
 class Config(object):
-  """
-    Encapsulates ini-style config file loading and access additionally supporting recursive variable
-    substitution using standard python format strings, ie: %(var_name)s will be replaced with the
-    value of var_name.
-  """
+  """Encapsulates ini-style config file loading and access.
 
-  # TODO: Replace these with regularly registered new-style options.
-
+  Supports recursive variable substitution using standard python format strings. E.g.,
+  %(var_name)s will be replaced with the value of var_name.
+  """
   DEFAULT_SECTION = ConfigParser.DEFAULTSECT
 
-  DEFAULT_PANTS_DISTDIR = ConfigOption.create(
-    section=DEFAULT_SECTION,
-    option='pants_distdir',
-    help='Directory where pants will write user visible artifacts.',
-    default=os.path.join(get_buildroot(), 'dist'))
-
-  DEFAULT_PANTS_SUPPORTDIR = ConfigOption.create(
-    section=DEFAULT_SECTION,
-    option='pants_supportdir',
-    help='Directory of pants support files (e.g.: ivysettings.xml).',
-    default=os.path.join(get_buildroot(), 'build-support'))
-
-  DEFAULT_PANTS_WORKDIR = ConfigOption.create(
-    section=DEFAULT_SECTION,
-    option='pants_workdir',
-    help='Directory where pants will write its intermediate output files.',
-    default=os.path.join(get_buildroot(), '.pants.d'))
+  _defaults = {
+    'buildroot': get_buildroot(),
+    'homedir': os.path.expanduser('~'),
+    'user': getpass.getuser(),
+    'pants_bootstrapdir': os.path.expanduser('~/.pants.d'),
+  }
+  reset_default_bootstrap_option_values(_defaults)
 
   class ConfigError(Exception):
     pass
 
+  @classmethod
+  def reset_default_bootstrap_option_values(cls, values=None):
+    reset_default_bootstrap_option_values(cls._defaults, values)
 
   _cache = {}
 
@@ -134,16 +85,16 @@ class Config(object):
       cls._cache[configpath] = cls.load(configpath)
     return cls._cache[configpath]
 
-  @staticmethod
-  def load(configpath=None, defaults=None):
-    """
-      Loads a Config from the given path, by default the path to the pants.ini file in the current
-      build root directory.  Any defaults supplied will act as if specified in the loaded config
-      file's DEFAULT section.  The 'buildroot', invoking 'user' and invoking user's 'homedir' are
-      automatically defaulted.
+  @classmethod
+  def load(cls, configpath=None):
+    """Loads a Config from the given path.
+
+     By default this is the path to the pants.ini file in the current build root directory.
+     Any defaults supplied will act as if specified in the loaded config file's DEFAULT section.
+     The 'buildroot', invoking 'user' and invoking user's 'homedir' are automatically defaulted.
     """
     configpath = configpath or os.path.join(get_buildroot(), 'pants.ini')
-    parser = Config.create_parser(defaults=defaults)
+    parser = cls.create_parser()
     with open(configpath) as ini:
       parser.readfp(ini)
     return Config(parser)
@@ -153,28 +104,12 @@ class Config(object):
     """Creates a config parser that supports %([key-name])s value substitution.
 
     Any defaults supplied will act as if specified in the loaded config file's DEFAULT section and
-    be available for substitutions.
-
-    All of the following are seeded with defaults in the config
-      user: the current user
-      homedir: the current user's home directory
-      buildroot: the root of this repo
-      pants_bootstrapdir: the global pants scratch space primarily used for caches
-      pants_supportdir: pants support files for this repo go here; for example: ivysettings.xml
-      pants_distdir: user visible artifacts for this repo go here
-      pants_workdir: the scratch space used to for live builds in this repo
+    be available for substitutions, along with all the standard defaults defined above.
     """
-    standard_defaults = dict(
-      buildroot=get_buildroot(),
-      homedir=os.path.expanduser('~'),
-      user=getpass.getuser(),
-      pants_bootstrapdir=os.path.expanduser('~/.pants.d'),
-      pants_workdir=cls.DEFAULT_PANTS_WORKDIR.default,
-      pants_supportdir=cls.DEFAULT_PANTS_SUPPORTDIR.default,
-      pants_distdir=cls.DEFAULT_PANTS_DISTDIR.default,
-    )
+    standard_defaults = copy.copy(cls._defaults)
     if defaults:
       standard_defaults.update(defaults)
+
     return ConfigParser.SafeConfigParser(standard_defaults)
 
   def __init__(self, configparser):
@@ -236,17 +171,6 @@ class Config(object):
       returned.
     """
     return self._getinstance(section, option, type, default=default)
-
-  # TODO(travis): Migrate all config reads to get_option and remove other getters.
-  # TODO(travis): Rename to get when other getters are removed.
-  def get_option(self, option):
-    if not isinstance(option, ConfigOption.Option):
-      raise ValueError('Expected %s but found %s' % (ConfigOption.Option.__class__.__name__,
-                                                     option))
-    return self.get(section=option.section,
-                    option=option.option,
-                    type=option.valtype,
-                    default=option.default)
 
   def get_required(self, section, option, type=str):
     """Retrieves option from the specified section and attempts to parse it as type.

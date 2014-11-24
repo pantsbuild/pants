@@ -132,9 +132,8 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
 
     self.intransitive = self.get_options().intransitive
 
-    self.checkstyle_suppression_files = self.context.config.getdefault(
-      'checkstyle_suppression_files', type=list, default=[]
-    )
+    self.checkstyle_suppression_files = self.context.config.get('checkstyle',
+      'suppression_files', type=list, default=[])
     # Everywhere else, debug_port is specified in the 'jvm' section. Use that as a default if none
     # is specified in the 'ide' section.
     jvm_config_debug_port = JvmDebugConfig.debug_port(self.context.config)

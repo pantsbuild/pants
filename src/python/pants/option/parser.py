@@ -9,18 +9,9 @@ from argparse import ArgumentParser, _HelpAction
 import copy
 
 from pants.option.arg_splitter import GLOBAL_SCOPE
+from pants.option.errors import ParseError, RegistrationError
 from pants.option.help_formatter import PantsHelpFormatter
 from pants.option.ranked_value import RankedValue
-
-
-class RegistrationError(Exception):
-  """An error at option registration time."""
-  pass
-
-
-class ParseError(Exception):
-  """An error at flag parsing time."""
-  pass
 
 
 # Standard ArgumentParser prints usage and exits on error. We subclass so we can raise instead.
@@ -51,7 +42,7 @@ class Parser(object):
   option from the outer scope.
 
   :param env: a dict of environment variables.
-  :param config: data from a config file (must support config.get(section, name, default=)).
+  :param config: data from a config file (must support config.get[list](section, name, default=)).
   :param scope: the scope this parser acts for.
   :param parent_parser: the parser for the scope immediately enclosing this one, or
          None if this is the global scope.

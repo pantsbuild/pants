@@ -4,4 +4,8 @@
 python_library(
   name = 'process',
   sources = globs('*.py'),
+  dependencies = [
+    '3rdparty/python:lockfile',
+    '3rdparty/python:psutil',
+  ]
 )

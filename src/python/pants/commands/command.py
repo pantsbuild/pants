@@ -30,10 +30,6 @@ class Command(object):
     if command_name:
       Command._commands[command_name] = cls
 
-  @classmethod
-  def serialized(cls):
-    return False
-
   def __init__(self,
                run_tracker,
                root_dir,
@@ -105,18 +101,18 @@ class Command(object):
   def error(self, message=None, show_help=True):
     """Reports the error message, optionally followed by pants help, and then exits."""
 
-  def run(self, lock):
-    """Subcommands that are serialized() should override if they need the ability to interact with
-    the global command lock.
-    The value returned should be an int, 0 indicating success and any other value indicating
+  def run(self):
+    """The value returned should be an int, 0 indicating success and any other value indicating
     failure."""
     return self.execute()
 
   def execute(self):
-    """Subcommands that do not require serialization should override to perform the command action.
-    The value returned should be an int, 0 indicating success and any other value indicating
-    failure."""
-    raise NotImplementedError('Either run(lock) or execute() must be over-ridden.')
+    """The value returned should be an int, 0 indicating success and any other value indicating
+    failure.
+
+    This method is duplicative with `run` but remains for legacy compat until Command is removed.
+    """
+    raise NotImplementedError('Either run() or execute() must be over-ridden.')
 
   def cleanup(self):
     """Called on SIGINT (e.g., when the user hits ctrl-c).

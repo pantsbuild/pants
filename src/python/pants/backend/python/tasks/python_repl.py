@@ -54,7 +54,7 @@ class PythonRepl(PythonTask):
         chroot.dump()
         builder.freeze()
         pex = PEX(builder.path(), interpreter=interpreter)
-        self.context.lock.release()
+        self.context.release_lock()
         with stty_utils.preserve_stty_settings():
           with self.context.new_workunit(name='run', labels=[WorkUnit.RUN]):
             po = pex.run(blocking=False)
