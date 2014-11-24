@@ -61,7 +61,7 @@ class JvmRun(JvmTask):
     # TODO(benjy): Some more elegant way to coordinate how tasks claim targets.
     if isinstance(binary, JvmBinary):
       executor = CommandLineGrabber() if self.only_write_cmd_line else None
-      self.context.lock.release()
+      self.context.release_lock()
       exclusives_classpath = self.get_base_classpath_for_target(binary)
       result = execute_java(
         classpath=(self.classpath(confs=self.confs, exclusives_classpath=exclusives_classpath)),

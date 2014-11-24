@@ -63,7 +63,7 @@ Pants uses a program called nailgun to run some JVM jobs. Pants runs
 nailgun as a server in the background and then sends requests to it. If
 nailgun runs into problems, it might not respond.
 
-To debug this, look in `./pants.d/ng/*/*`: these files should be named
+To debug this, look in `.pants.d/ng/*/*`: these files should be named
 `stdout` and `stderr`.
 
 One typical cause behind this symptom: if you removed your machine's Ivy

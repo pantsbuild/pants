@@ -127,7 +127,6 @@ class RunTracker(object):
 
     # Trigger subproc pool init while our memory image is still clean (see SubprocPool docstring)
     SubprocPool.foreground()
-    SubprocPool.background()
 
     self._aborted = False
 

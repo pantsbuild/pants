@@ -102,6 +102,11 @@ class BaseTest(unittest.TestCase):
     self.real_build_root = BuildRoot().path
     self.build_root = os.path.realpath(mkdtemp(suffix='_BUILD_ROOT'))
     self.new_options = defaultdict(dict)  # scope -> key-value mapping.
+    self.new_options[''] = {
+      'pants_workdir': os.path.join(self.build_root, '.pants.d'),
+      'pants_supportdir': os.path.join(self.build_root, 'build-support'),
+      'pants_distdir': os.path.join(self.build_root, 'dist')
+    }
     BuildRoot().path = self.build_root
 
     self.create_file('pants.ini')

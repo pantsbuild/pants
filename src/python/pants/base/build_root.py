@@ -11,6 +11,7 @@ from contextlib import contextmanager
 from twitter.common.lang import Singleton
 
 
+# TODO: Even this should probably just be a new-style option?
 class BuildRoot(Singleton):
   """Represents the global workspace build root
 

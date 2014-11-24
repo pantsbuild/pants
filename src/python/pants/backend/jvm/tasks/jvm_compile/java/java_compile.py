@@ -6,7 +6,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import os
-from pants.base.config import Config
 
 from pants.backend.jvm.tasks.jvm_compile.analysis_tools import AnalysisTools
 from pants.backend.jvm.tasks.jvm_compile.java.jmake_analysis import JMakeAnalysis
@@ -55,13 +54,11 @@ class JavaCompile(JvmCompile):
   _JMAKE_MAIN = 'com.sun.tools.jmake.Main'
 
   @classmethod
-  def get_args_default(cls):
+  def get_args_default(cls, bootstrap_option_values):
     return ('-C-encoding', '-CUTF-8', '-C-g', '-C-Tcolor',
-            # Don't warn for generated code. Note that we assume that we're using the default
-            # pants_workdir, which is always currently the case. In the future pants_workdir will
-            # be a regular option, and we will be able to get its value here, default or otherwise.
+            # Don't warn for generated code.
             '-C-Tnowarnprefixes',
-            '-C{0}'.format(os.path.join(Config.DEFAULT_PANTS_WORKDIR.default, 'gen')),
+            '-C{0}'.format(os.path.join(bootstrap_option_values.pants_workdir, 'gen')),
             # Suppress warning for annotations with no processor - we know there are many of these!
             '-C-Tnowarnregex', '-C^(warning: )?No processor claimed any of these annotations: .*')
 

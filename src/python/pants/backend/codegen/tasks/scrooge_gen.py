@@ -111,7 +111,7 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
   # TODO(benjy): Use regular os-located tmpfiles, as we do everywhere else.
   def _tempname(self):
     # don't assume the user's cwd is buildroot
-    pants_workdir = self.context.config.getdefault('pants_workdir')
+    pants_workdir = self.get_options().pants_workdir
     tmp_dir = os.path.join(pants_workdir, 'tmp')
     safe_mkdir(tmp_dir)
     fd, path = tempfile.mkstemp(dir=tmp_dir, prefix='')
