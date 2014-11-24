@@ -229,6 +229,14 @@ class Context(object):
     with self.run_tracker.new_workunit(name=name, labels=labels, cmd=cmd) as workunit:
       yield workunit
 
+  @contextmanager
+  def lock(self):
+    self.acquire_lock()
+    try:
+      yield
+    finally:
+      self.release_lock()
+
   def acquire_lock(self):
     """ Acquire the global lock for the root directory associated with this context. When
     a goal requires serialization, it will call this to acquire the lock.
