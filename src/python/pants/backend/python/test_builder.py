@@ -65,11 +65,12 @@ class PythonTestBuilder(object):
     PythonRequirement('unittest2py3k', version_filter=lambda py, pl: py.startswith('3'))
   ]
 
-  def __init__(self, targets, args, interpreter=None, conn_timeout=None, fast=False, debug=False):
+  def __init__(self, context, targets, args, interpreter=None, conn_timeout=None, fast=False, debug=False):
     self._targets = targets
     self._args = args
     self._interpreter = interpreter or PythonInterpreter.get()
     self._conn_timeout = conn_timeout
+    self._context = context
 
     # If fast is true, we run all the tests in a single chroot. This is MUCH faster than
     # creating a chroot for each test target. However running each test separately is more
@@ -295,7 +296,8 @@ class PythonTestBuilder(object):
       interpreter=self._interpreter,
       conn_timeout=self._conn_timeout)
     try:
-      builder = chroot.dump()
+      with self._context.lock():
+        builder = chroot.dump()
       builder.freeze()
       pex = PEX(builder.path(), interpreter=self._interpreter)
       with self._maybe_emit_junit_xml(targets) as junit_args:

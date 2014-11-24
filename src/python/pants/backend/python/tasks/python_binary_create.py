@@ -58,5 +58,6 @@ class PythonBinaryCreate(PythonTask):
         conn_timeout=self.conn_timeout)
 
       pex_path = os.path.join(self._distdir, '%s.pex' % binary.name)
-      chroot.dump()
+      with self.context.lock():
+        chroot.dump()
       builder.build(pex_path)

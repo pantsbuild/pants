@@ -22,7 +22,7 @@ from pants_test.base_test import BaseTest
 
 class PythonTestBuilderTestBase(BaseTest):
   def run_tests(self, targets, args=None, fast=True, debug=False):
-    test_builder = PythonTestBuilder(targets, args or [], fast=fast, debug=debug)
+    test_builder = PythonTestBuilder(self.context(), targets, args or [], fast=fast, debug=debug)
     with pushd(self.build_root):
       return test_builder.run()
 

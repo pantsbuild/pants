@@ -51,7 +51,8 @@ class PythonRepl(PythonTask):
           interpreter=interpreter,
           conn_timeout=self.conn_timeout)
 
-        chroot.dump()
+        with self.context.lock():
+          chroot.dump()
         builder.freeze()
         pex = PEX(builder.path(), interpreter=interpreter)
         self.context.release_lock()
