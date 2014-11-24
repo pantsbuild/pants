@@ -325,7 +325,8 @@ class PythonTestBuilder(object):
       args.extend(sources)
 
       try:
-        rc = pex.run(args=args, setsid=True, stdout=stdout, stderr=stderr)
+        with self._context.lock():
+          rc = pex.run(args=args, setsid=True, stdout=stdout, stderr=stderr)
         return PythonTestResult.rc(rc)
       except Exception:
         print('Failed to run test!', file=stderr)
