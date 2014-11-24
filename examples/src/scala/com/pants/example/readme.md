@@ -41,8 +41,10 @@ circular, you can set up targets to compile all of this code together:
 -   a `scala_library` whose `sources` param is the `*.scala` files and
     whose `java_sources` is the above `java_library`.
 
-TODO: should the sources have the same `package`? That was true in the
-sample space of 1 example I looked at.
+The [`scala_with_java_sources`](https://github.com/pantsbuild/pants/tree/master/examples/src/scala/com/pants/example/scala_with_java_sources)
+example shows how this can work:
+
+!inc[start-after=LICENSE](scala_with_java_sources/BUILD)
 
 Scala Console
 -------------
@@ -82,4 +84,5 @@ targets and their dependencies.
 
     $
 
-Pants' `repl` goal works with JVM targets.
+Pants' `repl` goal works with JVM targets. (It also works with Python targets, but that uses a
+Python console instead.)
