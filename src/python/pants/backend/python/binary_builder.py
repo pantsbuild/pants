@@ -50,7 +50,11 @@ class PythonBinaryBuilder(object):
 
   def run(self):
     print('Building PythonBinary %s:' % self.target)
-    env = self.chroot.dump()
+    self.context.acquire_lock()
+    try:
+      env = self.chroot.dump()
+    finally:
+      self.context.release_lock()
     filename = os.path.join(self.distdir, '%s.pex' % self.target.name)
     env.build(filename)
     print('Wrote %s' % filename)
