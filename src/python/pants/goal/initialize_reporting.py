@@ -40,7 +40,11 @@ def initial_reporting(config, run_tracker):
 
   html_dir = os.path.join(run_dir, 'html')
   safe_mkdir(html_dir)
-  os.symlink(run_dir, link_to_latest)
+  try:
+    os.symlink(run_dir, link_to_latest)
+  except OSError:
+    pass # not the latest anymore
+
 
   report = Report()
 

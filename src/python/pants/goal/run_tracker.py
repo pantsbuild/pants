@@ -87,9 +87,13 @@ class RunTracker(object):
 
     # Create a 'latest' symlink, after we add_infos, so we're guaranteed that the file exists.
     link_to_latest = os.path.join(os.path.dirname(self.info_dir), 'latest')
-    if os.path.lexists(link_to_latest):
-      os.unlink(link_to_latest)
-    os.symlink(self.info_dir, link_to_latest)
+
+    try:
+      if os.path.lexists(link_to_latest):
+        os.unlink(link_to_latest)
+      os.symlink(self.info_dir, link_to_latest)
+    except OSError:
+      pass # Another run was faster. Oh well.
 
     # Time spent in a workunit, including its children.
     self.cumulative_timings = AggregatedTimings(os.path.join(self.info_dir, 'cumulative_timings'))
