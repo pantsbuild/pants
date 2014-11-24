@@ -10,6 +10,7 @@ from pants.backend.python.tasks.python_binary_create import PythonBinaryCreate
 from pants.backend.python.tasks.pytest_run import PytestRun
 from pants.backend.python.tasks.python_repl import PythonRepl
 from pants.backend.python.tasks.python_run import PythonRun
+from pants.backend.python.tasks.python_setup import PythonSetup
 from pants.backend.python.commands.setup_py import SetupPy
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.python_requirement import PythonRequirement
@@ -63,3 +64,6 @@ def register_goals():
        dependencies=['bootstrap', 'check-exclusives', 'resources']
   ).install('repl')
 
+  task(name='setup-py', action=PythonSetup,
+       dependencies=['bootstrap', 'check-exclusives', 'resources']
+  ).install()
