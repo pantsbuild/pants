@@ -29,6 +29,15 @@ class Checkstyle(NailgunTask, JvmToolTaskMixin):
   def register_options(cls, register):
     super(Checkstyle, cls).register_options(register)
     register('--skip', action='store_true', help='Skip checkstyle.')
+    register('--configuration', help='Path to the checkstyle configuration file.')
+    register('--suppression_files', default=[],
+             help='List of checkstyle supression configuration files.')
+    register('--properties', default={},
+             help='Dictionary of property mappings to use for checkstyle.properties.')
+    register('--confs', default=['default'],
+             help='One or more ivy configurations to resolve for this target. This parameter is '
+                  'not intended for general use. ')
+
 
   def __init__(self, *args, **kwargs):
     super(Checkstyle, self).__init__(*args, **kwargs)
@@ -39,12 +48,10 @@ class Checkstyle(NailgunTask, JvmToolTaskMixin):
                                        ini_key='bootstrap-tools',
                                        default=['//:twitter-checkstyle'])
 
-    self._configuration_file = self.context.config.get(self._CONFIG_SECTION, 'configuration')
-
-    suppression_files = self.context.config.getlist(self._CONFIG_SECTION, 'suppression_files', [])
-    self._properties = self.context.config.getdict(self._CONFIG_SECTION, 'properties', {})
+    suppression_files = self.get_options().supression_files
+    self._properties = self.get_options().properties()
     self._properties['checkstyle.suppression.files'] = ','.join(suppression_files)
-    self._confs = self.context.config.getlist(self._CONFIG_SECTION, 'confs', default=['default'])
+    self._confs = self.context.config.getlist(self._CONFIG_SECTION, 'confs', )
 
   @property
   def config_section(self):
@@ -84,10 +91,10 @@ class Checkstyle(NailgunTask, JvmToolTaskMixin):
     etag = egroups.get_group_key_for_target(targets[0])
     classpath = self.tool_classpath(self._checkstyle_bootstrap_key)
     cp = egroups.get_classpath_for_group(etag)
-    classpath.extend(jar for conf, jar in cp if conf in self._confs)
+    classpath.extend(jar for conf, jar in cp if conf in self.get_options().confs())
 
     args = [
-      '-c', self._configuration_file,
+      '-c', self.get_options().configuration,
       '-f', 'plain'
     ]
 
