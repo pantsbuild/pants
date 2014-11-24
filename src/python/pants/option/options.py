@@ -10,6 +10,7 @@ import sys
 
 from pants.base.build_environment import pants_release
 from pants.goal.goal import Goal
+from pants.option import custom_types
 from pants.option.arg_splitter import ArgSplitter, GLOBAL_SCOPE
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.parser_hierarchy import ParserHierarchy
@@ -57,13 +58,27 @@ class Options(object):
     - The hard-coded value provided at registration time.
     - None.
   """
-  def __init__(self, env, config, known_scopes, args=sys.argv):
+
+  # Custom option types. You can specify these with type= when registering options.
+
+  # A dict-typed option.
+  dict = staticmethod(custom_types.dict_type)
+
+  # A list-typed option. Note that this is different than an action='append' option:
+  # An append option will append the cmd-line values to the default. A list-typed option
+  # will replace the default with the cmd-line value.
+  list = staticmethod(custom_types.list_type)
+
+
+  def __init__(self, env, config, known_scopes, args=sys.argv, bootstrap_option_values=None):
     """Create an Options instance.
 
     :param env: a dict of environment variables.
-    :param config: data from a config file (must support config.get(section, name, default=)).
+    :param config: data from a config file (must support config.get[list](section, name, default=)).
     :param known_scopes: a list of all possible scopes that may be encountered.
     :param args: a list of cmd-line args.
+    :param bootstrap_option_values: An optional namespace containing the values of bootstrap
+           options. We can use these values when registering other options.
     """
     splitter = ArgSplitter(known_scopes)
     self._goals, self._scope_to_flags, self._target_specs, self._passthru, self._passthru_owner = \
@@ -71,6 +86,7 @@ class Options(object):
     self._is_help = splitter.is_help
     self._parser_hierarchy = ParserHierarchy(env, config, known_scopes)
     self._values_by_scope = {}  # Arg values, parsed per-scope on demand.
+    self._bootstrap_option_values = bootstrap_option_values
 
   @property
   def target_specs(self):
@@ -153,6 +169,14 @@ class Options(object):
     self._parser_hierarchy.get_parser_by_scope(scope).parse_args(flags_in_scope, values)
     self._values_by_scope[scope] = values
     return values
+
+  def bootstrap_option_values(self):
+    """Return the option values for bootstrap options.
+
+    General code can also access these values in the global scope.  But option registration code
+    cannot, hence this special-casing of this small set of options.
+    """
+    return self._bootstrap_option_values
 
   def for_global_scope(self):
     """Return the option values for the global scope."""

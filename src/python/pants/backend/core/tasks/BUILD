@@ -94,7 +94,6 @@ python_library(
   dependencies = [
     ':task',
     'src/python/pants/base:build_environment',
-    'src/python/pants/base:config',
     'src/python/pants/util:dirutil',
   ],
 )

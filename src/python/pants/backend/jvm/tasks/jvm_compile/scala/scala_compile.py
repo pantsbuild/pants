@@ -20,7 +20,7 @@ class ScalaCompile(JvmCompile):
   _config_section = 'scala-compile'
 
   @classmethod
-  def get_args_default(cls):
+  def get_args_default(cls, bootstrap_option_values):
     return ('-S-encoding', '-SUTF-8','-S-g:vars')
 
   @classmethod

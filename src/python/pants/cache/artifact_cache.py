@@ -21,7 +21,7 @@ class ArtifactCacheError(Exception):
 class NonfatalArtifactCacheError(Exception):
   pass
 
-class UnreadableArtifact(Exception):
+class UnreadableArtifact(object):
   """A False-y value to indicate a read-failure (vs a normal cache-miss)
 
   See docstring on `ArtifactCache.use_cached_files` for details.
@@ -129,27 +129,31 @@ class ArtifactCache(object):
     pass
 
 def call_use_cached_files(tup):
-  """Importable helper for multi-proc calling of ArtifactCache.use_cached_files
+  """Importable helper for multi-proc calling of ArtifactCache.use_cached_files on a cache instance.
 
   Multiprocessing map/apply/etc require functions which can be imported, not bound methods.
   To call a bound method, instead call a helper like this and pass tuple of the instance and args.
   The helper can then call the original method on the deserialized instance.
 
-  :param tup: A tuple of an ArtifactCache and a argument to ArtifactCache.use_cached_files
+  :param tup: A tuple of an ArtifactCache and arg (eg CacheKey) for ArtifactCache.use_cached_files.
   """
-  res = tup[0].use_cached_files(tup[1])
-  sys.stderr.write('.')
-  return bool(res)
+  cache, key = tup
+  res = cache.use_cached_files(key)
+  if res:
+    sys.stderr.write('.')
+  else:
+    sys.stderr.write(' ')
+  return res
 
-def call_insert(cache, key, files, overwrite=False):
-  """Importable helper for multi-proc calling of ArtifactCache.insert
+def call_insert(tup):
+  """Importable helper for multi-proc calling of ArtifactCache.insert on an ArtifactCache instance.
 
   See docstring on call_use_cached_files explaining why this is useful.
 
-  :param ArtifactCache cache: see ArtifactCache.insert
-  :param CacheKey key: ArtifactCache.insert
-  :param iterable<str> files: ArtifactCache.insert
-  :param bool overwrite: ArtifactCache.insert
+  :param tup: A 4-tuple of an ArtifactCache and the 3 args passed to ArtifactCache.insert:
+              eg (some_cache_instance, cache_key, [some_file, another_file], False)
+
   """
+  cache, key, files, overwrite = tup
   return cache.insert(key, files, overwrite)
 

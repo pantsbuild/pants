@@ -147,7 +147,7 @@ class _JUnitRunner(object):
         confs=self._task_exports.confs,
         exclusives_classpath=self._task_exports.get_base_classpath_for_target(java_tests_targets[0]))
 
-      self._context.lock.release()
+      self._context.release_lock()
       self.instrument(targets, tests, junit_classpath)
 
       def report():

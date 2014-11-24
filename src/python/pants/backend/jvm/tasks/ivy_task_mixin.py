@@ -70,7 +70,7 @@ class IvyTaskMixin(object):
     if not targets:
       return []
 
-    ivy_workdir = os.path.join(self.context.config.getdefault('pants_workdir'), 'ivy')
+    ivy_workdir = os.path.join(self.context.new_options.for_global_scope().pants_workdir, 'ivy')
     ivy_utils = IvyUtils(config=self.context.config, log=self.context.log)
 
     fingerprint_strategy = IvyResolveFingerprintStrategy()

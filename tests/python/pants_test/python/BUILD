@@ -155,3 +155,18 @@ python_binary(
   entry_point = 'pants_test.python.echo_interpreter_version',
   compatibility = ['CPython<2.6']
 )
+
+python_library(
+  name = 'die_lib',
+  sources = ['die.py'],
+  dependencies = [],
+  compatibility = ['CPython>=2.6,<3']
+)
+
+python_binary(
+  name = 'die',
+  dependencies = [
+    ':die_lib',
+  ],
+  entry_point = 'pants_test.python.die',
+)

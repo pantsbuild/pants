@@ -39,7 +39,7 @@ class PytestRun(PythonTask):
 
     test_targets = list(filter(is_python_test, self.context.targets()))
     if test_targets:
-      self.context.lock.release()
+      self.context.release_lock()
 
       debug = self.get_options().level == 'debug'
 

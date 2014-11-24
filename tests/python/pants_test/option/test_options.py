@@ -9,28 +9,21 @@ import shlex
 import unittest2 as unittest
 
 from pants.option.options import Options
+from pants_test.option.fake_config import FakeConfig
 
 
 class OptionsTest(unittest.TestCase):
   _known_scopes = ['compile', 'compile.java', 'compile.scala', 'test', 'test.junit']
-
-  class FakeConfig(object):
-    def __init__(self, values):
-      self._values = values
-
-    def get(self, section, name, default=None):
-      if section not in self._values or name not in self._values[section]:
-        return default
-      return self._values[section][name]
-
-    def getlist(self, section, name, default=None):
-      return self.get(section, name, default)
 
   def _register(self, options):
     options.register_global('-v', '--verbose', action='store_true', help='Verbose output.')
     options.register_global('-n', '--num', type=int, default=99)
     options.register_global('-x', '--xlong', action='store_true')
     options.register_global('--y', action='append', type=int)
+
+    # Custom types.
+    options.register_global('--dicty', type=Options.dict, default='{"a": "b"}')
+    options.register_global('--listy', type=Options.list, default='[1, 2, 3]')
 
     # For the design doc example test.
     options.register_global('--a', type=int)
@@ -45,8 +38,7 @@ class OptionsTest(unittest.TestCase):
 
   def _parse(self, args_str, env=None, config=None):
     args = shlex.split(str(args_str))
-    options = Options(env or {}, OptionsTest.FakeConfig(config or {}),
-                      OptionsTest._known_scopes, args)
+    options = Options(env or {}, FakeConfig(config or {}), OptionsTest._known_scopes, args)
     self._register(options)
     return options
 
@@ -82,12 +74,22 @@ class OptionsTest(unittest.TestCase):
     self.assertEqual(100, options.for_scope('test').xlong)
     self.assertEqual(True, options.for_scope('test').x)
 
-    # Test list-typed option.
+    # Test action=append option.
     options = self._parse('./pants', config={ 'DEFAULT': { 'y': ['88', '-99'] }})
     self.assertEqual([88, -99], options.for_global_scope().y)
 
-    options = self._parse('./pants --y=5 --y=-6 --y=77', config={ 'DEFAULT': { 'y': ['88', '-99'] }})
+    options = self._parse('./pants --y=5 --y=-6 --y=77',
+                          config={ 'DEFAULT': { 'y': ['88', '-99'] }})
     self.assertEqual([88, -99, 5, -6, 77], options.for_global_scope().y)
+
+    # Test list-typed option.
+    options = self._parse('./pants --listy=\'["c", "d"]\'',
+                          config={ 'DEFAULT': {'listy': ["a", "b"] }})
+    self.assertEqual(['c', 'd'], options.for_global_scope().listy)
+
+    # Test dict-typed option.
+    options = self._parse('./pants --dicty=\'{"c": "d"}\'')
+    self.assertEqual({'c': 'd'}, options.for_global_scope().dicty)
 
   def test_defaults(self):
     # Hard-coded defaults.

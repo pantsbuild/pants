@@ -41,7 +41,9 @@ class Checkstyle(NailgunTask, JvmToolTaskMixin):
 
     self._configuration_file = self.context.config.get(self._CONFIG_SECTION, 'configuration')
 
+    suppression_files = self.context.config.getlist(self._CONFIG_SECTION, 'suppression_files', [])
     self._properties = self.context.config.getdict(self._CONFIG_SECTION, 'properties', {})
+    self._properties['checkstyle.suppression.files'] = ','.join(suppression_files)
     self._confs = self.context.config.getlist(self._CONFIG_SECTION, 'confs', default=['default'])
 
   @property

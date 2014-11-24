@@ -237,11 +237,11 @@ class TestArtifactCache(unittest.TestCase):
     with self.setup_local_cache() as cache:
       self.assertEquals(context.subproc_map(call_use_cached_files, [(cache, key)]), [False])
       with self.setup_test_file(cache.artifact_root) as path:
-        context.exec_on_subproc(call_insert, (cache, key, [path]))
+        context.subproc_map(call_insert, [(cache, key, [path], False)])
       self.assertEquals(context.subproc_map(call_use_cached_files, [(cache, key)]), [True])
 
     with self.setup_rest_cache() as cache:
       self.assertEquals(context.subproc_map(call_use_cached_files, [(cache, key)]), [False])
       with self.setup_test_file(cache.artifact_root) as path:
-        context.exec_on_subproc(call_insert, (cache, key, [path]))
+        context.subproc_map(call_insert, [(cache, key, [path], False)])
       self.assertEquals(context.subproc_map(call_use_cached_files, [(cache, key)]), [True])
