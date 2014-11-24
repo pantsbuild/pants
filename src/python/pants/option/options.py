@@ -10,6 +10,7 @@ import sys
 
 from pants.base.build_environment import pants_release
 from pants.goal.goal import Goal
+from pants.option import custom_types
 from pants.option.arg_splitter import ArgSplitter, GLOBAL_SCOPE
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.parser_hierarchy import ParserHierarchy
@@ -57,6 +58,18 @@ class Options(object):
     - The hard-coded value provided at registration time.
     - None.
   """
+
+  # Custom option types. You can specify these with type= when registering options.
+
+  # A dict-typed option.
+  dict = staticmethod(custom_types.dict_type)
+
+  # A list-typed option. Note that this is different than an action='append' option:
+  # An append option will append the cmd-line values to the default. A list-typed option
+  # will replace the default with the cmd-line value.
+  list = staticmethod(custom_types.list_type)
+
+
   def __init__(self, env, config, known_scopes, args=sys.argv, bootstrap_option_values=None):
     """Create an Options instance.
 

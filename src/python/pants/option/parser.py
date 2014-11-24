@@ -9,18 +9,9 @@ from argparse import ArgumentParser, _HelpAction
 import copy
 
 from pants.option.arg_splitter import GLOBAL_SCOPE
+from pants.option.errors import ParseError, RegistrationError
 from pants.option.help_formatter import PantsHelpFormatter
 from pants.option.ranked_value import RankedValue
-
-
-class RegistrationError(Exception):
-  """An error at option registration time."""
-  pass
-
-
-class ParseError(Exception):
-  """An error at flag parsing time."""
-  pass
 
 
 # Standard ArgumentParser prints usage and exits on error. We subclass so we can raise instead.
