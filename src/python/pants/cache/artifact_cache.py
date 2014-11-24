@@ -21,7 +21,7 @@ class ArtifactCacheError(Exception):
 class NonfatalArtifactCacheError(Exception):
   pass
 
-class UnreadableArtifact(Exception):
+class UnreadableArtifact(object):
   """A False-y value to indicate a read-failure (vs a normal cache-miss)
 
   See docstring on `ArtifactCache.use_cached_files` for details.
