@@ -43,6 +43,7 @@ python_library(
     'src/python/pants/base:target', # XXX(fixme)
     'src/python/pants/base:workunit',
     'src/python/pants/java:distribution',  # XXX(fixme)
+    'src/python/pants/process',
     'src/python/pants/reporting',
   ],
 )

@@ -26,6 +26,7 @@ python_library(
     # NB: this is actually just a hack for the fact we have not uploaded pre-compiled
     # platform-specific eggs for the newer coverage version to our cheeseshop!
     '3rdparty/python:coverage',
+    '3rdparty/python:lockfile',
     '3rdparty/python:Markdown',
     '3rdparty/python:pex',
     '3rdparty/python:psutil',
