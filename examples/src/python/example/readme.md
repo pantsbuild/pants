@@ -49,6 +49,7 @@ Relevant Goals and Targets
 > the code. To use several several of these via a `pip`-style
 > `requirements.txt` file, use a
 > <a pantsref="bdict_python_requirements">`python_requirements`</a>.
+> For details, see [[Python 3rdparty Pattern|pants('examples/src/python/example:3rdparty_py')]].
 
 **Tests**
 
