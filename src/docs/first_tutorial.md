@@ -36,8 +36,8 @@ in the codebase; a target in one can depend on a target in another.
 Typically, a directory's BUILD file defines the target[s] whose sources
 are files in that directory.
 
-Invoking Pants
---------------
+Pants Command Line
+------------------
 
 Pants knows about goals ("verbs" like `bundle` and `test`) and targets
 (build-able things in your source code). A typical pants command-line
@@ -75,9 +75,9 @@ This is a *build target*, a "build-able" thing in your source code. To
 define these, you set up configuration files named `BUILD` in your
 source code file tree. (You'll see more about these later.)
 
-Targets can depend on other targets. E.g., a test suite target normally
-depends on another target containing the "library" code to test; to
-build and run the test code, Pants also first build the library code.
+Targets can depend on other targets. E.g., a test target normally depends on another target
+containing "library" code to test; to build and run the test code, Pants also first build the
+library code.
 
 You can specify more than one target on a command line. Pants will carry
 out its goals on all specified targets. E.g., you might use this to
@@ -109,7 +109,7 @@ the goals to all the targets, skipping things that wouldn't make sense.
 E.g., you could
 
 -   Invoke `test` and `run` goals to both run tests and run a binary.
--   Specify both test-suite and binary targets.
+-   Specify both test and binary targets.
 
 In this example, it doesn't make sense to run a binary target as a test, so
 Pants doesn't do that.
@@ -120,44 +120,81 @@ Pants doesn't do that.
 
 One tricky side effect of this is accidental *goal-target mismatch*: You
 can invoke a goal that doesn't make sense for a target. E.g., you can
-invoke the `test` goal on a target that's not a test suite. Pants won't
+invoke the `test` goal on a target that's not actually a test target. Pants won't
 complain. It knows that it should compile code before it tests it; it
 will happily compile the build targets. If you're not watching closely,
 you might see a lot of output scrolling past and think it was running
 tests.
 
+### Comand-line Options
+
+You can specify some details of Pants' actions by means of command-line options. E.g., you could
+tell Pants to "fail fast" on the first `junit` test failure instead of running and reporting all
+`junit` tests like so:
+
+    :::bash
+    $ ./pants goal test.junit --fail-fast examples/tests/java/com/pants/examples/hello/greet:greet
+
+Here, `test` has become `test.junit`. The `test` goal is made up of parts: `test.junit`,
+`test.pytest`, and `test.specs`. We want to specify a flag to the `test.junit` part, so we
+specify that part on the command line.
+
+We entered the `--fail-fast` flag after `test.junit` but before the target. Command-line flags
+for a goal go immediately after that goal.
+
+Pants has some global options, options not associated with any goal. They go after the word `goal`
+and before goal names. E.g., for verbose debug-level logging, pass `-ldebug`:
+
+    :::bash
+    $ ./pants goal -ldebug test examples/tests/java/com/pants/examples/hello/greet:
+
+For details about the Pants command line, see [[Invoking Pants|pants('src/docs:invoking')]].
+
 ### Help
 
-To get help about a Pants goal, invoke <tt>./pants goal *goalname* -h</tt>.
-This lists the many command-line options you can pass for that goal.
-E.g.,
+To get help about a Pants goal, invoke <tt>./pants goal *goalname* -h</tt>. This lists
+command-line options for that goal. E.g.,
 
     :::bash
     $ ./pants goal test -h
 
     test: Test compiled code.
+    
+    test.specs
+      -h, --help              show this help message and exit
+      --jvm-options <option>...
+                              Run the jvm with these extra jvm options. (default: [])
+      --args <arg>...         Run the jvm with these extra program args. (default: [])
+      --[no-]debug            Run the jvm under a debugger. (default: None)
+      --confs _TEST.SPECS_CONFS__
+                              Use only these Ivy configurations of external deps.
+                              (default: [u'default'])
 
-    test options:
-      --ng-daemons, --no-ng-daemons
-                              [True] Use nailgun daemons to execute java tasks.
+    ...more test options...
 
-    gen:thrift options:
-    ...
-      --test-specs-color, --no-test-specs-color
-                              [True] Emit test result with ANSI terminal color
-                              codes.
+    test.pytest
+      -h, --help              show this help message and exit
+      --timeout _TEST.PYTEST_TIMEOUT__
+                              Number of seconds to wait for http connections.
+                              (default: 0)
+
+
+    ...many more test options...
+
+The `test` goal is made up of parts: `test.junit`, `test.pytest`, and `test.specs`. Command-line
+options apply to those parts. The goal's help groups options into those parts. E.g., here, it shows
+the `test.spec` ` --jvm-options` option with `test.specs`.
 
 For a list of available goals, `./pants goal goals`.
 
-For help with things that aren't goals, use
+For help with things that aren't goals (global options, other kinds of help), use
 
     :::bash
     $ ./pants -h
 
-If you want help diagnosing some strange Pants behavior, you might
-verbose output. To get this, instead of just invoking `./pants`, set
-some environment variables:
-`PEX_VERBOSE=1 PANTS_VERBOSE=1 PYTHON_VERBOSE=1 ./pants`.
+If you want help diagnosing some strange Pants behavior, you might want verbose output.
+To get this, instead of just invoking `./pants`, set some environment variables and request
+more logging: `PEX_VERBOSE=1 PANTS_VERBOSE=1 PYTHON_VERBOSE=1 ./pants -debug`.
 
 BUILD Files
 -----------
@@ -237,10 +274,10 @@ Get the list of goals:
     :::bash
     $ ./pants goal goals
 
-Get help for one goal:
+Get help for one goal, e.g., test:
 
     :::bash
-    $ ./pants goal help onegoal
+    $ ./pants goal test -h
 
 Next
 ----
