@@ -16,6 +16,7 @@ import psutil
 
 # TODO: Once we integrate standard logging into our reporting framework, we  can consider making
 #  some of the log.debug() below into log.info(). Right now it just looks wrong on the console.
+
 from twitter.common import log
 from twitter.common.collections import maybe_list
 from twitter.common.lang import Compatibility
@@ -165,7 +166,7 @@ class NailgunExecutor(Executor):
 
     self._ins = ins
 
-  def _runner(self, classpath, main, jvm_options, args):
+  def _runner(self, classpath, main, jvm_options, args, cwd=None):
     command = self._create_command(classpath, main, jvm_options, args)
 
     class Runner(self.Runner):
@@ -177,11 +178,11 @@ class NailgunExecutor(Executor):
       def cmd(this):
         return ' '.join(command)
 
-      def run(this, stdout=None, stderr=None):
+      def run(this, stdout=None, stderr=None, cwd=None):
         nailgun = self._get_nailgun_client(jvm_options, classpath, stdout, stderr)
         try:
           log.debug('Executing via {ng_desc}: {cmd}'.format(ng_desc=nailgun, cmd=this.cmd))
-          return nailgun(main, *args)
+          return nailgun(main, cwd, *args)
         except nailgun.NailgunError as e:
           self.kill()
           raise self.Error('Problem launching via {ng_desc} command {main} {args}: {msg}'

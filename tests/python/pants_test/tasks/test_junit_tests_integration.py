@@ -32,8 +32,8 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
       pants_run = self.run_pants_with_workdir(
         ['goal', 'test', 'examples/tests/java/com/pants/examples/hello/greet',
          'examples/tests/scala/com/pants/example/hello/welcome',
-         '--interpreter=CPython>=2.6,<3',
-         '--interpreter=CPython>=3.3',],
+         '--interpreter=CPython>=2.6,<3', '--interpreter=CPython>=3.3',
+         '--print-exception-stacktrace', ],
         workdir)
       self.assert_success(pants_run)
       self._assert_junit_output(workdir)
@@ -43,10 +43,10 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
       pants_run = self.run_pants_with_workdir(
         ['goal', 'test', 'examples/tests/java//com/pants/examples/hello/greet',
          'examples/tests/scala/com/pants/example/hello/welcome',
-         '--interpreter=CPython>=2.6,<3',
-         '--interpreter=CPython>=3.3',
+         '--interpreter=CPython>=2.6,<3', '--interpreter=CPython>=3.3',
          '--test-junit-coverage-processor=emma', '--test-junit-coverage',
-         '--test-junit-coverage-xml', '--test-junit-coverage-html',],
+         '--test-junit-coverage-xml', '--test-junit-coverage-html',
+         '--print-exception-stacktrace', ],
         workdir)
       self.assert_success(pants_run)
       self._assert_junit_output(workdir)
@@ -80,6 +80,7 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
          'examples/tests/scala/com/pants/example/hello/welcome',
          '--interpreter=CPython>=2.6,<3',
          '--interpreter=CPython>=3.3',
+         '--print-exception-stacktrace',
          '--test-junit-coverage-processor=cobertura', '--test-junit-coverage',
          '--test-junit-coverage-xml', '--test-junit-coverage-html',],
         workdir)
@@ -91,4 +92,31 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
       # TODO(Eric Ayers): Look at the xml report.  I think something is broken, it is empty
       self.assertTrue(os.path.exists(
         os.path.join(workdir, 'test', 'junit', 'coverage', 'xml', 'coverage.xml')))
+
+  def test_junit_test_with_cwd(self):
+    # Make sure the test fails if you don't specify cwd
+    pants_run = self.run_pants([
+      'goal', 'test', 'testprojects/tests/java/com/pants/testproject/cwdexample',
+      '--interpreter=CPython>=2.6,<3', '--interpreter=CPython>=3.3',
+      '--print-exception-stacktrace',
+      '--test-junit-jvm-options=-Dcwd.test.enabled=true',])
+    self.assert_failure(pants_run)
+
+    # Expicit cwd specified
+    pants_run = self.run_pants([
+      'goal', 'test', 'testprojects/tests/java/com/pants/testproject/cwdexample',
+      '--interpreter=CPython>=2.6,<3', '--interpreter=CPython>=3.3',
+      '--print-exception-stacktrace',
+      '--test-junit-jvm-options=-Dcwd.test.enabled=true',
+      '--test-junit-cwd=testprojects/src/java/com/pants/testproject/cwdexample/subdir',])
+    self.assert_success(pants_run)
+
+    # Implicit cwd specified based on path to target
+    pants_run = self.run_pants([
+      'goal', 'test', 'testprojects/tests/java/com/pants/testproject/cwdexample',
+      '--interpreter=CPython>=2.6,<3', '--interpreter=CPython>=3.3',
+      '--print-exception-stacktrace',
+      '--test-junit-jvm-options=-Dcwd.test.enabled=true',
+      '--test-junit-cwd',])
+    self.assert_success(pants_run)
 

@@ -165,10 +165,12 @@ class Parser(object):
       if not arg.startswith('--') and len(arg) > 2:
         raise RegistrationError('Multicharacter option {0} in scope {1} must begin '
                                 'with a double-dash'.format(arg, self._scope))
-    for k in ['nargs', 'required']:
-      if k in kwargs:
-        raise RegistrationError('{0} unsupported in registration of option {1} in '
-                                'scope {2}.'.format(k, args, self._scope))
+    if 'nargs' in kwargs and kwargs['nargs'] != '?':
+      raise RegistrationError('nargs={0} unsupported in registration of option {1} in '
+                              'scope {2}.'.format(kwargs['nargs'], args, self._scope))
+    if 'required' in kwargs:
+      raise RegistrationError('{0} unsupported in registration of option {1} in '
+                              'scope {2}.'.format(k, args, self._scope))
 
   def _set_dest(self, args, kwargs):
     """Maps the externally-used dest to a scoped one only seen internally.

@@ -79,7 +79,8 @@ def _synthesize_command(root_dir, args):
   if command.startswith('-'):
     _exit_and_fail('Invalid command: %s' % command)
 
-  _exit_and_fail('Pants build missing a command: %s' % traceback.format_exc())
+  _exit_and_fail('Pants build missing a command: args={args} tb=\n{tb}'
+                 .format(args=args, tb=traceback.format_exc()))
 
 
 def _parse_command(root_dir, args):
