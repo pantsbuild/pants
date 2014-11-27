@@ -16,6 +16,7 @@ python_binary(
   name= 'migrate_config',
   source = 'migrate_config.py',
   dependencies = [
+    ':option',
     '3rdparty/python:ansicolors',
     'src/python/pants/base:config',
   ]
