@@ -109,7 +109,7 @@ class AntlrGen(CodeGen, NailgunTask, JvmToolTaskMixin):
   # they do, uses that as the package. If they are different, then the user will need to set the package
   # as it cannot be correctly inferred.
   def _get_sources_package(self, target):
-    parents = set([os.path.dirname(source) for source in target.sources])
+    parents = set([os.path.dirname(source) for source in target.sources_relative_to_source_root()])
     if len(parents) != 1:
       raise TaskError('Antlr sources in multiple directories, cannot infer package.'
                       'Please set package member in antlr target.')
