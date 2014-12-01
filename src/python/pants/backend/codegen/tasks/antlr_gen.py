@@ -105,10 +105,11 @@ class AntlrGen(CodeGen, NailgunTask, JvmToolTaskMixin):
       if result != 0:
         raise TaskError('java %s ... exited non-zero (%i)' % (java_main, result))
 
-  # This checks to make sure that all of the sources have an identical package source structure, and if
-  # they do, uses that as the package. If they are different, then the user will need to set the package
-  # as it cannot be correctly inferred.
-  def _get_sources_package(self, target):
+  # This checks to make sure that all of the sources have an identical package source structure, and
+  # if they do, uses that as the package. If they are different, then the user will need to set the
+  # package as it cannot be correctly inferred.
+  @staticmethod
+  def _get_sources_package(target):
     parents = set([os.path.dirname(source) for source in target.sources_relative_to_source_root()])
     if len(parents) != 1:
       raise TaskError('Antlr sources in multiple directories, cannot infer package.'
