@@ -27,6 +27,9 @@ logger = logging.getLogger(__name__)
 
 class AntlrGen(CodeGen, NailgunTask, JvmToolTaskMixin):
 
+  class AmbiguousPackageError(TaskError):
+    """Raised when a java package cannot be unambiguously determined for a JavaAntlrLibrary."""
+
   # Maps the compiler attribute of a target to the config key in pants.ini
   _CONFIG_SECTION_BY_COMPILER = {
     'antlr3': 'antlr-gen',
@@ -108,12 +111,11 @@ class AntlrGen(CodeGen, NailgunTask, JvmToolTaskMixin):
   # This checks to make sure that all of the sources have an identical package source structure, and
   # if they do, uses that as the package. If they are different, then the user will need to set the
   # package as it cannot be correctly inferred.
-  @staticmethod
-  def _get_sources_package(target):
+  def _get_sources_package(self, target):
     parents = set([os.path.dirname(source) for source in target.sources_relative_to_source_root()])
     if len(parents) != 1:
-      raise TaskError('Antlr sources in multiple directories, cannot infer package.'
-                      'Please set package member in antlr target.')
+      raise self.AmbiguousPackageError('Antlr sources in multiple directories, cannot infer '
+                                       'package. Please set package member in antlr target.')
     return parents.pop().replace('/', '.')
 
   def _calculate_sources(self, targets):
