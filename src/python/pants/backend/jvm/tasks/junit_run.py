@@ -541,15 +541,11 @@ class Cobertura(_Coverage):
         raise TaskError("java %s ... exited non-zero (%i)"
                         " 'failed to instrument'" % (main, result))
 
-<<<<<<< HEAD
-  def run(self, tests, junit_classpath):
+  def run(self, tests, junit_classpath, cwd=None):
     if self._nothing_to_instrument:
       self._context.log.warn('Nothing found to instrument, skipping tests...')
       return
     cobertura_cp = self._task_exports.tool_classpath(self._cobertura_run_bootstrap_key)
-=======
-  def run(self, tests, junit_classpath, cwd=None):
->>>>>>> upstream/master
     self._run_tests(tests,
                     cobertura_cp + junit_classpath,
                     JUnitRun._MAIN,
