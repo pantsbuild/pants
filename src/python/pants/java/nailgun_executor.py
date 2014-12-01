@@ -16,6 +16,7 @@ import psutil
 
 # TODO: Once we integrate standard logging into our reporting framework, we  can consider making
 #  some of the log.debug() below into log.info(). Right now it just looks wrong on the console.
+
 from twitter.common import log
 from twitter.common.collections import maybe_list
 from twitter.common.lang import Compatibility
@@ -47,7 +48,7 @@ class NailgunExecutor(Executor):
 
   # Used to identify we own a given java nailgun server
   _PANTS_NG_ARG_PREFIX = b'-Dpants.buildroot'
-  _PANTS_NG_ARG = b'%s=%s' % (_PANTS_NG_ARG_PREFIX, get_buildroot())
+  _PANTS_NG_ARG = b'{0}={1}'.format(_PANTS_NG_ARG_PREFIX, get_buildroot())
 
   _PANTS_FINGERPRINT_ARG_PREFIX = b'-Dpants.nailgun.fingerprint='
 
@@ -62,7 +63,7 @@ class NailgunExecutor(Executor):
   @staticmethod
   def create_owner_arg(workdir):
     # Currently the owner is identified via the full path to the workdir.
-    return b'-Dpants.nailgun.owner=%s' % workdir
+    return b'-Dpants.nailgun.owner={0}'.format(workdir)
 
   @classmethod
   def _create_fingerprint_arg(cls, fingerprint):
@@ -94,7 +95,8 @@ class NailgunExecutor(Executor):
   @staticmethod
   def _log_kill(pid, port=None, logger=None):
     logger = logger or log.info
-    logger('killing ng server @ pid:%d%s' % (pid, ' port:%d' % port if port else ''))
+    port_desc = ' port:{0}'.format(port if port else '')
+    logger('killing ng server @ pid:{pid}{port}'.format(pid=pid, port=port_desc))
 
   @classmethod
   def _find_ngs(cls, everywhere=False):
@@ -155,7 +157,7 @@ class NailgunExecutor(Executor):
 
     self._nailgun_classpath = maybe_list(nailgun_classpath)
     if not isinstance(workdir, Compatibility.string):
-      raise ValueError('Workdir must be a path string, given %s' % workdir)
+      raise ValueError('Workdir must be a path string, given {workdir}'.format(workdir=workdir))
 
     self._workdir = workdir
 
@@ -164,7 +166,7 @@ class NailgunExecutor(Executor):
 
     self._ins = ins
 
-  def _runner(self, classpath, main, jvm_options, args):
+  def _runner(self, classpath, main, jvm_options, args, cwd=None):
     command = self._create_command(classpath, main, jvm_options, args)
 
     class Runner(self.Runner):
@@ -176,15 +178,15 @@ class NailgunExecutor(Executor):
       def cmd(this):
         return ' '.join(command)
 
-      def run(this, stdout=None, stderr=None):
+      def run(this, stdout=None, stderr=None, cwd=None):
         nailgun = self._get_nailgun_client(jvm_options, classpath, stdout, stderr)
         try:
-          log.debug('Executing via %s: %s' % (nailgun, this.cmd))
-          return nailgun(main, *args)
+          log.debug('Executing via {ng_desc}: {cmd}'.format(ng_desc=nailgun, cmd=this.cmd))
+          return nailgun(main, cwd, *args)
         except nailgun.NailgunError as e:
           self.kill()
-          raise self.Error('Problem launching via %s command %s %s: %s'
-                           % (nailgun, main, ' '.join(args), e))
+          raise self.Error('Problem launching via {ng_desc} command {main} {args}: {msg}'
+                           .format(ng_desc=nailgun, main=main, args=' '.join(args), msg=e))
 
     return Runner()
 
@@ -202,7 +204,7 @@ class NailgunExecutor(Executor):
   def _get_nailgun_endpoint(self):
     endpoint = self._find(self._workdir)
     if endpoint:
-      log.debug('Found ng server launched with %s fingerprint %s @ pid:%d port:%d' % endpoint)
+      log.debug('Found ng server launched with {endpoint}'.format(endpoint=repr(endpoint)))
     return endpoint
 
   def _get_nailgun_client(self, jvm_args, classpath, stdout, stderr):
@@ -217,7 +219,8 @@ class NailgunExecutor(Executor):
       return self._create_ngclient(endpoint.port, stdout, stderr)
     else:
       if running and updated:
-        log.debug('Killing ng server launched with %s fingerprint %s @ pid:%d port:%d' % endpoint)
+        log.debug(
+          'Killing ng server launched with {endpoint}'.format(endpoint=repr(endpoint)))
         self.kill()
       return self._spawn_nailgun_server(new_fingerprint, jvm_args, classpath, stdout, stderr)
 
@@ -228,12 +231,14 @@ class NailgunExecutor(Executor):
     match = self._PARSE_NG_PORT.match(line)
     if not match:
       raise NailgunClient.NailgunError('Failed to determine spawned ng port from response'
-                                       ' line: %s' % line)
+                                       ' line: {line}'.format(line=line))
     return int(match.group(1))
 
-  def _await_nailgun_server(self, stdout, stderr):
-    nailgun_timeout_seconds = 5
-    max_socket_connect_attempts = 10
+  def _await_nailgun_server(self, stdout, stderr, debug_desc):
+    # TODO(Eric Ayers) Make these cmdline/config parameters once we have a global way to fetch
+    # the global options scope.
+    nailgun_timeout_seconds = 10
+    max_socket_connect_attempts = 5
     nailgun = None
     port_parse_start = time.time()
     with safe_open(self._ng_out, 'r') as ng_out:
@@ -247,10 +252,11 @@ class NailgunExecutor(Executor):
         if started:
           port = self._parse_nailgun_port(started)
           nailgun = self._create_ngclient(port, stdout, stderr)
-          log.debug('Detected ng server up on port %d' % port)
+          log.debug('Detected ng server up on port {port}'.format(port=port))
         elif time.time() - port_parse_start > nailgun_timeout_seconds:
-          raise NailgunClient.NailgunError('Failed to read ng output after'
-                                           ' %s seconds' % nailgun_timeout_seconds)
+          raise NailgunClient.NailgunError(
+            'Failed to read ng output after {sec} seconds.\n {desc}'
+            .format(sec=nailgun_timeout_seconds, desc=debug_desc))
 
     attempt = 0
     while nailgun:
@@ -259,22 +265,24 @@ class NailgunExecutor(Executor):
         sock.close()
         endpoint = self._get_nailgun_endpoint()
         if endpoint:
-          log.debug('Connected to ng server launched with %s fingerprint %s pid: %d @ port: %d' % endpoint)
+          log.debug('Connected to ng server launched with {endpoint}'
+                    .format(endpoint=repr(endpoint)))
         else:
           raise NailgunClient.NailgunError('Failed to connect to ng server.')
         return nailgun
       elif attempt > max_socket_connect_attempts:
-        raise nailgun.NailgunError('Failed to connect to ng output after %d connect attempts'
-                                   % max_socket_connect_attempts)
+        raise nailgun.NailgunError('Failed to connect to ng output after {count} connect attempts'
+                                   .format(count=max_socket_connect_attempts))
       attempt += 1
-      log.debug('Failed to connect on attempt %d' % attempt)
+      log.debug('Failed to connect on attempt {count}'.format(count=attempt))
       time.sleep(0.1)
 
   def _create_ngclient(self, port, stdout, stderr):
     return NailgunClient(port=port, ins=self._ins, out=stdout, err=stderr, workdir=get_buildroot())
 
   def _spawn_nailgun_server(self, fingerprint, jvm_args, classpath, stdout, stderr):
-    log.debug('No ng server found with fingerprint %s, spawning...' % fingerprint)
+    log.debug('No ng server found with fingerprint {fingerprint}, spawning...'
+              .format(fingerprint=fingerprint))
 
     with safe_open(self._ng_out, 'w'):
       pass  # truncate
@@ -282,7 +290,10 @@ class NailgunExecutor(Executor):
     pid = os.fork()
     if pid != 0:
       # In the parent tine - block on ng being up for connections
-      return self._await_nailgun_server(stdout, stderr)
+      return self._await_nailgun_server(stdout, stderr,
+                                        'jvm_args={jvm_args} classpath={classpath}'
+                                        .format(jvm_args=jvm_args, classpath=classpath))
+
 
     os.setsid()
     in_fd = open('/dev/null', 'r')
@@ -304,11 +315,13 @@ class NailgunExecutor(Executor):
                          stderr=err_fd,
                          close_fds=True)
 
-    log.debug('Spawned ng server with fingerprint %s @ %d' % (fingerprint, process.pid))
+    log.debug('Spawned ng server with fingerprint {fingerprint} @ {pid}'
+              .format(fingerprint=fingerprint, pid=process.pid))
     # Prevents finally blocks and atexit handlers from being executed, unlike sys.exit(). We
     # don't want to execute finally blocks because we might, e.g., clean up tempfiles that the
     # parent still needs.
     os._exit(0)
 
   def __str__(self):
-    return 'NailgunExecutor(%s, server=%s)' % (self._distribution, self._get_nailgun_endpoint())
+    return 'NailgunExecutor({dist}, server={endpoint})' \
+      .format(dist=self._distribution, endpoint=self._get_nailgun_endpoint())

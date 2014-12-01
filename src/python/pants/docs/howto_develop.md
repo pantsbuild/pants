@@ -6,7 +6,7 @@ instructions for using Pants to develop other programs, please see
 [[First Tutorial|pants('src/docs:first_tutorial')]].)
 
 These instructions assume you've already
-<a xref="download_source_code">downloaded the source code</a>.
+<a pantsref="download_source_code">downloaded the source code</a>.
 
 Running from sources
 --------------------
@@ -98,7 +98,7 @@ specific version:
 Testing
 -------
 
-<a xmark="dev_run_all_tests"> </a>
+<a pantsmark="dev_run_all_tests"> </a>
 
 ### Running Tests
 
@@ -138,7 +138,7 @@ with the pull requests for the `pantsbuild/pants` repo. Travis-CI will test it s
 request is created. It will queue up a new job every time you subsequently push your branch.
 
 To kick off a new CI-build, push a branch to
-<a xref="download_source_code">your fork</a> of `pantsbuild/pants`.
+<a pantsref="download_source_code">your fork</a> of `pantsbuild/pants`.
 Create a pull request on the `pantsbuild/pants` [repo](https://github.com/pantsbuild/pants),
 not your fork. If you are posting a review request, put the pull request number into the Bug
 field. Then, when you close the request, you can navigate from the bug number to easily close
@@ -201,7 +201,7 @@ Debugging a JVM Tool
 
 Some Pants tools are imported as external JVM dependencies. If you need
 to debug one of these tools and change code, see
-<a xref="test_3rdparty_jvm_snapshot">Using a SNAPSHOT JVM Dependency</a>
+<a pantsref="test_3rdparty_jvm_snapshot">Using a SNAPSHOT JVM Dependency</a>
 which describes how to specify the `url` and `mutable` attributes of a `jar`
 dependency found on the local filesystem:
 

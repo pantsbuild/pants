@@ -23,11 +23,9 @@ class ConsoleTask(Task, QuietTaskMixin):
   def register_options(cls, register):
     super(ConsoleTask, cls).register_options(register)
     register('--sep', default='\\n', metavar='<separator>',
-             help='String to use to separate results.',
-             legacy='console_{0}_separator'.format(cls.__name__))
+             help='String to use to separate results.')
     register('--output-file', metavar='<path>',
-             help='Write the console output to this file instead.',
-             legacy='console_outstream')
+             help='Write the console output to this file instead.')
 
   def __init__(self, *args, **kwargs):
     super(ConsoleTask, self).__init__(*args, **kwargs)

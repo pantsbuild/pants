@@ -20,7 +20,7 @@ from pants.base.cache_manager import (InvalidationCacheManager, InvalidationChec
 from pants.base.config import Config
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import Work
-from pants.cache.artifact_cache import call_insert, call_use_cached_files
+from pants.cache.artifact_cache import call_insert, call_use_cached_files, UnreadableArtifact
 from pants.cache.cache_setup import create_artifact_cache
 from pants.cache.read_write_artifact_cache import ReadWriteArtifactCache
 from pants.reporting.reporting_utils import items_to_report_element
@@ -63,6 +63,7 @@ class TaskBase(AbstractClass):
     """
     def register(*args, **kwargs):
       options.register(cls.options_scope, *args, **kwargs)
+    register.bootstrap = options.bootstrap_option_values()
     cls.register_options(register)
 
   @classmethod
@@ -97,8 +98,10 @@ class TaskBase(AbstractClass):
     self._artifact_cache = None
     self._artifact_cache_setup_lock = threading.Lock()
 
-    default_invalidator_root = os.path.join(self.context.config.getdefault('pants_workdir'),
-                                            'build_invalidator')
+    self._cache_key_errors = set()
+
+    default_invalidator_root = os.path.join(
+      self.context.new_options.for_global_scope().pants_workdir, 'build_invalidator')
     suffix_type = self.__class__.__name__
     self._build_invalidator_dir = os.path.join(
         context.config.get('tasks', 'build_invalidator', default=default_invalidator_root),
@@ -155,7 +158,7 @@ class TaskBase(AbstractClass):
 
   def _create_artifact_cache(self, spec, action):
     if len(spec) > 0:
-      pants_workdir = self.context.config.getdefault('pants_workdir')
+      pants_workdir = self.context.new_options.for_global_scope().pants_workdir
       compression = self.context.config.getint('cache', 'compression', default=5)
       my_name = self.__class__.__name__
       return create_artifact_cache(
@@ -356,6 +359,9 @@ class TaskBase(AbstractClass):
       if was_in_cache:
         cached_vts.append(vt)
         uncached_vts.discard(vt)
+      elif isinstance(was_in_cache, UnreadableArtifact):
+        self._cache_key_errors.update(was_in_cache.key)
+
     # Note that while the input vts may represent multiple targets (for tasks that overrride
     # check_artifact_cache_for), the ones we return must represent single targets.
     def flatten(vts):
@@ -396,17 +402,15 @@ class TaskBase(AbstractClass):
         targets.update(vts.targets)
       self._report_targets('Caching artifacts for ', list(targets), '.')
 
-      # TODO(davidt): Track artifacts that erred while decompressing and overwrite just those.
-      overwrite = self.get_options().overwrite_cache_artifacts
+      always_overwrite = self.get_options().overwrite_cache_artifacts
 
       # Cache the artifacts.
       args_tuples = []
       for vts, artifactfiles in vts_artifactfiles_pairs:
+        overwrite = always_overwrite or vts.cache_key in self._cache_key_errors
         args_tuples.append((cache, vts.cache_key, artifactfiles, overwrite))
 
-      def bg_insert(cache, key, files, overwrite):
-        self.context.exec_on_subproc(call_insert, (cache, key, files, overwrite))
-      return Work(bg_insert, args_tuples, 'insert')
+      return Work(lambda x: self.context.subproc_map(call_insert, x), [(args_tuples,)], 'insert')
     else:
       return None
 

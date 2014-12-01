@@ -30,16 +30,16 @@ likely-looking `BUILD` file--in this example,
 `3rdparty/jvm/com/google/sun/jersey/BUILD`.
 
 In the appropriate `BUILD` file, you want to find a
-<a xref="bdict_jar_library">`jar_library`</a>
-with the <a xref="bdict_jar">`jar`</a>s you want:
+<a pantsref="bdict_jar_library">`jar_library`</a>
+with the <a pantsref="bdict_jar">`jar`</a>s you want:
 
 !inc[start-at=junit&end-before=specs](../../../../../../3rdparty/BUILD)
 
 Here, the
-<a xref="bdict_jar_library">`jar_library`</a>'s name
+<a pantsref="bdict_jar_library">`jar_library`</a>'s name
 defines a target address that
 other build targets can refer to. The
-<a xref="bdict_jar">`jar`</a>s refer to jars known to
+<a pantsref="bdict_jar">`jar`</a>s refer to jars known to
 your Ivy resolver.
 
 If there's already a `jar` importing the code you want but with a
@@ -105,18 +105,15 @@ source code and depend on local source:
 Troubleshooting a JVM Dependencies Problem
 ------------------------------------------
 
-If you're working in JVM (Java or Scala) and suspect you're pulling in
-different versions of some package, you can dump your dependency "tree"
-with versions with an Ivy resolve report. To generate a report for a
-target such as the `hello/main` example:
+If you're working in JVM (Java or Scala) and suspect you're pulling in different versions of some
+package, you can dump your dependency "tree" with versions with an Ivy resolve report.
+To generate a report for a target such as the `junit`-using `hello/greet` example tests:
 
     :::bash
-    $ ./pants goal resolve examples/src/java/com/pants/examples/hello/main --ivy-open
+    $ ./pants goal resolve.ivy --open examples/tests/java/com/pants/examples/hello/greet
 
-Ivy's report shows which things depend on which versions. You can see
-which package is pulling in the package-version you didn't expect. (It
-might not be clear which version you want to use; but at least you'll
-know what's causing the problem.)
+Ivy's report shows which which package is pulling in the package-version you didn't expect.
+(It might not be clear which version you *want*; but at least you've narrowed down the problem.)
 
 **If you notice a small number of wrong-version things,** then in a JVM
 target, you can depend on a `jar` that specifies a version and sets
@@ -200,7 +197,7 @@ transformed into:
 And as a result, both jars will now be brought into the target's
 classpath.
 
-<a xmark="test_3rdparty_jvm_snapshot"> </a>
+<a pantsmark="test_3rdparty_jvm_snapshot"> </a>
 
 Using a SNAPSHOT JVM Dependency
 -------------------------------

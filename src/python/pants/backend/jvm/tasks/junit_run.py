@@ -27,6 +27,8 @@ from pants.util.dirutil import (relativize_paths, safe_delete, safe_mkdir, safe_
                                 touch)
 
 
+_CWD_NOT_PRESENT='CWD NOT PRESENT'
+
 # TODO(ji): Add unit tests.
 # TODO(ji): Add coverage in ci.run (https://github.com/pantsbuild/pants/issues/83)
 
@@ -67,29 +69,27 @@ class _JUnitRunner(object):
   @classmethod
   def register_options(cls, register):
     _Coverage.register_options(register)
-    register('--skip', action='store_true', legacy='junit_run_skip',
-             help='Skip running junit.')
-    register('--fail-fast', action='store_true', legacy='junit_run_fail_fast',
+    register('--skip', action='store_true', help='Skip running junit.')
+    register('--fail-fast', action='store_true',
              help='Fail fast on the first test failure in a suite.')
-    register('--batch-size', type=int, default=sys.maxint, legacy='junit_run_batch_size',
+    register('--batch-size', type=int, default=sys.maxint,
              help='Run at most this many tests in a single test process.')
-    register('--test', action='append', legacy='junit_run_tests',
+    register('--test', action='append',
              help='Force running of just these tests.  Tests can be specified using any of: '
                   '[classname], [classname]#[methodname], [filename] or [filename]#[methodname]')
-    register('--xml-report', action='store_true', legacy='junit_run_xmlreport',
-             help='Output an XML report for the test run.')
-    register('--per-test-timer', action='store_true', legacy='junit_run_per_test_timer',
-             help='Show progress and timer for each test.')
-    register('--default-parallel', action='store_true', legacy='junit_run_default_parallel',
+    register('--xml-report', action='store_true', help='Output an XML report for the test run.')
+    register('--per-test-timer', action='store_true', help='Show progress and timer for each test.')
+    register('--default-parallel', action='store_true',
              help='Run classes without @TestParallel or @TestSerial annotations in parallel.')
-    register('--parallel-threads', type=int, default=0, legacy='junit_run_parallel_threads',
+    register('--parallel-threads', type=int, default=0,
              help='Number of threads to run tests in parallel. 0 for autoset.')
-    register('--test-shard', legacy='junit_run_test_shard',
+    register('--test-shard',
              help='Subset of tests to run, in the form M/N, 0 <= M < N. '
                   'For example, 1/3 means run tests number 2, 5, 8, 11, ...')
     register('--suppress-output', action='store_true', default=True,
-             legacy='junit_run_suppress_output',
              help='Redirect test output to files in .pants.d/test/junit. Implied by --xml-report.')
+    register('--cwd', default=_CWD_NOT_PRESENT, nargs='?',
+             help='Set the working directory. If no argument is passed, use the first target path.')
 
   def register_jvm_tool(self, key, ini_section, ini_key, default):
     tool = self._context.config.getlist(ini_section, ini_key, default)
@@ -111,7 +111,7 @@ class _JUnitRunner(object):
     self._tests_to_run = options.test
     self._batch_size = options.batch_size
     self._fail_fast = options.fail_fast
-
+    self._cwd_opt = options.cwd
     self._args = copy.copy(task_exports.args)
     if options.xml_report or options.suppress_output:
       if self._fail_fast:
@@ -134,6 +134,11 @@ class _JUnitRunner(object):
       self._args.append(options.test_shard)
 
   def execute(self, targets):
+    working_dir = None
+    if self._cwd_opt != _CWD_NOT_PRESENT:
+      working_dir = self._cwd_opt
+      if not working_dir and targets:
+        working_dir = targets[0].address.spec_path
     # For running the junit tests, we're only interested in
     # java_tests/junit_tests targets.
     #
@@ -153,7 +158,7 @@ class _JUnitRunner(object):
         confs=self._task_exports.confs,
         exclusives_classpath=self._task_exports.get_base_classpath_for_target(java_tests_targets[0]))
 
-      self._context.lock.release()
+      self._context.release_lock()
       self.instrument(targets, tests, junit_classpath)
 
       def _do_report(exception=None):
@@ -178,7 +183,7 @@ class _JUnitRunner(object):
     """
     pass
 
-  def run(self, tests, junit_classpath):
+  def run(self, tests, junit_classpath, cwd=None):
     """Run the tests in the appropriate environment.
 
     Subclasses should override this if they need more work done.
@@ -188,7 +193,6 @@ class _JUnitRunner(object):
     :param junit_classpath: the collective classpath value under which
       the junit tests will be executed.
     """
-    self._run_tests(tests, junit_classpath, JUnitRun._MAIN)
 
   def report(self, targets, tests, tests_failed_exception):
     """Post-processing of any test output.
@@ -204,12 +208,13 @@ class _JUnitRunner(object):
     """
     pass
 
-  def _run_tests(self, tests, classpath, main, extra_jvm_options=None):
+  def _run_tests(self, tests, classpath, main, extra_jvm_options=None, cwd=None):
     # TODO(John Sirois): Integrated batching with the test runner.  As things stand we get
     # results summaries for example for each batch but no overall summary.
     # http://jira.local.twitter.com/browse/AWESOME-1114
     extra_jvm_options = extra_jvm_options or []
     result = 0
+    cwd = cwd or get_buildroot()
     for batch in self._partition(tests):
       with binary_util.safe_args(batch) as batch_tests:
         result += abs(execute_java(
@@ -219,7 +224,8 @@ class _JUnitRunner(object):
           args=self._args + batch_tests,
           workunit_factory=self._context.new_workunit,
           workunit_name='run',
-          workunit_labels=[WorkUnit.TEST]
+          workunit_labels=[WorkUnit.TEST],
+          cwd=cwd
         ))
         if result != 0 and self._fail_fast:
           break
@@ -283,24 +289,22 @@ class _Coverage(_JUnitRunner):
 
   @classmethod
   def register_options(cls, register):
-    register('--coverage-patterns', action='append', legacy='junit_run_coverage_patterns',
+    register('--coverage-patterns', action='append',
              help='Restrict coverage measurement. Values are class name prefixes in dotted form '
                   'with ? and * wildcards. If preceded with a - the pattern is excluded. For '
                   'example, to include all code in com.pants.raven except claws and the eye you '
-                  'would use: %(flag)s=com.pants.raven.* %(flag)s=-com.pants.raven.claw '
-                  '%(flag)s=-com.pants.raven.Eye.'.format(flag='--coverage_patterns'))
+                  'would use: {flag}=com.pants.raven.* {flag}=-com.pants.raven.claw '
+                  '{flag}=-com.pants.raven.Eye.'.format(flag='--coverage_patterns'))
     register('--coverage-console', action='store_true', default=True,
-             legacy='junit_run_coverage_console',
              help='Output a simple coverage report to the console.')
-    register('--coverage-xml', action='store_true', legacy='junit_run_coverage_xml',
+    register('--coverage-xml', action='store_true',
              help='Output an XML coverage report.')
-    register('--coverage-html', action='store_true', legacy='junit_run_coverage_html',
+    register('--coverage-html', action='store_true',
             help='Output an HTML coverage report.')
-    register('--coverage-html-open', action='store_true', legacy='junit_run_coverage_html_open',
+    register('--coverage-html-open', action='store_true',
              help='Open the generated HTML coverage report in a browser. Implies --coverage-html.')
     register('--coverage-report-when-tests-fail', action='store_true',
-             legacy='junit_run_report_when_tests_fail',
-             help='[%%default] Attempt to run the reporting phase of coverage even if tests failed '
+             help='Attempt to run the reporting phase of coverage even if tests failed '
                   '(defaults to False, as otherwise the coverage results would be unreliable).')
 
   def __init__(self, task_exports, context):
@@ -330,7 +334,7 @@ class _Coverage(_JUnitRunner):
     pass
 
   @abstractmethod
-  def run(self, tests, junit_classpath):
+  def run(self, tests, junit_classpath, cwd=None):
     pass
 
   @abstractmethod
@@ -393,11 +397,12 @@ class Emma(_Coverage):
         raise TaskError("java %s ... exited non-zero (%i)"
                         " 'failed to instrument'" % (main, result))
 
-  def run(self, tests, junit_classpath):
+  def run(self, tests, junit_classpath, cwd=None):
     self._run_tests(tests,
                     [self._coverage_instrument_dir] + junit_classpath + self._emma_classpath,
                     JUnitRun._MAIN,
-                    extra_jvm_options=['-Demma.coverage.out.file={0}'.format(self._coverage_file)])
+                    extra_jvm_options=['-Demma.coverage.out.file={0}'.format(self._coverage_file)],
+                    cwd=cwd)
 
   def report(self, targets, tests, tests_failed_exception=None):
     if tests_failed_exception:
@@ -536,15 +541,20 @@ class Cobertura(_Coverage):
         raise TaskError("java %s ... exited non-zero (%i)"
                         " 'failed to instrument'" % (main, result))
 
+<<<<<<< HEAD
   def run(self, tests, junit_classpath):
     if self._nothing_to_instrument:
       self._context.log.warn('Nothing found to instrument, skipping tests...')
       return
     cobertura_cp = self._task_exports.tool_classpath(self._cobertura_run_bootstrap_key)
+=======
+  def run(self, tests, junit_classpath, cwd=None):
+>>>>>>> upstream/master
     self._run_tests(tests,
                     cobertura_cp + junit_classpath,
                     JUnitRun._MAIN,
-                    extra_jvm_options=['-Dnet.sourceforge.cobertura.datafile=' + self._coverage_datafile])
+                    extra_jvm_options=['-Dnet.sourceforge.cobertura.datafile=' + self._coverage_datafile],
+                    cwd=cwd)
 
   def _build_sources_by_class(self):
     """Invert classes_by_source."""
@@ -650,10 +660,8 @@ class JUnitRun(JvmTask, JvmToolTaskMixin):
   def register_options(cls, register):
     super(JUnitRun, cls).register_options(register)
     _JUnitRunner.register_options(register)
-    register('--coverage', action='store_true', legacy='junit_run_coverage',
-             help='Collect code coverage data.')
-    register('--coverage-processor', default='emma', legacy='junit_coverage_processor',
-             help='Which coverage subsystem to use.')
+    register('--coverage', action='store_true', help='Collect code coverage data.')
+    register('--coverage-processor', default='emma', help='Which coverage subsystem to use.')
 
 
   def __init__(self, *args, **kwargs):

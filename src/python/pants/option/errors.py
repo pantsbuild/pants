@@ -6,9 +6,11 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 
-class DuplicateDependencyError(Exception):
-  """Raised when a dependency is specified twice.
+class RegistrationError(Exception):
+  """An error at option registration time."""
+  pass
 
-  While not a serious error, it is better to give the user immediate feedback so
-  the dupe can be removed.
-  """
+
+class ParseError(Exception):
+  """An error at flag parsing time."""
+  pass

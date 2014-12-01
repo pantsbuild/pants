@@ -20,6 +20,7 @@ from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.target import Target
 from pants.goal.context import Context
 from pants.goal.goal import Goal
+from pants.option.bootstrap_options import register_bootstrap_options
 from pants.option.options import Options
 from pants_test.base_test import BaseTest
 from pants_test.base.context_utils import create_config, create_run_tracker
@@ -64,6 +65,8 @@ class TaskTest(BaseTest):
     workdir = os.path.join(config.getdefault('pants_workdir'), 'test', task_type.__name__)
 
     new_options = Options(env={}, config=config, known_scopes=['', 'test'], args=args or [])
+    # A lot of basic code uses these options, so always register them.
+    register_bootstrap_options(new_options.register_global)
 
     task_type.options_scope = 'test'
     task_type.register_options_on_scope(new_options)

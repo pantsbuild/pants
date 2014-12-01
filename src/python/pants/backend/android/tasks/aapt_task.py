@@ -16,12 +16,11 @@ class AaptTask(AndroidTask):
   @classmethod
   def register_options(cls, register):
     super(AaptTask, cls).register_options(register)
-    register('--target-sdk', legacy='target_sdk',
+    register('--target-sdk',
              help='Use this Android SDK to compile resources. Overrides AndroidManifest.xml.')
-    register('--build-tools-version', legacy='build_tools_version',
+    register('--build-tools-version',
              help='Use this Android build-tools version to compile resources.')
     register('--ignored-assets', default=IGNORED_ASSETS, metavar='<PATTERN>',
-             legacy='ignored_assets',
              help='Patterns the aapt tools should ignore as they search the resource_dir.')
 
   @classmethod

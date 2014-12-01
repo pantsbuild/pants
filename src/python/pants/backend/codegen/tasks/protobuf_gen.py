@@ -48,8 +48,7 @@ class ProtobufGen(CodeGen):
   def register_options(cls, register):
     super(ProtobufGen, cls).register_options(register)
     register('--lang', action='append', choices=['python', 'java'],
-             help='Force generation of protobuf code for these languages.',
-             legacy='protobuf_gen_langs')
+             help='Force generation of protobuf code for these languages.')
 
   def __init__(self, *args, **kwargs):
     """Generates Java and Python files from .proto files using the Google protobuf compiler."""
@@ -273,10 +272,11 @@ def calculate_java_genfiles(protobuf_parse):
     yield os.path.join(basepath, '{0}.java'.format(classname))
 
 def _same_contents(a, b):
+  """Perform a comparison of the two files"""
   with open(a, 'r') as f:
-    a_data = f.read().replace(' ', '')
+    a_data = f.read()
   with open(b, 'r') as f:
-    b_data = f.read().replace(' ', '')
+    b_data = f.read()
   return a_data == b_data
 
 def check_duplicate_conflicting_protos(sources_by_base, sources, log):

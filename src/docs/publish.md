@@ -19,9 +19,9 @@ It's tricky to keep track of versions, label artifacts with versions,
 and upload those artifacts. Pants eases these tasks.
 
 A library's build target specifies where to publish it. For example, a
-<a xref="bdict_java_library">`java_library`</a>
+<a pantsref="bdict_java_library">`java_library`</a>
 build target can have a `provides` parameter of type
-<a xref="bdict_artifact">`artifact`</a>.
+<a pantsref="bdict_artifact">`artifact`</a>.
 The `artifact` specifies an "address" similar to
 what you might see in `3rdparty` `BUILD` files: an artifact's location.
 It does *not* specify a version; that changes each time you publish.
@@ -85,10 +85,9 @@ Things can go wrong; you can recover:
     merge conflicts can happen, and folks don't always recover from them
     correctly.
 
-    In this situation, you probably want to pass `--publish-override` to
-    specify a version to use instead of the automatically-computed
-    already-existing version. Choose a version that's not already on the
-    server. Pants records this version in the pushdb, so hopefully the
+    In this situation, you probably want to pass `goal publish --overrride=<version>` to specify a
+    version to use instead of the automatically-computed already-existing version. Choose a version
+    that's not already on the server. Pants records this version in the pushdb, so hopefully the
     next publisher won't have the same problem.
 
     Perhaps you are "racing" a colleague and just lost the race: they
@@ -108,7 +107,7 @@ Things can go wrong; you can recover:
     ignoring the error now means that your *next* publish will probably
     fail, since Pants has lost track of the current version number.)
 
-    See: <a xref="publish_pushdb_push">Troubleshoot a Failed Push to Origin</a>
+    See: <a pantsref="publish_pushdb_push">Troubleshoot a Failed Push to Origin</a>
 
 How To
 ------
@@ -118,9 +117,9 @@ How To
     If so, be on that branch with no changes.
 -   Consider trying a local publish first. This lets you test the
     to-be-published artifact. See
-    <a xref="publish_local_test">Test with a Fake Local "Publish"</a>.
+    <a pantsref="publish_local_test">Test with a Fake Local "Publish"</a>.
 -   Start the publish:
-    `./pants goal publish --no-publish-dryrun [target]` Don't wander
+    `./pants goal publish --no-dryrun [target]` Don't wander
     off; Pants will ask for confirmation as it goes (making sure you
     aren't publishing artifact[s] you didn't mean to).
 
@@ -130,7 +129,7 @@ Restricting to "Release Branch"
 Your organization might have a notion of a special "release branch": you
 want all publishing to happen on this source control branch, which you
 maintain extra-carefully. You can
-<a xref="setup_publish_restrict_branch">configure your repo so that the
+<a pantsref="setup_publish_restrict_branch">configure your repo so that the
 `publish` goal only allows `publish`-ing from this special branch</a>.
 
 Authenticating to the Artifact Repository
@@ -184,17 +183,16 @@ To make this work:
 If you need to implement some other kind of authentication, you might
 look at [the Netrc
 implementation](https://github.com/pantsbuild/pants/blob/master/src/python/pants/backend/authentication/netrc_util.py)
-and the <a xref="bdict_credentials">`credentials`</a> target type for inspiration.
+and the <a pantsref="bdict_credentials">`credentials`</a> target type for inspiration.
 
 Troubleshooting
 ---------------
 
-Sometimes publishing doesn't do what you want. The fix usually involves
-publishing again, perhaps passing `--publish-override` (override the
-version number to use), `--publish-force`, and/or
-`--publish-restart-at`. The following are some usual symptoms/questions:
+Sometimes publishing doesn't do what you want. The fix usually involves publishing again, perhaps
+passing `--override` (override the version number to use), `--force`, and/or `--restart-at`. The
+following are some usual symptoms/questions:
 
-<a xmark="publish_version_exists"></a>
+<a pantsmark="publish_version_exists"></a>
 
 ### Versioned Artifact Already Exists
 
@@ -207,19 +205,17 @@ want to use. E.g., if you notice that versions up to 2.5.7 exist and you
 want to bump the patch version, you want to override the default version
 number and use 2.5.8 instead.
 
-Try publishing again, but pass `--publish-override` to specify the
-version number to use instead of incrementing the version number from
-the pushdb. Be sure to use a version number that has not already been
-published this time. For example, to override the default publish
-version number for the `org.archie` buoyancy artifact, you might pass
-`--publish-override=org.archie#buoyancy=2.5.8`.
+Try publishing again, but pass `--override` to specify the version number to use instead of
+incrementing the version number from the pushdb. Be sure to use a version number that has not
+already been published this time. For example, to override the default publish version number for
+the `org.archie` buoyancy artifact, you might pass
+`goal publish --override=org.archie#buoyancy=2.5.8`.
 
-<a xmark="publish_pushdb_push"></a>
+<a pantsmark="publish_pushdb_push"></a>
 
 ### Failed to Push to Origin
 
-You might successfully publish your artifact but then fail to push your
-pushdb change to origin:
+You might successfully publish your artifact but then fail to push your pushdb change to origin:
 
     To https://git.archimedes.org/owls
      ! [rejected]        master -> master (non-fast-forward)
@@ -252,12 +248,11 @@ In git, this might mean:
     git pull origin master
     ./pants goal publish <your previous args>
 
-Since you uploaded new versioned artifacts but the reset pushdb doesn't
-"remember" that, you might get "Versioned Artifact Already Exists"
-errors: see the section above, and use `--publish-override` to set
-version numbers to avoid these.
+Since you uploaded new versioned artifacts but the reset pushdb doesn't "remember" that, you might
+get "Versioned Artifact Already Exists" errors: see the section above and use `--override` to
+set version numbers to avoid these.
 
-<a xmark="publish_no_provides"></a>
+<a pantsmark="publish_no_provides"></a>
 
 ### Does not provide an artifact
 
@@ -287,7 +282,7 @@ coordinates from the target's `provides` parameter. Thus, if you try to
 publish a target that has no `provides`, Pants doesn't try. If the
 target depends on *other* targets that *do* provide artifacts, Pants
 might publish those. This is a case of
-<a xref="tut_goal_target_mismatch">goal-target mismatch</a>
+<a pantsref="tut_goal_target_mismatch">goal-target mismatch</a>
 To fix this, set `provides` correctly.
 
 Want to Publish Something? Publish Many Things
@@ -317,7 +312,7 @@ In this example, when you publish `high-level`, Pants knows to also
 publish `util`. If Pants publishes `util`, it does *not* automatically
 try to publish `high-level` or `other-high-level`.
 
-<a xmark="publish_local_test"></a>
+<a pantsmark="publish_local_test"></a>
 
 Test with a Fake Local "Publish"
 --------------------------------
@@ -332,7 +327,7 @@ Maven configured to use `~/.m2/repository` as a local repo. You can make
 pants publish to that local repo with:
 
     :::bash
-    ./pants goal publish --no-publish-dryrun --publish-local=~/.m2/repository
+    ./pants goal publish --no-dryrun --local=~/.m2/repository
 
 In the other codebase, change the dependencies to pull in the new
 artifact.
@@ -340,13 +335,13 @@ artifact.
 If your other codebase *also* uses Pants build, you can depend on the
 locally-published artifact. If the artifact is a jar, then in the
 3rdparty
-<a xref="bdict_jar">`jar` target</a>, set `mutable=True` and change the
+<a pantsref="bdict_jar">`jar` target</a>, set `mutable=True` and change the
 version number.
 
 Setting Up Your Workspace
 -------------------------
 
 To get Pants publish working in the first place, someone needs to
-<a xref="setup_publish">configure your codebase</a>
+<a pantsref="setup_publish">configure your codebase</a>
 to register one or more
 artifact repositories and, optionally, enable some features.

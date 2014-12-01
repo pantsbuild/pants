@@ -9,18 +9,9 @@ from argparse import ArgumentParser, _HelpAction
 import copy
 
 from pants.option.arg_splitter import GLOBAL_SCOPE
+from pants.option.errors import ParseError, RegistrationError
 from pants.option.help_formatter import PantsHelpFormatter
 from pants.option.ranked_value import RankedValue
-
-
-class RegistrationError(Exception):
-  """An error at option registration time."""
-  pass
-
-
-class ParseError(Exception):
-  """An error at flag parsing time."""
-  pass
 
 
 # Standard ArgumentParser prints usage and exits on error. We subclass so we can raise instead.
@@ -51,7 +42,7 @@ class Parser(object):
   option from the outer scope.
 
   :param env: a dict of environment variables.
-  :param config: data from a config file (must support config.get(section, name, default=)).
+  :param config: data from a config file (must support config.get[list](section, name, default=)).
   :param scope: the scope this parser acts for.
   :param parent_parser: the parser for the scope immediately enclosing this one, or
          None if this is the global scope.
@@ -111,14 +102,11 @@ class Parser(object):
       ancestor._freeze()
       ancestor = ancestor._parent_parser
 
-    clean_kwargs = copy.deepcopy(kwargs)  # Copy kwargs so we can remove legacy-related keys.
-    kwargs = None  # Ensure no code below modifies kwargs accidentally.
-    self._validate(args, clean_kwargs)
-    clean_kwargs.pop('legacy', None)
-    dest = self._set_dest(args, clean_kwargs)
+    self._validate(args, kwargs)
+    dest = self._set_dest(args, kwargs)
 
     # Is this a boolean flag?
-    if clean_kwargs.get('action') in ('store_false', 'store_true'):
+    if kwargs.get('action') in ('store_false', 'store_true'):
       inverse_args = []
       help_args = []
       for flag in args:
@@ -134,17 +122,17 @@ class Parser(object):
     # Register the option, only on this scope, for the purpose of displaying help.
     # Note that we'll only display the default value for this scope, even though the
     # default may be overridden in inner scopes.
-    raw_default = self._compute_default(dest, clean_kwargs).value
-    clean_kwargs_with_default = dict(clean_kwargs, default=raw_default)
-    self._help_argparser.add_argument(*help_args, **clean_kwargs_with_default)
+    raw_default = self._compute_default(dest, kwargs).value
+    kwargs_with_default = dict(kwargs, default=raw_default)
+    self._help_argparser.add_argument(*help_args, **kwargs_with_default)
     self._has_help_options = True
 
     # Register the option for the purpose of parsing, on this and all enclosed scopes.
     if inverse_args:
-      inverse_kwargs = self._create_inverse_kwargs(clean_kwargs)
-      self._register_boolean(dest, args, clean_kwargs, inverse_args, inverse_kwargs)
+      inverse_kwargs = self._create_inverse_kwargs(kwargs)
+      self._register_boolean(dest, args, kwargs, inverse_args, inverse_kwargs)
     else:
-      self._register(dest, args, clean_kwargs)
+      self._register(dest, args, kwargs)
 
   def _register(self, dest, args, kwargs):
     """Recursively register the option for parsing."""
@@ -177,10 +165,12 @@ class Parser(object):
       if not arg.startswith('--') and len(arg) > 2:
         raise RegistrationError('Multicharacter option {0} in scope {1} must begin '
                                 'with a double-dash'.format(arg, self._scope))
-    for k in ['nargs', 'required']:
-      if k in kwargs:
-        raise RegistrationError('{0} unsupported in registration of option {1} in '
-                                'scope {2}.'.format(k, args, self._scope))
+    if 'nargs' in kwargs and kwargs['nargs'] != '?':
+      raise RegistrationError('nargs={0} unsupported in registration of option {1} in '
+                              'scope {2}.'.format(kwargs['nargs'], args, self._scope))
+    if 'required' in kwargs:
+      raise RegistrationError('{0} unsupported in registration of option {1} in '
+                              'scope {2}.'.format(k, args, self._scope))
 
   def _set_dest(self, args, kwargs):
     """Maps the externally-used dest to a scoped one only seen internally.

@@ -21,6 +21,29 @@ class ArtifactCacheError(Exception):
 class NonfatalArtifactCacheError(Exception):
   pass
 
+class UnreadableArtifact(object):
+  """A False-y value to indicate a read-failure (vs a normal cache-miss)
+
+  See docstring on `ArtifactCache.use_cached_files` for details.
+  """
+
+  def __init__(self, key, err=None):
+    """
+    :param CacheKey key: The key of the artifact that encountered an error
+    :param err: Any additional information on the nature of the read error.
+    """
+    self.key = key
+    self.err = None
+
+  # For python 3
+  def __bool__(self):
+    return False
+
+  # For python 2
+  def __nonzero__(self):
+    return self.__bool__()
+
+
 class ArtifactCache(object):
   """A map from cache key to a set of build artifacts.
 
@@ -79,9 +102,19 @@ class ArtifactCache(object):
   def use_cached_files(self, cache_key):
     """Use the files cached for the given key.
 
-    Returns an appropriate Artifact instance if files were found and used, None otherwise.
-    Callers will typically only care about the truthiness of the return value. They usually
-    don't need to tinker with the returned instance.
+    Returned result indicates whether or not an artifact was successfully found
+    and decompressed to the `artifact_root`:
+      `True` if artifact was found and successfully decompressed
+      `False` if not in the cache
+
+    Implementations may choose to return an UnreadableArtifact instance instead
+    of `False` to indicate an artifact was in the cache but could not be read,
+    due to anerror or corruption. UnreadableArtifact evaluates as False-y, so
+    callers can treat the result as a boolean if they are only concerned with
+    whether or not an artifact was read.
+
+    Callers may also choose to attempt to repair or report corrupted artifacts
+    differently, as these are unexpected, unlike normal cache misses.
 
     :param CacheKey cache_key: A CacheKey object.
     """
@@ -96,27 +129,31 @@ class ArtifactCache(object):
     pass
 
 def call_use_cached_files(tup):
-  """Importable helper for multi-proc calling of ArtifactCache.use_cached_files
+  """Importable helper for multi-proc calling of ArtifactCache.use_cached_files on a cache instance.
 
   Multiprocessing map/apply/etc require functions which can be imported, not bound methods.
   To call a bound method, instead call a helper like this and pass tuple of the instance and args.
   The helper can then call the original method on the deserialized instance.
 
-  :param tup: A tuple of an ArtifactCache and a argument to ArtifactCache.use_cached_files
+  :param tup: A tuple of an ArtifactCache and arg (eg CacheKey) for ArtifactCache.use_cached_files.
   """
-  res = tup[0].use_cached_files(tup[1])
-  sys.stderr.write('.')
-  return bool(res)
+  cache, key = tup
+  res = cache.use_cached_files(key)
+  if res:
+    sys.stderr.write('.')
+  else:
+    sys.stderr.write(' ')
+  return res
 
-def call_insert(cache, key, files, overwrite=False):
-  """Importable helper for multi-proc calling of ArtifactCache.insert
+def call_insert(tup):
+  """Importable helper for multi-proc calling of ArtifactCache.insert on an ArtifactCache instance.
 
   See docstring on call_use_cached_files explaining why this is useful.
 
-  :param ArtifactCache cache: see ArtifactCache.insert
-  :param CacheKey key: ArtifactCache.insert
-  :param iterable<str> files: ArtifactCache.insert
-  :param bool overwrite: ArtifactCache.insert
+  :param tup: A 4-tuple of an ArtifactCache and the 3 args passed to ArtifactCache.insert:
+              eg (some_cache_instance, cache_key, [some_file, another_file], False)
+
   """
+  cache, key, files, overwrite = tup
   return cache.insert(key, files, overwrite)
 

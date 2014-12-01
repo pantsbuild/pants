@@ -11,9 +11,6 @@ import os
 import sys
 import traceback
 
-import psutil
-from twitter.common.dirutil import Lock
-
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.build_environment import get_buildroot, pants_version
 from pants.base.build_file_address_mapper import BuildFileAddressMapper
@@ -82,17 +79,13 @@ def _synthesize_command(root_dir, args):
   if command.startswith('-'):
     _exit_and_fail('Invalid command: %s' % command)
 
-  _exit_and_fail('Pants build missing a command: %s' % traceback.format_exc())
+  _exit_and_fail('Pants build missing a command: args={args} tb=\n{tb}'
+                 .format(args=args, tb=traceback.format_exc()))
 
 
 def _parse_command(root_dir, args):
   command, args = _synthesize_command(root_dir, args)
   return Command.get_command(command), args
-
-
-def _process_info(pid):
-  process = psutil.Process(pid)
-  return '%d (%s)' % (pid, ' '.join(process.cmdline))
 
 def _run():
   # Place the registration of the unhandled exception hook as early as possible in the code.
@@ -158,18 +151,8 @@ def _run():
                           address_mapper,
                           build_graph)
   try:
-    if command.serialized():
-      def onwait(pid):
-        process = psutil.Process(pid)
-        print('Waiting on pants process %d (%s) to complete' %
-              (pid, ' '.join(process.cmdline)), file=sys.stderr)
-        return True
-      runfile = os.path.join(root_dir, '.pants.run')
-      lock = Lock.acquire(runfile, onwait=onwait)
-    else:
-      lock = Lock.unlocked()
     try:
-      result = command.run(lock)
+      result = command.run()
       if result:
         run_tracker.set_root_outcome(WorkUnit.FAILURE)
       _do_exit(result)
@@ -179,13 +162,14 @@ def _run():
     except Exception:
       run_tracker.set_root_outcome(WorkUnit.FAILURE)
       raise
-    finally:
-      lock.release()
   finally:
     run_tracker.end()
     # Must kill nailguns only after run_tracker.end() is called, because there may still
     # be pending background work that needs a nailgun.
+    # TODO(Eric Ayers) simplify after setup_py goes away.
     if (hasattr(command.old_options, 'cleanup_nailguns') and command.old_options.cleanup_nailguns) \
+        or (hasattr(command, 'new_options')
+            and command.new_options.for_global_scope().kill_nailguns) \
         or config.get('nailgun', 'autokill', default=False):
       NailgunTask.killall(None)
 

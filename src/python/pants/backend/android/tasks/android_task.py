@@ -13,7 +13,7 @@ class AndroidTask(Task):
   @classmethod
   def register_options(cls, register):
     super(AndroidTask, cls).register_options(register)
-    register('--sdk-path', legacy='sdk_path',
+    register('--sdk-path',
              help='Use the Android SDK at this path.')
 
   def __init__(self, *args, **kwargs):

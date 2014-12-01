@@ -10,10 +10,6 @@ import sys
 from collections import defaultdict
 from contextlib import contextmanager
 
-from twitter.common.dirutil import Lock
-from twitter.common.process import ProcessProviderFactory
-from twitter.common.process.process_provider import ProcessProvider
-
 from pants.base.address import SyntheticAddress
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.build_graph import BuildGraph
@@ -23,23 +19,12 @@ from pants.base.workunit import WorkUnit
 from pants.goal.products import Products
 from pants.goal.workspace import ScmWorkspace
 from pants.java.distribution.distribution import Distribution
+from pants.process.pidlock import OwnerPrintingPIDLockFile
 from pants.reporting.report import Report
 from pants.base.worker_pool import SubprocPool
 
 # Override with ivy -> cache_dir
 _IVY_CACHE_DIR_DEFAULT=os.path.expanduser('~/.ivy2/pants')
-
-# Utility definition for grabbing process info for locking.
-def _process_info(pid):
-  try:
-    ps = ProcessProviderFactory.get()
-    ps.collect_set([pid])
-    handle = ps.get_handle(pid)
-    cmdline = handle.cmdline().replace('\0', ' ')
-    return '%d (%s)' % (pid, cmdline)
-  except ProcessProvider.UnknownPidError:
-    return '%d' % pid
-
 
 class Context(object):
   """Contains the context for a single run of pants.
@@ -74,7 +59,7 @@ class Context(object):
   # TODO: Figure out a more structured way to construct and use context than this big flat
   # repository of attributes?
   def __init__(self, config, new_options, run_tracker, target_roots,
-               requested_goals=None, lock=None, log=None, target_base=None, build_graph=None,
+               requested_goals=None, log=None, target_base=None, build_graph=None,
                build_file_parser=None, address_mapper=None, console_outstream=None, scm=None,
                workspace=None, spec_excludes=None):
     self._config = config
@@ -83,11 +68,11 @@ class Context(object):
     self.build_file_parser = build_file_parser
     self.address_mapper = address_mapper
     self.run_tracker = run_tracker
-    self._lock = lock or Lock.unlocked()
     self._log = log or Context.Log(run_tracker)
     self._target_base = target_base or Target
     self._products = Products()
     self._buildroot = get_buildroot()
+    self._lock = OwnerPrintingPIDLockFile(os.path.join(self._buildroot, '.pants.run'))
     self._java_sysprops = None  # Computed lazily.
     self.requested_goals = requested_goals or []
     self._console_outstream = console_outstream or sys.stdout
@@ -105,11 +90,6 @@ class Context(object):
   def new_options(self):
     """Returns the new-style options."""
     return self._new_options
-
-  @property
-  def lock(self):
-    """Returns the global pants run lock so a goal can release it if needed."""
-    return self._lock
 
   @property
   def log(self):
@@ -228,20 +208,6 @@ class Context(object):
       SubprocPool.shutdown(True)
       raise
 
-  def exec_on_subproc(self, f, args):
-    """Send work to a subprocess and block on it.
-
-       This can be used by existing background Work in a ThreadPool to sidestep the GIL:
-       The Thread calls this method and still blocks until the work is complete, so
-       existing reporting and accounting is unchanged, but the actual work is executed
-       in a subprocess, avoiding lock contention.
-
-       :param f: A multiproc-friendly (importable) work function.
-       :param args: Multiproc-friendly (pickleable) arguments to f.
-    """
-    return SubprocPool.background().apply(f, args)
-
-
   @contextmanager
   def new_workunit(self, name, labels=None, cmd=''):
     """Create a new workunit under the calling thread's current workunit."""
@@ -252,27 +218,22 @@ class Context(object):
     """ Acquire the global lock for the root directory associated with this context. When
     a goal requires serialization, it will call this to acquire the lock.
     """
-    def onwait(pid):
-      print('Waiting on pants process %s to complete' % _process_info(pid), file=sys.stderr)
-      return True
-    if self._lock.is_unlocked():
-      runfile = os.path.join(self._buildroot, '.pants.run')
-      self._lock = Lock.acquire(runfile, onwait=onwait)
+    if not self._lock.i_am_locking():
+      self._lock.acquire()
 
   def release_lock(self):
     """Release the global lock if it's held.
     Returns True if the lock was held before this call.
     """
-    if self._lock.is_unlocked():
+    if not self._lock.i_am_locking():
       return False
     else:
       self._lock.release()
-      self._lock = Lock.unlocked()
       return True
 
   def is_unlocked(self):
     """Whether the global lock object is actively holding the lock."""
-    return self._lock.is_unlocked()
+    return not self._lock.i_am_locking()
 
   def replace_targets(self, target_roots):
     """Replaces all targets in the context with the given roots and their transitive

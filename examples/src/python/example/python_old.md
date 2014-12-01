@@ -140,7 +140,7 @@ Let's take a look at the BUILD file in
     )
 
 This BUILD file names one target: hello\_world, which is a
-<a xref="bdict_python_binary">python\_binary target</a>.
+<a pantsref="bdict_python_binary">python\_binary target</a>.
 The hello\_world target contains one source file,
 hello\_world.py and depends upon one other target, the format of which
 will be described shortly.

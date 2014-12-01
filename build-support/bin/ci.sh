@@ -127,7 +127,7 @@ EOF
     mv dist/_pants_transitional_publishable_binary_.pex dist/self.pex && \
     ./dist/self.pex goal binary ${INTERPRETER_ARGS[@]} \
       src/python/pants:_pants_transitional_publishable_binary_ && \
-    ./dist/self.pex setup_py --recursive src/python/pants:pants-packaged
+    ./dist/self.pex goal setup-py --recursive src/python/pants:pants-packaged
   ) || die "Failed to create pants distributions."
 fi
 
@@ -196,7 +196,7 @@ if [[ "${skip_integration:-false}" == "false" ]]; then
             xargs ./pants goal filter --filter-type=python_tests | \
             grep integration | \
             sort | \
-            sed -n "${SHARD_NUMBER:-0}~${TOTAL_SHARDS:-1}p")
+            awk "NR%${TOTAL_SHARDS:-1}==${SHARD_NUMBER:-0}")
   ) || die "Pants Integration test failure"
 fi
 

@@ -16,19 +16,19 @@ features](http://pythonhosted.org/Markdown/) Pants uses Python
 Markdown's `codehilite`, `extra`, `tables`, and `toc` extensions.
 
 To tell Pants about your Markdown file, use a
-<a xref="bdict_page">`page`</a>
+<a pantsref="bdict_page">`page`</a>
 target in a `BUILD` file as in this excerpt from
 [examples/src/java/com/pants/examples/hello/main/BUILD](https://github.com/pantsbuild/pants/blob/master/examples/src/java/com/pants/examples/hello/main/BUILD):
 
 !inc[start-after=README page](hello/main/BUILD)
 
 To render the page as HTML, use the
-<a xref="gref_goal_markdown">markdown goal</a>. For example, to view
+<a pantsref="gref_goal_markdown">markdown goal</a>. For example, to view
 `examples/src/java/com/pants/examples/hello/main/README.md` as HTML in
 your browser,
 
     :::bash
-    $ ./pants goal markdown --markdown-open examples/src/java/com/pants/examples/hello/main:readme
+    $ ./pants goal markdown --open examples/src/java/com/pants/examples/hello/main:readme
 
 Pants generates the HTML files in the `dist/markdown/` directory tree.
 
@@ -121,7 +121,7 @@ To specify the "address" to which to publish a page, give it a
 `provides` parameter.
 
 Once you've done this, you can publish the page by invoking the goal
-<a xref="page_setup_confluence">set up in your workspace</a>. For example, if
+<a pantsref="page_setup_confluence">set up in your workspace</a>. For example, if
 the goal was set up with the name "confluence", you invoke:
 
     :::bash
@@ -143,7 +143,7 @@ set its `provides` to something like:
 ...assuming your workspace is set up for confluence publishing with a `Wiki` symbol named
 `confluence` set up as part of a plugin as described below:
 
-<a xmark="page_setup_confluence"></a>
+<a pantsmark="page_setup_confluence"></a>
 
 **Setting up your workspace for Confluence publish**
 

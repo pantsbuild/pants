@@ -48,38 +48,36 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
   @classmethod
   def register_options(cls, register):
     super(IdeGen, cls).register_options(register)
-    register('--project-name', legacy='ide_gen_project_name', default='project',
+    register('--project-name', default='project',
              help='Specifies the name to use for the generated project.')
-    register('--project-dir', legacy='ide_gen_project_dir',
+    register('--project-dir',
              help='Specifies the directory to output the generated project files to.')
-    register('--project-cwd', legacy='ide_gen_project_cwd',
+    register('--project-cwd',
              help='Specifies the directory the generated project should use as the cwd for '
                   'processes it launches.  Note that specifying this trumps --{0}-project-dir '
                   'and not all project related files will be stored there.'
                   .format(cls.options_scope))
-    register('--intransitive', action='store_true', legacy='ide_gen_intransitive', default=False,
+    register('--intransitive', action='store_true', default=False,
              help='Limits the sources included in the generated project to just '
                   'those owned by the targets specified on the command line.')
-    register('--python', action='store_true', legacy='ide_gen_python', default=False,
+    register('--python', action='store_true', default=False,
              help='Adds python support to the generated project configuration.')
-    register('--java', action='store_true', legacy='ide_gen_java', default=True,
+    register('--java', action='store_true', default=True,
              help='Includes java sources in the project; otherwise compiles them and adds them '
                    'to the project classpath.')
-    register('--java-language-level', legacy='ide_gen_java_language_level', type=int, default=7,
+    register('--java-language-level', type=int, default=7,
              help='Sets the java language and jdk used to compile the project\'s java sources.')
-    register('--java-jdk-name', legacy='ide_gen_java_jdk', default=None,
+    register('--java-jdk-name', default=None,
              help='Sets the jdk used to compile the project\'s java sources. If unset the default '
                   'jdk name for the --java-language-level is used')
-    register('--scala', action='store_true', legacy='ide_gen_scala', default=True,
+    register('--scala', action='store_true', default=True,
              help='Includes scala sources in the project; otherwise compiles them and adds them '
                   'to the project classpath.')
-    register('--use-source-root', action='store_true', legacy='ide_gen_use_source_root',
-             default=False,
+    register('--use-source-root', action='store_true', default=False,
              help='Use source_root() settings to collapse sourcepaths in project and determine '
                   'which paths are used for tests.  This is usually what you want if your repo '
                   ' uses a maven style directory layout.')
     register('--infer-test-from-siblings', action='store_true',
-             legacy='ide_infer_test_from_siblings', default=True,
              help='When determining if a path should be added to the IDE, check to see if any of '
                   'its sibling source_root() entries define test targets.  This is usually what '
                   'you want so that resource directories under test source roots are picked up as '
@@ -134,9 +132,8 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
 
     self.intransitive = self.get_options().intransitive
 
-    self.checkstyle_suppression_files = self.context.config.getdefault(
-      'checkstyle_suppression_files', type=list, default=[]
-    )
+    self.checkstyle_suppression_files = self.context.config.get('checkstyle',
+      'suppression_files', type=list, default=[])
     # Everywhere else, debug_port is specified in the 'jvm' section. Use that as a default if none
     # is specified in the 'ide' section.
     jvm_config_debug_port = JvmDebugConfig.debug_port(self.context.config)

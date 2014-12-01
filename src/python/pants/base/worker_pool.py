@@ -159,23 +159,22 @@ class WorkerPool(object):
     self._pool.terminate()
 
 class SubprocPool(object):
+  """Singleton for managing multiprocessing.Pool instances
+
+  Subprocesses (including multiprocessing.Pool workers) can inherit locks in poorly written
+  libraries (eg zlib) if other threads in the parent process happen to be holding them at the
+  moment the worker is fork()'ed. Thus it is important to create any subprocesses BEFORE
+  starting any threads, or they may deadlock mysteriously when sent a particular piece of work.
+
+  This is accomplished in pants by these initializing pools early, when creating the RunTracker.
+
+  However, in tests, RunTrackers are created repeatedly, as part of creating Contexts that
+  are used briefly and discarded. Creating a new subprocess pool every time is expensive, and will
+  lead to os.fork failing once too many processes are spawned.
+
+  To avoid this, the pools themselves are kept in this singleton and new RunTrackers re-use them.
   """
-    Singleton for managing multiprocessing.Pool instances
-
-    Subprocesses (including multiprocessing.Pool workers) can inherit locks in poorly written
-    libraries (eg zlib) if other threads in the parent process happen to be holding them at the
-    moment the worker is fork()'ed. Thus it is important to create any subprocesses BEFORE
-    starting any threads, or they may deadlock mysteriously when sent a particular piece of work.
-
-    This is accomplished in pants by these initializing pools early, when creating the RunTracker.
-
-    However, in tests, RunTrackers are created repeatedly, as part of creating Contexts that
-    are used briefly and discarded. Creating a new subprocess pool every time is expensive, and will
-    lead to os.fork failing once too many processes are spawned.
-
-    To avoid this, the pools themselves are kept in this singleton and new RunTrackers re-use them.  """
-  _fg = None
-  _bg = None
+  _pool = None
   _lock = threading.Lock()
 
   @staticmethod
@@ -186,29 +185,19 @@ class SubprocPool(object):
   @classmethod
   def foreground(cls):
     with cls._lock:
-      if cls._fg is None:
-        cls._fg = multiprocessing.Pool(initializer=SubprocPool.worker_init)
-      return cls._fg
-
-  @classmethod
-  def background(cls):
-    with cls._lock:
-      if cls._bg is None:
-        cls._bg = multiprocessing.Pool(initializer=SubprocPool.worker_init)
-      return cls._bg
+      if cls._pool is None:
+        cls._pool = multiprocessing.Pool(initializer=SubprocPool.worker_init)
+      return cls._pool
 
   @classmethod
   def shutdown(cls, force):
-    pools = []
     with cls._lock:
-      pools = [cls._bg, cls._fg]
-      cls._bg = None
-      cls._fg = None
+      old = cls._pool
+      cls._pool = None
 
-    for pool in pools:
-      if pool:
-        if force:
-          pool.terminate()
-        else:
-          pool.close()
-        pool.join()
+    if old:
+      if force:
+        old.terminate()
+      else:
+        old.close()
+      old.join()

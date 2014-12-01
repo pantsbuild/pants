@@ -17,7 +17,6 @@ from pants.base.build_file import BuildFile
 from pants.base.build_file_parser import BuildFileParser
 from pants.base.build_graph import BuildGraph
 from pants.base.build_root import BuildRoot
-from pants.base.duplicate_dependency_error import DuplicateDependencyError
 from pants.base.target import Target
 from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import touch
@@ -291,10 +290,27 @@ class BuildGraphTest(BaseTest):
                            'target(name="a", '
                            '  dependencies=['
                            '    "other:b",'
-                           '    "other:b",'
+                           '    "//other:b",'  # we should perform the test on normalized addresses
                            '])')
     self.add_to_build_file('other/BUILD',
                            'target(name="b")')
 
-    with self.assertRaises(DuplicateDependencyError):
+    with self.assertRaisesRegexp(
+        BuildGraph.TransitiveLookupError,
+        '^Addresses in dependencies must be unique. \'other:b\' is referenced more than once.'
+        '\s+referenced from :a$'):
       self.build_graph.inject_spec_closure('//:a')
+
+  def test_inject_then_inject_closure(self):
+    self.add_to_build_file('BUILD',
+                           'target(name="a", '
+                           '  dependencies=['
+                           '    "other:b",'
+                           '])')
+    self.add_to_build_file('other/BUILD',
+                           'target(name="b")')
+    self.build_graph.inject_address(SyntheticAddress.parse('//:a'))
+    self.build_graph.inject_address_closure(SyntheticAddress.parse('//:a'))
+    a = self.build_graph.get_target_from_spec('//:a')
+    b = self.build_graph.get_target_from_spec('//other:b')
+    self.assertIn(b, a.dependencies)

@@ -186,24 +186,14 @@ def page_to_html_path(page):
 class MarkdownToHtml(Task):
   @classmethod
   def register_options(cls, register):
-    register('--code-style',
-             choices=list(get_all_styles()),
-             default='friendly',
-             help='Use this stylesheet for code highlights.',
-             legacy='markdown_to_html_code_style')
-    register('--open',
-             action='store_true',
-             help='Open the generated documents in a browser.',
-             legacy='markdown_to_html_open')
-    register('--fragment',
-             action='store_true',
-             help='Generate a fragment of html to embed in a page.',
-             legacy='markdown_to_html_fragment')
-    register('--extension',
-             action='append',
-             default=['.md', '.markdown'],
-             help='Process files with these extensions (as well as the standard extensions).',
-             legacy='markdown_to_html_extensions')
+    register('--code-style', choices=list(get_all_styles()), default='friendly',
+             help='Use this stylesheet for code highlights.')
+    register('--open', action='store_true',
+             help='Open the generated documents in a browser.')
+    register('--fragment', action='store_true',
+             help='Generate a fragment of html to embed in a page.')
+    register('--extension', action='append', default=['.md', '.markdown'],
+             help='Process files with these extensions (as well as the standard extensions).')
 
 
   @classmethod

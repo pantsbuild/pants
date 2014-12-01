@@ -20,27 +20,39 @@ class PythonTask(Task):
   @classmethod
   def register_options(cls, register):
     super(PythonTask, cls).register_options(register)
-    register('--timeout', type=int, default=0, legacy='python_conn_timeout',
+    register('--timeout', type=int, default=0,
              help='Number of seconds to wait for http connections.')
 
   def __init__(self, *args, **kwargs):
     super(PythonTask, self).__init__(*args, **kwargs)
     self.conn_timeout = (self.get_options().timeout or
                          self.context.config.getdefault('connection_timeout'))
-    compatibilities = self.get_options().interpreter or [b'']
 
-    self.interpreter_cache = PythonInterpreterCache(self.context.config,
-                                                    logger=self.context.log.debug)
-    # We pass in filters=compatibilities because setting up some python versions
-    # (e.g., 3<=python<3.3) crashes, and this gives us an escape hatch.
-    self.interpreter_cache.setup(filters=compatibilities)
+    self._compatibilities = self.get_options().interpreter or [b'']
+    self._interpreter_cache = None
+    self._interpreter = None
 
-    # Select a default interpreter to use.
-    self._interpreter = self.select_interpreter(compatibilities)
+  @property
+  def interpreter_cache(self):
+    if self._interpreter_cache is None:
+      self._interpreter_cache = PythonInterpreterCache(self.context.config,
+                                                       logger=self.context.log.debug)
+
+      # Cache setup's requirement fetching can hang if run concurrently by another pants proc.
+      self.context.acquire_lock()
+      try:
+        # We pass in filters=compatibilities because setting up some python versions
+        # (e.g., 3<=python<3.3) crashes, and this gives us an escape hatch.
+        self._interpreter_cache.setup(filters=self._compatibilities)
+      finally:
+        self.context.release_lock()
+    return self._interpreter_cache
 
   @property
   def interpreter(self):
     """Subclasses can use this if they're fine with the default interpreter (the usual case)."""
+    if self._interpreter is None:
+      self._interpreter = self.select_interpreter(self._compatibilities)
     return self._interpreter
 
   def select_interpreter_for_targets(self, targets):

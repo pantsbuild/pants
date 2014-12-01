@@ -22,7 +22,7 @@ ease later "git detective work" when finding out who changed a version.
 **pip-style requirements.txt:**
 
 To define some third-party dependencies, use a
-<a xref="bdict_python_requirements">python_requirements</a> in your `BUILD`
+<a pantsref="bdict_python_requirements">python_requirements</a> in your `BUILD`
 file and make a pip `requirements.txt` file in the same directory.
 
 E.g, your `3rdparty/python/BUILD` file might look like:
@@ -42,9 +42,9 @@ ansicolors version 1.0.2.
 
 A `BUILD` file can also define requirements without a `requirements.txt`
 file. Set up a
-<a xref="bdict_python_requirement_library">`python_requirement_library`</a>
+<a pantsref="bdict_python_requirement_library">`python_requirement_library`</a>
 with one or more
-<a xref="bdict_python_requirement">`python_requirement`</a>s
+<a pantsref="bdict_python_requirement">`python_requirement`</a>s
 like:
 
     :::python

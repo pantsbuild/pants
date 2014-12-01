@@ -28,21 +28,30 @@ class Checkstyle(NailgunTask, JvmToolTaskMixin):
   @classmethod
   def register_options(cls, register):
     super(Checkstyle, cls).register_options(register)
-    register('--skip', action='store_true', legacy='checkstyle_skip', help='Skip checkstyle.')
+    register('--skip', action='store_true', help='Skip checkstyle.')
+    register('--configuration', help='Path to the checkstyle configuration file.')
+    register('--suppression_files', default=[],
+             help='List of checkstyle supression configuration files.')
+    register('--properties', default={},
+             help='Dictionary of property mappings to use for checkstyle.properties.')
+    register('--confs', default=['default'],
+             help='One or more ivy configurations to resolve for this target. This parameter is '
+                  'not intended for general use. ')
+    register('--bootstrap-tools', default=['//:twitter-checkstyle'],
+             help='Pants targets used to bootstrap this tool.')
 
   def __init__(self, *args, **kwargs):
     super(Checkstyle, self).__init__(*args, **kwargs)
 
     self._checkstyle_bootstrap_key = 'checkstyle'
-    self.register_jvm_tool_from_config(self._checkstyle_bootstrap_key, self.context.config,
-                                       ini_section='checkstyle',
-                                       ini_key='bootstrap-tools',
-                                       default=['//:twitter-checkstyle'])
+    self.register_jvm_tool(self._checkstyle_bootstrap_key, self.get_options().bootstrap_tools,
+                           ini_section=self.options_scope,
+                           ini_key='bootstrap-tools')
 
-    self._configuration_file = self.context.config.get(self._CONFIG_SECTION, 'configuration')
-
-    self._properties = self.context.config.getdict(self._CONFIG_SECTION, 'properties', {})
-    self._confs = self.context.config.getlist(self._CONFIG_SECTION, 'confs', default=['default'])
+    suppression_files = self.get_options().supression_files
+    self._properties = self.get_options().properties
+    self._properties['checkstyle.suppression.files'] = ','.join(suppression_files)
+    self._confs = self.context.config.getlist(self._CONFIG_SECTION, 'confs', )
 
   @property
   def config_section(self):
@@ -82,10 +91,10 @@ class Checkstyle(NailgunTask, JvmToolTaskMixin):
     etag = egroups.get_group_key_for_target(targets[0])
     classpath = self.tool_classpath(self._checkstyle_bootstrap_key)
     cp = egroups.get_classpath_for_group(etag)
-    classpath.extend(jar for conf, jar in cp if conf in self._confs)
+    classpath.extend(jar for conf, jar in cp if conf in self.get_options().confs)
 
     args = [
-      '-c', self._configuration_file,
+      '-c', self.get_options().configuration,
       '-f', 'plain'
     ]
 

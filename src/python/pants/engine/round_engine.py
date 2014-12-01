@@ -113,7 +113,8 @@ class RoundEngine(Engine):
       task_type = goal.task_type_by_name(task_name)
       visited_task_types.add(task_type)
 
-      task_workdir = os.path.join(context.config.getdefault('pants_workdir'), goal.name, task_name)
+      task_workdir = os.path.join(context.new_options.for_global_scope().pants_workdir,
+                                  goal.name, task_name)
       task = task_type(context, task_workdir)
       tasks_by_name[task_name] = task
 
