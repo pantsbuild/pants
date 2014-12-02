@@ -69,6 +69,10 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
 
   GenInfo = namedtuple('GenInfo', ['gen', 'deps'])
 
+  class DepLookupError(AddressLookupError):
+    """Thrown when a dependency can't be found."""
+    pass
+
   class PartialCmd(namedtuple('PC', ['compiler', 'language', 'rpc_style', 'namespace_map'])):
     @property
     def relative_outdir(self):
