@@ -8,6 +8,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import threading
 import multiprocessing
 from multiprocessing.pool import ThreadPool
+import os
 import signal
 import sys
 
@@ -179,8 +180,8 @@ class SubprocPool(object):
 
   @staticmethod
   def worker_init():
-    # Ignore sigint in workers since they are daemon procs and thus die with parent.
-    signal.signal(signal.SIGINT, signal.SIG_IGN)
+    # Exit quietly on sigint, otherwise we get {num_procs} keyboardinterrupt stacktraces spewn
+    signal.signal(signal.SIGINT, lambda *args: os._exit(0))
 
   @classmethod
   def foreground(cls):
