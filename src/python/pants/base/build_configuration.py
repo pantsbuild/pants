@@ -133,9 +133,9 @@ class BuildConfiguration(object):
       registered_addressable_instances.append((address, addressable))
 
     for alias, addressable_type in self._addressable_alias_map.items():
-      call_proxy =  AddressableCallProxy(addressable_type=addressable_type,
-                                         build_file=build_file,
-                                         registration_callback=registration_callback)
+      call_proxy = AddressableCallProxy(addressable_type=addressable_type,
+                                        build_file=build_file,
+                                        registration_callback=registration_callback)
       type_aliases[alias] = call_proxy
 
     parse_context = ParseContext(rel_path=build_file.spec_path, type_aliases=type_aliases)
