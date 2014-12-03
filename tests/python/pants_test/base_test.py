@@ -189,9 +189,9 @@ class BaseTest(unittest.TestCase):
 
     Returns the corresponding Target or else None if the address does not point to a defined Target.
     """
-    if self.build_graph.get_target_from_spec(spec) is None:
-      self.build_graph.inject_spec_closure(spec)
-    return self.build_graph.get_target_from_spec(spec)
+    address = SyntheticAddress.parse(spec)
+    self.build_graph.inject_address_closure(address)
+    return self.build_graph.get_target(address)
 
   def create_files(self, path, files):
     """Writes to a file under the buildroot with contents same as file name.

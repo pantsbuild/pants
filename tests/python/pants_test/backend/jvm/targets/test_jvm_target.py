@@ -11,6 +11,7 @@ from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.address import SyntheticAddress
+from pants.base.build_file_aliases import BuildFileAliases
 
 from pants_test.base_test import BaseTest
 
@@ -18,10 +19,10 @@ from pants_test.base_test import BaseTest
 # TODO(Eric Ayers) there are a lot of tests to backfill
 class JvmTargetTest(BaseTest):
 
-  def setUp(self):
-    super(JvmTargetTest, self).setUp()
-    self.build_file_parser._build_configuration.register_target_alias('jar_library', JarLibrary)
-    self.build_file_parser._build_configuration.register_exposed_object('jar', JarDependency)
+  @property
+  def alias_groups(self):
+    return BuildFileAliases.create(targets={'jar_library': JarLibrary},
+                                   objects={'jar': JarDependency})
 
   def test_to_jar_dependencies(self):
     def assert_dep(dep, org, name, rev):
@@ -43,14 +44,12 @@ class JvmTargetTest(BaseTest):
       ],
     )
     '''))
-    self.build_graph.inject_spec_closure('//:lib1')
-    lib1 = self.build_graph.get_target(SyntheticAddress.parse('//:lib1'))
+    lib1 = self.target('//:lib1')
     self.assertIsInstance(lib1, JarLibrary)
     self.assertEquals(1, len(lib1.jar_dependencies))
     assert_dep(lib1.jar_dependencies[0], 'testOrg1', 'testName1', '123')
 
-    self.build_graph.inject_spec_closure('//:lib2')
-    lib2 = self.build_graph.get_target(SyntheticAddress.parse('//:lib2'))
+    lib2 = self.target('//:lib2')
     self.assertIsInstance(lib2, JarLibrary)
     self.assertEquals(2, len(lib2.jar_dependencies))
     assert_dep(lib2.jar_dependencies[0], 'testOrg2', 'testName2', '456')

@@ -6,12 +6,9 @@ python_tests(
   sources = ['test_build_graph.py'],
   dependencies = [
     'src/python/pants/base:address',
-    'src/python/pants/base:build_file_parser',
+    'src/python/pants/base:address_lookup_error',
     'src/python/pants/base:build_graph',
-    'src/python/pants/base:build_root',
     'src/python/pants/base:target',
-    'src/python/pants/util:contextutil',
-    'src/python/pants/util:dirutil',
     'tests/python/pants_test:base_test'
   ],
 )

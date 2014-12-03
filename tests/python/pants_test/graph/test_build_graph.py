@@ -5,125 +5,58 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from contextlib import contextmanager
-import os
-import pytest
 from textwrap import dedent
 
-from pants.base.address import SyntheticAddress, BuildFileAddress
+from pants.base.address import SyntheticAddress
 from pants.base.address_lookup_error import AddressLookupError
-from pants.base.build_configuration import BuildConfiguration
-from pants.base.build_file import BuildFile
-from pants.base.build_file_parser import BuildFileParser
 from pants.base.build_graph import BuildGraph
-from pants.base.build_root import BuildRoot
 from pants.base.target import Target
-from pants.util.contextutil import pushd, temporary_dir
-from pants.util.dirutil import touch
 from pants_test.base_test import BaseTest
+
 
 # TODO(Eric Ayers) There are many untested methods in BuildGraph left to be tested.
 
 class BuildGraphTest(BaseTest):
-
-  @contextmanager
-  def workspace(self, *buildfiles):
-    with temporary_dir() as root_dir:
-      with BuildRoot().temporary(root_dir):
-        with pushd(root_dir):
-          for buildfile in buildfiles:
-            touch(os.path.join(root_dir, buildfile))
-          yield os.path.realpath(root_dir)
-
-  # TODO(Eric Ayers) This test broke during a refactoring and should be moved, removed or updated
-  @pytest.mark.xfail
-  def test_transitive_closure_spec(self):
-    with self.workspace('./BUILD', 'a/BUILD', 'a/b/BUILD') as root_dir:
-      with open(os.path.join(root_dir, './BUILD'), 'w') as build:
-        build.write(dedent('''
-          fake(name="foo",
-               dependencies=[
-                 'a',
-               ])
-        '''))
-
-      with open(os.path.join(root_dir, 'a/BUILD'), 'w') as build:
-        build.write(dedent('''
-          fake(name="a",
-               dependencies=[
-                 'a/b:bat',
-               ])
-        '''))
-
-      with open(os.path.join(root_dir, 'a/b/BUILD'), 'w') as build:
-        build.write(dedent('''
-          fake(name="bat")
-        '''))
-
-      build_configuration = BuildConfiguration()
-      build_configuration.register_target_alias('fake', Target)
-      parser = BuildFileParser(build_configuration, root_dir=root_dir)
-      build_graph = BuildGraph(self.address_mapper)
-      parser.inject_spec_closure_into_build_graph(':foo', build_graph)
-      self.assertEqual(len(build_graph.dependencies_of(SyntheticAddress.parse(':foo'))), 1)
-
-  # TODO(Eric Ayers) This test broke during a refactoring and should be moved, removed or updated
-  @pytest.mark.xfail
   def test_target_invalid(self):
     self.add_to_build_file('a/BUILD', 'target(name="a")')
-    with pytest.raises(BuildFileParser.InvalidTargetException):
-      self.build_graph.inject_spec_closure('a:nope')
+    with self.assertRaises(AddressLookupError):
+      self.build_graph.inject_address_closure(SyntheticAddress.parse('a:nope'))
 
     self.add_to_build_file('b/BUILD', 'target(name="a")')
-    with pytest.raises(BuildFileParser.InvalidTargetException):
-      self.build_graph.inject_spec_closure('b')
-    with pytest.raises(BuildFileParser.InvalidTargetException):
-      self.build_graph.inject_spec_closure('b:b')
-    with pytest.raises(BuildFileParser.InvalidTargetException):
-      self.build_graph.inject_spec_closure('b:')
+    with self.assertRaises(AddressLookupError):
+      self.build_graph.inject_address_closure(SyntheticAddress.parse('b'))
+    with self.assertRaises(AddressLookupError):
+      self.build_graph.inject_address_closure(SyntheticAddress.parse('b:b'))
 
-  # TODO(Eric Ayers) This test broke during a refactoring and should be moved removed or updated
-  @pytest.mark.xfail
   def test_transitive_closure_address(self):
-    with self.workspace('./BUILD', 'a/BUILD', 'a/b/BUILD') as root_dir:
-      with open(os.path.join(root_dir, './BUILD'), 'w') as build:
-        build.write(dedent('''
-          fake(name="foo",
+    self.add_to_build_file('BUILD', dedent('''
+        target(name='foo',
                dependencies=[
                  'a',
                ])
-        '''))
+      '''))
 
-      with open(os.path.join(root_dir, 'a/BUILD'), 'w') as build:
-        build.write(dedent('''
-          fake(name="a",
+    self.add_to_build_file('a/BUILD', dedent('''
+        target(name='a',
                dependencies=[
                  'a/b:bat',
                ])
-        '''))
+      '''))
 
-      with open(os.path.join(root_dir, 'a/b/BUILD'), 'w') as build:
-        build.write(dedent('''
-          fake(name="bat")
-        '''))
-      def fake_target(*args, **kwargs):
-        assert False, "This fake target should never be called in this test!"
+    self.add_to_build_file('a/b/BUILD', dedent('''
+        target(name='bat')
+      '''))
 
-      alias_map = {'target_aliases': {'fake': fake_target}}
-      self.build_file_parser.register_alias_groups(alias_map=alias_map)
+    root_address = SyntheticAddress.parse('//:foo')
+    self.build_graph.inject_address_closure(root_address)
+    self.assertEqual(len(self.build_graph.transitive_subgraph_of_addresses([root_address])), 3)
 
-      bf_address = BuildFileAddress(BuildFile(root_dir, 'BUILD'), 'foo')
-      self.build_file_parser._populate_target_proxy_transitive_closure_for_address(bf_address)
-      self.assertEqual(len(self.build_file_parser._target_proxy_by_address), 3)
-
-  # TODO(Eric Ayers) This test broke during a refactoring and should be moved, removed or updated
-  @pytest.mark.xfail
   def test_no_targets(self):
     self.add_to_build_file('empty/BUILD', 'pass')
-    with pytest.raises(BuildFileParser.EmptyBuildFileException):
-      self.build_file_parser.inject_spec_closure_into_build_graph('empty', self.build_graph)
-    with pytest.raises(BuildFileParser.EmptyBuildFileException):
-      self.build_file_parser.inject_spec_closure_into_build_graph('empty:foo', self.build_graph)
+    with self.assertRaises(AddressLookupError):
+      self.build_graph.inject_address_closure(SyntheticAddress.parse('empty'))
+    with self.assertRaises(AddressLookupError):
+      self.build_graph.inject_address_closure(SyntheticAddress.parse('empty:foo'))
 
   def test_contains_address(self):
     a = SyntheticAddress.parse('a')
@@ -143,10 +76,8 @@ class BuildGraphTest(BaseTest):
     self.assertEquals(b, result)
 
   def test_walk_graph(self):
-    """
-    Make sure that BuildGraph.walk_transitive_dependency_graph() and
-    BuildGraph.walk_transitive_dependee_graph() return DFS preorder (or postorder) traversal.
-    """
+    # Make sure that BuildGraph.walk_transitive_dependency_graph() and
+    # BuildGraph.walk_transitive_dependee_graph() return DFS preorder (or postorder) traversal.
     def assertDependencyWalk(target, results, postorder=False):
       targets = []
       self.build_graph.walk_transitive_dependency_graph([target.address],
@@ -191,7 +122,7 @@ class BuildGraphTest(BaseTest):
     assertDependeeWalk(d, [e, d], postorder=True)
     assertDependeeWalk(e, [e], postorder=True)
 
-    #Try a case where postorder traversal is not identical to reversed preorder traversal
+    # Try a case where postorder traversal is not identical to reversed preorder traversal
     c = self.make_target('c1', dependencies=[])
     d = self.make_target('d1', dependencies=[c])
     b = self.make_target('b1', dependencies=[c, d])
@@ -227,17 +158,18 @@ class BuildGraphTest(BaseTest):
     assertWalk([d, a, c, b], d)
 
   def test_lookup_exception(self):
-    """
-    There is code that depends on the fact that TransitiveLookupError is a subclass
-    of AddressLookupError
-    """
+    # There is code that depends on the fact that TransitiveLookupError is a subclass of
+    # AddressLookupError
     self.assertIsInstance(BuildGraph.TransitiveLookupError(), AddressLookupError)
+
+  def inject_address_closure(self, spec):
+    self.build_graph.inject_address_closure(SyntheticAddress.parse(spec))
 
   def test_invalid_address(self):
 
     with self.assertRaisesRegexp(AddressLookupError,
                                  '^BUILD file does not exist at:.*/BUILD'):
-      self.build_graph.inject_spec_closure('//:a')
+      self.inject_address_closure('//:a')
 
     self.add_to_build_file('BUILD',
                            'target(name="a", '
@@ -247,7 +179,7 @@ class BuildGraphTest(BaseTest):
                                  '^BUILD file does not exist at:.*/non-existent-path/BUILD'
                                  '\s+when translating spec non-existent-path:b'
                                  '\s+referenced from :a$'):
-      self.build_graph.inject_spec_closure('//:a')
+      self.inject_address_closure('//:a')
 
   def test_invalid_address_two_hops(self):
     self.add_to_build_file('BUILD',
@@ -263,7 +195,7 @@ class BuildGraphTest(BaseTest):
                                  '\s+when translating spec non-existent-path:c'
                                  '\s+referenced from goodpath:b'
                                  '\s+referenced from :a$'):
-      self.build_graph.inject_spec_closure('//:a')
+      self.inject_address_closure('//:a')
 
   def test_invalid_address_two_hops_same_file(self):
     self.add_to_build_file('BUILD',
@@ -283,7 +215,7 @@ class BuildGraphTest(BaseTest):
                                  '\s+referenced from goodpath:c'
                                  '\s+referenced from goodpath:b'
                                  '\s+referenced from :a$'):
-      self.build_graph.inject_spec_closure('//:a')
+      self.inject_address_closure('//:a')
 
   def test_raise_on_duplicate_dependencies(self):
     self.add_to_build_file('BUILD',
@@ -299,18 +231,4 @@ class BuildGraphTest(BaseTest):
         BuildGraph.TransitiveLookupError,
         '^Addresses in dependencies must be unique. \'other:b\' is referenced more than once.'
         '\s+referenced from :a$'):
-      self.build_graph.inject_spec_closure('//:a')
-
-  def test_inject_then_inject_closure(self):
-    self.add_to_build_file('BUILD',
-                           'target(name="a", '
-                           '  dependencies=['
-                           '    "other:b",'
-                           '])')
-    self.add_to_build_file('other/BUILD',
-                           'target(name="b")')
-    self.build_graph.inject_address(SyntheticAddress.parse('//:a'))
-    self.build_graph.inject_address_closure(SyntheticAddress.parse('//:a'))
-    a = self.build_graph.get_target_from_spec('//:a')
-    b = self.build_graph.get_target_from_spec('//other:b')
-    self.assertIn(b, a.dependencies)
+      self.inject_address_closure('//:a')
