@@ -7,6 +7,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import errno
 import os
+import shutil
 
 from pants.backend.jvm.tasks.bootstrap_jvm_tools import BootstrapJvmTools
 from pants.base.dev_backend_loader import load_build_configuration_from_source
@@ -25,17 +26,26 @@ class JvmToolTaskTestBase(TaskTestBase):
     real_config = self.config()
     super(JvmToolTaskTestBase, self).setUp()
 
+    def link_or_copy(src, dest):
+      try:
+        os.link(src, dest)
+      except OSError as e:
+        if e.errno == errno.EXDEV:
+          shutil.copy(src, dest)
+        else:
+          raise e
+
     def link(path, optional=False, force=False):
       src = os.path.join(self.real_build_root, path)
       if not optional or os.path.exists(src):
         dest = os.path.join(self.build_root, path)
         safe_mkdir(os.path.dirname(dest))
         try:
-          os.link(src, dest)
+          link_or_copy(src, dest)
         except OSError as e:
           if force and e.errno == errno.EEXIST:
             os.unlink(dest)
-            os.link(src, dest)
+            link_or_copy(src, dest)
           else:
             raise e
         return dest
