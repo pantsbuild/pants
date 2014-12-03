@@ -42,6 +42,9 @@ python_library(
     'src/python/pants/goal:initialize_reporting',
     'src/python/pants/goal:run_tracker',
     'src/python/pants/reporting',
+
+    # XXX SQUARE specific code. This is the easiest way to get it in
+    'src/python/square_backend:plugins',
   ],
 )
 
