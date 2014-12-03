@@ -141,11 +141,6 @@ class BuildConfiguration(object):
     parse_context = ParseContext(rel_path=build_file.spec_path, type_aliases=type_aliases)
 
     parse_globals = type_aliases.copy()
-
-    # TODO(pl): Don't inject __file__ into the context.  BUILD files should not be aware
-    # of their location on the filesystem.
-    parse_globals['__file__'] = build_file.full_path
-
     for alias, object_factory in self._exposed_context_aware_object_factories.items():
       parse_globals[alias] = object_factory(parse_context)
 
