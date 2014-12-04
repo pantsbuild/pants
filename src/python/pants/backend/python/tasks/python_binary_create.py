@@ -54,8 +54,7 @@ class PythonBinaryCreate(PythonTask):
         targets=[binary],
         builder=builder,
         platforms=binary.platforms,
-        interpreter=interpreter,
-        conn_timeout=self.conn_timeout)
+        interpreter=interpreter)
 
       pex_path = os.path.join(self._distdir, '%s.pex' % binary.name)
       chroot.dump()

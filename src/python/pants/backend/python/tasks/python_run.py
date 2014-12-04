@@ -40,8 +40,7 @@ class PythonRun(PythonTask):
           targets=[binary],
           builder=builder,
           platforms=binary.platforms,
-          interpreter=interpreter,
-          conn_timeout=self.conn_timeout)
+          interpreter=interpreter)
 
         chroot.dump()
         builder.freeze()
