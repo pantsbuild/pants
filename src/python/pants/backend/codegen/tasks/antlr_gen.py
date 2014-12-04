@@ -5,6 +5,7 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from collections import defaultdict, namedtuple
 import logging
 import os
 
@@ -12,6 +13,8 @@ from twitter.common.collections import OrderedSet
 
 from pants.backend.codegen.targets.java_antlr_library import JavaAntlrLibrary
 from pants.backend.codegen.tasks.code_gen import CodeGen
+from pants.backend.jvm.targets.jar_dependency import JarDependency
+from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
@@ -30,25 +33,75 @@ class AntlrGen(CodeGen, NailgunTask, JvmToolTaskMixin):
   class AmbiguousPackageError(TaskError):
     """Raised when a java package cannot be unambiguously determined for a JavaAntlrLibrary."""
 
+  class UnsupportedCompilerError(TaskError):
+    """Raised when an un-recognized antlr compiler is specified for a JavaAntlrLibrary."""
+
   # Maps the compiler attribute of a target to the config key in pants.ini
-  _CONFIG_SECTION_BY_COMPILER = {
-    'antlr3': 'antlr-gen',
-    'antlr4': 'antlr4-gen',
+  class ToolConfig(namedtuple('AntlrConfig', ['section', 'default_deps'])):
+    @property
+    def key(self):
+      return 'javadeps'
+
+    def get_deps(self, context, workdir):
+      deps = context.config.getlist(self.section, self.key, default=None)
+      if deps is None:
+        spec_path = '{workdir}/3rdparty/{section}'.format(workdir=workdir, section=self.section)
+        spec_relpath = os.path.relpath(spec_path, get_buildroot())
+        default_deps_addr = SyntheticAddress.parse('{spec_relpath}:tool-deps'
+                                                   .format(spec_relpath=spec_relpath,
+                                                           section=self.section))
+        if not context.build_graph.get_target(default_deps_addr):
+          context.add_new_target(default_deps_addr, JarLibrary, jars=self.default_deps)
+        deps = [default_deps_addr.spec]
+      return deps
+
+  # TODO(John Sirois): seperate the compiler deps from the runtime deps and apply these exactly
+  # where needed.
+  _TOOL_CONFIG_BY_COMPILER = {
+    'antlr3': ToolConfig(section='antlr-gen',
+                         default_deps=[JarDependency('org.antlr', 'antlr', '3.4')]),
+    'antlr4': ToolConfig(section='antlr4-gen',
+                         default_deps=[JarDependency('org.antlr', 'antlr4', '4.3'),
+                                       JarDependency('org.antlr', 'antlr4-runtime', '4.3')]),
   }
+
+  @classmethod
+  def get_tool_config(cls, compiler):
+    return cls._TOOL_CONFIG_BY_COMPILER.get(compiler)
+
+  @classmethod
+  def get_compiler(cls, target):
+    return target.compiler or 'antlr3'
 
   _GENERIC_CONFIG_SECTION = 'antlr'
 
   def __init__(self, *args, **kwargs):
     super(AntlrGen, self).__init__(*args, **kwargs)
 
-    # TODO(John Sirois): kill if not needed by prepare_gen
-    self._classpath_by_compiler = {}
+    invalid_compilers = defaultdict(list)
+    active_compilers = set()
+    for target in self.context.targets(predicate=self.is_gentarget):
+      if target.compiler and target.compiler not in self._TOOL_CONFIG_BY_COMPILER:
+        invalid_compilers[target.compiler].append(target)
+      else:
+        active_compilers.add(self.get_compiler(target))
 
-    active_compilers = set(map(lambda t: t.compiler,
-                               self.context.targets(predicate=self.is_gentarget)))
-    for compiler, tools in self._all_possible_antlr_bootstrap_tools():
-      if compiler in active_compilers:
-        self.register_jvm_tool(compiler, tools)
+    if invalid_compilers:
+      invalid_items = []
+      for compiler, targets in invalid_compilers.items():
+        addresses = '\n\t'.join(sorted(str(t.address) for t in targets))
+        invalid_items.append('- {compiler!r} by:\n\t{addresses}'
+                             .format(compiler=compiler, addresses=addresses))
+      raise self.UnsupportedCompilerError('Unsupported antlr compilers specified:\n{0}'
+                                          .format('\n'.join(invalid_items)))
+
+    for compiler in active_compilers:
+      # TODO(John Sirois): generify this mechanism in the JvmToolTaskMixin itself for all
+      # such Tasks to leverage.
+      tool_config = self.get_tool_config(compiler)
+      deps = tool_config.get_deps(self.context, self.workdir)
+      self.register_jvm_tool(key=compiler, target_addrs=deps, ini_section=tool_config.section,
+                             ini_key=tool_config.key)
 
   @property
   def config_section(self):
@@ -63,12 +116,6 @@ class AntlrGen(CodeGen, NailgunTask, JvmToolTaskMixin):
   def genlangs(self):
     return dict(java=lambda t: t.is_jvm)
 
-  def prepare_gen(self, targets):
-    compilers = set(map(lambda t: t.compiler, targets))
-    for compiler in compilers:
-      classpath = self.tool_classpath(compiler)
-      self._classpath_by_compiler[compiler] = classpath
-
   def genlang(self, lang, targets):
     if lang != 'java':
       raise TaskError('Unrecognized antlr gen lang: %s' % lang)
@@ -80,14 +127,15 @@ class AntlrGen(CodeGen, NailgunTask, JvmToolTaskMixin):
       java_out = self._java_out(target)
       safe_mkdir(java_out)
 
-      antlr_classpath = self._classpath_by_compiler[target.compiler]
+      compiler = self.get_compiler(target)
+      antlr_classpath = self.tool_classpath(compiler)
       args = ["-o", java_out]
 
-      if target.compiler == 'antlr3':
+      if compiler == 'antlr3':
         if target.package is not None:
           logger.warn("The 'package' attribute is not supported for antlr3 and will be ignored.")
         java_main = 'org.antlr.Tool'
-      elif target.compiler == 'antlr4':
+      elif compiler == 'antlr4':
         args.append('-visitor')  # Generate Parse Tree Visitor As Well
         # Note that this assumes that there is no package set in the antlr file itself,
         # which is considered an ANTLR best practice.
@@ -98,7 +146,8 @@ class AntlrGen(CodeGen, NailgunTask, JvmToolTaskMixin):
           args.append(target.package)
         java_main = 'org.antlr.v4.Tool'
       else:
-        raise TaskError('Unknown ANTLR compiler: {}'.format(target.compiler))
+        # Can't happen due to __init__ check.
+        raise self.UnsupportedCompilerError('Unknown ANTLR compiler: {}'.format(compiler))
 
       sources = self._calculate_sources([target])
       args.extend(sources)
@@ -135,7 +184,7 @@ class AntlrGen(CodeGen, NailgunTask, JvmToolTaskMixin):
 
   def _create_java_target(self, target, dependees):
     antlr_files_suffix = ["Lexer.java", "Parser.java"]
-    if target.compiler == 'antlr4':
+    if self.get_compiler(target) == 'antlr4':
       antlr_files_suffix = ["BaseListener.java", "BaseVisitor.java",
                             "Listener.java", "Visitor.java"] + antlr_files_suffix
 
@@ -164,22 +213,18 @@ class AntlrGen(CodeGen, NailgunTask, JvmToolTaskMixin):
     return tgt
 
   def _resolve_java_deps(self, target):
-    section = self._CONFIG_SECTION_BY_COMPILER[target.compiler]
+    tool_config = self.get_tool_config(self.get_compiler(target))
 
     deps = OrderedSet()
     try:
-      for dep in self.context.config.getlist(section, 'javadeps'):
+      for dep in tool_config.get_deps(self.context, self.workdir):
         deps.update(self.context.resolve(dep))
       return deps
     except AddressLookupError as e:
       raise self.DepLookupError("{message}\n"
-                                "  referenced from [{section}] key: javadeps in pants.ini"
-                                .format(message=e, section=section))
-
-
-  def _all_possible_antlr_bootstrap_tools(self):
-    for compiler, key in self._CONFIG_SECTION_BY_COMPILER.items():
-      yield compiler, self.context.config.getlist(key, 'javadeps')
+                                "  referenced from [{section}] key: {key} in pants.ini"
+                                .format(message=e, section=tool_config.section,
+                                        key=tool_config.key))
 
   def _java_out(self, target):
-    return os.path.join(self.workdir, target.compiler, 'gen-java')
+    return os.path.join(self.workdir, self.get_compiler(target), 'gen-java')

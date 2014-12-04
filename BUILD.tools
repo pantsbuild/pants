@@ -1,16 +1,6 @@
 # JVM artifacts that Pants itself depends on.
 # http://pantsbuild.github.io/dev_tasks.html#jvm-tool-bootstrapping
 
-jar_library(name = 'antlr-3.4',
-            jars = [jar(org = 'org.antlr', name = 'antlr', rev = '3.4')]
-           )
-
-jar_library(name = 'antlr-4',
-            jars = [
-              jar(org = 'org.antlr', name = 'antlr4', rev = '4.1'),
-              jar(org = 'org.antlr', name = 'antlr4-runtime', rev = '4.1'),
-            ])
-
 jar_library(name = 'xalan',
             jars = [jar(org = 'xalan', name = 'xalan', rev = '2.7.1')])
 

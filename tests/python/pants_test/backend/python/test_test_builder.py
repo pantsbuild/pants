@@ -16,6 +16,7 @@ from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.test_builder import PythonTestBuilder
 from pants.base.build_file_aliases import BuildFileAliases
+from pants.base.source_root import SourceRoot
 from pants.util.contextutil import pushd, environment_as
 from pants_test.base_test import BaseTest
 
@@ -64,6 +65,7 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
             ]
           )
         '''))
+    SourceRoot.register('lib', PythonLibrary)
 
     self.create_file(
         'tests/test_core_green.py',
@@ -138,6 +140,8 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
             ]
           )
         '''))
+    SourceRoot.register('tests', PythonTests)
+
     self.green = self.target('tests:green')
     self.red = self.target('tests:red')
     self.all = self.target('tests:all')

@@ -16,7 +16,7 @@ class JavaAntlrLibrary(ExportableJvmLibrary):
                sources=None,
                provides=None,
                excludes=None,
-               compiler='antlr3',
+               compiler=None,
                package=None,
                **kwargs):
 
@@ -38,11 +38,12 @@ class JavaAntlrLibrary(ExportableJvmLibrary):
                                            **kwargs)
     self.add_labels('codegen')
 
+    # TODO(John Sirois): fixup payload handling, including compiler and package as fields that
+    # should invalidate on change ... package is conservative - a change in value may not actually
+    # mean a change in the derived value.
     if not sources:
       raise ValueError("Missing required 'sources' parameter.")
     self.sources = sources
 
-    if compiler not in ('antlr3', 'antlr4'):
-      raise ValueError("Illegal value for 'compiler': {}".format(compiler))
     self.compiler = compiler
     self.package = package

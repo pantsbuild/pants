@@ -59,12 +59,6 @@ class JvmToolTaskTestBase(TaskTestBase):
 
     # TODO(John Sirois): Find a way to do this cleanly
     link('pants.ini', force=True)
-
-    # TODO(pl): Note that this pulls in a big chunk of the hairball to every test that
-    # depends on it, because BUILD contains source_roots that specify a variety of types
-    # from different backends.
-    link('BUILD', force=True)
-
     link('BUILD.tools', force=True)
     support_dir = real_config.getdefault('pants_supportdir')
     link_tree(os.path.relpath(os.path.join(support_dir, 'ivy'), self.real_build_root), force=True)

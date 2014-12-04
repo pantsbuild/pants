@@ -11,8 +11,10 @@ from textwrap import dedent
 
 from twitter.common.dirutil.fileset import Fileset
 
+from pants.backend.codegen.targets.java_antlr_library import JavaAntlrLibrary
 from pants.backend.codegen.tasks.antlr_gen import AntlrGen
 from pants.base.address import SyntheticAddress
+from pants.base.source_root import SourceRoot
 from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
 
 
@@ -40,6 +42,8 @@ class AntlrGenTest(NailgunTaskTestBase):
       ////////////////////
       fragment LETTER : [a-zA-Z] ;
     '''.format(**self.PARTS)))
+
+    SourceRoot.register(self.PARTS['srcroot'], JavaAntlrLibrary)
 
   def create_context(self):
     # generate a context to contain the build graph for the input target, then execute
@@ -118,4 +122,16 @@ class AntlrGenTest(NailgunTaskTestBase):
     '''.format(**self.PARTS)))
 
     with self.assertRaises(AntlrGen.AmbiguousPackageError):
+      self.execute(self.create_context())
+
+  def test_compiler_invalid(self):
+    self.add_to_build_file('{srcroot}/{dir}/BUILD'.format(**self.PARTS), dedent('''
+      java_antlr_library(
+        name='{name}',
+        compiler='_not_a_compiler_',
+        sources=['{prefix}.g4'],
+      )
+    '''.format(**self.PARTS)))
+
+    with self.assertRaises(AntlrGen.UnsupportedCompilerError):
       self.execute(self.create_context())
