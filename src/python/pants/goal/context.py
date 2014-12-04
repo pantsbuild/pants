@@ -287,8 +287,10 @@ class Context(object):
 
   def resolve(self, spec):
     """Returns an iterator over the target(s) the given address points to."""
-    self.build_graph.inject_spec_closure(spec)
-    return self.build_graph.transitive_subgraph_of_addresses([SyntheticAddress.parse(spec)])
+    address = SyntheticAddress.parse(spec)
+    # NB: This is an idempotent, short-circuiting call.
+    self.build_graph.inject_address_closure(address)
+    return self.build_graph.transitive_subgraph_of_addresses([address])
 
   def scan(self, root=None):
     """Scans and parses all BUILD files found under ``root``.

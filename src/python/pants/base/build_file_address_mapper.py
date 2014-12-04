@@ -32,16 +32,13 @@ class BuildFileAddressMapper(object):
     """ Raised when an address cannot be found in an existing BUILD file."""
     pass
 
-
   class EmptyBuildFileError(AddressLookupError):
     """Raised if no addresses are defined in a BUILD file."""
     pass
 
-
   class InvalidBuildFileReference(AddressLookupError):
     """ Raised when a BUILD file does not exist at the address referenced."""
     pass
-
 
   class InvalidAddressError(AddressLookupError):
     """ Raised when an address cannot be parsed."""
@@ -56,7 +53,7 @@ class BuildFileAddressMapper(object):
 
   @property
   def root_dir(self):
-    return self._build_file_parser._root_dir
+    return self._build_file_parser.root_dir
 
   def _raise_incorrect_address_error(self, build_file, wrong_target_name, targets):
     """Search through the list of targets and return those which originate from the same folder
@@ -108,11 +105,12 @@ class BuildFileAddressMapper(object):
 
   def resolve(self, address):
     """Maps an address in the virtual address space to an object.
+
     :param Address address: the address to lookup in a BUILD file
     :raises AddressLookupError: if the path to the address is not found.
-    :returns: Addressable from a build file specified by address
+    :returns: A tuple of the natively mapped BuildFileAddress and the Addressable it points to.
     """
-    address_map = self.address_map_from_spec_path(address.spec_path)
+    address_map = self._address_map_from_spec_path(address.spec_path)
     if address not in address_map:
       build_file = BuildFile.from_cache(self.root_dir, address.spec_path, must_exist=False)
       self._raise_incorrect_address_error(build_file, address.target_name, address_map)
@@ -125,25 +123,28 @@ class BuildFileAddressMapper(object):
       address = SyntheticAddress.parse(spec)
     except ValueError as e:
       raise self.InvalidAddressError(e)
-    return self.resolve(address)
+    _, addressable = self.resolve(address)
+    return addressable
 
-  def address_map_from_spec_path(self, spec_path):
+  def _address_map_from_spec_path(self, spec_path):
     """Returns a resolution map of all addresses in a "directory" in the virtual address space.
 
-    :returns {Address: <resolved Object>}:
+    :returns {Address: (Address, <resolved Object>)}:
     """
     if spec_path not in self._spec_path_to_address_map_map:
       try:
-        address_map = self._build_file_parser.address_map_from_spec_path(spec_path)
+        mapping = self._build_file_parser.address_map_from_spec_path(spec_path)
       except BuildFileParser.BuildFileParserError as e:
         raise AddressLookupError("{message}\n Loading addresses from '{spec_path}' failed."
-                                  .format(message=e, spec_path=spec_path))
+                                 .format(message=e, spec_path=spec_path))
+
+      address_map = {address: (address, addressed) for address, addressed in mapping.items()}
       self._spec_path_to_address_map_map[spec_path] = address_map
     return self._spec_path_to_address_map_map[spec_path]
 
   def addresses_in_spec_path(self, spec_path):
     """Returns only the addresses gathered by `address_map_from_spec_path`, with no values."""
-    return self.address_map_from_spec_path(spec_path).keys()
+    return self._address_map_from_spec_path(spec_path).keys()
 
   def spec_to_address(self, spec, relative_to=''):
     """A helper method for mapping a spec to the correct BuildFileAddress.

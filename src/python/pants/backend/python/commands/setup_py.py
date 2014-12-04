@@ -24,6 +24,7 @@ from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.thrift_builder import PythonThriftBuilder
+from pants.base.address import SyntheticAddress
 from pants.base.build_environment import get_buildroot
 from pants.base.config import Config
 from pants.base.exceptions import TargetDefinitionException
@@ -269,8 +270,9 @@ class SetupPy(Command):
     self._config = Config.from_cache()
     self._root = self.root_dir
 
-    self.build_graph.inject_spec_closure(self.args[0])
-    self.target = self.build_graph.get_target_from_spec(self.args[0])
+    address = SyntheticAddress.parse(self.args[0])
+    self.build_graph.inject_address_closure(address)
+    self.target = self.build_graph.get_target(address)
 
     if self.target is None:
       self.error('%s is not a valid target!' % self.args[0])
