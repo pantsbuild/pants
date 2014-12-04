@@ -138,7 +138,7 @@ class BuildFileAddressMapper(object):
         raise AddressLookupError("{message}\n Loading addresses from '{spec_path}' failed."
                                  .format(message=e, spec_path=spec_path))
 
-      address_map = dict((address, (address, addressed)) for address, addressed in mapping.items())
+      address_map = {address: (address, addressed) for address, addressed in mapping.items()}
       self._spec_path_to_address_map_map[spec_path] = address_map
     return self._spec_path_to_address_map_map[spec_path]
 

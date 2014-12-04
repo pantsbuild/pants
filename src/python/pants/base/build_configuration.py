@@ -133,19 +133,14 @@ class BuildConfiguration(object):
       registered_addressable_instances.append((address, addressable))
 
     for alias, addressable_type in self._addressable_alias_map.items():
-      call_proxy =  AddressableCallProxy(addressable_type=addressable_type,
-                                         build_file=build_file,
-                                         registration_callback=registration_callback)
+      call_proxy = AddressableCallProxy(addressable_type=addressable_type,
+                                        build_file=build_file,
+                                        registration_callback=registration_callback)
       type_aliases[alias] = call_proxy
 
     parse_context = ParseContext(rel_path=build_file.spec_path, type_aliases=type_aliases)
 
     parse_globals = type_aliases.copy()
-
-    # TODO(pl): Don't inject __file__ into the context.  BUILD files should not be aware
-    # of their location on the filesystem.
-    parse_globals['__file__'] = build_file.full_path
-
     for alias, object_factory in self._exposed_context_aware_object_factories.items():
       parse_globals[alias] = object_factory(parse_context)
 
