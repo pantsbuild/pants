@@ -259,8 +259,9 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
           except AddressLookupError as e:
             raise self.DepLookupError("{message}\n  referenced from [{section}] key: " \
                                       "gen->deps->{category} in pants.ini".format(
-                                        message=e, section='thrift-gen',
-                                        key="{category}"
+                                        message=e,
+                                        section=_CONFIG_SECTION,
+                                        category=category
                                       ))
       return self.GenInfo(gen, deps)
 
