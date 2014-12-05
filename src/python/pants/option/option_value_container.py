@@ -90,7 +90,7 @@ class OptionValueContainer(object):
 
   def __getitem__(self, key):
     # Support natural dynamic access, options[key_var] is more idiomatic than
-    # options.__getattr__(key_var)
+    # getattr(option, key_var).
     return getattr(self, key)
 
   def __getattr__(self, key):
