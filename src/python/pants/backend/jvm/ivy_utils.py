@@ -383,7 +383,7 @@ class IvyUtils(object):
     ivy_args.extend(self._args)
 
     def safe_link(src, dest):
-      if os.path.exists(dest):
+      if os.path.islink(dest):
         os.unlink(dest)
       os.symlink(src, dest)
 
