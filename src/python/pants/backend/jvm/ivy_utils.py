@@ -383,8 +383,11 @@ class IvyUtils(object):
     ivy_args.extend(self._args)
 
     def safe_link(src, dest):
-      if os.path.islink(dest):
+      try:
         os.unlink(dest)
+      except OSError as e:
+        if e.errno != errno.ENOENT:
+          raise
       os.symlink(src, dest)
 
     with IvyUtils.ivy_lock:
