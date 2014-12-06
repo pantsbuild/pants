@@ -41,7 +41,6 @@ python_library(
     'src/python/pants/goal:context',
     'src/python/pants/goal:error',
     'src/python/pants/goal:initialize_reporting',
-    'src/python/pants/goal:option_helpers',
     'src/python/pants/goal',
     'src/python/pants/option',
     'src/python/pants/reporting',

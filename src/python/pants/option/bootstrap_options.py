@@ -43,7 +43,7 @@ def get_bootstrap_option_values(env=None, config=None, args=None, buildroot=None
   def capture_the_flags(*args, **kwargs):
     flags.update(args)
   register_bootstrap_options(capture_the_flags, buildroot=buildroot)
-  bargs = filter(lambda x: x.partition('=')[0] in flags, args)
+  bargs = filter(lambda x: x.partition('=')[0] in flags, args or [])
 
   bootstrap_options = Options(env=env, config=config, known_scopes=[GLOBAL_SCOPE], args=bargs)
   register_bootstrap_options(bootstrap_options.register_global, buildroot=buildroot)

@@ -58,6 +58,7 @@ class Options(object):
     - The hard-coded value provided at registration time.
     - None.
   """
+  GLOBAL_SCOPE = GLOBAL_SCOPE
 
   # Custom option types. You can specify these with type= when registering options.
 
