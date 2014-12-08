@@ -41,7 +41,7 @@ class BootstrapOptionsTest(unittest.TestCase):
                   config={'pants_workdir': '/from_config/.pants.d'}, env={}, args=[])
     self._do_test(['/buildroot/.pants.d', '/from_env/build-support', '/buildroot/dist'],
                   config=None,
-                  env={'PANTS_DEFAULT_PANTS_SUPPORTDIR': '/from_env/build-support'}, args=[])
+                  env={'PANTS_SUPPORTDIR': '/from_env/build-support'}, args=[])
     self._do_test(['/buildroot/.pants.d', '/buildroot/build-support', '/from_args/dist'],
                   config={}, env={}, args=['--pants-distdir=/from_args/dist'])
 
@@ -53,8 +53,8 @@ class BootstrapOptionsTest(unittest.TestCase):
                     'pants_distdir': '/from_config/dist'
                   },
                   env={
-                    'PANTS_DEFAULT_PANTS_SUPPORTDIR': '/from_env/build-support',
-                    'PANTS_DEFAULT_PANTS_DISTDIR': '/from_env/dist'
+                    'PANTS_SUPPORTDIR': '/from_env/build-support',
+                    'PANTS_DISTDIR': '/from_env/dist'
                   },
                   args=['--pants-distdir=/from_args/dist'])
 
@@ -67,8 +67,8 @@ class BootstrapOptionsTest(unittest.TestCase):
                     'unrelated': 'foo'
                   },
                   env={
-                    'PANTS_DEFAULT_PANTS_SUPPORTDIR': '/from_env/build-support',
-                    'PANTS_DEFAULT_PANTS_DISTDIR': '/from_env/dist'
+                    'PANTS_SUPPORTDIR': '/from_env/build-support',
+                    'PANTS_DISTDIR': '/from_env/dist'
                   },
                   args=['--pants-distdir=/from_args/dist', '--foo=bar', '--baz'])
 
@@ -86,7 +86,7 @@ class BootstrapOptionsTest(unittest.TestCase):
       fp.close()
       opts = create_bootstrapped_options(known_scopes=['', 'foo', 'fruit'],
                                          env={
-                                           'PANTS_DEFAULT_PANTS_SUPPORTDIR': '/pear'
+                                           'PANTS_SUPPORTDIR': '/pear'
                                          },
                                          configpath=fp.name,
                                          args=['--pants-workdir=/qux'])
