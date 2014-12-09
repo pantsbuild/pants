@@ -48,7 +48,6 @@ target(
   name='pants_binary_deps',
   dependencies=[
     ':pants_exe',
-    'src/python/pants/backend/python/commands:pants_old',
     'src/python/pants/commands:pants_new',
   ]
 )

@@ -6,7 +6,6 @@ python_library(
   sources = ['__init__.py', 'register.py'],
   dependencies = [
     'src/python/pants/base:build_file_aliases',
-    'src/python/pants/backend/python/commands:pants_old',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/backend/python/tasks:python',
     'src/python/pants/goal:task_registrar',

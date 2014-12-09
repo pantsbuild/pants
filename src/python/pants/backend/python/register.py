@@ -11,7 +11,6 @@ from pants.backend.python.tasks.pytest_run import PytestRun
 from pants.backend.python.tasks.python_repl import PythonRepl
 from pants.backend.python.tasks.python_run import PythonRun
 from pants.backend.python.tasks.python_setup import PythonSetup
-from pants.backend.python.commands.setup_py import SetupPy
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.python_requirements import python_requirements
@@ -41,10 +40,6 @@ def build_file_aliases():
       'python_requirements': BuildFileAliases.curry_context(python_requirements),
     }
   )
-
-
-def register_commands():
-  SetupPy._register()
 
 
 def register_goals():
