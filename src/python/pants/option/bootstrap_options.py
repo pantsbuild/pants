@@ -34,6 +34,12 @@ def register_bootstrap_options(register, buildroot=None):
            help='Use support files from this dir.')
   register('--pants-distdir', metavar='<dir>', default=os.path.join(buildroot, 'dist'),
            help='Write end-product artifacts to this dir.')
+  register('--config-override', help='A second config file, to override pants.ini.')
+  register('--pantsrc', action='store_true', default=True,
+           help='Use pantsrc files.')
+  register('--pantsrc-files', action='append', metavar='<path>',
+           default=['/etc/pantsrc', '~/.pants.rc'],
+           help='Override config with values from these files. Later files override eariler ones.')
 
 
 def get_bootstrap_option_values(env=None, config=None, args=None, buildroot=None):
@@ -53,15 +59,24 @@ def get_bootstrap_option_values(env=None, config=None, args=None, buildroot=None
 def create_bootstrapped_options(known_scopes, env=None, configpath=None, args=None, buildroot=None):
   """Create an Options instance with appropriate bootstrapping."""
   env = env or os.environ.copy()
-  pre_bootstrap_config = Config.load(configpath)
+  # Bootstrap only from regular config file.
+  pre_bootstrap_config = Config.load([configpath] if configpath else None)
   args = args or sys.argv
   buildroot = buildroot or get_buildroot()
   bootstrap_option_values = get_bootstrap_option_values(env, pre_bootstrap_config, args, buildroot)
   Config.reset_default_bootstrap_option_values(bootstrap_option_values)
 
-  # Ensure that we cache the post-bootstrap version.
-  Config.clear_cache()
-  post_bootstrap_config = Config.from_cache(configpath)
+  # Note the order: First pants.ini, then config override, then rcfiles.
+  configpaths = list(pre_bootstrap_config.sources())
+  if bootstrap_option_values.config_override:
+    configpaths.append(bootstrap_option_values.config_override)
+  if bootstrap_option_values.pantsrc:
+    rcfiles = [os.path.expanduser(rcfile) for rcfile in bootstrap_option_values.pantsrc_files]
+    existing_rcfiles = filter(os.path.exists, rcfiles)
+    configpaths.extend(existing_rcfiles)
+
+  post_bootstrap_config = Config.load(configpaths)
+  Config.cache(post_bootstrap_config)
 
   opts = Options(env, post_bootstrap_config, known_scopes, args=args,
                  bootstrap_option_values=bootstrap_option_values)

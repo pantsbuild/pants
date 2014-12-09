@@ -52,7 +52,6 @@ class Scalastyle(NailgunTask, JvmToolTaskMixin):
 
   def __init__(self, *args, **kwargs):
     super(Scalastyle, self).__init__(*args, **kwargs)
-
     self._initialize_config()
     self._scalastyle_bootstrap_key = 'scalastyle'
     self.register_jvm_tool(self._scalastyle_bootstrap_key, ['//:scalastyle'])

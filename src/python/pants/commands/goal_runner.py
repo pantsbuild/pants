@@ -15,20 +15,17 @@ import sys
 import traceback
 
 from twitter.common import log
-from twitter.common.collections import OrderedSet
 from twitter.common.lang import Compatibility
 from twitter.common.log.options import LogOptions
 
-from pants.backend.core.tasks.task import QuietTaskMixin, Task
+from pants.backend.core.tasks.task import QuietTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask  # XXX(pl)
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.config import Config
-from pants.base.rcfile import RcFile
 from pants.base.workunit import WorkUnit
 from pants.commands.command import Command
-from pants.engine.engine import Engine
 from pants.engine.round_engine import RoundEngine
 from pants.goal.context import Context
 from pants.goal.error import GoalError
@@ -144,33 +141,6 @@ class GoalRunner(Command):
             self.build_graph.inject_address_closure(address)
             self.targets.append(self.build_graph.get_target(address))
     self.goals = [Goal.by_name(goal) for goal in goals]
-
-    rcfiles = self.config.getdefault('rcfiles', type=list,
-                                     default=['/etc/pantsrc', '~/.pants.rc'])
-    if rcfiles:
-      rcfile = RcFile(rcfiles, default_prepend=False, process_default=True)
-
-      # Break down the goals specified on the command line to the full set that will be run so we
-      # can apply default flags to inner goal nodes.  Also break down goals by Task subclass and
-      # register the task class hierarchy fully qualified names so we can apply defaults to
-      # baseclasses.
-
-      sections = OrderedSet()
-      for goal in Engine.execution_order(self.goals):
-        for task_name in goal.ordered_task_names():
-          sections.add(task_name)
-          task_type = goal.task_type_by_name(task_name)
-          for clazz in task_type.mro():
-            if clazz == Task:
-              break
-            sections.add('%s.%s' % (clazz.__module__, clazz.__name__))
-
-      augmented_args = rcfile.apply_defaults(sections, args)
-      if augmented_args != args:
-        # TODO(John Sirois): Cleanup this currently important mutation of the passed in args
-        # once the 2-layer of command -> goal is squashed into one.
-        args[:] = augmented_args
-        sys.stderr.write("(using pantsrc expansion: pants goal %s)\n" % ' '.join(augmented_args))
 
   def run(self):
     # TODO(John Sirois): Consider moving to straight python logging.  The divide between the

@@ -15,6 +15,7 @@ import unittest2 as unittest
 from pants.backend.core.tasks.check_exclusives import ExclusivesMapping
 from pants.backend.core.targets.dependencies import Dependencies
 from pants.base.address import SyntheticAddress
+from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.build_file_address_mapper import BuildFileAddressMapper
 from pants.base.build_configuration import BuildConfiguration
@@ -34,6 +35,15 @@ from pants_test.base.context_utils import create_context
 
 class BaseTest(unittest.TestCase):
   """A baseclass useful for tests requiring a temporary buildroot."""
+
+  @classmethod
+  def setUpClass(cls):
+    """Ensure that all code has a config to read from the cache.
+
+    TODO: Yuck. Get rid of this after plumbing options through in the right places.
+    """
+    super(BaseTest, cls).setUpClass()
+    Config.cache(Config.load())
 
   def build_path(self, relpath):
     """Returns the canonical BUILD file path for the given relative build path."""
@@ -118,14 +128,14 @@ class BaseTest(unittest.TestCase):
 
   def config(self, overrides=''):
     """Returns a config valid for the test build root."""
+    ini_file = os.path.join(get_buildroot(), 'pants.ini')
     if overrides:
-      with temporary_file() as fp:
+      with temporary_file(cleanup=False) as fp:
         fp.write(overrides)
         fp.close()
-        with environment_as(PANTS_CONFIG_OVERRIDE=fp.name):
-          return Config.load()
+        return Config.load([ini_file, fp.name])
     else:
-      return Config.load()
+      return Config.load([ini_file])
 
   def set_new_options_for_scope(self, scope, **kwargs):
     self.new_options[scope].update(kwargs)

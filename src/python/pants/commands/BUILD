@@ -25,7 +25,6 @@ python_library(
   sources = ['goal_runner.py'],
   dependencies = [
     ':command',
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.lang',
     '3rdparty/python/twitter/commons:twitter.common.log',
     'src/python/pants/backend/core/tasks:common',
@@ -34,7 +33,6 @@ python_library(
     'src/python/pants/base:address',
     'src/python/pants/base:config',
     'src/python/pants/base:cmd_line_spec_parser',
-    'src/python/pants/base:rcfile',
     'src/python/pants/base:target',
     'src/python/pants/base:workunit',
     'src/python/pants/engine',

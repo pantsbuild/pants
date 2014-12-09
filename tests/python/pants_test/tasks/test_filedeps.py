@@ -17,6 +17,7 @@ from pants.backend.jvm.targets.jvm_binary import Bundle, JvmApp, JvmBinary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.filedeps import FileDeps
 from pants.base.build_file_aliases import BuildFileAliases
+from pants.base.config import Config
 from pants_test.tasks.test_base import ConsoleTaskTest
 
 
@@ -61,6 +62,9 @@ class FileDepsTest(ConsoleTaskTest):
                        runtime-deps: ['tools:scala-library']
                      '''),
                      mode='a')
+
+    # TODO: Required because target code has no direct config reference. Remove after fixing that.
+    Config.cache(Config.load())
 
     create_target(path='tools',
                   definition=dedent('''

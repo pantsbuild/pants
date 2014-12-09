@@ -58,7 +58,7 @@ notes = {
 
 
 def check_config_file(path):
-  config = Config.from_cache(configpath=path)
+  config = Config.load(configpaths=[path])
 
   print('Checking config file at {0} for unmigrated keys.'.format(path), file=sys.stderr)
   def section(s):

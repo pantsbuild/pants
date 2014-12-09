@@ -8,10 +8,10 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import json
 import os
 
-from pants.util.contextutil import temporary_dir
-
-from pants.ivy.bootstrapper import Bootstrapper
 from pants.base.build_environment import get_buildroot
+from pants.base.config import Config
+from pants.ivy.bootstrapper import Bootstrapper
+from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
@@ -50,6 +50,9 @@ class DepmapIntegrationTest(PantsRunIntegrationTest):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
       test_target = 'examples/tests/java/com/pants/examples/usethrift:usethrift'
       json_data = self.run_depmap_project_info(test_target, workdir)
+      # Hack because Bootstrapper.instance() reads config from cache. Will go away after we plumb
+      # options into IvyUtil properly.
+      Config.cache(Config.load())
       ivy_cache_dir = Bootstrapper.instance().ivy_cache_dir
       self.assertEquals(json_data.get('libraries').get('commons-lang:commons-lang:2.5'),
                       [os.path.join(ivy_cache_dir,

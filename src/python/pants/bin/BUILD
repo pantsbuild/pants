@@ -22,7 +22,6 @@ python_library(
     'src/python/pants/base:build_graph',
     'src/python/pants/base:config',
     'src/python/pants/base:extension_loader',
-    'src/python/pants/base:rcfile',
     'src/python/pants/commands:command',
 
     # XXX these are necessary to parse BUILD.commons.  Should instead be

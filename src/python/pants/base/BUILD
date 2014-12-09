@@ -140,6 +140,7 @@ python_library(
   sources = ['config.py'],
   dependencies = [
     ':build_environment',
+    'src/python/pants/util:strutil',
   ]
 )
 
@@ -225,16 +226,6 @@ python_library(
     '3rdparty/python:six',
     ':build_environment',
     ':validation',
-  ]
-)
-
-python_library(
-  name = 'rcfile',
-  sources = ['rcfile.py'],
-  dependencies = [
-    ':config',
-    '3rdparty/python/twitter/commons:twitter.common.lang',
-    '3rdparty/python/twitter/commons:twitter.common.log',
   ]
 )
 
