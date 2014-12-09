@@ -10,7 +10,7 @@ import os
 import shutil
 
 from pants.backend.jvm.tasks.bootstrap_jvm_tools import BootstrapJvmTools
-from pants.base.extension_loader import load_build_configuration_from_source
+from pants.base.extension_loader import load_plugins_and_backends
 from pants.util.dirutil import safe_mkdir, safe_mkdtemp, safe_walk
 from pants_test.task_test_base import TaskTestBase
 
@@ -20,7 +20,7 @@ class JvmToolTaskTestBase(TaskTestBase):
 
   @property
   def alias_groups(self):
-    return load_build_configuration_from_source().registered_aliases()
+    return load_plugins_and_backends().registered_aliases()
 
   def setUp(self):
     real_config = self.config()

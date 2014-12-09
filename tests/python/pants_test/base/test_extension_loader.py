@@ -14,16 +14,34 @@ import unittest2 as unittest
 
 from pants.base.build_configuration import BuildConfiguration
 from pants.base.build_file_aliases import BuildFileAliases
-from pants.base.extension_loader import load_backend
+from pants.base.extension_loader import load_backend, load_plugins, PluginNotFound, PluginLoadOrderError
 from pants.base.exceptions import BuildConfigurationError
 from pants.base.target import Target
 from pants.goal.task_registrar import TaskRegistrar
 from pants.goal.goal import Goal
+from pkg_resources import yield_lines, working_set, Distribution, WorkingSet, EmptyProvider, VersionConflict
+
+
+class MockMetadata(EmptyProvider):
+  def __init__(self, metadata):
+    self.metadata = metadata
+
+  def has_metadata(self, name):
+    return name in self.metadata
+
+  def get_metadata(self, name):
+    return self.metadata[name]
+
+  def get_metadata_lines(self, name):
+    return yield_lines(self.get_metadata(name))
 
 
 class LoaderTest(unittest.TestCase):
   def setUp(self):
     self.build_configuration = BuildConfiguration()
+    self.working_set = WorkingSet()
+    for entry in working_set.entries:
+      self.working_set.add_entry(entry)
 
   def tearDown(self):
     Goal.clear()
@@ -105,3 +123,111 @@ class LoaderTest(unittest.TestCase):
     with self.create_register(module_name='register2') as backend_package:
       with self.assertRaises(BuildConfigurationError):
         load_backend(self.build_configuration, backend_package)
+
+  def test_load_missing_plugin(self):
+    with self.assertRaises(PluginNotFound):
+      self.load_plugins(['Foobar'])
+
+
+  def get_mock_plugin(self, name, version, reg=None, alias=None, after=None):
+    """Make a fake Distribution (optionally with entry points)
+
+    Note the entry points do not actually point to code in the returned distribution --
+    the distribution does not even have a location and does not contain any code, just metadata.
+
+    A module is synthesized on the fly and installed into sys.modules under a random name.
+    If optional entry point callables are provided, those are added as methods to the module and
+    their name (foo/bar/baz in fake module) is added as the requested entry point to the mocked
+    metadata added to the returned dist.
+
+    :param str name: project_name for distribution (see pkg_resources)
+    :param str version: version for distribution (see pkg_resources)
+    :param callable reg: Optional callable for goal registration entry point
+    :param callable alias: Optional callable for build_file_aliases entry point
+    :param callable after: Optional callable for load_after list entry point
+    """
+
+    plugin_pkg = b'demoplugin{0}'.format(uuid.uuid4().hex)
+    pkg = types.ModuleType(plugin_pkg)
+    sys.modules[plugin_pkg] = pkg
+    module_name = b'{0}.{1}'.format(plugin_pkg, 'demo')
+    plugin = types.ModuleType(module_name)
+    setattr(pkg, 'demo', plugin)
+    sys.modules[module_name] = plugin
+
+    metadata = {}
+    entry_lines = []
+
+    if reg is not None:
+      setattr(plugin, 'foo', reg)
+      entry_lines.append('register_goals = {}:foo\n'.format(module_name))
+
+    if alias is not None:
+      setattr(plugin, 'bar', alias)
+      entry_lines.append('build_file_aliases = {}:bar\n'.format(module_name))
+
+    if after is not None:
+      setattr(plugin, 'baz', after)
+      entry_lines.append('load_after = {}:baz\n'.format(module_name))
+
+    if entry_lines:
+      entry_data = '[pantsbuild.plugin]\n{}\n'.format('\n'.join(entry_lines))
+      metadata = {'entry_points.txt': entry_data}
+
+    return Distribution(project_name=name, version=version, metadata=MockMetadata(metadata))
+
+  def load_plugins(self, plugins):
+    load_plugins(self.build_configuration, plugins, load_from=self.working_set)
+
+  def test_plugin_load_and_order(self):
+    d1 = self.get_mock_plugin('demo1', '0.0.1', after=lambda: ['demo2'])
+    d2 = self.get_mock_plugin('demo2', '0.0.3')
+    self.working_set.add(d1)
+
+    # Attempting to load 'demo1' then 'demo2' should fail as 'demo1' requires 'after'=['demo2'].
+    with self.assertRaises(PluginLoadOrderError):
+      self.load_plugins(['demo1', 'demo2'])
+
+    # Attempting to load 'demo2' first should fail as it is not (yet) installed.
+    with self.assertRaises(PluginNotFound):
+      self.load_plugins(['demo2', 'demo1'])
+
+    # Installing demo2 and then loading in correct order should work though.
+    self.working_set.add(d2)
+    self.load_plugins(['demo2>=0.0.2', 'demo1'])
+
+    # But asking for a bad (not installed) version fails.
+    with self.assertRaises(VersionConflict):
+      self.load_plugins(['demo2>=0.0.5'])
+
+  def test_plugin_installs_goal(self):
+    def reg_goal():
+      Goal.by_name('plugindemo').install(TaskRegistrar('foo', lambda: 1))
+    self.working_set.add(self.get_mock_plugin('regdemo', '0.0.1', reg=reg_goal))
+
+    # Start without the custom goal.
+    self.assertEqual(0, len(Goal.by_name('plugindemo').ordered_task_names()))
+
+    # Load plugin which registers custom goal.
+    self.load_plugins(['regdemo'])
+
+    # Now the custom goal exists.
+    self.assertEqual(1, len(Goal.by_name('plugindemo').ordered_task_names()))
+    self.assertEqual('foo', Goal.by_name('plugindemo').ordered_task_names()[0])
+
+  def test_plugin_installs_alias(self):
+    def reg_alias():
+      return BuildFileAliases.create(targets={'pluginalias': Target}, objects={'FROMPLUGIN': 100})
+    self.working_set.add(self.get_mock_plugin('aliasdemo', '0.0.1', alias=reg_alias))
+
+    # Start with no aliases.
+    self.assert_empty_aliases()
+
+    # Now load the plugin which defines aliases.
+    self.load_plugins(['aliasdemo'])
+
+    # Aliases now exist.
+    registered_aliases = self.build_configuration.registered_aliases()
+    self.assertEqual(Target, registered_aliases.targets['pluginalias'])
+    self.assertEqual(100, registered_aliases.objects['FROMPLUGIN'])
+

@@ -17,7 +17,7 @@ from pants.base.build_file_address_mapper import BuildFileAddressMapper
 from pants.base.build_file_parser import BuildFileParser
 from pants.base.build_graph import BuildGraph
 from pants.base.config import Config
-from pants.base.extension_loader import load_build_configuration_from_source
+from pants.base.extension_loader import load_plugins_and_backends
 from pants.base.workunit import WorkUnit
 from pants.commands.command import Command
 from pants.goal.initialize_reporting import initial_reporting
@@ -136,8 +136,10 @@ def _run():
   else:
     run_tracker.log(Report.INFO, '(To run a reporting server: ./pants goal server)')
 
-  backend_packages = config.getlist('backends', 'packages')
-  build_configuration = load_build_configuration_from_source(additional_backends=backend_packages)
+  backend_packages = config.getlist('backends', 'packages', [])
+  plugins = config.getlist('backends', 'plugins', [])
+
+  build_configuration = load_plugins_and_backends(plugins, backend_packages)
   build_file_parser = BuildFileParser(build_configuration=build_configuration,
                                       root_dir=root_dir,
                                       run_tracker=run_tracker)
