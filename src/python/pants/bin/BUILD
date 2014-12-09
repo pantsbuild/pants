@@ -21,7 +21,7 @@ python_library(
     'src/python/pants/base:build_file_parser',
     'src/python/pants/base:build_graph',
     'src/python/pants/base:config',
-    'src/python/pants/base:dev_backend_loader',
+    'src/python/pants/base:extension_loader',
     'src/python/pants/base:rcfile',
     'src/python/pants/commands:command',
 

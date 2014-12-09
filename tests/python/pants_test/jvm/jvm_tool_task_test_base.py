@@ -10,7 +10,7 @@ import os
 import shutil
 
 from pants.backend.jvm.tasks.bootstrap_jvm_tools import BootstrapJvmTools
-from pants.base.dev_backend_loader import load_build_configuration_from_source
+from pants.base.extension_loader import load_build_configuration_from_source
 from pants.util.dirutil import safe_mkdir, safe_mkdtemp, safe_walk
 from pants_test.task_test_base import TaskTestBase
 

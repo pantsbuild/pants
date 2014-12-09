@@ -37,8 +37,8 @@ python_test_suite(
     ':build_invalidator',
     ':build_root',
     ':cmd_line_spec_parser',
-    ':dev_backend_loader',
     ':double_dag',
+    ':extension_loader',
     ':fingerprint_strategy',
     ':generator',
     ':hash_utils',
@@ -169,13 +169,13 @@ python_tests(
 )
 
 python_tests(
-  name = 'dev_backend_loader',
-  sources = ['test_dev_backend_loader.py'],
+  name = 'extension_loader',
+  sources = ['test_extension_loader.py'],
   dependencies = [
     'src/python/pants/base:build_configuration',
     'src/python/pants/base:build_file_aliases',
-    'src/python/pants/base:dev_backend_loader',
     'src/python/pants/base:exceptions',
+    'src/python/pants/base:extension_loader',
     'src/python/pants/base:target',
     'src/python/pants/goal',
     'src/python/pants/goal:task_registrar',

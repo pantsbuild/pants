@@ -14,7 +14,7 @@ import unittest2 as unittest
 
 from pants.base.build_configuration import BuildConfiguration
 from pants.base.build_file_aliases import BuildFileAliases
-from pants.base.dev_backend_loader import load_backend
+from pants.base.extension_loader import load_backend
 from pants.base.exceptions import BuildConfigurationError
 from pants.base.target import Target
 from pants.goal.task_registrar import TaskRegistrar

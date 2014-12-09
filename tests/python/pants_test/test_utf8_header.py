@@ -13,7 +13,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.build_file_parser import BuildFileParser
 from pants.base.build_graph import BuildGraph
 from pants.base.config import Config
-from pants.base.dev_backend_loader import load_build_configuration_from_source
+from pants.base.extension_loader import load_build_configuration_from_source
 
 
 class Utf8HeaderTest(unittest.TestCase):

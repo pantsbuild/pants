@@ -144,8 +144,8 @@ python_library(
 )
 
 python_library(
-  name = 'dev_backend_loader',
-  sources = ['dev_backend_loader.py'],
+  name = 'extension_loader',
+  sources = ['extension_loader.py'],
   dependencies = [
     ':exceptions',
     '3rdparty/python/twitter/commons:twitter.common.collections',
